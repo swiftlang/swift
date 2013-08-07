@@ -526,6 +526,21 @@ void Serializer::writeHeader() {
   }
 }
 
+using ImportPathBlob = llvm::SmallString<64>;
+void flattenImportPath(const Module::ImportedModule &import,
+                       ImportPathBlob &out) {
+  // FIXME: Submodules?
+  out.append(import.second->Name.str());
+
+  if (import.first.empty())
+    return;
+
+  out.push_back('\0');
+  assert(import.first.size() == 1 && "can only handle top-level decl imports");
+  auto accessPathElem = import.first.front();
+  out.append(accessPathElem.first.str());
+}
+
 void Serializer::writeInputFiles(const TranslationUnit *TU,
                                  FileBufferIDs inputFiles) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 3);
@@ -546,31 +561,14 @@ void Serializer::writeInputFiles(const TranslationUnit *TU,
     SourceFile.emit(ScratchRecord, path);
   }
 
-  SmallVector<StringRef, 16> imported;
-  for (auto &moduleEntry : TU->Ctx.LoadedModules) {
-    if (moduleEntry.second == TU)
+  for (auto import : TU->getImportedModules()) {
+    if (import.second == TU->Ctx.TheBuiltinModule)
       continue;
-    // FIXME: Submodules? Packages?
-    imported.push_back(moduleEntry.second->Name.str());
-  }
 
-  // Do we have a shadowed module? This is used when adapting a Clang module
-  // for Swift.
-  if (std::any_of(TU->getImportedModules().begin(),
-                  TU->getImportedModules().end(),
-                  [&](const TranslationUnit::ImportedModule &import) {
-    return import.first.empty() && import.second->Name == TU->Name;
-  })) {
-    imported.push_back(TU->Name.str());
+    ImportPathBlob importPath;
+    flattenImportPath(import, importPath);
+    ImportedModule.emit(ScratchRecord, importPath);
   }
-
-  // Arbitrarily sort by name.
-  // FIXME: It would be more efficient to linearize the dependency graph, but
-  // that's more difficult, especially with Clang modules in the mix. This is
-  // at least deterministic.
-  std::sort(imported.begin(), imported.end());
-  for (auto name : imported)
-    ImportedModule.emit(ScratchRecord, name);
 }
 
 /// Translate AST default argument kind to the Serialization enum values, which

@@ -179,20 +179,21 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
                    loadedModuleFile->getDependencies().end(),
                    std::back_inserter(missing),
                    [](const ModuleFile::Dependency &dependency) {
-        return dependency.Mod == nullptr;
+        return !dependency.isLoaded();
       });
 
+      // FIXME: only show module part of RawAccessPath
       assert(!missing.empty() && "unknown missing dependency?");
       if (missing.size() == 1) {
         Ctx.Diags.diagnose(moduleID.second,
                            diag::serialization_missing_single_dependency,
-                           missing.front().Name);
+                           missing.front().RawAccessPath);
       } else {
         llvm::SmallString<64> missingNames;
         missingNames += '\'';
         interleave(missing,
                    [&](const ModuleFile::Dependency &next) {
-                     missingNames += next.Name;
+                     missingNames += next.RawAccessPath;
                    },
                    [&] { missingNames += "', '"; });
         missingNames += '\'';

@@ -2118,10 +2118,29 @@ bool ModuleFile::associateWithModule(Module *module) {
   ASTContext &ctx = module->Ctx;
   bool missingDependency = false;
   for (auto &dependency : Dependencies) {
-    assert(!dependency.Mod && "already loaded?");
-    dependency.Mod = getModule(ctx.getIdentifier(dependency.Name));
-    if (!dependency.Mod)
+    assert(!dependency.isLoaded() && "already loaded?");
+
+    StringRef modulePath, scopePath;
+    llvm::tie(modulePath, scopePath) = dependency.RawAccessPath.split('\0');
+
+    auto moduleID = ctx.getIdentifier(modulePath);
+    assert(!moduleID.empty() &&
+           "invalid module name (submodules not yet supported)");
+    auto module = getModule(moduleID);
+    if (!module) {
       missingDependency = true;
+      continue;
+    }
+
+    if (scopePath.empty()) {
+      dependency.Import = { {}, module };
+    } else {
+      auto scopeID = ctx.getIdentifier(scopePath);
+      assert(!scopeID.empty() &&
+             "invalid decl name (non-top-level decls not supported)");
+      auto path = Module::AccessPathTy({scopeID, SourceLoc()});
+      dependency.Import = { ctx.AllocateCopy(path), module };
+    }
   }
 
   if (missingDependency) {
@@ -2186,9 +2205,10 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
 void ModuleFile::getReexportedModules(
     SmallVectorImpl<Module::ImportedModule> &results) {
   // FIXME: Lock down on re-exports.
-  // FIXME: Handle imports with access paths.
-  for (auto &dep : Dependencies)
-    results.push_back({Module::AccessPathTy(), dep.Mod});
+  for (auto &dep : Dependencies) {
+    assert(dep.isLoaded());
+    results.push_back(dep.Import);
+  }
 }
 
 void ModuleFile::lookupVisibleDecls(Module::AccessPathTy accessPath,

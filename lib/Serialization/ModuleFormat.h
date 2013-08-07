@@ -207,7 +207,7 @@ namespace input_block {
 
   using ImportedModuleLayout = BCRecordLayout<
     IMPORTED_MODULE,
-    BCBlob // module name
+    BCBlob // module name, optionally followed by a null and then an import path
   >;
 }
 

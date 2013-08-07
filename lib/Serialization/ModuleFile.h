@@ -84,14 +84,16 @@ class ModuleFile {
 
 public:
   /// Represents another module that has been imported as a dependency.
-  ///
-  /// If \c Mod is null, the dependency hasn't been resolved yet.
   class Dependency {
   public:
-    Module *Mod;
-    StringRef Name;
+    Module::ImportedModule Import;
+    StringRef RawAccessPath;
 
-    /*implicit*/ Dependency(StringRef name) : Mod(nullptr), Name(name) {}
+    /*implicit*/ Dependency(StringRef path) : Import(), RawAccessPath(path) {}
+
+    bool isLoaded() const {
+      return Import.second != nullptr;
+    }
   };
 
 private:
