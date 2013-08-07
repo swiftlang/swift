@@ -69,7 +69,7 @@ public:
   SILLocation(Decl* D) : ASTNode(D) {}
   SILLocation(Pattern* P) : ASTNode(P) {}
 
-  bool isNull() {
+  bool isNull() const {
     return ASTNode.isNull();
   }
   LLVM_EXPLICIT operator bool() const { return !ASTNode.isNull(); }
@@ -77,7 +77,7 @@ public:
   /// \brief If the current value is of the specified AST unit type T,
   /// return it, otherwise return null.
   template <typename T>
-  T *getAs() {
+  T *getAs() const {
     using base = typename base_type<T>::type*;
     return dyn_cast_or_null<T>(ASTNode.dyn_cast<base>());
   }
@@ -85,7 +85,7 @@ public:
   /// \brief Returns true if the Location currently points to the AST node
   /// matching type T.
   template <typename T>
-  bool is() {
+  bool is() const {
     if (ASTNode.is<typename base_type<T>::type*>()) {
       return isa<T>(ASTNode.get<typename base_type<T>::type*>());
     }
@@ -95,13 +95,13 @@ public:
   /// \brief Returns the value of the specified AST node type. If the specified
   /// type is incorrect, asserts.
   template <typename T>
-  T *castTo() {
+  T *castTo() const {
     return cast<T>(ASTNode.get<typename base_type<T>::type*>());
   }
 
-  SourceLoc getSourceLoc();
-  SourceLoc getStartSourceLoc();
-  SourceLoc getEndSourceLoc();
+  SourceLoc getSourceLoc() const;
+  SourceLoc getStartSourceLoc() const;
+  SourceLoc getEndSourceLoc() const;
 };
 
 } // end swift namespace

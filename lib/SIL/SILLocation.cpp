@@ -16,8 +16,9 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 
-namespace swift {
-SourceLoc SILLocation::getSourceLoc() {
+using namespace swift;
+
+SourceLoc SILLocation::getSourceLoc() const {
   if (auto decl = ASTNode.dyn_cast<Decl*>()) {
     return decl->getLoc();
   }
@@ -33,7 +34,7 @@ SourceLoc SILLocation::getSourceLoc() {
   llvm_unreachable("impossible SILLocation");
 }
 
-SourceLoc SILLocation::getStartSourceLoc() {
+SourceLoc SILLocation::getStartSourceLoc() const {
   if (auto decl = ASTNode.dyn_cast<Decl*>()) {
     return decl->getStartLoc();
   }
@@ -49,7 +50,7 @@ SourceLoc SILLocation::getStartSourceLoc() {
   llvm_unreachable("impossible SILLocation");
 }
 
-SourceLoc SILLocation::getEndSourceLoc() {
+SourceLoc SILLocation::getEndSourceLoc() const {
   if (auto decl = ASTNode.dyn_cast<Decl*>()) {
     return decl->getEndLoc();
   }
@@ -64,4 +65,3 @@ SourceLoc SILLocation::getEndSourceLoc() {
   }
   llvm_unreachable("impossible SILLocation");
 }
-};
