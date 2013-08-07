@@ -174,7 +174,7 @@ public:
 ///
 /// Here, there is a normal protocol conformance for both \c A and \c B<T>,
 /// providing the witnesses \c A.foo and \c B<T>.foo, respectively, for the
-/// requirement \foo.
+/// requirement \c foo.
 class NormalProtocolConformance : public ProtocolConformance {
   /// \brief The protocol being conformed to.
   ProtocolDecl *Protocol;
