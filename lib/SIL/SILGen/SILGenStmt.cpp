@@ -81,7 +81,7 @@ Condition SILGenFunction::emitCondition(SILLocation Loc, Expr *E,
   else
     B.createCondBranch(Loc, V, TrueBB, FalseDestBB);
   
-  return Condition(TrueBB, FalseBB, ContBB);
+  return Condition(TrueBB, FalseBB, ContBB, Loc);
 }
 
 void SILGenFunction::visitBraceStmt(BraceStmt *S) {
@@ -144,7 +144,8 @@ void SILGenFunction::emitReturnExpr(SILLocation loc, Expr *ret) {
 
 void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
   ReturnLoc = S;
-  
+  CurrentSILLoc = S;
+
   SILValue ArgV;
   if (!S->hasResult())
     // Void return.
@@ -271,7 +272,7 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   // to the continuation block.
   Condition Cond = S->getCond().isNonNull() ?
   emitCondition(S, S->getCond().get(), /*hasFalseCode*/ false) :
-  Condition(LoopBB, 0, 0);  // Infinite loop.
+  Condition(LoopBB, 0, 0, S); // Infinite loop.
   
   // If there's a true edge, emit the body in it.
   if (Cond.hasTrue()) {
@@ -345,10 +346,12 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
 }
 
 void SILGenFunction::visitBreakStmt(BreakStmt *S) {
+  CurrentSILLoc = S;
   Cleanups.emitBranchAndCleanups(BreakDestStack.back());
 }
 
 void SILGenFunction::visitContinueStmt(ContinueStmt *S) {
+  CurrentSILLoc = S;
   Cleanups.emitBranchAndCleanups(ContinueDestStack.back());
 }
 

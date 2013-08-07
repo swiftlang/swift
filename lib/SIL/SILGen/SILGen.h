@@ -15,6 +15,7 @@
 
 #include "ASTVisitor.h"
 #include "Cleanup.h"
+#include "Condition.h"
 #include "Scope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -283,6 +284,9 @@ public:
   /// of the first ReturnStmt in the function body. We probably want richer
   /// return location information.
   SILLocation ReturnLoc;
+
+  /// \brief The SIL location corresponding to the AST node being processed.
+  SILLocation CurrentSILLoc;
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;

@@ -99,8 +99,8 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
     if (cleanup->isActive())
       cleanup->emit(Gen);
   }
-  /// FIXME location info
-  B.createBranch(SILLocation(), Dest.getBlock(), Args);
+
+  B.createBranch(Gen.CurrentSILLoc, Dest.getBlock(), Args);
 }
 
 void CleanupManager::emitCleanupsForReturn(SILLocation loc) {

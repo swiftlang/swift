@@ -18,6 +18,7 @@
 #define SWIFT_SIL_LOWERING_CONDITION_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "swift/SIL/SILLocation.h"
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
@@ -30,19 +31,26 @@ namespace Lowering {
 /// A condition is the result of evaluating a boolean expression as
 /// control flow.
 class LLVM_LIBRARY_VISIBILITY Condition {
-  // The blocks responsible for executing the true and false conditions.  A
-  // block is non-null if that branch is possible, but it's only an independent
-  // block if both branches are possible.
+  /// The blocks responsible for executing the true and false conditions.  A
+  /// block is non-null if that branch is possible, but it's only an independent
+  /// block if both branches are possible.
   SILBasicBlock *TrueBB;
   SILBasicBlock *FalseBB;
   
-  /// ContBB - The continuation block if both branches are possible.
+  /// The continuation block if both branches are possible.
   SILBasicBlock *ContBB;
+
+  /// The location wrapping the originator conditional expression.
+  SILLocation Loc;
   
 public:
-  Condition(SILBasicBlock *TrueBB, SILBasicBlock *FalseBB, SILBasicBlock *ContBB)
-    : TrueBB(TrueBB), FalseBB(FalseBB), ContBB(ContBB)
+  Condition(SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
+            SILBasicBlock *ContBB,
+            SILLocation L)
+    : TrueBB(TrueBB), FalseBB(FalseBB), ContBB(ContBB), Loc(L)
   {
+    assert(L.is<IfStmt>() || L.is<ForEachStmt>() || L.is<ForStmt>() ||
+           L.is<IfExpr>() || L.is<WhileStmt>() || L.is<DoWhileStmt>()  );
   }
   
   bool hasTrue() const { return TrueBB; }

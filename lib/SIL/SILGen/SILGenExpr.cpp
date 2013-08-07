@@ -19,7 +19,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
-#include "Condition.h"
 #include "Initialization.h"
 #include "OwnershipConventions.h"
 #include "LValue.h"
