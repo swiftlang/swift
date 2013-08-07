@@ -27,22 +27,6 @@ static void diagnose(SILModule *M, SILLocation loc, ArgTypes... args) {
   M->getASTContext().Diags.diagnose(loc.getSourceLoc(), Diagnostic(args...));
 }
 
-/// isByRefOrIndirectReturn - Return true if the specified apply/partial_apply
-/// call operand is a [byref] or indirect return, indicating that the call
-/// doesn't capture the pointer.
-static bool isByRefOrIndirectReturn(SILInstruction *Apply,
-                                    unsigned ArgumentNumber) {
-  SILType FnTy = Apply->getOperand(0).getType();
-  SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(*Apply->getModule());
-
-  // If this is an indirect return slot, it isn't captured.
-  if (ArgumentNumber == 0 && FTI->hasIndirectReturn())
-    return true;
-
-  // Otherwise, check for [byref].
-  Type ArgTy = FTI->getSwiftArgumentType(ArgumentNumber);
-  return ArgTy->is<LValueType>();
-}
 
 /// getNumElements - Return the number of elements in the flattened SILType.
 /// For tuples and structs, this is the (recursive) count of the fields it
@@ -348,12 +332,28 @@ static void collectAllocationUses(SILValue Pointer,
 
 
     // apply and partial_apply instructions do not capture the pointer when
-    // it is passed through [byref] arguments or for indirect returns, but we
-    // need to treat them as a may-store.
-    if (isa<FunctionInst>(User) &&
-        isByRefOrIndirectReturn(User, UI->getOperandNumber()-1)) {
-      addElementUses(Uses, BaseElt, PointeeType, User, UseKind::ByrefUse);
-      continue;
+    // it is passed through [byref] arguments or for indirect returns.  Byref
+    // arguments are treated as uses and may-store's, but an indirect return is
+    // treated as a full store.
+    if (auto *Apply = dyn_cast<FunctionInst>(User)) {
+      SILType FnTy = Apply->getOperand(0).getType();
+      SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(*Apply->getModule());
+      unsigned ArgumentNumber = UI->getOperandNumber()-1;
+
+      // If this is an indirect return slot, it is a store.
+      if (ArgumentNumber == 0 && FTI->hasIndirectReturn()) {
+        addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store);
+        continue;
+      }
+
+      // Otherwise, check for [byref].
+      Type ArgTy = FTI->getSwiftArgumentType(ArgumentNumber);
+      if (ArgTy->is<LValueType>()) {
+        addElementUses(Uses, BaseElt, PointeeType, User, UseKind::ByrefUse);
+        continue;
+      }
+
+      // Othrewise, it is an escape.
     }
 
 

@@ -79,3 +79,47 @@ bb0(%0 : $Int64):
   %11 = return %8 : $(Int64, Int64)
 }
 
+
+struct GenericStruct<T> {
+  var a : T
+  var b : Int
+}
+
+/// returns_generic_struct - This returns a struct by reference.
+sil @returns_generic_struct : $[thin] () -> GenericStruct<Int64>
+
+// There should be no error in this function.
+// CHECK-LABEL: sil @call_struct_return_function
+sil @call_struct_return_function : $[thin] () -> Int64 {
+bb0:
+  %1 = alloc_box $GenericStruct<Int64>
+  %2 = function_ref @returns_generic_struct : $[thin] () -> GenericStruct<Int64>
+  %3 = apply %2(%1#1) : $[thin] () -> GenericStruct<Int64>
+  %4 = struct_element_addr %1#1 : $*GenericStruct<Int64>, #b
+  %5 = load %4 : $*Int64
+  release %1#0 : $Builtin.ObjectPointer
+  return %5 : $Int64
+}
+
+
+// CHECK-LABEL: sil @tuple_elements
+sil @tuple_elements : $[thin] (a : Int64) -> (Int64, Int64) {
+bb0(%0 : $Int64):
+  %3 = alloc_box $(Int64, Int64)
+  %4 = tuple_element_addr %3#1 : $*(Int64, Int64), 0
+  %5 = tuple_element_addr %3#1 : $*(Int64, Int64), 1
+  %14 = function_ref @takes_Int_byref : $[thin] (a : [byref] Int64) -> ()
+  %15 = tuple_element_addr %3#1 : $*(Int64, Int64), 1
+  %16 = apply %14(%15) : $[thin] (a : [byref] Int64) -> ()
+  %18 = tuple_element_addr %3#1 : $*(Int64, Int64), 0
+  store %0 to %18 : $*Int64
+  %20 = load %3#1 : $*(Int64, Int64)
+  %21 = tuple_extract %20 : $(Int64, Int64), 0
+  %22 = tuple_extract %20 : $(Int64, Int64), 1
+  %23 = tuple (%21 : $Int64, %22 : $Int64)
+  release %3#0 : $Builtin.ObjectPointer
+  return %23 : $(Int64, Int64)
+}
+
+
+
