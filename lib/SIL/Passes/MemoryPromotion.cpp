@@ -12,11 +12,20 @@
 
 #define DEBUG_TYPE "memory-promotion"
 #include "swift/Subsystems.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Diagnostics.h"
 #include "swift/SIL/SILBuilder.h"
-//#include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 //#include "swift/SIL/Dominance.h"
 using namespace swift;
+
+STATISTIC(NumLoadPromoted, "Number of loads promoted");
+
+template<typename ...ArgTypes>
+static void diagnose(SILModule *M, SILLocation loc, ArgTypes... args) {
+  M->getASTContext().Diags.diagnose(loc.getSourceLoc(), Diagnostic(args...));
+}
 
 /// isByRefOrIndirectReturn - Return true if the specified apply/partial_apply
 /// call operand is a [byref] or indirect return, indicating that the call
@@ -120,6 +129,10 @@ namespace {
     llvm::SmallPtrSet<SILInstruction*, 16> NonLoadUses;
 
     bool HasAnyEscape = false;
+
+    // Keep track of whether we've emitted an error.  We only emit one error per
+    // element as a policy decision.
+    bool HadError = false;
   public:
     ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses);
 
@@ -131,7 +144,7 @@ namespace {
       DI_No,
       DI_Partial
     };
-    DIKind isDefinitelyInit(SILInstruction *Inst, SILValue *AV);
+    DIKind checkDefinitelyInit(SILInstruction *Inst, SILValue *AV);
   };
 } // end anonymous namespace
 
@@ -163,9 +176,6 @@ ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses)
 
 
 void ElementPromotion::doIt() {
-  (void)PerBlockInfo;
-  (void)TheAllocBox;
-
   // With any escapes tallied up, we can work through all the uses, checking
   // for definitive initialization, promoting loads, rewriting assigns, and
   // performing other tasks.
@@ -176,6 +186,8 @@ void ElementPromotion::doIt() {
     case UseKind::ByrefUse: break;
     case UseKind::Escape:   break;
     }
+
+    if (HadError) break;
   }
 }
 
@@ -188,18 +200,25 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // If this is a Load (not a CopyAddr), we try to compute the loaded value as
   // an SSA register.  Otherwise, we don't ask for an available value to avoid
   // constructing SSA for the value.
-  if (isDefinitelyInit(Inst, isa<LoadInst>(Inst) ? &Result : nullptr)==DI_Yes){
+  auto DI = checkDefinitelyInit(Inst, isa<LoadInst>(Inst) ? &Result : nullptr);
+  if (DI == DI_Yes){
     // If the value is definitely initialized, check to see if this is a load
     // that we have a value available for.  If so, we can replace the load now.
     if (Result) {
       SILValue(Inst, 0).replaceAllUsesWith(Result);
       Inst->eraseFromParent();
+      ++NumLoadPromoted;
     }
 
     return;
   }
 
-  // FIXME: Emit a diagnostic here.
+  // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
+  // TODO: The QoI could be improved in many different ways here.  We could give
+  // some path information, give the name / access path of the variable, etc.
+  diagnose(Inst->getModule(), Inst->getLoc(),
+           diag::value_used_before_initialized);
+  HadError = true;
 }
 
 
@@ -220,7 +239,7 @@ static SILValue getStoredValueFrom(SILInstruction *I) {
 /// if AV is non-null, this function can return the currently live value in some
 /// cases.
 ElementPromotion::DIKind
-ElementPromotion::isDefinitelyInit(SILInstruction *Inst, SILValue *AV) {
+ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV) {
   // If there is a store in the current block, scan the block to see if the
   // store is before or after the load.  If it is before, it produces the value
   // we are looking for.
@@ -233,6 +252,11 @@ ElementPromotion::isDefinitelyInit(SILInstruction *Inst, SILValue *AV) {
 
         return DI_Yes;
       }
+
+      // If we found the allocation itself, then we are loading something that
+      // is not defined at all yet.
+      if (TheInst == TheAllocBox)
+        return DI_No;
     }
   }
 

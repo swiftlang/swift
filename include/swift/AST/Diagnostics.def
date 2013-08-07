@@ -1544,7 +1544,8 @@ ERROR(bridging_function_not_function,sil_gen,none,
       "definition of implicit conversion function '%0.%1' is not a function",
       (StringRef, StringRef))
 ERROR(bridging_function_not_correct_type,sil_gen,none,
-      "definition of implicit conversion function '%0.%1' is not of the correct type",
+      "definition of implicit conversion function '%0.%1' is not of the correct"
+      " type",
       (StringRef, StringRef))
 ERROR(invalid_sil_builtin,sil_gen,none,
       "INTERNAL ERROR: invalid use of builtin: %0",
@@ -1555,11 +1556,17 @@ ERROR(non_exhaustive_switch,sil_gen,none, "switch must be exhaustive", ())
 // SIL Analysis Diagnostics
 //==============================================================================
 
+// Definite initialization diagnostics.
+ERROR(value_used_before_initialized,sil_analysis,none,
+      "variable used before being initialized", ())
+
+// Control flow diagnostics.
 WARNING(missing_return,sil_analysis,none,
       "missing return in the function expected to return %0", (Type))
 
 ERROR(return_from_noreturn,sil_analysis,none, 
       "return from a 'noreturn' function", ())
+
 
 //==============================================================================
 // IR Generation Diagnostics
