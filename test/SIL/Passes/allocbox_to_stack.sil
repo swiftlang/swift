@@ -32,7 +32,7 @@ bb0:
 // CHECK-NOT: alloc_box
 // CHECK-NOT: release
 // CHECK-NOT: destroy_addr
-// CHECK: dealloc_stack %0#0 : $[local_storage] Int64
+// CHECK: dealloc_stack %0#0 : $*[local_storage] Int64
 // CHECK: return
 }
 
@@ -52,7 +52,7 @@ bb1:
 
 // CHECK: %0 = alloc_stack
 // CHECK: bb1:
-// CHECK: dealloc_stack %0#0 : $[local_storage] Int64
+// CHECK: dealloc_stack %0#0 : $*[local_storage] Int64
 // CHECK: return
 }
 
@@ -157,7 +157,7 @@ bb0(%0 : $*LogicValue, %1 : $Bool.metatype):
   %8 = apply %7(%6) : $[cc(method)] ((), [byref] LogicValue.This) -> Bool
   release %2#0 : $Builtin.ObjectPointer
 // CHECK:  destroy_addr %2#1 : $*LogicValue
-// CHECK-NEXT:  dealloc_stack %2#0 : $[local_storage] LogicValue
+// CHECK-NEXT:  dealloc_stack %2#0 : $*[local_storage] LogicValue
 // CHECK-NEXT:  return
   return %8 : $Bool
 }

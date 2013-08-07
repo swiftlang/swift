@@ -602,9 +602,6 @@ static bool isLocalLinkageType(CanType type) {
            isLocalLinkageType(fn.getResult());
   }
 
-  case TypeKind::LocalStorage:
-    return isLocalLinkageType(cast<LocalStorageType>(type).getValueType());
-
   case TypeKind::ReferenceStorage: {
     auto ref = cast<ReferenceStorageType>(type);
     return isLocalLinkageType(ref.getReferentType());

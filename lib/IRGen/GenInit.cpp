@@ -56,14 +56,14 @@ ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF,
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty()) {
     auto addr = getUndefAddress();
-    return { addr, addr.getAddress() };
+    return { addr, addr };
   }
 
   Address alloca =
     IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
   // TODO: lifetime intrinsics?
 
-  return { alloca, alloca.getAddress() };
+  return { alloca, alloca };
 }
 
 /// Allocate an object with fixed layout.

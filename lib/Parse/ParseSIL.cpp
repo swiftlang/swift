@@ -576,6 +576,15 @@ bool SILParser::parseSILType(SILType &Result) {
   DeclAttributes attrs;
   P.parseAttributeList(attrs);
 
+  // Handle [local_storage], which changes the SIL value category.
+  if (attrs.isLocalStorage()) {
+    // Require '*' on local_storage values.
+    if (category != SILValueCategory::Address)
+      P.diagnose(attrs.LSquareLoc, diag::sil_local_storage_non_address);
+    category = SILValueCategory::LocalStorage;
+    attrs.LocalStorage = false;
+  }
+
   // Parse Generic Parameters. Generic Parameters are visible in the function
   // body.
   GenericParamList *PList = P.maybeParseGenericParams();

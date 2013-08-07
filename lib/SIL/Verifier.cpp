@@ -157,12 +157,11 @@ public:
   }
 
   void checkAllocStackInst(AllocStackInst *AI) {
-    auto containerStorageType =
-      requireObjectType(LocalStorageType, AI->getContainerResult(),
-                        "first result of alloc_stack");
+    require(AI->getContainerResult().getType().isLocalStorage(),
+            "first result of alloc_stack must be local storage");
     require(AI->getAddressResult().getType().isAddress(),
             "second result of alloc_stack must be an address type");
-    require(containerStorageType.getValueType()
+    require(AI->getContainerResult().getType().getSwiftRValueType()
               == AI->getElementType().getSwiftRValueType(),
             "container storage must be for allocated type");
   }
@@ -439,8 +438,8 @@ public:
             "Operand of unowned_release must be unowned reference");
   }
   void checkDeallocStackInst(DeallocStackInst *DI) {
-    requireObjectType(LocalStorageType, DI->getOperand(),
-                      "Operand of dealloc_stack");
+    require(DI->getOperand().getType().isLocalStorage(),
+            "Operand of dealloc_stack must be local storage");
   }
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(DI->getOperand().getType().isObject(),

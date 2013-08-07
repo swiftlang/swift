@@ -55,8 +55,9 @@ public:
 
   void load(IRGenFunction &IGF, Address src, Explosion &out) const {
     // Create a temporary.
+    // FIXME: deallocate?  This is just bogus.
     Address dest =
-      asDerived().Derived::allocateStack(IGF, "temporary.forLoad");
+      asDerived().Derived::allocateStack(IGF, "temporary.forLoad").getAddress();
 
     // Initialize it with a copy of the source.
     asDerived().Derived::initializeWithCopy(IGF, dest, src);
@@ -65,9 +66,9 @@ public:
   }
 
   void loadAsTake(IRGenFunction &IGF, Address src, Explosion &out) const {
-    // Create a temporary and memcpy into it.
+    // Create a temporary and memcpy into it.  FIXME: deallocate?
     Address dest =
-      asDerived().Derived::allocateStack(IGF, "temporary.forLoad");
+      asDerived().Derived::allocateStack(IGF, "temporary.forLoad").getAddress();
 
     // Initialize it with a take of the source.
     asDerived().Derived::initializeWithTake(IGF, dest, src);

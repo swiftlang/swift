@@ -78,25 +78,18 @@ class ContainedAddress {
   /// The address of an object of type T.
   Address Addr;
 
-  /// A value of type [local_storage] T.
-  llvm::Value *Container;
+  /// The address of an object of [local_storage] T.
+  Address Container;
 
 public:
-  ContainedAddress() : Container(nullptr) {}
-  ContainedAddress(Address address, llvm::Value *container)
+  ContainedAddress() {}
+  ContainedAddress(Address container, Address address)
     : Addr(address), Container(container) {}
 
   llvm::Value *getAddressPointer() const { return Addr.getAddress(); }
   Alignment getAlignment() const { return Addr.getAlignment(); }
   Address getAddress() const { return Addr; }
-  llvm::Value *getContainer() const { return Container; }
-
-  Address getUnownedAddress() const {
-    assert(getContainer() == nullptr);
-    return getAddress();
-  }
-
-  operator Address() const { return getAddress(); }
+  Address getContainer() const { return Container; }
 
   bool isValid() const { return Addr.isValid(); }
 };

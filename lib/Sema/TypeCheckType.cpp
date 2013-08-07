@@ -614,12 +614,10 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
       attrs.clearOwnership();
     }
 
-    // In SIL translation units, permit [local_storage] to apply to
-    // types.  Also, it's important that this be applied after [weak]
-    // and [unowned].
+    // Diagnose [local_storage] in nested positions.
     if (attrs.isLocalStorage()) {
       assert(TU.Kind == TranslationUnit::SIL);
-      Ty = LocalStorageType::get(Ty, Context);
+      diagnose(attrs.LSquareLoc, diag::sil_local_storage_nested);
       attrs.LocalStorage = false;
     }
 
@@ -756,7 +754,6 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
     // Nothing to validate.
     return false;
 
-  case TypeKind::LocalStorage:
   case TypeKind::ReferenceStorage:
     llvm_unreachable("storage type in typechecker");
 
@@ -907,7 +904,6 @@ Type TypeChecker::transformType(Type type,
     return type;
   }
 
-  case TypeKind::LocalStorage:
   case TypeKind::ReferenceStorage:
     llvm_unreachable("storage type in typechecker");
 

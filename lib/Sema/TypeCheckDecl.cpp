@@ -1397,9 +1397,6 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
     return isDefaultInitializable(referent, initializer);
   }
 
-  case TypeKind::LocalStorage:
-    llvm_unreachable("found local storage type in AST?");
-
   // Sugar types.
 #define TYPE(Id, Parent)
 #define SUGARED_TYPE(Id, Parent) case TypeKind::Id:

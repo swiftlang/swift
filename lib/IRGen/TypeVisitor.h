@@ -89,9 +89,6 @@ public:
       llvm_unreachable(#Id "Type should not survive canonicalization");
 #include "swift/AST/TypeNodes.def"
 
-    case TypeKind::LocalStorage:
-      llvm_unreachable("Type should not be seen here");
-
     case TypeKind::BuiltinFloat:
     case TypeKind::BuiltinInteger:
     case TypeKind::BuiltinObjectPointer:

@@ -392,10 +392,11 @@ public:
   
   /// Create a new Address corresponding to the given SIL address value.
   void setLoweredAddress(SILValue v, Address const &address) {
-    assert(v.getType().isAddress() && "address for non-address value?!");
+    assert((v.getType().isAddress() || v.getType().isLocalStorage()) &&
+           "address for non-address value?!");
     setLoweredValue(v, address);
   }
-  
+
   /// Create a new Explosion corresponding to the given SIL value.
   void setLoweredExplosion(SILValue v, Explosion &e) {
     assert(v.getType().isObject() && "explosion for address value?!");
@@ -1756,7 +1757,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
                                                 Decl->getName().str(),
                                                 i);
 
-  setLoweredSingleValue(i->getContainerResult(), addr.getContainer());
+  setLoweredAddress(i->getContainerResult(), addr.getContainer());
   setLoweredAddress(i->getAddressResult(), addr.getAddress());
 }
 

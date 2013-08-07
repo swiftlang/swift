@@ -66,21 +66,20 @@ public:
   enum IsAddressOnly_t : bool { IsNotAddressOnly, IsAddressOnly };
 
 private:
-  /// The SIL type of values with this Swift type, and some associated
-  /// flags.
-  llvm::PointerIntPair<SILType, 2, unsigned> LoweredTypeAndFlags;
+  /// The SIL type of values with this Swift type.
+  SILType LoweredType;
 
   enum : unsigned {
     IsTrivialFlag     = 0x1,
     IsAddressOnlyFlag = 0x2,
   };
+  unsigned Flags;
 
 protected:  
   TypeLowering(SILType type, IsTrivial_t isTrivial,
                IsAddressOnly_t isAddressOnly)
-    : LoweredTypeAndFlags(type,
-                          (isTrivial ? IsTrivialFlag : 0U) | 
-                          (isAddressOnly ? IsAddressOnlyFlag : 0U)) {}
+    : LoweredType(type), Flags((isTrivial ? IsTrivialFlag : 0U) | 
+                               (isAddressOnly ? IsAddressOnlyFlag : 0U)) {}
 
 public:
   TypeLowering(const TypeLowering &) = delete;
@@ -103,7 +102,7 @@ public:
   /// value type with a resilient member. In either case, the full layout of
   /// values of the type is unavailable to the compiler.
   bool isAddressOnly() const {
-    return LoweredTypeAndFlags.getInt() & IsAddressOnlyFlag;
+    return Flags & IsAddressOnlyFlag;
   }
   /// isLoadable - Returns true if the type is loadable, in other words, its
   /// full layout is available to the compiler. This is the inverse of
@@ -115,13 +114,13 @@ public:
   /// isTrivial - Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
   bool isTrivial() const {
-    return LoweredTypeAndFlags.getInt() & IsTrivialFlag;
+    return Flags & IsTrivialFlag;
   }
 
   /// getLoweredType - Get the type used to represent values of the Swift type
   /// in SIL.
   SILType getLoweredType() const {
-    return LoweredTypeAndFlags.getPointer();
+    return LoweredType;
   }
 
   /// Return the semantic type.

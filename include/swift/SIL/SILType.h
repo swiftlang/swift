@@ -43,7 +43,14 @@ enum class SILValueCategory {
 
   /// An address is a pointer to an allocated variable of the type
   /// (possibly uninitialized).
-  Address
+  Address,
+
+  /// Local storage is the container for a local allocation.  For
+  /// statically-sized types, this is just the allocation itself.
+  /// However, for dynamically-sized types (like archetypes or
+  /// resilient structs), it may be some sort of fixed-size buffer,
+  /// stack depth, or the like.
+  LocalStorage
 };
 
 /// SILType - A Swift type that has been lowered to a SIL representation type.
@@ -54,7 +61,7 @@ enum class SILValueCategory {
 class SILType {
 public:
   /// The unsigned is a SILValueCategory.
-  using ValueType = llvm::PointerIntPair<TypeBase *, 1, unsigned>;
+  using ValueType = llvm::PointerIntPair<TypeBase *, 2, unsigned>;
 private:
   ValueType value;
 
@@ -82,16 +89,25 @@ public:
     return SILType(T, category);
   }
 
-  /// getPrimitiveType - Form a SILType for a primitive type that does not
-  /// require any special handling (i.e., not a function or aggregate type).
+  /// Form the type of an r-value, given a Swift type that either does
+  /// not require any special handling or has already been
+  /// appropriately lowered.
   static SILType getPrimitiveObjectType(CanType T) {
     return SILType(T, SILValueCategory::Object);
   }
 
-  /// getPrimitiveType - Form a SILType for a primitive type that does not
-  /// require any special handling (i.e., not a function or aggregate type).
+  /// Form the type for the address of an object, given a Swift type
+  /// that either does not require any special handling or has already
+  /// been appropriately lowered.
   static SILType getPrimitiveAddressType(CanType T) {
     return SILType(T, SILValueCategory::Address);
+  }
+
+  /// Form the type for the backing storage of a locally-allocated
+  /// object, given a Swift type that either does not require any
+  /// special handling or has already been appropriately lowered.
+  static SILType getPrimitiveLocalStorageType(CanType T) {
+    return SILType(T, SILValueCategory::LocalStorage);
   }
 
   bool isNull() const { return bool(value.getPointer()); }
@@ -99,18 +115,25 @@ public:
 
   SILValueCategory getCategory() const { return SILValueCategory(value.getInt()); }
   
-  /// Gets the address type referencing this type, or the type itself if it is
-  /// already an address type.
+  /// Returns the address variant of this type.  Instructions which
+  /// manipulate memory will generally work with object addresses.
   SILType getAddressType() const {
     return SILType(getSwiftRValueType(), SILValueCategory::Address);
   }
 
-  /// Gets the type referenced by an address type, or the type itself if it is
-  /// not an address type. Invalid for address-only types.
+  /// Returns the object variant of this type.  Note that address-only
+  /// types are not legal to manipulate directly as objects in SIL.
   SILType getObjectType() const {
     return SILType(getSwiftRValueType(), SILValueCategory::Object);
   }
-  
+
+  /// Returns the local storage variant of this type.  Local
+  /// allocations of dynamically-sized types generally require some
+  /// sort of buffer.
+  SILType getLocalStorageType() const {
+    return SILType(getSwiftRValueType(), SILValueCategory::LocalStorage);
+  }
+
   /// Returns the Swift type referenced by this SIL type.
   CanType getSwiftRValueType() const {
     return CanType(value.getPointer());
@@ -171,6 +194,11 @@ public:
 
   /// True if the type is an object type.
   bool isObject() const { return getCategory() == SILValueCategory::Object; }
+
+  /// True if the type is a local-storage type.
+  bool isLocalStorage() const {
+    return getCategory() == SILValueCategory::LocalStorage;
+  }
 
   /// isAddressOnly - True if the type, or the referenced type of an address
   /// type, is address-only.  For example, it could be a resilient struct or

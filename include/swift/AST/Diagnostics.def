@@ -343,6 +343,10 @@ ERROR(expected_sil_type_kind, decl_parsing,none,
       "expected SIL type to %0", (StringRef))
 ERROR(expected_sil_constant, decl_parsing,none,
       "expected constant in SIL code", ())
+ERROR(sil_local_storage_non_address, decl_parsing,none,
+      "can only work with the address of local storage", ())
+ERROR(sil_local_storage_nested, decl_parsing,none,
+      "local storage types cannot be in nested positions", ())
 
 // SIL Values
 ERROR(sil_value_redefinition, decl_parsing,none,

@@ -169,12 +169,8 @@ bool SILInstruction::mayHaveSideEffects() const {
 
 // alloc_stack always returns two results: Builtin.RawPointer & LValue[EltTy]
 static SILTypeList *getAllocStackType(SILType eltTy, SILFunction &F) {
-  const ASTContext &Ctx = F.getModule().getASTContext();
-
-  auto eltContainerTy =
-    CanType(LocalStorageType::get(eltTy.getSwiftRValueType(), Ctx));
   SILType resTys[] = {
-    SILType::getPrimitiveObjectType(eltContainerTy),
+    eltTy.getLocalStorageType(),
     eltTy.getAddressType()
   };
 

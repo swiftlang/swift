@@ -71,7 +71,7 @@ public:
       emitAllocateBufferCall(IGF, metadata, buffer);
     address = IGF.Builder.CreateBitCast(address,
                                         getStorageType()->getPointerTo());
-    return { getAddressForPointer(address), buffer.getAddress() };
+    return { buffer, getAddressForPointer(address) };
   }
 
   /// Perform a "take-initialization" from the given object.  A

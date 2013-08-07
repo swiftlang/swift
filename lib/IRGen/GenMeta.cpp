@@ -472,10 +472,6 @@ namespace {
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
 
-    llvm::Value *visitLocalStorageType(CanLocalStorageType type) {
-      llvm_unreachable("metadata reference for local storage type?");
-    }
-
     llvm::Value *visitReferenceStorageType(CanReferenceStorageType type) {
       IGF.unimplemented(SourceLoc(), "metadata ref for ref storage type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);

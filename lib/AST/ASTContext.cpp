@@ -72,7 +72,6 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<Type, ParenType*> ParenTypes;
-    llvm::DenseMap<Type, LocalStorageType*> LocalStorageTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
       LValueTypes;
@@ -724,16 +723,6 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Protocols) {
                                 C.AllocateCopy(Protocols));
   C.Impl.ProtocolCompositionTypes.InsertNode(New, InsertPos);
   return New;
-}
-
-LocalStorageType *LocalStorageType::get(Type T, const ASTContext &C) {
-  assert(!T->hasTypeVariable()); // not meaningful in type-checker
-  auto arena = AllocationArena::Permanent;
-
-  auto &entry = C.Impl.getArena(arena).LocalStorageTypes[T];
-  if (entry) return entry;
-
-  return entry = new (C, arena) LocalStorageType(T, T->isCanonical() ? &C : 0);
 }
 
 ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,

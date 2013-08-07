@@ -3277,10 +3277,6 @@ namespace {
     void visitProtocolCompositionType(CanProtocolCompositionType type) {}
     void visitReferenceStorageType(CanReferenceStorageType type) {}
 
-    void visitLocalStorageType(CanLocalStorageType type) {
-      llvm_unreachable("cannot work with local storage type here");
-    }
-
     // L-values are impossible.
     void visitLValueType(CanLValueType type) {
       llvm_unreachable("cannot store l-value type directly");
