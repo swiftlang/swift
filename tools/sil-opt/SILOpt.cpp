@@ -101,11 +101,6 @@ int main(int argc, char **argv) {
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
 
-  // If we're in verify mode, install a custom diagnostic handling for
-  // SourceMgr.
-  if (VerifyMode)
-    enableDiagnosticVerifier(CI.getSourceMgr());
-
   if (CI.setup(Invocation))
     return 1;
   CI.doIt();
@@ -113,6 +108,11 @@ int main(int argc, char **argv) {
   // If parsing produced an error, don't run any passes.
   if (CI.getASTContext().hadError())
     return 1;
+
+  // If we're in verify mode, install a custom diagnostic handling for
+  // SourceMgr.
+  if (VerifyMode)
+    enableDiagnosticVerifier(CI.getSourceMgr());
 
   for (auto Pass : Passes) {
     switch (Pass) {
