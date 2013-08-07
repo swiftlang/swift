@@ -161,16 +161,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   return OS;
 }
 
-/// Observe that we are processing a specific SIL function.
-class PrettyStackTraceSILFunction : public llvm::PrettyStackTraceEntry {
-  SILFunction *F;
-  const char *Action;
-public:
-  PrettyStackTraceSILFunction(const char *Action, SILFunction *F)
-  : F(F), Action(Action) {}
-  virtual void print(raw_ostream &OS) const;
-};
-
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//

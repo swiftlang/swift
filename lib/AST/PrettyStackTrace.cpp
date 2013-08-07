@@ -105,8 +105,12 @@ void PrettyStackTraceDecl::print(llvm::raw_ostream &out) const {
     out << "NULL declaration!\n";
     return;
   }
+  printDeclDescription(out, TheDecl, TheDecl->getASTContext());
+}
 
-  if (ValueDecl *named = dyn_cast<ValueDecl>(TheDecl)) {
+void swift::printDeclDescription(llvm::raw_ostream &out, Decl *D,
+                                 ASTContext &Context) {
+  if (ValueDecl *named = dyn_cast<ValueDecl>(D)) {
     if (named->getName().get())
       out << '\'' << named->getName() << '\'';
     else
@@ -115,7 +119,7 @@ void PrettyStackTraceDecl::print(llvm::raw_ostream &out) const {
     out << "declaration";
   }
   out << " at ";
-  printSourceLoc(out, TheDecl->getStartLoc(), TheDecl->getASTContext());
+  printSourceLoc(out, D->getStartLoc(), Context);
   out << '\n';
 }
 
@@ -125,14 +129,18 @@ void PrettyStackTraceExpr::print(llvm::raw_ostream &out) const {
     out << "NULL expression!\n";
     return;
   }
+  printExprDescription(out, TheExpr, Context);
+}
 
-  if (isa<FuncExpr>(TheExpr)) {
+void swift::printExprDescription(llvm::raw_ostream &out, Expr *E,
+                                 ASTContext &Context) {
+  if (isa<FuncExpr>(E)) {
     out << "function";
   } else {
     out << "expression";
   }
   out << " at ";
-  printSourceRange(out, TheExpr->getSourceRange(), Context);
+  printSourceRange(out, E->getSourceRange(), Context);
   out << '\n';
 }
 
@@ -142,9 +150,29 @@ void PrettyStackTraceStmt::print(llvm::raw_ostream &out) const {
     out << "NULL statement!\n";
     return;
   }
+  printStmtDescription(out, TheStmt, Context);
+}
 
+void swift::printStmtDescription(llvm::raw_ostream &out, Stmt *S,
+                                 ASTContext &Context) {
   out << "statement at ";
-  printSourceRange(out, TheStmt->getSourceRange(), Context);
+  printSourceRange(out, S->getSourceRange(), Context);
+  out << '\n';
+}
+
+void PrettyStackTracePattern::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << ' ';
+  if (!ThePattern) {
+    out << "NULL pattern!\n";
+    return;
+  }
+  printPatternDescription(out, ThePattern, Context);
+}
+
+void swift::printPatternDescription(llvm::raw_ostream &out, Pattern *P,
+                                    ASTContext &Context) {
+  out << "pattern at ";
+  printSourceRange(out, P->getSourceRange(), Context);
   out << '\n';
 }
 
@@ -177,9 +205,13 @@ void PrettyStackTraceType::print(llvm::raw_ostream &out) const {
     out << "NULL type!\n";
     return;
   }
+  printTypeDescription(out, TheType, Context);
+}
 
-  out << "type '" << TheType << '\'';
-  if (Decl *decl = InterestingDeclForType().visit(TheType)) {
+void swift::printTypeDescription(llvm::raw_ostream &out, Type type,
+                                 ASTContext &Context) {
+  out << "type '" << type << '\'';
+  if (Decl *decl = InterestingDeclForType().visit(type)) {
     out << " (declared at ";
     printSourceRange(out, decl->getSourceRange(), Context);
     out << ')';

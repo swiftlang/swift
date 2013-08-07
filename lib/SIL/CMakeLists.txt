@@ -3,6 +3,7 @@ add_subdirectory(Passes)
 add_swift_library(swiftSIL
   Dominance.cpp
   Mangle.cpp
+  PrettyStackTrace.cpp
   SIL.cpp
   SILBasicBlock.cpp
   SILBuilder.cpp

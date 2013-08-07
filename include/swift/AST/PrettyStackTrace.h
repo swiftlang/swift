@@ -1,4 +1,4 @@
-//===- PrettyStackTrace.h - Crash trace information -----------------------===//
+//===- PrettyStackTrace.h - Crash trace information -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,12 +19,14 @@
 #define SWIFT_PRETTYSTACKTRACE_H
 
 #include "llvm/Support/PrettyStackTrace.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Type.h"
 
 namespace swift {
   class ASTContext;
   class Decl;
   class Expr;
+  class Pattern;
   class Stmt;
 
 /// printSourceLoc - Print a debugging view of the given source location
@@ -43,6 +45,9 @@ public:
   virtual void print(llvm::raw_ostream &OS) const;
 };
 
+void printDeclDescription(llvm::raw_ostream &out, Decl *D,
+                          ASTContext &Context);
+
 /// PrettyStackTraceDecl - Observe that we are processing a specific
 /// declaration.
 class PrettyStackTraceDecl : public llvm::PrettyStackTraceEntry {
@@ -53,6 +58,9 @@ public:
     : TheDecl(D), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
 };
+
+void printExprDescription(llvm::raw_ostream &out, Expr *E,
+                          ASTContext &Context);
 
 /// PrettyStackTraceExpr - Observe that we are processing a specific
 /// expression.
@@ -66,6 +74,9 @@ public:
   virtual void print(llvm::raw_ostream &OS) const;
 };
 
+void printStmtDescription(llvm::raw_ostream &out, Stmt *S,
+                          ASTContext &Context);
+
 /// PrettyStackTraceStmt - Observe that we are processing a specific
 /// statement.
 class PrettyStackTraceStmt : public llvm::PrettyStackTraceEntry {
@@ -77,6 +88,24 @@ public:
     : Context(C), TheStmt(S), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
 };
+
+void printPatternDescription(llvm::raw_ostream &out, Pattern *P,
+                             ASTContext &Context);
+
+/// PrettyStackTracePattern - Observe that we are processing a
+/// specific pattern.
+class PrettyStackTracePattern : public llvm::PrettyStackTraceEntry {
+  ASTContext &Context;
+  Pattern *ThePattern;
+  const char *Action;
+public:
+  PrettyStackTracePattern(ASTContext &C, const char *action, Pattern *P)
+    : Context(C), ThePattern(P), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
+void printTypeDescription(llvm::raw_ostream &out, Type T,
+                          ASTContext &Context);
 
 /// PrettyStackTraceType - Observe that we are processing a specific type.
 class PrettyStackTraceType : public llvm::PrettyStackTraceEntry {

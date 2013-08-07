@@ -21,7 +21,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
@@ -921,18 +920,4 @@ void SILModule::print(llvm::raw_ostream &OS) const {
 
 void ValueBase::dumpInContext() const {
   SILPrinter(llvm::errs()).printInContext(this);
-}
-
-//===----------------------------------------------------------------------===//
-// Printing for PrettyStackTrace
-//===----------------------------------------------------------------------===//
-
-void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
-  out << "While " << Action << ' ';
-  SourceLoc sloc;
-  F->printName(out);
-
-  out << " at ";
-  printSourceLoc(out, sloc, F->getASTContext());
-  out << '\n';
 }
