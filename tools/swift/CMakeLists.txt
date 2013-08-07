@@ -17,5 +17,7 @@ if(HAVE_DARWIN_MODULES_SDK)
                    -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH}" )
 endif()
 
+target_link_libraries(swift curses)
+
 install(TARGETS swift
   RUNTIME DESTINATION bin)
