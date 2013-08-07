@@ -993,12 +993,13 @@ bool Module::lookupQualified(Type type,
           if (knownConformances.find(proto) == knownConformances.end())
             conformsStack.push_back({proto, conformances[protoIndex]});
           while (!conformsStack.empty()) {
-            ProtocolConformance *conformance = nullptr;
+            ProtocolDecl *proto;
+            ProtocolConformance *conformance;
             llvm::tie(proto, conformance) = conformsStack.back();
             conformsStack.pop_back();
 
             // Record this conformance.
-            knownConformances[proto] = conformances[protoIndex];
+            knownConformances[proto] = conformance;
 
             // Push inherited conformances.
             for (auto inherited : conformance->getInheritedConformances()) {
