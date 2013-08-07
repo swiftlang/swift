@@ -1,4 +1,4 @@
-// RUN: not %sil-opt %s -memory-promotion | FileCheck %s
+// RUN: %sil-opt %s -memory-promotion -verify | FileCheck %s
 
 import Builtin
 import swift
@@ -24,7 +24,7 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
 sil @use_before_init : $[thin] () -> Int64 {
 bb0:
   %1 = alloc_box $Int64
-  %4 = load %1#1 : $*Int64                // USE BEFORE DEFN.
+  %4 = load %1#1 : $*Int64                // expected-error {{variable used before being initialized}}
   release %1#0 : $Builtin.ObjectPointer
   %9 = return %4 : $Int64
 }

@@ -157,9 +157,11 @@ namespace {
     bool parseSILBBArgsAtBranch(llvm::SmallVector<SILValue, 6> &Args);
 
     bool parseSILInstruction(SILBasicBlock *BB);
-    bool parseCallInstruction(ValueKind Opcode, SILBuilder &B,
+    bool parseCallInstruction(SILLocation InstLoc,
+                              ValueKind Opcode, SILBuilder &B,
                               ValueBase *&ResultVal);
-    bool parseSILFunctionRef(SILBuilder &B, ValueBase *&ResultVal);
+    bool parseSILFunctionRef(SILLocation InstLoc,
+                             SILBuilder &B, ValueBase *&ResultVal);
 
     bool parseSILBasicBlock();
     
@@ -968,6 +970,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   SmallVector<SILValue, 4> OpList;
   SILValue Val;
 
+  SILLocation InstLoc = SILLocation::getSILFileLoc(OpcodeLoc);
+
   // Validate the opcode name, and do opcode-specific parsing logic based on the
   // opcode we find.
   ValueBase *ResultVal;
@@ -976,7 +980,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::AllocBoxInst: {
     SILType Ty;
     if (parseSILType(Ty)) return true;
-    ResultVal = B.createAllocBox(SILLocation(), Ty);
+    ResultVal = B.createAllocBox(InstLoc, Ty);
     break;
   }
   case ValueKind::AllocArrayInst: {
@@ -985,12 +989,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseTypedValueRef(Val))
       return true;
-    ResultVal = B.createAllocArray(SILLocation(), Ty, Val);
+    ResultVal = B.createAllocArray(InstLoc, Ty, Val);
     break;
   }
   case ValueKind::ApplyInst:
   case ValueKind::PartialApplyInst:
-    if (parseCallInstruction(Opcode, B, ResultVal))
+    if (parseCallInstruction(InstLoc, Opcode, B, ResultVal))
       return true;
     break;
   case ValueKind::IntegerLiteralInst: {
@@ -1018,7 +1022,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (value.getBitWidth() != intTy->getBitWidth())
       value = value.zextOrTrunc(intTy->getBitWidth());
     
-    ResultVal = B.createIntegerLiteral(SILLocation(), Ty, value);
+    ResultVal = B.createIntegerLiteral(InstLoc, Ty, value);
     P.consumeToken(tok::integer_literal);
     break;
   }
@@ -1050,7 +1054,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     
     APFloat value(floatTy->getAPFloatSemantics(), bits);
     
-    ResultVal = B.createFloatLiteral(SILLocation(), Ty, value);
+    ResultVal = B.createFloatLiteral(InstLoc, Ty, value);
     P.consumeToken(tok::integer_literal);
     break;
   }
@@ -1071,14 +1075,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
       return true;
     }
-    ResultVal = B.createStringLiteral(SILLocation(), Ty,
+    ResultVal = B.createStringLiteral(InstLoc, Ty,
                                       Str.substr(1, Str.size()-1));
     P.consumeToken(tok::string_literal);
     break;
   }
       
   case ValueKind::FunctionRefInst:
-    if (parseSILFunctionRef(B, ResultVal))
+    if (parseSILFunctionRef(InstLoc, B, ResultVal))
       return true;
     break;
   case ValueKind::BuiltinFunctionRefInst: {
@@ -1088,7 +1092,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
         parseSILType(Ty))
       return true;
-    ResultVal = B.createBuiltinFunctionRef(SILLocation(),
+    ResultVal = B.createBuiltinFunctionRef(InstLoc,
                       cast<FuncDecl>(FuncRef.getDecl()), Ty);
     break;
   }
@@ -1107,50 +1111,50 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
-    ResultVal = B.createProjectExistential(SILLocation(), Val, Ty);
+    ResultVal = B.createProjectExistential(InstLoc, Val, Ty);
     break;
   }
   case ValueKind::ProjectExistentialRefInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createProjectExistentialRef(SILLocation(), Val);
+    ResultVal = B.createProjectExistentialRef(InstLoc, Val);
     break;
       
   case ValueKind::RetainInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createRetainInst(SILLocation(), Val);
+    ResultVal = B.createRetainInst(InstLoc, Val);
     break;
   case ValueKind::ReleaseInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createReleaseInst(SILLocation(), Val);
+    ResultVal = B.createReleaseInst(InstLoc, Val);
     break;
   case ValueKind::RetainAutoreleasedInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createRetainAutoreleased(SILLocation(), Val);
+    ResultVal = B.createRetainAutoreleased(InstLoc, Val);
     break;
   case ValueKind::AutoreleaseReturnInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createAutoreleaseReturn(SILLocation(), Val);
+    ResultVal = B.createAutoreleaseReturn(InstLoc, Val);
     break;
   case ValueKind::RetainUnownedInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createRetainUnowned(SILLocation(), Val);
+    ResultVal = B.createRetainUnowned(InstLoc, Val);
     break;
   case ValueKind::UnownedRetainInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createUnownedRetain(SILLocation(), Val);
+    ResultVal = B.createUnownedRetain(InstLoc, Val);
     break;
   case ValueKind::UnownedReleaseInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createUnownedRelease(SILLocation(), Val);
+    ResultVal = B.createUnownedRelease(InstLoc, Val);
     break;
   case ValueKind::DestroyAddrInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createDestroyAddr(SILLocation(), Val);
+    ResultVal = B.createDestroyAddr(InstLoc, Val);
     break;
 
   case ValueKind::LoadInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createLoad(SILLocation(), Val);
+    ResultVal = B.createLoad(InstLoc, Val);
     break;
 
     // Conversion instructions.
@@ -1186,52 +1190,52 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     switch (Opcode) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::RefToObjectPointerInst:
-      ResultVal = B.createRefToObjectPointer(SILLocation(), Val, Ty);
+      ResultVal = B.createRefToObjectPointer(InstLoc, Val, Ty);
       break;
     case ValueKind::UpcastInst:
-      ResultVal = B.createUpcast(SILLocation(), Val, Ty);
+      ResultVal = B.createUpcast(InstLoc, Val, Ty);
       break;
     case ValueKind::ConvertFunctionInst:
-      ResultVal = B.createConvertFunction(SILLocation(), Val, Ty);
+      ResultVal = B.createConvertFunction(InstLoc, Val, Ty);
       break;
     case ValueKind::CoerceInst:
-      ResultVal = B.createCoerce(SILLocation(), Val, Ty);
+      ResultVal = B.createCoerce(InstLoc, Val, Ty);
       break;
     case ValueKind::AddressToPointerInst:
-      ResultVal = B.createAddressToPointer(SILLocation(), Val, Ty);
+      ResultVal = B.createAddressToPointer(InstLoc, Val, Ty);
       break;
     case ValueKind::PointerToAddressInst:
-      ResultVal = B.createPointerToAddress(SILLocation(), Val, Ty);
+      ResultVal = B.createPointerToAddress(InstLoc, Val, Ty);
       break;
     case ValueKind::ObjectPointerToRefInst:
-      ResultVal = B.createObjectPointerToRef(SILLocation(), Val, Ty);
+      ResultVal = B.createObjectPointerToRef(InstLoc, Val, Ty);
       break;
     case ValueKind::RefToRawPointerInst:
-      ResultVal = B.createRefToRawPointer(SILLocation(), Val, Ty);
+      ResultVal = B.createRefToRawPointer(InstLoc, Val, Ty);
       break;
     case ValueKind::RawPointerToRefInst:
-      ResultVal = B.createRawPointerToRef(SILLocation(), Val, Ty);
+      ResultVal = B.createRawPointerToRef(InstLoc, Val, Ty);
       break;
     case ValueKind::RefToUnownedInst:
-      ResultVal = B.createRefToUnowned(SILLocation(), Val, Ty);
+      ResultVal = B.createRefToUnowned(InstLoc, Val, Ty);
       break;
     case ValueKind::UnownedToRefInst:
-      ResultVal = B.createUnownedToRef(SILLocation(), Val, Ty);
+      ResultVal = B.createUnownedToRef(InstLoc, Val, Ty);
       break;
     case ValueKind::ConvertCCInst:
-      ResultVal = B.createConvertCC(SILLocation(), Val, Ty);
+      ResultVal = B.createConvertCC(InstLoc, Val, Ty);
       break;
     case ValueKind::ThinToThickFunctionInst:
-      ResultVal = B.createThinToThickFunction(SILLocation(), Val, Ty);
+      ResultVal = B.createThinToThickFunction(InstLoc, Val, Ty);
       break;
     case ValueKind::BridgeToBlockInst:
-      ResultVal = B.createBridgeToBlock(SILLocation(), Val, Ty);
+      ResultVal = B.createBridgeToBlock(InstLoc, Val, Ty);
       break;
     case ValueKind::ArchetypeRefToSuperInst:
-      ResultVal = B.createArchetypeRefToSuper(SILLocation(), Val, Ty);
+      ResultVal = B.createArchetypeRefToSuper(InstLoc, Val, Ty);
       break;
     case ValueKind::UpcastExistentialRefInst:
-      ResultVal = B.createUpcastExistentialRef(SILLocation(), Val, Ty);
+      ResultVal = B.createUpcastExistentialRef(InstLoc, Val, Ty);
       break;
     }
     break;
@@ -1273,7 +1277,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     switch (Opcode) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::DowncastInst:
-      ResultVal = B.createDowncast(SILLocation(), Val, Ty, Mode);
+      ResultVal = B.createDowncast(InstLoc, Val, Ty, Mode);
       break;
     }
     break;
@@ -1302,7 +1306,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     SILValue FromVal = getLocalValue(From, AddrVal.getType().getObjectType());
-    ResultVal = B.createStore(SILLocation(), FromVal, AddrVal);
+    ResultVal = B.createStore(InstLoc, FromVal, AddrVal);
     break;
   }
   case ValueKind::AllocStackInst:
@@ -1313,12 +1317,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     
     if (Opcode == ValueKind::AllocStackInst)
-      ResultVal = B.createAllocStack(SILLocation(), Ty);
+      ResultVal = B.createAllocStack(InstLoc, Ty);
     else if (Opcode == ValueKind::AllocRefInst) {
-      ResultVal = B.createAllocRef(SILLocation(), Ty);
+      ResultVal = B.createAllocRef(InstLoc, Ty);
     } else {
       assert(Opcode == ValueKind::MetatypeInst);
-      ResultVal = B.createMetatype(SILLocation(), Ty);
+      ResultVal = B.createMetatype(InstLoc, Ty);
     }
     break;
   }
@@ -1327,10 +1331,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val))
       return true;
     if (Opcode == ValueKind::DeallocStackInst) {
-      ResultVal = B.createDeallocStack(SILLocation(), Val);
+      ResultVal = B.createDeallocStack(InstLoc, Val);
     } else {
       assert(Opcode == ValueKind::DeallocRefInst);
-      ResultVal = B.createDeallocRef(SILLocation(), Val);
+      ResultVal = B.createDeallocRef(InstLoc, Val);
     }
     break;
   case ValueKind::DeallocBoxInst:
@@ -1345,16 +1349,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     switch (Opcode) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::ArchetypeMetatypeInst:
-      ResultVal = B.createArchetypeMetatype(SILLocation(), Ty, Val);
+      ResultVal = B.createArchetypeMetatype(InstLoc, Ty, Val);
       break;
     case ValueKind::ClassMetatypeInst:
-      ResultVal = B.createClassMetatype(SILLocation(), Ty, Val);
+      ResultVal = B.createClassMetatype(InstLoc, Ty, Val);
       break;
     case ValueKind::ProtocolMetatypeInst:
-      ResultVal = B.createProtocolMetatype(SILLocation(), Ty, Val);
+      ResultVal = B.createProtocolMetatype(InstLoc, Ty, Val);
       break;
     case ValueKind::DeallocBoxInst:
-      ResultVal = B.createDeallocBox(SILLocation(), Ty, Val);
+      ResultVal = B.createDeallocBox(InstLoc, Ty, Val);
       break;
     }
     break;
@@ -1385,7 +1389,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       
       auto Ty = TupleType::get(TypeElts, P.Context);
       auto Ty2 = SILType::getPrimitiveObjectType(Ty->getCanonicalType());
-      ResultVal = B.createTuple(SILLocation(), Ty2, OpList);
+      ResultVal = B.createTuple(InstLoc, Ty2, OpList);
       break;
     }
     
@@ -1426,7 +1430,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
-    ResultVal = B.createTuple(SILLocation(), Ty, OpList);
+    ResultVal = B.createTuple(InstLoc, Ty, OpList);
     break;
   }
   case ValueKind::TupleElementAddrInst:
@@ -1449,16 +1453,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     auto ResultTy = TT->getFields()[Field].getType()->getCanonicalType();
     if (Opcode == ValueKind::TupleElementAddrInst)
-      ResultVal = B.createTupleElementAddr(SILLocation(), Val, Field,
+      ResultVal = B.createTupleElementAddr(InstLoc, Val, Field,
                                   SILType::getPrimitiveAddressType(ResultTy));
     else
-      ResultVal = B.createTupleExtract(SILLocation(), Val, Field,
+      ResultVal = B.createTupleExtract(InstLoc, Val, Field,
                           SILType::getPrimitiveObjectType(ResultTy)).getDef();
     break;
   }
   case ValueKind::ReturnInst: {
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createReturn(SILLocation(), Val);
+    ResultVal = B.createReturn(InstLoc, Val);
     break;
   }
   case ValueKind::BranchInst: {
@@ -1473,8 +1477,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     // Note, the basic block here could be a reference to an undefined
     // basic block, which will be parsed later on.
-    ResultVal = B.createBranch(SILLocation(),
-                               getBBForReference(BBName, NameLoc),
+    ResultVal = B.createBranch(InstLoc, getBBForReference(BBName, NameLoc),
                                Args);
     break;
   }
@@ -1495,7 +1498,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     auto I1Ty =
       SILType::getBuiltinIntegerType(1, BB->getParent()->getASTContext());
     SILValue CondVal = getLocalValue(Cond, I1Ty);
-    ResultVal = B.createCondBranch(SILLocation(), CondVal,
+    ResultVal = B.createCondBranch(InstLoc, CondVal,
                                    getBBForReference(BBName, NameLoc),
                                    Args,
                                    getBBForReference(BBName2, NameLoc2),
@@ -1503,7 +1506,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::UnreachableInst:
-    ResultVal = B.createUnreachable(SILLocation());
+    ResultVal = B.createUnreachable(InstLoc);
     break;
     
   case ValueKind::ProtocolMethodInst:
@@ -1525,15 +1528,15 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     switch (Opcode) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::ProtocolMethodInst:
-      ResultVal = B.createProtocolMethod(SILLocation(), Val, Member, MethodTy,
+      ResultVal = B.createProtocolMethod(InstLoc, Val, Member, MethodTy,
                                          IsVolatile);
       break;
     case ValueKind::ClassMethodInst:
-      ResultVal = B.createClassMethod(SILLocation(), Val, Member, MethodTy,
+      ResultVal = B.createClassMethod(InstLoc, Val, Member, MethodTy,
                                       IsVolatile);
       break;
     case ValueKind::SuperMethodInst:
-      ResultVal = B.createSuperMethod(SILLocation(), Val, Member, MethodTy,
+      ResultVal = B.createSuperMethod(InstLoc, Val, Member, MethodTy,
                                       IsVolatile);
       break;
     }
@@ -1554,7 +1557,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILType(MethodTy, TyLoc)
        )
       return true;
-    ResultVal = B.createArchetypeMethod(SILLocation(), LookupTy, Member,
+    ResultVal = B.createArchetypeMethod(InstLoc, LookupTy, Member,
                                         MethodTy, IsVolatile);
     break;
   }
@@ -1582,7 +1585,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     SILValue SrcLVal = getLocalValue(SrcLName, DestLVal.getType());
-    ResultVal = B.createCopyAddr(SILLocation(), SrcLVal, DestLVal,
+    ResultVal = B.createCopyAddr(InstLoc, SrcLVal, DestLVal,
                                  IsTake_t(IsTake),
                                  IsInitialization_t(IsInit));
     break;
@@ -1603,7 +1606,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
       return true;
     }
-    ResultVal = B.createUpcastExistential(SILLocation(), Val, DestVal,
+    ResultVal = B.createUpcastExistential(InstLoc, Val, DestVal,
                                           IsTake_t(IsTake));
     break;
   }
@@ -1612,7 +1615,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILOptional(NoDefault, P, "no_default_construct") ||
         parseTypedValueRef(Val))
       return true;
-    ResultVal = B.createInitializeVar(SILLocation(), Val, !NoDefault);
+    ResultVal = B.createInitializeVar(InstLoc, Val, !NoDefault);
     break;
   }
   case ValueKind::StructInst: {
@@ -1632,7 +1635,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                      diag::expected_tok_in_sil_instr,")"))
       return true;
 
-    ResultVal = B.createStruct(SILLocation(), StructTy, OpList);
+    ResultVal = B.createStruct(InstLoc, StructTy, OpList);
     break;
   }
   case ValueKind::StructElementAddrInst:
@@ -1655,10 +1658,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // FIXME: substitution means this needs to be explicit.
     auto ResultTy = Field->getType()->getCanonicalType();
     if (Opcode == ValueKind::StructElementAddrInst)
-      ResultVal = B.createStructElementAddr(SILLocation(), Val, Field,
+      ResultVal = B.createStructElementAddr(InstLoc, Val, Field,
                                  SILType::getPrimitiveAddressType(ResultTy));
     else
-      ResultVal = B.createStructExtract(SILLocation(), Val, Field,
+      ResultVal = B.createStructExtract(InstLoc, Val, Field,
                                   SILType::getPrimitiveObjectType(ResultTy));
     break;
   }
@@ -1666,7 +1669,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILType Ty;
     if (parseSILType(Ty))
       return true;
-    ResultVal = B.createBuiltinZero(SILLocation(), Ty);
+    ResultVal = B.createBuiltinZero(InstLoc, Ty);
     break;
   }
   case ValueKind::RefElementAddrInst: {
@@ -1686,7 +1689,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     VarDecl *Field = cast<VarDecl>(FieldV);
     auto ResultTy = SILType::getPrimitiveAddressType(
                                        Field->getType()->getCanonicalType());
-    ResultVal = B.createRefElementAddr(SILLocation(), Val, Field,
+    ResultVal = B.createRefElementAddr(InstLoc, Val, Field,
                                        ResultTy).getDef();
     break;
   }
@@ -1696,7 +1699,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     auto BoolTy = SILType::getPrimitiveObjectType(
                                     lookupBoolType(Loc)->getCanonicalType());
-    ResultVal = B.createIsNonnull(SILLocation(), Val, BoolTy);
+    ResultVal = B.createIsNonnull(InstLoc, Val, BoolTy);
     break;
   }
   case ValueKind::IndexAddrInst: {
@@ -1705,7 +1708,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseTypedValueRef(IndexVal))
       return true;
-    ResultVal = B.createIndexAddr(SILLocation(), Val, IndexVal);
+    ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal);
     break;
   }
   case ValueKind::IndexRawPointerInst: {
@@ -1714,7 +1717,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseTypedValueRef(IndexVal))
       return true;
-    ResultVal = B.createIndexRawPointer(SILLocation(), Val, IndexVal);
+    ResultVal = B.createIndexRawPointer(InstLoc, Val, IndexVal);
     break;
   }
   case ValueKind::GlobalAddrInst: {
@@ -1734,7 +1737,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                       NLKind::UnqualifiedLookup, CurModuleResults);
     assert(CurModuleResults.size() == 1);
     VD = CurModuleResults[0];
-    ResultVal = B.createGlobalAddr(SILLocation(), cast<VarDecl>(VD), Ty);
+    ResultVal = B.createGlobalAddr(InstLoc, cast<VarDecl>(VD), Ty);
     break;
   }
   }
@@ -1745,7 +1748,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   return false;
 }
 
-bool SILParser::parseCallInstruction(ValueKind Opcode, SILBuilder &B,
+bool SILParser::parseCallInstruction(SILLocation InstLoc,
+                                     ValueKind Opcode, SILBuilder &B,
                                      ValueBase *&ResultVal) {
   UnresolvedValueName FnName;
   SmallVector<UnresolvedValueName, 4> ArgNames;
@@ -1795,17 +1799,18 @@ bool SILParser::parseCallInstruction(ValueKind Opcode, SILBuilder &B,
   switch (Opcode) {
   default: assert(0 && "Unexpected case");
   case ValueKind::ApplyInst:
-    ResultVal = B.createApply(SILLocation(), FnVal, ResTy, Args);
+    ResultVal = B.createApply(InstLoc, FnVal, ResTy, Args);
     break;
   case ValueKind::PartialApplyInst:
       // FIXME: Arbitrary order difference in type argument?
-    ResultVal = B.createPartialApply(SILLocation(), FnVal, Args, ResTy);
+    ResultVal = B.createPartialApply(InstLoc, FnVal, Args, ResTy);
     break;
   }
   return false;
 }
 
-bool SILParser::parseSILFunctionRef(SILBuilder &B, ValueBase *&ResultVal) {
+bool SILParser::parseSILFunctionRef(SILLocation InstLoc,
+                                    SILBuilder &B, ValueBase *&ResultVal) {
   Identifier Name;
   SILType Ty;
   SourceLoc Loc = P.Tok.getLoc();
@@ -1814,7 +1819,7 @@ bool SILParser::parseSILFunctionRef(SILBuilder &B, ValueBase *&ResultVal) {
       parseSILType(Ty))
     return true;
   
-  ResultVal = B.createFunctionRef(SILLocation(),
+  ResultVal = B.createFunctionRef(InstLoc,
                                   getGlobalNameForReference(Name, Ty, Loc));
   return false;
 }

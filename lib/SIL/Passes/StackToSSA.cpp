@@ -120,7 +120,7 @@ SILValue AllocStackPromotionState::getLoadedValue(LoadInst *L) {
 static bool optimizeAllocStack(AllocStackInst *ASI) {
   // Keep track of whether we will be able to remove the allocation (and all
   // stores to it) completely.
-  bool CanRemoveAlloc = ASI->getLoc().isNull();
+  bool CanRemoveAlloc = !ASI->getLoc().hasASTLocation();
 
   // Scan all of the uses of the alloc_stack to determine if we can promote the
   // uses.  Keep track of loads that we see, along with any (potential) stores
