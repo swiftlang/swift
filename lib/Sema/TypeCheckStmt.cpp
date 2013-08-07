@@ -547,8 +547,10 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
         assert(!field.getInit()->alreadyChecked() &&
                "Expression already checked");
         Expr *e = field.getInit()->getExpr();
-        tc.typeCheckExpression(e, dc, field.getPattern()->getType());
-        field.getInit()->setExpr(e, true);
+        if (tc.typeCheckExpression(e, dc, field.getPattern()->getType()))
+          field.getInit()->setExpr(field.getInit()->getExpr(), true);
+        else
+          field.getInit()->setExpr(e, true);
       }
     }
     return;

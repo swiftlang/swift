@@ -49,6 +49,7 @@ public:
 
   /// \brief Set the expression after it has been type-checked.
   void setExpr(Expr *newE, bool checked) {
+    assert(newE && "Null expression in handle");
     EAndChecked.setPointer(newE);
     EAndChecked.setInt(checked);
   }

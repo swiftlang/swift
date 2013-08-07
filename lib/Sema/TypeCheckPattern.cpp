@@ -632,7 +632,7 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
         if (initHandle->alreadyChecked()) {
           // Nothing to do
         } else if (typeCheckExpression(init, dc, CoercionType)) {
-          initHandle->setExpr(nullptr, true);
+          initHandle->setExpr(initHandle->getExpr(), true);
         } else {
           initHandle->setExpr(init, true);
         }
