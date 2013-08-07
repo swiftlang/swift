@@ -229,10 +229,7 @@ void NameBinder::addImport(ImportDecl *ID,
     return;
   }
 
-  // Pick up all transitively-imported modules.
-  M->forAllVisibleModules(ID->getDeclPath(), [&](const ImportedModule &import) {
-    Result.push_back(import);
-  });
+  Result.push_back({ID->getDeclPath(), M});
 
   // If we're importing a specific decl, validate the import kind.
   if (ID->getImportKind() != ImportKind::Module) {

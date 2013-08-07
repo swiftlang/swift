@@ -1340,6 +1340,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       Module *baseModule = M;
       if (isWithinExtension) {
         baseModule = getModule(getIdentifier(rawAccessPath.front()));
+        assert(baseModule && "missing dependency");
         rawAccessPath = rawAccessPath.slice(1);
       }
 

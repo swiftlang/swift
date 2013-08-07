@@ -275,9 +275,9 @@ Module *ClangImporter::loadModule(
                                                /*IsInclusionDirective=*/false);
   if (!clangModule)
     return nullptr;
-  auto &result = Impl.ModuleWrappers[clangModule];
-  if (result)
-    return result;
+  auto &cachedResult = Impl.ModuleWrappers[clangModule];
+  if (cachedResult)
+    return cachedResult;
 
   // FIXME: Revisit this once components are fleshed out. Clang components
   // are likely born-fragile.
@@ -286,13 +286,21 @@ Module *ClangImporter::loadModule(
   // Build the representation of the Clang module in Swift.
   // FIXME: The name of this module could end up as a key in the ASTContext,
   // but that's not correct for submodules.
-  result = new (Impl.SwiftContext)
+  auto result = new (Impl.SwiftContext)
     ClangModule(Impl.SwiftContext, (*clangModule).getFullModuleName(),
                 *this, component, clangModule);
+  cachedResult = result;
 
   // FIXME: Total hack.
   if (!Impl.firstClangModule)
     Impl.firstClangModule = result;
+
+  // Force load adapter modules for all imported modules.
+  // FIXME: This forces the creation of wrapper modules for all imports as well.
+  result->forAllVisibleModules(path, [](const Module::ImportedModule &import) {
+    if (auto clangMod = dyn_cast<ClangModule>(import.second))
+      (void)clangMod->getAdapterModule();
+  });
 
   // Bump the generation count.
   ++Impl.Generation;
@@ -637,8 +645,15 @@ Module *ClangModule::getAdapterModule() const {
   if (!adapterModule.getInt()) {
     // FIXME: Include proper source location.
     auto adapter = Ctx.getModule(Module::AccessPathTy({Name, SourceLoc()}));
-    if (isa<ClangModule>(adapter))
+    if (isa<ClangModule>(adapter)) {
       adapter = nullptr;
+    } else {
+      auto &sharedModuleRef = Ctx.LoadedModules[Name.str()];
+      assert(!sharedModuleRef || sharedModuleRef == adapter ||
+             sharedModuleRef == this);
+      sharedModuleRef = adapter;
+    }
+
     auto mutableThis = const_cast<ClangModule *>(this);
     mutableThis->adapterModule.setPointerAndInt(adapter, true);
   }
