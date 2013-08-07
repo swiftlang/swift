@@ -931,8 +931,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     if (auto Decl = NameAliasTy->getDecl()) {
       Name = Decl->getName().str();
       Location L = getStartLoc(SM, Decl);
-      auto CanTy = NameAliasTy->getDesugaredType();
-      auto CanDTI = DebugTypeInfo(CanTy, SizeInBits, AlignInBits);
+      auto AliasedTy = Decl->hasUnderlyingType()
+        ? Decl->getUnderlyingType()
+        : NameAliasTy->getDesugaredType();
+      auto CanDTI = DebugTypeInfo(AliasedTy, SizeInBits, AlignInBits);
       return DBuilder.createTypedef(getOrCreateType(CanDTI, Scope), Name,
                                     getOrCreateFile(L.Filename), L.Line, Scope);
     }
