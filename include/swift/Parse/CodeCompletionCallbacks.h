@@ -56,6 +56,10 @@ public:
   /// \brief Complete expr-super after we have consumed the 'super' keyword and
   /// a dot.
   virtual void completeExprSuperDot(SuperRefExpr *SRE) = 0;
+
+  /// \brief Signals that the AST for the all the delayed-parsed code was
+  /// constructed.  No \c complete*() callbacks will be done after this.
+  virtual void doneParsing() = 0;
 };
 
 /// \brief A factory to create instances of \c CodeCompletionCallbacks.

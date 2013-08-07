@@ -90,6 +90,7 @@ private:
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
     TheParser.parseDeclFuncBodyDelayed(FD);
+    CodeCompletion->doneParsing();
   }
 };
 
@@ -113,6 +114,7 @@ void parseDelayedTopLevelDecl(
       CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
   TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
   TheParser.parseTopLevelCodeDeclDelayed();
+  CodeCompletion->doneParsing();
 }
 } // unnamed namespace
 

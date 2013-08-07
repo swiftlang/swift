@@ -338,6 +338,18 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   CodeCompletionConsumer &Consumer;
   TranslationUnit *const TU;
 
+  enum class CompletionKind {
+    DotExpr,
+    PostfixExprBeginning,
+    PostfixExpr,
+    SuperExpr,
+    SuperExprDot,
+  };
+
+  CompletionKind Kind;
+  Expr *ParsedExpr = nullptr;
+  DeclContext *CurDeclContext = nullptr;
+
   /// \brief Set to true when we have delivered code completion results
   /// to the \c Consumer.
   bool DeliveredResults = false;
@@ -380,6 +392,8 @@ public:
   void completePostfixExpr(Expr *E) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
+
+  void doneParsing() override;
 
   void deliverCompletionResults();
 
@@ -842,53 +856,75 @@ public:
 } // end unnamed namespace
 
 void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
-  if (!typecheckExpr(E))
-    return;
-
-  CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
-  Lookup.setHaveDot();
-  Lookup.getValueExprCompletions(E->getType());
-
-  deliverCompletionResults();
+  Kind = CompletionKind::DotExpr;
+  ParsedExpr = E;
+  CurDeclContext = P.CurDeclContext;
 }
 
 void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
-  CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
   assert(P.Tok.is(tok::code_complete));
-  Lookup.getCompletionsInDeclContext(P.Tok.getLoc());
 
-  deliverCompletionResults();
+  Kind = CompletionKind::PostfixExprBeginning;
+  CurDeclContext = P.CurDeclContext;
 }
 
 void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
-  if (!typecheckExpr(E))
-    return;
-
-  CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
-  Lookup.getValueExprCompletions(E->getType());
-
-  deliverCompletionResults();
+  Kind = CompletionKind::PostfixExpr;
+  ParsedExpr = E;
+  CurDeclContext = P.CurDeclContext;
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
-  if (!typecheckExpr(SRE))
-    return;
-
-  CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
-  Lookup.setIsSuperRefExpr();
-  Lookup.getValueExprCompletions(SRE->getType());
-
-  deliverCompletionResults();
+  Kind = CompletionKind::SuperExpr;
+  ParsedExpr = SRE;
+  CurDeclContext = P.CurDeclContext;
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
-  if (!typecheckExpr(SRE))
+  Kind = CompletionKind::SuperExprDot;
+  ParsedExpr = SRE;
+  CurDeclContext = P.CurDeclContext;
+}
+
+void CodeCompletionCallbacksImpl::doneParsing() {
+  if (ParsedExpr && !typecheckExpr(ParsedExpr))
     return;
 
-  CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
-  Lookup.setIsSuperRefExpr();
-  Lookup.setHaveDot();
-  Lookup.getValueExprCompletions(SRE->getType());
+  switch (Kind) {
+  case CompletionKind::DotExpr: {
+    CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
+    Lookup.setHaveDot();
+    Lookup.getValueExprCompletions(ParsedExpr->getType());
+    break;
+  }
+
+  case CompletionKind::PostfixExprBeginning: {
+    CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
+    Lookup.getCompletionsInDeclContext(P.Tok.getLoc());
+    break;
+  }
+
+  case CompletionKind::PostfixExpr: {
+    CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
+    Lookup.getValueExprCompletions(ParsedExpr->getType());
+    break;
+  }
+
+  case CompletionKind::SuperExpr: {
+    CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
+    Lookup.setIsSuperRefExpr();
+    Lookup.getValueExprCompletions(ParsedExpr->getType());
+    break;
+  }
+
+  case CompletionKind::SuperExprDot: {
+    CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
+    Lookup.setIsSuperRefExpr();
+    Lookup.setHaveDot();
+    Lookup.getValueExprCompletions(ParsedExpr->getType());
+    break;
+  }
+  }
 
   deliverCompletionResults();
 }
