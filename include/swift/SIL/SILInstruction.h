@@ -1100,8 +1100,7 @@ public:
   unsigned getFieldNo() const { return FieldNo; }
 };
 
-/// Derive the address of a numbered element from the address
-/// of a tuple or fragile struct type.
+/// Derive the address of a numbered element from the address of a tuple.
 class TupleElementAddrInst
   : public UnaryInstructionBase<ValueKind::TupleElementAddrInst>
 {

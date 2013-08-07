@@ -189,7 +189,7 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   if (DI == DI_Yes) {
     // If the value is definitely initialized, check to see if this is a load
     // that we have a value available for.  If so, we can replace the load now.
-    if (Result) {
+    if (Result && Inst->getType(0) == Result.getType()) {
       SILValue(Inst, 0).replaceAllUsesWith(Result);
       Inst->eraseFromParent();
       ++NumLoadPromoted;
@@ -354,6 +354,21 @@ static void collectAllocationUses(SILValue Pointer,
       }
 
       // Othrewise, it is an escape.
+    }
+
+    // tuple_element P, 42 indexes into the current element.  Recursively
+    // process its uses with the adjusted element number.
+    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(User)) {
+      unsigned FieldNo = TEAI->getFieldNo();
+      auto *TT = Pointer.getType().getSwiftRValueType()->castTo<TupleType>();
+      unsigned NewBaseElt = BaseElt;
+      for (unsigned i = 0; i != FieldNo; ++i) {
+        CanType EltTy = TT->getElementType(i)->getCanonicalType();
+        NewBaseElt += getNumElements(EltTy, TEAI->getModule());
+      }
+
+      collectAllocationUses(SILValue(TEAI, 0), Uses, NewBaseElt);
+      continue;
     }
 
 
