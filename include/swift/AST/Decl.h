@@ -160,9 +160,8 @@ class alignas(8) Decl {
     unsigned : NumDeclBits;
 
     unsigned ImportKind : 3;
-    unsigned FromSingleImport : 1;
   };
-  enum { NumImportDeclBits = NumDeclBits + 4 };
+  enum { NumImportDeclBits = NumDeclBits + 3 };
   static_assert(NumImportDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -696,20 +695,6 @@ public:
     if (getImportKind() == ImportKind::Module)
       return {};
     return getFullAccessPath().back();
-  }
-
-  /// Returns true if this import was imported alone, i.e. not in a list.
-  ///
-  /// \code
-  ///   import swift  // yes
-  ///   import Foundation, AppKit  // no
-  /// \endcode
-  bool isFromSingleImport() const {
-    return ImportDeclBits.FromSingleImport;
-  }
-
-  void setFromSingleImport() {
-    ImportDeclBits.FromSingleImport = true;
   }
 
   ImportKind getImportKind() const {

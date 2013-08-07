@@ -256,18 +256,12 @@ void NameBinder::addImport(ImportDecl *ID,
         diagnose(next, diag::found_candidate);
 
     } else if (!isCompatibleImportKind(ID->getImportKind(), *actualKind)) {
-      auto diag = diagnose(ID, diag::imported_decl_is_wrong_kind,
-                           declPath.front().first,
-                           getImportKindString(ID->getImportKind()),
-                           static_cast<unsigned>(*actualKind));
-      if (ID->isFromSingleImport()) {
-        diag.fixItReplace(SourceRange(ID->getKindLoc()),
-                          getImportKindString(*actualKind));
-      } else {
-        diag.highlight(SourceRange(declPath.front().second,
-                                   declPath.back().second));
-      }
-      diag.flush();
+      diagnose(ID, diag::imported_decl_is_wrong_kind,
+               declPath.front().first,
+               getImportKindString(ID->getImportKind()),
+               static_cast<unsigned>(*actualKind))
+        .fixItReplace(SourceRange(ID->getKindLoc()),
+                      getImportKindString(*actualKind));
 
       if (decls.size() == 1)
         diagnose(decls.front(), diag::decl_declared_here,

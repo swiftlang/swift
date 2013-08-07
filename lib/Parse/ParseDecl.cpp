@@ -585,7 +585,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
 /// on error.
 ///
 ///   decl-import:
-///     'import' attribute-list import-kind? import-path (',' import-path)*
+///     'import' attribute-list import-kind? import-path
 ///   import-kind:
 ///     'typealias'
 ///     'struct'
@@ -643,29 +643,20 @@ bool Parser::parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     KindLoc = consumeToken();
   }
 
-  unsigned Count = 0;
-  bool HadInvalid = false;
+  SmallVector<std::pair<Identifier, SourceLoc>, 8> ImportPath;
   do {
-    SmallVector<std::pair<Identifier, SourceLoc>, 8> ImportPath;
-    do {
-      ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
-      if (parseAnyIdentifier(ImportPath.back().first,
-                          diag::expected_identifier_in_decl, "import"))
-        return true;
-    } while (consumeIf(tok::period));
+    ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
+    if (parseAnyIdentifier(ImportPath.back().first,
+                        diag::expected_identifier_in_decl, "import"))
+      return true;
+  } while (consumeIf(tok::period));
 
-    if (Kind != ImportKind::Module && ImportPath.size() == 1) {
-      diagnose(ImportPath.front().second, diag::decl_expected_module_name);
-      HadInvalid = true;
-    } else {
-      Decls.push_back(ImportDecl::create(Context, CurDeclContext, ImportLoc,
-                                         Kind, KindLoc, ImportPath));
-    }
-    ++Count;
-  } while (consumeIf(tok::comma));
-
-  if (Count == 1 && !HadInvalid)
-    cast<ImportDecl>(Decls.back())->setFromSingleImport();
+  if (Kind != ImportKind::Module && ImportPath.size() == 1) {
+    diagnose(ImportPath.front().second, diag::decl_expected_module_name);
+  } else {
+    Decls.push_back(ImportDecl::create(Context, CurDeclContext, ImportLoc,
+                                       Kind, KindLoc, ImportPath));
+  }
 
   return false;
 }
