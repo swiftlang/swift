@@ -61,18 +61,30 @@ private:
     using type = Pattern;
   };
 
+  // If this is coming from an AST, this is the location.
   llvm::PointerUnion4<Stmt*, Expr*, Decl*, Pattern*> ASTNode;
+
+  // If coming from a .sil file, this is the location in the .sil file.
+  SourceLoc SILFileSourceLoc;
 public:
   SILLocation() {}
-  SILLocation(Stmt* S) : ASTNode(S) {}
-  SILLocation(Expr* E) : ASTNode(E) {}
-  SILLocation(Decl* D) : ASTNode(D) {}
-  SILLocation(Pattern* P) : ASTNode(P) {}
+  SILLocation(Stmt *S) : ASTNode(S) {}
+  SILLocation(Expr *E) : ASTNode(E) {}
+  SILLocation(Decl *D) : ASTNode(D) {}
+  SILLocation(Pattern *P) : ASTNode(P) {}
+
+  static SILLocation getSILFileLoc(SourceLoc L) {
+    SILLocation Result;
+    Result.SILFileSourceLoc = L;
+    return Result;
+  }
 
   bool isNull() const {
-    return ASTNode.isNull();
+    return ASTNode.isNull() && SILFileSourceLoc.isInvalid();
   }
-  LLVM_EXPLICIT operator bool() const { return !ASTNode.isNull(); }
+  LLVM_EXPLICIT operator bool() const { return !isNull(); }
+
+  bool hasASTLocation() const { return !ASTNode.isNull(); }
 
   /// \brief If the current value is of the specified AST unit type T,
   /// return it, otherwise return null.
@@ -86,9 +98,8 @@ public:
   /// matching type T.
   template <typename T>
   bool is() const {
-    if (ASTNode.is<typename base_type<T>::type*>()) {
+    if (ASTNode.is<typename base_type<T>::type*>())
       return isa<T>(ASTNode.get<typename base_type<T>::type*>());
-    }
     return false;
   }
 

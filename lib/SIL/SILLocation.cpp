@@ -19,7 +19,7 @@ using namespace swift;
 
 SourceLoc SILLocation::getSourceLoc() const {
   if (ASTNode.isNull())
-    return SourceLoc();
+    return SILFileSourceLoc;
   if (auto decl = ASTNode.dyn_cast<Decl*>())
     return decl->getLoc();
   if (auto expr = ASTNode.dyn_cast<Expr*>())
@@ -33,7 +33,7 @@ SourceLoc SILLocation::getSourceLoc() const {
 
 SourceLoc SILLocation::getStartSourceLoc() const {
   if (ASTNode.isNull())
-    return SourceLoc();
+    return SILFileSourceLoc;
   if (auto decl = ASTNode.dyn_cast<Decl*>())
     return decl->getStartLoc();
   if (auto expr = ASTNode.dyn_cast<Expr*>())
@@ -47,7 +47,7 @@ SourceLoc SILLocation::getStartSourceLoc() const {
 
 SourceLoc SILLocation::getEndSourceLoc() const {
   if (ASTNode.isNull())
-    return SourceLoc();
+    return SILFileSourceLoc;
   if (auto decl = ASTNode.dyn_cast<Decl*>())
     return decl->getEndLoc();
   if (auto expr = ASTNode.dyn_cast<Expr*>())
