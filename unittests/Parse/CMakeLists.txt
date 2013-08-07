@@ -5,5 +5,5 @@ add_swift_unittest(SwiftParseTests
 )
 
 target_link_libraries(SwiftParseTests
-  swiftParse swiftSIL swiftSema swiftClangImporter
+   curses swiftParse swiftSIL swiftSema swiftClangImporter
 )
