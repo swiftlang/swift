@@ -1,4 +1,4 @@
-//===--- SILLocation.cpp - Location information for SIL nodes ---*- C++ -*-===//
+//===--- SILLocation.cpp - Location information for SIL nodes -------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,53 +15,46 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
-
 using namespace swift;
 
 SourceLoc SILLocation::getSourceLoc() const {
-  if (auto decl = ASTNode.dyn_cast<Decl*>()) {
+  if (ASTNode.isNull())
+    return SourceLoc();
+  if (auto decl = ASTNode.dyn_cast<Decl*>())
     return decl->getLoc();
-  }
-  if (auto expr = ASTNode.dyn_cast<Expr*>()) {
+  if (auto expr = ASTNode.dyn_cast<Expr*>())
     return expr->getLoc();
-  }
-  if (auto stmt = ASTNode.dyn_cast<Stmt*>()) {
+  if (auto stmt = ASTNode.dyn_cast<Stmt*>())
     return stmt->getStartLoc();
-  }
-  if (auto patt = ASTNode.dyn_cast<Pattern*>()) {
+  if (auto patt = ASTNode.dyn_cast<Pattern*>())
     return patt->getStartLoc();
-  }
   llvm_unreachable("impossible SILLocation");
 }
 
 SourceLoc SILLocation::getStartSourceLoc() const {
-  if (auto decl = ASTNode.dyn_cast<Decl*>()) {
+  if (ASTNode.isNull())
+    return SourceLoc();
+  if (auto decl = ASTNode.dyn_cast<Decl*>())
     return decl->getStartLoc();
-  }
-  if (auto expr = ASTNode.dyn_cast<Expr*>()) {
+  if (auto expr = ASTNode.dyn_cast<Expr*>())
     return expr->getStartLoc();
-  }
-  if (auto stmt = ASTNode.dyn_cast<Stmt*>()) {
+  if (auto stmt = ASTNode.dyn_cast<Stmt*>())
     return stmt->getStartLoc();
-  }
-  if (auto patt = ASTNode.dyn_cast<Pattern*>()) {
+  if (auto patt = ASTNode.dyn_cast<Pattern*>())
     return patt->getStartLoc();
-  }
   llvm_unreachable("impossible SILLocation");
 }
 
 SourceLoc SILLocation::getEndSourceLoc() const {
-  if (auto decl = ASTNode.dyn_cast<Decl*>()) {
+  if (ASTNode.isNull())
+    return SourceLoc();
+  if (auto decl = ASTNode.dyn_cast<Decl*>())
     return decl->getEndLoc();
-  }
-  if (auto expr = ASTNode.dyn_cast<Expr*>()) {
+  if (auto expr = ASTNode.dyn_cast<Expr*>())
     return expr->getEndLoc();
-  }
-  if (auto stmt = ASTNode.dyn_cast<Stmt*>()) {
+  if (auto stmt = ASTNode.dyn_cast<Stmt*>())
     return stmt->getEndLoc();
-  }
-  if (auto patt = ASTNode.dyn_cast<Pattern*>()) {
+  if (auto patt = ASTNode.dyn_cast<Pattern*>())
     return patt->getEndLoc();
-  }
   llvm_unreachable("impossible SILLocation");
 }
