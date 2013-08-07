@@ -1557,10 +1557,12 @@ ERROR(non_exhaustive_switch,sil_gen,none, "switch must be exhaustive", ())
 //==============================================================================
 
 // Definite initialization diagnostics.
-ERROR(value_used_before_initialized,sil_analysis,none,
-      "variable used before being initialized", ())
 NOTE(variable_defined_here,sil_analysis,none,
       "variable defined here", ())
+ERROR(variable_used_before_initialized,sil_analysis,none,
+      "variable used before being initialized", ())
+ERROR(variable_byref_before_initialized,sil_analysis,none,
+      "variable passed by reference before being initialized", ())
 
 // Control flow diagnostics.
 WARNING(missing_return,sil_analysis,none,

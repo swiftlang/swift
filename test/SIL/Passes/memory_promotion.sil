@@ -35,12 +35,12 @@ sil @takes_Int_byref : $[thin] (a : [byref] Int64) -> ()
 // CHECK-LABEL: @byref_uninit
 sil @byref_uninit : $[thin] () -> () {
 bb0:
-  %1 = alloc_box $Int64
+  %1 = alloc_box $Int64                                   // expected-note {{variable defined here}}
 
   %5 = function_ref @takes_Int_byref : $[thin] (a : [byref] Int64) -> ()
-  %6 = apply %5(%1#1) : $[thin] (a : [byref] Int64) -> ()
+  %6 = apply %5(%1#1) : $[thin] (a : [byref] Int64) -> () // expected-error {{variable passed by reference before being initialized}}
   
-  %0 = tuple ()                                   // user: %1
+  %0 = tuple ()
   release %1#0 : $Builtin.ObjectPointer
   return %0 : $()
 }

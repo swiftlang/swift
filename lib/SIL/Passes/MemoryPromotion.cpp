@@ -138,13 +138,14 @@ namespace {
 
     void doIt();
     void handleLoadUse(SILInstruction *Inst);
+    void handleByrefUse(SILInstruction *Inst);
 
     enum DIKind {
       DI_Yes,
       DI_No,
       DI_Partial
     };
-    DIKind checkDefinitelyInit(SILInstruction *Inst, SILValue *AV);
+    DIKind checkDefinitelyInit(SILInstruction *Inst, SILValue *AV = nullptr);
   };
 } // end anonymous namespace
 
@@ -183,7 +184,7 @@ void ElementPromotion::doIt() {
     switch (Use.second) {
     case UseKind::Load:     handleLoadUse(Use.first); break;
     case UseKind::Store:    break;
-    case UseKind::ByrefUse: break;
+    case UseKind::ByrefUse: handleByrefUse(Use.first); break;
     case UseKind::Escape:   break;
     }
 
@@ -201,7 +202,7 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // an SSA register.  Otherwise, we don't ask for an available value to avoid
   // constructing SSA for the value.
   auto DI = checkDefinitelyInit(Inst, isa<LoadInst>(Inst) ? &Result : nullptr);
-  if (DI == DI_Yes){
+  if (DI == DI_Yes) {
     // If the value is definitely initialized, check to see if this is a load
     // that we have a value available for.  If so, we can replace the load now.
     if (Result) {
@@ -217,7 +218,25 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // TODO: The QoI could be improved in many different ways here.  We could give
   // some path information, give the name / access path of the variable, etc.
   diagnose(Inst->getModule(), Inst->getLoc(),
-           diag::value_used_before_initialized);
+           diag::variable_used_before_initialized);
+  diagnose(Inst->getModule(), TheAllocBox->getLoc(),
+           diag::variable_defined_here);
+  HadError = true;
+}
+
+/// Given a byref use (a Apply or PartialApply), determine whether the loaded
+/// value is definitely assigned or not.  If not, produce a diagnostic.
+void ElementPromotion::handleByrefUse(SILInstruction *Inst) {
+
+  auto DI = checkDefinitelyInit(Inst);
+  if (DI == DI_Yes)
+    return;
+
+  // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
+  // TODO: The QoI could be improved in many different ways here.  We could give
+  // some path information, give the name / access path of the variable, etc.
+  diagnose(Inst->getModule(), Inst->getLoc(),
+           diag::variable_byref_before_initialized);
   diagnose(Inst->getModule(), TheAllocBox->getLoc(),
            diag::variable_defined_here);
   HadError = true;
