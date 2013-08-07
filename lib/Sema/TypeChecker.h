@@ -99,7 +99,7 @@ class LookupResult {
   friend class TypeChecker;
   
 public:
-  typedef SmallVector<ValueDecl *, 4>::iterator iterator;
+  typedef SmallVectorImpl<ValueDecl *>::iterator iterator;
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
   unsigned size() const { return Results.size(); }
@@ -126,7 +126,7 @@ class LookupTypeResult {
   friend class TypeChecker;
 
 public:
-  typedef SmallVector<std::pair<TypeDecl *, Type>, 4>::iterator iterator;
+  typedef SmallVectorImpl<std::pair<TypeDecl *, Type>>::iterator iterator;
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
   unsigned size() const { return Results.size(); }
