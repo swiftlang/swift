@@ -41,32 +41,24 @@ static bool isByRefOrIndirectReturn(SILInstruction *Apply,
 //===----------------------------------------------------------------------===//
 
 namespace {
+  enum UseKind {
+    // The instruction is a LoadInst.
+    Load,
+
+    // The instruction is a StoreInst.
+    Store,
+
+    /// The instruction is an Apply, this is a byref or indirect return.
+    ByrefUse,
+
+    /// This instruction is a general escape of the value, e.g. a call to a
+    /// closure that captures it.
+    Escape
+  };
+
   /// ElementUses - This class keeps track of all of the uses of a single
   /// element (i.e. tuple element or struct field) of a memory object.
-  struct ElementUses {
-    enum UseKindTy {
-      // The instruction is a LoadInst.
-      Load,
-
-      // The instruction is a StoreInst.
-      Store,
-
-      /// The instruction is an Apply, this is a byref or indirect return.
-      ByrefUse,
-
-      /// This instruction is a general escape of the value, e.g. a call to a
-      /// closure that captures it.
-      Escape
-    };
-
-    /// This is the set of uses that touch this allocation element.
-    std::vector<std::pair<SILInstruction*, UseKindTy>> Uses;
-
-    void addUse(std::pair<SILInstruction*, UseKindTy> Info) {
-      Uses.push_back(Info);
-    }
-
-  };
+  typedef std::vector<std::pair<SILInstruction*, UseKind>> ElementUses;
 } // end anonymous namespace
 
 /// getNumElements - Return the number of elements in the flattened SILType.
@@ -101,21 +93,76 @@ static unsigned getNumElements(CanType T, SILModule *M) {
 //===----------------------------------------------------------------------===//
 
 namespace {
+  enum class EscapeKind {
+    Unknown,
+    Yes,
+    No
+  };
+
   /// LiveOutBlockState - Keep track of information about blocks
   struct LiveOutBlockState {
-
-    enum {
-      EscapeUnknown,
-      EscapeYes,
-      EscapeNo
-    } EscapeKind = EscapeUnknown;
-
-
+    EscapeKind EscapeInfo = EscapeKind::Unknown;
   };
 } // end anonymous namespace
 
+namespace {
+  /// ElementPromotion - This is the main heavy lifting for processing the uses
+  /// of an element of an allocation.
+  class ElementPromotion {
+    AllocBoxInst *TheAllocBox;
+    ElementUses &Uses;
+    llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> &PerBlockInfo;
+
+    bool HasAnyEscape = false;
+  public:
+    ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses,
+                     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState,
+                     32> &PerBlockInfo);
+
+    void doIt();
+  };
+} // end anonymous namespace
+
+ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses,
+               llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState,
+                                   32> &PerBlockInfo)
+: TheAllocBox(TheAllocBox), Uses(Uses), PerBlockInfo(PerBlockInfo) {
+  PerBlockInfo.clear();
+
+  // The first step of processing an element is to determine which blocks it
+  // can escape from.  We aren't allowed to promote loads in blocks
+  // reachable from an escape point.
+  for (auto Use : Uses) {
+    if (Use.second == UseKind::Escape) {
+      HasAnyEscape = true;
+      PerBlockInfo[Use.first->getParent()].EscapeInfo = EscapeKind::Yes;
+    }
+  }
+}
 
 
+void ElementPromotion::doIt() {
+  (void)PerBlockInfo;
+  (void)TheAllocBox;
+
+  // With any escapes tallied up, we can work through all the uses, checking
+  // for definitive initialization, promoting loads, rewriting assigns, and
+  // performing other tasks.
+  for (auto Use : Uses) {
+    switch (Use.second) {
+    case UseKind::Load:
+      break;
+    case UseKind::Store:
+      break;
+
+    case UseKind::ByrefUse:
+      break;
+
+    case UseKind::Escape:
+      break;
+    }
+  }
+}
 
 
 
@@ -129,11 +176,11 @@ namespace {
 /// to keep the Uses data structure up to date for aggregate uses.
 static void addElementUses(SmallVectorImpl<ElementUses> &Uses,
                            unsigned BaseElt, SILType UseTy,
-                           SILInstruction *User, ElementUses::UseKindTy Kind) {
+                           SILInstruction *User, UseKind Kind) {
   for (unsigned i = 0, e = getNumElements(UseTy.getSwiftRValueType(),
                                           User->getModule());
        i != e; ++i)
-    Uses[BaseElt+i].addUse({User, Kind });
+    Uses[BaseElt+i].push_back({User, Kind });
 }
 
 
@@ -156,14 +203,14 @@ static void collectAllocationUses(SILValue Pointer,
 
     // Loads are a use of the value.  Note that this could be an aggregate load.
     if (auto *LI = dyn_cast<LoadInst>(User)) {
-      addElementUses(Uses, BaseElt, PointeeType, LI, ElementUses::Load);
+      addElementUses(Uses, BaseElt, PointeeType, LI, UseKind::Load);
       continue;
     }
 
     // Stores *to* the allocation are writes.  Stores *of* them are escapes.
     //  Note that this could be an aggregate store.
     if (isa<StoreInst>(User) && UI->getOperandNumber() == 1) {
-      addElementUses(Uses, BaseElt, PointeeType, User, ElementUses::Store);
+      addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store);
       continue;
     }
 
@@ -176,7 +223,7 @@ static void collectAllocationUses(SILValue Pointer,
     // need to treat them as a may-store.
     if (isa<FunctionInst>(User) &&
         isByRefOrIndirectReturn(User, UI->getOperandNumber()-1)) {
-      addElementUses(Uses, BaseElt, PointeeType, User, ElementUses::ByrefUse);
+      addElementUses(Uses, BaseElt, PointeeType, User, UseKind::ByrefUse);
       continue;
     }
 
@@ -188,7 +235,7 @@ static void collectAllocationUses(SILValue Pointer,
     // TODO: isa<ProjectExistentialInst>(User)
 
     // Otherwise, the use is something complicated, it escapes.
-    addElementUses(Uses, BaseElt, PointeeType, User, ElementUses::Escape);
+    addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Escape);
   }
 }
 
@@ -208,40 +255,8 @@ static void optimizeAllocBox(AllocBoxInst *ABI) {
   llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
 
   // Process each scalar value in the uses array individually.
-  for (auto &Elt : Uses) {
-    // The first step of processing an element is to determine which blocks it
-    // can escape from.  We aren't allowed to promote loads in blocks reachable
-    // from an escape point.
-    PerBlockInfo.clear();
-
-    // Add all escape points as mid-block escapes to start.
-    bool HasAnyEscape = false;
-    for (auto Use : Elt.Uses) {
-      if (Use.second == ElementUses::Escape) {
-        HasAnyEscape = true;
-        PerBlockInfo[Use.first->getParent()].EscapeKind =
-          LiveOutBlockState::EscapeYes;
-      }
-    }
-
-    // With any escapes tallied up, we can work through all the uses, checking
-    // for definitive initialization, promoting loads, rewriting assigns, and
-    // performing other tasks.
-    for (auto Use : Elt.Uses) {
-      switch (Use.second) {
-      case ElementUses::Load:
-        break;
-      case ElementUses::Store:
-        break;
-
-      case ElementUses::ByrefUse:
-        break;
-
-      case ElementUses::Escape:
-        break;
-      }
-    }
-  }
+  for (auto &Elt : Uses)
+    ElementPromotion(ABI, Elt, PerBlockInfo).doIt();
 }
 
 
