@@ -285,6 +285,10 @@ public:
   explicit ValueBaseUseIterator(Operand *cur) : Cur(cur) {}
   Operand *operator*() const { return Cur; }
 
+  ValueBase *getUser() const {
+    return Cur->getUser();
+  }
+
   ValueBaseUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
     Cur = Cur->NextUse;
