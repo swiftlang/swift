@@ -1212,6 +1212,7 @@ namespace {
         return expr->getBase();
       }
 
+      case OverloadChoiceKind::TypeDecl:
       case OverloadChoiceKind::FunctionReturningBaseType:
       case OverloadChoiceKind::IdentityFunction:
         llvm_unreachable("Nonsensical overload choice");

@@ -663,6 +663,7 @@ static LValueType::Qual settableQualForDecl(Type baseType,
 }
 
 Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
+                                          bool isTypeReference,
                                           bool isSpecialized) {
   if (auto proto = dyn_cast<ProtocolDecl>(value->getDeclContext())) {
     // Unqualified lookup can find operator names within protocols.
@@ -699,8 +700,15 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
     if (!type)
       return nullptr;
 
-    // Refer to the metatype of this type.
-    return MetaTypeType::get(openType(type), getASTContext());
+    // Open the type.
+    type = openType(type);
+
+    // If it's a type reference, we're done.
+    if (isTypeReference)
+      return type;
+
+    // If it's a value reference, refer to the metatype.
+    return MetaTypeType::get(type, getASTContext());
   }
 
   // Determine the type of the value, opening up that type if necessary.
@@ -796,7 +804,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>())
-    return getTypeOfReference(value, /*isSpecialized=*/false);
+    return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false);
 
   // The archetypes that have been opened up and replaced with type variables.
   llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
@@ -813,22 +821,25 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // Determine the type of the member.
   Type type;
-  if (isTypeReference)
+  if (isTypeReference) {
     type = cast<TypeDecl>(value)->getDeclaredType();
-  else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
     auto resultTy = LValueType::get(subscript->getElementType(),
                                     LValueType::Qual::DefaultForMemberAccess|
                                     settableQualForDecl(baseTy, subscript),
                                     TC.Context);
     type = FunctionType::get(subscript->getIndices()->getType(), resultTy,
                              TC.Context);
-  } else
+  } else {
     type = value->getTypeOfReference(baseTy);
+  }
 
-  // For a member of an archetype, substitute the base type for the 'This'
-  // type.
-  if (baseObjTy->is<ArchetypeType>()) {
-    if (auto ownerProtoTy = ownerTy->getAs<ProtocolType>()) {
+  // If the declaration is a protocol member, we may have more substitutions to
+  // perform.
+  if (auto ownerProtoTy = ownerTy->getAs<ProtocolType>()) {
+    // For a member of an archetype, substitute the base type for the 'This'
+    // type.
+    if (baseObjTy->is<ArchetypeType>()) {
       auto thisArchetype = ownerProtoTy->getDecl()->getThis()->getDeclaredType()
                              ->castTo<ArchetypeType>();
 
@@ -849,6 +860,22 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
                  return type;
                });
+    } else if (!baseObjTy->isExistentialType()) {
+      // When the base nominal type conforms to the protocol, and we made use of
+      // a default definition to provide the witness, dig out that witness.
+      if (auto baseNominal = baseObjTy->getAnyNominal()) {
+        // Retrieve the type witness from the protocol conformance.
+        ProtocolConformance *conformance = nullptr;
+        if (TC.conformsToProtocol(baseNominal->getDeclaredType(),
+                                  ownerProtoTy->getDecl(),
+                                  &conformance) &&
+            conformance->usesDefaultDefinition(value)) {
+          // FIXME: Eventually, deal with default function/property definitions.
+          auto assocType = cast<TypeAliasDecl>(value);
+          type = conformance->getTypeWitness(assocType).Replacement;
+        }
+        // FIXME: Short-circuit on the else here?
+      }
     }
   }
 
@@ -1855,14 +1882,18 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
   auto &choice = ovl->getChoices()[idx];
   Type refType;
   switch (choice.getKind()) {
-  case OverloadChoiceKind::Decl: {
+  case OverloadChoiceKind::Decl:
+  case OverloadChoiceKind::TypeDecl: {
+    bool isTypeReference = choice.getKind() == OverloadChoiceKind::TypeDecl;
     // Retrieve the type of a reference to the specific declaration choice.
     if (choice.getBaseType())
       refType = getTypeOfMemberReference(choice.getBaseType(),
                                          choice.getDecl(),
-                                         /*FIXME:*/false);
+                                         isTypeReference);
     else
-      refType = getTypeOfReference(choice.getDecl(), choice.isSpecialized());
+      refType = getTypeOfReference(choice.getDecl(),
+                                   isTypeReference,
+                                   choice.isSpecialized());
 
     bool isAssignment = choice.getDecl()->getAttrs().isAssignment();
     refType = adjustLValueForReference(refType, isAssignment,
@@ -2556,6 +2587,10 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::Decl:
     return sameDecl(x.getDecl(), y.getDecl());
 
+  case OverloadChoiceKind::TypeDecl:
+    // FIXME: Compare types after substitution?
+    return sameDecl(x.getDecl(), y.getDecl());
+
   case OverloadChoiceKind::TupleIndex:
     return x.getTupleIndex() == y.getTupleIndex();
   }
@@ -2692,6 +2727,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::FunctionReturningBaseType:
     case OverloadChoiceKind::IdentityFunction:
       llvm_unreachable("Never considered different");
+
+    case OverloadChoiceKind::TypeDecl:
+      break;
 
     case OverloadChoiceKind::Decl:
       // Determine whether one declaration is more specialized than the other.
@@ -3743,6 +3781,7 @@ void Solution::dump(SourceManager *sm) const {
     auto choice = ovl.second.first;
     switch (choice.getKind()) {
     case OverloadChoiceKind::Decl:
+    case OverloadChoiceKind::TypeDecl:
       if (choice.getBaseType())
         out << choice.getBaseType()->getString() << ".";
         
@@ -3816,6 +3855,7 @@ void ConstraintSystem::dump() {
           << " choice #" << resolved->ChoiceIndex << " for ";
       switch (choice.getKind()) {
         case OverloadChoiceKind::Decl:
+        case OverloadChoiceKind::TypeDecl:
           if (choice.getBaseType())
             out << choice.getBaseType()->getString() << ".";
           out << choice.getDecl()->getName().str() << ": "
@@ -3853,6 +3893,7 @@ void ConstraintSystem::dump() {
         out.indent(4);
         switch (choice.getKind()) {
         case OverloadChoiceKind::Decl:
+        case OverloadChoiceKind::TypeDecl:
           if (choice.getBaseType())
             out << choice.getBaseType()->getString() << ".";
           out << choice.getDecl()->getName().str() << ": ";

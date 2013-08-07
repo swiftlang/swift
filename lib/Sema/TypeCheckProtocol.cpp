@@ -1296,15 +1296,8 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   // If we're checking for conformance (rather than stating it),
   // look for the explicit declaration of conformance in the list of protocols.
   if (!ExplicitConformance) {
-    // Look through the metatype.
-    // FIXME: This is a hack to work around bugs in the solver.
-    auto instanceT = T;
-    if (auto metaT = T->getAs<MetaTypeType>()) {
-      instanceT = metaT->getInstanceType();
-    }
-
     // Only nominal types conform to protocols.
-    auto nominal = instanceT->getAnyNominal();
+    auto nominal = T->getAnyNominal();
     if (!nominal) {
       // If we need to complain, do so.
       if (ComplainLoc.isValid()) {

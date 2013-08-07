@@ -205,10 +205,12 @@ namespace {
       // FIXME: If the decl is in error, we get no information from this.
       // We may, alternatively, want to use a type variable in that case,
       // and possibly infer the type of the variable that way.
-      return adjustLValueForReference(CS.getTypeOfReference(E->getDecl(),
-                                                            E->isSpecialized()),
-                                      E->getDecl()->getAttrs().isAssignment(),
-                                      CS.getASTContext());
+      return adjustLValueForReference(
+               CS.getTypeOfReference(E->getDecl(),
+                                     /*isTypeReference=*/false,
+                                     E->isSpecialized()),
+               E->getDecl()->getAttrs().isAssignment(),
+               CS.getASTContext());
     }
 
     Type visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {

@@ -1095,6 +1095,9 @@ enum class OverloadChoiceKind : int {
   /// \brief The overload choice selects a particular declaration from a
   /// set of declarations.
   Decl,
+  /// \brief The overload choice selects a particular declaration from a
+  /// set of declarations and treats it as a type.
+  TypeDecl,
   /// \brief The overload choice equates the member type with the
   /// base type. Used for unresolved member expressions like ".none" that
   /// refer to union members with unit type.
@@ -1131,13 +1134,21 @@ public:
 
   OverloadChoice(Type base, ValueDecl *value, bool isSpecialized)
     : BaseAndSpecialized(base, isSpecialized) {
+    assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0
+           && "Badly aligned decl");
     DeclOrKind = reinterpret_cast<uintptr_t>(value);
-    assert((DeclOrKind & (uintptr_t)0x01) == 0 && "Badly aligned decl");
+  }
+
+  OverloadChoice(Type base, TypeDecl *type, bool isSpecialized)
+    : BaseAndSpecialized(base, isSpecialized) {
+    assert((reinterpret_cast<uintptr_t>(type) & (uintptr_t)0x03) == 0
+           && "Badly aligned decl");
+    DeclOrKind = reinterpret_cast<uintptr_t>(type) | 0x01;
   }
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
     : BaseAndSpecialized(base, false),
-      DeclOrKind((uintptr_t)kind << 1 | (uintptr_t)0x01) {
+      DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x02) {
     assert(base && "Must have a base type for overload choice");
     assert(kind != OverloadChoiceKind::Decl && "wrong constructor for decl");
   }
@@ -1145,8 +1156,8 @@ public:
   OverloadChoice(Type base, unsigned index)
     : BaseAndSpecialized(base, false),
       DeclOrKind(((uintptr_t)index
-                  + (uintptr_t)OverloadChoiceKind::TupleIndex) << 1
-                 | (uintptr_t)0x01) {
+                  + (uintptr_t)OverloadChoiceKind::TupleIndex) << 2
+                 | (uintptr_t)0x02) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
   }
 
@@ -1161,28 +1172,30 @@ public:
   
   /// \brief Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {
-    if (DeclOrKind & 0x01) {
-      uintptr_t value = DeclOrKind >> 1;
+    if (DeclOrKind & 0x02) {
+      uintptr_t value = DeclOrKind >> 2;
       if (value >= (uintptr_t)OverloadChoiceKind::TupleIndex)
         return OverloadChoiceKind::TupleIndex;
 
       return (OverloadChoiceKind)value;
     }
-    
-    return OverloadChoiceKind::Decl;
+
+    return DeclOrKind & 0x01? OverloadChoiceKind::TypeDecl
+                            : OverloadChoiceKind::Decl;
   }
 
   /// \brief Retrieve the declaraton that corresponds to this overload choice.
   ValueDecl *getDecl() const {
-    assert(getKind() == OverloadChoiceKind::Decl && "Not a declaration");
-    return reinterpret_cast<ValueDecl *>(DeclOrKind);
+    assert((getKind() == OverloadChoiceKind::Decl ||
+            getKind() == OverloadChoiceKind::TypeDecl) && "Not a declaration");
+    return reinterpret_cast<ValueDecl *>(DeclOrKind & ~(uintptr_t)0x03);
   }
 
   /// \brief Retrieve the tuple index that corresponds to this overload
   /// choice.
   unsigned getTupleIndex() const {
     assert(getKind() == OverloadChoiceKind::TupleIndex);
-    return (DeclOrKind >> 1) - (uintptr_t)OverloadChoiceKind::TupleIndex;
+    return (DeclOrKind >> 2) - (uintptr_t)OverloadChoiceKind::TupleIndex;
   }
 
   /// \brief Retrieves an opaque choice that ignores the base type.
@@ -1835,12 +1848,8 @@ public:
     assert(memberTy);
     assert(!name.empty());
     
-    // The type of the type member is the metatype of the declared type.
-    Type memberMetaTy = MetaTypeType::get(memberTy, getASTContext());
-    
     addConstraint(new (*this) Constraint(ConstraintKind::TypeMember,
-                                         baseTy, memberMetaTy, name,
-                                         locator));
+                                         baseTy, memberTy, name, locator));
   }
 
   /// \brief Add an archetype constraint.
@@ -1945,8 +1954,14 @@ public:
   /// variable.
   ///
   /// \param decl The declarations whose type is being computed.
+  ///
+  /// \param isTypeReference Whether it's a reference to this declaration
+  /// as a type.
+  ///
   /// \param isSpecialized Whether this declaration is immediately specialized.
-  Type getTypeOfReference(ValueDecl *decl, bool isSpecialized);
+  Type getTypeOfReference(ValueDecl *decl,
+                          bool isTypeReference,
+                          bool isSpecialized);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
