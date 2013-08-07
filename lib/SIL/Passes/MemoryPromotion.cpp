@@ -35,32 +35,6 @@ static bool isByRefOrIndirectReturn(SILInstruction *Apply,
   return ArgTy->is<LValueType>();
 }
 
-
-//===----------------------------------------------------------------------===//
-// ElementUses Helper Class
-//===----------------------------------------------------------------------===//
-
-namespace {
-  enum UseKind {
-    // The instruction is a LoadInst.
-    Load,
-
-    // The instruction is a StoreInst.
-    Store,
-
-    /// The instruction is an Apply, this is a byref or indirect return.
-    ByrefUse,
-
-    /// This instruction is a general escape of the value, e.g. a call to a
-    /// closure that captures it.
-    Escape
-  };
-
-  /// ElementUses - This class keeps track of all of the uses of a single
-  /// element (i.e. tuple element or struct field) of a memory object.
-  typedef std::vector<std::pair<SILInstruction*, UseKind>> ElementUses;
-} // end anonymous namespace
-
 /// getNumElements - Return the number of elements in the flattened SILType.
 /// For tuples and structs, this is the (recursive) count of the fields it
 /// contains.
@@ -89,19 +63,47 @@ static unsigned getNumElements(CanType T, SILModule *M) {
 }
 
 //===----------------------------------------------------------------------===//
-//                           Action Handling Code
+// Per-Element Promotion Logic
 //===----------------------------------------------------------------------===//
 
 namespace {
+  enum UseKind {
+    // The instruction is a LoadInst.
+    Load,
+
+    // The instruction is a StoreInst.
+    Store,
+
+    /// The instruction is an Apply, this is a byref or indirect return.
+    ByrefUse,
+
+    /// This instruction is a general escape of the value, e.g. a call to a
+    /// closure that captures it.
+    Escape
+  };
+
+  /// ElementUses - This class keeps track of all of the uses of a single
+  /// element (i.e. tuple element or struct field) of a memory object.
+  typedef std::vector<std::pair<SILInstruction*, UseKind>> ElementUses;
+
   enum class EscapeKind {
     Unknown,
     Yes,
     No
   };
 
-  /// LiveOutBlockState - Keep track of information about blocks
+  /// LiveOutBlockState - Keep track of information about blocks that have
+  /// already been analyzed.  Since this is a global analysis, we need this to
+  /// cache information about different paths through the CFG.
   struct LiveOutBlockState {
+    /// For this block, keep track of whether there is a path from the entry
+    /// of the function to the end of the block that crosses an escape site.
     EscapeKind EscapeInfo = EscapeKind::Unknown;
+
+    /// Keep track of whether there is a Store, ByrefUse, or Escape locally in
+    /// this block.
+    bool HasNonLoadUse = false;
+
   };
 } // end anonymous namespace
 
@@ -111,31 +113,50 @@ namespace {
   class ElementPromotion {
     AllocBoxInst *TheAllocBox;
     ElementUses &Uses;
-    llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> &PerBlockInfo;
+    llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
+
+    /// This is the set of uses that are not loads (i.e., they are Stores,
+    /// ByrefUses, and Escapes).
+    llvm::SmallPtrSet<SILInstruction*, 16> NonLoadUses;
 
     bool HasAnyEscape = false;
   public:
-    ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses,
-                     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState,
-                     32> &PerBlockInfo);
+    ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses);
 
     void doIt();
+    void handleLoadUse(SILInstruction *Inst);
+
+    enum DIKind {
+      DI_Yes,
+      DI_No,
+      DI_Partial
+    };
+    DIKind isDefinitelyInit(SILInstruction *Inst, SILValue *AV);
   };
 } // end anonymous namespace
 
-ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses,
-               llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState,
-                                   32> &PerBlockInfo)
-: TheAllocBox(TheAllocBox), Uses(Uses), PerBlockInfo(PerBlockInfo) {
-  PerBlockInfo.clear();
+ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses)
+  : TheAllocBox(TheAllocBox), Uses(Uses) {
 
-  // The first step of processing an element is to determine which blocks it
-  // can escape from.  We aren't allowed to promote loads in blocks
-  // reachable from an escape point.
+  // The first step of processing an element is to collect information about the
+  // element into data structures we use later.
   for (auto Use : Uses) {
+    // Keep track of all the uses that aren't loads.
+    if (Use.second != UseKind::Load)
+      NonLoadUses.insert(Use.first);
+
     if (Use.second == UseKind::Escape) {
+      // Determine which blocks the value can escape from.  We aren't allowed to
+      // promote loads in blocks reachable from an escape point.
       HasAnyEscape = true;
-      PerBlockInfo[Use.first->getParent()].EscapeInfo = EscapeKind::Yes;
+      auto &BBInfo = PerBlockInfo[Use.first->getParent()];
+      BBInfo.EscapeInfo = EscapeKind::Yes;
+      BBInfo.HasNonLoadUse = true;
+    } else if (Use.second == UseKind::Store ||
+               Use.second == UseKind::ByrefUse) {
+      // Keep track of which blocks have local stores.  This makes scanning for
+      // assignments cheaper later.
+      PerBlockInfo[Use.first->getParent()].HasNonLoadUse = true;
     }
   }
 }
@@ -150,20 +171,75 @@ void ElementPromotion::doIt() {
   // performing other tasks.
   for (auto Use : Uses) {
     switch (Use.second) {
-    case UseKind::Load:
-      break;
-    case UseKind::Store:
-      break;
-
-    case UseKind::ByrefUse:
-      break;
-
-    case UseKind::Escape:
-      break;
+    case UseKind::Load:     handleLoadUse(Use.first); break;
+    case UseKind::Store:    break;
+    case UseKind::ByrefUse: break;
+    case UseKind::Escape:   break;
     }
   }
 }
 
+/// Given a load (i.e., a LoadInst or CopyAddr), determine whether the loaded
+/// value is definitely assigned or not.  If not, produce a diagnostic.  If so,
+/// attempt to promote the value into SSA form.
+void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
+  SILValue Result;
+
+  // If this is a Load (not a CopyAddr), we try to compute the loaded value as
+  // an SSA register.  Otherwise, we don't ask for an available value to avoid
+  // constructing SSA for the value.
+  if (isDefinitelyInit(Inst, isa<LoadInst>(Inst) ? &Result : nullptr)==DI_Yes){
+    // If the value is definitely initialized, check to see if this is a load
+    // that we have a value available for.  If so, we can replace the load now.
+    if (Result) {
+      SILValue(Inst, 0).replaceAllUsesWith(Result);
+      Inst->eraseFromParent();
+    }
+
+    return;
+  }
+
+  // FIXME: Emit a diagnostic here.
+}
+
+
+
+/// getStoredValueFrom - Given a may store to the stack slot we're promoting,
+/// return the value being stored.
+static SILValue getStoredValueFrom(SILInstruction *I) {
+  if (auto *SI = dyn_cast<StoreInst>(I))
+    return SI->getOperand(0);
+  return SILValue();
+}
+
+/// The specified instruction is a use of the element.  Determine whether the
+/// element is definitely initialized at this point or not.  If the value is
+/// initialized on some paths, but not others, this returns a partial result.
+///
+/// In addition to computing whether a value is definitely initialized or not,
+/// if AV is non-null, this function can return the currently live value in some
+/// cases.
+ElementPromotion::DIKind
+ElementPromotion::isDefinitelyInit(SILInstruction *Inst, SILValue *AV) {
+  // If there is a store in the current block, scan the block to see if the
+  // store is before or after the load.  If it is before, it produces the value
+  // we are looking for.
+  if (PerBlockInfo[Inst->getParent()].HasNonLoadUse) {
+    for (SILBasicBlock::iterator BBI = Inst, E = Inst->getParent()->begin();
+         BBI != E;) {
+      SILInstruction *TheInst = --BBI;
+      if (NonLoadUses.count(TheInst)) {
+        if (AV) *AV = getStoredValueFrom(TheInst);
+
+        return DI_Yes;
+      }
+    }
+  }
+
+  // FIXME: Need to do cross-block analysis.
+
+  return DI_Partial;
+}
 
 
 //===----------------------------------------------------------------------===//
@@ -180,7 +256,7 @@ static void addElementUses(SmallVectorImpl<ElementUses> &Uses,
   for (unsigned i = 0, e = getNumElements(UseTy.getSwiftRValueType(),
                                           User->getModule());
        i != e; ++i)
-    Uses[BaseElt+i].push_back({User, Kind });
+    Uses[BaseElt+i].push_back({ User, Kind });
 }
 
 
@@ -207,12 +283,20 @@ static void collectAllocationUses(SILValue Pointer,
       continue;
     }
 
+    // FIXME: Canonicalize aggregate loads of entire sub-tuples/sub-structs into
+    // loads of their elements + struct_inst / tuple_inst.
+
+
     // Stores *to* the allocation are writes.  Stores *of* them are escapes.
-    //  Note that this could be an aggregate store.
+    // Note that this could be an aggregate store.
     if (isa<StoreInst>(User) && UI->getOperandNumber() == 1) {
       addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store);
       continue;
     }
+
+    // FIXME: Canonicalize aggregate stores of entire sub-tuples/sub-structs
+    // extracts of their elements + individual stores.
+
 
     // FIXME: CopyAddrInst is a load or store, depending.
     // TODO: "Assign".
@@ -251,12 +335,9 @@ static void optimizeAllocBox(AllocBoxInst *ABI) {
   // Walk the use list of the pointer, collecting them into the Uses array.
   collectAllocationUses(SILValue(ABI, 1), Uses, 0);
 
-  // This is per-basic block state (for each element) that we keep track of.
-  llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
-
   // Process each scalar value in the uses array individually.
   for (auto &Elt : Uses)
-    ElementPromotion(ABI, Elt, PerBlockInfo).doIt();
+    ElementPromotion(ABI, Elt).doIt();
 }
 
 

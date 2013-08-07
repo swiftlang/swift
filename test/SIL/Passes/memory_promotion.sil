@@ -1,0 +1,21 @@
+// RUN: %sil-opt %s -memory-promotion | FileCheck %s
+
+import Builtin
+import swift
+
+
+// CHECK-LABEL: sil @simple_reg_promotion
+sil @simple_reg_promotion : $[thin] (a : Int64) -> Int64 {
+bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
+  %1 = alloc_box $Int64                   // CHECK: alloc_box
+  %2 = store %0 to %1#1 : $*Int64
+  %3 = alloc_box $Int64                   // CHECK: alloc_box
+  %4 = load %1#1 : $*Int64
+  %5 = store %4 to %3#1 : $*Int64         // CHECK-NEXT: store
+  %6 = load %3#1 : $*Int64
+  release %3#0 : $Builtin.ObjectPointer   // CHECK-NEXT: release
+  release %1#0 : $Builtin.ObjectPointer
+  %9 = return %6 : $Int64
+
+  // CHECK: return %0 : $Int64
+}
