@@ -37,8 +37,8 @@ static bool isInstructionTriviallyDead(SILInstruction *I,
 }
 
 /// \brief Check if the operand is only used by the given user.
-static bool isTheOnlyUser(SILValue Op, SILValue User) {
-  for (auto UseI = Op.use_begin(), UseE = Op.use_end(); UseI != UseE; ++UseI) {
+static bool isTheOnlyUser(ValueBase *Op, SILValue User) {
+  for (auto UseI = Op->use_begin(), UseE = Op->use_end(); UseI != UseE; ++UseI) {
     if (UseI.getUser() != User.getDef())
       return false;
   }
@@ -67,7 +67,7 @@ static bool recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I) {
       // If the operand is an instruction that is only used by the instruction
       // being deleted, delete it in a future loop iteration.
       SILValue OpVal = (*OpI).get();
-      if (!isTheOnlyUser(OpVal, I))
+      if (!isTheOnlyUser(OpVal.getDef(), I))
         continue;
       if (SILInstruction *OpI = dyn_cast<SILInstruction>(OpVal))
         if (isInstructionTriviallyDead(OpI, false))

@@ -221,3 +221,16 @@ bb2:                                              // Preds: bb1 bb0
 // CHECK-NEXT:  function_ref @exit : $[thin, noreturn] () -> () 
 // CHECK-NEXT:  apply
 // CHECK-NEXT:  unreachable
+
+sil @dead_use_of_alloc_stack : $[thin] () -> () {
+bb0:
+  %1 = alloc_stack $((), (), ())
+  %2 = tuple_element_addr %1#1 : $*((), (), ()), 0
+  dealloc_stack %1#0 : $*[local_storage] ((), (), ())
+  %3 = tuple ()
+  return %3 : $()
+}
+// CHECK: sil @dead_use_of_alloc_stack
+// CHECK-NEXT: bb0
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: dealloc_stack
