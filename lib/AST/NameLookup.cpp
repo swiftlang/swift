@@ -562,12 +562,6 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       return true;
     }
   ));
-
-  auto last = std::unique(Results.begin(), Results.end(),
-              [](const Result &LHS, const Result &RHS) {
-    return LHS.getNamedModule() == RHS.getNamedModule();
-  });
-  Results.erase(last, Results.end());
 }
 
 Optional<UnqualifiedLookup>
@@ -735,6 +729,76 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(Identifier name) {
   return { known->second.begin(), known->second.size() };
 }
 
+/// A cache used by lookupInModule().
+class ModuleLookupCache {
+public:
+  llvm::SmallDenseMap<Module *, TinyPtrVector<ValueDecl *>, 32> Map;
+  bool SearchedClangModule = false;
+};
+
+/// Performs a qualified lookup into the given module and, if necessary, its
+/// reexports, observing proper shadowing rules.
+static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
+                           Identifier name, SmallVectorImpl<ValueDecl *> &decls,
+                           ModuleLookupCache &cache) {
+  if (accessPath.empty()) {
+    if (module->getContextKind() == DeclContextKind::ClangModule) {
+      if (cache.SearchedClangModule)
+        return;
+
+      cache.SearchedClangModule = true;
+    }
+
+    auto iter = cache.Map.find(module);
+    if (iter != cache.Map.end()) {
+      decls.append(iter->second.begin(), iter->second.end());
+      return;
+    }
+  }
+
+  size_t count = decls.size();
+  module->lookupValue(accessPath, name, NLKind::QualifiedLookup, decls);
+
+  if (decls.size() == count) {
+    SmallVector<Module::ImportedModule, 8> reexports;
+    module->getReexportedModules(reexports);
+
+    // Prefer scoped imports (import func swift.max) to whole-module imports.
+    SmallVector<ValueDecl *, 8> unscopedValues;
+    for (auto next : reexports) {
+      // Filter any whole-module imports, and skip specific-decl imports if the
+      // import path doesn't match exactly.
+      Module::AccessPathTy combinedAccessPath;
+      if (accessPath.empty()) {
+        combinedAccessPath = next.first;
+      } else if (!next.first.empty() &&
+                 !Module::isSameAccessPath(next.first, accessPath)) {
+        // If we ever allow importing non-top-level decls, it's possible the
+        // rule above isn't what we want.
+        assert(next.first.size() == 1 && "import of non-top-level decl");
+        continue;
+      } else {
+        combinedAccessPath = accessPath;
+      }
+
+      lookupInModule(next.second, combinedAccessPath, name,
+                     next.first.empty() ? unscopedValues : decls,
+                     cache);
+    }
+
+    // If there were no scoped imports, add the unscoped results.
+    if (decls.size() == count)
+      decls.append(unscopedValues.begin(), unscopedValues.end());
+  }
+
+  if (accessPath.empty()) {
+    auto &cachedValues = cache.Map[module];
+    cachedValues.insert(cachedValues.end(),
+                        llvm::makeArrayRef(decls).slice(count).begin(),
+                        llvm::makeArrayRef(decls).end());
+  }
+}
+
 bool Module::lookupQualified(Type type,
                              Identifier name,
                              unsigned options,
@@ -755,38 +819,8 @@ bool Module::lookupQualified(Type type,
 
   // Look for module references.
   if (auto moduleTy = type->getAs<ModuleType>()) {
-    Module *module = moduleTy->getModule();
-    module->lookupValue(Module::AccessPathTy(), name,
-                        NLKind::QualifiedLookup, decls);
-
-    // Prefer decls from the module itself, rather than imported modules.
-    if (!decls.empty())
-      return true;
-
-    // Track whether we've already searched the Clang modules.
-    // FIXME: This is a weird hack. We either need to filter within the
-    // Clang module importer, or we need to change how this works.
-    bool searchedClangModule =
-      module->getContextKind() == DeclContextKind::ClangModule;
-
-    module->forAllVisibleModules(Nothing,
-                                 makeStackLambda(
-      [&](const Module::ImportedModule &ImpEntry) {
-        // FIXME: Only searching Clang modules once.
-        if (ImpEntry.first.empty() &&
-            ImpEntry.second->getContextKind() == DeclContextKind::ClangModule) {
-          if (searchedClangModule)
-            return;
-
-          searchedClangModule = true;
-        }
-
-        // FIXME: Is the re-exported lookup really unqualified? We do want it
-        // to ignore the Builtin module, but no one should be re-exporting that.
-        ImpEntry.second->lookupValue(ImpEntry.first, name,
-                                     NLKind::UnqualifiedLookup, decls);
-      }
-    ));
+    ModuleLookupCache cache;
+    lookupInModule(moduleTy->getModule(), {}, name, decls, cache);
     return !decls.empty();
   }
 

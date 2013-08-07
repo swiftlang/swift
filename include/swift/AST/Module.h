@@ -215,6 +215,12 @@ public:
     });
   }
 
+  /// Returns true if the two access paths contain the same chain of
+  /// identifiers.
+  ///
+  /// Source locations are ignored here.
+  static bool isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs);
+
   static bool classof(const DeclContext *DC) {
     return DC->isModuleContext();
   }

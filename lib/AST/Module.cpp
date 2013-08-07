@@ -343,11 +343,7 @@ namespace {
   };
 }
 
-/// Returns true if the two access paths contain the same chain of identifiers.
-///
-/// Source locations are ignored here.
-static bool isSameAccessPath(Module::AccessPathTy lhs,
-                             Module::AccessPathTy rhs) {
+bool Module::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
   using AccessPathElem = std::pair<Identifier, SourceLoc>;
   if (lhs.size() != rhs.size())
     return false;
