@@ -59,7 +59,13 @@ namespace {
       Escape
     };
 
+    /// This is the set of uses that touch this allocation element.
     std::vector<std::pair<SILInstruction*, UseKindTy>> Uses;
+
+    void addUse(std::pair<SILInstruction*, UseKindTy> Info) {
+      Uses.push_back(Info);
+    }
+
   };
 } // end anonymous namespace
 
@@ -90,6 +96,28 @@ static unsigned getNumElements(CanType T, SILModule *M) {
   return 1;
 }
 
+//===----------------------------------------------------------------------===//
+//                           Action Handling Code
+//===----------------------------------------------------------------------===//
+
+namespace {
+  /// LiveOutBlockState - Keep track of information about blocks
+  struct LiveOutBlockState {
+
+    enum {
+      EscapeUnknown,
+      EscapeYes,
+      EscapeNo
+    } EscapeKind = EscapeUnknown;
+
+
+  };
+} // end anonymous namespace
+
+
+
+
+
 
 //===----------------------------------------------------------------------===//
 //                          Top Level Driver
@@ -105,7 +133,7 @@ static void addElementUses(SmallVectorImpl<ElementUses> &Uses,
   for (unsigned i = 0, e = getNumElements(UseTy.getSwiftRValueType(),
                                           User->getModule());
        i != e; ++i)
-    Uses[BaseElt+i].Uses.push_back({User, Kind });
+    Uses[BaseElt+i].addUse({User, Kind });
 }
 
 
@@ -139,7 +167,7 @@ static void collectAllocationUses(SILValue Pointer,
       continue;
     }
 
-    // FIXME: CopyAddrInst
+    // FIXME: CopyAddrInst is a load or store, depending.
     // TODO: "Assign".
 
 
@@ -164,6 +192,7 @@ static void collectAllocationUses(SILValue Pointer,
   }
 }
 
+
 static void optimizeAllocBox(AllocBoxInst *ABI) {
   // Set up the datastructure used to collect the uses of the alloc_box.  The
   // uses are bucketed up into the elements of the allocation that are being
@@ -175,8 +204,44 @@ static void optimizeAllocBox(AllocBoxInst *ABI) {
   // Walk the use list of the pointer, collecting them into the Uses array.
   collectAllocationUses(SILValue(ABI, 1), Uses, 0);
 
+  // This is per-basic block state (for each element) that we keep track of.
+  llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
 
+  // Process each scalar value in the uses array individually.
+  for (auto &Elt : Uses) {
+    // The first step of processing an element is to determine which blocks it
+    // can escape from.  We aren't allowed to promote loads in blocks reachable
+    // from an escape point.
+    PerBlockInfo.clear();
 
+    // Add all escape points as mid-block escapes to start.
+    bool HasAnyEscape = false;
+    for (auto Use : Elt.Uses) {
+      if (Use.second == ElementUses::Escape) {
+        HasAnyEscape = true;
+        PerBlockInfo[Use.first->getParent()].EscapeKind =
+          LiveOutBlockState::EscapeYes;
+      }
+    }
+
+    // With any escapes tallied up, we can work through all the uses, checking
+    // for definitive initialization, promoting loads, rewriting assigns, and
+    // performing other tasks.
+    for (auto Use : Elt.Uses) {
+      switch (Use.second) {
+      case ElementUses::Load:
+        break;
+      case ElementUses::Store:
+        break;
+
+      case ElementUses::ByrefUse:
+        break;
+
+      case ElementUses::Escape:
+        break;
+      }
+    }
+  }
 }
 
 
