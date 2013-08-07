@@ -29,6 +29,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
@@ -857,6 +858,8 @@ static void emitEntryPointArgumentsCCC(IRGenSILFunction &IGF,
 void IRGenModule::emitSILFunction(SILFunction *f) {
   if (f->isExternalDeclaration())
     return;
+
+  PrettyStackTraceSILFunction stackTrace("emitting IR", f);
     
   // FIXME: Emit all needed explosion levels.
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
