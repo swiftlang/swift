@@ -218,6 +218,8 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // some path information, give the name / access path of the variable, etc.
   diagnose(Inst->getModule(), Inst->getLoc(),
            diag::value_used_before_initialized);
+  diagnose(Inst->getModule(), TheAllocBox->getLoc(),
+           diag::variable_defined_here);
   HadError = true;
 }
 

@@ -23,7 +23,7 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
 // CHECK-LABEL: sil @use_before_init
 sil @use_before_init : $[thin] () -> Int64 {
 bb0:
-  %1 = alloc_box $Int64
+  %1 = alloc_box $Int64                   // expected-note {{variable defined here}}
   %4 = load %1#1 : $*Int64                // expected-error {{variable used before being initialized}}
   release %1#0 : $Builtin.ObjectPointer
   %9 = return %4 : $Int64
@@ -31,6 +31,21 @@ bb0:
 
 
 sil @takes_Int_byref : $[thin] (a : [byref] Int64) -> ()
+
+// CHECK-LABEL: @byref_uninit
+sil @byref_uninit : $[thin] () -> () {
+bb0:
+  %1 = alloc_box $Int64
+
+  %5 = function_ref @takes_Int_byref : $[thin] (a : [byref] Int64) -> ()
+  %6 = apply %5(%1#1) : $[thin] (a : [byref] Int64) -> ()
+  
+  %0 = tuple ()                                   // user: %1
+  release %1#0 : $Builtin.ObjectPointer
+  return %0 : $()
+}
+
+
 
 
 // This function shouldn't produce any diagnostics.
@@ -44,8 +59,8 @@ sil @takes_Int_byref : $[thin] (a : [byref] Int64) -> ()
 sil @used_by_byref : $[thin] (a : Int64) -> (Int64, Int64) {
 bb0(%0 : $Int64):
   // This alloc_stack can't be removed since it is used by a byref call.
-  // CHECK: %1 = alloc_stack $Int64
-  %1 = alloc_stack $Int64
+  // CHECK: %1 = alloc_box $Int64
+  %1 = alloc_box $Int64
   %2 = store %0 to %1#1 : $*Int64
   
   // This load should be eliminated.
@@ -60,6 +75,7 @@ bb0(%0 : $Int64):
   // This should use the incoming argument to the function.
   // CHECK: tuple (%0 : $Int64, [[RES]] : $Int64)
   %8 = tuple (%3 : $Int64, %7 : $Int64)
-  %10 = dealloc_stack %1#0 : $*[local_storage] Int64
+  release %1#0 : $Builtin.ObjectPointer
   %11 = return %8 : $(Int64, Int64)
 }
+
