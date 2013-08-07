@@ -15,6 +15,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
+#include "llvm/Support/raw_ostream.h"
+
 using namespace swift;
 
 SourceLoc SILLocation::getSourceLoc() const {
@@ -57,4 +59,11 @@ SourceLoc SILLocation::getEndSourceLoc() const {
   if (auto patt = ASTNode.dyn_cast<Pattern*>())
     return patt->getEndLoc();
   llvm_unreachable("impossible SILLocation");
+}
+
+void SILLocation::dump(const SourceManager &SM) const {
+  print(llvm::errs(), SM);
+}
+void SILLocation::print(raw_ostream &OS, const SourceManager &SM) const {
+  getSourceLoc().print(OS, SM);
 }

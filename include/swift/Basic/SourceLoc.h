@@ -54,6 +54,8 @@ public:
   void print(raw_ostream &OS, const SourceManager &SM,
              int &LastBuffer) const;
 
+  void printLineAndColon(raw_ostream &OS, const SourceManager &SM) const;
+
   void print(raw_ostream &OS, const SourceManager &SM) const {
     int Tmp = -1;
     print(OS, SM, Tmp);

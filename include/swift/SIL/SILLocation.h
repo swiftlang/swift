@@ -113,6 +113,10 @@ public:
   SourceLoc getSourceLoc() const;
   SourceLoc getStartSourceLoc() const;
   SourceLoc getEndSourceLoc() const;
+
+  /// Pretty-print the value.
+  void dump(const SourceManager &SM) const;
+  void print(raw_ostream &OS, const SourceManager &SM) const;
 };
 
 } // end swift namespace

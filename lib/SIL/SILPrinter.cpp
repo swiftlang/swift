@@ -224,12 +224,13 @@ namespace {
 class SILPrinter : public SILVisitor<SILPrinter> {
   llvm::formatted_raw_ostream OS;
   SILValue subjectValue;
+  bool Verbose;
 
   llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
 
   llvm::DenseMap<const ValueBase*, unsigned> ValueToIDMap;
 public:
-  SILPrinter(raw_ostream &OS) : OS(OS) {
+  SILPrinter(raw_ostream &OS, bool V = false) : OS(OS), Verbose(V) {
   }
 
   ID getID(const SILBasicBlock *B);
@@ -277,12 +278,19 @@ public:
 
   void print(SILValue V) {
     OS << "  ";
+
+    // Print result.
     if (V->hasValue()) {
       ID Name = getID(V);
       Name.ResultNumber = -1;  // Don't print subresult number.
       OS << Name << " = ";
     }
+
+    // Print the value.
     visit(V);
+
+    // Print users.
+    bool printedSlashes = false;
     if (!V->use_empty()) {
       OS.PadToColumn(50);
       OS << "// user";
@@ -292,7 +300,27 @@ public:
       interleave(V->use_begin(), V->use_end(),
                  [&] (Operand *o) { OS << getID(o->getUser()); },
                  [&] { OS << ", "; });
+      printedSlashes = true;
     }
+
+    // Print SIL location.
+    if (Verbose) {
+      if (SILInstruction *I = dyn_cast<SILInstruction>(V.getDef())) {
+        SILLocation L = I->getLoc();
+        SILModule *M = I->getParent()->getParent()->getParent();
+        if (M && !L.isNull()) {
+          if (!printedSlashes) {
+            OS.PadToColumn(50);
+            OS << "//";
+          }
+          OS << " ";
+          // To minimize output, only print the line and column number for
+          // everything but the first instruction.
+          L.getSourceLoc().printLineAndColon(OS, M->getASTContext().SourceMgr);
+        }
+      }
+    }
+    
     OS << '\n';
   }
   
@@ -850,7 +878,7 @@ void SILFunction::dump() const {
 }
 
 /// Pretty-print the SILFunction to the designated stream.
-void SILFunction::print(llvm::raw_ostream &OS) const {
+void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "// " << demangleSymbol(getName()) << '\n';
   OS << "sil ";
   switch (getLinkage()) {
@@ -869,7 +897,7 @@ void SILFunction::print(llvm::raw_ostream &OS) const {
   
   if (!isExternalDeclaration()) {
     OS << " {\n";
-    SILPrinter(OS).print(this);
+    SILPrinter(OS, Verbose).print(this);
     OS << "}";
   }
   
@@ -902,7 +930,7 @@ void SILModule::dump() const {
 }
 
 /// Pretty-print the SILModule to the designated stream.
-void SILModule::print(llvm::raw_ostream &OS) const {
+void SILModule::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_stage ";
   switch (Stage) {
   case SILStage::Raw:
@@ -916,7 +944,7 @@ void SILModule::print(llvm::raw_ostream &OS) const {
   OS << "\n\nimport Builtin\nimport swift\n\n";
 
   for (const SILFunction &f : *this)
-    f.print(OS);
+    f.print(OS, Verbose);
 }
 
 void ValueBase::dumpInContext() const {

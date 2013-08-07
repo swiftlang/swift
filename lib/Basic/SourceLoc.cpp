@@ -25,6 +25,12 @@ SourceLoc SourceManager::getCodeCompletionLoc() const {
       Buffer->getBufferStart() + CodeCompletionOffset));
 }
 
+void SourceLoc::printLineAndColon(raw_ostream &OS,
+                                  const SourceManager &SM) const {
+  int BufferIndex = SM->FindBufferContainingLoc(Value);
+  print(OS, SM, BufferIndex);
+}
+
 void SourceLoc::print(raw_ostream &OS, const SourceManager &SM,
                       int &LastBuffer) const {
   if (isInvalid()) {

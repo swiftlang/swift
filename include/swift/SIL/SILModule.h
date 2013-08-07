@@ -176,8 +176,10 @@ public:
   void dump() const;
 
   /// Pretty-print the module to the designated stream.
-  void print(raw_ostream &OS) const;
-  
+  ///
+  /// \param Verbose Dump SIL location information in verbose mode.
+  void print(raw_ostream &OS, bool Verbose = false) const;
+
   /// Allocate memory using the module's internal allocator.
   void *allocate(unsigned Size, unsigned Align) const {
     if (TheASTContext.LangOpts.UseMalloc)
