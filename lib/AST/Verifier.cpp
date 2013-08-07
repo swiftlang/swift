@@ -973,9 +973,7 @@ namespace {
         llvm_unreachable("impossible parent node");
       }
       
-      // FIXME: This is a very ugly way to check inclusion.
-      if (Enclosing.Start.Value.getPointer() > Current.Start.Value.getPointer()
-          || Enclosing.End.Value.getPointer() < Current.End.Value.getPointer()){
+      if (!Ctx.SourceMgr.rangeContains(Enclosing, Current)) {
         Out << "child source range not contained within its parent: ";
         printEntity();
         Out << "\n  parent range: ";

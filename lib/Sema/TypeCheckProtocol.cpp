@@ -16,6 +16,7 @@
 
 #include "ConstraintSystem.h"
 #include "TypeChecker.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
@@ -1053,8 +1054,8 @@ static void suggestExplicitConformance(TypeChecker &tc,
     // FIXME: < on character pointers is a horrible hack.
     assert(owner != witnessOwner && "Owners cannot match here.");
 
-    if (witnessOwner->getLoc().Value.getPointer() <
-          owner->getLoc().Value.getPointer())
+    if (tc.Context.SourceMgr.isBeforeInBuffer(witnessOwner->getLoc(),
+                                              owner->getLoc()))
       owner = witnessOwner;
   }
 

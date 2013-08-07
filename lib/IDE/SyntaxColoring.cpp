@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/SyntaxColoring.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -65,8 +66,7 @@ SyntaxColoringContext::SyntaxColoringContext(SourceManager &SM,
     }
 
     assert(Tok.getLoc().isValid());
-    assert(Nodes.empty() ||
-           Nodes.back().Loc.Value.getPointer()<Tok.getLoc().Value.getPointer());
+    assert(Nodes.empty() || SM.isBeforeInBuffer(Nodes.back().Loc, Tok.getLoc()));
     Nodes.emplace_back(Kind, Tok.getLoc(), Tok.getLength());
   }
 
@@ -80,12 +80,14 @@ SyntaxColoringContext::~SyntaxColoringContext() {
 namespace {
 
 class ColorASTWalker : public ASTWalker {
+  const SourceManager &SM;
+
 public:
   SyntaxColorWalker &SCWalker;
   ArrayRef<SyntaxNode> TokenNodes;
 
-  ColorASTWalker(SyntaxColorWalker &SCWalker)
-    : SCWalker(SCWalker) { }
+  ColorASTWalker(const SourceManager &SM, SyntaxColorWalker &SCWalker)
+      : SM(SM), SCWalker(SCWalker) { }
 
   void visitTranslationUnit(TranslationUnit &TU, ArrayRef<SyntaxNode> Tokens);
 
@@ -100,7 +102,7 @@ private:
 } // anonymous namespace
 
 bool SyntaxColoringContext::walk(SyntaxColorWalker &Walker) {
-  ColorASTWalker ASTWalk(Walker);
+  ColorASTWalker ASTWalk(TU.Ctx.SourceMgr, Walker);
   ASTWalk.visitTranslationUnit(TU, Impl.TokenNodes);
   return true;
 }
@@ -132,8 +134,7 @@ bool ColorASTWalker::passTokenNodesUntil(SourceLoc Loc, bool Inclusive) {
   unsigned I = 0;
   for (unsigned E = TokenNodes.size(); I != E; ++I) {
     SourceLoc TokLoc = TokenNodes[I].Loc;
-    if (TokLoc.Value.getPointer() > Loc.Value.getPointer() ||
-        (!Inclusive && TokLoc.Value.getPointer() == Loc.Value.getPointer())) {
+    if (SM.isBeforeInBuffer(Loc, TokLoc) || (!Inclusive && TokLoc == Loc)) {
       break;
     }
     if (!passNode(TokenNodes[I]))

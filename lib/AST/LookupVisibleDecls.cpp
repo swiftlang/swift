@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
@@ -269,15 +269,16 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
 namespace {
 
 struct FindLocalVal : public StmtVisitor<FindLocalVal> {
+  const SourceManager &SM;
   SourceLoc Loc;
   VisibleDeclConsumer &Consumer;
 
-  FindLocalVal(SourceLoc Loc, VisibleDeclConsumer &Consumer)
-    : Loc(Loc), Consumer(Consumer) {}
+  FindLocalVal(const SourceManager &SM, SourceLoc Loc,
+               VisibleDeclConsumer &Consumer)
+      : SM(SM), Loc(Loc), Consumer(Consumer) {}
 
   bool IntersectsRange(SourceRange R) {
-    return R.Start.Value.getPointer() <= Loc.Value.getPointer() &&
-           R.End.Value.getPointer() >= Loc.Value.getPointer();
+    return SM.rangeContainsLoc(R, Loc);
   }
 
   void checkValueDecl(ValueDecl *D) {
@@ -397,6 +398,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                                const DeclContext *DC,
                                SourceLoc Loc) {
   const Module &M = *DC->getParentModule();
+  const SourceManager &SM = DC->getASTContext().SourceMgr;
 
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.
@@ -407,14 +409,14 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     Type ExtendedType;
     if (auto FE = dyn_cast<FuncExpr>(DC)) {
       for (auto *P : FE->getArgParamPatterns())
-        FindLocalVal(Loc, Consumer).checkPattern(P);
+        FindLocalVal(SM, Loc, Consumer).checkPattern(P);
 
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       // FIXME: when we can parse and typecheck the function body partially for
       // code completion, FE->getBody() check can be removed.
       if (Loc.isValid() && FE->getBody()) {
-        FindLocalVal(Loc, Consumer).visit(FE->getBody());
+        FindLocalVal(SM, Loc, Consumer).visit(FE->getBody());
       }
 
       FuncDecl *FD = FE->getDecl();
@@ -433,7 +435,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         GenericParams = FD->getGenericParams();
     } else if (auto CE = dyn_cast<PipeClosureExpr>(DC)) {
       if (Loc.isValid()) {
-        FindLocalVal(Loc, Consumer).visit(CE->getBody());
+        FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());
       }
     } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getExtendedType();
@@ -447,7 +449,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       if (Loc.isValid()) {
-        FindLocalVal(Loc, Consumer).visit(CD->getBody());
+        FindLocalVal(SM, Loc, Consumer).visit(CD->getBody());
       }
 
       BaseDecl = CD->getImplicitThisDecl();
@@ -461,7 +463,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       if (Loc.isValid()) {
-        FindLocalVal(Loc, Consumer).visit(CD->getBody());
+        FindLocalVal(SM, Loc, Consumer).visit(CD->getBody());
       }
 
       BaseDecl = DD->getImplicitThisDecl();
@@ -480,7 +482,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
     // Check the generic parameters for something with the given name.
     if (GenericParams) {
-      FindLocalVal(Loc, Consumer).checkGenericParams(GenericParams);
+      FindLocalVal(SM, Loc, Consumer).checkGenericParams(GenericParams);
     }
 
     DC = DC->getParent();
@@ -491,7 +493,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       // Look for local variables in top-level code; normally, the parser
       // resolves these for us, but it can't do the right thing for
       // local types.
-      FindLocalVal(Loc, Consumer).checkTranslationUnit(TU);
+      FindLocalVal(SM, Loc, Consumer).checkTranslationUnit(TU);
     }
   }
 

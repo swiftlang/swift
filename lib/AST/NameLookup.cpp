@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
@@ -136,16 +136,16 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 }
 
 struct FindLocalVal : public StmtVisitor<FindLocalVal> {
+  const SourceManager &SM;
   SourceLoc Loc;
   Identifier Name;
   ValueDecl *MatchingValue;
 
-  FindLocalVal(SourceLoc Loc, Identifier Name)
-    : Loc(Loc), Name(Name), MatchingValue(nullptr) {}
+  FindLocalVal(const SourceManager &SM, SourceLoc Loc, Identifier Name)
+      : SM(SM), Loc(Loc), Name(Name), MatchingValue(nullptr) {}
 
   bool IntersectsRange(SourceRange R) {
-    return R.Start.Value.getPointer() <= Loc.Value.getPointer() &&
-           R.End.Value.getPointer() >= Loc.Value.getPointer();
+    return SM.rangeContainsLoc(R, Loc);
   }
 
   void checkValueDecl(ValueDecl *D) {
@@ -273,6 +273,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   typedef UnqualifiedLookupResult Result;
 
   Module &M = *DC->getParentModule();
+  const SourceManager &SM = DC->getASTContext().SourceMgr;
 
   // Never perform local lookup for operators.
   if (Name.isOperator())
@@ -291,7 +292,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       // FIXME: when we can parse and typecheck the function body partially for
       // code completion, FE->getBody() check can be removed.
       if (Loc.isValid() && FE->getBody()) {
-        FindLocalVal localVal(Loc, Name);
+        FindLocalVal localVal(SM, Loc, Name);
         localVal.visit(FE->getBody());
         if (!localVal.MatchingValue) {
           for (Pattern *P : FE->getBodyParamPatterns())
@@ -324,7 +325,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       if (Loc.isValid()) {
-        FindLocalVal localVal(Loc, Name);
+        FindLocalVal localVal(SM, Loc, Name);
         localVal.visit(CE->getBody());
         if (!localVal.MatchingValue) {
           localVal.checkPattern(CE->getParams());
@@ -346,7 +347,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       if (Loc.isValid()) {
-        FindLocalVal localVal(Loc, Name);
+        FindLocalVal localVal(SM, Loc, Name);
         localVal.visit(CD->getBody());
         if (!localVal.MatchingValue)
           localVal.checkPattern(CD->getArguments());
@@ -367,7 +368,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       if (Loc.isValid()) {
-        FindLocalVal localVal(Loc, Name);
+        FindLocalVal localVal(SM, Loc, Name);
         localVal.visit(CD->getBody());
         if (!localVal.MatchingValue)
           localVal.checkPattern(CD->getArguments());
@@ -388,7 +389,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
     // Check the generic parameters for something with the given name.
     if (GenericParams) {
-      FindLocalVal localVal(Loc, Name);
+      FindLocalVal localVal(SM, Loc, Name);
       localVal.checkGenericParams(GenericParams);
 
       if (localVal.MatchingValue) {
@@ -463,7 +464,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
                            ->getInstanceType()->getAnyNominal()
                        : ExtendedType->getAnyNominal();
       if (nominal && nominal->getGenericParams()) {
-        FindLocalVal localVal(Loc, Name);
+        FindLocalVal localVal(SM, Loc, Name);
         localVal.checkGenericParams(nominal->getGenericParams());
 
         if (localVal.MatchingValue) {
@@ -481,7 +482,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       // Look for local variables in top-level code; normally, the parser
       // resolves these for us, but it can't do the right thing for
       // local types.
-      FindLocalVal localVal(Loc, Name);
+      FindLocalVal localVal(SM, Loc, Name);
       localVal.checkTranslationUnit(TU);
       if (localVal.MatchingValue) {
         Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
