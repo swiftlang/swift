@@ -19,6 +19,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -268,6 +269,187 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   }
 };
 
+
+namespace {
+  /// A cache used by lookupInModule().
+  class ModuleLookupCache {
+  public:
+    using MapTy =
+      llvm::SmallDenseMap<Module::ImportedModule, TinyPtrVector<ValueDecl *>, 32>;
+    MapTy Map;
+    bool SearchedClangModule = false;
+  };
+
+  class SortCanType {
+  public:
+    bool operator()(CanType lhs, CanType rhs) const {
+      return std::less<TypeBase *>()(lhs.getPointer(), rhs.getPointer());
+    }
+  };
+  using CanTypeSet = llvm::SmallSet<CanType, 8, SortCanType>;
+}
+
+
+/// Controls the behavior of lookupInModule().
+enum class ResolutionKind {
+  /// Lookup can match any number of decls, as long as they are all
+  /// overloadable.
+  ///
+  /// If non-overloadable decls are returned, this indicates ambiguous lookup.
+  Overloadable,
+
+  /// Lookup should match a single decl.
+  Exact,
+
+  /// Lookup should match a single decl that declares a type.
+  TypesOnly
+};
+
+/// Returns true if this particular ValueDecl is overloadable.
+static bool isOverloadable(const ValueDecl *VD) {
+  return isa<FuncDecl>(VD) ||
+         isa<ConstructorDecl>(VD) ||
+         isa<SubscriptDecl>(VD);
+}
+
+/// Updates \p overloads with the types of the given decls.
+///
+/// \returns true if all of the given decls are overloadable, false if not.
+static bool updateOverloadSet(CanTypeSet &overloads,
+                              ArrayRef<ValueDecl *> decls) {
+  for (auto result : decls) {
+    if (!isOverloadable(result))
+      return false;
+    overloads.insert(result->getType()->getCanonicalType());
+  }
+  return true;
+}
+
+/// After finding decls by name lookup, filter based on the given
+/// resolution kind and existing overload set and add them to \p results.
+static ResolutionKind recordImportDecls(SmallVectorImpl<ValueDecl *> &results,
+                                        ArrayRef<ValueDecl *> newDecls,
+                                        CanTypeSet &overloads,
+                                        ResolutionKind resolutionKind) {
+  switch (resolutionKind) {
+  case ResolutionKind::Overloadable: {
+    // Add new decls if they provide a new overload. Note that the new decls
+    // may be ambiguous with respect to each other, just not any existing decls.
+    std::copy_if(newDecls.begin(), newDecls.end(), std::back_inserter(results),
+                 [&](const ValueDecl *result) -> bool {
+      if (overloads.count(result->getType()->getCanonicalType()))
+        return false;
+      if (!overloads.empty() && !isOverloadable(result))
+        return false;
+      return true;
+    });
+
+    // Update the overload set.
+    bool stillOverloadable = updateOverloadSet(overloads, newDecls);
+    return stillOverloadable ? ResolutionKind::Overloadable
+                             : ResolutionKind::Exact;
+  }
+
+  case ResolutionKind::Exact:
+    // Add all decls. If they're ambiguous, they're ambiguous.
+    results.append(newDecls.begin(), newDecls.end());
+    return ResolutionKind::Exact;
+
+  case ResolutionKind::TypesOnly:
+    // Add type decls only. If they're ambiguous, they're ambiguous.
+    std::copy_if(newDecls.begin(), newDecls.end(), std::back_inserter(results),
+                 [](const ValueDecl *VD) { return isa<TypeDecl>(VD); });
+    return ResolutionKind::TypesOnly;
+  }
+
+}
+
+/// Performs a qualified lookup into the given module and, if necessary, its
+/// reexports, observing proper shadowing rules.
+static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
+                           Identifier name, SmallVectorImpl<ValueDecl *> &decls,
+                           NLKind lookupKind, ResolutionKind resolutionKind,
+                           ModuleLookupCache &cache, unsigned depth = 0) {
+  ModuleLookupCache::MapTy::iterator iter;
+  bool isNew;
+  std::tie(iter, isNew) = cache.Map.insert({{accessPath, module}, {}});
+  if (!isNew) {
+    decls.append(iter->second.begin(), iter->second.end());
+    return;
+  }
+
+  size_t initialCount = decls.size();
+
+  // Only perform unscoped searches once in Clang modules.
+  // FIXME: This is a weird hack. ClangImporter should just filter the results
+  // for us.
+  bool isClangModule = false;
+  if (accessPath.empty())
+    isClangModule = module->getContextKind() == DeclContextKind::ClangModule;
+
+  SmallVector<ValueDecl *, 4> localDecls;
+  if (!isClangModule || !cache.SearchedClangModule) {
+    module->lookupValue(accessPath, name, lookupKind, localDecls);
+    if (isClangModule)
+      cache.SearchedClangModule = true;
+  }
+
+  CanTypeSet overloads;
+  resolutionKind = recordImportDecls(decls, localDecls, overloads,
+                                     resolutionKind);
+
+  bool foundDecls = decls.size() > initialCount;
+  if (!foundDecls || resolutionKind == ResolutionKind::Overloadable) {
+    SmallVector<Module::ImportedModule, 8> reexports;
+    module->getReexportedModules(reexports);
+
+    // Prefer scoped imports (import func swift.max) to whole-module imports.
+    SmallVector<ValueDecl *, 8> unscopedValues;
+    SmallVector<ValueDecl *, 8> scopedValues;
+    for (auto next : reexports) {
+      // Filter any whole-module imports, and skip specific-decl imports if the
+      // import path doesn't match exactly.
+      Module::AccessPathTy combinedAccessPath;
+      if (accessPath.empty()) {
+        combinedAccessPath = next.first;
+      } else if (!next.first.empty() &&
+                 !Module::isSameAccessPath(next.first, accessPath)) {
+        // If we ever allow importing non-top-level decls, it's possible the
+        // rule above isn't what we want.
+        assert(next.first.size() == 1 && "import of non-top-level decl");
+        continue;
+      } else {
+        combinedAccessPath = accessPath;
+      }
+
+      lookupInModule(next.second, combinedAccessPath, name,
+                     next.first.empty() ? unscopedValues : scopedValues,
+                     lookupKind, resolutionKind, cache, depth+1);
+    }
+
+    // Add the results from scoped imports.
+    resolutionKind = recordImportDecls(decls, scopedValues, overloads,
+                                       resolutionKind);
+
+    // Add the results from unscoped imports.
+    foundDecls = decls.size() > initialCount;
+    if (!foundDecls || resolutionKind == ResolutionKind::Overloadable) {
+      resolutionKind = recordImportDecls(decls, unscopedValues, overloads,
+                                         resolutionKind);
+    }
+  }
+
+  std::sort(decls.begin() + initialCount, decls.end());
+  auto afterUnique = std::unique(decls.begin() + initialCount, decls.end());
+  decls.erase(afterUnique, decls.end());
+
+  auto &cachedValues = cache.Map[{accessPath, module}];
+  cachedValues.insert(cachedValues.end(),
+                      decls.begin() + initialCount,
+                      decls.end());
+}
+
+
 UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
                                      SourceLoc Loc, bool IsTypeLookup) {
   typedef UnqualifiedLookupResult Result;
@@ -491,56 +673,17 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     }
   }
 
-  // Track whether we've already searched the Clang modules.
-  // FIXME: This is a weird hack. We either need to filter within the
-  // Clang module importer, or we need to change how this works.
-  bool searchedClangModule = false;
-  
-  // Do a local lookup within the current module.
-  llvm::SmallVector<ValueDecl*, 4> CurModuleResults;
-  M.lookupValue(Module::AccessPathTy(), Name, NLKind::UnqualifiedLookup,
-                CurModuleResults);
-  searchedClangModule = M.getContextKind() == DeclContextKind::ClangModule;
-  for (ValueDecl *VD : CurModuleResults)
+  SmallVector<ValueDecl *, 8> CurModuleResults;
+  auto resolutionKind =
+    IsTypeLookup ? ResolutionKind::TypesOnly : ResolutionKind::Overloadable;
+  ModuleLookupCache cache;
+  lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
+                 resolutionKind, cache);
+
+  for (auto VD : CurModuleResults) {
     if (!IsTypeLookup || isa<TypeDecl>(VD))
       Results.push_back(Result::getModuleMember(VD));
-
-  llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
-  for (ValueDecl *VD : CurModuleResults) {
-    // If we find a type in the current module, don't look into any
-    // imported modules.
-    if (isa<TypeDecl>(VD))
-      return;
-    if (!IsTypeLookup)
-      CurModuleTypes.insert(VD->getType()->getCanonicalType());
   }
-
-  // Scrape through all of the imports looking for additional results.
-  M.forAllVisibleModules(Nothing,
-                         makeStackLambda(
-    [&](const Module::ImportedModule &ImpEntry) {
-      // FIXME: Only searching Clang modules once.
-      if (ImpEntry.first.empty() &&
-          ImpEntry.second->getContextKind() == DeclContextKind::ClangModule) {
-        if (searchedClangModule)
-          return;
-
-        searchedClangModule = true;
-      }
-
-      SmallVector<ValueDecl*, 8> ImportedModuleResults;
-      ImpEntry.second->lookupValue(ImpEntry.first, Name,
-                                   NLKind::UnqualifiedLookup,
-                                   ImportedModuleResults);
-      for (ValueDecl *VD : ImportedModuleResults) {
-        if ((!IsTypeLookup || isa<TypeDecl>(VD)) &&
-            !CurModuleTypes.count(VD->getType()->getCanonicalType())) {
-          Results.push_back(Result::getModuleMember(VD));
-          CurModuleTypes.insert(VD->getType()->getCanonicalType());
-        }
-      }
-    }
-  ));
 
   // If we've found something, we're done.
   if (!Results.empty())
@@ -729,76 +872,6 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(Identifier name) {
   return { known->second.begin(), known->second.size() };
 }
 
-/// A cache used by lookupInModule().
-class ModuleLookupCache {
-public:
-  llvm::SmallDenseMap<Module *, TinyPtrVector<ValueDecl *>, 32> Map;
-  bool SearchedClangModule = false;
-};
-
-/// Performs a qualified lookup into the given module and, if necessary, its
-/// reexports, observing proper shadowing rules.
-static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
-                           Identifier name, SmallVectorImpl<ValueDecl *> &decls,
-                           ModuleLookupCache &cache) {
-  if (accessPath.empty()) {
-    if (module->getContextKind() == DeclContextKind::ClangModule) {
-      if (cache.SearchedClangModule)
-        return;
-
-      cache.SearchedClangModule = true;
-    }
-
-    auto iter = cache.Map.find(module);
-    if (iter != cache.Map.end()) {
-      decls.append(iter->second.begin(), iter->second.end());
-      return;
-    }
-  }
-
-  size_t count = decls.size();
-  module->lookupValue(accessPath, name, NLKind::QualifiedLookup, decls);
-
-  if (decls.size() == count) {
-    SmallVector<Module::ImportedModule, 8> reexports;
-    module->getReexportedModules(reexports);
-
-    // Prefer scoped imports (import func swift.max) to whole-module imports.
-    SmallVector<ValueDecl *, 8> unscopedValues;
-    for (auto next : reexports) {
-      // Filter any whole-module imports, and skip specific-decl imports if the
-      // import path doesn't match exactly.
-      Module::AccessPathTy combinedAccessPath;
-      if (accessPath.empty()) {
-        combinedAccessPath = next.first;
-      } else if (!next.first.empty() &&
-                 !Module::isSameAccessPath(next.first, accessPath)) {
-        // If we ever allow importing non-top-level decls, it's possible the
-        // rule above isn't what we want.
-        assert(next.first.size() == 1 && "import of non-top-level decl");
-        continue;
-      } else {
-        combinedAccessPath = accessPath;
-      }
-
-      lookupInModule(next.second, combinedAccessPath, name,
-                     next.first.empty() ? unscopedValues : decls,
-                     cache);
-    }
-
-    // If there were no scoped imports, add the unscoped results.
-    if (decls.size() == count)
-      decls.append(unscopedValues.begin(), unscopedValues.end());
-  }
-
-  if (accessPath.empty()) {
-    auto &cachedValues = cache.Map[module];
-    cachedValues.insert(cachedValues.end(),
-                        llvm::makeArrayRef(decls).slice(count).begin(),
-                        llvm::makeArrayRef(decls).end());
-  }
-}
-
 bool Module::lookupQualified(Type type,
                              Identifier name,
                              unsigned options,
@@ -820,7 +893,8 @@ bool Module::lookupQualified(Type type,
   // Look for module references.
   if (auto moduleTy = type->getAs<ModuleType>()) {
     ModuleLookupCache cache;
-    lookupInModule(moduleTy->getModule(), {}, name, decls, cache);
+    lookupInModule(moduleTy->getModule(), {}, name, decls,
+                   NLKind::QualifiedLookup, ResolutionKind::Overloadable, cache);
     return !decls.empty();
   }
 

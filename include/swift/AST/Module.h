@@ -403,4 +403,29 @@ LoadedModule::lookupOperator<InfixOperatorDecl>(Identifier name);
 
 } // end namespace swift
 
+namespace llvm {
+  template <>
+  class DenseMapInfo<swift::Module::ImportedModule> {
+    using Module = swift::Module;
+  public:
+    static Module::ImportedModule getEmptyKey() {
+      return {{}, llvm::DenseMapInfo<Module *>::getEmptyKey()};
+    }
+    static Module::ImportedModule getTombstoneKey() {
+      return {{}, llvm::DenseMapInfo<Module *>::getTombstoneKey()};
+    }
+
+    static unsigned getHashValue(const Module::ImportedModule &val) {
+      auto pair = std::make_pair(val.first.size(), val.second);
+      return llvm::DenseMapInfo<decltype(pair)>::getHashValue(pair);
+    }
+
+    static bool isEqual(const Module::ImportedModule &lhs,
+                        const Module::ImportedModule &rhs) {
+      return lhs.second == rhs.second &&
+             Module::isSameAccessPath(lhs.first, rhs.first);
+    }
+  };
+}
+
 #endif
