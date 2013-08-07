@@ -17,5 +17,9 @@ TOOLNAME = swift-demangle
 LINK_COMPONENTS := support
 USEDLIBS = swiftBasic.a
 
+LLVMLibsOptions :=     \
+  $(LLVMLibsOptions)   \
+  -lcurses
+
 include $(SWIFT_LEVEL)/Makefile
 
