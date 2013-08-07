@@ -19,13 +19,10 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
-
 using namespace swift;
 
-namespace {
-
 template<typename...T, typename...U>
-void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
+static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
               U &&...args) {
   Context.Diags.diagnose(loc,
                          diag, std::forward<U>(args)...);
@@ -96,7 +93,6 @@ static void diagnoseUnreachable(const SILInstruction *I,
       diagnoseNonExhaustiveSwitch(UI, Context);
       return;
     }
-
   }
 }
 
@@ -119,8 +115,6 @@ static void diagnoseReturn(const SILInstruction *I, ASTContext &Context) {
     }
   }
 }
-
-}; // end of anonymous namespace
 
 void swift::emitSILDataflowDiagnostics(const SILModule *M) {
   for (auto &Fn : *M)
