@@ -66,6 +66,10 @@ ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF,
   return { alloca, alloca };
 }
 
+void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, Address addr) const {
+  // TODO: lifetime intrinsics?
+}
+
 /// Allocate an object with fixed layout.
 OwnedAddress FixedTypeInfo::allocateBox(IRGenFunction &IGF,
                                         const Twine &name) const {

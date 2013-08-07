@@ -48,6 +48,8 @@ public:
 
   ContainedAddress allocateStack(IRGenFunction &IGF,
                                  const llvm::Twine &name) const override;
+  void deallocateStack(IRGenFunction &IGF, Address addr) const override;
+
   OwnedAddress allocateBox(IRGenFunction &IGF,
                            const llvm::Twine &name) const override;
 

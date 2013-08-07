@@ -182,6 +182,9 @@ public:
   virtual ContainedAddress allocateStack(IRGenFunction &IGF,
                                          const llvm::Twine &name) const = 0;
 
+  /// Deallocate a variable of this type.
+  virtual void deallocateStack(IRGenFunction &IGF, Address addr) const = 0;
+
   /// Allocate a box of this type on the heap.
   virtual OwnedAddress allocateBox(IRGenFunction &IGF,
                                    const llvm::Twine &name) const = 0;

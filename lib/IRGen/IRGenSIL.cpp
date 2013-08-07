@@ -1772,7 +1772,9 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
-  // Nothing to do. We could emit a lifetime.end here maybe.
+  const TypeInfo &type = getFragileTypeInfo(i->getOperand().getType());
+  Address addr = getLoweredAddress(i->getOperand());
+  type.deallocateStack(*this, addr);
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {

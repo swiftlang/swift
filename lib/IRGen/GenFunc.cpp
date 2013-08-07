@@ -1231,6 +1231,8 @@ void CallEmission::emitToExplosion(Explosion &out) {
       // Otherwise, we need to load.
       substResultTI.loadAsTake(IGF, temp, out);
     }
+
+    substResultTI.deallocateStack(IGF, ctemp.getContainer());
     return;
   }
 

@@ -74,6 +74,11 @@ public:
     return { buffer, getAddressForPointer(address) };
   }
 
+  void deallocateStack(IRGenFunction &IGF, Address buffer) const override {
+    llvm::Value *metadata = asImpl().getMetadataRef(IGF);
+    emitDeallocateBufferCall(IGF, metadata, buffer);
+  }
+
   /// Perform a "take-initialization" from the given object.  A
   /// take-initialization is like a C++ move-initialization, except that
   /// the old object is actually no longer permitted to be destroyed.
