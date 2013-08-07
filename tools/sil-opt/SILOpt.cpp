@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
+#include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "llvm/ADT/Statistic.h"
@@ -59,6 +60,12 @@ Passes(llvm::cl::desc("Passes:"),
 static llvm::cl::opt<bool>
 PrintStats("print-stats", llvm::cl::desc("Print various statistics"));
 
+static llvm::cl::opt<bool>
+VerifyMode("verify",
+           llvm::cl::desc("verify diagnostics against expected-"
+                          "{error|warning|note} annotations"));
+
+
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -93,6 +100,11 @@ int main(int argc, char **argv) {
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
+
+  // If we're in verify mode, install a custom diagnostic handling for
+  // SourceMgr.
+  if (VerifyMode)
+    enableDiagnosticVerifier(CI.getSourceMgr());
 
   if (CI.setup(Invocation))
     return 1;
@@ -135,5 +147,13 @@ int main(int argc, char **argv) {
   if (PrintStats)
     llvm::PrintStatistics(llvm::errs());
 
-  return CI.getASTContext().hadError();
+  bool HadError = CI.getASTContext().hadError();
+
+  // If we're in -verify mode, we've buffered up all of the generated
+  // diagnostics.  Check now to ensure that they meet our expectations.
+  if (VerifyMode)
+    HadError = verifyDiagnostics(CI.getSourceMgr(), CI.getInputBufferIDs());
+
+
+  return HadError;
 }
