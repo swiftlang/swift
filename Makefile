@@ -17,10 +17,13 @@ ifndef SWIFT_LEVEL
 
 IS_TOP_LEVEL := 1
 SWIFT_LEVEL := .
-DIRS := lib tools stdlib examples benchmark unittests   # include docs
+DIRS := lib tools stdlib benchmark unittests   # include docs
 
 PARALLEL_DIRS :=
 
+ifeq ($(BUILD_EXAMPLES),1)
+  PARALLEL_DIRS += examples
+endif
 endif
 
 CXX.Flags += -std=gnu++0x -Wno-nested-anon-types -Wdocumentation
