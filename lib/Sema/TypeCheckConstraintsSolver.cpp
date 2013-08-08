@@ -752,6 +752,29 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // If there are no overload sets, we can't solve this system.
   if (UnresolvedOverloadSets.empty()) {
+    // If the only remaining constraints are conformance constraints, and 
+    // we're allowed to have free variables, we still have a solution. 
+    // FIXME: It seems like this should be easier to detect. Aren't there 
+    // other kinds of constraints that could show up here?
+    if (allowFreeTypeVariables && hasFreeTypeVariables()) {
+      bool anyNonConformanceConstraints = false;
+      for (auto constraint : Constraints) {
+        if (constraint->getKind() != ConstraintKind::ConformsTo) {
+          anyNonConformanceConstraints = true;
+          break;
+        }
+      }
+
+      if (!anyNonConformanceConstraints) {
+        auto solution = finalize();
+        if (TC.getLangOpts().DebugConstraintSolver) {
+          llvm::errs().indent(solverState->depth * 2) << "(found solution)\n";
+        }
+        
+        solutions.push_back(std::move(solution));
+        return false;
+      }
+    }
     return true;
   }
 
