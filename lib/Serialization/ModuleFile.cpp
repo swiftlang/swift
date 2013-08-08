@@ -2206,8 +2206,9 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
 
 void ModuleFile::getReexportedModules(
     SmallVectorImpl<Module::ImportedModule> &results) {
-  // FIXME: Lock down on re-exports.
   for (auto &dep : Dependencies) {
+    if (!dep.IsExported)
+      continue;
     assert(dep.isLoaded());
     results.push_back(dep.Import);
   }
