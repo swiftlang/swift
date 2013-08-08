@@ -71,7 +71,7 @@ static llvm::Function *emitObjCClassInitializer(IRGenModule &IGM,
 
   IRGenFunction initIGF(IGM, ExplosionKind::Minimal, initFn);
   if (IGM.DebugInfo)
-    IGM.DebugInfo->createArtificialFunction(initIGF, initFn);
+    IGM.DebugInfo->emitArtificialFunction(initIGF, initFn);
 
   llvm::Constant *loadSelRef = IGM.getAddrOfObjCSelectorRef("load");
   llvm::Value *loadSel =
@@ -139,7 +139,7 @@ public:
                                              "class_replaceMethod",
                                              &IGF.IGM.Module);
       if (IGF.IGM.DebugInfo)
-        IGF.IGM.DebugInfo->createArtificialFunction(IGF, class_replaceMethod);
+        IGF.IGM.DebugInfo->emitArtificialFunction(IGF, class_replaceMethod);
     }
     
     CanType origTy = ext->getDeclaredTypeOfContext()->getCanonicalType();
@@ -218,7 +218,7 @@ static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
   
   IRGenFunction initIGF(IGM, ExplosionKind::Minimal, initFn);
   if (IGM.DebugInfo)
-    IGM.DebugInfo->createArtificialFunction(initIGF, initFn);
+    IGM.DebugInfo->emitArtificialFunction(initIGF, initFn);
   
   for (ExtensionDecl *ext : categories) {
     CategoryInitializerVisitor(initIGF, ext).visitMembers(ext);
@@ -262,7 +262,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     // Insert a call to the top_level_code symbol from the SIL module.
     IRGenFunction initIGF(*this, ExplosionKind::Minimal, initFn);
     if (DebugInfo)
-      DebugInfo->createArtificialFunction(initIGF, initFn);
+      DebugInfo->emitArtificialFunction(initIGF, initFn);
 
     initIGF.Builder.CreateCall(topLevelCodeFn);
     initIGF.Builder.CreateRetVoid();
@@ -320,7 +320,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
 
     IRGenFunction mainIGF(*this, ExplosionKind::Minimal, mainFn);
     if (DebugInfo)
-      DebugInfo->createArtificialFunction(mainIGF, mainFn);
+      DebugInfo->emitArtificialFunction(mainIGF, mainFn);
 
     // Poke argc and argv into variables declared in the Swift stdlib
     auto args = mainFn->arg_begin();

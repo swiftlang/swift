@@ -402,9 +402,9 @@ llvm::DIArray IRGenDebugInfo::createParameterTypes(SILModule &SILMod,
   return DBuilder.getOrCreateArray(Parameters);
 }
 
-void IRGenDebugInfo::createFunction(SILModule &SILMod, SILDebugScope *DS,
-                                    llvm::Function *Fn,
-                                    AbstractCC CC, SILType SILTy) {
+void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
+                                  llvm::Function *Fn,
+                                  AbstractCC CC, SILType SILTy) {
   StringRef Name;
   Location L = {};
   if (DS) {
@@ -556,18 +556,18 @@ llvm::DIScope IRGenDebugInfo::getOrCreateNamespace(llvm::DIScope Namespace,
 }
 
 
-void IRGenDebugInfo::createFunction(SILFunction *SILFn, llvm::Function *Fn) {
-  createFunction(SILFn->getModule(),
-                 SILFn->getDebugScope(), Fn,
-                 SILFn->getAbstractCC(),
-                 SILFn->getLoweredType());
+void IRGenDebugInfo::emitFunction(SILFunction *SILFn, llvm::Function *Fn) {
+  emitFunction(SILFn->getModule(),
+               SILFn->getDebugScope(), Fn,
+               SILFn->getAbstractCC(),
+               SILFn->getLoweredType());
 }
 
-void IRGenDebugInfo::createArtificialFunction(SILModule &SILMod,
+void IRGenDebugInfo::emitArtificialFunction(SILModule &SILMod,
                                               IRBuilder &Builder,
                                               llvm::Function *Fn) {
   SILDebugScope *Scope = new (SILMod) SILDebugScope();
-  createFunction(SILMod, Scope, Fn, AbstractCC::Freestanding, SILType());
+  emitFunction(SILMod, Scope, Fn, AbstractCC::Freestanding, SILType());
   setCurrentLoc(Builder, Scope);
 }
 

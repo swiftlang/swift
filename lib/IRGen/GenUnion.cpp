@@ -452,7 +452,7 @@ static void emitInjectionFunction(IRGenModule &IGM,
   ExplosionKind explosionKind = ExplosionKind::Minimal;
   IRGenFunction IGF(IGM, explosionKind, fn);
   if (IGM.DebugInfo)
-    IGM.DebugInfo->createArtificialFunction(IGF, fn);
+    IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
   if (elt->hasArgumentType()) {
     // FIXME: Implement!

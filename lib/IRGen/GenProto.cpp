@@ -1605,7 +1605,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
   IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
   if (IGM.DebugInfo)
-    IGM.DebugInfo->createArtificialFunction(IGF, fn);
+    IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
   auto argv = fn->arg_begin();
   switch (index) {
@@ -1781,7 +1781,7 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
     if (IGM.DebugInfo)
-      IGM.DebugInfo->createArtificialFunction(IGF, def);
+      IGM.DebugInfo->emitArtificialFunction(IGF, def);
 
     auto it = def->arg_begin();
     Address dest(it++, getFixedBufferAlignment(IGM));
@@ -1879,7 +1879,7 @@ static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
     IRBuilder B(IGM.getLLVMContext());
     B.SetInsertPoint(entry);
     if (IGM.DebugInfo)
-      IGM.DebugInfo->createArtificialFunction(*IGM.SILMod, B, def);
+      IGM.DebugInfo->emitArtificialFunction(*IGM.SILMod, B, def);
     B.CreateRetVoid();
   }
   return fn;
@@ -1900,7 +1900,7 @@ static llvm::Constant *getReturnSelfFunction(IRGenModule &IGM) {
     IRBuilder B(IGM.getLLVMContext());
     B.SetInsertPoint(entry);
     if (IGM.DebugInfo)
-      IGM.DebugInfo->createArtificialFunction(*IGM.SILMod, B, def);
+      IGM.DebugInfo->emitArtificialFunction(*IGM.SILMod, B, def);
     B.CreateRet(def->arg_begin());
   }
   return fn;
@@ -1921,7 +1921,7 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
     if (IGM.DebugInfo)
-      IGM.DebugInfo->createArtificialFunction(IGF, def);
+      IGM.DebugInfo->emitArtificialFunction(IGF, def);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
     Address src(it++, IGM.getPointerAlignment());
@@ -1952,7 +1952,7 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
     if (IGM.DebugInfo)
-      IGM.DebugInfo->createArtificialFunction(IGF, def);
+      IGM.DebugInfo->emitArtificialFunction(IGF, def);
 
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
@@ -1982,7 +1982,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
     if (IGM.DebugInfo)
-      IGM.DebugInfo->createArtificialFunction(IGF, def);
+      IGM.DebugInfo->emitArtificialFunction(IGF, def);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
     Address src(it++, IGM.getPointerAlignment());
@@ -2008,7 +2008,7 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
     if (IGM.DebugInfo)
-      IGM.DebugInfo->createArtificialFunction(IGF, def);
+      IGM.DebugInfo->emitArtificialFunction(IGF, def);
     Address arg(def->arg_begin(), IGM.getPointerAlignment());
     IGF.emitRelease(IGF.Builder.CreateLoad(arg));
     IGF.Builder.CreateRetVoid();
@@ -2047,7 +2047,7 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
     if (IGM.DebugInfo)
-      IGM.DebugInfo->createArtificialFunction(IGF, def);
+      IGM.DebugInfo->emitArtificialFunction(IGF, def);
 
     auto it = def->arg_begin();
     Address dest(it++, fixedTI->getFixedAlignment());
@@ -2312,7 +2312,7 @@ namespace {
       // Start building it.
       IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
       if (IGM.DebugInfo)
-        IGM.DebugInfo->createArtificialFunction(IGF, fn);
+        IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
       emitThunk(IGF);
 

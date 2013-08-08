@@ -1698,7 +1698,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   IRGenFunction subIGF(IGM, explosionLevel, fwd);
   if (IGM.DebugInfo)
-    IGM.DebugInfo->createArtificialFunction(subIGF, fwd);
+    IGM.DebugInfo->emitArtificialFunction(subIGF, fwd);
   
   Explosion params = subIGF.collectParameters();
 
@@ -1840,7 +1840,7 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
   
   IRGenFunction subIGF(IGM, explosionLevel, spec);
   if (IGM.DebugInfo)
-    IGM.DebugInfo->createArtificialFunction(subIGF, spec);
+    IGM.DebugInfo->emitArtificialFunction(subIGF, spec);
 
   Explosion params = subIGF.collectParameters();
   

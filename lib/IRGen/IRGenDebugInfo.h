@@ -122,25 +122,25 @@ public:
   /// Emit debug info for an import declaration.
   void emitImport(ImportDecl *D);
 
-  /// Create debug info for the given function.
+  /// Emit debug info for the given function.
   /// \param DS The parent scope of the function.
   /// \param Fn The IR representation of the function.
   /// \param CC The calling convention of the function.
   /// \param Ty The signature of the function.
-  void createFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
-                      AbstractCC CC, SILType Ty);
+  void emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
+                    AbstractCC CC, SILType Ty);
 
-  /// Create debug info for a given SIL function.
-  void createFunction(SILFunction *SILFn, llvm::Function *Fn);
+  /// Emit debug info for a given SIL function.
+  void emitFunction(SILFunction *SILFn, llvm::Function *Fn);
 
 
   /// Convenience function useful for functions without any source
-  /// location. Internally calls createFunction, creates a debug
+  /// location. Internally calls emitFunction, emits a debug
   /// scope, and finally sets it using setCurrentLoc.
-  inline void createArtificialFunction(IRGenFunction &IGF, llvm::Function *Fn) {
-    createArtificialFunction(*IGF.IGM.SILMod, IGF.Builder, Fn);
+  inline void emitArtificialFunction(IRGenFunction &IGF, llvm::Function *Fn) {
+    emitArtificialFunction(*IGF.IGM.SILMod, IGF.Builder, Fn);
   }
-  void createArtificialFunction(SILModule &SILMod, IRBuilder &Builder,
+  void emitArtificialFunction(SILModule &SILMod, IRBuilder &Builder,
                                 llvm::Function *Fn);
 
   /// Emit a dbg.declare instrinsic at the current insertion point and
