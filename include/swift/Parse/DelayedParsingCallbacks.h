@@ -14,6 +14,7 @@
 #define SWIFT_PARSE_DELAYED_PARSING_CALLBACKS_H
 
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/SourceManager.h"
 
 namespace swift {
   class FuncExpr;
@@ -52,9 +53,8 @@ public:
                                       FuncExpr *FE,
                                       SourceRange BodyRange) override {
     // Delay parsing if the code completion point is in the function body.
-    return CodeCompleteLoc.Value.getPointer() >
-               BodyRange.Start.Value.getPointer() &&
-        CodeCompleteLoc.Value.getPointer() <= BodyRange.End.Value.getPointer();
+    return TheParser.SourceMgr
+        .rangeContainsTokenLoc(BodyRange, CodeCompleteLoc);
   }
 };
 
