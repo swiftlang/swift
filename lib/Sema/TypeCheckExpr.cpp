@@ -487,9 +487,7 @@ void TypeChecker::computeCaptures(CapturingExpr *capturing) {
     finder.doWalk(closure->getBody());
   else {
     auto func = cast<FuncExpr>(capturing);
-    if (auto body = func->getBody()) {
-      finder.doWalk(body);
-    }
+    finder.doWalk(func->getBody());
   }
   ValueDecl** CaptureCopy
     = Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());

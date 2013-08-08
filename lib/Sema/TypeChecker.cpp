@@ -605,8 +605,8 @@ namespace {
     /// we're nested in.
     SmallVector<DeclContext*, 4> CurDeclContexts;
 
-    // FuncExprs - This is a list of all the FuncExprs we need to analyze, in
-    // an appropriate order.
+    /// This is a list of all the FuncExprs with parsed bodies that we need to
+    /// analyze, in an appropriate order.
     SmallVector<FuncExprLike, 32> FuncExprs;
 
     virtual bool walkToDeclPre(Decl *D) {
@@ -659,7 +659,8 @@ namespace {
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (FuncExpr *FE = dyn_cast<FuncExpr>(E))
-        FuncExprs.push_back(FE);
+        if (FE->getBody())
+          FuncExprs.push_back(FE);
 
       if (CapturingExpr *CE = dyn_cast<CapturingExpr>(E))
         CurDeclContexts.push_back(CE);
@@ -1030,7 +1031,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       llvm_unreachable("Unhandled external definition kind");
     }
 
-    // Define any pending implicitly declarations.
+    // Define any pending implicit declarations.
     TC.definePendingImplicitDecls();
     prePass.FuncExprs.append(TC.implicitlyDefinedFunctions.begin(),
                              TC.implicitlyDefinedFunctions.end());
@@ -1051,7 +1052,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 bool swift::performTypeLocChecking(TranslationUnit *TU, TypeLoc &T) {
   return TypeChecker(*TU).validateType(T);
 }
-
 
 bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
                                            Expr *&parsedExpr) {

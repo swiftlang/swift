@@ -605,8 +605,7 @@ void TypeChecker::typeCheckFunctionBodyUntil(FuncExpr *FE,
   }
 
   BraceStmt *BS = FE->getBody();
-  if (!BS)
-    return;
+  assert(BS && "Should have a body");
 
   StmtChecker SC(*this, FE);
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
