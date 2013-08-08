@@ -169,4 +169,25 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 
+sil @takes_closure : $[thin] (x : () -> ()) -> ()
+sil @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
+
+// CHECK-LABEL: sil @closure_test
+sil @closure_test : $[thin] () -> () {
+bb0:
+  %0 = alloc_box $Int64    // expected-note {{variable defined here}}
+
+  %5 = function_ref @takes_closure : $[thin] (x : () -> ()) -> ()
+  %6 = function_ref @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
+  retain %0#0 : $Builtin.ObjectPointer
+  %8 = partial_apply %6(%0#0, %0#1) : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()  // expected-error {{variable captured by a closure before being initialized}}
+  %9 = apply %5(%8) : $[thin] (x : () -> ()) -> ()
+  release %0#0 : $Builtin.ObjectPointer
+
+  %11 = tuple ()
+  return %11 : $()
+}
+
+
+
 

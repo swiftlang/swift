@@ -125,6 +125,7 @@ namespace {
     void doIt();
     void handleLoadUse(SILInstruction *Inst);
     void handleByrefUse(SILInstruction *Inst);
+    void handleEscape(SILInstruction *Inst);
 
     enum DIKind {
       DI_Yes,
@@ -171,7 +172,7 @@ void ElementPromotion::doIt() {
     case UseKind::Load:     handleLoadUse(Use.first); break;
     case UseKind::Store:    break;
     case UseKind::ByrefUse: handleByrefUse(Use.first); break;
-    case UseKind::Escape:   break;
+    case UseKind::Escape:   handleEscape(Use.first); break;
     }
 
     if (HadError) break;
@@ -210,10 +211,9 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   HadError = true;
 }
 
-/// Given a byref use (a Apply or PartialApply), determine whether the loaded
+/// Given a byref use (an Apply), determine whether the loaded
 /// value is definitely assigned or not.  If not, produce a diagnostic.
 void ElementPromotion::handleByrefUse(SILInstruction *Inst) {
-
   auto DI = checkDefinitelyInit(Inst);
   if (DI == DI_Yes)
     return;
@@ -227,6 +227,22 @@ void ElementPromotion::handleByrefUse(SILInstruction *Inst) {
            diag::variable_defined_here);
   HadError = true;
 }
+
+void ElementPromotion::handleEscape(SILInstruction *Inst) {
+  auto DI = checkDefinitelyInit(Inst);
+  if (DI == DI_Yes)
+    return;
+
+  // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
+  // TODO: The QoI could be improved in many different ways here.  We could give
+  // some path information, give the name / access path of the variable, etc.
+  diagnose(Inst->getModule(), Inst->getLoc(),
+           diag::variable_escape_before_initialized);
+  diagnose(Inst->getModule(), TheAllocBox->getLoc(),
+           diag::variable_defined_here);
+  HadError = true;
+}
+
 
 
 
@@ -341,11 +357,14 @@ static void collectAllocationUses(SILValue Pointer,
 
 
 
-    // apply and partial_apply instructions do not capture the pointer when
-    // it is passed through [byref] arguments or for indirect returns.  Byref
-    // arguments are treated as uses and may-store's, but an indirect return is
-    // treated as a full store.
-    if (auto *Apply = dyn_cast<FunctionInst>(User)) {
+    // The apply instruction does not capture the pointer when it is passed
+    // through [byref] arguments or for indirect returns.  Byref arguments are
+    // treated as uses and may-store's, but an indirect return is treated as a
+    // full store.
+    //
+    // Note that partial_apply instructions always close over their argument.
+    //
+    if (auto *Apply = dyn_cast<ApplyInst>(User)) {
       SILType FnTy = Apply->getOperand(0).getType();
       SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(*Apply->getModule());
       unsigned ArgumentNumber = UI->getOperandNumber()-1;
