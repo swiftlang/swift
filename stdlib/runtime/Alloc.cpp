@@ -441,8 +441,33 @@ extern "C" bool swift_isUniquelyReferenced(HeapObject *object) {
   return result;
 }
 
-void swift::swift_weakInit(WeakReference *ref) {
-  ref->Value = nullptr;
+void swift::swift_weakInit(WeakReference *ref, HeapObject *value) {
+  ref->Value = value;
+  swift_weakRetain(value);
+}
+
+void swift::swift_weakAssign(WeakReference *ref, HeapObject *newValue) {
+  swift_weakRetain(newValue);
+  auto oldValue = ref->Value;
+  ref->Value = newValue;
+  swift_weakRelease(oldValue);
+}
+
+HeapObject *swift::swift_weakLoadStrong(WeakReference *ref) {
+  auto object = ref->Value;
+  if (object == nullptr) return nullptr;
+  if (object->refCount & RC_DEALLOCATING_BIT) {
+    swift_weakRelease(object);
+    ref->Value = nullptr;
+    return nullptr;
+  }
+  return swift_tryRetain(object);
+}
+
+HeapObject *swift::swift_weakTakeStrong(WeakReference *ref) {
+  auto result = swift_weakLoadStrong(ref);
+  swift_weakDestroy(ref);
+  return result;
 }
 
 void swift::swift_weakDestroy(WeakReference *ref) {
@@ -486,17 +511,6 @@ void swift::swift_weakTakeAssign(WeakReference *dest, WeakReference *src) {
     swift_weakRelease(object);
   }
   swift_weakTakeInit(dest, src);
-}
-
-HeapObject *swift::swift_weakTryRetain(WeakReference *ref) {
-  auto object = ref->Value;
-  if (object == nullptr) return nullptr;
-  if (object->refCount & RC_DEALLOCATING_BIT) {
-    swift_weakRelease(object);
-    ref->Value = nullptr;
-    return nullptr;
-  }
-  return swift_tryRetain(object);
 }
 
 void swift::_swift_abortRetainUnowned(const void *object) {

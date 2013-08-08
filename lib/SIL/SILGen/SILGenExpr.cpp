@@ -357,7 +357,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc,
                                       IsTake_t isTake) {
   auto &addrTL = getTypeLowering(addr.getType());
   auto &semanticTL = addrTL.getSemanticTypeLowering(SGM.Types);
-  if (addrTL.isAddressOnly()) {
+  if (semanticTL.isAddressOnly()) {
     // Copy the address-only value.
     SILValue copy = getBufferForExprResult(loc, semanticTL.getLoweredType(), C);
     addrTL.emitSemanticLoadInto(B, loc, addr, copy, isTake, IsInitialization);

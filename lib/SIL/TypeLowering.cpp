@@ -470,6 +470,19 @@ bool SILType::isAddressOnly(CanType type, SILModule &M) {
   return classifyType(type, M) == LoweredTypeKind::AddressOnly;
 }
 
+/// Emit the semantic store operation on a reference type.
+static void emitReferenceSemanticStore(SILBuilder &B, SILLocation loc,
+                                       SILValue value, SILValue addr,
+                                       IsInitialization_t isInit) {
+  // FIXME: Use assign instruction here? Or maybe have two
+  // variants of this function, one for canonical, one for
+  // non-canonical.
+  SILValue old;
+  if (!isInit) old = B.createLoad(loc, addr);
+  B.createStore(loc, value, addr);
+  if (!isInit) B.createRelease(loc, old);
+}
+
 namespace {
   /// A class for loadable types.
   class LoadableTypeLowering : public TypeLowering {
@@ -684,13 +697,7 @@ namespace {
     void emitSemanticStore(SILBuilder &B, SILLocation loc,
                            SILValue value, SILValue addr,
                            IsInitialization_t isInit) const override {
-      // FIXME: Use assign instruction here? Or maybe have two
-      // variants of this function, one for canonical, one for
-      // non-canonical.
-      SILValue old;
-      if (!isInit) old = B.createLoad(loc, addr);
-      B.createStore(loc, value, addr);
-      if (!isInit) B.createRelease(loc, old);
+      emitReferenceSemanticStore(B, loc, value, addr, isInit);
     }
 
     SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
@@ -788,20 +795,24 @@ namespace {
     void emitSemanticStore(SILBuilder &B, SILLocation loc,
                            SILValue value, SILValue addr,
                            IsInitialization_t isInit) const override {
-      // FIXME
+      B.createStoreWeak(loc, value, addr, isInit);
+
+      // store_weak does not consume a retain on its input, so we have
+      // to balance that out.
+      B.createRelease(loc, value);
     }
 
     SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
                               SILValue addr, IsTake_t isTake) const override {
-      // FIXME
-      return SILValue();
+      return B.createLoadWeak(loc, addr, isTake);
     }
 
     void emitSemanticLoadInto(SILBuilder &B, SILLocation loc,
                               SILValue src, SILValue dest,
                               IsTake_t isTake,
                               IsInitialization_t isInit) const override {
-      // FIXME
+      auto value = B.createLoadWeak(loc, src, isTake);
+      emitReferenceSemanticStore(B, loc, value, dest, isInit);
     }
   };
 

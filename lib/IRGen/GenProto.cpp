@@ -561,6 +561,24 @@ namespace {
       IGF.emitMemCpy(dest, src, NumProtocols * IGF.IGM.getPointerSize());
     }
 
+    void emitLoadOfTables(IRGenFunction &IGF, Address existential,
+                          Explosion &out) const {
+      for (unsigned i = 0; i != NumProtocols; ++i) {
+        auto tableAddr = IGF.Builder.CreateStructGEP(existential, i,
+                                                i * IGF.IGM.getPointerSize());
+        out.add(IGF.Builder.CreateLoad(tableAddr));
+      }
+    }
+
+    void emitStoreOfTables(IRGenFunction &IGF, Explosion &in,
+                           Address existential) const {
+      for (unsigned i = 0; i != NumProtocols; ++i) {
+        auto tableAddr = IGF.Builder.CreateStructGEP(existential, i,
+                                                i * IGF.IGM.getPointerSize());
+        IGF.Builder.CreateStore(in.claimNext(), tableAddr);
+      }
+    }
+
     Address projectValue(IRGenFunction &IGF, Address existential) const {
       return IGF.Builder.CreateStructGEP(existential, NumProtocols,
                                        NumProtocols * IGF.IGM.getPointerSize(),
@@ -601,6 +619,43 @@ namespace {
     void destroy(IRGenFunction &IGF, Address existential) const {
       Address valueAddr = projectValue(IGF, existential);
       IGF.emitUnknownWeakDestroy(valueAddr);
+    }
+
+    // These explosions must follow the same schema as
+    // ClassExistentialTypeInfo, i.e. first the tables, then the value.
+
+    void weakLoadStrong(IRGenFunction &IGF, Address existential,
+                        Explosion &out) const override {
+      emitLoadOfTables(IGF, existential, out);
+      Address valueAddr = projectValue(IGF, existential);
+      out.add(IGF.emitUnknownWeakLoadStrong(valueAddr,
+                                            IGF.IGM.UnknownRefCountedPtrTy));
+    }
+
+    void weakTakeStrong(IRGenFunction &IGF, Address existential,
+                        Explosion &out) const override {
+      emitLoadOfTables(IGF, existential, out);
+      Address valueAddr = projectValue(IGF, existential);
+      out.add(IGF.emitUnknownWeakTakeStrong(valueAddr,
+                                            IGF.IGM.UnknownRefCountedPtrTy));
+    }
+
+    void weakInit(IRGenFunction &IGF, Explosion &in,
+                  Address existential) const override {
+      emitStoreOfTables(IGF, in, existential);
+      llvm::Value *value = in.claimNext();
+      assert(value->getType() == IGF.IGM.UnknownRefCountedPtrTy);
+      Address valueAddr = projectValue(IGF, existential);
+      IGF.emitUnknownWeakInit(value, valueAddr);
+    }
+
+    void weakAssign(IRGenFunction &IGF, Explosion &in,
+                    Address existential) const override {
+      emitStoreOfTables(IGF, in, existential);
+      llvm::Value *value = in.claimNext();
+      assert(value->getType() == IGF.IGM.UnknownRefCountedPtrTy);
+      Address valueAddr = projectValue(IGF, existential);
+      IGF.emitUnknownWeakAssign(value, valueAddr);
     }
   };
 

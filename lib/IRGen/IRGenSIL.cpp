@@ -49,6 +49,7 @@
 #include "IRGenModule.h"
 #include "Linking.h"
 #include "ReferenceTypeInfo.h"
+#include "WeakTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -508,6 +509,8 @@ public:
 
   void visitLoadInst(LoadInst *i);
   void visitStoreInst(StoreInst *i);
+  void visitLoadWeakInst(LoadWeakInst *i);
+  void visitStoreWeakInst(StoreWeakInst *i);
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
   void visitBuiltinZeroInst(BuiltinZeroInst *i);
@@ -1672,6 +1675,33 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
                               i->getSrc().getType().getObjectType());
 
   type.initialize(*this, source, dest);
+}
+
+void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
+  Address source = getLoweredAddress(i->getOperand());
+  auto &weakTI =
+    cast<WeakTypeInfo>(getFragileTypeInfo(i->getOperand().getType()));
+
+  Explosion result(ExplosionKind::Maximal);
+  if (i->isTake()) {
+    weakTI.weakTakeStrong(*this, source, result);
+  } else {
+    weakTI.weakLoadStrong(*this, source, result);
+  }
+
+  setLoweredExplosion(SILValue(i, 0), result);
+}
+
+void IRGenSILFunction::visitStoreWeakInst(swift::StoreWeakInst *i) {
+  Explosion source = getLoweredExplosion(i->getSrc());
+  Address dest = getLoweredAddress(i->getDest());
+
+  auto &weakTI = cast<WeakTypeInfo>(getFragileTypeInfo(i->getDest().getType()));
+  if (i->isInitialization()) {
+    weakTI.weakInit(*this, source, dest);
+  } else {
+    weakTI.weakAssign(*this, source, dest);
+  }
 }
 
 void IRGenSILFunction::visitRetainInst(swift::RetainInst *i) {

@@ -606,33 +606,59 @@ namespace {
   class SwiftWeakReferenceTypeInfo
     : public IndirectTypeInfo<SwiftWeakReferenceTypeInfo,
                               WeakTypeInfo> {
+    llvm::Type *ValueType;
   public:
-    SwiftWeakReferenceTypeInfo(llvm::Type *type,
+    SwiftWeakReferenceTypeInfo(llvm::Type *valueType,
+                               llvm::Type *weakType,
                                Size size, Alignment alignment)
-      : IndirectTypeInfo(type, size, alignment) {}
+      : IndirectTypeInfo(weakType, size, alignment), ValueType(valueType) {}
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr) const {
+                            Address srcAddr) const override {
       IGF.emitWeakCopyInit(destAddr, srcAddr);
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr) const {
+                            Address srcAddr) const override {
       IGF.emitWeakTakeInit(destAddr, srcAddr);
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr) const {
+                        Address srcAddr) const override {
       IGF.emitWeakCopyAssign(destAddr, srcAddr);
     }
 
     void assignWithTake(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr) const {
+                        Address srcAddr) const override {
       IGF.emitWeakTakeAssign(destAddr, srcAddr);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr) const {
+    void destroy(IRGenFunction &IGF, Address addr) const override {
       IGF.emitWeakDestroy(addr);
+    }
+
+    void weakLoadStrong(IRGenFunction &IGF, Address addr,
+                        Explosion &out) const override {
+      out.add(IGF.emitWeakLoadStrong(addr, ValueType));
+    }
+
+    void weakTakeStrong(IRGenFunction &IGF, Address addr,
+                        Explosion &out) const override {
+      out.add(IGF.emitWeakTakeStrong(addr, ValueType));
+    }
+
+    void weakInit(IRGenFunction &IGF, Explosion &in,
+                  Address dest) const override {
+      llvm::Value *value = in.claimNext();
+      assert(value->getType() == ValueType);
+      IGF.emitWeakInit(value, dest);
+    }
+
+    void weakAssign(IRGenFunction &IGF, Explosion &in,
+                    Address dest) const override {
+      llvm::Value *value = in.claimNext();
+      assert(value->getType() == ValueType);
+      IGF.emitWeakAssign(value, dest);
     }
   };
 }
@@ -646,7 +672,8 @@ TypeConverter::createSwiftUnownedStorageType(llvm::Type *valueType) {
 
 const WeakTypeInfo *
 TypeConverter::createSwiftWeakStorageType(llvm::Type *valueType) {
-  return new SwiftWeakReferenceTypeInfo(IGM.WeakReferencePtrTy,
+  return new SwiftWeakReferenceTypeInfo(valueType,
+                                    IGM.WeakReferencePtrTy->getElementType(),
                                         IGM.getWeakReferenceSize(),
                                         IGM.getWeakReferenceAlignment());
 }
@@ -678,10 +705,14 @@ namespace {
   class UnknownWeakReferenceTypeInfo :
       public IndirectTypeInfo<UnknownWeakReferenceTypeInfo,
                               WeakTypeInfo> {
+    /// We need to separately store the value type because we always
+    /// use the same type to store the weak reference struct.
+    llvm::Type *ValueType;
   public:
-    UnknownWeakReferenceTypeInfo(llvm::Type *type,
+    UnknownWeakReferenceTypeInfo(llvm::Type *valueType,
+                                 llvm::Type *weakType,
                                  Size size, Alignment alignment)
-      : IndirectTypeInfo(type, size, alignment) {}
+      : IndirectTypeInfo(weakType, size, alignment), ValueType(valueType) {}
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                             Address srcAddr) const {
@@ -706,6 +737,30 @@ namespace {
     void destroy(IRGenFunction &IGF, Address addr) const {
       IGF.emitUnknownWeakDestroy(addr);
     }
+
+    void weakLoadStrong(IRGenFunction &IGF, Address addr,
+                        Explosion &out) const override {
+      out.add(IGF.emitUnknownWeakLoadStrong(addr, ValueType));
+    }
+
+    void weakTakeStrong(IRGenFunction &IGF, Address addr,
+                        Explosion &out) const override {
+      out.add(IGF.emitUnknownWeakTakeStrong(addr, ValueType));
+    }
+
+    void weakInit(IRGenFunction &IGF, Explosion &in,
+                  Address dest) const override {
+      llvm::Value *value = in.claimNext();
+      assert(value->getType() == ValueType);
+      IGF.emitUnknownWeakInit(value, dest);
+    }
+
+    void weakAssign(IRGenFunction &IGF, Explosion &in,
+                    Address dest) const override {
+      llvm::Value *value = in.claimNext();
+      assert(value->getType() == ValueType);
+      IGF.emitUnknownWeakAssign(value, dest);
+    }
   };
 }
 
@@ -718,7 +773,8 @@ TypeConverter::createUnknownUnownedStorageType(llvm::Type *valueType) {
 
 const WeakTypeInfo *
 TypeConverter::createUnknownWeakStorageType(llvm::Type *valueType) {
-  return new UnknownWeakReferenceTypeInfo(IGM.WeakReferencePtrTy,
+  return new UnknownWeakReferenceTypeInfo(valueType,
+                                      IGM.WeakReferencePtrTy->getElementType(),
                                           IGM.getWeakReferenceSize(),
                                           IGM.getWeakReferenceAlignment());
 }
@@ -729,17 +785,19 @@ static bool doesNotRequireRefCounting(llvm::Value *value) {
   return isa<llvm::Constant>(value);
 }
 
+static llvm::FunctionType *getTypeOfFunction(llvm::Constant *fn) {
+  return cast<llvm::FunctionType>(fn->getType()->getPointerElementType());
+}
+
 /// Emit a unary call to perform a ref-counting operation.
 ///
-/// \param fn - expected signature 'void (T*)'
+/// \param fn - expected signature 'void (T)'
 static void emitUnaryRefCountCall(IRGenFunction &IGF,
                                   llvm::Constant *fn,
                                   llvm::Value *value) {
-  auto fnTy = cast<llvm::FunctionType>(fn->getType()->getPointerElementType());
-
-  // Instead of casting the input to %swift.refcounted*, we cast the
-  // function type.  This tends to produce less IR, but might be evil.
-  if (value->getType() != fnTy->getParamType(0)) {
+  // Instead of casting the input, we cast the function type.
+  // This tends to produce less IR, but might be evil.
+  if (value->getType() != getTypeOfFunction(fn)->getParamType(0)) {
     llvm::FunctionType *fnType =
       llvm::FunctionType::get(IGF.IGM.VoidTy, value->getType(), false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
@@ -751,20 +809,19 @@ static void emitUnaryRefCountCall(IRGenFunction &IGF,
   call->setDoesNotThrow();  
 }
 
-/// Emit a unary call to perform a ref-counting operation.
+/// Emit a copy-like call to perform a ref-counting operation.
 ///
-/// \param fn - expected signature 'void (T*, T*)'
-static void emitBinaryRefCountCall(IRGenFunction &IGF,
-                                   llvm::Constant *fn,
-                                   llvm::Value *dest,
-                                   llvm::Value *src) {
+/// \param fn - expected signature 'void (T, T)'
+static void emitCopyLikeCall(IRGenFunction &IGF,
+                             llvm::Constant *fn,
+                             llvm::Value *dest,
+                             llvm::Value *src) {
   assert(dest->getType() == src->getType() &&
          "type mismatch in binary refcounting operation");
 
-  // Instead of casting the input to %swift.refcounted*, we cast the
-  // function type.  This tends to produce less IR, but might be evil.
-  if (dest->getType() !=
-        cast<llvm::FunctionType>(fn->getType())->getParamType(0)) {
+  // Instead of casting the inputs, we cast the function type.
+  // This tends to produce less IR, but might be evil.
+  if (dest->getType() != getTypeOfFunction(fn)->getParamType(0)) {
     llvm::Type *paramTypes[] = { dest->getType(), dest->getType() };
     llvm::FunctionType *fnType =
       llvm::FunctionType::get(IGF.IGM.VoidTy, paramTypes, false);
@@ -775,6 +832,58 @@ static void emitBinaryRefCountCall(IRGenFunction &IGF,
   llvm::CallInst *call = IGF.Builder.CreateCall2(fn, dest, src);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();  
+}
+
+/// Emit a call to a function with a loadWeak-like signature.
+///
+/// \param fn - expected signature 'T (Weak*)'
+static llvm::Value *emitLoadWeakLikeCall(IRGenFunction &IGF,
+                                         llvm::Constant *fn,
+                                         llvm::Value *addr,
+                                         llvm::Type *resultType) {
+  assert(addr->getType() == IGF.IGM.WeakReferencePtrTy &&
+         "address is not of a weak reference");
+
+  // Instead of casting the output, we cast the function type.
+  // This tends to produce less IR, but might be evil.
+  if (resultType != getTypeOfFunction(fn)->getReturnType()) {
+    llvm::Type *paramTypes[] = { addr->getType() };
+    llvm::FunctionType *fnType =
+      llvm::FunctionType::get(resultType, paramTypes, false);
+    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+  }
+
+  // Emit the call.
+  llvm::CallInst *call = IGF.Builder.CreateCall(fn, addr);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotThrow();
+
+  return call;
+}
+
+/// Emit a call to a function with a storeWeak-like signature.
+///
+/// \param fn - expected signature 'void (Weak*, T)'
+static void emitStoreWeakLikeCall(IRGenFunction &IGF,
+                                  llvm::Constant *fn,
+                                  llvm::Value *addr,
+                                  llvm::Value *value) {
+  assert(addr->getType() == IGF.IGM.WeakReferencePtrTy &&
+         "address is not of a weak reference");
+
+  // Instead of casting the inputs, we cast the function type.
+  // This tends to produce less IR, but might be evil.
+  if (value->getType() != getTypeOfFunction(fn)->getParamType(1)) {
+    llvm::Type *paramTypes[] = { addr->getType(), value->getType() };
+    llvm::FunctionType *fnType =
+      llvm::FunctionType::get(IGF.IGM.VoidTy, paramTypes, false);
+    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+  }
+
+  // Emit the call.
+  llvm::CallInst *call = IGF.Builder.CreateCall2(fn, addr, value);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotThrow();
 }
 
 /// Emit a call to swift_retain_noresult.  In general, you should not be using
@@ -856,34 +965,52 @@ void IRGenFunction::emitUnknownRelease(llvm::Value *value) {
   return emitObjCRelease(value);
 }
 
-#define REFCOUNT_VALUE(ID)                                            \
+#define DEFINE_VALUE_OP(ID)                                           \
 void IRGenFunction::emit##ID(llvm::Value *value) {                    \
   if (doesNotRequireRefCounting(value)) return;                       \
   emitUnaryRefCountCall(*this, IGM.get##ID##Fn(), value);             \
 }
-#define REFCOUNT_ADDR(ID)                                             \
+#define DEFINE_ADDR_OP(ID)                                            \
 void IRGenFunction::emit##ID(Address addr) {                          \
   emitUnaryRefCountCall(*this, IGM.get##ID##Fn(), addr.getAddress()); \
 }
-#define REFCOUNT_ADDR_ADDR(ID)                                        \
+#define DEFINE_COPY_OP(ID)                                            \
 void IRGenFunction::emit##ID(Address dest, Address src) {             \
-  emitBinaryRefCountCall(*this, IGM.get##ID##Fn(), dest.getAddress(), \
-                         src.getAddress());                           \
+  emitCopyLikeCall(*this, IGM.get##ID##Fn(), dest.getAddress(),       \
+                   src.getAddress());                                 \
+}
+#define DEFINE_LOAD_WEAK_OP(ID)                                       \
+llvm::Value *IRGenFunction::emit##ID(Address src, llvm::Type *type) { \
+  return emitLoadWeakLikeCall(*this, IGM.get##ID##Fn(),               \
+                              src.getAddress(), type);                \
+}
+#define DEFINE_STORE_WEAK_OP(ID)                                      \
+void IRGenFunction::emit##ID(llvm::Value *value, Address src) {       \
+  emitStoreWeakLikeCall(*this, IGM.get##ID##Fn(),                     \
+                        src.getAddress(), value);                     \
 }
 
-REFCOUNT_VALUE(RetainUnowned)
-REFCOUNT_VALUE(UnownedRelease)
-REFCOUNT_VALUE(UnownedRetain)
-REFCOUNT_ADDR(WeakDestroy)
-REFCOUNT_ADDR_ADDR(WeakCopyInit)
-REFCOUNT_ADDR_ADDR(WeakCopyAssign)
-REFCOUNT_ADDR_ADDR(WeakTakeInit)
-REFCOUNT_ADDR_ADDR(WeakTakeAssign)
-REFCOUNT_VALUE(UnknownRetainUnowned)
-REFCOUNT_VALUE(UnknownUnownedRelease)
-REFCOUNT_VALUE(UnknownUnownedRetain)
-REFCOUNT_ADDR(UnknownWeakDestroy)
-REFCOUNT_ADDR_ADDR(UnknownWeakCopyInit)
-REFCOUNT_ADDR_ADDR(UnknownWeakCopyAssign)
-REFCOUNT_ADDR_ADDR(UnknownWeakTakeInit)
-REFCOUNT_ADDR_ADDR(UnknownWeakTakeAssign)
+DEFINE_VALUE_OP(RetainUnowned)
+DEFINE_VALUE_OP(UnownedRelease)
+DEFINE_VALUE_OP(UnownedRetain)
+DEFINE_LOAD_WEAK_OP(WeakLoadStrong)
+DEFINE_LOAD_WEAK_OP(WeakTakeStrong)
+DEFINE_STORE_WEAK_OP(WeakInit)
+DEFINE_STORE_WEAK_OP(WeakAssign)
+DEFINE_ADDR_OP(WeakDestroy)
+DEFINE_COPY_OP(WeakCopyInit)
+DEFINE_COPY_OP(WeakCopyAssign)
+DEFINE_COPY_OP(WeakTakeInit)
+DEFINE_COPY_OP(WeakTakeAssign)
+DEFINE_VALUE_OP(UnknownRetainUnowned)
+DEFINE_VALUE_OP(UnknownUnownedRelease)
+DEFINE_VALUE_OP(UnknownUnownedRetain)
+DEFINE_LOAD_WEAK_OP(UnknownWeakLoadStrong)
+DEFINE_LOAD_WEAK_OP(UnknownWeakTakeStrong)
+DEFINE_STORE_WEAK_OP(UnknownWeakInit)
+DEFINE_STORE_WEAK_OP(UnknownWeakAssign)
+DEFINE_ADDR_OP(UnknownWeakDestroy)
+DEFINE_COPY_OP(UnknownWeakCopyInit)
+DEFINE_COPY_OP(UnknownWeakCopyAssign)
+DEFINE_COPY_OP(UnknownWeakTakeInit)
+DEFINE_COPY_OP(UnknownWeakTakeAssign)

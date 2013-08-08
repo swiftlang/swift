@@ -268,7 +268,29 @@ struct WeakReference {
 /// Initialize a weak reference.
 ///
 /// \param ref - never null
-extern "C" void swift_weakInit(WeakReference *ref);
+/// \param value - can be null
+extern "C" void swift_weakInit(WeakReference *ref, HeapObject *value);
+
+/// Assign a new value to a weak reference.
+///
+/// \param ref - never null
+/// \param value - can be null
+extern "C" void swift_weakAssign(WeakReference *ref, HeapObject *value);
+
+/// Load a value from a weak reference.  If the current value is a
+/// non-null object that has begun deallocation, returns null;
+/// otherwise, retains the object before returning.
+///
+/// \param ref - never null
+/// \return can be null
+extern "C" HeapObject *swift_weakLoadStrong(WeakReference *ref);
+
+/// Load a value from a weak reference as if by swift_weakLoadStrong,
+/// but leaving the reference in an uninitialized state.
+///
+/// \param ref - never null
+/// \return can be null
+extern "C" HeapObject *swift_weakTakeStrong(WeakReference *ref);
 
 /// Destroy a weak reference.
 ///
@@ -299,11 +321,6 @@ extern "C" void swift_weakCopyAssign(WeakReference *dest, WeakReference *src);
 /// \param src - never null, but can refer to a null object
 extern "C" void swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
 
-/// Try to retain a weak reference
-///
-/// \param object - never null, but can refer to a null object
-extern "C" HeapObject *swift_weakTryRetain(WeakReference *object);
-
 #if SWIFT_OBJC_INTEROP
 
 /// Increment the strong retain count of an object which may have been
@@ -317,6 +334,33 @@ extern "C" void swift_unknownWeakRetain(void *value);
 /// Decrement the weak-reference count of an object that might not be
 /// a native Swift object.
 extern "C" void swift_unknownWeakRelease(void *value);
+
+/// Initialize a weak reference.
+///
+/// \param ref - never null
+/// \param value - not necessarily a native Swift object; can be null
+extern "C" void swift_unknownWeakInit(WeakReference *ref, void *value);
+
+/// Assign a new value to a weak reference.
+///
+/// \param ref - never null
+/// \param value - not necessarily a native Swift object; can be null
+extern "C" void swift_unknownWeakAssign(WeakReference *ref, void *value);
+
+/// Load a value from a weak reference, much like swift_weakLoadStrong
+/// but without requiring the variable to refer to a native Swift object.
+///
+/// \param ref - never null
+/// \return can be null
+extern "C" void *swift_unknownWeakLoadStrong(WeakReference *ref);
+
+/// Load a value from a weak reference as if by
+/// swift_unknownWeakLoadStrong, but leaving the reference in an
+/// uninitialized state.
+///
+/// \param ref - never null
+/// \return can be null
+extern "C" void *swift_unknownWeakTakeStrong(WeakReference *ref);
 
 /// Destroy a weak reference variable that might not refer to a native
 /// Swift object.

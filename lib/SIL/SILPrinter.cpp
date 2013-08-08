@@ -440,6 +440,15 @@ public:
     OS << "store " << getID(SI->getSrc()) << " to "
        << getIDAndType(SI->getDest());
   }
+  void visitLoadWeakInst(LoadWeakInst *LI) {
+    OS << "load_weak " << getIDAndType(LI->getOperand());
+  }
+  void visitStoreWeakInst(StoreWeakInst *SI) {
+    OS << "store_weak " << getID(SI->getSrc()) << " to ";
+    if (SI->isInitialization())
+      OS << "[initialization] ";
+    OS << getIDAndType(SI->getDest());
+  }
   void visitCopyAddrInst(CopyAddrInst *CI) {
     OS << "copy_addr ";
     if (CI->isTakeOfSrc())

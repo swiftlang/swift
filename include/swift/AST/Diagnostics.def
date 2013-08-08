@@ -386,6 +386,11 @@ ERROR(sil_expected_allocation_kind,decl_parsing,none,
       "expected allocation kind (heap, pseudo, or stack)", ())
 ERROR(sil_invalid_instr_operands,decl_parsing,none,
       "invalid instruction operands", ())
+ERROR(sil_operand_not_address,decl_parsing,none,
+      "%0 operand of '%1' must have address type", (StringRef, StringRef))
+ERROR(sil_operand_not_weak_address,decl_parsing,none,
+      "%0 operand of '%1' must have address of [weak] type",
+      (StringRef, StringRef))
 ERROR(sil_integer_literal_not_integer_type,decl_parsing,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
 ERROR(sil_float_literal_not_float_type,decl_parsing,none,

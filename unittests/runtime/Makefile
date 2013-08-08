@@ -15,6 +15,8 @@ TESTNAME = runtime
 include $(SWIFT_LEVEL)/../../Makefile.config
 LINK_COMPONENTS := $(TARGETS_TO_BUILD)
 
+SOURCES = $(notdir $(wildcard $(PROJ_SRC_DIR)/*.cpp $(PROJ_SRC_DIR)/*.mm))
+
 # This is almost certainly not the right way of doing this.
 ProjLibsOptions += -lswift_stdlib_core
 

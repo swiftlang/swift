@@ -222,6 +222,15 @@ public:
                     StoreInst(Loc, Src, DestLValue));
   }
 
+  LoadWeakInst *createLoadWeak(SILLocation loc, SILValue src, IsTake_t isTake) {
+    return insert(new (F.getModule()) LoadWeakInst(loc, src, isTake));
+  }
+
+  StoreWeakInst *createStoreWeak(SILLocation loc, SILValue value,
+                                 SILValue dest, IsInitialization_t isInit) {
+    return insert(new (F.getModule()) StoreWeakInst(loc, value, dest, isInit));
+  }
+
   InitializeVarInst *createInitializeVar(SILLocation Loc,
                                          SILValue DestLValue,
                                          bool canDefaultConstruct) {

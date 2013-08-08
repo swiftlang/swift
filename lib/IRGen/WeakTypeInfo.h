@@ -31,6 +31,15 @@ protected:
     : FixedTypeInfo(type, size, align, IsNotPOD, STIK_Weak) {}
 
 public:
+  virtual void weakLoadStrong(IRGenFunction &IGF, Address addr,
+                              Explosion &out) const = 0;
+  virtual void weakTakeStrong(IRGenFunction &IGF, Address addr,
+                              Explosion &out) const = 0;
+  virtual void weakInit(IRGenFunction &IGF, Explosion &src,
+                        Address dest) const = 0;
+  virtual void weakAssign(IRGenFunction &IGF, Explosion &src,
+                          Address dest) const = 0;
+
   static bool classof(const WeakTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) {
     return type->getSpecialTypeInfoKind() == STIK_Weak;

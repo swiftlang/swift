@@ -169,7 +169,10 @@ public:
   void emitRetainUnowned(llvm::Value *value);
   void emitUnownedRetain(llvm::Value *value);
   void emitUnownedRelease(llvm::Value *value);
-  void emitWeakInit(Address addr);
+  void emitWeakInit(llvm::Value *value, Address dest);
+  void emitWeakAssign(llvm::Value *value, Address dest);
+  llvm::Value *emitWeakLoadStrong(Address src, llvm::Type *type);
+  llvm::Value *emitWeakTakeStrong(Address src, llvm::Type *type);
   void emitWeakDestroy(Address addr);
   void emitWeakCopyInit(Address destAddr, Address srcAddr);
   void emitWeakTakeInit(Address destAddr, Address srcAddr);
@@ -194,6 +197,10 @@ public:
   void emitUnknownWeakTakeInit(Address destAddr, Address srcAddr);
   void emitUnknownWeakCopyAssign(Address destAddr, Address srcAddr);
   void emitUnknownWeakTakeAssign(Address destAddr, Address srcAddr);
+  void emitUnknownWeakInit(llvm::Value *value, Address dest);
+  void emitUnknownWeakAssign(llvm::Value *value, Address dest);
+  llvm::Value *emitUnknownWeakLoadStrong(Address src, llvm::Type *type);
+  llvm::Value *emitUnknownWeakTakeStrong(Address src, llvm::Type *type);
 
 //--- Expression emission ------------------------------------------------------
 public:

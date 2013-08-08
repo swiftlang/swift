@@ -850,6 +850,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("is_nonnull", ValueKind::IsNonnullInst)
     .Case("function_ref", ValueKind::FunctionRefInst)
     .Case("load", ValueKind::LoadInst)
+    .Case("load_weak", ValueKind::LoadWeakInst)
     .Case("metatype", ValueKind::MetatypeInst)
     .Case("object_pointer_to_ref", ValueKind::ObjectPointerToRefInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
@@ -871,6 +872,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("retain_unowned", ValueKind::RetainUnownedInst)
     .Case("return", ValueKind::ReturnInst)
     .Case("store", ValueKind::StoreInst)
+    .Case("store_weak", ValueKind::StoreWeakInst)
     .Case("string_literal", ValueKind::StringLiteralInst)
     .Case("struct", ValueKind::StructInst)
     .Case("struct_element_addr", ValueKind::StructElementAddrInst)
@@ -1156,6 +1158,15 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createLoad(InstLoc, Val);
     break;
+  case ValueKind::LoadWeakInst: {
+    bool isTake = false;
+    if (parseSILOptional(isTake, P, "take") ||
+        parseTypedValueRef(Val))
+      return true;
+
+    ResultVal = B.createLoadWeak(SILLocation(), Val, IsTake_t(isTake));
+    break;
+  }
 
     // Conversion instructions.
   case ValueKind::RefToObjectPointerInst:
@@ -1299,30 +1310,48 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
 
-  case ValueKind::StoreInst: {
-    UnresolvedValueName From;
+  case ValueKind::StoreInst:
+  case ValueKind::StoreWeakInst: {
+    UnresolvedValueName from;
 
-    SourceLoc ToLoc, AddrLoc;
-    Identifier ToToken;
-    SILValue AddrVal;
-    if (parseValueName(From) ||
-        P.parseIdentifier(ToToken, ToLoc,
+    SourceLoc toLoc, addrLoc;
+    Identifier toToken;
+    SILValue addrVal;
+    bool isInit = false;
+    if (parseValueName(from) ||
+        P.parseIdentifier(toToken, toLoc,
                           diag::expected_tok_in_sil_instr, "to") ||
-        parseTypedValueRef(AddrVal, AddrLoc))
+        (Opcode == ValueKind::StoreWeakInst &&
+         parseSILOptional(isInit, P, "initialization")) ||
+        parseTypedValueRef(addrVal, addrLoc))
       return true;
 
-    if (ToToken.str() != "to") {
-      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
-      return true;
-    }
-    
-    if (!AddrVal.getType().isAddress()) {
-      P.diagnose(AddrLoc, diag::sil_invalid_instr_operands);
+    if (toToken.str() != "to") {
+      P.diagnose(toLoc, diag::expected_tok_in_sil_instr, "to");
       return true;
     }
 
-    SILValue FromVal = getLocalValue(From, AddrVal.getType().getObjectType());
-    ResultVal = B.createStore(InstLoc, FromVal, AddrVal);
+    if (!addrVal.getType().isAddress()) {
+      P.diagnose(addrLoc, diag::sil_operand_not_address,
+                 "destination", OpcodeName);
+      return true;
+    }
+
+    SILType valueTy;
+    if (Opcode == ValueKind::StoreInst) {
+      valueTy = addrVal.getType().getObjectType();
+    } else {
+      auto refType = addrVal.getType().getAs<ReferenceStorageType>();
+      if (!refType || refType->getOwnership() != Ownership::Weak) {
+        P.diagnose(addrLoc, diag::sil_operand_not_weak_address,
+                   "destination", OpcodeName);
+        return true;
+      }
+      valueTy = SILType::getPrimitiveObjectType(refType.getReferentType());
+    }
+
+    SILValue fromVal = getLocalValue(from, valueTy);
+    ResultVal = B.createStore(InstLoc, fromVal, addrVal);
     break;
   }
   case ValueKind::AllocStackInst:

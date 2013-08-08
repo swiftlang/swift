@@ -53,6 +53,9 @@ enum class SILInstructionMemoryBehavior {
   MayWriteAndHaveSideEffects
 };
 
+enum IsTake_t { IsNotTake, IsTake };
+enum IsInitialization_t { IsNotInitialization, IsInitialization };
+
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
 class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
@@ -549,6 +552,53 @@ public:
   }
 };
 
+/// Represents a load from a [weak] memory location.
+class LoadWeakInst
+  : public UnaryInstructionBase<ValueKind::LoadWeakInst>
+{
+  static SILType getResultType(SILType operandTy) {
+    assert(operandTy.isAddress() && "loading from non-address operand?");
+    auto refType = cast<ReferenceStorageType>(operandTy.getSwiftRValueType());
+    return SILType::getPrimitiveObjectType(refType.getReferentType());
+  }
+
+  unsigned IsTake : 1; // FIXME: pack this somewhere
+
+public:
+  /// \param loc The location of the expression that caused the load.
+  /// \param lvalue The SILValue representing the address to
+  ///        use for the load.
+  LoadWeakInst(SILLocation loc, SILValue lvalue, IsTake_t isTake)
+    : UnaryInstructionBase(loc, lvalue, getResultType(lvalue.getType())),
+      IsTake(unsigned(isTake))
+  {}
+
+  IsTake_t isTake() const { return IsTake_t(IsTake); }
+};
+
+/// Represents a store to a [weak] memory location.
+class StoreWeakInst : public SILInstruction {
+  enum { Src, Dest };
+  FixedOperandList<2> Operands;
+  unsigned IsInit : 1; // FIXME: pack this somewhere
+public:
+  StoreWeakInst(SILLocation loc, SILValue src, SILValue dest,
+                IsInitialization_t isInit);
+
+  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  IsInitialization_t isInitialization() const {
+    return IsInitialization_t(IsInit);
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::StoreWeakInst;
+  }
+};
+
 /// InitializeVarInst - Represents a default initialization of a variable.
 class InitializeVarInst
   : public UnaryInstructionBase<ValueKind::InitializeVarInst,
@@ -565,9 +615,6 @@ public:
   /// True if this InitializeVar can be lowered to a default constructor call.
   bool canDefaultConstruct() const { return CanDefaultConstruct; }
 };
-
-enum IsTake_t { IsNotTake, IsTake };
-enum IsInitialization_t { IsNotInitialization, IsInitialization };
 
 /// CopyAddrInst - Represents a copy from one memory location to another. This
 /// is similar to:

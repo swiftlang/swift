@@ -72,7 +72,9 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Accessing memory
   INST(LoadInst, SILInstruction, None)
+  INST(LoadWeakInst, SILInstruction, None)
   INST(StoreInst, SILInstruction, MayWrite)
+  INST(StoreWeakInst, SILInstruction, MayWrite)
   INST(InitializeVarInst, SILInstruction, MayWrite)
   INST(CopyAddrInst, SILInstruction, MayWrite)
   INST(DestroyAddrInst, SILInstruction, MayHaveSideEffects)
