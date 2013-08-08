@@ -562,12 +562,12 @@ void Serializer::writeInputFiles(const TranslationUnit *TU,
   }
 
   for (auto import : TU->getImportedModules()) {
-    if (import.second == TU->Ctx.TheBuiltinModule)
+    if (import.first.second == TU->Ctx.TheBuiltinModule)
       continue;
 
     ImportPathBlob importPath;
-    flattenImportPath(import, importPath);
-    ImportedModule.emit(ScratchRecord, importPath);
+    flattenImportPath(import.first, importPath);
+    ImportedModule.emit(ScratchRecord, import.second, importPath);
   }
 }
 

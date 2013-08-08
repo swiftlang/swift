@@ -48,16 +48,17 @@ namespace {
     ASTContext &Context;
 
     NameBinder(TranslationUnit *TU) : TU(TU), Context(TU->Ctx) {
-      for (auto M : TU->getImportedModules()) {
+      for (auto importPair : TU->getImportedModules()) {
+        Module *M = importPair.first.second;
         // Don't add the builtin module to the LoadedModules list.
-        if (isa<BuiltinModule>(M.second))
+        if (isa<BuiltinModule>(M))
           continue;
         
-        Module *&ref = Context.LoadedModules[M.second->Name.str()];
+        Module *&ref = Context.LoadedModules[M->Name.str()];
         if (ref)
-          assert(ref == M.second || isa<ClangModule>(M.second));
+          assert(ref == M || isa<ClangModule>(M));
         else
-          ref = M.second;
+          ref = M;
       }
     }
     ~NameBinder() {
@@ -68,7 +69,7 @@ namespace {
       return Context.Diags.diagnose(Args...);
     }
     
-    void addImport(ImportDecl *ID, SmallVectorImpl<ImportedModule> &Result);
+    Optional<std::pair<ImportedModule, bool>> addImport(ImportDecl *ID);
 
     /// Load a module referenced by an import statement.
     ///
@@ -215,8 +216,7 @@ static const char *getImportKindString(ImportKind kind) {
   }
 }
 
-void NameBinder::addImport(ImportDecl *ID, 
-                           SmallVectorImpl<ImportedModule> &Result) {
+Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) {
   Module *M = getModule(ID->getModulePath());
   if (M == 0) {
     // FIXME: print entire path regardless.
@@ -226,10 +226,11 @@ void NameBinder::addImport(ImportDecl *ID,
     } else {
       diagnose(ID->getLoc(), diag::sema_no_import_submodule);
     }
-    return;
+    return Nothing;
   }
 
-  Result.push_back({ID->getDeclPath(), M});
+  auto result = std::make_pair(ImportedModule(ID->getDeclPath(), M),
+                               ID->isExported());
 
   // If we're importing a specific decl, validate the import kind.
   if (ID->getImportKind() != ImportKind::Module) {
@@ -244,7 +245,7 @@ void NameBinder::addImport(ImportDecl *ID,
       diagnose(ID, diag::no_decl_in_module)
         .highlight(SourceRange(declPath.front().second,
                                declPath.back().second));
-      return;
+      return result;
     }
 
     Optional<ImportKind> actualKind = findBestImportKind(decls);
@@ -268,6 +269,8 @@ void NameBinder::addImport(ImportDecl *ID,
                  decls.front()->getName());
     }
   }
+
+  return result;
 }
 
 /// performAutoImport - When a translation unit is first set up, this handles
@@ -282,10 +285,8 @@ void swift::performAutoImport(TranslationUnit *TU) {
     M = TU->Ctx.getModule(std::make_pair(TU->Ctx.getIdentifier("swift"),
                                          SourceLoc()));
 
-  SmallVector<ImportedModule, 1> ImportedModules;
-  ImportedModules.push_back({Module::AccessPathTy(), M});
-
-  TU->setImportedModules(TU->Ctx.AllocateCopy(ImportedModules));
+  auto Import = std::make_pair(ImportedModule({}, M), false);
+  TU->setImportedModules(TU->Ctx.AllocateCopy(llvm::makeArrayRef(Import)));
 }
 
 //===----------------------------------------------------------------------===//
@@ -360,16 +361,17 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
 
   NameBinder Binder(TU);
 
-  SmallVector<ImportedModule, 8> ImportedModules;
+  SmallVector<std::pair<ImportedModule, bool>, 8> ImportedModules;
   ImportedModules.append(TU->getImportedModules().begin(),
                          TU->getImportedModules().end());
 
   // Do a prepass over the declarations to find and load the imported modules
   // and map operator decls.
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
-    if (ImportDecl *ID = dyn_cast<ImportDecl>(TU->Decls[i]))
-      Binder.addImport(ID, ImportedModules);
-    else if (auto *OD = dyn_cast<PrefixOperatorDecl>(TU->Decls[i]))
+    if (ImportDecl *ID = dyn_cast<ImportDecl>(TU->Decls[i])) {
+      if (auto import = Binder.addImport(ID))
+        ImportedModules.push_back(*import);
+    } else if (auto *OD = dyn_cast<PrefixOperatorDecl>(TU->Decls[i]))
       insertOperatorDecl(Binder, TU->PrefixOperators, OD);
     else if (auto *OD = dyn_cast<PostfixOperatorDecl>(TU->Decls[i]))
       insertOperatorDecl(Binder, TU->PostfixOperators, OD);

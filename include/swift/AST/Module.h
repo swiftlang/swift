@@ -242,9 +242,11 @@ public:
 class TranslationUnit : public Module {
 private:
 
-  /// ImportedModules - This is the list of modules that are imported by this
-  /// module.  This is filled in by the Name Binding phase.
-  ArrayRef<ImportedModule> ImportedModules;
+  /// This is the list of modules that are imported by this module, with the
+  /// second element of the pair declaring whether the module is reexported.
+  ///
+  /// This is filled in by the Name Binding phase.
+  ArrayRef<std::pair<ImportedModule, bool>> ImportedModules;
 
 public:
   /// Kind - This is the sort of file the translation unit was parsed for, which
@@ -285,11 +287,11 @@ public:
   /// ImportedModules - This is the list of modules that are imported by this
   /// module.  This is filled in as the first thing that the Name Binding phase
   /// does.
-  ArrayRef<ImportedModule> getImportedModules() const {
+  ArrayRef<std::pair<ImportedModule, bool>> getImportedModules() const {
     assert(ASTStage >= Parsed || Kind == SIL);
     return ImportedModules;
   }
-  void setImportedModules(ArrayRef<ImportedModule> IM) {
+  void setImportedModules(ArrayRef<std::pair<ImportedModule, bool>> IM) {
     ImportedModules = IM;
   }
 

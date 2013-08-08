@@ -88,8 +88,10 @@ public:
   public:
     Module::ImportedModule Import;
     StringRef RawAccessPath;
+    bool IsExported;
 
-    /*implicit*/ Dependency(StringRef path) : Import(), RawAccessPath(path) {}
+    Dependency(StringRef path, bool Exported)
+      : Import(), RawAccessPath(path), IsExported(Exported) {}
 
     bool isLoaded() const {
       return Import.second != nullptr;

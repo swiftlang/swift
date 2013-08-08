@@ -1974,10 +1974,12 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
           assert(scratch.empty());
           SourcePaths.push_back(blobData);
           break;
-        case input_block::IMPORTED_MODULE:
-          assert(scratch.empty());
-          Dependencies.push_back(blobData);
+        case input_block::IMPORTED_MODULE: {
+          bool exported;
+          input_block::ImportedModuleLayout::readRecord(scratch, exported);
+          Dependencies.push_back({blobData, exported});
           break;
+        }
         default:
           // Unknown input kind, possibly for use by a future version of the
           // module format.

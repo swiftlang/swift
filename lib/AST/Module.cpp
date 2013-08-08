@@ -250,7 +250,7 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
   llvm::DenseSet<OP_DECL*> importedOperators;
   for (auto &imported : TU->getImportedModules()) {
     Optional<OP_DECL *> maybeOp
-      = lookupOperatorDeclForName(imported.second, Loc, Name, OP_MAP);
+      = lookupOperatorDeclForName(imported.first.second, Loc, Name, OP_MAP);
     if (!maybeOp)
       return Nothing;
     
@@ -318,8 +318,8 @@ Module::getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const {
     // A translation unit doesn't really re-export all of its imported modules,
     // but for the purposes of lookup a TU is always top-level, so we want to
     // look at regular imports as well as re-exports.
-    modules.append(TU->getImportedModules().begin(),
-                   TU->getImportedModules().end());
+    for (auto importPair : TU->getImportedModules())
+      modules.push_back(importPair.first);
     return;
   }
 

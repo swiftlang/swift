@@ -189,7 +189,8 @@ static bool IRGenImportedModules(TranslationUnit *TU,
                                  irgen::Options &Options,
                                  bool IsREPL = true) {
   // IRGen the modules this module depends on.
-  for (auto ModPair : TU->getImportedModules()) {
+  for (auto importPair : TU->getImportedModules()) {
+    auto ModPair = importPair.first;
     // Nothing to do for the builtin module.
     if (isa<BuiltinModule>(ModPair.second))
       continue;

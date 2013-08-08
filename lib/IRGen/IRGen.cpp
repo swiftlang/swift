@@ -137,11 +137,11 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   bool UseStandardLibraryHack = Opts.OptLevel != 0;
   if (UseStandardLibraryHack) {
     for (auto ModPair : TU->getImportedModules()) {
-      if (isa<BuiltinModule>(ModPair.second) || 
-          isa<LoadedModule>(ModPair.second))
+      if (isa<BuiltinModule>(ModPair.first.second) ||
+          isa<LoadedModule>(ModPair.first.second))
         continue;
 
-      TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);
+      TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.first.second);
 
       if (SubTU->Name.str() == "swift") {
         Options SubOpts;
