@@ -46,7 +46,9 @@ class VarDecl;
 enum class SILInstructionMemoryBehavior {
   None,
   /// \brief The instruction may have side effects not captured solely by its
-  ///        users.
+  ///        users. Specifically, it can return, release memory, or store. Note,
+  ///        alloc is not considered to have side effects because its
+  ///        result/users represnet its effect.
   MayHaveSideEffects,
   /// \brief The istruction may write to memory.
   MayWrite,
