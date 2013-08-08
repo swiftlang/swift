@@ -39,12 +39,11 @@ public:
   bool operator==(const SourceLoc &RHS) const { return RHS.Value == Value; }
   bool operator!=(const SourceLoc &RHS) const { return RHS.Value != Value; }
   
-  /// getAdvanced - Return a source location advanced a specified number of
-  /// characters.
-  SourceLoc getAdvancedLoc(int NumCharacters) const {
+  /// Return a source location advanced a specified number of bytes.
+  SourceLoc getAdvancedLoc(int ByteOffset) const {
     assert(isValid() && "Can't advance an invalid location");
-    return SourceLoc(llvm::SMLoc::getFromPointer(Value.getPointer() +
-                                                 NumCharacters));
+    return SourceLoc(
+        llvm::SMLoc::getFromPointer(Value.getPointer() + ByteOffset));
   }
 
   /// print - Print out the SourceLoc.  If this location is in the same buffer
