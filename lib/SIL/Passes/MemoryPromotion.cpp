@@ -308,15 +308,16 @@ static void collectAllocationUses(SILValue Pointer,
         isa<DeallocRefInst>(User))
       continue;
 
+    // FIXME: Canonicalize aggregate loads of entire sub-tuples/sub-structs into
+    // loads of their elements + struct_inst / tuple_inst.
+    // FIXME: Canonicalize aggregate stores of entire sub-tuples/sub-structs
+    // extracts of their elements + individual stores.
+
     // Loads are a use of the value.  Note that this could be an aggregate load.
     if (auto *LI = dyn_cast<LoadInst>(User)) {
       addElementUses(Uses, BaseElt, PointeeType, LI, UseKind::Load);
       continue;
     }
-
-    // FIXME: Canonicalize aggregate loads of entire sub-tuples/sub-structs into
-    // loads of their elements + struct_inst / tuple_inst.
-
 
     // Stores *to* the allocation are writes.  Stores *of* them are escapes.
     // Note that this could be an aggregate store.
@@ -325,12 +326,19 @@ static void collectAllocationUses(SILValue Pointer,
       continue;
     }
 
-    // FIXME: Canonicalize aggregate stores of entire sub-tuples/sub-structs
-    // extracts of their elements + individual stores.
+    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
+      // If this is the source of the copy_addr, then this is a load.  If it is
+      // the destination, then this is a store.
+      auto Kind = UI->getOperandNumber() == 0 ? UseKind::Load : UseKind::Store;
+      addElementUses(Uses, BaseElt, PointeeType, CAI, Kind);
+      continue;
+    }
 
-
-    // FIXME: CopyAddrInst is a load or store, depending.
     // TODO: "Assign".
+    // TODO: InitializeVarInst.
+    // TODO: isa<ProjectExistentialInst>(User)
+    
+
 
 
     // apply and partial_apply instructions do not capture the pointer when
@@ -355,7 +363,7 @@ static void collectAllocationUses(SILValue Pointer,
         continue;
       }
 
-      // Othrewise, it is an escape.
+      // Otherwise, it is an escape.
     }
 
     // tuple_element P, 42 indexes into the current element.  Recursively
@@ -397,14 +405,7 @@ static void collectAllocationUses(SILValue Pointer,
       continue;
     }
 
-
-    // TODO: isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User)
-
-    // TODO: InitializeVarInst.
-
-    // TODO: isa<ProjectExistentialInst>(User)
-
-    // Otherwise, the use is something complicated, it escapes.
+     // Otherwise, the use is something complicated, it escapes.
     addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Escape);
   }
 }
