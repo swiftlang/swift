@@ -200,6 +200,11 @@ public:
       if (ConformsTo.size() != 1)
         Out << ">";
     }
+
+    if (Representative != this) {
+      Out << " [represented by " << getRepresentative()->getFullName() << "]";
+    }
+
     Out << "\n";
 
     // Print nested types.
@@ -281,6 +286,9 @@ bool ArchetypeBuilder::addGenericParameter(TypeAliasDecl *GenericParam,
 
 bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
                                                  ProtocolDecl *Proto){
+  // Add the requirement to the representative.
+  T = T->getRepresentative();
+
   // If we've already added this requirement, we're done.
   if (!T->ConformsTo.insert(Proto))
     return false;
