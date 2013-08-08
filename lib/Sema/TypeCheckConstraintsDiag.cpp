@@ -499,10 +499,17 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
     break;
 
   case Failure::DoesNotHaveMember:
-    tc.diagnose(loc, diag::does_not_have_member,
-                failure.getFirstType(),
-                failure.getName())
-      .highlight(range1).highlight(range2);
+    if (auto moduleTy = failure.getFirstType()->getAs<ModuleType>()) {
+      tc.diagnose(loc, diag::no_member_of_module,
+                  moduleTy->getModule()->Name,
+                  failure.getName())
+        .highlight(range1).highlight(range2);
+    } else {
+      tc.diagnose(loc, diag::does_not_have_member,
+                  failure.getFirstType(),
+                  failure.getName())
+        .highlight(range1).highlight(range2);
+    }
     break;
 
   case Failure::DoesNotConformToProtocol:
