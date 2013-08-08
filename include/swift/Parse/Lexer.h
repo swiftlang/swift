@@ -20,14 +20,14 @@
 #include "Token.h"
 #include "llvm/ADT/SmallVector.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/SourceManager.h"
 
 namespace swift {
   class DiagnosticEngine;
   class Identifier;
   class InFlightDiagnostic;
   class ASTContext;
-  class SourceManager;
-  
+
   template<typename ...T> struct Diag;
 
 class Lexer {
@@ -83,20 +83,18 @@ public:
   /// \brief Lexer state can be saved/restored to/from objects of this class.
   class State {
   public:
-    State(): CurPtr(nullptr) {}
+    State() {}
 
-    State advance(unsigned Len) const {
+    State advance(unsigned Offset) const {
       assert(isValid());
-      State NewState;
-      NewState.CurPtr = CurPtr + Len;
-      return NewState;
+      return State(Loc.getAdvancedLoc(Offset));
     }
 
   private:
-    explicit State(const char *CurPtr): CurPtr(CurPtr) {}
-    const char *CurPtr;
+    explicit State(SourceLoc Loc): Loc(Loc) {}
+    SourceLoc Loc;
     bool isValid() const {
-      return CurPtr != nullptr;
+      return Loc.isValid();
     }
     friend class Lexer;
   };
@@ -110,12 +108,14 @@ public:
   Lexer(Lexer &Parent, State BeginState, State EndState,
         SourceManager &SourceMgr, DiagnosticEngine *Diags, bool InSILMode)
     : Lexer(SourceMgr,
-            StringRef(BeginState.CurPtr, Parent.BufferEnd - BeginState.CurPtr),
-            Diags, BeginState.CurPtr, InSILMode, Parent.isKeepingComments(),
+            StringRef(BeginState.Loc.Value.getPointer(),
+                      Parent.BufferEnd - BeginState.Loc.Value.getPointer()),
+            Diags, BeginState.Loc.Value.getPointer(), InSILMode,
+            Parent.isKeepingComments(),
             /*Prime=*/false) {
-    assert(BeginState.CurPtr >= Parent.BufferStart &&
-           BeginState.CurPtr <= Parent.BufferEnd &&
-           "Begin position out of range");
+    assert(BufferID == static_cast<unsigned>(SourceMgr->FindBufferContainingLoc(
+                           BeginState.Loc.Value)) &&
+           "state for the wrong buffer");
     // If the parent lexer should stop prematurely, and the ArtificialEOF
     // position is in this subrange, then we should stop at that point, too.
     if (Parent.ArtificialEOF &&
@@ -123,7 +123,7 @@ public:
         Parent.ArtificialEOF <= BufferEnd) {
       ArtificialEOF = Parent.ArtificialEOF;
     } else
-      ArtificialEOF = EndState.CurPtr;
+      ArtificialEOF = EndState.Loc.Value.getPointer();
 
     // Do code completion if the parent lexer is doing code completion and the
     // code completion token is in subrange.
@@ -167,23 +167,24 @@ public:
   }
 
   State getStateForEndOfTokenLoc(SourceLoc Loc) const {
-    return State(getLocForEndOfToken(SourceMgr, Loc).Value.getPointer());
+    return State(getLocForEndOfToken(SourceMgr, Loc));
   }
 
   /// \brief Restore the lexer state to a given one, that can be located either
   /// before or after the current position.
   void restoreState(State S) {
     assert(S.isValid());
-    assert(BufferStart <= S.CurPtr && S.CurPtr <= BufferEnd &&
+    assert(BufferID == static_cast<unsigned>(
+                           SourceMgr->FindBufferContainingLoc(S.Loc.Value)) &&
            "state for the wrong buffer");
-    CurPtr = S.CurPtr;
+    CurPtr = S.Loc.Value.getPointer();
     lexImpl();
   }
 
   /// \brief Restore the lexer state to a given state that is located before
   /// current position.
   void backtrackToState(State S) {
-    assert(S.CurPtr <= CurPtr && "can't backtrack forward");
+    assert(S.Loc.Value.getPointer() <= CurPtr && "can't backtrack forward");
     restoreState(S);
   }
 
