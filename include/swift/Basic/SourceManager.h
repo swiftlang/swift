@@ -81,6 +81,13 @@ public:
     return rangeContainsTokenLoc(Enclosing, Inner.Start) &&
            rangeContainsTokenLoc(Enclosing, Inner.End);
   }
+
+  /// \brief Returns the SourceLoc for the beginning of the specified buffer
+  /// (at offset zero).
+  ///
+  /// Note that the resulting location might not point at the first token: it
+  /// might point at whitespace or comment.
+  SourceLoc getLocForBufferStart(unsigned BufferID) const;
 };
 
 } // namespace swift

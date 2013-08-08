@@ -18,11 +18,13 @@
 using namespace swift;
 
 SourceLoc SourceManager::getCodeCompletionLoc() const {
-  const llvm::MemoryBuffer *Buffer =
-      LLVMSourceMgr.getMemoryBuffer(CodeCompletionBufferID);
+  return getLocForBufferStart(CodeCompletionBufferID)
+      .getAdvancedLoc(CodeCompletionOffset);
+}
 
-  return SourceLoc(llvm::SMLoc::getFromPointer(
-      Buffer->getBufferStart() + CodeCompletionOffset));
+SourceLoc SourceManager::getLocForBufferStart(unsigned BufferID) const {
+  auto *Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID);
+  return SourceLoc(llvm::SMLoc::getFromPointer(Buffer->getBufferStart()));
 }
 
 void SourceLoc::printLineAndColon(raw_ostream &OS,
