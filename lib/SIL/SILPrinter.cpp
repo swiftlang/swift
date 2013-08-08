@@ -36,14 +36,59 @@ using namespace swift;
 using namespace Demangle;
 
 struct ID {
-  enum {
+  enum ID_Kind {
     SILBasicBlock, SSAValue
   } Kind;
   unsigned Number;
   int ResultNumber;
 };
+  
+enum SILColorKind {
+  SC_Type,
+};
+
+namespace {
+/// RAII based coloring of SIL output.
+class SILColor {
+  raw_ostream &OS;
+  enum raw_ostream::Colors Color;
+public:
+#define DEF_COL(NAME, RAW) case NAME: Color = raw_ostream::RAW; break;
+
+  explicit SILColor(raw_ostream &OS, SILColorKind K) : OS(OS) {
+    if (!OS.has_colors())
+      return;
+    switch (K) {
+      DEF_COL(SC_Type, YELLOW)
+    }
+    OS.resetColor();
+    OS.changeColor(Color);
+  }
+
+  explicit SILColor(raw_ostream &OS, ID::ID_Kind K) : OS(OS) {
+    if (!OS.has_colors())
+      return;
+    switch (K) {
+      DEF_COL(ID::SILBasicBlock, GREEN)
+      DEF_COL(ID::SSAValue, MAGENTA)
+    }
+    OS.resetColor();
+    OS.changeColor(Color);
+  }
+  
+  ~SILColor() {
+    if (!OS.has_colors())
+      return;
+    // FIXME: instead of resetColor(), we can look into
+    // capturing the current active color and restoring it.
+    OS.resetColor();
+  }
+#undef DEF_COL
+};
+}
 
 static raw_ostream &operator<<(raw_ostream &OS, ID i) {
+  SILColor C(OS, i.Kind);
   switch (i.Kind) {
   case ID::SILBasicBlock: OS << "bb"; break;
   case ID::SSAValue: OS << '%'; break;
@@ -62,6 +107,7 @@ struct IDAndType {
 };
 
 static raw_ostream &operator<<(raw_ostream &OS, IDAndType i) {
+  SILColor C(OS, SC_Type);
   return OS << i.id << " : " << i.Ty;
 }
 
@@ -203,6 +249,7 @@ static void print(raw_ostream &OS, SILValueCategory category) {
 }
       
 void SILType::print(raw_ostream &OS) const {
+  SILColor C(OS, SC_Type);
   OS << '$';
 
   // Potentially add a leading sigil for the value category.
