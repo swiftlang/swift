@@ -205,12 +205,10 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     if (isStartOfDecl(Tok, peekToken())) {
       bool FailedToParse =
           parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
-      if (Tok.is(tok::code_complete) && isCodeCompletionFirstPass()) {
-        bool ShouldDelay = FailedToParse;
-        if (ShouldDelay) {
-          consumeTopLevelDecl(BeginParserPosition);
-          return;
-        }
+      if (FailedToParse && IsTopLevel &&
+          Tok.is(tok::code_complete) && isCodeCompletionFirstPass()) {
+        consumeTopLevelDecl(BeginParserPosition);
+        return;
       }
       if (FailedToParse)
         NeedParseErrorRecovery = true;
@@ -373,9 +371,21 @@ NullablePtr<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
 
   parseBraceItems(Entries, false /*NotTopLevel*/);
   if (parseMatchingToken(tok::r_brace, RBLoc,
-                         diag::expected_rbrace_in_brace_stmt, LBLoc))
-    return 0;
-  
+                         diag::expected_rbrace_in_brace_stmt, LBLoc)) {
+    // Recover by setting the right brace location to the end location of the
+    // last parsed brace item.
+    if (Entries.empty())
+      RBLoc = LBLoc;
+    else {
+      if (auto *SubStmt = Entries.back().dyn_cast<Stmt *>())
+        RBLoc = SubStmt->getEndLoc();
+      else if (auto *SubExpr = Entries.back().dyn_cast<Expr *>())
+        RBLoc = SubExpr->getEndLoc();
+      else
+        RBLoc = Entries.back().get<Decl *>()->getEndLoc();
+    }
+  }
+
   return BraceStmt::create(Context, LBLoc, Entries, RBLoc);
 }
 

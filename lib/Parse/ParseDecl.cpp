@@ -1277,7 +1277,8 @@ void Parser::consumeFunctionBody(FuncExpr *FE) {
     // that point.
     backtrackToPosition(BeginParserPosition);
     consumeToken(tok::l_brace);
-    while (Tok.isNot(tok::eof) && !isStartOfDecl(Tok, peekToken())) {
+    while (Tok.is(tok::kw_var) ||
+           (Tok.isNot(tok::eof) && !isStartOfDecl(Tok, peekToken()))) {
       consumeToken();
     }
   }
