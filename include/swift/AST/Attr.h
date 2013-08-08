@@ -158,6 +158,7 @@ public:
   bool Weak = false;
   bool Unowned = false;
   bool LocalStorage = false;
+  bool Exported = false;
   Optional<AbstractCC> cc = Nothing;
   
   DeclAttributes() {}
@@ -189,6 +190,7 @@ public:
     if (Unowned) return Ownership::Unowned;
     return Ownership::Strong;
   }
+  bool isExported() const { return Exported; }
   bool hasCC() const { return cc.hasValue(); }
   AbstractCC getAbstractCC() const { return *cc; }
 
@@ -198,7 +200,7 @@ public:
            !isConversion() && !isForceInline() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
            !isClassProtocol() && !hasCC() && !hasOwnership() &&
-           !isLocalStorage() && AsmName.empty();
+           !isLocalStorage() && !isExported() && AsmName.empty();
   }
 
   void clearOwnership() {

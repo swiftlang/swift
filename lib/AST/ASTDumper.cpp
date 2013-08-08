@@ -237,6 +237,9 @@ namespace {
     void visitImportDecl(ImportDecl *ID) {
       printCommon(ID, "import_decl");
 
+      if (ID->isExported())
+        OS << " exported";
+
       const char *KindString;
       switch (ID->getImportKind()) {
       case ImportKind::Module:

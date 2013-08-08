@@ -371,6 +371,15 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     Attributes.Conversion = true;
     return false;    
   }
+
+  case AttrName::exported: {
+    if (Attributes.isExported())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    consumeToken(tok::identifier);
+
+    Attributes.Exported = true;
+    return false;
+  }
       
   case AttrName::force_inline: {
     if (Attributes.isForceInline())
@@ -600,11 +609,16 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
 bool Parser::parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
   
-  DeclAttributes Attributes;
-  parseAttributeList(Attributes);
+  bool Exported;
+  {
+    DeclAttributes Attributes;
+    parseAttributeList(Attributes);
 
-  if (!Attributes.empty())
-    diagnose(Attributes.LSquareLoc, diag::import_attributes);
+    Exported = Attributes.isExported();
+    Attributes.Exported = false;
+    if (!Attributes.empty())
+      diagnose(Attributes.LSquareLoc, diag::import_attributes);
+  }
 
   if (!(Flags & PD_AllowTopLevel)) {
     diagnose(ImportLoc, diag::decl_inner_scope);
@@ -655,7 +669,7 @@ bool Parser::parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     diagnose(ImportPath.front().second, diag::decl_expected_module_name);
   } else {
     Decls.push_back(ImportDecl::create(Context, CurDeclContext, ImportLoc,
-                                       Kind, KindLoc, ImportPath));
+                                       Kind, KindLoc, Exported, ImportPath));
   }
 
   return false;

@@ -175,6 +175,10 @@ void PrintAST::printAttributes(const DeclAttributes &attrs) {
     comma();
     OS << "class_protocol";
   }
+  if (attrs.isExported()) {
+    comma();
+    OS << "exported";
+  }
   OS << "] ";
 }
 
@@ -335,6 +339,10 @@ void PrintAST::printInherited(ArrayRef<TypeLoc> inherited) {
 
 void PrintAST::visitImportDecl(ImportDecl *decl) {
   OS << "import ";
+
+  if (decl->isExported())
+    OS << "[exported] ";
+
   switch (decl->getImportKind()) {
   case ImportKind::Module:
     break;

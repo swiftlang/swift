@@ -160,8 +160,9 @@ class alignas(8) Decl {
     unsigned : NumDeclBits;
 
     unsigned ImportKind : 3;
+    unsigned IsExported : 1;
   };
-  enum { NumImportDeclBits = NumDeclBits + 3 };
+  enum { NumImportDeclBits = NumDeclBits + 4 };
   static_assert(NumImportDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -672,12 +673,13 @@ private:
   }
   
   ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
-             SourceLoc KindLoc, ArrayRef<AccessPathElement> Path);
+             SourceLoc KindLoc, bool Exported,
+             ArrayRef<AccessPathElement> Path);
 
 public:
   static ImportDecl *create(ASTContext &C, DeclContext *DC,
                             SourceLoc ImportLoc, ImportKind Kind,
-                            SourceLoc KindLoc,
+                            SourceLoc KindLoc, bool Exported,
                             ArrayRef<AccessPathElement> Path);
 
   ArrayRef<AccessPathElement> getFullAccessPath() const {
@@ -699,6 +701,10 @@ public:
 
   ImportKind getImportKind() const {
     return static_cast<ImportKind>(ImportDeclBits.ImportKind);
+  }
+
+  bool isExported() const {
+    return ImportDeclBits.IsExported;
   }
 
   SourceLoc getStartLoc() const { return ImportLoc; }

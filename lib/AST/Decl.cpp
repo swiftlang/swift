@@ -248,22 +248,24 @@ GenericParamList::create(const ASTContext &Context,
 
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc ImportLoc, ImportKind Kind,
-                               SourceLoc KindLoc,
+                               SourceLoc KindLoc, bool Exported,
                                ArrayRef<AccessPathElement> Path) {
   assert(!Path.empty());
   assert(Kind == ImportKind::Module || Path.size() > 1);
   void *buffer = Ctx.Allocate(sizeof(ImportDecl) +
                               Path.size() * sizeof(AccessPathElement),
                               alignof(ImportDecl));
-  return new (buffer) ImportDecl(DC, ImportLoc, Kind, KindLoc, Path);
+  return new (buffer) ImportDecl(DC, ImportLoc, Kind, KindLoc, Exported, Path);
 }
 
 ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
-                       SourceLoc KindLoc, ArrayRef<AccessPathElement> Path)
+                       SourceLoc KindLoc, bool Exported,
+                       ArrayRef<AccessPathElement> Path)
   : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc), KindLoc(KindLoc),
     NumPathElements(Path.size()) {
   ImportDeclBits.ImportKind = static_cast<unsigned>(K);
   assert(getImportKind() == K && "not enough bits for ImportKind");
+  ImportDeclBits.IsExported = Exported;
   std::uninitialized_copy(Path.begin(), Path.end(), getPathBuffer());
 }
 

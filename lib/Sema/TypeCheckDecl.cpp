@@ -1813,6 +1813,11 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     VD->getMutableAttrs().AutoClosure = false;
   }
 
+  if (Attrs.isExported()) {
+    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "exported");
+    VD->getMutableAttrs().Exported = false;
+  }
+
   if (Attrs.isObjCBlock()) {
     TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "objc_block");
     VD->getMutableAttrs().ObjCBlock = false;
