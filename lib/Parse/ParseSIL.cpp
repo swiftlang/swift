@@ -1078,7 +1078,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     ResultVal = B.createStringLiteral(InstLoc, Ty,
-                                      Str.substr(1, Str.size()-1));
+                                      Str.substr(1, Str.size()-2));
     P.consumeToken(tok::string_literal);
     break;
   }

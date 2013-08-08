@@ -434,19 +434,21 @@ bb0:
   %9 = metatype $String.metatype
   // CHECK: string_literal $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), "foo"
   %10 = string_literal $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), "foo"
-  %11 = tuple_extract %10 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 0
-  %12 = tuple_extract %10 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 1
-  %13 = tuple_extract %10 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 2
-  %14 = apply %8(%11, %12, %13, %9) : $[thin] ((value : Builtin.RawPointer, byteSize : Builtin.Int64, isASCII : Builtin.Int1), String.metatype) -> String
-  %15 = store %14 to %7#1 : $*String
-  %16 = load %7#1 : $*String                        // CHECK: load {{%.*}} : $*String
-  %17 = struct_extract %16 : $String, #str_value  // CHECK: struct_extract
-  %18 = struct_extract %17 : $StringByteData, #owner // CHECK: struct_extract
-  %19 = release %18 : $Builtin.ObjectPointer
-  %20 = dealloc_stack %7#0 : $*[local_storage] String
-  %21 = dealloc_stack %1#0 : $*[local_storage] Float64
-  %22 = tuple ()
-  %23 = return %22 : $()
+  // CHECK-NOT: "bar""
+  %11 = string_literal $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), "bar"
+  %12 = tuple_extract %11 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 0
+  %13 = tuple_extract %11 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 1
+  %14 = tuple_extract %11 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 2
+  %15 = apply %8(%12, %13, %14, %9) : $[thin] ((value : Builtin.RawPointer, byteSize : Builtin.Int64, isASCII : Builtin.Int1), String.metatype) -> String
+  %16 = store %15 to %7#1 : $*String
+  %17 = load %7#1 : $*String                        // CHECK: load {{%.*}} : $*String
+  %18 = struct_extract %17 : $String, #str_value  // CHECK: struct_extract
+  %19 = struct_extract %18 : $StringByteData, #owner // CHECK: struct_extract
+  %20 = release %19 : $Builtin.ObjectPointer
+  %21 = dealloc_stack %7#0 : $*[local_storage] String
+  %22 = dealloc_stack %1#0 : $*[local_storage] Float64
+  %23 = tuple ()
+  %24 = return %23 : $()
 }
 
 sil @_T5index5gep64FT1pBp1iBi64__Bp : $[thin] (p : Builtin.RawPointer, i : Builtin.Int64) -> Builtin.RawPointer {
