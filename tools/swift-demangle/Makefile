@@ -18,8 +18,7 @@ LINK_COMPONENTS := support
 USEDLIBS = swiftBasic.a
 
 LLVMLibsOptions :=     \
-  $(LLVMLibsOptions)   \
-  -lcurses
+  $(LLVMLibsOptions)
 
 include $(SWIFT_LEVEL)/Makefile
 

@@ -8,8 +8,6 @@ if(HAVE_DARWIN_MODULES_SDK)
                    -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH}" )
 endif()
 
-target_link_libraries(swift-ide-test curses)
-
 install(TARGETS swift-ide-test
   RUNTIME DESTINATION bin)
 

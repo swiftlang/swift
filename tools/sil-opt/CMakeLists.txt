@@ -8,7 +8,5 @@ find_library(CORE_FOUNDATION NAMES CoreFoundation)
 
 target_link_libraries(sil-opt edit ${CORE_FOUNDATION})
 
-target_link_libraries(sil-opt curses)
-
 install(TARGETS sil-opt
   RUNTIME DESTINATION bin)
