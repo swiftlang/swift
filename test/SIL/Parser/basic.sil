@@ -136,8 +136,8 @@ bb1:
   %9 = apply %6(%8, %7) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: dealloc_stack
   %10 = dealloc_stack %1#0 : $*[local_storage] Bool
-  // CHECK: return
-  %11 = return %9 : $Int64
+  // CHECK: br
+  br bb3(%9 : $Int64)
 
 // CHECK: bb2:
 bb2:
@@ -151,8 +151,12 @@ bb2:
   %15 = apply %12(%14, %13) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: dealloc_stack
   %16 = dealloc_stack %1#0 : $*[local_storage] Bool
+  // CHECK: br
+  br bb3(%15 : $Int64)
+
+bb3(%17 : $Int64):
   // CHECK: return
-  %17 = return %15 : $Int64
+  return %17 : $Int64
 }
 
 
@@ -587,9 +591,11 @@ bb0(%0 : $Int64, %1 : $Builtin.Int1):
   condbranch %1, bb1(%0 : $Int64), bb2(%0 : $Int64)
 // CHECK: condbranch %1, bb1(%0 : $Int64), bb2(%0 : $Int64)
 bb1(%3 : $Int64):
-  return %3 : $Int64
+  br bb3 (%3 : $Int64)
 bb2(%2 : $Int64):
-  return %2 : $Int64
+  br bb3(%2 : $Int64)
+bb3(%4 : $Int64):
+  return %4 : $Int64
 }
 
 class Bas : NSObject {

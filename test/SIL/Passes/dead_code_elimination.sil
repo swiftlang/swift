@@ -60,14 +60,15 @@ bb2:                                              // Preds: bb1
   %22 = condbranch %20, bb3, bb4
 
 bb3:                                              // Preds: bb2
-  %23 = tuple ()                                  // user: %25
-  %25 = return %23 : $()
-
+  br bb6
 bb4:                                              // Preds: bb2
   %26 = br bb1
 
 bb5:                                              // Preds: bb1
-  %28 = tuple ()                                  // user: %29
+  br bb6
+
+bb6:
+  %28 = tuple () 
   %29 = return %28 : $()
 }
 // CHECK: @loopWithFalse
@@ -76,6 +77,8 @@ bb5:                                              // Preds: bb1
 // CHECK:bb1:                                              // Preds: bb0
 // CHECK-NEXT:  br bb2
 // CHECK:bb2:                                              // Preds: bb1
+// CHECK:br bb3
+// CHECK:bb3:                         
 // CHECK-NEXT:  tuple ()                          
 // CHECK-NEXT:  return
 // CHECK-NEXT:}
@@ -100,14 +103,16 @@ bb2:                                              // Preds: bb1
   %22 = condbranch %20, bb3, bb4
 
 bb3:                                              // Preds: bb2
-  %23 = tuple ()                                  // user: %25
-  %25 = return %23 : $()
+  br bb6
 
 bb4:                                              // Preds: bb2
   %26 = br bb1
 
 bb5:                                              // Preds: bb1
-  %28 = tuple ()                                  // user: %29
+  br bb6
+
+bb6:
+  %28 = tuple () 
   %29 = return %28 : $()
 }
 // CHECK: @InfLoop
@@ -171,14 +176,18 @@ bb0(%0 : $Int64, %1 : $Int64):
   %2 = integer_literal $Builtin.Int1, 0
   condbranch %2, bb1(%0 : $Int64), bb2(%1 : $Int64)
 bb1(%3 : $Int64):
-  return %3 : $Int64
+  br bb3(%3 : $Int64)
 bb2(%4 : $Int64):
-  return %4 : $Int64
+  br bb3(%4 : $Int64)
+bb3(%5 : $Int64):
+  return %5 : $Int64
 }
 // CHECK: sil @testCondBranchBBArgs
 // CHECK-NEXT: bb0
 // CHECK-NEXT:  br bb1(%{{[0-9]+}} : $Int64)
 // CHECK: bb1(%{{[0-9]+}} : $Int64):                                 
+// CHECK-NEXT: br bb2
+// CHECK: bb2
 // CHECK-NEXT:  return
 
 sil @removePredecessorWithBBArgs : $[thin] (i1: Int64, i2 :Int64) -> Int64 {

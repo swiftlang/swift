@@ -1284,10 +1284,23 @@ public:
                       }),
             "entry point argument types do not match function type");
   }
+
+  void verifyEpilogBlock(SILFunction *F) {
+    bool FoundEpilogBlock = false;
+    for (auto &BB : *F) {
+      if (isa<ReturnInst>(BB.getTerminator())) {
+        require(FoundEpilogBlock == false,
+                "more than one function epilog block");
+        FoundEpilogBlock = true;
+      }
+    }
+  }
   
   void visitSILFunction(SILFunction *F) {
     
     verifyEntryPointArguments(F->getBlocks().begin());
+    verifyEpilogBlock(F);
+
     SILVisitor::visitSILFunction(F);
   }
   
