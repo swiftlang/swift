@@ -1795,16 +1795,28 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   for (auto &ArgName : ArgNames)
     Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++]));
 
-  SILType ResTy = FTI->getResultType();
   switch (Opcode) {
   default: assert(0 && "Unexpected case");
   case ValueKind::ApplyInst:
-    ResultVal = B.createApply(InstLoc, FnVal, ResTy, Args);
+    ResultVal = B.createApply(InstLoc, FnVal, FTI->getResultType(), Args);
     break;
-  case ValueKind::PartialApplyInst:
-      // FIXME: Arbitrary order difference in type argument?
-    ResultVal = B.createPartialApply(InstLoc, FnVal, Args, ResTy);
+  case ValueKind::PartialApplyInst: {
+    SmallVector<TupleTypeElt, 4> NewArgTypes;
+
+    // Compute the result type of the partial_apply, based on which arguments
+    // are getting applied.
+    for (unsigned i = 0, e = ArgTys.size()-ArgNames.size(); i != e; ++i)
+      NewArgTypes.push_back(ArgTys[i].getSwiftType());
+
+    Type ArgTy = TupleType::get(NewArgTypes, P.Context);
+    Type ResTy = FunctionType::get(ArgTy, FTI->getResultType().getSwiftType(),
+                                   P.Context);
+
+    // FIXME: Why the arbitrary order difference in IRBuilder type argument?
+    ResultVal = B.createPartialApply(InstLoc, FnVal, Args,
+                                     SILMod.Types.getLoweredType(ResTy));
     break;
+  }
   }
   return false;
 }

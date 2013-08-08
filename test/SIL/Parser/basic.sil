@@ -695,3 +695,25 @@ bb0:
   %2 = tuple ()
   return %2 : $()
 }
+
+
+
+// CHECK-LABEL: closure_test
+sil @takes_closure : $[thin] (x : () -> ()) -> ()
+sil @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
+
+sil @closure_test : $[thin] () -> () {
+bb0:
+  %0 = alloc_box $Int64                           // users: %10, %8, %8, %7, %4
+
+  %5 = function_ref @takes_closure : $[thin] (x : () -> ()) -> ()
+  %6 = function_ref @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
+  retain %0#0 : $Builtin.ObjectPointer
+  %8 = partial_apply %6(%0#0, %0#1) : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
+  %9 = apply %5(%8) : $[thin] (x : () -> ()) -> ()
+  release %0#0 : $Builtin.ObjectPointer
+
+  %11 = tuple ()
+  return %11 : $()
+}
+

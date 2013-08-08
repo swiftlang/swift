@@ -113,7 +113,9 @@ public:
   bool isNull() const { return bool(value.getPointer()); }
   explicit operator bool() const { return bool(value.getPointer()); }
 
-  SILValueCategory getCategory() const { return SILValueCategory(value.getInt()); }
+  SILValueCategory getCategory() const {
+    return SILValueCategory(value.getInt());
+  }
   
   /// Returns the address variant of this type.  Instructions which
   /// manipulate memory will generally work with object addresses.
