@@ -286,7 +286,7 @@ public:
   /// module.  This is filled in as the first thing that the Name Binding phase
   /// does.
   ArrayRef<ImportedModule> getImportedModules() const {
-    assert(ASTStage >= Parsed);
+    assert(ASTStage >= Parsed || Kind == SIL);
     return ImportedModules;
   }
   void setImportedModules(ArrayRef<ImportedModule> IM) {

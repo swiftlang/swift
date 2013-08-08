@@ -893,8 +893,22 @@ bool Module::lookupQualified(Type type,
   // Look for module references.
   if (auto moduleTy = type->getAs<ModuleType>()) {
     ModuleLookupCache cache;
-    lookupInModule(moduleTy->getModule(), {}, name, decls,
-                   NLKind::QualifiedLookup, ResolutionKind::Overloadable, cache);
+    Module *module = moduleTy->getModule();
+    // Perform the lookup in all imports of this module.
+    forAllVisibleModules(AccessPathTy(), makeStackLambda(
+      [&](const ImportedModule &import) -> bool {
+        if (import.second != module)
+          return true;
+        lookupInModule(import.second, import.first, name, decls,
+                       NLKind::QualifiedLookup, ResolutionKind::Overloadable,
+                       cache);
+        // If we're able to do an unscoped lookup, we see everything. No need
+        // to keep going.
+        return !import.first.empty();
+      }));
+    std::sort(decls.begin(), decls.end());
+    auto afterUnique = std::unique(decls.begin(), decls.end());
+    decls.erase(afterUnique, decls.end());
     return !decls.empty();
   }
 
