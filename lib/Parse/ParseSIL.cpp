@@ -1279,6 +1279,22 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     case ValueKind::DowncastInst:
       ResultVal = B.createDowncast(InstLoc, Val, Ty, Mode);
       break;
+    case ValueKind::SuperToArchetypeRefInst:
+      ResultVal = B.createSuperToArchetypeRef(InstLoc, Val, Ty, Mode);
+      break;
+    case ValueKind::DowncastArchetypeAddrInst:
+      ResultVal = B.createDowncastArchetypeAddr(InstLoc, Val, Ty, Mode);
+      break;
+    case ValueKind::DowncastArchetypeRefInst:
+      ResultVal = B.createDowncastArchetypeRef(InstLoc, Val, Ty, Mode);
+      break;
+    case ValueKind::ProjectDowncastExistentialAddrInst:
+      ResultVal = B.createProjectDowncastExistentialAddr(InstLoc,
+                                                         Val, Ty, Mode);
+      break;
+    case ValueKind::DowncastExistentialRefInst:
+      ResultVal = B.createDowncastExistentialRef(InstLoc, Val, Ty, Mode);
+      break;
     }
     break;
   }

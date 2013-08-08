@@ -717,3 +717,38 @@ bb0:
   return %11 : $()
 }
 
+sil @test_super_to_archetype_ref : $[thin] <T : Class1> (c : Class1) -> T {
+bb0(%c : $Class1):
+  %0 = super_to_archetype_ref unconditional %c : $Class1 to $T
+  return %0 : $T
+}
+
+sil @test_downcast_archetype_addr : $[thin] <T, U> (t : T) -> () {
+bb0(%t : $*T):
+  %0 = downcast_archetype_addr unconditional %t : $*T to $*U
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil @test_downcast_archetype_ref : $[thin] <T:Class1, U:Class1> (t : T) -> () {
+bb0(%t : $T):
+  %0 = downcast_archetype_ref unconditional %t : $T to $U
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil @test_project_downcast_existential_addr : $[thin] <U> (t : P) -> () {
+bb0(%t : $*P):
+  %0 = project_downcast_existential_addr unconditional %t : $*P to $*U
+  %1 = tuple ()
+  return %1 : $()
+}
+
+protocol [class_protocol] ClassP {}
+
+sil @test_downcast_existential_ref : $[thin] <U : ClassP> (t : ClassP) -> () {
+bb0(%t : $ClassP):
+  %0 = downcast_existential_ref unconditional %t : $ClassP to $U
+  %1 = tuple ()
+  return %1 : $()
+}
