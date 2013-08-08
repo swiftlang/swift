@@ -109,7 +109,7 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
   // visit*Expr method's responsibility to store to it if possible.
   RValue result = emitRValue(E, SGFContext(I));
   if (result)
-    std::move(result).forwardInto(*this, I);
+    std::move(result).forwardInto(*this, I, E);
 }
 
 namespace {
@@ -1608,7 +1608,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
                                     fieldTL.getLoweredType().getAddressType());
       InitializationPtr init(new ImplicitValueInitialization(slot,
                                                          elements[i].getType()));
-      std::move(elements[i]).forwardInto(gen, init.get());
+      std::move(elements[i]).forwardInto(gen, init.get(), ctor);
       ++memberIndex;
       findNextPhysicalField();
     }

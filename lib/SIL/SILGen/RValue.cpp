@@ -199,9 +199,11 @@ class InitializeTupleValues
 public:
   ArrayRef<ManagedValue> values;
   SILGenFunction &gen;
+  SILLocation loc;
   
-  InitializeTupleValues(ArrayRef<ManagedValue> values, SILGenFunction &gen)
-    : values(values), gen(gen)
+  InitializeTupleValues(ArrayRef<ManagedValue> values, SILGenFunction &gen,
+                        SILLocation l)
+    : values(values), gen(gen), loc(l)
   {}
   
   void visitType(CanType t, Initialization *I) {
@@ -222,7 +224,7 @@ public:
     case Initialization::Kind::SingleBuffer: {
       // If we didn't evaluate into the initialization buffer, do so now.
       if (result.getValue() != I->getAddress()) {
-        result.forwardInto(gen, SILLocation(), I->getAddress());
+        result.forwardInto(gen, loc, I->getAddress());
       } else {
         // If we did evaluate into the initialization buffer, disable the
         // cleanup.
@@ -327,9 +329,10 @@ SILValue RValue::forwardAsSingleValue(SILGenFunction &gen) && {
   return result;
 }
 
-void RValue::forwardInto(SILGenFunction &gen, Initialization *I) && {
+void RValue::forwardInto(SILGenFunction &gen, Initialization *I,
+                         SILLocation loc) && {
   assert(isComplete() && "rvalue is not complete");
-  InitializeTupleValues(values, gen).visit(type, I);
+  InitializeTupleValues(values, gen, loc).visit(type, I);
 }
 
 ManagedValue RValue::getAsSingleValue(SILGenFunction &gen) && {

@@ -65,5 +65,7 @@ void SILLocation::dump(const SourceManager &SM) const {
   print(llvm::errs(), SM);
 }
 void SILLocation::print(raw_ostream &OS, const SourceManager &SM) const {
+  if (isNull())
+    OS << "<no loc>";
   getSourceLoc().print(OS, SM);
 }
