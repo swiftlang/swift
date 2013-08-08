@@ -356,6 +356,13 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
 
   template<typename ExprType>
   bool typecheckExpr(ExprType *&E) {
+    if (CurDeclContext->getContextKind() == DeclContextKind::CapturingExpr) {
+      // FIXME: constructors and destructors.
+      // FIXME: closures.
+      if (auto *FE = dyn_cast<FuncExpr>(CurDeclContext))
+        typeCheckFunctionBodyUntil(TU, CurDeclContext, FE, E->getStartLoc());
+    }
+
     assert(E && "should have an expression");
 
     DEBUG(llvm::dbgs() << "\nparsed:\n";
@@ -365,6 +372,10 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
     Expr *AsExpr = E;
     if (!typeCheckCompletionContextExpr(TU, AsExpr))
       return false;
+
+    if (AsExpr->getType()->isError())
+      return false;
+
     E = cast<ExprType>(AsExpr);
 
     DEBUG(llvm::dbgs() << "\type checked:\n";

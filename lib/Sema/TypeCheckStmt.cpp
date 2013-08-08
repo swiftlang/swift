@@ -25,6 +25,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
@@ -62,6 +63,8 @@ public:
   /// scope depth is zero or if we are checking the final 'case' of the current
   /// switch.
   CaseStmt /*nullable*/ *FallthroughDest;
+
+  SourceLoc EndTypeCheckLoc;
 
   struct AddLoopNest {
     StmtChecker &SC;
@@ -496,8 +499,14 @@ public:
 } // end anonymous namespace
   
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
+  const SourceManager &SM = TC.Context.SourceMgr;
   for (auto &elem : BS->getElements()) {
     if (Expr *SubExpr = elem.dyn_cast<Expr*>()) {
+      SourceLoc Loc = SubExpr->getStartLoc();
+      if (EndTypeCheckLoc.isValid() &&
+          (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
+        break;
+
       // Type check the expression.
       if (typeCheckExpr(SubExpr)) continue;
       
@@ -508,11 +517,23 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
     }
 
     if (Stmt *SubStmt = elem.dyn_cast<Stmt*>()) {
+      SourceLoc Loc = SubStmt->getStartLoc();
+      if (EndTypeCheckLoc.isValid() &&
+          (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
+        break;
+
       if (!typeCheckStmt(SubStmt))
         elem = SubStmt;
-    } else {
-      TC.typeCheckDecl(elem.get<Decl*>(), /*isFirstPass*/false);
+      continue;
     }
+
+    Decl *SubDecl = elem.get<Decl *>();
+    SourceLoc Loc = SubDecl->getStartLoc();
+    if (EndTypeCheckLoc.isValid() &&
+        (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
+      break;
+
+    TC.typeCheckDecl(SubDecl, /*isFirstPass*/false);
   }
   
   return BS;
@@ -573,7 +594,8 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
 
 // Type check a function body (defined with the func keyword) that is either a
 // named function or an anonymous func expression.
-void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
+void TypeChecker::typeCheckFunctionBodyUntil(FuncExpr *FE,
+                                             SourceLoc EndTypeCheckLoc) {
   if (FE->getDecl() && FE->getDecl()->isInvalid())
     return;
 
@@ -586,8 +608,15 @@ void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
   if (!BS)
     return;
 
-  StmtChecker(*this, FE).typeCheckStmt(BS);
+  StmtChecker SC(*this, FE);
+  SC.EndTypeCheckLoc = EndTypeCheckLoc;
+  SC.typeCheckStmt(BS);
+
   FE->setBody(BS);
+}
+
+void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
+  typeCheckFunctionBodyUntil(FE, SourceLoc());
 }
 
 /// \brief Given a pattern declaring some number of member variables, build an

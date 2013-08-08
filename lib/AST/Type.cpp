@@ -61,6 +61,14 @@ bool TypeBase::isEqual(Type Other) {
   return getCanonicalType() == Other.getPointer()->getCanonicalType();
 }
 
+bool TypeBase::isError() {
+  TypeBase *T = this;
+  if (auto *LVT = T->getAs<LValueType>())
+    T = LVT->getObjectType().getPointer();
+
+  return T->is<ErrorType>();
+}
+
 /// isMaterializable - Is this type 'materializable' according to the
 /// rules of the language?  Basically, does it not contain any l-value
 /// types?

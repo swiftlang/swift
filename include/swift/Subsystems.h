@@ -18,6 +18,7 @@
 #define SWIFT_SUBSYSTEMS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 
 #include <memory>
@@ -31,7 +32,9 @@ namespace llvm {
 namespace swift {
   class TranslationUnit;
   class Component;
+  class DeclContext;
   class Expr;
+  class FuncExpr;
   class SILModule;
   struct TypeLoc;
   class SILParserTUState;
@@ -118,7 +121,11 @@ namespace swift {
   /// completion context.
   bool typeCheckCompletionContextExpr(TranslationUnit *TU,
                                       Expr *&parsedExpr);
-  
+
+  /// Partially typecheck the specified function body.
+  bool typeCheckFunctionBodyUntil(TranslationUnit *TU, DeclContext *DC,
+                                  FuncExpr *FE, SourceLoc EndTypeCheckLoc);
+
   /// performCaptureAnalysis - Analyse the AST and mark local declarations
   /// and expressions which can capture them so they can be emitted more
   /// efficiently.  StartElem indicates where to start for incremental capture

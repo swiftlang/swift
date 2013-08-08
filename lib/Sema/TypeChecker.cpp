@@ -1072,3 +1072,17 @@ bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
                     && parsedExpr->getType()
                     && !parsedExpr->getType()->is<ErrorType>();
 }
+
+bool swift::typeCheckFunctionBodyUntil(TranslationUnit *TU, DeclContext *DC,
+                                       FuncExpr *FE,
+                                       SourceLoc EndTypeCheckLoc) {
+  // Set up a diagnostics engine that swallows diagnostics.
+  DiagnosticEngine Diags(TU->Ctx.SourceMgr);
+
+  TypeChecker TC(*TU, Diags);
+  ExprPrePassWalker prePass(TC);
+  prePass.doWalk(FE, DC);
+  TC.typeCheckFunctionBodyUntil(FE, EndTypeCheckLoc);
+  return true;
+}
+
