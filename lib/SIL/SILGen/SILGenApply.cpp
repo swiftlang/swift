@@ -526,11 +526,9 @@ public:
     if (gen.LocalConstants.count(constant)) {
       ManagedValue localFn = gen.emitReferenceToDecl(e, e->getDecl());
       setCallee(Callee::forIndirect(localFn));
-    }
+
     // Otherwise, stash the SILDeclRef.
-    else {
-      SourceLoc L = e->getLoc();
-      L.dump(gen.SGM.M.getASTContext().SourceMgr);
+    } else {
       setCallee(Callee::forDirect(gen, constant, e));
     }
   }
