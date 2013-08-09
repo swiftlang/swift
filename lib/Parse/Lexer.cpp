@@ -164,12 +164,23 @@ Lexer::Lexer(SourceManager &SourceMgr, DiagnosticEngine *Diags,
              unsigned BufferID, bool InSILMode, bool KeepComments)
     : SourceMgr(SourceMgr), Diags(Diags), BufferID(BufferID),
       InSILMode(InSILMode), KeepComments(KeepComments) {
+  // Initialize buffer pointers.
+  auto *Buffer = SourceMgr->getMemoryBuffer(BufferID);
+  BufferStart = Buffer->getBufferStart();
+  BufferEnd = Buffer->getBufferEnd();
+  CurPtr = BufferStart;
+
+  // Initialize code completion.
+  if (BufferID == SourceMgr.getCodeCompletionBufferID()) {
+    const char *Ptr = BufferStart + SourceMgr.getCodeCompletionOffset();
+    if (Ptr >= BufferStart && Ptr <= BufferEnd)
+      CodeCompletionPtr = Ptr;
+  }
 }
 
 Lexer::Lexer(SourceManager &SourceMgr, unsigned BufferID,
              DiagnosticEngine *Diags, bool InSILMode, bool KeepComments)
     : Lexer(SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
-  initLexer();
   primeLexer();
 }
 
@@ -181,22 +192,7 @@ void Lexer::primeLexer() {
          "or we should be lexing from the middle of the buffer");
 }
 
-void Lexer::initLexer() {
-  auto *Buffer = SourceMgr->getMemoryBuffer(BufferID);
-  BufferStart = Buffer->getBufferStart();
-  BufferEnd = Buffer->getBufferEnd();
-  CurPtr = BufferStart;
-
-  if (BufferID == SourceMgr.getCodeCompletionBufferID()) {
-    const char *Ptr = BufferStart + SourceMgr.getCodeCompletionOffset();
-    if (Ptr >= BufferStart && Ptr <= BufferEnd)
-      CodeCompletionPtr = Ptr;
-  }
-}
-
 void Lexer::initSubLexer(Lexer &Parent, State BeginState, State EndState) {
-  initLexer();
-
   assert(BufferID == static_cast<unsigned>(SourceMgr->FindBufferContainingLoc(
                          BeginState.Loc.Value)) &&
          "state for the wrong buffer");

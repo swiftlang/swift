@@ -101,7 +101,6 @@ private:
   /// @{
   /// Helper routines used in Lexer constructors.
   void primeLexer();
-  void initLexer();
   void initSubLexer(Lexer &Parent, State BeginState, State EndState);
   /// @}
 
