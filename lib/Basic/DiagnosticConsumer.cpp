@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/DiagnosticConsumer.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -22,6 +23,18 @@
 using namespace swift;
 
 DiagnosticConsumer::~DiagnosticConsumer() { }
+
+llvm::SMRange DiagnosticConsumer::getRawRange(SourceManager &SM,
+                                              DiagnosticInfo::Range R) {
+  SourceLoc End;
+  if (R.IsTokenRange)
+    End = Lexer::getLocForEndOfToken(SM, R.End);
+  else
+    End = R.End;
+
+  return llvm::SMRange(getRawLoc(R.Start), getRawLoc(End));
+}
+
 
 void NullDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
                                               SourceLoc Loc,

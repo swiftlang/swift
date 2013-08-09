@@ -27,9 +27,13 @@ namespace swift {
 /// (instead of as a typedef) just to remove the "getFromPointer" methods and
 /// enforce purity in the Swift codebase.
 class SourceLoc {
-public:
+  friend class SourceManager;
+  friend class SourceRange;
+  friend class DiagnosticConsumer;
+
   llvm::SMLoc Value;
-  
+
+public:
   SourceLoc() {}
   explicit SourceLoc(llvm::SMLoc Value) : Value(Value) {}
   

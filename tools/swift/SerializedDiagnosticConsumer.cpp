@@ -197,29 +197,6 @@ namespace swift { namespace serialized_diagnostics {
   }
 }}
 
-// FIXME: Copy-pasted from PrintingDiagnosticConsumer.
-// Refactor when more code is wired up.  All of this is just
-// rapid prototyping.
-static llvm::SMRange getRawRange(SourceManager &SM,
-                                 DiagnosticInfo::Range R) {
-  SourceLoc End;
-  if (R.IsTokenRange)
-    End = Lexer::getLocForEndOfToken(SM, R.End);
-  else
-    End = R.End;
-
-  return llvm::SMRange(R.Start.Value, End.Value);
-}
-
-// FIXME: Copy-pasted from PrintingDiagnosticConsumer.
-// Refactor when more code is wired up.  All of this is just
-// rapid prototyping.
-static llvm::SMFixIt getRawFixIt(SourceManager &SM,
-                                 DiagnosticInfo::FixIt F) {
-  // FIXME: It's unfortunate that we have to copy the replacement text.
-  return llvm::SMFixIt(getRawRange(SM, F.getRange()), F.getText());
-}
-
 unsigned SerializedDiagnosticConsumer::getEmitFile(StringRef Filename) {
   // NOTE: Using Filename.data() here relies on SourceMgr using
   // const char* as buffer identifiers.  This is fast, but may
@@ -472,7 +449,7 @@ emitDiagnosticMessage(SourceManager &SM,
 
   // Construct the diagnostic.
   const llvm::SMDiagnostic &D =
-    SM->GetMessage(Loc.Value, SMKind, Text,
+    SM->GetMessage(getRawLoc(Loc), SMKind, Text,
                    ArrayRef<llvm::SMRange>(), ArrayRef<llvm::SMFixIt>());
 
   // Emit the diagnostic to bitcode.
@@ -484,7 +461,7 @@ emitDiagnosticMessage(SourceManager &SM,
   Record.clear();
   Record.push_back(RECORD_DIAG);
   Record.push_back(getDiagnosticLevel(Kind));
-  addLocToRecord(Loc.Value, SM, D.getFilename(), Record);
+  addLocToRecord(getRawLoc(Loc), SM, D.getFilename(), Record);
 
   // FIXME: Swift diagnostics currently have no category.
   Record.push_back(0);

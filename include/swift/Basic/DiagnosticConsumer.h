@@ -23,6 +23,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/SourceMgr.h"
 #include <string>
 
 namespace swift {
@@ -82,6 +83,18 @@ struct DiagnosticInfo {
   
 /// \brief Abstract interface for classes that present diagnostics to the user.
 class DiagnosticConsumer {
+protected:
+  // HACK: To use the the LLVM diagnostic substem in the DiagnosticConsumer,
+  // we need to translate swift::SourceLoc to llvm::SMLoc.
+  static llvm::SMLoc getRawLoc(SourceLoc Loc) { return Loc.Value; }
+
+  static llvm::SMRange getRawRange(SourceManager &SM, DiagnosticInfo::Range R);
+
+  static llvm::SMFixIt getRawFixIt(SourceManager &SM, DiagnosticInfo::FixIt F) {
+    // FIXME: It's unfortunate that we have to copy the replacement text.
+    return llvm::SMFixIt(getRawRange(SM, F.getRange()), F.getText());
+  }
+
 public:
   virtual ~DiagnosticConsumer();
   
