@@ -523,14 +523,13 @@ public:
                [&] { OS << ", "; });
   }
   
-  void printUncheckedConversionInst(ConversionInst *CI,
-                                    SILValue operand,
-                                    llvm::StringRef name) {
+  void printUncheckedConversionInst(ConversionInst *CI, SILValue operand,
+                                    StringRef name) {
     OS << name << " " << getIDAndType(operand) << " to " << CI->getType();
   }
 
   void printCheckedConversionInst(CheckedConversionInst *CI, SILValue operand,
-                                  llvm::StringRef name) {
+                                  StringRef name) {
     OS << name;
     switch (CI->getMode()) {
     case CheckedCastMode::Conditional:

@@ -203,9 +203,9 @@ private:
 
 //--- Globals ---------------------------------------------------------------
 public:
-  llvm::Constant *getAddrOfGlobalString(llvm::StringRef string);
-  llvm::Constant *getAddrOfObjCSelectorRef(llvm::StringRef selector);
-  llvm::Constant *getAddrOfObjCMethodName(llvm::StringRef methodName);
+  llvm::Constant *getAddrOfGlobalString(StringRef string);
+  llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
+  llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);
   void addUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr);
 
@@ -220,15 +220,15 @@ private:
   /// present in the object file; bitcast to i8*. This is used for
   /// forcing visibility of symbols which may otherwise be optimized
   /// out.
-  llvm::SmallVector<llvm::WeakVH, 4> LLVMUsed;
+  SmallVector<llvm::WeakVH, 4> LLVMUsed;
 
   /// ObjCClasses - List of Objective-C classes, bitcast to i8*.
-  llvm::SmallVector<llvm::WeakVH, 4> ObjCClasses;
+  SmallVector<llvm::WeakVH, 4> ObjCClasses;
   /// ObjCCategories - List of Objective-C categories, bitcast to i8*.
-  llvm::SmallVector<llvm::WeakVH, 4> ObjCCategories;
+  SmallVector<llvm::WeakVH, 4> ObjCCategories;
   /// ObjCCategoryDecls - List of ExtensionDecls corresponding to the generated
   /// categories.
-  llvm::SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
+  SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
 
   void mangleGlobalInitializer(raw_ostream &buffer, TranslationUnit *D);
   void emitGlobalLists();
@@ -326,8 +326,7 @@ public:
                                        ExplosionKind level);
   llvm::Function *getAddrOfBridgeToBlockConverter(SILType blockType);
 
-  llvm::StringRef mangleType(CanType type,
-                             llvm::SmallVectorImpl<char> &buffer);
+  StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
 
 //--- Global context emission --------------------------------------------------
 public:

@@ -715,7 +715,7 @@ public:
 
   /// \brief Retrieve the components of the complete locator, which includes
   /// the anchor expression and the path.
-  Expr *getLocatorParts(llvm::SmallVectorImpl<LocatorPathElt> &path) const {
+  Expr *getLocatorParts(SmallVectorImpl<LocatorPathElt> &path) const {
     for (auto prev = this;
          prev;
          prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {
@@ -1528,7 +1528,7 @@ private:
   ///
   /// These failures are unavoidable, in the sense that they occur before
   /// we have made any (potentially incorrect) assumptions at all.
-  llvm::SmallVector<Failure *, 1> unavoidableFailures;
+  SmallVector<Failure *, 1> unavoidableFailures;
 
   /// \brief Failures that occured while solving.
   ///

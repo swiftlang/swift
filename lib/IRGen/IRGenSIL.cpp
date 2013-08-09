@@ -206,7 +206,7 @@ public:
   Kind kind;
   
 private:
-  using ExplosionVector = llvm::SmallVector<llvm::Value*, 4>;
+  using ExplosionVector = SmallVector<llvm::Value *, 4>;
   
   union {
     Address address;

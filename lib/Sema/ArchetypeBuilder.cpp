@@ -72,7 +72,7 @@ struct ArchetypeBuilder::PotentialArchetype {
 
 private:
   /// \brief Recursively build the full name.
-  void buildFullName(llvm::SmallVectorImpl<char> &Result) const {
+  void buildFullName(SmallVectorImpl<char> &Result) const {
     if (Parent) {
       Parent->buildFullName(Result);
       Result.push_back('.');

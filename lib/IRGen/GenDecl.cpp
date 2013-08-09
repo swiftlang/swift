@@ -1548,7 +1548,7 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
 ///
 /// \returns an i8* with a null terminator; note that embedded nulls
 ///   are okay
-llvm::Constant *IRGenModule::getAddrOfGlobalString(llvm::StringRef data) {
+llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data) {
   // Check whether this string already exists.
   auto &entry = GlobalStrings[data];
   if (entry) return entry;

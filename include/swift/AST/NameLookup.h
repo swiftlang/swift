@@ -198,7 +198,7 @@ public:
                                                       StringRef Module,
                                                       StringRef Name);
 
-  llvm::SmallVector<UnqualifiedLookupResult, 4> Results;
+  SmallVector<UnqualifiedLookupResult, 4> Results;
 
   /// isSuccess - Return true if anything was found by the name lookup.
   bool isSuccess() const { return !Results.empty(); }

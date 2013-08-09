@@ -656,7 +656,7 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
       return nullptr;
   }
   
-  llvm::SmallVector<CaseStmt*, 8> cases;
+  SmallVector<CaseStmt*, 8> cases;
   bool parsedDefault = false;
   bool parsedBlockAfterDefault = false;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
@@ -687,8 +687,8 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
                             Context);
 }
 
-bool Parser::parseStmtCaseLabels(llvm::SmallVectorImpl<CaseLabel *> &labels,
-                                 llvm::SmallVectorImpl<Decl *> &boundDecls) {
+bool Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
+                                 SmallVectorImpl<Decl *> &boundDecls) {
   // We must have at least one case label.
   assert(Tok.is(tok::kw_case) || Tok.is(tok::kw_default));
   
@@ -788,8 +788,8 @@ NullablePtr<CaseStmt> Parser::parseStmtCase() {
   // A case block has its own scope for variables bound out of the pattern.
   Scope scope(this, ScopeKind::CaseVars);
   
-  llvm::SmallVector<CaseLabel*, 2> labels;
-  llvm::SmallVector<Decl*, 4> boundDecls;
+  SmallVector<CaseLabel*, 2> labels;
+  SmallVector<Decl*, 4> boundDecls;
   if (parseStmtCaseLabels(labels, boundDecls))
     return nullptr;
   assert(!labels.empty() && "did not parse any labels?!");
@@ -800,7 +800,7 @@ NullablePtr<CaseStmt> Parser::parseStmtCase() {
     diagnose(boundDecls[0]->getLoc(),
              diag::var_binding_with_multiple_case_patterns);
   
-  llvm::SmallVector<ExprStmtOrDecl, 8> bodyItems;
+  SmallVector<ExprStmtOrDecl, 8> bodyItems;
 
   SourceLoc startOfBody = Tok.getLoc();
   parseBraceItems(bodyItems, /*isTopLevel*/ false, BraceItemListKind::Case);

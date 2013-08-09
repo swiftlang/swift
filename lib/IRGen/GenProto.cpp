@@ -2710,7 +2710,7 @@ namespace {
                                CanType ifaceTy, unsigned uncurryLevel,
                                ArrayRef<Substitution> witnessSubs) {
       // Combine the substitutions for the type and the individual witness.
-      llvm::SmallVector<Substitution, 4> combinedSubs;
+      SmallVector<Substitution, 4> combinedSubs;
       combinedSubs.append(Substitutions.begin(), Substitutions.end());
       combinedSubs.append(witnessSubs.begin(), witnessSubs.end());
       

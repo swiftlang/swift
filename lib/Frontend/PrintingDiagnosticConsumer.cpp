@@ -41,7 +41,7 @@ static llvm::SMFixIt getRawFixIt(SourceManager &SM, DiagnosticInfo::FixIt F) {
 void
 PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                                              DiagnosticKind Kind, 
-                                             llvm::StringRef Text,
+                                             StringRef Text,
                                              const DiagnosticInfo &Info) {
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind SMKind;

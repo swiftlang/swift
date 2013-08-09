@@ -1231,7 +1231,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
 
   auto captures = body->getCaptures();
   if (!captures.empty()) {    
-    llvm::SmallVector<SILValue, 4> capturedArgs;
+    SmallVector<SILValue, 4> capturedArgs;
     for (ValueDecl *capture : captures) {
       switch (getDeclCaptureKind(capture)) {
         case CaptureKind::Box: {

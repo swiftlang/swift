@@ -31,7 +31,7 @@ using ConformancePair = std::pair<ProtocolDecl *, ProtocolConformance *>;
 
 static ModuleStatus
 validateControlBlock(llvm::BitstreamCursor &cursor,
-                     llvm::SmallVectorImpl<uint64_t> &scratch) {
+                     SmallVectorImpl<uint64_t> &scratch) {
   // The control block is malformed until we've at least read a major version
   // number.
   ModuleStatus result = ModuleStatus::Malformed;
@@ -397,7 +397,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
-  llvm::SmallVector<ValueDecl *, 4> defaultedDefinitions;
+  SmallVector<ValueDecl *, 4> defaultedDefinitions;
   while (defaultedCount--) {
     auto decl = cast<ValueDecl>(getDecl(*rawIDIter++));
     defaultedDefinitions.push_back(decl);

@@ -424,8 +424,7 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
 
 /// Create the LLVM function declaration for a thunk that acts like
 /// an Objective-C method for a Swift method implementation.
-static llvm::Function *findSwiftAsObjCThunk(IRGenModule &IGM,
-                                            llvm::StringRef name) {
+static llvm::Function *findSwiftAsObjCThunk(IRGenModule &IGM, StringRef name) {
   // Construct the thunk name.
   llvm::SmallString<128> buffer;
   buffer.reserve(name.size() + 2);

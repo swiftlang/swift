@@ -103,7 +103,7 @@ struct ASTContext::Implementation {
   ///
   /// Since these conformances are tied explicitly to the source code, semantic
   /// analysis is responsible for handling the uniquing.
-  llvm::SmallVector<NormalProtocolConformance *, 2> NormalConformances;
+  SmallVector<NormalProtocolConformance *, 2> NormalConformances;
 
   /// The set of specialized protocol conformances.
   llvm::FoldingSet<SpecializedProtocolConformance> SpecializedConformances;

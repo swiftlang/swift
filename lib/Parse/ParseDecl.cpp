@@ -431,7 +431,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
       return false;
     }
 
-    llvm::SmallVector<Lexer::StringSegment, 1> Segments;
+    SmallVector<Lexer::StringSegment, 1> Segments;
     L->getStringLiteralSegments(Tok, Segments);
     if (Segments.size() != 1 ||
         Segments.front().Kind == Lexer::StringSegment::Expr) {
@@ -888,7 +888,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       // Set up a function declaration for the getter and parse its body.
       
       // Create the parameter list(s) for the getter.
-      llvm::SmallVector<Pattern *, 3> Params;
+      SmallVector<Pattern *, 3> Params;
       
       // Add the implicit 'this' to Params, if needed.
       if (HasContainerType)
@@ -983,7 +983,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     // Set up a function declaration for the setter and parse its body.
     
     // Create the parameter list(s) for the setter.
-    llvm::SmallVector<Pattern *, 3> Params;
+    SmallVector<Pattern *, 3> Params;
     
     // Add the implicit 'this' to Params, if needed.
     if (HasContainerType)

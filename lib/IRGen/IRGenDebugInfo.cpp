@@ -330,7 +330,7 @@ StringRef IRGenDebugInfo::getName(const FuncDecl& FD) {
     if (Decl* D = FD.getGetterOrSetterDecl()) {
       if (ValueDecl* VD = dyn_cast<ValueDecl>(D)) {
         bool IsGetter = FD.getGetterDecl();
-        llvm::SmallVector<char, 64> Buf;
+        SmallVector<char, 64> Buf;
         StringRef Name = (VD->getName().str() +
                           Twine(IsGetter ? ".get" : ".set")).toStringRef(Buf);
         return BumpAllocatedString(Name, DebugInfoNames);
@@ -387,7 +387,7 @@ llvm::DIArray IRGenDebugInfo::createParameterTypes(SILModule &SILMod,
   SILFunctionTypeInfo *TypeInfo = SILTy.getFunctionTypeInfo(SILMod);
   if (!TypeInfo) return llvm::DIArray();
 
-  llvm::SmallVector<llvm::Value *, 16> Parameters;
+  SmallVector<llvm::Value *, 16> Parameters;
   // Actually, the input type is either a single type or a tuple
   // type. We currently represent a function with one n-tuple argument
   // as an n-ary function.
@@ -711,7 +711,7 @@ StringRef IRGenDebugInfo::getMangledName(CanType CanTy) {
 /// Return an array with the DITypes for each of a tuple's elements.
 llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
                                                llvm::DIDescriptor Scope) {
-  llvm::SmallVector<llvm::Value *, 16> Elements;
+  SmallVector<llvm::Value *, 16> Elements;
   for (auto Elem : TupleTy->getElementTypes()) {
     CanType CTy = Elem->getCanonicalType();
     DebugTypeInfo DTy(CTy, Types.getCompleteTypeInfo(CTy));

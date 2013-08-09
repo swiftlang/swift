@@ -215,7 +215,7 @@ class StructLayoutBuilder {
 protected:
   IRGenModule &IGM;
 private:
-  llvm::SmallVector<llvm::Type*, 8> StructFields;
+  SmallVector<llvm::Type*, 8> StructFields;
   Size CurSize = Size(0);
   Alignment CurAlignment = Alignment(1);
   unsigned NextNonFixedOffsetIndex = 0;
@@ -287,7 +287,7 @@ class StructLayout {
   IsPOD_t IsKnownPOD;
 
   llvm::Type *Ty;
-  llvm::SmallVector<ElementLayout, 8> Elements;
+  SmallVector<ElementLayout, 8> Elements;
 
 public:
   /// Create a structure layout.

@@ -950,7 +950,7 @@ createStringLiteralExprFromSegment(ASTContext &Ctx,
 ///   expr-literal:
 ///     string_literal
 Expr *Parser::parseExprStringLiteral() {
-  llvm::SmallVector<Lexer::StringSegment, 1> Segments;
+  SmallVector<Lexer::StringSegment, 1> Segments;
   L->getStringLiteralSegments(Tok, Segments);
   SourceLoc Loc = consumeToken();
     
@@ -960,7 +960,7 @@ Expr *Parser::parseExprStringLiteral() {
     return createStringLiteralExprFromSegment(Context, Segments.front(), Loc);
   }
     
-  llvm::SmallVector<Expr*, 4> Exprs;
+  SmallVector<Expr*, 4> Exprs;
   for (auto Segment : Segments) {
     switch (Segment.Kind) {
     case Lexer::StringSegment::Literal: {
@@ -1301,7 +1301,7 @@ Expr *Parser::parseExprAnonClosureArg() {
   auto &decls = AnonClosureVars.back();
   while (ArgNo >= decls.size()) {
     unsigned nextIdx = decls.size();
-    llvm::SmallVector<char, 4> StrBuf;
+    SmallVector<char, 4> StrBuf;
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc; // FIXME: Location?

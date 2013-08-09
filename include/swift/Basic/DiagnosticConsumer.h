@@ -19,6 +19,7 @@
 #ifndef SWIFT_BASIC_DIAGNOSTIC_CONSUMER_H
 #define SWIFT_BASIC_DIAGNOSTIC_CONSUMER_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -65,11 +66,11 @@ struct DiagnosticInfo {
     std::string Text;
 
   public:
-    FixIt(DiagnosticInfo::Range R, llvm::StringRef Str)
+    FixIt(DiagnosticInfo::Range R, StringRef Str)
       : Range(R), Text(Str) {}
 
     DiagnosticInfo::Range getRange() const { return Range; }
-    llvm::StringRef getText() const { return Text; }
+    StringRef getText() const { return Text; }
   };
 
   /// \brief Extra source ranges that are attached to the diagnostic.
@@ -99,7 +100,7 @@ public:
   ///
   /// \param Info Extra information associated with the diagnostic.
   virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                DiagnosticKind Kind, llvm::StringRef Text,
+                                DiagnosticKind Kind, StringRef Text,
                                 const DiagnosticInfo &Info) = 0;
 };
   
@@ -107,7 +108,7 @@ public:
 class NullDiagnosticConsumer : public DiagnosticConsumer {
 public:
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind, llvm::StringRef Text,
+                        DiagnosticKind Kind, StringRef Text,
                         const DiagnosticInfo &Info) override;
 };
   

@@ -154,7 +154,7 @@ namespace {
                         StringRef &OpcodeName);
 
     /// \brief Parses the basic block arguments as part of branch instruction.
-    bool parseSILBBArgsAtBranch(llvm::SmallVector<SILValue, 6> &Args);
+    bool parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args);
 
     bool parseSILInstruction(SILBasicBlock *BB);
     bool parseCallInstruction(SILLocation InstLoc,
@@ -921,7 +921,7 @@ Type SILParser::lookupBoolType(SourceLoc Loc) {
   return Ty.getType();
 }
 
-bool SILParser::parseSILBBArgsAtBranch(llvm::SmallVector<SILValue, 6> &Args) {
+bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args) {
   if (P.Tok.is(tok::l_paren)) {
     SourceLoc LParenLoc = P.consumeToken(tok::l_paren);
     SourceLoc RParenLoc;
@@ -1520,7 +1520,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name))
       return true;
 
-    llvm::SmallVector<SILValue, 6> Args;
+    SmallVector<SILValue, 6> Args;
     if (parseSILBBArgsAtBranch(Args))
       return true;
 
@@ -1534,7 +1534,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     UnresolvedValueName Cond;
     Identifier BBName, BBName2;
     SourceLoc NameLoc, NameLoc2;
-    llvm::SmallVector<SILValue, 6> Args,  Args2;
+    SmallVector<SILValue, 6> Args, Args2;
     if (parseValueName(Cond) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
@@ -1779,7 +1779,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     // Find VarDecl for GlobalName.
     ValueDecl *VD;
-    llvm::SmallVector<ValueDecl*, 4> CurModuleResults;
+    SmallVector<ValueDecl*, 4> CurModuleResults;
     // Perform a module level lookup on the first component of the fully-qualified
     // name.
     P.TU->lookupValue(Module::AccessPathTy(), GlobalName,

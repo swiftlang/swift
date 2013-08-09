@@ -34,7 +34,7 @@ using namespace swift;
 /// EncodeToUTF8 - Encode the specified code point into a UTF8 stream.  Return
 /// true if it is an erroneous code point.
 static bool EncodeToUTF8(unsigned CharValue,
-                         llvm::SmallVectorImpl<char> &Result) {
+                         SmallVectorImpl<char> &Result) {
   assert(CharValue >= 0x80 && "Single-byte encoding should be already handled");
   // Number of bits in the value, ignoring leading zeros.
   unsigned NumBits = 32-llvm::countLeadingZeros(CharValue);
@@ -491,7 +491,7 @@ static bool advanceIfValidContinuationOfOperator(char const *&ptr,
 }
 
 /// isIdentifier - Checks whether a string matches the identifier regex.
-bool Lexer::isIdentifier(llvm::StringRef string) {
+bool Lexer::isIdentifier(StringRef string) {
   if (string.empty()) return false;
   char const *p = string.data(), *end = string.end();
   if (!advanceIfValidStartOfIdentifier(p, end))
@@ -1113,7 +1113,7 @@ void Lexer::lexStringLiteral() {
 }
 
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
-                                      llvm::SmallVectorImpl<char> &TempString) {
+                                         SmallVectorImpl<char> &TempString) {
   TempString.clear();
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
@@ -1192,8 +1192,9 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
   return StringRef(TempString.begin(), TempString.size());
 }
 
-void Lexer::getStringLiteralSegments(const Token &Str,
-              llvm::SmallVectorImpl<StringSegment> &Segments,
+void Lexer::getStringLiteralSegments(
+              const Token &Str,
+              SmallVectorImpl<StringSegment> &Segments,
               DiagnosticEngine *Diags) {
   assert(Str.is(tok::string_literal));
   // Get the bytes behind the string literal, dropping the double quotes.

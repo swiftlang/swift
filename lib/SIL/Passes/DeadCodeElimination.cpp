@@ -174,7 +174,7 @@ static bool removeUnreachableBlocks(SILFunction &F) {
     return false;
 
   llvm::SmallPtrSet<SILBasicBlock*, 16> Reachable;
-  llvm::SmallVector<SILBasicBlock*, 128> Worklist;
+  SmallVector<SILBasicBlock*, 128> Worklist;
   Worklist.push_back(&F.front());
   Reachable.insert(&F.front());
 

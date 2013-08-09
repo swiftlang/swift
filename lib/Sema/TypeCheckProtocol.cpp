@@ -465,7 +465,7 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   Substitution result;
   result.Archetype = archetype;
   result.Replacement = replacement;
-  llvm::SmallVector<ProtocolConformance *, 4> conformances;
+  SmallVector<ProtocolConformance *, 4> conformances;
 
   for (auto proto : archetype->getConformsTo()) {
     ProtocolConformance *conformance = nullptr;
@@ -851,7 +851,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     return nullptr;
   }
 
-  llvm::SmallVector<ValueDecl *, 4> defaultedDefinitions;
+  SmallVector<ValueDecl *, 4> defaultedDefinitions;
   for (auto deduced : deducedAssocTypes) {
     defaultedDefinitions.push_back(deduced.first);
   }

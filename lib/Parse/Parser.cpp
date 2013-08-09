@@ -156,7 +156,7 @@ void swift::performDelayedParsing(
 void getStringPartTokens(const Token &Tok, SourceManager &SM, int BufID,
                          std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
-  llvm::SmallVector<Lexer::StringSegment, 4> Segments;
+  SmallVector<Lexer::StringSegment, 4> Segments;
   Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
   for (unsigned i = 0, e = Segments.size(); i != e; ++i) {
     Lexer::StringSegment &Seg = Segments[i];

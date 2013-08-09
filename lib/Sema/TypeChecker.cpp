@@ -222,7 +222,7 @@ Type TypeChecker::lookupBoolType() {
 bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
                               llvm::SmallPtrSet<ProtocolDecl *, 16> &Visited,
                               llvm::SmallPtrSet<ProtocolDecl *, 16> &Local,
-                              llvm::SmallVectorImpl<ProtocolDecl *> &Path) {
+                              SmallVectorImpl<ProtocolDecl *> &Path) {
   for (auto inheritedProto : Proto->getProtocols()) {
     if (Visited.count(inheritedProto)) {
       // We've seen this protocol as part of another protocol search;
@@ -308,7 +308,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
   auto superclassMetaTy = MetaTypeType::get(superclassTy, TC.Context);
   llvm::DenseMap<Identifier, std::vector<ValueDecl*>> FoundDecls;
   llvm::SmallPtrSet<ValueDecl*, 16> ExactOverriddenDecls;
-  llvm::SmallVector<ValueDecl*, 16> PossiblyOverridingDecls;
+  SmallVector<ValueDecl*, 16> PossiblyOverridingDecls;
   for (Decl *MemberD : Members) {
     ValueDecl *MemberVD = dyn_cast<ValueDecl>(MemberD);
     if (!MemberVD)
@@ -378,7 +378,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
     }
   }
 
-  llvm::SmallVector<ValueDecl*, 16> PossiblyOverloadingDecls;
+  SmallVector<ValueDecl*, 16> PossiblyOverloadingDecls;
   llvm::SmallPtrSet<ValueDecl*, 16> SubtypeOverriddenDecls;
   for (auto MemberVD : PossiblyOverridingDecls) {
     // Then, check for a subtyping relationship.
@@ -606,7 +606,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       if (auto Protocol = dyn_cast<ProtocolDecl>(D)) {
         // Check for circular protocol definitions.
         llvm::SmallPtrSet<ProtocolDecl *, 16> LocalVisited;
-        llvm::SmallVector<ProtocolDecl *, 4> Path;
+        SmallVector<ProtocolDecl *, 4> Path;
         if (VisitedProtocols.count(Protocol) == 0) {
           LocalVisited.insert(Protocol);
           if (checkProtocolCircularity(TC, Protocol, VisitedProtocols,
@@ -642,7 +642,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   {
     enum ClassState { CheckNone, CheckExtensions, CheckAll };
     llvm::DenseMap<ClassDecl *, ClassState> CheckedClasses;
-    llvm::SmallVector<ClassDecl *, 16> QueuedClasses;
+    SmallVector<ClassDecl *, 16> QueuedClasses;
     for (unsigned i = 0, e = StartElem; i != e; ++i) {
       ClassDecl *CD = dyn_cast<ClassDecl>(TU->Decls[i]);
       if (CD)
@@ -650,7 +650,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
 
     // Find all of the classes and class extensions.
-    llvm::DenseMap<ClassDecl *, llvm::SmallVector<ExtensionDecl *, 2>>
+    llvm::DenseMap<ClassDecl *, SmallVector<ExtensionDecl *, 2>>
       Extensions;
     for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
       // We found a class; record it.

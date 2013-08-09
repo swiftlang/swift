@@ -198,7 +198,7 @@ public:
 
   /// \brief Determines if the given string is a valid non-operator
   /// identifier.
-  static bool isIdentifier(llvm::StringRef identifier);
+  static bool isIdentifier(StringRef identifier);
 
   SourceLoc getLocForStartOfBuffer() const {
     return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
@@ -232,9 +232,9 @@ public:
   /// If a copy needs to be made, it will be allocated out of the provided
   /// Buffer.
   static StringRef getEncodedStringSegment(StringRef Str,
-                                           llvm::SmallVectorImpl<char> &Buffer);
+                                           SmallVectorImpl<char> &Buffer);
   static StringRef getEncodedStringSegment(StringSegment Segment,
-                                           llvm::SmallVectorImpl<char> &Buffer){
+                                           SmallVectorImpl<char> &Buffer) {
     return getEncodedStringSegment(StringRef(Segment.Loc.Value.getPointer(),
                                              Segment.Length),
                                    Buffer);
@@ -242,12 +242,13 @@ public:
 
   /// \brief Given a string literal token, separate it into string/expr segments
   /// of a potentially interpolated string.
-  static void getStringLiteralSegments(const Token &Str,
-                                llvm::SmallVectorImpl<StringSegment> &Segments,
-                                DiagnosticEngine *Diags);
+  static void getStringLiteralSegments(
+      const Token &Str,
+      SmallVectorImpl<StringSegment> &Segments,
+      DiagnosticEngine *Diags);
 
   void getStringLiteralSegments(const Token &Str,
-                                llvm::SmallVectorImpl<StringSegment> &Segments){
+                                SmallVectorImpl<StringSegment> &Segments) {
     return getStringLiteralSegments(Str, Segments, Diags);
   }
 

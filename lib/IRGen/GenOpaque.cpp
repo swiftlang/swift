@@ -145,7 +145,7 @@ llvm::Type *IRGenModule::getValueWitnessTy(ValueWitness index) {
   return ty;
 }
 
-static llvm::StringRef getValueWitnessLabel(ValueWitness index) {
+static StringRef getValueWitnessLabel(ValueWitness index) {
   switch (index) {
   case ValueWitness::DeallocateBuffer:
     return "deallocateBuffer";

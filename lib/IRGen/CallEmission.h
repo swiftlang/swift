@@ -36,7 +36,7 @@ private:
   llvm::AttributeSet Attrs;
   
   /// The builtin/special arguments to pass to the call.
-  llvm::SmallVector<llvm::Value*, 8> Args;
+  SmallVector<llvm::Value*, 8> Args;
 
   /// The function we're going to call.
   Callee CurCallee;

@@ -1796,7 +1796,7 @@ public:
   /// by this routine.
   static ArchetypeType *getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                           Identifier Name,
-                          llvm::SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                          SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                           Type Superclass,
                           Optional<unsigned> Index = Optional<unsigned>());
 

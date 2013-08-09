@@ -26,7 +26,7 @@ DiagnosticConsumer::~DiagnosticConsumer() { }
 void NullDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
                                               SourceLoc Loc,
                                               DiagnosticKind Kind,
-                                              llvm::StringRef Text,
+                                              StringRef Text,
                                               const DiagnosticInfo &Info) {
   DEBUG(llvm::dbgs() << "NullDiagnosticConsumer received diagnostic: "
                      << Text << "\n");

@@ -18,6 +18,7 @@
 #ifndef SWIFT_PRINTINGDIAGNOSTICCONSUMER_H
 #define SWIFT_PRINTINGDIAGNOSTICCONSUMER_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 
 namespace swift {
@@ -26,7 +27,7 @@ namespace swift {
 class PrintingDiagnosticConsumer : public DiagnosticConsumer {
 public:
   virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                DiagnosticKind Kind, llvm::StringRef Text,
+                                DiagnosticKind Kind, StringRef Text,
                                 const DiagnosticInfo &Info) override;
 };
   

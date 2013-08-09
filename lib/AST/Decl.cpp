@@ -855,9 +855,7 @@ bool FuncDecl::isBinaryOperator() const {
     || (argTuple->getNumFields() == 1 && argTuple->hasVararg());
 }
 
-StringRef VarDecl::getObjCGetterSelector(llvm::SmallVectorImpl<char> &buffer)
-  const
-{
+StringRef VarDecl::getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
   llvm::raw_svector_ostream out(buffer);
 
   // The getter selector is the property name itself.
@@ -865,10 +863,8 @@ StringRef VarDecl::getObjCGetterSelector(llvm::SmallVectorImpl<char> &buffer)
   out << getName().str();
   return out.str();
 }
-  
-StringRef VarDecl::getObjCSetterSelector(llvm::SmallVectorImpl<char> &buffer)
-  const
-{
+
+StringRef VarDecl::getObjCSetterSelector(SmallVectorImpl<char> &buffer) const {
   llvm::raw_svector_ostream out(buffer);
 
   // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
@@ -881,7 +877,7 @@ StringRef VarDecl::getObjCSetterSelector(llvm::SmallVectorImpl<char> &buffer)
 }
 
 /// Produce the selector for this "Objective-C method" in the given buffer.
-StringRef FuncDecl::getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const {
+StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
   assert(buffer.empty());
   
   // Property accessors should go through a different path.
@@ -1004,7 +1000,7 @@ Type ConstructorDecl::getResultType() const {
 
 /// Produce the selector for this "Objective-C method" in the given buffer.
 StringRef
-ConstructorDecl::getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const {
+ConstructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
   assert(buffer.empty());
 
   llvm::raw_svector_ostream out(buffer);

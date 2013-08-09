@@ -147,7 +147,7 @@ namespace irgen {
   /// Emit references to the witness tables for the substituted type
   /// in the given substitution.
   void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
-                            llvm::SmallVectorImpl<llvm::Value *> &out);
+                            SmallVectorImpl<llvm::Value *> &out);
 
   /// Emit a dynamic metatype lookup for the given archetype.
   llvm::Value *emitTypeMetadataRefForArchetype(IRGenFunction &IGF,

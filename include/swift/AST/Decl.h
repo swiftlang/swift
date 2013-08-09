@@ -231,7 +231,7 @@ public:
   /// \param declOffsets If non-null, will be populated with the stream offsets
   /// at which each declaration encountered is printed.
   void print(raw_ostream &os, const PrintOptions &options,
-             llvm::SmallVectorImpl<std::pair<Decl *, uint64_t>> *declOffsets
+             SmallVectorImpl<std::pair<Decl *, uint64_t>> *declOffsets
                = nullptr) const;
 
   /// \brief Determine whether this declaration should be printed when
@@ -1571,11 +1571,11 @@ public:
   
   /// Given that this is an Objective-C property declaration, produce
   /// its getter selector in the given buffer (as UTF-8).
-  StringRef getObjCGetterSelector(llvm::SmallVectorImpl<char> &buffer) const;
+  StringRef getObjCGetterSelector(SmallVectorImpl<char> &buffer) const;
 
   /// Given that this is an Objective-C property declaration, produce
   /// its setter selector in the given buffer (as UTF-8).
-  StringRef getObjCSetterSelector(llvm::SmallVectorImpl<char> &buffer) const;
+  StringRef getObjCSetterSelector(SmallVectorImpl<char> &buffer) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
@@ -1733,7 +1733,7 @@ public:
 
   /// Given that this is an Objective-C method declaration, produce
   /// its selector in the given buffer (as UTF-8).
-  StringRef getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const;
+  StringRef getObjCSelector(SmallVectorImpl<char> &buffer) const;
 
   FuncDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(FuncDecl *over) { OverriddenDecl = over; }
@@ -1980,7 +1980,7 @@ public:
 
   /// Given that this is an Objective-C method declaration, produce
   /// its selector in the given buffer (as UTF-8).
-  StringRef getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const;
+  StringRef getObjCSelector(SmallVectorImpl<char> &buffer) const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;

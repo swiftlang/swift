@@ -270,21 +270,21 @@ public:
   
   /// Forward the exploded SILValues into a SmallVector.
   void forwardAll(SILGenFunction &gen,
-                  llvm::SmallVectorImpl<SILValue> &values) &&;
+                  SmallVectorImpl<SILValue> &values) &&;
 
   
   /// Take the ManagedValues from this RValue into a SmallVector.
-  void getAll(llvm::SmallVectorImpl<ManagedValue> &values) &&;
+  void getAll(SmallVectorImpl<ManagedValue> &values) &&;
   
   /// Store the unmanaged SILValues into a SmallVector. The values must not
   /// require any cleanups.
-  void getAllUnmanaged(llvm::SmallVectorImpl<SILValue> &values) const &;
+  void getAllUnmanaged(SmallVectorImpl<SILValue> &values) const &;
   
   /// Extract a single tuple element from the rvalue.
   RValue extractElement(unsigned element) &&;
   
   /// Extract the tuple elements from the rvalue.
-  void extractElements(llvm::SmallVectorImpl<RValue> &elements) &&;
+  void extractElements(SmallVectorImpl<RValue> &elements) &&;
   
   CanType getType() const & { return type; }
   

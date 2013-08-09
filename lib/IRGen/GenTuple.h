@@ -17,6 +17,8 @@
 #ifndef SWIFT_IRGEN_GENTUPLE_H
 #define SWIFT_IRGEN_GENTUPLE_H
 
+#include "swift/Basic/LLVM.h"
+
 namespace swift {
   class CanType;
 
@@ -43,7 +45,7 @@ namespace irgen {
 
   /// Emit a string literal rvalue.
   void emitStringLiteral(IRGenFunction &IGF,
-                         llvm::StringRef string,
+                         StringRef string,
                          Explosion &out);
   
 } // end namespace irgen

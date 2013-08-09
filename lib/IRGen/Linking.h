@@ -382,7 +382,7 @@ public:
   }
 
   void mangle(llvm::raw_ostream &out) const;
-  void mangle(llvm::SmallVectorImpl<char> &buffer) const;
+  void mangle(SmallVectorImpl<char> &buffer) const;
   bool isLocalLinkage() const;
   bool isClangThunk() const;
 
@@ -463,7 +463,7 @@ public:
   /// Compute linkage information for the given 
   static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity);
 
-  llvm::StringRef getName() const {
+  StringRef getName() const {
     return Name.str();
   }
   llvm::GlobalValue::LinkageTypes getLinkage() const {

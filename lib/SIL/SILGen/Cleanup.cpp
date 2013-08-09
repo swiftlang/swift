@@ -28,7 +28,7 @@ namespace {
   /// A CleanupBuffer is a location to which to temporarily copy a
   /// cleanup.
   class CleanupBuffer {
-    llvm::SmallVector<char, sizeof(Cleanup) + 10 * sizeof(void*)> Data;
+    SmallVector<char, sizeof(Cleanup) + 10 * sizeof(void*)> Data;
     
   public:
     CleanupBuffer(const Cleanup &cleanup) {

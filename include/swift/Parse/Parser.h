@@ -657,8 +657,8 @@ public:
   NullablePtr<Stmt> parseStmtForEach(SourceLoc ForLoc);
   NullablePtr<Stmt> parseStmtSwitch();
   NullablePtr<CaseStmt> parseStmtCase();
-  bool parseStmtCaseLabels(llvm::SmallVectorImpl<CaseLabel*> &labels,
-                           llvm::SmallVectorImpl<Decl *> &boundDecls);
+  bool parseStmtCaseLabels(SmallVectorImpl<CaseLabel*> &labels,
+                           SmallVectorImpl<Decl *> &boundDecls);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing

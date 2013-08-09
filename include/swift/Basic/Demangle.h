@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_DEMANGLE_H
 #define SWIFT_BASIC_DEMANGLE_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
 
@@ -31,7 +32,7 @@ namespace Demangle {
 ///
 /// \returns The demangled string - or the mangled string on failure.
 ///
-std::string demangleSymbol(llvm::StringRef mangled);
+std::string demangleSymbol(StringRef mangled);
 
 } // end namespace Demangle
 } // end namespace swift

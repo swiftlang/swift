@@ -34,7 +34,7 @@ namespace {
     bool HadError;
 
     /// \brief The stack of functions we're visiting.
-    llvm::SmallVector<FuncExprLike, 4> Functions;
+    SmallVector<FuncExprLike, 4> Functions;
 
   public:
     Verifier(TranslationUnit *TU) : TU(TU), Ctx(TU->Ctx), Out(llvm::errs()),

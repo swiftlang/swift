@@ -1919,7 +1919,7 @@ namespace {
     typedef MetadataLayout super;
     ProtocolDecl *Protocol;
 
-    llvm::SmallVector<llvm::Constant*, 8> Fields;
+    SmallVector<llvm::Constant*, 8> Fields;
 
   public:
     ProtocolMetadataBuilder(IRGenModule &IGM, ProtocolDecl *protocol)

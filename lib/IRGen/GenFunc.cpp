@@ -1439,7 +1439,7 @@ void CallEmission::externalizeArguments(Explosion &out, Explosion &arg,
 /// Add a new set of arguments to the function.
 void CallEmission::addArg(Explosion &arg) {
   forceCallee();
-  llvm::SmallVector<std::pair<unsigned, Alignment>, 2> newByvals;
+  SmallVector<std::pair<unsigned, Alignment>, 2> newByvals;
   
   // Convert arguments to a representation appropriate to the calling
   // convention.
@@ -1750,7 +1750,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                            Explosion &out) {
   // Collect the type infos for the context types.
   // FIXME: Keep LValueTypes out of this.
-  llvm::SmallVector<const TypeInfo *, 4> argTypeInfos;
+  SmallVector<const TypeInfo *, 4> argTypeInfos;
   for (SILType argType : argTypes) {
     argTypeInfos.push_back(&IGF.getFragileTypeInfo(argType.getSwiftType()));
   }

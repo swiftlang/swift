@@ -31,7 +31,7 @@ namespace {
   class PrintAST : public ASTVisitor<PrintAST> {
     raw_ostream &OS;
     const PrintOptions &Options;
-    llvm::SmallVectorImpl<std::pair<Decl *, uint64_t>> *DeclOffsets;
+    SmallVectorImpl<std::pair<Decl *, uint64_t>> *DeclOffsets;
     unsigned IndentLevel = 0;
 
     friend DeclVisitor<PrintAST>;
@@ -80,7 +80,7 @@ namespace {
     
   public:
     PrintAST(raw_ostream &os, const PrintOptions &options,
-             llvm::SmallVectorImpl<std::pair<Decl *, uint64_t>> *declOffsets)
+             SmallVectorImpl<std::pair<Decl *, uint64_t>> *declOffsets)
       : OS(os), Options(options), DeclOffsets(declOffsets) { }
   };
 }
@@ -800,7 +800,7 @@ void Decl::print(raw_ostream &os) const {
 
 void Decl::print(
        raw_ostream &os, const PrintOptions &options,
-       llvm::SmallVectorImpl<std::pair<Decl *, uint64_t>> *declOffsets) const {
+       SmallVectorImpl<std::pair<Decl *, uint64_t>> *declOffsets) const {
   PrintAST printer(os, options, declOffsets);
   printer.visit(const_cast<Decl *>(this));
 }

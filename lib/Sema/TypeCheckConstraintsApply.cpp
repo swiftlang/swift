@@ -2611,7 +2611,7 @@ void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
   cs.addConstraint(ConstraintKind::Conversion, objectTy, ownerTy);
 
   // Solve the constraint system.
-  llvm::SmallVector<Solution, 1> solutions;
+  SmallVector<Solution, 1> solutions;
   bool failed = cs.solve(solutions);
   (void)failed;
   assert(!failed && "Solution failed");

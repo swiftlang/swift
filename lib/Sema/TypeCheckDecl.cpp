@@ -1353,8 +1353,8 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
   case TypeKind::Tuple: {
     // Check whether all fields either have an initializer or have
     // default-initializable types.
-    llvm::SmallVector<Expr *, 4> eltInits;
-    llvm::SmallVector<Identifier, 4> eltNames;
+    SmallVector<Expr *, 4> eltInits;
+    SmallVector<Identifier, 4> eltNames;
     for (auto &elt : ty->castTo<TupleType>()->getFields()) {
       assert(!elt.hasInit() && "Initializers can't appear here");
 

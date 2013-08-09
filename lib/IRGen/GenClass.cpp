@@ -661,7 +661,7 @@ namespace {
     }
     
   private:
-    void buildCategoryName(llvm::SmallVectorImpl<char> &s) {
+    void buildCategoryName(SmallVectorImpl<char> &s) {
       llvm::raw_svector_ostream os(s);
       // Find the module the extension is declared in.
       DeclContext *ModuleDC = TheExtension;
@@ -991,8 +991,7 @@ namespace {
     }
     
     /// Build the property attribute string for a property decl.
-    void buildPropertyAttributes(VarDecl *prop,
-                                 llvm::SmallVectorImpl<char> &out,
+    void buildPropertyAttributes(VarDecl *prop, SmallVectorImpl<char> &out,
                                  ClassDecl *theClass) {
       llvm::raw_svector_ostream outs(out);
       

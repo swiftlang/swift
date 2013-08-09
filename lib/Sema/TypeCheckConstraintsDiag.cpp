@@ -117,7 +117,7 @@ constraints::simplifyLocator(ConstraintSystem &cs,
   // The path to be tacked on to the target locator to identify the specific
   // target.
   Expr *targetAnchor = nullptr;
-  llvm::SmallVector<LocatorPathElt, 4> targetPath;
+  SmallVector<LocatorPathElt, 4> targetPath;
 
   auto path = locator->getPath();
   auto anchor = locator->getAnchor();

@@ -224,7 +224,7 @@ public:
   };
   
 private:
-  llvm::SmallVector<Element, 8> Elements;
+  SmallVector<Element, 8> Elements;
   ExplosionKind Kind;
   bool ContainsAggregate;
 
@@ -250,8 +250,8 @@ public:
     return containsAggregate() || size() > MaxScalarsForDirectResult;
   }
 
-  typedef llvm::SmallVectorImpl<Element>::iterator iterator;
-  typedef llvm::SmallVectorImpl<Element>::const_iterator const_iterator;
+  typedef SmallVectorImpl<Element>::iterator iterator;
+  typedef SmallVectorImpl<Element>::const_iterator const_iterator;
   
   iterator begin() { return Elements.begin(); }
   iterator end() { return Elements.end(); }
@@ -273,7 +273,7 @@ public:
   /// Treating the types in this schema as potential arguments to a
   /// function call, add them to the end of the given vector of types.
   void addToArgTypes(IRGenModule &IGM,
-                     llvm::SmallVectorImpl<llvm::Type*> &types) const;
+                     SmallVectorImpl<llvm::Type*> &types) const;
 };
 
 } // end namespace irgen

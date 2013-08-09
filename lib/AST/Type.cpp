@@ -530,7 +530,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
       
   case TypeKind::Tuple: {
     TupleType *TupleTy = cast<TupleType>(type.getPointer());
-    llvm::SmallVector<TupleTypeElt, 4> Elements;
+    SmallVector<TupleTypeElt, 4> Elements;
     bool Rebuild = false;
     unsigned Idx = 0;
     for (const TupleTypeElt &Elt : TupleTy->getFields()) {
@@ -1188,7 +1188,7 @@ ArchetypeType *ArchetypeType::getNew(const ASTContext &Ctx,
 ArchetypeType *
 ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                       Identifier Name,
-                      llvm::SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                      SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass, Optional<unsigned> Index) {
   // Gather the set of protocol declarations to which this archetype conforms.
   minimizeProtocols(ConformsTo);
@@ -1241,7 +1241,7 @@ setNestedTypes(ASTContext &Ctx,
 }
 
 static void collectFullName(const ArchetypeType *Archetype,
-                            llvm::SmallVectorImpl<char> &Result) {
+                            SmallVectorImpl<char> &Result) {
   if (auto Parent = Archetype->getParent()) {
     collectFullName(Parent, Result);
     Result.push_back('.');

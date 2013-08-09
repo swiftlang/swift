@@ -913,7 +913,7 @@ bool Module::lookupQualified(Type type,
   }
 
   // The set of nominal type declarations we should (and have) visited.
-  llvm::SmallVector<NominalTypeDecl *, 4> stack;
+  SmallVector<NominalTypeDecl *, 4> stack;
   llvm::SmallPtrSet<NominalTypeDecl *, 4> visited;
 
   // Handle nominal types.

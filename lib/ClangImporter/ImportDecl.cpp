@@ -1517,7 +1517,7 @@ namespace {
       // Property setters are similar, but don't have indices.
 
       // Form the argument patterns.
-      llvm::SmallVector<Pattern *, 3> setterArgs;
+      SmallVector<Pattern *, 3> setterArgs;
 
       // 'this'
       auto thisVar = addImplicitThisParameter(dc->getDeclaredTypeOfContext(),

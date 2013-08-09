@@ -92,7 +92,7 @@ class IRGenDebugInfo {
   Location LastLoc; /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
 
-  llvm::SmallVector<std::pair<Location, SILDebugScope*>, 8> LocationStack;
+  SmallVector<std::pair<Location, SILDebugScope*>, 8> LocationStack;
 
 public:
   IRGenDebugInfo(const Options &Opts,
