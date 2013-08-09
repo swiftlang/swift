@@ -89,6 +89,7 @@ public:
   /// might point at whitespace or comment.
   SourceLoc getLocForBufferStart(unsigned BufferID) const;
 
+  /// \brief Returns the offset in bytes for the given source location.
   unsigned getLocOffsetInBuffer(SourceLoc Loc, unsigned BufferID) const;
 };
 
