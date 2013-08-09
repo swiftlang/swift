@@ -470,8 +470,6 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 ///
 /// FIXME: This should be moved out to somewhere else.
 void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
-
-  
   // Make sure that name binding has been completed before doing any type
   // checking.
   performNameBinding(TU, StartElem);
@@ -480,7 +478,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   auto &FuncExprs = TC.definedFunctions;
 
   // Resolve extensions. This has to occur first during type checking,
-  // because
+  // because the extensions need to be wired into the AST for name lookup
+  // to work.
+  // FIXME: We can have interesting ordering dependencies among the various
+  // extensions, so we'll need to be smarter here.
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(TU->Decls[i])) {
       bindExtensionDecl(ED, TC);
@@ -489,15 +490,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   }
 
   // FIXME: Check for cycles in class inheritance here?
-
-  // Validate the conformance types of all of the protocols in the translation
-  // unit. This includes inherited protocols, associated types with
-  // requirements, and (FIXME:) conformance requirements in requires clauses.
-  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
-    Decl *D = TU->Decls[i];
-    if (auto Proto = dyn_cast<ProtocolDecl>(D))
-      TC.preCheckProtocol(Proto);
-  }
 
   // Type check the top-level elements of the translation unit.
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {

@@ -19,6 +19,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
+#include <functional>
 #include <memory>
 
 namespace swift {
@@ -76,8 +77,26 @@ class ArchetypeBuilder {
 
 public:
   ArchetypeBuilder(ASTContext &Context, DiagnosticEngine &Diags);
-  ArchetypeBuilder(ArchetypeBuilder &&) = default;
-  ArchetypeBuilder &operator=(ArchetypeBuilder &&) = default;
+
+  /// Construct a new archtype builder.
+  ///
+  /// \param Context The ASTContext in which the builder will create archetypes.
+  ///
+  /// \param Diags The diagnostics entity to use.
+  ///
+  /// \param getInheritedProtocols A function that determines the set of
+  /// protocols inherited from the given protocol. This produces the final
+  /// results of ProtocolDecl::getProtocols().
+  ///
+  /// \param getConformsTo A function that determines the set of protocols
+  /// to which the given associated type conforms. The produces the final
+  /// results of TypeAliasDecl::getProtocols() for an associated type.
+  ArchetypeBuilder(ASTContext &Context, DiagnosticEngine &Diags,
+                   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
+                     getInheritedProtocols,
+                   std::function<ArrayRef<ProtocolDecl *>(TypeAliasDecl *)>
+                     getConformsTo);
+  ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
 
   /// \brief Add a new generic parameter for which there may be requirements.

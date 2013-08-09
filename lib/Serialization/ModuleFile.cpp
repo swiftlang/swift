@@ -755,7 +755,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     while (auto conformance = maybeReadConformance(underlyingType.getType()))
       conformances.push_back(*conformance);
     processConformances(ctx, alias, conformances);
-
+    alias->setCheckedInheritanceClause();
     break;
   }
 
@@ -797,7 +797,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto members = readMembers();
     assert(members.hasValue() && "could not read struct members");
     theStruct->setMembers(members.getValue(), SourceRange());
-
+    theStruct->setCheckedInheritanceClause();
     break;
   }
 
@@ -1030,7 +1030,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto members = readMembers();
     assert(members.hasValue() && "could not read struct members");
     proto->setMembers(members.getValue(), SourceRange());
-
+    proto->setCheckedInheritanceClause();
     break;
   }
 
@@ -1128,7 +1128,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto members = readMembers();
     assert(members.hasValue() && "could not read class members");
     theClass->setMembers(members.getValue(), SourceRange());
-
+    theClass->setCheckedInheritanceClause();
     break;
   }
 
@@ -1174,7 +1174,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto members = readMembers();
     assert(members.hasValue() && "could not read union members");
     theUnion->setMembers(members.getValue(), SourceRange());
-
+    theUnion->setCheckedInheritanceClause();
     break;
   }
 
@@ -1287,6 +1287,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     extension->setMembers(members.getValue(), SourceRange());
 
     baseTy.getType()->getAnyNominal()->addExtension(extension);
+    extension->setCheckedInheritanceClause();
     break;
   }
 

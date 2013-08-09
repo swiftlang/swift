@@ -215,6 +215,8 @@ public:
 };
 
 struct ArchetypeBuilder::Implementation {
+  std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols;
+  std::function<ArrayRef<ProtocolDecl *>(TypeAliasDecl *)> getConformsTo;
   SmallVector<TypeAliasDecl *, 4> GenericParams;
   DenseMap<TypeAliasDecl *, PotentialArchetype *> PotentialArchetypes;
   DenseMap<TypeAliasDecl *, ArchetypeType *> PrimaryArchetypeMap;
@@ -224,7 +226,25 @@ struct ArchetypeBuilder::Implementation {
 ArchetypeBuilder::ArchetypeBuilder(ASTContext &Context, DiagnosticEngine &Diags)
   : Context(Context), Diags(Diags), Impl(new Implementation)
 {
+  Impl->getInheritedProtocols = [](ProtocolDecl *protocol) {
+    return protocol->getProtocols();
+  };
+  Impl->getConformsTo = [](TypeAliasDecl *assocType) {
+    return assocType->getProtocols();
+  };
 }
+
+ArchetypeBuilder::ArchetypeBuilder(
+  ASTContext &Context, DiagnosticEngine &Diags,
+  std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols,
+  std::function<ArrayRef<ProtocolDecl *>(TypeAliasDecl *)> getConformsTo)
+  : Context(Context), Diags(Diags), Impl(new Implementation)
+{
+  Impl->getInheritedProtocols = std::move(getInheritedProtocols);
+  Impl->getConformsTo = std::move(getConformsTo);
+}
+
+ArchetypeBuilder::ArchetypeBuilder(ArchetypeBuilder &&) = default;
 
 ArchetypeBuilder::~ArchetypeBuilder() {
   for (auto PA : Impl->PotentialArchetypes)
@@ -294,7 +314,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
     return false;
 
   // Add all of the inherited protocol requirements, recursively.
-  for (auto InheritedProto : Proto->getProtocols()) {
+  for (auto InheritedProto : Impl->getInheritedProtocols(Proto)) {
     if (addConformanceRequirement(T, InheritedProto))
       return true;
   }
@@ -308,7 +328,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
 
       // Add requirements placed directly on this associated type.
       auto AssocPA = T->getNestedType(AssocType->getName());
-      for (auto InheritedProto : AssocType->getProtocols()) {
+      for (auto InheritedProto : Impl->getConformsTo(AssocType)) {
         if (addConformanceRequirement(AssocPA, InheritedProto))
           return true;
       }

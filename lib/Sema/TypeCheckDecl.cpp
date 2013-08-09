@@ -63,62 +63,37 @@ static Type getDeclaredType(Decl *decl) {
   return cast<ExtensionDecl>(decl)->getExtendedType();
 }
 
-/// Determine whether the given declaration already had its inheritance
-/// clause checked.
-static bool alreadyCheckedInheritanceClause(Decl *decl) {
-  // FIXME: Should we simply record when the inheritance clause was checked,
-  // so we don't need this approximation?
-
-  // If it's an extension with a non-empty protocol list, we're done.
-  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    return !ext->getProtocols().empty();
-  }
-
-  // If it's a nominal declaration with a non-empty protocol list, we're done.
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    if (!nominal->getProtocols().empty())
-      return true;
-
-    // If it's a class declaration with a superclass, we're done.
-    if (auto classDecl = dyn_cast<ClassDecl>(nominal))
-      return classDecl->hasSuperclass();
-
-    return false;
-  }
-
-  // For a typealias with a non-empty protocol list, we're done.
-  auto typeAlias = cast<TypeAliasDecl>(decl);
-  if (!typeAlias->getProtocols().empty())
-    return true;
-
-  // For a generic parameter with a superclass, we're done.
-  return typeAlias->isGenericParameter() && typeAlias->getSuperclass();
-}
-
-/// Retrieve the inheritance clause as written from the given declaration.
-static MutableArrayRef<TypeLoc> getInheritanceClause(Decl *decl) {
-  if (auto ext = dyn_cast<ExtensionDecl>(decl))
-    return ext->getInherited();
-
-  return cast<TypeDecl>(decl)->getInherited();
-}
-
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine validates all of the types in the parsed inheritance clause,
 /// recording the superclass (if any and if allowed) as well as the protocols
 /// to which this type declaration conforms.
 static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
-  // If we already checked the inheritance clause, we're done.
-  if (alreadyCheckedInheritanceClause(decl))
-    return;
+  MutableArrayRef<TypeLoc> inheritedClause;
+
+  // If we already checked the inheritance clause, don't do so again.
+  if (auto type = dyn_cast<TypeDecl>(decl)) {
+    if (type->checkedInheritanceClause())
+      return;
+
+    // FIXME: This breaks infinite recursion, but doesn't diagnose it well.
+    type->setCheckedInheritanceClause();
+    inheritedClause = type->getInherited();
+  } else {
+    auto ext = cast<ExtensionDecl>(decl);
+    if (ext->checkedInheritanceClause())
+      return;
+
+    // FIXME: This breaks infinite recursion, but doesn't diagnose it well.
+    ext->setCheckedInheritanceClause();
+    inheritedClause = ext->getInherited();
+  }
 
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
   SourceRange superclassRange;
   llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
   llvm::SmallDenseMap<CanType, SourceRange> inheritedTypes;
-  auto inheritedClause = getInheritanceClause(decl);
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
 
@@ -331,11 +306,24 @@ public:
     gatherExplicitConformances(D, T);
   }
 
+  /// Create a fresh archetype building.
+  ArchetypeBuilder createArchetypeBuilder() {
+    return ArchetypeBuilder(
+             TC.Context, TC.Diags,
+             [&](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
+               return TC.getDirectConformsTo(protocol);
+             },
+             [&](TypeAliasDecl *assocType) -> ArrayRef<ProtocolDecl *> {
+               checkInheritanceClause(TC, assocType);
+               return assocType->getProtocols();
+             });
+  }
+
   void checkGenericParams(GenericParamList *GenericParams) {
     assert(GenericParams && "Missing generic parameters");
 
     // Assign archetypes to each of the generic parameters.
-    ArchetypeBuilder Builder(TC.Context, TC.Diags);
+    ArchetypeBuilder Builder = createArchetypeBuilder();
     unsigned Index = 0;
     for (auto GP : *GenericParams) {
       auto TypeParam = GP.getAsTypeParam();
@@ -759,7 +747,9 @@ public:
     if (IsSecondPass) {
       return;
     }
-    
+
+    checkInheritanceClause(TC, PD);
+
     // If the protocol is [objc], it may only refine other [objc] protocols.
     // FIXME: Revisit this restriction.
     if (PD->getAttrs().isObjC()) {
@@ -792,6 +782,8 @@ public:
     TypeAliasDecl *thisDecl = nullptr;
     for (auto Member : PD->getMembers()) {
       if (auto AssocType = dyn_cast<TypeAliasDecl>(Member)) {
+        checkInheritanceClause(TC, AssocType);
+
         if (AssocType->getName().str() == "This") {
           thisDecl = AssocType;
           break;
@@ -800,7 +792,7 @@ public:
     }
 
     // Build archetypes for this protocol.
-    ArchetypeBuilder builder(TC.Context, TC.Diags);
+    ArchetypeBuilder builder = createArchetypeBuilder();
     builder.addGenericParameter(thisDecl, 0);
     builder.addImplicitConformance(thisDecl, PD);
     builder.assignArchetypes();
@@ -1634,17 +1626,6 @@ void TypeChecker::definePendingImplicitDecls() {
   for (auto structDecl : structsWithImplicitDefaultConstructor) {
     if (structsNeedingImplicitDefaultConstructor.count(structDecl))
       defineDefaultConstructor(structDecl);
-  }
-}
-
-void TypeChecker::preCheckProtocol(ProtocolDecl *D) {
-  DeclChecker checker(*this, /*isFirstPass=*/true, /*isSecondPass=*/false);
-  checkInheritanceClause(*this, D);
-
-  for (auto member : D->getMembers()) {
-    if (auto assocType = dyn_cast<TypeAliasDecl>(member)) {
-      checkInheritanceClause(*this, assocType);
-    }
   }
 }
 

@@ -111,7 +111,19 @@ class alignas(8) Decl {
   enum { NumFuncDeclBits = NumValueDeclBits + 1 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
-  enum { NumTypeDeclBits = NumValueDeclBits };
+  class TypeDeclBitFields {
+    friend class TypeDecl;
+    unsigned : NumValueDeclBits;
+
+
+    /// Whether we have already checked the inheritance clause.
+    ///
+    /// FIXME: Is this too fine-grained?
+    unsigned CheckedInheritanceClause : 1;
+  };
+
+  enum { NumTypeDeclBits = NumValueDeclBits + 1 };
+  static_assert(NumTypeDeclBits <= 32, "fits in an unsigned");
 
   class TypeAliasDeclBitFields {
     friend class TypeAliasDecl;
@@ -165,15 +177,29 @@ class alignas(8) Decl {
   enum { NumImportDeclBits = NumDeclBits + 4 };
   static_assert(NumImportDeclBits <= 32, "fits in an unsigned");
 
+  class ExtensionDeclBitFields {
+    friend class ExtensionDecl;
+    unsigned : NumDeclBits;
+
+    /// Whether we have already checked the inheritance clause.
+    ///
+    /// FIXME: Is this too fine-grained?
+    unsigned CheckedInheritanceClause : 1;
+  };
+  enum { NumExtensionDeclBits = NumDeclBits + 4 };
+  static_assert(NumExtensionDeclBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     DeclBitfields DeclBits;
     ValueDeclBitfields ValueDeclBits;
     FuncDeclBitFields FuncDeclBits;
+    TypeDeclBitFields TypeDeclBits;
     TypeAliasDeclBitFields TypeAliasDeclBits;
     ProtocolDeclBitFields ProtocolDeclBits;
     InfixOperatorDeclBitFields InfixOperatorDeclBits;
     ImportDeclBitFields ImportDeclBits;
+    ExtensionDeclBitFields ExtensionDeclBits;
   };
 
 private:
@@ -758,7 +784,9 @@ public:
     : Decl(DeclKind::Extension, Parent),
       DeclContext(DeclContextKind::ExtensionDecl, Parent),
       ExtensionLoc(ExtensionLoc),
-      ExtendedType(ExtendedType), Inherited(Inherited) {
+      ExtendedType(ExtendedType), Inherited(Inherited)
+  {
+    ExtensionDeclBits.CheckedInheritanceClause = false;
   }
   
   SourceLoc getStartLoc() const { return ExtensionLoc; }
@@ -776,6 +804,16 @@ public:
   /// explicitly conforms to).
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
+
+  /// Whether we already type-checked the inheritance clause.
+  bool checkedInheritanceClause() const {
+    return ExtensionDeclBits.CheckedInheritanceClause;
+  }
+
+  /// Note that we have already type-checked the inheritance clause.
+  void setCheckedInheritanceClause() {
+    ExtensionDeclBits.CheckedInheritanceClause = true;
+  }
 
   /// \brief Retrieve the set of protocols to which this extension conforms.
   ArrayRef<ProtocolDecl *> getProtocols() const { return Protocols; }
@@ -1044,7 +1082,10 @@ class TypeDecl : public ValueDecl {
 public:
   TypeDecl(DeclKind K, DeclContext *DC, Identifier name,
            MutableArrayRef<TypeLoc> inherited, Type ty) :
-    ValueDecl(K, DC, name, ty), Inherited(inherited) {}
+    ValueDecl(K, DC, name, ty), Inherited(inherited)
+  {
+    TypeDeclBits.CheckedInheritanceClause = false;
+  }
 
   Type getDeclaredType() const;
 
@@ -1052,6 +1093,16 @@ public:
   /// explicitly conforms to).
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
+
+  /// Whether we already type-checked the inheritance clause.
+  bool checkedInheritanceClause() const {
+    return TypeDeclBits.CheckedInheritanceClause;
+  }
+
+  /// Note that we have already type-checked the inheritance clause.
+  void setCheckedInheritanceClause() {
+    TypeDeclBits.CheckedInheritanceClause = true;
+  }
 
   /// \brief Retrieve the set of protocols to which this type conforms.
   ///

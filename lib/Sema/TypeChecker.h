@@ -421,10 +421,6 @@ public:
   /// \brief Define any implicit declarations that are still pending.
   void definePendingImplicitDecls();
 
-  /// \brief Pre-check protocol declaration, validating all of the types
-  /// that are involved in conformance requirements.
-  void preCheckProtocol(ProtocolDecl *D);
-
   /// \brief Fold the given sequence expression into an (unchecked) expression
   /// tree.
   Expr *foldSequence(SequenceExpr *expr);
