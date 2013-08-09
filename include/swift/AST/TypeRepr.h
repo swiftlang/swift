@@ -241,7 +241,14 @@ public:
 
 private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
-  SourceLoc getEndLocImpl() const { return Brackets.End; }
+  SourceLoc getEndLocImpl() const {
+    // This test is necessary because the type Int[4][2] is represented as
+    // ArrayTypeRepr(ArrayTypeRepr(Int, 2), 4), so the range needs to cover both
+    // sets of brackets.
+    if (isa<ArrayTypeRepr>(Base))
+      return Base->getEndLoc();
+    return Brackets.End;
+  }
   void printImpl(llvm::raw_ostream &OS) const;
   friend class TypeRepr;
 };

@@ -504,6 +504,10 @@ ERROR(expected_langle_protocol,type_parsing,none,
 ERROR(expected_rangle_protocol,type_parsing,none,
       "expected '>' to complete protocol composition type", ())
 
+// Optional Types
+ERROR(unsupported_unparenthesized_array_optional,type_parsing,none,
+      "optional array type requires parentheses", ())
+
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
 //------------------------------------------------------------------------------

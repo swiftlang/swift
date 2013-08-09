@@ -106,13 +106,24 @@ TypeRepr *Parser::parseType(Diag<> MessageID) {
     return new (Context) FunctionTypeRepr(ty, SecondHalf);
   }
 
-  // Parse optional simple types.
-  while (ty && Tok.is(tok::question) && !Tok.isAtStartOfLine())
-    ty = parseTypeOptional(ty);
-
-  // If there is a square bracket without a newline, we have an array.
-  if (ty && Tok.isFollowingLSquare())
-    ty = parseTypeArray(ty);
+  // Parse optional types and array types.
+  // If we see "T[]?", emit a diagnostic; this type must be written "(T[])?"
+  // or "Optional<T[]>".
+  while (ty && !Tok.isAtStartOfLine()) {
+    if (Tok.is(tok::question)) {
+      if (isa<ArrayTypeRepr>(ty)) {
+        diagnose(Tok, diag::unsupported_unparenthesized_array_optional)
+          .fixItInsert(ty->getStartLoc(), "(")
+          .fixItInsert(Lexer::getLocForEndOfToken(SourceMgr, ty->getEndLoc()),
+                       ")");
+      }
+      ty = parseTypeOptional(ty);
+    } else if (Tok.is(tok::l_square)) {
+      ty = parseTypeArray(ty);
+    } else {
+      break;
+    }
+  }
 
   return ty;
 }
@@ -490,14 +501,20 @@ bool Parser::canParseType() {
     return true;
   }
 
-  // Handle optional types.
-  while (!Tok.isAtStartOfLine() && consumeIf(tok::question))
-    ;
+  // Handle optional types and arrays.
+  // For recovery purposes, accept "T[]?" here, even though we'll reject it
+  // later.
+  while (!Tok.isAtStartOfLine()) {
+    if (Tok.is(tok::question)) {
+      consumeToken();
+    } else if (Tok.is(tok::l_square)) {
+      if (!canParseTypeArray())
+        return false;
+    } else {
+      break;
+    }
+  }
 
-  // If there is a square bracket without a newline, we have an array.
-  if (Tok.isFollowingLSquare())
-    return canParseTypeArray();
-  
   return true;
 }
 
