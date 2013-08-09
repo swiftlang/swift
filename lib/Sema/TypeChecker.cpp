@@ -448,51 +448,6 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
   }
 }
 
-namespace {
-  struct ExprPrePassWalker : private ASTWalker {
-    TypeChecker &TC;
-
-    ExprPrePassWalker(TypeChecker &TC) : TC(TC) {}
-    
-    /// This is a list of all the FuncExprs with parsed bodies that we need to
-    /// analyze, in an appropriate order.
-    SmallVector<FuncExprLike, 32> FuncExprs;
-
-    virtual bool walkToDeclPre(Decl *D) {
-      if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D))
-        FuncExprs.push_back(CD);
-      if (DestructorDecl *DD = dyn_cast<DestructorDecl>(D))
-        FuncExprs.push_back(DD);
-      return true;
-    }
-    
-    virtual bool walkToDeclPost(Decl *D) {
-      return true;
-    }
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (FuncExpr *FE = dyn_cast<FuncExpr>(E))
-        if (FE->getBody())
-          FuncExprs.push_back(FE);
-
-      return { true, E } ;
-    }
-
-    Expr *walkToExprPost(Expr *E) {
-      return E;
-    }
-
-    Expr *doWalk(Expr *E, DeclContext *DC) {
-      E = E->walk(*this);
-      return E;
-    }
-
-    void doWalk(Decl *D) {
-      D->walk(*this);
-    }
-  };
-} // end anonymous namespace
-
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // FIXME: Should allow bound generics here as well.
   if (TC.validateType(ED->getExtendedTypeLoc(), /*allowUnboundGenerics=*/true)) {
@@ -557,8 +512,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   performNameBinding(TU, StartElem);
   
   TypeChecker TC(*TU);
-
-  ExprPrePassWalker prePass(TC);
+  auto &FuncExprs = TC.definedFunctions;
 
   // Resolve extensions and operator declarations.
   // FIXME: Feels too early to care about operator declarations.
@@ -717,18 +671,17 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     Decl *D = TU->Decls[i];
     if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       // Immediately perform global name-binding etc.
-      prePass.doWalk(TLCD);
       TC.typeCheckTopLevelCodeDecl(TLCD);
     } else {
-      prePass.doWalk(D);
       TC.typeCheckDecl(D, /*isFirstPass*/false);
     }
   }
 
   // Define any pending implicitly declarations.
   TC.definePendingImplicitDecls();
-  prePass.FuncExprs.append(TC.implicitlyDefinedFunctions.begin(),
-                           TC.implicitlyDefinedFunctions.end());
+  FuncExprs.insert(FuncExprs.end(),
+                   TC.implicitlyDefinedFunctions.begin(),
+                   TC.implicitlyDefinedFunctions.end());
   TC.implicitlyDefinedFunctions.clear();
 
   // If we're in REPL mode, inject temporary result variables and other stuff
@@ -770,9 +723,9 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     // FuncExprs must be visited before nested FuncExprs for type-checking to
     // work correctly.
     unsigned previousFuncExpr = currentFuncExpr;
-    for (unsigned n = prePass.FuncExprs.size(); currentFuncExpr != n;
+    for (unsigned n = FuncExprs.size(); currentFuncExpr != n;
          ++currentFuncExpr) {
-      auto func = prePass.FuncExprs[currentFuncExpr];
+      auto func = FuncExprs[currentFuncExpr];
 
       if (ConstructorDecl *CD = func.dyn_cast<ConstructorDecl*>()) {
         TC.typeCheckConstructorBody(CD);
@@ -792,7 +745,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     // opposite order of type checking. i.e., the nested FuncExprs will be
     // visited before the outer FuncExprs.
     for (unsigned i = currentFuncExpr; i > previousFuncExpr; --i) {
-      auto func = prePass.FuncExprs[i-1].dyn_cast<FuncExpr *>();
+      auto func = FuncExprs[i-1].dyn_cast<FuncExpr *>();
       if (!func)
         continue;
 
@@ -828,10 +781,11 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
     // Define any pending implicit declarations.
     TC.definePendingImplicitDecls();
-    prePass.FuncExprs.append(TC.implicitlyDefinedFunctions.begin(),
-                             TC.implicitlyDefinedFunctions.end());
+    FuncExprs.insert(FuncExprs.end(),
+                     TC.implicitlyDefinedFunctions.begin(),
+                     TC.implicitlyDefinedFunctions.end());
     TC.implicitlyDefinedFunctions.clear();
-  } while (currentFuncExpr < prePass.FuncExprs.size() ||
+  } while (currentFuncExpr < FuncExprs.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size());
 
   // FIXME: Horrible hack. Store this somewhere more sane.

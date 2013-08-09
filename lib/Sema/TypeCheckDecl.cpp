@@ -948,6 +948,12 @@ public:
   }
 
   void visitFuncDecl(FuncDecl *FD) {
+    if (!IsFirstPass) {
+      if (auto body = FD->getBody())
+        if (body->getBody())
+          TC.definedFunctions.push_back(body);
+    }
+
     if (IsSecondPass)
       return;
 
@@ -1098,8 +1104,14 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
-    if (IsSecondPass)
+    if (!IsFirstPass) {
+      if (CD->getBody())
+        TC.definedFunctions.push_back(CD);
+    }
+
+    if (IsSecondPass) {
       return;
+    }
 
     assert(CD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent constructors outside of types!");
@@ -1148,8 +1160,14 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    if (IsSecondPass)
+    if (!IsFirstPass) {
+      if (DD->getBody())
+        TC.definedFunctions.push_back(DD);
+    }
+
+    if (IsSecondPass) {
       return;
+    }
 
     assert(DD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent destructors outside of types!");

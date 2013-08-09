@@ -175,6 +175,9 @@ public:
   /// type checker.
   std::vector<FuncExprLike> implicitlyDefinedFunctions;
 
+  /// \brief The list of function definitions we've encountered.
+  std::vector<FuncExprLike> definedFunctions;
+
 private:
   /// \brief The number of known protocols.
   static const unsigned numKnownProtocols
