@@ -134,10 +134,7 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
     P.setDelayedParsingCallbacks(DelayedParseCB);
 
   bool FoundSideEffects = P.parseTranslationUnit(TU);
-
-  const llvm::MemoryBuffer *Buffer = P.SourceMgr->getMemoryBuffer(BufferID);
-  *Done = P.Tok.getLoc().Value.getPointer() ==
-          Buffer->getBuffer().end();
+  *Done = P.Tok.is(tok::eof);
 
   return FoundSideEffects;
 }

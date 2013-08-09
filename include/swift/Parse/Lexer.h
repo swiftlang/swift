@@ -140,8 +140,6 @@ public:
     return CodeCompletionPtr != nullptr;
   }
 
-  const char *getBufferEnd() const { return BufferEnd; }
-
   void lex(Token &Result) {
     Result = NextToken;
     if (Result.isNot(tok::eof))

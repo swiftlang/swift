@@ -89,10 +89,7 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   TU->ASTStage = TranslationUnit::Parsed;
   verify(TU);
 
-  bool Done = Tok.getLoc().Value.getPointer() == L->getBufferEnd();
-  if (!Done) {
-    State->markParserPosition(Tok.getLoc(), PreviousLoc);
-  }
+  State->markParserPosition(Tok.getLoc(), PreviousLoc);
 
   return FoundTopLevelCodeToExecute;
 }

@@ -1087,9 +1087,8 @@ void Lexer::lexStringLiteral() {
     if (*CurPtr == '\\' && *(CurPtr + 1) == '(') {
       // Consume tokens until we hit the corresponding ')'.
       CurPtr += 2;
-      const char *EndPtr = skipToEndOfInterpolatedExpression(CurPtr,
-                                                             getBufferEnd(),
-                                                             Diags);
+      const char *EndPtr =
+          skipToEndOfInterpolatedExpression(CurPtr, BufferEnd, Diags);
       
       if (*EndPtr == ')') {
         // Successfully scanned the body of the expression literal.
