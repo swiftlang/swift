@@ -488,6 +488,8 @@ public:
   TypeRepr *parseType(Diag<> ID);
   TypeRepr *parseTypeAnnotation();
   TypeRepr *parseTypeAnnotation(Diag<> ID);
+  TypeRepr *parseTypeSimple();
+  TypeRepr *parseTypeSimple(Diag<> ID);
   bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);

@@ -49,27 +49,19 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty, DeclAttributes &attrs) {
   return new (Context) AttributedTypeRepr(attrs, ty);
 }
 
-TypeRepr *Parser::parseType() {
-  return parseType(diag::expected_type);
+TypeRepr *Parser::parseTypeSimple() {
+  return parseTypeSimple(diag::expected_type);
 }
 
-/// parseType
-///   type:
-///     type-function
-///     type-array
-///
-///   type-function:
-///     type-tuple '->' type 
-///
+/// parseTypeSimple
 ///   type-simple:
 ///     type-identifier
 ///     type-tuple
 ///     type-composition
+///     type-simple '.metatype'
 ///     type-simple '?'
-///
-TypeRepr *Parser::parseType(Diag<> MessageID) {
+TypeRepr *Parser::parseTypeSimple(Diag<> MessageID) {
   TypeRepr *ty = nullptr;
-  // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::kw_This:
   case tok::identifier:
@@ -87,16 +79,41 @@ TypeRepr *Parser::parseType(Diag<> MessageID) {
     return nullptr;
   }
 
+  // '.metatype' and '?' still leave us with type-simple.
+  while (ty) {
+    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
+        peekToken().is(tok::kw_metatype)) {
+      consumeToken();
+      SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);
+      ty = new (Context) MetaTypeTypeRepr(ty, metatypeLoc);
+      continue;
+    }
+    if (!Tok.isAtStartOfLine() && Tok.is(tok::question)) {
+      ty = parseTypeOptional(ty);
+      continue;
+    }
+    break;
+  }
+
+  return ty;
+}
+
+TypeRepr *Parser::parseType() {
+  return parseType(diag::expected_type);
+}
+
+/// parseType
+///   type:
+///     type-function
+///     type-array
+///
+///   type-function:
+///     type-simple '->' type
+///
+TypeRepr *Parser::parseType(Diag<> MessageID) {
+  TypeRepr *ty = parseTypeSimple(MessageID);
   if (!ty)
     return nullptr;
-
-  // '.metatype' still leaves us with type-simple.
-  while ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
-         peekToken().is(tok::kw_metatype)) {
-    consumeToken();
-    SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);
-    ty = new (Context) MetaTypeTypeRepr(ty, metatypeLoc);
-  }
 
   // Handle type-function if we have an arrow.
   if (consumeIf(tok::arrow)) {
@@ -106,11 +123,13 @@ TypeRepr *Parser::parseType(Diag<> MessageID) {
     return new (Context) FunctionTypeRepr(ty, SecondHalf);
   }
 
-  // Parse optional types and array types.
+  // Parse array types, plus recovery for optional array types.
   // If we see "T[]?", emit a diagnostic; this type must be written "(T[])?"
   // or "Optional<T[]>".
   while (ty && !Tok.isAtStartOfLine()) {
-    if (Tok.is(tok::question)) {
+    if (Tok.is(tok::l_square)) {
+      ty = parseTypeArray(ty);
+    } else if (Tok.is(tok::question)) {
       if (isa<ArrayTypeRepr>(ty)) {
         diagnose(Tok, diag::unsupported_unparenthesized_array_optional)
           .fixItInsert(ty->getStartLoc(), "(")
@@ -118,8 +137,6 @@ TypeRepr *Parser::parseType(Diag<> MessageID) {
                        ")");
       }
       ty = parseTypeOptional(ty);
-    } else if (Tok.is(tok::l_square)) {
-      ty = parseTypeArray(ty);
     } else {
       break;
     }
@@ -487,11 +504,19 @@ bool Parser::canParseType() {
     return false;
   }
   
-  // '.metatype' still leaves us with type-simple.
-  while ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
-         peekToken().is(tok::kw_metatype)) {
-    consumeToken();
-    consumeToken(tok::kw_metatype);
+  // '.metatype' and '?' still leave us with type-simple.
+  while (true) {
+    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
+        peekToken().is(tok::kw_metatype)) {
+      consumeToken();
+      consumeToken(tok::kw_metatype);
+      continue;
+    }
+    if (!Tok.isAtStartOfLine() && Tok.is(tok::question)) {
+      consumeToken();
+      continue;
+    }
+    break;
   }
   
   // Handle type-function if we have an arrow.
@@ -505,11 +530,11 @@ bool Parser::canParseType() {
   // For recovery purposes, accept "T[]?" here, even though we'll reject it
   // later.
   while (!Tok.isAtStartOfLine()) {
-    if (Tok.is(tok::question)) {
-      consumeToken();
-    } else if (Tok.is(tok::l_square)) {
+    if (Tok.is(tok::l_square)) {
       if (!canParseTypeArray())
         return false;
+    } else if (Tok.is(tok::question)) {
+      consumeToken();
     } else {
       break;
     }

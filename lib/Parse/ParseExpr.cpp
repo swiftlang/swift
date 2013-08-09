@@ -497,7 +497,7 @@ Expr *Parser::parseExprOperator() {
 /// parseExprNew
 ///
 ///   expr-new:
-///     'new' type-identifier expr-new-bounds
+///     'new' type-simple expr-new-bounds
 ///   expr-new-bounds:
 ///     expr-new-bound
 ///     expr-new-bounds expr-new-bound
@@ -507,8 +507,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
   SourceLoc newLoc = Tok.getLoc();
   consumeToken(tok::kw_new);
 
-  // FIXME: this should probably be type-simple.
-  TypeRepr *elementTy = parseTypeIdentifier();
+  TypeRepr *elementTy = parseTypeSimple();
   if (!elementTy)
     return nullptr;
 
