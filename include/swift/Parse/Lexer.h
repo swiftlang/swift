@@ -255,16 +255,12 @@ public:
   /// \brief Return the UTF32 codepoint for the specified character literal.
   uint32_t getEncodedCharacterLiteral(const Token &Tok);
 
-  InFlightDiagnostic diagnose(const char *Loc, Diag<> ID);
-
   static SourceLoc getSourceLoc(const char *Loc) {
     return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
   }
 
   /// Get the token that starts at the given location.
   Token getTokenAt(SourceLoc Loc);
-  
-  void lexHexNumber();
 
   /// SILBodyRAII - This helper class is used when parsing a SIL body to inform
   /// the lexer that SIL-specific lexing should be enabled.
@@ -284,6 +280,7 @@ public:
 
 private:
   void lexImpl();
+  InFlightDiagnostic diagnose(const char *Loc, Diag<> ID);
   void formToken(tok Kind, const char *TokStart);
 
   void skipToEndOfLine();
@@ -298,8 +295,9 @@ private:
   void lexIdentifier();
   void lexDollarIdent();
   void lexOperatorIdentifier();
+  void lexHexNumber();
   void lexNumber();
-  
+
   unsigned lexCharacter(const char *&CurPtr,
                         bool StopAtDoubleQuote, bool EmitDiagnostics);
   void lexCharacterLiteral();
