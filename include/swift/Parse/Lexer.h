@@ -231,11 +231,11 @@ public:
   /// Buffer.
   static StringRef getEncodedStringSegment(StringRef Str,
                                            SmallVectorImpl<char> &Buffer);
-  static StringRef getEncodedStringSegment(StringSegment Segment,
-                                           SmallVectorImpl<char> &Buffer) {
-    return getEncodedStringSegment(StringRef(Segment.Loc.Value.getPointer(),
-                                             Segment.Length),
-                                   Buffer);
+  StringRef getEncodedStringSegment(StringSegment Segment,
+                                    SmallVectorImpl<char> &Buffer) const {
+    return getEncodedStringSegment(
+        StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
+        Buffer);
   }
 
   /// \brief Given a string literal token, separate it into string/expr segments

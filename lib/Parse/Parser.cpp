@@ -147,7 +147,8 @@ void swift::performDelayedParsing(
 }
 
 /// \brief Tokenizes a string literal, taking into account string interpolation.
-void getStringPartTokens(const Token &Tok, SourceManager &SM, int BufID,
+static void getStringPartTokens(const Token &Tok, SourceManager &SM,
+                                int BufID, const llvm::MemoryBuffer *Buffer,
                          std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
   SmallVector<Lexer::StringSegment, 4> Segments;
@@ -168,7 +169,9 @@ void getStringPartTokens(const Token &Tok, SourceManager &SM, int BufID,
         // Include the quote.
         ++Len;
       }
-      StringRef Text(Loc.Value.getPointer(), Len);
+      StringRef Text(Buffer->getBufferStart() +
+                         SM.getLocOffsetInBuffer(Loc, BufID),
+                     Len);
       Token NewTok;
       NewTok.setToken(tok::string_literal, Text);
       Toks.push_back(NewTok);
@@ -188,8 +191,9 @@ std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
                                    unsigned Offset, unsigned EndOffset,
                                    bool KeepComments,
                                    bool TokenizeInterpolatedString) {
+  auto *Buffer = SM->getMemoryBuffer(BufferID);
   if (Offset == 0 && EndOffset == 0)
-    EndOffset = SM->getMemoryBuffer(BufferID)->getBufferSize();
+    EndOffset = Buffer->getBufferSize();
 
   Lexer L(SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments,
           Offset, EndOffset);
@@ -200,7 +204,7 @@ std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
     if (Tokens.back().is(tok::string_literal) && TokenizeInterpolatedString) {
       Token StrTok = Tokens.back();
       Tokens.pop_back();
-      getStringPartTokens(StrTok, SM, BufferID, Tokens);
+      getStringPartTokens(StrTok, SM, BufferID, Buffer, Tokens);
     }
   } while (Tokens.back().isNot(tok::eof));
   Tokens.pop_back(); // Remove EOF.
@@ -214,6 +218,7 @@ std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
 Parser::Parser(unsigned BufferID, TranslationUnit *TU, SILParserState *SIL,
                PersistentParserState *PersistentState)
   : SourceMgr(TU->getASTContext().SourceMgr),
+    BufferID(BufferID),
     Diags(TU->getASTContext().Diags),
     TU(TU),
     L(new Lexer(TU->getASTContext().SourceMgr, BufferID,

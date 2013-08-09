@@ -932,12 +932,13 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
 
 static StringLiteralExpr *
 createStringLiteralExprFromSegment(ASTContext &Ctx,
+                                   const Lexer *L,
                                    Lexer::StringSegment &Segment,
                                    SourceLoc TokenLoc) {
   assert(Segment.Kind == Lexer::StringSegment::Literal);
   // FIXME: Consider lazily encoding the string when needed.
   llvm::SmallString<256> Buf;
-  StringRef EncodedStr = Lexer::getEncodedStringSegment(Segment, Buf);
+  StringRef EncodedStr = L->getEncodedStringSegment(Segment, Buf);
   if (!Buf.empty()) {
     assert(EncodedStr.begin() == Buf.begin() &&
            "Returned string is not from buffer?");
@@ -956,7 +957,8 @@ Expr *Parser::parseExprStringLiteral() {
   // The simple case: just a single literal segment.
   if (Segments.size() == 1 &&
       Segments.front().Kind == Lexer::StringSegment::Literal) {
-    return createStringLiteralExprFromSegment(Context, Segments.front(), Loc);
+    return createStringLiteralExprFromSegment(Context, L, Segments.front(),
+                                              Loc);
   }
     
   SmallVector<Expr*, 4> Exprs;
@@ -964,7 +966,7 @@ Expr *Parser::parseExprStringLiteral() {
     switch (Segment.Kind) {
     case Lexer::StringSegment::Literal: {
       Exprs.push_back(
-          createStringLiteralExprFromSegment(Context, Segment, Loc));
+          createStringLiteralExprFromSegment(Context, L, Segment, Loc));
       break;
     }
         

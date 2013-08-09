@@ -66,6 +66,7 @@ public:
   typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
 
   SourceManager &SourceMgr;
+  const unsigned BufferID;
   DiagnosticEngine &Diags;
   TranslationUnit *TU;
   Lexer *L;

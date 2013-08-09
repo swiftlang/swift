@@ -437,8 +437,10 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
         Segments.front().Kind == Lexer::StringSegment::Expr) {
       diagnose(TokLoc, diag::asmname_interpolated_string);
     } else {
-      Attributes.AsmName = StringRef(Segments.front().Loc.Value.getPointer(),
-                                     Segments.front().Length);
+      Attributes.AsmName = StringRef(
+          SourceMgr->getMemoryBuffer(BufferID)->getBufferStart() +
+              SourceMgr.getLocOffsetInBuffer(Segments.front().Loc, BufferID),
+          Segments.front().Length);
     }
     consumeToken(tok::string_literal);
     return false;
