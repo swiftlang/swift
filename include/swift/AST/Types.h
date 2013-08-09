@@ -1432,20 +1432,26 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(ArrayType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getBaseType)
 END_CAN_TYPE_WRAPPER(ArrayType, Type)
-  
-/// ArraySliceType - An array slice type is the type T[], which is
-/// always sugar for a library type.
-class ArraySliceType : public TypeBase {
-  // ArraySliceTypes are never canonical.
-  ArraySliceType(Type base, bool hasTypeVariable)
-    : TypeBase(TypeKind::ArraySlice, nullptr, hasTypeVariable),
-      Base(base) {}
 
+/// A type with a special syntax that is always sugar for a library type.
+///
+/// The prime examples are slices (T[] -> Slice<T>) and
+/// optionals (T? -> Optional<T>).
+class SyntaxSugarType : public TypeBase {
   Type Base;
   Type Impl;
 
+protected:
+  // Syntax sugar types are never canonical.
+  SyntaxSugarType(TypeKind K, Type base, bool hasTypeVariable)
+    : TypeBase(K, nullptr, hasTypeVariable), Base(base) {}
+
 public:
-  static ArraySliceType *get(Type baseTy, const ASTContext &C);
+  Type getBaseType() const {
+    return Base;
+  }
+
+  TypeBase *getDesugaredType();
 
   bool hasImplementationType() const { return !Impl.isNull(); }
   void setImplementationType(Type ty) {
@@ -1457,19 +1463,42 @@ public:
     return Impl;
   }
 
-  Type getBaseType() const {
-    return Base;
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_SyntaxSugarType &&
+           T->getKind() <= TypeKind::Last_SyntaxSugarType;
   }
-   
-  /// getDesugaredType - If this type is a sugared type, remove all levels of
-  /// sugar until we get down to a non-sugar type.
-  TypeBase *getDesugaredType();
+};
+  
+/// The type T[], which is always sugar for a library type.
+class ArraySliceType : public SyntaxSugarType {
+  ArraySliceType(Type base, bool hasTypeVariable)
+    : SyntaxSugarType(TypeKind::ArraySlice, base, hasTypeVariable) {}
+
+public:
+  /// Return a uniqued array slice type with the specified base type.
+  static ArraySliceType *get(Type baseTy, const ASTContext &C);
+
+  void print(raw_ostream &OS) const;
+  
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::ArraySlice;
+  }
+};
+
+/// The type T?, which is always sugar for a library type.
+class OptionalType : public SyntaxSugarType {
+  OptionalType(Type base, bool hasTypeVariable)
+    : SyntaxSugarType(TypeKind::Optional, base, hasTypeVariable) {}
+
+public:
+  /// Return a uniqued optional type with the specified base type.
+  static OptionalType *get(Type baseTy, const ASTContext &C);
 
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::ArraySlice;
+    return T->getKind() == TypeKind::Optional;
   }
 };
 

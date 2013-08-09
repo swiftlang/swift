@@ -239,6 +239,7 @@ namespace decls_block {
     ARRAY_TYPE,
     REFERENCE_STORAGE_TYPE,
     UNBOUND_GENERIC_TYPE,
+    OPTIONAL_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
@@ -388,11 +389,15 @@ namespace decls_block {
     BCFixed<1>   // noreturn?
   >;
 
-  using ArraySliceTypeLayout = BCRecordLayout<
-    ARRAY_SLICE_TYPE,
+  template <unsigned Code>
+  using SyntaxSugarTypeLayout = BCRecordLayout<
+    Code,
     TypeIDField, // element type
     TypeIDField  // implementation type
   >;
+
+  using ArraySliceTypeLayout = SyntaxSugarTypeLayout<ARRAY_SLICE_TYPE>;
+  using OptionalTypeLayout = SyntaxSugarTypeLayout<OPTIONAL_TYPE>;
 
   using ArrayTypeLayout = BCRecordLayout<
     ARRAY_TYPE,

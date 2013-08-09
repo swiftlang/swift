@@ -55,7 +55,6 @@ TypeRepr *Parser::parseType() {
 
 /// parseType
 ///   type:
-///     type-simple
 ///     type-function
 ///     type-array
 ///
@@ -66,6 +65,7 @@ TypeRepr *Parser::parseType() {
 ///     type-identifier
 ///     type-tuple
 ///     type-composition
+///     type-simple '?'
 ///
 TypeRepr *Parser::parseType(Diag<> MessageID) {
   TypeRepr *ty = nullptr;
@@ -106,10 +106,14 @@ TypeRepr *Parser::parseType(Diag<> MessageID) {
     return new (Context) FunctionTypeRepr(ty, SecondHalf);
   }
 
+  // Parse optional simple types.
+  while (ty && Tok.is(tok::question) && !Tok.isAtStartOfLine())
+    ty = parseTypeOptional(ty);
+
   // If there is a square bracket without a newline, we have an array.
-  if (Tok.isFollowingLSquare())
-    return parseTypeArray(ty);
-  
+  if (ty && Tok.isFollowingLSquare())
+    ty = parseTypeArray(ty);
+
   return ty;
 }
 
@@ -381,6 +385,14 @@ ArrayTypeRepr *Parser::parseTypeArray(TypeRepr *Base) {
   return nullptr;
 }
 
+/// Parse a single optional suffix, given that we are looking at the
+/// question mark.
+OptionalTypeRepr *Parser::parseTypeOptional(TypeRepr *base) {
+  assert(Tok.is(tok::question));
+  SourceLoc questionLoc = consumeToken();
+  return new (Context) OptionalTypeRepr(base, questionLoc);
+}
+
 //===--------------------------------------------------------------------===//
 // Speculative type list parsing
 //===--------------------------------------------------------------------===//
@@ -477,7 +489,11 @@ bool Parser::canParseType() {
       return false;
     return true;
   }
-  
+
+  // Handle optional types.
+  while (!Tok.isAtStartOfLine() && consumeIf(tok::question))
+    ;
+
   // If there is a square bracket without a newline, we have an array.
   if (Tok.isFollowingLSquare())
     return canParseTypeArray();

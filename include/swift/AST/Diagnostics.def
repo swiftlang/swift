@@ -1531,8 +1531,9 @@ ERROR(union_element_pattern_member_not_found,sema_tcp,none,
 // Type Check Types
 //------------------------------------------------------------------------------
 
-ERROR(slice_type_not_found,sema_tct,none,
-      "broken standard library: cannot find Slice type", ())
+ERROR(sugar_type_not_found,sema_tct,none,
+      "broken standard library: cannot find %select{Slice|Optional}0 type",
+      (/*SugarImplTypeKind*/ unsigned))
 ERROR(tuple_default_local_ref,sema_tct,none,
       "cannot refer to local declaration from default value of"
       " tuple element", ())

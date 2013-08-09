@@ -495,6 +495,7 @@ public:
   ProtocolCompositionTypeRepr *parseTypeComposition();
   TupleTypeRepr *parseTypeTupleBody();
   ArrayTypeRepr *parseTypeArray(TypeRepr *Base);
+  OptionalTypeRepr *parseTypeOptional(TypeRepr *Base);
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, DeclAttributes &Attr);
 

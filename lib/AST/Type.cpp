@@ -397,7 +397,8 @@ static void gatherTypeVariables(Type wrappedTy,
                                typeVariables);
 
   case TypeKind::ArraySlice:
-    gatherTypeVariables(cast<ArraySliceType>(ty)->getImplementationType(),
+  case TypeKind::Optional:
+    gatherTypeVariables(cast<SyntaxSugarType>(ty)->getImplementationType(),
                         typeVariables);
     return;
 
@@ -623,7 +624,21 @@ static Type getStrippedType(const ASTContext &context, Type type,
     
     return type;
   }
-      
+
+  case TypeKind::Optional: {
+    auto optionalTy = cast<OptionalType>(type.getPointer());
+    Type baseTy = getStrippedType(context, optionalTy->getBaseType(),
+                                  stripLabels, stripDefaultArgs);
+    if (baseTy.getPointer() != optionalTy->getBaseType().getPointer()) {
+      auto newOptTy = OptionalType::get(baseTy, context);
+      if (!newOptTy->hasImplementationType())
+        newOptTy->setImplementationType(optionalTy->getImplementationType());
+      return newOptTy;
+    }
+    
+    return type;
+  }
+
   case TypeKind::LValue: {
     LValueType *LValueTy = cast<LValueType>(type.getPointer());
     Type ObjectTy = getStrippedType(context, LValueTy->getObjectType(),
@@ -931,7 +946,8 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::NameAlias:
     return cast<NameAliasType>(this)->getDesugaredType();
   case TypeKind::ArraySlice:
-    return cast<ArraySliceType>(this)->getDesugaredType();
+  case TypeKind::Optional:
+    return cast<SyntaxSugarType>(this)->getDesugaredType();
   case TypeKind::Substituted:
     return cast<SubstitutedType>(this)->getDesugaredType();
   }
@@ -947,7 +963,7 @@ TypeBase *NameAliasType::getDesugaredType() {
   return getDecl()->getUnderlyingType()->getDesugaredType();
 }
 
-TypeBase *ArraySliceType::getDesugaredType() {
+TypeBase *SyntaxSugarType::getDesugaredType() {
   return getImplementationType()->getDesugaredType();
 }
 
@@ -1084,9 +1100,10 @@ bool TypeBase::isSpelledLike(Type other) {
     auto pThem = cast<ParenType>(them);
     return pMe->getUnderlyingType()->isSpelledLike(pThem->getUnderlyingType());
   }
-  case TypeKind::ArraySlice: {
-    auto aMe = cast<ArraySliceType>(me);
-    auto aThem = cast<ArraySliceType>(them);
+  case TypeKind::ArraySlice:
+  case TypeKind::Optional: {
+    auto aMe = cast<SyntaxSugarType>(me);
+    auto aThem = cast<SyntaxSugarType>(them);
     return aMe->getBaseType()->isSpelledLike(aThem->getBaseType());
   }
   case TypeKind::ReferenceStorage: {
@@ -1604,7 +1621,11 @@ void PolymorphicFunctionType::print(raw_ostream &OS) const {
 }
 
 void ArraySliceType::print(raw_ostream &OS) const {
-  OS << Base << "[]";
+  OS << getBaseType() << "[]";
+}
+
+void OptionalType::print(raw_ostream &OS) const {
+  OS << getBaseType() << '?';
 }
 
 void ArrayType::print(raw_ostream &OS) const {

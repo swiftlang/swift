@@ -45,18 +45,22 @@
 #define BUILTIN_TYPE(id, parent) ALWAYS_CANONICAL_TYPE(id, parent)
 #endif
 
-/// Most metaprograms do not care about abstract types, so the default
-/// is to ignore them.
-#ifndef ABSTRACT_TYPE
-#define ABSTRACT_TYPE(Id, Parent)
-#endif
-
 #ifndef SUGARED_TYPE
 #define SUGARED_TYPE(id, parent) TYPE(id, parent)
 #endif
 
 #ifndef UNCHECKED_TYPE
 #define UNCHECKED_TYPE(id, parent) TYPE(id, parent)
+#endif
+
+/// Most metaprograms do not care about abstract types, so the default
+/// is to ignore them.
+#ifndef ABSTRACT_TYPE
+#define ABSTRACT_TYPE(Id, Parent)
+#endif
+
+#ifndef ABSTRACT_SUGARED_TYPE
+#define ABSTRACT_SUGARED_TYPE(Id, Parent) ABSTRACT_TYPE(Id, Parent)
 #endif
 
 /// A convenience for determining the range of types.  These will always
@@ -95,7 +99,10 @@ ABSTRACT_TYPE(AnyFunction, Type)
   TYPE(PolymorphicFunction, AnyFunctionType)
   TYPE_RANGE(AnyFunction, Function, PolymorphicFunction)
 TYPE(Array, Type)
-SUGARED_TYPE(ArraySlice, Type)
+ABSTRACT_SUGARED_TYPE(SyntaxSugar, Type)
+  SUGARED_TYPE(ArraySlice, SyntaxSugarType)
+  SUGARED_TYPE(Optional, SyntaxSugarType)
+  TYPE_RANGE(SyntaxSugar, ArraySlice, Optional)
 TYPE(ProtocolComposition, Type)
 TYPE(LValue, Type)
 UNCHECKED_TYPE(UnboundGeneric, Type)
@@ -107,9 +114,10 @@ ABSTRACT_TYPE(BoundGeneric, Type)
 UNCHECKED_TYPE(TypeVariable, Type)
 
 #undef TYPE_RANGE
+#undef ABSTRACT_SUGARED_TYPE
+#undef ABSTRACT_TYPE
 #undef UNCHECKED_TYPE
 #undef SUGARED_TYPE
-#undef ABSTRACT_TYPE
 #undef BUILTIN_TYPE
 #undef ALWAYS_CANONICAL_TYPE
 #undef TYPE

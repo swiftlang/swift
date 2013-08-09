@@ -24,32 +24,60 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
-/// Given an array slice type with a valid base type and no
-/// implementation type, find its canonicalization.
-static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy,
-                                SourceLoc loc) {
-  if (sliceTy->hasImplementationType())
+enum class SugarImplTypeKind {
+  Slice,
+  Optional
+};
+
+/// Given a sugar type with a valid base type and no implementation type,
+/// find its canonicalization by looking for a generic nominal with the
+/// appropriate name.
+static bool buildSugarImplType(TypeChecker &TC, SyntaxSugarType *sugarTy,
+                               SourceLoc loc, SugarImplTypeKind K) {
+  if (sugarTy->hasImplementationType())
     return false;
   
-  Type baseTy = sliceTy->getBaseType();
+  Type baseTy = sugarTy->getBaseType();
 
-  // Hack for array slices: first, try to look up Slice<T>.
-  UnqualifiedLookup genericSliceLookup(TC.Context.getIdentifier("Slice"),
-                                       &TC.TU);
-  if (TypeDecl *sliceTypeDecl = genericSliceLookup.getSingleTypeResult()) {
-    if (auto sliceTypeNTD = dyn_cast<NominalTypeDecl>(sliceTypeDecl)) {
-      if (auto Params = sliceTypeNTD->getGenericParams()) {
+  StringRef name;
+  switch (K) {
+  case SugarImplTypeKind::Slice:
+    name = "Slice";
+    break;
+  case SugarImplTypeKind::Optional:
+    name = "Optional";
+    break;
+  }
+  UnqualifiedLookup genericLookup(TC.Context.getIdentifier(name), &TC.TU);
+
+  if (TypeDecl *lookupDecl = genericLookup.getSingleTypeResult()) {
+    if (NominalTypeDecl *ND = lookupDecl->getDeclaredType()->getAnyNominal()) {
+      if (auto Params = ND->getGenericParams()) {
         if (Params->size() == 1) {
-          Type implTy = BoundGenericType::get(sliceTypeNTD, Type(), baseTy);
-          sliceTy->setImplementationType(implTy);
+          Type implTy = BoundGenericType::get(ND, Type(), baseTy);
+          sugarTy->setImplementationType(implTy);
           return false;
         }
       }
     }
   }
 
-  TC.diagnose(loc, diag::slice_type_not_found);
+  TC.diagnose(loc, diag::sugar_type_not_found, static_cast<unsigned>(K));
   return true;
+}
+
+/// Given an array slice type with a valid base type and no
+/// implementation type, find its canonicalization.
+static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy,
+                                SourceLoc loc) {
+  return buildSugarImplType(TC, sliceTy, loc, SugarImplTypeKind::Slice);
+}
+
+/// Given an optional type with a valid base type and no
+/// implementation type, find its canonicalization.
+static bool buildOptionalType(TypeChecker &TC, OptionalType *optionalTy,
+                              SourceLoc loc) {
+  return buildSugarImplType(TC, optionalTy, loc, SugarImplTypeKind::Optional);
 }
 
 Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType,
@@ -62,6 +90,18 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType,
     validateTypeSimple(sliceTy->getImplementationType());
   }
   return sliceTy;
+}
+
+Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType,
+                                  bool canonicalize) {
+  auto optionalTy = OptionalType::get(elementType, Context);
+  if (optionalTy->hasCanonicalTypeComputed()) return optionalTy;
+  if (buildOptionalType(*this, optionalTy, loc)) return Type();
+  if (canonicalize) {
+    optionalTy->getCanonicalType();
+    validateTypeSimple(optionalTy->getImplementationType());
+  }
+  return optionalTy;
 }
 
 Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
@@ -665,6 +705,20 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
     return sliceTy;
   }
 
+  case TypeReprKind::Optional: {
+    // FIXME: diagnose non-materializability of element type!
+    auto optTyR = cast<OptionalTypeRepr>(TyR);
+    Type baseTy = resolveType(optTyR->getBase());
+    if (baseTy->is<ErrorType>())
+      return baseTy;
+
+    auto optionalTy = OptionalType::get(baseTy, Context);
+    if (buildOptionalType(*this, optionalTy, optTyR->getQuestionLoc()))
+      return ErrorType::get(Context);
+
+    return optionalTy;
+  }
+
   case TypeReprKind::Tuple: {
     auto TupTyR = cast<TupleTypeRepr>(TyR);
     SmallVector<TupleTypeElt, 8> Elements;
@@ -808,6 +862,17 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
       buildArraySliceType(*this, AT, SourceLoc());
     }
     if (validateTypeSimple(AT->getImplementationType()))
+      return true;
+    break;
+  }
+  case TypeKind::Optional: {
+    OptionalType *OT = cast<OptionalType>(T);
+    if (validateTypeSimple(OT->getBaseType()))
+      return true;
+    if (!OT->hasImplementationType()) {
+      buildOptionalType(*this, OT, SourceLoc());
+    }
+    if (validateTypeSimple(OT->getImplementationType()))
       return true;
     break;
   }
@@ -1110,6 +1175,18 @@ Type TypeChecker::transformType(Type type,
       return type;
 
     return getArraySliceType(SourceLoc(), BaseTy);
+  }
+
+  case TypeKind::Optional: {
+    auto OptTy = cast<OptionalType>(base);
+    auto BaseTy = transformType(OptTy->getBaseType(), fn);
+    if (!BaseTy)
+      return Type();
+
+    if (BaseTy.getPointer() == OptTy->getBaseType().getPointer())
+      return type;
+
+    return getOptionalType(SourceLoc(), BaseTy);
   }
 
   case TypeKind::LValue: {

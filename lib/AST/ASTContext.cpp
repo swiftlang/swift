@@ -71,6 +71,7 @@ struct ASTContext::Implementation {
       FunctionTypes;
     llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
+    llvm::DenseMap<Type, OptionalType*> OptionalTypes;
     llvm::DenseMap<Type, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
@@ -846,7 +847,6 @@ ArrayType::ArrayType(Type base, uint64_t size, bool hasTypeVariable)
     Base(base), Size(size) {}
 
 
-/// Return a uniqued array slice type with the specified base type.
 ArraySliceType *ArraySliceType::get(Type base, const ASTContext &C) {
   bool hasTypeVariable = base->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
@@ -855,6 +855,16 @@ ArraySliceType *ArraySliceType::get(Type base, const ASTContext &C) {
   if (entry) return entry;
 
   return entry = new (C, arena) ArraySliceType(base, hasTypeVariable);
+}
+
+OptionalType *OptionalType::get(Type base, const ASTContext &C) {
+  bool hasTypeVariable = base->hasTypeVariable();
+  auto arena = getArena(hasTypeVariable);
+
+  OptionalType *&entry = C.Impl.getArena(arena).OptionalTypes[base];
+  if (entry) return entry;
+
+  return entry = new (C, arena) OptionalType(base, hasTypeVariable);
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)

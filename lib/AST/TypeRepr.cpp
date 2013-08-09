@@ -167,6 +167,10 @@ void ArrayTypeRepr::printImpl(llvm::raw_ostream &OS) const {
   OS << Base << '[' << Size << ']';
 }
 
+void OptionalTypeRepr::printImpl(llvm::raw_ostream &OS) const {
+  OS << Base << '?';
+}
+
 TupleTypeRepr *TupleTypeRepr::create(ASTContext &C,
                                      ArrayRef<TypeRepr *> Elements,
                                      SourceRange Parens,

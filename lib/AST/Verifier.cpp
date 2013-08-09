@@ -1059,8 +1059,9 @@ namespace {
         return checkBoundGenericTypes(cast<ArrayType>(typePtr)->getBaseType());
         
       case TypeKind::ArraySlice:
+      case TypeKind::Optional:
         return checkBoundGenericTypes(
-                                 cast<ArraySliceType>(typePtr)->getBaseType());
+                                 cast<SyntaxSugarType>(typePtr)->getBaseType());
 
       case TypeKind::LValue:
         return checkBoundGenericTypes(

@@ -246,6 +246,33 @@ private:
   friend class TypeRepr;
 };
 
+/// \brief An optional type.
+/// \code
+///   Foo?
+/// \endcode
+class OptionalTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  SourceLoc QuestionLoc;
+
+public:
+  OptionalTypeRepr(TypeRepr *Base, SourceLoc Question)
+    : TypeRepr(TypeReprKind::Optional), Base(Base), QuestionLoc(Question) {
+  }
+
+  TypeRepr *getBase() const { return Base; }
+  SourceLoc getQuestionLoc() const { return QuestionLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Optional;
+  }
+
+private:
+  SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
+  SourceLoc getEndLocImpl() const { return QuestionLoc; }
+  void printImpl(llvm::raw_ostream &OS) const;
+  friend class TypeRepr;
+};
+
 /// \brief A tuple type.
 /// \code
 ///   (Foo, Bar)

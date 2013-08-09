@@ -211,6 +211,8 @@ public:
 
   Type getArraySliceType(SourceLoc loc, Type elementType,
                          bool canonicalize = true);
+  Type getOptionalType(SourceLoc loc, Type elementType,
+                       bool canonicalize = true);
   Expr *buildArrayInjectionFnRef(DeclContext *dc,
                                  ArraySliceType *sliceType,
                                  Type lenTy, SourceLoc Loc);

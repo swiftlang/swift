@@ -63,6 +63,7 @@ public:
               ->visit##PARENT(T, std::forward<Args>(args)...); \
   }
 #define TYPE(CLASS, PARENT) ABSTRACT_TYPE(CLASS, PARENT)
+#define ABSTRACT_SUGARED_TYPE(CLASS, PARENT)
 #define SUGARED_TYPE(CLASS, PARENT)
 #define UNCHECKED_TYPE(CLASS, PARENT)
 #include "swift/AST/TypeNodes.def"

@@ -1892,6 +1892,20 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
+  case decls_block::OPTIONAL_TYPE: {
+    TypeID baseID, implID;
+    decls_block::OptionalTypeLayout::readRecord(scratch, baseID, implID);
+
+    auto optionalTy = OptionalType::get(getType(baseID), ctx);
+    typeOrOffset = optionalTy;
+
+    // Optional types are uniqued by the ASTContext, so they may already have
+    // type information. If so, ignore the information in the module.
+    if (!optionalTy->hasImplementationType())
+      optionalTy->setImplementationType(getType(implID));
+    break;
+  }
+
   case decls_block::ARRAY_TYPE: {
     TypeID baseID;
     uint64_t size;
