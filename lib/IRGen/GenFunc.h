@@ -69,7 +69,7 @@ namespace irgen {
   /// VarDecls bound by the pattern.
   void emitParameterClauses(IRGenFunction &IGF,
                             Type type,
-                            llvm::ArrayRef<Pattern*> paramClauses,
+                            ArrayRef<Pattern *> paramClauses,
                             Explosion &args);
   
   /// Emit a call to convert a Swift closure to an Objective-C block via a

@@ -58,7 +58,7 @@ static llvm::ConstantInt *getSizeMax(IRGenFunction &IGF) {
 
 /// Perform the layout required for a heap object.
 HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
-                       llvm::ArrayRef<const TypeInfo *> fields,
+                       ArrayRef<const TypeInfo *> fields,
                        llvm::StructType *typeToFill)
   : StructLayout(IGM, LayoutKind::HeapObject, strategy, fields, typeToFill) {
 }

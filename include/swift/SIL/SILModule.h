@@ -105,7 +105,7 @@ public:
   ~SILModule();
 
   /// \brief Get a uniqued pointer to a SIL type list.
-  SILTypeList *getSILTypeList(llvm::ArrayRef<SILType> Types) const;
+  SILTypeList *getSILTypeList(ArrayRef<SILType> Types) const;
 
   /// \brief This converts Swift types to SILTypes.
   Lowering::TypeConverter Types;

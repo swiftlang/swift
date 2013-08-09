@@ -240,7 +240,7 @@ public:
   bool empty() const { return IsFixedLayout && CurSize == Size(0); }
 
   /// Return the current set of fields.
-  llvm::ArrayRef<llvm::Type*> getStructFields() const { return StructFields; }
+  ArrayRef<llvm::Type *> getStructFields() const { return StructFields; }
 
   /// Return whether the structure has a fixed-size layout.
   bool isFixedLayout() const { return IsFixedLayout; }
@@ -299,13 +299,13 @@ public:
   /// \param typeToFill - if present, must be an opaque type whose body
   ///   will be filled with this layout
   StructLayout(IRGenModule &IGM, LayoutKind kind, LayoutStrategy strategy,
-               llvm::ArrayRef<const TypeInfo *> fields,
+               ArrayRef<const TypeInfo *> fields,
                llvm::StructType *typeToFill = 0);
 
   /// Create a structure layout from a builder.
   StructLayout(const StructLayoutBuilder &builder,
                llvm::Type *type,
-               llvm::ArrayRef<ElementLayout> elements)
+               ArrayRef<ElementLayout> elements)
     : MinimumAlign(builder.getAlignment()),
       MinimumSize(builder.getSize()),
       IsFixedLayout(builder.isFixedLayout()),
@@ -315,7 +315,7 @@ public:
 
   /// Return the element layouts.  This is parallel to the fields
   /// passed in the constructor.
-  llvm::ArrayRef<ElementLayout> getElements() const { return Elements; }
+  ArrayRef<ElementLayout> getElements() const { return Elements; }
   llvm::Type *getType() const { return Ty; }
   Size getSize() const { return MinimumSize; }
   Alignment getAlignment() const { return MinimumAlign; }

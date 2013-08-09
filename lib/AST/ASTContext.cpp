@@ -349,7 +349,7 @@ ASTContext::getConformance(Type conformingType,
                            WitnessMap &&witnesses,
                            TypeWitnessMap &&typeWitnesses,
                            InheritedConformanceMap &&inheritedConformances,
-                           llvm::ArrayRef<ValueDecl *> defaultedDefinitions) {
+                           ArrayRef<ValueDecl *> defaultedDefinitions) {
   auto result
     = new (*this) NormalProtocolConformance(conformingType, protocol,
                                             containingModule,

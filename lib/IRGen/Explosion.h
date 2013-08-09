@@ -93,7 +93,7 @@ public:
     Values.push_back(value);
   }
 
-  void add(llvm::ArrayRef<llvm::Value*> values) {
+  void add(ArrayRef<llvm::Value*> values) {
 #ifndef NDEBUG
     for (auto value : values)
       assert(value && "adding null value to explosion");
@@ -104,7 +104,7 @@ public:
 
   /// Return an array containing the given range of values.  The values
   /// are not claimed.
-  llvm::ArrayRef<llvm::Value*> getRange(unsigned from, unsigned to) const {
+  ArrayRef<llvm::Value*> getRange(unsigned from, unsigned to) const {
     assert(from <= to);
     assert(to <= Values.size());
     return llvm::makeArrayRef(begin() + from, to - from);
@@ -112,7 +112,7 @@ public:
 
   /// Return an array containing all of the remaining values.  The values
   /// are not claimed.
-  llvm::ArrayRef<llvm::Value *> getAll() {
+  ArrayRef<llvm::Value *> getAll() {
     return llvm::makeArrayRef(begin(), Values.size() - NextValue);
   }
 
@@ -136,7 +136,7 @@ public:
   }
 
   /// Claim and return the next N values in this explosion.
-  llvm::ArrayRef<llvm::Value*> claim(unsigned n) {
+  ArrayRef<llvm::Value*> claim(unsigned n) {
     assert(NextValue + n <= Values.size());
     auto array = llvm::makeArrayRef(begin(), n);
     NextValue += n;
@@ -144,7 +144,7 @@ public:
   }
 
   /// Claim and return all the values in this explosion.
-  llvm::ArrayRef<llvm::Value*> claimAll() {
+  ArrayRef<llvm::Value*> claimAll() {
     return claim(size());
   }
 

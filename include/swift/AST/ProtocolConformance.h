@@ -207,7 +207,7 @@ class NormalProtocolConformance : public ProtocolConformance {
                             WitnessMap &&witnesses,
                             TypeWitnessMap &&typeWitnesses,
                             InheritedConformanceMap &&inheritedConformances,
-                            llvm::ArrayRef<ValueDecl *> defaultedDefinitions)
+                            ArrayRef<ValueDecl *> defaultedDefinitions)
     : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
       Protocol(protocol),
       ContainingModule(containingModule),

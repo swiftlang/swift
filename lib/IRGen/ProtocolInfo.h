@@ -149,14 +149,14 @@ class ProtocolInfo {
     return reinterpret_cast<const WitnessTableEntry*>(this+1);
   }
 
-  ProtocolInfo(unsigned numWitnesses, llvm::ArrayRef<WitnessTableEntry> table)
+  ProtocolInfo(unsigned numWitnesses, ArrayRef<WitnessTableEntry> table)
     : NumWitnesses(numWitnesses), NumTableEntries(table.size()) {
     std::memcpy(getEntriesBuffer(), table.data(),
                 sizeof(WitnessTableEntry) * table.size());
   }
 
   static ProtocolInfo *create(unsigned numWitnesses,
-                              llvm::ArrayRef<WitnessTableEntry> table);
+                              ArrayRef<WitnessTableEntry> table);
 
 public:
   const ConformanceInfo &getConformance(IRGenModule &IGM,
@@ -169,9 +169,9 @@ public:
     return NumTableEntries;
   }
 
-  llvm::ArrayRef<WitnessTableEntry> getWitnessEntries() const {
-    return llvm::ArrayRef<WitnessTableEntry>(getEntriesBuffer(),
-                                             getNumTableEntries());
+  ArrayRef<WitnessTableEntry> getWitnessEntries() const {
+    return ArrayRef<WitnessTableEntry>(getEntriesBuffer(),
+                                       getNumTableEntries());
   }
 
   const WitnessTableEntry &getWitnessEntry(Decl *member) const {

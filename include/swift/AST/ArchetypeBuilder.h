@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <memory>
@@ -109,7 +110,7 @@ public:
   /// \brief Retrieve the array of all of the archetypes produced during
   /// archetype assignment. The 'primary' archetypes will occur first in this
   /// list.
-  llvm::ArrayRef<ArchetypeType *> getAllArchetypes();
+  ArrayRef<ArchetypeType *> getAllArchetypes();
 
   // FIXME: Infer requirements from signatures
   // FIXME: Compute the set of 'extra' witness tables needed to express this

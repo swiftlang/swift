@@ -74,7 +74,7 @@ namespace {
     /// Load a module referenced by an import statement.
     ///
     /// Returns null if no module can be loaded.
-    Module *getModule(llvm::ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
+    Module *getModule(ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
   };
 }
 

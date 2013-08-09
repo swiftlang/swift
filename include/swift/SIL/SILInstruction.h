@@ -1623,7 +1623,7 @@ protected:
   TermInst(ValueKind K, SILLocation Loc) : SILInstruction(K, Loc) {}
 public:
 
-  typedef llvm::ArrayRef<SILSuccessor> SuccessorListTy;
+  typedef ArrayRef<SILSuccessor> SuccessorListTy;
 
   /// The successor basic blocks of this terminator.
   SuccessorListTy getSuccessors();

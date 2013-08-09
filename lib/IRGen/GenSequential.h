@@ -258,7 +258,7 @@ public:
     return type;
   }
 
-  TypeInfo *layout(llvm::ArrayRef<ASTField> astFields) {
+  TypeInfo *layout(ArrayRef<ASTField> astFields) {
     SmallVector<FieldImpl, 8> fields;
     SmallVector<const TypeInfo *, 8> fieldTypesForLayout;
     fields.reserve(astFields.size());

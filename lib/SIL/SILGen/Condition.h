@@ -62,7 +62,7 @@ public:
   
   /// exitTrue - End the emission of the true block.  This must be called after
   /// enterTrue but before anything else on this Condition.
-  void exitTrue(SILBuilder &B, llvm::ArrayRef<SILValue> Args = {});
+  void exitTrue(SILBuilder &B, ArrayRef<SILValue> Args = {});
   
   /// enterFalse - Begin the emission of the false block.  This should only be
   /// called if hasFalse() returns true.
@@ -70,7 +70,7 @@ public:
   
   /// exitFalse - End the emission of the true block.  This must be called after
   /// enterFalse but before anything else on this Condition.
-  void exitFalse(SILBuilder &B, llvm::ArrayRef<SILValue> Args = {});
+  void exitFalse(SILBuilder &B, ArrayRef<SILValue> Args = {});
   
   /// complete - Complete this conditional execution.  This should be called
   /// only after all other calls on this Condition have been made.

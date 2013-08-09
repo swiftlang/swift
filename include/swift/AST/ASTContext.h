@@ -400,7 +400,7 @@ public:
                  WitnessMap &&witnesses,
                  TypeWitnessMap &&typeWitnesses,
                  InheritedConformanceMap &&inheritedConformances,
-                 llvm::ArrayRef<ValueDecl *> defaultedDefinitions);
+                 ArrayRef<ValueDecl *> defaultedDefinitions);
 
   /// \brief Produce a specialized conformance, which takes a generic
   /// conformance and substitutes

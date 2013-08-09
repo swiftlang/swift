@@ -74,10 +74,10 @@ struct DiagnosticInfo {
   };
 
   /// \brief Extra source ranges that are attached to the diagnostic.
-  llvm::ArrayRef<Range> Ranges;
+  ArrayRef<Range> Ranges;
 
   /// \brief Extra source ranges that are attached to the diagnostic.
-  llvm::ArrayRef<FixIt> FixIts;
+  ArrayRef<FixIt> FixIts;
 };
   
 /// \brief Abstract interface for classes that present diagnostics to the user.

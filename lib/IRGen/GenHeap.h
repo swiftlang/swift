@@ -35,7 +35,7 @@ namespace irgen {
 class HeapLayout : public StructLayout {
 public:
   HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
-             llvm::ArrayRef<const TypeInfo *> fields,
+             ArrayRef<const TypeInfo *> fields,
              llvm::StructType *typeToFill = 0);
 
   /// Build a size function for this layout.

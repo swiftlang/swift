@@ -662,7 +662,7 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
   }
 
   // Ignore the first element of the array unless we have an aggregate result.
-  llvm::ArrayRef<llvm::Type*> realArgTypes = argTypes;
+  ArrayRef<llvm::Type *> realArgTypes = argTypes;
   if (!hasAggregateResult)
     realArgTypes = realArgTypes.slice(1);
 
@@ -1580,7 +1580,7 @@ static void emitParameterClause(IRGenFunction &IGF, AnyFunctionType *fnType,
 /// VarDecls bound by the pattern.
 void irgen::emitParameterClauses(IRGenFunction &IGF,
                                  Type type,
-                                 llvm::ArrayRef<Pattern*> paramClauses,
+                                 ArrayRef<Pattern *> paramClauses,
                                  Explosion &args) {
   assert(!paramClauses.empty());
 
