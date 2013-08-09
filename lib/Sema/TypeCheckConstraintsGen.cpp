@@ -267,6 +267,12 @@ namespace {
       ArrayRef<ValueDecl*> decls = expr->getDecls();
       SmallVector<OverloadChoice, 4> choices;
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
+        // If the result is invalid, skip it.
+        // FIXME: Note this as invalid, in case we don't find a solution,
+        // so we don't let errors cascade further.
+        if (decls[i]->isInvalid())
+          continue;
+
         choices.push_back(OverloadChoice(Type(), decls[i],
                                          expr->isSpecialized()));
       }
@@ -285,6 +291,12 @@ namespace {
       SmallVector<OverloadChoice, 4> choices;
       auto baseTy = expr->getBase()->getType();
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
+        // If the result is invalid, skip it.
+        // FIXME: Note this as invalid, in case we don't find a solution,
+        // so we don't let errors cascade further.
+        if (decls[i]->isInvalid())
+          continue;
+
         choices.push_back(OverloadChoice(baseTy, decls[i],
                                          /*isSpecialized=*/false));
       }

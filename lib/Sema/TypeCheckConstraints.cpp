@@ -2225,6 +2225,13 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // Introduce a new overload set.
     SmallVector<OverloadChoice, 4> choices;
     for (auto constructor : ctors) {
+      // If the constructor is invalid, skip it.
+      // FIXME: Note this as invalid, in case we don't find a solution,
+      // so we don't let errors cascade further.
+      if (constructor->isInvalid())
+        continue;
+
+
       // If our base is an existential type, we can't make use of any
       // constructor whose signature involves associated types.
       // FIXME: Mark this as 'unavailable'.
@@ -2269,6 +2276,12 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // Form the overload set.
     SmallVector<OverloadChoice, 4> choices;
     for (auto result : lookup) {
+      // If the result is invalid, skip it.
+      // FIXME: Note this as invalid, in case we don't find a solution,
+      // so we don't let errors cascade further.
+      if (result.first->isInvalid())
+        continue;
+
       choices.push_back(OverloadChoice(baseTy, result.first,
                                        /*isSpecialized=*/false));
     }
@@ -2305,6 +2318,12 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   SmallVector<OverloadChoice, 4> choices;
   bool isMetatype = baseObjTy->is<MetaTypeType>();
   for (auto result : lookup) {
+    // If the result is invalid, skip it.
+    // FIXME: Note this as invalid, in case we don't find a solution,
+    // so we don't let errors cascade further.
+    if (result->isInvalid())
+      continue;
+
     // If our base is an existential type, we can't make use of any
     // member whose signature involves associated types.
     // FIXME: Mark this as 'unavailable'.
