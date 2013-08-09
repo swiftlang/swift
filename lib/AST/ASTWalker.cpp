@@ -808,7 +808,7 @@ public:
       return Pre.second;
 
     // Otherwise, visit the children.
-    E = visit(E);
+    E = visit(Pre.second);
 
     // If we didn't bail out, do post-order visitation.
     if (E) E = Walker.walkToExprPost(E);

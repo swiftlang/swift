@@ -3015,6 +3015,154 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions)  {
 //===--------------------------------------------------------------------===//
 // High-level entry points.
 //===--------------------------------------------------------------------===//
+
+static unsigned getNumArgs(ValueDecl *value) {
+  if (!isa<FuncDecl>(value)) return ~0U;
+
+  AnyFunctionType *fnTy = value->getType()->castTo<AnyFunctionType>();
+  if (value->getDeclContext()->isTypeContext())
+    fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+  Type argTy = fnTy->getInput();
+  if (auto tuple = argTy->getAs<TupleType>()) {
+    return tuple->getFields().size();
+  } else {
+    return 1;
+  }
+}
+
+static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {
+  if (value->getType()->is<ErrorType>())
+    return true;
+
+  switch (refKind) {
+      // An ordinary reference doesn't ignore anything.
+    case DeclRefKind::Ordinary:
+      return true;
+
+      // A binary-operator reference only honors FuncDecls with a certain type.
+    case DeclRefKind::BinaryOperator:
+      return (getNumArgs(value) == 2);
+
+    case DeclRefKind::PrefixOperator:
+      return (!value->getAttrs().isPostfix() && getNumArgs(value) == 1);
+
+    case DeclRefKind::PostfixOperator:
+      return (value->getAttrs().isPostfix() && getNumArgs(value) == 1);
+  }
+  llvm_unreachable("bad declaration reference kind");
+}
+
+/// BindName - Bind an UnresolvedDeclRefExpr by performing name lookup and
+/// returning the resultant expression.  Context is the DeclContext used
+/// for the lookup.
+static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
+                      TypeChecker &TC) {
+  // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
+  Identifier Name = UDRE->getName();
+  SourceLoc Loc = UDRE->getLoc();
+
+  // Perform standard value name lookup.
+  UnqualifiedLookup Lookup(Name, Context);
+
+  if (!Lookup.isSuccess()) {
+    TC.diagnose(Loc, diag::use_unresolved_identifier, Name);
+    return new (TC.Context) ErrorExpr(Loc);
+  }
+
+  // FIXME: Need to refactor the way we build an AST node from a lookup result!
+
+  if (Lookup.Results.size() == 1 &&
+      Lookup.Results[0].Kind == UnqualifiedLookupResult::ModuleName) {
+    ModuleType *MT = ModuleType::get(Lookup.Results[0].getNamedModule());
+    return new (TC.Context) ModuleExpr(Loc, MT);
+  }
+
+  bool AllDeclRefs = true;
+  SmallVector<ValueDecl*, 4> ResultValues;
+  for (auto Result : Lookup.Results) {
+    switch (Result.Kind) {
+      case UnqualifiedLookupResult::MemberProperty:
+      case UnqualifiedLookupResult::MemberFunction:
+      case UnqualifiedLookupResult::MetatypeMember:
+      case UnqualifiedLookupResult::ExistentialMember:
+      case UnqualifiedLookupResult::ArchetypeMember:
+      case UnqualifiedLookupResult::MetaArchetypeMember:
+      case UnqualifiedLookupResult::ModuleName:
+        // Types are never referenced with an implicit 'this'.
+        if (!isa<TypeDecl>(Result.getValueDecl())) {
+          AllDeclRefs = false;
+          break;
+        }
+
+        SWIFT_FALLTHROUGH;
+
+      case UnqualifiedLookupResult::ModuleMember:
+      case UnqualifiedLookupResult::LocalDecl: {
+        ValueDecl *D = Result.getValueDecl();
+        if (matchesDeclRefKind(D, UDRE->getRefKind()))
+          ResultValues.push_back(D);
+        break;
+      }
+    }
+  }
+  if (AllDeclRefs) {
+    // Diagnose uses of operators that found no matching candidates.
+    if (ResultValues.empty()) {
+      assert(UDRE->getRefKind() != DeclRefKind::Ordinary);
+      TC.diagnose(Loc, diag::use_nonmatching_operator, Name,
+                  UDRE->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
+                  UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
+      return new (TC.Context) ErrorExpr(Loc);
+    }
+
+    return TC.buildRefExpr(ResultValues, Loc, UDRE->isSpecialized());
+  }
+
+  ResultValues.clear();
+  bool AllMemberRefs = true;
+  ValueDecl *Base = 0;
+  for (auto Result : Lookup.Results) {
+    switch (Result.Kind) {
+      case UnqualifiedLookupResult::MemberProperty:
+      case UnqualifiedLookupResult::MemberFunction:
+      case UnqualifiedLookupResult::MetatypeMember:
+      case UnqualifiedLookupResult::ExistentialMember:
+        ResultValues.push_back(Result.getValueDecl());
+        if (Base && Result.getBaseDecl() != Base) {
+          AllMemberRefs = false;
+          break;
+        }
+        Base = Result.getBaseDecl();
+        break;
+      case UnqualifiedLookupResult::ModuleMember:
+      case UnqualifiedLookupResult::LocalDecl:
+      case UnqualifiedLookupResult::ModuleName:
+        AllMemberRefs = false;
+        break;
+      case UnqualifiedLookupResult::MetaArchetypeMember:
+      case UnqualifiedLookupResult::ArchetypeMember:
+        // FIXME: We need to extend OverloadedMemberRefExpr to deal with this.
+        llvm_unreachable("Archetype members in overloaded member references");
+        break;
+    }
+  }
+
+  if (AllMemberRefs) {
+    Expr *BaseExpr;
+    if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
+      Type BaseTy = MetaTypeType::get(NTD->getDeclaredTypeInContext(),
+                                      TC.Context);
+      BaseExpr = new (TC.Context) MetatypeExpr(nullptr, Loc, BaseTy);
+    } else {
+      BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc,
+                                              Base->getTypeOfReference());
+    }
+    return new (TC.Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name, Loc);
+  }
+  
+  llvm_unreachable("Can't represent lookup result");
+}
+
 namespace {
   class PreCheckExpression : public ASTWalker {
     TypeChecker &TC;
@@ -3042,6 +3190,10 @@ namespace {
         }
         
         return { closure->hasSingleExpressionBody(), expr };
+      }
+
+      if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+        return { true, BindName(unresolved, DC, TC) };
       }
 
       return { true, expr };
