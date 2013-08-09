@@ -149,7 +149,7 @@ public:
   void emitVariableDeclaration(IRBuilder& Builder,
                                llvm::Value *Storage,
                                DebugTypeInfo Ty,
-                               const llvm::Twine &Name,
+                               StringRef Name,
                                unsigned Tag,
                                unsigned ArgNo = 0);
 
@@ -158,14 +158,14 @@ public:
   void emitStackVariableDeclaration(IRBuilder& Builder,
                                     llvm::Value *Storage,
                                     DebugTypeInfo Ty,
-                                    const llvm::Twine &Name,
+                                    StringRef Name,
                                     swift::AllocStackInst *i);
 
   /// Convenience function for variables that are function arguments.
   void emitArgVariableDeclaration(IRBuilder& Builder,
                                   llvm::Value *Storage,
                                   DebugTypeInfo Ty,
-                                  const llvm::Twine &Name,
+                                  StringRef Name,
                                   unsigned ArgNo);
 
   /// Emit debug metadata for a global variable.

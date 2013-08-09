@@ -603,7 +603,7 @@ unsigned IRGenDebugInfo::getArgNo(SILFunction *Fn, SILArgument *Arg) {
 void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& Builder,
                                                   llvm::Value *Storage,
                                                   DebugTypeInfo Ty,
-                                                  const llvm::Twine &Name,
+                                                  StringRef Name,
                                                   AllocStackInst *i) {
   // Make a best effort to find out if this variable is actually an
   // argument of the current function. This is done by looking at the
@@ -615,7 +615,8 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& Builder,
       if (auto SILArg = dyn_cast<SILArgument>(Store->getSrc())) {
         assert(i && i->getParent() && i->getParent()->getParent() );
         auto Fn = i->getParent()->getParent();
-        emitArgVariableDeclaration(Builder, Storage, Ty, Name, getArgNo(Fn, SILArg));
+        emitArgVariableDeclaration(Builder, Storage, Ty, Name,
+                                   getArgNo(Fn, SILArg));
         return;
       }
   emitVariableDeclaration(Builder, Storage, Ty, Name,
@@ -625,7 +626,7 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& Builder,
 void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 llvm::Value *Storage,
                                                 DebugTypeInfo Ty,
-                                                const llvm::Twine &Name,
+                                                StringRef Name,
                                                 unsigned ArgNo) {
   emitVariableDeclaration(Builder, Storage, Ty, Name,
                           llvm::dwarf::DW_TAG_arg_variable, ArgNo);
@@ -655,7 +656,7 @@ llvm::DIFile IRGenDebugInfo::getFile(llvm::DIDescriptor Scope) {
 void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              llvm::Value *Storage,
                                              DebugTypeInfo Ty,
-                                             const llvm::Twine &Name,
+                                             StringRef Name,
                                              unsigned Tag,
                                              unsigned ArgNo) {
   llvm::DebugLoc DL = Builder.getCurrentDebugLocation();
