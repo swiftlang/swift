@@ -174,7 +174,7 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
   }
   
   // Recover with an infinite-precedence left-associative operator.
-  return InfixData(~0U, Associativity::Left);
+  return InfixData((unsigned char)~0U, Associativity::Left);
 }
 
 static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {

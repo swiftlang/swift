@@ -47,7 +47,7 @@ class InfixData {
   unsigned InvalidOrAssoc : 8;
 public:
   InfixData() : Precedence(0), InvalidOrAssoc(0) {}
-  InfixData(unsigned prec, Associativity assoc)
+  InfixData(unsigned char prec, Associativity assoc)
     : Precedence(prec), InvalidOrAssoc(unsigned(assoc) + 1) {}
 
   bool isValid() const { return InvalidOrAssoc != 0; }

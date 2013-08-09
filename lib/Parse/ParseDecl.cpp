@@ -2313,7 +2313,7 @@ OperatorDecl *Parser::parseDeclInfixOperator(SourceLoc OperatorLoc,
 
   // Initialize InfixData with default attributes:
   // precedence 100, associativity none
-  unsigned precedence = 100;
+  unsigned char precedence = 100;
   Associativity associativity = Associativity::None;
   
   SourceLoc AssociativityLoc, AssociativityValueLoc,
@@ -2367,9 +2367,10 @@ OperatorDecl *Parser::parseDeclInfixOperator(SourceLoc OperatorLoc,
         skipUntilDeclRBrace();
         return nullptr;
       }
-      bool error = Tok.getText().getAsInteger(0, precedence);
-      assert(!error && "integer literal precedence did not parse as integer?!");
-      (void)error;
+      if (Tok.getText().getAsInteger(0, precedence)) {
+        diagnose(Tok, diag::invalid_infix_operator_precedence);
+        precedence = 255;
+      }
       
       PrecedenceValueLoc = consumeToken();
       continue;
