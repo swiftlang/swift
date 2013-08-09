@@ -1000,10 +1000,9 @@ void Lexer::lexCharacterLiteral() {
   return formToken(tok::character_literal, TokStart);
 }
 
-/// getEncodedCharacterLiteral - Return the UTF32 codepoint for the specified
-/// character literal.
-uint32_t Lexer::getEncodedCharacterLiteral(const Token &Str) {
-  const char *CharStart = Str.getText().data()+1;
+uint32_t Lexer::getEncodedCharacterLiteral(const Token &Tok) {
+  assert(Tok.is(tok::character_literal));
+  const char *CharStart = Tok.getText().data() + 1;
   return lexCharacter(CharStart, false, false);
 }
 

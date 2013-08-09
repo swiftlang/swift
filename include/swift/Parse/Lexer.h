@@ -252,9 +252,8 @@ public:
     return getStringLiteralSegments(Str, Segments, Diags);
   }
 
-  /// getEncodedCharacterLiteral - Return the UTF32 codepoint for the specified
-  /// character literal.
-  uint32_t getEncodedCharacterLiteral(const Token &Str); 
+  /// \brief Return the UTF32 codepoint for the specified character literal.
+  uint32_t getEncodedCharacterLiteral(const Token &Tok);
 
   InFlightDiagnostic diagnose(const char *Loc, Diag<> ID);
 
