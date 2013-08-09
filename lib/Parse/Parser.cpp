@@ -199,12 +199,12 @@ std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
   if (Offset == 0 && EndOffset == 0)
     EndOffset = SM->getMemoryBuffer(BufferID)->getBufferSize();
 
-  Lexer L(SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments);
-  Lexer SubLexer(L, Offset, EndOffset);
+  Lexer L(SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments,
+          Offset, EndOffset);
   std::vector<Token> Tokens;
   do {
     Tokens.emplace_back();
-    SubLexer.lex(Tokens.back());
+    L.lex(Tokens.back());
     if (Tokens.back().is(tok::string_literal) && TokenizeInterpolatedString) {
       Token StrTok = Tokens.back();
       Tokens.pop_back();

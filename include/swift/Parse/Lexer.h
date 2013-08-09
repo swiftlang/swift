@@ -35,11 +35,11 @@ class Lexer {
   DiagnosticEngine *Diags;
   const unsigned BufferID;
 
-  /// Pointer to the first character of the buffer, even in a sublexer that
+  /// Pointer to the first character of the buffer, even in a lexer that
   /// scans a subrange of the buffer.
   const char *BufferStart;
 
-  /// Pointer to one past the end character of the buffer, even in a sublexer
+  /// Pointer to one past the end character of the buffer, even in a lexer
   /// that scans a subrange of the buffer.  Because the buffer is always
   /// NUL-terminated, this points to the NUL terminator.
   const char *BufferEnd;
@@ -107,7 +107,22 @@ private:
 public:
   /// \brief Create a normal lexer that scans the whole source buffer.
   Lexer(SourceManager &SourceMgr, unsigned BufferID,
-        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false);
+        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false)
+      : Lexer(SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
+    primeLexer();
+  }
+
+  /// \brief Create a lexer that scans a subrange of the source buffer.
+  Lexer(SourceManager &SourceMgr, unsigned BufferID,
+        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments,
+        unsigned Offset, unsigned EndOffset)
+      : Lexer(SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
+    assert(Offset <= EndOffset && "invalid range");
+    initSubLexer(
+        *this,
+        State(getLocForStartOfBuffer().getAdvancedLoc(Offset)),
+        State(getLocForStartOfBuffer().getAdvancedLoc(EndOffset)));
+  }
 
   /// \brief Create a sub-lexer that lexes from the same buffer, but scans
   /// a subrange of the buffer.
@@ -119,18 +134,6 @@ public:
       : Lexer(Parent.SourceMgr, Parent.Diags, Parent.BufferID,
               Parent.InSILMode, Parent.isKeepingComments()) {
     initSubLexer(Parent, BeginState, EndState);
-  }
-
-  /// \brief Create a sub-lexer that lexes from the same buffer, but scans
-  /// a subrange of the buffer.
-  Lexer(Lexer &Parent, unsigned Offset, unsigned EndOffset)
-      : Lexer(Parent.SourceMgr, Parent.Diags, Parent.BufferID,
-              Parent.InSILMode, Parent.isKeepingComments()) {
-    assert(Offset <= EndOffset && "invalid range");
-    initSubLexer(
-        Parent,
-        State(Parent.getLocForStartOfBuffer().getAdvancedLoc(Offset)),
-        State(Parent.getLocForStartOfBuffer().getAdvancedLoc(EndOffset)));
   }
 
   bool isKeepingComments() const { return KeepComments; }

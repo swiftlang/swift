@@ -178,12 +178,6 @@ Lexer::Lexer(SourceManager &SourceMgr, DiagnosticEngine *Diags,
   }
 }
 
-Lexer::Lexer(SourceManager &SourceMgr, unsigned BufferID,
-             DiagnosticEngine *Diags, bool InSILMode, bool KeepComments)
-    : Lexer(SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
-  primeLexer();
-}
-
 void Lexer::primeLexer() {
   assert(NextToken.is(tok::NUM_TOKENS));
   lexImpl();
