@@ -213,13 +213,6 @@ void Lexer::initSubLexer(Lexer &Parent, State BeginState, State EndState) {
   } else
     ArtificialEOF = EndState.Loc.Value.getPointer();
 
-  // Do code completion if the parent lexer is doing code completion and the
-  // code completion token is in subrange.
-  if (Parent.CodeCompletionPtr &&
-      Parent.CodeCompletionPtr >= BufferStart &&
-      Parent.CodeCompletionPtr <= BufferEnd)
-    CodeCompletionPtr = Parent.CodeCompletionPtr;
-
   primeLexer();
   restoreState(BeginState);
 }
