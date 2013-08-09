@@ -33,13 +33,15 @@ namespace swift {
 class Lexer {
   SourceManager &SourceMgr;
   DiagnosticEngine *Diags;
-  unsigned BufferID;
+  const unsigned BufferID;
 
-  /// Pointer to the first character of the buffer.
+  /// Pointer to the first character of the buffer, even in a sublexer that
+  /// scans a subrange of the buffer.
   const char *BufferStart;
 
-  /// Pointer to one past the end character of the buffer.  Because the buffer
-  /// is always NUL-terminated, this points to the NUL terminator.
+  /// Pointer to one past the end character of the buffer, even in a sublexer
+  /// that scans a subrange of the buffer.  Because the buffer is always
+  /// NUL-terminated, this points to the NUL terminator.
   const char *BufferEnd;
 
   /// Pointer to the artificial EOF that is located before BufferEnd.  Useful
@@ -93,13 +95,13 @@ private:
   /// The principal constructor used by public constructors below.
   /// Don't use this constructor for other purposes, it does not initialize
   /// everything.
-  Lexer(SourceManager &SourceMgr, DiagnosticEngine *Diags,
+  Lexer(SourceManager &SourceMgr, DiagnosticEngine *Diags, unsigned BufferID,
         bool InSILMode, bool KeepComments);
 
   /// @{
   /// Helper routines used in Lexer constructors.
   void primeLexer();
-  void initLexer(const char *BufferBegin, unsigned Offset);
+  void initLexer();
   void initSubLexer(Lexer &Parent, State BeginState, State EndState);
   /// @}
 
@@ -115,16 +117,16 @@ public:
   /// \param BeginState start of the subrange
   /// \param EndState end of the subrange
   Lexer(Lexer &Parent, State BeginState, State EndState)
-      : Lexer(Parent.SourceMgr, Parent.Diags, Parent.InSILMode,
-              Parent.isKeepingComments()) {
+      : Lexer(Parent.SourceMgr, Parent.Diags, Parent.BufferID,
+              Parent.InSILMode, Parent.isKeepingComments()) {
     initSubLexer(Parent, BeginState, EndState);
   }
 
   /// \brief Create a sub-lexer that lexes from the same buffer, but scans
   /// a subrange of the buffer.
   Lexer(Lexer &Parent, unsigned Offset, unsigned EndOffset)
-      : Lexer(Parent.SourceMgr, Parent.Diags, Parent.InSILMode,
-              Parent.isKeepingComments()) {
+      : Lexer(Parent.SourceMgr, Parent.Diags, Parent.BufferID,
+              Parent.InSILMode, Parent.isKeepingComments()) {
     assert(Offset <= EndOffset && "invalid range");
     initSubLexer(
         Parent,

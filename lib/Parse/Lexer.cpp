@@ -161,16 +161,15 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 //===----------------------------------------------------------------------===//
 
 Lexer::Lexer(SourceManager &SourceMgr, DiagnosticEngine *Diags,
-             bool InSILMode, bool KeepComments)
-  : SourceMgr(SourceMgr), Diags(Diags), InSILMode(InSILMode),
-    KeepComments(KeepComments) {
+             unsigned BufferID, bool InSILMode, bool KeepComments)
+    : SourceMgr(SourceMgr), Diags(Diags), BufferID(BufferID),
+      InSILMode(InSILMode), KeepComments(KeepComments) {
 }
 
 Lexer::Lexer(SourceManager &SourceMgr, unsigned BufferID,
              DiagnosticEngine *Diags, bool InSILMode, bool KeepComments)
-    : Lexer(SourceMgr, Diags, InSILMode, KeepComments) {
-  initLexer(SourceMgr->getMemoryBuffer(BufferID)->getBufferStart(),
-            /*Offset=*/0);
+    : Lexer(SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
+  initLexer();
   primeLexer();
 }
 
@@ -182,37 +181,29 @@ void Lexer::primeLexer() {
          "or we should be lexing from the middle of the buffer");
 }
 
-void Lexer::initLexer(const char *BufferBegin, unsigned Offset) {
-  BufferID = SourceMgr->FindBufferContainingLoc(
-      llvm::SMLoc::getFromPointer(BufferBegin));
-  assert(BufferID != ~0U && "StringRef does not point into a valid buffer");
-
+void Lexer::initLexer() {
   auto *Buffer = SourceMgr->getMemoryBuffer(BufferID);
-
-  BufferStart = BufferBegin;
+  BufferStart = Buffer->getBufferStart();
   BufferEnd = Buffer->getBufferEnd();
-  CurPtr = BufferBegin + Offset;
-  assert(CurPtr >= BufferStart && CurPtr <= BufferEnd &&
-         "Current position is out-of-range");
+  CurPtr = BufferStart;
 
   if (BufferID == SourceMgr.getCodeCompletionBufferID()) {
-    // The Buffer StringRef might not point at the beginning of the buffer.
-    // Adjust the code completion offset.
-    unsigned CodeCompletionOffset = SourceMgr.getCodeCompletionOffset();
-    CodeCompletionOffset -= BufferStart - Buffer->getBuffer().begin();
-
-    const char *Ptr = BufferStart + CodeCompletionOffset;
+    const char *Ptr = BufferStart + SourceMgr.getCodeCompletionOffset();
     if (Ptr >= BufferStart && Ptr <= BufferEnd)
       CodeCompletionPtr = Ptr;
   }
 }
 
 void Lexer::initSubLexer(Lexer &Parent, State BeginState, State EndState) {
-  initLexer(BeginState.Loc.Value.getPointer(), /*Offset=*/0);
+  initLexer();
 
   assert(BufferID == static_cast<unsigned>(SourceMgr->FindBufferContainingLoc(
                          BeginState.Loc.Value)) &&
          "state for the wrong buffer");
+  assert(BufferID == static_cast<unsigned>(SourceMgr->FindBufferContainingLoc(
+                         EndState.Loc.Value)) &&
+         "state for the wrong buffer");
+
   // If the parent lexer should stop prematurely, and the ArtificialEOF
   // position is in this subrange, then we should stop at that point, too.
   if (Parent.ArtificialEOF &&
