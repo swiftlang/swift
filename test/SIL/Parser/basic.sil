@@ -803,3 +803,37 @@ bb5:
   %18 = tuple ()
   return %18 : $()                                        // CHECK: return
 }
+
+class ConcreteClass : ClassP {
+}
+struct Spoon : Bendable {
+}
+
+// CHECK: sil @test_init_existential : $[thin] (x : Spoon) -> Bendable
+sil @test_init_existential : $[thin] (x : Spoon) -> Bendable {
+bb0(%0 : $*Bendable, %1 : $Spoon):
+  %2 = alloc_box $Spoon
+  store %1 to %2#1 : $*Spoon
+  // CHECK: init_existential %{{.*}} : $*Bendable, $*Spoon
+  %4 = init_existential %0 : $*Bendable, $*Spoon
+  // CHECK: deinit_existential %{{.*}} : $*Bendable
+  deinit_existential %0 : $*Bendable
+  %5 = load %2#1 : $*Spoon
+  store %5 to %4 : $*Spoon
+  release %2#0 : $Builtin.ObjectPointer
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK: sil @test_existential_ref : $[thin] (x : ConcreteClass) -> ClassP
+sil @test_existential_ref : $[thin] (x : ConcreteClass) -> ClassP {
+bb0(%0 : $ConcreteClass):
+  %1 = alloc_box $ConcreteClass
+  store %0 to %1#1 : $*ConcreteClass
+  %3 = load %1#1 : $*ConcreteClass
+  retain %3 : $ConcreteClass
+  // CHECK: init_existential_ref %{{.*}} : $ConcreteClass, $ClassP
+  %5 = init_existential_ref %3 : $ConcreteClass, $ClassP
+  release %1#0 : $Builtin.ObjectPointer
+  return %5 : $ClassP
+}

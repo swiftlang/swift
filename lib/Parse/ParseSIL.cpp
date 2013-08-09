@@ -836,6 +836,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("dealloc_box", ValueKind::DeallocBoxInst)
     .Case("dealloc_ref", ValueKind::DeallocRefInst)
     .Case("dealloc_stack", ValueKind::DeallocStackInst)
+    .Case("deinit_existential", ValueKind::DeinitExistentialInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
     .Case("downcast", ValueKind::DowncastInst)
     .Case("downcast_archetype_addr", ValueKind::DowncastArchetypeAddrInst)
@@ -845,6 +846,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("global_addr", ValueKind::GlobalAddrInst)
     .Case("index_addr", ValueKind::IndexAddrInst)
     .Case("index_raw_pointer", ValueKind::IndexRawPointerInst)
+    .Case("init_existential", ValueKind::InitExistentialInst)
+    .Case("init_existential_ref", ValueKind::InitExistentialRefInst)
     .Case("initialize_var", ValueKind::InitializeVarInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("is_nonnull", ValueKind::IsNonnullInst)
@@ -1820,6 +1823,36 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     ResultVal = B.createSwitchUnion(InstLoc, Val, DefaultBB, CaseBBs);
+    break;
+  }
+  case ValueKind::DeinitExistentialInst: {
+    if (parseTypedValueRef(Val))
+      return true;
+    ResultVal = B.createDeinitExistential(InstLoc, Val);
+    break;
+  }
+  case ValueKind::InitExistentialInst: {
+    SILType Ty;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(Ty))
+      return true;
+    // FIXME: Conformances in InitExistentialInst is currently not included in
+    // SIL.rst.
+    ResultVal = B.createInitExistential(InstLoc, Val, Ty,
+                  ArrayRef<ProtocolConformance*>());
+    break;
+  }
+  case ValueKind::InitExistentialRefInst: {
+    SILType Ty;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(Ty))
+      return true;
+    // FIXME: Conformances in InitExistentialRefInst is currently not included
+    // in SIL.rst.
+    ResultVal = B.createInitExistentialRef(InstLoc, Ty, Val,
+                  ArrayRef<ProtocolConformance*>());
     break;
   }
   }

@@ -719,7 +719,7 @@ public:
     OS << "project_existential_ref " << getIDAndType(PI->getOperand());
   }
   void visitInitExistentialInst(InitExistentialInst *AEI) {
-    OS << "init_existential " << getID(AEI->getOperand()) << ", ";
+    OS << "init_existential " << getIDAndType(AEI->getOperand()) << ", ";
     AEI->getConcreteType().print(OS);
   }
   void visitInitExistentialRefInst(InitExistentialRefInst *AEI) {
@@ -734,7 +734,7 @@ public:
        << " to " << getIDAndType(UEI->getDestExistential());
   }
   void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
-    OS << "deinit_existential " << getID(DEI->getOperand());
+    OS << "deinit_existential " << getIDAndType(DEI->getOperand());
   }
   void visitClassMetatypeInst(ClassMetatypeInst *MI) {
     OS << "class_metatype " << MI->getType() << ", "
