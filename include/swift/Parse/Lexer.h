@@ -57,17 +57,17 @@ class Lexer {
 
   Token NextToken;
   
-  /// InSILMode - This is true if we're lexing a .sil file instead of a .swift
+  /// \brief This is true if we're lexing a .sil file instead of a .swift
   /// file.  This enables the 'sil' keyword.
-  bool InSILMode;
+  const bool InSILMode;
+
+  /// \brief Set to true to return comment tokens, instead of skipping them.
+  const bool KeepComments;
 
   /// InSILBody - This is true when we're lexing the body of a SIL declaration
   /// in a SIL file.  This enables some context-sensitive lexing.
   bool InSILBody = false;
   
-  /// \brief Set to true to return comment tokens, instead of skipping them.
-  bool KeepComments = false;
-
 public:
   /// \brief Lexer state can be saved/restored to/from objects of this class.
   class State {
