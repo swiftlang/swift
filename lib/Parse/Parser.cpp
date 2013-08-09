@@ -78,7 +78,7 @@ private:
     assert(FE);
     assert(FE->getBodyKind() == FuncExpr::BodyKind::Unparsed);
 
-    int BufferID = TU->Ctx.SourceMgr->FindBufferContainingLoc(FD->getLoc().Value);
+    int BufferID = TU->Ctx.SourceMgr.findBufferContainingLoc(FD->getLoc());
     Parser TheParser(BufferID, TU, nullptr, &ParserState);
 
     std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
@@ -103,7 +103,7 @@ void parseDelayedTopLevelDecl(
     return;
 
   int BufferID = TU->Ctx.SourceMgr
-      ->FindBufferContainingLoc(ParserState.getDelayedDeclLoc().Value);
+      .findBufferContainingLoc(ParserState.getDelayedDeclLoc());
   Parser TheParser(BufferID, TU, nullptr, &ParserState);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
@@ -240,7 +240,7 @@ Parser::Parser(unsigned BufferID, TranslationUnit *TU, SILParserState *SIL,
 
   auto ParserPos = State->takeParserPosition();
   if (ParserPos.isValid() &&
-      SourceMgr->FindBufferContainingLoc(ParserPos.Loc.Value) == int(BufferID)) {
+      SourceMgr.findBufferContainingLoc(ParserPos.Loc) == int(BufferID)) {
     auto BeginParserPosition = getParserPosition(ParserPos);
     restoreParserPosition(BeginParserPosition);
   }

@@ -875,8 +875,8 @@ namespace {
 
     bool isGoodSourceRange(SourceRange SR) {
       return SR.isValid() &&
-             Ctx.SourceMgr->FindBufferContainingLoc(SR.Start.Value) != -1 &&
-             Ctx.SourceMgr->FindBufferContainingLoc(SR.End.Value) != -1;
+             Ctx.SourceMgr.findBufferContainingLoc(SR.Start) != -1 &&
+             Ctx.SourceMgr.findBufferContainingLoc(SR.End) != -1;
     }
 
     void checkSourceRanges(FuncExpr *FE) {

@@ -90,6 +90,14 @@ public:
            rangeContainsTokenLoc(Enclosing, Inner.End);
   }
 
+  int findBufferContainingLoc(SourceLoc Loc) const {
+    return LLVMSourceMgr.FindBufferContainingLoc(Loc.Value);
+  }
+
+  size_t addNewSourceBuffer(llvm::MemoryBuffer *Buffer, SourceLoc IncludeLoc) {
+    return LLVMSourceMgr.AddNewSourceBuffer(Buffer, IncludeLoc.Value);
+  }
+
   /// \brief Returns the SourceLoc for the beginning of the specified buffer
   /// (at offset zero).
   ///
@@ -101,6 +109,11 @@ public:
   unsigned getLocOffsetInBuffer(SourceLoc Loc, unsigned BufferID) const;
 
   DecomposedLoc decompose(SourceLoc Loc) const;
+
+  std::pair<unsigned, unsigned> getLineAndColumn(SourceLoc Loc,
+                                                 int BufferID = -1) const {
+    return LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
+  }
 };
 
 } // namespace swift

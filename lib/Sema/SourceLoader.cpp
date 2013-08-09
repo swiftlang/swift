@@ -40,7 +40,7 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
 
   // First, search in the directory corresponding to the import location.
   // FIXME: This screams for a proper FileManager abstraction.
-  int currentBufferID = ctx.SourceMgr->FindBufferContainingLoc(importLoc.Value);
+  int currentBufferID = ctx.SourceMgr.findBufferContainingLoc(importLoc);
   if (currentBufferID >= 0) {
     const llvm::MemoryBuffer *importingBuffer
       = ctx.SourceMgr->getBufferInfo(currentBufferID).Buffer;
@@ -96,8 +96,8 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   llvm::SaveAndRestore<bool> turnOffDebug(Ctx.LangOpts.DebugConstraintSolver,
                                           false);
 
-  unsigned bufferID = Ctx.SourceMgr->AddNewSourceBuffer(inputFile.take(),
-                                                       moduleID.second.Value);
+  unsigned bufferID = Ctx.SourceMgr.addNewSourceBuffer(inputFile.take(),
+                                                       moduleID.second);
 
   // For now, treat all separate modules as unique components.
   Component *comp = new (Ctx.Allocate<Component>(1)) Component();

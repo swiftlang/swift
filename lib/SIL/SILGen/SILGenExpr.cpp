@@ -2006,18 +2006,18 @@ RValue RValueEmitter::
 visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   ASTContext &Ctx = SGF.SGM.M.getASTContext();
   SILType Ty = SGF.getLoweredLoadableType(E->getType());
-  llvm::SMLoc Loc;
+  SourceLoc Loc;
   
   // If "overrideLocationForMagicIdentifiers" is set, then we use it as the
   // location point for these magic identifiers.
   if (SGF.overrideLocationForMagicIdentifiers.isValid())
-    Loc = SGF.overrideLocationForMagicIdentifiers.Value;
+    Loc = SGF.overrideLocationForMagicIdentifiers;
   else
-    Loc = E->getStartLoc().Value;
+    Loc = E->getStartLoc();
   
   switch (E->getKind()) {
   case MagicIdentifierLiteralExpr::File: {
-    int BufferID = Ctx.SourceMgr->FindBufferContainingLoc(Loc);
+    int BufferID = Ctx.SourceMgr.findBufferContainingLoc(Loc);
     assert(BufferID != -1 && "MagicIdentifierLiteral has invalid location");
     
     StringRef Value =
@@ -2027,12 +2027,12 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
                                     ManagedValue::Unmanaged));
   }
   case MagicIdentifierLiteralExpr::Line: {
-    unsigned Value = Ctx.SourceMgr->getLineAndColumn(Loc).first;
+    unsigned Value = Ctx.SourceMgr.getLineAndColumn(Loc).first;
     return RValue(SGF, ManagedValue(SGF.B.createIntegerLiteral(E, Ty, Value),
                                     ManagedValue::Unmanaged));
   }
   case MagicIdentifierLiteralExpr::Column: {
-    unsigned Value = Ctx.SourceMgr->getLineAndColumn(Loc).second;
+    unsigned Value = Ctx.SourceMgr.getLineAndColumn(Loc).second;
     return RValue(SGF, ManagedValue(SGF.B.createIntegerLiteral(E, Ty, Value),
                                     ManagedValue::Unmanaged));
   }

@@ -46,8 +46,7 @@ static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
 
   // First, search in the directory corresponding to the import location.
   // FIXME: This screams for a proper FileManager abstraction.
-  llvm::SMLoc rawLoc = moduleID.second.Value;
-  int currentBufferID = ctx.SourceMgr->FindBufferContainingLoc(rawLoc);
+  int currentBufferID = ctx.SourceMgr.findBufferContainingLoc(moduleID.second);
   if (currentBufferID >= 0) {
     const llvm::MemoryBuffer *importingBuffer
       = ctx.SourceMgr->getBufferInfo(currentBufferID).Buffer;
@@ -100,9 +99,8 @@ static Module *makeTU(ASTContext &ctx, AccessPathElem moduleID,
 
     // Transfer ownership of the MemoryBuffer to the SourceMgr.
     // FIXME: include location
-    llvm::SMLoc rawLoc = moduleID.second.Value;
-    BufferIDs.push_back(ctx.SourceMgr->AddNewSourceBuffer(InputFile.take(),
-                                                         rawLoc));
+    BufferIDs.push_back(ctx.SourceMgr.addNewSourceBuffer(InputFile.take(),
+                                                         moduleID.second));
   }
 
   for (auto &BufferID : BufferIDs) {

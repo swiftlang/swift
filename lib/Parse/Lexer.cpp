@@ -187,11 +187,11 @@ void Lexer::primeLexer() {
 }
 
 void Lexer::initSubLexer(Lexer &Parent, State BeginState, State EndState) {
-  assert(BufferID == static_cast<unsigned>(SourceMgr->FindBufferContainingLoc(
-                         BeginState.Loc.Value)) &&
+  assert(BufferID == static_cast<unsigned>(SourceMgr.findBufferContainingLoc(
+                         BeginState.Loc)) &&
          "state for the wrong buffer");
-  assert(BufferID == static_cast<unsigned>(SourceMgr->FindBufferContainingLoc(
-                         EndState.Loc.Value)) &&
+  assert(BufferID == static_cast<unsigned>(SourceMgr.findBufferContainingLoc(
+                         EndState.Loc)) &&
          "state for the wrong buffer");
 
   // If the parent lexer should stop prematurely, and the ArtificialEOF
@@ -216,7 +216,7 @@ InFlightDiagnostic Lexer::diagnose(const char *Loc, Diag<> ID) {
 
 Token Lexer::getTokenAt(SourceLoc Loc) {
   assert(BufferID == static_cast<unsigned>(
-                         SourceMgr->FindBufferContainingLoc(Loc.Value)) &&
+                         SourceMgr.findBufferContainingLoc(Loc)) &&
          "location from the wrong buffer");
 
   Lexer L(SourceMgr, BufferID, Diags, InSILMode, /*KeepComments=*/false);
@@ -1418,7 +1418,7 @@ SourceLoc Lexer::getLocForEndOfToken(SourceManager &SM, SourceLoc Loc) {
     return Loc;
 
   // Figure out which buffer contains this location.
-  int BufferID = SM->FindBufferContainingLoc(Loc.Value);
+  int BufferID = SM.findBufferContainingLoc(Loc);
   if (BufferID < 0)
     return SourceLoc();
   

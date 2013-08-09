@@ -172,7 +172,7 @@ Location getStartLoc(SourceManager &SM, WithLoc *S) {
   if (S == nullptr) return L;
 
   SourceLoc Start = S->getStartLoc();
-  int BufferIndex = SM->FindBufferContainingLoc(Start.Value);
+  int BufferIndex = SM.findBufferContainingLoc(Start);
   if (BufferIndex == -1)
     // This may be a deserialized or clang-imported decl. And modules
     // don't come with SourceLocs right now. Get at least the name of
@@ -180,7 +180,7 @@ Location getStartLoc(SourceManager &SM, WithLoc *S) {
     return getDeserializedLoc(S);
 
   L.Filename = SM->getMemoryBuffer((unsigned)BufferIndex)->getBufferIdentifier();
-  std::tie(L.Line, L.Col) = SM->getLineAndColumn(Start.Value, BufferIndex);
+  std::tie(L.Line, L.Col) = SM.getLineAndColumn(Start, BufferIndex);
   return L;
 }
 
