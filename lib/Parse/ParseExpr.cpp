@@ -982,8 +982,7 @@ Expr *Parser::parseExprStringLiteral() {
       // check for a tok::EOF that is spelled with a ')'.
       // FIXME: This seems like a hack, there must be a better way..
       Lexer::State EndState = BeginState.advance(Segment.Length-1);
-      Lexer LocalLex(*L, BeginState, EndState,
-                     SourceMgr, &Diags, nullptr /*not SIL*/);
+      Lexer LocalLex(*L, BeginState, EndState);
       
       // Temporarily swap out the parser's current lexer with our new one.
       llvm::SaveAndRestore<Lexer*> T(L, &LocalLex);

@@ -105,12 +105,11 @@ public:
   /// \param Parent the parent lexer that scans the whole buffer
   /// \param BeginState start of the subrange
   /// \param EndState end of the subrange
-  Lexer(Lexer &Parent, State BeginState, State EndState,
-        SourceManager &SourceMgr, DiagnosticEngine *Diags, bool InSILMode)
-    : Lexer(SourceMgr,
+  Lexer(Lexer &Parent, State BeginState, State EndState)
+    : Lexer(Parent.SourceMgr,
             StringRef(BeginState.Loc.Value.getPointer(),
                       Parent.BufferEnd - BeginState.Loc.Value.getPointer()),
-            Diags, BeginState.Loc.Value.getPointer(), InSILMode,
+            Parent.Diags, BeginState.Loc.Value.getPointer(), Parent.InSILMode,
             Parent.isKeepingComments(),
             /*Prime=*/false) {
     assert(BufferID == static_cast<unsigned>(SourceMgr->FindBufferContainingLoc(
