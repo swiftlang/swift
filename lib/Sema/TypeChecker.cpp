@@ -854,12 +854,6 @@ bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
   DiagnosticEngine diags(TU->Ctx.SourceMgr);
   
   TypeChecker TC(*TU, diags);
-  
-  parsedExpr = ExprPrePassWalker(TC).doWalk(parsedExpr, TU);
-  if (!parsedExpr
-      || isa<ErrorExpr>(parsedExpr)
-      || (parsedExpr->getType() && parsedExpr->getType()->is<ErrorType>()))
-    return false;
   TC.typeCheckExpression(parsedExpr, TU);
   TU->ASTStage = TranslationUnit::TypeChecked;
   
@@ -875,8 +869,6 @@ bool swift::typeCheckFunctionBodyUntil(TranslationUnit *TU, DeclContext *DC,
   DiagnosticEngine Diags(TU->Ctx.SourceMgr);
 
   TypeChecker TC(*TU, Diags);
-  ExprPrePassWalker prePass(TC);
-  prePass.doWalk(FE, DC);
   TC.typeCheckFunctionBodyUntil(FE, EndTypeCheckLoc);
   return true;
 }
