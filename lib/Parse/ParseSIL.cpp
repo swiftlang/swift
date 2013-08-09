@@ -855,6 +855,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("load", ValueKind::LoadInst)
     .Case("load_weak", ValueKind::LoadWeakInst)
     .Case("metatype", ValueKind::MetatypeInst)
+    .Case("module", ValueKind::ModuleInst)
     .Case("object_pointer_to_ref", ValueKind::ObjectPointerToRefInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
     .Case("pointer_to_address", ValueKind::PointerToAddressInst)
@@ -1853,6 +1854,21 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // in SIL.rst.
     ResultVal = B.createInitExistentialRef(InstLoc, Ty, Val,
                   ArrayRef<ProtocolConformance*>());
+    break;
+  }
+  case ValueKind::ModuleInst: {
+    Identifier ModuleName;
+    SourceLoc ModuleLoc;
+    // Parse reference to a module.
+    if (P.parseToken(tok::sil_pound, diag::expected_sil_constant) ||
+        P.parseIdentifier(ModuleName, ModuleLoc, diag::expected_sil_constant))
+      return true;
+    llvm::PointerUnion<ValueDecl*, Module *> Res = lookupTopDecl(P, ModuleName);
+    assert(Res.is<Module*>() && "Expect a module name in ModuleInst");
+    auto Mod = Res.get<Module*>();
+    ResultVal = B.createModule(InstLoc,
+                  SILType::getPrimitiveObjectType(
+                    ModuleType::get(Mod)->getCanonicalType()));
     break;
   }
   }
