@@ -995,6 +995,11 @@ ERROR(declared_operator_without_operator_decl,sema_nb,none,
       "operator implementation without matching operator declaration", ())
 ERROR(declared_unary_op_without_attribute,sema_nb,none,
       "unary operator implementation must have a 'prefix' or 'postfix' attribute", ())
+ERROR(unary_op_missing_prepos_attribute,sema_nb,none,
+      "%select{prefix|postfix}0 unary operator missing "
+      "'%select{prefix|postfix}0' attribute", (bool))
+NOTE(unary_operator_declaration_here,sema_nb,none,
+   "%select{prefix|postfix}0 operator found here", (bool))
 ERROR(invalid_arg_count_for_operator,sema_nb,none,
       "operators must have one or two arguments", ())
 

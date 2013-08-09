@@ -238,12 +238,12 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
 
   auto *TU = dyn_cast<TranslationUnit>(M);
   if (!TU)
-    return nullptr;
+    return Nothing;
 
   // Look for an operator declaration in the current module.
   auto found = (TU->*OP_MAP).find(Name.get());
   if (found != (TU->*OP_MAP).end())
-    return found->getValue();
+    return found->getValue()? Optional<OP_DECL *>(found->getValue()) : Nothing;
   
   // Look for imported operator decls.
   
@@ -262,7 +262,7 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
   if (importedOperators.empty()) {
     // Cache the mapping so we don't need to troll imports next time.
     (TU->*OP_MAP)[Name.get()] = nullptr;
-    return nullptr;
+    return Nothing;
   }
   if (importedOperators.size() == 1) {
     // Cache the mapping so we don't need to troll imports next time.

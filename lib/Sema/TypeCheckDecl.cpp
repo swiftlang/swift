@@ -947,6 +947,88 @@ public:
     FE->setType(funcTy);
   }
 
+  /// Bind the given function declaration, which declares an operator, to
+  /// the corresponding operator declaration.
+  void bindFuncDeclToOperator(FuncDecl *FD) {
+    OperatorDecl *op = nullptr;
+    auto &TU = TC.TU;
+    if (FD->isUnaryOperator()) {
+      if (FD->getAttrs().isPrefix()) {
+        if (auto maybeOp = TU.lookupPrefixOperator(FD->getName(), FD->getLoc()))
+          op = *maybeOp;
+        else
+          return;
+      } else if (FD->getAttrs().isPostfix()) {
+        if (auto maybeOp = TU.lookupPostfixOperator(FD->getName(),FD->getLoc()))
+          op = *maybeOp;
+        else
+          return;
+      } else {
+        auto prefixOp = TU.lookupPrefixOperator(FD->getName(), FD->getLoc());
+        auto postfixOp = TU.lookupPostfixOperator(FD->getName(), FD->getLoc());
+
+        // If we found both prefix and postfix, or neither prefix nor postfix,
+        // complain. We can't fix this situation.
+        if (static_cast<bool>(prefixOp) == static_cast<bool>(postfixOp)) {
+          TC.diagnose(FD, diag::declared_unary_op_without_attribute);
+
+          // If we found both, point at them.
+          if (prefixOp) {
+            SourceLoc insertionLoc = FD->getLoc();
+
+            TC.diagnose(*prefixOp, diag::unary_operator_declaration_here,false)
+              .fixItInsert(insertionLoc, "[prefix] ");
+            TC.diagnose(*postfixOp, diag::unary_operator_declaration_here, true)
+              .fixItInsert(insertionLoc, "[postfix] ");
+          } else {
+            // FIXME: Introduce a Fix-It that adds the operator declaration?
+          }
+
+          // FIXME: Errors could cascade here, because name lookup for this
+          // operator won't find this declaration.
+          return;
+        }
+
+        // We found only one operator declaration, so we know whether this
+        // should be a prefix or a postfix operator.
+
+        // Fix the AST and determine the insertion text.
+        SourceLoc insertionLoc = FD->getLoc();
+        const char *insertionText;
+        if (postfixOp) {
+          insertionText = "[postfix] ";
+          op = *postfixOp;
+          FD->getMutableAttrs().ExplicitPostfix = true;
+        } else {
+          insertionText = "[prefix] ";
+          op = *prefixOp;
+          FD->getMutableAttrs().ExplicitPrefix = true;
+        }
+
+        // Emit diagnostic with the Fix-It.
+        TC.diagnose(FD, diag::unary_op_missing_prepos_attribute,
+                    static_cast<bool>(postfixOp))
+          .fixItInsert(insertionLoc, insertionText);
+        TC.diagnose(op, diag::unary_operator_declaration_here,
+                    static_cast<bool>(postfixOp));
+      }
+    } else if (FD->isBinaryOperator()) {
+      if (auto maybeOp = TU.lookupInfixOperator(FD->getName(), FD->getLoc()))
+        op = *maybeOp;
+      else {
+        // FIXME: Add Fix-It introducing an operator declaration?
+        TC.diagnose(FD, diag::declared_operator_without_operator_decl);
+        return;
+      }
+    } else {
+      TC.diagnose(FD, diag::invalid_arg_count_for_operator);
+      return;
+    }
+
+    assert(op && "Should have computed operator above");
+    FD->setOperatorDecl(op);
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     if (!IsFirstPass) {
       if (auto body = FD->getBody())
@@ -956,6 +1038,10 @@ public:
 
     if (IsSecondPass)
       return;
+
+    // Bind operator functions to the corresponding operator declaration.
+    if (FD->isOperator())
+      bindFuncDeclToOperator(FD);
 
     FuncExpr *body = FD->getBody();
 

@@ -465,41 +465,6 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   }
 }
 
-static void bindFuncDeclToOperator(TypeChecker &TC,
-                                   TranslationUnit *TU,
-                                   FuncDecl *FD) {
-  OperatorDecl *op;
-  if (FD->isUnaryOperator()) {
-    if (FD->getAttrs().isPrefix()) {
-      if (auto maybeOp = TU->lookupPrefixOperator(FD->getName(), FD->getLoc()))
-        op = *maybeOp;
-      else
-        return;
-    } else if (FD->getAttrs().isPostfix()) {
-      if (auto maybeOp = TU->lookupPostfixOperator(FD->getName(), FD->getLoc()))
-        op = *maybeOp;
-      else
-        return;
-    } else {
-      TC.diagnose(FD, diag::declared_unary_op_without_attribute);
-      return;
-    }
-  } else if (FD->isBinaryOperator()) {
-    if (auto maybeOp = TU->lookupInfixOperator(FD->getName(), FD->getLoc()))
-      op = *maybeOp;
-    else
-      return;
-  } else {
-    TC.diagnose(FD, diag::invalid_arg_count_for_operator);
-    return;
-  }
-
-  if (!op)
-    TC.diagnose(FD, diag::declared_operator_without_operator_decl);
-  else
-    FD->setOperatorDecl(op);
-}
-
 /// performTypeChecking - Once parsing and namebinding are complete, these
 /// walks the AST to resolve types and diagnose problems therein.
 ///
@@ -514,19 +479,11 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   TypeChecker TC(*TU);
   auto &FuncExprs = TC.definedFunctions;
 
-  // Resolve extensions and operator declarations.
-  // FIXME: Feels too early to care about operator declarations.
+  // Resolve extensions. This has to occur first during type checking,
+  // because
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(TU->Decls[i])) {
       bindExtensionDecl(ED, TC);
-      continue;
-    }
-
-    if (FuncDecl *FD = dyn_cast<FuncDecl>(TU->Decls[i])) {
-      // If this is an operator implementation, bind it to an operator decl.
-      if (FD->isOperator())
-        bindFuncDeclToOperator(TC, TU, FD);
-
       continue;
     }
   }
