@@ -66,8 +66,8 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
     parseDeclSILStage();
   } else {
     parseBraceItems(Items, true,
-                    IsMainModule ? BraceItemListKind::TopLevelCode
-                                 : BraceItemListKind::Brace);
+                    allowTopLevelCode() ? BraceItemListKind::TopLevelCode
+                                        : BraceItemListKind::Brace);
   }
 
 
@@ -75,7 +75,7 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   // executed (this is used by the repl to know whether to compile and run the
   // newly parsed stuff).
   bool FoundTopLevelCodeToExecute = false;
-  if (IsMainModule) {
+  if (allowTopLevelCode()) {
     for (auto V : Items)
       if (isa<TopLevelCodeDecl>(V.get<Decl*>()))
         FoundTopLevelCodeToExecute = true;
@@ -1220,9 +1220,9 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
   if (isInvalid) return true;
 
   // If this is a var in the top-level of script/repl translation unit, then
-  // wrap the PatternBindingDecls in TopLevelCodeDecls, since they represents
+  // wrap the PatternBindingDecls in TopLevelCodeDecls, since they represent
   // executable code.
-  if (IsMainModule && isa<TranslationUnit>(CurDeclContext)) {
+  if (allowTopLevelCode() && isa<TranslationUnit>(CurDeclContext)) {
     for (unsigned i = FirstDecl; i != Decls.size(); ++i) {
       auto *PBD = dyn_cast<PatternBindingDecl>(Decls[i]);
       if (PBD == 0) continue;

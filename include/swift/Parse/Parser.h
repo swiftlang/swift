@@ -79,7 +79,6 @@ public:
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   std::pair<const DeclContext *, ArrayRef<VarDecl *>> CurVars;
   unsigned VarPatternDepth = 0;
-  bool IsMainModule;
 
   DelayedParsingCallbacks *DelayedParseCB = nullptr;
 
@@ -95,6 +94,11 @@ public:
 
   bool isCodeCompletionFirstPass() {
     return L->isCodeCompletion() && !CodeCompletion;
+  }
+
+  bool allowTopLevelCode() const {
+    return TU->Kind == TranslationUnit::Main ||
+           TU->Kind == TranslationUnit::REPL;
   }
 
   /// Tok - This is the current token being considered by the parser.
@@ -127,14 +131,8 @@ public:
     }
   };
 
-private:
-  Parser(Lexer *Lex, TranslationUnit *TU,
-         DiagnosticEngine &Diags, SILParserState *SIL,
-         PersistentParserState *PersistentState = nullptr);
-
 public:
-  Parser(unsigned BufferID, TranslationUnit *TU,
-         bool IsMainModule, SILParserState *SIL,
+  Parser(unsigned BufferID, TranslationUnit *TU, SILParserState *SIL,
          PersistentParserState *PersistentState = nullptr);
   ~Parser();
 

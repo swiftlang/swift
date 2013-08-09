@@ -79,9 +79,7 @@ private:
     assert(FE->getBodyKind() == FuncExpr::BodyKind::Unparsed);
 
     int BufferID = TU->Ctx.SourceMgr->FindBufferContainingLoc(FD->getLoc().Value);
-    Parser TheParser(BufferID, TU,
-                     TU->Kind == TranslationUnit::Main ||
-                     TU->Kind == TranslationUnit::REPL, nullptr, &ParserState);
+    Parser TheParser(BufferID, TU, nullptr, &ParserState);
 
     std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
     if (CodeCompletionFactory) {
@@ -106,9 +104,7 @@ void parseDelayedTopLevelDecl(
 
   int BufferID = TU->Ctx.SourceMgr
       ->FindBufferContainingLoc(ParserState.getDelayedDeclLoc().Value);
-  Parser TheParser(BufferID, TU,
-                   TU->Kind == TranslationUnit::Main ||
-                   TU->Kind == TranslationUnit::REPL, nullptr, &ParserState);
+  Parser TheParser(BufferID, TU, nullptr, &ParserState);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
       CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
@@ -125,9 +121,7 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
                                      SILParserState *SIL,
                                      PersistentParserState *PersistentState,
                                      DelayedParsingCallbacks *DelayedParseCB) {
-  Parser P(BufferID, TU,
-           TU->Kind == TranslationUnit::Main ||
-           TU->Kind == TranslationUnit::REPL, SIL, PersistentState);
+  Parser P(BufferID, TU, SIL, PersistentState);
   PrettyStackTraceParser StackTrace(P);
 
   if (DelayedParseCB)
@@ -219,17 +213,17 @@ std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Parser::Parser(Lexer *Lex, TranslationUnit *TU,
-               DiagnosticEngine &Diags, SILParserState *SIL,
+Parser::Parser(unsigned BufferID, TranslationUnit *TU, SILParserState *SIL,
                PersistentParserState *PersistentState)
   : SourceMgr(TU->getASTContext().SourceMgr),
-    Diags(Diags),
+    Diags(TU->getASTContext().Diags),
     TU(TU),
-    L(Lex),
+    L(new Lexer(TU->getASTContext().SourceMgr, BufferID,
+                &TU->getASTContext().Diags,
+                /*InSILMode=*/SIL != nullptr, /*KeepComments=*/false)),
     SIL(SIL),
     Component(TU->getComponent()),
-    Context(TU->getASTContext()),
-    IsMainModule(false) {
+    Context(TU->getASTContext()) {
 
   State = PersistentState;
   if (!State) {
@@ -240,16 +234,7 @@ Parser::Parser(Lexer *Lex, TranslationUnit *TU,
   // Set the token to a sentinel so that we know the lexer isn't primed yet.
   // This cannot be tok::unknown, since that is a token the lexer could produce.
   Tok.setKind(tok::NUM_TOKENS);
-}
 
-Parser::Parser(unsigned BufferID, TranslationUnit *TU,
-               bool IsMainModule, SILParserState *SIL,
-               PersistentParserState *PersistentState)
-  : Parser(new Lexer(TU->getASTContext().SourceMgr, BufferID,
-                     &TU->getASTContext().Diags,
-                     /*InSILMode=*/SIL != nullptr, /*KeepComments=*/false),
-           TU, TU->getASTContext().Diags, SIL, PersistentState) {
-  this->IsMainModule = IsMainModule;
   auto ParserPos = State->takeParserPosition();
   if (ParserPos.isValid() &&
       SourceMgr->FindBufferContainingLoc(ParserPos.Loc.Value) == int(BufferID)) {

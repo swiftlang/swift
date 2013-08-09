@@ -220,7 +220,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       }
 
       TmpDecls.clear();
-    } else if (IsTopLevel && IsMainModule) {
+    } else if (IsTopLevel && allowTopLevelCode()) {
       // If this is a statement or expression at the top level of the module,
       // Parse it as a child of a TopLevelCodeDecl.
       auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
