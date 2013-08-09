@@ -512,7 +512,7 @@ public:
     OS << getIDAndType(ZI->getOperand());
   }
   void visitSpecializeInst(SpecializeInst *SI) {
-    OS << "specialize " << getID(SI->getOperand()) << ", "
+    OS << "specialize " << getIDAndType(SI->getOperand()) << ", "
        << SI->getType() << ", ";
     interleave(SI->getSubstitutions(),
                [&](const Substitution &s) {

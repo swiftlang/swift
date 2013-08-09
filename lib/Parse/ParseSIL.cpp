@@ -875,6 +875,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
     .Case("retain_unowned", ValueKind::RetainUnownedInst)
     .Case("return", ValueKind::ReturnInst)
+    .Case("specialize", ValueKind::SpecializeInst)
     .Case("store", ValueKind::StoreInst)
     .Case("store_weak", ValueKind::StoreWeakInst)
     .Case("string_literal", ValueKind::StringLiteralInst)
@@ -1869,6 +1870,53 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createModule(InstLoc,
                   SILType::getPrimitiveObjectType(
                     ModuleType::get(Mod)->getCanonicalType()));
+    break;
+  }
+  case ValueKind::SpecializeInst: {
+    SILType DestTy;
+    SourceLoc Loc;
+    if (parseTypedValueRef(Val, Loc) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(DestTy) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+
+    // Make sure Type of Val is PolymorphicFunctionType.
+    if (!Val.getType().getSwiftType()->is<PolymorphicFunctionType>()) {
+      P.diagnose(Loc, diag::expected_sil_type_kind,
+                 "be a polymorphic function");
+      return true;
+    }
+    PolymorphicFunctionType *PTy = cast<PolymorphicFunctionType>(
+        Val.getType().getSwiftType().getPointer());
+
+    // Parse a list of Substitutions: Archetype = Replacement.
+    SmallVector<Substitution, 4> Substitutions;
+    do {
+      Substitution Sub;
+      SILType Replace;
+      Identifier ArcheId;
+      if (P.parseIdentifier(ArcheId, diag::expected_sil_type) ||
+          P.parseToken(tok::equal, diag::expected_tok_in_sil_instr, "=") ||
+          parseSILType(Replace))
+        return true;
+
+      // Find the corresponding ArchetypeType for ArcheId in PTy.
+      ArrayRef<ArchetypeType *> AllArchetypes =
+                                  PTy->getGenericParams().getAllArchetypes();
+      for (auto ArcheTy : AllArchetypes)
+        if (ArcheTy->getName() == ArcheId) {
+          Sub.Archetype = ArcheTy;
+          break;
+        }
+
+      Sub.Replacement = Replace.getSwiftType();
+      Substitutions.push_back(Sub);
+    } while (P.consumeIf(tok::comma));
+
+    ResultVal = B.createSpecialize(SILLocation(), Val,
+                                   P.Context.AllocateCopy(Substitutions),
+                                   DestTy);
     break;
   }
   }
