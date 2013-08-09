@@ -199,12 +199,15 @@ std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
                                    unsigned Offset, unsigned EndOffset,
                                    bool KeepComments,
                                    bool TokenizeInterpolatedString) {
-  Lexer L(SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments,
-          Offset, EndOffset);
+  if (Offset == 0 && EndOffset == 0)
+    EndOffset = SM->getMemoryBuffer(BufferID)->getBufferSize();
+
+  Lexer L(SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments);
+  Lexer SubLexer(L, Offset, EndOffset);
   std::vector<Token> Tokens;
   do {
     Tokens.emplace_back();
-    L.lex(Tokens.back());
+    SubLexer.lex(Tokens.back());
     if (Tokens.back().is(tok::string_literal) && TokenizeInterpolatedString) {
       Token StrTok = Tokens.back();
       Tokens.pop_back();
@@ -286,9 +289,8 @@ SourceLoc Parser::consumeStartingLess() {
     return consumeToken();
   
   // Skip the starting '<' in the existing token.
-  SourceLoc Loc = Tok.getLoc();  
-  StringRef Remaining = Tok.getText().substr(1);
-  Tok.setToken(L->getTokenKind(Remaining), Remaining);
+  SourceLoc Loc = Tok.getLoc();
+  Tok = L->getTokenAt(Loc.getAdvancedLoc(1));
   return Loc;
 }
 
@@ -300,8 +302,7 @@ SourceLoc Parser::consumeStartingGreater() {
   
   // Skip the starting '>' in the existing token.
   SourceLoc Loc = Tok.getLoc();
-  StringRef Remaining = Tok.getText().substr(1);
-  Tok.setToken(L->getTokenKind(Remaining), Remaining);
+  Tok = L->getTokenAt(Loc.getAdvancedLoc(1));
   return Loc;
 }
 

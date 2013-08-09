@@ -66,20 +66,7 @@ class Lexer {
   /// \brief Set to true to return comment tokens, instead of skipping them.
   bool KeepComments = false;
 
-  Lexer(const Lexer&) = delete;
-  void operator=(const Lexer&) = delete;
-
-  Lexer(SourceManager &SourceMgr, llvm::StringRef Buffer,
-        DiagnosticEngine *Diags, const char *CurrentPosition,
-        bool InSILMode, bool KeepComments, bool Prime);
-
-  void primeLexer();
-
 public:
-  Lexer(SourceManager &SourceMgr, unsigned BufferID,
-        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false,
-        unsigned Offset = 0, unsigned EndOffset = 0);
-
   /// \brief Lexer state can be saved/restored to/from objects of this class.
   class State {
   public:
@@ -99,6 +86,28 @@ public:
     friend class Lexer;
   };
 
+private:
+  Lexer(const Lexer&) = delete;
+  void operator=(const Lexer&) = delete;
+
+  /// The principal constructor used by public constructors below.
+  /// Don't use this constructor for other purposes, it does not initialize
+  /// everything.
+  Lexer(SourceManager &SourceMgr, DiagnosticEngine *Diags,
+        bool InSILMode, bool KeepComments);
+
+  /// @{
+  /// Helper routines used in Lexer constructors.
+  void primeLexer();
+  void initLexer(const char *BufferBegin, unsigned Offset);
+  void initSubLexer(Lexer &Parent, State BeginState, State EndState);
+  /// @}
+
+public:
+  /// \brief Create a normal lexer that scans the whole source buffer.
+  Lexer(SourceManager &SourceMgr, unsigned BufferID,
+        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false);
+
   /// \brief Create a sub-lexer that lexes from the same buffer, but scans
   /// a subrange of the buffer.
   ///
@@ -106,32 +115,21 @@ public:
   /// \param BeginState start of the subrange
   /// \param EndState end of the subrange
   Lexer(Lexer &Parent, State BeginState, State EndState)
-    : Lexer(Parent.SourceMgr,
-            StringRef(BeginState.Loc.Value.getPointer(),
-                      Parent.BufferEnd - BeginState.Loc.Value.getPointer()),
-            Parent.Diags, BeginState.Loc.Value.getPointer(), Parent.InSILMode,
-            Parent.isKeepingComments(),
-            /*Prime=*/false) {
-    assert(BufferID == static_cast<unsigned>(SourceMgr->FindBufferContainingLoc(
-                           BeginState.Loc.Value)) &&
-           "state for the wrong buffer");
-    // If the parent lexer should stop prematurely, and the ArtificialEOF
-    // position is in this subrange, then we should stop at that point, too.
-    if (Parent.ArtificialEOF &&
-        Parent.ArtificialEOF >= BufferStart &&
-        Parent.ArtificialEOF <= BufferEnd) {
-      ArtificialEOF = Parent.ArtificialEOF;
-    } else
-      ArtificialEOF = EndState.Loc.Value.getPointer();
+      : Lexer(Parent.SourceMgr, Parent.Diags, Parent.InSILMode,
+              Parent.isKeepingComments()) {
+    initSubLexer(Parent, BeginState, EndState);
+  }
 
-    // Do code completion if the parent lexer is doing code completion and the
-    // code completion token is in subrange.
-    if (Parent.CodeCompletionPtr &&
-        Parent.CodeCompletionPtr >= BufferStart &&
-        Parent.CodeCompletionPtr <= BufferEnd)
-      CodeCompletionPtr = Parent.CodeCompletionPtr;
-
-    primeLexer();
+  /// \brief Create a sub-lexer that lexes from the same buffer, but scans
+  /// a subrange of the buffer.
+  Lexer(Lexer &Parent, unsigned Offset, unsigned EndOffset)
+      : Lexer(Parent.SourceMgr, Parent.Diags, Parent.InSILMode,
+              Parent.isKeepingComments()) {
+    assert(Offset <= EndOffset && "invalid range");
+    initSubLexer(
+        Parent,
+        State(Parent.getLocForStartOfBuffer().getAdvancedLoc(Offset)),
+        State(Parent.getLocForStartOfBuffer().getAdvancedLoc(EndOffset)));
   }
 
   bool isKeepingComments() const { return KeepComments; }
@@ -261,9 +259,8 @@ public:
     return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
   }
 
-  /// getTokenKind - Retrieve the token kind for the given text, which must
-  /// fall within the given source buffer.
-  tok getTokenKind(StringRef Text);
+  /// Get the token that starts at the given location.
+  Token getTokenAt(SourceLoc Loc);
   
   void lexHexNumber();
 
