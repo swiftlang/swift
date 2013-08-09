@@ -66,9 +66,8 @@ enum NameLookupOptions {
   /// and their extensions as well as the current extension.
   NL_VisitSupertypes = 0x01,
 
-  /// Consider default definitions within protocols to which the lookup
-  /// context type conforms.
-  NL_DefaultDefinitions = 0x02,
+  /// Consider declarations within protocols to which the context type conforms.
+  NL_ProtocolMembers = 0x02,
 
   /// Remove non-visible declarations from the set of results.
   NL_RemoveNonVisible = 0x04,
@@ -77,8 +76,11 @@ enum NameLookupOptions {
   NL_RemoveOverridden = 0x08,
 
   /// The default set of options used for qualified name lookup.
-  NL_QualifiedDefault = NL_VisitSupertypes | NL_DefaultDefinitions |
-                        NL_RemoveNonVisible | NL_RemoveOverridden,
+  ///
+  /// FIXME: Eventually, add NL_ProtocolMembers to this, once all of the
+  /// callers can handle it.
+  NL_QualifiedDefault = NL_VisitSupertypes | NL_RemoveNonVisible |
+                        NL_RemoveOverridden,
 
   /// The default set of options used for unqualified name lookup.
   NL_UnqualifiedDefault = NL_VisitSupertypes |

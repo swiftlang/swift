@@ -693,8 +693,9 @@ public:
       TC.addImplicitConstructors(SD);
     }
 
-    if (!IsFirstPass)
+    if (!IsFirstPass) {
       checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
+    }
   }
   
   void checkObjCConformance(ProtocolDecl *protocol,

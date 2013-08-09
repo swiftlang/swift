@@ -73,7 +73,8 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
 
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
-  if (!TU.lookupQualified(type, name, NL_QualifiedDefault, decls))
+  unsigned options = NL_QualifiedDefault | NL_ProtocolMembers;
+  if (!TU.lookupQualified(type, name, options, decls))
     return result;
 
   // Look through the declarations, keeping only the unique type declarations.
@@ -85,7 +86,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
       continue;
 
     // If there are any type variables in the base type, don't substitute.
-    // FIXME: This feels like a hack.
+    // FIXME: This is a total hack that won't actually work.
     if (type->hasTypeVariable()) {
       result.Results.push_back({typeDecl, typeDecl->getDeclaredType()});
       continue;
@@ -93,19 +94,28 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
 
     Type memberType;
 
-    // If we found an associated type when looking into a non-protocol,
-    // non-archetype type, get the corresponding witness type. This makes
-    // deduced/defaulted associated types visible.
-    if (isa<ProtocolDecl>(typeDecl->getDeclContext()) &&
-        !type->is<ArchetypeType>() && !type->isExistentialType()) {
-      auto protocol = cast<ProtocolDecl>(typeDecl->getDeclContext());
-      ProtocolConformance *conformance = nullptr;
-      if (!conformsToProtocol(type, protocol, &conformance) || !conformance)
-        continue;
+    // If we found a member of a protocol type when looking into a non-protocol,
+    // non-archetype type, only include this member in the result set if
+    // this member was used as the default definition or otherwise inferred.
+    if (auto protocol = dyn_cast<ProtocolDecl>(typeDecl->getDeclContext())) {
+      if (!type->is<ArchetypeType>() && !type->isExistentialType()) {
+        // If the type does not actually conform to the protocol, skip this
+        // member entirely.
+        // FIXME: This is an error path. Should we try to recover?
+        ProtocolConformance *conformance = nullptr;
+        if (!conformsToProtocol(type, protocol, &conformance) || !conformance)
+          continue;
 
-      memberType = conformance->getTypeWitness(cast<TypeAliasDecl>(typeDecl))
-                     .Replacement;
-    } else {
+        // Use the type witness.
+        auto assocType = cast<TypeAliasDecl>(typeDecl);
+        memberType = conformance->getTypeWitness(assocType).Replacement;
+        assert(memberType && "Missing type witness?");
+      }
+    }
+
+    // If we didn't assign a member type above, derive it based on the declared
+    // type of the declaration.
+    if (!memberType) {
       // Substitute the the base into the member's type.
       memberType = substMemberTypeWithBase(typeDecl->getDeclaredType(),
                                            typeDecl, type);

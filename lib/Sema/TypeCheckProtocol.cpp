@@ -1111,7 +1111,31 @@ ArrayRef<Substitution> gatherSubstitutions(TypeChecker &tc, Type type) {
       // FIXME: This feels like a hack. We should be able to compute the
       // substitutions ourselves for this.
       tc.validateTypeSimple(type);
-      allSubstitutions.push_back(boundGeneric->getSubstitutions());
+      if (boundGeneric->hasTypeVariable() && !boundGeneric->hasSubstitutions()){
+        // If we have a type variable, introduce fake substitutions.
+        // FIXME: This feels a little awkward, and shouldn't go into
+        // permanent storage.
+        SmallVector<Substitution, 4> substitutions;
+        unsigned index = 0;
+        for (auto gp : *boundGeneric->getDecl()->getGenericParams()) {
+          Substitution sub;
+          sub.Archetype
+            = gp.getAsTypeParam()->getDeclaredType()->castTo<ArchetypeType>();
+          sub.Replacement = boundGeneric->getGenericArgs()[index++];
+          SmallVector<ProtocolConformance *, 4> conformances;
+          conformances.assign(sub.Archetype->getConformsTo().size(), nullptr);
+          sub.Conformance
+            = tc.Context.AllocateCopy(conformances,
+                                      AllocationArena::ConstraintSolver);
+          substitutions.push_back(sub);
+        }
+        allSubstitutions.push_back(
+          tc.Context.AllocateCopy(substitutions,
+                                  AllocationArena::ConstraintSolver));
+        boundGeneric->setSubstitutions(allSubstitutions.back());
+      } else {
+        allSubstitutions.push_back(boundGeneric->getSubstitutions());
+      }
       type = boundGeneric->getParent();
       continue;
     }
@@ -1313,16 +1337,22 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     SmallVector<std::tuple<NominalTypeDecl *, NominalTypeDecl *, Decl *>, 4>
       stack;
     NominalTypeDecl *owningNominal = nullptr;
+    ProtocolConformance *nominalConformance = nullptr;
 
     // Local function that checks for our protocol in the given array of
     // protocols.
-    auto isProtocolInList = [&](NominalTypeDecl *currentNominal,
-                                Decl *currentOwner,
-                                ArrayRef<ProtocolDecl *> protocols) -> bool {
-      for (auto testProto : protocols) {
+    auto isProtocolInList
+      = [&](NominalTypeDecl *currentNominal,
+            Decl *currentOwner,
+            ArrayRef<ProtocolDecl *> protocols,
+            ArrayRef<ProtocolConformance *> conformances) -> bool {
+      for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
+        auto testProto = protocols[i];
         if (testProto == Proto) {
           owningNominal = currentNominal;
           ExplicitConformance = currentOwner;
+          if (i < conformances.size())
+            nominalConformance = conformances[i];
           return true;
         }
 
@@ -1352,12 +1382,14 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
 
       // Visit the protocols this type conforms to directly.
       if (isProtocolInList(currentNominal, currentOwner,
-                           getDirectConformsTo(current)))
+                           getDirectConformsTo(current),
+                           current->getConformances()))
         break;
 
       // Visit the extensions of this type.
       for (auto ext : current->getExtensions()) {
-        if (isProtocolInList(currentNominal, ext, getDirectConformsTo(ext)))
+        if (isProtocolInList(currentNominal, ext, getDirectConformsTo(ext),
+                             ext->getConformances()))
           break;
       }
     }
@@ -1415,21 +1447,22 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     // as the type we asked for, it's an inherited type.
     if (owningNominal != nominal) {
       // Find the superclass type
-      ProtocolConformance *inheritedConformance = nullptr;
-      Type superclassTy = getSuperClassOf(T);
-      while (superclassTy->getAnyNominal() != owningNominal)
-        superclassTy = getSuperClassOf(superclassTy);
+      ProtocolConformance *inheritedConformance = nominalConformance;
+      if (!inheritedConformance) {
+        Type superclassTy = getSuperClassOf(T);
+        while (superclassTy->getAnyNominal() != owningNominal)
+          superclassTy = getSuperClassOf(superclassTy);
 
-      // Compute the conformance for the inherited type.
-      bool conforms = conformsToProtocol(superclassTy, Proto,
-                                         &inheritedConformance);
-      assert(conforms && "Superclass does not conform but should?");
-      (void)conforms;
-      assert(inheritedConformance &&
-             "We should have found an inherited conformance");
+        // Compute the conformance for the inherited type.
+        bool conforms = conformsToProtocol(superclassTy, Proto,
+                                           &inheritedConformance);
+        assert(conforms && "Superclass does not conform but should?");
+        (void)conforms;
+        assert(inheritedConformance &&
+               "We should have found an inherited conformance");
+      }
 
       // Create the inherited conformance entry.
-      Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
       auto result = Context.getInheritedConformance(T, inheritedConformance);
       Context.ConformsTo[Key] = ConformanceEntry(result, true);
 
@@ -1460,13 +1493,15 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       // from the type we're checking, retrieve generic conformance.
       if (!explicitConformanceType->isEqual(instanceT)) {
         // Retrieve the generic conformance.
-        ProtocolConformance *genericConformance = nullptr;
-        if (!conformsToProtocol(explicitConformanceType, Proto,
-                                &genericConformance, ComplainLoc)) {
-          // If generic conformance fails, we're done.
-          return false;
+        ProtocolConformance *genericConformance = nominalConformance;
+        if (!genericConformance) {
+          if (!conformsToProtocol(explicitConformanceType, Proto,
+                                  &genericConformance, ComplainLoc)) {
+            // If generic conformance fails, we're done.
+            return false;
+          }
+          assert(genericConformance && "Missing generic conformance?");
         }
-        assert(genericConformance && "Missing generic conformance?");
 
         // Gather the substitutions we need to map the generic conformance to
         // the specialized conformance.
@@ -1490,6 +1525,13 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
           *Conformance = result;
         return true;
       }
+    }
+
+    // If we already found the conformance, we're done.
+    if (nominalConformance) {
+      *Conformance = nominalConformance;
+      Context.ConformsTo[Key] = ConformanceEntry(nominalConformance, true);
+      return true;
     }
 
     // Fall through to check conformance in the implicit case.

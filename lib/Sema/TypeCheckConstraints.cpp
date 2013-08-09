@@ -861,20 +861,19 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                  return type;
                });
     } else if (!baseObjTy->isExistentialType()) {
-      // When the base nominal type conforms to the protocol, and we made use of
-      // a default definition to provide the witness, dig out that witness.
+      // When the base nominal type conforms to the protocol, dig out the
+      // witness.
       if (auto baseNominal = baseObjTy->getAnyNominal()) {
         // Retrieve the type witness from the protocol conformance.
         ProtocolConformance *conformance = nullptr;
-        if (TC.conformsToProtocol(baseNominal->getDeclaredType(),
+        if (TC.conformsToProtocol(baseNominal->getDeclaredTypeInContext(),
                                   ownerProtoTy->getDecl(),
-                                  &conformance) &&
-            conformance->usesDefaultDefinition(value)) {
+                                  &conformance)) {
           // FIXME: Eventually, deal with default function/property definitions.
-          auto assocType = cast<TypeAliasDecl>(value);
-          type = conformance->getTypeWitness(assocType).Replacement;
+          if (auto assocType = dyn_cast<TypeAliasDecl>(value)) {
+            type = conformance->getTypeWitness(assocType).Replacement;
+          }
         }
-        // FIXME: Short-circuit on the else here?
       }
     }
   }
@@ -2812,6 +2811,16 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         ++score1;
       if (type2Better)
         ++score2;
+      continue;
+    }
+
+    // A concrete type is better than an archetype.
+    // FIXME: Total hack.
+    if (type1->is<ArchetypeType>() != type2->is<ArchetypeType>()) {
+      if (type1->is<ArchetypeType>())
+        ++score2;
+      else
+        ++score1;
       continue;
     }
   }

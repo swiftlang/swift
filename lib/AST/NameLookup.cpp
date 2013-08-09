@@ -917,13 +917,13 @@ bool Module::lookupQualified(Type type,
   llvm::SmallPtrSet<NominalTypeDecl *, 4> visited;
 
   // Handle nominal types.
-  bool wantDefaultImplementations = false;
+  bool wantProtocolMembers = false;
   if (auto nominal = type->getAnyNominal()) {
     visited.insert(nominal);
     stack.push_back(nominal);
 
-    wantDefaultImplementations = (options & NL_DefaultDefinitions) &&
-                                 !isa<ProtocolDecl>(nominal);
+    wantProtocolMembers = (options & NL_ProtocolMembers) &&
+                          !isa<ProtocolDecl>(nominal);
   }
   // Handle archetypes
   else if (auto archetypeTy = type->getAs<ArchetypeType>()) {
@@ -939,8 +939,8 @@ bool Module::lookupQualified(Type type,
           if (visited.insert(superclassDecl)) {
             stack.push_back(superclassDecl);
 
-            wantDefaultImplementations = (options & NL_DefaultDefinitions) &&
-                                         !isa<ProtocolDecl>(superclassDecl);
+            wantProtocolMembers = (options & NL_ProtocolMembers) &&
+                                  !isa<ProtocolDecl>(superclassDecl);
           }
         }
       }
@@ -965,8 +965,10 @@ bool Module::lookupQualified(Type type,
     stack.pop_back();
 
     // Look for results within the current nominal type and its extensions.
-    for (auto results : current->lookupDirect(name))
-      decls.push_back(results);
+    bool currentIsProtocol = isa<ProtocolDecl>(current);
+    for (auto decl : current->lookupDirect(name)) {
+      decls.push_back(decl);
+    }
 
     // If we're not supposed to visit our supertypes, we're done.
     if ((options & NL_VisitSupertypes) == 0)
@@ -981,62 +983,26 @@ bool Module::lookupQualified(Type type,
       continue;
     }
 
-    // If we're not looking at a protocol and we don't we're not supposed to visit the protocols that this type conforms to,
-    // skip the next step.
-    bool currentIsProtocol = isa<ProtocolDecl>(current);
-    if (!wantDefaultImplementations && !currentIsProtocol)
+    // If we're not looking at a protocol and we don't we're not supposed to
+    // visit the protocols that this type conforms to, skip the next step.
+    if (!wantProtocolMembers && !currentIsProtocol)
       continue;
 
     // Local function object used to add protocols to the stack.
-    auto addProtocols = [&](ArrayRef<ProtocolDecl *> protocols,
-                            ArrayRef<ProtocolConformance *> conformances) {
-      unsigned protoIndex = 0;
+    auto addProtocols = [&](ArrayRef<ProtocolDecl *> protocols) {
       for (auto proto : protocols) {
-        // If our current declaration isn't a protocol, only consider this
-        // inherited protocol if we have protocol-conformance information.
-        if (!currentIsProtocol) {
-          if (conformances.size() <= protoIndex || !conformances[protoIndex]) {
-            ++protoIndex;
-            continue;
-          }
-
-          // Record conformances for this protocol and every protocol it
-          // inherits, recursively.
-          SmallVector<std::pair<ProtocolDecl *, ProtocolConformance *>, 4>
-            conformsStack;
-          if (knownConformances.find(proto) == knownConformances.end())
-            conformsStack.push_back({proto, conformances[protoIndex]});
-          while (!conformsStack.empty()) {
-            ProtocolDecl *proto;
-            ProtocolConformance *conformance;
-            llvm::tie(proto, conformance) = conformsStack.back();
-            conformsStack.pop_back();
-
-            // Record this conformance.
-            knownConformances[proto] = conformance;
-
-            // Push inherited conformances.
-            for (auto inherited : conformance->getInheritedConformances()) {
-              if (knownConformances.find(inherited.first)
-                    == knownConformances.end())
-                conformsStack.push_back(inherited);
-            }
-          }
-        }
-
         if (visited.insert(proto)) {
           stack.push_back(proto);
         }
-        ++protoIndex;
       }
     };
 
     // Add protocols from the current type.
-    addProtocols(current->getProtocols(), current->getConformances());
+    addProtocols(current->getProtocols());
 
     // Add protocols from the extensions of the current type.
     for (auto ext : current->getExtensions()) {
-      addProtocols(ext->getProtocols(), ext->getConformances());
+      addProtocols(ext->getProtocols());
     }
   }
 
@@ -1046,16 +1012,7 @@ bool Module::lookupQualified(Type type,
     llvm::SmallPtrSet<ValueDecl*, 8> overridden;
     for (auto decl : decls) {
       // FIXME: Generalize this.
-      if (auto protocol = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
-        // A declaration found in a protocol is a requirement that is
-        // overridden by the witness satisfies that requirement, unless we
-        // used a default definition or otherwise inferred the witness.
-        auto knownProtocol = knownConformances.find(protocol);
-        if (knownProtocol != knownConformances.end() &&
-            !knownProtocol->second->usesDefaultDefinition(decl)) {
-          overridden.insert(decl);
-        }
-      } else if (auto fd = dyn_cast<FuncDecl>(decl)) {
+      if (auto fd = dyn_cast<FuncDecl>(decl)) {
         if (fd->getOverriddenDecl())
           overridden.insert(fd->getOverriddenDecl());
       } else if (auto vd = dyn_cast<VarDecl>(decl)) {
