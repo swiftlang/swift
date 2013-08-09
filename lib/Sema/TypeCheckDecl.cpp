@@ -956,6 +956,8 @@ public:
     // Before anything else, set up the 'this' argument correctly.
     GenericParamList *outerGenericParams = nullptr;
     if (Type thisType = FD->computeThisType(&outerGenericParams)) {
+      FD->getImplicitThisDecl()->setType(thisType);
+
       TypedPattern *thisPattern =
         cast<TypedPattern>(body->getArgParamPatterns()[0]);
       if (thisPattern->hasType()) {

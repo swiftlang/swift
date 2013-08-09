@@ -454,33 +454,11 @@ namespace {
 
     ExprPrePassWalker(TypeChecker &TC) : TC(TC) {}
     
-    /// CurDeclContexts - This is the stack of DeclContexts that
-    /// we're nested in.
-    SmallVector<DeclContext*, 4> CurDeclContexts;
-
     /// This is a list of all the FuncExprs with parsed bodies that we need to
     /// analyze, in an appropriate order.
     SmallVector<FuncExprLike, 32> FuncExprs;
 
     virtual bool walkToDeclPre(Decl *D) {
-      if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D))
-        CurDeclContexts.push_back(NTD);
-      else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D))
-        CurDeclContexts.push_back(ED);
-      else if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D))
-        CurDeclContexts.push_back(CD);
-      else if (DestructorDecl *DD = dyn_cast<DestructorDecl>(D))
-        CurDeclContexts.push_back(DD);
-
-      if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-        // If this is an instance method with a body, set the type of its
-        // implicit 'this' variable.
-        // FIXME: This is only necessary because we do name-binding for
-        // DeclRefs too early.
-        if (Type ThisTy = FD->computeThisType())
-          FD->getImplicitThisDecl()->setType(ThisTy);
-      }
-
       if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D))
         FuncExprs.push_back(CD);
       if (DestructorDecl *DD = dyn_cast<DestructorDecl>(D))
@@ -489,24 +467,6 @@ namespace {
     }
     
     virtual bool walkToDeclPost(Decl *D) {
-      if (isa<NominalTypeDecl>(D)) {
-        assert(CurDeclContexts.back() == cast<NominalTypeDecl>(D) &&
-               "Context misbalance");
-        CurDeclContexts.pop_back();
-      } else if (isa<ExtensionDecl>(D)) {
-        assert(CurDeclContexts.back() == cast<ExtensionDecl>(D) &&
-               "Context misbalance");
-        CurDeclContexts.pop_back();
-      } else if (isa<ConstructorDecl>(D)) {
-        assert(CurDeclContexts.back() == cast<ConstructorDecl>(D) &&
-               "Context misbalance");
-        CurDeclContexts.pop_back();
-      } else if (isa<DestructorDecl>(D)) {
-        assert(CurDeclContexts.back() == cast<DestructorDecl>(D) &&
-               "Context misbalance");
-        CurDeclContexts.pop_back();
-      }
-
       return true;
     }
 
@@ -515,33 +475,20 @@ namespace {
         if (FE->getBody())
           FuncExprs.push_back(FE);
 
-      if (CapturingExpr *CE = dyn_cast<CapturingExpr>(E))
-        CurDeclContexts.push_back(CE);
-
       return { true, E } ;
     }
 
     Expr *walkToExprPost(Expr *E) {
-      if (isa<CapturingExpr>(E)) {
-        assert(CurDeclContexts.back() == cast<CapturingExpr>(E) &&
-               "Context misbalance");
-        CurDeclContexts.pop_back();
-      }
-
       return E;
     }
 
     Expr *doWalk(Expr *E, DeclContext *DC) {
-      CurDeclContexts.push_back(DC);
       E = E->walk(*this);
-      CurDeclContexts.pop_back();
       return E;
     }
 
     void doWalk(Decl *D) {
-      CurDeclContexts.push_back(D->getDeclContext());
       D->walk(*this);
-      CurDeclContexts.pop_back();
     }
   };
 } // end anonymous namespace
