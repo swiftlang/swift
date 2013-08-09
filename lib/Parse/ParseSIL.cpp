@@ -879,6 +879,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("struct_extract", ValueKind::StructExtractInst)
     .Case("super_method", ValueKind::SuperMethodInst)
     .Case("super_to_archetype_ref", ValueKind::SuperToArchetypeRefInst)
+    .Case("switch_union", ValueKind::SwitchUnionInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
     .Case("tuple", ValueKind::TupleInst)
     .Case("tuple_element_addr", ValueKind::TupleElementAddrInst)
@@ -1783,6 +1784,42 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     assert(CurModuleResults.size() == 1);
     VD = CurModuleResults[0];
     ResultVal = B.createGlobalAddr(InstLoc, cast<VarDecl>(VD), Ty);
+    break;
+  }
+  case ValueKind::SwitchUnionInst: {
+    if (parseTypedValueRef(Val))
+      return true;
+
+    SmallVector<std::pair<UnionElementDecl*, SILBasicBlock*>, 4> CaseBBs;
+    SILBasicBlock *DefaultBB = nullptr;
+    while (P.consumeIf(tok::comma)) {
+      Identifier BBName;
+      SourceLoc BBLoc;
+      // Parse 'default' sil-identifier.
+      if (P.consumeIf(tok::kw_default)) {
+        P.parseIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
+        DefaultBB = getBBForReference(BBName, BBLoc);
+        break;
+      }
+
+      // Parse 'case' sil-decl-ref ':' sil-identifier.
+      if (P.consumeIf(tok::kw_case)) {
+        SILDeclRef ElemRef;
+        if (parseSILDeclRef(ElemRef))
+          return true;
+        assert(ElemRef.hasDecl() && isa<UnionElementDecl>(ElemRef.getDecl()));
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":");
+        P.parseIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
+        CaseBBs.push_back( {cast<UnionElementDecl>(ElemRef.getDecl()),
+                            getBBForReference(BBName, BBLoc)} );
+        continue;
+      }
+
+      P.diagnose(P.Tok.getLoc(), diag::expected_tok_in_sil_instr,
+                 "case or default");
+      return true;
+    }
+    ResultVal = B.createSwitchUnion(InstLoc, Val, DefaultBB, CaseBBs);
     break;
   }
   }

@@ -760,3 +760,46 @@ bb0(%t : $ClassP):
   %1 = tuple ()
   return %1 : $()
 }
+
+union MaybePair {
+  case Neither
+  case Left(Int)
+}
+
+sil @_T6switch1aFT_T_ : $[thin] () -> ()
+sil @_T6switch1bFT_T_ : $[thin] () -> ()
+sil @_T6switch1cFT_T_ : $[thin] () -> ()
+
+// CHECK: sil @test_switch_union : $[thin] (u : MaybePair) -> ()
+sil @test_switch_union : $[thin] (u : MaybePair) -> () {
+bb0(%0 : $MaybePair):
+  %1 = alloc_box $MaybePair
+  store %0 to %1#1 : $*MaybePair
+  %3 = load %1#1 : $*MaybePair
+  %4 = tuple ()
+  // CHECK: switch_union %{{.*}} : $MaybePair, case #MaybePair.Neither!unionelt: bb{{.*}}, case #MaybePair.Left!unionelt.1: bb
+  switch_union %3 : $MaybePair, case #MaybePair.Neither!unionelt: bb1, case #MaybePair.Left!unionelt.1: bb3
+
+bb1:
+  br bb2
+
+bb2:
+  %7 = function_ref @_T6switch1aFT_T_ : $[thin] () -> () // CHECK: function_ref
+  %8 = apply %7() : $[thin] () -> ()
+  br bb5                                                 // CHECK: br
+
+bb3(%10 : $Int64):
+  br bb4
+
+bb4:
+  %12 = function_ref @_T6switch1bFT_T_ : $[thin] () -> () // CHECK: function_ref
+  %13 = apply %12() : $[thin] () -> ()
+  br bb5                                                  // CHECK: br
+
+bb5:
+  %15 = function_ref @_T6switch1cFT_T_ : $[thin] () -> () // CHECK: function_ref
+  %16 = apply %15() : $[thin] () -> ()
+  release %1#0 : $Builtin.ObjectPointer                   // CHECK: release
+  %18 = tuple ()
+  return %18 : $()                                        // CHECK: return
+}
