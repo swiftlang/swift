@@ -176,7 +176,7 @@ public:
                                      SILLocation Loc);
 
 private:
-  llvm::DIType createType(DebugTypeInfo Ty, llvm::DIDescriptor Scope,
+  llvm::DIType createType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope,
                           llvm::DIFile File);
   llvm::DIType getOrCreateType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope);
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);
@@ -190,13 +190,32 @@ private:
                                      SILType SILTy,
                                      llvm::FunctionType *IRTy,
                                      llvm::DIDescriptor Scope);
-  llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope);
+  llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope,
+                                 llvm::DIFile File, unsigned Flags);
   unsigned getArgNo(SILFunction *Fn, SILArgument *Arg);
   llvm::DIFile getFile(llvm::DIDescriptor Scope);
   llvm::DIScope getOrCreateNamespace(llvm::DIScope Namespace,
                                      std::string MangledName,
                                      llvm::DIFile File, unsigned Line = 0);
   llvm::DIScope getNamespace(StringRef MangledName);
+  llvm::DIArray getStructMembers(NominalTypeDecl *D, llvm::DIDescriptor Scope,
+                                 llvm::DIFile File, unsigned Flags);
+  llvm::DICompositeType createStructType(DebugTypeInfo DbgTy,
+                                         NominalTypeDecl *Decl,
+                                         StringRef Name,
+                                         llvm::DIDescriptor Scope,
+                                         llvm::DIFile File, unsigned Line,
+                                         unsigned SizeInBits,
+                                         unsigned AlignInBits,
+                                         unsigned Flags,
+                                         llvm::DIType DerivedFrom,
+                                         unsigned RuntimeLang);
+  llvm::DIDerivedType createMemberType(CanType CTy,
+                                       unsigned &OffsetInBits,
+                                       llvm::DIDescriptor Scope,
+                                       llvm::DIFile File,
+                                       unsigned Flags);
+
 
 };
 

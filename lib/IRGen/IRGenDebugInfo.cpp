@@ -709,17 +709,78 @@ StringRef IRGenDebugInfo::getMangledName(CanType CanTy) {
   return BumpAllocatedString(Buffer, DebugInfoNames);
 }
 
+/// Create a member of a struct, class, tuple, or union.
+llvm::DIDerivedType IRGenDebugInfo::createMemberType(CanType CTy,
+                                                     unsigned &OffsetInBits,
+                                                     llvm::DIDescriptor Scope,
+                                                     llvm::DIFile File,
+                                                     unsigned Flags) {
+  DebugTypeInfo DTy(CTy, Types.getCompleteTypeInfo(CTy));
+  auto Ty = getOrCreateType(DTy, Scope);
+  OffsetInBits += Ty.getSizeInBits();
+  OffsetInBits = llvm::RoundUpToAlignment(OffsetInBits, Ty.getAlignInBits());
+  return DBuilder.createMemberType(Scope, StringRef(), File, 0,
+                                   Ty.getSizeInBits(),
+                                   Ty.getAlignInBits(),
+                                   OffsetInBits, Flags, Ty);
+}
+
 /// Return an array with the DITypes for each of a tuple's elements.
 llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
-                                               llvm::DIDescriptor Scope) {
+                                               llvm::DIDescriptor Scope,
+                                               llvm::DIFile File,
+                                               unsigned Flags) {
   SmallVector<llvm::Value *, 16> Elements;
+  unsigned OffsetInBits = 0;
   for (auto Elem : TupleTy->getElementTypes()) {
     CanType CTy = Elem->getCanonicalType();
-    DebugTypeInfo DTy(CTy, Types.getCompleteTypeInfo(CTy));
-    Elements.push_back(getOrCreateType(DTy, Scope));
+    Elements.push_back(createMemberType(CTy, OffsetInBits, Scope, File, Flags));
   }
   return DBuilder.getOrCreateArray(Elements);
 }
+
+/// Return an array with the DITypes for each of a struct's elements.
+llvm::DIArray IRGenDebugInfo::getStructMembers(NominalTypeDecl *D,
+                                               llvm::DIDescriptor Scope,
+                                               llvm::DIFile File,
+                                               unsigned Flags) {
+  SmallVector<llvm::Value *, 16> Elements;
+  unsigned OffsetInBits = 0;
+  for (auto Decl : D->getMembers())
+    if (VarDecl *VD = dyn_cast<VarDecl>(Decl)) {
+      auto Ty = VD->getType()->getCanonicalType();
+      Elements.push_back(createMemberType(Ty, OffsetInBits,
+                                          Scope, File, Flags));
+    }
+  return DBuilder.getOrCreateArray(Elements);
+}
+
+/// Create a temporary forward declaration for a struct and add it to
+/// the type cache so we can safely build recursive types.
+llvm::DICompositeType
+IRGenDebugInfo::createStructType(DebugTypeInfo DbgTy,
+                                 NominalTypeDecl *Decl,
+                                 StringRef Name,
+                                 llvm::DIDescriptor Scope,
+                                 llvm::DIFile File, unsigned Line,
+                                 unsigned SizeInBits, unsigned AlignInBits,
+                                 unsigned Flags,
+                                 llvm::DIType DerivedFrom,
+                                 unsigned RuntimeLang) {
+  auto FwdDecl = DBuilder.createForwardDecl
+    (llvm::dwarf::DW_TAG_structure_type,
+     Name, Scope, File, Line, DW_LANG_Swift, SizeInBits, AlignInBits);
+
+  DITypeCache[DbgTy] = llvm::WeakVH(FwdDecl);
+
+  auto DTy = DBuilder.createStructType
+    (Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
+     getStructMembers(Decl, Scope, File, Flags), RuntimeLang);
+
+  FwdDecl->replaceAllUsesWith(DTy);
+  return DTy;
+}
+
 
 /// Construct a DIType from a DebugTypeInfo object.
 ///
@@ -782,13 +843,15 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::BuiltinObjectPointer: {
     Name = getMangledName(DbgTy.Ty->getCanonicalType());
-    auto PTy = DBuilder.createPointerType(llvm::DIType(), SizeInBits, AlignInBits, Name);
+    auto PTy = DBuilder.createPointerType(llvm::DIType(),
+                                          SizeInBits, AlignInBits, Name);
     return DBuilder.createObjectPointerType(PTy);
   }
 
   case TypeKind::BuiltinRawPointer:
     Name = getMangledName(DbgTy.Ty->getCanonicalType());
-    return DBuilder.createPointerType(llvm::DIType(), SizeInBits, AlignInBits, Name);
+    return DBuilder.createPointerType(llvm::DIType(),
+                                      SizeInBits, AlignInBits, Name);
 
   // Even builtin swift types usually come boxed in a struct.
   case TypeKind::Struct: {
@@ -796,12 +859,11 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     if (auto Decl = StructTy->getDecl()) {
       Location L = getStartLoc(SM, Decl);
       Name = getMangledName(DbgTy.Ty->getCanonicalType());
-      return DBuilder.createStructType(Scope, Name,
-                                       getOrCreateFile(L.Filename), L.Line,
-                                       SizeInBits, AlignInBits, Flags,
-                                       llvm::DIType(),  // DerivedFrom
-                                       llvm::DIArray(), // Elements
-                                       DW_LANG_Swift);
+      return createStructType(DbgTy, Decl, Name, Scope,
+                              getOrCreateFile(L.Filename), L.Line,
+                              SizeInBits, AlignInBits, Flags,
+                              llvm::DIType(),  // DerivedFrom
+                              DW_LANG_Swift);
     }
     DEBUG(llvm::dbgs() << "Struct without Decl: "; DbgTy.Ty.dump();
           llvm::dbgs() << "\n");
@@ -818,12 +880,11 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       Location L = getStartLoc(SM, Decl);
       auto Attrs = Decl->getAttrs();
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
-      return DBuilder.createStructType(Scope, Name,
-                                       getOrCreateFile(L.Filename), L.Line,
-                                       SizeInBits, AlignInBits, Flags,
-                                       llvm::DIType(),  // DerivedFrom
-                                       llvm::DIArray(), // Elements
-                                       RuntimeLang);
+      return createStructType(DbgTy, Decl, Name, Scope,
+                              getOrCreateFile(L.Filename), L.Line,
+                              SizeInBits, AlignInBits, Flags,
+                              llvm::DIType(),  // DerivedFrom
+                              RuntimeLang);
     }
     DEBUG(llvm::dbgs() << "Class without Decl: "; DbgTy.Ty.dump();
           llvm::dbgs() << "\n");
@@ -840,12 +901,11 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     if (auto Decl = StructTy->getDecl()) {
       Location L = getStartLoc(SM, Decl);
       Name = Decl->getName().str();
-      return DBuilder.createStructType(Scope, Name,
-                                       getOrCreateFile(L.Filename), L.Line,
-                                       SizeInBits, AlignInBits, Flags,
-                                       llvm::DIType(),  // DerivedFrom
-                                       llvm::DIArray(), // Elements
-                                       DW_LANG_Swift);
+      return createStructType(DbgTy, Decl, Name, Scope,
+                              getOrCreateFile(L.Filename), L.Line,
+                              SizeInBits, AlignInBits, Flags,
+                              llvm::DIType(),  // DerivedFrom
+                              DW_LANG_Swift);
     }
     DEBUG(llvm::dbgs() << "Bound Generic struct without Decl: ";
           DbgTy.Ty.dump(); llvm::dbgs() << "\n");
@@ -859,12 +919,11 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       Name = Decl->getName().str();
       auto Attrs = Decl->getAttrs();
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
-      return DBuilder.createStructType(Scope, Name,
-                                       getOrCreateFile(L.Filename), L.Line,
-                                       SizeInBits, AlignInBits, Flags,
-                                       llvm::DIType(),  // DerivedFrom
-                                       llvm::DIArray(), // Elements
-                                       RuntimeLang);
+      return createStructType(DbgTy, Decl, Name, Scope,
+                              getOrCreateFile(L.Filename), L.Line,
+                              SizeInBits, AlignInBits, Flags,
+                              llvm::DIType(),  // DerivedFrom
+                              RuntimeLang);
     }
     DEBUG(llvm::dbgs() << "Bound Generic class without Decl: ";
           DbgTy.Ty.dump(); llvm::dbgs() << "\n");
@@ -881,12 +940,13 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // We could use the mangled Name instead of emitting the typ, but no:
     // FIXME: getMangledName(DbgTy.CanTy) crashes if one of the elements
     // is an ArcheType.
-    return DBuilder.createStructType(Scope, Name,
-                                     File, 0,
-                                     SizeInBits, AlignInBits, Flags,
-                                     llvm::DIType(),  // DerivedFrom
-                                     getTupleElements(TupleTy, Scope),
-                                     DW_LANG_Swift);
+    return DBuilder.
+      createStructType(Scope, Name,
+                       File, 0,
+                       SizeInBits, AlignInBits, Flags,
+                       llvm::DIType(), // DerivedFrom
+                       getTupleElements(TupleTy, Scope, File, Flags),
+                       DW_LANG_Swift);
   }
 
   case TypeKind::LValue: {
