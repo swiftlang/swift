@@ -27,6 +27,15 @@ SourceLoc SourceManager::getLocForBufferStart(unsigned BufferID) const {
   return SourceLoc(llvm::SMLoc::getFromPointer(Buffer->getBufferStart()));
 }
 
+unsigned SourceManager::getLocOffsetInBuffer(SourceLoc Loc,
+                                             unsigned BufferID) const {
+  auto *Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID);
+  assert(Loc.Value.getPointer() >= Buffer->getBuffer().begin() &&
+         Loc.Value.getPointer() <= Buffer->getBuffer().end() &&
+         "Location is not from the specified buffer");
+  return Loc.Value.getPointer() - Buffer->getBuffer().begin();
+}
+
 void SourceLoc::printLineAndColon(raw_ostream &OS,
                                   const SourceManager &SM) const {
   int BufferIndex = SM->FindBufferContainingLoc(Value);

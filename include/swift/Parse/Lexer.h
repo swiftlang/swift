@@ -173,17 +173,15 @@ public:
   /// before or after the current position.
   void restoreState(State S) {
     assert(S.isValid());
-    assert(BufferID == static_cast<unsigned>(
-                           SourceMgr->FindBufferContainingLoc(S.Loc.Value)) &&
-           "state for the wrong buffer");
-    CurPtr = S.Loc.Value.getPointer();
+    CurPtr = getBufferPtrForSourceLoc(S.Loc);
     lexImpl();
   }
 
   /// \brief Restore the lexer state to a given state that is located before
   /// current position.
   void backtrackToState(State S) {
-    assert(S.Loc.Value.getPointer() <= CurPtr && "can't backtrack forward");
+    assert(getBufferPtrForSourceLoc(S.Loc) <= CurPtr &&
+           "can't backtrack forward");
     restoreState(S);
   }
 
@@ -279,6 +277,12 @@ public:
   };
 
 private:
+  /// For a source location in the current buffer, returns the corresponding
+  /// pointer.
+  const char *getBufferPtrForSourceLoc(SourceLoc Loc) const {
+    return BufferStart + SourceMgr.getLocOffsetInBuffer(Loc, BufferID);
+  }
+
   void lexImpl();
   InFlightDiagnostic diagnose(const char *Loc, Diag<> ID);
   void formToken(tok Kind, const char *TokStart);

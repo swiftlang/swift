@@ -88,6 +88,8 @@ public:
   /// Note that the resulting location might not point at the first token: it
   /// might point at whitespace or comment.
   SourceLoc getLocForBufferStart(unsigned BufferID) const;
+
+  unsigned getLocOffsetInBuffer(SourceLoc Loc, unsigned BufferID) const;
 };
 
 } // namespace swift

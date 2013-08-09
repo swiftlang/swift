@@ -168,11 +168,8 @@ void REPLCompletions::populate(TranslationUnit *TU, StringRef EnteredCode) {
     if (LastToken.is(tok::identifier) || LastToken.isKeyword()) {
       Prefix = LastToken.getText();
 
-      const llvm::MemoryBuffer *Buffer =
-          TU->getASTContext().SourceMgr->getMemoryBuffer(BufferID);
-
-      unsigned Offset =
-          LastToken.getLoc().Value.getPointer() - Buffer->getBuffer().begin();
+      unsigned Offset = TU->getASTContext().SourceMgr
+          .getLocOffsetInBuffer(LastToken.getLoc(), BufferID);
 
       doCodeCompletion(TU, EnteredCode.substr(0, Offset),
                        &BufferID, CompletionCallbacksFactory.get());

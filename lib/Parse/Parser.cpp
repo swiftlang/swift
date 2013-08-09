@@ -174,9 +174,7 @@ void getStringPartTokens(const Token &Tok, SourceManager &SM, int BufID,
       Toks.push_back(NewTok);
 
     } else {
-      const llvm::MemoryBuffer *Buffer = SM->getMemoryBuffer(BufID);
-      unsigned Offset = Seg.Loc.Value.getPointer() -
-                        Buffer->getBufferStart();
+      unsigned Offset = SM.getLocOffsetInBuffer(Seg.Loc, BufID);
       unsigned EndOffset = Offset + Seg.Length;
       std::vector<Token> NewTokens = swift::tokenize(SM, BufID, Offset,
                                                      EndOffset,
