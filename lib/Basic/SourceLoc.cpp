@@ -36,6 +36,27 @@ unsigned SourceManager::getLocOffsetInBuffer(SourceLoc Loc,
   return Loc.Value.getPointer() - Buffer->getBuffer().begin();
 }
 
+DecomposedLoc SourceManager::decompose(SourceLoc Loc) const {
+  assert(Loc.isValid());
+
+  unsigned BufferID =
+      unsigned(LLVMSourceMgr.FindBufferContainingLoc(Loc.Value));
+  assert(BufferID != ~0U);
+
+  DecomposedLoc Result;
+  Result.Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID);
+  Result.Line = LLVMSourceMgr.FindLineNumber(Loc.Value, BufferID);
+
+  const char *BufferStart = Result.Buffer->getBufferStart();
+  const char *LineStart = Loc.Value.getPointer();
+  while (LineStart != BufferStart &&
+         LineStart[-1] != '\n' && LineStart[-1] != '\r')
+    --LineStart;
+  Result.Column = Loc.Value.getPointer() - LineStart;
+
+  return Result;
+}
+
 void SourceLoc::printLineAndColon(raw_ostream &OS,
                                   const SourceManager &SM) const {
   int BufferIndex = SM->FindBufferContainingLoc(Value);

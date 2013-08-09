@@ -25,29 +25,11 @@
 
 using namespace swift;
 
-struct DecomposedLoc {
-  llvm::MemoryBuffer *Buffer;
-  unsigned Line;
-  unsigned Column;
-};
+static Optional<DecomposedLoc> decompose(SourceManager &SM, SourceLoc Loc) {
+  if (!Loc.isValid())
+    return Nothing;
 
-static Optional<DecomposedLoc> decompose(SourceManager &SM, SourceLoc loc) {
-  if (!loc.isValid()) return Nothing;
-
-  int bufferIndex = SM->FindBufferContainingLoc(loc.Value);
-  if (bufferIndex == -1) return Nothing;
-
-  DecomposedLoc result;
-  result.Buffer = SM->getBufferInfo(bufferIndex).Buffer;
-  result.Line = SM->FindLineNumber(loc.Value, bufferIndex);
-
-  const char *lineStart = loc.Value.getPointer();
-  while (lineStart != result.Buffer->getBufferStart() &&
-         lineStart[-1] != '\n' && lineStart[-1] != '\r')
-    --lineStart;
-  result.Column = loc.Value.getPointer() - lineStart;
-
-  return result;
+  return SM.decompose(Loc);
 }
 
 static void printDecomposedLoc(llvm::raw_ostream &out,

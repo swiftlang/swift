@@ -18,6 +18,14 @@
 
 namespace swift {
 
+/// \brief A decomposed representation of a source location, useful for
+/// printing diagnostics.
+struct DecomposedLoc {
+  const llvm::MemoryBuffer *Buffer;
+  unsigned Line;
+  unsigned Column;
+};
+
 /// \brief This class manages and owns source buffers.
 class SourceManager {
   llvm::SourceMgr LLVMSourceMgr;
@@ -91,6 +99,8 @@ public:
 
   /// \brief Returns the offset in bytes for the given source location.
   unsigned getLocOffsetInBuffer(SourceLoc Loc, unsigned BufferID) const;
+
+  DecomposedLoc decompose(SourceLoc Loc) const;
 };
 
 } // namespace swift
