@@ -880,9 +880,26 @@ void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
 }
 
 void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
-  Kind = CompletionKind::PostfixExpr;
-  ParsedExpr = E;
-  CurDeclContext = P.CurDeclContext;
+  SourceManager &SM = TU->Ctx.SourceMgr;
+  unsigned ExprEndLine =
+      SM.getLineAndColumn(E->getEndLoc(), SM.getCodeCompletionBufferID()).first;
+  unsigned CodeCompletionLine =
+      SM.getLineAndColumn(SM.getCodeCompletionLoc(),
+                          SM.getCodeCompletionBufferID()).first;
+  if (ExprEndLine == CodeCompletionLine) {
+    // If the postfix expression ends on the same line as the code completion
+    // token is located, then consider the postfix expression as the base of
+    // completion.
+    Kind = CompletionKind::PostfixExpr;
+    ParsedExpr = E;
+    CurDeclContext = P.CurDeclContext;
+  } else {
+    // Postfix expression is located on the previous line than the code
+    // completion token, and thus it is irrelevant from the user's point of
+    // view.
+    Kind = CompletionKind::PostfixExprBeginning;
+    CurDeclContext = P.CurDeclContext;
+  }
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
