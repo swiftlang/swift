@@ -30,6 +30,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/PersistentParserState.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -46,9 +47,12 @@ bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
   
   bool FoundAnySideEffects = false;
   unsigned CurTUElem = RC.CurTUElem;
+  PersistentParserState PersistentState;
   bool Done;
   do {
-    FoundAnySideEffects |= parseIntoTranslationUnit(TU, RC.CurBufferID, &Done);
+    FoundAnySideEffects |=
+        parseIntoTranslationUnit(TU, RC.CurBufferID, &Done, nullptr,
+                                 &PersistentState);
     performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->Decls.size();
   } while (!Done);
