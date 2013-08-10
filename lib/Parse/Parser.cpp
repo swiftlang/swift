@@ -42,7 +42,7 @@ namespace {
     PrettyStackTraceParser(Parser &P) : P(P) {}
     void print(llvm::raw_ostream &out) const {
       out << "With parser at source location: ";
-      printSourceLoc(out, P.Tok.getLoc(), P.Context);
+      P.Tok.getLoc().print(out, P.Context.SourceMgr);
       out << '\n';
     }
   };

@@ -29,10 +29,6 @@ namespace swift {
   class Pattern;
   class Stmt;
 
-/// printSourceLoc - Print a debugging view of the given source location
-/// to an output stream.
-void printSourceLoc(llvm::raw_ostream &OS, SourceLoc loc, ASTContext &C);
-
 /// PrettyStackTraceLocation - Observe that we are doing some
 /// processing starting at a fixed location.
 class PrettyStackTraceLocation : public llvm::PrettyStackTraceEntry {

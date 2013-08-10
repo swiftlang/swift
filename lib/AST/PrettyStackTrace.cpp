@@ -25,47 +25,6 @@
 
 using namespace swift;
 
-static void printDecomposedLoc(llvm::raw_ostream &out,
-                               const DecomposedLoc &loc) {
-  out << loc.Buffer->getBufferIdentifier()
-      << ":" << loc.Line << ':' << loc.Column;
-}
-
-void swift::printSourceLoc(llvm::raw_ostream &OS, SourceLoc Loc,
-                           ASTContext &Context) {
-  if (Loc.isInvalid()) {
-    OS << "<<invalid location>>";
-    return;
-  }
-
-  return printDecomposedLoc(OS, Context.SourceMgr.decompose(Loc));
-}
-
-static void printSourceRange(llvm::raw_ostream &OS, SourceRange SR,
-                             ASTContext &Context) {
-  if (SR.isInvalid()) {
-    OS << "<<invalid source range>>";
-    return;
-  }
-
-  DecomposedLoc Start = Context.SourceMgr.decompose(SR.Start);
-  DecomposedLoc End = Context.SourceMgr.decompose(SR.End);
-
-  // Print the start location as normal.
-  printDecomposedLoc(OS, Start);
-  OS << '-';
-
-  // Only print the non-matching information from the second location.
-  if (Start.Buffer != End.Buffer) {
-    printDecomposedLoc(OS, End);
-    return;
-  }
-  if (Start.Line != End.Line) {
-    OS << End.Line << ':';
-  }
-  OS << End.Column;
-}
-
 void PrettyStackTraceDecl::print(llvm::raw_ostream &out) const {
   out << "While " << Action << ' ';
   if (!TheDecl) {
@@ -86,7 +45,7 @@ void swift::printDeclDescription(llvm::raw_ostream &out, Decl *D,
     out << "declaration";
   }
   out << " at ";
-  printSourceLoc(out, D->getStartLoc(), Context);
+  D->getStartLoc().print(out, Context.SourceMgr);
   out << '\n';
 }
 
@@ -107,7 +66,7 @@ void swift::printExprDescription(llvm::raw_ostream &out, Expr *E,
     out << "expression";
   }
   out << " at ";
-  printSourceRange(out, E->getSourceRange(), Context);
+  E->getSourceRange().print(out, Context.SourceMgr);
   out << '\n';
 }
 
@@ -123,7 +82,7 @@ void PrettyStackTraceStmt::print(llvm::raw_ostream &out) const {
 void swift::printStmtDescription(llvm::raw_ostream &out, Stmt *S,
                                  ASTContext &Context) {
   out << "statement at ";
-  printSourceRange(out, S->getSourceRange(), Context);
+  S->getSourceRange().print(out, Context.SourceMgr);
   out << '\n';
 }
 
@@ -139,7 +98,7 @@ void PrettyStackTracePattern::print(llvm::raw_ostream &out) const {
 void swift::printPatternDescription(llvm::raw_ostream &out, Pattern *P,
                                     ASTContext &Context) {
   out << "pattern at ";
-  printSourceRange(out, P->getSourceRange(), Context);
+  P->getSourceRange().print(out, Context.SourceMgr);
   out << '\n';
 }
 
@@ -180,7 +139,7 @@ void swift::printTypeDescription(llvm::raw_ostream &out, Type type,
   out << "type '" << type << '\'';
   if (Decl *decl = InterestingDeclForType().visit(type)) {
     out << " (declared at ";
-    printSourceRange(out, decl->getSourceRange(), Context);
+    decl->getSourceRange().print(out, Context.SourceMgr);
     out << ')';
   }
   out << '\n';
@@ -188,6 +147,6 @@ void swift::printTypeDescription(llvm::raw_ostream &out, Type type,
 
 void PrettyStackTraceLocation::print(llvm::raw_ostream &out) const {
   out << "While " << Action << " starting at ";
-  printSourceLoc(out, Loc, Context);
+  Loc.print(out, Context.SourceMgr);
   out << '\n';
 }
