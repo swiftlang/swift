@@ -28,6 +28,66 @@ static void diagnose(SILModule *M, SILLocation loc, ArgTypes... args) {
 }
 
 //===----------------------------------------------------------------------===//
+// Element Counting Logic
+//===----------------------------------------------------------------------===//
+
+namespace {
+  /// Recursively computing the number of elements in a type can be exponential,
+  /// and even if the number of elements is low, the presence of single-element
+  /// struct wrappers (like Int!) means that computing this is non-trivial.
+  ///
+  /// Cache the results of the NumElements computation in a densemap to make this
+  /// be linear in the number of types analyzed.
+  class NumElementsCache {
+    llvm::DenseMap<CanType, unsigned> ElementCountMap;
+    
+    NumElementsCache(const NumElementsCache&) = delete;
+    void operator=(const NumElementsCache&) = delete;
+  public:
+    NumElementsCache() {}
+    unsigned get(CanType T);
+    
+  };
+} // end anonymous namespace
+
+/// getNumElements - Return the number of elements in the flattened SILType.
+/// For tuples and structs, this is the (recursive) count of the fields it
+/// contains.
+unsigned NumElementsCache::get(CanType T) {
+  if (TupleType *TT = T->getAs<TupleType>()) {
+    auto It = ElementCountMap.find(T);
+    if (It != ElementCountMap.end()) return It->second;
+    
+    unsigned NumElements = 0;
+    for (auto &Elt : TT->getFields())
+      NumElements += get(Elt.getType()->getCanonicalType());
+    return ElementCountMap[T] = NumElements;
+  }
+  
+  if (T->is<StructType>() || T->is<BoundGenericStructType>()) {
+    auto It = ElementCountMap.find(T);
+    if (It != ElementCountMap.end()) return It->second;
+    
+    StructDecl *SD;
+    if (auto *ST = T->getAs<StructType>())
+      SD = ST->getDecl();
+    else
+      SD = T->castTo<BoundGenericStructType>()->getDecl();
+    
+    unsigned NumElements = 0;
+    for (auto *D : SD->getMembers())
+      if (auto *VD = dyn_cast<VarDecl>(D))
+        if (!VD->isProperty())
+          NumElements += get(VD->getType()->getCanonicalType());
+    return ElementCountMap[T] = NumElements;
+  }
+  
+  // If this isn't a tuple or struct, it is a single element.
+  return 1;
+}
+
+
+//===----------------------------------------------------------------------===//
 // Per-Element Promotion Logic
 //===----------------------------------------------------------------------===//
 
@@ -78,6 +138,7 @@ namespace {
   class ElementPromotion {
     AllocBoxInst *TheAllocBox;
     ElementUses &Uses;
+    NumElementsCache &NumElements;
     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
 
     /// This is the set of uses that are not loads (i.e., they are Stores,
@@ -90,7 +151,8 @@ namespace {
     // element as a policy decision.
     bool HadError = false;
   public:
-    ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses);
+    ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses,
+                     NumElementsCache &NumElements);
 
     void doIt();
     void handleLoadUse(SILInstruction *Inst);
@@ -106,8 +168,9 @@ namespace {
   };
 } // end anonymous namespace
 
-ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses)
-  : TheAllocBox(TheAllocBox), Uses(Uses) {
+ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses,
+                                   NumElementsCache &NumElements)
+  : TheAllocBox(TheAllocBox), Uses(Uses), NumElements(NumElements) {
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -162,12 +225,15 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   if (DI == DI_Yes) {
     // If the value is definitely initialized, check to see if this is a load
     // that we have a value available for.  If so, we can replace the load now.
-    if (Result && Inst->getType(0) == Result.getType()) {
+    //
+    // Don't transform aggregate loads and stores.  We are operating
+    // elementwise, so just because this element of the aggregate is
+    // fullfilled by the load doesn't mean the other lanes are.
+    if (Result && NumElements.get(Inst->getType(0).getSwiftType()) == 1) {
       SILValue(Inst, 0).replaceAllUsesWith(Result);
       Inst->eraseFromParent();
       ++NumLoadPromoted;
     }
-
     return;
   }
 
@@ -262,61 +328,6 @@ ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV) {
 //===----------------------------------------------------------------------===//
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
-
-namespace {
-  /// Recursively computing the number of elements in a type can be exponential,
-  /// and even if the number of elements is low, the presence of single-element
-  /// struct wrappers (like Int!) means that computing this is non-trivial.
-  ///
-  /// Cache the results of the NumElements computation in a densemap to make this
-  /// be linear in the number of types analyzed.
-  class NumElementsCache {
-    llvm::DenseMap<CanType, unsigned> ElementCountMap;
-    
-    NumElementsCache(const NumElementsCache&) = delete;
-    void operator=(const NumElementsCache&) = delete;
-  public:
-    NumElementsCache() {}
-    unsigned get(CanType T);
-    
-  };
-} // end anonymous namespace
-
-/// getNumElements - Return the number of elements in the flattened SILType.
-/// For tuples and structs, this is the (recursive) count of the fields it
-/// contains.
-unsigned NumElementsCache::get(CanType T) {
-  if (TupleType *TT = T->getAs<TupleType>()) {
-    auto It = ElementCountMap.find(T);
-    if (It != ElementCountMap.end()) return It->second;
-    
-    unsigned NumElements = 0;
-    for (auto &Elt : TT->getFields())
-      NumElements += get(Elt.getType()->getCanonicalType());
-    return ElementCountMap[T] = NumElements;
-  }
-  
-  if (T->is<StructType>() || T->is<BoundGenericStructType>()) {
-    auto It = ElementCountMap.find(T);
-    if (It != ElementCountMap.end()) return It->second;
-    
-    StructDecl *SD;
-    if (auto *ST = T->getAs<StructType>())
-      SD = ST->getDecl();
-    else
-      SD = T->castTo<BoundGenericStructType>()->getDecl();
-    
-    unsigned NumElements = 0;
-    for (auto *D : SD->getMembers())
-      if (auto *VD = dyn_cast<VarDecl>(D))
-        if (!VD->isProperty())
-          NumElements += get(VD->getType()->getCanonicalType());
-    return ElementCountMap[T] = NumElements;
-  }
-  
-  // If this isn't a tuple or struct, it is a single element.
-  return 1;
-}
 
 
 /// addElementUses - An operation (e.g. load, store, byref use, etc) on a value
@@ -474,7 +485,7 @@ static void optimizeAllocBox(AllocBoxInst *ABI, NumElementsCache &NumElements) {
 
   // Process each scalar value in the uses array individually.
   for (auto &Elt : Uses)
-    ElementPromotion(ABI, Elt).doIt();
+    ElementPromotion(ABI, Elt, NumElements).doIt();
 }
 
 
