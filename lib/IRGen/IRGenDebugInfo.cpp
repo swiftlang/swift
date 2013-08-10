@@ -171,16 +171,16 @@ Location getStartLoc(SourceManager &SM, WithLoc *S) {
   Location L = {};
   if (S == nullptr) return L;
 
-  SourceLoc Start = S->getStartLoc();
-  int BufferIndex = SM.findBufferContainingLoc(Start);
-  if (BufferIndex == -1)
+  SourceLoc StartLoc = S->getStartLoc();
+  if (StartLoc.isInvalid())
     // This may be a deserialized or clang-imported decl. And modules
     // don't come with SourceLocs right now. Get at least the name of
     // the module.
     return getDeserializedLoc(S);
 
-  L.Filename = SM->getMemoryBuffer((unsigned)BufferIndex)->getBufferIdentifier();
-  std::tie(L.Line, L.Col) = SM.getLineAndColumn(Start, BufferIndex);
+  unsigned BufferID = SM.findBufferContainingLoc(StartLoc);
+  L.Filename = SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
+  std::tie(L.Line, L.Col) = SM.getLineAndColumn(StartLoc, BufferID);
   return L;
 }
 

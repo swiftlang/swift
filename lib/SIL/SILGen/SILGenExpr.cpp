@@ -2017,9 +2017,8 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   
   switch (E->getKind()) {
   case MagicIdentifierLiteralExpr::File: {
-    int BufferID = Ctx.SourceMgr.findBufferContainingLoc(Loc);
-    assert(BufferID != -1 && "MagicIdentifierLiteral has invalid location");
-    
+    unsigned BufferID = Ctx.SourceMgr.findBufferContainingLoc(Loc);
+
     StringRef Value =
       Ctx.SourceMgr->getMemoryBuffer(BufferID)->getBufferIdentifier();
     

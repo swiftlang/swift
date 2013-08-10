@@ -874,9 +874,11 @@ namespace {
     }
 
     bool isGoodSourceRange(SourceRange SR) {
-      return SR.isValid() &&
-             Ctx.SourceMgr.findBufferContainingLoc(SR.Start) != -1 &&
-             Ctx.SourceMgr.findBufferContainingLoc(SR.End) != -1;
+      if (SR.isInvalid())
+        return false;
+      (void) Ctx.SourceMgr.findBufferContainingLoc(SR.Start);
+      (void) Ctx.SourceMgr.findBufferContainingLoc(SR.End);
+      return true;
     }
 
     void checkSourceRanges(FuncExpr *FE) {

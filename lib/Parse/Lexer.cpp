@@ -187,11 +187,9 @@ void Lexer::primeLexer() {
 }
 
 void Lexer::initSubLexer(Lexer &Parent, State BeginState, State EndState) {
-  assert(BufferID == static_cast<unsigned>(SourceMgr.findBufferContainingLoc(
-                         BeginState.Loc)) &&
+  assert(BufferID == SourceMgr.findBufferContainingLoc(BeginState.Loc) &&
          "state for the wrong buffer");
-  assert(BufferID == static_cast<unsigned>(SourceMgr.findBufferContainingLoc(
-                         EndState.Loc)) &&
+  assert(BufferID == SourceMgr.findBufferContainingLoc(EndState.Loc) &&
          "state for the wrong buffer");
 
   // If the parent lexer should stop prematurely, and the ArtificialEOF

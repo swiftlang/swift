@@ -90,8 +90,15 @@ public:
            rangeContainsTokenLoc(Enclosing, Inner.End);
   }
 
-  int findBufferContainingLoc(SourceLoc Loc) const {
-    return LLVMSourceMgr.FindBufferContainingLoc(Loc.Value);
+  /// Returns the buffer ID for the specified *valid* location.
+  ///
+  /// Because a valid source location always corresponds to a source buffer,
+  /// this routine always returns a valid buffer ID.
+  unsigned findBufferContainingLoc(SourceLoc Loc) const {
+    assert(Loc.isValid());
+    int BufferID = LLVMSourceMgr.FindBufferContainingLoc(Loc.Value);
+    assert(BufferID != -1);
+    return unsigned(BufferID);
   }
 
   size_t addNewSourceBuffer(llvm::MemoryBuffer *Buffer, SourceLoc IncludeLoc) {
@@ -112,6 +119,7 @@ public:
 
   std::pair<unsigned, unsigned> getLineAndColumn(SourceLoc Loc,
                                                  int BufferID = -1) const {
+    assert(Loc.isValid());
     return LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
   }
 };

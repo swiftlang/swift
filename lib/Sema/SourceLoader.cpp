@@ -40,10 +40,11 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
 
   // First, search in the directory corresponding to the import location.
   // FIXME: This screams for a proper FileManager abstraction.
-  int currentBufferID = ctx.SourceMgr.findBufferContainingLoc(importLoc);
-  if (currentBufferID >= 0) {
+  if (importLoc.isValid()) {
+    unsigned currentBufferID =
+        ctx.SourceMgr.findBufferContainingLoc(importLoc);
     const llvm::MemoryBuffer *importingBuffer
-      = ctx.SourceMgr->getBufferInfo(currentBufferID).Buffer;
+      = ctx.SourceMgr->getMemoryBuffer(currentBufferID);
     StringRef currentDirectory
       = llvm::sys::path::parent_path(importingBuffer->getBufferIdentifier());
     if (!currentDirectory.empty()) {
