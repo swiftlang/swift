@@ -17,6 +17,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/ADT/StringExtras.h"
 //#include "swift/SIL/Dominance.h"
 using namespace swift;
 
@@ -46,7 +47,11 @@ namespace {
   public:
     NumElementsCache() {}
     unsigned get(CanType T);
-    
+
+    /// Push the symbolic path name to the specified element number onto to
+    /// specified std::string.
+    void getPathStringToElement(CanType T, unsigned Element,
+                                std::string &Result);
   };
 } // end anonymous namespace
 
@@ -84,6 +89,60 @@ unsigned NumElementsCache::get(CanType T) {
   
   // If this isn't a tuple or struct, it is a single element.
   return 1;
+}
+
+/// Push the symbolic path name to the specified element number onto to
+/// specified std::string.
+void NumElementsCache::getPathStringToElement(CanType T, unsigned Element,
+                                              std::string &Result) {
+  // If the specified type has a single element, we're done.  Don't dive in any
+  // farther even if we could.
+  if (get(T) == 1) return;
+  
+  if (TupleType *TT = T->getAs<TupleType>()) {
+    unsigned FieldNo = 0;
+    for (auto &Field : TT->getFields()) {
+      unsigned ElementsForField = get(Field.getType()->getCanonicalType());
+      
+      if (Element < ElementsForField) {
+        Result += '.';
+        if (Field.hasName())
+          Result += Field.getName().str();
+        else
+          Result += llvm::utostr(FieldNo);
+        return getPathStringToElement(Field.getType()->getCanonicalType(),
+                                      Element, Result);
+      }
+      
+      Element -= ElementsForField;
+      
+      ++FieldNo;
+    }
+    assert(0 && "Element number is out of range for this type!");
+  }
+  
+  assert(T->is<StructType>() || T->is<BoundGenericStructType>());
+  StructDecl *SD;
+  if (auto *ST = T->getAs<StructType>())
+    SD = ST->getDecl();
+  else
+    SD = T->castTo<BoundGenericStructType>()->getDecl();
+  
+  for (auto *D : SD->getMembers())
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      if (VD->isProperty()) continue;
+      unsigned ElementsForField = get(VD->getType()->getCanonicalType());
+
+      if (Element < ElementsForField) {
+        Result += '.';
+        Result += VD->getName().str();
+        return getPathStringToElement(VD->getType()->getCanonicalType(),
+                                      Element, Result);
+      }
+      
+      Element -= ElementsForField;
+    }
+  assert(0 && "Element number is out of range for this type!");
 }
 
 
@@ -137,6 +196,7 @@ namespace {
   /// of an element of an allocation.
   class ElementPromotion {
     AllocBoxInst *TheAllocBox;
+    unsigned ElementNumber;
     ElementUses &Uses;
     NumElementsCache &NumElements;
     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
@@ -151,10 +211,12 @@ namespace {
     // element as a policy decision.
     bool HadError = false;
   public:
-    ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses,
-                     NumElementsCache &NumElements);
+    ElementPromotion(AllocBoxInst *TheAllocBox, unsigned ElementNumber,
+                     ElementUses &Uses, NumElementsCache &NumElements);
 
     void doIt();
+    
+  private:
     void handleLoadUse(SILInstruction *Inst);
     void handleByrefUse(SILInstruction *Inst);
     void handleEscape(SILInstruction *Inst);
@@ -165,12 +227,19 @@ namespace {
       DI_Partial
     };
     DIKind checkDefinitelyInit(SILInstruction *Inst, SILValue *AV = nullptr);
+    
+    
+    void diagnoseInitError(SILInstruction *Use,
+                           Diag<> DiagNoName,
+                           Diag<StringRef> DiagWithName);
   };
 } // end anonymous namespace
 
-ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses,
+ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox,
+                                   unsigned ElementNumber, ElementUses &Uses,
                                    NumElementsCache &NumElements)
-  : TheAllocBox(TheAllocBox), Uses(Uses), NumElements(NumElements) {
+  : TheAllocBox(TheAllocBox), ElementNumber(ElementNumber), Uses(Uses),
+    NumElements(NumElements) {
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -193,6 +262,41 @@ ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox, ElementUses &Uses,
       PerBlockInfo[Use.first->getParent()].HasNonLoadUse = true;
     }
   }
+}
+
+void ElementPromotion::diagnoseInitError(SILInstruction *Use,
+                                         Diag<> DiagNoName,
+                                         Diag<StringRef> DiagWithName) {
+  HadError = true;
+
+  // TODO: The QoI could be improved in many different ways here.  For example,
+  // We could give some path information where the use was uninitialized, like
+  // the static analyzer.
+
+  // If the definition is a declaration, try to reconstruct a name and
+  // optionally an access path to the uninitialized element.
+  if (ValueDecl *VD =
+        dyn_cast_or_null<ValueDecl>(TheAllocBox->getLoc().getAs<Decl>())) {
+    std::string Name = VD->getName().str();
+    
+    // If the overall memory allocation is an aggregate of multiple elements
+    // (i.e. a struct or tuple), then dive in to explain *which* element is
+    // being used uninitialized.
+    CanType AllocTy = TheAllocBox->getElementType().getSwiftRValueType();
+    NumElements.getPathStringToElement(AllocTy, ElementNumber, Name);
+    
+    diagnose(Use->getModule(), Use->getLoc(), DiagWithName, Name);
+    
+  } else {
+    // Otherwise, emit the diagnostic with no name or path information.
+    diagnose(Use->getModule(), Use->getLoc(), DiagNoName);
+  }
+  
+  
+  
+  
+  diagnose(Use->getModule(), TheAllocBox->getLoc(),
+           diag::variable_defined_here);
 }
 
 
@@ -239,13 +343,8 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   }
 
   // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
-  // TODO: The QoI could be improved in many different ways here.  We could give
-  // some path information, give the name / access path of the variable, etc.
-  diagnose(Inst->getModule(), Inst->getLoc(),
-           diag::variable_used_before_initialized);
-  diagnose(Inst->getModule(), TheAllocBox->getLoc(),
-           diag::variable_defined_here);
-  HadError = true;
+  diagnoseInitError(Inst, diag::variable_used_before_initialized,
+                    diag::variable_n_used_before_initialized);
 }
 
 /// Given a byref use (an Apply), determine whether the loaded
@@ -256,13 +355,8 @@ void ElementPromotion::handleByrefUse(SILInstruction *Inst) {
     return;
 
   // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
-  // TODO: The QoI could be improved in many different ways here.  We could give
-  // some path information, give the name / access path of the variable, etc.
-  diagnose(Inst->getModule(), Inst->getLoc(),
-           diag::variable_byref_before_initialized);
-  diagnose(Inst->getModule(), TheAllocBox->getLoc(),
-           diag::variable_defined_here);
-  HadError = true;
+  diagnoseInitError(Inst, diag::variable_byref_before_initialized,
+                    diag::variable_n_byref_before_initialized);
 }
 
 void ElementPromotion::handleEscape(SILInstruction *Inst) {
@@ -271,13 +365,8 @@ void ElementPromotion::handleEscape(SILInstruction *Inst) {
     return;
 
   // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
-  // TODO: The QoI could be improved in many different ways here.  We could give
-  // some path information, give the name / access path of the variable, etc.
-  diagnose(Inst->getModule(), Inst->getLoc(),
-           diag::variable_escape_before_initialized);
-  diagnose(Inst->getModule(), TheAllocBox->getLoc(),
-           diag::variable_defined_here);
-  HadError = true;
+  diagnoseInitError(Inst, diag::variable_escape_before_initialized,
+                    diag::variable_n_escape_before_initialized);
 }
 
 
@@ -490,8 +579,9 @@ static void optimizeAllocBox(AllocBoxInst *ABI, NumElementsCache &NumElements) {
   collectAllocationUses(SILValue(ABI, 1), Uses, 0, NumElements);
 
   // Process each scalar value in the uses array individually.
+  unsigned EltNo = 0;
   for (auto &Elt : Uses)
-    ElementPromotion(ABI, Elt, NumElements).doIt();
+    ElementPromotion(ABI, EltNo++, Elt, NumElements).doIt();
 }
 
 
