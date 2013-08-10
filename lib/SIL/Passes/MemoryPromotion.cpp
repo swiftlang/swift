@@ -229,7 +229,8 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
     // Don't transform aggregate loads and stores.  We are operating
     // elementwise, so just because this element of the aggregate is
     // fullfilled by the load doesn't mean the other lanes are.
-    if (Result && NumElements.get(Inst->getType(0).getSwiftType()) == 1) {
+    if (Result && NumElements.get(Inst->getType(0).getSwiftType()) == 1 &&
+        Inst->getType(0) == Result.getType()) {
       SILValue(Inst, 0).replaceAllUsesWith(Result);
       Inst->eraseFromParent();
       ++NumLoadPromoted;

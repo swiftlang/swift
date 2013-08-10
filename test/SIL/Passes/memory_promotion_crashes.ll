@@ -25,3 +25,23 @@ bb0(%0 : $Int64, %1 : $*Triple):
   return %10 : $Triple
 }
 
+
+struct Single {
+  var a : Int
+}
+
+// CHECK-LABEL: sil @SingleTest
+sil @SingleTest : $[cc(method), thin] (s : [byref]  Single, a : Int64) -> Single {
+bb0(%0 : $*Single, %1 : $Int64):
+  %4 = alloc_box $Single
+  %5 = load %0 : $*Single
+  store %5 to %4#1 : $*Single
+  
+  %8 = struct_element_addr %4#1 : $*Single, #a
+  store %1 to %8 : $*Int64
+
+  %10 = load %4#1 : $*Single
+  release %4#0 : $Builtin.ObjectPointer
+  return %10 : $Single
+}
+
