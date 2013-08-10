@@ -27,36 +27,6 @@ static void diagnose(SILModule *M, SILLocation loc, ArgTypes... args) {
   M->getASTContext().Diags.diagnose(loc.getSourceLoc(), Diagnostic(args...));
 }
 
-
-/// getNumElements - Return the number of elements in the flattened SILType.
-/// For tuples and structs, this is the (recursive) count of the fields it
-/// contains.
-static unsigned getNumElements(CanType T, SILModule *M) {
-  if (TupleType *TT = T->getAs<TupleType>()) {
-    unsigned NumElements = 0;
-    for (auto &Elt : TT->getFields())
-      NumElements += getNumElements(Elt.getType()->getCanonicalType(), M);
-    return NumElements;
-  }
-
-  if (T->is<StructType>() || T->is<BoundGenericStructType>()) {
-    StructDecl *SD;
-    if (auto *ST = T->getAs<StructType>())
-      SD = ST->getDecl();
-    else
-      SD = T->castTo<BoundGenericStructType>()->getDecl();
-
-    unsigned NumElements = 0;
-    for (auto *D : SD->getMembers())
-      if (auto *VD = dyn_cast<VarDecl>(D))
-        NumElements += getNumElements(VD->getType()->getCanonicalType(), M);
-    return NumElements;
-  }
-
-  // If this isn't a tuple or struct, it is a single element.
-  return 1;
-}
-
 //===----------------------------------------------------------------------===//
 // Per-Element Promotion Logic
 //===----------------------------------------------------------------------===//
@@ -293,15 +263,70 @@ ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV) {
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 
+namespace {
+  /// Recursively computing the number of elements in a type can be exponential,
+  /// and even if the number of elements is low, the presence of single-element
+  /// struct wrappers (like Int!) means that computing this is non-trivial.
+  ///
+  /// Cache the results of the NumElements computation in a densemap to make this
+  /// be linear in the number of types analyzed.
+  class NumElementsCache {
+    llvm::DenseMap<CanType, unsigned> ElementCountMap;
+    
+    NumElementsCache(const NumElementsCache&) = delete;
+    void operator=(const NumElementsCache&) = delete;
+  public:
+    NumElementsCache() {}
+    unsigned get(CanType T);
+    
+  };
+} // end anonymous namespace
+
+/// getNumElements - Return the number of elements in the flattened SILType.
+/// For tuples and structs, this is the (recursive) count of the fields it
+/// contains.
+unsigned NumElementsCache::get(CanType T) {
+  if (TupleType *TT = T->getAs<TupleType>()) {
+    auto It = ElementCountMap.find(T);
+    if (It != ElementCountMap.end()) return It->second;
+    
+    unsigned NumElements = 0;
+    for (auto &Elt : TT->getFields())
+      NumElements += get(Elt.getType()->getCanonicalType());
+    return ElementCountMap[T] = NumElements;
+  }
+  
+  if (T->is<StructType>() || T->is<BoundGenericStructType>()) {
+    auto It = ElementCountMap.find(T);
+    if (It != ElementCountMap.end()) return It->second;
+    
+    StructDecl *SD;
+    if (auto *ST = T->getAs<StructType>())
+      SD = ST->getDecl();
+    else
+      SD = T->castTo<BoundGenericStructType>()->getDecl();
+    
+    unsigned NumElements = 0;
+    for (auto *D : SD->getMembers())
+      if (auto *VD = dyn_cast<VarDecl>(D))
+        NumElements += get(VD->getType()->getCanonicalType());
+    return ElementCountMap[T] = NumElements;
+  }
+  
+  // If this isn't a tuple or struct, it is a single element.
+  return 1;
+}
+
+
 /// addElementUses - An operation (e.g. load, store, byref use, etc) on a value
 /// acts on all of the aggregate elements in that value.  For example, a load
 /// of $*(Int,Int) is a use of both Int elements of the tuple.  This is a helper
 /// to keep the Uses data structure up to date for aggregate uses.
 static void addElementUses(SmallVectorImpl<ElementUses> &Uses,
                            unsigned BaseElt, SILType UseTy,
-                           SILInstruction *User, UseKind Kind) {
-  for (unsigned i = 0, e = getNumElements(UseTy.getSwiftRValueType(),
-                                          User->getModule());
+                           SILInstruction *User, UseKind Kind,
+                           NumElementsCache &NumElements) {
+  for (unsigned i = 0, e = NumElements.get(UseTy.getSwiftRValueType());
        i != e; ++i)
     Uses[BaseElt+i].push_back({ User, Kind });
 }
@@ -309,7 +334,8 @@ static void addElementUses(SmallVectorImpl<ElementUses> &Uses,
 
 static void collectAllocationUses(SILValue Pointer,
                                   SmallVectorImpl<ElementUses> &Uses,
-                                  unsigned BaseElt) {
+                                  unsigned BaseElt,
+                                  NumElementsCache &NumElements) {
   assert(Pointer.getType().isAddress() &&
          "Walked through the pointer to the value?");
   SILType PointeeType = Pointer.getType().getObjectType();
@@ -331,14 +357,16 @@ static void collectAllocationUses(SILValue Pointer,
 
     // Loads are a use of the value.  Note that this could be an aggregate load.
     if (auto *LI = dyn_cast<LoadInst>(User)) {
-      addElementUses(Uses, BaseElt, PointeeType, LI, UseKind::Load);
+      addElementUses(Uses, BaseElt, PointeeType, LI, UseKind::Load,
+                     NumElements);
       continue;
     }
 
     // Stores *to* the allocation are writes.  Stores *of* them are escapes.
     // Note that this could be an aggregate store.
     if (isa<StoreInst>(User) && UI->getOperandNumber() == 1) {
-      addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store);
+      addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store,
+                     NumElements);
       continue;
     }
 
@@ -346,7 +374,7 @@ static void collectAllocationUses(SILValue Pointer,
       // If this is the source of the copy_addr, then this is a load.  If it is
       // the destination, then this is a store.
       auto Kind = UI->getOperandNumber() == 0 ? UseKind::Load : UseKind::Store;
-      addElementUses(Uses, BaseElt, PointeeType, CAI, Kind);
+      addElementUses(Uses, BaseElt, PointeeType, CAI, Kind, NumElements);
       continue;
     }
 
@@ -371,14 +399,16 @@ static void collectAllocationUses(SILValue Pointer,
 
       // If this is an indirect return slot, it is a store.
       if (ArgumentNumber == 0 && FTI->hasIndirectReturn()) {
-        addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store);
+        addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store,
+                       NumElements);
         continue;
       }
 
       // Otherwise, check for [byref].
       Type ArgTy = FTI->getSwiftArgumentType(ArgumentNumber);
       if (ArgTy->is<LValueType>()) {
-        addElementUses(Uses, BaseElt, PointeeType, User, UseKind::ByrefUse);
+        addElementUses(Uses, BaseElt, PointeeType, User, UseKind::ByrefUse,
+                       NumElements);
         continue;
       }
 
@@ -393,10 +423,10 @@ static void collectAllocationUses(SILValue Pointer,
       unsigned NewBaseElt = BaseElt;
       for (unsigned i = 0; i != FieldNo; ++i) {
         CanType EltTy = TT->getElementType(i)->getCanonicalType();
-        NewBaseElt += getNumElements(EltTy, TEAI->getModule());
+        NewBaseElt += NumElements.get(EltTy);
       }
 
-      collectAllocationUses(SILValue(TEAI, 0), Uses, NewBaseElt);
+      collectAllocationUses(SILValue(TEAI, 0), Uses, NewBaseElt, NumElements);
       continue;
     }
 
@@ -416,30 +446,29 @@ static void collectAllocationUses(SILValue Pointer,
       for (auto *D : SD->getMembers()) {
         if (D == Field) break;
         if (auto *VD = dyn_cast<VarDecl>(D))
-          NewBaseElt += getNumElements(VD->getType()->getCanonicalType(),
-                                       SEAI->getModule());
+          NewBaseElt += NumElements.get(VD->getType()->getCanonicalType());
       }
 
-      collectAllocationUses(SILValue(SEAI, 0), Uses, NewBaseElt);
+      collectAllocationUses(SILValue(SEAI, 0), Uses, NewBaseElt, NumElements);
       continue;
     }
 
      // Otherwise, the use is something complicated, it escapes.
-    addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Escape);
+    addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Escape,
+                   NumElements);
   }
 }
 
 
-static void optimizeAllocBox(AllocBoxInst *ABI) {
+static void optimizeAllocBox(AllocBoxInst *ABI, NumElementsCache &NumElements) {
   // Set up the datastructure used to collect the uses of the alloc_box.  The
   // uses are bucketed up into the elements of the allocation that are being
   // used.  This matters for element-wise tuples and fragile structs.
   SmallVector<ElementUses, 1> Uses;
-  Uses.resize(getNumElements(ABI->getElementType().getSwiftRValueType(),
-                             ABI->getModule()));
+  Uses.resize(NumElements.get(ABI->getElementType().getSwiftRValueType()));
 
   // Walk the use list of the pointer, collecting them into the Uses array.
-  collectAllocationUses(SILValue(ABI, 1), Uses, 0);
+  collectAllocationUses(SILValue(ABI, 1), Uses, 0, NumElements);
 
   // Process each scalar value in the uses array individually.
   for (auto &Elt : Uses)
@@ -450,7 +479,7 @@ static void optimizeAllocBox(AllocBoxInst *ABI) {
 /// performSILMemoryPromotion - Promote alloc_box uses into SSA registers and
 /// perform definitive initialization analysis.
 void swift::performSILMemoryPromotion(SILModule *M) {
-  
+  NumElementsCache NumElements;
   for (auto &Fn : *M) {
     for (auto &BB : Fn) {
       auto I = BB.begin(), E = BB.end();
@@ -461,7 +490,7 @@ void swift::performSILMemoryPromotion(SILModule *M) {
           continue;
         }
 
-        optimizeAllocBox(ABI);
+        optimizeAllocBox(ABI, NumElements);
 
         // Carefully move iterator to avoid invalidation problems.
         ++I;
