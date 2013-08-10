@@ -390,13 +390,18 @@ static void collectAllocationUses(SILValue Pointer,
       addElementUses(Uses, BaseElt, PointeeType, CAI, Kind, NumElements);
       continue;
     }
-
-    // TODO: "Assign".
-    // TODO: InitializeVarInst.
-    // TODO: isa<ProjectExistentialInst>(User)
+    
+    // Initializations are definitions of the whole thing.  This is currently
+    // used in constructors and should go away someday.
+    if (isa<InitializeVarInst>(User)) {
+      addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store,
+                     NumElements);
+      continue;
+    }
     
 
-
+    // TODO: "Assign".
+    // TODO: isa<ProjectExistentialInst>(User)
 
     // The apply instruction does not capture the pointer when it is passed
     // through [byref] arguments or for indirect returns.  Byref arguments are
