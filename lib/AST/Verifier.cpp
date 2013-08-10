@@ -18,9 +18,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/Lexer.h" // bad dependency!
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include <functional>
 using namespace swift;
 
