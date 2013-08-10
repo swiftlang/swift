@@ -1609,8 +1609,7 @@ bool Parser::parseDeclUnionElement(unsigned Flags,
   // 'case Identifier where ...:'
   if (Tok.is(tok::colon) || Tok.is(tok::comma) || Tok.is(tok::kw_where)) {
     diagnose(CaseLoc, diag::case_outside_of_switch, "case");
-    skipUntil(tok::colon);
-    consumeIf(tok::colon);
+    skipUntilDeclRBrace();
     return true;
   }
   

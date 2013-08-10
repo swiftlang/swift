@@ -464,13 +464,18 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       skipUntil(RightK, SeparatorK);
       if (Tok.is(RightK))
         break;
-      if (Tok.is(tok::eof) || Tok.is(tok::code_complete))
+      if (Tok.is(tok::eof) || Tok.is(tok::code_complete)) {
+        RightLoc = Tok.getLoc();
         return true;
+      }
       consumeIf(SeparatorK);
     }
   }
 
-  Invalid |= parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc);
+  if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
+    Invalid = true;
+    RightLoc = Tok.getLoc();
+  }
   return Invalid;
 }
 
