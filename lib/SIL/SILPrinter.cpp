@@ -363,7 +363,7 @@ public:
           OS << " ";
           // To minimize output, only print the line and column number for
           // everything but the first instruction.
-          L.getSourceLoc().printLineAndColon(OS, M->getASTContext().SourceMgr);
+          L.getSourceLoc().printLineAndColumn(OS, M->getASTContext().SourceMgr);
         }
       }
     }

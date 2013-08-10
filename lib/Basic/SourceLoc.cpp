@@ -51,33 +51,33 @@ DecomposedLoc SourceManager::decompose(SourceLoc Loc) const {
   return Result;
 }
 
-void SourceLoc::printLineAndColon(raw_ostream &OS,
-                                  const SourceManager &SM) const {
-  int BufferIndex = SM->FindBufferContainingLoc(Value);
-  print(OS, SM, BufferIndex);
-}
-
-void SourceLoc::print(raw_ostream &OS, const SourceManager &SM,
-                      int &LastBuffer) const {
+void SourceLoc::printLineAndColumn(raw_ostream &OS,
+                                   const SourceManager &SM) const {
   if (isInvalid()) {
     OS << "<invalid loc>";
     return;
   }
-  int BufferIndex = SM->FindBufferContainingLoc(Value);
-  if (BufferIndex == -1) {
-    OS << "<malformed loc>";
+
+  auto LineAndCol = SM.getLineAndColumn(*this);
+  OS << "line:" << LineAndCol.first << ':' << LineAndCol.second;
+}
+
+void SourceLoc::print(raw_ostream &OS, const SourceManager &SM,
+                      unsigned &LastBufferID) const {
+  if (isInvalid()) {
+    OS << "<invalid loc>";
     return;
   }
-  
-  if (BufferIndex != LastBuffer) {
-    OS << SM->getMemoryBuffer((unsigned)BufferIndex)->getBufferIdentifier();
-    LastBuffer = BufferIndex;
+
+  unsigned BufferID = SM.findBufferContainingLoc(*this);
+  if (BufferID != LastBufferID) {
+    OS << SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
+    LastBufferID = BufferID;
   } else {
     OS << "line";
   }
 
-  auto LineAndCol = SM->getLineAndColumn(Value, BufferIndex);
-
+  auto LineAndCol = SM.getLineAndColumn(*this, BufferID);
   OS << ':' << LineAndCol.first << ':' << LineAndCol.second;
 }
 
@@ -86,11 +86,11 @@ void SourceLoc::dump(const SourceManager &SM) const {
 }
 
 void SourceRange::print(raw_ostream &OS, const SourceManager &SM,
-                        int &LastBuffer, bool PrintText) const {
+                        unsigned &LastBufferID, bool PrintText) const {
   OS << '[';
-  Start.print(OS, SM, LastBuffer);
+  Start.print(OS, SM, LastBufferID);
   OS << " - ";
-  End.print(OS, SM, LastBuffer);
+  End.print(OS, SM, LastBufferID);
   OS << ']';
   
   if (Start.isInvalid() || End.isInvalid())

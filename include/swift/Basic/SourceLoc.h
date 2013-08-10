@@ -50,17 +50,17 @@ public:
         llvm::SMLoc::getFromPointer(Value.getPointer() + ByteOffset));
   }
 
-  /// print - Print out the SourceLoc.  If this location is in the same buffer
-  /// as specified by LastBuffer, then we don't print the filename.  If not, we
-  /// do print the filename, and then update LastBuffer with the BufferID
-  /// printed.
+  /// Print out the SourceLoc.  If this location is in the same buffer
+  /// as specified by \c LastBufferID, then we don't print the filename.  If
+  /// not, we do print the filename, and then update \c LastBufferID with the
+  /// BufferID printed.
   void print(raw_ostream &OS, const SourceManager &SM,
-             int &LastBuffer) const;
+             unsigned &LastBufferID) const;
 
-  void printLineAndColon(raw_ostream &OS, const SourceManager &SM) const;
+  void printLineAndColumn(raw_ostream &OS, const SourceManager &SM) const;
 
   void print(raw_ostream &OS, const SourceManager &SM) const {
-    int Tmp = -1;
+    unsigned Tmp = ~0U;
     print(OS, SM, Tmp);
   }
 
@@ -85,16 +85,16 @@ public:
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return Start.isInvalid(); }
 
-  /// print - Print out the SourceRange. If the locations are in the same buffer
-  /// as specified by LastBuffer, then we don't print the filename.  If not, we
-  /// do print the filename, and then update LastBuffer with the BufferID
+  /// Print out the SourceRange.  If the locations are in the same buffer
+  /// as specified by LastBufferID, then we don't print the filename.  If not,
+  /// we do print the filename, and then update LastBufferID with the BufferID
   /// printed.
   void print(raw_ostream &OS, const SourceManager &SM,
-             int &LastBuffer, bool PrintText = true) const;
+             unsigned &LastBufferID, bool PrintText = true) const;
 
   void print(raw_ostream &OS, const SourceManager &SM,
              bool PrintText = true) const {
-    int Tmp = -1;
+    unsigned Tmp = ~0U;
     print(OS, SM, Tmp, PrintText);
   }
 
