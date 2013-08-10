@@ -18,6 +18,7 @@
 #include "Immediate.h"
 #include "Frontend.h"
 #include "swift/Subsystems.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/IRGen/Options.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/AST/ASTContext.h"
@@ -419,6 +420,9 @@ class REPLInput {
   
   llvm::SmallVector<wchar_t, 80> PromptString;
 
+  /// A buffer for all lines that the user entered, but we have not parsed yet.
+  llvm::SmallString<128> CurrentLines;
+
 public:
   REPLEnvironment &Env;
   bool Autoindent;
@@ -490,14 +494,14 @@ public:
   
   TranslationUnit *getTU();
 
-  REPLInputKind getREPLInput(llvm::SmallVectorImpl<char> &Line) {
+  REPLInputKind getREPLInput(SmallVectorImpl<char> &Result) {
     int BraceCount = 0;
     bool HadLineContinuation = false;
     bool UnfinishedInfixExpr = false;
     unsigned CurChunkLines = 0;
-    
-    Line.clear();
-    
+
+    CurrentLines.clear();
+
     // Reset color before showing the prompt.
     if (ShowColors)
       llvm::outs().resetColor();
@@ -510,7 +514,7 @@ public:
       PromptedForLine = false;
       Outdented = false;
       int LineCount;
-      size_t LineStart = Line.size();
+      size_t LineStart = CurrentLines.size();
       const wchar_t* WLine = el_wgets(e, &LineCount);
       if (!WLine) {
         // End-of-file.
@@ -521,15 +525,17 @@ public:
       
       if (Autoindent) {
         size_t indent = PromptContinuationLevel*2;
-        Line.append(indent, ' ');
+        CurrentLines.append(indent, ' ');
       }
       
-      convertToUTF8(llvm::makeArrayRef(WLine, WLine + wcslen(WLine)), Line);
+      convertToUTF8(llvm::makeArrayRef(WLine, WLine + wcslen(WLine)),
+                    CurrentLines);
       
       // Special-case backslash for line continuations in the REPL.
-      if (Line.size() > 2 && Line.end()[-1] == '\n' && Line.end()[-2] == '\\') {
+      if (CurrentLines.size() > 2 &&
+          CurrentLines.end()[-1] == '\n' && CurrentLines.end()[-2] == '\\') {
         HadLineContinuation = true;
-        Line.erase(Line.end() - 2);
+        CurrentLines.erase(CurrentLines.end() - 2);
       } else {
         HadLineContinuation = false;
       }
@@ -544,12 +550,12 @@ public:
       
       // If we detect a line starting with a colon, treat it as a special
       // REPL escape.
-      char const *s = Line.data() + LineStart;
+      char const *s = CurrentLines.data() + LineStart;
       char const *p = s;
-      while (p < Line.end() && isspace(*p)) {
+      while (p < CurrentLines.end() && isspace(*p)) {
         ++p;
       }
-      if (p == Line.end()) {
+      if (p == CurrentLines.end()) {
         if (BraceCount != 0 || UnfinishedInfixExpr) continue;
         return REPLInputKind::Empty;
       }
@@ -566,7 +572,7 @@ public:
       
       // If we detect unbalanced braces, keep reading before
       // we start parsing.
-      while (p < Line.end()) {
+      while (p < CurrentLines.end()) {
         if (*p == '{' || *p == '(' || *p == '[')
           ++BraceCount;
         else if (*p == '}' || *p == ')' || *p == ']')
@@ -581,10 +587,13 @@ public:
           UnfinishedInfixExpr = true;
       }
     } while (BraceCount > 0 || HadLineContinuation || UnfinishedInfixExpr);
-    
+
+    Result.clear();
+    Result.append(CurrentLines.begin(), CurrentLines.end());
+
     // The lexer likes null-terminated data.
-    Line.push_back('\0');
-    Line.pop_back();
+    Result.push_back('\0');
+    Result.pop_back();
     
     // Colorize the response output.
     if (ShowColors)
@@ -838,12 +847,13 @@ private:
   unsigned char onComplete(int ch) {
     LineInfoW const *line = el_wline(e);
     llvm::ArrayRef<wchar_t> wprefix(line->buffer, line->cursor - line->buffer);
-    llvm::SmallString<16> prefix;
-    convertToUTF8(wprefix, prefix);
+    llvm::SmallString<16> Prefix;
+    Prefix.assign(CurrentLines);
+    convertToUTF8(wprefix, Prefix);
     
     if (!completions) {
       // If we aren't currently working with a completion set, generate one.
-      completions.populate(getTU(), prefix);
+      completions.populate(getTU(), Prefix);
       // Display the common root of the found completions and beep unless we
       // found a unique one.
       insertStringRef(completions.getRoot());
