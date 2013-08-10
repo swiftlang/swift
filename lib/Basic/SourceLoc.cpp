@@ -45,14 +45,8 @@ DecomposedLoc SourceManager::decompose(SourceLoc Loc) const {
 
   DecomposedLoc Result;
   Result.Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID);
-  Result.Line = LLVMSourceMgr.FindLineNumber(Loc.Value, BufferID);
-
-  const char *BufferStart = Result.Buffer->getBufferStart();
-  const char *LineStart = Loc.Value.getPointer();
-  while (LineStart != BufferStart &&
-         LineStart[-1] != '\n' && LineStart[-1] != '\r')
-    --LineStart;
-  Result.Column = Loc.Value.getPointer() - LineStart;
+  std::tie(Result.Line, Result.Column) =
+      LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
 
   return Result;
 }

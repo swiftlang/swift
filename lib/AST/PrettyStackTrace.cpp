@@ -25,60 +25,45 @@
 
 using namespace swift;
 
-static Optional<DecomposedLoc> decompose(SourceManager &SM, SourceLoc Loc) {
-  if (!Loc.isValid())
-    return Nothing;
-
-  return SM.decompose(Loc);
-}
-
 static void printDecomposedLoc(llvm::raw_ostream &out,
                                const DecomposedLoc &loc) {
   out << loc.Buffer->getBufferIdentifier()
       << ":" << loc.Line << ':' << loc.Column;
 }
 
-static void printDecomposedLoc(llvm::raw_ostream &out,
-                               const Optional<DecomposedLoc> &loc) {
-  if (!loc) {
-    out << "<<invalid location>>";
-    return;
-  }
-
-  return printDecomposedLoc(out, loc.getValue());
-}
-
-void swift::printSourceLoc(llvm::raw_ostream &out, SourceLoc loc,
+void swift::printSourceLoc(llvm::raw_ostream &OS, SourceLoc Loc,
                            ASTContext &Context) {
-  printDecomposedLoc(out, decompose(Context.SourceMgr, loc));
-}
-
-static void printSourceRange(llvm::raw_ostream &out, SourceRange range,
-                             ASTContext &Context) {
-  Optional<DecomposedLoc> start = decompose(Context.SourceMgr, range.Start);
-  Optional<DecomposedLoc> end = decompose(Context.SourceMgr, range.End);
-
-  // Use a unified message if both locations are invalid.
-  if (!start && !end) {
-    out << "<<invalid source range>>";
+  if (Loc.isInvalid()) {
+    OS << "<<invalid location>>";
     return;
   }
+
+  return printDecomposedLoc(OS, Context.SourceMgr.decompose(Loc));
+}
+
+static void printSourceRange(llvm::raw_ostream &OS, SourceRange SR,
+                             ASTContext &Context) {
+  if (SR.isInvalid()) {
+    OS << "<<invalid source range>>";
+    return;
+  }
+
+  DecomposedLoc Start = Context.SourceMgr.decompose(SR.Start);
+  DecomposedLoc End = Context.SourceMgr.decompose(SR.End);
 
   // Print the start location as normal.
-  printDecomposedLoc(out, start);
-  out << '-';
+  printDecomposedLoc(OS, Start);
+  OS << '-';
 
   // Only print the non-matching information from the second location.
-  if (!start || !end || start.getValue().Buffer != end.getValue().Buffer) {
-    printDecomposedLoc(out, end);
+  if (Start.Buffer != End.Buffer) {
+    printDecomposedLoc(OS, End);
     return;
   }
-
-  if (start.getValue().Line != end.getValue().Line) {
-    out << end.getValue().Line << ':';
+  if (Start.Line != End.Line) {
+    OS << End.Line << ':';
   }
-
-  out << end.getValue().Column;
+  OS << End.Column;
 }
 
 void PrettyStackTraceDecl::print(llvm::raw_ostream &out) const {
