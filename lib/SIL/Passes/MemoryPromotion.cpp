@@ -309,7 +309,8 @@ unsigned NumElementsCache::get(CanType T) {
     unsigned NumElements = 0;
     for (auto *D : SD->getMembers())
       if (auto *VD = dyn_cast<VarDecl>(D))
-        NumElements += get(VD->getType()->getCanonicalType());
+        if (!VD->isProperty())
+          NumElements += get(VD->getType()->getCanonicalType());
     return ElementCountMap[T] = NumElements;
   }
   
@@ -446,7 +447,8 @@ static void collectAllocationUses(SILValue Pointer,
       for (auto *D : SD->getMembers()) {
         if (D == Field) break;
         if (auto *VD = dyn_cast<VarDecl>(D))
-          NewBaseElt += NumElements.get(VD->getType()->getCanonicalType());
+          if (!VD->isProperty())
+            NewBaseElt += NumElements.get(VD->getType()->getCanonicalType());
       }
 
       collectAllocationUses(SILValue(SEAI, 0), Uses, NewBaseElt, NumElements);
