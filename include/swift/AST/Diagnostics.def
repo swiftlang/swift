@@ -654,6 +654,8 @@ ERROR(expected_operator_ref,expr_parsing,none,
       "expected operator name in operator reference", ())
 ERROR(expected_rparen_operator_ref,expr_parsing,none,
       "expected closing ')' after operator name in operator reference", ())
+ERROR(invalid_postfix_operator,expr_parsing,none,
+      "operator with postfix spacing cannot start a subexpression", ())
 
 ERROR(expected_field_name,expr_parsing,none,
       "expected field name following '.'", ())

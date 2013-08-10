@@ -19,6 +19,7 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/Twine.h"
+#include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -447,7 +448,14 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
       return new (Context) AddressOfExpr(Loc, SubExpr, Type());
     return 0;
   }
-      
+
+  case tok::oper_postfix:
+    // Postfix operators cannot start a subexpression, but can happen
+    // syntactically because the operator may just follow whatever preceeds this
+    // expression (and that may not always be an expression).
+    diagnose(Tok.getLoc(), diag::invalid_postfix_operator);
+    Tok.setKind(tok::oper_prefix);
+    SWIFT_FALLTHROUGH;
   case tok::oper_prefix:
     Operator = parseExprOperator();
     break;
@@ -462,8 +470,6 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
       .fixItRemove(Diagnostic::Range(OperEndLoc, Tok.getLoc()));
     break;
   }
-  case tok::oper_postfix:
-    llvm_unreachable("oper_postfix should not appear here");
   }
 
   if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
