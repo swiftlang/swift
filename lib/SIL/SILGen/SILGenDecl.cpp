@@ -376,7 +376,10 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
     FullExpr Scope(Cleanups);
     emitExprInto(D->getInit(), initialization.get());
   } else {
-    initialization->defaultInitialize(*this);
+    if (!SGM.M.getASTContext().LangOpts.UseDefiniteInit)
+      initialization->defaultInitialize(*this);
+    else
+      initialization->finishInitialization(*this);
   }
 }
 
