@@ -243,7 +243,7 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
 namespace {
 
 class DeclChecker : public DeclVisitor<DeclChecker> {
-  
+
 public:
   TypeChecker &TC;
 
@@ -297,11 +297,11 @@ public:
     }
     D->setConformances(D->getASTContext().AllocateCopy(allConformances));
   }
-  
+
   void checkExplicitConformance(TypeDecl *D, Type T) {
     gatherExplicitConformances(D, T);
   }
-  
+
   void checkExplicitConformance(ExtensionDecl *D, Type T) {
     gatherExplicitConformances(D, T);
   }
@@ -341,7 +341,7 @@ public:
     for (auto &Req : GenericParams->getRequirements()) {
       if (Req.isInvalid())
         continue;
-      
+
       switch (Req.getKind()) {
       case RequirementKind::Conformance: {
         if (TC.validateType(Req.getConstraintLoc())) {
@@ -450,7 +450,7 @@ public:
       }
 
       validateAttributes(VD);
-      
+
       // The var requires ObjC interop if it has an [objc] or [iboutlet]
       // attribute or if it's a member of an ObjC class.
       DeclContext *dc = VD->getDeclContext();
@@ -460,7 +460,7 @@ public:
         VD->setIsObjC(VD->getAttrs().isObjC()
                       || (classContext && classContext->isObjC()));
       }
-      
+
       return;
     }
 
@@ -492,7 +492,7 @@ public:
       if (auto subpattern = cast<UnionElementPattern>(pattern)->getSubPattern())
         setBoundVarsTypeError(subpattern);
       return;
-        
+
     // Handle vars.
     case PatternKind::Named: {
       VarDecl *var = cast<NamedPattern>(pattern)->getDecl();
@@ -618,7 +618,7 @@ public:
                                     SD->getElementType(), TC.Context));
     }
   }
-  
+
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (!IsSecondPass) {
       TC.validateType(TAD->getUnderlyingTypeLoc());
@@ -648,10 +648,10 @@ public:
 
       checkInheritanceClause(TC, OOD);
     }
-    
+
     for (Decl *member : OOD->getMembers())
       visit(member);
-    
+
     if (!IsFirstPass)
       checkExplicitConformance(OOD, OOD->getDeclaredTypeInContext());
   }
@@ -688,7 +688,7 @@ public:
       checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
     }
   }
-  
+
   void checkObjCConformance(ProtocolDecl *protocol,
                             ProtocolConformance *conformance) {
     if (!conformance)
@@ -699,14 +699,14 @@ public:
     for (auto &inherited : conformance->getInheritedConformances())
       checkObjCConformance(inherited.first, inherited.second);
   }
-  
+
   /// Mark class members needed to conform to ObjC protocols as requiring ObjC
   /// interop.
   void checkObjCConformances(ArrayRef<ProtocolDecl*> protocols,
                              ArrayRef<ProtocolConformance*> conformances) {
     assert(protocols.size() == conformances.size() &&
            "protocol conformance mismatch");
-    
+
     for (unsigned i = 0, size = protocols.size(); i < size; ++i)
       checkObjCConformance(protocols[i], conformances[i]);
   }
@@ -732,14 +732,14 @@ public:
       ClassDecl *superclassDecl = CD->hasSuperclass()
         ? CD->getSuperclass()->getClassOrBoundGenericClass()
         : nullptr;
-      
+
       CD->setIsObjC(CD->getAttrs().isObjC()
                     || (superclassDecl && superclassDecl->isObjC()));
     }
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
-    
+
     if (!IsFirstPass) {
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
       checkObjCConformances(CD->getProtocols(), CD->getConformances());
@@ -762,7 +762,7 @@ public:
       for (auto inherited : PD->getInherited()) {
         if (!inherited.getType()->isExistentialType(inheritedProtocols))
           continue;
-        
+
         for (auto proto : inheritedProtocols) {
           if (!proto->getAttrs().isObjC()) {
             TC.diagnose(PD->getLoc(),
@@ -774,10 +774,10 @@ public:
             isObjC = false;
           }
         }
-        
+
         inheritedProtocols.clear();
       }
-      
+
       PD->setIsObjC(isObjC);
     }
 
@@ -821,7 +821,7 @@ public:
 
     validateAttributes(PD);
   }
-  
+
   void visitVarDecl(VarDecl *VD) {
     // Delay type-checking on VarDecls until we see the corresponding
     // PatternBindingDecl.
@@ -1064,14 +1064,14 @@ public:
     FD->setType(body->getType());
 
     validateAttributes(FD);
-    
+
     // A method is ObjC-compatible if it's explicitly [objc], a member of an
     // ObjC-compatible class, or an accessor for an ObjC property.
     DeclContext *dc = FD->getDeclContext();
     if (dc && dc->getDeclaredTypeInContext()) {
       ClassDecl *classContext = dc->getDeclaredTypeInContext()
         ->getClassOrBoundGenericClass();
-      
+
       bool isObjC = FD->getAttrs().isObjC()
         || (classContext && classContext->isObjC());
       if (!isObjC && FD->isGetterOrSetter()) {
@@ -1084,7 +1084,7 @@ public:
         ValueDecl *prop = cast<ValueDecl>(FD->getGetterOrSetterDecl());
         isObjC = prop->getAttrs().isObjC() || prop->getAttrs().isIBOutlet();
       }
-      
+
       FD->setIsObjC(isObjC);
     }
   }
@@ -1166,7 +1166,7 @@ public:
       if (auto nominal = ExtendedTy->getAnyNominal()) {
         nominal->addExtension(ED);
       }
-    
+
       checkInheritanceClause(TC, ED);
     }
 
@@ -1264,7 +1264,7 @@ public:
     else
       FnTy = FunctionType::get(ThisTy, TupleType::getEmpty(TC.Context),
                                TC.Context);
-    
+
     DD->setType(FnTy);
     DD->getImplicitThisDecl()->setType(ThisTy);
 
@@ -1340,7 +1340,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   for (auto var : allArgs) {
     var->setDeclContext(ctor);
   }
-  
+
   // Set its arguments.
   auto pattern = TuplePattern::create(context, structDecl->getLoc(),
                                       patternElts, structDecl->getLoc());
@@ -1486,7 +1486,7 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
     }
     return true;
   }
-  
+
   case TypeKind::Function:
   case TypeKind::LValue:
   case TypeKind::PolymorphicFunction:
@@ -1636,7 +1636,7 @@ void TypeChecker::definePendingImplicitDecls() {
 void DeclChecker::validateAttributes(ValueDecl *VD) {
   const DeclAttributes &Attrs = VD->getAttrs();
   Type Ty = VD->getType();
-  
+
   // Get the number of lexical arguments, for semantic checks below.
   int NumArguments = -1;
   FuncDecl *FDOrNull = dyn_cast<FuncDecl>(VD);
@@ -1658,7 +1658,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
-  
+
     // The unary prefix operator '&' is reserved and cannot be overloaded.
     if (FDOrNull->isUnaryOperator() && VD->getName().str() == "&"
         && !Attrs.isPostfix()) {
@@ -1671,7 +1671,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     return bool(vd->getDeclContext()->getDeclaredTypeOfContext()
                   ->getClassOrBoundGenericClass());
   };
-  
+
   if (Attrs.isObjC()) {
     // Only classes, class protocols, instance properties, and methods can be
     // ObjC.
@@ -1689,7 +1689,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     } else {
       error = diag::invalid_objc_decl;
     }
-    
+
     if (error) {
       TC.diagnose(VD->getStartLoc(), *error);
       VD->getMutableAttrs().ObjC = false;
@@ -1802,7 +1802,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       return;
     }
   }
-  
+
   if (Attrs.isPrefix()) {
     // Only operator functions can be postfix.
     if (!isOperator) {
@@ -1811,7 +1811,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
-    
+
     // Only unary operators can be postfix.
     if (!FDOrNull || !FDOrNull->isUnaryOperator()) {
       TC.diagnose(VD->getStartLoc(), diag::invalid_prefix_input);
@@ -1820,7 +1820,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       return;
     }
   }
-  
+
   if (Attrs.isAssignment()) {
     // Only function declarations can be assignments.
     if (!isa<FuncDecl>(VD) || !VD->isOperator()) {
@@ -1835,7 +1835,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       TupleType *ParamTT = ParamType->getAs<TupleType>();
       if (ParamTT)
         ParamType = ParamTT->getElementType(0);
-      
+
       if (!ParamType->is<LValueType>()) {
         TC.diagnose(VD->getStartLoc(), diag::assignment_without_byref);
         VD->getMutableAttrs().Assignment = false;
@@ -1854,7 +1854,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       AnyFunctionType *BoundMethodTy
         = VD->getType()->castTo<AnyFunctionType>()->getResult()
             ->castTo<AnyFunctionType>();
-      
+
       bool AcceptsEmptyParamList = false;
       Type InputTy = BoundMethodTy->getInput();
       if (const TupleType *Tuple = InputTy->getAs<TupleType>()) {
@@ -1865,10 +1865,10 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
             break;
           }
         }
-        
+
         AcceptsEmptyParamList = AllDefaulted;
       }
-      
+
       if (!AcceptsEmptyParamList) {
         TC.diagnose(VD->getStartLoc(), diag::conversion_params,
                     VD->getName());
@@ -1876,7 +1876,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       }
     }
   }
-  
+
   if (Attrs.isForceInline()) {
     // Only functions can be force_inline.
     auto *FD = dyn_cast<FuncDecl>(VD);
@@ -1890,10 +1890,10 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     } else if (FD->getGenericParams()) {
       // We don't yet support force_inline of generic functions.
       TC.diagnose(VD->getStartLoc(), diag::force_inline_generic_not_supported);
-      VD->getMutableAttrs().ForceInline = false;      
+      VD->getMutableAttrs().ForceInline = false;
     }
   }
-  
+
   if (Attrs.isByref()) {
     TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "byref");
     VD->getMutableAttrs().Byref = false;
@@ -1919,7 +1919,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     TC.diagnose(VD->getStartLoc(), diag::class_protocol_not_protocol);
     VD->getMutableAttrs().ClassProtocol = false;
   }
-  
+
   if (Attrs.hasCC()) {
     TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "cc");
     VD->getMutableAttrs().cc = {};
