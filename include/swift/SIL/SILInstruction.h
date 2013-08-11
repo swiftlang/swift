@@ -1386,7 +1386,7 @@ public:
 
   /// True if the destination can take ownership of the concrete value from the
   /// source.
-  bool isTakeOfSrc() const { return IsTake_t(IsTakeOfSrc); }
+  IsTake_t isTakeOfSrc() const { return IsTake_t(IsTakeOfSrc); }
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
