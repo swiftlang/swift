@@ -108,7 +108,7 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, Type type,
     }
   }
   
-  if (!requirement) {
+  if (!requirement || requirement->isInvalid()) {
     tc.diagnose(proto->getLoc(), diag);
     return nullptr;
   }
