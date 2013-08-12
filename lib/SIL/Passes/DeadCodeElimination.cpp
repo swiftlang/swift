@@ -119,9 +119,9 @@ static bool constantFoldTerminator(SILBasicBlock &BB) {
   return false;
 }
 
-static bool isCallToNoReturn(const FunctionInst *FI, SILBasicBlock &BB) {
-  SILType Ty = FI->getCallee().getType();
-  SILModule *M= BB.getParent()->getParent();
+static bool isCallToNoReturn(const ApplyInst *AI, SILBasicBlock &BB) {
+  SILType Ty = AI->getCallee().getType();
+  SILModule *M = BB.getParent()->getParent();
   CanType CalleeTy = Ty.getFunctionTypeInfo(*M)->getSwiftType();
   if (const AnyFunctionType *FT = CalleeTy->getAs<FunctionType>())
     return FT->isNoReturn();
@@ -148,8 +148,8 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB) {
       continue;
     }
 
-    if (ApplyInst *FI = dyn_cast<ApplyInst>(CurrentInst)) {
-      if (isCallToNoReturn(FI, BB)) {
+    if (ApplyInst *AI = dyn_cast<ApplyInst>(CurrentInst)) {
+      if (isCallToNoReturn(AI, BB)) {
         FoundNoReturnCall = true;
         // FIXME: Diagnose unreachable code if the call is followed by anything
         // but implicit return.

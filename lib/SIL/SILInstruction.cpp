@@ -215,55 +215,38 @@ AllocArrayInst::AllocArrayInst(SILLocation Loc, SILType ElementType,
     Operands(this, NumElements) {
 }
 
-FunctionInst::FunctionInst(ValueKind kind,
-                           SILLocation Loc, SILType Ty, SILValue Callee,
-                           ArrayRef<SILValue> Args)
-  : SILInstruction(kind, Loc, Ty), Operands(this, Args, Callee) {
-}
-
-template<typename DERIVED, typename...T>
-DERIVED *FunctionInst::create(SILFunction &F, ArrayRef<SILValue> Args,
-                              T &&...ConstructorArgs) {
-  // The way we store operands requires this.
-  static_assert(sizeof(DERIVED) == sizeof(FunctionInst),
-                "can't have extra storage in a FunctionInst subclass");
-
-  void *Buffer = F.getModule().allocate(sizeof(DERIVED) +
-                            decltype(Operands)::getExtraSize(Args.size()),
-                            alignof(DERIVED));
-  return ::new(Buffer) DERIVED(::std::forward<T>(ConstructorArgs)...);
-}
-
 ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
-                     SILType Result, ArrayRef<SILValue> Args)
-  : FunctionInst(ValueKind::ApplyInst, Loc, Result,
-                 Callee, Args) {
-  
+                     SILType Result, ArrayRef<SILValue> Args,
+                     bool ForceInline)
+  : SILInstruction(ValueKind::ApplyInst, Loc, Result), ForceInline(ForceInline),
+    Operands(this, Args, Callee) {
 }
 
 ApplyInst *ApplyInst::create(SILLocation Loc, SILValue Callee,
                              SILType Result, ArrayRef<SILValue> Args,
-                             SILFunction &F) {
-  return FunctionInst::create<ApplyInst>(F, Args,
-                                         Loc, Callee, Result, Args);
+                             bool ForceInline, SILFunction &F) {
+  void *Buffer = F.getModule().allocate(sizeof(ApplyInst) +
+                            decltype(Operands)::getExtraSize(Args.size()),
+                            alignof(ApplyInst));
+  return ::new(Buffer) ApplyInst(Loc, Callee, Result, Args, ForceInline);
 }
 
 PartialApplyInst::PartialApplyInst(SILLocation Loc, SILValue Callee,
                                    ArrayRef<SILValue> Args, SILType ClosureType)
 // FIXME: the callee should have a lowered SIL function type, and PartialApplyInst
 // should derive the type of its result by partially applying the callee's type.
-  : FunctionInst(ValueKind::PartialApplyInst, Loc,
-                 ClosureType,
-                 Callee, Args) {
-  
+  : SILInstruction(ValueKind::PartialApplyInst, Loc, ClosureType),
+    Operands(this, Args, Callee) {
 }
 
 PartialApplyInst *PartialApplyInst::create(SILLocation Loc, SILValue Callee,
                                            ArrayRef<SILValue> Args,
                                            SILType ClosureType,
                                            SILFunction &F) {
-  return FunctionInst::create<PartialApplyInst>(F, Args, Loc, Callee,
-                                                Args, ClosureType);
+  void *Buffer = F.getModule().allocate(sizeof(PartialApplyInst) +
+                            decltype(Operands)::getExtraSize(Args.size()),
+                            alignof(PartialApplyInst));
+  return ::new(Buffer) PartialApplyInst(Loc, Callee, Args, ClosureType);
 }
 
 FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)

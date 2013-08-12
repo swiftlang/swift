@@ -156,8 +156,9 @@ public:
   }
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn,
-                         SILType Result, ArrayRef<SILValue> Args) {
-    return insert(ApplyInst::create(Loc, Fn, Result, Args, F));
+                         SILType Result, ArrayRef<SILValue> Args,
+                         bool ForceInline = false) {
+    return insert(ApplyInst::create(Loc, Fn, Result, Args, ForceInline, F));
   }
 
   PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,

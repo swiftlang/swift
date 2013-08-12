@@ -645,6 +645,7 @@ public:
                          ArrayRef<ManagedValue> Args,
                          CanType NativeResultTy,
                          OwnershipConventions const &Ownership,
+                         bool ForceInline = false,
                          SGFContext C = SGFContext());
 
   /// \brief Emit the cast instruction appropriate to the kind of checked cast.

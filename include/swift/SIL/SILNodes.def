@@ -113,10 +113,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     VALUE_RANGE(DynamicMethodInst, ClassMethodInst, ProtocolMethodInst)
 
   // Function Application
-  ABSTRACT_VALUE(FunctionInst, SILInstruction)
-    INST(ApplyInst, FunctionInst, MayHaveSideEffects)
-    INST(PartialApplyInst, FunctionInst, MayHaveSideEffects)
-    VALUE_RANGE(FunctionInst, ApplyInst, PartialApplyInst)
+  INST(ApplyInst, SILInstruction, MayHaveSideEffects)
+  INST(PartialApplyInst, SILInstruction, MayHaveSideEffects)
   INST(SpecializeInst, SILInstruction, None)
 
   // Metatypes

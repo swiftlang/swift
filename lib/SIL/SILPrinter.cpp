@@ -429,22 +429,24 @@ public:
        << ", " << getIDAndType(AAI->getNumElements());
   }
   
-  void printFunctionInst(FunctionInst *FI) {
-    OS << getID(FI->getCallee()) << '(';
-    interleave(FI->getArguments(),
-               [&](const SILValue &arg) { OS << getID(arg); },
-               [&] { OS << ", "; });
-    OS << ") : " << FI->getCallee().getType();
-  }
-
   void visitApplyInst(ApplyInst *AI) {
     OS << "apply ";
-    printFunctionInst(AI);
+    if (AI->isForceInline())
+      OS << "[force_inline] ";
+    OS << getID(AI->getCallee()) << '(';
+    interleave(AI->getArguments(),
+               [&](const SILValue &arg) { OS << getID(arg); },
+               [&] { OS << ", "; });
+    OS << ") : " << AI->getCallee().getType();
   }
   
   void visitPartialApplyInst(PartialApplyInst *CI) {
     OS << "partial_apply ";
-    printFunctionInst(CI);
+    OS << getID(CI->getCallee()) << '(';
+    interleave(CI->getArguments(),
+               [&](const SILValue &arg) { OS << getID(arg); },
+               [&] { OS << ", "; });
+    OS << ") : " << CI->getCallee().getType();
   }
 
   void visitFunctionRefInst(FunctionRefInst *DRI) {

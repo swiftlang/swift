@@ -272,30 +272,87 @@ public:
   }
 };
 
-
-/// FunctionInst - Abstract instruction type that represents full or partial
-/// application of a function.
-class FunctionInst : public SILInstruction {
+/// ApplyInst - Represents the full application of a function value.
+class ApplyInst : public SILInstruction {
   enum {
     Callee
   };
+
+  // Whether the callee had the attribute [force_inline];
+  // FIXME: pack this somewhere
+  bool ForceInline;
+
   /// The fixed operand is the callee;  the rest are arguments.
   TailAllocatedOperandList<1> Operands;
 
-protected:
-  /// Construct an ApplyInst from a given call expression and the provided
-  /// arguments.
-  FunctionInst(ValueKind kind,
-               SILLocation Loc, SILType Ty, SILValue Callee,
-               ArrayRef<SILValue> Args);
-
-  template<typename DERIVED, typename...T>
-  static DERIVED *create(SILFunction &F, ArrayRef<SILValue> Args,
-                         T &&...ConstructorArgs);
+  ApplyInst(SILLocation Loc, SILValue Callee, SILType ReturnType,
+            ArrayRef<SILValue> Args, bool ForceInline);
 
 public:
+  static ApplyInst *create(SILLocation Loc, SILValue Callee,
+                           SILType ReturnType,
+                           ArrayRef<SILValue> Args,
+                           bool ForceInline,
+                           SILFunction &F);
   SILValue getCallee() const { return Operands[Callee].get(); }
-  
+
+  /// The arguments passed to this instruction.
+  MutableArrayRef<Operand> getArgumentOperands() {
+    return Operands.getDynamicAsArray();
+  }
+
+  /// The arguments passed to this instruction.
+  OperandValueArrayRef getArguments() const {
+    return Operands.getDynamicValuesAsArray();
+  }
+
+  bool isForceInline() const { return ForceInline; }
+
+  bool hasIndirectReturn(SILModule &M) const {
+    return getCallee().getType().getFunctionTypeInfo(M)->hasIndirectReturn();
+  }
+
+  SILValue getIndirectReturn(SILModule &M) const {
+    assert(hasIndirectReturn(M) && "apply inst does not have indirect return!");
+    return getArguments().front();
+  }
+
+  OperandValueArrayRef getArgumentsWithoutIndirectReturn(SILModule &M) const {
+    if (hasIndirectReturn(M))
+      return getArguments().slice(1);
+    return getArguments();
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::ApplyInst;
+  }
+};
+
+/// PartialApplyInst - Represents the creation of a closure object by partial
+/// application of a function value.
+class PartialApplyInst : public SILInstruction {
+   enum {
+    Callee
+  };
+
+  /// The fixed operand is the callee;  the rest are arguments.
+  TailAllocatedOperandList<1> Operands;
+
+  PartialApplyInst(SILLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
+                   SILType ClosureType);
+public:
+  static PartialApplyInst *create(SILLocation Loc, SILValue Callee,
+                                  ArrayRef<SILValue> Args,
+                                  SILType ClosureType,
+                                  SILFunction &F);
+
+  SILValue getCallee() const { return Operands[Callee].get(); }
+
   /// The arguments passed to this instruction.
   MutableArrayRef<Operand> getArgumentOperands() {
     return Operands.getDynamicAsArray();
@@ -310,55 +367,6 @@ public:
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  static bool classof(const ValueBase *V) {
-    return V->getKind() >= ValueKind::First_FunctionInst &&
-           V->getKind() <= ValueKind::Last_FunctionInst;
-  }
-};
-  
-/// ApplyInst - Represents the full application of a function value.
-class ApplyInst : public FunctionInst {
-  friend class FunctionInst;
-  ApplyInst(SILLocation Loc, SILValue Callee, SILType ReturnType,
-            ArrayRef<SILValue> Args);
-public:
-  static ApplyInst *create(SILLocation Loc, SILValue Callee,
-                           SILType ReturnType,
-                           ArrayRef<SILValue> Args,
-                           SILFunction &F);
-
-  bool hasIndirectReturn(SILModule &M) const {
-    return getCallee().getType().getFunctionTypeInfo(M)->hasIndirectReturn();
-  }
-  
-  SILValue getIndirectReturn(SILModule &M) const {
-    assert(hasIndirectReturn(M) && "apply inst does not have indirect return!");
-    return getArguments().front();
-  }
-  
-  OperandValueArrayRef getArgumentsWithoutIndirectReturn(SILModule &M) const {
-    if (hasIndirectReturn(M))
-      return getArguments().slice(1);
-    return getArguments();
-  }
-  
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::ApplyInst;
-  }
-};
-
-/// PartialApplyInst - Represents the creation of a closure object by partial
-/// application of a function value.
-class PartialApplyInst : public FunctionInst {
-  friend class FunctionInst;
-  PartialApplyInst(SILLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
-                   SILType ClosureType);
-public:
-  static PartialApplyInst *create(SILLocation Loc, SILValue Callee,
-                                  ArrayRef<SILValue> Args,
-                                  SILType ClosureType,
-                                  SILFunction &F);
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::PartialApplyInst;

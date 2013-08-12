@@ -268,6 +268,15 @@ public:
     addSubstitutions(gen, e, e->getSubstitutions(),
                      e->getType()->getCanonicalType(), callDepth);
   }
+
+  bool isForceInline() const {
+    if (kind == Kind::StandaloneFunction && standaloneFunction.hasDecl()) {
+      ValueDecl *VD = standaloneFunction.getDecl();
+      if (VD->getAttrs().isForceInline())
+        return true;
+    }
+    return false;
+  }
   
   unsigned getNaturalUncurryLevel() const {
     switch (kind) {
@@ -660,6 +669,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                        ArrayRef<ManagedValue> Args,
                                        CanType NativeResultTy,
                                        OwnershipConventions const &Ownership,
+                                       bool ForceInline,
                                        SGFContext C) {
   AbstractCC cc = Fn.getType().getAbstractCC();
   
@@ -704,7 +714,8 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     argValues.push_back(argValue);
   }
   
-  SILValue result = B.createApply(Loc, fnValue, instructionTy, argValues);
+  SILValue result = B.createApply(Loc, fnValue, instructionTy, argValues,
+                                  ForceInline);
   
   // Take ownership of the return value, if necessary.
   ManagedValue bridgedResult;
@@ -914,7 +925,7 @@ namespace {
 
       // Emit the uncurried call.
       ManagedValue result;
-      
+
       if (specializedEmitter)
         result = specializedEmitter(gen,
                                     uncurriedLoc,
@@ -923,7 +934,8 @@ namespace {
                                     uncurriedContext);
       else
         result = gen.emitApply(uncurriedLoc, calleeValue, uncurriedArgs,
-                               uncurriedResultTy, ownership, uncurriedContext);
+                               uncurriedResultTy, ownership,
+                               callee.isForceInline(), uncurriedContext);
       
       // End the initial writeback scope, if any.
       initialWritebackScope.reset();
@@ -938,7 +950,7 @@ namespace {
         SGFContext context = i == size - 1 ? C : SGFContext();
         result = gen.emitApply(loc, result, uncurriedArgs,
                                extraSites[i].resultType,
-                               ownership, context);
+                               ownership, false, context);
       }
       
       return result;
