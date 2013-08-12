@@ -1,0 +1,14 @@
+
+* Everything is DebugPrintable, and has a DebugPrintRepresentation
+* Things that are Printable have a PrintRepresentation
+* An xxxRepresentation is Streamable
+* String is an acceptable xxxRepresentation
+* Interpolation gets the PrintRepresentation and streams it
+
+* x %% foo() is a thing with a PrintRepresentation, i.e. is Printable
+* x %% uppercase() is an example.  When printed it must print x and transform it into uppercase
+
+
+
+  
+

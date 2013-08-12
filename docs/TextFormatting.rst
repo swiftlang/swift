@@ -2,301 +2,206 @@ Text Formatting in Swift
 ========================
 
 :Author: Dave Abrahams
+:Author: Chris Lattner
 :Author: Dave Zarzycki
-:Date: 2013-06-26
+:Date: 2013-08-12
 
-**Abstract:** We propose a unified system for creating textual
-representations of Swift objects.  Our proposal is inspired by and
-respects the strengths of ``printf``, but improves on it in several
-important ways.
 
-What's Great about ``printf``
------------------------------
+.. contents:: Index
 
-The ``printf`` interface has three great strengths:
+**Abstract:** We propose a system for creating textual representations
+of Swift objects. Our system unifies conversion to ``String``, string
+interpolation, printing, and representation in the REPL and debugger.
 
-1. C programmers already know it by heart and use it reflexively
+Scope
+-----
 
-2. It is nice and compact.  By keeping the format string together it
-   avoids the cost in extra quotes and whitespace incurred by other
-   interfaces.
+Goals
+.....
 
-3. Because the format string acts as a template, it allows you to
-   focus on the overall structure of your message, without being
-   distracted by details of how the substitutions are computed.
+* The REPL and LLDB (“debuggers”) share formatting logic
+* All types are “debug-printable” automatically
+* Making a type “printable for humans” is super-easy
+* ``toString()``-ability is a consequence of printability.
+* Customizing a type's printed representations is super-easy
+* Format variations such as numeric radix are explicit and readable
+* Large textual representations do not (necessarily) ever need to be
+  stored in memory, e.g. if they're being streamed into a file or over
+  a remote-debugging channel.
 
-What We'd Like to Improve about Swift's ``printf``
---------------------------------------------------
+Non-Goals
+.........
 
-Still, there are problems to solve for both of ``printf``\ 's major
-client groups:
+.. sidebar:: Rationale
 
-Problems for Users
-..................
+  Localization (including single-locale linguistic processing such as
+  what's found in Clang's diagnostics subsystem) is the only major
+  application we can think of for dynamically-constructed format
+  strings, [#dynamic]_ and is certainly the most important consumer of
+  that feature.  Therefore, localization and dynamic format strings
+  should be designed together, and *under this proposal* the only
+  format strings are string literals containing interpolations
+  (“``\(...)``”). Cocoa programmers can still use Cocoa localization
+  APIs for localization jobs.
 
-* It's not (fully) statically checked.  While Swift has already made
-  vast improvements over C in the type-safety of ``printf``, it
-  relies on the use of formatting characters such as ``d`` and ``x``,
-  not all of which apply to every type.  In the current
-  implementation, after this project concluded it was unacceptable to
-  silently ignore wrong format characters, the implementation was
-  changed to ``DebugTrap`` when the user messes up.  Neither behavior
-  is ideal; these mistakes can be prevented at compile-time.
+  In Swift, only the most common cases need to be very terse.
+  Anything “fancy” can afford to be a bit more verbose. If and when
+  we address localization and design a full-featured dynamic string
+  formatter, it may make sense to incorporate features of ``printf``
+  into the design.
 
-* Swift's ``printf`` doesn't support reordering of parameters in the
-  format string.  A string resource used for printf formatting should
-  be able to express something like “eat *adjective* *noun*”, and be
-  transformed into “manger *noun* *adjective*” in a French
-  localization, without recompiling the application code that invokes
-  ``printf``.  
+* **Localization** issues such as pluralizing and argument
+  presentation order are beyond the scope of this proposal.
 
-  .. Note:: POSIX ``printf`` does this with “``%``\ *n*\ ``$``...”,
-            where *n* is a 1-based integer.
+* **Dynamic format strings** are beyond the scope of this proposal.
 
-* Swift's current ``printf`` is arguably too similar to C's
-  ``printf``, while being just a little bit different.  This may leave
-  habitual users of C's ``printf`` in an awkward “uncanny valley.”
+* **Matching the terseness of C**\ 's ``printf`` is a non-goal. 
 
-* The full syntax of ``printf`` is a jargon that is comfortable for
-  its habitual users, but cryptic and difficult for others.
+Printable Types
+---------------
 
-Problems for Extenders
-......................
+``Printable`` types can be used in string literal interpolations,
+printed with ``print(x)`` and ``println(x)``, and can be converted to
+``String`` with ``x.toString()``.
 
-* Extensibility of format kinds is limited to 2*26 characters, and
-  isn't namespaced.  The “``%q``” used by my type might have a
-  completely different meaning from the one used by your type.
+The simple extension story for beginners is as follows: 
 
-* The interface to ``FormattedPrintable`` is awkward::
-
-    protocol FormattedPrintable {
-      func format(kind : Char, layout : String) -> String
-    }
-
-  Layout information from the format string, which has a standard
-  meaning and representation, is delivered as a String instead of
-  being parsed into useful values.  Each type conforming to
-  ``FormattedPrintable`` has to ignore or parse the information
-  itself.
-
-* There's no way to satisfy the requirements of
-  ``FormattedPrintable`` without rubbing up against “``kind``” and
-  “``layout``,” at least enough to learn that you can ignore them.
-  Delivering printability for a type should be as simple as building
-  a ``String`` representation.
-
-* Because all formatting styles are routed through a single function,
-  there's no way to implement one of the format styles for a type
-  (such as “``%x``”) without implementing all of them.
-
-The Fix
--------
-
-Our plan can be summarized like this:
-
-* Keep width, precision, and alignment in the format string.  These
-  features of ``printf`` have a reasonable interpretation
-  for all argument types.
-* Replace the “``kind``” flag, which is tied to the type of the
-  argument, with a (zero-based) argument index.
-* Move all type-specific formatting directives into the argument list
-  (details to follow).
-
-For example, ::
-
-  printf("in %s, register 7 = %-5.7llx", name, r7)
-
-would become ::
-
-  printf("in %0, register 7 = %-5.7:1", name, r7 % hex)
-
-Format String Syntax
-....................
-
-We propose the following grammar for *format directive*\ s, with
-simple max-munch semantics. 
-
-  | *format-directive* := ``%`` ( *format-directive-body* | *braced-format-directive-body* )
-  | *braced-format-directive-body* := ``{`` *format-directive-body* ``}``
-  | *format-directive-body* := *format-flags*\ ? *format-argument-index*
-  | *format-flags* := ``-``\ ? *format-width* ? *format-precision*\ ? ``:``
-  | *format-width* := [\ ``0``\ -\ ``9``\ ]+
-  | *format-precision* := ``.``\ [\ ``0``\ -\ ``9``\ ]+
-  | *format-argument-index* := [\ ``0``\ -\ ``9``\ ]+
-
-This syntax optimizes for the 90% case where one simply wants the
-default representation for each argument, with the advantage of
-positional selection.  In the 10% case where width, precision, and/or
-alignment are required, the user must type one additional character,
-the colon, to separate the *format-flags* from the
-*format-argument-index*.  We realize that the colon *could* be dropped
-when only alignment is specified, but we think it serves clarity to
-require it whenever *format-flags* are specified.  The optional braces
-handle the 1% of cases where the *format-directive*\ is followed by a
-number, and help make room in the syntax for future extension.
-
-Type-Specific Formatting
-........................
-
-Formatting options like numeric radix, which apply only to certain
-types, can appear in the printf argument list.  We suggest using the
-``%`` operator to chain format modifications.  This allows us to
-clearly distinguish potentially-lazy computations, like ::
-
-  some_really_long_string % uppercase
-
-from their more-eager cousins, which could be too
-inefficient/memory-hungry for longer formatting.
-
-Conforming to Printable
-.......................
-
-The simple story for beginners is this: 
-
-  “to make your type ``Printable``, simply declare conformance to
+  “To make your type ``Printable``, simply declare conformance to
   ``Printable``::
 
     extension Person : Printable {}
 
-  and you'll get the same representation you see in the interpreter
-  (REPL).  To customize the representation, give your type a ``func
-  printFormat()`` that returns a ``String``::
+  and it will have the same printed representation you see in the
+  interpreter (REPL). To customize the representation, give your type
+  a ``func formatForPrinting()`` that returns a ``String``::
 
     extension Person : Printable {
-      func printFormat() -> String {
+      func formatForPrinting() -> String {
         return "\(lastName), \(firstName)"
       }
     }
 
-The design of the formatting protocols (below) allows more
-sophisticated and efficient formatting as a natural extension of this
-simple story.
+The formatting protocols described below allow more efficient and
+flexible formatting as a natural extension of this simple story.
 
-Framework Details
------------------
+Formatting Variants
+-------------------
+
+``Printable`` types with parameterized textual representations
+(e.g. number types) support a ``format(…)`` method, [#format]_
+parameterized according to that type's axes of variability::
+
+  print( offset.format(radix: 16, width: 5, precision: 3) )
+
+Although ``format(…)`` is intended to provide the most general
+interface, specialized formatting interfaces are also possible::
+
+  print( offset.hex() )
+
+
+Design Details
+--------------
 
 Output Streams
 ..............
 
-The most fundamental part of the framework is
-``FormattedOutputStream``, a thing into which we can stream text::
+The most fundamental part of this design is ``OutputStream``, a thing
+into which we can stream text: [#character]_
 
-  protocol FormattedOutputStream {
+::
+
+  protocol OutputStream {
     func append(text: String)
   }
 
-.. Note:: We don't support streaming ``Char`` (a.k.a. ``CodePoint``)
-   directly because it's possible to create invalid sequences of code
-   points.
+Every ``String`` can be used as an ``OutputStream`` directly::
 
-Every String can be used as a FormattedOutputStream directly::
-
-  extension String: FormattedOutputStream {
+  extension String : OutputStream {
     func append(text: String)
   }
 
 Debug Printing
 ..............
 
-Via compiler magic, everything conforms to the ``DebugPrintable``
-protocol.  To change the debug representation for a type, you don't
-need to declare conformance: simply give the type a ``debugFormat()``
+Via compiler magic, *everything* conforms to the ``DebugPrintable``
+protocol. To change the debug representation for a type, you don't
+need to declare conformance: simply give the type a ``formatForDebugging()``
 ::
 
   /// \brief A thing that can be printed in the REPL and the Debugger
   protocol DebugPrintable {
-    typealias DebugFormatter: Formattable = String
+    typealias DebugRepresentation : Streamable = String
 
     /// \brief Produce a textual representation for the REPL and
     /// Debugger.
-    func debugFormat() -> DebugFormatter
+    func formatForDebugging() -> DebugRepresentation
   }
 
-Because ``String`` is a ``Formattable``, your implementation of
-``debugFormat`` can just return a ``String``.  If you don't like
-``String``\ 's default response to width, precision, and/or alignment,
-or if you want to write directly to the ``FormattedOutputStream``
-for efficiency reasons, (e.g. if your representation is huge),
-you can return a custom ``DebugFormatter`` type.
+Because ``String`` is a ``Streamable``, your implementation of
+``formatForDebugging`` can just return a ``String``. If want to write
+directly to the ``OutputStream`` for efficiency reasons,
+(e.g. if your representation is huge), you can return a custom
+``DebugRepresentation`` type.
 
-.. Note:: producing a representation that can be consumed by the REPL
-   to produce an equivalent object is strongly encouraged where
-   possible!  For example, ``String.debugFormat()`` produces a
-   representation starting and ending with “``"``”, where special
-   characters are escaped, etc.  A ``struct Point { var x, y: Int }``
+
+.. Admonition:: Guideline
+
+   Producing a representation that can be consumed by the REPL
+   and LLDB to produce an equivalent object is strongly encouraged
+   where possible!  For example, ``String.formatForDebugging()`` produces
+   a representation starting and ending with “``"``”, where special
+   characters are escaped, etc. A ``struct Point { var x, y: Int }``
    might be represented as “``Point(x: 3, y: 5)``”.
 
 (Non-Debug) Printing
 ....................
 
 The ``Printable`` protocol provides a "pretty" textual representation
-that can be distinct from the debug format.  For example,
-``String.printFormat()`` returns the string itself, without quoting.
+that can be distinct from the debug format. For example, when ``s``
+is a ``String``, ``s.formatForPrinting()`` returns the string itself,
+without quoting.
 
 Conformance to ``Printable`` is explicit, but if you want to use the
-``debugFormat()`` results for your type's ``printFormat()``, all you
+``formatForDebugging()`` results for your type's ``formatForPrinting()``, all you
 need to do is declare conformance to ``Printable``; there's nothing to
-implement.
-
-.. Note:: explicitness here keeps us from automatically polluting
-   completion results for every type with ``printFormat()`` and
-   ``toString()`` functions.
-
-::
+implement::
 
   /// \brief A thing that can be print()ed and toString()ed.
-  protocol Printable: DebugPrintable {
-    typealias PrintFormatter: Formattable = DebugFormatter
+  protocol Printable : DebugPrintable {
+    typealias PrintRepresentation: Streamable = DebugRepresentation
 
     /// \brief produce a "pretty" textual representation.
     ///
     /// In general you can return a String here, but if you need more
-    /// control, we strongly recommend returning a custom Formatter
-    /// type, e.g. a nested struct of your type.  If you're lazy, you
-    /// can conform to Formattable directly and just implement its
-    /// write() func.
-    func printFormat() -> PrintFormatter {
-      return debugFormat()
+    /// control, return a custom Streamable type
+    func formatForPrinting() -> PrintRepresentation {
+      return formatForDebugging()
     }
 
     /// \brief Simply convert to String
     ///
-    /// Don't reimplement this: the default implementation always works.
-    /// If you must reimplement toString(), make sure its results are
-    /// consistent with those of printFormat() (i.e. you shouldn't
-    /// change the behavior).
+    /// You'll never want to reimplement this
     func toString() -> String {
       var result: String
-      this.printFormat().write(result)
+      this.formatForPrinting().write(result)
       return result
     }
   }
 
-``Formattable``
+``Streamable``
 ...............
 
-For full control we provide ``Formattable``, a thing that can write
-into a ``FormattedOutputStream`` while responding to width, precision,
-and alignment.  Every ``Formattable`` is also a ``Printable``,
-naturally. ::
+Because it's not always efficient to construct a ``String``
+representation before writing an object to a stream, we provide a
+``Streamable`` protocol, for types that can write themselves into an
+``OutputStream``. Every ``Streamable`` is also a ``Printable``,
+naturally ::
 
-  protocol Formattable: Printable {
-    func write(
-      target: [byref] FormattedOutputStream, 
-      width: Int? = None, precision: Int? = None, 
-      right_align: Bool? = None)
+  protocol Streamable : Printable {
+    func writeTo<T: OutputStream>(target: [byref] T)
 
     // You'll never want to reimplement this
-    func printFormat() -> PrintFormatter {
-      return this
-    }
-
-    /// \brief get the debug representation.  
-    ///
-    /// A Formattable will usually want to override this, so that in the
-    /// debugger and REPL, it doesn't appear to be the thing on whose
-    /// behalf it is formatting.
-    func debugFormat() -> DebugFormatter {
+    func formatForPrinting() -> PrintRepresentation {
       return this
     }
   }
@@ -304,72 +209,266 @@ naturally. ::
 How ``String`` Fits In
 ......................
 
-Making ``String`` conform to ``Formattable`` is the key to an
-easy-to-use interface that still provides full control.
+``String``\ 's ``formatForDebugging()`` yields a ``Streamable`` that
+adds surrounding quotes and escapes special characters::
 
-.. parsed-literal::
+  extension String : DebugPrintable {
+    func formatForDebugging() -> EscapedStringRepresentation {
+      return EscapedStringRepresentation(this)
+    }
+  }
 
-  extension String: Formattable {
-    func write(
-      target: [byref] FormattedOutputStream, knobs
-      width: Int? = None, precision: Int? = None, 
-      right_align: Bool? = None
-    ) {
-      *...*
+  struct EscapedStringRepresentation : Streamable {
+    var _value: String
+
+    func writeTo<T: OutputStream>(target: [byref] T) {
+      target.append("\"")
+      for c in _value {
+        target.append(c.escape())
+      }
+      target.append("\"")
+    }
+  }
+
+Besides modeling ``OutputStream``, ``String`` also conforms to
+``Streamable``::
+
+  extension String : Streamable {
+    func writeTo<T: OutputStream>(target: [byref] T) {
+      target.append(this) // Append yourself to the stream
     }
 
-    func debugFormat() -> String {
-      *...escape all the CodePoints...*
-    }
-
-    // Swift may get us this default automatically from the protocol,
-    // but it's here as a reminder of how String behaves.
-    func printFormat() -> String {
+    func formatForPrinting() -> String {
       return this
     }
   }
 
-Conclusion
-==========
+This conformance allows *most* formatting code to be written entirely
+in terms of ``String``, simplifying usage. Types with other needs can
+expose lazy representations like ``EscapedStringRepresentation``
+above.
 
-We've proposed an interface that:
+Extended Formatting Example
+---------------------------
 
-* Will be familiar to users of printf (we're not changing format
-  string introducers, width, alignment, or precision specifiers)
-* Turns potential runtime errors into compile-time errors.
-* Makes simple cases simple and uncommon cases more explicit
-* Offers major bang for the buck:
+The following code is a scaled-down version of the formatting code
+used for ``Int``. It represents an example of how a relatively
+complicated ``format(…)`` might be written::
 
- - handles an important element of the internationalization picture
- - the common case uses the same number of characters
- - the case where you want to do formatting costs one extra character
-   (``:``)
+  protocol PrintableInteger 
+    : IntegerLiteralConvertible, Comparable, SignedNumber, Printable {
+    func %(lhs: This, rhs: This) -> This
+    func /(lhs: This, rhs: This) -> This
+    constructor(x: Int)
+    func toInt() -> Int
 
-Options and Bike Sheds
-----------------------
+    func format(radix: Int = 10, fill: String = " ", width: Int = 0) 
+      -> RadixFormat<This> {
 
-* Use something other than ``:`` to separate flags from argument
-  number
+      return RadixFormat(this, radix: radix, fill: fill, width: width)
+    }
+  }
 
-* Use something other than ``{``\ … ``}`` to override max-munch
-  parsing.
+  struct RadixFormat<T: PrintableInteger> : Streamable {
+    var value: T, radix = 10, fill = " ", width = 0
 
-* Use something other than ``%`` to denote format modifiers.
-  ``x.format.uppercase()`` is a possibility.
+    func writeTo<S: OutputStream>(target: [byref] S) {
+      _writeSigned(value, &target)
+    }
 
-* Provide a type-safe binding directly to posix's printf in the posix
-  module, for those who need that interface.
+    // Write the given positive value to stream
+    func _writePositive<T:PrintableInteger, S: OutputStream>( 
+      value: T, stream: [byref] S
+    ) -> Int {
+      if value == 0 { return 0 }
+      var radix: T = T.fromInt(this.radix)
+      var rest: T = value / radix
+      var nDigits = _writePositive(rest, &stream)
+      var digit = UInt32((value % radix).toInt())
+      var baseCharOrd : UInt32 = digit <= 9 ? '0'.value : 'A'.value - 10
+      stream.append(String(Char(baseCharOrd + digit)))
+      return nDigits + 1
+    }
 
-  .. Note:: this interface will not be as type-safe as Swift's
-            ``printf``; more errors will only be caught at runtime
+    func _writeSigned<T:PrintableInteger, S: OutputStream>(
+      value: T, target: [byref] S
+    ) {
+      var width = 0
+      var result = ""
 
-* Allow ``String``\ s to serve as format modifiers for some types,
-  with POSIX semantics.  This would allow, e.g. 
-  
-  .. parsed-literal::
+      if value == 0 {
+        result = "0"
+        ++width
+      }
+      else {
+        var absVal = abs(value)
+        if (value < 0) {
+          target.append("-")
+          ++width
+        }
+        width += _writePositive(absVal, &result)
+      }
 
-    printf("in %0, register 7 = %1", **name % "s"**, **r7 % "-5.7llx"**)
+      while width < width {
+        ++width
+        target.append(fill)
+      }
+      target.append(result)
+    }
+  }
 
-  .. Note:: reduced type-safety applies here as well, but less-so
-            because we can *choose* the argument types for which
-            ``String`` can act as a format modifier.
+  extension Int : PrintableInteger {
+    func toInt() -> Int { return this }
+  }
+
+
+Possible Extensions (a.k.a. Complications)
+------------------------------------------
+
+We are not proposing these extensions. Since we have given them
+considerable thought, they are included here for completeness and to
+ensure our proposed design doesn't rule out important directions of
+evolution.
+
+``OutputStream`` Adapters
+.........................
+
+Most text transformations can be expressed as adapters over generic
+``OutputStream``\ s. For example, it's easy to imagine an upcasing
+adapter that transforms its input to upper case before writing it to
+an underlying stream::
+
+  struct UpperStream<UnderlyingStream:OutputStream> : OutputStream {
+    func append(x: String) { base.append( x.toUpper() ) }
+    var base: UnderlyingStream
+  }
+
+However, upcasing is a trivial example: many such transformations—such
+as ``trim()`` or regex replacement—are stateful, which implies some
+way of indicating “end of input” so that buffered state can be
+processed and written to the underlying stream:
+
+.. parsed-literal::
+
+  struct TrimStream<UnderlyingStream:OutputStream> : OutputStream {
+    func append(x: String) { ... }
+    **func close() { ... }**
+    var base: UnderlyingStream
+    var bufferedWhitespace: String
+  }
+
+This makes general ``OutputStream`` adapters more complicated to write
+and use than ordinary ``OutputStream``\ s.
+
+``Streamable`` Adapters
+.......................
+
+For every conceivable ``OutputStream`` adaptor there's a corresponding
+``Streamable`` adaptor. For example::
+
+  struct UpperStreamable<UnderlyingStreamable:Streamable> {
+    var base: UnderlyingStreamable
+
+    func writeTo<T: OutputStream>(target: [byref] T) {
+      var adaptedStream = UpperStream(target)
+      this.base.writeTo(&adaptedStream)
+      target = adaptedStream.base
+    }
+  }
+
+Then, we could extend ``Streamable`` as follows::
+
+  extension Streamable {
+    typealias Upcased : Streamable = UpperStreamable<This>
+    func toUpper() -> UpperStreamable<This> {
+      return Upcased(this)
+    }
+  }
+
+and, finally, we'd be able to write:
+
+.. parsed-literal::
+
+  print( n.format(radix:16)\ **.toUpper()** )
+
+The complexity of this back-and-forth adapter dance is daunting, and
+might well be better handled in the language once we have some formal
+model—such as coroutines—of inversion-of-control. We think it makes
+more sense to build the important transformations directly into
+``format()`` methods, allowing, e.g.:
+
+.. parsed-literal::
+
+  print( n.format(radix:16, **case:.upper** ) )
+
+Possible Simplifications
+------------------------
+
+One obvious simplification might be to fearlessly use ``String`` as
+the universal textual representation type, rather than having a
+separate ``Streamable`` protocol that doesn't necessarily create a
+fully-stored representation. This approach would trade some
+efficiency for considerable design simplicity. It is reasonable to
+ask whether the efficiency cost would be significant in real cases,
+and the truth is that we don't have enough information to know. At
+least until we do, we opt not to trade away any CPU, memory, and
+power.
+
+If we were willing to say that only ``class``\ es can conform to
+``OutputStream``, we could eliminate the explicit ``[byref]`` where
+``OutputStream``\ s are passed around. Then, we'd simply need a
+``class StringStream`` for creating ``String`` representations. It
+would also make ``OutputStream`` adapters a *bit* simpler to use
+because you'd never need to “write back” explicitly onto the target
+stream. However, stateful ``OutputStream`` adapters would still need a
+``close()`` method, which makes a perfect place to return a copy of
+the underlying stream, which can then be “written back.”  :
+
+.. parsed-literal::
+
+  struct AdaptedStreamable<T:Streamable> {
+    ...
+    func writeTo<Target: OutputStream>(target: [byref] Target) {
+      // create the stream that transforms the representation
+      var adaptedTarget = adapt(target, adapter);
+      // write the Base object to the target stream
+      base.writeTo(&adaptedTarget)
+      // Flush the adapted stream and, in case Target is a value type,
+      // write its new value
+      **target = adaptedTarget.close()**
+    }
+    ...
+  }
+
+We think anyone writing such adapters can handle the need for explicit
+write-back, and the ability to use ``String`` as an ``OutputStream``
+without additionally allocating a ``StringStream`` on the heap seems
+to tip the balance in favor of the current design.
+
+--------
+
+.. [#format] Whether ``format(…)`` is to be a real protocol or merely
+   an ad-hoc convention is TBD. So far, there's no obvious use for a
+   generic ``format`` with arguments that depend on the type being
+   formatted, so an ad-hoc convention would be just fine.
+
+.. [#character] We don't support streaming individual code points
+   directly because it's possible to create invalid sequences of code
+   points. For any code point that, on its own, represents a valid
+   ``Character`` (a.k.a. Unicode `extended grapheme cluster`__), it is
+   trivial and inexpensive to create a ``String``. For more
+   information on the relationship between ``String`` and
+   ``Character`` see the (forthcoming, as of this writing) document
+   *Swift Strings State of the Union*.
+
+   __ http://www.unicode.org/glossary/#extended_grapheme_cluster
+
+.. [#dynamic] In fact it's possible to imagine a workable system for
+   localization that does away with dynamic format strings altogether,
+   so that all format strings are fully statically-checked and some of
+   the same formatting primitives can be used by localizers as by
+   fully-privileged Swift programmers. This approach would involve
+   compiling/JIT-ing localizations into dynamically-loaded modules.
+   In any case, that will wait until we have native Swift dylibs.
+
+
