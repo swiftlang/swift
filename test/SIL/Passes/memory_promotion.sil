@@ -308,6 +308,51 @@ bb0:
   return %11 : $()
 }
 
+// CHECK-LABEL: sil @assign_test_unowned
+sil @assign_test_unowned : $[thin]() -> () {
+bb0:
+  // Assignments of unowned pointer.  The first becomes an initialize, and the
+  // second becomes an assignment.
+
+  %c = alloc_box $[unowned] SomeClass
+  // CHECK: [[BOX:%[0-9]+]] = alloc_box
+  %f = function_ref @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass
+  %3 = metatype $SomeClass.metatype
+
+  %4 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  // CHECK: [[C1x:%[0-9]+]] = apply
+
+  %5 = ref_to_unowned %4 : $SomeClass to $[unowned] SomeClass
+  // CHECK-NEXT: [[C1:%[0-9]+]] = ref_to_unowned [[C1x]]
+
+  // This should become an initialization.
+  assign %5 to %c#1 : $*[unowned] SomeClass
+  // CHECK-NEXT: store [[C1]] to [[BOX]]#1
+  // CHECK-NEXT: unowned_retain [[C1]]
+
+  release %4 : $SomeClass
+  // CHECK-NEXT: release [[C1x]]
+
+  %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  // CHECK-NEXT: [[C2x:%[0-9]+]] = apply
+
+  %9 = ref_to_unowned %8 : $SomeClass to $[unowned] SomeClass
+  // CHECK-NEXT: [[C2:%[0-9]+]] = ref_to_unowned [[C2x]]
+
+  assign %9 to %c#1 : $*[unowned] SomeClass
+  // CHECK-NEXT: unowned_retain [[C2]]
+  // CHECK-NEXT: store [[C2]] to [[BOX]]#1
+  // CHECK-NEXT: unowned_release [[C1]]
+
+  release %8 : $SomeClass
+  // CHECK-NEXT: release [[C2x]]
+
+  release %c#0 : $Builtin.ObjectPointer
+
+  %11 = tuple ()
+  return %11 : $()
+}
+
 
 
 
