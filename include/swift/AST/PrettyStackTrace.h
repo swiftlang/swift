@@ -28,6 +28,7 @@ namespace swift {
   class Expr;
   class Pattern;
   class Stmt;
+  class TypeRepr;
 
 /// PrettyStackTraceLocation - Observe that we are doing some
 /// processing starting at a fixed location.
@@ -110,6 +111,17 @@ class PrettyStackTraceType : public llvm::PrettyStackTraceEntry {
   const char *Action;
 public:
   PrettyStackTraceType(ASTContext &C, const char *action, Type type)
+    : Context(C), TheType(type), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
+/// Observe that we are processing a specific type representation.
+class PrettyStackTraceTypeRepr : public llvm::PrettyStackTraceEntry {
+  ASTContext &Context;
+  TypeRepr *TheType;
+  const char *Action;
+public:
+  PrettyStackTraceTypeRepr(ASTContext &C, const char *action, TypeRepr *type)
     : Context(C), TheType(type), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
 };

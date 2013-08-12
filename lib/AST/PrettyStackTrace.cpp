@@ -145,6 +145,16 @@ void swift::printTypeDescription(llvm::raw_ostream &out, Type type,
   out << '\n';
 }
 
+void PrettyStackTraceTypeRepr::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << " type ";
+  TheType->print(out);
+  if (TheType && TheType->getSourceRange().isValid()) {
+    out << " at ";
+    TheType->getSourceRange().print(out, Context.SourceMgr);
+  }
+  out << '\n';
+}
+
 void PrettyStackTraceLocation::print(llvm::raw_ostream &out) const {
   out << "While " << Action << " starting at ";
   Loc.print(out, Context.SourceMgr);

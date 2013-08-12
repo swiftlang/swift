@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -580,6 +581,8 @@ void TypeChecker::validateTypeDecl(TypeDecl *D) {
 }
 
 Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
+  PrettyStackTraceTypeRepr stackTrace(Context, "resolving", TyR);
+
   assert(TyR && "Cannot validate null TypeReprs!");
   switch (TyR->getKind()) {
   case TypeReprKind::Attributed: {
