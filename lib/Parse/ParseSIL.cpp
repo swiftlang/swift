@@ -1353,7 +1353,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         return true;
       }
       auto valueTy = SILType::getPrimitiveObjectType(refType.getReferentType());
-      ResultVal = B.createStore(InstLoc, getLocalValue(from, valueTy), addrVal);
+      ResultVal = B.createStoreWeak(InstLoc, getLocalValue(from, valueTy),
+                                    addrVal, IsInitialization_t(isInit));
       break;
     }
 
