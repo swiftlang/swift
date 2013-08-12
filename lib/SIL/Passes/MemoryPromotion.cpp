@@ -22,6 +22,7 @@
 using namespace swift;
 
 STATISTIC(NumLoadPromoted, "Number of loads promoted");
+STATISTIC(NumAssignRewritten, "Number of assigns rewritten");
 
 template<typename ...ArgTypes>
 static void diagnose(SILModule *M, SILLocation loc, ArgTypes... args) {
@@ -218,6 +219,7 @@ namespace {
     
   private:
     void handleLoadUse(SILInstruction *Inst);
+    void handleStoreUse(SILInstruction *Inst);
     void handleByrefUse(SILInstruction *Inst);
     void handleEscape(SILInstruction *Inst);
 
@@ -269,10 +271,6 @@ void ElementPromotion::diagnoseInitError(SILInstruction *Use,
                                          Diag<StringRef> DiagWithName) {
   HadError = true;
 
-  // TODO: The QoI could be improved in many different ways here.  For example,
-  // We could give some path information where the use was uninitialized, like
-  // the static analyzer.
-
   // If the definition is a declaration, try to reconstruct a name and
   // optionally an access path to the uninitialized element.
   if (ValueDecl *VD =
@@ -291,10 +289,12 @@ void ElementPromotion::diagnoseInitError(SILInstruction *Use,
     // Otherwise, emit the diagnostic with no name or path information.
     diagnose(Use->getModule(), Use->getLoc(), DiagNoName);
   }
-  
-  
-  
-  
+
+  // Provide context as note diagnostics.
+
+  // TODO: The QoI could be improved in many different ways here.  For example,
+  // We could give some path information where the use was uninitialized, like
+  // the static analyzer.
   diagnose(Use->getModule(), TheAllocBox->getLoc(),
            diag::variable_defined_here);
 }
@@ -307,7 +307,7 @@ void ElementPromotion::doIt() {
   for (auto Use : Uses) {
     switch (Use.second) {
     case UseKind::Load:     handleLoadUse(Use.first); break;
-    case UseKind::Store:    break;
+    case UseKind::Store:    handleStoreUse(Use.first); break;
     case UseKind::ByrefUse: handleByrefUse(Use.first); break;
     case UseKind::Escape:   handleEscape(Use.first); break;
     }
@@ -347,6 +347,67 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
                     diag::variable_n_used_before_initialized);
 }
 
+void ElementPromotion::handleStoreUse(SILInstruction *Inst) {
+  // Generally, we don't need to do anything for stores, since this analysis is
+  // use-driven.  However, we *do* need to decide if assignments are stores,
+  // initializations, or ambiguous and then rewrite them.
+
+  auto *AI = dyn_cast<AssignInst>(Inst);
+  if (AI == 0) return;
+
+  bool HasTrivialType = Inst->getModule()->
+    Types.getTypeLowering(Inst->getOperand(0).getType()).isTrivial();
+
+  // Check to see if the value is known-initialized here or not.  If the assign
+  // has non-trivial type, then we're interested in using any live-in value that
+  // is available.
+  SILValue IncomingVal;
+  auto DI = checkDefinitelyInit(Inst, HasTrivialType ? nullptr : &IncomingVal);
+
+  // If it is initialized on some paths, but not others, then we have an
+  // inconsistent initialization error.
+  if (DI == DI_Partial) {
+    diagnoseInitError(Inst, diag::variable_initialized_on_some_paths,
+                      diag::variable_n_initialized_on_some_paths);
+    return;
+  }
+
+  ++NumAssignRewritten;
+  SILBuilder B(Inst);
+
+  // Otherwise, if it has trivial type, we can always just replace the
+  // assignment with a store.  If it has non-trivial type and is an
+  // initialization, we can also replace it with a store.
+  if (HasTrivialType || DI == DI_No) {
+    auto NewStore =
+      B.createStore(Inst->getLoc(), Inst->getOperand(0), Inst->getOperand(1));
+
+    // Non-trivial values must be retained, since the box owns them.
+    if (!HasTrivialType)
+      B.createRetainInst(Inst->getLoc(), Inst->getOperand(0));
+
+    NonLoadUses.insert(NewStore);
+    NonLoadUses.erase(Inst);
+    Inst->eraseFromParent();
+    return;
+  }
+
+  // Otherwise, we need to replace the assignment with the full
+  // load/store/retain/release dance.  If we have a live-in value available, we
+  // can use that instead of doing a reload.
+  if (!IncomingVal)
+    IncomingVal = B.createLoad(Inst->getLoc(), Inst->getOperand(1));
+
+  B.createRetainInst(Inst->getLoc(), Inst->getOperand(0));
+  auto NewStore =
+    B.createStore(Inst->getLoc(), Inst->getOperand(0), Inst->getOperand(1));
+  B.createReleaseInst(Inst->getLoc(), IncomingVal);
+
+  NonLoadUses.insert(NewStore);
+  NonLoadUses.erase(Inst);
+  Inst->eraseFromParent();
+}
+
 /// Given a byref use (an Apply), determine whether the loaded
 /// value is definitely assigned or not.  If not, produce a diagnostic.
 void ElementPromotion::handleByrefUse(SILInstruction *Inst) {
@@ -377,6 +438,8 @@ void ElementPromotion::handleEscape(SILInstruction *Inst) {
 static SILValue getStoredValueFrom(SILInstruction *I) {
   if (auto *SI = dyn_cast<StoreInst>(I))
     return SI->getOperand(0);
+  if (auto *AI = dyn_cast<AssignInst>(I))
+    return AI->getOperand(0);
   return SILValue();
 }
 
@@ -457,16 +520,16 @@ static void collectAllocationUses(SILValue Pointer,
     // FIXME: Canonicalize aggregate stores of entire sub-tuples/sub-structs
     // extracts of their elements + individual stores.
 
-    // Loads are a use of the value.  Note that this could be an aggregate load.
+    // Loads are a use of the value.
     if (auto *LI = dyn_cast<LoadInst>(User)) {
       addElementUses(Uses, BaseElt, PointeeType, LI, UseKind::Load,
                      NumElements);
       continue;
     }
 
-    // Stores *to* the allocation are writes.  Stores *of* them are escapes.
-    // Note that this could be an aggregate store.
-    if (isa<StoreInst>(User) && UI->getOperandNumber() == 1) {
+    // Stores *to* the allocation are writes.  Stores *of* it is an escape.
+    if ((isa<StoreInst>(User) || isa<AssignInst>(User)) &&
+        UI->getOperandNumber() == 1) {
       addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store,
                      NumElements);
       continue;
@@ -487,10 +550,6 @@ static void collectAllocationUses(SILValue Pointer,
                      NumElements);
       continue;
     }
-    
-
-    // TODO: "Assign".
-    // TODO: isa<ProjectExistentialInst>(User)
 
     // The apply instruction does not capture the pointer when it is passed
     // through [byref] arguments or for indirect returns.  Byref arguments are

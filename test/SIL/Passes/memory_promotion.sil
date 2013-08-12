@@ -188,4 +188,61 @@ bb0:
   return %11 : $()
 }
 
+class SomeClass {}
+
+sil @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass
+
+
+// CHECK-LABEL: sil @assign_test
+sil @assign_test : $[thin] (a : Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_box $Int64
+
+  // These assigns are a mix of init + store forms, but because Int is trivial,
+  // they all turn into stores.
+  assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
+  assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
+  assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
+
+  %2 = load %1#1 : $*Int64
+  release %1#0 : $Builtin.ObjectPointer            // CHECK-NEXT: release %1#0
+
+  // Assignments of nontrivial types.  The first becomes an initialize (i.e.,
+  // lone store), the second becomes an assignment (retain/release dance).
+
+  %c = alloc_box $SomeClass
+  %f = function_ref @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass // t.SomeClass.__allocating_constructor : (t.SomeClass.metatype)() -> t.SomeClass // user: %4
+  %3 = metatype $SomeClass.metatype
+
+  %4 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  // CHECK: [[C1:%[0-9]+]] = apply
+
+  assign %4 to %c#1 : $*SomeClass
+  // CHECK-NEXT: store [[C1]]
+  // CHECK-NEXT: retain [[C1]]
+
+  release %4 : $SomeClass
+  // CHECK-NEXT: release [[C1]]
+
+  %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  // CHECK-NEXT: [[C2:%[0-9]+]] = apply
+
+  assign %8 to %c#1 : $*SomeClass
+  // CHECK-NEXT: retain [[C2]]
+  // CHECK-NEXT: store [[C2]]
+  // CHECK-NEXT: release [[C1]]
+
+  release %8 : $SomeClass
+  // CHECK-NEXT: release [[C2]]
+
+
+  release %c#0 : $Builtin.ObjectPointer
+
+
+  // Verify that the load got forwarded from an assign.
+  return %2 : $Int64                        // CHECK: return %0 : $Int64
+}
+
+
+
 
