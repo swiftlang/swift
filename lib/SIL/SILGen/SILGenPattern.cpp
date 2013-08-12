@@ -354,7 +354,8 @@ void destructurePattern(SILGenFunction &gen,
     // Create the new cast pattern.
     auto *newIsa
       = new (gen.F.getASTContext()) IsaPattern(p->getLoc(),
-                                               ip->getCastTypeLoc());
+                                               ip->getCastTypeLoc(),
+                                               newKind);
     newIsa->setType(newFromType);
     
     destructured.push_back(newIsa);
