@@ -1166,7 +1166,7 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
     // alternative, and there really isn't an ObjC convention for
     // transferring ownership in aggregates.
     fieldLowering.emitSemanticLoadInto(B, var, addr, indirectReturn,
-                                       IsNotTake, IsInitialization);
+                                       IsNotTake, IAU_Initialize);
     B.createRelease(getter.getDecl(), thisValue);
     B.createReturn(var, emitEmptyTuple(var));
     return;

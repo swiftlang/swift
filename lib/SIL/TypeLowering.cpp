@@ -473,14 +473,21 @@ bool SILType::isAddressOnly(CanType type, SILModule &M) {
 /// Emit the semantic store operation on a reference type.
 static void emitReferenceSemanticStore(SILBuilder &B, SILLocation loc,
                                        SILValue value, SILValue addr,
-                                       IsInitialization_t isInit) {
-  // FIXME: Use assign instruction here? Or maybe have two
-  // variants of this function, one for canonical, one for
-  // non-canonical.
-  SILValue old;
-  if (!isInit) old = B.createLoad(loc, addr);
-  B.createStore(loc, value, addr);
-  if (!isInit) B.createRelease(loc, old);
+                                       InitAssignUnknown_t storeKind) {
+  switch (storeKind) {
+  case IAU_Unknown:
+    B.createAssign(loc, value, addr);
+    break;
+
+  case IAU_Initialize:
+    B.createStore(loc, value, addr);
+    break;
+  case IAU_Assign:
+    SILValue oldValue = B.createLoad(loc, addr);
+    B.createStore(loc, value, addr);
+    B.createRelease(loc, oldValue);
+    break;
+  }
 }
 
 namespace {
@@ -499,11 +506,11 @@ namespace {
 
     void emitSemanticLoadInto(SILBuilder &B, SILLocation loc,
                               SILValue src, SILValue dest, IsTake_t isTake,
-                              IsInitialization_t isInit) const override {
+                              InitAssignUnknown_t storeKind) const override {
       SILValue value = emitSemanticLoad(B, loc, src, isTake);
       auto &semanticLowering =
         getSemanticTypeLowering(B.getFunction().getParent()->Types);
-      semanticLowering.emitSemanticStore(B, loc, value, dest, isInit);
+      semanticLowering.emitSemanticStore(B, loc, value, dest, storeKind);
     }
   };
 
@@ -515,8 +522,11 @@ namespace {
 
     void emitSemanticStore(SILBuilder &B, SILLocation loc,
                            SILValue value, SILValue addr,
-                           IsInitialization_t isInit) const override {
-      B.createStore(loc, value, addr);
+                           InitAssignUnknown_t storeKind) const override {
+      if (storeKind == IAU_Unknown)
+        B.createAssign(loc, value, addr);
+      else
+        B.createStore(loc, value, addr);
     }
 
     SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
@@ -624,11 +634,21 @@ namespace {
 
     void emitSemanticStore(SILBuilder &B, SILLocation loc,
                            SILValue newValue, SILValue addr,
-                           IsInitialization_t isInit) const override {
-      SILValue oldValue;
-      if (!isInit) oldValue = B.createLoad(loc, addr);
-      B.createStore(loc, newValue, addr);
-      if (!isInit) asImpl().Impl::emitRelease(B, loc, oldValue);
+                           InitAssignUnknown_t isInit) const override {
+      switch (isInit) {
+      case IAU_Unknown:
+        B.createAssign(loc, newValue, addr);
+        break;
+      case IAU_Initialize:
+        B.createStore(loc, newValue, addr);
+        break;
+      case IAU_Assign: {
+        SILValue oldValue = B.createLoad(loc, addr);
+        B.createStore(loc, newValue, addr);
+        asImpl().Impl::emitRelease(B, loc, oldValue);
+        break;
+      }
+      }
     }
 
     SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
@@ -696,8 +716,8 @@ namespace {
 
     void emitSemanticStore(SILBuilder &B, SILLocation loc,
                            SILValue value, SILValue addr,
-                           IsInitialization_t isInit) const override {
-      emitReferenceSemanticStore(B, loc, value, addr, isInit);
+                           InitAssignUnknown_t storeKind) const override {
+      emitReferenceSemanticStore(B, loc, value, addr, storeKind);
     }
 
     SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
@@ -732,9 +752,9 @@ namespace {
 
     void emitSemanticStore(SILBuilder &B, SILLocation loc,
                            SILValue value, SILValue addr,
-                           IsInitialization_t isInit) const override {
+                           InitAssignUnknown_t storeKind) const override {
       value = B.emitGeneralizedValue(loc, value);
-      ReferenceTypeLowering::emitSemanticStore(B, loc, value, addr, isInit);
+      ReferenceTypeLowering::emitSemanticStore(B, loc, value, addr, storeKind);
     }
   };
 
@@ -747,7 +767,13 @@ namespace {
   public:
     void emitSemanticStore(SILBuilder &B, SILLocation loc,
                            SILValue value, SILValue addr,
-                           IsInitialization_t isInit) const override {
+                           InitAssignUnknown_t storeKind) const override {
+      IsInitialization_t isInit;
+      switch (storeKind) {
+      case IAU_Unknown:
+      case IAU_Assign:     isInit = IsNotInitialization; break;
+      case IAU_Initialize: isInit = IsInitialization; break;
+      }
       assert(value.getType().isAddress());
       B.createCopyAddr(loc, value, addr, IsTake, isInit);
     }
@@ -760,7 +786,13 @@ namespace {
     void emitSemanticLoadInto(SILBuilder &B, SILLocation loc,
                               SILValue src, SILValue dest,
                               IsTake_t isTake,
-                              IsInitialization_t isInit) const override {
+                              InitAssignUnknown_t storeKind) const override {
+      IsInitialization_t isInit;
+      switch (storeKind) {
+      case IAU_Unknown:
+      case IAU_Assign:     isInit = IsNotInitialization; break;
+      case IAU_Initialize: isInit = IsInitialization; break;
+      }
       assert(src.getType().isAddress());
       B.createCopyAddr(loc, src, dest, isTake, isInit);
     }
@@ -794,7 +826,14 @@ namespace {
 
     void emitSemanticStore(SILBuilder &B, SILLocation loc,
                            SILValue value, SILValue addr,
-                           IsInitialization_t isInit) const override {
+                           InitAssignUnknown_t storeKind) const override {
+      IsInitialization_t isInit;
+      switch (storeKind) {
+      case IAU_Unknown:
+      case IAU_Assign:     isInit = IsNotInitialization; break;
+      case IAU_Initialize: isInit = IsInitialization; break;
+      }
+
       B.createStoreWeak(loc, value, addr, isInit);
 
       // store_weak does not consume a retain on its input, so we have
@@ -810,9 +849,9 @@ namespace {
     void emitSemanticLoadInto(SILBuilder &B, SILLocation loc,
                               SILValue src, SILValue dest,
                               IsTake_t isTake,
-                              IsInitialization_t isInit) const override {
+                              InitAssignUnknown_t storeKind) const override {
       auto value = B.createLoadWeak(loc, src, isTake);
-      emitReferenceSemanticStore(B, loc, value, dest, isInit);
+      emitReferenceSemanticStore(B, loc, value, dest, storeKind);
     }
   };
 
@@ -830,20 +869,36 @@ namespace {
 
     void emitSemanticStore(SILBuilder &B, SILLocation loc,
                            SILValue value, SILValue addr,
-                           IsInitialization_t isInit) const override {
-      // Remember the current value.
-      SILValue oldValue;
-      if (!isInit) oldValue = B.createLoad(loc, addr);
-
-      // Convert the new value to [unowned] type, unowned_retain it,
-      // and release the old +1 value.
+                           InitAssignUnknown_t storeKind) const override {
+      // Convert the new value to [unowned] type.
       auto unownedValue = B.createRefToUnowned(loc, value, getLoweredType());
-      B.createUnownedRetain(loc, unownedValue);
-      B.createStore(loc, unownedValue, addr);
-      B.createRelease(loc, value);
 
-      // If we have an old value, release it.
-      if (!isInit) B.createUnownedRelease(loc, oldValue);
+      switch (storeKind) {
+      case IAU_Unknown:
+        B.createAssign(loc, unownedValue, addr);
+        break;
+
+      case IAU_Initialize:
+        // Convert the new value to [unowned] type, unowned_retain it,
+        // and release the old +1 value.
+        B.createUnownedRetain(loc, unownedValue);
+        B.createStore(loc, unownedValue, addr);
+        B.createRelease(loc, value);
+        break;
+      case IAU_Assign: {
+        // Remember the current value.
+        SILValue oldValue = B.createLoad(loc, addr);
+
+        // unowned_retain the new value, and release the old +1 value.
+        B.createUnownedRetain(loc, unownedValue);
+        B.createStore(loc, unownedValue, addr);
+        B.createRelease(loc, value);
+
+        // Release the old value.
+        B.createUnownedRelease(loc, oldValue);
+        break;
+      }
+      }
     }
 
     SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,

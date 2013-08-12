@@ -360,7 +360,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc,
   if (semanticTL.isAddressOnly()) {
     // Copy the address-only value.
     SILValue copy = getBufferForExprResult(loc, semanticTL.getLoweredType(), C);
-    addrTL.emitSemanticLoadInto(B, loc, addr, copy, isTake, IsInitialization);
+    addrTL.emitSemanticLoadInto(B, loc, addr, copy, isTake, IAU_Initialize);
     return emitManagedRValueWithCleanup(copy, semanticTL);
   }
   
