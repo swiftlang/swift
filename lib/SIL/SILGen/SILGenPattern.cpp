@@ -385,6 +385,95 @@ void destructurePattern(SILGenFunction &gen,
   }
 }
 
+/// True if the 'sub' pattern node is subsumed by the 'super' node, that is,
+/// all values 'sub' matches are also matched by 'super'.
+bool isPatternSubsumed(const Pattern *sub, const Pattern *super) {
+  // Wildcards subsume everything.
+  if (!super) return true;
+  if (isWildcardPattern(super)) return true;
+  
+  sub = sub->getSemanticsProvidingPattern();
+  super = super->getSemanticsProvidingPattern();
+  
+  // A pattern always subsumes itself.
+  if (sub == super) return true;
+  
+  switch (sub->getKind()) {
+  case PatternKind::Any:
+  case PatternKind::Named:
+  case PatternKind::Expr:
+    // If super wasn't already handled as a wildcard above, then it can't
+    // subsume a wildcard.
+    return false;
+      
+  case PatternKind::Tuple: {
+    // Tuples should only match wildcard or same-shaped tuple patterns, which
+    // are exhaustive so always subsume other tuple patterns of the same type.
+    // Tuples should only match wildcard or same-shaped tuple patterns, to
+    // which they are never orthogonal.
+    auto *tsub = cast<TuplePattern>(sub);
+    // Wildcard 'super' should have been handled above.
+    auto *tsup = cast<TuplePattern>(super);
+    
+    assert(tsub->getType()->isEqual(tsup->getType()) &&
+           "tuple patterns should match same type");
+    assert(tsub->getFields().size() == tsup->getFields().size() &&
+           "tuple patterns should have same shape");
+
+    (void)tsub;
+    (void)tsup;
+
+    return true;
+  }
+  
+  case PatternKind::Isa: {
+    auto *isub = cast<IsaPattern>(sub);
+    
+    // FIXME: interaction with NominalTypePattern
+    assert(!isa<NominalTypePattern>(sub)
+           && "Isa/NominalType combination not implemented");
+
+    auto *isup = cast<IsaPattern>(super);
+    
+    // Casts to the same type subsume each other.
+    Type subTy = isub->getCastTypeLoc().getType();
+    Type supTy = isup->getCastTypeLoc().getType();
+    
+    if (subTy->isEqual(supTy))
+      return true;
+
+    // TODO: Archetype casts are never subsumed; the archetype could substitute
+    // for any other type.
+    // TODO: Casts to archetypes with unrelated superclass constraints could
+    // be orthogonal. We could also treat casts to types that don't fit the
+    // archetype's constraints as orthogonal.
+    // TODO: Class casts are never subsumed by non-class casts.
+    // TODO: Class casts subsume casts to subclasses.
+    // TODO: We can't check super/subclass relationships in SILGen yet.
+    // For now we conservatively assume all class casts may overlap but don't
+    // subsume each other.
+    return false;
+  }
+
+  case PatternKind::UnionElement: {
+    auto *usub = cast<UnionElementPattern>(sub);
+    // Wildcard 'super' should have been handled above.
+    auto *usup = cast<UnionElementPattern>(super);
+    
+    // UnionElements are subsumed by equivalent UnionElements.
+    return usub->getElementDecl() == usup->getElementDecl();
+  }
+    
+  case PatternKind::NominalType:
+    llvm_unreachable("not implemented");
+    
+  case PatternKind::Paren:
+  case PatternKind::Typed:
+  case PatternKind::Var:
+    llvm_unreachable("not semantic");
+  }
+}
+
 /// True if two pattern nodes are orthogonal, that is, they never both match
 /// the same value.
 bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
@@ -414,7 +503,7 @@ bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
     assert(ta->getType()->isEqual(tb->getType()) &&
            "tuple patterns should match same type");
     assert(ta->getFields().size() == tb->getFields().size() &&
-           "tuple patterns have same shape");
+           "tuple patterns should have same shape");
 
     (void)ta;
     (void)tb;
@@ -425,11 +514,11 @@ bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
   case PatternKind::Isa: {
     auto *ia = cast<IsaPattern>(a);
 
-    // Casts are orthogonal to non-cast patterns.
-    // FIXME: Not to NominalTypePatterns of related type.
+    // FIXME: interaction with NominalTypePattern
     assert(!isa<NominalTypePattern>(b)
            && "Isa/NominalType combination not implemented");
-    auto *ib = dyn_cast<IsaPattern>(b);
+
+    auto *ib = cast<IsaPattern>(b);
     if (!ib)
       return true;
     
@@ -466,10 +555,7 @@ bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
       
   case PatternKind::UnionElement: {
     auto *ua = cast<UnionElementPattern>(a);
-    
-    // UnionElements are orthogonal to different UnionElements, but not to other
-    // patterns that match the whole type.
-    auto *ub = dyn_cast<UnionElementPattern>(b);
+    auto *ub = cast<UnionElementPattern>(b);
     if (!ub)
       return false;
     
@@ -1192,11 +1278,11 @@ recur:
   unsigned skipRows = r;
   
   // FIXME: O(rows * orthogonal patterns). Linear scan in this loop is lame.
-  auto isOrthogonalToSpecialized = [&](const Pattern *p) -> bool {
+  auto isSubsumedBySpecialized = [&](const Pattern *p) -> bool {
     for (auto s : specialized)
-      if (!arePatternsOrthogonal(p, s))
-        return false;
-    return true;
+      if (isPatternSubsumed(p, s))
+        return true;
+    return false;
   };
 
   // Derive a set of orthogonal pattern nodes to specialize on.
@@ -1204,9 +1290,9 @@ recur:
     const Pattern *p = clauses[r][0];
     if (isWildcardPattern(p))
       continue;
-    // If we've seen a constructor non-orthogonal to this one, skip it.
+    // If we've seen a constructor subsuming this one, skip it.
     // FIXME: O(n^2). Linear search here is lame.
-    if (!isOrthogonalToSpecialized(p))
+    if (isSubsumedBySpecialized(p))
       continue;
     
     specialized.push_back(p);
