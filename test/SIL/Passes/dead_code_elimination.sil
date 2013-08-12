@@ -182,7 +182,7 @@ bb2(%4 : $Int64):
 bb3(%5 : $Int64):
   return %5 : $Int64
 }
-// CHECK: sil @testCondBranchBBArgs
+// CHECK-LABEL: sil @testCondBranchBBArgs
 // CHECK-NEXT: bb0
 // CHECK-NEXT:  br bb1(%{{[0-9]+}} : $Int64)
 // CHECK: bb1(%{{[0-9]+}} : $Int64):                                 
@@ -225,7 +225,7 @@ bb2:                                              // Preds: bb1 bb0
   %20 = tuple ()                                  // user: %21
   return %20 : $()
 }
-// CHECK: sil @code_removed_after_a_call_to_noreturn
+// CHECK-LABEL: sil @code_removed_after_a_call_to_noreturn
 // CHECK-NEXT: bb0
 // CHECK-NEXT:  function_ref @exit : $[thin, noreturn] () -> () 
 // CHECK-NEXT:  apply
@@ -239,7 +239,7 @@ bb0:
   %3 = tuple ()
   return %3 : $()
 }
-// CHECK: sil @dead_use_of_alloc_stack
+// CHECK-LABEL: sil @dead_use_of_alloc_stack
 // CHECK-NEXT: bb0
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: dealloc_stack

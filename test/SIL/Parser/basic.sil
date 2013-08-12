@@ -8,10 +8,10 @@ import Foundation
 
 // Linkage types.
 
-// CHECK: sil clang_thunk @clang_thunk : $() -> ()
+// CHECK-LABEL: sil clang_thunk @clang_thunk : $() -> ()
 sil clang_thunk @clang_thunk : $() -> ()
 
-// CHECK: sil internal @internal_fn : $() -> ()
+// CHECK-LABEL: sil internal @internal_fn : $() -> ()
 sil internal @internal_fn : $() -> () {
 bb0:
   %0 = tuple ()
@@ -29,7 +29,7 @@ sil @type_ref1 : $(a : Class1, b : Int) -> ()  // CHECK: $(a : Class1, b : Int64
 
 // Instructions
 
-sil @test1 : $() -> () {              // CHECK: sil @test1 : $() -> ()
+sil @test1 : $() -> () {              // CHECK-LABEL: sil @test1 : $() -> ()
 bb0:                                  // CHECK: bb0:
   %0 = tuple ()                       // CHECK:   %0 = tuple ()
   br bb1                              // CHECK:   br bb1
@@ -42,7 +42,7 @@ bb1:
 }
 
 // Forward referenced values.
-sil @test2 : $(x : Int64) -> () {              // CHECK: sil @test2 : $(x : Int64) -> ()
+sil @test2 : $(x : Int64) -> () {              // CHECK-LABEL: sil @test2 : $(x : Int64) -> ()
 bb0(%0 : $Int64):
   br bb2
 bb1:
@@ -547,7 +547,7 @@ bb0(%0 : $*SomeProtocol):
   %10 = return %6 : $SomeProtocol.metatype
 }
 
-// CHECK: sil @test_unreachable
+// CHECK-LABEL: sil @test_unreachable
 sil @test_unreachable : $() -> () {
 bb0:
   unreachable
@@ -568,7 +568,7 @@ bb0(%0 : $SomeClass):
   %6 = return %5 : $()
 }
 
-// CHECK: sil @test_basic_block_arguments
+// CHECK-LABEL: sil @test_basic_block_arguments
 sil @test_basic_block_arguments : $[thin] (i : Builtin.Int1) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int1):
   condbranch %0, bb1, bb2
@@ -585,7 +585,7 @@ bb3(%6 : $Builtin.Int64):
   return %6 : $Builtin.Int64
 }
 
-// CHECK: sil @test_cond_branch_basic_block_args
+// CHECK-LABEL: sil @test_cond_branch_basic_block_args
 sil @test_cond_branch_basic_block_args : $[thin] (i : Int64, b : Builtin.Int1) -> Int64 {
 bb0(%0 : $Int64, %1 : $Builtin.Int1):
   condbranch %1, bb1(%0 : $Int64), bb2(%0 : $Int64)
@@ -609,7 +609,7 @@ class Bas : NSObject {
 //     super.constructor()
 //   }
 // }
-// CHECK: sil @test_autorelease_return
+// CHECK-LABEL: sil @test_autorelease_return
 sil @test_autorelease_return : $[cc(objc_method), thin] (Bas, ()) -> NSString {
 bb0(%0 : $Bas):
   retain %0 : $Bas
@@ -632,7 +632,7 @@ bb0(%0 : $Bas):
 }
 sil @swift_StringToNSString : $[thin] (string : [byref] String) -> NSString
 
-// CHECK: sil @test_super_method
+// CHECK-LABEL: sil @test_super_method
 sil @test_super_method : $[cc(method), thin] ((), Bas) -> Bas {
 bb0(%0 : $Bas):
   %1 = tuple ()
@@ -669,7 +669,7 @@ bb0(%0 : $Bas):
 }
 sil @_TSSCfMSSFT_SS : $[thin] ((), String.metatype) -> String
 
-// CHECK: sil @test_builtin_func_ref
+// CHECK-LABEL: sil @test_builtin_func_ref
 sil @test_builtin_func_ref : $[thin] (x : Builtin.Int1, y : Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %2 = alloc_box $Builtin.Int1
@@ -687,7 +687,7 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   return %10 : $Builtin.Int1
 }
 
-// CHECK: sil @test_dealloc_ref
+// CHECK-LABEL: sil @test_dealloc_ref
 sil @test_dealloc_ref : $[thin] () -> () {
 bb0:
   %0 = alloc_ref $Class1
@@ -696,7 +696,7 @@ bb0:
   return %2 : $()
 }
 
-// CHECK: sil @test_dealloc_box
+// CHECK-LABEL: sil @test_dealloc_box
 sil @test_dealloc_box : $[thin] () -> () {
 bb0:
   %0 = alloc_box $Class1
@@ -771,7 +771,7 @@ sil @_T6switch1aFT_T_ : $[thin] () -> ()
 sil @_T6switch1bFT_T_ : $[thin] () -> ()
 sil @_T6switch1cFT_T_ : $[thin] () -> ()
 
-// CHECK: sil @test_switch_union : $[thin] (u : MaybePair) -> ()
+// CHECK-LABEL: sil @test_switch_union : $[thin] (u : MaybePair) -> ()
 sil @test_switch_union : $[thin] (u : MaybePair) -> () {
 bb0(%0 : $MaybePair):
   %1 = alloc_box $MaybePair
@@ -810,7 +810,7 @@ class ConcreteClass : ClassP {
 struct Spoon : Bendable {
 }
 
-// CHECK: sil @test_init_existential : $[thin] (x : Spoon) -> Bendable
+// CHECK-LABEL: sil @test_init_existential : $[thin] (x : Spoon) -> Bendable
 sil @test_init_existential : $[thin] (x : Spoon) -> Bendable {
 bb0(%0 : $*Bendable, %1 : $Spoon):
   %2 = alloc_box $Spoon
@@ -826,7 +826,7 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
   return %8 : $()
 }
 
-// CHECK: sil @test_existential_ref : $[thin] (x : ConcreteClass) -> ClassP
+// CHECK-LABEL: sil @test_existential_ref : $[thin] (x : ConcreteClass) -> ClassP
 sil @test_existential_ref : $[thin] (x : ConcreteClass) -> ClassP {
 bb0(%0 : $ConcreteClass):
   %1 = alloc_box $ConcreteClass
