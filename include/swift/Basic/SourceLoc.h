@@ -110,6 +110,9 @@ public:
   /// \brief Constructs an invalid range.
   CharSourceRange() {}
 
+  CharSourceRange(SourceLoc Start, unsigned ByteLength)
+    : Start(Start), ByteLength(ByteLength) { }
+
   /// \brief Constructs a character range which starts and ends at the
   /// specified character locations.
   CharSourceRange(SourceManager &SM, SourceLoc Start, SourceLoc End);

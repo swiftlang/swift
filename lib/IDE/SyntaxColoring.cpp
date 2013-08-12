@@ -66,8 +66,9 @@ SyntaxColoringContext::SyntaxColoringContext(SourceManager &SM,
     }
 
     assert(Tok.getLoc().isValid());
-    assert(Nodes.empty() || SM.isBeforeInBuffer(Nodes.back().Loc, Tok.getLoc()));
-    Nodes.emplace_back(Kind, Tok.getLoc(), Tok.getLength());
+    assert(Nodes.empty() || SM.isBeforeInBuffer(Nodes.back().Range.getStart(),
+                                                Tok.getLoc()));
+    Nodes.emplace_back(Kind, CharSourceRange(Tok.getLoc(), Tok.getLength()));
   }
 
   Impl.TokenNodes = std::move(Nodes);
@@ -121,8 +122,10 @@ void ColorASTWalker::visitTranslationUnit(TranslationUnit &TU,
 bool ColorASTWalker::walkToTypeReprPre(TypeRepr *T) {
   if (IdentTypeRepr *IdT = dyn_cast<IdentTypeRepr>(T)) {
     for (auto &comp : IdT->Components) {
-      if (!passNonTokenNode({ SyntaxColor::TypeId, comp.getIdLoc(),
-                              comp.getIdentifier().getLength() }))
+      if (!passNonTokenNode({ SyntaxColor::TypeId,
+                              CharSourceRange(comp.getIdLoc(),
+                                              comp.getIdentifier().getLength())
+                            }))
         return false;
     }
   }
@@ -133,7 +136,7 @@ bool ColorASTWalker::passTokenNodesUntil(SourceLoc Loc, bool Inclusive) {
   assert(Loc.isValid());
   unsigned I = 0;
   for (unsigned E = TokenNodes.size(); I != E; ++I) {
-    SourceLoc TokLoc = TokenNodes[I].Loc;
+    SourceLoc TokLoc = TokenNodes[I].Range.getStart();
     if (SM.isBeforeInBuffer(Loc, TokLoc) || (!Inclusive && TokLoc == Loc)) {
       break;
     }
@@ -146,7 +149,7 @@ bool ColorASTWalker::passTokenNodesUntil(SourceLoc Loc, bool Inclusive) {
 }
 
 bool ColorASTWalker::passNonTokenNode(const SyntaxNode &Node) {
-  if (!passTokenNodesUntil(Node.Loc, /*Inclusive=*/false))
+  if (!passTokenNodesUntil(Node.Range.getStart(), /*Inclusive=*/false))
     return false;
   if (!passNode(Node))
     return false;
