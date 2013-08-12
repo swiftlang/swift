@@ -21,11 +21,10 @@ protocol DebugPrintable {
   /// Debugger.
   ///
   /// Because String is a Formattable, your implementation of
-  /// debugFormat can just return a String.  If you don't like
-  /// String's default response to width, precision, and/or alignment,
-  /// or if you want to write directly to the FormattedOutputStream
-  /// for efficiency reasons, (e.g. if your representation is huge),
-  /// you can return a custom DebugFormatter type.
+  /// debugFormat can just return a String.  If you want to write
+  /// directly to the FormattedOutputStream for efficiency reasons,
+  /// (e.g. if your representation is huge), you can return a custom
+  /// DebugFormatter type.
   ///
   /// NOTE: producing a representation that can be consumed by the
   /// REPL to produce an equivalent object is strongly encouraged
@@ -75,9 +74,8 @@ protocol Printable: DebugPrintable {
   }
 }
 
-/// \brief A thing that can write into a FormattedOutputStream while
-/// responding to width, precision, and alignment.  Every Formattable
-/// is also a Printable, naturally.
+/// \brief A thing that can write into a FormattedOutputStream.  Every
+/// Formattable is also a Printable, naturally.
 protocol Formattable: Printable {
   func write(
     target: [byref] FormattedOutputStream, 
