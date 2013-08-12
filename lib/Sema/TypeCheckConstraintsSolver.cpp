@@ -158,20 +158,28 @@ static bool overloadSetFullyBindsType(OverloadSet *ovl) {
   return false;
 }
 
-/// \brief Determine whether the given member constraint fully binds it's
-/// right-hand type variables.
-///
-/// The only member constraints that don't fully bind their right-hand
-/// type variables are unresolved member constraints, which require type
-/// information to flow through the member constraint to determine the member
-/// itself.
-static bool memberConstraintFullyBindsType(const Constraint *constraint) {
-  assert(constraint->getKind() == ConstraintKind::TypeMember ||
-         constraint->getKind() == ConstraintKind::ValueMember);
-  auto locator = constraint->getLocator();
-  return !locator || locator->getPath().empty() ||
-         locator->getPath().back().getKind()
-           != ConstraintLocator::UnresolvedMember;
+/// Determine whether the type variables in the two given sets intersect.
+static bool
+typeVariablesIntersect(ConstraintSystem &cs,
+                       SmallVectorImpl<TypeVariableType *> &typeVars1,
+                       SmallVectorImpl<TypeVariableType *> &typeVars2) {
+  if (typeVars1.empty() || typeVars2.empty())
+    return false;
+
+  // Put the representations of the type variables from the first set into
+  // a pointer set.
+  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars1Set;
+  for (auto tv : typeVars1) {
+    typeVars1Set.insert(cs.getRepresentative(tv));
+  }
+
+  // Check if there are any intersections.
+  for (auto tv : typeVars2) {
+    if (typeVars1Set.count(cs.getRepresentative(tv)))
+      return true;
+  }
+
+  return false;
 }
 
 void ConstraintSystem::collectConstraintsForTypeVariables(
@@ -222,28 +230,23 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       continue;
 
     case ConstraintClassification::Member: {
-      // Mark the referenced type variables for the left-hand side, unless
-      // it is simply a type variable or a metatype of a type variable, in
-      // which case it's not going to open up any more opportunities.
-      bool skipFirst;
-      if (auto metaFirst = first->getAs<MetaTypeType>())
-        skipFirst = metaFirst->getInstanceType()->is<TypeVariableType>();
-      else
-        skipFirst = first->is<TypeVariableType>();
-      if (skipFirst)
-        first->getTypeVariables(referencedTypeVars);
+      // Collect the type variables from the base type (first) and member
+      // type (second).
+      SmallVector<TypeVariableType *, 4> baseTypeVars;
+      first->getTypeVariables(baseTypeVars);
 
-      if (memberConstraintFullyBindsType(constraint)) {
-        // Variables on the right-hand side are fully bound by the member
-        // constraint.
-        SmallVector<TypeVariableType *, 4> rhsTypeVars;
-        simplifyType(constraint->getSecondType())->getTypeVariables(rhsTypeVars);
-        for (auto typeVar : rhsTypeVars)
+      SmallVector<TypeVariableType *, 4> memberTypeVars;
+      simplifyType(constraint->getSecondType())
+        ->getTypeVariables(memberTypeVars);
+
+      // If the set of type variables in the base type does not intersect with
+      // the set of the type variables in the member type, the type variables
+      // in the member type are fully bound.
+      if (!typeVariablesIntersect(*this, baseTypeVars, memberTypeVars)) {
+        for (auto typeVar : memberTypeVars)
           getTVC(typeVar).FullyBound = true;
       } else {
-        // Reference all of the variables on the right-hand side.
-        simplifyType(constraint->getSecondType())
-          ->getTypeVariables(referencedTypeVars);
+        referencedTypeVars.append(memberTypeVars.begin(), memberTypeVars.end());
       }
       continue;
     }
