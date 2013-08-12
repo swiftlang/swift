@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ModuleNameLookup.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
@@ -497,28 +498,15 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     }
   }
 
-  // Track whether we've already searched the Clang modules.
-  // FIXME: This is a weird hack. We either need to filter within the
-  // Clang module importer, or we need to change how this works.
-  bool searchedClangModule = false;
-
+  // FIXME: Cache TU-level visible decls, since those shouldn't change.
+  using namespace namelookup;
+  SmallVector<ValueDecl *, 0> moduleResults;
   auto &mutableM = const_cast<Module&>(M);
-  mutableM.forAllVisibleModules(Module::AccessPathTy(),
-                                makeStackLambda(
-    [&](const Module::ImportedModule &import) {
-      // FIXME: Only searching Clang modules once.
-      if (import.first.empty() &&
-          import.second->getContextKind() == DeclContextKind::ClangModule) {
-        if (searchedClangModule)
-          return;
-
-        searchedClangModule = true;
-      }
-
-      import.second->lookupVisibleDecls(import.first, Consumer,
-                                        NLKind::UnqualifiedLookup);
-    }
-  ));
+  lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
+                             NLKind::QualifiedLookup,
+                             ResolutionKind::Overloadable);
+  for (auto result : moduleResults)
+    Consumer.foundDecl(result);
 }
 
 void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,

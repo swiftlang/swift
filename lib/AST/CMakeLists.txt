@@ -12,6 +12,7 @@ add_swift_library(swiftAST
   Identifier.cpp
   LookupVisibleDecls.cpp
   Module.cpp
+  ModuleNameLookup.cpp
   NameLookup.cpp
   Pattern.cpp
   PrettyStackTrace.cpp
