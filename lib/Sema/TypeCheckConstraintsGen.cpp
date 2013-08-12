@@ -773,7 +773,7 @@ namespace {
       if (!base) return expr->getType();
 
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
-      CS.addConstraint(ConstraintKind::EqualRvalue, tv, base->getType(),
+      CS.addConstraint(ConstraintKind::Equal, tv, base->getType(),
         CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
 
       return MetaTypeType::get(tv, CS.getASTContext());

@@ -271,8 +271,6 @@ enum class ConstraintKind : char {
   /// \brief The two types must be bound to the same type, dropping
   /// lvalueness when comparing a type variable to a type.
   Equal,
-  /// \brief The first type is the rvalue of the second type.
-  EqualRvalue,
   /// \brief The first type is a "trivial" subtype of the second type,
   /// meaning that it is a subtype that is also guaranteed to have the same
   /// in-memory representation.
@@ -995,7 +993,6 @@ public:
     switch (Kind) {
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
-    case ConstraintKind::EqualRvalue:
     case ConstraintKind::TrivialSubtype:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
@@ -1030,7 +1027,6 @@ public:
     switch (Kind) {
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
-    case ConstraintKind::EqualRvalue:
     case ConstraintKind::TrivialSubtype:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
@@ -1293,9 +1289,6 @@ enum class TypeMatchKind : char {
   /// \brief Require the types to match exactly, but strips lvalueness from
   /// a type when binding to a type variable.
   SameType,
-  /// \brief Require the type of the first to match the rvalue type of the
-  /// second.
-  SameTypeRvalue,
   /// \brief Require the first type to be a "trivial" subtype of the second
   /// type or be an exact match.
   TrivialSubtype,

@@ -227,7 +227,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   switch (Kind) {
   case ConstraintKind::Bind: Out << " := "; break;
   case ConstraintKind::Equal: Out << " == "; break;
-  case ConstraintKind::EqualRvalue: Out << " ==R "; break;
   case ConstraintKind::TrivialSubtype: Out << " <t "; break;
   case ConstraintKind::Subtype: Out << " < "; break;
   case ConstraintKind::Conversion: Out << " <c "; break;
@@ -1178,7 +1177,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   switch (kind) {
   case TypeMatchKind::BindType:
   case TypeMatchKind::SameType:
-  case TypeMatchKind::SameTypeRvalue:
   case TypeMatchKind::TrivialSubtype:
     subKind = kind;
     break;
@@ -1235,9 +1233,6 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
   case TypeMatchKind::SameType:
     return ConstraintKind::Equal;
 
-  case TypeMatchKind::SameTypeRvalue:
-    return ConstraintKind::EqualRvalue;
-
   case TypeMatchKind::TrivialSubtype:
     return ConstraintKind::TrivialSubtype;
 
@@ -1256,7 +1251,6 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
   switch (kind) {
   case TypeMatchKind::BindType:
   case TypeMatchKind::SameType:
-  case TypeMatchKind::SameTypeRvalue:
     return Failure::TypesNotEqual;
 
   case TypeMatchKind::TrivialSubtype:
@@ -1312,26 +1306,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   type2 = getFixedTypeRecursive(*this, type2, typeVar2);
   auto desugar2 = type2->getDesugaredType();
 
-  // If we have a same-type-as-rvalue constraint, and the right-hand side
-  // has a form that is either definitely an lvalue or definitely an rvalue,
-  // force the right-hand side to be an rvalue and tighten the constraint
-  // to a same-type constraint.
-  if (kind == TypeMatchKind::SameTypeRvalue) {
-    if (isa<LValueType>(desugar2)) {
-      // The right-hand side is an lvalue type. Strip off the lvalue and
-      // call this a normal 'same-type' constraint.
-      type2 = type2->castTo<LValueType>()->getObjectType();
-      desugar2 = type2->getDesugaredType();
-      kind = TypeMatchKind::SameType;
-      flags |= TMF_GenerateConstraints;
-    } else if (!type2->is<TypeVariableType>()) {
-      // The right-hand side is guaranteed to be an rvalue type. Call this
-      // a normal same-type constraint.
-      kind = TypeMatchKind::SameType;
-      flags |= TMF_GenerateConstraints;
-    }
-  }
-
   // If the types are obviously equivalent, we're done.
   if (desugar1 == desugar2)
     return SolutionKind::TriviallySolved;
@@ -1364,7 +1338,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return SolutionKind::Solved;
     }
 
-    case TypeMatchKind::SameTypeRvalue:
     case TypeMatchKind::TrivialSubtype:
     case TypeMatchKind::Subtype:
     case TypeMatchKind::Conversion:
@@ -2456,7 +2429,6 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   switch (kind) {
   case ConstraintKind::Bind: return TypeMatchKind::BindType;
   case ConstraintKind::Equal: return TypeMatchKind::SameType;
-  case ConstraintKind::EqualRvalue: return TypeMatchKind::SameTypeRvalue;
   case ConstraintKind::TrivialSubtype: return TypeMatchKind::TrivialSubtype;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
@@ -2485,7 +2457,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   switch (constraint.getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
-  case ConstraintKind::EqualRvalue:
   case ConstraintKind::TrivialSubtype:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion: {

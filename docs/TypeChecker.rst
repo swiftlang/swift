@@ -78,7 +78,6 @@ the Swift type system:
        for some type variable ``T0`` and  type ``X``, which requires
        that ``T0`` be exactly identical to ``X``;
     - Equality constraints, written ``X == Y`` for types ``X`` and ``Y``, which require ``X`` and ``Y`` to have the same type, ignoring lvalue types in the process. For example, the constraint ``T0 == X`` would be satisfied by assigning ``T0`` the type ``X`` and by assigning ``T0`` the type ``[byref] X``.
-    - Rvalue equality constraints, written ``T0 ==R X``, which specify that ``T0`` be the same as the rvalue type of ``X``. The rvalue type of a type strips off the ``[byref]``, if present, and looks at the underlying object type. 
 
 **Subtyping**
   A subtype constraint requires the first type to be equivalent to or
