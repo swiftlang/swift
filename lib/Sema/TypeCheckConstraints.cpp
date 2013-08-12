@@ -219,7 +219,7 @@ void ConstraintLocator::dump(SourceManager *sm) {
   }
 }
 
-void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) {
+void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   First->print(Out);
 
   bool skipSecond = false;
@@ -256,7 +256,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) {
   }
 }
 
-void Constraint::dump(SourceManager *sm) {
+void Constraint::dump(SourceManager *sm) const {
   print(llvm::errs(), sm);
 }
 

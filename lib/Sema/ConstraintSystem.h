@@ -1078,9 +1078,9 @@ public:
   /// \brief Retrieve the locator for this constraint.
   ConstraintLocator *getLocator() const { return Locator; }
 
-  void print(llvm::raw_ostream &Out, SourceManager *sm);
+  void print(llvm::raw_ostream &Out, SourceManager *sm) const;
 
-  void dump(SourceManager *SM) LLVM_ATTRIBUTE_USED;
+  void dump(SourceManager *SM) const LLVM_ATTRIBUTE_USED;
 
   void *operator new(size_t bytes, ConstraintSystem& cs,
                      size_t alignment = alignof(Constraint)) {
