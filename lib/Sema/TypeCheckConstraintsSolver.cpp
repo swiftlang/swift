@@ -45,7 +45,9 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
     return Nothing;
 
   // If the type is a type variable itself, don't permit the binding.
-  if (type->is<TypeVariableType>())
+  // FIXME: This is a hack. We need to be smarter about whether there's enough
+  // structure in the type to produce an interesting binding, or not.
+  if (type->getRValueType()->is<TypeVariableType>())
     return Nothing;
 
   // Okay, allow the binding (with the simplified type).
@@ -579,8 +581,7 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
         type = cs.openBindingType(type);
       }
 
-      // FIXME: Use a 'bind' constraint here.
-      cs.addConstraint(ConstraintKind::Equal, typeVar, type);
+      cs.addConstraint(ConstraintKind::Bind, typeVar, type);
       if (!cs.solve(solutions, allowFreeTypeVariables))
         anySolved = true;
 

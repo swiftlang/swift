@@ -404,7 +404,8 @@ Type ConstraintSystem::openType(
       // FIXME: Path to this declaration being opened, then to the archetype.
       auto tv = CS.createTypeVariable(
                   CS.getConstraintLocator((Expr *)nullptr,
-                                          LocatorPathElt(archetype)));
+                                          LocatorPathElt(archetype)),
+                  /*canBindToLValue=*/false);
 
       // If there is a superclass for the archetype, add the appropriate
       // trivial subtype requirement on the type variable.
@@ -1324,6 +1325,24 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           return SolutionKind::TriviallySolved;
         }
 
+        // If exactly one of the type variables can bind to an lvalue, we
+        // can't merge these two type variables.
+        if (rep1->getImpl().canBindToLValue()
+              != rep2->getImpl().canBindToLValue()) {
+          if (flags & TMF_GenerateConstraints) {
+            // Add a new constraint between these types. We consider the current
+            // type-matching problem to the "solved" by this addition, because
+            // this new constraint will be solved at a later point.
+            // Obviously, this must not happen at the top level, or the algorithm
+            // would not terminate.
+            addConstraint(getConstraintKind(kind), rep1, rep2,
+                          getConstraintLocator(locator));
+            return SolutionKind::Solved;
+          }
+
+          return SolutionKind::Unsolved;
+        }
+
         // Merge the equivalence classes corresponding to these two variables.
         mergeEquivalenceClasses(rep1, rep2);
         return SolutionKind::Solved;
@@ -1331,10 +1350,40 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
       // Provide a fixed type for the type variable.
       bool wantRvalue = kind == TypeMatchKind::SameType;
-      if (typeVar1)
-        assignFixedType(typeVar1, wantRvalue ? type2->getRValueType() : type2);
-      else
-        assignFixedType(typeVar2, wantRvalue ? type1->getRValueType() : type1);
+      if (typeVar1) {
+        // If we want an rvalue, get the rvalue.
+        if (wantRvalue)
+          type2 = type2->getRValueType();
+
+        // If the left-hand type variable cannot bind to an rvalue,
+        // but we still have an rvalue, fail.
+        if (!typeVar1->getImpl().canBindToLValue()) {
+          if (type2->is<LValueType>()) {
+            // FIXME: Produce a "not an lvalue" failure.
+            return SolutionKind::Error;
+          }
+
+          // Okay. Bind below.
+        }
+
+        assignFixedType(typeVar1, type2);
+        return SolutionKind::Solved;
+      }
+
+      // If we want an rvalue, get the rvalue.
+      if (wantRvalue)
+        type1 = type1->getRValueType();
+
+      if (!typeVar2->getImpl().canBindToLValue()) {
+        if (type1->is<LValueType>()) {
+          // FIXME: Produce a "not an lvalue" failure.
+          return SolutionKind::Error;
+        }
+        
+        // Okay. Bind below.
+      }
+
+      assignFixedType(typeVar2, type1);
       return SolutionKind::Solved;
     }
 
@@ -1772,11 +1821,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       auto inputTV = createTypeVariable(
                        getConstraintLocator(
                           memberLocator,
-                          ConstraintLocator::FunctionArgument));
+                          ConstraintLocator::FunctionArgument),
+                      /*canBindToLValue=*/false);
       auto outputTV = createTypeVariable(
                         getConstraintLocator(
                            memberLocator,
-                           ConstraintLocator::FunctionResult));
+                           ConstraintLocator::FunctionResult),
+                        /*canBindToLValue=*/false);
 
       // The conversion function will have function type TI -> TO, for fresh
       // type variables TI and TO.
@@ -1882,7 +1933,8 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
     refType = FunctionType::get(createTypeVariable(
                                   getConstraintLocator(
                                     ovl->getLocator(),
-                                    ConstraintLocator::FunctionResult)),
+                                    ConstraintLocator::FunctionResult),
+                                  /*canBindToLValue=*/false),
                                 choice.getBaseType(),
                                 getASTContext());
     break;
@@ -2036,7 +2088,8 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   auto name = context.getIdentifier("constructor");
   auto applyLocator = getConstraintLocator(locator,
                                            ConstraintLocator::ApplyArgument);
-  auto tv = createTypeVariable(applyLocator);
+  auto tv = createTypeVariable(applyLocator,
+                               /*canBindToLValue=*/true);
   
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. Note that these constraints specifically require a
@@ -2369,7 +2422,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
   auto desugar2 = type2->getDesugaredType();
 
   // Force the right-hand side to be an rvalue.
-  unsigned flags = TMF_None;
+  unsigned flags = TMF_GenerateConstraints;
   while (isa<LValueType>(desugar2)) {
     type2 = type2->castTo<LValueType>()->getObjectType();
     type2 = getFixedTypeRecursive(*this, type2, typeVar2);
@@ -3510,7 +3563,8 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     // will be the object type of this particular expression type.
     auto objectTv = createTypeVariable(
                       getConstraintLocator(dest,
-                                           ConstraintLocator::AssignDest));
+                                           ConstraintLocator::AssignDest),
+                      /*canBindToLValue=*/true);
     auto refTv = LValueType::get(objectTv,
                                  LValueType::Qual::Implicit,
                                  getASTContext());
@@ -3979,6 +4033,8 @@ void ConstraintSystem::dump() {
   for (auto tv : TypeVariables) {
     out.indent(2);
     tv->getImpl().print(out);
+    if (tv->getImpl().canBindToLValue())
+      out << " [lvalue allowed]";
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {

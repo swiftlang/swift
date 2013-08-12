@@ -83,7 +83,10 @@ class ConstraintLocator;
 /// which it is assigned.
 class TypeVariableType::Implementation {
   /// \brief The unique number assigned to this type variable.
-  unsigned ID;
+  unsigned ID : 31;
+
+  /// Whether this type variable can be bound to an lvalue type.
+  unsigned CanBindToLValue : 1;
 
   /// \brief The locator that describes where this type variable was generated.
   constraints::ConstraintLocator *locator;
@@ -96,11 +99,16 @@ class TypeVariableType::Implementation {
   friend class constraints::SavedTypeVariableBinding;
 
 public:
-  explicit Implementation(unsigned ID, constraints::ConstraintLocator *locator)
-    : ID(ID), locator(locator), ParentOrFixed(getTypeVariable()) { }
+  explicit Implementation(unsigned ID, constraints::ConstraintLocator *locator,
+                          bool canBindToLValue)
+    : ID(ID), CanBindToLValue(canBindToLValue), locator(locator),
+              ParentOrFixed(getTypeVariable()) { }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
   unsigned getID() const { return ID; }
+
+  /// Whether this type variable can bind to an lvalue type.
+  bool canBindToLValue() const { return CanBindToLValue; }
 
   /// \brief Retrieve the type variable associated with this implementation.
   TypeVariableType *getTypeVariable() {
@@ -195,11 +203,14 @@ public:
       if (record)
         rep->getImpl().recordBinding(*record);
       rep->getImpl().ParentOrFixed = getTypeVariable();
+      assert(rep->getImpl().canBindToLValue() == canBindToLValue());
     } else {
       auto rep = getRepresentative(record);
       if (record)
         rep->getImpl().recordBinding(*record);
       rep->getImpl().ParentOrFixed = other;
+      assert(rep->getImpl().canBindToLValue() 
+               == other->getImpl().canBindToLValue());
     }
   }
 
@@ -1676,9 +1687,10 @@ public:
   }
 
   /// \brief Create a new type variable.
-  TypeVariableType *createTypeVariable(ConstraintLocator *locator) {
+  TypeVariableType *createTypeVariable(ConstraintLocator *locator,
+                                       bool canBindToLValue) {
     auto tv = TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
-                                       locator);
+                                       locator, canBindToLValue);
     TypeVariables.push_back(tv);
     return tv;
   }
