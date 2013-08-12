@@ -242,12 +242,35 @@ bb0:
   release %8 : $SomeClass
   // CHECK-NEXT: release [[C2]]
 
-
   release %c#0 : $Builtin.ObjectPointer
-
 
   %11 = tuple ()
   return %11 : $()
+}
+
+
+// CHECK-LABEL: sil @assign_test_addressonly
+sil @assign_test_addressonly : $[thin] <T> (v : T) -> T {
+bb0(%0 : $*T, %1 : $*T):
+  %2 = alloc_box $T
+  // CHECK: alloc_box
+
+  // This should become an initialization of %4
+  copy_addr %1 to %2#1 : $*T
+  // CHECK-NEXT: copy_addr %1 to [initialization] %2#1 : $*T
+
+  // This should stay an assignment of %4
+  copy_addr [take] %1 to %2#1 : $*T
+  // CHECK-NEXT: copy_addr [take] %1 to %2#1 : $*T
+  
+  // This is a load, and shouldn't be changed.
+  copy_addr %2#1 to [initialization] %0 : $*T
+  // CHECK-NEXT: copy_addr %2#1 to [initialization] %0 : $*T
+
+  release %2#0 : $Builtin.ObjectPointer
+  // CHECK-NEXT: release %2#0
+  %9 = tuple ()
+  return %9 : $()
 }
 
 

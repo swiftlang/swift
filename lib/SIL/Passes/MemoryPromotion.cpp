@@ -349,14 +349,20 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
 
 void ElementPromotion::handleStoreUse(SILInstruction *Inst) {
   // Generally, we don't need to do anything for stores, since this analysis is
-  // use-driven.  However, we *do* need to decide if assignments are stores,
-  // initializations, or ambiguous and then rewrite them.
+  // use-driven.  However, we *do* need to decide if "assignments" are stores,
+  // initializations, or ambiguous and then rewrite them.  As such, we look at
+  // AssignInst and "assignment" CopyAddr's.  We ignore initialize copy_addrs,
+  // relying on SILGen to only produce them when known correct.
+  if (!isa<AssignInst>(Inst)) {
+    auto CA = dyn_cast<CopyAddrInst>(Inst);
+    if (CA == nullptr || CA->isInitializationOfDest())
+      return;
+  }
 
-  auto *AI = dyn_cast<AssignInst>(Inst);
-  if (AI == 0) return;
-
-  bool HasTrivialType = Inst->getModule()->
-    Types.getTypeLowering(Inst->getOperand(0).getType()).isTrivial();
+  bool HasTrivialType = false;
+  if (isa<AssignInst>(Inst))
+    HasTrivialType = Inst->getModule()->
+      Types.getTypeLowering(Inst->getOperand(0).getType()).isTrivial();
 
   // Check to see if the value is known-initialized here or not.  If the assign
   // has non-trivial type, then we're interested in using any live-in value that
@@ -371,6 +377,16 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst) {
                       diag::variable_n_initialized_on_some_paths);
     return;
   }
+
+  // If this is a copy_addr, we just set the initialization bit depending on
+  // what we find.
+  if (auto *CA = dyn_cast<CopyAddrInst>(Inst)) {
+    CA->setIsInitializationOfDest(DI == DI_No ? IsInitialization
+                                              : IsNotInitialization);
+    return;
+  }
+
+  assert(isa<AssignInst>(Inst));
 
   ++NumAssignRewritten;
   SILBuilder B(Inst);

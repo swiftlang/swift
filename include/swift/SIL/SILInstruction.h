@@ -680,6 +680,13 @@ public:
     return IsInitialization_t(IsInitializationOfDest);
   }
 
+  void setIsTakeOfSrc(IsTake_t T) {
+    IsTakeOfSrc = (bool)T;
+  }
+  void setIsInitializationOfDest(IsInitialization_t I) {
+    IsInitializationOfDest = (bool)I;
+  }
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
