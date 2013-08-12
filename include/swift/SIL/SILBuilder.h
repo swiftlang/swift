@@ -439,8 +439,8 @@ public:
                     StructElementAddrInst(Loc, Operand, Field, ResultTy));
   }
   
-  SILValue createRefElementAddr(SILLocation Loc, SILValue Operand,
-                                VarDecl *Field, SILType ResultTy) {
+  RefElementAddrInst *createRefElementAddr(SILLocation Loc, SILValue Operand,
+                                           VarDecl *Field, SILType ResultTy) {
     return insert(new (F.getModule())
                     RefElementAddrInst(Loc, Operand, Field, ResultTy));
   }

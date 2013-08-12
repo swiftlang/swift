@@ -1748,8 +1748,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     VarDecl *Field = cast<VarDecl>(FieldV);
     auto ResultTy = SILType::getPrimitiveAddressType(
                                        Field->getType()->getCanonicalType());
-    ResultVal = B.createRefElementAddr(InstLoc, Val, Field,
-                                       ResultTy).getDef();
+    ResultVal = B.createRefElementAddr(InstLoc, Val, Field, ResultTy);
     break;
   }
   case ValueKind::IsNonnullInst: {
