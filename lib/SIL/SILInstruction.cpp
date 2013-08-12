@@ -411,6 +411,11 @@ StoreInst::StoreInst(SILLocation Loc, SILValue Src, SILValue Dest)
     Operands(this, Src, Dest) {
 }
 
+AssignInst::AssignInst(SILLocation Loc, SILValue Src, SILValue Dest)
+  : SILInstruction(ValueKind::AssignInst, Loc),
+    Operands(this, Src, Dest) {
+}
+
 StoreWeakInst::StoreWeakInst(SILLocation loc, SILValue value, SILValue dest,
                              IsInitialization_t isInit)
   : SILInstruction(ValueKind::StoreWeakInst, loc),

@@ -821,6 +821,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("archetype_method", ValueKind::ArchetypeMethodInst)
     .Case("archetype_ref_to_super", ValueKind::ArchetypeRefToSuperInst)
     .Case("apply", ValueKind::ApplyInst)
+    .Case("assign", ValueKind::AssignInst)
     .Case("autorelease_return", ValueKind::AutoreleaseReturnInst)
     .Case("br", ValueKind::BranchInst)
     .Case("bridge_to_block", ValueKind::BridgeToBlockInst)
@@ -1316,6 +1317,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
 
+  case ValueKind::AssignInst:
   case ValueKind::StoreInst:
   case ValueKind::StoreWeakInst: {
     UnresolvedValueName from;
@@ -1343,21 +1345,26 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
-    SILType valueTy;
-    if (Opcode == ValueKind::StoreInst) {
-      valueTy = addrVal.getType().getObjectType();
-    } else {
+    if (Opcode == ValueKind::StoreWeakInst) {
       auto refType = addrVal.getType().getAs<ReferenceStorageType>();
       if (!refType || refType->getOwnership() != Ownership::Weak) {
         P.diagnose(addrLoc, diag::sil_operand_not_weak_address,
                    "destination", OpcodeName);
         return true;
       }
-      valueTy = SILType::getPrimitiveObjectType(refType.getReferentType());
+      auto valueTy = SILType::getPrimitiveObjectType(refType.getReferentType());
+      ResultVal = B.createStore(InstLoc, getLocalValue(from, valueTy), addrVal);
+      break;
     }
 
-    SILValue fromVal = getLocalValue(from, valueTy);
-    ResultVal = B.createStore(InstLoc, fromVal, addrVal);
+    SILValue fromVal = getLocalValue(from, addrVal.getType().getObjectType());
+    if (Opcode == ValueKind::StoreInst)
+      ResultVal = B.createStore(InstLoc, fromVal, addrVal);
+    else {
+      assert(Opcode == ValueKind::AssignInst);
+      ResultVal = B.createStore(InstLoc, fromVal, addrVal);
+    }
+
     break;
   }
   case ValueKind::AllocStackInst:

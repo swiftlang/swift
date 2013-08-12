@@ -311,6 +311,17 @@ public:
             "Store operand type and dest type mismatch");
   }
 
+  void checkAssignInst(AssignInst *AI) {
+    require(AI->getModule()->getStage() == SILStage::Raw,
+            "assign instruction can only exist in raw SIL");
+    require(AI->getSrc().getType().isObject(),
+            "Can't assign from an address source");
+    require(AI->getDest().getType().isAddress(),
+            "Must store to an address dest");
+    require(AI->getDest().getType().getObjectType() == AI->getSrc().getType(),
+            "Store operand type and dest type mismatch");
+  }
+
   void checkCopyAddrInst(CopyAddrInst *SI) {
     require(SI->getSrc().getType().isAddress(),
             "Src value should be lvalue");

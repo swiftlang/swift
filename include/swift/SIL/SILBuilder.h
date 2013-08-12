@@ -213,13 +213,14 @@ public:
   }
 
   LoadInst *createLoad(SILLocation Loc, SILValue LV) {
-    return insert(new (F.getModule())
-                    LoadInst(Loc, LV));
+    return insert(new (F.getModule()) LoadInst(Loc, LV));
   }
 
   StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestLValue) {
-    return insert(new (F.getModule())
-                    StoreInst(Loc, Src, DestLValue));
+    return insert(new (F.getModule()) StoreInst(Loc, Src, DestLValue));
+  }
+  AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestLValue) {
+    return insert(new (F.getModule()) AssignInst(Loc, Src, DestLValue));
   }
 
   LoadWeakInst *createLoadWeak(SILLocation loc, SILValue src, IsTake_t isTake) {

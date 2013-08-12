@@ -554,6 +554,32 @@ public:
   }
 };
 
+/// AssignInst - Represents an abstract assignment to a memory location, which
+/// may either be an initialization or a store sequence.  This is only valid in
+/// Raw SIL.
+class AssignInst : public SILInstruction {
+  enum {
+    /// the value being stored
+    Src,
+    /// the lvalue being stored to
+    Dest
+  };
+  FixedOperandList<2> Operands;
+public:
+
+  AssignInst(SILLocation Loc, SILValue Src, SILValue Dest);
+
+  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::AssignInst;
+  }
+};
+
+
 /// Represents a load from a [weak] memory location.
 class LoadWeakInst
   : public UnaryInstructionBase<ValueKind::LoadWeakInst>

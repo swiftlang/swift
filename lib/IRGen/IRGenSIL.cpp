@@ -509,6 +509,7 @@ public:
 
   void visitLoadInst(LoadInst *i);
   void visitStoreInst(StoreInst *i);
+  void visitAssignInst(AssignInst *i);
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitStructInst(StructInst *i);
@@ -1676,6 +1677,11 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
 
   type.initialize(*this, source, dest);
 }
+
+void IRGenSILFunction::visitAssignInst(AssignInst *i) {
+  llvm_unreachable("assign is not valid in canonical SIL");
+}
+
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
   Address source = getLoweredAddress(i->getOperand());

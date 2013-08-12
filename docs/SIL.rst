@@ -158,7 +158,7 @@ has been applied to it.
 * **Raw SIL** is the form produced by SILGen that has not been run through
   guaranteed optimizations or diagnostic passes. Raw SIL may not have a
   fully-constructed SSA graph. It may contain dataflow errors. Some instructions
-  may be represented in non-canonical forms, such as (TODO) ``assign`` and
+  may be represented in non-canonical forms, such as ``assign`` and
   ``destroy_addr`` for non-address-only values. Raw SIL should not be used
   for native code generation or distribution.
 
@@ -934,6 +934,28 @@ and the type of ``%0 is ``T``, which must be of a loadable type. This will
 overwrite the memory at ``%1``. If ``%1`` already references a value that
 requires ``release`` or other cleanup, that value must be loaded before being
 stored over and cleaned up.
+
+assign
+``````
+::
+
+  sil-instruction ::= 'assign' sil-value 'to' sil-operand
+
+  assign %0 to %1 : $*T
+  // $T must be a loadable type
+
+Represents an abstract assignment of the value ``%0`` to memory at address
+``%1`` without specifying whether it is an initialization or a normal store.
+The type of %1 is ``*T`` and the type of ``%0 is ``T``, which must be of a
+loadable type. This will overwrite the memory at ``%1``.
+
+The ``assign`` instruction is only valid in Raw SIL, it is produced by SILGen
+(which doesn't know what assignment is an initialization) and rewritten by the
+definitive initialization pass into an initialization or store sequence.
+Further, ``assign`` instructions may only access memory allocated by an
+``alloc_box`` instruction, or through a pointer derived from and ``alloc_box``
+through a sequence of ``struct_element_addr`` and/or ``tuple_element_addr``
+instructions.
 
 initialize_var
 ``````````````

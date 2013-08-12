@@ -487,6 +487,10 @@ public:
     OS << "store " << getID(SI->getSrc()) << " to "
        << getIDAndType(SI->getDest());
   }
+  void visitAssignInst(AssignInst *AI) {
+    OS << "assign " << getID(AI->getSrc()) << " to "
+       << getIDAndType(AI->getDest());
+  }
   void visitLoadWeakInst(LoadWeakInst *LI) {
     OS << "load_weak " << getIDAndType(LI->getOperand());
   }
