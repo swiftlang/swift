@@ -415,6 +415,15 @@ public:
                     TupleExtractInst(Loc, Operand, FieldNo, ResultTy));
   }
 
+  TupleExtractInst *createTupleExtractInst(SILLocation Loc,
+                              SILValue Operand,
+                              unsigned FieldNo,
+                              SILType ResultTy) {
+    return insert(new (F.getModule())
+                    TupleExtractInst(Loc, Operand, FieldNo, ResultTy));
+  }
+
+
   TupleElementAddrInst *createTupleElementAddr(SILLocation Loc,
                                                SILValue Operand,
                                                unsigned FieldNo,
