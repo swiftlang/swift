@@ -35,12 +35,12 @@ swift::CompilerInvocation::CompilerInvocation() {
   TargetTriple = llvm::sys::getDefaultTargetTriple();
 }
 
-std::string swift::CompilerInvocation::getRuntimeIncludePath() const {
-  llvm::SmallString<128> LibPath(MainExecutablePath);
+void CompilerInvocation::setMainExecutablePath(StringRef Path) {
+  llvm::SmallString<128> LibPath(Path);
   llvm::sys::path::remove_filename(LibPath); // Remove /swift
   llvm::sys::path::remove_filename(LibPath); // Remove /bin
   llvm::sys::path::append(LibPath, "lib", "swift");
-  return LibPath.str();
+  setRuntimeIncludePath(LibPath.str());
 }
 
 void swift::CompilerInstance::createSILModule() {

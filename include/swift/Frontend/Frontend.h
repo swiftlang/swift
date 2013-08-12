@@ -41,7 +41,7 @@ class CompilerInvocation {
   std::string ClangModuleCachePath;
   std::vector<std::string> ImportSearchPaths;
   std::vector<std::string> FrameworkSearchPaths;
-  std::string MainExecutablePath;
+  std::string RuntimeIncludePath;
   std::string SDKPath;
 
   LangOptions LangOpts;
@@ -103,11 +103,15 @@ public:
     return FrameworkSearchPaths;
   }
 
-  void setMainExecutablePath(const std::string &Path) {
-    MainExecutablePath = Path;
+  void setMainExecutablePath(StringRef Path);
+
+  void setRuntimeIncludePath(StringRef Path) {
+    RuntimeIncludePath = Path;
   }
 
-  std::string getRuntimeIncludePath() const;
+  StringRef getRuntimeIncludePath() const {
+    return RuntimeIncludePath;
+  }
 
   void setSDKPath(const std::string &Path) {
     // Capture the clang importer entrypoint here, so that clients that don't
