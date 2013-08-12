@@ -277,6 +277,10 @@ namespace {
                                          expr->isSpecialized()));
       }
 
+      // If there are no valid overloads, give up.
+      if (choices.empty())
+        return nullptr;
+
       // Record this overload set.
       CS.addOverloadSet(OverloadSet::getNew(CS, tv, locator, choices));
       return tv;
@@ -300,7 +304,11 @@ namespace {
         choices.push_back(OverloadChoice(baseTy, decls[i],
                                          /*isSpecialized=*/false));
       }
-      
+
+      // If there are no valid overloads, give up.
+      if (choices.empty())
+        return nullptr;
+
       // Record this overload set.
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addOverloadSet(OverloadSet::getNew(CS, tv, locator, choices));
