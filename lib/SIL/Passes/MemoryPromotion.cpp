@@ -322,9 +322,9 @@ void ElementPromotion::doIt() {
 void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   SILValue Result;
 
-  // If this is a Load (not a CopyAddr), we try to compute the loaded value as
-  // an SSA register.  Otherwise, we don't ask for an available value to avoid
-  // constructing SSA for the value.
+  // If this is a Load (not a CopyAddr or LoadWeak), we try to compute the
+  // loaded value as an SSA register.  Otherwise, we don't ask for an available
+  // value to avoid constructing SSA for the value.
   auto DI = checkDefinitelyInit(Inst, isa<LoadInst>(Inst) ? &Result : nullptr);
   if (DI == DI_Yes) {
     // If the value is definitely initialized, check to see if this is a load
@@ -353,10 +353,14 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst) {
   // initializations, or ambiguous and then rewrite them.  As such, we look at
   // AssignInst and "assignment" CopyAddr's.  We ignore initialize copy_addrs,
   // relying on SILGen to only produce them when known correct.
-  if (!isa<AssignInst>(Inst)) {
-    auto CA = dyn_cast<CopyAddrInst>(Inst);
-    if (CA == nullptr || CA->isInitializationOfDest())
-      return;
+  if (isa<AssignInst>(Inst))
+    ;
+  else if (auto CA = dyn_cast<CopyAddrInst>(Inst)) {
+    if (CA->isInitializationOfDest()) return;
+  } else if (auto SW = dyn_cast<StoreWeakInst>(Inst)) {
+    if (SW->isInitializationOfDest()) return;
+  } else {
+    return;
   }
 
   bool HasTrivialType = false;
@@ -378,11 +382,14 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst) {
     return;
   }
 
-  // If this is a copy_addr, we just set the initialization bit depending on
-  // what we find.
+  // If this is a copy_addr or store_weak, we just set the initialization bit
+  // depending on what we find.
   if (auto *CA = dyn_cast<CopyAddrInst>(Inst)) {
-    CA->setIsInitializationOfDest(DI == DI_No ? IsInitialization
-                                              : IsNotInitialization);
+    CA->setIsInitializationOfDest(IsInitialization_t(DI == DI_No));
+    return;
+  }
+  if (auto *SW = dyn_cast<StoreWeakInst>(Inst)) {
+    SW->setIsInitializationOfDest(IsInitialization_t(DI == DI_No));
     return;
   }
 
@@ -456,6 +463,7 @@ static SILValue getStoredValueFrom(SILInstruction *I) {
     return SI->getOperand(0);
   if (auto *AI = dyn_cast<AssignInst>(I))
     return AI->getOperand(0);
+  // TODO: Should we support store forwarding of weak pointers?
   return SILValue();
 }
 
@@ -537,14 +545,15 @@ static void collectAllocationUses(SILValue Pointer,
     // extracts of their elements + individual stores.
 
     // Loads are a use of the value.
-    if (auto *LI = dyn_cast<LoadInst>(User)) {
-      addElementUses(Uses, BaseElt, PointeeType, LI, UseKind::Load,
+    if (isa<LoadInst>(User) || isa<LoadWeakInst>(User)) {
+      addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Load,
                      NumElements);
       continue;
     }
 
     // Stores *to* the allocation are writes.  Stores *of* it is an escape.
-    if ((isa<StoreInst>(User) || isa<AssignInst>(User)) &&
+    if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
+         isa<StoreWeakInst>(User)) &&
         UI->getOperandNumber() == 1) {
       addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store,
                      NumElements);

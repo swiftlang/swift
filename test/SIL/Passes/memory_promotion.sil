@@ -273,6 +273,41 @@ bb0(%0 : $*T, %1 : $*T):
   return %9 : $()
 }
 
+// CHECK-LABEL: sil @assign_test_weak
+sil @assign_test_weak : $[thin]() -> () {
+bb0:
+  // Assignments of weak pointer.  The first becomes an initialize, and the
+  // second becomes an assignment.
+
+  %c = alloc_box $[weak] SomeClass
+  %f = function_ref @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass
+  %3 = metatype $SomeClass.metatype
+
+  %4 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  // CHECK: [[C1:%[0-9]+]] = apply
+
+  // THis should become an initialization.
+  store_weak %4 to %c#1 : $*[weak] SomeClass
+  // CHECK-NEXT: store_weak [[C1]] to [initialization] %0#1
+
+  release %4 : $SomeClass
+  // CHECK-NEXT: release [[C1]]
+
+  %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  // CHECK-NEXT: [[C2:%[0-9]+]] = apply
+
+  store_weak %8 to %c#1 : $*[weak] SomeClass
+  // CHECK-NEXT: store_weak [[C2]] to %0#1
+
+  release %8 : $SomeClass
+  // CHECK-NEXT: release [[C2]]
+
+  release %c#0 : $Builtin.ObjectPointer
+
+  %11 = tuple ()
+  return %11 : $()
+}
+
 
 
 
