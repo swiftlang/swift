@@ -15,12 +15,12 @@ config.target_triple = "@TARGET_TRIPLE@"
 # parameters. This is used when we can't determine the tool dir at
 # configuration time.
 try:
-    config.llvm_tools_dir = config.llvm_tools_dir % lit.params
-    config.llvm_libs_dir = config.llvm_libs_dir % lit.params
-    config.llvm_build_mode = config.llvm_build_mode % lit.params
+    config.llvm_tools_dir = config.llvm_tools_dir % lit_config.params
+    config.llvm_libs_dir = config.llvm_libs_dir % lit_config.params
+    config.llvm_build_mode = config.llvm_build_mode % lit_config.params
 except KeyError,e:
     key, = e.args
-    lit.fatal("unable to find %r parameter, use '--param=%s=VALUE'" % (key,key))
+    lit_config.fatal("unable to find %r parameter, use '--param=%s=VALUE'" % (key,key))
 
 # Let the main config do the real work.
-lit.load_config(config, "@SWIFT_SOURCE_DIR@/test/Unit/lit.cfg")
+lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/test/Unit/lit.cfg")
