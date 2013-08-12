@@ -18,6 +18,7 @@
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -1211,6 +1212,7 @@ public:
                             CD,
                             /*allowUnknownTypes*/false)) {
       CD->setType(ErrorType::get(TC.Context));
+      CD->setInvalid();
     } else {
       Type FnTy;
       Type AllocFnTy;
@@ -1523,7 +1525,7 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
   for (auto member : ctors) {
     // Dig out the parameter tuple for this constructor.
     auto ctor = dyn_cast<ConstructorDecl>(member);
-    if (!ctor)
+    if (!ctor || ctor->isInvalid())
       continue;
 
     auto paramTuple = ctor->getArgumentType()->getAs<TupleType>();
@@ -1566,6 +1568,9 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
 }
 
 void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
+  PrettyStackTraceDecl stackTrace("defining default constructor for",
+                                  structDecl);
+
   // Erase this from the set of structs that need an implicit default
   // constructor.
   assert(structsNeedingImplicitDefaultConstructor.count(structDecl));
@@ -1590,7 +1595,7 @@ void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
     patternBind->getPattern()->collectVariables(variables);
 
     for (auto var : variables) {
-      if (var->isProperty())
+      if (var->isProperty() || var->isInvalid())
         continue;
 
       // If this variable is not default-initializable, we're done: we can't
