@@ -104,6 +104,8 @@ namespace {
                             VisibleDeclConsumer &Consumer,
                             NLKind LookupKind,
                             const TranslationUnit &TU);
+
+    SmallVector<ValueDecl *, 0> AllVisibleValues;
   };
 } // end anonymous namespace.
 
@@ -414,6 +416,17 @@ void TranslationUnit::print(raw_ostream &os, const PrintOptions &options) {
 
 void TranslationUnit::clearLookupCache() {
   freeTUCachePimpl(LookupCachePimpl);
+}
+
+void
+TranslationUnit::cacheVisibleDecls(SmallVectorImpl<ValueDecl*> &&globals) const{
+  auto &cached = getTUCachePimpl(LookupCachePimpl, *this).AllVisibleValues;
+  static_cast<SmallVectorImpl<ValueDecl*>&>(cached) = std::move(globals);
+}
+
+const SmallVectorImpl<ValueDecl *> &
+TranslationUnit::getCachedVisibleDecls() const {
+  return getTUCachePimpl(LookupCachePimpl, *this).AllVisibleValues;
 }
 
 //===----------------------------------------------------------------------===//

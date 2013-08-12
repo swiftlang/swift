@@ -299,6 +299,9 @@ public:
 
   void clearLookupCache();
 
+  void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
+  const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
+
   void dump() const;
 
   /// \brief Pretty-print the entire contents of this translation unit.

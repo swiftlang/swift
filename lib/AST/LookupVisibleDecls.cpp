@@ -489,16 +489,22 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     DC = DC->getParent();
   }
 
-  if (Loc.isValid()) {
-    if (auto TU = dyn_cast<TranslationUnit>(&M)) {
+  if (auto TU = dyn_cast<TranslationUnit>(&M)) {
+    if (Loc.isValid()) {
       // Look for local variables in top-level code; normally, the parser
       // resolves these for us, but it can't do the right thing for
       // local types.
       FindLocalVal(SM, Loc, Consumer).checkTranslationUnit(TU);
     }
+
+    auto &cached = TU->getCachedVisibleDecls();
+    if (!cached.empty()) {
+      for (auto result : cached)
+        Consumer.foundDecl(result);
+      return;
+    }
   }
 
-  // FIXME: Cache TU-level visible decls, since those shouldn't change.
   using namespace namelookup;
   SmallVector<ValueDecl *, 0> moduleResults;
   auto &mutableM = const_cast<Module&>(M);
@@ -507,6 +513,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                              ResolutionKind::Overloadable);
   for (auto result : moduleResults)
     Consumer.foundDecl(result);
+
+  if (auto TU = dyn_cast<TranslationUnit>(&M)) {
+    TU->cacheVisibleDecls(std::move(moduleResults));
+  }
 }
 
 void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
