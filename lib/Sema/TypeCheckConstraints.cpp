@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
@@ -3351,6 +3352,8 @@ bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       Type convertType){
+  PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (preCheckExpression(expr, dc))
@@ -3430,6 +3433,8 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
 bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
                                              Type convertType) {
+  PrettyStackTraceExpr stackTrace(Context, "shallow type-checking", expr);
+
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
@@ -3552,6 +3557,8 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
+  PrettyStackTraceExpr stackTrace(Context, "type-checking condition", expr);
+
   if (preCheckExpression(expr, dc))
     return true;
 
@@ -3629,6 +3636,8 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 
 bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
                                       DeclContext *dc) {
+  PrettyStackTraceExpr stackTrace(Context, "type-checking array bound", expr);
+
   // If it's an integer literal expression, just convert the type directly.
   if (auto lit = dyn_cast<IntegerLiteralExpr>(
                    expr->getSemanticsProvidingExpr())) {
@@ -3736,6 +3745,8 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
 /// value of a given type.
 bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                        Type rhsType) {
+  PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
+
   // Create a variable to stand in for the RHS value.
   auto *matchVar = new (Context) VarDecl(EP->getLoc(),
                                          Context.getIdentifier("$match"),
