@@ -457,5 +457,9 @@ void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
   if (hasCleanup())
     forwardCleanup(gen);
   auto &lowering = gen.getTypeLowering(address.getType().getSwiftRValueType());
-  lowering.emitSemanticAssign(gen.B, loc, getValue(), address);
+
+  if (gen.SGM.M.getASTContext().LangOpts.UseDefiniteInit)
+    lowering.emitSemanticAssignOrInitialize(gen.B, loc, getValue(), address);
+  else
+    lowering.emitSemanticAssign(gen.B, loc, getValue(), address);
 }
