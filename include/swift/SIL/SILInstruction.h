@@ -1257,7 +1257,10 @@ public:
                     SILDeclRef Member,
                     bool Volatile = false)
     : SILInstruction(Kind, Loc, Ty), Member(Member), Volatile(Volatile) {}
-  
+
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
   SILDeclRef getMember() const { return Member; }
   
   /// True if this dynamic dispatch is semantically required.
