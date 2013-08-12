@@ -193,8 +193,8 @@ class SomeClass {}
 sil @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass
 
 
-// CHECK-LABEL: sil @assign_test
-sil @assign_test : $[thin] (a : Int64) -> Int64 {
+// CHECK-LABEL: sil @assign_test_trivial
+sil @assign_test_trivial : $[thin] (a : Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
 
@@ -207,11 +207,18 @@ bb0(%0 : $Int64):
   %2 = load %1#1 : $*Int64
   release %1#0 : $Builtin.ObjectPointer            // CHECK-NEXT: release %1#0
 
+  // Verify that the load got forwarded from an assign.
+  return %2 : $Int64                        // CHECK: return %0 : $Int64
+}
+
+// CHECK-LABEL: sil @assign_test_nontrivial
+sil @assign_test_nontrivial : $[thin] () -> () {
+bb0:
   // Assignments of nontrivial types.  The first becomes an initialize (i.e.,
   // lone store), the second becomes an assignment (retain/release dance).
 
   %c = alloc_box $SomeClass
-  %f = function_ref @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass // t.SomeClass.__allocating_constructor : (t.SomeClass.metatype)() -> t.SomeClass // user: %4
+  %f = function_ref @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass
   %3 = metatype $SomeClass.metatype
 
   %4 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
@@ -239,8 +246,8 @@ bb0(%0 : $Int64):
   release %c#0 : $Builtin.ObjectPointer
 
 
-  // Verify that the load got forwarded from an assign.
-  return %2 : $Int64                        // CHECK: return %0 : $Int64
+  %11 = tuple ()
+  return %11 : $()
 }
 
 
