@@ -180,13 +180,12 @@ namespace swift {
   /// the DiagnosticArguments that it requires. 
   class Diagnostic {
   public:
-    typedef DiagnosticInfo::Range Range;
     typedef DiagnosticInfo::FixIt FixIt;
 
   private:
     DiagID ID;
     SmallVector<DiagnosticArgument, 3> Args;
-    SmallVector<Range, 2> Ranges;
+    SmallVector<CharSourceRange, 2> Ranges;
     SmallVector<FixIt, 2> FixIts;
 
   public:
@@ -207,10 +206,10 @@ namespace swift {
     // Accessors.
     DiagID getID() const { return ID; }
     ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
-    ArrayRef<Range> getRanges() const { return Ranges; }
+    ArrayRef<CharSourceRange> getRanges() const { return Ranges; }
     ArrayRef<FixIt> getFixIts() const { return FixIts; }
 
-    void addRange(Range R) {
+    void addRange(CharSourceRange R) {
       Ranges.push_back(R);
     }
 
@@ -266,29 +265,36 @@ namespace swift {
     /// \brief Flush the active diagnostic to the diagnostic output engine.
     void flush();
 
-    /// \brief Add a range to the currently-active diagnostic.
-    ///
-    /// Use a SourceRange for a token-based range; explicitly construct a
-    /// Diagnostic::Range from two SourceLocs for a character-based range.
-    InFlightDiagnostic &highlight(Diagnostic::Range R);
+    /// \brief Add a token-based range to the currently-active diagnostic.
+    InFlightDiagnostic &highlight(SourceRange R);
 
-    /// \brief Add a replacement fix-it to the currently-active diagnostic.
-    ///
-    /// Use a SourceRange for a token-based range; explicitly construct a
-    /// Diagnostic::Range from two SourceLocs for a character-based range.
-    InFlightDiagnostic &fixItReplace(Diagnostic::Range R, StringRef Str);
+    /// \brief Add a character-based range to the currently-active diagnostic.
+    InFlightDiagnostic &highlightChars(SourceLoc Start, SourceLoc End);
+
+    /// \brief Add a token-based replacement fix-it to the currently-active
+    /// diagnostic.
+    InFlightDiagnostic &fixItReplace(SourceRange R, StringRef Str);
+
+    /// \brief Add a character-based replacement fix-it to the currently-active
+    /// diagnostic.
+    InFlightDiagnostic &fixItReplaceChars(SourceLoc Start, SourceLoc End,
+                                          StringRef Str);
 
     /// \brief Add an insertion fix-it to the currently-active diagnostic.
     InFlightDiagnostic &fixItInsert(SourceLoc L, StringRef Str) {
-      return fixItReplace(Diagnostic::Range(L, L), Str);
+      return fixItReplaceChars(L, L, Str);
     }
 
-    /// \brief Add a removal fix-it to the currently-active diagnostic.
-    ///
-    /// Use a SourceRange for a token-based range; explicitly construct a
-    /// Diagnostic::Range from two SourceLocs for a character-based range.
-    InFlightDiagnostic &fixItRemove(Diagnostic::Range R) {
+    /// \brief Add a token-based removal fix-it to the currently-active
+    /// diagnostic.
+    InFlightDiagnostic &fixItRemove(SourceRange R) {
       return fixItReplace(R, {});
+    }
+
+    /// \brief Add a token-based removal fix-it to the currently-active
+    /// diagnostic.
+    InFlightDiagnostic &fixItRemoveChars(SourceLoc Start, SourceLoc End) {
+      return fixItReplaceChars(Start, End, {});
     }
   };
     
@@ -475,22 +481,6 @@ namespace swift {
     /// \brief Retrieve the active diagnostic.
     Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
   };
-
-  inline InFlightDiagnostic &
-  InFlightDiagnostic::highlight(Diagnostic::Range R) {
-    assert(IsActive && "Cannot modify an inactive diagnostic");
-    if (Engine)
-      Engine->getActiveDiagnostic().addRange(R);
-    return *this;
-  }
-
-  inline InFlightDiagnostic &
-  InFlightDiagnostic::fixItReplace(Diagnostic::Range R, StringRef Str) {
-    assert(IsActive && "Cannot modify an inactive diagnostic");
-    if (Engine)
-      Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(R, Str));
-    return *this;
-  }
 } // end namespace swift
 
 #endif

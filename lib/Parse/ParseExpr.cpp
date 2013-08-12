@@ -467,7 +467,7 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
 
     assert(OperEndLoc != Tok.getLoc() && "binary operator with no spaces?");
     diagnose(PreviousLoc, diag::expected_prefix_operator)
-      .fixItRemove(Diagnostic::Range(OperEndLoc, Tok.getLoc()));
+      .fixItRemoveChars(OperEndLoc, Tok.getLoc());
     break;
   }
   }

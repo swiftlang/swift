@@ -119,7 +119,7 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
 
       tc.diagnose(inherited.getSourceRange().Start,
                   diag::duplicate_inheritance, inheritedTy)
-        .fixItRemove(Diagnostic::Range(afterPriorLoc, afterMyEndLoc))
+        .fixItRemoveChars(afterPriorLoc, afterMyEndLoc)
         .highlight(knownType->second);
       continue;
     }
@@ -175,7 +175,7 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
 
         tc.diagnose(inherited.getSourceRange().Start,
                     diag::superclass_not_first, inheritedTy)
-          .fixItRemove(Diagnostic::Range(afterPriorLoc, afterMyEndLoc))
+          .fixItRemoveChars(afterPriorLoc, afterMyEndLoc)
           .fixItInsert(inheritedClause[0].getSourceRange().Start,
                        inheritedTy.getString() + ", ");
 

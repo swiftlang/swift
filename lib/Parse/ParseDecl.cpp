@@ -1309,7 +1309,7 @@ FuncDecl *Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   // Reject 'static' functions at global scope.
   if (StaticLoc.isValid() && !HasContainerType) {
     diagnose(Tok, diag::static_func_decl_global_scope)
-      .fixItRemove(Diagnostic::Range(StaticLoc, Tok.getLoc()));
+      .fixItRemoveChars(StaticLoc, Tok.getLoc());
     StaticLoc = SourceLoc();
   }
   

@@ -43,7 +43,7 @@ PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
   
   // Translate ranges.
   SmallVector<llvm::SMRange, 2> Ranges;
-  for (DiagnosticInfo::Range R : Info.Ranges)
+  for (auto R : Info.Ranges)
     Ranges.push_back(getRawRange(SM, R));
 
   // Translate fix-its.

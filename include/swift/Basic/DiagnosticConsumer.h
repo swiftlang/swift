@@ -40,42 +40,21 @@ enum class DiagnosticKind {
 /// \brief Extra information carried along with a diagnostic, which may or
 /// may not be of interest to a given diagnostic consumer.
 struct DiagnosticInfo {
-  /// Represents a source range that can either be a half-open character range
-  /// (like llvm::SMRange) or a closed token range (like SourceRange).
-  ///
-  /// Diagnostics need to be able to handle both kinds of ranges.
-  class Range {
-  public:
-    SourceLoc Start, End;
-    bool IsTokenRange;
-
-    Range(SourceLoc S, SourceLoc E, bool TokenRange = false)
-      : Start(S), End(E), IsTokenRange(TokenRange) {}
-
-    /// Force callers to choose whether they want a zero-length range at \p S,
-    /// a one-character range at \p S, or a range consisting of the token at
-    /// \p S.
-    /*implicit*/ Range(SourceLoc S) = delete;
-
-    /*implicit*/ Range(SourceRange SR)
-      : Start(SR.Start), End(SR.End), IsTokenRange(true) {}
-  };
-
   /// Represents a fix-it, a replacement of one range of text with another.
   class FixIt {
-    DiagnosticInfo::Range Range;
+    CharSourceRange Range;
     std::string Text;
 
   public:
-    FixIt(DiagnosticInfo::Range R, StringRef Str)
-      : Range(R), Text(Str) {}
+    FixIt(CharSourceRange R, StringRef Str)
+        : Range(R), Text(Str) {}
 
-    DiagnosticInfo::Range getRange() const { return Range; }
+    CharSourceRange getRange() const { return Range; }
     StringRef getText() const { return Text; }
   };
 
   /// \brief Extra source ranges that are attached to the diagnostic.
-  ArrayRef<Range> Ranges;
+  ArrayRef<CharSourceRange> Ranges;
 
   /// \brief Extra source ranges that are attached to the diagnostic.
   ArrayRef<FixIt> FixIts;
@@ -88,7 +67,9 @@ protected:
   // we need to translate swift::SourceLoc to llvm::SMLoc.
   static llvm::SMLoc getRawLoc(SourceLoc Loc) { return Loc.Value; }
 
-  static llvm::SMRange getRawRange(SourceManager &SM, DiagnosticInfo::Range R);
+  static llvm::SMRange getRawRange(SourceManager &SM, CharSourceRange R) {
+    return llvm::SMRange(getRawLoc(R.getStart()), getRawLoc(R.getEnd()));
+  }
 
   static llvm::SMFixIt getRawFixIt(SourceManager &SM, DiagnosticInfo::FixIt F) {
     // FIXME: It's unfortunate that we have to copy the replacement text.

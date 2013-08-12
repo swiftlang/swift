@@ -101,6 +101,37 @@ public:
   void dump(const SourceManager &SM) const;
 };
 
+/// A half-open character-based source range.
+class CharSourceRange {
+  SourceLoc Start;
+  unsigned ByteLength;
+
+public:
+  /// \brief Constructs an invalid range.
+  CharSourceRange() {}
+
+  /// \brief Constructs a character range which starts and ends at the
+  /// specified character locations.
+  CharSourceRange(SourceManager &SM, SourceLoc Start, SourceLoc End);
+
+  bool isValid() const { return Start.isValid(); }
+  bool isInvalid() const { return Start.isInvalid(); }
+
+  SourceLoc getStart() const { return Start; }
+  SourceLoc getEnd() const {
+    if (Start.isValid())
+      return Start.getAdvancedLoc(ByteLength);
+    else
+      return SourceLoc();
+  }
+
+  /// \brief Return the length of this valid range in bytes.  Can be zero.
+  unsigned getByteLength() const {
+    assert(isValid() && "length does not make sense for an invalid range");
+    return ByteLength;
+  }
+};
+
 } // end namespace swift
 
 #endif

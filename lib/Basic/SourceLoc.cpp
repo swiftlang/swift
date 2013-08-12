@@ -36,6 +36,19 @@ unsigned SourceManager::getLocOffsetInBuffer(SourceLoc Loc,
   return Loc.Value.getPointer() - Buffer->getBuffer().begin();
 }
 
+unsigned SourceManager::getByteDistance(SourceLoc Start, SourceLoc End) const {
+#ifndef NDEBUG
+  unsigned BufferID = findBufferContainingLoc(Start);
+  auto *Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID);
+  assert(End.Value.getPointer() >= Buffer->getBuffer().begin() &&
+         End.Value.getPointer() <= Buffer->getBuffer().end() &&
+         "End location is not from the same buffer");
+#endif
+  // When we have a rope buffer, could be implemented in terms of
+  // getLocOffsetInBuffer().
+  return End.Value.getPointer() - Start.Value.getPointer();
+}
+
 void SourceLoc::printLineAndColumn(raw_ostream &OS,
                                    const SourceManager &SM) const {
   if (isInvalid()) {
@@ -91,5 +104,14 @@ void SourceRange::print(raw_ostream &OS, const SourceManager &SM,
 
 void SourceRange::dump(const SourceManager &SM) const {
   print(llvm::errs(), SM);
+}
+
+CharSourceRange::CharSourceRange(SourceManager &SM, SourceLoc Start,
+                                 SourceLoc End)
+    : Start(Start) {
+  assert(Start.isValid() == End.isValid() &&
+         "Start and end should either both be valid or both be invalid!");
+  if (Start.isValid())
+    ByteLength = SM.getByteDistance(Start, End);
 }
 

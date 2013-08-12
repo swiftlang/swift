@@ -267,7 +267,7 @@ static void diagnoseEmbeddedNul(DiagnosticEngine *Diags, const char *Ptr) {
   SourceLoc NulLoc = Lexer::getSourceLoc(Ptr);
   SourceLoc NulEndLoc = Lexer::getSourceLoc(Ptr+1);
   Diags->diagnose(NulLoc, diag::lex_nul_character)
-    .fixItRemove(DiagnosticInfo::Range(NulLoc, NulEndLoc));
+      .fixItRemoveChars(NulLoc, NulEndLoc);
 }
 
 void Lexer::skipToEndOfLine() {
@@ -1036,8 +1036,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
       if (Diags)
         Diags->diagnose(Lexer::getSourceLoc(CurPtr - 1),
                         diag::lex_unexpected_quote_string_interpolation)
-          .highlight(Diagnostic::Range(InterpStart,
-                                       Lexer::getSourceLoc(CurPtr-1)));
+            .highlightChars(InterpStart, Lexer::getSourceLoc(CurPtr-1));
       return CurPtr-1;
     case 0:
       // If we hit EOF, we fail.

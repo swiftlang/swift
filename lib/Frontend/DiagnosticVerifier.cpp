@@ -129,13 +129,13 @@ static bool checkForFixIt(const ExpectedFixIt &Expected,
 }
 
 
-/// VerifyDiagnostics - After the file has been processed, check to see if we
-/// got all of the expected diagnostics and check to see if there were any
-/// unexpected ones.
+/// \brief After the file has been processed, check to see if we got all of
+/// the expected diagnostics and check to see if there were any unexpected
+/// ones.
 bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
+  const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
   const llvm::MemoryBuffer &MemBuffer = *SM->getMemoryBuffer(BufferID);
   StringRef InputFile = MemBuffer.getBuffer();
-
 
   // Queue up all of the diagnostics, allowing us to sort them and emit them in
   // file order.
@@ -210,9 +210,10 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
     if (PrevExpectedContinuationLine)
       Expected.LineNo = PrevExpectedContinuationLine;
     else
-      Expected.LineNo =
-      SM->FindLineNumber(llvm::SMLoc::getFromPointer(MatchStart.data()),
-                         BufferID);
+      Expected.LineNo = SM.getLineAndColumn(
+          BufferStartLoc
+              .getAdvancedLoc(MatchStart.data() - MemBuffer.getBufferStart()),
+          BufferID).first;
 
     // Check if the next expected diagnostic should be in the same line.
     StringRef AfterEnd = MatchStart.substr(End + strlen("}}"));

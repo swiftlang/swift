@@ -22,6 +22,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/Lexer.h" // bad dependency
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -48,6 +49,51 @@ static StoredDiagnosticInfo StoredDiagnosticInfos[] = {
 #include "swift/AST/Diagnostics.def"
   { DiagnosticKind::Error, "<not a diagnostic>" }
 };
+
+static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
+  return CharSourceRange(SM, SR.Start, Lexer::getLocForEndOfToken(SM, SR.End));
+}
+
+static CharSourceRange toCharSourceRange(SourceManager &SM, SourceLoc Start,
+                                         SourceLoc End) {
+  return CharSourceRange(SM, Start, End);
+}
+
+InFlightDiagnostic &InFlightDiagnostic::highlight(SourceRange R) {
+  assert(IsActive && "Cannot modify an inactive diagnostic");
+  if (Engine)
+    Engine->getActiveDiagnostic()
+        .addRange(toCharSourceRange(Engine->SourceMgr, R));
+  return *this;
+}
+
+InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
+                                                       SourceLoc End) {
+  assert(IsActive && "Cannot modify an inactive diagnostic");
+  if (Engine)
+    Engine->getActiveDiagnostic()
+        .addRange(toCharSourceRange(Engine->SourceMgr, Start, End));
+  return *this;
+}
+
+InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
+                                                     StringRef Str) {
+  assert(IsActive && "Cannot modify an inactive diagnostic");
+  if (Engine)
+    Engine->getActiveDiagnostic().addFixIt(
+        Diagnostic::FixIt(toCharSourceRange(Engine->SourceMgr, R), Str));
+  return *this;
+}
+
+InFlightDiagnostic &InFlightDiagnostic::fixItReplaceChars(SourceLoc Start,
+                                                          SourceLoc End,
+                                                          StringRef Str) {
+  assert(IsActive && "Cannot modify an inactive diagnostic");
+  if (Engine)
+    Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(
+        toCharSourceRange(Engine->SourceMgr, Start, End), Str));
+  return *this;
+}
 
 void InFlightDiagnostic::flush() {
   if (!IsActive)
@@ -373,3 +419,4 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   // Reset the active diagnostic.
   ActiveDiagnostic.reset();
 }
+

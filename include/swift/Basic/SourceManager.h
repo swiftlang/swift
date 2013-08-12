@@ -107,6 +107,9 @@ public:
   /// \brief Returns the offset in bytes for the given source location.
   unsigned getLocOffsetInBuffer(SourceLoc Loc, unsigned BufferID) const;
 
+  /// \brief Returns the distance in bytes between the given source locations.
+  unsigned getByteDistance(SourceLoc Start, SourceLoc End) const;
+
   std::pair<unsigned, unsigned> getLineAndColumn(SourceLoc Loc,
                                                  int BufferID = -1) const {
     assert(Loc.isValid());
