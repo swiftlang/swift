@@ -1362,7 +1362,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       ResultVal = B.createStore(InstLoc, fromVal, addrVal);
     else {
       assert(Opcode == ValueKind::AssignInst);
-      ResultVal = B.createStore(InstLoc, fromVal, addrVal);
+      ResultVal = B.createAssign(InstLoc, fromVal, addrVal);
     }
 
     break;

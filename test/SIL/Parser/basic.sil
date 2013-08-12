@@ -838,3 +838,10 @@ bb0(%0 : $ConcreteClass):
   release %1#0 : $Builtin.ObjectPointer
   return %5 : $ClassP
 }
+
+sil @test_assign : $(x : Int64, y : [byref] Int64) -> () {    // CHECK-LABEL: sil @test_assign
+bb0(%0 : $Int64, %1 : $*Int64):
+  assign %0 to %1 : $*Int64                   // CHECK:   assign %0 to %1
+  unreachable
+}
+
