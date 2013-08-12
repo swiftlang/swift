@@ -608,7 +608,7 @@ public:
 class StoreWeakInst : public SILInstruction {
   enum { Src, Dest };
   FixedOperandList<2> Operands;
-  unsigned IsInit : 1; // FIXME: pack this somewhere
+  unsigned IsInitializationOfDest : 1; // FIXME: pack this somewhere
 public:
   StoreWeakInst(SILLocation loc, SILValue src, SILValue dest,
                 IsInitialization_t isInit);
@@ -616,8 +616,11 @@ public:
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
-  IsInitialization_t isInitialization() const {
-    return IsInitialization_t(IsInit);
+  IsInitialization_t isInitializationOfDest() const {
+    return IsInitialization_t(IsInitializationOfDest);
+  }
+  void setIsInitializationOfDest(IsInitialization_t I) {
+    IsInitializationOfDest = (bool)I;
   }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }

@@ -419,7 +419,7 @@ AssignInst::AssignInst(SILLocation Loc, SILValue Src, SILValue Dest)
 StoreWeakInst::StoreWeakInst(SILLocation loc, SILValue value, SILValue dest,
                              IsInitialization_t isInit)
   : SILInstruction(ValueKind::StoreWeakInst, loc),
-    Operands(this, value, dest), IsInit(isInit) {
+    Operands(this, value, dest), IsInitializationOfDest(isInit) {
 }
 
 CopyAddrInst::CopyAddrInst(SILLocation Loc, SILValue SrcLValue, SILValue DestLValue,

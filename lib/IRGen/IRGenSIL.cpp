@@ -1703,7 +1703,7 @@ void IRGenSILFunction::visitStoreWeakInst(swift::StoreWeakInst *i) {
   Address dest = getLoweredAddress(i->getDest());
 
   auto &weakTI = cast<WeakTypeInfo>(getFragileTypeInfo(i->getDest().getType()));
-  if (i->isInitialization()) {
+  if (i->isInitializationOfDest()) {
     weakTI.weakInit(*this, source, dest);
   } else {
     weakTI.weakAssign(*this, source, dest);

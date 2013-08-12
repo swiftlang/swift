@@ -431,7 +431,7 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
 }
 
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
-                                                 LValue const &src) {
+                                                 const LValue &src) {
   SILValue addr;
   
   assert(src.begin() != src.end() && "lvalue must have at least one component");
@@ -444,7 +444,7 @@ ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
 }
 
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
-                                        RValue &&src, LValue const &dest) {
+                                        RValue &&src, const LValue &dest) {
   WritebackScope scope(*this);
   
   // Resolve all components up to the last, keeping track of value-type logical

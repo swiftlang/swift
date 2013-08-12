@@ -496,7 +496,7 @@ public:
   }
   void visitStoreWeakInst(StoreWeakInst *SI) {
     OS << "store_weak " << getID(SI->getSrc()) << " to ";
-    if (SI->isInitialization())
+    if (SI->isInitializationOfDest())
       OS << "[initialization] ";
     OS << getIDAndType(SI->getDest());
   }
