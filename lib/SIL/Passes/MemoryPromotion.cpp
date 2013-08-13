@@ -52,6 +52,12 @@ namespace {
     /// specified std::string.
     void getPathStringToElement(CanType T, unsigned Element,
                                 std::string &Result);
+
+    /// Given a pointer to an aggregate type, compute the addresses of each
+    /// element and add them to the ElementAddrs vector.  If an element lowers
+    /// down to zero elements, this pushes a null SILValue.
+    void getElementAddresses(SILValue Pointer,
+                             SmallVectorImpl<SILValue> &ElementAddrs);
   };
 } // end anonymous namespace
 
@@ -140,6 +146,55 @@ void NumElementsCache::getPathStringToElement(CanType T, unsigned Element,
   }
   assert(0 && "Element number is out of range for this type!");
 }
+
+/// Given a pointer to an aggregate type, compute the addresses of each
+/// element and add them to the ElementAddrs vector.  If an element lowers
+/// down to zero elements, this pushes a null SILValue.
+void NumElementsCache::getElementAddresses(SILValue Pointer,
+                                     SmallVectorImpl<SILValue> &ElementAddrs) {
+  CanType PointeeType = Pointer.getType().getSwiftRValueType();
+  assert(get(PointeeType) != 1 && "Shouldn't decompose scalars");
+  
+  SILInstruction *PointerInst = cast<SILInstruction>(Pointer.getDef());
+  SILBuilder B(PointerInst);
+
+  if (TupleType *TT = PointeeType->getAs<TupleType>()) {
+    for (auto &Field : TT->getFields()) {
+      if (get(Field.getType()->getCanonicalType()) == 0) {
+        ElementAddrs.push_back(SILValue());
+        continue;
+      }
+      
+      auto ResultTy = Field.getType()->getCanonicalType();
+      ElementAddrs.push_back(B.createTupleElementAddr(PointerInst->getLoc(),
+                                                      Pointer,
+                                                      ElementAddrs.size(),
+                                  SILType::getPrimitiveAddressType(ResultTy)));
+    }
+    return;
+  }
+  
+  assert(PointeeType->is<StructType>() ||
+         PointeeType->is<BoundGenericStructType>());
+  StructDecl *SD;
+  if (auto *ST = PointeeType->getAs<StructType>())
+    SD = ST->getDecl();
+  else
+    SD = PointeeType->castTo<BoundGenericStructType>()->getDecl();
+  
+  for (auto *VD : SD->getPhysicalFields()) {
+    if (get(VD->getType()->getCanonicalType()) == 0) {
+      ElementAddrs.push_back(SILValue());
+      continue;
+    }
+
+    auto ResultTy = VD->getType()->getCanonicalType();
+    ElementAddrs.push_back(B.createStructElementAddr(PointerInst->getLoc(),
+                                                     Pointer, VD,
+                                   SILType::getPrimitiveAddressType(ResultTy)));
+  }
+}
+
 
 
 //===----------------------------------------------------------------------===//
@@ -521,25 +576,39 @@ ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV) {
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 
+namespace {
+  class ElementUseCollector {
+    SmallVectorImpl<ElementUses> &Uses;
+    NumElementsCache &NumElements;
+  public:
+    ElementUseCollector(SmallVectorImpl<ElementUses> &Uses,
+                        NumElementsCache &NumElements)
+      : Uses(Uses), NumElements(NumElements) {
+    }
+
+    /// This is the main entry point for the use walker.
+    void collectUses(SILValue Pointer, unsigned BaseElt);
+    
+  private:
+    void addElementUses(unsigned BaseElt, SILType UseTy,
+                        SILInstruction *User, UseKind Kind);
+  };
+  
+  
+} // end anonymous namespace
 
 /// addElementUses - An operation (e.g. load, store, byref use, etc) on a value
 /// acts on all of the aggregate elements in that value.  For example, a load
 /// of $*(Int,Int) is a use of both Int elements of the tuple.  This is a helper
 /// to keep the Uses data structure up to date for aggregate uses.
-static void addElementUses(SmallVectorImpl<ElementUses> &Uses,
-                           unsigned BaseElt, SILType UseTy,
-                           SILInstruction *User, UseKind Kind,
-                           NumElementsCache &NumElements) {
+void ElementUseCollector::addElementUses(unsigned BaseElt, SILType UseTy,
+                                         SILInstruction *User, UseKind Kind) {
   for (unsigned i = 0, e = NumElements.get(UseTy.getSwiftRValueType());
        i != e; ++i)
     Uses[BaseElt+i].push_back({ User, Kind });
 }
 
-
-static void collectAllocationUses(SILValue Pointer,
-                                  SmallVectorImpl<ElementUses> &Uses,
-                                  unsigned BaseElt,
-                                  NumElementsCache &NumElements) {
+void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
   assert(Pointer.getType().isAddress() &&
          "Walked through the pointer to the value?");
   SILType PointeeType = Pointer.getType().getObjectType();
@@ -561,8 +630,7 @@ static void collectAllocationUses(SILValue Pointer,
 
     // Loads are a use of the value.
     if (isa<LoadInst>(User) || isa<LoadWeakInst>(User)) {
-      addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Load,
-                     NumElements);
+      addElementUses(BaseElt, PointeeType, User, UseKind::Load);
       continue;
     }
 
@@ -570,24 +638,22 @@ static void collectAllocationUses(SILValue Pointer,
     if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
          isa<StoreWeakInst>(User)) &&
         UI->getOperandNumber() == 1) {
-      addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store,
-                     NumElements);
+      addElementUses(BaseElt, PointeeType, User, UseKind::Store);
       continue;
     }
 
-    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
+    if (isa<CopyAddrInst>(User)) {
       // If this is the source of the copy_addr, then this is a load.  If it is
       // the destination, then this is a store.
       auto Kind = UI->getOperandNumber() == 0 ? UseKind::Load : UseKind::Store;
-      addElementUses(Uses, BaseElt, PointeeType, CAI, Kind, NumElements);
+      addElementUses(BaseElt, PointeeType, User, Kind);
       continue;
     }
     
     // Initializations are definitions of the whole thing.  This is currently
     // used in constructors and should go away someday.
     if (isa<InitializeVarInst>(User)) {
-      addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store,
-                     NumElements);
+      addElementUses(BaseElt, PointeeType, User, UseKind::Store);
       continue;
     }
 
@@ -605,16 +671,14 @@ static void collectAllocationUses(SILValue Pointer,
 
       // If this is an indirect return slot, it is a store.
       if (ArgumentNumber == 0 && FTI->hasIndirectReturn()) {
-        addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Store,
-                       NumElements);
+        addElementUses(BaseElt, PointeeType, User, UseKind::Store);
         continue;
       }
 
       // Otherwise, check for [byref].
       Type ArgTy = FTI->getSwiftArgumentType(ArgumentNumber);
       if (ArgTy->is<LValueType>()) {
-        addElementUses(Uses, BaseElt, PointeeType, User, UseKind::ByrefUse,
-                       NumElements);
+        addElementUses(BaseElt, PointeeType, User, UseKind::ByrefUse);
         continue;
       }
 
@@ -632,7 +696,7 @@ static void collectAllocationUses(SILValue Pointer,
         NewBaseElt += NumElements.get(EltTy);
       }
 
-      collectAllocationUses(SILValue(TEAI, 0), Uses, NewBaseElt, NumElements);
+      collectUses(SILValue(TEAI, 0), NewBaseElt);
       continue;
     }
 
@@ -654,13 +718,12 @@ static void collectAllocationUses(SILValue Pointer,
         NewBaseElt += NumElements.get(VD->getType()->getCanonicalType());
       }
 
-      collectAllocationUses(SILValue(SEAI, 0), Uses, NewBaseElt, NumElements);
+      collectUses(SILValue(SEAI, 0), NewBaseElt);
       continue;
     }
 
      // Otherwise, the use is something complicated, it escapes.
-    addElementUses(Uses, BaseElt, PointeeType, User, UseKind::Escape,
-                   NumElements);
+    addElementUses(BaseElt, PointeeType, User, UseKind::Escape);
   }
 }
 
@@ -673,7 +736,7 @@ static void optimizeAllocBox(AllocBoxInst *ABI, NumElementsCache &NumElements) {
   Uses.resize(NumElements.get(ABI->getElementType().getSwiftRValueType()));
 
   // Walk the use list of the pointer, collecting them into the Uses array.
-  collectAllocationUses(SILValue(ABI, 1), Uses, 0, NumElements);
+  ElementUseCollector(Uses, NumElements).collectUses(SILValue(ABI, 1), 0);
 
   // Process each scalar value in the uses array individually.
   unsigned EltNo = 0;
