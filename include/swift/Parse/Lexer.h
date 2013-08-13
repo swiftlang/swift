@@ -24,9 +24,7 @@
 
 namespace swift {
   class DiagnosticEngine;
-  class Identifier;
   class InFlightDiagnostic;
-  class ASTContext;
 
   template<typename ...T> struct Diag;
 
