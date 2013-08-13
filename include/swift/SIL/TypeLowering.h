@@ -26,11 +26,6 @@ namespace swift {
   class SILLocation;
   class SILModule;
 
-/// This enum is used to model the kind of store done by TypeLowering.  A
-/// user-level assignment can either be an initialization, an assignment, or (at
-/// SILGen time) it may be unknown (and resolved by definite initialization).
-enum InitAssignUnknown_t { IAU_Assign, IAU_Initialize, IAU_Unknown };
-
 namespace Lowering {
 
 /// Given a function type or polymorphic function type, returns the same type
@@ -148,26 +143,20 @@ public:
   /// Given a +1 value of the semantic type which we are claiming
   /// ownership of, put it into the given address with either
   /// initialization or assignment semantics.
-  virtual void emitSemanticStore(SILBuilder &B,
-                                 SILLocation loc,
-                                 SILValue value,
-                                 SILValue addr,
-                                 InitAssignUnknown_t storeKind) const = 0;
-  void emitSemanticInitialize(SILBuilder &B, SILLocation loc,
-                              SILValue value, SILValue addr) const {
-    emitSemanticStore(B, loc, value, addr, IAU_Initialize);
-  }
-  void emitSemanticAssign(SILBuilder &B, SILLocation loc,
-                          SILValue value, SILValue addr) const {
-    emitSemanticStore(B, loc, value, addr, IAU_Assign);
-  }
-
+  virtual void emitSemanticInitialize(SILBuilder &B,
+                                      SILLocation loc,
+                                      SILValue value,
+                                      SILValue addr) const = 0;
+  virtual void emitSemanticAssignment(SILBuilder &B,
+                                      SILLocation loc,
+                                      SILValue value,
+                                      SILValue addr) const = 0;
   /// Emit an assignment where we don't know whether the destination is being
   /// initialized or assigned.  This should only be used by SILGen.
-  void emitSemanticAssignOrInitialize(SILBuilder &B, SILLocation loc,
-                                      SILValue value, SILValue addr) const {
-    emitSemanticStore(B, loc, value, addr, IAU_Unknown);
-  }
+  virtual void emitSemanticUnknownAssignment(SILBuilder &B,
+                                             SILLocation loc,
+                                             SILValue value,
+                                             SILValue addr) const = 0;
 
   /// Given an address, emit operations to destroy it.
   ///
@@ -191,7 +180,7 @@ public:
                                     SILValue src,
                                     SILValue dest,
                                     IsTake_t isTake,
-                                    InitAssignUnknown_t storeKind) const = 0;
+                                    IsInitialization_t isInit) const = 0;
 
   /// Given a +1 r-value which are are claiming ownership of, destroy it.
   ///

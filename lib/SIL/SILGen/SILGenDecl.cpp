@@ -1166,7 +1166,7 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
     // alternative, and there really isn't an ObjC convention for
     // transferring ownership in aggregates.
     fieldLowering.emitSemanticLoadInto(B, var, addr, indirectReturn,
-                                       IsNotTake, IAU_Initialize);
+                                       IsNotTake, IsInitialization);
     B.createRelease(getter.getDecl(), thisValue);
     B.createReturn(var, emitEmptyTuple(var));
     return;
@@ -1204,7 +1204,7 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
   auto &varTI = getTypeLowering(var->getType());
   SILValue addr = B.createRefElementAddr(var, thisValue, var,
                                  varTI.getLoweredType().getAddressType());
-  varTI.emitSemanticAssign(B, setter.getDecl(), setValue, addr);
+  varTI.emitSemanticAssignment(B, setter.getDecl(), setValue, addr);
   
   B.createRelease(setter.getDecl(), thisValue);
   B.createReturn(var, emitEmptyTuple(var));
