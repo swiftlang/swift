@@ -509,7 +509,7 @@ public:
       Builder.addTypeAnnotation(T.getString());
   }
 
-  void addSwiftVarDeclRef(const VarDecl *VD) {
+  void addVarDeclRef(const VarDecl *VD) {
     StringRef Name = VD->getName().get();
     assert(!Name.empty() && "name should not be empty");
 
@@ -551,7 +551,7 @@ public:
     Builder.addCallParameter(TP->getBoundName(), TP->getType().getString());
   }
 
-  void addSwiftFunctionCall(const AnyFunctionType *AFT) {
+  void addFunctionCall(const AnyFunctionType *AFT) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
         CodeCompletionResult::ResultKind::Pattern);
@@ -577,7 +577,7 @@ public:
     addTypeAnnotation(Builder, AFT->getResult());
   }
 
-  void addSwiftMethodCall(const FuncDecl *FD) {
+  void addMethodCall(const FuncDecl *FD) {
     bool IsImlicitlyCurriedInstanceMethod;
     switch (Kind) {
     case LookupKind::ValueExpr:
@@ -643,7 +643,7 @@ public:
     // TODO: skip arguments with default parameters?
   }
 
-  void addSwiftConstructorCall(const ConstructorDecl *CD) {
+  void addConstructorCall(const ConstructorDecl *CD) {
     assert(!HaveDot && "can not add a constructor call after a dot");
     CodeCompletionResultBuilder Builder(
         CompletionContext,
@@ -658,7 +658,7 @@ public:
     addTypeAnnotation(Builder, CD->getResultType());
   }
 
-  void addSwiftSubscriptCall(const SubscriptDecl *SD) {
+  void addSubscriptCall(const SubscriptDecl *SD) {
     assert(!HaveDot && "can not add a subscript after a dot");
     CodeCompletionResultBuilder Builder(
         CompletionContext,
@@ -670,7 +670,7 @@ public:
     addTypeAnnotation(Builder, SD->getElementType());
   }
 
-  void addSwiftNominalTypeRef(const NominalTypeDecl *NTD) {
+  void addNominalTypeRef(const NominalTypeDecl *NTD) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
         CodeCompletionResult::ResultKind::Declaration);
@@ -682,7 +682,7 @@ public:
                       MetaTypeType::get(NTD->getDeclaredType(), SwiftContext));
   }
 
-  void addSwiftTypeAliasRef(const TypeAliasDecl *TAD) {
+  void addTypeAliasRef(const TypeAliasDecl *TAD) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
         CodeCompletionResult::ResultKind::Declaration);
@@ -729,7 +729,7 @@ public:
         // Swift does not have class variables.
         // FIXME: add code completion results when class variables are added.
         assert(!ExprType->is<MetaTypeType>() && "name lookup bug");
-        addSwiftVarDeclRef(VD);
+        addVarDeclRef(VD);
         return;
       }
 
@@ -744,17 +744,17 @@ public:
         if (FD->isGetterOrSetter())
           return;
 
-        addSwiftMethodCall(FD);
+        addMethodCall(FD);
         return;
       }
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        addSwiftNominalTypeRef(NTD);
+        addNominalTypeRef(NTD);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
-        addSwiftTypeAliasRef(TAD);
+        addTypeAliasRef(TAD);
         return;
       }
 
@@ -767,21 +767,21 @@ public:
           return;
         if (IsSuperRefExpr && !isa<ConstructorDecl>(CurrDeclContext))
           return;
-        addSwiftConstructorCall(CD);
+        addConstructorCall(CD);
         return;
       }
 
       if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
         if (ExprType->is<MetaTypeType>())
           return;
-        addSwiftSubscriptCall(SD);
+        addSubscriptCall(SD);
         return;
       }
       return;
 
     case LookupKind::DeclContext:
       if (auto *VD = dyn_cast<VarDecl>(D)) {
-        addSwiftVarDeclRef(VD);
+        addVarDeclRef(VD);
         return;
       }
 
@@ -796,17 +796,17 @@ public:
         if (FD->isGetterOrSetter())
           return;
 
-        addSwiftMethodCall(FD);
+        addMethodCall(FD);
         return;
       }
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        addSwiftNominalTypeRef(NTD);
+        addNominalTypeRef(NTD);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
-        addSwiftTypeAliasRef(TAD);
+        addTypeAliasRef(TAD);
         return;
       }
 
@@ -820,12 +820,12 @@ public:
     this->ExprType = ExprType;
     bool Done = false;
     if (auto AFT = ExprType->getAs<AnyFunctionType>()) {
-      addSwiftFunctionCall(AFT);
+      addFunctionCall(AFT);
       Done = true;
     }
     if (auto LVT = ExprType->getAs<LValueType>()) {
       if (auto AFT = LVT->getObjectType()->getAs<AnyFunctionType>()) {
-        addSwiftFunctionCall(AFT);
+        addFunctionCall(AFT);
         Done = true;
       }
     }
