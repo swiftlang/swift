@@ -926,9 +926,13 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     }
 
     if (Tok.is(tok::code_complete)) {
+      if (Tok.isAtStartOfLine()) {
+        // Postfix expression is located on a different line than the code
+        // completion token, and thus they are not related.
+        return Result;
+      }
       if (CodeCompletion && Result.isNonNull())
-        if (!CodeCompletion->completePostfixExpr(Result.get()))
-          return Result;
+        CodeCompletion->completePostfixExpr(Result.get());
       return nullptr;
     }
     break;
