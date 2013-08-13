@@ -3437,10 +3437,10 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
     }
   } else if (auto lvalueType = result->getType()->getAs<LValueType>()) {
     if (!lvalueType->getQualifiers().isImplicit()) {
-      // We explicitly took the address of the result, but didn't use it.
+      // We explicitly took a reference to the result, but didn't use it.
       // Complain and emit a Fix-It to zap the '&'.
       auto addressOf = cast<AddressOfExpr>(result->getSemanticsProvidingExpr());
-      diagnose(addressOf->getLoc(), diag::address_of_non_byref,
+      diagnose(addressOf->getLoc(), diag::reference_non_byref,
                lvalueType->getObjectType())
         .highlight(addressOf->getSubExpr()->getSourceRange())
         .fixItRemove(SourceRange(addressOf->getLoc()));

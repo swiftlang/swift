@@ -1397,12 +1397,8 @@ ERROR(non_assoc_adjacent,sema_tce,none,
 ERROR(incompatible_assoc,sema_tce,none,
       "operator is adjacent to operator of same precedence"
       " but incompatible associativity", ())
-ERROR(address_of_rvalue,sema_tce,none,
-      "cannot apply '&' to non-lvalue of type %0", (Type))
-ERROR(address_of_address,sema_tce,none,
-      "cannot apply '&' to an '&' expression", ())
-ERROR(address_of_non_byref,sema_tce,none,
-      "address of %0 not used to initialize a [byref] parameter", (Type))
+ERROR(reference_non_byref,sema_tce,none,
+      "reference to %0 not used to initialize a [byref] parameter", (Type))
 ERROR(no_subscript_declaration,sema_tce,none,
       "type %0 cannot be subscripted", (Type))
 ERROR(subscript_overload_fail,sema_tce,none,
