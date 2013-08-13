@@ -46,7 +46,8 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
       signature = decl->getType()->getCanonicalType();
 
     // If we've seen a declaration with this signature before, note it.
-    auto &knownDecls = CollidingDeclGroups[std::make_pair(signature, decl->getName())];
+    auto &knownDecls =
+        CollidingDeclGroups[std::make_pair(signature, decl->getName())];
     if (!knownDecls.empty())
       anyCollisions = true;
 
