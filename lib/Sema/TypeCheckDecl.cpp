@@ -520,7 +520,8 @@ public:
       if (PBD->getInit() && PBD->getPattern()->hasType()) {
         Expr *Init = PBD->getInit();
         Type DestTy = PBD->getPattern()->getType();
-        if (TC.typeCheckExpression(Init, PBD->getDeclContext(), DestTy)) {
+        if (TC.typeCheckExpression(Init, PBD->getDeclContext(), DestTy,
+                                   /*discardedExpr=*/false)) {
           if (DestTy)
             TC.diagnose(PBD, diag::while_converting_var_init,
                         DestTy);
@@ -554,7 +555,8 @@ public:
         TC.diagnose(PBD, diag::decl_no_default_init, ty);
         PBD->setInvalid();
       } else {
-        if (TC.typeCheckExpression(initializer, PBD->getDeclContext(), ty)) {
+        if (TC.typeCheckExpression(initializer, PBD->getDeclContext(), ty,
+                                   /*discardedExpr=*/false)) {
           TC.diagnose(PBD, diag::while_converting_var_init, ty);
           return;
         }
@@ -571,7 +573,8 @@ public:
         DestTy = PBD->getPattern()->getType();
       }
       Expr *Init = PBD->getInit();
-      if (TC.typeCheckExpression(Init, PBD->getDeclContext(), DestTy)) {
+      if (TC.typeCheckExpression(Init, PBD->getDeclContext(), DestTy,
+                                 /*discardedExpr=*/false)) {
         if (DestTy)
           TC.diagnose(PBD, diag::while_converting_var_init,
                       DestTy);

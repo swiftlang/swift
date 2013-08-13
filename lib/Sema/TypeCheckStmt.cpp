@@ -116,10 +116,6 @@ public:
   // Helper Functions.
   //===--------------------------------------------------------------------===//
   
-  bool typeCheckExpr(Expr *&E, Type DestTy = Type()) {
-    return TC.typeCheckExpression(E, DC, DestTy);
-  }
-
   template<typename StmtTy>
   bool typeCheckStmt(StmtTy *&S) {
     StmtTy *S2 = cast_or_null<StmtTy>(visit(S));
@@ -167,7 +163,7 @@ public:
     }
 
     Expr *E = RS->getResult();
-    if (typeCheckExpr(E, ResultTy))
+    if (TC.typeCheckExpression(E, DC, ResultTy, /*discardedExpr=*/false))
       return 0;
     RS->setResult(E);
 
@@ -223,7 +219,8 @@ public:
 
     Expr *Tmp = FS->getInitializer();
     if (Tmp) {
-      if (typeCheckExpr(Tmp)) return 0;
+      if (TC.typeCheckExpression(Tmp, DC, Type(), /*discardedExpr=*/true))
+        return 0;
       FS->setInitializer(Tmp);
     }
     
@@ -236,7 +233,8 @@ public:
     
     Tmp = FS->getIncrement();
     if (Tmp) {
-      if (typeCheckExpr(Tmp)) return 0;
+      if (TC.typeCheckExpression(Tmp, DC, Type(), /*discardedExpr=*/true))
+        return 0;
       FS->setIncrement(Tmp);
     }
 
@@ -251,7 +249,8 @@ public:
   Stmt *visitForEachStmt(ForEachStmt *S) {
     // Type-check the container and convert it to an rvalue.
     Expr *Container = S->getContainer();
-    if (TC.typeCheckExpression(Container, DC)) return nullptr;
+    if (TC.typeCheckExpression(Container, DC, Type(), /*discardedExpr=*/false))
+      return nullptr;
     S->setContainer(Container);
 
     // Retrieve the 'Enumerable' protocol.
@@ -440,7 +439,8 @@ public:
   Stmt *visitSwitchStmt(SwitchStmt *S) {
     // Type-check the subject expression.
     Expr *subjectExpr = S->getSubjectExpr();
-    if (typeCheckExpr(subjectExpr))
+    if (TC.typeCheckExpression(subjectExpr, DC, Type(),
+                               /*discardedExpr=*/false))
       return nullptr;
     subjectExpr = TC.coerceToMaterializable(subjectExpr);
     if (!subjectExpr)
@@ -508,9 +508,12 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         break;
 
       // Type check the expression.
-      if (typeCheckExpr(SubExpr)) continue;
+      bool isDiscarded
+        = TC.TU.Kind != TranslationUnit::REPL || !isa<TopLevelCodeDecl>(DC);
+      if (TC.typeCheckExpression(SubExpr, DC, Type(), isDiscarded))
+        continue;
       
-      if (TC.TU.Kind != TranslationUnit::REPL || !isa<TopLevelCodeDecl>(DC))
+      if (isDiscarded)
         TC.typeCheckIgnoredExpr(SubExpr);
       elem = SubExpr;
       continue;
@@ -556,6 +559,8 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
       .highlight(E->getSourceRange());
     return;
   }
+
+  // FIXME: Complain about literals
 }
 
 /// Check the default arguments that occur within this pattern.
@@ -568,7 +573,8 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
         assert(!field.getInit()->alreadyChecked() &&
                "Expression already checked");
         Expr *e = field.getInit()->getExpr();
-        if (tc.typeCheckExpression(e, dc, field.getPattern()->getType()))
+        if (tc.typeCheckExpression(e, dc, field.getPattern()->getType(),
+                                   /*discardedExpr=*/false))
           field.getInit()->setExpr(field.getInit()->getExpr(), true);
         else
           field.getInit()->setExpr(e, true);
@@ -683,7 +689,7 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *thisDecl,
 
 void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
   if (auto allocThis = ctor->getAllocThisExpr()) {
-    if (!typeCheckExpression(allocThis, ctor))
+    if (!typeCheckExpression(allocThis, ctor, Type(), /*discardedExpr=*/false))
       ctor->setAllocThisExpr(allocThis);
   }
 
@@ -773,7 +779,7 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
             initializer = new (Context) DefaultValueExpr(initializer);
             Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
                                                     initializer);
-            typeCheckExpression(assign, ctor);
+            typeCheckExpression(assign, ctor, Type(), /*discardedExpr=*/false);
             defaultInits.push_back(assign);
             continue;
           }
@@ -818,7 +824,7 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
                 SourceLoc());
           Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
                                                   initializer);
-          typeCheckExpression(assign, ctor);
+          typeCheckExpression(assign, ctor, Type(), /*discardedExpr=*/false);
           defaultInits.push_back(assign);
         }
       }

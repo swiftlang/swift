@@ -437,9 +437,12 @@ public:
   /// \param convertType The type that the expression is being converted to,
   /// or null if the expression is standalone.
   ///
+  /// \param discardedExpr True if the result of this expression will be
+  /// discarded.
+  ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
-                           Type convertType = Type());
+                           Type convertType, bool discardedExpr);
 
   /// \brief Type check the given expression assuming that its children
   /// have already been fully type-checked.

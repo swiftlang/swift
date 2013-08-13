@@ -3366,7 +3366,8 @@ bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
 
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
-                                      Type convertType){
+                                      Type convertType,
+                                      bool discardedExpr){
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // First, pre-check the expression, validating any types that occur in the
@@ -3433,6 +3434,27 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                    cs.getConstraintLocator(expr, { }));
     if (!result) {
       return true;
+    }
+  } else if (auto lvalueType = result->getType()->getAs<LValueType>()) {
+    if (!lvalueType->getQualifiers().isImplicit()) {
+      // We explicitly took the address of the result, but didn't use it.
+      // Complain and emit a Fix-It to zap the '&'.
+      auto addressOf = cast<AddressOfExpr>(result->getSemanticsProvidingExpr());
+      diagnose(addressOf->getLoc(), diag::address_of_non_byref,
+               lvalueType->getObjectType())
+        .highlight(addressOf->getSubExpr()->getSourceRange())
+        .fixItRemove(SourceRange(addressOf->getLoc()));
+
+      // Strip the address-of expression.
+      result = addressOf->getSubExpr();
+      lvalueType = result->getType()->getAs<LValueType>();
+    } 
+
+    if (lvalueType && !discardedExpr) {
+      // We referenced an lvalue. Load it.
+      assert(lvalueType->getQualifiers().isImplicit() &&
+             "Explicit lvalue diagnosed above");
+      result = new (Context) LoadExpr(result, lvalueType->getObjectType());
     }
   }
 

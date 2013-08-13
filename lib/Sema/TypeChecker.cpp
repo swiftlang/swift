@@ -757,7 +757,7 @@ bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
   DiagnosticEngine diags(TU->Ctx.SourceMgr);
   
   TypeChecker TC(*TU, diags);
-  TC.typeCheckExpression(parsedExpr, TU);
+  TC.typeCheckExpression(parsedExpr, TU, Type(), /*discardedExpr=*/true);
   TU->ASTStage = TranslationUnit::TypeChecked;
   
   return parsedExpr && !isa<ErrorExpr>(parsedExpr)

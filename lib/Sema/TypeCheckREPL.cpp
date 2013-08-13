@@ -94,7 +94,8 @@ getArgRefExpr(TypeChecker &TC,
                                            Arg->getTypeOfReference());
   ArgRef = TC.coerceToRValue(ArgRef);
   for (unsigned i : MemberIndexes) {
-    bool failed = TC.typeCheckExpression(ArgRef, &TC.TU);
+    bool failed = TC.typeCheckExpression(ArgRef, &TC.TU, Type(),
+                                         /*discardedExpr=*/false);
     assert(!failed);
     (void)failed;
 
@@ -149,7 +150,8 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
 
     Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc);
     CE = new (Context) CallExpr(PrintStrFn, Res);
-    if (TC.typeCheckExpression(CE, Arg->getDeclContext()))
+    if (TC.typeCheckExpression(CE, Arg->getDeclContext(), Type(),
+                               /*discardedExpr=*/false))
       goto dynamicTypeFailed;
     Res = CE;
 
@@ -349,7 +351,8 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
                                 /*hasTrailingClosure=*/false,
                                 TupleType::getEmpty(Context));
     Expr *CE = new (Context) CallExpr(Res, CallArgs, Type());
-    if (TC.typeCheckExpression(CE, Arg->getDeclContext()))
+    if (TC.typeCheckExpression(CE, Arg->getDeclContext(), Type(),
+                               /*discardedExpr=*/false))
       return;
     Res = CE;
     BodyContent.push_back(Res);

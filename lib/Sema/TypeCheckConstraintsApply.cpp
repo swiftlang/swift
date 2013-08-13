@@ -1542,7 +1542,7 @@ namespace {
 
       // Type-check the subexpression in isolation.
       Expr *sub = expr->getSubExpr();
-      if (tc.typeCheckExpression(sub, cs.DC)) {
+      if (tc.typeCheckExpression(sub, cs.DC, Type(), /*discardedExpr=*/false)) {
         return CheckedCastKind::Unresolved;
       }
       sub = tc.coerceToRValue(sub);
@@ -1753,7 +1753,8 @@ static Expr *getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
   // Create the default argument, which is a converted magic identifier
   // literal expression.
   Expr *init = new (tc.Context) MagicIdentifierLiteralExpr(magicKind, loc);
-  bool invalid = tc.typeCheckExpression(init, dc, defArg.second);
+  bool invalid = tc.typeCheckExpression(init, dc, defArg.second,
+                                        /*discardedExpr=*/false);
   assert(!invalid && "conversion cannot fail");
   (void)invalid;
   return init;
