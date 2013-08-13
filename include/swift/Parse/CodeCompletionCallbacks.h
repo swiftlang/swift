@@ -57,6 +57,10 @@ public:
   /// a dot.
   virtual void completeExprSuperDot(SuperRefExpr *SRE) = 0;
 
+  /// \brief Complete the beginning of type-simple -- no tokens provided
+  /// by user.
+  virtual void completeTypeSimpleBeginning() = 0;
+
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.
   virtual void doneParsing() = 0;

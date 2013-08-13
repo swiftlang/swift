@@ -19,6 +19,7 @@
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -73,6 +74,11 @@ TypeRepr *Parser::parseTypeSimple(Diag<> MessageID) {
   case tok::l_paren: {
     ty = parseTypeTupleBody();
     break;
+  }
+  case tok::code_complete: {
+    if (CodeCompletion)
+      CodeCompletion->completeTypeSimpleBeginning();
+    return nullptr;
   }
   default:
     diagnose(Tok.getLoc(), MessageID);

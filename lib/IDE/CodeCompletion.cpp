@@ -345,6 +345,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
     PostfixExpr,
     SuperExpr,
     SuperExprDot,
+    TypeSimpleBeginning,
   };
 
   CompletionKind Kind = CompletionKind::None;
@@ -413,6 +414,8 @@ public:
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
 
+  void completeTypeSimpleBeginning() override;
+
   void doneParsing() override;
 
   void deliverCompletionResults();
@@ -443,7 +446,8 @@ class CompletionLookup : swift::VisibleDeclConsumer {
 
   enum class LookupKind {
     ValueExpr,
-    ValueInDeclContext
+    ValueInDeclContext,
+    TypeInDeclContext,
   };
 
   LookupKind Kind;
@@ -589,6 +593,9 @@ public:
           FD->getDeclContext() == CurrMethodDC->getParent() &&
           InsideStaticMethod && !FD->isStatic();
       break;
+    case LookupKind::TypeInDeclContext:
+      llvm_unreachable("can not have a method call while doing a "
+                       "type completion");
     }
 
     StringRef Name = FD->getName().get();
@@ -808,7 +815,18 @@ public:
         addTypeAliasRef(TAD);
         return;
       }
+      return;
 
+    case LookupKind::TypeInDeclContext:
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+        addNominalTypeRef(NTD);
+        return;
+      }
+
+      if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
+        addTypeAliasRef(TAD);
+        return;
+      }
       return;
     }
   }
@@ -870,6 +888,11 @@ public:
 
     CompletionContext.includeUnqualifiedClangResults();
   }
+
+  void getTypeCompletionsInDeclContext(SourceLoc Loc) {
+    Kind = LookupKind::TypeInDeclContext;
+    lookupVisibleDecls(*this, CurrDeclContext, Loc);
+  }
 };
 
 } // end unnamed namespace
@@ -910,7 +933,17 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
+  Kind = CompletionKind::TypeSimpleBeginning;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::doneParsing() {
+  if (Kind == CompletionKind::None) {
+    DEBUG(llvm::dbgs() << "did not get a completion callback");
+    return;
+  }
+
   if (!typecheckContext())
     return;
 
@@ -919,7 +952,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   switch (Kind) {
   case CompletionKind::None:
-    llvm_unreachable("did not get a completion callback");
+    llvm_unreachable("should be already handled");
+    return;
 
   case CompletionKind::DotExpr: {
     CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
@@ -953,6 +987,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setIsSuperRefExpr();
     Lookup.setHaveDot();
     Lookup.getValueExprCompletions(ParsedExpr->getType());
+    break;
+  }
+
+  case CompletionKind::TypeSimpleBeginning: {
+    CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
+    Lookup.getTypeCompletionsInDeclContext(
+        TU->Ctx.SourceMgr.getCodeCompletionLoc());
     break;
   }
   }
