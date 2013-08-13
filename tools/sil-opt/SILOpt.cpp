@@ -28,6 +28,7 @@ enum class PassKind {
   AllocBoxToStack,
   StackToSSA,
   MemoryPromotion,
+  CCP,
   DCE,
   DataflowDiagnostics
 };
@@ -50,6 +51,9 @@ Passes(llvm::cl::desc("Passes:"),
                                    "stack-to-ssa", "alloc_stack to SSA"),
                         clEnumValN(PassKind::MemoryPromotion,
                                    "memory-promotion", "Promote memory"),
+                        clEnumValN(PassKind::CCP,
+                                   "constant-propagation",
+                                   "Propagate constants"),
                         clEnumValN(PassKind::DCE,
                                    "dead-code-elimination", "Remove dead code"),
                         clEnumValN(PassKind::DataflowDiagnostics,
@@ -124,6 +128,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::MemoryPromotion:
       performSILMemoryPromotion(CI.getSILModule());
+      break;
+    case PassKind::CCP:
+      performSILConstantPropagation(CI.getSILModule());
       break;
     case PassKind::DCE:
       performSILDeadCodeElimination(CI.getSILModule());

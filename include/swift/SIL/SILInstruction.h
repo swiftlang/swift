@@ -296,6 +296,9 @@ public:
                            bool ForceInline,
                            SILFunction &F);
   SILValue getCallee() const { return Operands[Callee].get(); }
+  SILFunctionTypeInfo *getFunctionTypeInfo(SILModule &M) const {
+    return getCallee().getType().getFunctionTypeInfo(M);
+  }
 
   /// The arguments passed to this instruction.
   MutableArrayRef<Operand> getArgumentOperands() {
@@ -310,7 +313,7 @@ public:
   bool isForceInline() const { return ForceInline; }
 
   bool hasIndirectReturn(SILModule &M) const {
-    return getCallee().getType().getFunctionTypeInfo(M)->hasIndirectReturn();
+    return getFunctionTypeInfo(M)->hasIndirectReturn();
   }
 
   SILValue getIndirectReturn(SILModule &M) const {

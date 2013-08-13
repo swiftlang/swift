@@ -149,6 +149,10 @@ namespace swift {
   /// registers.
   void performSILStackToSSAPromotion(SILModule *M);
 
+  /// \brief Fold instructions with constant operands. Diagnose overflows when
+  /// possible.
+  void performSILConstantPropagation(SILModule *M);
+
   /// \brief Detect and remove unreachable code. Diagnose provably unreachable
   /// user code.
   void performSILDeadCodeElimination(SILModule *M);

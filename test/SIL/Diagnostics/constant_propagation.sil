@@ -1,0 +1,12 @@
+// RUN: %swift %s -emit-sil -verify
+import Builtin
+
+sil @fold_sadd_with_overflow_Overflow : $[thin] () -> Builtin.Int64 {
+bb0:
+ %1 = builtin_function_ref #Builtin.int_sadd_with_overflow_Int64 : $[thin] (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %0 = integer_literal $Builtin.Int64, 9223372036854775807
+ %110 = integer_literal $Builtin.Int64, 9223372036854775807
+ %18 = apply %1(%0, %110) : $[thin] (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // expected-error {{arithmetic operation overflows}}
+ %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
+ return %19 : $Builtin.Int64
+}
