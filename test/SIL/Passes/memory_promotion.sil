@@ -8,17 +8,47 @@ import swift
 sil @simple_reg_promotion : $[thin] (a : Int64) -> Int64 {
 bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
   %1 = alloc_box $Int64                   // CHECK: alloc_box
-  %2 = store %0 to %1#1 : $*Int64
+  store %0 to %1#1 : $*Int64
   %3 = alloc_box $Int64                   // CHECK: alloc_box
   %4 = load %1#1 : $*Int64
-  %5 = store %4 to %3#1 : $*Int64         // CHECK-NEXT: store
+  store %4 to %3#1 : $*Int64         // CHECK-NEXT: store
   %6 = load %3#1 : $*Int64
   release %3#0 : $Builtin.ObjectPointer   // CHECK-NEXT: release
   release %1#0 : $Builtin.ObjectPointer
-  %9 = return %6 : $Int64
+  return %6 : $Int64
 
   // CHECK: return %0 : $Int64
 }
+
+
+// CHECK-LABEL: sil @tuple_reg_promotion
+sil @tuple_reg_promotion : $[thin] (a : Int64) -> Int64 {
+bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
+  %1 = alloc_box $(Int64, Int64)                   // CHECK: alloc_box
+  
+  %a = tuple_element_addr %1#1 : $*(Int64, Int64), 0
+  %b = tuple_element_addr %1#1 : $*(Int64, Int64), 1
+  store %0 to %a : $*Int64
+  // CHECK: store %0 to
+
+  store %0 to %b : $*Int64
+  // CHECK-NEXT: store %0 to 
+
+  %c = load %1#1 : $*(Int64, Int64)
+  %d = tuple_extract %c : $(Int64, Int64), 0
+
+  release %1#0 : $Builtin.ObjectPointer
+
+  return %d : $Int64
+
+  // Verify that promotion has promoted the tuple load away, and we know that
+  // %0 is being returned through scalar instructions in SSA form.
+  // CHECK: [[TUPLE:%[0-9]+]] = tuple (%0 : $Int64, %0 : $Int64)
+  // CHECK: [[TUPLE_ELT:%[0-9]+]] = tuple_extract [[TUPLE]] : $(Int64, Int64), 0
+
+  // CHECK: return [[TUPLE_ELT]] : $Int64
+}
+
 
 // CHECK-LABEL: sil @use_before_init
 sil @use_before_init : $[thin] () -> Int64 {
