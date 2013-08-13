@@ -304,7 +304,7 @@ void Parser::parseTopLevelCodeDeclDelayed() {
   // Temporarily swap out the parser's current lexer with our new one.
   llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
 
-  // Rewind to '{' of the function body.
+  // Rewind to the beginning of the top-level code.
   restoreParserPosition(BeginParserPosition);
 
   // No need to re-enter the scope: parseBraceItems() will create a scope
