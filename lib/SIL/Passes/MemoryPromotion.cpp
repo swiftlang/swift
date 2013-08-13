@@ -569,11 +569,15 @@ void ElementPromotion::handleEscape(SILInstruction *Inst) {
 /// getStoredValueFrom - Given a may store to the stack slot we're promoting,
 /// return the value being stored.
 static SILValue getStoredValueFrom(SILInstruction *I) {
+  // Note that we intentionally don't support forwarding of weak pointers,
+  // because the underlying value may drop be deallocated at any time.  We would
+  // have to prove that something in this function is holding the weak value
+  // live across the promoted region and that isn't desired for a stable
+  // diagnostics pass this like one.
   if (auto *SI = dyn_cast<StoreInst>(I))
     return SI->getOperand(0);
   if (auto *AI = dyn_cast<AssignInst>(I))
     return AI->getOperand(0);
-  // TODO: Should we support store forwarding of weak pointers?
   return SILValue();
 }
 
