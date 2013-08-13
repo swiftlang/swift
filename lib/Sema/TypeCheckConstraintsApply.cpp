@@ -1388,8 +1388,6 @@ namespace {
       // Coerce the pattern, in case we resolved something.
       auto fnType = expr->getType()->castTo<FunctionType>();
       auto &tc = cs.getTypeChecker();
-      if (tc.coerceToType(expr->getParams(), cs.DC, fnType->getInput()))
-        return nullptr;
 
       // If this is a single-expression closure, convert the expression
       // in the body to the result type of the closure.
@@ -2705,6 +2703,18 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
       if (isa<DefaultValueExpr>(expr)) {
         return { false, expr };
       }
+
+      // For closures, update the parameter types before we recurse.
+      if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
+        Rewriter.simplifyExprType(expr);
+        auto &cs = Rewriter.getConstraintSystem();
+        auto &tc = cs.getTypeChecker();
+        auto fnType = closure->getType()->castTo<FunctionType>();
+        if (tc.coerceToType(closure->getParams(), cs.DC, fnType->getInput()))
+          return { false, nullptr };
+        return { true, expr };
+      }
+
 
       return { true, expr };
     }

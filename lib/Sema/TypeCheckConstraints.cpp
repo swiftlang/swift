@@ -1758,8 +1758,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // An lvalue of type T1 can be converted to a value of type T2 so long as
     // T1 is convertible to T2 (by loading the value).
     if (auto lvalue1 = type1->getAs<LValueType>()) {
-      return matchTypes(lvalue1->getObjectType(), type2, kind, subFlags,
-                        locator, trivial);
+      if (lvalue1->getQualifiers().isImplicit()) {
+        return matchTypes(lvalue1->getObjectType(), type2, kind, subFlags,
+                          locator, trivial);
+      }
     }
 
     // An expression can be converted to an auto-closure function type, creating
@@ -2551,17 +2553,6 @@ Type Solution::simplifyType(TypeChecker &tc, Type type) const {
                auto known = typeBindings.find(tvt);
                assert(known != typeBindings.end());
                type = known->second;
-             }
-
-             // Strip the implicit bit off lvalue types.
-             if (auto lvalue = type->getAs<LValueType>()) {
-               auto wantQuals = lvalue->getQualifiers() -
-                                  (LValueType::Qual::Implicit |
-                                   LValueType::Qual::NonSettable);
-               if (lvalue->getQualifiers() != wantQuals) {
-                 auto objectType = simplifyType(tc, lvalue->getObjectType());
-                 type = LValueType::get(objectType, wantQuals, tc.Context);
-               }
              }
 
              return type;

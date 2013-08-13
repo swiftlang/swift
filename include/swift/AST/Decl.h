@@ -1619,7 +1619,10 @@ public:
   void setOverriddenDecl(VarDecl *over) {
     OverriddenDecl = over;
   }
-  
+
+  /// Determine whether this declaration is an anonymous closure parameter.
+  bool isAnonClosureParam() const;
+
   /// Given that this is an Objective-C property declaration, produce
   /// its getter selector in the given buffer (as UTF-8).
   StringRef getObjCGetterSelector(SmallVectorImpl<char> &buffer) const;

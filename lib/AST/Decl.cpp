@@ -724,6 +724,18 @@ void VarDecl::setProperty(ASTContext &Context, SourceLoc LBraceLoc,
     Set->makeSetter(this);
 }
 
+bool VarDecl::isAnonClosureParam() const {
+  auto name = getName();
+  if (name.empty())
+    return false;
+
+  auto nameStr = name.str();
+  if (nameStr.empty())
+    return false;
+
+  return nameStr[0] == '$';
+}
+
 VarDecl *FuncDecl::getImplicitThisDecl() const {
   return Body->getImplicitThisDecl();
 }

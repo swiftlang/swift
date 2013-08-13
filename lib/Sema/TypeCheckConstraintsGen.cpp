@@ -209,6 +209,19 @@ namespace {
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
+      // If this is an anonymous closure argument, take it's type and turn it
+      // into an implicit lvalue type. This accounts for the fact that the
+      // closure argument type itself might be inferred to an lvalue type.
+      if (auto var = dyn_cast<VarDecl>(E->getDecl())) {
+        if (var->isAnonClosureParam()) {
+          auto tv = CS.createTypeVariable(CS.getConstraintLocator(E, { }),
+                                          /*canBindToLValue=*/false);
+          CS.addConstraint(ConstraintKind::Equal, tv, E->getDecl()->getType());
+          return LValueType::get(tv, LValueType::Qual::DefaultForVar,
+                                 CS.getASTContext());
+        }
+      }
+
       // FIXME: If the decl is in error, we get no information from this.
       // We may, alternatively, want to use a type variable in that case,
       // and possibly infer the type of the variable that way.
