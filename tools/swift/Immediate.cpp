@@ -567,6 +567,13 @@ public:
         if (ShowColors)
           llvm::outs().changeColor(llvm::raw_ostream::GREEN);
 
+        Result.clear();
+        Result.append(CurrentLines.begin(), CurrentLines.end());
+
+        // The lexer likes null-terminated data.
+        Result.push_back('\0');
+        Result.pop_back();
+
         return REPLInputKind::REPLDirective;
       }
       
