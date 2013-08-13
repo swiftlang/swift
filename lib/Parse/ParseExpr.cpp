@@ -927,7 +927,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
 
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion && Result.isNonNull())
-        CodeCompletion->completePostfixExpr(Result.get());
+        if (!CodeCompletion->completePostfixExpr(Result.get()))
+          return Result;
       return nullptr;
     }
     break;

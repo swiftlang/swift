@@ -772,7 +772,6 @@ bool swift::typeCheckFunctionBodyUntil(TranslationUnit *TU, DeclContext *DC,
   DiagnosticEngine Diags(TU->Ctx.SourceMgr);
 
   TypeChecker TC(*TU, Diags);
-  TC.typeCheckFunctionBodyUntil(FE, EndTypeCheckLoc);
-  return true;
+  return !TC.typeCheckFunctionBodyUntil(FE, EndTypeCheckLoc);
 }
 

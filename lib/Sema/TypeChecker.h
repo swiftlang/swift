@@ -354,8 +354,8 @@ public:
   Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
   void typeCheckIgnoredExpr(Expr *E);
-  void typeCheckFunctionBodyUntil(FuncExpr *FE, SourceLoc EndTypeCheckLoc);
-  void typeCheckFunctionBody(FuncExpr *FE);
+  bool typeCheckFunctionBodyUntil(FuncExpr *FE, SourceLoc EndTypeCheckLoc);
+  bool typeCheckFunctionBody(FuncExpr *FE);
   void typeCheckConstructorBody(ConstructorDecl *CD);
   void typeCheckDestructorBody(DestructorDecl *DD);
   void typeCheckClosureBody(PipeClosureExpr *closure);

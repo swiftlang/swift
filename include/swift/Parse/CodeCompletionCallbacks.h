@@ -48,7 +48,12 @@ public:
   virtual void completePostfixExprBeginning() = 0;
 
   /// \brief Complete a given expr-postfix.
-  virtual void completePostfixExpr(Expr *E) = 0;
+  ///
+  /// \returns true if code completion engine decided that the code completion
+  /// token corresponds to the expr-postfix.  Otherwise, returns false, which
+  /// means that the parser should not consider the code completion token to be
+  /// a part of expr-postfix.
+  virtual bool completePostfixExpr(Expr *E) = 0;
 
   /// \brief Complete expr-super after we have consumed the 'super' keyword.
   virtual void completeExprSuper(SuperRefExpr *SRE) = 0;

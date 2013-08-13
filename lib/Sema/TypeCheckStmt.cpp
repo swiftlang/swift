@@ -594,10 +594,10 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
 
 // Type check a function body (defined with the func keyword) that is either a
 // named function or an anonymous func expression.
-void TypeChecker::typeCheckFunctionBodyUntil(FuncExpr *FE,
+bool TypeChecker::typeCheckFunctionBodyUntil(FuncExpr *FE,
                                              SourceLoc EndTypeCheckLoc) {
   if (FE->getDecl() && FE->getDecl()->isInvalid())
-    return;
+    return true;
 
   // Check the default argument definitions.
   for (auto pattern : FE->getBodyParamPatterns()) {
@@ -609,13 +609,14 @@ void TypeChecker::typeCheckFunctionBodyUntil(FuncExpr *FE,
 
   StmtChecker SC(*this, FE);
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
-  SC.typeCheckStmt(BS);
+  bool HadError = SC.typeCheckStmt(BS);
 
   FE->setBody(BS);
+  return HadError;
 }
 
-void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
-  typeCheckFunctionBodyUntil(FE, SourceLoc());
+bool TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
+  return typeCheckFunctionBodyUntil(FE, SourceLoc());
 }
 
 /// \brief Given a pattern declaring some number of member variables, build an

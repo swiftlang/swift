@@ -339,6 +339,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   TranslationUnit *const TU;
 
   enum class CompletionKind {
+    None,
     DotExpr,
     PostfixExprBeginning,
     PostfixExpr,
@@ -346,7 +347,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
     SuperExprDot,
   };
 
-  CompletionKind Kind;
+  CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
   DeclContext *CurDeclContext = nullptr;
 
@@ -354,32 +355,40 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   /// to the \c Consumer.
   bool DeliveredResults = false;
 
-  template<typename ExprType>
-  bool typecheckExpr(ExprType *&E) {
+  bool typecheckContext() {
+    // Type check the function that contains the expression.
     if (CurDeclContext->getContextKind() == DeclContextKind::CapturingExpr) {
+      SourceLoc EndTypeCheckLoc =
+          ParsedExpr ? ParsedExpr->getStartLoc()
+                     : TU->Ctx.SourceMgr.getCodeCompletionLoc();
       // FIXME: constructors and destructors.
       // FIXME: closures.
       if (auto *FE = dyn_cast<FuncExpr>(CurDeclContext))
-        typeCheckFunctionBodyUntil(TU, CurDeclContext, FE, E->getStartLoc());
+        return typeCheckFunctionBodyUntil(TU, CurDeclContext, FE,
+                                          EndTypeCheckLoc);
+      return false;
     }
+    return true;
+  }
 
-    assert(E && "should have an expression");
+  bool typecheckParsedExpr() {
+    assert(ParsedExpr && "should have an expression");
 
     DEBUG(llvm::dbgs() << "\nparsed:\n";
-          E->print(llvm::dbgs());
+          ParsedExpr->print(llvm::dbgs());
           llvm::dbgs() << "\n");
 
-    Expr *AsExpr = E;
-    if (!typeCheckCompletionContextExpr(TU, AsExpr))
+    Expr *TypecheckedExpr = ParsedExpr;
+    if (!typeCheckCompletionContextExpr(TU, TypecheckedExpr))
       return false;
 
-    if (AsExpr->getType()->isError())
+    if (TypecheckedExpr->getType()->isError())
       return false;
 
-    E = cast<ExprType>(AsExpr);
+    ParsedExpr = TypecheckedExpr;
 
     DEBUG(llvm::dbgs() << "\type checked:\n";
-          E->print(llvm::dbgs());
+          ParsedExpr->print(llvm::dbgs());
           llvm::dbgs() << "\n");
     return true;
   }
@@ -400,7 +409,7 @@ public:
   void completeExpr() override;
   void completeDotExpr(Expr *E) override;
   void completePostfixExprBeginning() override;
-  void completePostfixExpr(Expr *E) override;
+  bool completePostfixExpr(Expr *E) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
 
@@ -875,31 +884,35 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
 void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
   assert(P.Tok.is(tok::code_complete));
 
+  if (Kind != CompletionKind::None)
+    return;
+
   Kind = CompletionKind::PostfixExprBeginning;
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
+bool CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
   SourceManager &SM = TU->Ctx.SourceMgr;
   unsigned ExprEndLine =
       SM.getLineAndColumn(E->getEndLoc(), SM.getCodeCompletionBufferID()).first;
   unsigned CodeCompletionLine =
       SM.getLineAndColumn(SM.getCodeCompletionLoc(),
                           SM.getCodeCompletionBufferID()).first;
-  if (ExprEndLine == CodeCompletionLine) {
-    // If the postfix expression ends on the same line as the code completion
-    // token is located, then consider the postfix expression as the base of
-    // completion.
-    Kind = CompletionKind::PostfixExpr;
-    ParsedExpr = E;
-    CurDeclContext = P.CurDeclContext;
-  } else {
+
+  if (ExprEndLine != CodeCompletionLine) {
     // Postfix expression is located on the previous line than the code
     // completion token, and thus it is irrelevant from the user's point of
     // view.
-    Kind = CompletionKind::PostfixExprBeginning;
-    CurDeclContext = P.CurDeclContext;
+    return false;
   }
+
+  // If the postfix expression ends on the same line as the code completion
+  // token is located, then consider the postfix expression as the base of
+  // completion.
+  Kind = CompletionKind::PostfixExpr;
+  ParsedExpr = E;
+  CurDeclContext = P.CurDeclContext;
+  return true;
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
@@ -915,10 +928,16 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
 }
 
 void CodeCompletionCallbacksImpl::doneParsing() {
-  if (ParsedExpr && !typecheckExpr(ParsedExpr))
+  if (!typecheckContext())
+    return;
+
+  if (ParsedExpr && !typecheckParsedExpr())
     return;
 
   switch (Kind) {
+  case CompletionKind::None:
+    llvm_unreachable("did not get a completion callback");
+
   case CompletionKind::DotExpr: {
     CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
     Lookup.setHaveDot();
@@ -928,7 +947,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::PostfixExprBeginning: {
     CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
-    Lookup.getCompletionsInDeclContext(P.Tok.getLoc());
+    Lookup.getCompletionsInDeclContext(
+        TU->Ctx.SourceMgr.getCodeCompletionLoc());
     break;
   }
 
