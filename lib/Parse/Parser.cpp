@@ -348,6 +348,14 @@ void Parser::skipUntilDeclStmtRBrace(bool StopAtCodeComplete) {
   }
 }
 
+void Parser::skipUntilDeclRBrace(tok T1, tok T2, bool StopAtCodeComplete) {
+  while (Tok.isNot(T1) && Tok.isNot(T2) &&
+         Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
+         !isStartOfDecl(Tok, peekToken()) &&
+         (!StopAtCodeComplete || Tok.isNot(tok::code_complete))) {
+    skipSingle(StopAtCodeComplete);
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Primitive Parsing
@@ -462,14 +470,16 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     }
     // If we haven't made progress, skip ahead
     if (Tok.getLoc() == StartLoc) {
-      skipUntil(RightK, SeparatorK);
+      skipUntilDeclRBrace(RightK, SeparatorK);
       if (Tok.is(RightK))
         break;
       if (Tok.is(tok::eof) || Tok.is(tok::code_complete)) {
         RightLoc = Tok.getLoc();
         return true;
       }
-      consumeIf(SeparatorK);
+      if (consumeIf(SeparatorK))
+        continue;
+      break;
     }
   }
 

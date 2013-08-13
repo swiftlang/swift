@@ -271,6 +271,8 @@ public:
   /// skipUntilDeclStmtRBrace - Skip to the next decl, statement or '}'.
   void skipUntilDeclStmtRBrace(bool StopAtCodeComplete = true);
 
+  void skipUntilDeclRBrace(tok T1, tok T2, bool StopAtCodeComplete = true);
+
 private:
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///
