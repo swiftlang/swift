@@ -93,10 +93,8 @@ private:
   }
 };
 
-void parseDelayedTopLevelDecl(
-    TranslationUnit *TU,
-    PersistentParserState &ParserState,
-    CodeCompletionCallbacksFactory *CodeCompletionFactory) {
+void parseDelayedDecl(TranslationUnit *TU, PersistentParserState &ParserState,
+                      CodeCompletionCallbacksFactory *CodeCompletionFactory) {
   assert(CodeCompletionFactory &&
          "delayed parsing of decls only makes sense for code completion");
 
@@ -110,7 +108,15 @@ void parseDelayedTopLevelDecl(
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
       CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
   TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
-  TheParser.parseTopLevelCodeDeclDelayed();
+  switch (ParserState.getDelayedDeclKind()) {
+  case PersistentParserState::DelayedDeclKind::TopLevelCodeDecl:
+    TheParser.parseTopLevelCodeDeclDelayed();
+    break;
+
+  case PersistentParserState::DelayedDeclKind::Decl:
+    TheParser.parseDeclDelayed();
+    break;
+  }
   CodeCompletion->doneParsing();
 }
 } // unnamed namespace
@@ -144,7 +150,7 @@ void swift::performDelayedParsing(
   }
 
   if (CodeCompletionFactory)
-    parseDelayedTopLevelDecl(TU, PersistentState, CodeCompletionFactory);
+    parseDelayedDecl(TU, PersistentState, CodeCompletionFactory);
 }
 
 /// \brief Tokenizes a string literal, taking into account string interpolation.

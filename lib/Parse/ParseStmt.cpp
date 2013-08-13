@@ -145,8 +145,9 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition) {
   // this decl that are past the code completion token.
   skipUntilDeclStmtRBrace();
   SourceLoc EndLoc = Tok.getLoc();
-  State->delayTopLevelCodeDecl(nullptr, { BeginLoc, EndLoc },
-                               BeginParserPosition.PreviousLoc);
+  State->delayDecl(PersistentParserState::DelayedDeclKind::TopLevelCodeDecl, 0,
+                   CurDeclContext, { BeginLoc, EndLoc },
+                   BeginParserPosition.PreviousLoc);
 
   // Skip the rest of the file to prevent the parser from constructing the AST
   // for it.  Forward references are not allowed at the top level.
@@ -311,7 +312,7 @@ void Parser::parseTopLevelCodeDeclDelayed() {
   // anyway.
 
   // Re-enter the top-level decl context.
-  ContextChange CC(*this, TU);
+  ContextChange CC(*this, DelayedState->ParentContext);
 
   SmallVector<ExprStmtOrDecl, 4> Entries;
   parseBraceItems(Entries, true, BraceItemListKind::TopLevelCode);

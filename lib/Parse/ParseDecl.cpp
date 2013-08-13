@@ -474,6 +474,21 @@ bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
         || Tok2.isContextualKeyword("infix"));
 }
 
+void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags) {
+  backtrackToPosition(BeginParserPosition);
+  SourceLoc BeginLoc = Tok.getLoc();
+  // Consume tokens up to code completion token.
+  while (Tok.isNot(tok::code_complete)) {
+    consumeToken();
+  }
+  // Consume the code completion token, if there is one.
+  consumeIf(tok::code_complete);
+  SourceLoc EndLoc = Tok.getLoc();
+  State->delayDecl(PersistentParserState::DelayedDeclKind::Decl, Flags,
+                   CurDeclContext, { BeginLoc, EndLoc },
+                   BeginParserPosition.PreviousLoc);
+}
+
 /// parseDecl - Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
 /// values, structs that define a struct decl and a constructor, etc.
@@ -491,6 +506,10 @@ bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
 ///     decl-operator
 ///
 bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
+  ParserPosition BeginParserPosition;
+  if (isCodeCompletionFirstPass())
+    BeginParserPosition = getParserPosition();
+
   // If we see the 'static' keyword, parse it now.
   SourceLoc StaticLoc;
   bool UnhandledStatic = false;
@@ -580,6 +599,16 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     HadParseError = true;
   }
 
+  if (HadParseError &&
+      Tok.is(tok::code_complete) && isCodeCompletionFirstPass() &&
+      !CurDeclContext->isModuleContext()) {
+    // Only consume non-toplevel decls.
+    consumeDecl(BeginParserPosition, Flags);
+
+    // Pretend that there was no error.
+    return false;
+  }
+
   // If we parsed 'static' but didn't handle it above, complain about it.
   if (!HadParseError && UnhandledStatic) {
     diagnose(Entries.back()->getLoc(), diag::decl_not_static)
@@ -587,6 +616,37 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   }
 
   return HadParseError;
+}
+
+void Parser::parseDeclDelayed() {
+  auto DelayedState = State->takeDelayedDeclState();
+  assert(DelayedState.get() && "should have delayed state");
+
+  auto BeginParserPosition = getParserPosition(DelayedState->BodyPos);
+  auto EndLexerState = L->getStateForEndOfTokenLoc(DelayedState->BodyEnd);
+
+  // ParserPositionRAII needs a primed parser to restore to.
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeToken();
+
+  // Ensure that we restore the parser state at exit.
+  ParserPositionRAII PPR(*this);
+
+  // Create a lexer that can not go past the end state.
+  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
+
+  // Temporarily swap out the parser's current lexer with our new one.
+  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
+
+  // Rewind to the beginning of the decl.
+  restoreParserPosition(BeginParserPosition);
+
+  // Re-enter the lexical scope.
+  Scope S(this, DelayedState->takeScope());
+  ContextChange CC(*this, DelayedState->ParentContext);
+
+  SmallVector<ExprStmtOrDecl, 4> Entries;
+  parseBraceItems(Entries, true, BraceItemListKind::TopLevelCode);
 }
 
 /// Parse an 'import' declaration, returning true (and doing no token skipping)

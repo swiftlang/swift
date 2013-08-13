@@ -41,12 +41,15 @@ PersistentParserState::takeBodyState(FuncExpr *FE) {
   return State;
 }
 
-void PersistentParserState::delayTopLevelCodeDecl(TopLevelCodeDecl *TLCD,
-                                                  SourceRange BodyRange,
-                                                  SourceLoc PreviousLoc) {
+void PersistentParserState::delayDecl(DelayedDeclKind Kind,
+                                      unsigned Flags,
+                                      DeclContext *ParentContext,
+                                      SourceRange BodyRange,
+                                      SourceLoc PreviousLoc) {
   assert(!CodeCompletionDelayedDeclState.get() &&
          "only one decl can be delayed for code completion");
   CodeCompletionDelayedDeclState.reset(new DelayedDeclState(
-      TLCD, BodyRange, PreviousLoc, ScopeInfo.saveCurrentScope()));
+      Kind, Flags, ParentContext, BodyRange, PreviousLoc,
+      ScopeInfo.saveCurrentScope()));
 }
 

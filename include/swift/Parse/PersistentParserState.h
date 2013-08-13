@@ -52,10 +52,17 @@ public:
     {}
   };
 
+  enum class DelayedDeclKind {
+    TopLevelCodeDecl,
+    Decl,
+  };
+
   class DelayedDeclState {
     friend class PersistentParserState;
     friend class Parser;
-    Decl *D;
+    DelayedDeclKind Kind;
+    unsigned Flags;
+    DeclContext *ParentContext;
     ParserPos BodyPos;
     SourceLoc BodyEnd;
     SavedScope Scope;
@@ -65,9 +72,11 @@ public:
     }
 
   public:
-    DelayedDeclState(Decl *D, SourceRange BodyRange, SourceLoc PreviousLoc,
-                     SavedScope &&Scope)
-      : D(D), BodyPos{BodyRange.Start, PreviousLoc},
+    DelayedDeclState(DelayedDeclKind Kind, unsigned Flags,
+                     DeclContext *ParentContext, SourceRange BodyRange,
+                     SourceLoc PreviousLoc, SavedScope &&Scope)
+      : Kind(Kind), Flags(Flags), ParentContext(ParentContext),
+        BodyPos{BodyRange.Start, PreviousLoc},
         BodyEnd(BodyRange.End), Scope(std::move(Scope))
     {}
   };
@@ -90,10 +99,15 @@ public:
                                 SourceLoc PreviousLoc);
   std::unique_ptr<FunctionBodyState> takeBodyState(FuncExpr *FE);
 
-  void delayTopLevelCodeDecl(TopLevelCodeDecl *TLCD, SourceRange BodyRange,
-                             SourceLoc PreviousLoc);
+  void delayDecl(DelayedDeclKind Kind, unsigned Flags,
+                 DeclContext *ParentContext,
+                 SourceRange BodyRange, SourceLoc PreviousLoc);
+
   bool hasDelayedDecl() {
     return CodeCompletionDelayedDeclState.get() != nullptr;
+  }
+  DelayedDeclKind getDelayedDeclKind() {
+    return CodeCompletionDelayedDeclState->Kind;
   }
   SourceLoc getDelayedDeclLoc() {
     return CodeCompletionDelayedDeclState->BodyPos.Loc;

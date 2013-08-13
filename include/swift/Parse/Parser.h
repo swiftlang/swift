@@ -407,7 +407,9 @@ public:
   static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2);
 
   bool parseTranslationUnit(TranslationUnit *TU);
+  void consumeDecl(ParserPosition BeginParserPosition, unsigned Flags);
   bool parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
+  void parseDeclDelayed();
   enum {
     PD_Default              = 0,
     PD_AllowTopLevel        = 1 << 1,
