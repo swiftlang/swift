@@ -18,7 +18,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/StringExtras.h"
-//#include "swift/SIL/Dominance.h"
 using namespace swift;
 
 STATISTIC(NumLoadPromoted, "Number of loads promoted");
@@ -38,8 +37,8 @@ namespace {
   /// and even if the number of elements is low, the presence of single-element
   /// struct wrappers (like Int!) means that computing this is non-trivial.
   ///
-  /// Cache the results of the NumElements computation in a densemap to make this
-  /// be linear in the number of types analyzed.
+  /// Cache the results of the NumElements computation in a DenseMap to make
+  /// this be linear in the number of types analyzed.
   class NumElementsCache {
     llvm::DenseMap<CanType, unsigned> ElementCountMap;
     
@@ -81,10 +80,8 @@ unsigned NumElementsCache::get(CanType T) {
       SD = T->castTo<BoundGenericStructType>()->getDecl();
     
     unsigned NumElements = 0;
-    for (auto *D : SD->getMembers())
-      if (auto *VD = dyn_cast<VarDecl>(D))
-        if (!VD->isProperty())
-          NumElements += get(VD->getType()->getCanonicalType());
+    for (auto *VD : SD->getPhysicalFields())
+      NumElements += get(VD->getType()->getCanonicalType());
     return ElementCountMap[T] = NumElements;
   }
   
@@ -129,20 +126,18 @@ void NumElementsCache::getPathStringToElement(CanType T, unsigned Element,
   else
     SD = T->castTo<BoundGenericStructType>()->getDecl();
   
-  for (auto *D : SD->getMembers())
-    if (auto *VD = dyn_cast<VarDecl>(D)) {
-      if (VD->isProperty()) continue;
-      unsigned ElementsForField = get(VD->getType()->getCanonicalType());
+  for (auto *VD : SD->getPhysicalFields()) {
+    unsigned ElementsForField = get(VD->getType()->getCanonicalType());
 
-      if (Element < ElementsForField) {
-        Result += '.';
-        Result += VD->getName().str();
-        return getPathStringToElement(VD->getType()->getCanonicalType(),
-                                      Element, Result);
-      }
-      
-      Element -= ElementsForField;
+    if (Element < ElementsForField) {
+      Result += '.';
+      Result += VD->getName().str();
+      return getPathStringToElement(VD->getType()->getCanonicalType(),
+                                    Element, Result);
     }
+    
+    Element -= ElementsForField;
+  }
   assert(0 && "Element number is out of range for this type!");
 }
 
@@ -654,11 +649,9 @@ static void collectAllocationUses(SILValue Pointer,
         SD = StructTy->castTo<BoundGenericStructType>()->getDecl();
 
       unsigned NewBaseElt = BaseElt;
-      for (auto *D : SD->getMembers()) {
-        if (D == Field) break;
-        if (auto *VD = dyn_cast<VarDecl>(D))
-          if (!VD->isProperty())
-            NewBaseElt += NumElements.get(VD->getType()->getCanonicalType());
+      for (auto *VD : SD->getPhysicalFields()) {
+        if (VD == Field) break;
+        NewBaseElt += NumElements.get(VD->getType()->getCanonicalType());
       }
 
       collectAllocationUses(SILValue(SEAI, 0), Uses, NewBaseElt, NumElements);
