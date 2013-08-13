@@ -400,6 +400,8 @@ void ElementPromotion::doIt() {
     case UseKind::Store:    handleStoreUse(Use.first); break;
     case UseKind::ByrefUse: handleByrefUse(Use.first); break;
     case UseKind::Escape:   handleEscape(Use.first); break;
+    // FIXME: Boxes may not be completely constructed by the time they are
+    // destroyed.  We need to handle destroying partially constructed boxes.
     }
 
     if (HadError) break;
@@ -416,26 +418,41 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // loaded value as an SSA register.  Otherwise, we don't ask for an available
   // value to avoid constructing SSA for the value.
   auto DI = checkDefinitelyInit(Inst, isa<LoadInst>(Inst) ? &Result : nullptr);
-  if (DI == DI_Yes) {
-    // If the value is definitely initialized, check to see if this is a load
-    // that we have a value available for.  If so, we can replace the load now.
-    //
-    // Don't transform aggregate loads and stores.  We are operating
-    // elementwise, so just because this element of the aggregate is
-    // fullfilled by the load doesn't mean the other lanes are.
-    if (Result && NumElements.get(Inst->getType(0).getSwiftType()) == 1 &&
-        Inst->getType(0) == Result.getType()) {
-      SILValue(Inst, 0).replaceAllUsesWith(Result);
-      Inst->eraseFromParent();
-      ++NumLoadPromoted;
-    }
+
+  // If the value is not definitively initialized, emit an error.
+
+  // TODO: In the "No" case, we can emit a fixit adding a default initialization
+  // of the type.
+  // TODO: In the "partial" case, we can produce a more specific diagnostic
+  // indicating where the control flow merged.
+  if (DI != DI_Yes) {
+    // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
+    diagnoseInitError(Inst, diag::variable_used_before_initialized,
+                      diag::variable_n_used_before_initialized);
     return;
   }
 
-  // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
-  diagnoseInitError(Inst, diag::variable_used_before_initialized,
-                    diag::variable_n_used_before_initialized);
+  // If the value is definitely initialized, check to see if this is a load
+  // that we have a value available for.
+  if (!Result) return;
+
+  // If so, we can replace the load now.  Note that all loads have been
+  // scalarized at this point to access a single element, and that we know this
+  // is a LoadInst, not a CopyAddr or LoadWeak.
+
+  // FIXME: There are some cases where we can find a value of the wrong type.
+  // For example a store in type "((Int))" and a load of type "Int".  We need to
+  // define this away to get perfect dataflow.
+  if (Inst->getType(0) == Result.getType()) {
+    // FIXME: We cannot do load promotion in regions where the value has
+    // escaped!
+    SILValue(Inst, 0).replaceAllUsesWith(Result);
+    Inst->eraseFromParent();
+    ++NumLoadPromoted;
+  }
 }
+
+
 
 void ElementPromotion::handleStoreUse(SILInstruction *Inst) {
   // Generally, we don't need to do anything for stores, since this analysis is
