@@ -436,15 +436,14 @@ void CodeCompletionCallbacksImpl::completeExpr() {
 
 namespace {
 /// Build completions by doing visible decl lookup from a context.
-class CompletionLookup : swift::VisibleDeclConsumer
-{
+class CompletionLookup : swift::VisibleDeclConsumer {
   CodeCompletionContext &CompletionContext;
   ASTContext &SwiftContext;
   const DeclContext *CurrDeclContext;
 
   enum class LookupKind {
     ValueExpr,
-    DeclContext
+    ValueInDeclContext
   };
 
   LookupKind Kind;
@@ -584,7 +583,7 @@ public:
       IsImlicitlyCurriedInstanceMethod = ExprType->is<MetaTypeType>() &&
                                          !FD->isStatic();
       break;
-    case LookupKind::DeclContext:
+    case LookupKind::ValueInDeclContext:
       IsImlicitlyCurriedInstanceMethod =
           CurrMethodDC &&
           FD->getDeclContext() == CurrMethodDC->getParent() &&
@@ -779,7 +778,7 @@ public:
       }
       return;
 
-    case LookupKind::DeclContext:
+    case LookupKind::ValueInDeclContext:
       if (auto *VD = dyn_cast<VarDecl>(D)) {
         addVarDeclRef(VD);
         return;
@@ -858,8 +857,8 @@ public:
     }
   }
 
-  void getCompletionsInDeclContext(SourceLoc Loc) {
-    Kind = LookupKind::DeclContext;
+  void getValueCompletionsInDeclContext(SourceLoc Loc) {
+    Kind = LookupKind::ValueInDeclContext;
     lookupVisibleDecls(*this, CurrDeclContext, Loc);
 
     // FIXME: The pedantically correct way to find the type is to resolve the
@@ -931,7 +930,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::PostfixExprBeginning: {
     CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
-    Lookup.getCompletionsInDeclContext(
+    Lookup.getValueCompletionsInDeclContext(
         TU->Ctx.SourceMgr.getCodeCompletionLoc());
     break;
   }
