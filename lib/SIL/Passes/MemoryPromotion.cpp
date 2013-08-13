@@ -57,7 +57,12 @@ namespace {
     /// element and add them to the ElementAddrs vector.  If an element lowers
     /// down to zero elements, this pushes a null SILValue.
     void getElementAddresses(SILValue Pointer,
-                             SmallVectorImpl<SILValue> &ElementAddrs);
+                             SmallVectorImpl<SILInstruction*> &ElementAddrs);
+    
+    /// Given an RValue of aggregate type, compute the values of the elements by
+    /// emitting a series of tuple_element or struct_element instructions.
+    void getElements(SILValue V, SmallVectorImpl<SILValue> &ElementVals,
+                     SILLocation Loc, SILBuilder &B);
   };
 } // end anonymous namespace
 
@@ -151,17 +156,17 @@ void NumElementsCache::getPathStringToElement(CanType T, unsigned Element,
 /// element and add them to the ElementAddrs vector.  If an element lowers
 /// down to zero elements, this pushes a null SILValue.
 void NumElementsCache::getElementAddresses(SILValue Pointer,
-                                     SmallVectorImpl<SILValue> &ElementAddrs) {
-  CanType PointeeType = Pointer.getType().getSwiftRValueType();
-  assert(get(PointeeType) != 1 && "Shouldn't decompose scalars");
+                               SmallVectorImpl<SILInstruction*> &ElementAddrs) {
+  CanType AggType = Pointer.getType().getSwiftRValueType();
+  assert(get(AggType) != 1 && "Shouldn't decompose scalars");
   
   SILInstruction *PointerInst = cast<SILInstruction>(Pointer.getDef());
   SILBuilder B(PointerInst);
 
-  if (TupleType *TT = PointeeType->getAs<TupleType>()) {
+  if (TupleType *TT = AggType->getAs<TupleType>()) {
     for (auto &Field : TT->getFields()) {
       if (get(Field.getType()->getCanonicalType()) == 0) {
-        ElementAddrs.push_back(SILValue());
+        ElementAddrs.push_back(nullptr);
         continue;
       }
       
@@ -174,17 +179,16 @@ void NumElementsCache::getElementAddresses(SILValue Pointer,
     return;
   }
   
-  assert(PointeeType->is<StructType>() ||
-         PointeeType->is<BoundGenericStructType>());
+  assert(AggType->is<StructType>() || AggType->is<BoundGenericStructType>());
   StructDecl *SD;
-  if (auto *ST = PointeeType->getAs<StructType>())
+  if (auto *ST = AggType->getAs<StructType>())
     SD = ST->getDecl();
   else
-    SD = PointeeType->castTo<BoundGenericStructType>()->getDecl();
+    SD = AggType->castTo<BoundGenericStructType>()->getDecl();
   
   for (auto *VD : SD->getPhysicalFields()) {
     if (get(VD->getType()->getCanonicalType()) == 0) {
-      ElementAddrs.push_back(SILValue());
+      ElementAddrs.push_back(nullptr);
       continue;
     }
 
@@ -195,6 +199,37 @@ void NumElementsCache::getElementAddresses(SILValue Pointer,
   }
 }
 
+/// Given an RValue of aggregate type, compute the values of the elements by
+/// emitting a series of tuple_element or struct_element instructions.
+void NumElementsCache::getElements(SILValue V,
+                                   SmallVectorImpl<SILValue> &ElementVals,
+                                   SILLocation Loc, SILBuilder &B) {
+  CanType AggType = V.getType().getSwiftRValueType();
+  assert(get(AggType) != 1 && "Shouldn't decompose scalars");
+  
+  if (TupleType *TT = AggType->getAs<TupleType>()) {
+    for (auto &Field : TT->getFields()) {
+      auto ResultTy = Field.getType()->getCanonicalType();
+      ElementVals.push_back(B.createTupleExtract(Loc, V, ElementVals.size(),
+                                 SILType::getPrimitiveObjectType(ResultTy)));
+    }
+    return;
+  }
+  
+  assert(AggType->is<StructType>() ||
+         AggType->is<BoundGenericStructType>());
+  StructDecl *SD;
+  if (auto *ST = AggType->getAs<StructType>())
+    SD = ST->getDecl();
+  else
+    SD = AggType->castTo<BoundGenericStructType>()->getDecl();
+  
+  for (auto *VD : SD->getPhysicalFields()) {
+    auto ResultTy = VD->getType()->getCanonicalType();
+    ElementVals.push_back(B.createStructExtract(Loc, V, VD,
+                                  SILType::getPrimitiveObjectType(ResultTy)));
+  }
+}
 
 
 //===----------------------------------------------------------------------===//
@@ -592,6 +627,7 @@ namespace {
   private:
     void addElementUses(unsigned BaseElt, SILType UseTy,
                         SILInstruction *User, UseKind Kind);
+    void collectElementAddressUses(SILInstruction *ElementPtr,unsigned BaseElt);
   };
   
   
@@ -608,11 +644,60 @@ void ElementUseCollector::addElementUses(unsigned BaseElt, SILType UseTy,
     Uses[BaseElt+i].push_back({ User, Kind });
 }
 
+/// Given a tuple_element_addr or struct_element_addr, compute the new BaseElt
+/// implicit in the selected member, and recursively add uses of the
+/// instruction.
+void ElementUseCollector::collectElementAddressUses(SILInstruction *ElementPtr,
+                                                    unsigned BaseElt) {
+  auto RValueType = ElementPtr->getOperand(0).getType().getSwiftRValueType();
+  
+  // tuple_element_addr P, 42 indexes into the current element.  Recursively
+  // process its uses with the adjusted element number.
+  if (auto *TEAI = dyn_cast<TupleElementAddrInst>(ElementPtr)) {
+    unsigned FieldNo = TEAI->getFieldNo();
+    auto *TT = RValueType->castTo<TupleType>();
+    unsigned NewBaseElt = BaseElt;
+    for (unsigned i = 0; i != FieldNo; ++i) {
+      CanType EltTy = TT->getElementType(i)->getCanonicalType();
+      NewBaseElt += NumElements.get(EltTy);
+    }
+    
+    collectUses(SILValue(TEAI, 0), NewBaseElt);
+    return;
+  }
+  
+  // struct_element_addr P, #field indexes into the current element.
+  // Recursively process its uses with the adjusted element number.
+  auto *SEAI = cast<StructElementAddrInst>(ElementPtr);
+  VarDecl *Field = SEAI->getField();
+  
+  StructDecl *SD;
+  if (auto *ST = RValueType->getAs<StructType>())
+    SD = ST->getDecl();
+  else
+    SD = RValueType->castTo<BoundGenericStructType>()->getDecl();
+    
+  unsigned NewBaseElt = BaseElt;
+  for (auto *VD : SD->getPhysicalFields()) {
+    if (VD == Field) break;
+    NewBaseElt += NumElements.get(VD->getType()->getCanonicalType());
+  }
+  
+  collectUses(SILValue(SEAI, 0), NewBaseElt);
+}
+
+
 void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
   assert(Pointer.getType().isAddress() &&
          "Walked through the pointer to the value?");
   SILType PointeeType = Pointer.getType().getObjectType();
 
+  /// This keeps track of instructions in the use list that touch multiple
+  /// elements and should be scalarized.  This is done as a second phase to
+  /// avoid invalidating the use iterator.
+  ///
+  SmallVector<SILInstruction*, 4> UsesToScalarize;
+  
   for (auto UI : Pointer.getUses()) {
     auto *User = cast<SILInstruction>(UI->getUser());
 
@@ -622,6 +707,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
         isa<ReleaseInst>(User) ||
         isa<DeallocRefInst>(User))
       continue;
+    
+    // Instructions that compute a subelement are handled by a helper.
+    if (isa<TupleElementAddrInst>(User) ||
+        isa<StructElementAddrInst>(User)) {
+      collectElementAddressUses(User, BaseElt);
+      continue;
+    }
+    
 
     // FIXME: Canonicalize aggregate loads of entire sub-tuples/sub-structs into
     // loads of their elements + struct_inst / tuple_inst.
@@ -638,7 +731,13 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
          isa<StoreWeakInst>(User)) &&
         UI->getOperandNumber() == 1) {
-      addElementUses(BaseElt, PointeeType, User, UseKind::Store);
+      if (NumElements.get(PointeeType.getSwiftRValueType()) == 1)
+        Uses[BaseElt].push_back({ User, UseKind::Store });
+      else {
+        assert(!isa<StoreWeakInst>(User) &&
+               "Aggregate store_weak shouldn't happen");
+        UsesToScalarize.push_back(User);
+      }
       continue;
     }
 
@@ -685,45 +784,49 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       // Otherwise, it is an escape.
     }
 
-    // tuple_element P, 42 indexes into the current element.  Recursively
-    // process its uses with the adjusted element number.
-    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(User)) {
-      unsigned FieldNo = TEAI->getFieldNo();
-      auto *TT = Pointer.getType().getSwiftRValueType()->castTo<TupleType>();
-      unsigned NewBaseElt = BaseElt;
-      for (unsigned i = 0; i != FieldNo; ++i) {
-        CanType EltTy = TT->getElementType(i)->getCanonicalType();
-        NewBaseElt += NumElements.get(EltTy);
-      }
-
-      collectUses(SILValue(TEAI, 0), NewBaseElt);
-      continue;
-    }
-
-    // struct_element P, #field indexes into the current element.  Recursively
-    // process its uses with the adjusted element number.
-    if (auto *SEAI = dyn_cast<StructElementAddrInst>(User)) {
-      VarDecl *Field = SEAI->getField();
-      CanType StructTy = Pointer.getType().getSwiftRValueType();
-
-      StructDecl *SD;
-      if (auto *ST = StructTy->getAs<StructType>())
-        SD = ST->getDecl();
-      else
-        SD = StructTy->castTo<BoundGenericStructType>()->getDecl();
-
-      unsigned NewBaseElt = BaseElt;
-      for (auto *VD : SD->getPhysicalFields()) {
-        if (VD == Field) break;
-        NewBaseElt += NumElements.get(VD->getType()->getCanonicalType());
-      }
-
-      collectUses(SILValue(SEAI, 0), NewBaseElt);
-      continue;
-    }
-
      // Otherwise, the use is something complicated, it escapes.
     addElementUses(BaseElt, PointeeType, User, UseKind::Escape);
+  }
+
+  // Now that we've walked all of the immediate uses, scalarize any elements
+  // that we need to for canonicalization or analysis reasons.
+  if (!UsesToScalarize.empty()) {
+    SmallVector<SILInstruction*, 4> ElementAddrs;
+    NumElements.getElementAddresses(Pointer, ElementAddrs);
+    
+    SmallVector<SILValue, 4> ElementTmps;
+    
+    for (auto *User : UsesToScalarize) {
+      SILBuilder B(User);
+      ElementTmps.clear();
+
+      // Handle AssignInst
+      if (auto *AI = dyn_cast<AssignInst>(User)) {
+        NumElements.getElements(AI->getOperand(0), ElementTmps, AI->getLoc(),B);
+
+        for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
+          if (auto EltAddr = ElementAddrs[i])
+            B.createAssign(AI->getLoc(), ElementTmps[i], EltAddr);
+        }
+        continue;
+      }
+      
+      // Handle StoreInst
+      auto *SI = cast<StoreInst>(User);
+      NumElements.getElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
+      
+      for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
+        if (auto EltAddr = ElementAddrs[i])
+          B.createStore(SI->getLoc(), ElementTmps[i], EltAddr);
+      }
+    }
+    
+    // Now that we've scalarized some stuff, recurse down into the newly created
+    // element address computations to recursively process it.  This can cause
+    // further scalarization.
+    for (auto EltPtr : ElementAddrs)
+      if (EltPtr)
+        collectElementAddressUses(EltPtr, BaseElt);
   }
 }
 
