@@ -196,6 +196,14 @@ void NumElementsCache::getElements(SILValue V,
   assert(get(AggType) != 1 && "Shouldn't decompose scalars");
   
   if (TupleType *TT = AggType->getAs<TupleType>()) {
+    // If this is exploding a tuple_inst, just return the element values.  This
+    // can happen when recursively scalarizing stuff.
+    if (auto *TI = dyn_cast<TupleInst>(V)) {
+      for (unsigned i = 0, e = TI->getNumOperands(); i != e; ++i)
+        ElementVals.push_back(TI->getOperand(i));
+      return;
+    }
+    
     for (auto &Field : TT->getFields()) {
       auto ResultTy = Field.getType()->getCanonicalType();
       ElementVals.push_back(B.createTupleExtract(Loc, V, ElementVals.size(),
@@ -206,6 +214,15 @@ void NumElementsCache::getElements(SILValue V,
   
   assert(AggType->is<StructType>() ||
          AggType->is<BoundGenericStructType>());
+  
+  // If this is exploding a struct_inst, just return the element values.  This
+  // can happen when recursively scalarizing stuff.
+  if (auto *SI = dyn_cast<StructInst>(V)) {
+    for (unsigned i = 0, e = SI->getNumOperands(); i != e; ++i)
+      ElementVals.push_back(SI->getOperand(i));
+    return;
+  }
+  
   StructDecl *SD;
   if (auto *ST = AggType->getAs<StructType>())
     SD = ST->getDecl();

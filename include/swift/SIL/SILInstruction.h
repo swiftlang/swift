@@ -113,6 +113,7 @@ public:
   /// Return the array of operands for this instruction.
   ArrayRef<Operand> getAllOperands() const;
 
+  unsigned getNumOperands() const { return getAllOperands().size(); }
   SILValue getOperand(unsigned Num) const { return getAllOperands()[Num].get();}
 
   SILInstructionMemoryBehavior getMemoryBehavior() const;
