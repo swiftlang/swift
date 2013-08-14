@@ -833,11 +833,11 @@ namespace {
                tc.Context.getIdentifier("CharacterLiteralType"),
                tc.Context.getIdentifier("convertFromCharacterLiteral"),
                builtinProtocol,
-               Type(BuiltinIntegerType::get(32, tc.Context)),
+               Type(BuiltinIntegerType::get(21, tc.Context)),
                tc.Context.getIdentifier("_convertFromBuiltinCharacterLiteral"),
                [] (Type type) -> bool {
                  if (auto builtinInt = type->getAs<BuiltinIntegerType>()) {
-                   return builtinInt->getBitWidth() == 32;
+                   return builtinInt->getBitWidth() == 21;
                  }
                  return false;
                },
