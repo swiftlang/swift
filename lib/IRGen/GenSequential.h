@@ -21,7 +21,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
-#include "FixedTypeInfo.h"
+#include "LoadableTypeInfo.h"
 #include "TypeInfo.h"
 #include "StructLayout.h"
 
@@ -85,15 +85,14 @@ public:
 };
 
 /// A metaprogrammed TypeInfo implementation for sequential types.
-template <class Impl, class Base, class FieldImpl_>
-class SequentialTypeInfo : public Base {
+template <class Impl, class Base, class FieldImpl_,
+          bool IsLoadable = std::is_base_of<LoadableTypeInfo, Base>::value>
+class SequentialTypeInfoImpl : public Base {
 public:
   typedef FieldImpl_ FieldImpl;
 
 private:
   const unsigned NumFields;
-  unsigned MaximalExplosionSize : 16;
-  unsigned MinimalExplosionSize : 16;
 
   const FieldImpl *getFieldsBuffer() const {
     return reinterpret_cast<const FieldImpl*>(static_cast<const Impl*>(this)+1);
@@ -108,20 +107,12 @@ protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
 
   template <class... As> 
-  SequentialTypeInfo(unsigned numFields, As&&...args)
+  SequentialTypeInfoImpl(unsigned numFields, As&&...args)
     : Base(std::forward<As>(args)...), NumFields(numFields) {}
 
 public:
   ArrayRef<FieldImpl> getFields() const {
     return ArrayRef<FieldImpl>(getFieldsBuffer(), NumFields);
-  }
-
-  unsigned getExplosionSize(ExplosionKind level) const {
-    switch (level) {
-    case ExplosionKind::Minimal: return MinimalExplosionSize;
-    case ExplosionKind::Maximal: return MaximalExplosionSize;
-    }
-    llvm_unreachable("bad explosion level");
   }
 
   /// The standard schema is just all the fields jumbled together.
@@ -131,37 +122,8 @@ public:
     }
   }
 
-  void load(IRGenFunction &IGF, Address addr, Explosion &out) const {
-    auto offsets = asImpl().getNonFixedOffsets(IGF);
-    for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
-
-      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
-      field.getTypeInfo().load(IGF, fieldAddr, out);
-    }
-  }
-
-  void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &out) const {
-    auto offsets = asImpl().getNonFixedOffsets(IGF);
-    for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
-
-      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
-      field.getTypeInfo().loadAsTake(IGF, fieldAddr, out);
-    }
-  }
-  
-  void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-    auto offsets = asImpl().getNonFixedOffsets(IGF);
-    for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
-
-      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
-      field.getTypeInfo().assign(IGF, e, fieldAddr);
-    }
-  }
-
-  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+  void assignWithCopy(IRGenFunction &IGF, Address dest,
+                      Address src) const override {
     auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
@@ -172,7 +134,8 @@ public:
     }
   }
 
-  void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+  void assignWithTake(IRGenFunction &IGF, Address dest,
+                      Address src) const override {
     auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
@@ -183,22 +146,12 @@ public:
     }
   }
 
-  void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
-    auto offsets = asImpl().getNonFixedOffsets(IGF);
-    for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
-      
-      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
-      field.getTypeInfo().initialize(IGF, e, fieldAddr);
-    }
-  }
-
-  void initializeWithCopy(IRGenFunction &IGF, Address dest,
-                          Address src) const {
+  void initializeWithCopy(IRGenFunction &IGF,
+                          Address dest, Address src) const override {
     // If we're POD, use the generic routine.
-    if (this->isPOD(ResilienceScope::Local) && Base::isFixedSize()) {
-      return cast<FixedTypeInfo>(this)->
-               FixedTypeInfo::initializeWithCopy(IGF, dest, src);
+    if (this->isPOD(ResilienceScope::Local) && isa<LoadableTypeInfo>(this)) {
+      return cast<LoadableTypeInfo>(this)->
+               LoadableTypeInfo::initializeWithCopy(IGF, dest, src);
     }
 
     auto offsets = asImpl().getNonFixedOffsets(IGF);
@@ -211,16 +164,6 @@ public:
     }
   }
 
-  void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-    for (auto &field : getFields())
-      field.getTypeInfo().reexplode(IGF, src, dest);
-  }
-
-  void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-    for (auto &field : getFields())
-      field.getTypeInfo().copy(IGF, src, dest);
-  }
-
   void destroy(IRGenFunction &IGF, Address addr) const {
     auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
@@ -228,6 +171,102 @@ public:
 
       field.getTypeInfo().destroy(IGF, field.projectAddress(IGF, addr, offsets));
     }
+  }
+};
+
+template <class Impl, class Base, class FieldImpl_,
+          bool IsLoadable = std::is_base_of<LoadableTypeInfo, Base>::value>
+class SequentialTypeInfo;
+
+/// An implementation of SequentialTypeInfo for non-loadable types. 
+template <class Impl, class Base, class FieldImpl>
+class SequentialTypeInfo<Impl, Base, FieldImpl, false>
+    : public SequentialTypeInfoImpl<Impl, Base, FieldImpl> {
+  typedef SequentialTypeInfoImpl<Impl, Base, FieldImpl> super;
+protected:
+  template <class... As> 
+  SequentialTypeInfo(As&&...args) : super(std::forward<As>(args)...) {}
+};
+
+/// An implementation of SequentialTypeInfo for loadable types. 
+template <class Impl, class Base, class FieldImpl>
+class SequentialTypeInfo<Impl, Base, FieldImpl, true>
+    : public SequentialTypeInfoImpl<Impl, Base, FieldImpl> {
+  typedef SequentialTypeInfoImpl<Impl, Base, FieldImpl> super;
+
+  unsigned MaximalExplosionSize : 16;
+  unsigned MinimalExplosionSize : 16;
+
+  template <class, class, class> friend class SequentialTypeBuilder;
+
+protected:
+  using super::asImpl;
+
+  template <class... As> 
+  SequentialTypeInfo(As&&...args) : super(std::forward<As>(args)...) {}
+
+private:
+  template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF,
+                                         Address addr,
+                                         Explosion &out) const>
+  void forAllFields(IRGenFunction &IGF, Address addr, Explosion &out) const {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
+    for (auto &field : getFields()) {
+      if (field.isEmpty()) continue;
+
+      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
+      (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, fieldAddr, out);
+    }
+  }
+
+  template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF,
+                                         Explosion &in,
+                                         Address addr) const>
+  void forAllFields(IRGenFunction &IGF, Explosion &in, Address addr) const {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
+    for (auto &field : getFields()) {
+      if (field.isEmpty()) continue;
+
+      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
+      (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, in, fieldAddr);
+    }
+  }
+
+public:
+  using super::getFields;
+
+  void load(IRGenFunction &IGF, Address addr, Explosion &out) const {
+    forAllFields<&LoadableTypeInfo::load>(IGF, addr, out);
+  }
+
+  void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &out) const {
+    forAllFields<&LoadableTypeInfo::loadAsTake>(IGF, addr, out);
+  }
+  
+  void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    forAllFields<&LoadableTypeInfo::assign>(IGF, e, addr);
+  }
+
+  void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    forAllFields<&LoadableTypeInfo::initialize>(IGF, e, addr);
+  }
+
+  unsigned getExplosionSize(ExplosionKind level) const {
+    switch (level) {
+    case ExplosionKind::Minimal: return MinimalExplosionSize;
+    case ExplosionKind::Maximal: return MaximalExplosionSize;
+    }
+    llvm_unreachable("bad explosion level");
+  }
+
+  void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+    for (auto &field : getFields())
+      cast<LoadableTypeInfo>(field.getTypeInfo()).reexplode(IGF, src, dest);
+  }
+
+  void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+    for (auto &field : getFields())
+      cast<LoadableTypeInfo>(field.getTypeInfo()).copy(IGF, src, dest);
   }
 };
 
@@ -264,6 +303,8 @@ public:
     fields.reserve(astFields.size());
     fieldTypesForLayout.reserve(astFields.size());
 
+    bool loadable = true;
+
     unsigned maximalExplosionSize = 0, minimalExplosionSize = 0;
     for (auto &astField : astFields) {
       // Compute the field's type info.
@@ -273,13 +314,21 @@ public:
 
       fields.push_back(FieldImpl(asImpl()->getFieldInfo(astField, fieldTI)));
 
+      auto loadableFieldTI = dyn_cast<LoadableTypeInfo>(&fieldTI);
+      if (!loadableFieldTI) {
+        loadable = false;
+        continue;
+      }
+
       auto &fieldInfo = fields.back();
       fieldInfo.MaximalBegin = maximalExplosionSize;
-      maximalExplosionSize += fieldTI.getExplosionSize(ExplosionKind::Maximal);
+      maximalExplosionSize +=
+        loadableFieldTI->getExplosionSize(ExplosionKind::Maximal);
       fieldInfo.MaximalEnd = maximalExplosionSize;
 
       fieldInfo.MinimalBegin = minimalExplosionSize;
-      minimalExplosionSize += fieldTI.getExplosionSize(ExplosionKind::Minimal);
+      minimalExplosionSize +=
+        loadableFieldTI->getExplosionSize(ExplosionKind::Minimal);
       fieldInfo.MinimalEnd = minimalExplosionSize;
     }
 
@@ -290,18 +339,17 @@ public:
     }
 
     // Create the type info.
-
-    if (layout.isFixedLayout()) {
-      auto seqTI = asImpl()->createFixed(fields, layout);
+    if (loadable) {
+      assert(layout.isFixedLayout());
+      auto seqTI = asImpl()->createLoadable(fields, layout);
       seqTI->MaximalExplosionSize = maximalExplosionSize;
       seqTI->MinimalExplosionSize = minimalExplosionSize;
       return seqTI;
+    } else if (layout.isFixedLayout()) {
+      return asImpl()->createFixed(fields, layout);
+    } else {
+      return asImpl()->createNonFixed(fields, layout);
     }
-
-    auto seqTI = asImpl()->createNonFixed(fields, layout);
-    seqTI->MaximalExplosionSize = maximalExplosionSize;
-    seqTI->MinimalExplosionSize = minimalExplosionSize;
-    return seqTI;
   }  
 };
 

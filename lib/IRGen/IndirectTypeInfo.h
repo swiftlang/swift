@@ -51,58 +51,19 @@ public:
                                               this->getBestKnownAlignment()));
   }
 
-  unsigned getExplosionSize(ExplosionKind kind) const { return 1; }
-
-  void load(IRGenFunction &IGF, Address src, Explosion &out) const {
-    // Create a temporary.
-    // FIXME: deallocate?  This is just bogus.
-    Address dest =
-      asDerived().Derived::allocateStack(IGF, "temporary.forLoad").getAddress();
-
-    // Initialize it with a copy of the source.
-    asDerived().Derived::initializeWithCopy(IGF, dest, src);
-
-    out.add(dest.getAddress());
+  bool isIndirectArgument(ExplosionKind level) const override {
+    return true;
   }
 
-  void loadAsTake(IRGenFunction &IGF, Address src, Explosion &out) const {
-    // Create a temporary and memcpy into it.  FIXME: deallocate?
-    Address dest =
-      asDerived().Derived::allocateStack(IGF, "temporary.forLoad").getAddress();
-
-    // Initialize it with a take of the source.
+  void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                            Address dest) const {
+    Address src = this->getAddressForPointer(params.claimNext());
     asDerived().Derived::initializeWithTake(IGF, dest, src);
-    out.add(dest.getAddress());
   }
 
-  void assign(IRGenFunction &IGF, Explosion &in, Address dest) const {
-    // Destroy the old value.  This is safe because the value in the
-    // explosion is already +1, so even if there's any aliasing
-    // going on, we're totally fine.
-    asDerived().Derived::destroy(IGF, dest);
-
-    // Take the new value.
-    asDerived().Derived::initialize(IGF, in, dest);
-  }
-
-  void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+  void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const override {
     asDerived().Derived::destroy(IGF, dest);
     asDerived().Derived::initializeWithTake(IGF, dest, src);
-  }
-
-  void initialize(IRGenFunction &IGF, Explosion &in, Address dest) const {
-    // Take ownership of the temporary and memcpy it into place.
-    Address src = asDerived().Derived::getAddressForPointer(in.claimNext());
-    asDerived().Derived::initializeWithTake(IGF, dest, src);
-  }
-
-  void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-    dest.add(src.claimNext());
-  }
-
-  void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
-    Address src = asDerived().Derived::getAddressForPointer(in.claimNext());
-    asDerived().Derived::load(IGF, src, out);
   }
 };
 

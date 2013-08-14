@@ -55,6 +55,14 @@ inline IsFixedSize_t &operator&=(IsFixedSize_t &l, IsFixedSize_t r) {
   return (l = (l & r));
 }
 
+enum IsLoadable_t : bool { IsNotLoadable, IsLoadable };
+inline IsLoadable_t operator&(IsLoadable_t l, IsLoadable_t r) {
+  return IsLoadable_t(unsigned(l) & unsigned(r));
+}
+inline IsLoadable_t &operator&=(IsLoadable_t &l, IsLoadable_t r) {
+  return (l = (l & r));
+}
+
 /// Whether or not an object should be emitted on the heap.
 enum OnHeap_t : unsigned char {
   NotOnHeap,

@@ -25,9 +25,9 @@
 #include "Explosion.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "TypeInfo.h"
+#include "LoadableTypeInfo.h"
 #include "TypeVisitor.h"
-
+#include "GenTuple.h"
 #include "GenPoly.h"
 
 using namespace swift;
@@ -429,22 +429,46 @@ namespace {
       }
 
       // Otherwise, we need to make a temporary.
-      auto &substTI = IGF.getFragileTypeInfo(substTy);
-      initIntoTemporary(substTI);
-    }
-
-    void initIntoTemporary(const TypeInfo &substTI) {
       // FIXME: this temporary has to get cleaned up!
+      auto &substTI = IGF.getFragileTypeInfo(substTy);
       auto addr = substTI.allocateStack(IGF, "substitution.temp").getAddress();
 
       // Initialize into it.
-      substTI.initialize(IGF, In, addr);
- 
+      initIntoTemporary(substTy, substTI, addr);
+
       // Cast to the expected pointer type.
       addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.OpaquePtrTy, "temp.cast");
 
       // Add that to the output explosion.
       Out.add(addr.getAddress());
+    }
+
+    void initIntoTemporary(CanType substTy, const TypeInfo &substTI,
+                           Address dest) {
+      // This is really easy if the substituted type is loadable.
+      if (substTI.isLoadable()) {
+        cast<LoadableTypeInfo>(substTI).initialize(IGF, In, dest);
+
+      // Otherwise, if it's a tuple, we need to unexplode it.
+      } else if (auto tupleTy = dyn_cast<TupleType>(substTy)) {
+        auto nextIndex = 0;
+        for (auto eltType : tupleTy.getElementTypes()) {
+          auto index = nextIndex++;
+          auto &eltTI = IGF.getFragileTypeInfo(eltType);
+          if (eltTI.isKnownEmpty()) continue;
+
+          auto eltAddr = projectTupleElementAddress(IGF,
+                                                    { dest, nullptr },
+                              SILType::getPrimitiveObjectType(tupleTy),
+                                                    index).getAddress();
+          initIntoTemporary(eltType, eltTI, eltAddr);
+        }
+
+      // Otherwise, just copy over.
+      } else {
+        Address src = substTI.getAddressForPointer(In.claimNext());
+        substTI.initializeWithTake(IGF, dest, src);
+      }
     }
 
     void visitArrayType(CanArrayType origTy, CanArrayType substTy) {
@@ -591,7 +615,8 @@ namespace {
       }
 
       // Otherwise, load as a take.
-      substTI.loadAsTake(IGF, substTI.getAddressForPointer(inAddr), Out);
+      cast<LoadableTypeInfo>(substTI).loadAsTake(IGF,
+                                   substTI.getAddressForPointer(inAddr), Out);
     }
 
     void visitArrayType(CanArrayType origTy, CanArrayType substTy) {

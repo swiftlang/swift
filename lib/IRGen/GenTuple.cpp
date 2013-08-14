@@ -34,6 +34,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
+#include "IndirectTypeInfo.h"
 #include "NonFixedTypeInfo.h"
 
 #include "GenTuple.h"
@@ -104,11 +105,32 @@ namespace {
                                                offsets);
       return {fieldAddr, tuple.getOwner()};
     }
+
+    bool isIndirectArgument(ExplosionKind kind) const override {
+      llvm_unreachable("unexploded tuple as argument?");
+    }
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address src) const override {
+      llvm_unreachable("unexploded tuple as argument?");
+    }
   };
 
-  /// Type implementation for fixed-size tuples.
+  /// Type implementation for loadable tuples.
+  class LoadableTupleTypeInfo :
+      public TupleTypeInfoBase<LoadableTupleTypeInfo, LoadableTypeInfo> {
+  public:
+    LoadableTupleTypeInfo(unsigned numFields, llvm::Type *ty,
+                          Size size, Alignment align, IsPOD_t isPOD)
+      : TupleTypeInfoBase(numFields, ty, size, align, isPOD) {}
+
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
+  };
+
+  /// Type implementation for fixed-size but non-loadable tuples.
   class FixedTupleTypeInfo :
-      public TupleTypeInfoBase<FixedTupleTypeInfo, FixedTypeInfo> {
+      public TupleTypeInfoBase<FixedTupleTypeInfo,
+                               IndirectTypeInfo<FixedTupleTypeInfo,
+                                                FixedTypeInfo>> {
   public:
     FixedTupleTypeInfo(unsigned numFields, llvm::Type *ty,
                        Size size, Alignment align, IsPOD_t isPOD)
@@ -183,8 +205,17 @@ namespace {
     FixedTupleTypeInfo *createFixed(ArrayRef<TupleFieldInfo> fields,
                                     const StructLayout &layout) {
       return create<FixedTupleTypeInfo>(fields, layout.getType(),
-                                        layout.getSize(), layout.getAlignment(),
+                                        layout.getSize(),
+                                        layout.getAlignment(),
                                         layout.isKnownPOD());
+    }
+
+    LoadableTupleTypeInfo *createLoadable(ArrayRef<TupleFieldInfo> fields,
+                                          const StructLayout &layout) {
+      return create<LoadableTupleTypeInfo>(fields, layout.getType(),
+                                           layout.getSize(),
+                                           layout.getAlignment(),
+                                           layout.isKnownPOD());
     }
 
     NonFixedTupleTypeInfo *createNonFixed(ArrayRef<TupleFieldInfo> fields,
@@ -217,7 +248,9 @@ const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
 /// various tuple implementations.
 #define FOR_TUPLE_IMPL(IGF, type, op, ...) do {                      \
   auto &tupleTI = IGF.getFragileTypeInfo(type);                      \
-  if (isa<FixedTypeInfo>(tupleTI)) {                                 \
+  if (isa<LoadableTypeInfo>(tupleTI)) {                              \
+    return tupleTI.as<LoadableTupleTypeInfo>().op(IGF, __VA_ARGS__); \
+  } else if (isa<FixedTypeInfo>(tupleTI)) {                          \
     return tupleTI.as<FixedTupleTypeInfo>().op(IGF, __VA_ARGS__);    \
   } else {                                                           \
     return tupleTI.as<NonFixedTupleTypeInfo>().op(IGF, __VA_ARGS__); \

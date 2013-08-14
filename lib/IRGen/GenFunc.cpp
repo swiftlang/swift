@@ -1173,7 +1173,7 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
   if (LastArgWritten == 0) {
     Explosion result(getCallee().getExplosionLevel());
     emitToExplosion(result);
-    substResultTI.initialize(IGF, result, addr);
+    cast<LoadableTypeInfo>(substResultTI).initialize(IGF, result, addr);
     return;
   }
 
@@ -1209,28 +1209,21 @@ void CallEmission::emitToExplosion(Explosion &out) {
   assert(RemainingArgsForCallee == 0);
   assert(LastArgWritten <= 1);
 
+  Type substResultType = getCallee().getSubstResultType();
+  auto &substResultTI =
+    cast<LoadableTypeInfo>(IGF.getFragileTypeInfo(substResultType));
+
   // If the call is naturally to memory, emit it that way and then
   // explode that temporary.
   if (LastArgWritten == 1) {
-    Type substResultType = getCallee().getSubstResultType();
-    const TypeInfo &substResultTI = IGF.getFragileTypeInfo(substResultType);
+    // FIXME: we might still need to handle abstraction difference here?
 
     ContainedAddress ctemp = substResultTI.allocateStack(IGF, "call.aggresult");
     Address temp = ctemp.getAddress();
     emitToMemory(temp, substResultTI);
  
-    // If the subst result is passed as an aggregate, don't uselessly
-    // copy the temporary.
-    auto substSchema = substResultTI.getSchema(out.getKind());
-    if (substSchema.isSingleAggregate()) {
-      auto substType = substSchema.begin()->getAggregateType()->getPointerTo();
-      temp = IGF.Builder.CreateBitCast(temp, substType);
-      out.add(temp.getAddress());
-
-    } else {
-      // Otherwise, we need to load.
-      substResultTI.loadAsTake(IGF, temp, out);
-    }
+    // We can use a take.
+    substResultTI.loadAsTake(IGF, temp, out);
 
     substResultTI.deallocateStack(IGF, ctemp.getContainer());
     return;
@@ -1240,8 +1233,6 @@ void CallEmission::emitToExplosion(Explosion &out) {
   // Figure out how the substituted result differs from the original.
   CanType substType = getCallee().getSubstResultType()->getCanonicalType();
   auto resultDiff = computeResultDifference(IGF.IGM, CurOrigType, substType);
-  const TypeInfo &substResultTI =
-    IGF.getFragileTypeInfo(getCallee().getSubstResultType());
 
   switch (resultDiff) {
   // If they don't differ at all, we're good. 
@@ -1410,7 +1401,7 @@ llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
 void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
                      SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
                      CanType ty) {
-  TypeInfo const &ti = IGF.getFragileTypeInfo(ty);
+  auto &ti = cast<LoadableTypeInfo>(IGF.getFragileTypeInfo(ty));
   if (requiresExternalByvalArgument(IGF.IGM, ty)) {
     // FIXME: deallocate temporary!
     Address addr = ti.allocateStack(IGF, "byval-temporary").getAddress();
@@ -1702,20 +1693,40 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   
   Explosion params = subIGF.collectParameters();
 
+  typedef std::pair<const TypeInfo &, Address> AddressToDeallocate;
+  SmallVector<AddressToDeallocate, 4> addressesToDeallocate;
+
   // FIXME: support
   NonFixedOffsets offsets = Nothing;
-  
+
   // If there's a data pointer required, grab it (it's always the
   // last parameter) and load out the extra, previously-curried
   // parameters.
   if (!layout.isKnownEmpty()) {
     llvm::Value *rawData = params.takeLast();
     Address data = layout.emitCastTo(subIGF, rawData);
-    
+
     // Perform the loads.
     for (auto &fieldLayout : layout.getElements()) {
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
-      fieldLayout.getType().load(subIGF, fieldAddr, params);
+      auto &fieldType = fieldLayout.getType();
+
+      // If the argument is passed indirectly, copy into a temporary.
+      // (If it were instead passed "const +0", we could pass a reference
+      // to the memory in the data pointer.  But it isn't.)
+      if (fieldType.isIndirectArgument(explosionLevel)) {
+        auto caddr = fieldType.allocateStack(subIGF, "arg.temp");
+        fieldType.initializeWithCopy(subIGF, caddr.getAddress(), fieldAddr);
+        params.add(caddr.getAddressPointer());
+
+        // Remember to deallocate later.
+        addressesToDeallocate.push_back(
+                       AddressToDeallocate(fieldType, caddr.getContainer()));
+        continue;
+      }
+
+      // Otherwise, just load out.
+      cast<LoadableTypeInfo>(fieldType).load(subIGF, fieldAddr, params);
     }
     
     // Kill the allocated data pointer immediately.  The safety of
@@ -1728,6 +1739,12 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   call->setAttributes(fnPtr->getAttributes());
   call->setCallingConv(fnPtr->getCallingConv());
   call->setTailCall();
+
+  // Deallocate everything we allocated above.
+  // FIXME: exceptions?
+  for (auto &entry : addressesToDeallocate) {
+    entry.first.deallocateStack(subIGF, entry.second);
+  }
   
   if (call->getType()->isVoidTy())
     subIGF.Builder.CreateRetVoid();
@@ -1797,7 +1814,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     // Perform the store.
     for (auto &fieldLayout : layout.getElements()) {
       Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
-      fieldLayout.getType().initialize(IGF, args, fieldAddr);
+      fieldLayout.getType().initializeFromParams(IGF, args, fieldAddr);
     }
   }
   assert(args.empty() && "unused args in partial application?!");

@@ -29,7 +29,8 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Linking.h"
-#include "Explosion.h"
+#include "IndirectTypeInfo.h"
+#include "NonFixedTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -48,38 +49,151 @@ namespace {
     }
   };
 
-  /// Layout information for struct types.
-  class StructTypeInfo : // FIXME: FixedTypeInfo as the base class is a lie.
-    public SequentialTypeInfo<StructTypeInfo, FixedTypeInfo, StructFieldInfo> {
+  /// A common base class for structs.
+  template <class Impl, class Base>
+  class StructTypeInfoBase :
+     public SequentialTypeInfo<Impl, Base, StructFieldInfo> {
+    typedef SequentialTypeInfo<Impl, Base, StructFieldInfo> super;
+
+  protected:
+    template <class... As>
+    StructTypeInfoBase(As &&...args) : super(std::forward<As>(args)...) {}
+
+    using super::asImpl;
+
   public:
-    StructTypeInfo(unsigned numFields, llvm::Type *T, Size size,Alignment align,
-                   IsPOD_t isPOD)
-      : SequentialTypeInfo(numFields, T, size, align, isPOD) {
+    const StructFieldInfo &getFieldInfo(VarDecl *field) const {
+      // FIXME: cache the physical field index in the VarDecl.
+      for (auto &fieldInfo : asImpl().getFields()) {
+        if (fieldInfo.Field == field)
+          return fieldInfo;
+      }
+      llvm_unreachable("field not in struct?");
     }
 
-    /// FIXME: implement
+    /// Given a full struct explosion, project out a single field.
+    void projectFieldFromExplosion(IRGenFunction &IGF,
+                                   Explosion &in,
+                                   VarDecl *field,
+                                   Explosion &out) const {
+      assert(in.getKind() == out.getKind());
+      auto &fieldInfo = getFieldInfo(field);
+
+      // If the field requires no storage, there's nothing to do.
+      if (fieldInfo.isEmpty())
+        return;
+  
+      // Otherwise, project from the base.
+      auto fieldRange = fieldInfo.getProjectionRange(out.getKind());
+      auto elements = in.getRange(fieldRange.first, fieldRange.second);
+      out.add(elements);
+    }
+
+    /// Given the address of a tuple, project out the address of a
+    /// single element.
+    OwnedAddress projectFieldAddress(IRGenFunction &IGF,
+                                     OwnedAddress addr,
+                                     VarDecl *field) const {
+      auto &fieldInfo = getFieldInfo(field);
+      if (fieldInfo.isEmpty())
+        return {fieldInfo.getTypeInfo().getUndefAddress(), nullptr};
+
+      auto offsets = asImpl().getNonFixedOffsets(IGF);
+      Address fieldAddr = fieldInfo.projectAddress(IGF, addr.getAddress(),
+                                                   offsets);
+      return {fieldAddr, addr.getOwner()};
+    }
+  };
+
+
+  /// A type implementation for loadable struct types.
+  class LoadableStructTypeInfo
+      : public StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo> {
+  public:
+    LoadableStructTypeInfo(unsigned numFields, llvm::Type *T, Size size,
+                           Alignment align, IsPOD_t isPOD)
+      : StructTypeInfoBase(numFields, T, size, align, isPOD) {
+    }
+
+    bool isIndirectArgument(ExplosionKind kind) const override { return false; }
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address addr) const override {
+      LoadableStructTypeInfo::initialize(IGF, params, addr);
+    }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
+  };
+
+  /// A type implementation for non-loadable but fixed-size struct types.
+  class FixedStructTypeInfo
+      : public StructTypeInfoBase<FixedStructTypeInfo,
+                                  IndirectTypeInfo<FixedStructTypeInfo,
+                                                   FixedTypeInfo>> {
+  public:
+    FixedStructTypeInfo(unsigned numFields, llvm::Type *T, Size size,
+                        Alignment align, IsPOD_t isPOD)
+      : StructTypeInfoBase(numFields, T, size, align, isPOD) {
+    }
+
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
+  };
+
+  /// A type implementation for non-fixed struct types.
+  class NonFixedStructTypeInfo
+      : public StructTypeInfoBase<NonFixedStructTypeInfo,
+                                  WitnessSizedTypeInfo<NonFixedStructTypeInfo>> {
+    CanType TheType;
+  public:
+    NonFixedStructTypeInfo(unsigned numFields, llvm::Type *T, CanType theType,
+                           Alignment align, IsPOD_t isPOD)
+      : StructTypeInfoBase(numFields, T, align, isPOD), TheType(theType) {
+    }
+
+    // FIXME: implement
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
+
+    llvm::Value *getMetadataRef(IRGenFunction &IGF) const {
+      return IGF.emitTypeMetadataRef(TheType);
+    }
+
+    llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const {
+      auto metadata = getMetadataRef(IGF);
+      return IGF.emitValueWitnessTableRefForMetadata(metadata);
+    }
   };
 
   class StructTypeBuilder :
     public SequentialTypeBuilder<StructTypeBuilder, StructFieldInfo, VarDecl*> {
 
     llvm::StructType *StructTy;
+    CanType TheStruct;
   public:
-    StructTypeBuilder(IRGenModule &IGM, llvm::StructType *structTy) :
-      SequentialTypeBuilder(IGM), StructTy(structTy) {
+    StructTypeBuilder(IRGenModule &IGM, llvm::StructType *structTy,
+                      CanType type) :
+      SequentialTypeBuilder(IGM), StructTy(structTy), TheStruct(type) {
     }
 
-    StructTypeInfo *createFixed(ArrayRef<StructFieldInfo> fields,
-                                const StructLayout &layout) {
-      return create<StructTypeInfo>(fields, layout.getType(), layout.getSize(),
-                                    layout.getAlignment(), layout.isKnownPOD());
+    LoadableStructTypeInfo *createLoadable(ArrayRef<StructFieldInfo> fields,
+                                           const StructLayout &layout) {
+      return create<LoadableStructTypeInfo>(fields, layout.getType(),
+                                            layout.getSize(),
+                                            layout.getAlignment(),
+                                            layout.isKnownPOD());
     }
 
-    StructTypeInfo *createNonFixed(ArrayRef<StructFieldInfo> fields,
-                                   const StructLayout &layout) {
-      // FIXME: implement properly
-      return createFixed(fields, layout);
+    FixedStructTypeInfo *createFixed(ArrayRef<StructFieldInfo> fields,
+                                     const StructLayout &layout) {
+      return create<FixedStructTypeInfo>(fields, layout.getType(),
+                                         layout.getSize(),
+                                         layout.getAlignment(),
+                                         layout.isKnownPOD());
+    }
+
+    NonFixedStructTypeInfo *createNonFixed(ArrayRef<StructFieldInfo> fields,
+                                           const StructLayout &layout) {
+      return create<NonFixedStructTypeInfo>(fields, layout.getType(),
+                                            TheStruct,
+                                            layout.getAlignment(),
+                                            layout.isKnownPOD());
     }
 
     StructFieldInfo getFieldInfo(VarDecl *field, const TypeInfo &fieldTI) {
@@ -95,33 +209,24 @@ namespace {
   };
 }  // end anonymous namespace.
 
-static unsigned getStructFieldIndex(SILType ty, VarDecl *v) {
-  auto *decl = cast<StructDecl>(
-                    ty.getSwiftRValueType()->getNominalOrBoundGenericNominal());
-  // FIXME: Keep field index mappings in a side table somewhere?
-  unsigned index = 0;
-  for (auto member : decl->getMembers()) {
-    if (member == v)
-      return index;
-    if (auto *memberVar = dyn_cast<VarDecl>(member)) {
-      if (!memberVar->isProperty())
-        ++index;
-    }
-  }
-  llvm_unreachable("field not in struct?!");
-}
+/// A convenient macro for delegating an operation to all of the
+/// various struct implementations.
+#define FOR_STRUCT_IMPL(IGF, type, op, ...) do {                       \
+  auto &structTI = IGF.getFragileTypeInfo(type);                       \
+  if (isa<LoadableStructTypeInfo>(structTI)) {                         \
+    return structTI.as<LoadableStructTypeInfo>().op(IGF, __VA_ARGS__); \
+  } else if (isa<FixedTypeInfo>(structTI)) {                           \
+    return structTI.as<FixedStructTypeInfo>().op(IGF, __VA_ARGS__);    \
+  } else {                                                             \
+    return structTI.as<NonFixedStructTypeInfo>().op(IGF, __VA_ARGS__); \
+  }                                                                    \
+} while(0)
 
 OwnedAddress irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                                        OwnedAddress base,
                                                        SILType baseType,
                                                        VarDecl *field) {
-  assert((baseType.is<StructType>() || baseType.is<BoundGenericStructType>())
-         && "not a struct type");
-  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
-  auto &fieldI = baseTI.getFields()[getStructFieldIndex(baseType, field)];
-  auto offsets = baseTI.getNonFixedOffsets(IGF);
-  Address project = fieldI.projectAddress(IGF, base, offsets);
-  return OwnedAddress(project, base.getOwner());
+  FOR_STRUCT_IMPL(IGF, baseType, projectFieldAddress, base, field);
 }
 
 void irgen::projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
@@ -129,18 +234,7 @@ void irgen::projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
                                                      Explosion &base,
                                                      VarDecl *field,
                                                      Explosion &out) {
-  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
-  auto &fieldI = baseTI.getFields()[getStructFieldIndex(baseType, field)];
-  // If the field requires no storage, there's nothing to do.
-  if (fieldI.isEmpty()) {
-    return IGF.emitFakeExplosion(fieldI.getTypeInfo(), out);
-  }
-  
-  // Otherwise, project from the base.
-  auto fieldRange = fieldI.getProjectionRange(out.getKind());
-  ArrayRef<llvm::Value *> element = base.getRange(fieldRange.first,
-                                                 fieldRange.second);
-  out.add(element);
+  FOR_STRUCT_IMPL(IGF, baseType, projectFieldFromExplosion, base, field, out);
 }
 
 /// emitStructDecl - Emit all the declarations associated with this struct type.
@@ -198,7 +292,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
   }
 }
 
-const TypeInfo *TypeConverter::convertStructType(StructDecl *D) {
+const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
   // Collect all the fields from the type.
   SmallVector<VarDecl*, 8> fields;
   for (Decl *D : D->getMembers())
@@ -220,6 +314,6 @@ const TypeInfo *TypeConverter::convertStructType(StructDecl *D) {
   addForwardDecl(typesMapKey, ty);
 
   // Build the type.
-  StructTypeBuilder builder(IGM, ty);
+  StructTypeBuilder builder(IGM, ty, type);
   return builder.layout(fields);
 }

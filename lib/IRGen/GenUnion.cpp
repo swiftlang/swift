@@ -31,7 +31,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 
-#include "FixedTypeInfo.h"
+#include "LoadableTypeInfo.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -43,10 +43,11 @@ using namespace irgen;
 
 namespace {
   /// An abstract base class for TypeInfo implementations of union types.
-  class UnionTypeInfo : public FixedTypeInfo { // FIXME: not always fixed!
+  // FIXME: not always loadable or even fixed-size!
+  class UnionTypeInfo : public LoadableTypeInfo {
   public:
     UnionTypeInfo(llvm::StructType *T, Size S, Alignment A, IsPOD_t isPOD)
-      : FixedTypeInfo(T, S, A, isPOD) {}
+      : LoadableTypeInfo(T, S, A, isPOD) {}
 
     llvm::StructType *getStorageType() const {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
@@ -68,6 +69,17 @@ namespace {
         index++;
       }
       return llvm::ConstantInt::get(getDiscriminatorType(), index);
+    }
+
+    bool isIndirectArgument(ExplosionKind kind) const override {
+      // FIXME!
+      return false;
+    }
+
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address dest) const override {
+      // FIXME!
+      initialize(IGF, params, dest);
     }
 
     virtual void emitInjectionFunctionBody(IRGenFunction &IGF,
@@ -146,7 +158,7 @@ namespace {
     }
 
     /// The type info of the singleton member, or null if it carries no data.
-    const TypeInfo *Singleton;
+    const LoadableTypeInfo *Singleton;
 
     SingletonUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
                            IsPOD_t isPOD)
@@ -364,7 +376,7 @@ const TypeInfo *TypeConverter::convertUnionType(UnionDecl *theUnion) {
       storageType = eltTI.StorageType;
       unionTI->completeFixed(fixedEltTI.getFixedSize(),
                              fixedEltTI.getFixedAlignment());
-      unionTI->Singleton = &eltTI;
+      unionTI->Singleton = cast<LoadableTypeInfo>(&eltTI); // FIXME
       unionTI->setPOD(eltTI.isPOD(ResilienceScope::Local));
     }
 

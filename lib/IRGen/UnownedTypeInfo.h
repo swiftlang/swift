@@ -18,17 +18,17 @@
 #ifndef SWIFT_IRGEN_UNOWNEDTYPEINFO_H
 #define SWIFT_IRGEN_UNOWNEDTYPEINFO_H
 
-#include "FixedTypeInfo.h"
+#include "LoadableTypeInfo.h"
 
 namespace swift {
 namespace irgen {
 
 /// \brief An abstract class designed for use when implementing a
 /// ReferenceStorageType with [unowned] ownership.
-class UnownedTypeInfo : public FixedTypeInfo {
+class UnownedTypeInfo : public LoadableTypeInfo {
 protected:
   UnownedTypeInfo(llvm::Type *type, Size size, Alignment align)
-    : FixedTypeInfo(type, size, align, IsNotPOD, STIK_Unowned) {}
+    : LoadableTypeInfo(type, size, align, IsNotPOD, STIK_Unowned) {}
 
 public:
   // No API yet.

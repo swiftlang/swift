@@ -18,7 +18,7 @@
 #ifndef SWIFT_IRGEN_REFERENCETYPEINFO_H
 #define SWIFT_IRGEN_REFERENCETYPEINFO_H
 
-#include "FixedTypeInfo.h"
+#include "LoadableTypeInfo.h"
 
 namespace swift {
 namespace irgen {
@@ -28,10 +28,10 @@ class UnownedTypeInfo;
 
 /// \brief An abstract class designed for use when implementing a type
 /// that has reference semantics.
-class ReferenceTypeInfo : public FixedTypeInfo {
+class ReferenceTypeInfo : public LoadableTypeInfo {
 protected:
   ReferenceTypeInfo(llvm::Type *type, Size size, Alignment align)
-    : FixedTypeInfo(type, size, align, IsNotPOD, STIK_Reference) {}
+    : LoadableTypeInfo(type, size, align, IsNotPOD, STIK_Reference) {}
 
 public:
   /// Strongly retains a value.

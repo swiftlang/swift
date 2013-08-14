@@ -63,15 +63,21 @@ class TypeInfo {
 protected:
   enum SpecialTypeInfoKind {
     STIK_None,
-    STIK_Reference,
+
+    /// Everything after this is statically fixed-size.
+    STIK_Fixed,
     STIK_Weak,
+
+    /// Everything after this is loadable.
+    STIK_Loadable,
+    STIK_Reference,
     STIK_Unowned,
   };
 
   TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod,
-           IsFixedSize_t fixed, SpecialTypeInfoKind stik = STIK_None)
+           SpecialTypeInfoKind stik)
     : NextConverted(0), StorageType(Type), StorageAlignment(A),
-      POD(pod), Fixed(fixed), STIK(stik) {}
+      POD(pod), STIK(stik) {}
 
   /// Change the minimum alignment of a stored value of this type.
   void setStorageAlignment(Alignment alignment) {
@@ -99,11 +105,8 @@ private:
   /// Whether this type is known to be POD.
   unsigned POD : 1;
 
-  /// Whether this type is known to be fixed in size.
-  unsigned Fixed : 1;
-
   /// The kind of supplemental API this type has, if any.
-  unsigned STIK : 2;
+  unsigned STIK : 3;
 
 public:
   /// Sets whether this type is POD.  Should only be called during
@@ -134,7 +137,14 @@ public:
   /// resilience domain.  If true, this TypeInfo can be cast to
   /// FixedTypeInfo.
   IsFixedSize_t isFixedSize() const {
-    return IsFixedSize_t(Fixed);
+    return IsFixedSize_t(STIK >= STIK_Fixed);
+  }
+
+  /// Whether this type is known to be loadable in the local
+  /// resilience domain.  If true, this TypeInfo can be cast to
+  /// LoadableTypeInfo.
+  IsLoadable_t isLoadable() const {
+    return IsLoadable_t(STIK >= STIK_Loadable);
   }
 
   llvm::Type *getStorageType() const { return StorageType; }
@@ -168,15 +178,16 @@ public:
   /// it is not known.
   virtual llvm::Constant *getStaticStride(IRGenModule &IGM) const = 0;
 
+  /// Is this type passed indirectly as an argument at the given
+  /// explosion level?
+  virtual bool isIndirectArgument(Mangle::ExplosionKind level) const = 0;
+
   /// Add the information for exploding values of this type to the
   /// given schema.
   virtual void getSchema(ExplosionSchema &schema) const = 0;
 
   /// A convenience for getting the schema of a single type.
   ExplosionSchema getSchema(Mangle::ExplosionKind kind) const;
-
-  /// Return the number of elements in an explosion of this type.
-  virtual unsigned getExplosionSize(Mangle::ExplosionKind kind) const = 0;
 
   /// Allocate a variable of this type on the stack.
   virtual ContainedAddress allocateStack(IRGenFunction &IGF,
@@ -189,21 +200,6 @@ public:
   virtual OwnedAddress allocateBox(IRGenFunction &IGF,
                                    const llvm::Twine &name) const = 0;
 
-  /// Load an explosion of values from an address.
-  virtual void load(IRGenFunction &IGF, Address addr,
-                    Explosion &explosion) const = 0;
-
-  /// Perform a 'take' load of the given address.  This is like a C++
-  /// move-initialization, except that the object at the old address
-  /// will not be destroyed.
-  virtual void loadAsTake(IRGenFunction &IGF, Address addr,
-                          Explosion &explosion) const = 0;
-
-  /// Assign a set of exploded values into an address.  The values are
-  /// consumed out of the explosion.
-  virtual void assign(IRGenFunction &IGF, Explosion &explosion,
-                      Address addr) const = 0;
-
   /// Copy a value out of an object and into another, destroying the
   /// old value in the destination.
   virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
@@ -213,10 +209,6 @@ public:
   /// old value there and leaving the source object in an invalid state.
   virtual void assignWithTake(IRGenFunction &IGF, Address dest,
                               Address src) const = 0;
-
-  /// Initialize an address by consuming values out of an explosion.
-  virtual void initialize(IRGenFunction &IGF, Explosion &explosion,
-                          Address addr) const = 0;
 
   /// Perform a "take-initialization" from the given object.  A
   /// take-initialization is like a C++ move-initialization, except that
@@ -228,19 +220,9 @@ public:
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                                   Address srcAddr) const = 0;
 
-  /// Consume a bunch of values which have exploded at one explosion
-  /// level and produce them at another.
-  virtual void reexplode(IRGenFunction &IGF, Explosion &sourceExplosion,
-                         Explosion &targetExplosion) const = 0;
-
-  /// Copy a value into a new explosion with independent ownership.
-  /// This operation may also shift explosion levels.
-  ///
-  /// This operation is useful when an explosion is being used
-  /// multiple times, for example in when doing load-modify-store
-  /// l-value operations.
-  virtual void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
-                    Explosion &targetExplosion) const = 0;
+  /// Take-initialize an address from a parameter explosion.
+  virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                                    Address src) const = 0;
 
   /// Destroy an object of this type in memory.
   virtual void destroy(IRGenFunction &IGF, Address address) const = 0;

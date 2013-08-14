@@ -763,7 +763,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     // that it's passed directly in IR.
     if (param->getType().isObject()) {
       Explosion paramValues(IGF.CurExplosionLevel);
-      paramTI.reexplode(IGF, allParamValues, paramValues);
+      cast<LoadableTypeInfo>(paramTI).reexplode(IGF, allParamValues, paramValues);
       IGF.setLoweredExplosion(SILValue(param, 0), paramValues);
       continue;
     }
@@ -790,21 +790,22 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
                                            Explosion &params,
                                            ArrayRef<SILArgument*> args) {
   for (SILArgument *arg : args) {
-    TypeInfo const &argType = IGF.getFragileTypeInfo(arg->getType());
+    auto &argTI = IGF.getFragileTypeInfo(arg->getType());
     if (arg->getType().isAddress()) {
       IGF.setLoweredAddress(arg,
-                            argType.getAddressForPointer(params.claimNext()));
+                            argTI.getAddressForPointer(params.claimNext()));
       continue;
     }
-    
+
+    auto &loadableArgTI = cast<LoadableTypeInfo>(argTI);
     Explosion argExplosion(IGF.CurExplosionLevel);
-    
+
     // Load and explode an argument that is 'byval' in the C calling convention.
     if (requiresExternalByvalArgument(IGF.IGM, arg->getType())) {
-      Address byval = argType.getAddressForPointer(params.claimNext());
-      argType.load(IGF, byval, argExplosion);
+      Address byval = loadableArgTI.getAddressForPointer(params.claimNext());
+      loadableArgTI.load(IGF, byval, argExplosion);
     } else {
-      argType.reexplode(IGF, params, argExplosion);
+      loadableArgTI.reexplode(IGF, params, argExplosion);
     }
     
     IGF.setLoweredExplosion(arg, argExplosion);
@@ -832,7 +833,7 @@ static void emitEntryPointArgumentsObjCMethodCC(IRGenSILFunction &IGF,
   SILArgument *selfArg = args[0];
   TypeInfo const &selfType = IGF.getFragileTypeInfo(selfArg->getType());
   Explosion self(IGF.CurExplosionLevel);
-  selfType.reexplode(IGF, params, self);
+  cast<LoadableTypeInfo>(selfType).reexplode(IGF, params, self);
   IGF.setLoweredExplosion(selfArg, self);
   
   // Discard the implicit _cmd argument.
@@ -1138,7 +1139,9 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
     IGF.getLoweredExplosion(newArg, args);
   } else {
     Explosion temp = IGF.getLoweredExplosion(newArg);
-    IGF.getFragileTypeInfo(newArg.getType()).reexplode(IGF, temp, args);
+    auto &newArgType =
+      cast<LoadableTypeInfo>(IGF.getFragileTypeInfo(newArg.getType()));
+    newArgType.reexplode(IGF, temp, args);
   }
 }
 
@@ -1497,7 +1500,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
   // Even if SIL has a direct return, the IR-level calling convention may
   // require an indirect return.
   if (IGF.IndirectReturn.isValid()) {
-    TypeInfo const &retType = IGF.getFragileTypeInfo(resultTy);
+    auto &retType = cast<LoadableTypeInfo>(IGF.getFragileTypeInfo(resultTy));
     retType.initialize(IGF, result, IGF.IndirectReturn);
     IGF.Builder.CreateRetVoid();
   } else {
@@ -1616,8 +1619,8 @@ void IRGenSILFunction::visitTupleElementAddrInst(swift::TupleElementAddrInst *i)
 
 void IRGenSILFunction::visitStructExtractInst(swift::StructExtractInst *i) {
   SILValue v(i, 0);
-  Explosion lowered(ExplosionKind::Maximal);
   Explosion operand = getLoweredExplosion(i->getOperand());
+  Explosion lowered(operand.getKind());
   SILType baseType = i->getOperand().getType();
   
   projectPhysicalStructMemberFromExplosion(*this,
@@ -1665,7 +1668,7 @@ void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
   Explosion lowered(ExplosionKind::Maximal);
   Address source = getLoweredAddress(i->getOperand());
   const TypeInfo &type = getFragileTypeInfo(i->getType().getObjectType());
-  type.loadAsTake(*this, source, lowered);
+  cast<LoadableTypeInfo>(type).loadAsTake(*this, source, lowered);
   setLoweredExplosion(SILValue(i, 0), lowered);
 }
 
@@ -1675,7 +1678,7 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   const TypeInfo &type = getFragileTypeInfo(
                               i->getSrc().getType().getObjectType());
 
-  type.initialize(*this, source, dest);
+  cast<LoadableTypeInfo>(type).initialize(*this, source, dest);
 }
 
 void IRGenSILFunction::visitAssignInst(AssignInst *i) {

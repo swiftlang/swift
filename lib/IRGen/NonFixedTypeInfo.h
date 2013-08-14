@@ -24,7 +24,7 @@
 #define SWIFT_IRGEN_NONFIXEDTYPEINFO_H
 
 #include "GenOpaque.h"
-#include "TypeInfo.h"
+#include "IndirectTypeInfo.h"
 
 namespace swift {
 namespace irgen {
@@ -37,12 +37,24 @@ namespace irgen {
 ///   llvm::Value *getMetadataRef(IRGenFunction &IGF) const;
 ///   llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const;
 template <class Impl>
-class WitnessSizedTypeInfo : public TypeInfo {
+class WitnessSizedTypeInfo : public IndirectTypeInfo<Impl, TypeInfo> {
+private:
+  typedef IndirectTypeInfo<Impl, TypeInfo> super;
+
 protected:
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
 
   WitnessSizedTypeInfo(llvm::Type *type, Alignment align, IsPOD_t pod)
-    : TypeInfo(type, align, pod, IsNotFixedSize) {}
+    : super(type, align, pod, TypeInfo::STIK_None) {}
+
+private:
+  /// Bit-cast the given pointer to the right type and assume it as an
+  /// address of this type.
+  Address getAsBitCastAddress(IRGenFunction &IGF, llvm::Value *addr) const {
+    addr = IGF.Builder.CreateBitCast(addr,
+                                     this->getStorageType()->getPointerTo());
+    return this->getAddressForPointer(addr);
+  }
 
 public:
   // This is useful for metaprogramming.
@@ -54,8 +66,7 @@ public:
     llvm::Value *metadata = asImpl().getMetadataRef(IGF);
     llvm::Value *box, *address;
     IGF.emitAllocBoxCall(metadata, box, address);
-    address = IGF.Builder.CreateBitCast(address, StorageType->getPointerTo());
-    return OwnedAddress(getAddressForPointer(address), box);
+    return OwnedAddress(getAsBitCastAddress(IGF, address), box);
   }
 
   ContainedAddress allocateStack(IRGenFunction &IGF,
@@ -69,9 +80,7 @@ public:
     llvm::Value *metadata = asImpl().getMetadataRef(IGF);
     llvm::Value *address =
       emitAllocateBufferCall(IGF, metadata, buffer);
-    address = IGF.Builder.CreateBitCast(address,
-                                        getStorageType()->getPointerTo());
-    return { buffer, getAddressForPointer(address) };
+    return { buffer, getAsBitCastAddress(IGF, address) };
   }
 
   void deallocateStack(IRGenFunction &IGF, Address buffer) const override {

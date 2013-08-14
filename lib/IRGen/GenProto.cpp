@@ -464,7 +464,8 @@ namespace {
 
     OpaqueExistentialTypeInfo(llvm::Type *ty, Size size, Alignment align,
                         ArrayRef<ProtocolEntry> protocols)
-      : IndirectTypeInfo(ty, size, align, IsNotPOD), NumProtocols(protocols.size()) {
+      : IndirectTypeInfo(ty, size, align, IsNotPOD),
+        NumProtocols(protocols.size()) {
 
       for (unsigned i = 0; i != NumProtocols; ++i) {
         new (&getProtocolsBuffer()[i]) ProtocolEntry(protocols[i]);
@@ -708,6 +709,10 @@ namespace {
     /// the address of its instance pointer.
     Address projectValue(IRGenFunction &IGF, Address address) const {
       return IGF.Builder.CreateStructGEP(address, NumProtocols, Size(0));
+    }
+
+    llvm::Value *loadValue(IRGenFunction &IGF, Address addr) const {
+      return IGF.Builder.CreateLoad(projectValue(IGF, addr));
     }
     
     /// Given a class existential container, returns a witness table
@@ -1450,24 +1455,6 @@ static Address emitAllocateBuffer(IRGenFunction &IGF,
   llvm_unreachable("bad packing!");
 }
 
-/// Emit an 'assignWithCopy' operation.
-static void emitAssignWithCopy(IRGenFunction &IGF,
-                               const TypeInfo &type,
-                               Address src, Address dest) {
-  Explosion value(ExplosionKind::Maximal);
-  type.load(IGF, src, value);
-  type.assign(IGF, value, dest);
-}
-
-/// Emit an 'assignWithTake' operation.
-static void emitAssignWithTake(IRGenFunction &IGF,
-                               const TypeInfo &type,
-                               Address src, Address dest) {
-  Explosion value(ExplosionKind::Maximal);
-  type.loadAsTake(IGF, src, value);
-  type.assign(IGF, value, dest);
-}
-
 /// Emit a 'deallocateBuffer' operation.
 static void emitDeallocateBuffer(IRGenFunction &IGF,
                                  const TypeInfo &type,
@@ -1490,13 +1477,6 @@ static void emitDeallocateBuffer(IRGenFunction &IGF,
   }
   llvm_unreachable("bad packing!");
 }
-/// Emit a 'destroyObject' operation.
-static void emitDestroyObject(IRGenFunction &IGF,
-                              const TypeInfo &type,
-                              Address object) {
-  if (!type.isPOD(ResilienceScope::Local))
-    type.destroy(IGF, object);
-}
 
 /// Emit a 'destroyBuffer' operation.
 static void emitDestroyBuffer(IRGenFunction &IGF,
@@ -1508,7 +1488,7 @@ static void emitDestroyBuffer(IRGenFunction &IGF,
     return emitForDynamicPacking(IGF, &emitDestroyBuffer, type, buffer);
 
   Address object = emitProjectBuffer(IGF, type, packing, buffer);
-  emitDestroyObject(IGF, type, object);
+  type.destroy(IGF, object);
   emitDeallocateBuffer(IGF, type, packing, buffer);
 }
 
@@ -1620,7 +1600,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::AssignWithCopy: {
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
-    emitAssignWithCopy(IGF, type, src, dest);
+    type.assignWithCopy(IGF, dest, src);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -1629,7 +1609,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::AssignWithTake: {
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
-    emitAssignWithTake(IGF, type, src, dest);
+    type.assignWithTake(IGF, dest, src);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -1644,7 +1624,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
   case ValueWitness::Destroy: {
     Address object = getArgAs(IGF, argv, type, "object");
-    emitDestroyObject(IGF, type, object);
+    type.destroy(IGF, object);
     IGF.Builder.CreateRetVoid();
     return;
   }
@@ -1718,13 +1698,10 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
            "non-existentials should have a known typeof witness");
     Address obj = getArgAs(IGF, argv, type, "obj");
     if (concreteType->isClassExistentialType()) {
-      Explosion existential(IGF.CurExplosionLevel);
-      type.loadAsTake(IGF, obj, existential);
-      llvm::Value *result
-        = emitTypeMetadataRefForClassExistential(IGF, existential,
-                                                        concreteType);
+      auto &concreteTI = type.as<ClassExistentialTypeInfo>();
+      auto instance = concreteTI.loadValue(IGF, obj);
+      auto result = emitTypeMetadataRefForOpaqueHeapObject(IGF, instance);
       IGF.Builder.CreateRet(result);
-      
     } else {
       llvm::Value *result
         = emitTypeMetadataRefForOpaqueExistential(IGF, obj, concreteType);
@@ -2465,7 +2442,8 @@ namespace {
         // Load.  In theory this might require
         // remapping, but in practice the constraints (which we
         // assert just above) don't permit that.
-        remappedThisTI.load(IGF, sigThis, sigClauseForImpl);
+        cast<LoadableTypeInfo>(remappedThisTI).load(IGF, sigThis,
+                                                    sigClauseForImpl);
         sigClause = std::move(sigClauseForImpl);
         
         // Respecify the signature type with the remapped 'This' type.

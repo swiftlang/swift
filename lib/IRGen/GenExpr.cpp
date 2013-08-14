@@ -34,7 +34,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
-#include "TypeInfo.h"
+#include "LoadableTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -93,8 +93,13 @@ llvm::Value *IRGenFunction::emitDowncast(llvm::Value *from, SILType toType,
 
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
                                       Explosion &explosion) {
-  ExplosionSchema schema(explosion.getKind());
-  type.getSchema(schema);
+  if (!isa<LoadableTypeInfo>(type)) {
+    explosion.add(llvm::UndefValue::get(type.getStorageType()->getPointerTo()));
+    return;
+  }
+
+  ExplosionSchema schema =
+    cast<LoadableTypeInfo>(type).getSchema(explosion.getKind());
   for (auto &element : schema) {
     llvm::Type *elementType;
     if (element.isAggregate()) {

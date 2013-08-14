@@ -35,9 +35,10 @@ private:
 
 protected:
   FixedTypeInfo(llvm::Type *type, Size size, Alignment align,
-                IsPOD_t pod, SpecialTypeInfoKind stik = STIK_None)
-    : TypeInfo(type, align, pod, IsFixedSize, stik),
-      StorageSize(size) {}
+                IsPOD_t pod, SpecialTypeInfoKind stik = STIK_Fixed)
+      : TypeInfo(type, align, pod, stik), StorageSize(size) {
+    assert(isFixedSize());
+  }
 
 public:
   // This is useful for metaprogramming.
@@ -56,9 +57,6 @@ public:
   // We can give these reasonable default implementations.
 
   void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr) const override;
-
-  void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                           Address srcAddr) const override;
 
   std::pair<llvm::Value*, llvm::Value*>

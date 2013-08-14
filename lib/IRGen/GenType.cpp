@@ -22,7 +22,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 
-#include "FixedTypeInfo.h"
+#include "LoadableTypeInfo.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -75,9 +75,10 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
   // Maybe this should also require the scalars to have a fixed offset.
   ExplosionSchema schema = getSchema(ExplosionKind::Maximal);
   if (!schema.containsAggregate() && schema.size() <= 2) {
+    auto &loadableTI = cast<LoadableTypeInfo>(*this);
     Explosion copy(ExplosionKind::Maximal);
-    loadAsTake(IGF, srcAddr, copy);
-    initialize(IGF, copy, destAddr);
+    loadableTI.loadAsTake(IGF, srcAddr, copy);
+    loadableTI.initialize(IGF, copy, destAddr);
     return;
   }
 
@@ -87,9 +88,9 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
 
 /// Copy a value from one object to a new object.  This is just the
 /// default implementation.
-void FixedTypeInfo::initializeWithCopy(IRGenFunction &IGF,
-                                       Address destAddr,
-                                       Address srcAddr) const {
+void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF,
+                                          Address destAddr,
+                                          Address srcAddr) const {
   // Use memcpy if that's legal.
   if (isPOD(ResilienceScope::Local)) {
     return initializeWithTake(IGF, destAddr, srcAddr);
@@ -135,7 +136,7 @@ llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
 
 namespace {
   /// A TypeInfo implementation for empty types.
-  struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, FixedTypeInfo> {
+  struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, LoadableTypeInfo> {
     EmptyTypeInfo(llvm::Type *ty)
       : ScalarTypeInfo(ty, Size(0), Alignment(1), IsPOD) {}
     unsigned getExplosionSize(ExplosionKind kind) const { return 0; }
@@ -151,7 +152,7 @@ namespace {
   /// A TypeInfo implementation for types represented as a single
   /// scalar type.
   class PrimitiveTypeInfo :
-    public PODSingleScalarTypeInfo<PrimitiveTypeInfo, FixedTypeInfo> {
+    public PODSingleScalarTypeInfo<PrimitiveTypeInfo, LoadableTypeInfo> {
   public:
     PrimitiveTypeInfo(llvm::Type *storage, Size size, Alignment align)
       : PODSingleScalarTypeInfo(storage, size, align) {}
@@ -312,16 +313,20 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
 
 /// A convenience for grabbing the TypeInfo for a class declaration.
 const TypeInfo &TypeConverter::getFragileTypeInfo(ClassDecl *theClass) {
+  // This type doesn't really matter except for serving as a key.
+  CanType theType = theClass->getDeclaredType()->getCanonicalType();
+
   // If we have generic parameters, use the bound-generics conversion
   // routine.  This does an extra level of caching based on the common
   // class decl.
   TypeCacheEntry entry;
   if (theClass->getGenericParams()) {
-    entry = convertBoundGenericType(theClass);
+    entry = convertAnyNominalType(theType, theClass);
 
-  // Otherwise, use the declared type.
+  // Otherwise, just look up the declared type.
   } else {
-    entry = getTypeEntry(theClass->getDeclaredType()->getCanonicalType());
+    assert(isa<ClassType>(theType));
+    entry = getTypeEntry(theType);
   }
 
   // This will always yield a TypeInfo because forward-declarations
@@ -385,10 +390,9 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
   }
 }
 
-TypeCacheEntry TypeConverter::convertType(CanType canTy) {
-  PrettyStackTraceType stackTrace(IGM.Context, "converting", canTy);
+TypeCacheEntry TypeConverter::convertType(CanType ty) {
+  PrettyStackTraceType stackTrace(IGM.Context, "converting", ty);
 
-  TypeBase *ty = canTy.getPointer();
   switch (ty->getKind()) {
 #define UNCHECKED_TYPE(id, parent) \
   case TypeKind::id: \
@@ -414,26 +418,24 @@ TypeCacheEntry TypeConverter::convertType(CanType canTy) {
     llvm::Type *llvmTy;
     Size size;
     Alignment align;
-    std::tie(llvmTy, size, align) = convertPrimitiveBuiltin(IGM, canTy);
+    std::tie(llvmTy, size, align) = convertPrimitiveBuiltin(IGM, ty);
     return createPrimitive(llvmTy, size, align);
   }
 
   case TypeKind::Archetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
+  case TypeKind::Class:
+  case TypeKind::Union:
+  case TypeKind::Struct:
+    return convertAnyNominalType(ty, cast<NominalType>(ty)->getDecl());
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct:
-    return convertBoundGenericType(cast<BoundGenericType>(ty)->getDecl());
+    return convertAnyNominalType(ty, cast<BoundGenericType>(ty)->getDecl());
   case TypeKind::LValue:
     return convertLValueType(cast<LValueType>(ty));
   case TypeKind::Tuple:
     return convertTupleType(cast<TupleType>(ty));
-  case TypeKind::Union:
-    return convertUnionType(cast<UnionType>(ty)->getDecl());
-  case TypeKind::Struct:
-    return convertStructType(cast<StructType>(ty)->getDecl());
-  case TypeKind::Class:
-    return convertClassType(cast<ClassType>(ty)->getDecl());
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
     return convertFunctionType(cast<AnyFunctionType>(ty));
@@ -484,7 +486,41 @@ static void overwriteForwardDecl(llvm::DenseMap<TypeBase*, TypeCacheEntry> &cach
   cache[key] = result;
 }
 
-TypeCacheEntry TypeConverter::convertBoundGenericType(NominalTypeDecl *decl) {
+TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
+                                                    NominalTypeDecl *decl) {
+  // By "any", we don't mean existentials.
+  assert(!isa<ProtocolDecl>(decl));
+
+  // We want to try to re-use implementations between generic
+  // specializations.  However, don't bother with this secondary hash
+  // if the type isn't generic or if its type is obviously fixed.
+  //
+  // (But if it's generic and even *resilient*, we might need the
+  // implementation to store a real type in order to grab the value
+  // witnesses successfully.)
+  if (!decl->getGenericParams() ||
+      (!isa<ClassDecl>(decl) && // fast path obvious case
+       IGM.classifyTypeSize(type, ResilienceScope::Local)
+         != ObjectSize::Fixed)) {
+    switch (decl->getKind()) {
+#define NOMINAL_TYPE_DECL(ID, PARENT)
+#define DECL(ID, PARENT) \
+    case DeclKind::ID:
+#include "swift/AST/DeclNodes.def"
+      llvm_unreachable("not a nominal type declaration");
+    case DeclKind::Protocol:
+      llvm_unreachable("protocol types shouldn't be handled here");
+
+    case DeclKind::Class:
+      return convertClassType(cast<ClassDecl>(decl));
+    case DeclKind::Union:
+      return convertUnionType(cast<UnionDecl>(decl));
+    case DeclKind::Struct:
+      return convertStructType(type, cast<StructDecl>(decl));
+    }
+    llvm_unreachable("bad declaration kind");
+  }
+
   assert(decl->getGenericParams());
 
   // Look to see if we've already emitted this type under a different
@@ -524,7 +560,7 @@ TypeCacheEntry TypeConverter::convertBoundGenericType(NominalTypeDecl *decl) {
   }
 
   case DeclKind::Struct: {
-    auto result = convertStructType(cast<StructDecl>(decl));
+    auto result = convertStructType(type, cast<StructDecl>(decl));
     overwriteForwardDecl(Types.Cache, key, result);
     return result;
   }
@@ -614,8 +650,12 @@ unsigned IRGenModule::getExplosionSize(CanType type, ExplosionKind kind) {
     return count;
   }
 
+  // If the type isn't loadable, the explosion size is always 1.
+  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&getFragileTypeInfo(type));
+  if (!loadableTI) return 1;
+
   // Okay, that didn't work;  just do the general thing.
-  return getFragileTypeInfo(type).getExplosionSize(kind);
+  return loadableTI->getExplosionSize(kind);
 }
 
 /// Determine whether this type is a single value that is passed
@@ -696,8 +736,69 @@ namespace {
       return visit(array.getBaseType());
     }
 
+    ObjectSize visitStructType(CanStructType type) {
+      if (type->getDecl()->getGenericParams())
+        return visitGenericStructType(type, type->getDecl());
+      if (IGM.isResilient(type->getDecl(), Scope))
+        return ObjectSize::Resilient;
+      return ObjectSize::Fixed;
+    }
+
+    ObjectSize visitBoundGenericStructType(CanBoundGenericStructType type) {
+      return visitGenericStructType(type, type->getDecl());
+    }
+
+    ObjectSize visitGenericStructType(CanType type, StructDecl *D) {
+      assert(D->getGenericParams());
+
+      // If a generic struct is resilient, we have to assume that any
+      // unknown fields might be dependently-sized.
+      if (IGM.isResilient(D, Scope))
+        return ObjectSize::Dependent;
+
+      // TODO: apply substitutions to decide whether the struct
+      // members are actually dependently-sized with the given
+      // arguments.
+      ObjectSize result = ObjectSize::Fixed;
+      for (auto field : D->getPhysicalFields()) {
+        result = std::max(result, visit(field->getType()->getCanonicalType()));
+      }
+      return result;
+    }
+
+    ObjectSize visitUnionType(CanUnionType type) {
+      if (type->getDecl()->getGenericParams())
+        return visitGenericUnionType(type, type->getDecl());
+      if (IGM.isResilient(type->getDecl(), Scope))
+        return ObjectSize::Resilient;
+      return ObjectSize::Fixed;
+    }
+
+    ObjectSize visitBoundGenericUnionType(CanBoundGenericUnionType type) {
+      return visitGenericUnionType(type, type->getDecl());
+    }
+
+    ObjectSize visitGenericUnionType(CanType type, UnionDecl *D) {
+      assert(D->getGenericParams());
+
+      // If a generic union is resilient, we have to assume that any
+      // unknown elements might be dependently-sized.
+      if (IGM.isResilient(D, Scope))
+        return ObjectSize::Dependent;
+
+      // TODO: apply substitutions to decide whether the union data
+      // members are actually dependently-sized with the given
+      // arguments.
+      ObjectSize result = ObjectSize::Fixed;
+      for (auto elt : D->getAllElements()) {
+        if (!elt->hasArgumentType()) continue;
+        result = std::max(result,
+                          visit(elt->getArgumentType()->getCanonicalType()));
+      }
+      return result;
+    }
+
     ObjectSize visitType(CanType type) {
-      // FIXME: resilience!
       return ObjectSize::Fixed;
     }
   };

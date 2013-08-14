@@ -73,11 +73,11 @@ private:
   void addForwardDecl(TypeBase *key, llvm::Type *type);
 
   TypeCacheEntry convertType(CanType T);
-  TypeCacheEntry convertBoundGenericType(NominalTypeDecl *D);
+  TypeCacheEntry convertAnyNominalType(CanType T, NominalTypeDecl *D);
   const TypeInfo *convertTupleType(TupleType *T);
   const TypeInfo *convertUnionType(UnionDecl *D);
-  const TypeInfo *convertStructType(StructDecl *D);
   const TypeInfo *convertClassType(ClassDecl *D);
+  const TypeInfo *convertStructType(CanType type, StructDecl *D);
   const TypeInfo *convertFunctionType(AnyFunctionType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
   const TypeInfo *convertLValueType(LValueType *T);
@@ -109,8 +109,8 @@ private:
   class Types_t {
     llvm::DenseMap<TypeBase*, TypeCacheEntry> Cache;
     friend TypeCacheEntry TypeConverter::getTypeEntry(CanType T);
-    friend TypeCacheEntry
-      TypeConverter::convertBoundGenericType(NominalTypeDecl *D);
+    friend TypeCacheEntry TypeConverter::convertAnyNominalType(CanType Type,
+                                                           NominalTypeDecl *D);
     friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
   };
   Types_t Types;

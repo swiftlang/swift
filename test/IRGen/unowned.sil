@@ -103,12 +103,12 @@ sil @top_level_code : $[thin] () -> () {
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwcaV7unowned1A([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]]* [[SRC]], i32 0, i32 0
-// CHECK-NEXT: [[NEW:%.*]] = load [[C]]** [[T0]], align 8
+// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds [[A]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[NEW:%.*]] = load [[C]]** [[SRC_X]], align 8
 // CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_weakRetain to void ([[C]]*)*)([[C]]* [[NEW]])
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]]* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[OLD:%.*]] = load [[C]]** [[T0]], align 8
-// CHECK-NEXT: store [[C]]* [[NEW]], [[C]]** [[T0]], align 8
+// CHECK-NEXT: [[OLD:%.*]] = load [[C]]** [[DEST_X]], align 8
+// CHECK-NEXT: store [[C]]* [[NEW]], [[C]]** [[DEST_X]], align 8
 // CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_weakRelease to void ([[C]]*)*)([[C]]* [[OLD]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
@@ -117,11 +117,11 @@ sil @top_level_code : $[thin] () -> () {
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwtaV7unowned1A([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]]* [[SRC]], i32 0, i32 0
-// CHECK-NEXT: [[NEW:%.*]] = load [[C]]** [[T0]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]]* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[OLD:%.*]] = load [[C]]** [[T0]], align 8
-// CHECK-NEXT: store [[C]]* [[NEW]], [[C]]** [[T0]], align 8
+// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds [[A]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[NEW:%.*]] = load [[C]]** [[SRC_X]], align 8
+// CHECK-NEXT: [[OLD:%.*]] = load [[C]]** [[DEST_X]], align 8
+// CHECK-NEXT: store [[C]]* [[NEW]], [[C]]** [[DEST_X]], align 8
 // CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_weakRelease to void ([[C]]*)*)([[C]]* [[OLD]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
