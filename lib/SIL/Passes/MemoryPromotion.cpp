@@ -17,6 +17,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringExtras.h"
 using namespace swift;
 
@@ -79,23 +80,7 @@ unsigned NumElementsCache::get(CanType T) {
     return ElementCountMap[T] = NumElements;
   }
   
-  if (T->is<StructType>() || T->is<BoundGenericStructType>()) {
-    auto It = ElementCountMap.find(T);
-    if (It != ElementCountMap.end()) return It->second;
-    
-    StructDecl *SD;
-    if (auto *ST = T->getAs<StructType>())
-      SD = ST->getDecl();
-    else
-      SD = T->castTo<BoundGenericStructType>()->getDecl();
-    
-    unsigned NumElements = 0;
-    for (auto *VD : SD->getPhysicalFields())
-      NumElements += get(VD->getType()->getCanonicalType());
-    return ElementCountMap[T] = NumElements;
-  }
-  
-  // If this isn't a tuple or struct, it is a single element.
+  // If this isn't a tuple, it is a single element.
   return 1;
 }
 
@@ -107,46 +92,24 @@ void NumElementsCache::getPathStringToElement(CanType T, unsigned Element,
   // farther even if we could.
   if (get(T) == 1) return;
   
-  if (TupleType *TT = T->getAs<TupleType>()) {
-    unsigned FieldNo = 0;
-    for (auto &Field : TT->getFields()) {
-      unsigned ElementsForField = get(Field.getType()->getCanonicalType());
-      
-      if (Element < ElementsForField) {
-        Result += '.';
-        if (Field.hasName())
-          Result += Field.getName().str();
-        else
-          Result += llvm::utostr(FieldNo);
-        return getPathStringToElement(Field.getType()->getCanonicalType(),
-                                      Element, Result);
-      }
-      
-      Element -= ElementsForField;
-      
-      ++FieldNo;
-    }
-    assert(0 && "Element number is out of range for this type!");
-  }
-  
-  assert(T->is<StructType>() || T->is<BoundGenericStructType>());
-  StructDecl *SD;
-  if (auto *ST = T->getAs<StructType>())
-    SD = ST->getDecl();
-  else
-    SD = T->castTo<BoundGenericStructType>()->getDecl();
-  
-  for (auto *VD : SD->getPhysicalFields()) {
-    unsigned ElementsForField = get(VD->getType()->getCanonicalType());
-
+  TupleType *TT = T->castTo<TupleType>();
+  unsigned FieldNo = 0;
+  for (auto &Field : TT->getFields()) {
+    unsigned ElementsForField = get(Field.getType()->getCanonicalType());
+    
     if (Element < ElementsForField) {
       Result += '.';
-      Result += VD->getName().str();
-      return getPathStringToElement(VD->getType()->getCanonicalType(),
+      if (Field.hasName())
+        Result += Field.getName().str();
+      else
+        Result += llvm::utostr(FieldNo);
+      return getPathStringToElement(Field.getType()->getCanonicalType(),
                                     Element, Result);
     }
     
     Element -= ElementsForField;
+    
+    ++FieldNo;
   }
   assert(0 && "Element number is out of range for this type!");
 }
@@ -161,29 +124,13 @@ void NumElementsCache::getElementAddresses(SILValue Pointer,
   SILInstruction *PointerInst = cast<SILInstruction>(Pointer.getDef());
   SILBuilder B(++SILBasicBlock::iterator(PointerInst));
 
-  if (TupleType *TT = AggType->getAs<TupleType>()) {
-    for (auto &Field : TT->getFields()) {
-      auto ResultTy = Field.getType()->getCanonicalType();
-      ElementAddrs.push_back(B.createTupleElementAddr(PointerInst->getLoc(),
-                                                      Pointer,
-                                                      ElementAddrs.size(),
+  TupleType *TT = AggType->castTo<TupleType>();
+  for (auto &Field : TT->getFields()) {
+    auto ResultTy = Field.getType()->getCanonicalType();
+    ElementAddrs.push_back(B.createTupleElementAddr(PointerInst->getLoc(),
+                                                    Pointer,
+                                                    ElementAddrs.size(),
                                   SILType::getPrimitiveAddressType(ResultTy)));
-    }
-    return;
-  }
-  
-  assert(AggType->is<StructType>() || AggType->is<BoundGenericStructType>());
-  StructDecl *SD;
-  if (auto *ST = AggType->getAs<StructType>())
-    SD = ST->getDecl();
-  else
-    SD = AggType->castTo<BoundGenericStructType>()->getDecl();
-  
-  for (auto *VD : SD->getPhysicalFields()) {
-    auto ResultTy = VD->getType()->getCanonicalType();
-    ElementAddrs.push_back(B.createStructElementAddr(PointerInst->getLoc(),
-                                                     Pointer, VD,
-                                   SILType::getPrimitiveAddressType(ResultTy)));
   }
 }
 
@@ -195,44 +142,19 @@ void NumElementsCache::getElements(SILValue V,
   CanType AggType = V.getType().getSwiftRValueType();
   assert(get(AggType) != 1 && "Shouldn't decompose scalars");
   
-  if (TupleType *TT = AggType->getAs<TupleType>()) {
-    // If this is exploding a tuple_inst, just return the element values.  This
-    // can happen when recursively scalarizing stuff.
-    if (auto *TI = dyn_cast<TupleInst>(V)) {
-      for (unsigned i = 0, e = TI->getNumOperands(); i != e; ++i)
-        ElementVals.push_back(TI->getOperand(i));
-      return;
-    }
-    
-    for (auto &Field : TT->getFields()) {
-      auto ResultTy = Field.getType()->getCanonicalType();
-      ElementVals.push_back(B.createTupleExtract(Loc, V, ElementVals.size(),
-                                 SILType::getPrimitiveObjectType(ResultTy)));
-    }
-    return;
-  }
-  
-  assert(AggType->is<StructType>() ||
-         AggType->is<BoundGenericStructType>());
-  
-  // If this is exploding a struct_inst, just return the element values.  This
+  TupleType *TT = AggType->castTo<TupleType>();
+  // If this is exploding a tuple_inst, just return the element values.  This
   // can happen when recursively scalarizing stuff.
-  if (auto *SI = dyn_cast<StructInst>(V)) {
-    for (unsigned i = 0, e = SI->getNumOperands(); i != e; ++i)
-      ElementVals.push_back(SI->getOperand(i));
+  if (auto *TI = dyn_cast<TupleInst>(V)) {
+    for (unsigned i = 0, e = TI->getNumOperands(); i != e; ++i)
+      ElementVals.push_back(TI->getOperand(i));
     return;
   }
   
-  StructDecl *SD;
-  if (auto *ST = AggType->getAs<StructType>())
-    SD = ST->getDecl();
-  else
-    SD = AggType->castTo<BoundGenericStructType>()->getDecl();
-  
-  for (auto *VD : SD->getPhysicalFields()) {
-    auto ResultTy = VD->getType()->getCanonicalType();
-    ElementVals.push_back(B.createStructExtract(Loc, V, VD,
-                                  SILType::getPrimitiveObjectType(ResultTy)));
+  for (auto &Field : TT->getFields()) {
+    auto ResultTy = Field.getType()->getCanonicalType();
+    ElementVals.push_back(B.createTupleExtract(Loc, V, ElementVals.size(),
+                                   SILType::getPrimitiveObjectType(ResultTy)));
   }
 }
 
@@ -641,6 +563,11 @@ namespace {
   class ElementUseCollector {
     SmallVectorImpl<ElementUses> &Uses;
     NumElementsCache &NumElements;
+
+    /// When walking the use list, if we index into a struct element, keep track
+    /// of this, so that any indexes into tuple subelements don't affect the
+    /// element we attribute an access to.
+    bool InStructSubElement = false;
   public:
     ElementUseCollector(SmallVectorImpl<ElementUses> &Uses,
                         NumElementsCache &NumElements)
@@ -653,7 +580,8 @@ namespace {
   private:
     void addElementUses(unsigned BaseElt, SILType UseTy,
                         SILInstruction *User, UseKind Kind);
-    void collectElementAddressUses(SILInstruction *ElementPtr,unsigned BaseElt);
+    void collectTupleElementUses(TupleElementAddrInst *ElementPtr,
+                                 unsigned BaseElt);
   };
   
   
@@ -670,46 +598,29 @@ void ElementUseCollector::addElementUses(unsigned BaseElt, SILType UseTy,
     Uses[BaseElt+i].push_back({ User, Kind });
 }
 
-/// Given a tuple_element_addr or struct_element_addr, compute the new BaseElt
-/// implicit in the selected member, and recursively add uses of the
-/// instruction.
-void ElementUseCollector::collectElementAddressUses(SILInstruction *ElementPtr,
-                                                    unsigned BaseElt) {
-  auto RValueType = ElementPtr->getOperand(0).getType().getSwiftRValueType();
+/// Given a tuple_element_addr, compute the new BaseElt implicit in the selected
+/// member, and recursively add uses of the instruction.
+void ElementUseCollector::
+collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseElt) {
+  // If we're walking into a tuple within a struct, don't adjust the BaseElt.
+  // the uses hanging off the tuple_element_addr are going to be counted as uses
+  // of the struct itself.
+  if (InStructSubElement)
+    return collectUses(SILValue(TEAI, 0), BaseElt);
+
+  auto RValueType = TEAI->getOperand().getType().getSwiftRValueType();
   
   // tuple_element_addr P, 42 indexes into the current element.  Recursively
   // process its uses with the adjusted element number.
-  if (auto *TEAI = dyn_cast<TupleElementAddrInst>(ElementPtr)) {
-    unsigned FieldNo = TEAI->getFieldNo();
-    auto *TT = RValueType->castTo<TupleType>();
-    unsigned NewBaseElt = BaseElt;
-    for (unsigned i = 0; i != FieldNo; ++i) {
-      CanType EltTy = TT->getElementType(i)->getCanonicalType();
-      NewBaseElt += NumElements.get(EltTy);
-    }
-    
-    collectUses(SILValue(TEAI, 0), NewBaseElt);
-    return;
-  }
-  
-  // struct_element_addr P, #field indexes into the current element.
-  // Recursively process its uses with the adjusted element number.
-  auto *SEAI = cast<StructElementAddrInst>(ElementPtr);
-  VarDecl *Field = SEAI->getField();
-  
-  StructDecl *SD;
-  if (auto *ST = RValueType->getAs<StructType>())
-    SD = ST->getDecl();
-  else
-    SD = RValueType->castTo<BoundGenericStructType>()->getDecl();
-    
+  unsigned FieldNo = TEAI->getFieldNo();
+  auto *TT = RValueType->castTo<TupleType>();
   unsigned NewBaseElt = BaseElt;
-  for (auto *VD : SD->getPhysicalFields()) {
-    if (VD == Field) break;
-    NewBaseElt += NumElements.get(VD->getType()->getCanonicalType());
+  for (unsigned i = 0; i != FieldNo; ++i) {
+    CanType EltTy = TT->getElementType(i)->getCanonicalType();
+    NewBaseElt += NumElements.get(EltTy);
   }
   
-  collectUses(SILValue(SEAI, 0), NewBaseElt);
+  collectUses(SILValue(TEAI, 0), NewBaseElt);
 }
 
 
@@ -735,9 +646,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       continue;
     
     // Instructions that compute a subelement are handled by a helper.
-    if (isa<TupleElementAddrInst>(User) ||
-        isa<StructElementAddrInst>(User)) {
-      collectElementAddressUses(User, BaseElt);
+    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(User)) {
+      collectTupleElementUses(TEAI, BaseElt);
       continue;
     }
     
@@ -781,6 +691,15 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       addElementUses(BaseElt, PointeeType, User, UseKind::Store);
       continue;
     }
+
+    // struct_element_addr P, #field indexes into the current element.
+    if (auto *SEAI = dyn_cast<StructElementAddrInst>(User)) {
+      // Set the "InStructSubElement" flag and recursively process the uses.
+      llvm::SaveAndRestore<bool> X(InStructSubElement, true);
+      collectUses(SILValue(SEAI, 0), BaseElt);
+      continue;
+    }
+
 
     // The apply instruction does not capture the pointer when it is passed
     // through [byref] arguments or for indirect returns.  Byref arguments are
@@ -865,7 +784,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     // element address computations to recursively process it.  This can cause
     // further scalarization.
     for (auto EltPtr : ElementAddrs)
-      collectElementAddressUses(EltPtr, BaseElt);
+      collectTupleElementUses(cast<TupleElementAddrInst>(EltPtr), BaseElt);
   }
 }
 

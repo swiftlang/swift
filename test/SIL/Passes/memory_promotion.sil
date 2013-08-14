@@ -164,19 +164,6 @@ bb0(%0 : $Int64):
 struct XYStruct { var x, y : Int }
 
 
-// CHECK-LABEL: sil @struct_elements
-sil @struct_elements : $[thin] (v : Int64) -> Int64 {
-bb0(%0 : $Int64):
-  %3 = alloc_box $XYStruct    // expected-note {{variable defined here}}
-  %9 = struct_element_addr %3#1 : $*XYStruct, #x
-  store %0 to %9 : $*Int64
-  %11 = struct_element_addr %3#1 : $*XYStruct, #y
-  %12 = load %11 : $*Int64    // expected-error {{variable used before being initialized}}
-  release %3#0 : $Builtin.ObjectPointer
-  return %12 : $Int64
-}
-
-
 // CHECK-LABEL: sil @copy_addr1
 sil @copy_addr1 : $[thin] <T> (v : T) -> T {
 bb0(%0 : $*T, %1 : $*T):
