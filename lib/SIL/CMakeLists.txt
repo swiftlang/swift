@@ -7,8 +7,9 @@ add_swift_library(swiftSIL
   SIL.cpp
   SILBasicBlock.cpp
   SILBuilder.cpp
-  SILInstruction.cpp
   SILFunction.cpp
+  SILInliner.cpp
+  SILInstruction.cpp
   SILLocation.cpp
   SILModule.cpp
   SILPrinter.cpp

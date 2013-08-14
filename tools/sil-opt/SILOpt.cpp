@@ -30,7 +30,8 @@ enum class PassKind {
   MemoryPromotion,
   CCP,
   DCE,
-  DataflowDiagnostics
+  DataflowDiagnostics,
+  MandatoryInlining
 };
 
 static llvm::cl::opt<std::string>
@@ -59,6 +60,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::DataflowDiagnostics,
                                    "dataflow-diagnostics",
                                    "Emit SIL diagnostics"),
+                        clEnumValN(PassKind::MandatoryInlining,
+                                   "mandatory-inlining",
+                                   "Inline [force_inline] functions"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -137,6 +141,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::DataflowDiagnostics:
       emitSILDataflowDiagnostics(CI.getSILModule());
+      break;
+    case PassKind::MandatoryInlining:
+      performSILMandatoryInlining(CI.getSILModule());
       break;
     }
   }
