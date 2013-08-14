@@ -189,9 +189,9 @@ type grammar. SIL adds some additional kinds of type of its own:
 
   Addresses of address-only types (see below) can only be used with
   instructions that manipulate their operands indirectly by address, such
-  as ``copy_addr``, ``destroy_addr``, and ``dealloc_stack``, or as arguments
-  to functions. For an address-only type ``T``, only the SIL address ``$*T``
-  can be formed, and ``$T`` is an invalid SIL type.
+  as ``copy_addr`` or ``destroy_addr``, or as arguments to functions.
+  For an address-only type ``T``, only the SIL address ``$*T`` can be
+  formed, and ``$T`` is an invalid SIL type.
   
   Addresses are not reference-counted pointers like class values are. They
   cannot be retained or released.
@@ -212,6 +212,16 @@ type grammar. SIL adds some additional kinds of type of its own:
   Functions cannot return an address. If an address-only
   value needs to be returned, it is done so using an indirect return argument
   according to the `calling convention`_ of the function.
+
+- The *address of local storage for T* ``$*[local_storage] T``, a
+  handle to a stack allocation of a variable of type ``$T``.
+
+  For many types, the handle for a stack allocation is simply the
+  allocated address itself.  However, if a type is runtime-sized, the
+  compiler must emit code to potentially dynamically allocate memory.
+  SIL abstracts over such differences by using values of local-storage
+  type as the first result of ``alloc_stack`` and the operand of
+  ``dealloc_stack``.
 
 - Values of *generic function type* such as
   ``$<T...> (A...) -> R`` can be expressed in SIL.  Accessing a generic
@@ -238,14 +248,20 @@ generic constraints:
   Values of trivial type can be loaded and stored without any retain or
   release operations and do not need to be destroyed.
 
-- *Address-only types* are restricted value types for which the compiler
-  cannot access a full concrete representation:
+- *Runtime-sized types* are restricted value types for which the compiler
+  does not know the size of the type statically:
 
   * Resilient value types
   * Fragile struct or tuple types that contain resilient types as elements at
     any depth
   * Archetypes not constrained by a class protocol
+
+- *Address-only types* are restricted value types which cannot be
+  loaded or otherwise worked with as SSA values:
+
+  * Runtime-sized types
   * Non-class protocol types
+  * [weak] types
 
   Values of address-only type (“address-only values”) must reside in
   memory and can only be referenced in SIL by address. Addresses of
@@ -780,14 +796,20 @@ alloc_stack
   sil-instruction ::= 'alloc_stack' sil-type
 
   %1 = alloc_stack $T
-  // %1 has type $*T
+  // %1#0 has type $*[local_storage] T
+  // %1#1 has type $*T
 
-Allocates enough uninitialized memory that is sufficiently aligned on the stack
-to contain a value of type ``T``. The result of the instruction is the address
-of the allocated memory. ``alloc_stack`` marks the start of the lifetime of
-the value; the allocation must be balanced with a ``dealloc_stack``
-instruction to mark the end of its lifetime. The memory is not retainable;
-to allocate a retainable box for a value type, use ``alloc_box``.
+Allocates uninitialized memory that is sufficiently aligned on the stack
+to contain a value of type ``T``. The first result of the instruction
+is a local-storage handle suitable for passing to ``dealloc_stack``.
+The second result of the instruction is the address of the allocated memory.
+
+``alloc_stack`` marks the start of the lifetime of the value; the
+allocation must be balanced with a ``dealloc_stack`` instruction to
+mark the end of its lifetime.
+
+The memory is not retainable; to allocate a retainable box for a value
+type, use ``alloc_box``.
 
 alloc_ref
 `````````
@@ -856,13 +878,13 @@ dealloc_stack
 
   sil-instruction ::= 'dealloc_stack' sil-operand
 
-  dealloc_stack %0 : $*T
-  // %0 must be of an address $*T type
+  dealloc_stack %0 : $*[local_storage] T
+  // %0 must be of a local-storage $*[local_storage] T type
 
-Deallocates memory previously allocated by ``alloc_stack``. The value in memory
-must be uninitialized or destroyed prior to being deallocated. This instruction
-marks the end of the lifetime for the value created by the corresponding
-``alloc_stack`` instruction.
+Deallocates memory previously allocated by ``alloc_stack``. The
+allocated value in memory must be uninitialized or destroyed prior to
+being deallocated. This instruction marks the end of the lifetime for
+the value created by the corresponding ``alloc_stack`` instruction.
 
 dealloc_box
 ```````````
