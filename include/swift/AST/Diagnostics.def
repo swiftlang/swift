@@ -1601,6 +1601,12 @@ ERROR(return_from_noreturn,sil_analysis,none,
       "return from a 'noreturn' function", ())
 ERROR(non_exhaustive_switch,sil_gen,none, "switch must be exhaustive", ())
 
+// Force inline diagnostics
+ERROR(circular_force_inline,sil_analysis,none,
+      "forced inlining forms circular loop", ())
+NOTE(note_while_inlining,sil_analysis,none,
+     "while inlining here", ())
+
 //==============================================================================
 // IR Generation Diagnostics
 //==============================================================================

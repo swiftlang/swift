@@ -40,11 +40,15 @@ public:
   bool inlineFunction(ApplyInst *AI);
 
 private:
+  void visitSILBasicBlock(SILBasicBlock* BB);
+
   SILValue remapValue(SILValue Value) {
     if (SILArgument* A = dyn_cast<SILArgument>(Value.getDef())) {
       assert(Value.getResultNumber() == 0 &&
              "Non-zero result number of argument used?");
-      return ArgumentMap[A];
+      SILValue MappedValue = ArgumentMap[A];
+      assert (MappedValue && "Unmapped argument while inlining");
+      return MappedValue;
     }
 
     if (SILInstruction* I = dyn_cast<SILInstruction>(Value.getDef())) {
@@ -56,11 +60,19 @@ private:
     llvm_unreachable("Unknown value type while inlining?");
   }
 
+  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) {
+    SILBasicBlock* MappedBB = BBMap[BB];
+    assert(MappedBB && "Unmapped basic block while inlining?");
+    return MappedBB;
+  }
+
   SILValue postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     InstructionMap.insert(std::make_pair(Orig, Cloned));
     return Cloned;
   }
 
+  SILBasicBlock* CalleeEntryBB;
+  SILBasicBlock* InsertBeforeBB;
   llvm::DenseMap<SILArgument*, SILValue> ArgumentMap;
   llvm::DenseMap<SILInstruction*, SILInstruction*> InstructionMap;
   llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;

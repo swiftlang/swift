@@ -92,6 +92,9 @@ public:
     return const_cast<SILBasicBlock*>(this)->getTerminator();
   }
 
+  SILBasicBlock *splitBasicBlock(iterator I, bool CreateBranch = true,
+                                 SILLocation BranchLoc = SILLocation());
+
   //===--------------------------------------------------------------------===//
   // SILBasicBlock Argument List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
