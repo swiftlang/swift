@@ -715,14 +715,15 @@ llvm::DIDerivedType IRGenDebugInfo::createMemberType(CanType CTy,
                                                      llvm::DIDescriptor Scope,
                                                      llvm::DIFile File,
                                                      unsigned Flags) {
-  DebugTypeInfo DTy(CTy, Types.getCompleteTypeInfo(CTy));
-  auto Ty = getOrCreateType(DTy, Scope);
+  DebugTypeInfo DTI(CTy, Types.getCompleteTypeInfo(CTy));
+  auto Ty = getOrCreateType(DTI, Scope);
+  auto DTy = DBuilder.createMemberType(Scope, StringRef(), File, 0,
+                                       Ty.getSizeInBits(),
+                                       Ty.getAlignInBits(),
+                                       OffsetInBits, Flags, Ty);
   OffsetInBits += Ty.getSizeInBits();
   OffsetInBits = llvm::RoundUpToAlignment(OffsetInBits, Ty.getAlignInBits());
-  return DBuilder.createMemberType(Scope, StringRef(), File, 0,
-                                   Ty.getSizeInBits(),
-                                   Ty.getAlignInBits(),
-                                   OffsetInBits, Flags, Ty);
+  return DTy;
 }
 
 /// Return an array with the DITypes for each of a tuple's elements.
@@ -821,13 +822,20 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   switch (BaseTy->getKind()) {
   case TypeKind::BuiltinInteger: {
-    SizeInBits = TargetInfo.getIntWidth();
+    auto IntegerTy = BaseTy->castTo<BuiltinIntegerType>();
+    // FIXME: Translate this into the actually allocated number of
+    // bits using TargetInfo.
+    SizeInBits = IntegerTy->getBitWidth();
     Name = "_TtSi";
+    Encoding = llvm::dwarf::DW_ATE_unsigned;
     break;
   }
 
   case TypeKind::BuiltinFloat: {
-    SizeInBits = TargetInfo.getFloatWidth();
+    auto FloatTy = BaseTy->castTo<BuiltinFloatType>();
+    // Assuming that the bitwidth and FloatTy->getFPKind() are identical.
+    SizeInBits = FloatTy->getBitWidth();
+    Encoding = llvm::dwarf::DW_ATE_float;
     Name = "_TtSf";
     break;
   }
