@@ -611,16 +611,6 @@ UnionElementDecl *UnionDecl::getElement(Identifier Name) const {
   return 0;
 }
 
-void
-UnionDecl::getAllElements(llvm::DenseSet<UnionElementDecl*> &elements) const {
-  for (auto *member : getMembers()) {
-    auto *elt = dyn_cast<UnionElementDecl>(member);
-    if (!elt)
-      continue;
-    elements.insert(elt);
-  }
-}
-
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
                            SourceLoc NameLoc, Identifier Name,
                            MutableArrayRef<TypeLoc> Inherited)
