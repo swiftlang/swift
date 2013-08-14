@@ -1152,9 +1152,9 @@ retain
   sil-instruction ::= 'retain' sil-operand
 
   retain %0 : $T
-  // %0 must be of a reference type
+  // $T must be a reference type
 
-Retains the heap object referenced by ``%0``.
+Increases the strong retain count of the heap object referenced by ``%0``.
 
 retain_autoreleased
 ```````````````````
@@ -1163,7 +1163,7 @@ retain_autoreleased
   sil-instruction ::= 'retain_autoreleased' sil-operand
 
   retain_autoreleased %0 : $T
-  // %0 must be of a reference type
+  // $T must be a reference type
 
 Retains the heap object referenced by ``%0`` using the Objective-C ARC
 "autoreleased return value" optimization. The operand must be the result of
@@ -1177,12 +1177,90 @@ release
 ```````
 ::
 
-  release %0
-  // %0 must be of a reference type.
+  release %0 : $T
+  // $T must be a reference type.
 
-Releases the heap object referenced by ``%0``. If the release
-operation brings the retain count of the object to zero, the object
-is destroyed and its memory is deallocated.
+Decrements the strong reference count of the heap object referenced by ``%0``.
+If the release operation brings the strong reference count of the object
+to zero, the object is destroyed and ``[weak]`` references are cleared.
+When both its strong and unowned reference counts reach zero, the object's
+memory is deallocated.
+
+retain_unowned
+``````````````
+::
+  
+  sil-instruction ::= 'retain_unowned' sil-operand
+
+  retain_unowned %0 : $[unowned] T
+  // $T must be a reference type
+
+Asserts that the strong reference count of the heap object referenced by
+``%0`` is still positive, then increases it by one.
+
+unowned_retain
+``````````````
+::
+  
+  sil-instruction ::= 'unowned_retain' sil-operand
+
+  unowned_retain %0 : $[unowned] T
+  // $T must be a reference type
+
+Increments the unowned reference count of the heap object underlying ``%0``.
+
+unowned_release
+```````````````
+::
+  
+  sil-instruction ::= 'unowned_release' sil-operand
+
+  unowned_release %0 : $[unowned] T
+  // $T must be a reference type
+
+Decrements the unowned reference count of the heap object refereced by
+``%0``.  When both its strong and unowned reference counts reach zero,
+the object's memory is deallocated.
+
+load_weak
+`````````
+
+::
+
+  sil-instruction ::= 'load_weak' '[take]'? sil-operand
+
+  load_weak [take] %0 : $*[weak] T
+  // $T must be a reference type
+
+Increments the strong reference count of the heap object held in the
+operand, which must be an initialized weak reference.  The result is
+value of type ``$T``, except that it is ``null`` if the heap object
+has begun deallocation.
+
+This operation must be atomic with respect to the final ``release`` on
+the operand heap object.  It need not be atomic with respect to
+``store_weak`` operations on the same address.
+
+store_weak
+``````````
+
+::
+
+  sil-instruction ::= 'store_weak' sil-value 'to' '[initialization]'? sil-operand
+
+  store_weak %0 to [initialization] %1 : $*[weak] T
+  // $T must be a reference type
+
+Initializes or reassigns a weak reference.  The operand may be ``null``.]
+
+If ``[initialization]`` is given, the weak reference must currently
+either be uninitialized or destroyed.  If it is not given, the weak
+reference must currently be initialized.
+
+This operation must be atomic with respect to the final ``release`` on
+the operand (source) heap object.  It need not be atomic with respect
+to ``store_weak`` or ``load_weak`` operations on the same address.
+
 
 Literals
 ~~~~~~~~
