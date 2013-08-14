@@ -19,6 +19,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
@@ -393,8 +394,18 @@ namespace {
       return asImpl().visitAnyUnionType(type, type->getDecl());
     }
     RetTy visitAnyUnionType(CanType type, UnionDecl *D) {
-      // FIXME
-      return asImpl().handleTrivial(type);
+      // Consult the type lowering.
+      auto &lowering = M.Types.getTypeLowering(type);
+      return handleClassificationFromLowering(type, lowering);
+    }
+    
+    RetTy handleClassificationFromLowering(CanType type,
+                                           const TypeLowering &lowering) {
+      if (lowering.isAddressOnly())
+        return asImpl().handleAddressOnly(type);
+      if (lowering.isTrivial())
+        return asImpl().handleTrivial(type);
+      return asImpl().handleAggWithReference(type);
     }
 
     // Structs depend on their physical fields.
@@ -409,13 +420,9 @@ namespace {
       // Consult the type lowering.  This means we implicitly get
       // caching, but that type lowering needs to override this case.
       auto &lowering = M.Types.getTypeLowering(type);
-      if (lowering.isAddressOnly())
-        return asImpl().handleAddressOnly(type);
-      if (lowering.isTrivial())
-        return asImpl().handleTrivial(type);
-      return asImpl().handleAggWithReference(type);
+      return handleClassificationFromLowering(type, lowering);
     }
-
+    
     // Tuples depend on their elements.
     RetTy visitTupleType(CanTupleType type) {
       bool hasReference = false;
@@ -618,9 +625,9 @@ namespace {
       }
     }
 
-    typedef void (TypeLowering::*SimpleOperationTy)(SILBuilder &B,
-                                                    SILLocation loc,
-                                                    SILValue value) const;
+    using SimpleOperationTy = void (TypeLowering::*)(SILBuilder &B,
+                                                     SILLocation loc,
+                                                     SILValue value) const;
     void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
                                 SILValue aggValue,
                                 SimpleOperationTy operation) const {
@@ -630,7 +637,6 @@ namespace {
           (childLowering.*operation)(B, loc, childValue);
         });
     }
-
 
     void emitSemanticInitialize(SILBuilder &B, SILLocation loc,
                                 SILValue newValue, SILValue addr)const override{
@@ -701,6 +707,130 @@ namespace {
                                const TypeLowering &fieldLowering) const {
       return B.createStructExtract(loc, structValue, field,
                                    fieldLowering.getLoweredType());
+    }
+  };
+  
+  /// A lowering for loadable but non-trivial union types.
+  class LoadableUnionTypeLowering : public LoadableTypeLowering {
+  public:
+    /// A non-trivial case of the union.
+    class NonTrivialElement {
+      /// The non-trivial element.
+      UnionElementDecl *element;
+      
+      /// Its type lowering.
+      const TypeLowering *lowering;
+      
+    public:
+      NonTrivialElement(UnionElementDecl *element, const TypeLowering &lowering)
+        : element(element), lowering(&lowering) {}
+      
+      const TypeLowering &getLowering() const { return *lowering; }
+      UnionElementDecl *getElement() const { return element; }
+    };
+    
+  private:
+    /// The number of tail-allocated NonTrivialElements following this object.
+    unsigned numNonTrivial;
+    
+    LoadableUnionTypeLowering(SILType type,
+                              ArrayRef<NonTrivialElement> nonTrivial)
+      : LoadableTypeLowering(type, IsNotTrivial),
+        numNonTrivial(nonTrivial.size())
+    {
+      memcpy(reinterpret_cast<NonTrivialElement*>(this+1), nonTrivial.data(),
+             numNonTrivial * sizeof(NonTrivialElement));
+    }
+    
+    using SimpleOperationTy = void (TypeLowering::*)(SILBuilder &B,
+                                                     SILLocation loc,
+                                                     SILValue value) const;
+    /// Emit a value semantics operation for each nontrivial case of the union.
+    void ifNonTrivialElement(SILBuilder &B, SILLocation loc,
+                             SILValue value,
+                             SimpleOperationTy operation) const {
+      SmallVector<std::pair<UnionElementDecl*, SILBasicBlock*>, 4> nonTrivialBBs;
+      
+      auto &M = B.getFunction().getModule();
+      
+      for (auto &elt : getNonTrivialElements()) {
+        auto bb = new (M) SILBasicBlock(&B.getFunction());
+        auto argTy = elt.getLowering().getLoweredType();
+        new (M) SILArgument(argTy, bb);
+        nonTrivialBBs.push_back({elt.getElement(), bb});
+      }
+      
+      auto doneBB = new (M) SILBasicBlock(&B.getFunction());
+      B.createSwitchUnion(loc, value, doneBB, nonTrivialBBs);
+      
+      for (size_t i = 0; i < nonTrivialBBs.size(); ++i) {
+        SILBasicBlock *bb = nonTrivialBBs[i].second;
+        const TypeLowering &lowering = getNonTrivialElements()[i].getLowering();
+        B.emitBlock(bb);
+        (lowering.*operation)(B, loc, bb->getBBArgs()[0]);
+        B.createBranch(loc, doneBB);
+      }
+      
+      B.emitBlock(doneBB);
+    }
+    
+  public:
+    static const LoadableUnionTypeLowering *create(TypeConverter &TC,
+                                       CanType type,
+                                       ArrayRef<NonTrivialElement> nonTrivial) {
+      void *buffer
+        = operator new(sizeof(LoadableUnionTypeLowering)
+                         + sizeof(NonTrivialElement) * nonTrivial.size(),
+                       TC);
+      
+      auto silTy = SILType::getPrimitiveObjectType(type);
+      
+      return ::new (buffer) LoadableUnionTypeLowering(silTy, nonTrivial);
+    }
+    
+    ArrayRef<NonTrivialElement> getNonTrivialElements() const {
+      auto buffer = reinterpret_cast<const NonTrivialElement*>(this+1);
+      return ArrayRef<NonTrivialElement>(buffer, numNonTrivial);
+    }
+    
+    void emitSemanticInitialize(SILBuilder &B, SILLocation loc,
+                                SILValue newValue, SILValue addr)const override{
+      B.createStore(loc, newValue, addr);
+    }
+    
+    void emitSemanticAssignment(SILBuilder &B, SILLocation loc,
+                                SILValue newValue, SILValue addr)const override{
+      SILValue old = B.createLoad(loc, addr);
+      B.createStore(loc, newValue, addr);
+      emitRelease(B, loc, old);
+    }
+    
+    void emitSemanticUnknownAssignment(SILBuilder &B, SILLocation loc,
+                                       SILValue newValue,
+                                       SILValue addr) const override {
+      B.createAssign(loc, newValue, addr);
+    }
+    
+    SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
+                              SILValue addr, IsTake_t isTake) const override {
+      SILValue value = B.createLoad(loc, addr);
+      if (!isTake) emitRetain(B, loc, value);
+      return value;
+    }
+    
+    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      ifNonTrivialElement(B, loc, value, &TypeLowering::emitDestroyRValue);
+    }
+    
+    void emitRetain(SILBuilder &B, SILLocation loc,
+                    SILValue value) const override {
+      ifNonTrivialElement(B, loc, value, &TypeLowering::emitRetain);
+    }
+    
+    void emitRelease(SILBuilder &B, SILLocation loc,
+                     SILValue value) const override {
+      ifNonTrivialElement(B, loc, value, &TypeLowering::emitRelease);
     }
   };
 
@@ -1020,7 +1150,8 @@ namespace {
       typedef LoadableStructTypeLowering::NonTrivialChild NonTrivialChild;
       SmallVector<NonTrivialChild, 8> nonTrivialFields;
 
-      // For consistency, if it's anywhere resilient, we need to 
+      // For consistency, if it's anywhere resilient, we need to treat the type
+      // as resilient in SIL.
       if (TC.isAnywhereResilient(D))
         return handleAddressOnly(structType);
 
@@ -1038,6 +1169,34 @@ namespace {
         return handleTrivial(structType);
       return LoadableStructTypeLowering::create(TC, structType,
                                                 nonTrivialFields);
+    }
+        
+    const TypeLowering *visitAnyUnionType(CanType unionType, UnionDecl *D) {
+      // For consistency, if it's anywhere resilient, we need to treat the type
+      // as resilient in SIL.
+      if (TC.isAnywhereResilient(D))
+        return handleAddressOnly(unionType);
+      
+      typedef LoadableUnionTypeLowering::NonTrivialElement NonTrivialElement;
+      SmallVector<NonTrivialElement, 8> nonTrivialElts;
+      
+      // If any of the union elements have address-only data, the union is
+      // address-only.
+      for (auto elt : D->getAllElements()) {
+        // Singleton elements do not affect address-only-ness.
+        if (!elt->hasArgumentType())
+          continue;
+        
+        auto eltType = elt->getArgumentType()->getCanonicalType();
+        auto &lowering = TC.getTypeLowering(eltType);
+        if (lowering.isAddressOnly())
+          return handleAddressOnly(unionType);
+        if (!lowering.isTrivial())
+          nonTrivialElts.push_back(NonTrivialElement(elt, lowering));        
+      }
+      if (nonTrivialElts.empty())
+        return handleTrivial(unionType);
+      return LoadableUnionTypeLowering::create(TC, unionType, nonTrivialElts);
     }
   };
 }
