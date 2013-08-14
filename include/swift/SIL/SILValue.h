@@ -74,7 +74,6 @@ public:
   inline ValueBaseUseIterator use_begin();
   inline ValueBaseUseIterator use_end();
   inline Range<ValueBaseUseIterator> getUses();
-  void replaceAllUsesWith(SILValue V);
 
   /// Pretty-print the value.
   void dump() const;

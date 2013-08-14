@@ -112,7 +112,9 @@ static bool CCPFunctionBody(SILFunction &F, SILModule &M) {
       // Try to fold the instruction.
       if (SILInstruction *C = constantFoldInstruction(*I, M)) {
         // We were able to fold, so all users should use the new folded value.
-        I->replaceAllUsesWith(C);
+        assert(I->getTypes().size() &&
+               "Currently, we only support single result instructions.");
+        SILValue(I).replaceAllUsesWith(C);
 
         // The users could be constant propagatable now.
         for (auto UseI = I->use_begin(),

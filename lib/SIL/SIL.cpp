@@ -27,12 +27,6 @@ void SILValue::replaceAllUsesWith(SILValue V) {
     (**use_begin()).set(V);
 }
 
-void ValueBase::replaceAllUsesWith(SILValue V) {
-  assert(this != V.getDef() && "Cannot RAUW a value with itself");
-  while (!use_empty())
-    (**use_begin()).set(V);
-}
-
 static unsigned getNaturalUncurryLevel(CapturingExpr *func) {
   assert(func && "no function body?!");
   assert(func->getParamPatterns().size() >= 1 && "no arguments for func?!");
