@@ -581,8 +581,6 @@ ERROR(expected_expr_do_while,stmt_parsing,none,
       "expected expression in 'do-while' condition", ())
 
 // C-Style For Stmt
-ERROR(expected_lparen_for_stmt,stmt_parsing,none,
-      "expected '(' in 'for' statement", ())
 ERROR(expected_semi_for_stmt,stmt_parsing,none,
       "expected ';' in 'for' statement", ())
 ERROR(expected_cond_for_stmt,stmt_parsing,none,
