@@ -1,3 +1,40 @@
+2013-08-14
+----------
+
+* Swift now supports weak references by applying the [weak] attribute to a
+  variable declaration.
+
+    (swift) var x = NSObject()
+    // x : NSObject = <NSObject: 0x7f95d5804690>
+    (swift) var [weak] w = x
+    // w : NSObject = <NSObject: 0x7f95d5804690>
+    (swift) w == nil
+    // r2 : Bool = false
+    (swift) x = NSObject()
+    (swift) w == nil
+    // r3 : Bool = true
+
+  Swift also supports a special form of weak reference, called [unowned], for
+  references that should never be nil but are required to be weak to break
+  cycles, such as parent or sibling references. Accessing an [unowned]
+  reference asserts that the reference is still valid and implicitly promotes
+  the loaded reference to a strong reference, so it does not need to be loaded
+  and checked for nullness before use like a true [weak] reference.
+
+    class Parent {
+      var children : Vector<Child>
+
+      func addChild(c:Child) {
+        c.parent = this
+        children.append(c)
+      }
+    }
+
+    class Child {
+      var [unowned] parent : Parent
+    }
+
+
 2013-07-31
 ----------
 
