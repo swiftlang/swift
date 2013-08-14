@@ -229,7 +229,7 @@ public:
 class CodeCompletionResultBuilder {
   CodeCompletionContext &Context;
   CodeCompletionResult::ResultKind Kind;
-  const Decl *AssociatedDecl;
+  const Decl *AssociatedDecl = nullptr;
   unsigned CurrentNestingLevel = 0;
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
   bool HasLeadingDot = false;

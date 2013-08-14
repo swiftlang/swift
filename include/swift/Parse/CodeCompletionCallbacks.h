@@ -24,6 +24,7 @@ protected:
   Parser &P;
   ASTContext &Context;
   Parser::ParserPosition ExprBeginPosition;
+  const GenericParamList *DeclFuncGenericParams = nullptr;
 
 public:
   CodeCompletionCallbacks(Parser &P)
@@ -35,6 +36,25 @@ public:
   void setExprBeginning(Parser::ParserPosition PP) {
     ExprBeginPosition = PP;
   }
+
+  /// RAII object to inform code completion about function's generic parameters
+  /// while parsing the function signature.
+  class FunctionSignatureGenericParams {
+    CodeCompletionCallbacks *CodeCompletion;
+
+  public:
+    FunctionSignatureGenericParams(CodeCompletionCallbacks *CodeCompletion,
+                                   const GenericParamList *GenericParams)
+        : CodeCompletion(CodeCompletion) {
+      if (CodeCompletion && GenericParams)
+        CodeCompletion->DeclFuncGenericParams = GenericParams;
+    }
+
+    ~FunctionSignatureGenericParams() {
+      if (CodeCompletion)
+        CodeCompletion->DeclFuncGenericParams = nullptr;
+    }
+  };
 
   /// \brief Complete the whole expression.  This is a fallback that should
   /// produce results when more specific completion methods failed.

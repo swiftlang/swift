@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Parser.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
@@ -1431,8 +1432,13 @@ FuncDecl *Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   }
 
   TypeRepr *FuncRetTy;
-  if (parseFunctionSignature(ArgParams, BodyParams, FuncRetTy))
-    return 0;
+  {
+    CodeCompletionCallbacks::FunctionSignatureGenericParams CCInfo(
+        CodeCompletion, GenericParams);
+
+    if (parseFunctionSignature(ArgParams, BodyParams, FuncRetTy))
+      return 0;
+  }
 
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name

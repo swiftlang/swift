@@ -351,6 +351,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
   DeclContext *CurDeclContext = nullptr;
+  const GenericParamList *DeclFuncGenericParams = nullptr;
 
   /// \brief Set to true when we have delivered code completion results
   /// to the \c Consumer.
@@ -444,6 +445,8 @@ class CompletionLookup : swift::VisibleDeclConsumer {
   ASTContext &SwiftContext;
   const DeclContext *CurrDeclContext;
 
+  const GenericParamList *DeclFuncGenericParams = nullptr;
+
   enum class LookupKind {
     ValueExpr,
     ValueInDeclContext,
@@ -495,6 +498,10 @@ public:
       if (auto Importer = SwiftContext.getClangModuleLoader())
         static_cast<ClangImporter &>(*Importer).lookupVisibleDecls(*this);
     });
+  }
+
+  void setDeclFuncGenericParameters(const GenericParamList *GenericParams) {
+    DeclFuncGenericParams = GenericParams;
   }
 
   void setHaveDot() {
@@ -696,13 +703,31 @@ public:
     if (needDot())
       Builder.addLeadingDot();
     Builder.addTextChunk(TAD->getName().str());
-    Type TypeAnnotation;
     if (TAD->hasUnderlyingType())
-      TypeAnnotation = MetaTypeType::get(TAD->getUnderlyingType(),
-                                         SwiftContext);
-    else
-      TypeAnnotation = MetaTypeType::get(TAD->getDeclaredType(), SwiftContext);
-    addTypeAnnotation(Builder, TypeAnnotation);
+      addTypeAnnotation(Builder,
+                        MetaTypeType::get(TAD->getUnderlyingType(),
+                                          SwiftContext));
+    else {
+      Builder.addTypeAnnotation(MetaTypeType::get(TAD->getDeclaredType(),
+                                                  SwiftContext)->getString());
+    }
+  }
+
+  void addDeclFuncGenericParams() {
+    if (!DeclFuncGenericParams)
+      return;
+
+    // Can not refer to generic parameters with a dot.
+    if (HaveDot)
+      return;
+
+    if (Kind != LookupKind::ValueInDeclContext &&
+        Kind != LookupKind::TypeInDeclContext)
+      return;
+
+    for (auto Param : *DeclFuncGenericParams) {
+      addTypeAliasRef(Param.getAsTypeParam());
+    }
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation) {
@@ -878,6 +903,7 @@ public:
   void getValueCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::ValueInDeclContext;
     lookupVisibleDecls(*this, CurrDeclContext, Loc);
+    addDeclFuncGenericParams();
 
     // FIXME: The pedantically correct way to find the type is to resolve the
     // swift.StringLiteralType type.
@@ -892,6 +918,7 @@ public:
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::TypeInDeclContext;
     lookupVisibleDecls(*this, CurrDeclContext, Loc);
+    addDeclFuncGenericParams();
   }
 };
 
@@ -936,6 +963,7 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
 void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
   Kind = CompletionKind::TypeSimpleBeginning;
   CurDeclContext = P.CurDeclContext;
+  this->DeclFuncGenericParams = CodeCompletionCallbacks::DeclFuncGenericParams;
 }
 
 void CodeCompletionCallbacksImpl::doneParsing() {
@@ -950,40 +978,37 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (ParsedExpr && !typecheckParsedExpr())
     return;
 
+  CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
+
   switch (Kind) {
   case CompletionKind::None:
     llvm_unreachable("should be already handled");
     return;
 
   case CompletionKind::DotExpr: {
-    CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
     Lookup.setHaveDot();
     Lookup.getValueExprCompletions(ParsedExpr->getType());
     break;
   }
 
   case CompletionKind::PostfixExprBeginning: {
-    CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
     Lookup.getValueCompletionsInDeclContext(
         TU->Ctx.SourceMgr.getCodeCompletionLoc());
     break;
   }
 
   case CompletionKind::PostfixExpr: {
-    CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
     Lookup.getValueExprCompletions(ParsedExpr->getType());
     break;
   }
 
   case CompletionKind::SuperExpr: {
-    CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
     Lookup.setIsSuperRefExpr();
     Lookup.getValueExprCompletions(ParsedExpr->getType());
     break;
   }
 
   case CompletionKind::SuperExprDot: {
-    CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
     Lookup.setIsSuperRefExpr();
     Lookup.setHaveDot();
     Lookup.getValueExprCompletions(ParsedExpr->getType());
@@ -991,7 +1016,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::TypeSimpleBeginning: {
-    CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
+    Lookup.setDeclFuncGenericParameters(DeclFuncGenericParams);
     Lookup.getTypeCompletionsInDeclContext(
         TU->Ctx.SourceMgr.getCodeCompletionLoc());
     break;
