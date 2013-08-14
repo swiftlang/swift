@@ -103,6 +103,14 @@ void SILInstruction::eraseFromParent() {
   getParent()->getInsts().erase(this);
 }
 
+void SILInstruction::dropAllReferences() {
+  MutableArrayRef<Operand> PossiblyDeadOps = getAllOperands();
+  for (auto OpI = PossiblyDeadOps.begin(),
+            OpE = PossiblyDeadOps.end(); OpI != OpE; ++OpI) {
+    OpI->drop();
+  }
+}
+
 namespace {
   class InstructionDestroyer : public SILVisitor<InstructionDestroyer> {
   public:
@@ -131,10 +139,31 @@ namespace {
     }
 #include "swift/SIL/SILNodes.def"
   };
+
+  class AllOperandsMutableAccessor
+    : public SILVisitor<AllOperandsMutableAccessor,
+                        MutableArrayRef<Operand> > {
+  public:
+#define VALUE(CLASS, PARENT) \
+    MutableArrayRef<Operand> visit##CLASS(const CLASS *I) {             \
+      llvm_unreachable("accessing non-instruction " #CLASS);            \
+    }
+#define INST(CLASS, PARENT, MEMBEHAVIOR) \
+    MutableArrayRef<Operand> visit##CLASS(CLASS *I) {                   \
+      ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,          \
+                        MutableArrayRef<Operand>());                    \
+      return I->getAllOperands();                                       \
+    }
+#include "swift/SIL/SILNodes.def"
+  };
 } // end anonymous namespace
 
 ArrayRef<Operand> SILInstruction::getAllOperands() const {
   return AllOperandsAccessor().visit(const_cast<SILInstruction*>(this));
+}
+
+MutableArrayRef<Operand> SILInstruction::getAllOperands() {
+  return AllOperandsMutableAccessor().visit(this);
 }
 
 /// getOperandNumber - Return which operand this is in the operand list of the

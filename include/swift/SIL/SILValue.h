@@ -202,6 +202,15 @@ public:
     insertIntoCurrent();
   }
 
+  /// \brief Remove this use of the operand.
+  void drop() {
+    removeFromCurrent();
+    TheValue = SILValue();
+    NextUse = nullptr;
+    Back = nullptr;
+    Owner = nullptr;
+  }
+
   ~Operand() {
     removeFromCurrent();
   }

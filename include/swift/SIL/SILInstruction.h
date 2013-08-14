@@ -110,8 +110,14 @@ public:
   ///
   void eraseFromParent();
 
+  /// \brief Drops all uses that belong to this instruction.
+  void dropAllReferences();
+
   /// Return the array of operands for this instruction.
   ArrayRef<Operand> getAllOperands() const;
+
+  /// Return the array of mutable operands for this instruction.
+  MutableArrayRef<Operand> getAllOperands();
 
   unsigned getNumOperands() const { return getAllOperands().size(); }
   SILValue getOperand(unsigned Num) const { return getAllOperands()[Num].get();}
@@ -175,7 +181,8 @@ public:
   getType(unsigned i = 0) const { return ValueBase::getType(i); }
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == KIND;
   }
@@ -200,7 +207,8 @@ public:
   SILValue getContainerResult() const { return SILValue(this, 0); }
   SILValue getAddressResult() const { return SILValue(this, 1); }
 
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocStackInst;
@@ -216,8 +224,9 @@ public:
 
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
-  
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocRefInst;
   }
@@ -236,7 +245,8 @@ public:
     return getType(1).getObjectType();
   }
 
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocBoxInst;
@@ -267,6 +277,7 @@ public:
 
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocArrayInst;
@@ -328,6 +339,7 @@ public:
   }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
@@ -368,6 +380,7 @@ public:
   }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
@@ -392,7 +405,8 @@ public:
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
   
   ArrayRef<Operand> getAllOperands() const { return {}; }
-  
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::BuiltinFunctionRefInst;
   }
@@ -415,6 +429,7 @@ public:
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::FunctionRefInst;
@@ -436,7 +451,8 @@ public:
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
   
   ArrayRef<Operand> getAllOperands() const { return {}; }
-  
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::GlobalAddrInst;
   }
@@ -464,6 +480,7 @@ public:
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::IntegerLiteralInst;
@@ -491,7 +508,8 @@ public:
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::FloatLiteralInst;
@@ -519,7 +537,8 @@ public:
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::StringLiteralInst;
@@ -560,6 +579,7 @@ public:
   SILValue getDest() const { return Operands[Dest].get(); }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::StoreInst;
@@ -585,6 +605,7 @@ public:
   SILValue getDest() const { return Operands[Dest].get(); }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AssignInst;
@@ -636,6 +657,7 @@ public:
   }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::StoreWeakInst;
@@ -703,6 +725,7 @@ public:
   }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::CopyAddrInst;
@@ -752,6 +775,7 @@ public:
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::SpecializeInst;
@@ -1060,6 +1084,7 @@ public:
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::StructInst;
@@ -1097,6 +1122,7 @@ public:
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::TupleInst;
@@ -1111,7 +1137,8 @@ public:
     : SILInstruction(ValueKind::BuiltinZeroInst, Loc, Type) {}
   
   ArrayRef<Operand> getAllOperands() const { return {}; }
-  
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
   
@@ -1131,8 +1158,9 @@ public:
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
-  
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::MetatypeInst;
   }
@@ -1177,7 +1205,8 @@ public:
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ModuleInst;
@@ -1315,7 +1344,8 @@ public:
   SILType getLookupArchetype() const { return LookupType; }
   
   ArrayRef<Operand> getAllOperands() const { return {}; }
-  
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ArchetypeMethodInst;
   }
@@ -1440,6 +1470,7 @@ public:
   IsTake_t isTakeOfSrc() const { return IsTake_t(IsTakeOfSrc); }
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::UpcastExistentialInst;
@@ -1622,7 +1653,8 @@ public:
   SILValue getIndex() const { return Operands[Index].get(); }
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
   
   static bool classof(const ValueBase *V) {
@@ -1704,8 +1736,9 @@ public:
     return SuccessorListTy();
   }
 
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
-  
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::UnreachableInst;
   }
@@ -1790,6 +1823,7 @@ public:
   }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::BranchInst;
@@ -1846,6 +1880,7 @@ public:
   OperandValueArrayRef getFalseArgs() const;
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::CondBranchInst;
@@ -1910,7 +1945,8 @@ public:
   SILValue getOperand() const { return Operands[0].get(); }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
   SuccessorListTy getSuccessors() {
     return ArrayRef<SILSuccessor>{getSuccessorBuf(), NumCases + HasDefault};
   }
@@ -1981,7 +2017,8 @@ public:
   SILValue getOperand() const { return Operands[0].get(); }
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
   SuccessorListTy getSuccessors() {
     return ArrayRef<SILSuccessor>{getSuccessorBuf(), NumCases + HasDefault};
   }
