@@ -38,10 +38,10 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
     ContextPtr(nullptr) {
   // Make sure the instructions in this function are attached its debug scope.
   if (IGM.DebugInfo) {
-    // Functions, especially artificial helpers, are sometimes
+    // Functions, especially artificial thunks and closures, are often
     // generated on-the-fly while we are in the middle of another
-    // function. Be nice and reset the current debug location after
-    // we're done.
+    // function. Be nice and preserve the current debug location until
+    // after we're done with this function.
     IGM.DebugInfo->pushLoc();
     IGM.DebugInfo->setCurrentLoc(Builder, DbgScope, DbgLoc);
   }
