@@ -1182,6 +1182,9 @@ public:
     // we're never guaranteed to be exhaustive.
     llvm::DenseSet<UnionElementDecl*> unswitchedElts;
     
+    require(SOI->getOperand().getType().isObject(),
+            "switch_union operand must be an object");
+    
     UnionDecl *uDecl
       = SOI->getOperand().getType().getSwiftRValueType()
         ->getUnionOrBoundGenericUnion();
@@ -1215,9 +1218,8 @@ public:
           CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
           require(eltArgTy->isEqual(bbArgTy),
                   "switch_union destination bbarg must match case arg type");
-          require(SOI->getOperand().getType().isAddress()
-                    == dest->getBBArgs()[0]->getType().isAddress(),
-                  "switch_union destination bbarg type does not match case");
+          require(!dest->getBBArgs()[0]->getType().isAddress(),
+                  "switch_union destination bbarg type must not be an address");
         }
         
       } else {

@@ -2495,7 +2495,7 @@ switch_union
                         ...,                 \
                         default labelN
 
-  // %0 must be a value or address of union type $U
+  // %0 must be a value of union type $U
   // #U.Foo, #U.Bar, etc. must be 'case' declarations inside $U
   // `label1` through `labelN` must refer to block labels within the current
   //   function
@@ -2512,7 +2512,7 @@ requires coverage of the operand type: If the ``union`` type is resilient, the
 ``case`` of the ``union``. The destination basic block for a ``case`` may take
 an argument of the corresponding ``union`` ``case``'s data type (or of the
 address type, if the operand is an address). If the branch is taken, the
-argument will be bound to the associated data (or its address) inside the
+argument will be bound to the associated data inside the
 original union value. For example::
 
   union Foo {
@@ -2543,8 +2543,3 @@ original union value. For example::
     return %result : $Int
   }
 
-TODO design questions
----------------------
-
-* debug information representation
-* maintaining good AST location info in the face of optimization
