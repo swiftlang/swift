@@ -14,7 +14,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Diagnostics.h"
-#include "swift/SIL/SILInliner.h"
+#include "swift/SILPasses/Utils/SILInliner.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/ImmutableSet.h"

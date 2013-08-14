@@ -1,4 +1,4 @@
-##===- swift/lib/SIL/SILGen/Makefile -----------------------*- Makefile -*-===##
+##===- swift/lib/SILGen/Makefile ---------------------------*- Makefile -*-===##
 # 
 # This source file is part of the Swift.org open source project
 #
@@ -10,10 +10,9 @@
 #
 ##===----------------------------------------------------------------------===##
 
-SWIFT_LEVEL := ../../..
+SWIFT_LEVEL := ../..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
 LIBRARYNAME := swiftSILGen
 
 include $(SWIFT_LEVEL)/Makefile
-

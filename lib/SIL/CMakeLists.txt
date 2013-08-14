@@ -1,5 +1,3 @@
-add_subdirectory(SILGen)
-add_subdirectory(Passes)
 add_swift_library(swiftSIL
   Dominance.cpp
   Mangle.cpp
@@ -8,7 +6,6 @@ add_swift_library(swiftSIL
   SILBasicBlock.cpp
   SILBuilder.cpp
   SILFunction.cpp
-  SILInliner.cpp
   SILInstruction.cpp
   SILLocation.cpp
   SILModule.cpp

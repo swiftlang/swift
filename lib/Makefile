@@ -11,7 +11,6 @@
 ##===----------------------------------------------------------------------===##
 SWIFT_LEVEL := ..
 
-PARALLEL_DIRS = Basic AST Sema Parse SIL IRGen ClangImporter Serialization IDE Frontend
+PARALLEL_DIRS = Basic AST Sema Parse SIL SILGen SILPasses IRGen ClangImporter Serialization IDE Frontend
 
 include $(SWIFT_LEVEL)/Makefile
-

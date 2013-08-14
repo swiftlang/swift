@@ -1,3 +1,4 @@
+add_subdirectory(Utils)
 add_swift_library(swiftSILPasses
   AllocBoxToStack.cpp
   ConstantPropagation.cpp
@@ -6,5 +7,5 @@ add_swift_library(swiftSILPasses
   MandatoryInlining.cpp
   MemoryPromotion.cpp
   StackToSSA.cpp
-  DEPENDS swiftSIL)
+  DEPENDS swiftSILPassesUtils)
 

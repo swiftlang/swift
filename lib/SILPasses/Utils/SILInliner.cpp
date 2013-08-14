@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/STLExtras.h"
-#include "swift/SIL/SILInliner.h"
+#include "swift/SILPasses/Utils/SILInliner.h"
 
 using namespace swift;
 

@@ -1,4 +1,4 @@
-##===- swift/lib/SIL/Passes/Makefile -----------------------*- Makefile -*-===##
+##===- swift/lib/SILPasses/Utils/Makefile ------------------*- Makefile -*-===##
 # 
 # This source file is part of the Swift.org open source project
 #
@@ -13,7 +13,6 @@
 SWIFT_LEVEL := ../../..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
-LIBRARYNAME := swiftSILPasses
+LIBRARYNAME := swiftSILPassesUtils
 
 include $(SWIFT_LEVEL)/Makefile
-
