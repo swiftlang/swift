@@ -590,6 +590,14 @@ Demangler::Substitution Demangler::demangleValueWitnessKind() {
     return success("projectBuffer");
   if (c1 == 't' && c2 == 'y')
     return success("typeof");
+  if (c1 == 'x' && c2 == 's')
+    return success("storeExtraInhabitant");
+  if (c1 == 'x' && c2 == 'g')
+    return success("getExtraInhabitantIndex");
+  if (c1 == 'u' && c2 == 'g')
+    return success("getUnionTag");
+  if (c1 == 'u' && c2 == 'p')
+    return success("inplaceProjectUnionData");
   return failure();
 }
 

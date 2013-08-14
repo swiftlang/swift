@@ -53,10 +53,15 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   case ValueWitness::InitializeWithTake: return "tk";
   case ValueWitness::ProjectBuffer: return "pr";
   case ValueWitness::TypeOf: return "ty";
-
+  case ValueWitness::StoreExtraInhabitant: return "xs";
+  case ValueWitness::GetExtraInhabitantIndex: return "xg";
+  case ValueWitness::GetUnionTag: return "ug";
+  case ValueWitness::InplaceProjectUnionData: return "up";
+      
   case ValueWitness::Size:
   case ValueWitness::Flags:
   case ValueWitness::Stride:
+  case ValueWitness::ExtraInhabitantFlags:
     llvm_unreachable("not a function witness");
   }
   llvm_unreachable("bad witness kind");

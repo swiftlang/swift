@@ -1709,10 +1709,20 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     }
     return;
   }
+      
+  // TODO
+  case ValueWitness::StoreExtraInhabitant:
+  case ValueWitness::GetExtraInhabitantIndex:
+  case ValueWitness::GetUnionTag:
+  case ValueWitness::InplaceProjectUnionData: {
+    IGF.Builder.CreateUnreachable();
+    return;
+  }
 
   case ValueWitness::Size:
   case ValueWitness::Flags:
   case ValueWitness::Stride:
+  case ValueWitness::ExtraInhabitantFlags:
     llvm_unreachable("these value witnesses aren't functions");
   }
   llvm_unreachable("bad value witness kind!");
@@ -2162,7 +2172,14 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     // Just fill in null here if the type can't be statically laid out.
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   }
-
+  
+  /// TODO:
+  case ValueWitness::StoreExtraInhabitant:
+  case ValueWitness::GetExtraInhabitantIndex:
+  case ValueWitness::ExtraInhabitantFlags:
+  case ValueWitness::GetUnionTag:
+  case ValueWitness::InplaceProjectUnionData:
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   }
   llvm_unreachable("bad value witness kind");
 
@@ -2702,7 +2719,7 @@ namespace {
 static void addValueWitnesses(IRGenModule &IGM, FixedPacking packing,
                               CanType concreteType, const TypeInfo &concreteTI,
                               SmallVectorImpl<llvm::Constant*> &table) {
-  for (unsigned i = 0; i != NumValueWitnesses; ++i) {
+  for (unsigned i = 0; i != NumRequiredValueWitnesses; ++i) {
     table.push_back(getValueWitness(IGM, ValueWitness(i),
                                     packing, concreteType,
                                     concreteTI));
@@ -2745,7 +2762,7 @@ llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
   auto &concreteTI = IGM.getFragileTypeInfo(concreteType);
   FixedPacking packing = computePacking(IGM, concreteTI);
 
-  SmallVector<llvm::Constant*, NumValueWitnesses> witnesses;
+  SmallVector<llvm::Constant*, NumRequiredValueWitnesses> witnesses;
   addValueWitnesses(IGM, packing, concreteType, concreteTI, witnesses);
 
   auto tableTy = llvm::ArrayType::get(IGM.Int8PtrTy, witnesses.size());

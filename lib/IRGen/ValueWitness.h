@@ -158,6 +158,8 @@ enum class ValueWitness : unsigned {
   /// Given a valid object of this type, returns the metatype pointer for
   /// the dynamic type of the value of the object.
   TypeOf,
+  
+  Last_RequiredValueWitnessFunction = TypeOf,
 
   ///   size_t size;
   ///
@@ -179,32 +181,145 @@ enum class ValueWitness : unsigned {
   ///
   /// The ValueWitnessIsNonInline bit is set if the type cannot be
   /// represented in a fixed-size buffer.
+  ///
+  /// The Union_HasExtraInhabitants bit is set if the type's binary
+  /// representation has "extra inhabitants" that do not form valid values of
+  /// the type, and the value witness table contains the ExtraInhabitantWitness
+  /// entries.
+  ///
+  /// The Union_HasSpareBits bit is set if the type's binary representation
+  /// has unused bits.
   Flags,
 
   ///   size_t stride;
   ///
   /// The required size per element of an array of this type.
-  Stride
+  Stride,
+  
+  Last_RequiredValueWitness = Stride,
+  
+  /// The following value witnesses are conditionally present based on
+  /// the Union_HasExtraInhabitants bit of the flags.
+  First_ExtraInhabitantValueWitness,
+  
+  ///   void (*storeExtraInhabitant)(T *obj, unsigned index, M *self);
+  ///
+  /// Given an invalid object of this type, store the representation of an
+  /// extra inhabitant of the type. The object will remain invalid, because
+  /// an extra inhabitant is by definition an invalid representation of the
+  /// type. index must be less than numExtraInhabitants.
+  StoreExtraInhabitant = First_ExtraInhabitantValueWitness,
+  
+  ///   int (*getExtraInhabitantIndex)(T *obj, M *self);
+  ///
+  /// Given an invalid object of this type with an extra inhabitant
+  /// representation, returns the index of the extra inhabitant representation.
+  /// Returns -1 if the object is a valid value of the type. If non-negative,
+  /// the return value is the same index that can be passed to
+  /// storeExtraInhabitant to reproduce the representation.
+  GetExtraInhabitantIndex,
+  
+  Last_ExtraInhabitantValueWitnessFunction = GetExtraInhabitantIndex,
+  
+  ///   size_t extraInhabitantFlags;
+  ///
+  /// These bits are always present if the extra inhabitants witnesses are:
+  ///
+  /// - The NumExtraInhabitantsMask bits contain the number of extra
+  ///   inhabitants of the type representation.
+  ///
+  /// If the Union_HasSpareBits flag is set in the value witness flags, these
+  /// additional flags are available:
+  ///
+  /// - The NumSpareBitsMask bits contain the number of (host-endian) contiguous
+  ///   spare bits in the type representation.
+  /// - The SpareBitsShiftMask bits contain the (host-endian) bit offset of the
+  ///   lowest spare bit.
+  ExtraInhabitantFlags,
+  
+  Last_ExtraInhabitantValueWitness = ExtraInhabitantFlags,
+  
+  /// The following value witnesses are conditionally present if the witnessed
+  /// type is a union.
+  First_UnionValueWitness,
+  
+  ///   unsigned (*getUnionTag)(T *obj, M *self);
+  ///
+  /// Given a valid object of this union type, extracts the tag value indicating
+  /// which case of the union is inhabited.
+  GetUnionTag = First_UnionValueWitness,
+  
+  ///   U *(*inplaceProjectUnionData)(T *obj, unsigned tag, M *self);
+  ///
+  /// Given a valid object of this union type with the given tag, destructively
+  /// extracts the associated data for that tag inplace, and returns a pointer
+  /// to the data. The tag must match the result of getUnionTag for the value;
+  /// it is not validated prior to the operation.
+  InplaceProjectUnionData,
+  
+  Last_UnionValueWitness = InplaceProjectUnionData,
+  
+  Last_ValueWitness = Last_UnionValueWitness,
 };
 
-// The namespace here is to force these to be scoped.  We can't just
+// The namespaces here are to force the enumerators to be scoped.  We don't
 // use 'enum class' because we want the enumerators to convert freely
 // to uint64_t.
 namespace ValueWitnessFlags {
   enum : uint64_t {
     AlignmentMask = 0x0FFFF,
     IsNonPOD      = 0x10000,
-    IsNonInline   = 0x20000
+    IsNonInline   = 0x20000,
+    
+    /// Flags pertaining to union representation.
+    Union_FlagMask = 0xC0000,
+    
+    /// If Flags & Union_FlagMask == Union_IsOpaque, then the type does not
+    /// support any optimized representation in unions.
+    Union_IsOpaque = 0x00000,
+    /// If Flags & Union_FlagMask == Union_HasExtraInhabitants, then the type
+    /// has "extra inhabitants" of its binary representation which do not form
+    /// valid values of the type, such as null in a class type. The
+    /// ExtraInhabitants value witnesses are present in the value witness table.
+    Union_HasExtraInhabitants = 0x40000,
+    /// If Flags & Union_FlagMask == Union_HasSpareBits, then the type has
+    /// unused bits in its binary representation. This implies
+    /// HasExtraInhabitants. Both the ExtraInhabitants and SpareBits value
+    /// witnesses are present in the value witness table.
+    Union_HasSpareBits = 0xC0000,
+  };
+}
+  
+namespace ExtraInhabitantFlags {
+  enum : uint64_t {
+    NumExtraInhabitantsMask = 0x7FFFFFFFULL,
+    
+    NumSpareBitsMask   = 0x0000FFFF00000000ULL,
+    NumSpareBitsShift  = 32,
+    
+    SpareBitsShiftMask = 0xFFFF000000000000ULL,
+    SpareBitsShiftShift = 48,
   };
 }
  
 enum {
-  NumValueWitnesses = unsigned(ValueWitness::Stride) + 1,
-  NumValueWitnessFunctions = NumValueWitnesses - 3
+  NumRequiredValueWitnesses
+    = unsigned(ValueWitness::Last_RequiredValueWitness) + 1,
+  NumRequiredValueWitnessFunctions
+    = unsigned(ValueWitness::Last_RequiredValueWitnessFunction) + 1,
+  
+  MaxNumValueWitnesses
+    = unsigned(ValueWitness::Last_ValueWitness) + 1,
 };
 
 static inline bool isValueWitnessFunction(ValueWitness witness) {
-  return unsigned(witness) < NumValueWitnessFunctions;
+  auto ord = unsigned(witness);
+  return ord < NumRequiredValueWitnessFunctions
+    || (ord >= unsigned(ValueWitness::First_ExtraInhabitantValueWitness)
+        && ord <= unsigned(
+                       ValueWitness::Last_ExtraInhabitantValueWitnessFunction))
+    || (ord >= unsigned(ValueWitness::First_UnionValueWitness)
+        && ord <= unsigned(ValueWitness::Last_UnionValueWitness));
 }
 
 } // end namespace irgen

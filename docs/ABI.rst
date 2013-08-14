@@ -159,6 +159,10 @@ the conformance.
   value-witness-kind ::= 'tk'                // initializeWithTake
   value-witness-kind ::= 'pr'                // projectBuffer
   value-witness-kind ::= 'ty'                // typeof
+  value-witness-kind ::= 'xs'                // storeExtraInhabitant
+  value-witness-kind ::= 'xg'                // getExtraInhabitantIndex
+  value-witness-kind ::= 'ug'                // getUnionTag
+  value-witness-kind ::= 'up'                // inplaceProjectUnionData
 
 <value-witness-kind> differentiates the kinds of function value
 witnesses for a type.

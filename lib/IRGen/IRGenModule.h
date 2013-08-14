@@ -25,6 +25,7 @@
 #include "llvm/Support/ValueHandle.h"
 #include "llvm/IR/CallingConv.h"
 #include "IRGen.h"
+#include "ValueWitness.h"
 
 namespace llvm {
   class Constant;
@@ -171,8 +172,7 @@ private:
   Size PtrSize;
   llvm::Type *FixedBufferTy;           /// [N x i8], where N == 3 * sizeof(void*)
 
-  enum { NumValueWitnessFunctions = 13 };
-  llvm::PointerType *ValueWitnessTys[NumValueWitnessFunctions]; /// pointer-to-functions
+  llvm::Type *ValueWitnessTys[MaxNumValueWitnesses];
 
 //--- Types -----------------------------------------------------------------
 public:

@@ -53,30 +53,31 @@ llvm::Type *IRGenModule::getFixedBufferTy() {
   return FixedBufferTy;
 }
 
-static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
-                                                     ValueWitness index) {
+static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
   switch (index) {
-
   // void (*deallocateBuffer)(B *buffer, M *self);
   // void (*destroyBuffer)(B *buffer, M *self);
   case ValueWitness::DeallocateBuffer:
   case ValueWitness::DestroyBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
     llvm::Type *args[] = { bufPtrTy, IGM.TypeMetadataPtrTy };
-    return llvm::FunctionType::get(IGM.VoidTy, args, false);
+    return llvm::FunctionType::get(IGM.VoidTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
   }
 
   // void (*destroy)(T *object, witness_t *self);
   case ValueWitness::Destroy: {
     llvm::Type *args[] = { IGM.OpaquePtrTy, IGM.TypeMetadataPtrTy };
-    return llvm::FunctionType::get(IGM.VoidTy, args, false);
+    return llvm::FunctionType::get(IGM.VoidTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
   }
 
   // T *(*initializeBufferWithCopyOfBuffer)(B *dest, B *src, M *self);
   case ValueWitness::InitializeBufferWithCopyOfBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
     llvm::Type *args[] = { bufPtrTy, bufPtrTy, IGM.TypeMetadataPtrTy };
-    return llvm::FunctionType::get(IGM.OpaquePtrTy, args, false);
+    return llvm::FunctionType::get(IGM.OpaquePtrTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
   }
 
   // T *(*allocateBuffer)(B *buffer, M *self);
@@ -85,7 +86,8 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   case ValueWitness::ProjectBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
     llvm::Type *args[] = { bufPtrTy, IGM.TypeMetadataPtrTy };
-    return llvm::FunctionType::get(IGM.OpaquePtrTy, args, false);
+    return llvm::FunctionType::get(IGM.OpaquePtrTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
   }
 
   // T *(*initializeBufferWithCopy)(B *dest, T *src, M *self);
@@ -94,7 +96,8 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   case ValueWitness::InitializeBufferWithTake: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
     llvm::Type *args[] = { bufPtrTy, IGM.OpaquePtrTy, IGM.TypeMetadataPtrTy };
-    return llvm::FunctionType::get(IGM.OpaquePtrTy, args, false);
+    return llvm::FunctionType::get(IGM.OpaquePtrTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
   }
 
   // T *(*assignWithCopy)(T *dest, T *src, M *self);
@@ -107,7 +110,8 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   case ValueWitness::InitializeWithTake: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *args[] = { ptrTy, ptrTy, IGM.TypeMetadataPtrTy };
-    return llvm::FunctionType::get(ptrTy, args, false);
+    return llvm::FunctionType::get(ptrTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
   }
 
   // M *(*typeof)(T *src, M *self);
@@ -115,13 +119,64 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
     llvm::Type *args[] = { ptrTy, metaTy };
-    return llvm::FunctionType::get(metaTy, args, false);
+    return llvm::FunctionType::get(metaTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
+  }
+      
+  /// void (*storeExtraInhabitant)(T *obj, unsigned index, M *self);
+  case ValueWitness::StoreExtraInhabitant: {
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *indexTy = IGM.Int32Ty;
+    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
+    llvm::Type *voidTy = IGM.VoidTy;
+    llvm::Type *args[] = {ptrTy, indexTy, metaTy};
+    
+    return llvm::FunctionType::get(voidTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
+  }
+      
+  /// int (*getExtraInhabitantIndex)(T *obj, M *self);
+  case ValueWitness::GetExtraInhabitantIndex: {
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
+    llvm::Type *indexTy = IGM.Int32Ty;
+    
+    llvm::Type *args[] = {ptrTy, metaTy};
+    
+    return llvm::FunctionType::get(indexTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
+  }
+  
+  /// unsigned (*getUnionTag)(T *obj, M *self);
+  case ValueWitness::GetUnionTag: {
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
+    llvm::Type *indexTy = IGM.Int32Ty;
+    
+    llvm::Type *args[] = {ptrTy, metaTy};
+    
+    return llvm::FunctionType::get(indexTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
+  }
+    
+  /// U *(*inplaceProjectUnionData)(T *obj, unsigned tag, M *self);
+  case ValueWitness::InplaceProjectUnionData: {
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
+    llvm::Type *indexTy = IGM.Int32Ty;
+    
+    llvm::Type *args[] = {ptrTy, indexTy, metaTy};
+    
+    return llvm::FunctionType::get(ptrTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
   }
       
   case ValueWitness::Size:
   case ValueWitness::Flags:
   case ValueWitness::Stride:
-    llvm_unreachable("these witnesses aren't value witness functions!");
+  case ValueWitness::ExtraInhabitantFlags:
+    // Non-function witnesses all have type size_t.
+    return IGM.SizeTy;
   }
   llvm_unreachable("bad value witness!");
 }
@@ -129,19 +184,11 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
 /// Return the cached pointer-to-function type for the given value
 /// witness index.
 llvm::Type *IRGenModule::getValueWitnessTy(ValueWitness index) {
-  static_assert(IRGenModule::NumValueWitnessFunctions
-                  == ::NumValueWitnessFunctions,
-                "array on IGM has the wrong size");
-
-  /// All the non-function values are size_t's.
-  if (!isValueWitnessFunction(index))
-    return SizeTy;
-
-  assert(unsigned(index) < NumValueWitnessFunctions);
+  assert(unsigned(index) < MaxNumValueWitnesses);
   auto &ty = ValueWitnessTys[unsigned(index)];
   if (ty) return ty;
 
-  ty = createWitnessFunctionType(*this, index)->getPointerTo(0);
+  ty = createWitnessType(*this, index);
   return ty;
 }
 
@@ -179,6 +226,16 @@ static StringRef getValueWitnessLabel(ValueWitness index) {
     return "flags";
   case ValueWitness::Stride:
     return "stride";
+  case ValueWitness::StoreExtraInhabitant:
+    return "storeExtraInhabitant";
+  case ValueWitness::GetExtraInhabitantIndex:
+    return "getExtraInhabitantIndex";
+  case ValueWitness::ExtraInhabitantFlags:
+    return "extraInhabitantFlags";
+  case ValueWitness::GetUnionTag:
+    return "getUnionTag";
+  case ValueWitness::InplaceProjectUnionData:
+    return "inplaceProjectUnionData";
   }
   llvm_unreachable("bad value witness index");
 }
