@@ -22,27 +22,14 @@ STATISTIC(NumInstructionsRemoved, "Number of unreachable instructions removed");
 /// \brief Perform a fast local check to see if the instruction is dead.
 ///
 /// This rutine only examines the state of the instruction at hand.
-/// \param checkUses - The flag that allows not to check if the instruction is
-///        used by others. This should be used when we already know that the
-//         instruction is not used or is only used by dead instructions.
-static bool isInstructionTriviallyDead(SILInstruction *I,
-                                       bool checkUses = true) {
-  if ((!I->use_empty() && checkUses) || isa<TermInst>(I))
+static bool isInstructionTriviallyDead(SILInstruction *I) {
+  if (!I->use_empty() || isa<TermInst>(I))
     return false;
 
   if (!I->mayHaveSideEffects())
     return true;
 
   return false;
-}
-
-/// \brief Check if the operand is only used by the given user.
-static bool isTheOnlyUser(ValueBase *Op, SILValue User) {
-  for (auto UseI = Op->use_begin(), UseE = Op->use_end(); UseI != UseE; ++UseI) {
-    if (UseI.getUser() != User.getDef())
-      return false;
-  }
-  return true;
 }
 
 /// \brief If the given instruction is dead, delete it along with its dead
@@ -61,17 +48,20 @@ static bool recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I) {
     I = DeadInsts.pop_back_val();
 
     // Check if any of the operands will become dead as well.
-    ArrayRef<Operand> Ops = I->getAllOperands();
+    MutableArrayRef<Operand> Ops = I->getAllOperands();
     for (auto OpI = Ops.begin(), OpE = Ops.end(); OpI != OpE; ++OpI) {
+      Operand &Op = *OpI;
+      SILValue OpVal = Op.get();
+
+      // Remove the reference from the instruction being deleted to this
+      // operand.
+      Op.drop();
 
       // If the operand is an instruction that is only used by the instruction
-      // being deleted, delete it in a future loop iteration.
-      SILValue OpVal = (*OpI).get();
-      if (!isTheOnlyUser(OpVal.getDef(), I))
-        continue;
-      if (SILInstruction *OpI = dyn_cast<SILInstruction>(OpVal))
-        if (isInstructionTriviallyDead(OpI, false))
-          DeadInsts.push_back(OpI);
+      // being deleted, delete it.
+      if (SILInstruction *OpValInst = dyn_cast<SILInstruction>(OpVal))
+        if (isInstructionTriviallyDead(OpValInst))
+          DeadInsts.push_back(OpValInst);
     }
 
     // This will remove this instruction and all its uses.
