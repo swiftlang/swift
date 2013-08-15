@@ -54,6 +54,10 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
                          DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet) {
+  // Avoid reprocessing functions needlessly
+  if (FullyInlinedSet.find(F) != FullyInlinedSet.end())
+    return true;
+  
   // Prevent attempt to circularly inline.
   if (CurrentInliningSet.contains(F)) {
     // This cannot happen on a top-level call, so AI should be non-null.
@@ -87,10 +91,8 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         if (!CalledFunc || CalledFunc->empty())
           continue;
 
-        // If we haven't fully processed this function yet, then recursively
-        // process it first before trying to inline it.
-        if (FullyInlinedSet.find(CalledFunc) == FullyInlinedSet.end() &&
-            !runOnFunctionRecursively(CalledFunc, InnerAI, FullyInlinedSet,
+        // Then recursively process it first before trying to inline it.
+        if (!runOnFunctionRecursively(CalledFunc, InnerAI, FullyInlinedSet,
                                       SetFactory, CurrentInliningSet)) {
           // If we failed due to circular inlining, then emit some notes to
           // trace back the failure if we have more information.
