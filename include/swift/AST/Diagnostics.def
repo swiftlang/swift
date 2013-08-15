@@ -561,6 +561,8 @@ ERROR(expected_expr_return,stmt_parsing,none,
 // If Statement
 ERROR(expected_expr_if,stmt_parsing,none,
       "expected expression in 'if' condition", ())
+ERROR(missing_condition_after_if,stmt_parsing,none,
+      "missing condition in an 'if' statement", ())
 ERROR(expected_lbrace_after_if,stmt_parsing,none,
       "expected '{' after 'if' condition", ())
 ERROR(expected_lbrace_after_else,stmt_parsing,none,
@@ -569,6 +571,8 @@ ERROR(expected_lbrace_after_else,stmt_parsing,none,
 // While Statement
 ERROR(expected_expr_while,stmt_parsing,none,
       "expected expression in 'while' condition", ())
+ERROR(missing_condition_after_while,stmt_parsing,none,
+      "missing condition in a 'while' statement", ())
 ERROR(expected_lbrace_after_while,stmt_parsing,none,
       "expected '{' after 'while' condition", ())
 
@@ -581,6 +585,9 @@ ERROR(expected_expr_do_while,stmt_parsing,none,
       "expected expression in 'do-while' condition", ())
 
 // C-Style For Stmt
+
+ERROR(missing_init_for_stmt,stmt_parsing,none,
+      "missing initialization in a 'for' statement", ())
 ERROR(expected_semi_for_stmt,stmt_parsing,none,
       "expected ';' in 'for' statement", ())
 ERROR(expected_cond_for_stmt,stmt_parsing,none,

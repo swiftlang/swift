@@ -423,12 +423,26 @@ NullablePtr<Stmt> Parser::parseStmtIf() {
   SourceLoc IfLoc = consumeToken(tok::kw_if);
 
   NullablePtr<Expr> Condition = parseExprBasic(diag::expected_expr_if);
-  if (Condition.isNull()) return 0;
-  NullablePtr<BraceStmt> NormalBody =
-    parseBraceItemList(diag::expected_lbrace_after_if);
+  if (Condition.isNull())
+    return nullptr; // FIXME: better recovery
+
+  NullablePtr<BraceStmt> NormalBody;
+  if (auto *CE = dyn_cast<PipeClosureExpr>(Condition.get())) {
+    // If we parsed closure after 'if', then it was not the condition, but the
+    // 'if' statement body.  We can not have a bare closure in an 'if'
+    // condition because closures don't conform to LogicValue.
+    auto ClosureBody = CE->getBody();
+    SourceLoc LBraceLoc = ClosureBody->getStartLoc();
+    NormalBody = ClosureBody;
+    Condition = new (Context) ErrorExpr(LBraceLoc);
+    diagnose(IfLoc, diag::missing_condition_after_if)
+        .highlight(SourceRange(IfLoc, LBraceLoc));
+  }
   if (NormalBody.isNull())
-    return 0;
-    
+    NormalBody = parseBraceItemList(diag::expected_lbrace_after_if);
+  if (NormalBody.isNull())
+    return nullptr; // FIXME: better recovery
+
   NullablePtr<Stmt> ElseBody;
   SourceLoc ElseLoc = Tok.getLoc();
   if (consumeIf(tok::kw_else)) {
@@ -455,12 +469,26 @@ NullablePtr<Stmt> Parser::parseStmtWhile() {
   SourceLoc WhileLoc = consumeToken(tok::kw_while);
   
   NullablePtr<Expr> Condition = parseExprBasic(diag::expected_expr_while);
-  if (Condition.isNull()) return 0;
-  NullablePtr<BraceStmt> Body =
-    parseBraceItemList(diag::expected_lbrace_after_while);
+  if (Condition.isNull())
+    return nullptr; // FIXME: better recovery
+
+  NullablePtr<BraceStmt> Body;
+  if (auto *CE = dyn_cast<PipeClosureExpr>(Condition.get())) {
+    // If we parsed a closure after 'while', then it was not the condition, but
+    // the 'while' statement body.  We can not have a bare closure in a 'while'
+    // condition because closures don't conform to LogicValue.
+    auto ClosureBody = CE->getBody();
+    SourceLoc LBraceLoc = ClosureBody->getStartLoc();
+    Body = ClosureBody;
+    Condition = new (Context) ErrorExpr(LBraceLoc);
+    diagnose(WhileLoc, diag::missing_condition_after_while)
+        .highlight(SourceRange(WhileLoc, LBraceLoc));
+  }
   if (Body.isNull())
-    return 0;
-  
+    Body = parseBraceItemList(diag::expected_lbrace_after_while);
+  if (Body.isNull())
+    return nullptr; // FIXME: better recovery
+
   // If our normal expression parsed correctly, build an AST.
   return new (Context) WhileStmt(WhileLoc, Condition.get(), Body.get());
 }
@@ -469,21 +497,44 @@ NullablePtr<Stmt> Parser::parseStmtWhile() {
 ///   stmt-do-while:
 ///     'do' stmt-brace 'while' expr
 NullablePtr<Stmt> Parser::parseStmtDoWhile() {
-  SourceLoc DoLoc = consumeToken(tok::kw_do), WhileLoc;
+  SourceLoc DoLoc = consumeToken(tok::kw_do);
 
   NullablePtr<BraceStmt> Body =
     parseBraceItemList(diag::expected_lbrace_after_do);
-  if (Body.isNull()) return 0;
+  if (Body.isNull())
+    return nullptr; // FIXME: better recovery
 
+  SourceLoc WhileLoc;
   if (parseToken(tok::kw_while, WhileLoc, diag::expected_while_in_dowhile))
-    return 0;
-  
+    return nullptr; // FIXME: better recovery
+
+  ParserPosition ConditionStartState;
+  if (Tok.is(tok::l_brace)) {
+    // It is unusual for the condition expression to start with a left brace,
+    // and we anticipate the need to do recovery.  Save the parser state so
+    // that we can rewind.
+    ConditionStartState = getParserPosition();
+  }
+
   NullablePtr<Expr> Condition = parseExpr(diag::expected_expr_do_while);
-  if (Condition.isNull()) return 0;
-  
+  if (Condition.isNull())
+    return nullptr; // FIXME: better recovery
+
+  if (auto *CE = dyn_cast<PipeClosureExpr>(Condition.get())) {
+    // If we parsed a closure after 'do ... while', then it was not the
+    // condition, but a beginning of the next statement.  We can not have a
+    // bare closure in a 'do ... while' condition because closures don't
+    // conform to LogicValue.
+    SourceLoc LBraceLoc = CE->getBody()->getStartLoc();
+    Condition = new (Context) ErrorExpr(LBraceLoc);
+    diagnose(WhileLoc, diag::missing_condition_after_while);
+
+    // We did not actually want to parse the next statement.
+    backtrackToPosition(ConditionStartState);
+  }
+
   return new (Context) DoWhileStmt(DoLoc, Condition.get(), WhileLoc, Body.get());
 }
-
 
 NullablePtr<Stmt> Parser::parseStmtFor() {
   SourceLoc ForLoc = consumeToken(tok::kw_for);
@@ -505,22 +556,21 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
 
   // If we have a leading identifier followed by a ':' or 'in', then this is a
   // pattern, so it is foreach.
-  if (isStartOfBindingName(Tok) &&
-      (peekToken().is(tok::colon) || peekToken().is(tok::kw_in)))
+  //
+  // For error recovery, also parse "for in ..." as foreach.
+  if ((isStartOfBindingName(Tok) &&
+       (peekToken().is(tok::colon) || peekToken().is(tok::kw_in))) ||
+      Tok.is(tok::kw_in))
     return parseStmtForEach(ForLoc);
 
   // Otherwise, this is some sort of c-style for loop.
   return parseStmtForCStyle(ForLoc);
 }
 
-static bool parseExprForCStyle(Parser &P, Parser::ExprStmtOrDecl &Result,
-                               bool usesExprBasic = false) {
-  NullablePtr<Expr> ResultExpr = P.parseExpr(diag::expected_expr, usesExprBasic);
-  if (ResultExpr.isNull())
-    return true;
-  
-  Result = ResultExpr.get();
-  return false;
+static bool parseExprForCStyle(Parser &P, NullablePtr<Expr> &Result,
+                               bool UsesExprBasic = false) {
+  Result = P.parseExpr(diag::expected_expr, UsesExprBasic);
+  return Result.isNull();
 }
 
 ///   stmt-for-c-style:
@@ -534,10 +584,10 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   SourceLoc LPLoc, RPLoc;
   bool LPLocConsumed = false;
 
-  ExprStmtOrDecl First;
+  NullablePtr<Expr> First;
   SmallVector<Decl*, 2> FirstDecls;
   NullablePtr<Expr> Second;
-  ExprStmtOrDecl Third;
+  NullablePtr<Expr> Third;
   NullablePtr<BraceStmt> Body;
   
   // Introduce a new scope to contain any var decls in the init value.
@@ -551,43 +601,106 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   if (Tok.is(tok::kw_var)) {
     if (parseDeclVar(false, FirstDecls)) return 0;
   } else if ((Tok.isNot(tok::semi) && parseExprForCStyle(*this, First)))
-    return 0;
+    return nullptr; // FIXME: better recovery
 
-  // Parse the rest of the statement.
+  ArrayRef<Decl *> FirstDeclsContext;
+  if (!FirstDecls.empty())
+    FirstDeclsContext = Context.AllocateCopy(FirstDecls);
+
+  if (Tok.isNot(tok::semi)) {
+    if (auto *CE = dyn_cast_or_null<PipeClosureExpr>(First.getPtrOrNull())) {
+      // We have seen:
+      //     for { ... }
+      // and there's no semicolon after that.
+      //
+      // We parsed the brace statement as a closure.  Recover by using the
+      // brace statement as a 'for' body.
+      auto ClosureBody = CE->getBody();
+      SourceLoc LBraceLoc = ClosureBody->getStartLoc();
+      First = new (Context) ErrorExpr(LBraceLoc);
+      Second = nullptr;
+      Third = nullptr;
+      Body = ClosureBody;
+      diagnose(ForLoc, diag::missing_init_for_stmt)
+          .highlight(SourceRange(ForLoc, LBraceLoc));
+
+      return new (Context) ForStmt(ForLoc, First.getPtrOrNull(),
+                                   FirstDeclsContext,
+                                   Semi1Loc, Second,
+                                   Semi2Loc, Third.getPtrOrNull(),
+                                   Body.get());
+    }
+  }
+
+  // Consume the first semicolon.
   if (parseToken(tok::semi, Semi1Loc, diag::expected_semi_for_stmt))
-    return 0;
+    return nullptr; // FIXME: better recovery
 
-  if ((Tok.isNot(tok::semi) && Tok.isNot(tok::l_brace) &&
-        (Second = parseExpr(diag::expected_cond_for_stmt)).isNull()) ||
-      parseToken(tok::semi, Semi2Loc, diag::expected_semi_for_stmt) ||
-      (Tok.isNot(tok::l_brace) && parseExprForCStyle(*this, Third, true)))
-    return 0;
+  if (Tok.isNot(tok::semi) &&
+      (Second = parseExpr(diag::expected_cond_for_stmt)).isNull())
+    return nullptr; // FIXME: better recovery
+
+  if (Tok.isNot(tok::semi)) {
+    Expr *RecoveredCondition = nullptr;
+    BraceStmt *RecoveredBody = nullptr;
+    if (auto *CE = dyn_cast<PipeClosureExpr>(Second.get())) {
+      // We have seen:
+      //     for ... ; { ... }
+      // and there's no semicolon after that.
+      //
+      // We parsed the brace statement as a closure.  Recover by using the
+      // brace statement as a 'for' body.
+      RecoveredCondition = nullptr;
+      RecoveredBody = CE->getBody();
+    }
+    if (auto *CE = dyn_cast<CallExpr>(Second.get())) {
+      if (auto *PE = dyn_cast<ParenExpr>(CE->getArg())) {
+        if (PE->hasTrailingClosure()) {
+          // We have seen:
+          //     for ... ; ... { ... }
+          // and there's no semicolon after that.
+          //
+          // We parsed the condition as a CallExpr with a brace statement as a
+          // trailing closure.  Recover by using the original expression as the
+          // condition and brace statement as a 'for' body.
+          RecoveredBody = cast<PipeClosureExpr>(PE->getSubExpr())->getBody();
+          RecoveredCondition = CE->getFn();
+        }
+      }
+    }
+    if (RecoveredBody) {
+      SourceLoc LBraceLoc = RecoveredBody->getStartLoc();
+      Second = RecoveredCondition;
+      Third = nullptr;
+      Body = RecoveredBody;
+      diagnose(LBraceLoc, diag::expected_semi_for_stmt)
+          .highlight(SourceRange(ForLoc, LBraceLoc));
+
+      return new (Context) ForStmt(ForLoc, First.getPtrOrNull(),
+                                   FirstDeclsContext,
+                                   Semi1Loc, Second,
+                                   Semi2Loc, Third.getPtrOrNull(),
+                                   Body.get());
+    }
+  }
+
+  // Consume the second semicolon.
+  if (parseToken(tok::semi, Semi2Loc, diag::expected_semi_for_stmt))
+    return nullptr; // FIXME: better recovery
+
+  if (Tok.isNot(tok::l_brace) && parseExprForCStyle(*this, Third, true))
+    return nullptr; // FIXME: better recovery
 
   if (LPLocConsumed && parseMatchingToken(tok::r_paren, RPLoc,
                                           diag::expected_rparen_for_stmt,LPLoc))
-    return 0;
+    return nullptr; // FIXME: better recovery
 
   if ((Body = parseBraceItemList(diag::expected_lbrace_after_for)).isNull())
-    return 0;
+    return nullptr; // FIXME: better recovery
 
-  Expr *Initializer, *Increment;
-  if (First.isNull())
-    Initializer = nullptr;
-  else
-    Initializer = First.get<Expr*>();
-
-  if (Third.isNull())
-    Increment = nullptr;
-  else
-    Increment = Third.get<Expr*>();
-
-  ArrayRef<Decl*> FirstDeclsContext;
-  if (!FirstDecls.empty())
-    FirstDeclsContext = Context.AllocateCopy(FirstDecls);
-  
-  return new (Context) ForStmt(ForLoc, Initializer, FirstDeclsContext,
+  return new (Context) ForStmt(ForLoc, First.getPtrOrNull(), FirstDeclsContext,
                                Semi1Loc, Second,
-                               Semi2Loc, Increment, Body.get());
+                               Semi2Loc, Third.getPtrOrNull(), Body.get());
 }
 
 /// 
@@ -595,34 +708,55 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 ///     'for' pattern 'in' expr-basic stmt-brace
 NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   NullablePtr<Pattern> Pattern = parsePattern();
+  if (Pattern.isNull())
+    // Recover by creating a "_" pattern.
+    Pattern = new (Context) AnyPattern(SourceLoc());
 
-  if (!Tok.is(tok::kw_in)) {
-    if (Pattern.isNonNull())
-      diagnose(Tok.getLoc(), diag::expected_foreach_in);
-    return nullptr;
+  SourceLoc InLoc;
+  parseToken(tok::kw_in, InLoc, diag::expected_foreach_in);
+
+  ParserPosition ContainerStartState;
+  if (Tok.is(tok::l_brace)) {
+    // It is unusual for the container expression to start with a left brace,
+    // and we anticipate the need to do recovery.  Save the parser state so
+    // that we can rewind.
+    ContainerStartState = getParserPosition();
   }
-  SourceLoc InLoc = consumeToken();
-  
-  // expr
-  NullablePtr<Expr> Container
-    = parseExprBasic(diag::expected_foreach_container);
+
+  NullablePtr<Expr> Container =
+      parseExprBasic(diag::expected_foreach_container);
+  if (Container.isNull())
+    Container = new (Context) ErrorExpr(Tok.getLoc());
+
+  if (auto *CE = dyn_cast<PipeClosureExpr>(Container.get())) {
+    diagnose(CE->getStartLoc(), diag::expected_foreach_container);
+
+    // If the container expression turns out to be a closure, then it was not
+    // the container expression, but the 'for' statement body.  We can not have
+    // a bare closure as a container expression because closures don't conform
+    // to Enumerable.
+    Container = new (Context) ErrorExpr(CE->getStartLoc());
+
+    // Backtrack to the '{' so that we can re-parse the body in the correct
+    // lexical scope.
+    backtrackToPosition(ContainerStartState);
+  }
 
   // Introduce a new scope and place the variables in the pattern into that
   // scope.
   // FIXME: We may want to merge this scope with the scope introduced by
   // the stmt-brace, as in C++.
   Scope S(this, ScopeKind::ForeachVars);
-  if (Pattern.isNonNull()) {
-    SmallVector<Decl *, 2> Decls;
-    DeclAttributes Attributes;
-    addVarsToScope(Pattern.get(), Decls, Attributes);
-  }
+  SmallVector<Decl *, 2> Decls;
+  DeclAttributes Attributes;
+  addVarsToScope(Pattern.get(), Decls, Attributes);
+
   // stmt-brace
   NullablePtr<BraceStmt> Body =
-    parseBraceItemList(diag::expected_foreach_lbrace);
-  
-  if (Pattern.isNull() || Container.isNull() || Body.isNull())
-    return nullptr;
+      parseBraceItemList(diag::expected_foreach_lbrace);
+
+  if (Body.isNull())
+    return nullptr; // FIXME: better recovery
 
   return new (Context) ForEachStmt(ForLoc, Pattern.get(), InLoc,
                                    Container.get(), Body.get());
