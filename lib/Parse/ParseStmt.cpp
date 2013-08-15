@@ -213,13 +213,11 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       }
       if (FailedToParse)
         NeedParseErrorRecovery = true;
-      else {
-        for (Decl *D : TmpDecls)
-          Entries.push_back(D);
-        if (!TmpDecls.empty())
-          previousHadSemi = TmpDecls.back()->TrailingSemiLoc.isValid();
-      }
 
+      for (Decl *D : TmpDecls)
+        Entries.push_back(D);
+      if (!TmpDecls.empty())
+        previousHadSemi = TmpDecls.back()->TrailingSemiLoc.isValid();
       TmpDecls.clear();
     } else if (IsTopLevel && allowTopLevelCode()) {
       // If this is a statement or expression at the top level of the module,

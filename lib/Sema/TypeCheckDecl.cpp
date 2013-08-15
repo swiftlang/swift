@@ -799,6 +799,7 @@ public:
         }
       }
     }
+    assert(thisDecl && "no This decl?");
 
     // Build archetypes for this protocol.
     ArchetypeBuilder builder = createArchetypeBuilder();

@@ -702,6 +702,13 @@ namespace {
       }
     }
 
+    void verifyParsed(UnionElementDecl *UED) {
+      if (!isa<UnionDecl>(UED->getDeclContext())) {
+        Out << "UnionElementDecl has wrong DeclContext";
+        abort();
+      }
+    }
+
     /// Look through a possible l-value type, returning true if it was
     /// an l-value.
     bool lookThroughLValue(Type &type, LValueType::Qual &qs) {

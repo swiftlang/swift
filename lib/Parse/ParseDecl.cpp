@@ -1280,8 +1280,6 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
     return true;
   }
 
-  if (isInvalid) return true;
-
   // If this is a var in the top-level of script/repl translation unit, then
   // wrap the PatternBindingDecls in TopLevelCodeDecls, since they represent
   // executable code.
@@ -1597,8 +1595,10 @@ bool Parser::parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   }
 
   SourceLoc LBLoc, RBLoc;
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_union_type))
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_union_type)) {
+    OOD->setMembers({}, Tok.getLoc());
     return true;
+  }
 
   bool Invalid = false;
   // Parse the body.
@@ -1679,17 +1679,18 @@ bool Parser::parseDeclUnionElement(unsigned Flags,
     return true;
   }
   
-  // Add the element.
+  // Create the element.
   auto *result = new (Context) UnionElementDecl(CaseLoc, NameLoc, Name,
                                                 ArgType, ArrowLoc, ResultType,
                                                 CurDeclContext);
-  Decls.push_back(result);
-  
   if (!(Flags & PD_AllowUnionElement)) {
     diagnose(CaseLoc, diag::disallowed_union_element);
     return true;
   }
-  
+  // Don't add the UnionElementDecl to a DeclContext unless it is allowed to
+  // have a UnionElementDecl in that context.
+  Decls.push_back(result);
+
   return false;
 }
 
@@ -1777,8 +1778,10 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   }
 
   SourceLoc LBLoc, RBLoc;
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
+    SD->setMembers({}, Tok.getLoc());
     return true;
+  }
 
   bool Invalid = false;
 
@@ -1857,8 +1860,10 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   }
 
   // Parse the class body.
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class))
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
+    CD->setMembers({}, Tok.getLoc());
     return true;
+  }
 
   bool Invalid = false;
 
@@ -1945,13 +1950,9 @@ Decl *Parser::parseDeclProtocol(unsigned Flags) {
   ContextChange CC(*this, Proto);
   Scope ProtocolBodyScope(this, ScopeKind::ProtocolBody);
 
+  // Parse the body.
   {
-    // Parse the body.
-    SourceLoc LBraceLoc = Tok.getLoc();
-    if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type))
-      return nullptr;
-    
-    // Parse the list of protocol elements.
+    // The list of protocol elements.
     SmallVector<Decl*, 8> Members;
 
     // Add the implicit 'This' associated type.
@@ -1961,6 +1962,12 @@ Decl *Parser::parseDeclProtocol(unsigned Flags) {
                                                   ProtocolLoc, TypeLoc(),
                                                   CurDeclContext,
                                                   MutableArrayRef<TypeLoc>()));
+
+    SourceLoc LBraceLoc = Tok.getLoc();
+    if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type)) {
+      Proto->setMembers(Context.AllocateCopy(Members), Tok.getLoc());
+      return Proto;
+    }
 
     SourceLoc RBraceLoc;
     // Parse the members.
