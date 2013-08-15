@@ -1590,6 +1590,9 @@ ERROR(variable_escape_before_initialized,sil_analysis,none,
 ERROR(variable_initialized_on_some_paths,sil_analysis,none,
       "variable '%0' inconsistently initialized on paths to this assignment",
       (StringRef))
+ERROR(struct_not_fully_initialized,sil_analysis,none,
+      "struct '%0' must be completely initialized before a member is stored to",
+      (StringRef))
 
 // Control flow diagnostics.
 ERROR(arithmetic_operation_overflow,sil_analysis,none,

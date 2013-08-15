@@ -216,11 +216,14 @@ static void RemoveDeadAddressingInstructions(SILValue Pointer) {
 
 namespace {
   enum UseKind {
-    // The instruction is a LoadInst.
+    // The instruction is a Load.
     Load,
 
-    // The instruction is a StoreInst.
+    // The instruction is a Store.
     Store,
+
+    // The instruction is a store to a member of a larger struct value.
+    PartialStore,
 
     /// The instruction is an Apply, this is a byref or indirect return.
     ByrefUse,
@@ -281,7 +284,7 @@ namespace {
     
   private:
     void handleLoadUse(SILInstruction *Inst);
-    void handleStoreUse(SILInstruction *Inst);
+    void handleStoreUse(SILInstruction *Inst, bool isPartialStore);
     void handleByrefUse(SILInstruction *Inst);
     void handleEscape(SILInstruction *Inst);
 
@@ -317,6 +320,7 @@ ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox,
       BBInfo.EscapeInfo = EscapeKind::Yes;
       BBInfo.HasNonLoadUse = true;
     } else if (Use.second == UseKind::Store ||
+               Use.second == UseKind::PartialStore ||
                Use.second == UseKind::ByrefUse) {
       // Keep track of which blocks have local stores.  This makes scanning for
       // assignments cheaper later.
@@ -361,10 +365,11 @@ void ElementPromotion::doIt() {
   // performing other tasks.
   for (auto Use : Uses) {
     switch (Use.second) {
-    case UseKind::Load:     handleLoadUse(Use.first); break;
-    case UseKind::Store:    handleStoreUse(Use.first); break;
-    case UseKind::ByrefUse: handleByrefUse(Use.first); break;
-    case UseKind::Escape:   handleEscape(Use.first); break;
+    case UseKind::Load:         handleLoadUse(Use.first); break;
+    case UseKind::Store:        handleStoreUse(Use.first, false); break;
+    case UseKind::PartialStore: handleStoreUse(Use.first, true); break;
+    case UseKind::ByrefUse:     handleByrefUse(Use.first); break;
+    case UseKind::Escape:       handleEscape(Use.first); break;
     // FIXME: Boxes may not be completely constructed by the time they are
     // destroyed.  We need to handle destroying partially constructed boxes.
     }
@@ -437,26 +442,28 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
 
 
 
-void ElementPromotion::handleStoreUse(SILInstruction *Inst) {
-  // Generally, we don't need to do anything for stores, since this analysis is
-  // use-driven.  However, we *do* need to decide if "assignments" are stores,
-  // initializations, or ambiguous and then rewrite them.  As such, we look at
-  // AssignInst and "assignment" CopyAddr's.  We ignore initialize copy_addrs,
-  // relying on SILGen to only produce them when known correct.
-  if (isa<AssignInst>(Inst))
-    ;
-  else if (auto CA = dyn_cast<CopyAddrInst>(Inst)) {
-    if (CA->isInitializationOfDest()) return;
-  } else if (auto SW = dyn_cast<StoreWeakInst>(Inst)) {
-    if (SW->isInitializationOfDest()) return;
-  } else {
-    return;
+void ElementPromotion::handleStoreUse(SILInstruction *Inst,
+                                      bool isPartialStore) {
+
+  // We assume that SILGen knows what it is doing when it produces
+  // initializations of variables, because it only produces them when it knows
+  // they are correct, and this is a super common case for "var x = 4" cases.
+  if (!isPartialStore) {
+    if (isa<AssignInst>(Inst))
+      ;
+    else if (auto CA = dyn_cast<CopyAddrInst>(Inst)) {
+      if (CA->isInitializationOfDest()) return;
+    } else if (auto SW = dyn_cast<StoreWeakInst>(Inst)) {
+      if (SW->isInitializationOfDest()) return;
+    } else {
+      return;
+    }
   }
 
   SILType StoredType = Inst->getOperand(0).getType();
 
   bool HasTrivialType = false;
-  if (isa<AssignInst>(Inst))
+  if (isa<AssignInst>(Inst)|| isa<StoreInst>(Inst))
     HasTrivialType = Inst->getModule()->
       Types.getTypeLowering(StoredType).isTrivial();
 
@@ -464,10 +471,23 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst) {
   // has non-trivial type, then we're interested in using any live-in value that
   // is available.
   SILValue IncomingVal;
-  auto DI = checkDefinitelyInit(Inst, HasTrivialType ? nullptr : &IncomingVal);
+  auto DI = checkDefinitelyInit(Inst,
+                                (HasTrivialType || isPartialStore)
+                                         ? nullptr : &IncomingVal);
+
+  // If this is a partial store into a struct and the whole struct hasn't been
+  // initialized, diagnose this as an error.
+  if (isPartialStore && DI != DI_Yes) {
+    diagnoseInitError(Inst, diag::struct_not_fully_initialized);
+    return;
+  }
 
   // If it is initialized on some paths, but not others, then we have an
   // inconsistent initialization error.
+  //
+  // FIXME: This needs to be supported through the introduction of a boolean
+  // control path, or (for reference types as an important special case) a store
+  // of zero at the definition point.
   if (DI == DI_Partial) {
     diagnoseInitError(Inst, diag::variable_initialized_on_some_paths);
     return;
@@ -484,16 +504,17 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst) {
     return;
   }
 
-  assert(isa<AssignInst>(Inst));
+  // Other stores (e.g. initialize_var) don't need further processing.
+  if (!isa<AssignInst>(Inst))
+    return;
 
   ++NumAssignRewritten;
   SILBuilder B(Inst);
 
   // "unowned" assignments are expanded to unowned operations.
   bool isOwned = true;
-  if (auto *RST = StoredType.getSwiftRValueType()->getAs<ReferenceStorageType>())
+  if (auto *RST =StoredType.getSwiftRValueType()->getAs<ReferenceStorageType>())
     isOwned = RST->getOwnership() != Ownership::Unowned;
-
 
   // Otherwise, if it has trivial type, we can always just replace the
   // assignment with a store.  If it has non-trivial type and is an
@@ -735,15 +756,20 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
         assert(!isa<StoreWeakInst>(User) &&
                "Can't weak store a struct or tuple");
         UsesToScalarize.push_back(User);
-      } else
-        Uses[BaseElt].push_back({ User, UseKind::Store });
+      } else {
+        auto Kind = InStructSubElement ? UseKind::PartialStore : UseKind::Store;
+        Uses[BaseElt].push_back({ User, Kind });
+      }
       continue;
     }
 
     if (isa<CopyAddrInst>(User)) {
+      // FIXME: Scalarize these.
+
       // If this is the source of the copy_addr, then this is a load.  If it is
       // the destination, then this is a store.
-      auto Kind = UI->getOperandNumber() == 0 ? UseKind::Load : UseKind::Store;
+      auto Kind = InStructSubElement ? UseKind::PartialStore : UseKind::Store;
+      if (UI->getOperandNumber() == 0) Kind = UseKind::Load;
       addElementUses(BaseElt, PointeeType, User, Kind);
       continue;
     }
@@ -751,7 +777,9 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     // Initializations are definitions of the whole thing.  This is currently
     // used in constructors and should go away someday.
     if (isa<InitializeVarInst>(User)) {
-      addElementUses(BaseElt, PointeeType, User, UseKind::Store);
+      // FIXME: Scalarize these. ??
+      auto Kind = InStructSubElement ? UseKind::PartialStore : UseKind::Store;
+      addElementUses(BaseElt, PointeeType, User, Kind);
       continue;
     }
 
@@ -769,6 +797,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
 
       // If this is an indirect return slot, it is a store.
       if (ArgumentNumber == 0 && FTI->hasIndirectReturn()) {
+        assert(!InStructSubElement && "We're initializing sub-members?");
         addElementUses(BaseElt, PointeeType, User, UseKind::Store);
         continue;
       }
