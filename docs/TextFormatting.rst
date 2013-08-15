@@ -73,10 +73,10 @@ The simple extension story for beginners is as follows:
 
   and it will have the same printed representation you see in the
   interpreter (REPL). To customize the representation, give your type
-  a ``func formatForPrinting()`` that returns a ``String``::
+  a ``func format()`` that returns a ``String``::
 
     extension Person : Printable {
-      func formatForPrinting() -> String {
+      func format() -> String {
         return "\(lastName), \(firstName)"
       }
     }
@@ -88,9 +88,11 @@ Formatting Variants
 -------------------
 
 ``Printable`` types with parameterized textual representations
-(e.g. number types) support a ``format(…)`` method, [#format]_
+(e.g. number types) *additionally* support a ``format(…)`` method
 parameterized according to that type's axes of variability::
 
+  print( offset )
+  print( offset.format() ) // equivalent to previous line
   print( offset.format(radix: 16, width: 5, precision: 3) )
 
 Although ``format(…)`` is intended to provide the most general
@@ -158,11 +160,11 @@ directly to the ``OutputStream`` for efficiency reasons,
 
 The ``Printable`` protocol provides a "pretty" textual representation
 that can be distinct from the debug format. For example, when ``s``
-is a ``String``, ``s.formatForPrinting()`` returns the string itself,
+is a ``String``, ``s.format()`` returns the string itself,
 without quoting.
 
 Conformance to ``Printable`` is explicit, but if you want to use the
-``formatForDebugging()`` results for your type's ``formatForPrinting()``, all you
+``formatForDebugging()`` results for your type's ``format()``, all you
 need to do is declare conformance to ``Printable``; there's nothing to
 implement::
 
@@ -174,7 +176,7 @@ implement::
     ///
     /// In general you can return a String here, but if you need more
     /// control, return a custom Streamable type
-    func formatForPrinting() -> PrintRepresentation {
+    func format() -> PrintRepresentation {
       return formatForDebugging()
     }
 
@@ -183,7 +185,7 @@ implement::
     /// You'll never want to reimplement this
     func toString() -> String {
       var result: String
-      this.formatForPrinting().write(result)
+      this.format().write(result)
       return result
     }
   }
@@ -201,7 +203,7 @@ naturally ::
     func writeTo<T: OutputStream>(target: [byref] T)
 
     // You'll never want to reimplement this
-    func formatForPrinting() -> PrintRepresentation {
+    func format() -> PrintRepresentation {
       return this
     }
   }
@@ -238,7 +240,7 @@ Besides modeling ``OutputStream``, ``String`` also conforms to
       target.append(this) // Append yourself to the stream
     }
 
-    func formatForPrinting() -> String {
+    func format() -> String {
       return this
     }
   }
