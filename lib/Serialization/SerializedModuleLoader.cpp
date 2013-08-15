@@ -137,8 +137,8 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   }
   assert(inputFile);
   std::string DebugModuleName = inputFile->getBufferIdentifier();
-  
-  llvm::OwningPtr<ModuleFile> loadedModuleFile;
+
+  std::unique_ptr<ModuleFile> loadedModuleFile;
   ModuleStatus err = ModuleFile::load(std::move(inputFile), loadedModuleFile);
   switch (err) {
   case ModuleStatus::FallBackToTranslationUnit:
@@ -169,7 +169,8 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   if (loadedModuleFile) {
     bool success = loadedModuleFile->associateWithModule(module);
     if (success) {
-      LoadedModuleFiles.push_back(std::move(loadedModuleFile));
+      LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
+                                     Ctx.getCurrentGeneration());
     } else {
       assert(loadedModuleFile->getStatus() == ModuleStatus::MissingDependency);
 
@@ -260,3 +261,13 @@ SerializedModuleLoader::lookupVisibleDecls(const Module *module,
   
   moduleFile->lookupVisibleDecls(accessPath, consumer, lookupKind);
 }
+
+void SerializedModuleLoader::loadExtensions(NominalTypeDecl *nominal,
+                                            unsigned previousGeneration) {
+  for (auto &modulePair : LoadedModuleFiles) {
+    if (modulePair.second <= previousGeneration)
+      continue;
+    modulePair.first->loadExtensions(nominal);
+  }
+}
+

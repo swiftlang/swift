@@ -26,7 +26,9 @@ class SerializedModuleLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
 
-  std::vector<llvm::OwningPtr<ModuleFile>> LoadedModuleFiles;
+  /// A { module, generation # } pair.
+  using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
+  std::vector<LoadedModulePair> LoadedModuleFiles;
 
   explicit SerializedModuleLoader(ASTContext &ctx);
 
@@ -89,6 +91,9 @@ public:
                                   Module::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) override;
+
+  virtual void loadExtensions(NominalTypeDecl *nominal,
+                              unsigned previousGeneration) override;
 };
 
 } // end namespace swift

@@ -18,6 +18,7 @@
 #ifndef SWIFT_SERIALIZATION_MODULEFORMAT_H
 #define SWIFT_SERIALIZATION_MODULEFORMAT_H
 
+#include "swift/AST/Decl.h"
 #include "swift/Serialization/BCRecordLayout.h"
 #include "llvm/Bitcode/BitCodes.h"
 
@@ -86,6 +87,20 @@ enum OperatorKind : uint8_t {
 };
 static_assert(sizeof(OperatorKind) <= sizeof(TypeID),
               "too many operator kinds");
+
+/// Translates an operator DeclKind to a fixity.
+static inline OperatorKind getRawStableFixity(DeclKind kind) {
+  switch (kind) {
+  case DeclKind::PrefixOperator:
+    return Prefix;
+  case DeclKind::PostfixOperator:
+    return Postfix;
+  case DeclKind::InfixOperator:
+    return Infix;
+  default:
+    llvm_unreachable("unknown operator fixity");
+  }
+}
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -218,7 +233,7 @@ namespace input_block {
 namespace decls_block {
   // These IDs must \em not be renumbered or reordered without incrementing
   // VERSION_MAJOR.
-  enum : uint8_t {
+  enum RecordKind : uint8_t {
     NAME_ALIAS_TYPE = 1,
     NOMINAL_TYPE,
     PAREN_TYPE,
@@ -730,7 +745,7 @@ namespace identifier_block {
 namespace index_block {
   // These IDs must \em not be renumbered or reordered without incrementing
   // VERSION_MAJOR.
-  enum {
+  enum RecordKind {
     TYPE_OFFSETS = 1,
     DECL_OFFSETS,
     IDENTIFIER_OFFSETS,
@@ -745,7 +760,8 @@ namespace index_block {
 
   using DeclListLayout = BCGenericRecordLayout<
     BCFixed<3>,  // record ID
-    BCArray<DeclIDField>
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from identifier strings to decl kinds / decl IDs
   >;
 }
 

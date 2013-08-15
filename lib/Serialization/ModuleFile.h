@@ -33,6 +33,12 @@ namespace llvm {
   class MemoryBuffer;
 }
 
+// This template should eventually move to llvm/Support.
+namespace clang {
+  template <typename Info>
+  class OnDiskChainedHashTable;
+}
+
 namespace swift {
 class Pattern;
 class ProtocolConformance;
@@ -163,28 +169,22 @@ private:
   /// Identifiers referenced by this module.
   std::vector<SerializedIdentifier> Identifiers;
 
-  /// All top-level decls in this module.
-  llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl *>> TopLevelDecls;
+private:
+  class DeclTableInfo;
+  using SerializedDeclTable = clang::OnDiskChainedHashTable<DeclTableInfo>;
 
-  /// An array of the top-level decl IDs.
-  // FIXME: We don't really want to deserialize all of these at once.
-  std::vector<serialization::DeclID> RawTopLevelIDs;
-
-  using OperatorKey = std::pair<Identifier, serialization::OperatorKind>;
-  friend struct llvm::DenseMapInfo<OperatorKey>;
-
-  /// All the operators in the module.
-  llvm::DenseMap<OperatorKey, OperatorDecl *> Operators;
-
-  /// An array of the top-level decl IDs.
-  // FIXME: We don't really want to deserialize all of these at once.
-  std::vector<serialization::DeclID> RawOperatorIDs;
+public:
+  std::unique_ptr<SerializedDeclTable> TopLevelDecls;
+  std::unique_ptr<SerializedDeclTable> OperatorDecls;
 
   /// Whether this module file can be used.
   ModuleStatus Status;
 
   /// Constructs an new module and validates it.
   ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input);
+
+  // Out of line to avoid instantiation OnDiskChainedHashTable here.
+  ~ModuleFile();
 
   /// Convenience function for module loading.
   void error(ModuleStatus issue = ModuleStatus::Malformed) {
@@ -277,7 +277,7 @@ public:
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
   static ModuleStatus load(llvm::OwningPtr<llvm::MemoryBuffer> &&input,
-                           llvm::OwningPtr<ModuleFile> &module) {
+                           std::unique_ptr<ModuleFile> &module) {
     module.reset(new ModuleFile(std::move(input)));
     return module->getStatus();
   }
@@ -317,6 +317,11 @@ public:
   void lookupVisibleDecls(Module::AccessPathTy accessPath,
                           VisibleDeclConsumer &consumer,
                           NLKind lookupKind);
+
+  /// Loads extensions for the given decl.
+  ///
+  /// Note that this may cause other extensions to load as well.
+  void loadExtensions(NominalTypeDecl *nominal);
 };
 
 class SerializedModule : public LoadedModule {
@@ -336,26 +341,5 @@ public:
 };
 
 } // end namespace swift
-
-namespace llvm {
-  template<> struct DenseMapInfo<swift::ModuleFile::OperatorKey> {
-    using OperatorKey = swift::ModuleFile::OperatorKey;
-    using Identifier = swift::Identifier;
-    
-    static OperatorKey getEmptyKey() {
-      return OperatorKey(Identifier(), swift::serialization::Prefix);
-    }
-    static OperatorKey getTombstoneKey() {
-      return OperatorKey(Identifier(), swift::serialization::Postfix);
-    }
-    static unsigned getHashValue(OperatorKey Val) {
-      using RawPair = std::pair<Identifier, unsigned>;
-      return DenseMapInfo<RawPair>::getHashValue(RawPair(Val));
-    }
-    static bool isEqual(OperatorKey LHS, OperatorKey RHS) {
-      return LHS == RHS;
-    }
-  };
-}
 
 #endif

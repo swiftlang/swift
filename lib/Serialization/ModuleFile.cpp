@@ -15,8 +15,14 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Serialization/BCReadingExtras.h"
+
+// This is a template-only header; eventually it should move to llvm/Support.
+#include "clang/Basic/OnDiskHashTable.h"
+
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <functional>
 
@@ -1936,6 +1942,52 @@ Type ModuleFile::getType(TypeID TID) {
   return typeOrOffset;
 }
 
+/// Used to deserialize entries in the on-disk decl hash table.
+class ModuleFile::DeclTableInfo {
+public:
+  using internal_key_type = StringRef;
+  using external_key_type = Identifier;
+  using data_type = SmallVector<std::pair<uint8_t, DeclID>, 8>;
+
+  internal_key_type GetInternalKey(external_key_type ID) {
+    return ID.str();
+  }
+
+  uint32_t ComputeHash(internal_key_type key) {
+    return llvm::HashString(key);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    using namespace clang::io;
+    unsigned keyLength = ReadUnalignedLE16(data);
+    unsigned dataLength = ReadUnalignedLE16(data);
+    return { keyLength, dataLength };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    return StringRef(reinterpret_cast<const char *>(data), length);
+  }
+
+  static data_type ReadData(internal_key_type key, const uint8_t *data,
+                            unsigned length) {
+    using namespace clang::io;
+
+    data_type result;
+    while (length > 0) {
+      uint8_t kind = *data++;
+      DeclID offset = ReadUnalignedLE32(data);
+      result.push_back({ kind, offset });
+      length -= 5;
+    }
+
+    return result;
+  }
+};
+
 ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
   : ModuleContext(nullptr),
     InputFile(std::move(input)),
@@ -2085,14 +2137,22 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
           assert(blobData.empty());
           Identifiers.assign(scratch.begin(), scratch.end());
           break;
-        case index_block::TOP_LEVEL_DECLS:
-          assert(blobData.empty());
-          RawTopLevelIDs.assign(scratch.begin(), scratch.end());
+        case index_block::TOP_LEVEL_DECLS: {
+          uint32_t tableOffset;
+          index_block::DeclListLayout::readRecord(scratch, tableOffset);
+          auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+          TopLevelDecls.reset(SerializedDeclTable::Create(base + tableOffset,
+                                                          base));
           break;
-        case index_block::OPERATORS:
-          assert(blobData.empty());
-          RawOperatorIDs.assign(scratch.begin(), scratch.end());
+        }
+        case index_block::OPERATORS: {
+          uint32_t tableOffset;
+          index_block::DeclListLayout::readRecord(scratch, tableOffset);
+          auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+          OperatorDecls.reset(SerializedDeclTable::Create(base + tableOffset,
+                                                          base));
           break;
+        }
         default:
           // Unknown index kind, which this version of the compiler won't use.
           break;
@@ -2165,58 +2225,42 @@ bool ModuleFile::associateWithModule(Module *module) {
     return false;
   }
 
-
-  // FIXME: The only reason we're deserializing eagerly is to force extensions
-  // to load, which they shouldn't yet anyway.
-  buildTopLevelDeclMap();
   return Status == ModuleStatus::Valid;
 }
 
-void ModuleFile::buildTopLevelDeclMap() {
-  // FIXME: be more lazy about deserialization by encoding this some other way.
-  for (DeclID ID : RawTopLevelIDs) {
-    // FIXME: Right now ExtensionDecls are in here as well.
-    if (auto value = dyn_cast<ValueDecl>(getDecl(ID)))
-      TopLevelDecls[value->getName()].push_back(value);
-  }
-
-  RawTopLevelIDs.clear();
-}
+// This is here so that other clients don't 
+ModuleFile::~ModuleFile() = default;
 
 void ModuleFile::lookupValue(Identifier name,
                              SmallVectorImpl<ValueDecl*> &results) {
-  auto iter = TopLevelDecls.find(name);
-  if (iter == TopLevelDecls.end())
+  auto iter = TopLevelDecls->find(name);
+  if (iter == TopLevelDecls->end())
     return;
 
-  results.append(iter->second.begin(), iter->second.end());
-}
-
-OperatorKind getOperatorKind(DeclKind kind) {
-  switch (kind) {
-  case DeclKind::PrefixOperator:
-    return Prefix;
-  case DeclKind::PostfixOperator:
-    return Postfix;
-  case DeclKind::InfixOperator:
-    return Infix;
-  default:
-    llvm_unreachable("unknown operator fixity");
+  for (auto item : *iter) {
+    // FIXME: Once extensions are removed from the top-level decls, this can
+    // be a cast<>.
+    if (auto VD = dyn_cast<ValueDecl>(getDecl(item.second))) {
+      // Force load our own extensions, which may contain conformances.
+      if (auto TD = dyn_cast<TypeDecl>(VD))
+        if (auto nominal = TD->getDeclaredType()->getAnyNominal())
+          loadExtensions(nominal);
+      results.push_back(VD);
+    }
   }
 }
 
 OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
-  if (!RawOperatorIDs.empty()) {
-    for (DeclID ID : RawOperatorIDs) {
-      auto op = cast<OperatorDecl>(getDecl(ID));
-      OperatorKey key(op->getName(), getOperatorKind(op->getKind()));
-      Operators[key] = op;
-    }
+  auto iter = OperatorDecls->find(name);
+  if (iter == OperatorDecls->end())
+    return nullptr;
 
-    RawOperatorIDs = {};
+  for (auto item : *iter) {
+    if (getRawStableFixity(fixity) == item.first)
+      return cast<OperatorDecl>(getDecl(item.second));
   }
 
-  return Operators.lookup(OperatorKey(name, getOperatorKind(fixity)));
+  return nullptr;
 }
 
 void ModuleFile::getReexportedModules(
@@ -2235,17 +2279,40 @@ void ModuleFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
   if (!accessPath.empty()) {
-    auto I = TopLevelDecls.find(accessPath.front().first);
-    if (I == TopLevelDecls.end()) return;
+    auto iter = TopLevelDecls->find(accessPath.front().first);
+    if (iter == TopLevelDecls->end())
+      return;
 
-    for (auto vd : I->second)
-      consumer.foundDecl(vd);
-    return;
+    for (auto item : *iter) {
+      // FIXME: Once extensions are removed from the top-level decls, this can
+      // be a cast<>.
+      if (auto VD = dyn_cast<ValueDecl>(getDecl(item.second)))
+        consumer.foundDecl(VD);
+    }
   }
 
-  for (auto &topLevelEntry : TopLevelDecls) {
-    for (auto &value : topLevelEntry.second)
-      consumer.foundDecl(value);
+  for (auto entry : make_range(TopLevelDecls->data_begin(),
+                               TopLevelDecls->data_end())) {
+    for (auto item : entry) {
+      // FIXME: Once extensions are removed from the top-level decls, this can
+      // be a cast<>.
+      if (auto VD = dyn_cast<ValueDecl>(getDecl(item.second)))
+        consumer.foundDecl(VD);
+    }
+  }
+}
+
+void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
+  // FIXME: Need dedicated extension table.
+  auto iter = TopLevelDecls->find(nominal->getName());
+  if (iter == TopLevelDecls->end())
+    return;
+
+  for (auto item : *iter) {
+    // FIXME: Once extensions are removed from the top-level decls, this can
+    // be a cast<>.
+    if (item.first == decls_block::EXTENSION_DECL)
+      (void)getDecl(item.second);
   }
 }
 

@@ -17,6 +17,11 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Serialization/BCRecordLayout.h"
+
+// This is a template-only header; eventually it should move to llvm/Support.
+#include "clang/Basic/OnDiskHashTable.h"
+
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
@@ -27,6 +32,7 @@
 
 using namespace swift;
 using namespace swift::serialization;
+using clang::OnDiskChainedHashTableGenerator;
 
 namespace {
   typedef ArrayRef<unsigned> FileBufferIDs;
@@ -946,20 +952,7 @@ bool Serializer::writeCrossReference(const Decl *D) {
   } else if (auto op = dyn_cast<OperatorDecl>(D)) {
     kind = XRefKind::SwiftOperator;
     accessPath.push_back(addIdentifierRef(op->getName()));
-
-    switch (op->getKind()) {
-      case DeclKind::InfixOperator:
-        typeID = OperatorKind::Infix;
-        break;
-      case DeclKind::PrefixOperator:
-        typeID = OperatorKind::Prefix;
-        break;
-      case DeclKind::PostfixOperator:
-        typeID = OperatorKind::Postfix;
-        break;
-      default:
-        llvm_unreachable("unknown operator kind");
-    }
+    typeID = getRawStableFixity(op->getKind());
   } else {
     llvm_unreachable("cannot cross-reference this kind of decl");
   }
@@ -1810,22 +1803,127 @@ void Serializer::writeOffsets(const index_block::OffsetsLayout &Offsets,
   Offsets.emit(ScratchRecord, getOffsetRecordCode(values), values);
 }
 
+namespace {
+  /// Used to serialize the on-disk decl hash table.
+  class DeclTableInfo {
+  public:
+    using key_type = Identifier;
+    using key_type_ref = key_type;
+    using data_type = SmallVector<std::pair<uint8_t, DeclID>, 8>;
+    using data_type_ref = const data_type &;
+
+    uint32_t ComputeHash(key_type_ref key) {
+      assert(!key.empty());
+      return llvm::HashString(key.str());
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      using namespace clang::io;
+      uint32_t keyLength = key.str().size();
+      uint32_t dataLength = (sizeof(DeclID) + 1) * data.size();
+      Emit16(out, keyLength);
+      Emit16(out, dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      out << key.str();
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(sizeof(DeclID) <= 32, "DeclID too large");
+      using namespace clang::io;
+      for (auto entry : data) {
+        Emit8(out, entry.first);
+        Emit32(out, entry.second);
+      }
+    }
+  };
+}
+
+/// Returns the encoding kind for the given decl.
+///
+/// Note that this does not work for all encodable decls, only those designed
+/// to be stored in a hash table.
+static decls_block::RecordKind getDeclKind(const Decl *D) {
+  using namespace decls_block;
+
+  switch (D->getKind()) {
+  case DeclKind::TypeAlias:
+    return decls_block::TYPE_ALIAS_DECL;
+  case DeclKind::Union:
+    return decls_block::UNION_DECL;
+  case DeclKind::Struct:
+    return decls_block::STRUCT_DECL;
+  case DeclKind::Class:
+    return decls_block::CLASS_DECL;
+  case DeclKind::Protocol:
+    return decls_block::PROTOCOL_DECL;
+
+  case DeclKind::Func:
+    return decls_block::FUNC_DECL;
+  case DeclKind::Var:
+    return decls_block::VAR_DECL;
+
+  case DeclKind::Extension:
+    return decls_block::EXTENSION_DECL;
+
+  default:
+    llvm_unreachable("cannot store this kind of decl in a hash table");
+  }
+}
+
+/// The in-memory representation of what will eventually be an on-disk hash
+/// table.
+using DeclTable = llvm::DenseMap<Identifier, DeclTableInfo::data_type>;
+
+/// Writes an in-memory decl table to an on-disk representation, using the
+/// given layout.
+static void writeDeclTable(const index_block::DeclListLayout &DeclList,
+                           index_block::RecordKind kind,
+                           const DeclTable &table) {
+  SmallVector<uint64_t, 8> scratch;
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    OnDiskChainedHashTableGenerator<DeclTableInfo> generator;
+    for (auto &entry : table)
+      generator.insert(entry.first, entry.second);
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    clang::io::Emit32(blobStream, 0);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  DeclList.emit(scratch, kind, tableOffset, hashTableBlob);
+}
+
 void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
   assert(!this->TU && "already serializing a translation unit");
   this->TU = TU;
 
-  SmallVector<DeclID, 32> topLevelIDs;
-  SmallVector<DeclID, 8> operatorIDs;
+  DeclTable topLevelDecls;
+  DeclTable operatorDecls;
   for (auto D : TU->Decls) {
     if (isa<ImportDecl>(D))
       continue;
-    else if (isa<ValueDecl>(D))
-      topLevelIDs.push_back(addDeclRef(D));
-    else if (isa<ExtensionDecl>(D))
-      // FIXME: should have a lazy extension table
-      topLevelIDs.push_back(addDeclRef(D));
-    else if (isa<OperatorDecl>(D))
-      operatorIDs.push_back(addDeclRef(D));
+    else if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->getName().empty())
+        continue;
+      topLevelDecls[VD->getName()]
+        .push_back({getDeclKind(D), addDeclRef(D)});
+    } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+      // FIXME: should have a separate extension table.
+      topLevelDecls[ED->getExtendedType()->getAnyNominal()->getName()]
+        .push_back({getDeclKind(D), addDeclRef(D)});
+    } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
+      operatorDecls[OD->getName()]
+        .push_back({getRawStableFixity(OD->getKind()), addDeclRef(D)});
+    }
   }
 
   writeAllDeclsAndTypes();
@@ -1833,15 +1931,15 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
 
   {
     BCBlockRAII restoreBlock(Out, INDEX_BLOCK_ID, 3);
-    index_block::OffsetsLayout Offsets(Out);
 
+    index_block::OffsetsLayout Offsets(Out);
     writeOffsets(Offsets, DeclOffsets);
     writeOffsets(Offsets, TypeOffsets);
     writeOffsets(Offsets, IdentifierOffsets);
 
     index_block::DeclListLayout DeclList(Out);
-    DeclList.emit(ScratchRecord, index_block::TOP_LEVEL_DECLS, topLevelIDs);
-    DeclList.emit(ScratchRecord, index_block::OPERATORS, operatorIDs);
+    writeDeclTable(DeclList, index_block::TOP_LEVEL_DECLS, topLevelDecls);
+    writeDeclTable(DeclList, index_block::OPERATORS, operatorDecls);
   }
 
 #ifndef NDEBUG
