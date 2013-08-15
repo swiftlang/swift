@@ -94,6 +94,9 @@ public:
 
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
+
+  virtual void loadDeclsConformingTo(KnownProtocolKind kind,
+                                     unsigned previousGeneration) override;
 };
 
 } // end namespace swift

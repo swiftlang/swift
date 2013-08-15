@@ -177,14 +177,11 @@ private:
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
   std::unique_ptr<SerializedDeclTable> ExtensionDecls;
 
-  using ProtocolAdopterVec = SmallVector<serialization::DeclID, 4>;
+  using DeclIDVector = SmallVector<serialization::DeclID, 4>;
 
   /// All adopters of compiler-known protocols in this module.
-  ///
-  /// These are eagerly deserialized to aid in type-checking.
-  /// The final entry (at NumKnownProtocols) contains decls that have
-  /// conversion methods, which also need to be eagerly deserialized.
-  ProtocolAdopterVec KnownProtocolAdopters[NumKnownProtocols+1];
+  DeclIDVector KnownProtocolAdopters[NumKnownProtocols];
+  DeclIDVector EagerDeserializationDecls;
 
   /// Whether this module file can be used.
   ModuleStatus Status;
@@ -342,8 +339,13 @@ public:
 
   /// Loads extensions for the given decl.
   ///
-  /// Note that this may cause other extensions to load as well.
+  /// Note that this may cause other decls to load as well.
   void loadExtensions(NominalTypeDecl *nominal);
+
+  /// Loads decls that conform to the given protocol.
+  ///
+  /// Note that this may cause other decls to load as well.
+  void loadDeclsConformingTo(KnownProtocolKind kind);
 };
 
 class SerializedModule : public LoadedModule {

@@ -271,3 +271,13 @@ void SerializedModuleLoader::loadExtensions(NominalTypeDecl *nominal,
   }
 }
 
+void
+SerializedModuleLoader::loadDeclsConformingTo(KnownProtocolKind kind,
+                                              unsigned previousGeneration) {
+  for (auto &modulePair : LoadedModuleFiles) {
+    if (modulePair.second <= previousGeneration)
+      continue;
+    modulePair.first->loadDeclsConformingTo(kind);
+  }
+}
+

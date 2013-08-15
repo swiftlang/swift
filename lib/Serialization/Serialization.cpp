@@ -117,7 +117,7 @@ namespace {
     std::vector<CharOffset> IdentifierOffsets;
 
     SmallVector<DeclID, 2> KnownProtocolAdopters[NumKnownProtocols];
-    SmallVector<DeclID, 2> ConversionMethods;
+    SmallVector<DeclID, 2> EagerDeserializationDecls;
 
     /// The last assigned DeclID for decls from this module.
     DeclID LastDeclID = 0;
@@ -518,7 +518,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK(KNOWN_PROTOCOL_BLOCK);
 #define PROTOCOL(Id) RECORD(index_block, Id);
 #include "swift/AST/KnownProtocols.def"
-  RECORD(index_block, CONVERSION);
+  RECORD(index_block, FORCE_DESERIALIZATION);
 
   BLOCK(FALL_BACK_TO_TRANSLATION_UNIT);
 
@@ -1320,7 +1320,7 @@ bool Serializer::writeDecl(const Decl *D) {
       writePattern(pattern);
 
     if (fn->getAttrs().isConversion())
-      ConversionMethods.push_back(addDeclRef(DC));
+      EagerDeserializationDecls.push_back(addDeclRef(DC));
 
     return true;
   }
@@ -1978,8 +1978,8 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
         writeKnownProtocolList(AdopterList, static_cast<KnownProtocolKind>(i),
                                KnownProtocolAdopters[i]);
       }
-      AdopterList.emit(ScratchRecord, index_block::CONVERSION,
-                       ConversionMethods);
+      AdopterList.emit(ScratchRecord, index_block::FORCE_DESERIALIZATION,
+                       EagerDeserializationDecls);
     }
   }
 

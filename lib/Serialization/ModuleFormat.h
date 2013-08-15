@@ -808,7 +808,7 @@ namespace index_block {
   /// renumbered or reordered without incrementing VERSION_MAJOR.
   enum KnownProtocolKind : uint8_t {
     /// Not a known protocol, but force deserialization anyway.
-    CONVERSION,
+    FORCE_DESERIALIZATION,
 
     ArrayBound = 1,
     Enumerable,

@@ -2004,8 +2004,8 @@ static Optional<KnownProtocolKind> getActualKnownProtocol(unsigned rawKind) {
 #define PROTOCOL(Id) \
   case index_block::Id: return KnownProtocolKind::Id;
 #include "swift/AST/KnownProtocols.def"
-  case index_block::CONVERSION:
-    llvm_unreachable("must handle CONVERSION explicitly");
+  case index_block::FORCE_DESERIALIZATION:
+    llvm_unreachable("must handle FORCE_DESERIALIZATION explicitly");
   }
 
   // If there's a new case value in the module file, ignore it.
@@ -2032,17 +2032,19 @@ bool ModuleFile::readKnownProtocolsBlock(llvm::BitstreamCursor &cursor) {
     case llvm::BitstreamEntry::Record: {
       scratch.clear();
       unsigned rawKind = cursor.readRecord(next.ID, scratch);
-      unsigned index;
 
-      if (rawKind == index_block::CONVERSION)
-        index = NumKnownProtocols;
-      else if (auto actualKind = getActualKnownProtocol(rawKind))
-        index = static_cast<unsigned>(actualKind.getValue());
-      else
-        break; // ignore this record
+      DeclIDVector *list;
+      if (rawKind == index_block::FORCE_DESERIALIZATION) {
+        list = &EagerDeserializationDecls;
+      } else if (auto actualKind = getActualKnownProtocol(rawKind)) {
+        auto index = static_cast<unsigned>(actualKind.getValue());
+        list = &KnownProtocolAdopters[index];
+      } else {
+        // Ignore this record.
+        break;
+      }
 
-      auto &adopterList = KnownProtocolAdopters[index];
-      adopterList.append(scratch.begin(), scratch.end());
+      list->append(scratch.begin(), scratch.end());
       break;
     }
     }
@@ -2265,6 +2267,12 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
     return error();
 }
 
+static NominalTypeDecl *getAnyNominal(Decl *D) {
+  if (auto extension = dyn_cast<ExtensionDecl>(D))
+    D = extension->getExtendedType()->getAnyNominal();
+  return dyn_cast_or_null<NominalTypeDecl>(D);
+}
+
 bool ModuleFile::associateWithModule(Module *module) {
   assert(Status == ModuleStatus::Valid && "invalid module file");
   assert(!ModuleContext && "already associated with an AST module");
@@ -2303,21 +2311,11 @@ bool ModuleFile::associateWithModule(Module *module) {
     return false;
   }
 
-  // Eagerly deserialize decls conforming to special protocols.
-  for (unsigned i = 0; i < NumKnownProtocols+1; ++i) {
-    for (DeclID DID : KnownProtocolAdopters[i]) {
-      Decl *decl = getDecl(DID);
-
-      // Don't record any conformance for the plain "force deserialization"
-      // decls.
-      if (i < NumKnownProtocols)
-        ctx.recordConformance(static_cast<KnownProtocolKind>(i), decl);
-
-      if (auto extension = dyn_cast<ExtensionDecl>(decl))
-        decl = extension->getExtendedType()->getAnyNominal();
-      if (auto nominal = dyn_cast_or_null<NominalTypeDecl>(decl))
-        loadExtensions(nominal);
-    }
+  // Process decls we know we want to eagerly deserialize.
+  for (DeclID DID : EagerDeserializationDecls) {
+    Decl *decl = getDecl(DID);
+    if (auto nominal = getAnyNominal(decl))
+      loadExtensions(nominal);
   }
 
   return Status == ModuleStatus::Valid;
@@ -2405,6 +2403,16 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   for (auto item : *iter) {
     if (item.first == getKindForTable(nominal))
       (void)getDecl(item.second);
+  }
+}
+
+void ModuleFile::loadDeclsConformingTo(KnownProtocolKind kind) {
+  auto index = static_cast<unsigned>(kind);
+  for (DeclID DID : KnownProtocolAdopters[index]) {
+    Decl *D = getDecl(DID);
+    ModuleContext->Ctx.recordConformance(kind, D);
+    if (auto nominal = getAnyNominal(D))
+      loadExtensions(nominal);
   }
 }
 

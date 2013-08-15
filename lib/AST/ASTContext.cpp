@@ -97,9 +97,11 @@ struct ASTContext::Implementation {
   llvm::DenseMap<BoundGenericType *, ArrayRef<Substitution>>
     BoundGenericSubstitutions;
 
+  using ConformanceListPair = std::pair<unsigned, SmallVector<Decl *, 8>>;
+
   /// \brief The set of nominal types and extensions thereof known to conform
   /// to compiler-known protocols.
-  SmallVector<Decl *, 8> KnownProtocolConformances[NumKnownProtocols];
+  ConformanceListPair KnownProtocolConformances[NumKnownProtocols];
 
   /// The list of normal protocol conformances.
   ///
@@ -334,7 +336,7 @@ void ASTContext::recordConformance(KnownProtocolKind protocolKind, Decl *decl) {
   assert(isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl));
   auto index = static_cast<unsigned>(protocolKind);
   assert(index < NumKnownProtocols);
-  Impl.KnownProtocolConformances[index].push_back(decl);
+  Impl.KnownProtocolConformances[index].second.push_back(decl);
 }
 
 /// \brief Retrieve the set of nominal types and extensions thereof that
@@ -342,7 +344,14 @@ void ASTContext::recordConformance(KnownProtocolKind protocolKind, Decl *decl) {
 ArrayRef<Decl *> ASTContext::getTypesThatConformTo(KnownProtocolKind kind) {
   auto index = static_cast<unsigned>(kind);
   assert(index < NumKnownProtocols);
-  return Impl.KnownProtocolConformances[index];
+
+  for (auto loader : Impl.ModuleLoaders) {
+    loader->loadDeclsConformingTo(kind,
+                                  Impl.KnownProtocolConformances[index].first);
+  }
+  Impl.KnownProtocolConformances[index].first = CurrentGeneration;
+
+  return Impl.KnownProtocolConformances[index].second;
 }
 
 NormalProtocolConformance *
