@@ -200,8 +200,7 @@ namespace {
     
     
     void diagnoseInitError(SILInstruction *Use,
-                           Diag<> DiagNoName,
-                           Diag<StringRef> DiagWithName);
+                           Diag<StringRef> DiagMessage);
   };
 } // end anonymous namespace
 
@@ -233,27 +232,24 @@ ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox,
 }
 
 void ElementPromotion::diagnoseInitError(SILInstruction *Use,
-                                         Diag<> DiagNoName,
-                                         Diag<StringRef> DiagWithName) {
+                                         Diag<StringRef> DiagMessage) {
   HadError = true;
 
   // If the definition is a declaration, try to reconstruct a name and
   // optionally an access path to the uninitialized element.
+  std::string Name;
   if (ValueDecl *VD =
-        dyn_cast_or_null<ValueDecl>(TheAllocBox->getLoc().getAs<Decl>())) {
-    std::string Name = VD->getName().str();
-    
-    // If the overall memory allocation is a tuple with multiple elements,
-    // then dive in to explain *which* element is being used uninitialized.
-    CanType AllocTy = TheAllocBox->getElementType().getSwiftRValueType();
-    getPathStringToElement(AllocTy, ElementNumber, Name);
-    
-    diagnose(Use->getModule(), Use->getLoc(), DiagWithName, Name);
-    
-  } else {
-    // Otherwise, emit the diagnostic with no name or path information.
-    diagnose(Use->getModule(), Use->getLoc(), DiagNoName);
-  }
+        dyn_cast_or_null<ValueDecl>(TheAllocBox->getLoc().getAs<Decl>()))
+    Name = VD->getName().str();
+  else
+    Name = "<unknown>";
+
+  // If the overall memory allocation is a tuple with multiple elements,
+  // then dive in to explain *which* element is being used uninitialized.
+  CanType AllocTy = TheAllocBox->getElementType().getSwiftRValueType();
+  getPathStringToElement(AllocTy, ElementNumber, Name);
+  
+  diagnose(Use->getModule(), Use->getLoc(), DiagMessage, Name);
 
   // Provide context as note diagnostics.
 
@@ -302,8 +298,7 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // indicating where the control flow merged.
   if (DI != DI_Yes) {
     // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
-    diagnoseInitError(Inst, diag::variable_used_before_initialized,
-                      diag::variable_n_used_before_initialized);
+    diagnoseInitError(Inst, diag::variable_used_before_initialized);
     return;
   }
 
@@ -361,8 +356,7 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst) {
   // If it is initialized on some paths, but not others, then we have an
   // inconsistent initialization error.
   if (DI == DI_Partial) {
-    diagnoseInitError(Inst, diag::variable_initialized_on_some_paths,
-                      diag::variable_n_initialized_on_some_paths);
+    diagnoseInitError(Inst, diag::variable_initialized_on_some_paths);
     return;
   }
 
@@ -441,8 +435,7 @@ void ElementPromotion::handleByrefUse(SILInstruction *Inst) {
     return;
 
   // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
-  diagnoseInitError(Inst, diag::variable_byref_before_initialized,
-                    diag::variable_n_byref_before_initialized);
+  diagnoseInitError(Inst, diag::variable_byref_before_initialized);
 }
 
 void ElementPromotion::handleEscape(SILInstruction *Inst) {
@@ -451,8 +444,7 @@ void ElementPromotion::handleEscape(SILInstruction *Inst) {
     return;
 
   // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
-  diagnoseInitError(Inst, diag::variable_escape_before_initialized,
-                    diag::variable_n_escape_before_initialized);
+  diagnoseInitError(Inst, diag::variable_escape_before_initialized);
 }
 
 

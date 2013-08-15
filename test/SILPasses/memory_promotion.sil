@@ -54,7 +54,7 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
 sil @use_before_init : $[thin] () -> Int64 {
 bb0:
   %1 = alloc_box $Int64                   // expected-note {{variable defined here}}
-  %4 = load %1#1 : $*Int64                // expected-error {{variable used before being initialized}}
+  %4 = load %1#1 : $*Int64                // expected-error {{variable '<unknown>' used before being initialized}}
   release %1#0 : $Builtin.ObjectPointer
   %9 = return %4 : $Int64
 }
@@ -68,7 +68,7 @@ bb0:
   %1 = alloc_box $Int64                                   // expected-note {{variable defined here}}
 
   %5 = function_ref @takes_Int_byref : $[thin] (a : [byref] Int64) -> ()
-  %6 = apply %5(%1#1) : $[thin] (a : [byref] Int64) -> () // expected-error {{variable passed by reference before being initialized}}
+  %6 = apply %5(%1#1) : $[thin] (a : [byref] Int64) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
   
   %0 = tuple ()
   release %1#0 : $Builtin.ObjectPointer
@@ -140,7 +140,7 @@ bb0(%0 : $Int64):
   %5 = tuple_element_addr %3#1 : $*(Int64, Int64), 1
   %14 = function_ref @takes_Int_byref : $[thin] (a : [byref] Int64) -> ()
   %15 = tuple_element_addr %3#1 : $*(Int64, Int64), 1
-  %16 = apply %14(%15) : $[thin] (a : [byref] Int64) -> ()  // expected-error {{variable passed by reference before being initialized}}
+  %16 = apply %14(%15) : $[thin] (a : [byref] Int64) -> ()  // expected-error {{variable '<unknown>.1' passed by reference before being initialized}}
 
   release %3#0 : $Builtin.ObjectPointer
   %99 = tuple ()
@@ -153,7 +153,7 @@ bb0(%0 : $Int64):
   %3 = alloc_box $(Int64, Int64)     // expected-note {{variable defined here}}
   %18 = tuple_element_addr %3#1 : $*(Int64, Int64), 0
   store %0 to %18 : $*Int64
-  %20 = load %3#1 : $*(Int64, Int64) // expected-error {{variable used before being initialized}}
+  %20 = load %3#1 : $*(Int64, Int64) // expected-error {{variable '<unknown>.1' used before being initialized}}
   %21 = tuple_extract %20 : $(Int64, Int64), 0
   %22 = tuple_extract %20 : $(Int64, Int64), 1
   %23 = tuple (%21 : $Int64, %22 : $Int64)
@@ -179,7 +179,7 @@ bb0(%0 : $*T, %1 : $*T):
 sil @copy_addr2 : $[thin] <T> (v : T) -> T {
 bb0(%0 : $*T, %1 : $*T):
   %4 = alloc_box $T         // expected-note {{variable defined here}}
-  copy_addr %4#1 to [initialization] %0 : $*T   // expected-error {{variable used before being initialized}}
+  copy_addr %4#1 to [initialization] %0 : $*T   // expected-error {{variable '<unknown>' used before being initialized}}
   release %4#0 : $Builtin.ObjectPointer
   %9 = tuple ()
   return %9 : $()
@@ -197,7 +197,7 @@ bb0:
   %5 = function_ref @takes_closure : $[thin] (x : () -> ()) -> ()
   %6 = function_ref @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
   retain %0#0 : $Builtin.ObjectPointer
-  %8 = partial_apply %6(%0#0, %0#1) : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()  // expected-error {{variable captured by a closure before being initialized}}
+  %8 = partial_apply %6(%0#0, %0#1) : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
   %9 = apply %5(%8) : $[thin] (x : () -> ()) -> ()
   release %0#0 : $Builtin.ObjectPointer
 

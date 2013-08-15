@@ -1581,21 +1581,13 @@ ERROR(invalid_sil_builtin,sil_gen,none,
 NOTE(variable_defined_here,sil_analysis,none,
       "variable defined here", ())
 ERROR(variable_used_before_initialized,sil_analysis,none,
-      "variable used before being initialized", ())
-ERROR(variable_n_used_before_initialized,sil_analysis,none,
       "variable '%0' used before being initialized", (StringRef))
 ERROR(variable_byref_before_initialized,sil_analysis,none,
-      "variable passed by reference before being initialized", ())
-ERROR(variable_n_byref_before_initialized,sil_analysis,none,
       "variable '%0' passed by reference before being initialized", (StringRef))
 ERROR(variable_escape_before_initialized,sil_analysis,none,
-      "variable captured by a closure before being initialized", ())
-ERROR(variable_n_escape_before_initialized,sil_analysis,none,
       "variable '%0' captured by a closure before being initialized",
       (StringRef))
 ERROR(variable_initialized_on_some_paths,sil_analysis,none,
-      "variable inconsistently initialized on paths to this assignment", ())
-ERROR(variable_n_initialized_on_some_paths,sil_analysis,none,
       "variable '%0' inconsistently initialized on paths to this assignment",
       (StringRef))
 
