@@ -22,9 +22,12 @@ enum class KnownProtocolKind : uint8_t {
 };
 
 enum : uint8_t {
+  // This uses a preprocessor trick to count all the protocols. The enum value
+  // expression below expands to "+1+1+1...". (Note that the first plus
+  // is parsed as a unary operator.)
+#define PROTOCOL(Id) +1
   /// The number of known protocols.
-  NumKnownProtocols = 0
-#define PROTOCOL(Id) + 1
+  NumKnownProtocols =
 #include "swift/AST/KnownProtocols.def"
 };
 
