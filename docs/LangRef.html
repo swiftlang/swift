@@ -1535,7 +1535,6 @@ if vec[3] {
   <!-- ********************************************************************* -->
   
   <pre class="grammar">
-    type ::= type-simple
     type ::= <a href="#type-function">type-function</a>
     type ::= <a href="#type-array">type-array</a>
     
@@ -1543,6 +1542,7 @@ if vec[3] {
     type-simple ::= <a href="#type-tuple">type-tuple</a>
     type-simple ::= <a href="#type-composition">type-composition</a>
     type-simple ::= <a href="#type-metatype">type-metatype</a>
+    type-simple ::= <a href="#type-optional">type-optional</a>
 
     type-annotation ::= <a href="#attribute-list">attribute-list</a> type
   </pre>
@@ -1551,10 +1551,6 @@ if vec[3] {
       compiler.  Most user-facing datatypes are defined by the
       <a href="#stdlib">standard library</a> or declared as a user defined
       types.</p>
-  
-  <p>
-  FIXME: Why is array a type instead of type-simple?
-  </p>
 
   <!-- _____________________________________________________________________ -->
   <h3>Metatypes</h3>
@@ -1890,6 +1886,51 @@ if vec[3] {
     storage, but metatypes associated with <a href="#decl-class">class
     types</a> follow the same subtyping rules as their associated
     class types and therefore are not singleton.</p>
+
+    <!-- _____________________________________________________________________ -->
+    <h3 id="type-optional">Optional Types</h3>
+    <div class="commentary">
+      Similar constructs exist in Haskell (<a
+      href="http://hackage.haskell.org/packages/archive/base/latest/doc/html/Data-Maybe.html">Maybe</a>),
+      the Boost library (<a 
+      href="http://www.boost.org/doc/libs/1_54_0/libs/optional/doc/html/index.html">Optional</a>),
+      and C++14 (<a href="http://en.cppreference.com/w/cpp/utility/optional">optional</a>).
+    </div>
+
+    <pre class="grammar">
+      type-optional ::= type-simple '?'
+    </pre>
+
+    <p>An optional type is syntactic sugar for the library type 
+    Optional&lt;T&gt;. This is a <a href="#decl-union">union</a> with two 
+    cases: None and Some, used to represent a value that may or may not be 
+    present.</p>
+
+    <p>FIXME: The current implementation of Optional is a hack and None and 
+    Some are currently both globals rather than members.</p>
+
+    <p>Optional types are different from other unions in that any value 
+    <code>x</code> is implicitly convertible to Some(<code>x</code>). This is
+    part of the language, not the library; therefore, the libary type Optional
+    is required to have a constructor that accepts a single argument.</p>
+
+    <p>Since optional types are part of the
+    <a href="#type-simple">type-simple</a> grammar, it is not possible to write
+    <code>T[]?</code> for an optional array. Use <code>(T[]?)</code> instead.
+    </p>
+
+    <p>Some example optional types:</p>
+  
+    <pre class="example">
+      <i>// A simple optional declaration:</i>
+      var a : Int? // equivalent to Optional&lt;Int&gt;
+    
+      <i>// An empty optional:</i>
+      var b : Int? = .None
+        
+      <i>// Declare an array of optionals:</i>
+      var c : Int?[] = new Int?[4]
+    </pre>
 
   <!-- _____________________________________________________________________ -->
   <h3 id="type-composition">Protocol Composition Types</h3>
