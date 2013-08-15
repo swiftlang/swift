@@ -49,7 +49,10 @@ static bool buildSugarImplType(TypeChecker &TC, SyntaxSugarType *sugarTy,
     name = "Optional";
     break;
   }
-  UnqualifiedLookup genericLookup(TC.Context.getIdentifier(name), &TC.TU);
+  UnqualifiedLookup genericLookup(TC.Context.getIdentifier(name),
+                                  TC.getStdlibModule(),
+                                  SourceLoc(),
+                                  /*IsTypeLookup=*/true);
 
   if (TypeDecl *lookupDecl = genericLookup.getSingleTypeResult()) {
     if (NominalTypeDecl *ND = lookupDecl->getDeclaredType()->getAnyNominal()) {

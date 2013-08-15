@@ -136,7 +136,7 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
     break;
   }
 
-  UnqualifiedLookup global(name, &TU);
+  UnqualifiedLookup global(name, getStdlibModule());
   knownProtocols[index]
     = dyn_cast_or_null<ProtocolDecl>(global.getSingleTypeResult());
 
@@ -195,9 +195,20 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
   llvm_unreachable("Unhandled literal kind");
 }
 
+Module *TypeChecker::getStdlibModule() {
+  if (!StdlibModule)
+    StdlibModule = Context.LoadedModules.lookup("swift");
+  if (!StdlibModule)
+    StdlibModule = &TU;
+  return StdlibModule;
+}
+
 Type TypeChecker::lookupBoolType() {
   return boolType.cache([&]{
-    UnqualifiedLookup boolLookup(Context.getIdentifier("Bool"), &TU);
+    UnqualifiedLookup boolLookup(Context.getIdentifier("Bool"),
+                                 getStdlibModule(),
+                                 SourceLoc(),
+                                 /*IsTypeLookup=*/true);
     if (!boolLookup.isSuccess()) {
       diagnose(SourceLoc(), diag::bool_type_broken);
       return Type();

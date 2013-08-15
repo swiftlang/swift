@@ -194,6 +194,8 @@ private:
   Type ArrayLiteralType;
   Type DictionaryLiteralType;
 
+  Module *StdlibModule = nullptr;
+
   /// The index of the next response metavariable to bind to a REPL result.
   unsigned NextResponseVariableIndex = 0;
 
@@ -712,6 +714,12 @@ public:
   /// \returns the literal protocol, if known and available, or null if the
   /// expression does not have an associated literal protocol.
   ProtocolDecl *getLiteralProtocol(Expr *expr);
+
+  /// Get the module appropriate for looking up standard library types.
+  ///
+  /// This is "swift", if that module is imported, or the current translation
+  /// unit if we're parsing the standard library.
+  Module *getStdlibModule();
 
   /// \name AST Mutation Listener Implementation
   /// @{

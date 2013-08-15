@@ -333,17 +333,19 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
 
       llvm::Value* fnParameter = args++;
       fnParameter->setName(fnParameterName);
-      
-      UnqualifiedLookup lookup(
-        Context.getIdentifier(swiftVarName), tunit);
+
+      auto lookup = UnqualifiedLookup::forModuleAndName(tunit->Ctx, "swift",
+                                                        swiftVarName);
+      if (!lookup.hasValue())
+        continue;
 
       // If you're running without a standard library, there's nowhere
       // to poke the variable.
-      unsigned const resultCount = lookup.Results.size();
+      unsigned const resultCount = lookup->Results.size();
       if (resultCount != 0) {
-        assert(lookup.Results.size() == 1);
+        assert(lookup->Results.size() == 1);
         auto swiftVarDecl = cast<VarDecl>(
-          lookup.Results.front().getValueDecl());
+          lookup->Results.front().getValueDecl());
         Address swiftVarAddress = getAddrOfGlobalVariable(swiftVarDecl);
 
         // The swift vars are structs whose first member is a raw LLVM value
