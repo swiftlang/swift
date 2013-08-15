@@ -76,44 +76,138 @@ static void getPathStringToElement(CanType T, unsigned Element,
   assert(0 && "Element number is out of range for this type!");
 }
 
+//===----------------------------------------------------------------------===//
+// Scalarization Logic
+//===----------------------------------------------------------------------===//
+
+static bool isStructOrTupleToScalarize(SILType T) {
+  return T.is<TupleType>() || T.is<StructType>() ||
+         T.is<BoundGenericStructType>();
+}
+
+
 /// Given a pointer to an aggregate type, compute the addresses of each
 /// element and add them to the ElementAddrs vector.
-void getTupleElementAddresses(SILValue Pointer,
+static void getScalarizedElementAddresses(SILValue Pointer,
                               SmallVectorImpl<SILInstruction*> &ElementAddrs) {
-  TupleType *TT = Pointer.getType().getSwiftRValueType()->castTo<TupleType>();
+  CanType AggType = Pointer.getType().getSwiftRValueType();
 
   SILInstruction *PointerInst = cast<SILInstruction>(Pointer.getDef());
   SILBuilder B(++SILBasicBlock::iterator(PointerInst));
 
-  for (auto &Field : TT->getFields()) {
-    auto ResultTy = Field.getType()->getCanonicalType();
-    ElementAddrs.push_back(B.createTupleElementAddr(PointerInst->getLoc(),
-                                                    Pointer,
-                                                    ElementAddrs.size(),
-                                  SILType::getPrimitiveAddressType(ResultTy)));
+  if (TupleType *TT = AggType->getAs<TupleType>()) {
+    for (auto &Field : TT->getFields()) {
+      auto ResultTy = Field.getType()->getCanonicalType();
+      ElementAddrs.push_back(B.createTupleElementAddr(PointerInst->getLoc(),
+                                                      Pointer,
+                                                      ElementAddrs.size(),
+                                   SILType::getPrimitiveAddressType(ResultTy)));
+    }
+    return;
+  }
+
+  assert(AggType->is<StructType>() || AggType->is<BoundGenericStructType>());
+  StructDecl *SD;
+  if (auto *ST = AggType->getAs<StructType>())
+    SD = ST->getDecl();
+  else
+    SD = AggType->castTo<BoundGenericStructType>()->getDecl();
+
+  for (auto *VD : SD->getPhysicalFields()) {
+    auto ResultTy = VD->getType()->getCanonicalType();
+    ElementAddrs.push_back(B.createStructElementAddr(PointerInst->getLoc(),
+                                                     Pointer, VD,
+                                   SILType::getPrimitiveAddressType(ResultTy)));
   }
 }
 
 /// Given an RValue of aggregate type, compute the values of the elements by
 /// emitting a series of tuple_element instructions.
-void getTupleElements(SILValue V, SmallVectorImpl<SILValue> &ElementVals,
-                      SILLocation Loc, SILBuilder &B) {
-  TupleType *TT = V.getType().getSwiftRValueType()->castTo<TupleType>();
+static void getScalarizedElements(SILValue V,
+                                  SmallVectorImpl<SILValue> &ElementVals,
+                                  SILLocation Loc, SILBuilder &B) {
+  CanType AggType = V.getType().getSwiftRValueType();
 
-  // If this is exploding a tuple_inst, just return the element values.  This
-  // can happen when recursively scalarizing stuff.
-  if (auto *TI = dyn_cast<TupleInst>(V)) {
-    for (unsigned i = 0, e = TI->getNumOperands(); i != e; ++i)
-      ElementVals.push_back(TI->getOperand(i));
+  if (TupleType *TT = AggType->getAs<TupleType>()) {
+    // If this is exploding a tuple_inst, just return the element values.  This
+    // can happen when recursively scalarizing stuff.
+    if (auto *TI = dyn_cast<TupleInst>(V)) {
+      for (unsigned i = 0, e = TI->getNumOperands(); i != e; ++i)
+        ElementVals.push_back(TI->getOperand(i));
+      return;
+    }
+
+    for (auto &Field : TT->getFields()) {
+      auto ResultTy = Field.getType()->getCanonicalType();
+      ElementVals.push_back(B.createTupleExtract(Loc, V, ElementVals.size(),
+                                    SILType::getPrimitiveObjectType(ResultTy)));
+    }
     return;
   }
-  
-  for (auto &Field : TT->getFields()) {
-    auto ResultTy = Field.getType()->getCanonicalType();
-    ElementVals.push_back(B.createTupleExtract(Loc, V, ElementVals.size(),
-                                   SILType::getPrimitiveObjectType(ResultTy)));
+
+  assert(AggType->is<StructType>() ||
+         AggType->is<BoundGenericStructType>());
+
+  // If this is exploding a struct_inst, just return the element values.  This
+  // can happen when recursively scalarizing stuff.
+  if (auto *SI = dyn_cast<StructInst>(V)) {
+    for (unsigned i = 0, e = SI->getNumOperands(); i != e; ++i)
+      ElementVals.push_back(SI->getOperand(i));
+    return;
+  }
+
+  StructDecl *SD;
+  if (auto *ST = AggType->getAs<StructType>())
+    SD = ST->getDecl();
+  else
+    SD = AggType->castTo<BoundGenericStructType>()->getDecl();
+
+  for (auto *VD : SD->getPhysicalFields()) {
+    auto ResultTy = VD->getType()->getCanonicalType();
+    ElementVals.push_back(B.createStructExtract(Loc, V, VD,
+                                    SILType::getPrimitiveObjectType(ResultTy)));
   }
 }
+
+/// Given a value of [bound generic]struct type, and a load that is known to be
+/// from a pointer with an aggregate of the specified struct type, figure out
+/// which field path is being accessed, and extract the element value from
+/// StructVal that corresponds to it.
+static SILValue ExtractMatchingElement(SILValue Pointer, SILValue StructVal,
+                                       SILBuilder &B, SILLocation Loc) {
+  // If we find the underlying element we care about, we're done.
+  if (Pointer.getType().getObjectType() == StructVal.getType())
+    return StructVal;
+
+  // Otherwise, we must be in an element of the struct, and the pointer must be
+  // a tuple_element_addr or struct_element_addr.
+  if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
+    SILValue Res = ExtractMatchingElement(TEAI->getOperand(), StructVal,B,Loc);
+
+    return B.createTupleExtract(Loc, Res, TEAI->getFieldNo(),
+                                TEAI->getType().getObjectType());
+  }
+
+  auto *SEAI = cast<StructElementAddrInst>(Pointer);
+  SILValue Res = ExtractMatchingElement(SEAI->getOperand(), StructVal, B, Loc);
+  return B.createStructExtract(Loc, Res, SEAI->getField(),
+                               SEAI->getType().getObjectType());
+}
+
+/// Remove dead tuple_element_addr and struct_element_addr chains - only.
+static void RemoveDeadAddressingInstructions(SILValue Pointer) {
+  if (!Pointer.use_empty()) return;
+
+  SILInstruction *I = dyn_cast<SILInstruction>(Pointer);
+  if (I == 0 ||
+      !(isa<TupleElementAddrInst>(Pointer) ||
+        isa<StructElementAddrInst>(Pointer)))
+    return;
+  Pointer = I->getOperand(0);
+  I->eraseFromParent();
+  RemoveDeadAddressingInstructions(Pointer);
+}
+
 
 
 //===----------------------------------------------------------------------===//
@@ -288,6 +382,12 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // If this is a Load (not a CopyAddr or LoadWeak), we try to compute the
   // loaded value as an SSA register.  Otherwise, we don't ask for an available
   // value to avoid constructing SSA for the value.
+
+  // Note that we intentionally don't support forwarding of weak pointers,
+  // because the underlying value may drop be deallocated at any time.  We would
+  // have to prove that something in this function is holding the weak value
+  // live across the promoted region and that isn't desired for a stable
+  // diagnostics pass this like one.
   auto DI = checkDefinitelyInit(Inst, isa<LoadInst>(Inst) ? &Result : nullptr);
 
   // If the value is not definitively initialized, emit an error.
@@ -306,18 +406,31 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // that we have a value available for.
   if (!Result) return;
 
+  // FIXME: We cannot do load promotion in regions where the value has
+  // escaped!
+
   // If so, we can replace the load now.  Note that all loads have been
   // scalarized at this point to access a single element, and that we know this
-  // is a LoadInst, not a CopyAddr or LoadWeak.
+  // is a LoadInst, not a CopyAddr or LoadWeak.  Stores of tuples have been
+  // scalarized to storing their elements, but stores of structs have not.
+  assert(!isStructOrTupleToScalarize(Inst->getType(0)));
 
-  // FIXME: There are some cases where we can find a value of the wrong type.
-  // For example a store in type "((Int))" and a load of type "Int".  We need to
-  // define this away to get perfect dataflow.
+  // If this is a store of a struct, the load will be of an incorrect type,
+  // try to determine (from the load pointer) what struct element is being
+  // referenced, and extract that from the struct value.
+  if (Result.getType().is<StructType>() ||
+      Result.getType().is<BoundGenericStructType>()) {
+    SILBuilder B(Inst);
+    Result = ExtractMatchingElement(Inst->getOperand(0), Result, B,
+                                    Inst->getLoc());
+  }
+
+  // FIXME: This check shouldn't be needed any longer.
   if (Inst->getType(0) == Result.getType()) {
-    // FIXME: We cannot do load promotion in regions where the value has
-    // escaped!
     SILValue(Inst, 0).replaceAllUsesWith(Result);
+    SILValue Addr = Inst->getOperand(0);
     Inst->eraseFromParent();
+    RemoveDeadAddressingInstructions(Addr);
     ++NumLoadPromoted;
   }
 }
@@ -453,11 +566,6 @@ void ElementPromotion::handleEscape(SILInstruction *Inst) {
 /// getStoredValueFrom - Given a may store to the stack slot we're promoting,
 /// return the value being stored.
 static SILValue getStoredValueFrom(SILInstruction *I) {
-  // Note that we intentionally don't support forwarding of weak pointers,
-  // because the underlying value may drop be deallocated at any time.  We would
-  // have to prove that something in this function is holding the weak value
-  // live across the promoted region and that isn't desired for a stable
-  // diagnostics pass this like one.
   if (auto *SI = dyn_cast<StoreInst>(I))
     return SI->getOperand(0);
   if (auto *AI = dyn_cast<AssignInst>(I))
@@ -523,8 +631,7 @@ namespace {
   private:
     void addElementUses(unsigned BaseElt, SILType UseTy,
                         SILInstruction *User, UseKind Kind);
-    void collectTupleElementUses(TupleElementAddrInst *ElementPtr,
-                                 unsigned BaseElt);
+    void collectElementUses(SILInstruction *ElementPtr, unsigned BaseElt);
   };
   
   
@@ -541,10 +648,20 @@ void ElementUseCollector::addElementUses(unsigned BaseElt, SILType UseTy,
     Uses[BaseElt+i].push_back({ User, Kind });
 }
 
-/// Given a tuple_element_addr, compute the new BaseElt implicit in the selected
-/// member, and recursively add uses of the instruction.
+/// Given a tuple_element_addr or struct_element_addr, compute the new BaseElt
+/// implicit in the selected member, and recursively add uses of the instruction.
 void ElementUseCollector::
-collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseElt) {
+collectElementUses(SILInstruction *ElementPtr, unsigned BaseElt) {
+  // struct_element_addr P, #field indexes into the current element.
+  if (auto *SEAI = dyn_cast<StructElementAddrInst>(ElementPtr)) {
+    // Set the "InStructSubElement" flag and recursively process the uses.
+    llvm::SaveAndRestore<bool> X(InStructSubElement, true);
+    collectUses(SILValue(SEAI, 0), BaseElt);
+    return;
+  }
+
+  auto *TEAI = cast<TupleElementAddrInst>(ElementPtr);
+
   // If we're walking into a tuple within a struct, don't adjust the BaseElt.
   // the uses hanging off the tuple_element_addr are going to be counted as uses
   // of the struct itself.
@@ -589,34 +706,37 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       continue;
     
     // Instructions that compute a subelement are handled by a helper.
-    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(User)) {
-      collectTupleElementUses(TEAI, BaseElt);
+    if (isa<TupleElementAddrInst>(User) || isa<StructElementAddrInst>(User)) {
+      collectElementUses(User, BaseElt);
       continue;
     }
     
     // Loads are a use of the value.
-    if (isa<LoadInst>(User) || isa<LoadWeakInst>(User)) {
-      if (getElementCount(PointeeType.getSwiftRValueType()) == 1)
-        Uses[BaseElt].push_back({User, UseKind::Load});
-      else {
-        assert(!isa<LoadWeakInst>(User) &&
-               "Aggregate load_weak shouldn't happen");
+    if (isa<LoadInst>(User)) {
+      if (isStructOrTupleToScalarize(PointeeType))
         UsesToScalarize.push_back(User);
-      }
+      else
+        Uses[BaseElt].push_back({User, UseKind::Load});
       continue;
     }
 
-    // Stores *to* the allocation are writes.  Stores *of* it is an escape.
+    if (isa<LoadWeakInst>(User)) {
+      Uses[BaseElt].push_back({User, UseKind::Load});
+      continue;
+    }
+
+    // Stores *to* the allocation are writes.
     if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
          isa<StoreWeakInst>(User)) &&
         UI->getOperandNumber() == 1) {
-      if (getElementCount(PointeeType.getSwiftRValueType()) == 1)
-        Uses[BaseElt].push_back({ User, UseKind::Store });
-      else {
+      // We only scalarize stores of aggregate stores of tuples to their
+      // elements, we do not scalarize stores of structs to their elements.
+      if (PointeeType.is<TupleType>()) {
         assert(!isa<StoreWeakInst>(User) &&
-               "Aggregate store_weak shouldn't happen");
+               "Can't weak store a struct or tuple");
         UsesToScalarize.push_back(User);
-      }
+      } else
+        Uses[BaseElt].push_back({ User, UseKind::Store });
       continue;
     }
 
@@ -634,15 +754,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       addElementUses(BaseElt, PointeeType, User, UseKind::Store);
       continue;
     }
-
-    // struct_element_addr P, #field indexes into the current element.
-    if (auto *SEAI = dyn_cast<StructElementAddrInst>(User)) {
-      // Set the "InStructSubElement" flag and recursively process the uses.
-      llvm::SaveAndRestore<bool> X(InStructSubElement, true);
-      collectUses(SILValue(SEAI, 0), BaseElt);
-      continue;
-    }
-
 
     // The apply instruction does not capture the pointer when it is passed
     // through [byref] arguments or for indirect returns.  Byref arguments are
@@ -680,7 +791,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
   // that we need to for canonicalization or analysis reasons.
   if (!UsesToScalarize.empty()) {
     SmallVector<SILInstruction*, 4> ElementAddrs;
-    getTupleElementAddresses(Pointer, ElementAddrs);
+    getScalarizedElementAddresses(Pointer, ElementAddrs);
     
     SmallVector<SILValue, 4> ElementTmps;
     for (auto *User : UsesToScalarize) {
@@ -692,8 +803,11 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
           ElementTmps.push_back(B.createLoad(LI->getLoc(), ElementAddrs[i]));
         
-        SILInstruction *Result =
-          B.createTuple(LI->getLoc(), LI->getType(), ElementTmps);
+        SILInstruction *Result;
+        if (LI->getType().is<TupleType>())
+          Result = B.createTuple(LI->getLoc(), LI->getType(), ElementTmps);
+        else
+          Result = B.createStruct(LI->getLoc(), LI->getType(), ElementTmps);
 
         SILValue(LI,0).replaceAllUsesWith(Result);
         LI->eraseFromParent();
@@ -702,7 +816,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       
       // Scalarize AssignInst
       if (auto *AI = dyn_cast<AssignInst>(User)) {
-        getTupleElements(AI->getOperand(0), ElementTmps, AI->getLoc(),B);
+        getScalarizedElements(AI->getOperand(0), ElementTmps, AI->getLoc(), B);
 
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
           B.createAssign(AI->getLoc(), ElementTmps[i], ElementAddrs[i]);
@@ -712,7 +826,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       
       // Scalarize StoreInst
       auto *SI = cast<StoreInst>(User);
-      getTupleElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
+      getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
       
       for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
         B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i]);
@@ -723,7 +837,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     // element address computations to recursively process it.  This can cause
     // further scalarization.
     for (auto EltPtr : ElementAddrs)
-      collectTupleElementUses(cast<TupleElementAddrInst>(EltPtr), BaseElt);
+      collectElementUses(EltPtr, BaseElt);
   }
 }
 

@@ -11,13 +11,17 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
   store %0 to %1#1 : $*Int64
   %3 = alloc_box $Int64                   // CHECK: alloc_box
   %4 = load %1#1 : $*Int64
+  // CHECK-NEXT: struct_extract
+  // CHECK-NEXT: struct $Int64
   store %4 to %3#1 : $*Int64         // CHECK-NEXT: store
   %6 = load %3#1 : $*Int64
+  // CHECK-NEXT: struct_extract
+  // CHECK-NEXT: struct $Int64
   release %3#0 : $Builtin.ObjectPointer   // CHECK-NEXT: release
   release %1#0 : $Builtin.ObjectPointer
   return %6 : $Int64
 
-  // CHECK: return %0 : $Int64
+  // CHECK: return {{.*}} : $Int64
 }
 
 
@@ -43,7 +47,7 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
 
   // Verify that promotion has promoted the tuple load away, and we know that
   // %0 is being returned through scalar instructions in SSA form.
-  // CHECK: [[TUPLE:%[0-9]+]] = tuple (%0 : $Int64, %0 : $Int64)
+  // CHECK: [[TUPLE:%[0-9]+]] = tuple ({{.*}} : $Int64, {{.*}} : $Int64)
   // CHECK: [[TUPLE_ELT:%[0-9]+]] = tuple_extract [[TUPLE]] : $(Int64, Int64), 0
 
   // CHECK: return [[TUPLE_ELT]] : $Int64
@@ -99,11 +103,11 @@ bb0(%0 : $Int64):
   %6 = apply %5(%1#1) : $[thin] (a : [byref] Int64) -> ()
   
   // This load is needed in case the callee modifies the allocation.
-  // CHECK: [[RES:%[0-9]+]] = load %1
+  // CHECK: [[RES:%[0-9]+]] = load
   %7 = load %1#1 : $*Int64
   
   // This should use the incoming argument to the function.
-  // CHECK: tuple (%0 : $Int64, [[RES]] : $Int64)
+  // CHECK: tuple ({{.*}} : $Int64, {{.*}} : $Int64)
   %8 = tuple (%3 : $Int64, %7 : $Int64)
   release %1#0 : $Builtin.ObjectPointer
   %11 = return %8 : $(Int64, Int64)
@@ -220,12 +224,14 @@ bb0(%0 : $Int64):
   assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
   assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
   assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
+  // CHECK-NEXT: struct_extract
+  // CHECK-NEXT: struct $Int64
 
   %2 = load %1#1 : $*Int64
   release %1#0 : $Builtin.ObjectPointer            // CHECK-NEXT: release %1#0
 
   // Verify that the load got forwarded from an assign.
-  return %2 : $Int64                        // CHECK: return %0 : $Int64
+  return %2 : $Int64                        // CHECK: return {{.*}} : $Int64
 }
 
 // CHECK-LABEL: sil @assign_test_nontrivial
