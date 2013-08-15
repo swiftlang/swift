@@ -169,22 +169,23 @@ private:
   /// Identifiers referenced by this module.
   std::vector<SerializedIdentifier> Identifiers;
 
-private:
   class DeclTableInfo;
   using SerializedDeclTable = clang::OnDiskChainedHashTable<DeclTableInfo>;
 
-public:
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
+  std::unique_ptr<SerializedDeclTable> ExtensionDecls;
+
+  /// Read an on-disk decl hash table stored in index_block::DeclListLayout
+  /// format.
+  std::unique_ptr<SerializedDeclTable>
+  readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
   /// Whether this module file can be used.
   ModuleStatus Status;
 
   /// Constructs an new module and validates it.
   ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input);
-
-  // Out of line to avoid instantiation OnDiskChainedHashTable here.
-  ~ModuleFile();
 
   /// Convenience function for module loading.
   void error(ModuleStatus issue = ModuleStatus::Malformed) {
@@ -281,6 +282,9 @@ public:
     module.reset(new ModuleFile(std::move(input)));
     return module->getStatus();
   }
+
+  // Out of line to avoid instantiation OnDiskChainedHashTable here.
+  ~ModuleFile();
 
   /// Associates this module file with an AST module.
   ///

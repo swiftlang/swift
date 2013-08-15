@@ -507,6 +507,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(index_block, IDENTIFIER_OFFSETS);
   RECORD(index_block, TOP_LEVEL_DECLS);
   RECORD(index_block, OPERATORS);
+  RECORD(index_block, EXTENSIONS);
 
   BLOCK(FALL_BACK_TO_TRANSLATION_UNIT);
 
@@ -1844,38 +1845,6 @@ namespace {
   };
 }
 
-/// Returns the encoding kind for the given decl.
-///
-/// Note that this does not work for all encodable decls, only those designed
-/// to be stored in a hash table.
-static decls_block::RecordKind getDeclKind(const Decl *D) {
-  using namespace decls_block;
-
-  switch (D->getKind()) {
-  case DeclKind::TypeAlias:
-    return decls_block::TYPE_ALIAS_DECL;
-  case DeclKind::Union:
-    return decls_block::UNION_DECL;
-  case DeclKind::Struct:
-    return decls_block::STRUCT_DECL;
-  case DeclKind::Class:
-    return decls_block::CLASS_DECL;
-  case DeclKind::Protocol:
-    return decls_block::PROTOCOL_DECL;
-
-  case DeclKind::Func:
-    return decls_block::FUNC_DECL;
-  case DeclKind::Var:
-    return decls_block::VAR_DECL;
-
-  case DeclKind::Extension:
-    return decls_block::EXTENSION_DECL;
-
-  default:
-    llvm_unreachable("cannot store this kind of decl in a hash table");
-  }
-}
-
 /// The in-memory representation of what will eventually be an on-disk hash
 /// table.
 using DeclTable = llvm::DenseMap<Identifier, DeclTableInfo::data_type>;
@@ -1885,6 +1854,9 @@ using DeclTable = llvm::DenseMap<Identifier, DeclTableInfo::data_type>;
 static void writeDeclTable(const index_block::DeclListLayout &DeclList,
                            index_block::RecordKind kind,
                            const DeclTable &table) {
+  if (table.empty())
+    return;
+
   SmallVector<uint64_t, 8> scratch;
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
@@ -1906,8 +1878,7 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
   assert(!this->TU && "already serializing a translation unit");
   this->TU = TU;
 
-  DeclTable topLevelDecls;
-  DeclTable operatorDecls;
+  DeclTable topLevelDecls, extensionDecls, operatorDecls;
   for (auto D : TU->Decls) {
     if (isa<ImportDecl>(D))
       continue;
@@ -1915,14 +1886,17 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
       if (VD->getName().empty())
         continue;
       topLevelDecls[VD->getName()]
-        .push_back({getDeclKind(D), addDeclRef(D)});
+        .push_back({ getKindForTable(D), addDeclRef(D) });
+
     } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-      // FIXME: should have a separate extension table.
-      topLevelDecls[ED->getExtendedType()->getAnyNominal()->getName()]
-        .push_back({getDeclKind(D), addDeclRef(D)});
+      Type extendedTy = ED->getExtendedType();
+      const NominalTypeDecl *extendedNominal = extendedTy->getAnyNominal();
+      extensionDecls[extendedNominal->getName()]
+        .push_back({ getKindForTable(extendedNominal), addDeclRef(D) });
+
     } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
       operatorDecls[OD->getName()]
-        .push_back({getRawStableFixity(OD->getKind()), addDeclRef(D)});
+        .push_back({ getRawStableFixity(OD->getKind()), addDeclRef(D) });
     }
   }
 
@@ -1940,6 +1914,7 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
     index_block::DeclListLayout DeclList(Out);
     writeDeclTable(DeclList, index_block::TOP_LEVEL_DECLS, topLevelDecls);
     writeDeclTable(DeclList, index_block::OPERATORS, operatorDecls);
+    writeDeclTable(DeclList, index_block::EXTENSIONS, extensionDecls);
   }
 
 #ifndef NDEBUG

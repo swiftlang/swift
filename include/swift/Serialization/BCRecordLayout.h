@@ -456,15 +456,24 @@ public:
   /// Note that even fixed arguments must be specified here. Pass \c Nothing
   /// if you don't care about a particular parameter. Blob data is not included
   /// in the buffer and should be handled separately by the caller.
-  template <typename BufferTy, typename... Data>
-  static void readRecord(BufferTy &buffer, Data &... data) {
+  template <typename ElementTy, typename... Data>
+  static void readRecord(ArrayRef<ElementTy> buffer, Data &... data) {
     static_assert(sizeof...(data) <= sizeof...(Fields),
                   "Too many record elements");
     static_assert(sizeof...(Fields) <=
                   sizeof...(data) + impl::has_blob<Fields...>::value,
                   "Too few record elements");
-    return impl::BCRecordCoding<Fields...>::read(llvm::makeArrayRef(buffer),
-                                                 data...);
+    return impl::BCRecordCoding<Fields...>::read(buffer, data...);
+  }
+
+  /// Extract record data from \p buffer into the given data fields.
+  ///
+  /// Note that even fixed arguments must be specified here. Pass \c Nothing
+  /// if you don't care about a particular parameter. Blob data is not included
+  /// in the buffer and should be handled separately by the caller.
+  template <typename BufferTy, typename... Data>
+  static void readRecord(BufferTy &buffer, Data &... data) {
+    return readRecord(llvm::makeArrayRef(buffer), data...);
   }
 };
 

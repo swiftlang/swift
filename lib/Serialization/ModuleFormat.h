@@ -728,6 +728,35 @@ namespace decls_block {
   >;
 }
 
+/// Returns the encoding kind for the given decl.
+///
+/// Note that this does not work for all encodable decls, only those designed
+/// to be stored in a hash table.
+static inline decls_block::RecordKind getKindForTable(const Decl *D) {
+  using namespace decls_block;
+
+  switch (D->getKind()) {
+  case DeclKind::TypeAlias:
+    return decls_block::TYPE_ALIAS_DECL;
+  case DeclKind::Union:
+    return decls_block::UNION_DECL;
+  case DeclKind::Struct:
+    return decls_block::STRUCT_DECL;
+  case DeclKind::Class:
+    return decls_block::CLASS_DECL;
+  case DeclKind::Protocol:
+    return decls_block::PROTOCOL_DECL;
+
+  case DeclKind::Func:
+    return decls_block::FUNC_DECL;
+  case DeclKind::Var:
+    return decls_block::VAR_DECL;
+
+  default:
+    llvm_unreachable("cannot store this kind of decl in a hash table");
+  }
+}
+
 /// The record types within the identifier block.
 ///
 /// \sa IDENTIFIER_BLOCK_ID
@@ -750,7 +779,8 @@ namespace index_block {
     DECL_OFFSETS,
     IDENTIFIER_OFFSETS,
     TOP_LEVEL_DECLS,
-    OPERATORS
+    OPERATORS,
+    EXTENSIONS
   };
 
   using OffsetsLayout = BCGenericRecordLayout<
