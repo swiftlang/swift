@@ -68,72 +68,18 @@ void TypeChecker::addedExternalType(Type type) {
 ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
   // Check whether we've already looked for and cached this protocol.
   unsigned index = (unsigned)kind;
-  assert(index < numKnownProtocols && "Number of known protocols is wrong");
+  assert(index < NumKnownProtocols && "Number of known protocols is wrong");
   if (knownProtocols[index])
     return knownProtocols[index];
 
   // Look for the protocol by name.
   Identifier name;
   switch (kind) {
-  case KnownProtocolKind::ArrayBound:
-    name = Context.getIdentifier("ArrayBound");
+#define PROTOCOL(Id) \
+  case KnownProtocolKind::Id: \
+    name = Context.getIdentifier(#Id); \
     break;
-
-  case KnownProtocolKind::ArrayLiteralConvertible:
-    name = Context.getIdentifier("ArrayLiteralConvertible");
-    break;
-
-  case KnownProtocolKind::BuiltinCharacterLiteralConvertible:
-    name = Context.getIdentifier("BuiltinCharacterLiteralConvertible");
-    break;
-
-  case KnownProtocolKind::BuiltinFloatLiteralConvertible:
-    name = Context.getIdentifier("BuiltinFloatLiteralConvertible");
-    break;
-
-  case KnownProtocolKind::BuiltinIntegerLiteralConvertible:
-    name = Context.getIdentifier("BuiltinIntegerLiteralConvertible");
-    break;
-
-  case KnownProtocolKind::BuiltinStringLiteralConvertible:
-    name = Context.getIdentifier("BuiltinStringLiteralConvertible");
-    break;
-
-  case KnownProtocolKind::CharacterLiteralConvertible:
-    name = Context.getIdentifier("CharacterLiteralConvertible");
-    break;
-
-  case KnownProtocolKind::DictionaryLiteralConvertible:
-    name = Context.getIdentifier("DictionaryLiteralConvertible");
-    break;
-
-  case KnownProtocolKind::Enumerable:
-    name = Context.getIdentifier("Enumerable");
-    break;
-
-  case KnownProtocolKind::Enumerator:
-    name = Context.getIdentifier("Enumerator");
-    break;
-
-  case KnownProtocolKind::FloatLiteralConvertible:
-    name = Context.getIdentifier("FloatLiteralConvertible");
-    break;
-
-  case KnownProtocolKind::IntegerLiteralConvertible:
-    name = Context.getIdentifier("IntegerLiteralConvertible");
-    break;
-
-  case KnownProtocolKind::LogicValue:
-    name = Context.getIdentifier("LogicValue");
-    break;
-
-  case KnownProtocolKind::StringInterpolationConvertible:
-    name = Context.getIdentifier("StringInterpolationConvertible");
-    break;
-
-  case KnownProtocolKind::StringLiteralConvertible:
-    name = Context.getIdentifier("StringLiteralConvertible");
-    break;
+#include "swift/AST/KnownProtocols.def"
   }
 
   UnqualifiedLookup global(name, getStdlibModule());
@@ -476,6 +422,14 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   }
 }
 
+static void recordKnownProtocol(Module *stdlib, StringRef name,
+                                KnownProtocolKind kind) {
+  Identifier ID = stdlib->Ctx.getIdentifier(name);
+  UnqualifiedLookup lookup(ID, stdlib, SourceLoc(), /*IsType=*/true);
+  if (auto proto = dyn_cast_or_null<ProtocolDecl>(lookup.getSingleTypeResult()))
+    proto->setKnownProtocolKind(kind);
+}
+
 /// performTypeChecking - Once parsing and namebinding are complete, these
 /// walks the AST to resolve types and diagnose problems therein.
 ///
@@ -499,6 +453,12 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       continue;
     }
   }
+
+  // Record compiler-known protocol information in the AST.
+  Module *stdlib = TC.getStdlibModule();
+#define PROTOCOL(Name) \
+  recordKnownProtocol(stdlib, #Name, KnownProtocolKind::Name);
+#include "swift/AST/KnownProtocols.def"
 
   // FIXME: Check for cycles in class inheritance here?
 

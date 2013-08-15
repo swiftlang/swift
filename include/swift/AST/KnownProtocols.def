@@ -1,0 +1,60 @@
+//===-- KnownProtocols.def - Compiler protocol metaprogramming --*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with compiler-known
+// protocols.
+//
+//===----------------------------------------------------------------------===//
+
+
+/// \def PROTOCOL(Id)
+///
+/// The enumerator value is \c KnownProtocolKind::Id. The protocol represented
+/// is simply named \p Id.
+#ifndef PROTOCOL
+#define PROTOCOL(Id)
+#endif
+
+/// \def LITERAL_CONVERTIBLE_PROTOCOL(Id)
+#ifndef LITERAL_CONVERTIBLE_PROTOCOL
+#define LITERAL_CONVERTIBLE_PROTOCOL(Id) PROTOCOL(Id)
+#endif
+
+/// \def BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(Id)
+///
+/// Note that this is not a special form of LITERAL_CONVERTIBLE_PROTOCOL.
+#ifndef BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL
+#define BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(Id) PROTOCOL(Id)
+#endif
+
+PROTOCOL(ArrayBound)
+PROTOCOL(Enumerable)
+PROTOCOL(Enumerator)
+PROTOCOL(LogicValue)
+
+LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(CharacterLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(DictionaryLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(FloatLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(IntegerLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(StringInterpolationConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(StringLiteralConvertible)
+
+BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(BuiltinCharacterLiteralConvertible)
+BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(BuiltinFloatLiteralConvertible)
+BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(BuiltinIntegerLiteralConvertible)
+BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(BuiltinStringLiteralConvertible)
+
+
+#undef LITERAL_CONVERTIBLE_PROTOCOL
+#undef BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL
+#undef PROTOCOL

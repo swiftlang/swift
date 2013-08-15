@@ -20,6 +20,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTMutationListener.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/SetVector.h"
 #include <functional>
@@ -32,64 +33,6 @@ class TypeChecker;
 /// mappings for those types.
 typedef llvm::DenseMap<SubstitutableType *,
                        SmallVector<ProtocolConformance *, 2>> ConformanceMap;
-
-/// \brief The set of known protocols.
-enum class KnownProtocolKind : unsigned {
-  /// \brief The 'ArrayBound' protocol, used for array bounds.
-  ArrayBound,
-
-  /// \brief The 'ArrayLiteralConvertible' protocol, used for array literals.
-  ArrayLiteralConvertible,
-
-  /// \brief The 'BuiltinCharacterLiteralConvertible' protocol, used for
-  /// character literals.
-  BuiltinCharacterLiteralConvertible,
-
-  /// \brief The 'BuiltinFloatLiteralConvertible' protocol, used for floating
-  /// point literals.
-  BuiltinFloatLiteralConvertible,
-
-  /// \brief The 'BuiltinIntegerLiteralConvertible' protocol, used for integer
-  /// literals.
-  BuiltinIntegerLiteralConvertible,
-
-  /// \brief The 'BuiltinStringLiteralConvertible' protocol, used for string
-  /// literals.
-  BuiltinStringLiteralConvertible,
-
-  /// \brief The 'CharacterLiteralConvertible' protocol, used for character
-  /// literals.
-  CharacterLiteralConvertible,
-
-  /// \brief The 'DictionaryLiteralConvertible' protocol, used for dictionary
-  /// literals.
-  DictionaryLiteralConvertible,
-
-  /// \brief The 'Enumerable' protocol, used by the for-each loop.
-  Enumerable,
-
-  /// \brief The 'Enumerator' protocol, used by the for-each loop.
-  Enumerator,
-
-  /// \brief The 'FloatLiteralConvertible' protocol, used for floating
-  /// point literals.
-  FloatLiteralConvertible,
-
-  /// \brief The 'IntegerLiteralConvertible' protocol, used for integer
-  /// literals.
-  IntegerLiteralConvertible,
-
-  /// \brief The 'LogicValue' protocol, used for places where a value is
-  /// considered to be a logic value, such as in an 'if' statement.
-  LogicValue,
-
-  /// \brief The 'StringInterpolationConvertible ' protocol, used for string
-  /// interpolation literals.
-  StringInterpolationConvertible,
-
-  /// \brief The 'StringLiteralConvertible' protocol, used for string literals.
-  StringLiteralConvertible
-};
 
 /// The result of name lookup.
 class LookupResult {
@@ -179,13 +122,8 @@ public:
   std::vector<FuncExprLike> definedFunctions;
 
 private:
-  /// \brief The number of known protocols.
-  static const unsigned numKnownProtocols
-    = 1 + static_cast<unsigned>(
-            KnownProtocolKind::StringLiteralConvertible);
-
   /// \brief The set of known protocols, lazily populated as needed.
-  ProtocolDecl *knownProtocols[numKnownProtocols] = { };
+  ProtocolDecl *knownProtocols[NumKnownProtocols] = { };
 
   Type IntLiteralType;
   Type FloatLiteralType;

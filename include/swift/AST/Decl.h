@@ -20,6 +20,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DefaultArgumentKind.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
@@ -153,8 +154,12 @@ class alignas(8) Decl {
 
     /// Whether the existential of this protocol conforms to itself.
     unsigned ExistentialConformsToSelf : 1;
+
+    /// If this is a compiler-known protocol, this will be a KnownProtocolKind
+    /// value, plus one. Otherwise, it will be 0.
+    unsigned KnownProtocol : 4;
   };
-  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 4 };
+  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 8 };
   static_assert(NumProtocolDeclBits <= 32, "fits in an unsigned");
 
   class InfixOperatorDeclBitFields {
@@ -1596,6 +1601,24 @@ public:
   void setExistentialConformsToSelf(bool conforms) {
     ProtocolDeclBits.ExistentialConformsToSelfValid = true;
     ProtocolDeclBits.ExistentialConformsToSelf = conforms;
+  }
+
+  /// If this is known to be a compiler-known protocol, returns the kind.
+  /// Otherwise returns Nothing.
+  ///
+  /// Note that this is only valid after type-checking.
+  Optional<KnownProtocolKind> getKnownProtocolKind() const {
+    if (ProtocolDeclBits.KnownProtocol == 0)
+      return Nothing;
+    return static_cast<KnownProtocolKind>(ProtocolDeclBits.KnownProtocol - 1);
+  }
+
+  /// Records that this is a compiler-known protocol.
+  void setKnownProtocolKind(KnownProtocolKind kind) {
+    assert((!getKnownProtocolKind() || *getKnownProtocolKind() == kind) &&
+           "can't reset known protocol kind");
+    ProtocolDeclBits.KnownProtocol = static_cast<unsigned>(kind) + 1;
+    assert(*getKnownProtocolKind() == kind && "not enough bits");
   }
 
   // Implement isa/cast/dyncast/etc.
