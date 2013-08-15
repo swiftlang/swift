@@ -34,20 +34,15 @@ static void diagnose(SILModule *M, SILLocation loc, ArgTypes... args) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-  /// Recursively computing the number of elements in a type can be exponential,
-  /// and even if the number of elements is low, the presence of single-element
-  /// struct wrappers (like Int!) means that computing this is non-trivial.
-  ///
-  /// Cache the results of the NumElements computation in a DenseMap to make
-  /// this be linear in the number of types analyzed.
-  class NumElementsCache {
-    llvm::DenseMap<CanType, unsigned> ElementCountMap;
-    
-    NumElementsCache(const NumElementsCache&) = delete;
-    void operator=(const NumElementsCache&) = delete;
+  class TupleFlattening {
+    TupleFlattening(const TupleFlattening&) = delete;
+    void operator=(const TupleFlattening&) = delete;
   public:
-    NumElementsCache() {}
-    unsigned get(CanType T);
+    TupleFlattening() {}
+
+    /// Return the number of elements (recursively flattened tuple leaves)
+    /// contained in a type.  For non-tuple types, this is always 1.
+    unsigned getElementCount(CanType T);
 
     /// Push the symbolic path name to the specified element number onto to
     /// specified std::string.
@@ -66,36 +61,31 @@ namespace {
   };
 } // end anonymous namespace
 
-/// getNumElements - Return the number of elements in the flattened SILType.
-/// For tuples and structs, this is the (recursive) count of the fields it
-/// contains.
-unsigned NumElementsCache::get(CanType T) {
-  if (TupleType *TT = T->getAs<TupleType>()) {
-    auto It = ElementCountMap.find(T);
-    if (It != ElementCountMap.end()) return It->second;
-    
-    unsigned NumElements = 0;
-    for (auto &Elt : TT->getFields())
-      NumElements += get(Elt.getType()->getCanonicalType());
-    return ElementCountMap[T] = NumElements;
-  }
-  
+/// getElementCount - Return the number of elements in the flattened SILType.
+/// For tuples, this is the (recursive) count of the fields it contains.
+unsigned TupleFlattening::getElementCount(CanType T) {
+  TupleType *TT = T->getAs<TupleType>();
+
   // If this isn't a tuple, it is a single element.
-  return 1;
+  if (!TT) return 1;
+
+  unsigned NumElements = 0;
+  for (auto &Elt : TT->getFields())
+    NumElements += getElementCount(Elt.getType()->getCanonicalType());
+  return NumElements;
 }
 
-/// Push the symbolic path name to the specified element number onto to
+/// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
-void NumElementsCache::getPathStringToElement(CanType T, unsigned Element,
-                                              std::string &Result) {
-  // If the specified type has a single element, we're done.  Don't dive in any
-  // farther even if we could.
-  if (get(T) == 1) return;
-  
-  TupleType *TT = T->castTo<TupleType>();
+void TupleFlattening::getPathStringToElement(CanType T, unsigned Element,
+                                             std::string &Result) {
+  TupleType *TT = T->getAs<TupleType>();
+  if (!TT) return;
+
   unsigned FieldNo = 0;
   for (auto &Field : TT->getFields()) {
-    unsigned ElementsForField = get(Field.getType()->getCanonicalType());
+    unsigned ElementsForField =
+      getElementCount(Field.getType()->getCanonicalType());
     
     if (Element < ElementsForField) {
       Result += '.';
@@ -116,15 +106,13 @@ void NumElementsCache::getPathStringToElement(CanType T, unsigned Element,
 
 /// Given a pointer to an aggregate type, compute the addresses of each
 /// element and add them to the ElementAddrs vector.
-void NumElementsCache::getElementAddresses(SILValue Pointer,
+void TupleFlattening::getElementAddresses(SILValue Pointer,
                                SmallVectorImpl<SILInstruction*> &ElementAddrs) {
-  CanType AggType = Pointer.getType().getSwiftRValueType();
-  assert(get(AggType) != 1 && "Shouldn't decompose scalars");
-  
+  TupleType *TT = Pointer.getType().getSwiftRValueType()->castTo<TupleType>();
+
   SILInstruction *PointerInst = cast<SILInstruction>(Pointer.getDef());
   SILBuilder B(++SILBasicBlock::iterator(PointerInst));
 
-  TupleType *TT = AggType->castTo<TupleType>();
   for (auto &Field : TT->getFields()) {
     auto ResultTy = Field.getType()->getCanonicalType();
     ElementAddrs.push_back(B.createTupleElementAddr(PointerInst->getLoc(),
@@ -135,14 +123,12 @@ void NumElementsCache::getElementAddresses(SILValue Pointer,
 }
 
 /// Given an RValue of aggregate type, compute the values of the elements by
-/// emitting a series of tuple_element or struct_element instructions.
-void NumElementsCache::getElements(SILValue V,
-                                   SmallVectorImpl<SILValue> &ElementVals,
-                                   SILLocation Loc, SILBuilder &B) {
-  CanType AggType = V.getType().getSwiftRValueType();
-  assert(get(AggType) != 1 && "Shouldn't decompose scalars");
-  
-  TupleType *TT = AggType->castTo<TupleType>();
+/// emitting a series of tuple_element instructions.
+void TupleFlattening::getElements(SILValue V,
+                                  SmallVectorImpl<SILValue> &ElementVals,
+                                  SILLocation Loc, SILBuilder &B) {
+  TupleType *TT = V.getType().getSwiftRValueType()->castTo<TupleType>();
+
   // If this is exploding a tuple_inst, just return the element values.  This
   // can happen when recursively scalarizing stuff.
   if (auto *TI = dyn_cast<TupleInst>(V)) {
@@ -211,7 +197,7 @@ namespace {
     AllocBoxInst *TheAllocBox;
     unsigned ElementNumber;
     ElementUses &Uses;
-    NumElementsCache &NumElements;
+    TupleFlattening &TupleInfo;
     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
 
     /// This is the set of uses that are not loads (i.e., they are Stores,
@@ -225,7 +211,7 @@ namespace {
     bool HadError = false;
   public:
     ElementPromotion(AllocBoxInst *TheAllocBox, unsigned ElementNumber,
-                     ElementUses &Uses, NumElementsCache &NumElements);
+                     ElementUses &Uses, TupleFlattening &TupleInfo);
 
     void doIt();
     
@@ -251,9 +237,9 @@ namespace {
 
 ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox,
                                    unsigned ElementNumber, ElementUses &Uses,
-                                   NumElementsCache &NumElements)
+                                   TupleFlattening &TupleInfo)
   : TheAllocBox(TheAllocBox), ElementNumber(ElementNumber), Uses(Uses),
-    NumElements(NumElements) {
+    TupleInfo(TupleInfo) {
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -289,11 +275,10 @@ void ElementPromotion::diagnoseInitError(SILInstruction *Use,
         dyn_cast_or_null<ValueDecl>(TheAllocBox->getLoc().getAs<Decl>())) {
     std::string Name = VD->getName().str();
     
-    // If the overall memory allocation is an aggregate of multiple elements
-    // (i.e. a struct or tuple), then dive in to explain *which* element is
-    // being used uninitialized.
+    // If the overall memory allocation is a tuple with multiple elements,
+    // then dive in to explain *which* element is being used uninitialized.
     CanType AllocTy = TheAllocBox->getElementType().getSwiftRValueType();
-    NumElements.getPathStringToElement(AllocTy, ElementNumber, Name);
+    TupleInfo.getPathStringToElement(AllocTy, ElementNumber, Name);
     
     diagnose(Use->getModule(), Use->getLoc(), DiagWithName, Name);
     
@@ -562,7 +547,7 @@ ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV) {
 namespace {
   class ElementUseCollector {
     SmallVectorImpl<ElementUses> &Uses;
-    NumElementsCache &NumElements;
+    TupleFlattening &TupleInfo;
 
     /// When walking the use list, if we index into a struct element, keep track
     /// of this, so that any indexes into tuple subelements don't affect the
@@ -570,8 +555,8 @@ namespace {
     bool InStructSubElement = false;
   public:
     ElementUseCollector(SmallVectorImpl<ElementUses> &Uses,
-                        NumElementsCache &NumElements)
-      : Uses(Uses), NumElements(NumElements) {
+                        TupleFlattening &TupleInfo)
+      : Uses(Uses), TupleInfo(TupleInfo) {
     }
 
     /// This is the main entry point for the use walker.
@@ -593,8 +578,8 @@ namespace {
 /// to keep the Uses data structure up to date for aggregate uses.
 void ElementUseCollector::addElementUses(unsigned BaseElt, SILType UseTy,
                                          SILInstruction *User, UseKind Kind) {
-  for (unsigned i = 0, e = NumElements.get(UseTy.getSwiftRValueType());
-       i != e; ++i)
+  for (unsigned i = 0,
+       e = TupleInfo.getElementCount(UseTy.getSwiftRValueType()); i != e; ++i)
     Uses[BaseElt+i].push_back({ User, Kind });
 }
 
@@ -617,7 +602,7 @@ collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseElt) {
   unsigned NewBaseElt = BaseElt;
   for (unsigned i = 0; i != FieldNo; ++i) {
     CanType EltTy = TT->getElementType(i)->getCanonicalType();
-    NewBaseElt += NumElements.get(EltTy);
+    NewBaseElt += TupleInfo.getElementCount(EltTy);
   }
   
   collectUses(SILValue(TEAI, 0), NewBaseElt);
@@ -653,7 +638,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     
     // Loads are a use of the value.
     if (isa<LoadInst>(User) || isa<LoadWeakInst>(User)) {
-      if (NumElements.get(PointeeType.getSwiftRValueType()) == 1)
+      if (TupleInfo.getElementCount(PointeeType.getSwiftRValueType()) == 1)
         Uses[BaseElt].push_back({User, UseKind::Load});
       else {
         assert(!isa<LoadWeakInst>(User) &&
@@ -667,7 +652,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
          isa<StoreWeakInst>(User)) &&
         UI->getOperandNumber() == 1) {
-      if (NumElements.get(PointeeType.getSwiftRValueType()) == 1)
+      if (TupleInfo.getElementCount(PointeeType.getSwiftRValueType()) == 1)
         Uses[BaseElt].push_back({ User, UseKind::Store });
       else {
         assert(!isa<StoreWeakInst>(User) &&
@@ -737,7 +722,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
   // that we need to for canonicalization or analysis reasons.
   if (!UsesToScalarize.empty()) {
     SmallVector<SILInstruction*, 4> ElementAddrs;
-    NumElements.getElementAddresses(Pointer, ElementAddrs);
+    TupleInfo.getElementAddresses(Pointer, ElementAddrs);
     
     SmallVector<SILValue, 4> ElementTmps;
     for (auto *User : UsesToScalarize) {
@@ -763,7 +748,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       
       // Scalarize AssignInst
       if (auto *AI = dyn_cast<AssignInst>(User)) {
-        NumElements.getElements(AI->getOperand(0), ElementTmps, AI->getLoc(),B);
+        TupleInfo.getElements(AI->getOperand(0), ElementTmps, AI->getLoc(),B);
 
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
           B.createAssign(AI->getLoc(), ElementTmps[i], ElementAddrs[i]);
@@ -773,7 +758,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       
       // Scalarize StoreInst
       auto *SI = cast<StoreInst>(User);
-      NumElements.getElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
+      TupleInfo.getElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
       
       for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
         B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i]);
@@ -789,27 +774,28 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
 }
 
 
-static void optimizeAllocBox(AllocBoxInst *ABI, NumElementsCache &NumElements) {
+static void optimizeAllocBox(AllocBoxInst *ABI, TupleFlattening &TupleInfo) {
   // Set up the datastructure used to collect the uses of the alloc_box.  The
   // uses are bucketed up into the elements of the allocation that are being
   // used.  This matters for element-wise tuples and fragile structs.
   SmallVector<ElementUses, 1> Uses;
-  Uses.resize(NumElements.get(ABI->getElementType().getSwiftRValueType()));
+  Uses.resize(TupleInfo.
+              getElementCount(ABI->getElementType().getSwiftRValueType()));
 
   // Walk the use list of the pointer, collecting them into the Uses array.
-  ElementUseCollector(Uses, NumElements).collectUses(SILValue(ABI, 1), 0);
+  ElementUseCollector(Uses, TupleInfo).collectUses(SILValue(ABI, 1), 0);
 
   // Process each scalar value in the uses array individually.
   unsigned EltNo = 0;
   for (auto &Elt : Uses)
-    ElementPromotion(ABI, EltNo++, Elt, NumElements).doIt();
+    ElementPromotion(ABI, EltNo++, Elt, TupleInfo).doIt();
 }
 
 
 /// performSILMemoryPromotion - Promote alloc_box uses into SSA registers and
 /// perform definitive initialization analysis.
 void swift::performSILMemoryPromotion(SILModule *M) {
-  NumElementsCache NumElements;
+  TupleFlattening TupleInfo;
   for (auto &Fn : *M) {
     for (auto &BB : Fn) {
       auto I = BB.begin(), E = BB.end();
@@ -820,7 +806,7 @@ void swift::performSILMemoryPromotion(SILModule *M) {
           continue;
         }
 
-        optimizeAllocBox(ABI, NumElements);
+        optimizeAllocBox(ABI, TupleInfo);
 
         // Carefully move iterator to avoid invalidation problems.
         ++I;
