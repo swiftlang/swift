@@ -632,21 +632,21 @@ public:
         printRec(D);
         OS << '\n';
       }
-    } else if (S->getInitializer()) {
-      printRec(S->getInitializer());
+    } else if (auto *Initializer = S->getInitializer().getPtrOrNull()) {
+      printRec(Initializer);
       OS << '\n';
     } else {
       OS.indent(Indent+2) << "<null initializer>\n";
     }
 
-    if (S->getCond().isNull())
-      OS.indent(Indent+2) << "<null condition>";
+    if (auto *Cond = S->getCond().getPtrOrNull())
+      printRec(Cond);
     else
-      printRec(S->getCond().get());
+      OS.indent(Indent+2) << "<null condition>";
     OS << '\n';
 
-    if (S->getIncrement()) {
-      printRec(S->getIncrement());
+    if (auto *Increment = S->getIncrement().getPtrOrNull()) {
+      printRec(Increment);
     } else {
       OS.indent(Indent+2) << "<null increment>";
     }

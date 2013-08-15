@@ -556,23 +556,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (doIt(D))
         return nullptr;
     
-    if (FS->getInitializer()) {
-      if (Expr *E = doIt(FS->getInitializer()))
+    if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
+      if (Expr *E = doIt(Initializer))
         FS->setInitializer(E);
       else
         return nullptr;
     }
     
-    if (FS->getCond().isNonNull()) {
-      if (Expr *E2 = doIt(FS->getCond().get()))
+    if (auto *Cond = FS->getCond().getPtrOrNull()) {
+      if (Expr *E2 = doIt(Cond))
         FS->setCond(E2);
       else
         return nullptr;
 
     }
 
-    if (FS->getIncrement()) {
-      if (Expr *E = doIt(FS->getIncrement()))
+    if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
+      if (Expr *E = doIt(Increment))
         FS->setIncrement(E);
       else
         return nullptr;

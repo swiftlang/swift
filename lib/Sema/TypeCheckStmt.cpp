@@ -217,25 +217,22 @@ public:
     for (auto D : FS->getInitializerVarDecls())
       TC.typeCheckDecl(D, /*isFirstPass*/false);
 
-    Expr *Tmp = FS->getInitializer();
-    if (Tmp) {
-      if (TC.typeCheckExpression(Tmp, DC, Type(), /*discardedExpr=*/true))
+    if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
+      if (TC.typeCheckExpression(Initializer, DC, Type(), /*discardedExpr=*/true))
         return 0;
-      FS->setInitializer(Tmp);
+      FS->setInitializer(Initializer);
     }
-    
-    // Type check the condition if present.
-    if (FS->getCond().isNonNull()) {
-      Expr *E = FS->getCond().get();
-      if (TC.typeCheckCondition(E, DC)) return 0;
-      FS->setCond(E);
-    }
-    
-    Tmp = FS->getIncrement();
-    if (Tmp) {
-      if (TC.typeCheckExpression(Tmp, DC, Type(), /*discardedExpr=*/true))
+
+    if (auto *Cond = FS->getCond().getPtrOrNull()) {
+      if (TC.typeCheckCondition(Cond, DC))
         return 0;
-      FS->setIncrement(Tmp);
+      FS->setCond(Cond);
+    }
+
+    if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
+      if (TC.typeCheckExpression(Increment, DC, Type(), /*discardedExpr=*/true))
+        return 0;
+      FS->setIncrement(Increment);
     }
 
     AddLoopNest loopNest(*this);

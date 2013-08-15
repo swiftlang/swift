@@ -249,9 +249,9 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   for (auto D : S->getInitializerVarDecls())
     visit(D);
   
-  if (S->getInitializer()) {
+  if (auto *Initializer = S->getInitializer().getPtrOrNull()) {
     FullExpr Scope(Cleanups);
-    emitRValue(S->getInitializer());
+    emitRValue(Initializer);
   }
   
   // If we ever reach an unreachable point, stop emitting statements.
@@ -281,9 +281,9 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
     
     emitOrDeleteBlock(B, IncBB);
     
-    if (B.hasValidInsertionPoint() && S->getIncrement()) {
+    if (B.hasValidInsertionPoint() && S->getIncrement().isNonNull()) {
       FullExpr Scope(Cleanups);
-      emitRValue(S->getIncrement());
+      emitRValue(S->getIncrement().get());
     }
     
     if (B.hasValidInsertionPoint())

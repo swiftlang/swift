@@ -232,21 +232,21 @@ public:
 /// optional.
 class ForStmt : public Stmt {
   SourceLoc ForLoc, Semi1Loc, Semi2Loc;
-  Expr *Initializer;
+  NullablePtr<Expr> Initializer;
   ArrayRef<Decl*> InitializerVarDecls;
   NullablePtr<Expr> Cond;
-  Expr *Increment;
+  NullablePtr<Expr> Increment;
   Stmt *Body;
   
 public:
   ForStmt(SourceLoc ForLoc,
-          Expr *Initializer,
+          NullablePtr<Expr> Initializer,
           ArrayRef<Decl*> InitializerVarDecls,
           SourceLoc Semi1Loc, NullablePtr<Expr> Cond, SourceLoc Semi2Loc,
-          Expr *Increment,
+          NullablePtr<Expr> Increment,
           Stmt *Body)
   : Stmt(StmtKind::For), ForLoc(ForLoc), Semi1Loc(Semi1Loc),
-    Semi2Loc(Semi2Loc), Initializer(Initializer), 
+    Semi2Loc(Semi2Loc), Initializer(Initializer),
     InitializerVarDecls(InitializerVarDecls),
     Cond(Cond), Increment(Increment), Body(Body) {
   }
@@ -255,16 +255,18 @@ public:
     return SourceRange(ForLoc, Body->getEndLoc());
   }
   
-  Expr *getInitializer() const { return Initializer;}
+  NullablePtr<Expr> getInitializer() const { return Initializer; }
   void setInitializer(Expr *V) { Initializer = V; }
   
   ArrayRef<Decl*> getInitializerVarDecls() const { return InitializerVarDecls; }
   void setInitializerVarDecls(ArrayRef<Decl*> D) { InitializerVarDecls = D; }
-  
+
   NullablePtr<Expr> getCond() const { return Cond; }
   void setCond(NullablePtr<Expr> C) { Cond = C; }
-  Expr *getIncrement() const { return Increment; }
+
+  NullablePtr<Expr> getIncrement() const { return Increment; }
   void setIncrement(Expr *V) { Increment = V; }
+
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
   
