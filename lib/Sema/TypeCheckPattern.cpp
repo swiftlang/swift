@@ -508,18 +508,19 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     bool missingType = false;
     for (unsigned i = 0, e = tuplePat->getFields().size(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getFields()[i];
-      Type type;
       Pattern *pattern = elt.getPattern();
       bool isVararg = tuplePat->hasVararg() && i == e-1;
       if (typeCheckPattern(pattern, dc, allowUnknownTypes, isVararg)) {
         hadError = true;
-      } else if (pattern->hasType()) {
-        type = pattern->getType();
-      } else {
+        continue;
+      }
+      if (!pattern->hasType()) {
         missingType = true;
+        continue;
       }
 
-      typeElts.push_back(TupleTypeElt(type, pattern->getBoundName(),
+      typeElts.push_back(TupleTypeElt(pattern->getType(),
+                                      pattern->getBoundName(),
                                       elt.getDefaultArgKind(),
                                       isVararg));
     }
