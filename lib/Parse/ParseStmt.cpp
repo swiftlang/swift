@@ -576,6 +576,8 @@ static bool parseExprForCStyle(Parser &P, NullablePtr<Expr> &Result,
 ///   stmt-for-c-style:
 ///     'for' stmt-for-c-style-init? ';' expr? ';' expr-or-stmt-assign-basic?
 ///           stmt-brace
+///     'for' '(' stmt-for-c-style-init? ';' expr? ';'
+///           expr-or-stmt-assign-basic? ')' stmt-brace
 ///   stmt-for-c-style-init:
 ///     decl-var
 ///     expr-basic-or-stmt-assign
