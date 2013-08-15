@@ -741,7 +741,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
 
     if (TupTyR->hasEllipsis()) {
       Type BaseTy = Elements.back().getType();
-      Type FullTy = ArraySliceType::get(BaseTy, Context);
+      Type FullTy = getArraySliceType(TupTyR->getEllipsisLoc(), BaseTy);
       Identifier Name = Elements.back().getName();
       // FIXME: Where are we rejecting default arguments for variadic
       // parameters?
