@@ -127,7 +127,7 @@ Debug Printing
 
 Via compiler magic, *everything* conforms to the ``DebugPrintable``
 protocol. To change the debug representation for a type, you don't
-need to declare conformance: simply give the type a ``formatForDebugging()``
+need to declare conformance: simply give the type a ``debugFormat()``
 ::
 
   /// \brief A thing that can be printed in the REPL and the Debugger
@@ -136,11 +136,11 @@ need to declare conformance: simply give the type a ``formatForDebugging()``
 
     /// \brief Produce a textual representation for the REPL and
     /// Debugger.
-    func formatForDebugging() -> DebugRepresentation
+    func debugFormat() -> DebugRepresentation
   }
 
 Because ``String`` is a ``Streamable``, your implementation of
-``formatForDebugging`` can just return a ``String``. If want to write
+``debugFormat`` can just return a ``String``. If want to write
 directly to the ``OutputStream`` for efficiency reasons,
 (e.g. if your representation is huge), you can return a custom
 ``DebugRepresentation`` type.
@@ -150,7 +150,7 @@ directly to the ``OutputStream`` for efficiency reasons,
 
    Producing a representation that can be consumed by the REPL
    and LLDB to produce an equivalent object is strongly encouraged
-   where possible!  For example, ``String.formatForDebugging()`` produces
+   where possible!  For example, ``String.debugFormat()`` produces
    a representation starting and ending with “``"``”, where special
    characters are escaped, etc. A ``struct Point { var x, y: Int }``
    might be represented as “``Point(x: 3, y: 5)``”.
@@ -164,7 +164,7 @@ is a ``String``, ``s.format()`` returns the string itself,
 without quoting.
 
 Conformance to ``Printable`` is explicit, but if you want to use the
-``formatForDebugging()`` results for your type's ``format()``, all you
+``debugFormat()`` results for your type's ``format()``, all you
 need to do is declare conformance to ``Printable``; there's nothing to
 implement::
 
@@ -177,7 +177,7 @@ implement::
     /// In general you can return a String here, but if you need more
     /// control, return a custom Streamable type
     func format() -> PrintRepresentation {
-      return formatForDebugging()
+      return debugFormat()
     }
 
     /// \brief Simply convert to String
@@ -211,11 +211,11 @@ naturally ::
 How ``String`` Fits In
 ......................
 
-``String``\ 's ``formatForDebugging()`` yields a ``Streamable`` that
+``String``\ 's ``debugFormat()`` yields a ``Streamable`` that
 adds surrounding quotes and escapes special characters::
 
   extension String : DebugPrintable {
-    func formatForDebugging() -> EscapedStringRepresentation {
+    func debugFormat() -> EscapedStringRepresentation {
       return EscapedStringRepresentation(this)
     }
   }
