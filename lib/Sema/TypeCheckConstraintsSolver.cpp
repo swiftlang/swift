@@ -615,7 +615,8 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
         if (!tc.getDefaultType(proto))
           continue;
 
-        for (auto decl : tc.Context.getTypesThatConformTo(proto)) {
+        KnownProtocolKind knownKind = *proto->getKnownProtocolKind();
+        for (auto decl : tc.Context.getTypesThatConformTo(knownKind)) {
           Type type;
           if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
             type = nominal->getDeclaredTypeOfContext();

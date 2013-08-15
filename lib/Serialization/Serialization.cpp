@@ -14,6 +14,7 @@
 #include "ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Serialization/BCRecordLayout.h"
@@ -115,6 +116,9 @@ namespace {
     /// IdentifierID.
     std::vector<CharOffset> IdentifierOffsets;
 
+    SmallVector<DeclID, 2> KnownProtocolAdopters[NumKnownProtocols];
+    SmallVector<DeclID, 2> ConversionMethods;
+
     /// The last assigned DeclID for decls from this module.
     DeclID LastDeclID = 0;
 
@@ -215,11 +219,13 @@ namespace {
 
     /// Writes a protocol conformance.
     void writeConformance(const ProtocolDecl *protocol,
-                          const ProtocolConformance *conformance);
+                          const ProtocolConformance *conformance,
+                          const Decl *associatedDecl);
 
     /// Writes a list of protocol conformances.
     void writeConformances(ArrayRef<ProtocolDecl *> protocols,
-                           ArrayRef<ProtocolConformance *> conformances);
+                           ArrayRef<ProtocolConformance *> conformances,
+                           const Decl *associatedDecl = nullptr);
 
     /// Writes an array of members for a decl context.
     void writeMembers(ArrayRef<Decl *> members);
@@ -509,6 +515,11 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(index_block, OPERATORS);
   RECORD(index_block, EXTENSIONS);
 
+  BLOCK(KNOWN_PROTOCOL_BLOCK);
+#define PROTOCOL(Id) RECORD(index_block, Id);
+#include "swift/AST/KnownProtocols.def"
+  RECORD(index_block, CONVERSION);
+
   BLOCK(FALL_BACK_TO_TRANSLATION_UNIT);
 
 #undef BLOCK
@@ -757,7 +768,8 @@ Serializer::encodeUnderlyingConformance(const ProtocolConformance *conformance,
 
 void
 Serializer::writeConformance(const ProtocolDecl *protocol,
-                             const ProtocolConformance *conformance) {
+                             const ProtocolConformance *conformance,
+                             const Decl *associatedDecl) {
   using namespace decls_block;
 
   if (!conformance) {
@@ -765,6 +777,19 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     NoConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     addDeclRef(protocol));
     return;
+  }
+
+  if (associatedDecl) {
+    if (auto protoKind = protocol->getKnownProtocolKind()) {
+      const NominalTypeDecl *nominal;
+      if (auto extension = dyn_cast<ExtensionDecl>(associatedDecl))
+        nominal = extension->getExtendedType()->getAnyNominal();
+      else
+        nominal = dyn_cast<NominalTypeDecl>(associatedDecl);
+
+      auto index = static_cast<unsigned>(protoKind.getValue());
+      KnownProtocolAdopters[index].push_back(addDeclRef(associatedDecl));
+    }
   }
 
   switch (conformance->getKind()) {
@@ -810,11 +835,12 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
       inheritedProtos.push_back(inheritedMapping.first);
       inheritedConformance.push_back(inheritedMapping.second);
     }
-    writeConformances(inheritedProtos, inheritedConformance);
+    writeConformances(inheritedProtos, inheritedConformance, associatedDecl);
     for (auto valueMapping : conf->getWitnesses())
       writeSubstitutions(valueMapping.second.Substitutions);
     for (auto typeMapping : conf->getTypeWitnesses())
       writeSubstitutions(typeMapping.second);
+
     break;
   }
 
@@ -850,7 +876,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
       writeSubstitutions(typeMapping.second);
 
     if (appendGenericConformance) {
-      writeConformance(protocol, conf->getGenericConformance());
+      writeConformance(protocol, conf->getGenericConformance(), nullptr);
     }
     break;
   }
@@ -872,7 +898,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
                                                    typeID,
                                                    moduleID);
     if (appendInheritedConformance) {
-      writeConformance(protocol, conf->getInheritedConformance());
+      writeConformance(protocol, conf->getInheritedConformance(), nullptr);
     }
     break;
   }
@@ -881,12 +907,13 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
 
 void
 Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
-                              ArrayRef<ProtocolConformance *> conformances) {
+                              ArrayRef<ProtocolConformance *> conformances,
+                              const Decl *associatedDecl) {
   using namespace decls_block;
 
   for_each(protocols, conformances,
            [&](const ProtocolDecl *proto, const ProtocolConformance *conf) {
-    writeConformance(proto, conf);
+    writeConformance(proto, conf, associatedDecl);
   });
 }
 
@@ -953,7 +980,7 @@ bool Serializer::writeCrossReference(const Decl *D) {
   } else if (auto op = dyn_cast<OperatorDecl>(D)) {
     kind = XRefKind::SwiftOperator;
     accessPath.push_back(addIdentifierRef(op->getName()));
-    typeID = getRawStableFixity(op->getKind());
+    typeID = getStableFixity(op->getKind());
   } else {
     llvm_unreachable("cannot cross-reference this kind of decl");
   }
@@ -1023,7 +1050,8 @@ bool Serializer::writeDecl(const Decl *D) {
                                 addDeclRef(DC),
                                 extension->isImplicit());
 
-    writeConformances(extension->getProtocols(), extension->getConformances());
+    writeConformances(extension->getProtocols(), extension->getConformances(),
+                      extension);
     writeMembers(extension->getMembers());
     return true;
   }
@@ -1111,7 +1139,8 @@ bool Serializer::writeDecl(const Decl *D) {
                                   ? addTypeRef(typeAlias->getSuperclass())
                                   : addTypeRef(Type()));
 
-    writeConformances(typeAlias->getProtocols(), typeAlias->getConformances());
+    writeConformances(typeAlias->getProtocols(), typeAlias->getConformances(),
+                      typeAlias);
     return true;
   }
 
@@ -1131,7 +1160,8 @@ bool Serializer::writeDecl(const Decl *D) {
                              theStruct->isImplicit());
 
     writeGenericParams(theStruct->getGenericParams());
-    writeConformances(theStruct->getProtocols(), theStruct->getConformances());
+    writeConformances(theStruct->getProtocols(), theStruct->getConformances(),
+                      theStruct);
     writeMembers(theStruct->getMembers());
     return true;
   }
@@ -1152,7 +1182,8 @@ bool Serializer::writeDecl(const Decl *D) {
                             theUnion->isImplicit());
 
     writeGenericParams(theUnion->getGenericParams());
-    writeConformances(theUnion->getProtocols(), theUnion->getConformances());
+    writeConformances(theUnion->getProtocols(), theUnion->getConformances(),
+                      theUnion);
     writeMembers(theUnion->getMembers());
     return true;
   }
@@ -1177,7 +1208,8 @@ bool Serializer::writeDecl(const Decl *D) {
                             addTypeRef(theClass->getSuperclass()));
 
     writeGenericParams(theClass->getGenericParams());
-    writeConformances(theClass->getProtocols(), theClass->getConformances());
+    writeConformances(theClass->getProtocols(), theClass->getConformances(),
+                      theClass);
     writeMembers(theClass->getMembers());
     return true;
   }
@@ -1286,6 +1318,9 @@ bool Serializer::writeDecl(const Decl *D) {
       writePattern(pattern);
     for (auto pattern : fn->getBody()->getBodyParamPatterns())
       writePattern(pattern);
+
+    if (fn->getAttrs().isConversion())
+      ConversionMethods.push_back(addDeclRef(DC));
 
     return true;
   }
@@ -1874,6 +1909,25 @@ static void writeDeclTable(const index_block::DeclListLayout &DeclList,
   DeclList.emit(scratch, kind, tableOffset, hashTableBlob);
 }
 
+/// Translate from the AST known protocol enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableKnownProtocolKind(KnownProtocolKind kind) {
+  switch (kind) {
+#define PROTOCOL(Id) \
+  case KnownProtocolKind::Id: return index_block::Id;
+#include "swift/AST/KnownProtocols.def"
+  }
+}
+
+/// Writes a list of decls known to conform to the given compiler-known
+/// protocol.
+static void
+writeKnownProtocolList(const index_block::KnownProtocolLayout &AdopterList,
+                       KnownProtocolKind kind, ArrayRef<DeclID> adopters) {
+  SmallVector<uint32_t, 32> scratch;
+  AdopterList.emit(scratch, getRawStableKnownProtocolKind(kind), adopters);
+}
+
 void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
   assert(!this->TU && "already serializing a translation unit");
   this->TU = TU;
@@ -1896,7 +1950,7 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
 
     } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
       operatorDecls[OD->getName()]
-        .push_back({ getRawStableFixity(OD->getKind()), addDeclRef(D) });
+        .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
     }
   }
 
@@ -1915,6 +1969,18 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
     writeDeclTable(DeclList, index_block::TOP_LEVEL_DECLS, topLevelDecls);
     writeDeclTable(DeclList, index_block::OPERATORS, operatorDecls);
     writeDeclTable(DeclList, index_block::EXTENSIONS, extensionDecls);
+
+    {
+      BCBlockRAII subBlock(Out, KNOWN_PROTOCOL_BLOCK_ID, 3);
+      index_block::KnownProtocolLayout AdopterList(Out);
+
+      for (unsigned i = 0; i < NumKnownProtocols; ++i) {
+        writeKnownProtocolList(AdopterList, static_cast<KnownProtocolKind>(i),
+                               KnownProtocolAdopters[i]);
+      }
+      AdopterList.emit(ScratchRecord, index_block::CONVERSION,
+                       ConversionMethods);
+    }
   }
 
 #ifndef NDEBUG

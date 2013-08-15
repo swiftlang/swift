@@ -16,6 +16,7 @@
 #include "ModuleFormat.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -176,10 +177,14 @@ private:
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
   std::unique_ptr<SerializedDeclTable> ExtensionDecls;
 
-  /// Read an on-disk decl hash table stored in index_block::DeclListLayout
-  /// format.
-  std::unique_ptr<SerializedDeclTable>
-  readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData);
+  using ProtocolAdopterVec = SmallVector<serialization::DeclID, 4>;
+
+  /// All adopters of compiler-known protocols in this module.
+  ///
+  /// These are eagerly deserialized to aid in type-checking.
+  /// The final entry (at NumKnownProtocols) contains decls that have
+  /// conversion methods, which also need to be eagerly deserialized.
+  ProtocolAdopterVec KnownProtocolAdopters[NumKnownProtocols+1];
 
   /// Whether this module file can be used.
   ModuleStatus Status;
@@ -193,6 +198,19 @@ private:
            issue != ModuleStatus::FallBackToTranslationUnit);
     Status = issue;
   }
+
+  /// Read an on-disk decl hash table stored in index_block::DeclListLayout
+  /// format.
+  std::unique_ptr<SerializedDeclTable>
+  readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Reads the known protocols block.
+  bool readKnownProtocolsBlock(llvm::BitstreamCursor &cursor);
+
+  /// Reads the index block, which contains global tables.
+  ///
+  /// Returns false if there was an error.
+  bool readIndexBlock(llvm::BitstreamCursor &cursor);
 
   /// Recursively reads a pattern from \c DeclTypeCursor.
   ///

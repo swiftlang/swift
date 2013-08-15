@@ -88,8 +88,9 @@ enum OperatorKind : uint8_t {
 static_assert(sizeof(OperatorKind) <= sizeof(TypeID),
               "too many operator kinds");
 
-/// Translates an operator DeclKind to a fixity.
-static inline OperatorKind getRawStableFixity(DeclKind kind) {
+/// Translates an operator DeclKind to a Serialization fixity, whose values are
+/// guaranteed to be stable.
+static inline OperatorKind getStableFixity(DeclKind kind) {
   switch (kind) {
   case DeclKind::PrefixOperator:
     return Prefix;
@@ -178,6 +179,12 @@ enum BlockID {
   ///
   /// \sa index_block
   INDEX_BLOCK_ID,
+
+  /// The known protocol block, which is a sub-block of the index block.
+  ///
+  /// This contains lists of decls known to conform to each compiler-known
+  /// protocol.
+  KNOWN_PROTOCOL_BLOCK_ID = 64,
 
   /// An empty block that signals to the reader to throw away the module and
   /// reparse the source files in the input block.
@@ -272,6 +279,7 @@ namespace decls_block {
     SUBSCRIPT_DECL,
     EXTENSION_DECL,
     DESTRUCTOR_DECL,
+    KNOWN_PROTOCOL,
 
     PAREN_PATTERN = 200,
     TUPLE_PATTERN,
@@ -792,6 +800,38 @@ namespace index_block {
     BCFixed<3>,  // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // map from identifier strings to decl kinds / decl IDs
+  >;
+
+  /// A stable version of swift::KnownProtocolKind.
+  ///
+  /// The names should be kept in sync, but the values must \em not be
+  /// renumbered or reordered without incrementing VERSION_MAJOR.
+  enum KnownProtocolKind : uint8_t {
+    /// Not a known protocol, but force deserialization anyway.
+    CONVERSION,
+
+    ArrayBound = 1,
+    Enumerable,
+    Enumerator,
+    LogicValue,
+
+    ArrayLiteralConvertible,
+    CharacterLiteralConvertible,
+    DictionaryLiteralConvertible,
+    FloatLiteralConvertible,
+    IntegerLiteralConvertible,
+    StringInterpolationConvertible,
+    StringLiteralConvertible,
+
+    BuiltinCharacterLiteralConvertible,
+    BuiltinFloatLiteralConvertible,
+    BuiltinIntegerLiteralConvertible,
+    BuiltinStringLiteralConvertible
+  };
+
+  using KnownProtocolLayout = BCGenericRecordLayout<
+    BCFixed<4>,  // known protocol ID
+    BCArray<DeclIDField> // list of conforming decls
   >;
 }
 

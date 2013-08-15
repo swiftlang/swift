@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMutationListener.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ExprHandle.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ModuleLoadListener.h"
 #include "swift/Basic/SourceManager.h"
@@ -97,8 +98,8 @@ struct ASTContext::Implementation {
     BoundGenericSubstitutions;
 
   /// \brief The set of nominal types and extensions thereof known to conform
-  /// to each protocol.
-  llvm::DenseMap<ProtocolDecl *, SmallVector<Decl *, 4>> Conformances;
+  /// to compiler-known protocols.
+  SmallVector<Decl *, 8> KnownProtocolConformances[NumKnownProtocols];
 
   /// The list of normal protocol conformances.
   ///
@@ -329,18 +330,19 @@ void ASTContext::setClangNode(Decl *decl, ClangNode node) {
   Impl.ClangNodes[decl] = node;
 }
 
-void ASTContext::recordConformance(ProtocolDecl *protocol, Decl *decl) {
+void ASTContext::recordConformance(KnownProtocolKind protocolKind, Decl *decl) {
   assert(isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl));
-  Impl.Conformances[protocol].push_back(decl);
+  auto index = static_cast<unsigned>(protocolKind);
+  assert(index < NumKnownProtocols);
+  Impl.KnownProtocolConformances[index].push_back(decl);
 }
 
 /// \brief Retrieve the set of nominal types and extensions thereof that
 /// conform to the given protocol.
-ArrayRef<Decl *> ASTContext::getTypesThatConformTo(ProtocolDecl *protocol) {
-  auto known = Impl.Conformances.find(protocol);
-  if (known == Impl.Conformances.end())
-    return { };
-  return known->second;
+ArrayRef<Decl *> ASTContext::getTypesThatConformTo(KnownProtocolKind kind) {
+  auto index = static_cast<unsigned>(kind);
+  assert(index < NumKnownProtocols);
+  return Impl.KnownProtocolConformances[index];
 }
 
 NormalProtocolConformance *

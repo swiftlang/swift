@@ -277,9 +277,11 @@ public:
             ProtocolConformance *conformance = nullptr;
             if (TC.conformsToProtocol(T, proto, &conformance,
                                       D->getStartLoc(), D)) {
-              // For nominal types and extensions thereof, record conformance.
-              if (isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D))
-                TC.Context.recordConformance(proto, D);
+              // For nominal types and extensions thereof, record conformance
+              // to known protocols.
+              if (auto kind = proto->getKnownProtocolKind())
+                if (isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D))
+                  TC.Context.recordConformance(kind.getValue(), D);
             }
             allProtocols.push_back(proto);
             allConformances.push_back(conformance);

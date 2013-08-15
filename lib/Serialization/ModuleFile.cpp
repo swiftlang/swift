@@ -433,9 +433,6 @@ void processConformances(ASTContext &ctx, T *decl,
 
     protoBuf.push_back(proto);
     conformanceBuf.push_back(conformance);
-
-    if (conformance && decl)
-      ctx.recordConformance(proto, decl);
   }
 
   decl->setProtocols(ctx.AllocateCopy(protoBuf));
@@ -1998,6 +1995,124 @@ ModuleFile::readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   return OwnedTable(SerializedDeclTable::Create(base + tableOffset, base));
 }
 
+static Optional<KnownProtocolKind> getActualKnownProtocol(unsigned rawKind) {
+  auto stableKind = static_cast<index_block::KnownProtocolKind>(rawKind);
+  if (stableKind != rawKind)
+    return Nothing;
+
+  switch (stableKind) {
+#define PROTOCOL(Id) \
+  case index_block::Id: return KnownProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+  case index_block::CONVERSION:
+    llvm_unreachable("must handle CONVERSION explicitly");
+  }
+
+  // If there's a new case value in the module file, ignore it.
+  return Nothing;
+}
+
+bool ModuleFile::readKnownProtocolsBlock(llvm::BitstreamCursor &cursor) {
+  cursor.EnterSubBlock(KNOWN_PROTOCOL_BLOCK_ID);
+
+  SmallVector<uint64_t, 8> scratch;
+
+  do {
+    auto next = cursor.advanceSkippingSubblocks();
+    switch (next.Kind) {
+    case llvm::BitstreamEntry::EndBlock:
+      return true;
+
+    case llvm::BitstreamEntry::Error:
+      return false;
+
+    case llvm::BitstreamEntry::SubBlock:
+      llvm_unreachable("subblocks skipped");
+
+    case llvm::BitstreamEntry::Record: {
+      scratch.clear();
+      unsigned rawKind = cursor.readRecord(next.ID, scratch);
+      unsigned index;
+
+      if (rawKind == index_block::CONVERSION)
+        index = NumKnownProtocols;
+      else if (auto actualKind = getActualKnownProtocol(rawKind))
+        index = static_cast<unsigned>(actualKind.getValue());
+      else
+        break; // ignore this record
+
+      auto &adopterList = KnownProtocolAdopters[index];
+      adopterList.append(scratch.begin(), scratch.end());
+      break;
+    }
+    }
+  } while (true);
+}
+
+bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
+  cursor.EnterSubBlock(INDEX_BLOCK_ID);
+
+  SmallVector<uint64_t, 4> scratch;
+  StringRef blobData;
+
+  do {
+    auto next = cursor.advance();
+    switch (next.Kind) {
+    case llvm::BitstreamEntry::EndBlock:
+      return true;
+
+    case llvm::BitstreamEntry::Error:
+      return false;
+
+    case llvm::BitstreamEntry::SubBlock:
+      switch (next.ID) {
+      case KNOWN_PROTOCOL_BLOCK_ID:
+        if (!readKnownProtocolsBlock(cursor))
+          return false;
+        break;
+      default:
+        // Unknown sub-block, which this version of the compiler won't use.
+        if (cursor.SkipBlock())
+          return false;
+        break;
+      }
+      break;
+
+    case llvm::BitstreamEntry::Record:
+      scratch.clear();
+      unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+
+      switch (kind) {
+      case index_block::DECL_OFFSETS:
+        assert(blobData.empty());
+        Decls.assign(scratch.begin(), scratch.end());
+        break;
+      case index_block::TYPE_OFFSETS:
+        assert(blobData.empty());
+        Types.assign(scratch.begin(), scratch.end());
+        break;
+      case index_block::IDENTIFIER_OFFSETS:
+        assert(blobData.empty());
+        Identifiers.assign(scratch.begin(), scratch.end());
+        break;
+      case index_block::TOP_LEVEL_DECLS:
+        TopLevelDecls = readDeclTable(scratch, blobData);
+        break;
+      case index_block::OPERATORS:
+        OperatorDecls = readDeclTable(scratch, blobData);
+        break;
+      case index_block::EXTENSIONS:
+        ExtensionDecls = readDeclTable(scratch, blobData);
+        break;
+      default:
+        // Unknown index kind, which this version of the compiler won't use.
+        break;
+      }
+      break;
+    }
+  } while (true);
+}
+
 ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
   : ModuleContext(nullptr),
     InputFile(std::move(input)),
@@ -2125,48 +2240,8 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
     case INDEX_BLOCK_ID: {
       if (!hasValidControlBlock)
         return error();
-
-      cursor.EnterSubBlock(INDEX_BLOCK_ID);
-
-      auto next = cursor.advanceSkippingSubblocks();
-      while (next.Kind == llvm::BitstreamEntry::Record) {
-        scratch.clear();
-        StringRef blobData;
-        unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
-
-        switch (kind) {
-        case index_block::DECL_OFFSETS:
-          assert(blobData.empty());
-          Decls.assign(scratch.begin(), scratch.end());
-          break;
-        case index_block::TYPE_OFFSETS:
-          assert(blobData.empty());
-          Types.assign(scratch.begin(), scratch.end());
-          break;
-        case index_block::IDENTIFIER_OFFSETS:
-          assert(blobData.empty());
-          Identifiers.assign(scratch.begin(), scratch.end());
-          break;
-        case index_block::TOP_LEVEL_DECLS:
-          TopLevelDecls = readDeclTable(scratch, blobData);
-          break;
-        case index_block::OPERATORS:
-          OperatorDecls = readDeclTable(scratch, blobData);
-          break;
-        case index_block::EXTENSIONS:
-          ExtensionDecls = readDeclTable(scratch, blobData);
-          break;
-        default:
-          // Unknown index kind, which this version of the compiler won't use.
-          break;
-        }
-
-        next = cursor.advanceSkippingSubblocks();
-      }
-
-      if (next.Kind != llvm::BitstreamEntry::EndBlock)
+      if (!readIndexBlock(cursor))
         return error();
-
       break;
     }
 
@@ -2228,6 +2303,23 @@ bool ModuleFile::associateWithModule(Module *module) {
     return false;
   }
 
+  // Eagerly deserialize decls conforming to special protocols.
+  for (unsigned i = 0; i < NumKnownProtocols+1; ++i) {
+    for (DeclID DID : KnownProtocolAdopters[i]) {
+      Decl *decl = getDecl(DID);
+
+      // Don't record any conformance for the plain "force deserialization"
+      // decls.
+      if (i < NumKnownProtocols)
+        ctx.recordConformance(static_cast<KnownProtocolKind>(i), decl);
+
+      if (auto extension = dyn_cast<ExtensionDecl>(decl))
+        decl = extension->getExtendedType()->getAnyNominal();
+      if (auto nominal = dyn_cast_or_null<NominalTypeDecl>(decl))
+        loadExtensions(nominal);
+    }
+  }
+
   return Status == ModuleStatus::Valid;
 }
 
@@ -2261,7 +2353,7 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
     return nullptr;
 
   for (auto item : *iter) {
-    if (getRawStableFixity(fixity) == item.first)
+    if (getStableFixity(fixity) == item.first)
       return cast<OperatorDecl>(getDecl(item.second));
   }
 

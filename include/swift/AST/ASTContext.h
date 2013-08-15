@@ -69,6 +69,8 @@ namespace swift {
   class DiagnosticEngine;
   class Substitution;
 
+  enum class KnownProtocolKind : uint8_t;
+
   typedef llvm::PointerUnion<const clang::Decl *, clang::MacroInfo *> ClangNode;
 
 /// \brief The arena in which a particular ASTContext allocation will go.
@@ -385,12 +387,12 @@ public:
   unsigned bumpGeneration() { return CurrentGeneration++; }
 
   /// \brief Record that the given nominal type or extension thereof conforms
-  /// to the given protocol.
-  void recordConformance(ProtocolDecl *protocol, Decl *decl);
+  /// to the given compiler-known protocol.
+  void recordConformance(KnownProtocolKind kind, Decl *decl);
 
   /// \brief Retrieve the set of nominal types and extensions thereof that
-  /// conform to the given protocol.
-  ArrayRef<Decl *> getTypesThatConformTo(ProtocolDecl *protocol);
+  /// conform to the given compiler-known protocol.
+  ArrayRef<Decl *> getTypesThatConformTo(KnownProtocolKind kind);
 
   /// \brief Produce a "normal" conformance for a nominal type.
   NormalProtocolConformance *
