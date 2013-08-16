@@ -190,11 +190,14 @@ static bool IRGenImportedModules(TranslationUnit *TU,
                                  irgen::Options &Options,
                                  bool IsREPL = true) {
   // IRGen the modules this module depends on.
-  for (auto importPair : TU->getImportedModules()) {
-    auto ModPair = importPair.first;
+  // FIXME: "all visible modules" may not actually include "all modules this
+  // module depends on". This is just a stopgap measure before we have real
+  // autolinking.
+  bool hadError = false;
+  TU->forAllVisibleModules(Nothing, [&](Module::ImportedModule ModPair) -> bool{
     // Nothing to do for the builtin module.
     if (isa<BuiltinModule>(ModPair.second))
-      continue;
+      return true;
 
     if (auto clangMod = dyn_cast<ClangModule>(ModPair.second)) {
       // Automatically link against whatever the Clang module requires.
@@ -224,7 +227,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
         dlopen(path.c_str(), 0);
       }
 
-      continue;
+      return true;
     }
 
     // Load the shared library corresponding to this module.
@@ -243,29 +246,21 @@ static bool IRGenImportedModules(TranslationUnit *TU,
 
     // FIXME: Handle Swift modules that need IRGen here.
     if (isa<LoadedModule>(ModPair.second))
-      continue;
+      return true;
     
     TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);
     if (!ImportedModules.insert(SubTU))
-      continue;
-
-    // For the moment, if we're in the REPL, don't bother to IRGen
-    // swift.swift at all.
-    // FIXME: Checking for "swift" explicitly is an ugly hack.
-    if (SubTU->Name.str() == "swift")
-      continue;
-
-    // Recursively IRGen imported modules.
-    IRGenImportedModules(SubTU, Module, CmdLine, ImportedModules, InitFns,
-                         Options);
+      return true;
 
     // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
     llvm::OwningPtr<SILModule> SILMod(performSILGeneration(SubTU));
     performIRGeneration(Options, &SubModule, SubTU, SILMod.get());
 
-    if (TU->Ctx.hadError())
-      return true;
+    if (TU->Ctx.hadError()) {
+      hadError = true;
+      return false;
+    }
 
     std::string ErrorMessage;
     if (llvm::Linker::LinkModules(&Module, &SubModule,
@@ -273,7 +268,8 @@ static bool IRGenImportedModules(TranslationUnit *TU,
                                   &ErrorMessage)) {
       llvm::errs() << "Error linking swift modules\n";
       llvm::errs() << ErrorMessage << "\n";
-      return true;
+      hadError = true;
+      return false;
     }
 
     // FIXME: This is an ugly hack; need to figure out how this should
@@ -283,9 +279,11 @@ static bool IRGenImportedModules(TranslationUnit *TU,
     llvm::Function *InitFn = Module.getFunction(InitFnName);
     if (InitFn)
       InitFns.push_back(InitFn);
-  }
+    
+    return true;
+  });
 
-  return false;
+  return hadError;
 }
 
 void swift::RunImmediately(irgen::Options &Options,
