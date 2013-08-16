@@ -471,6 +471,7 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
     ProtocolConformance *conformance = nullptr;
     bool conforms = tc.conformsToProtocol(replacement, proto, &conformance);
     assert(conforms && "Conformance should already have been verified");
+    (void)conforms;
     conformances.push_back(conformance);
   }
 
