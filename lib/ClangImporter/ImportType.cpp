@@ -560,7 +560,8 @@ Type ClangImporter::Implementation::importFunctionType(
     return Type();
 
   // Import the parameters.
-  SmallVector<TupleTypeElt, 4> swiftParams;
+  SmallVector<TupleTypeElt, 4> swiftArgParams;
+  SmallVector<TupleTypeElt, 4> swiftBodyParams;
   SmallVector<TuplePatternElt, 4> argPatternElts;
   SmallVector<TuplePatternElt, 4> bodyPatternElts;
   unsigned index = 0;
@@ -625,24 +626,26 @@ Type ClangImporter::Implementation::importFunctionType(
     }
     argPatternElts.push_back(TuplePatternElt(argPattern));
 
-    // Add the tuple element for the function type.
-    swiftParams.push_back(TupleTypeElt(swiftParamTy, name));
+    // Add the tuple elements for the function types.
+    swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name));
+    swiftBodyParams.push_back(TupleTypeElt(swiftParamTy, bodyName));
     ++index;
   }
 
-  // Form the parameter tuple.
-  auto paramsTy = TupleType::get(swiftParams, SwiftContext);
+  // Form the parameter tuples.
+  auto argParamsTy = TupleType::get(swiftArgParams, SwiftContext);
+  auto bodyParamsTy = TupleType::get(swiftBodyParams, SwiftContext);
 
   // Form the body and argument patterns.
   bodyPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
                                               bodyPatternElts, SourceLoc()));
-  bodyPatterns.back()->setType(paramsTy);
+  bodyPatterns.back()->setType(bodyParamsTy);
   argPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
                                              argPatternElts, SourceLoc()));
-  argPatterns.back()->setType(paramsTy);
+  argPatterns.back()->setType(argParamsTy);
 
   // Form the function type.
-  return FunctionType::get(paramsTy, swiftResultTy, SwiftContext);
+  return FunctionType::get(argParamsTy, swiftResultTy, SwiftContext);
 }
 
 Module *ClangImporter::Implementation::getSwiftModule() {

@@ -70,6 +70,14 @@ namespace {
     void printInherited(ArrayRef<TypeLoc> inherited);
     void printBraceStmtElements(BraceStmt *stmt);
 
+    /// Print the argument/body patterns in selector style, if possible.
+    ///
+    /// \returns true if the arguments were printed in a selector style,
+    /// false otherwise.
+    bool printSelectorStyleArgs(ValueDecl *decl,
+                                ArrayRef<Pattern *> argPatterns,
+                                ArrayRef<Pattern *> bodyPatterns);
+
 #define DECL(Name,Parent) void visit##Name##Decl(Name##Decl *decl);
 #define ABSTRACT_DECL(Name, Parent)
 #define DECL_RANGE(Name,Start,End)
@@ -485,6 +493,69 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   }
 }
 
+bool PrintAST::printSelectorStyleArgs(ValueDecl *decl,
+                                      ArrayRef<Pattern *> argPatterns,
+                                      ArrayRef<Pattern *> bodyPatterns) {
+  // Skip over the implicit 'this'.
+  if (decl->getDeclContext()->isTypeContext()) {
+    argPatterns = argPatterns.slice(1);
+    bodyPatterns = bodyPatterns.slice(1);
+  }
+
+  // Only works for a single pattern.
+  if (argPatterns.size() != 1 || bodyPatterns.size() != 1)
+    return false;
+
+  // Only applies when we have a tuple with at least two elements.
+  auto argTuple = argPatterns[0]->getType()->getAs<TupleType>();
+  auto bodyTuple = bodyPatterns[0]->getType()->getAs<TupleType>();
+  if (!argTuple || argTuple->getFields().size() < 2 ||
+      !bodyTuple ||
+      bodyTuple->getFields().size() != argTuple->getFields().size())
+    return false;
+
+  // Step through the elements one by one, checking whether we have a name
+  // mismatch at any point. That implies we need to use selector style.
+  // FIXME: This is bogus. We should record whether selector style was used
+  // within the AST.
+  bool mismatched = false;
+  for (unsigned i = 1, n = argTuple->getFields().size(); i != n; ++i) {
+    if (argTuple->getFields()[i].getName() !=
+          bodyTuple->getFields()[i].getName()) {
+      mismatched = true;
+      break;
+    }
+  }
+
+  // All of the names match up. There's nothing to do here.
+  if (!mismatched)
+    return false;
+
+  // Print in selector style.
+  for (unsigned i = 0, n = argTuple->getFields().size(); i != n; ++i) {
+    auto argName = argTuple->getFields()[i].getName();
+    auto bodyName = bodyTuple->getFields()[i].getName();
+    if (i != 0) {
+      OS << ' ';
+      if (argName.empty())
+        OS << '_';
+      else
+        OS << argName.str();
+    }
+
+    OS << "(";
+    if (bodyName.empty())
+      OS << '_';
+    else
+      OS << bodyName.str();
+
+    OS << ": ";
+    argTuple->getElementType(i).print(OS);
+    OS << ")";
+  }
+  return true;
+}
+
 void PrintAST::printBraceStmtElements(BraceStmt *stmt) {
   IndentRAII indentMore(*this);
   for (auto element : stmt->getElements()) {
@@ -500,7 +571,6 @@ void PrintAST::printBraceStmtElements(BraceStmt *stmt) {
     }
   }
 }
-
 
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
   if (decl->isGetterOrSetter()) {
@@ -538,19 +608,21 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       printGenericParams(decl->getGenericParams());
     }
 
-    // FIXME: If arg/body parameter patterns differ, switch to
-    // printing selector-style.
-    bool first = true;
-    for (auto pattern : decl->getBody()->getArgParamPatterns()) {
-      if (first) {
-        first = false;
+    if (!printSelectorStyleArgs(decl,
+                                decl->getBody()->getArgParamPatterns(),
+                                decl->getBody()->getBodyParamPatterns())) {
+      bool first = true;
+      for (auto pattern : decl->getBody()->getArgParamPatterns()) {
+        if (first) {
+          first = false;
 
-        // Don't print the implicit 'this' parameter.
-        if (decl->getDeclContext()->isTypeContext())
-          continue;
+          // Don't print the implicit 'this' parameter.
+          if (decl->getDeclContext()->isTypeContext())
+            continue;
+        }
+
+        printPattern(pattern);
       }
-
-      printPattern(pattern);
     }
 
     auto &context = decl->getASTContext();
