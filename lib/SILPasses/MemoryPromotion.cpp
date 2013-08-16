@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/Basic/Fixnum.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -169,31 +170,6 @@ static void getScalarizedElements(SILValue V,
   }
 }
 
-/// Given a value of [bound generic]struct type, and a load that is known to be
-/// from a pointer with an aggregate of the specified struct type, figure out
-/// which field path is being accessed, and extract the element value from
-/// StructVal that corresponds to it.
-static SILValue ExtractMatchingElement(SILValue Pointer, SILValue StructVal,
-                                       SILBuilder &B, SILLocation Loc) {
-  // If we find the underlying element we care about, we're done.
-  if (Pointer.getType().getObjectType() == StructVal.getType())
-    return StructVal;
-
-  // Otherwise, we must be in an element of the struct, and the pointer must be
-  // a tuple_element_addr or struct_element_addr.
-  if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
-    SILValue Res = ExtractMatchingElement(TEAI->getOperand(), StructVal,B,Loc);
-
-    return B.createTupleExtract(Loc, Res, TEAI->getFieldNo(),
-                                TEAI->getType().getObjectType());
-  }
-
-  auto *SEAI = cast<StructElementAddrInst>(Pointer);
-  SILValue Res = ExtractMatchingElement(SEAI->getOperand(), StructVal, B, Loc);
-  return B.createStructExtract(Loc, Res, SEAI->getField(),
-                               SEAI->getType().getObjectType());
-}
-
 /// Remove dead tuple_element_addr and struct_element_addr chains - only.
 static void RemoveDeadAddressingInstructions(SILValue Pointer) {
   if (!Pointer.use_empty()) return;
@@ -208,6 +184,93 @@ static void RemoveDeadAddressingInstructions(SILValue Pointer) {
   RemoveDeadAddressingInstructions(Pointer);
 }
 
+//===----------------------------------------------------------------------===//
+// Access Path Analysis Logic
+//===----------------------------------------------------------------------===//
+
+// An access path is an array of tuple or struct members.  Note that the path
+// is actually stored backwards for efficiency, the back() is the element
+// closest to the underlying alloc_box.
+typedef Fixnum<31, unsigned> TupleIndexTy;
+typedef PointerUnion<VarDecl*, TupleIndexTy> StructOrTupleElement;
+typedef SmallVector<StructOrTupleElement, 8> AccessPathTy;
+
+/// Given a pointer that is known to be derived from an alloc_box, chase up to
+/// the alloc box, computing the access path.
+static void ComputeAccessPath(SILValue Pointer, AccessPathTy &AccessPath) {
+  // If we got to the root, we're done.
+  while (!isa<AllocBoxInst>(Pointer)) {
+    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
+      AccessPath.push_back(Fixnum<31, unsigned>(TEAI->getFieldNo()));
+      Pointer = TEAI->getOperand();
+    } else {
+      auto *SEAI = cast<StructElementAddrInst>(Pointer);
+      AccessPath.push_back(SEAI->getField());
+      Pointer = SEAI->getOperand();
+    }
+  }
+}
+
+/// Given an aggregate value and an access path, extract the value indicated by
+/// the path.
+static SILValue ExtractElement(SILValue Val,
+                               ArrayRef<StructOrTupleElement> AccessPath,
+                               SILBuilder &B, SILLocation Loc) {
+  for (auto I = AccessPath.rbegin(), E = AccessPath.rend(); I != E; ++I) {
+    StructOrTupleElement Elt = *I;
+
+    if (Elt.is<VarDecl*>())
+      Val = B.createStructExtract(Loc, Val, Elt.get<VarDecl*>());
+    else
+      Val = B.createTupleExtract(Loc, Val, Elt.get<TupleIndexTy>());
+  }
+
+  return Val;
+}
+
+/// If the specified instruction is a store of some value, check to see if it is
+/// storing to something that intersects the access path of a load.  If the two
+/// accesses are non-intersecting, return true.  Otherwise, attempt to compute
+/// the accessed subelement value and return it in LoadResultVal.
+static bool checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
+                                               SILValue &LoadResultVal,
+                                               AccessPathTy &LoadAccessPath) {
+  // We can only store forward from store and assign's.
+  if (!isa<StoreInst>(Inst) && !isa<AssignInst>(Inst)) return false;
+
+  // Get the access path for the store/assign.
+  AccessPathTy StoreAccessPath;
+  ComputeAccessPath(Inst->getOperand(1), StoreAccessPath);
+
+  // Since loads are always completely scalarized, we know that the load access
+  // path will either be non-intersecting or that the load is deeper-or-equal in
+  // length than the store.
+  if (LoadAccessPath.size() < StoreAccessPath.size()) return true;
+
+  // In the case when the load is deeper (not equal) to the stored value, we'll
+  // have to do a number of extracts.  Compute how many.
+  unsigned LoadUnwrapLevel = LoadAccessPath.size()-StoreAccessPath.size();
+
+  // Ignoring those extracts, the remaining access path needs to be exactly
+  // identical.  If not, we have a non-intersecting access.
+  if (ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(LoadUnwrapLevel) !=
+        ArrayRef<StructOrTupleElement>(StoreAccessPath))
+    return true;
+
+  SILValue StoredVal = Inst->getOperand(0);
+
+  // If we have an exact match (which is common), we are done.  Early exit.
+  if (LoadUnwrapLevel == 0) {
+    LoadResultVal = StoredVal;
+    return false;
+  }
+
+  SILBuilder B(Inst);
+  LoadResultVal = ExtractElement(StoredVal,
+       ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(0, LoadUnwrapLevel),
+                                 B, Inst->getLoc());
+  return false;
+}
 
 
 //===----------------------------------------------------------------------===//
@@ -293,7 +356,8 @@ namespace {
       DI_No,
       DI_Partial
     };
-    DIKind checkDefinitelyInit(SILInstruction *Inst, SILValue *AV = nullptr);
+    DIKind checkDefinitelyInit(SILInstruction *Inst, SILValue *AV = nullptr,
+                               AccessPathTy *AccessPath = nullptr);
     
     
     void diagnoseInitError(SILInstruction *Use,
@@ -304,6 +368,8 @@ namespace {
 ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox,
                                    unsigned ElementNumber, ElementUses &Uses)
   : TheAllocBox(TheAllocBox), ElementNumber(ElementNumber), Uses(Uses) {
+
+  NonLoadUses.insert(TheAllocBox);
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -389,13 +455,21 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // If this is a Load (not a CopyAddr or LoadWeak), we try to compute the
   // loaded value as an SSA register.  Otherwise, we don't ask for an available
   // value to avoid constructing SSA for the value.
+  bool WantValue = isa<LoadInst>(Inst);
+
+  // If this is a load from a struct field that we want to promote, compute the
+  // access path down to the field so we can determine precise def/use behavior.
+  AccessPathTy AccessPath;
+  if (WantValue)
+    ComputeAccessPath(Inst->getOperand(0), AccessPath);
 
   // Note that we intentionally don't support forwarding of weak pointers,
   // because the underlying value may drop be deallocated at any time.  We would
   // have to prove that something in this function is holding the weak value
   // live across the promoted region and that isn't desired for a stable
   // diagnostics pass this like one.
-  auto DI = checkDefinitelyInit(Inst, isa<LoadInst>(Inst) ? &Result : nullptr);
+  auto DI = checkDefinitelyInit(Inst, WantValue ? &Result : nullptr,
+                                      WantValue ? &AccessPath : nullptr);
 
   // If the value is not definitively initialized, emit an error.
 
@@ -416,21 +490,7 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // FIXME: We cannot do load promotion in regions where the value has
   // escaped!
 
-  // If so, we can replace the load now.  Note that all loads have been
-  // scalarized at this point to access a single element, and that we know this
-  // is a LoadInst, not a CopyAddr or LoadWeak.  Stores of tuples have been
-  // scalarized to storing their elements, but stores of structs have not.
   assert(!isStructOrTupleToScalarize(Inst->getType(0)));
-
-  // If this is a store of a struct, the load will be of an incorrect type,
-  // try to determine (from the load pointer) what struct element is being
-  // referenced, and extract that from the struct value.
-  if (Result.getType().is<StructType>() ||
-      Result.getType().is<BoundGenericStructType>()) {
-    SILBuilder B(Inst);
-    Result = ExtractMatchingElement(Inst->getOperand(0), Result, B,
-                                    Inst->getLoc());
-  }
 
   SILValue(Inst, 0).replaceAllUsesWith(Result);
   SILValue Addr = Inst->getOperand(0);
@@ -461,18 +521,31 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
 
   SILType StoredType = Inst->getOperand(0).getType();
 
+  // If we are lowering/expanding an "assign", we may turn it into a read/write
+  // operation to release the old value.  If so, we want to determine a live-in
+  // value and classify the type a bit.
   bool HasTrivialType = false;
-  if (isa<AssignInst>(Inst)|| isa<StoreInst>(Inst))
+  bool WantsValue = false;
+  AccessPathTy AccessPath;
+  if (isa<AssignInst>(Inst)) {
     HasTrivialType = Inst->getModule()->
       Types.getTypeLowering(StoredType).isTrivial();
+
+    // Only compute the live-in type if we have a complete store of a
+    // non-trivial type.
+    WantsValue = !HasTrivialType && !isPartialStore;
+
+    if (WantsValue)
+      ComputeAccessPath(Inst->getOperand(1), AccessPath);
+  }
 
   // Check to see if the value is known-initialized here or not.  If the assign
   // has non-trivial type, then we're interested in using any live-in value that
   // is available.
   SILValue IncomingVal;
   auto DI = checkDefinitelyInit(Inst,
-                                (HasTrivialType || isPartialStore)
-                                         ? nullptr : &IncomingVal);
+                                WantsValue ? &IncomingVal : nullptr,
+                                WantsValue ? &AccessPath : nullptr);
 
   // If this is a partial store into a struct and the whole struct hasn't been
   // initialized, diagnose this as an error.
@@ -583,16 +656,6 @@ void ElementPromotion::handleEscape(SILInstruction *Inst) {
 
 
 
-/// getStoredValueFrom - Given a may store to the stack slot we're promoting,
-/// return the value being stored.
-static SILValue getStoredValueFrom(SILInstruction *I) {
-  if (auto *SI = dyn_cast<StoreInst>(I))
-    return SI->getOperand(0);
-  if (auto *AI = dyn_cast<AssignInst>(I))
-    return AI->getOperand(0);
-  return SILValue();
-}
-
 /// The specified instruction is a use of the element.  Determine whether the
 /// element is definitely initialized at this point or not.  If the value is
 /// initialized on some paths, but not others, this returns a partial result.
@@ -601,7 +664,8 @@ static SILValue getStoredValueFrom(SILInstruction *I) {
 /// if AV is non-null, this function can return the currently live value in some
 /// cases.
 ElementPromotion::DIKind
-ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV) {
+ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV,
+                                      AccessPathTy *AccessPath) {
   // If there is a store in the current block, scan the block to see if the
   // store is before or after the load.  If it is before, it produces the value
   // we are looking for.
@@ -609,16 +673,27 @@ ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV) {
     for (SILBasicBlock::iterator BBI = Inst, E = Inst->getParent()->begin();
          BBI != E;) {
       SILInstruction *TheInst = --BBI;
-      if (NonLoadUses.count(TheInst)) {
-        if (AV) *AV = getStoredValueFrom(TheInst);
 
-        return DI_Yes;
-      }
+      // If this instruction is unrelated to the alloc_box element, ignore it.
+      if (!NonLoadUses.count(TheInst))
+        continue;
 
       // If we found the allocation itself, then we are loading something that
       // is not defined at all yet.
       if (TheInst == TheAllocBox)
         return DI_No;
+
+      // If we're trying to compute a value (due to a load), check to see if the
+      // loaded pointer's access path and this potential store are to the same
+      // sub-element member.  If not, this is a store to some other struct
+      // member.  If it is to the right member, try to compute the available
+      // value that can replace the load.
+      if (AV) {
+        if (checkLoadAccessPathAndComputeValue(TheInst, *AV, *AccessPath))
+          continue;
+      }
+
+      return DI_Yes;
     }
   }
 

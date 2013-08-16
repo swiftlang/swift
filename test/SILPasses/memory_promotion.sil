@@ -11,11 +11,10 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
   store %0 to %1#1 : $*Int64
   %3 = alloc_box $Int64                   // CHECK: alloc_box
   %4 = load %1#1 : $*Int64
-  // CHECK-NEXT: struct_extract
   // CHECK-NEXT: struct $Int64
+  // CHECK-NEXT: struct_extract
   store %4 to %3#1 : $*Int64         // CHECK-NEXT: store
   %6 = load %3#1 : $*Int64
-  // CHECK-NEXT: struct_extract
   // CHECK-NEXT: struct $Int64
   release %3#0 : $Builtin.ObjectPointer   // CHECK-NEXT: release
   release %1#0 : $Builtin.ObjectPointer
@@ -34,7 +33,7 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
   %b = tuple_element_addr %1#1 : $*(Int64, Int64), 1
   store %0 to %a : $*Int64
   // CHECK: store %0 to
-
+ //CHECK-NEXT: struct_extract %0
   store %0 to %b : $*Int64
   // CHECK-NEXT: store %0 to 
 
@@ -223,8 +222,8 @@ bb0(%0 : $Int64):
   // they all turn into stores.
   assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
   assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
-  assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
   // CHECK-NEXT: struct_extract
+  assign %0 to %1#1 : $*Int64                      // CHECK: store %0 to %1#1
   // CHECK-NEXT: struct $Int64
 
   %2 = load %1#1 : $*Int64
