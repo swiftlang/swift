@@ -774,15 +774,17 @@ Decl *Parser::parseDeclExtension(unsigned Flags) {
   if (Tok.is(tok::colon))
     parseInheritance(Inherited);
 
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension))
-    return nullptr;
-
   ExtensionDecl *ED
     = new (Context) ExtensionDecl(ExtensionLoc, Ty,
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
   ContextChange CC(*this, ED);
   Scope S(this, ScopeKind::Extension);
+
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
+    ED->setMembers({}, Tok.getLoc());
+    return ED;
+  }
 
   SmallVector<Decl*, 8> MemberDecls;
 
@@ -792,8 +794,6 @@ Decl *Parser::parseDeclExtension(unsigned Flags) {
                            [&] () -> bool {
     return parseDecl(MemberDecls, PD_HasContainerType|PD_DisallowVar);
   });
-
-  if (Invalid) return nullptr;
 
   ED->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
 
