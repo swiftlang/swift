@@ -760,6 +760,13 @@ static inline decls_block::RecordKind getKindForTable(const Decl *D) {
   case DeclKind::Var:
     return decls_block::VAR_DECL;
 
+  case DeclKind::Subscript:
+    return decls_block::SUBSCRIPT_DECL;
+  case DeclKind::Constructor:
+    return decls_block::CONSTRUCTOR_DECL;
+  case DeclKind::Destructor:
+    return decls_block::DESTRUCTOR_DECL;
+
   default:
     llvm_unreachable("cannot store this kind of decl in a hash table");
   }
@@ -788,7 +795,8 @@ namespace index_block {
     IDENTIFIER_OFFSETS,
     TOP_LEVEL_DECLS,
     OPERATORS,
-    EXTENSIONS
+    EXTENSIONS,
+    CLASS_MEMBERS
   };
 
   using OffsetsLayout = BCGenericRecordLayout<

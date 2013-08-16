@@ -176,6 +176,7 @@ private:
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
   std::unique_ptr<SerializedDeclTable> ExtensionDecls;
+  std::unique_ptr<SerializedDeclTable> ClassMembersByName;
 
   using DeclIDVector = SmallVector<serialization::DeclID, 4>;
 

@@ -60,6 +60,7 @@ namespace swift {
   enum class Resilience : unsigned char;
   class TypeAliasDecl;
   class Stmt;
+  class SubscriptDecl;
   class ValueDecl;
   class VarDecl;
 
@@ -1053,6 +1054,18 @@ public:
   
   void setIsObjC(bool value) {
     AttrsAndIsObjC = {AttrsAndIsObjC.getPointer(), value};
+  }
+  
+  /// Returns true if this decl can be found by id-style dynamic lookup.
+  ///
+  /// Note that this method does NOT check that this value is actually a class
+  /// member.
+  bool canBeAccessedByDynamicLookup() const {
+    if (getName().empty())
+      return false;
+    if (isa<FuncDecl>(this) || isa<VarDecl>(this) || isa<SubscriptDecl>(this))
+      return isInstanceMember();
+    return false;
   }
 
   /// Determine the default argument kind and type for the given argument index

@@ -38,6 +38,45 @@ using clang::OnDiskChainedHashTableGenerator;
 namespace {
   typedef ArrayRef<unsigned> FileBufferIDs;
 
+  /// Used to serialize the on-disk decl hash table.
+  class DeclTableInfo {
+  public:
+    using key_type = Identifier;
+    using key_type_ref = key_type;
+    using data_type = SmallVector<std::pair<uint8_t, DeclID>, 4>;
+    using data_type_ref = const data_type &;
+
+    uint32_t ComputeHash(key_type_ref key) {
+      assert(!key.empty());
+      return llvm::HashString(key.str());
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      using namespace clang::io;
+      uint32_t keyLength = key.str().size();
+      uint32_t dataLength = (sizeof(DeclID) + 1) * data.size();
+      Emit16(out, keyLength);
+      Emit16(out, dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      out << key.str();
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(sizeof(DeclID) <= 32, "DeclID too large");
+      using namespace clang::io;
+      for (auto entry : data) {
+        Emit8(out, entry.first);
+        Emit32(out, entry.second);
+      }
+    }
+  };
+
   class Serializer {
     SmallVector<char, 0> Buffer;
     llvm::BitstreamWriter Out{Buffer};
@@ -90,6 +129,17 @@ namespace {
 
     /// A map from generic parameter lists to the decls they come from.
     llvm::DenseMap<const GenericParamList *, const Decl *> GenericContexts;
+
+  public:
+    /// The in-memory representation of what will eventually be an on-disk hash
+    /// table.
+    using DeclTable = llvm::DenseMap<Identifier, DeclTableInfo::data_type>;
+
+  private:
+    /// A map from identifiers to methods and properties with the given name.
+    ///
+    /// This is used for id-style lookup.
+    DeclTable ClassMembersByName;
 
     /// The queue of types and decls that need to be serialized.
     ///
@@ -228,7 +278,11 @@ namespace {
                            const Decl *associatedDecl = nullptr);
 
     /// Writes an array of members for a decl context.
-    void writeMembers(ArrayRef<Decl *> members);
+    ///
+    /// \param members The decls within the context
+    /// \param isClass True if the context could be a class context (class,
+    ///        class extension, or protocol).
+    void writeMembers(ArrayRef<Decl *> members, bool isClass);
 
     /// Writes a reference to a decl in another module.
     ///
@@ -514,6 +568,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(index_block, TOP_LEVEL_DECLS);
   RECORD(index_block, OPERATORS);
   RECORD(index_block, EXTENSIONS);
+  RECORD(index_block, CLASS_MEMBERS);
 
   BLOCK(KNOWN_PROTOCOL_BLOCK);
 #define PROTOCOL(Id) RECORD(index_block, Id);
@@ -931,13 +986,24 @@ void Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions) {
 }
 
 
-void Serializer::writeMembers(ArrayRef<Decl*> members) {
+void Serializer::writeMembers(ArrayRef<Decl*> members, bool isClass) {
   using namespace decls_block;
   
   unsigned abbrCode = DeclTypeAbbrCodes[DeclContextLayout::Code];
   SmallVector<DeclID, 16> memberIDs;
-  for (auto member : members)
-    memberIDs.push_back(addDeclRef(member));
+  for (auto member : members) {
+    DeclID memberID = addDeclRef(member);
+    memberIDs.push_back(memberID);
+
+    if (isClass) {
+      if (auto VD = dyn_cast<ValueDecl>(member)) {
+        if (VD->canBeAccessedByDynamicLookup()) {
+          auto &list = ClassMembersByName[VD->getName()];
+          list.push_back({getKindForTable(VD), memberID});
+        }
+      }
+    }
+  }
   DeclContextLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
 }
 
@@ -1043,16 +1109,24 @@ bool Serializer::writeDecl(const Decl *D) {
     auto extension = cast<ExtensionDecl>(D);
 
     const Decl *DC = getDeclForContext(extension->getDeclContext());
+    Type baseTy = extension->getExtendedType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ExtensionLayout::Code];
     ExtensionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                addTypeRef(extension->getExtendedType()),
+                                addTypeRef(baseTy),
                                 addDeclRef(DC),
                                 extension->isImplicit());
 
     writeConformances(extension->getProtocols(), extension->getConformances(),
                       extension);
-    writeMembers(extension->getMembers());
+
+    bool isClassExtension = false;
+    if (auto baseNominal = baseTy->getAnyNominal()) {
+      isClassExtension = isa<ClassDecl>(baseNominal) ||
+                         isa<ProtocolDecl>(baseNominal);
+    }
+    writeMembers(extension->getMembers(), isClassExtension);
+
     return true;
   }
 
@@ -1162,7 +1236,7 @@ bool Serializer::writeDecl(const Decl *D) {
     writeGenericParams(theStruct->getGenericParams());
     writeConformances(theStruct->getProtocols(), theStruct->getConformances(),
                       theStruct);
-    writeMembers(theStruct->getMembers());
+    writeMembers(theStruct->getMembers(), false);
     return true;
   }
 
@@ -1184,7 +1258,7 @@ bool Serializer::writeDecl(const Decl *D) {
     writeGenericParams(theUnion->getGenericParams());
     writeConformances(theUnion->getProtocols(), theUnion->getConformances(),
                       theUnion);
-    writeMembers(theUnion->getMembers());
+    writeMembers(theUnion->getMembers(), false);
     return true;
   }
 
@@ -1210,7 +1284,7 @@ bool Serializer::writeDecl(const Decl *D) {
     writeGenericParams(theClass->getGenericParams());
     writeConformances(theClass->getProtocols(), theClass->getConformances(),
                       theClass);
-    writeMembers(theClass->getMembers());
+    writeMembers(theClass->getMembers(), true);
     return true;
   }
 
@@ -1241,7 +1315,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                proto->isObjC(),
                                protocols);
 
-    writeMembers(proto->getMembers());
+    writeMembers(proto->getMembers(), true);
     return true;
   }
 
@@ -1839,56 +1913,11 @@ void Serializer::writeOffsets(const index_block::OffsetsLayout &Offsets,
   Offsets.emit(ScratchRecord, getOffsetRecordCode(values), values);
 }
 
-namespace {
-  /// Used to serialize the on-disk decl hash table.
-  class DeclTableInfo {
-  public:
-    using key_type = Identifier;
-    using key_type_ref = key_type;
-    using data_type = SmallVector<std::pair<uint8_t, DeclID>, 8>;
-    using data_type_ref = const data_type &;
-
-    uint32_t ComputeHash(key_type_ref key) {
-      assert(!key.empty());
-      return llvm::HashString(key.str());
-    }
-
-    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
-                                                    key_type_ref key,
-                                                    data_type_ref data) {
-      using namespace clang::io;
-      uint32_t keyLength = key.str().size();
-      uint32_t dataLength = (sizeof(DeclID) + 1) * data.size();
-      Emit16(out, keyLength);
-      Emit16(out, dataLength);
-      return { keyLength, dataLength };
-    }
-
-    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      out << key.str();
-    }
-
-    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
-                  unsigned len) {
-      static_assert(sizeof(DeclID) <= 32, "DeclID too large");
-      using namespace clang::io;
-      for (auto entry : data) {
-        Emit8(out, entry.first);
-        Emit32(out, entry.second);
-      }
-    }
-  };
-}
-
-/// The in-memory representation of what will eventually be an on-disk hash
-/// table.
-using DeclTable = llvm::DenseMap<Identifier, DeclTableInfo::data_type>;
-
 /// Writes an in-memory decl table to an on-disk representation, using the
 /// given layout.
 static void writeDeclTable(const index_block::DeclListLayout &DeclList,
                            index_block::RecordKind kind,
-                           const DeclTable &table) {
+                           const Serializer::DeclTable &table) {
   if (table.empty())
     return;
 
@@ -1969,6 +1998,7 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
     writeDeclTable(DeclList, index_block::TOP_LEVEL_DECLS, topLevelDecls);
     writeDeclTable(DeclList, index_block::OPERATORS, operatorDecls);
     writeDeclTable(DeclList, index_block::EXTENSIONS, extensionDecls);
+    writeDeclTable(DeclList, index_block::CLASS_MEMBERS, ClassMembersByName);
 
     {
       BCBlockRAII subBlock(Out, KNOWN_PROTOCOL_BLOCK_ID, 3);

@@ -2105,6 +2105,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::EXTENSIONS:
         ExtensionDecls = readDeclTable(scratch, blobData);
         break;
+      case index_block::CLASS_MEMBERS:
+        ClassMembersByName = readDeclTable(scratch, blobData);
+        break;
       default:
         // Unknown index kind, which this version of the compiler won't use.
         break;
