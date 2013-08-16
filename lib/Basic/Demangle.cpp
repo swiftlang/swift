@@ -1350,7 +1350,7 @@ void toString (NodePointer pointer, DemanglerPrinter& printer) {
         break;
       DemanglerPrinter sub_printer;
       toString(metatype, sub_printer);
-      printer /*<< "("*/ << sub_printer.str() /*<< ")"*/;
+      printer << sub_printer.str();
       NodePointer real_func = pointer->child_at(1);
       if (!real_func)
         break;
