@@ -22,6 +22,7 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallSet.h"
@@ -224,6 +225,14 @@ public:
       fn(import);
       return true;
     });
+  }
+  
+  template <typename Fn>
+  void forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
+                            const Fn &fn) {
+    using RetTy = typename as_function<Fn>::type::result_type;
+    std::function<RetTy(ImportedModule)> wrapped = std::cref(fn);
+    forAllVisibleModules(topLevelAccessPath, wrapped);
   }
 
   /// Returns true if the two access paths contain the same chain of

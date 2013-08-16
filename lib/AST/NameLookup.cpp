@@ -516,15 +516,13 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   }
 
   M.forAllVisibleModules(Nothing,
-                         makeStackLambda(
-    [&](const Module::ImportedModule &ImpEntry) -> bool {
-      if (ImpEntry.second->Name == Name) {
-        Results.push_back(Result::getModuleName(ImpEntry.second));
-        return false;
-      }
-      return true;
+                         [&](const Module::ImportedModule &ImpEntry) -> bool {
+    if (ImpEntry.second->Name == Name) {
+      Results.push_back(Result::getModuleName(ImpEntry.second));
+      return false;
     }
-  ));
+    return true;
+  });
 }
 
 Optional<UnqualifiedLookup>
@@ -714,17 +712,17 @@ bool Module::lookupQualified(Type type,
   if (auto moduleTy = type->getAs<ModuleType>()) {
     Module *module = moduleTy->getModule();
     // Perform the lookup in all imports of this module.
-    forAllVisibleModules(AccessPathTy(), makeStackLambda(
-      [&](const ImportedModule &import) -> bool {
-        using namespace namelookup;
-        if (import.second != module)
-          return true;
-        lookupInModule(import.second, import.first, name, decls,
-                       NLKind::QualifiedLookup, ResolutionKind::Overloadable);
-        // If we're able to do an unscoped lookup, we see everything. No need
-        // to keep going.
-        return !import.first.empty();
-      }));
+    forAllVisibleModules(AccessPathTy(),
+                         [&](const ImportedModule &import) -> bool {
+      using namespace namelookup;
+      if (import.second != module)
+        return true;
+      lookupInModule(import.second, import.first, name, decls,
+                     NLKind::QualifiedLookup, ResolutionKind::Overloadable);
+      // If we're able to do an unscoped lookup, we see everything. No need
+      // to keep going.
+      return !import.first.empty();
+    });
     std::sort(decls.begin(), decls.end());
     auto afterUnique = std::unique(decls.begin(), decls.end());
     decls.erase(afterUnique, decls.end());
