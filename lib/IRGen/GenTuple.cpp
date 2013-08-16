@@ -119,9 +119,11 @@ namespace {
   class LoadableTupleTypeInfo :
       public TupleTypeInfoBase<LoadableTupleTypeInfo, LoadableTypeInfo> {
   public:
+    // FIXME: Spare bits between tuple elements.
     LoadableTupleTypeInfo(unsigned numFields, llvm::Type *ty,
                           Size size, Alignment align, IsPOD_t isPOD)
-      : TupleTypeInfoBase(numFields, ty, size, align, isPOD) {}
+      : TupleTypeInfoBase(numFields, ty, size, llvm::BitVector{}, align, isPOD)
+      {}
 
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
   };
@@ -130,11 +132,14 @@ namespace {
   class FixedTupleTypeInfo :
       public TupleTypeInfoBase<FixedTupleTypeInfo,
                                IndirectTypeInfo<FixedTupleTypeInfo,
-                                                FixedTypeInfo>> {
+                                                FixedTypeInfo>>
+  {
   public:
+    // FIXME: Spare bits between tuple elements.
     FixedTupleTypeInfo(unsigned numFields, llvm::Type *ty,
                        Size size, Alignment align, IsPOD_t isPOD)
-      : TupleTypeInfoBase(numFields, ty, size, align, isPOD) {}
+      : TupleTypeInfoBase(numFields, ty, size, llvm::BitVector{}, align, isPOD)
+    {}
 
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
   };

@@ -20,6 +20,7 @@
 #define SWIFT_IRGEN_FIXEDTYPEINFO_H
 
 #include "TypeInfo.h"
+#include "llvm/ADT/BitVector.h"
 
 namespace swift {
 namespace irgen {
@@ -32,11 +33,17 @@ private:
   /// for well-formed and complete types, such as a trivial union or
   /// tuple.
   Size StorageSize;
-
+  
+  /// The spare bit mask for this type. SpareBits[0] is the LSB of the first
+  /// byte. This may be empty if the type has no spare bits.
+  llvm::BitVector SpareBits;
+  
 protected:
-  FixedTypeInfo(llvm::Type *type, Size size, Alignment align,
-                IsPOD_t pod, SpecialTypeInfoKind stik = STIK_Fixed)
-      : TypeInfo(type, align, pod, stik), StorageSize(size) {
+  FixedTypeInfo(llvm::Type *type, Size size, llvm::BitVector spareBits,
+                Alignment align, IsPOD_t pod,
+                SpecialTypeInfoKind stik = STIK_Fixed)
+      : TypeInfo(type, align, pod, stik), StorageSize(size),
+        SpareBits(std::move(spareBits)) {
     assert(isFixedSize());
   }
 
@@ -91,7 +98,42 @@ public:
   Size getFixedStride() const {
     return StorageSize.roundUpToAlignment(getFixedAlignment());
   }
+  
+  /// Returns the fixed number of "extra inhabitants" (that is, bit
+  /// patterns that don't represent valid values of the type) in the type
+  /// representation.
+  virtual unsigned getFixedExtraInhabitantCount() const {
+    return getSpareBitExtraInhabitantCount();
+  }
 
+  /// Returns the number of extra inhabitants available by exercising spare
+  /// bits.
+  unsigned getSpareBitExtraInhabitantCount() const;
+
+  
+  /// True if the type representation has statically "spare" unused bits.
+  bool hasFixedSpareBits() const {
+    return SpareBits.any();
+  }
+  
+  /// Applies the fixed spare bits mask for this type to the given BitVector,
+  /// clearing any bits used by valid representations of the type.
+  ///
+  /// If the bitvector is empty or smaller than this type, it is grown and
+  /// filled with bits direct from the spare bits mask. If the bitvector is
+  /// larger than this type, the trailing bits are untouched.
+  ///
+  /// The intent is that, for all the data types of a union, you should be able
+  /// to do this:
+  ///
+  ///   llvm::BitVector spareBits;
+  ///   for (UnionElementDecl *elt : u->getAllElements())
+  ///     getFragileTypeInfo(elt->getArgumentType())
+  ///       .applyFixedSpareBitsMask(spareBits, 0);
+  ///
+  /// and end up with a spare bits mask for the entire union.
+  void applyFixedSpareBitsMask(llvm::BitVector &bits) const;
+  
   static bool classof(const FixedTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isFixedSize(); }
 };

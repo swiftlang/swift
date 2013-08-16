@@ -191,6 +191,8 @@ public:
   explicit Size(int_type Value) : Value(Value) {}
 
   int_type getValue() const { return Value; }
+  
+  int_type getValueInBits() const { return Value * 8; }
 
   bool isZero() const { return Value == 0; }
 

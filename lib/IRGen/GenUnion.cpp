@@ -46,8 +46,10 @@ namespace {
   // FIXME: not always loadable or even fixed-size!
   class UnionTypeInfo : public LoadableTypeInfo {
   public:
-    UnionTypeInfo(llvm::StructType *T, Size S, Alignment A, IsPOD_t isPOD)
-      : LoadableTypeInfo(T, S, A, isPOD) {}
+    // FIXME: Derive spare bits from element layout.
+    UnionTypeInfo(llvm::StructType *T, Size S, llvm::BitVector SB,
+                  Alignment A, IsPOD_t isPOD)
+      : LoadableTypeInfo(T, S, std::move(SB), A, isPOD) {}
 
     llvm::StructType *getStorageType() const {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
@@ -90,9 +92,10 @@ namespace {
   /// A TypeInfo implementation which uses an aggregate.
   class AggregateUnionTypeInfo : public UnionTypeInfo {
   public:
+    /// FIXME: Spare bits common to aggregate elements and not used for tags.
     AggregateUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
                            IsPOD_t isPOD)
-      : UnionTypeInfo(T, S, A, isPOD) {}
+      : UnionTypeInfo(T, S, {}, A, isPOD) {}
 
     void getSchema(ExplosionSchema &schema) const {
       schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
@@ -162,7 +165,7 @@ namespace {
 
     SingletonUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
                            IsPOD_t isPOD)
-      : UnionTypeInfo(T, S, A, isPOD), Singleton(nullptr) {}
+      : UnionTypeInfo(T, S, {}, A, isPOD), Singleton(nullptr) {}
 
     void getSchema(ExplosionSchema &schema) const {
       assert(isComplete());
@@ -251,7 +254,7 @@ namespace {
     public PODSingleScalarTypeInfo<EnumTypeInfo,UnionTypeInfo> {
   public:
     EnumTypeInfo(llvm::StructType *T, Size S, Alignment A)
-      : PODSingleScalarTypeInfo(T, S, A) {}
+      : PODSingleScalarTypeInfo(T, S, {}, A) {}
 
     llvm::Type *getScalarType() const {
       assert(isComplete());

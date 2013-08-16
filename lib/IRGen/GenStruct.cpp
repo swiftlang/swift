@@ -110,10 +110,11 @@ namespace {
   class LoadableStructTypeInfo
       : public StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo> {
   public:
+    // FIXME: Spare bits between struct members.
     LoadableStructTypeInfo(unsigned numFields, llvm::Type *T, Size size,
                            Alignment align, IsPOD_t isPOD)
-      : StructTypeInfoBase(numFields, T, size, align, isPOD) {
-    }
+      : StructTypeInfoBase(numFields, T, size, llvm::BitVector{}, align, isPOD)
+    {}
 
     bool isIndirectArgument(ExplosionKind kind) const override { return false; }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -129,10 +130,11 @@ namespace {
                                   IndirectTypeInfo<FixedStructTypeInfo,
                                                    FixedTypeInfo>> {
   public:
+    // FIXME: Spare bits between struct members.
     FixedStructTypeInfo(unsigned numFields, llvm::Type *T, Size size,
                         Alignment align, IsPOD_t isPOD)
-      : StructTypeInfoBase(numFields, T, size, align, isPOD) {
-    }
+      : StructTypeInfoBase(numFields, T, size, llvm::BitVector{}, align, isPOD)
+    {}
 
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
   };

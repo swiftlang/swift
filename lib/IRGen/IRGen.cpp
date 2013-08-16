@@ -120,11 +120,11 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   Module->setDataLayout(DataLayout->getStringRepresentation());
 
   // Emit the translation unit.
-  IRGenModule IRM(TU->Ctx, Opts, *Module, *DataLayout, SILMod);
-  IRM.emitTranslationUnit(TU, StartElem);
+  IRGenModule IGM(TU->Ctx, Opts, *Module, *DataLayout, SILMod);
+  IGM.emitTranslationUnit(TU, StartElem);
   
   DEBUG(llvm::dbgs() << "module before passes:\n";
-        IRM.Module.dump());
+        IGM.Module.dump());
 
   // Bail out if there are any errors.
   if (TU->Ctx.hadError()) return;

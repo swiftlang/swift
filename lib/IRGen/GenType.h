@@ -67,8 +67,8 @@ private:
   const TypeInfo *WitnessTablePtrTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
 
-  static const TypeInfo *createPrimitive(llvm::Type *T,
-                                         Size size, Alignment align);
+  const TypeInfo *createPrimitive(llvm::Type *T,
+                                  Size size, Alignment align);
 
   void addForwardDecl(TypeBase *key, llvm::Type *type);
 
@@ -115,7 +115,7 @@ private:
   };
   Types_t Types;
 };
-
+  
 } // end namespace irgen
 } // end namespace swift
 

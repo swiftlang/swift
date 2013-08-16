@@ -462,9 +462,11 @@ namespace {
       return reinterpret_cast<const ProtocolEntry *>(this + 1);
     }
 
+    // FIXME: We could get spare bits out of the metadata and/or witness
+    // pointers.
     OpaqueExistentialTypeInfo(llvm::Type *ty, Size size, Alignment align,
                         ArrayRef<ProtocolEntry> protocols)
-      : IndirectTypeInfo(ty, size, align, IsNotPOD),
+      : IndirectTypeInfo(ty, size, llvm::BitVector{}, align, IsNotPOD),
         NumProtocols(protocols.size()) {
 
       for (unsigned i = 0; i != NumProtocols; ++i) {

@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_IRGENMODULE_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -173,6 +174,8 @@ private:
   llvm::Type *FixedBufferTy;           /// [N x i8], where N == 3 * sizeof(void*)
 
   llvm::Type *ValueWitnessTys[MaxNumValueWitnesses];
+  
+  llvm::DenseMap<llvm::Type *, llvm::BitVector> SpareBitsForTypes;
 
 //--- Types -----------------------------------------------------------------
 public:
@@ -197,6 +200,8 @@ public:
 
   bool isResilient(Decl *decl, ResilienceScope scope);
 
+  llvm::BitVector getSpareBitsForType(llvm::Type *scalarTy);
+  
 private:
   TypeConverter &Types;
   friend class TypeConverter;

@@ -134,11 +134,50 @@ llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return asSizeConstant(IGM, getFixedStride());
 }
 
+unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount() const {
+  if (SpareBits.none())
+    return 0;
+  // The runtime supports a max of 0x7FFFFFFF extra inhabitants, which ought
+  // to be enough for anybody.
+  if (StorageSize.getValue() >= 4)
+    return 0x7FFFFFFF;
+  unsigned spareBitCount = SpareBits.count();
+  assert(spareBitCount <= StorageSize.getValueInBits()
+         && "more spare bits than storage bits?!");
+  unsigned inhabitedBitCount = StorageSize.getValueInBits() - spareBitCount;
+  return ((1U << spareBitCount) - 1U) << inhabitedBitCount;
+}
+
+void FixedTypeInfo::applyFixedSpareBitsMask(llvm::BitVector &bits) const {
+  auto numBits = StorageSize.getValueInBits();
+  
+  // Grow the mask with one bits if needed.
+  if (bits.size() < numBits) {
+    bits.resize(numBits, true);
+  }
+  
+  // If there are no SpareBits, mask out the range.
+  if (SpareBits.empty()) {
+    bits.reset(0, numBits);
+    return;
+  }
+  
+  // Apply the mask.
+  if (SpareBits.size() < bits.size()) {
+    // Pad mask with one bits so we don't disturb bits unused by the type.
+    auto paddedSpareBits = SpareBits;
+    paddedSpareBits.resize(bits.size(), true);
+    bits &= paddedSpareBits;
+  } else {
+    bits &= SpareBits;
+  }
+}
+
 namespace {
   /// A TypeInfo implementation for empty types.
   struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, LoadableTypeInfo> {
     EmptyTypeInfo(llvm::Type *ty)
-      : ScalarTypeInfo(ty, Size(0), Alignment(1), IsPOD) {}
+      : ScalarTypeInfo(ty, Size(0), llvm::BitVector{}, Alignment(1), IsPOD) {}
     unsigned getExplosionSize(ExplosionKind kind) const { return 0; }
     void getSchema(ExplosionSchema &schema) const {}
     void load(IRGenFunction &IGF, Address addr, Explosion &e) const {}
@@ -154,8 +193,9 @@ namespace {
   class PrimitiveTypeInfo :
     public PODSingleScalarTypeInfo<PrimitiveTypeInfo, LoadableTypeInfo> {
   public:
-    PrimitiveTypeInfo(llvm::Type *storage, Size size, Alignment align)
-      : PODSingleScalarTypeInfo(storage, size, align) {}
+    PrimitiveTypeInfo(llvm::Type *storage, Size size, llvm::BitVector spareBits,
+                      Alignment align)
+      : PODSingleScalarTypeInfo(storage, size, spareBits, align) {}
   };
 }
 
@@ -163,7 +203,8 @@ namespace {
 /// the given IR type.
 const TypeInfo *TypeConverter::createPrimitive(llvm::Type *type,
                                                Size size, Alignment align) {
-  return new PrimitiveTypeInfo(type, size, align);
+  return new PrimitiveTypeInfo(type, size, IGM.getSpareBitsForType(type),
+                               align);
 }
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
@@ -806,4 +847,42 @@ namespace {
 
 ObjectSize IRGenModule::classifyTypeSize(CanType type, ResilienceScope scope) {
   return ClassifyTypeSize(*this, scope).visit(type);
+}
+
+llvm::BitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy) {
+  if (SpareBitsForTypes.count(scalarTy))
+    return SpareBitsForTypes[scalarTy];
+  
+  {
+    // FIXME: Currently we only implement spare bits for single-element
+    // primitive integer types.
+    while (auto structTy = dyn_cast<llvm::StructType>(scalarTy)) {
+      if (structTy->getNumElements() != 1)
+        goto no_spare_bits;
+      scalarTy = structTy->getElementType(0);
+    }
+
+    auto *intTy = dyn_cast<llvm::IntegerType>(scalarTy);
+    if (!intTy)
+      goto no_spare_bits;
+
+    // Round Integer-Of-Unusual-Size types up to their allocation size according
+    // to the target data layout.
+    unsigned allocBits = DataLayout.getTypeAllocSizeInBits(intTy);
+    assert(allocBits >= intTy->getBitWidth());
+    // Integer types get rounded up to the next power-of-two size in our layout,
+    // so non-power-of-two integer types get spare bits up to that power of two.
+    if (allocBits == intTy->getBitWidth())
+      goto no_spare_bits;
+        
+    // FIXME: Endianness.
+    llvm::BitVector &result = SpareBitsForTypes[scalarTy];
+    result.resize(intTy->getBitWidth(), false);
+    result.resize(allocBits, true);
+    return result;
+  }
+  
+no_spare_bits:
+  SpareBitsForTypes[scalarTy] = {};
+  return {};
 }

@@ -27,8 +27,9 @@ namespace irgen {
 /// ReferenceStorageType with [unowned] ownership.
 class UnownedTypeInfo : public LoadableTypeInfo {
 protected:
+  // FIXME: Get spare bits for pointers from a TargetInfo structure.
   UnownedTypeInfo(llvm::Type *type, Size size, Alignment align)
-    : LoadableTypeInfo(type, size, align, IsNotPOD, STIK_Unowned) {}
+    : LoadableTypeInfo(type, size, {}, align, IsNotPOD, STIK_Unowned) {}
 
 public:
   // No API yet.

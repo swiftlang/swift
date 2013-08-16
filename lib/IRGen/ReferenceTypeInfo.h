@@ -30,8 +30,9 @@ class UnownedTypeInfo;
 /// that has reference semantics.
 class ReferenceTypeInfo : public LoadableTypeInfo {
 protected:
+  // FIXME: Get spare bits for pointers from a TargetInfo-like structure.
   ReferenceTypeInfo(llvm::Type *type, Size size, Alignment align)
-    : LoadableTypeInfo(type, size, align, IsNotPOD, STIK_Reference) {}
+    : LoadableTypeInfo(type, size, {}, align, IsNotPOD, STIK_Reference) {}
 
 public:
   /// Strongly retains a value.
@@ -57,7 +58,8 @@ public:
   /// The reference-counting operations done by the value operations
   /// on the [unowned] storage type are assumed to be basically the
   /// same operations as weakRetain and weakRelease.
-  virtual const UnownedTypeInfo *createUnownedStorageType(TypeConverter &TC) const = 0;
+  virtual const UnownedTypeInfo *createUnownedStorageType(TypeConverter &TC)
+    const = 0;
 
   static bool classof(const ReferenceTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) {
