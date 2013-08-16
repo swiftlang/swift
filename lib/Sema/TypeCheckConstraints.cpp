@@ -3280,12 +3280,15 @@ namespace {
 
 /// \brief Clean up the given ill-formed expression, removing any references
 /// to type variables and setting error types on erroneous expression nodes.
-static Expr *cleanupIllFormedExpression(ConstraintSystem &cs, Expr *expr) {
+static Expr *cleanupIllFormedExpression(ASTContext &context,
+                                        ConstraintSystem *cs, Expr *expr) {
   class CleanupIllFormedExpression : public ASTWalker {
-    ConstraintSystem &cs;
+    ASTContext &context;
+    ConstraintSystem *cs;
 
   public:
-    CleanupIllFormedExpression(ConstraintSystem &cs) : cs(cs) { }
+    CleanupIllFormedExpression(ASTContext &context, ConstraintSystem *cs)
+      : context(context), cs(cs) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For FuncExprs, we just want to type-check the patterns as written,
@@ -3311,11 +3314,13 @@ static Expr *cleanupIllFormedExpression(ConstraintSystem &cs, Expr *expr) {
     Expr *walkToExprPost(Expr *expr) {
       Type type;
       if (expr->getType()) {
-        type = cs.simplifyType(expr->getType());
+        type = expr->getType();
+        if (cs)
+          type = cs->simplifyType(type);
       }
 
       if (!type || type->hasTypeVariable())
-        expr->setType(ErrorType::get(cs.getASTContext()));
+        expr->setType(ErrorType::get(context));
       else
         expr->setType(type);
       return expr;
@@ -3330,7 +3335,7 @@ static Expr *cleanupIllFormedExpression(ConstraintSystem &cs, Expr *expr) {
   if (!expr)
     return expr;
   
-  return expr->walk(CleanupIllFormedExpression(cs));
+  return expr->walk(CleanupIllFormedExpression(context, cs));
 }
 
 namespace {
@@ -3346,7 +3351,7 @@ namespace {
 
     ~CleanupIllFormedExpressionRAII() {
       if (expr) {
-        *expr = cleanupIllFormedExpression(cs, *expr);
+        *expr = cleanupIllFormedExpression(cs.getASTContext(), &cs, *expr);
       }
     }
 
@@ -3360,8 +3365,13 @@ namespace {
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
 bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
-  expr = expr->walk(PreCheckExpression(*this, dc));
-  return !expr;
+  if (auto result = expr->walk(PreCheckExpression(*this, dc))) {
+    expr = result;
+    return false;
+  }
+
+  expr = cleanupIllFormedExpression(dc->getASTContext(), nullptr, expr);
+  return true;
 }
 
 #pragma mark High-level entry points
@@ -3380,8 +3390,9 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
-  expr = cs.generateConstraints(expr);
-  if (!expr) {
+  if (auto generatedExpr = cs.generateConstraints(expr))
+    expr = generatedExpr;
+  else {
     return true;
   }
 
@@ -3475,10 +3486,10 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
-  expr = cs.generateConstraintsShallow(expr);
-  if (!expr) {
+  if (auto generatedExpr = cs.generateConstraintsShallow(expr))
+    expr = generatedExpr;
+  else
     return true;
-  }
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
@@ -3605,8 +3616,9 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
-  expr = cs.generateConstraints(expr);
-  if (!expr)
+  if (auto generatedExpr = cs.generateConstraints(expr))
+    expr = generatedExpr;
+  else
     return true;
 
   // The result must be a LogicValue.
@@ -3712,8 +3724,9 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
-  expr = cs.generateConstraints(expr);
-  if (!expr)
+  if (auto generatedExpr = cs.generateConstraints(expr))
+    expr = generatedExpr;
+  else
     return true;
 
   // The result must be an ArrayBound.

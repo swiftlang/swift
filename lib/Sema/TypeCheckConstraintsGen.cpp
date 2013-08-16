@@ -97,6 +97,10 @@ namespace {
     /// \brief Add constraints for a reference to a specific member of the given
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, ValueDecl *decl) {
+      // If we're referring to an invalid declaration, fail.
+      if (decl->isInvalid())
+        return nullptr;
+
       auto tv = CS.createTypeVariable(
                   CS.getConstraintLocator(expr, ConstraintLocator::Member),
                   /*canBindToLValue=*/true);
@@ -209,6 +213,10 @@ namespace {
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
+      // If we're referring to an invalid declaration, don't type-check.
+      if (E->getDecl()->isInvalid())
+        return nullptr;
+
       // If this is an anonymous closure argument, take it's type and turn it
       // into an implicit lvalue type. This accounts for the fact that the
       // closure argument type itself might be inferred to an lvalue type.

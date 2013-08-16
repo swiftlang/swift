@@ -450,6 +450,7 @@ public:
         TC.diagnose(VD->getStartLoc(), diag::var_type_not_materializable,
                     VD->getType());
         VD->overwriteType(ErrorType::get(TC.Context));
+        VD->setInvalid();
       }
 
       validateAttributes(VD);
@@ -499,8 +500,10 @@ public:
     // Handle vars.
     case PatternKind::Named: {
       VarDecl *var = cast<NamedPattern>(pattern)->getDecl();
-      if (!var->hasType())
+      if (!var->hasType()) {
         var->setType(ErrorType::get(TC.Context));
+      }
+      var->setInvalid();
       return;
     }
 
@@ -542,8 +545,10 @@ public:
       // Type-check the pattern.
       if (TC.typeCheckPattern(PBD->getPattern(),
                               PBD->getDeclContext(),
-                              /*allowUnknownTypes*/false))
+                              /*allowUnknownTypes*/false)) {
+        setBoundVarsTypeError(PBD->getPattern());
         return;
+      }
 
       Type ty = PBD->getPattern()->getType();
       Expr *initializer = nullptr;
@@ -555,7 +560,6 @@ public:
       } else if (!TC.isDefaultInitializable(ty, &initializer)) {
         // FIXME: Better diagnostics here.
         TC.diagnose(PBD, diag::decl_no_default_init, ty);
-        PBD->setInvalid();
       } else {
         if (TC.typeCheckExpression(initializer, PBD->getDeclContext(), ty,
                                    /*discardedExpr=*/false)) {
@@ -570,8 +574,10 @@ public:
       if (isa<TypedPattern>(PBD->getPattern())) {
         if (TC.typeCheckPattern(PBD->getPattern(),
                                 PBD->getDeclContext(),
-                                /*allowUnknownTypes*/false))
+                                /*allowUnknownTypes*/false)) {
+          setBoundVarsTypeError(PBD->getPattern());
           return;
+        }
         DestTy = PBD->getPattern()->getType();
       }
       Expr *Init = PBD->getInit();
@@ -580,7 +586,8 @@ public:
         if (DestTy)
           TC.diagnose(PBD, diag::while_converting_var_init,
                       DestTy);
-        setBoundVarsTypeError(PBD->getPattern());
+        else
+          setBoundVarsTypeError(PBD->getPattern());
         return;
       }
       if (!DestTy) {
@@ -591,14 +598,18 @@ public:
       if (!DestTy) {
         if (TC.coerceToType(PBD->getPattern(),
                             PBD->getDeclContext(),
-                            Init->getType()))
+                            Init->getType())) {
+          setBoundVarsTypeError(PBD->getPattern());
           return;
+        }
       }
     } else if (!IsFirstPass || !DelayCheckingPattern) {
       if (TC.typeCheckPattern(PBD->getPattern(),
                               PBD->getDeclContext(),
-                              /*allowUnknownTypes*/false))
+                              /*allowUnknownTypes*/false)) {
+        setBoundVarsTypeError(PBD->getPattern());
         return;
+      }
     }
 
     visitBoundVars(PBD->getPattern());
@@ -618,7 +629,8 @@ public:
                                      /*allowUnknownTypes*/false);
 
     if (isInvalid) {
-      SD->setType(ErrorType::get(TC.Context));
+      SD->overwriteType(ErrorType::get(TC.Context));
+      SD->setInvalid();
     } else {
       SD->setType(FunctionType::get(SD->getIndices()->getType(),
                                     SD->getElementType(), TC.Context));
@@ -627,7 +639,11 @@ public:
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (!IsSecondPass) {
-      TC.validateType(TAD->getUnderlyingTypeLoc());
+      if (TC.validateType(TAD->getUnderlyingTypeLoc())) {
+        TAD->setInvalid();
+        TAD->getUnderlyingTypeLoc().setType(ErrorType::get(TC.Context));
+      }
+
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         checkInheritanceClause(TC, TAD);
     }
@@ -1104,11 +1120,17 @@ public:
     Type ElemTy = UD->getDeclaredTypeInContext();
 
     if (!ED->getArgumentTypeLoc().isNull())
-      if (TC.validateType(ED->getArgumentTypeLoc()))
+      if (TC.validateType(ED->getArgumentTypeLoc())) {
+        ED->overwriteType(ErrorType::get(TC.Context));
+        ED->setInvalid();
         return;
+      }
     if (!ED->getResultTypeLoc().isNull())
-      if (TC.validateType(ED->getResultTypeLoc()))
+      if (TC.validateType(ED->getResultTypeLoc())) {
+        ED->overwriteType(ErrorType::get(TC.Context));
+        ED->setInvalid();
         return;
+      }
 
     // If we have a simple element, just set the type.
     if (ED->getArgumentType().isNull()) {
@@ -1134,6 +1156,8 @@ public:
     // Require the carried type to be materializable.
     if (!ED->getArgumentType()->isMaterializable()) {
       TC.diagnose(ED->getLoc(), diag::union_element_not_materializable);
+      ED->overwriteType(ErrorType::get(TC.Context));
+      ED->setInvalid();
     }
   }
 
@@ -1167,6 +1191,7 @@ public:
                     isa<ProtocolType>(ExtendedTy), ExtendedTy);
         // FIXME: It would be nice to point out where we found the named type
         // declaration, if any.
+        ED->setInvalid();
       }
 
       // Add this extension to the list of extensions for the extended type.
@@ -1217,7 +1242,7 @@ public:
     if (TC.typeCheckPattern(CD->getArguments(),
                             CD,
                             /*allowUnknownTypes*/false)) {
-      CD->setType(ErrorType::get(TC.Context));
+      CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
       Type FnTy;
