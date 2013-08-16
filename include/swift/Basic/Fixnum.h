@@ -142,6 +142,21 @@ namespace swift {
       assertValid();
       return result;
     }
+
+    bool operator==(const Fixnum &RHS) const {
+      return Value == RHS.Value;
+    }
+    bool operator!=(const Fixnum &RHS) const {
+      return !operator==(RHS);
+    }
+
+    bool operator==(int RHS) const {
+      return Value == IntType(RHS);
+    }
+    bool operator!=(int RHS) const {
+      return !operator==(RHS);
+    }
+
   };
 } // end namespace swift
 
