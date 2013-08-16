@@ -1294,6 +1294,8 @@ public:
     auto endRange = Members.Remaining.slice(Members.Remaining.size());
     return iterator(endRange);
   }
+  
+  FilterDeclType *front() const { return *begin(); }
 };
 
   

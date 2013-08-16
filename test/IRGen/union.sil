@@ -1,0 +1,143 @@
+// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm | FileCheck %s
+
+import Builtin
+
+// -- Singleton union. The representation is just the singleton payload.
+// CHECK: %O5union9Singleton = type { { i64, i64 } }
+
+// -- No-payload unions. The representation is just an enum tag.
+// CHECK: %O5union10NoPayloads = type { i2 }
+// CHECK: %O5union11NoPayloads2 = type { i3 }
+
+// -- Single-payload union, no extra inhabitants in the payload type. The
+//    representation adds a tag bit to distinguish payload from enum tag:
+//      case x(i64): X0 X1 X2 ... X63 | 0, where X0...X63 are the payload bits
+//      case y:      0  0  0  ... 0   | 1
+//      case z:      1  0  0  ... 0   | 1
+// CHECK: %O5union17SinglePayloadNoXI = type { i64, i1 }
+// CHECK: %O5union18SinglePayloadNoXI2 = type { i64, i1 }
+
+// -- Single-payload union, spare bits. The representation uses a tag bit
+//    out of the payload to distinguish payload from enum tag:
+//      case x(i3): X0 X1 X2 0 0 0 0 0
+//      case y:     0  0  0  1 0 0 0 0
+//      case z:     1  0  0  1 0 0 0 0
+// CHECK: %O5union21SinglePayloadSpareBit = type { i64 }
+
+// -- Multi-payload union, no spare bits. The representation adds tag bits
+//    to discriminate payloads. No-payload cases all share a tag.
+//      case x(i8): X0 X1 X2 ... X7 X8 | 0 0
+//      case y(i7): Y0 Y1 Y2 ... Y7 0  | 1 0
+//      case z(i2): Z0 Z1 0  ... 0  0  | 0 1
+//      case a:     0  0  0  ... 0  0  | 1 1
+//      case b:     1  0  0  ... 0  0  | 1 1
+//      case c:     0  1  0  ... 0  0  | 1 1
+// CHECK: %O5union23MultiPayloadNoSpareBits = type { i64, i2 }
+
+// -- Multi-payload union, one spare bit. The representation uses spare bits
+//    common to all payloads to partially discriminate payloads, with added
+//    tag bits to cover the gap. No-payload cases all share a tag.
+//      case x(i7): X0 X1 X2 X3 X4 X5 X6 0 | 0
+//      case y(i1): Y  0  0  0  0  0  0  1 | 0
+//      case z(i5): Z0 Z1 Z2 Z3 Z4 0  0  0 | 1
+//      case a:     0  0  0  0  0  0  0  1 | 1
+//      case b:     1  0  0  0  0  0  0  1 | 1
+//      case c:     0  1  0  0  0  0  0  1 | 1
+// CHECK: %O5union23MultiPayloadOneSpareBit = type { i64, i1 }
+
+// -- Multi-payload union, two spare bits. Same as above, except we have enough
+//    spare bits not to require any added tag bits.
+//      case x(i6): X0 X1 X2 X3 X4 X5 0  0
+//      case y(i1): Y  0  0  0  0  0  1  0
+//      case z(i5): Z0 Z1 Z2 Z3 Z4 0  0  1
+//      case a:     0  0  0  0  0  0  1  1
+//      case b:     1  0  0  0  0  0  1  1
+//      case c:     0  1  0  0  0  0  1  1
+// CHECK: %O5union24MultiPayloadTwoSpareBits = type { i64 }
+union Singleton {
+  case val(Builtin.Int64, Builtin.Int64)
+}
+
+
+union NoPayloads {
+  case x
+  case y
+  case z
+}
+
+
+union NoPayloads2 {
+  case a
+  case e
+  case i
+  case o
+  case u
+  case y
+}
+
+union SinglePayloadNoXI {
+  case x(Builtin.Int64)
+  case y
+}
+
+union SinglePayloadNoXI2 {
+  case x(Builtin.Int64)
+  case y
+  case z
+}
+
+union SinglePayloadSpareBit {
+  case x(Builtin.Int63)
+  case y
+  case z
+}
+
+union MultiPayloadNoSpareBits {
+  case x(Builtin.Int64)
+  case y(Builtin.Int32)
+  case z(Builtin.Int63)
+  case a
+  case b
+  case c
+}
+
+union MultiPayloadOneSpareBit {
+  case x(Builtin.Int62)
+  case y(Builtin.Int63)
+  case z(Builtin.Int61)
+  case a
+  case b
+  case c
+}
+
+union MultiPayloadTwoSpareBits {
+  case x(Builtin.Int62)
+  case y(Builtin.Int60)
+  case z(Builtin.Int61)
+  case a
+  case b
+  case c
+}
+
+// Force the storage types to all be generated.
+typealias AllTestUnions = (
+  Singleton,
+  NoPayloads,
+  NoPayloads2,
+  SinglePayloadNoXI,
+  SinglePayloadNoXI2,
+  SinglePayloadSpareBit,
+  MultiPayloadNoSpareBits,
+  MultiPayloadOneSpareBit,
+  MultiPayloadTwoSpareBits)
+
+var x : AllTestUnions
+
+sil @top_level_code : $() -> () {
+entry:
+  // Force the global variables to materialize.
+  %x = global_addr #x : $*AllTestUnions
+  initialize_var %x : $*AllTestUnions
+  %z = tuple ()
+  return %z : $()
+}

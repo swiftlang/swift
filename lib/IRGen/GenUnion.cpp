@@ -42,6 +42,8 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
+  class UnionImplStrategy;
+  
   /// An abstract base class for TypeInfo implementations of union types.
   // FIXME: not always loadable or even fixed-size!
   class UnionTypeInfo : public LoadableTypeInfo {
@@ -87,13 +89,87 @@ namespace {
     virtual void emitInjectionFunctionBody(IRGenFunction &IGF,
                                            UnionElementDecl *elt,
                                            Explosion &params) const = 0;
+    
+    /// Given an incomplete UnionTypeInfo, completes layout of the storage type
+    /// and calculates its size and alignment.
+    virtual void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
+                                 UnionImplStrategy &strategy) = 0;
   };
 
-  /// A TypeInfo implementation which uses an aggregate.
-  class AggregateUnionTypeInfo : public UnionTypeInfo {
+  /// A UnionTypeInfo implementation which has a single case with a payload, and
+  /// one or more additional no-payload cases..
+  class SinglePayloadUnionTypeInfo : public UnionTypeInfo {
+  public:
+    /// FIXME: Spare bits from the payload not exhausted by the extra
+    /// inhabitants we used.
+    SinglePayloadUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
+                              IsPOD_t isPOD)
+      : UnionTypeInfo(T, S, {}, A, isPOD) {}
+    
+    void getSchema(ExplosionSchema &schema) const {
+      schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
+                                                        getFixedAlignment()));
+    }
+    
+    unsigned getExplosionSize(ExplosionKind kind) const {
+      return 1;
+    }
+    
+    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      // FIXME
+    }
+    
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      // FIXME
+    }
+    
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      // FIXME
+    }
+    
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+      // FIXME
+    }
+    
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+      // FIXME
+    }
+    
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      // FIXME
+    }
+    
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      // FIXME
+    }
+    
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      // FIXME
+    }
+    
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      // FIXME
+    }
+    
+    void emitInjectionFunctionBody(IRGenFunction &IGF,
+                                   UnionElementDecl *elt,
+                                   Explosion &params) const {
+      // FIXME
+      params.markClaimed(params.size());
+      IGF.Builder.CreateRetVoid();
+    }
+    
+    void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
+                         UnionImplStrategy &strategy) override;
+  };
+
+  /// A UnionTypeInfo implementation which has multiple payloads.
+  class MultiPayloadUnionTypeInfo : public UnionTypeInfo {
+    // The spare bits shared by all payloads, if any.
+    llvm::BitVector CommonSpareBits;
   public:
     /// FIXME: Spare bits common to aggregate elements and not used for tags.
-    AggregateUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
+    MultiPayloadUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
                            IsPOD_t isPOD)
       : UnionTypeInfo(T, S, {}, A, isPOD) {}
 
@@ -149,9 +225,12 @@ namespace {
       params.markClaimed(params.size());
       IGF.Builder.CreateRetVoid();
     }
+    
+    void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
+                         UnionImplStrategy &strategy) override;
   };
 
-  /// A TypeInfo implementation for singleton unions.
+  /// A UnionTypeInfo implementation for singleton unions.
   class SingletonUnionTypeInfo : public UnionTypeInfo {
   public:
     static Address getSingletonAddress(IRGenFunction &IGF, Address addr) {
@@ -247,13 +326,16 @@ namespace {
         IGF.emitScalarReturn(params);
       }
     }
+    
+    void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
+                         UnionImplStrategy &) override;
   };
 
-  /// A TypeInfo implementation for unions with no payload.
-  class EnumTypeInfo :
-    public PODSingleScalarTypeInfo<EnumTypeInfo,UnionTypeInfo> {
+  /// A UnionTypeInfo implementation for unions with no payload.
+  class NoPayloadUnionTypeInfo :
+    public PODSingleScalarTypeInfo<NoPayloadUnionTypeInfo,UnionTypeInfo> {
   public:
-    EnumTypeInfo(llvm::StructType *T, Size S, Alignment A)
+    NoPayloadUnionTypeInfo(llvm::StructType *T, Size S, Alignment A)
       : PODSingleScalarTypeInfo(T, S, {}, A) {}
 
     llvm::Type *getScalarType() const {
@@ -270,6 +352,9 @@ namespace {
                                    Explosion &params) const {
       IGF.Builder.CreateRet(getDiscriminatorIndex(elt));
     }
+      
+    void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
+                         UnionImplStrategy &strategy) override;
   };
 
   bool isObviouslyEmptyType(CanType type) {
@@ -287,64 +372,262 @@ namespace {
   class UnionImplStrategy {
   public:
     enum Kind {
+      /// A "union" with a single case.
       Singleton,
-      Enum,
-      Aggregate
+      /// An enum-like union whose cases all have empty payloads.
+      NoPayload,
+      /// A union which is enum-like except for a single case with payload.
+      SinglePayload,
+      /// A fully general union with more than one case with payload.
+      MultiPayload,
     };
 
   private:
     unsigned NumElements;
     Kind TheKind;
+    std::vector<UnionElementDecl *> ElementsWithPayload;
 
   public:
     explicit UnionImplStrategy(UnionDecl *theUnion) {
       NumElements = 0;
 
-      bool hasApparentPayload = false;
-      for (auto member : theUnion->getMembers()) {
-        auto elt = dyn_cast<UnionElementDecl>(member);
-        if (!elt) continue;
-
+      for (auto elt : theUnion->getAllElements()) {
         NumElements++;
 
         // Compute whether this gives us an apparent payload.
-        if (hasApparentPayload) continue;
-
         Type argType = elt->getArgumentType();
         if (!argType.isNull() &&
-            !isObviouslyEmptyType(argType->getCanonicalType()))
-          hasApparentPayload = true;
+            !isObviouslyEmptyType(argType->getCanonicalType())) {
+          ElementsWithPayload.push_back(elt);
+        }
       }
 
       assert(NumElements != 0);
       if (NumElements == 1) {
         TheKind = Singleton;
-      } else if (hasApparentPayload) {
-        TheKind = Aggregate;
+      } else if (ElementsWithPayload.size() > 1) {
+        TheKind = MultiPayload;
+      } else if (ElementsWithPayload.size() == 1) {
+        TheKind = SinglePayload;
       } else {
-        TheKind = Enum;
+        TheKind = NoPayload;
       }
     }
 
     Kind getKind() const { return TheKind; }
     unsigned getNumElements() const { return NumElements; }
-
+    unsigned getNumElementsWithPayload() const {
+      return ElementsWithPayload.size();
+    }
+    
+    UnionElementDecl *getOnlyElementWithPayload() const {
+      assert(TheKind == SinglePayload &&
+             "not a single-payload union");
+      assert(ElementsWithPayload.size() == 1 &&
+             "single-payload union has multiple payloads?!");
+      return ElementsWithPayload[0];
+    }
+    
+    ArrayRef<UnionElementDecl*> getElementsWithPayload() const {
+      return ElementsWithPayload;
+    }
+    
     /// Create a forward declaration for the union.
     UnionTypeInfo *create(llvm::StructType *convertedStruct) const {
       switch (getKind()) {
       case Singleton:
         return new SingletonUnionTypeInfo(convertedStruct,
                                           Size(0), Alignment(0), IsPOD);
-      case Enum:
-        return new EnumTypeInfo(convertedStruct,
-                                Size(0), Alignment(0));
-      case Aggregate:
-        return new AggregateUnionTypeInfo(convertedStruct,
-                                          Size(0), Alignment(0), IsPOD);
+      case NoPayload:
+        return new NoPayloadUnionTypeInfo(convertedStruct,
+                                          Size(0), Alignment(0));
+      
+      case SinglePayload:
+        return new SinglePayloadUnionTypeInfo(convertedStruct,
+                                              Size(0), Alignment(0), IsPOD);
+      
+      case MultiPayload:
+        return new MultiPayloadUnionTypeInfo(convertedStruct,
+                                             Size(0), Alignment(0), IsPOD);
       }
-      llvm_unreachable("bad strategy kind");
     }
   };
+  
+  void SingletonUnionTypeInfo::layoutUnionType(TypeConverter &TC,
+                                               UnionDecl *theUnion,
+                                               UnionImplStrategy &) {
+    Type eltType =
+      theUnion->getAllElements().front()->getArgumentType();
+    
+    llvm::Type *storageType;
+    if (eltType.isNull()) {
+      storageType = TC.IGM.Int8Ty;
+      completeFixed(Size(0), Alignment(1));
+      Singleton = nullptr;
+    } else {
+      const TypeInfo &eltTI
+        = TC.getCompleteTypeInfo(eltType->getCanonicalType());
+      
+      auto &fixedEltTI = cast<FixedTypeInfo>(eltTI); // FIXME
+      storageType = eltTI.StorageType;
+      completeFixed(fixedEltTI.getFixedSize(),
+                    fixedEltTI.getFixedAlignment());
+      Singleton = cast<LoadableTypeInfo>(&eltTI); // FIXME
+      setPOD(eltTI.isPOD(ResilienceScope::Local));
+    }
+    
+    llvm::Type *body[] = { storageType };
+    getStorageType()->setBody(body);
+  }
+  
+  void NoPayloadUnionTypeInfo::layoutUnionType(TypeConverter &TC,
+                                               UnionDecl *theUnion,
+                                               UnionImplStrategy &strategy) {
+    // Since there are no payloads, we need just enough bits to hold a
+    // discriminator.
+    assert(strategy.getNumElements() > 1 &&
+           "singletons should use SingletonUnionTypeInfo");
+    unsigned tagBits = llvm::Log2_32(strategy.getNumElements() - 1) + 1;
+    auto tagTy = llvm::IntegerType::get(TC.IGM.getLLVMContext(), tagBits);
+    // Round the physical size up to the next power of two.
+    unsigned tagBytes = (tagBits + 7U)/8U;
+    if (!llvm::isPowerOf2_32(tagBytes))
+      tagBytes = llvm::NextPowerOf2(tagBytes);
+    completeFixed(Size(tagBytes), Alignment(tagBytes));
+    
+    llvm::Type *body[] = { tagTy };
+    getStorageType()->setBody(body);
+  }
+  
+  static void setTaggedUnionBody(IRGenModule &IGM,
+                                 llvm::StructType *bodyStruct,
+                                 unsigned payloadBits, unsigned extraTagBits) {
+
+    auto payloadUnionTy = llvm::IntegerType::get(IGM.getLLVMContext(),
+                                                 payloadBits);
+
+    if (extraTagBits > 0) {
+      auto extraTagTy = llvm::IntegerType::get(IGM.getLLVMContext(),
+                                               extraTagBits);
+      llvm::Type *body[] = { payloadUnionTy, extraTagTy };
+      bodyStruct->setBody(body);
+    } else {
+      llvm::Type *body[] = { payloadUnionTy };
+      bodyStruct->setBody(body);
+    }
+  }
+  
+  void SinglePayloadUnionTypeInfo::layoutUnionType(TypeConverter &TC,
+                                                   UnionDecl *theUnion,
+                                                   UnionImplStrategy &strategy){
+    // See whether the payload case's type has extra inhabitants.
+    // FIXME: Dynamically query extra inhabitants for opaque types.
+    unsigned fixedExtraInhabitants = 0;
+    unsigned numTags = strategy.getNumElements() - 1;
+    
+    auto payloadTy = strategy.getOnlyElementWithPayload()->getArgumentType()
+      ->getCanonicalType();
+    
+    auto &payloadTI = TC.getCompleteTypeInfo(payloadTy);
+    auto &fixedPayloadTI = cast<FixedTypeInfo>(payloadTI); // FIXME
+    fixedExtraInhabitants = fixedPayloadTI.getFixedExtraInhabitantCount();
+    
+    // Determine how many tag bits we need. Given N extra inhabitants, we
+    // represent the first N tags using those inhabitants. For additional tags,
+    // we use discriminator bit(s) to inhabit the full bit size of the payload.
+    unsigned tagsWithoutInhabitants = numTags <= fixedExtraInhabitants
+      ? 0 : numTags - fixedExtraInhabitants;
+    
+    unsigned extraTagBits;
+    
+    if (tagsWithoutInhabitants == 0) {
+      extraTagBits = 0;
+    // If the payload size is greater than 32 bits, the calculation would
+    // overflow, but one tag bit should suffice. if you have more than 2^32
+    // union discriminators you have other problems.
+    } else if (fixedPayloadTI.getFixedSize().getValue() >= 4) {
+      extraTagBits = 1;
+    } else {
+      unsigned tagsPerTagBitValue =
+        1 << fixedPayloadTI.getFixedSize().getValueInBits();
+      unsigned tagBitValues
+        = (tagsWithoutInhabitants + (tagsPerTagBitValue-1))/tagsPerTagBitValue;
+      extraTagBits = llvm::Log2_32(tagBitValues-1) + 1;
+    }
+
+    // Create the body type.
+    setTaggedUnionBody(TC.IGM, getStorageType(),
+                       fixedPayloadTI.getFixedSize().getValueInBits(),
+                       extraTagBits);
+    
+    // The union has the alignment of the payload. The size includes the added
+    // tag bits.
+    auto sizeWithTag = fixedPayloadTI.getFixedSize()
+      .roundUpToAlignment(fixedPayloadTI.getFixedAlignment())
+      .getValue();
+    sizeWithTag += (extraTagBits+7U)/8U;
+    
+    completeFixed(Size(sizeWithTag),
+                  fixedPayloadTI.getFixedAlignment());
+  }
+  
+  void MultiPayloadUnionTypeInfo::layoutUnionType(TypeConverter &TC,
+                                                  UnionDecl *theUnion,
+                                                  UnionImplStrategy &strategy) {
+    // We need tags for each of the payload types, which we may be able to form
+    // using spare bits, plus a minimal number of tags with which we can
+    // represent the empty cases.
+    unsigned numPayloadTags = strategy.getNumElementsWithPayload();
+    unsigned numEmptyElements = strategy.getNumElements() - numPayloadTags;
+    
+    // See if the payload types have any spare bits in common.
+    // At the end of the loop CommonSpareBits.size() will be the size (in bits)
+    // of the largest payload.
+    CommonSpareBits = {};
+    Alignment worstAlignment(1);
+    for (auto *elt : strategy.getElementsWithPayload()) {
+      auto payloadTy = elt->getArgumentType()->getCanonicalType();
+      auto &payloadTI = TC.getCompleteTypeInfo(payloadTy);
+      auto &fixedPayloadTI = cast<FixedTypeInfo>(payloadTI); // FIXME
+      fixedPayloadTI.applyFixedSpareBitsMask(CommonSpareBits);
+      if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
+        worstAlignment = fixedPayloadTI.getFixedAlignment();
+    }
+    
+    unsigned commonSpareBitCount = CommonSpareBits.count();
+    unsigned usedBitCount = CommonSpareBits.size() - commonSpareBitCount;
+    
+    // We can store tags for the empty elements using the inhabited bits with
+    // their own tag(s).
+    unsigned numEmptyElementTags;
+    if (usedBitCount >= 32) {
+      numEmptyElementTags = 1;
+    } else {
+      unsigned emptyElementsPerTag = 1 << usedBitCount;
+      numEmptyElementTags
+        = (numEmptyElements + (emptyElementsPerTag-1))/emptyElementsPerTag;
+    }
+    
+    unsigned numTags = numPayloadTags + numEmptyElementTags;
+    unsigned numTagBits = llvm::Log2_32(numTags-1) + 1;
+    unsigned extraTagBits = numTagBits <= commonSpareBitCount
+      ? 0 : numTagBits - commonSpareBitCount;
+    
+    // Create the type. We need enough bits to store the largest payload plus
+    // extra tag bits we need.
+    setTaggedUnionBody(TC.IGM, getStorageType(),
+                       CommonSpareBits.size(),
+                       extraTagBits);
+    
+    // The union has the worst alignment of its payloads. The size includes the
+    // added tag bits.
+    auto sizeWithTag = Size((CommonSpareBits.size() + 7U)/8U)
+      .roundUpToAlignment(worstAlignment)
+      .getValue();
+    sizeWithTag += (extraTagBits+7U)/8U;
+    
+    completeFixed(Size(sizeWithTag), worstAlignment);
+  }
 }
 
 const TypeInfo *TypeConverter::convertUnionType(UnionDecl *theUnion) {
@@ -360,103 +643,7 @@ const TypeInfo *TypeConverter::convertUnionType(UnionDecl *theUnion) {
   // Create the TI as a forward declaration and map it in the table.
   UnionTypeInfo *convertedTI = strategy.create(convertedStruct);
 
-  // We don't need a discriminator if this is a singleton ADT.
-  if (strategy.getKind() == UnionImplStrategy::Singleton) {
-    auto unionTI = static_cast<SingletonUnionTypeInfo*>(convertedTI);
-
-    Type eltType =
-      cast<UnionElementDecl>(theUnion->getMembers()[0])->getArgumentType();
-
-    llvm::Type *storageType;
-    if (eltType.isNull()) {
-      storageType = IGM.Int8Ty;
-      unionTI->StorageAlignment = Alignment(1);
-      unionTI->Singleton = nullptr;
-    } else {
-      const TypeInfo &eltTI = getCompleteTypeInfo(eltType->getCanonicalType());
-
-      auto &fixedEltTI = cast<FixedTypeInfo>(eltTI); // FIXME
-      storageType = eltTI.StorageType;
-      unionTI->completeFixed(fixedEltTI.getFixedSize(),
-                             fixedEltTI.getFixedAlignment());
-      unionTI->Singleton = cast<LoadableTypeInfo>(&eltTI); // FIXME
-      unionTI->setPOD(eltTI.isPOD(ResilienceScope::Local));
-    }
-
-    llvm::Type *body[] = { storageType };
-    convertedStruct->setBody(body);
-
-    return unionTI;
-  }
-
-  // Otherwise, we need a discriminator.
-
-  // Compute the discriminator type.
-  llvm::Type *discriminatorType;
-  Size discriminatorSize;
-  if (strategy.getNumElements() == 2) {
-    discriminatorType = IGM.Int1Ty;
-    discriminatorSize = Size(1);
-  } else if (strategy.getNumElements() <= (1 << 8)) {
-    discriminatorType = IGM.Int8Ty;
-    discriminatorSize = Size(1);
-  } else if (strategy.getNumElements() <= (1 << 16)) {
-    discriminatorType = IGM.Int16Ty;
-    discriminatorSize = Size(2);
-  } else {
-    discriminatorType = IGM.Int32Ty;
-    discriminatorSize = Size(4);
-  }
-
-  SmallVector<llvm::Type*, 2> body;
-  body.push_back(discriminatorType);
-
-  Size payloadSize = Size(0);
-  Alignment storageAlignment = Alignment(1);
-  IsPOD_t isPOD = IsPOD;
-
-  // Figure out how much storage we need for the union.
-  for (Decl *member : theUnion->getMembers()) {
-    UnionElementDecl *elt = dyn_cast<UnionElementDecl>(member);
-    if (!elt)
-      continue;
-
-    // Ignore variants that carry no data.
-    Type eltType = elt->getArgumentType();
-    if (eltType.isNull()) continue;
-
-    // Compute layout for the type, and ignore variants with
-    // zero-size data.
-    auto &eltTInfo = getCompleteTypeInfo(eltType->getCanonicalType());
-    if (eltTInfo.isKnownEmpty()) continue;
-
-    auto &fixedEltTI = cast<FixedTypeInfo>(eltTInfo);
-
-    // The required payload size is the amount of padding needed to
-    // get up to the element's alignment, plus the actual size.
-    Size eltPayloadSize = fixedEltTI.getFixedSize();
-    if (fixedEltTI.getFixedAlignment().getValue()
-          > discriminatorSize.getValue())
-      eltPayloadSize += Size(fixedEltTI.getFixedAlignment().getValue()
-                               - discriminatorSize.getValue());
-
-    payloadSize = std::max(payloadSize, eltPayloadSize);
-    storageAlignment = std::max(storageAlignment, eltTInfo.StorageAlignment);
-    isPOD &= eltTInfo.isPOD(ResilienceScope::Local);
-  }
-
-  convertedTI->completeFixed(discriminatorSize + payloadSize, storageAlignment);
-  convertedTI->setPOD(isPOD);
-
-  // Add the payload to the body if necessary.
-  if (payloadSize) {
-    body.push_back(llvm::ArrayType::get(IGM.Int8Ty, payloadSize.getValue()));
-  }
-
-  // TODO: remember element layout information above and stash it in
-  // convertedTI.
-
-  convertedStruct->setBody(body);
+  convertedTI->layoutUnionType(*this, theUnion, strategy);
   return convertedTI;
 }
 
