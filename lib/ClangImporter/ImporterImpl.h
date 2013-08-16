@@ -213,10 +213,14 @@ private:
 
   ///\ brief The Swift standard library module.
   Module *swiftModule = nullptr;
+  
+  /// A pair containing a ClangModule and whether the adapters of its
+  /// re-exported modules have all been forced to load already.
+  using ModuleInitPair = llvm::PointerIntPair<ClangModule *, 1, bool>;
 
 public:
   /// A map from Clang modules to their Swift wrapper modules.
-  llvm::SmallDenseMap<clang::Module *, ClangModule *, 16> ModuleWrappers;
+  llvm::SmallDenseMap<clang::Module *, ModuleInitPair, 16> ModuleWrappers;
 
   /// \brief The first Clang module we loaded.
   ///

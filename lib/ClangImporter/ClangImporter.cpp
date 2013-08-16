@@ -276,8 +276,16 @@ Module *ClangImporter::loadModule(
   if (!clangModule)
     return nullptr;
   auto &cachedResult = Impl.ModuleWrappers[clangModule];
-  if (cachedResult)
-    return cachedResult;
+  if (Module *result = cachedResult.getPointer()) {
+    if (!cachedResult.getInt()) {
+      // Force load adapter modules for all imported modules.
+      // FIXME: This forces the creation of wrapper modules for all imports as
+      // well, and may do unnecessary work.
+      cachedResult.setInt(true);
+      //result->forAllVisibleModules(path, [&](Module::ImportedModule import) {});
+    }
+    return result;
+  }
 
   // FIXME: Revisit this once components are fleshed out. Clang components
   // are likely born-fragile.
@@ -289,18 +297,17 @@ Module *ClangImporter::loadModule(
   auto result = new (Impl.SwiftContext)
     ClangModule(Impl.SwiftContext, (*clangModule).getFullModuleName(),
                 *this, component, clangModule);
-  cachedResult = result;
+  cachedResult.setPointer(result);
 
   // FIXME: Total hack.
   if (!Impl.firstClangModule)
     Impl.firstClangModule = result;
 
   // Force load adapter modules for all imported modules.
-  // FIXME: This forces the creation of wrapper modules for all imports as well.
-  result->forAllVisibleModules(path, [](const Module::ImportedModule &import) {
-    if (auto clangMod = dyn_cast<ClangModule>(import.second))
-      (void)clangMod->getAdapterModule();
-  });
+  // FIXME: This forces the creation of wrapper modules for all imports as
+  // well, and may do unnecessary work.
+  cachedResult.setInt(true);
+  result->forAllVisibleModules(path, [](Module::ImportedModule import) {});
 
   // Bump the generation count.
   ++Impl.Generation;
@@ -313,16 +320,17 @@ ClangModule *
 ClangImporter::Implementation::getWrapperModule(ClangImporter &importer,
                                                 clang::Module *underlying,
                                                 Component *component) {
-  auto &result = ModuleWrappers[underlying];
-  if (result)
-    return result;
+  auto &cacheEntry = ModuleWrappers[underlying];
+  if (ClangModule *cachedModule = cacheEntry.getPointer())
+    return cachedModule;
 
   if (!component)
     component = new (SwiftContext.Allocate<Component>(1)) Component();
 
-  result = new (SwiftContext)
-    ClangModule(SwiftContext, underlying->getFullModuleName(),
-                importer, component, underlying);
+  auto result = new (SwiftContext) ClangModule(SwiftContext,
+                                               underlying->getFullModuleName(),
+                                               importer, component, underlying);
+  cacheEntry.setPointer(result);
   return result;
 }
 
