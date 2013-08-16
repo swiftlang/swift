@@ -805,6 +805,27 @@ bb5:
   return %18 : $()                                        // CHECK: return
 }
 
+// CHECK-LABEL: sil @test_switch_int : $[thin] (u : Builtin.Int64) -> ()
+sil @test_switch_int : $[thin] (u : Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  // CHECK: switch_int %{{.*}} : $Builtin.Int64, case 1: bb1, case 2: bb2
+  switch_int %0 : $Builtin.Int64, case 1: bb1, case 2: bb2
+
+bb1:
+  %7 = function_ref @_T6switch1aFT_T_ : $[thin] () -> () // CHECK: function_ref
+  %8 = apply %7() : $[thin] () -> ()
+  br bb3
+
+bb2:
+  %12 = function_ref @_T6switch1bFT_T_ : $[thin] () -> () // CHECK: function_ref
+  %13 = apply %12() : $[thin] () -> ()
+  br bb3
+
+bb3:
+  %18 = tuple ()
+  return %18 : $()                                        // CHECK: return
+}
+
 class ConcreteClass : ClassP {
 }
 struct Spoon : Bendable {

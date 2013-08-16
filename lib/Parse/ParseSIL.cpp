@@ -885,6 +885,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("struct_extract", ValueKind::StructExtractInst)
     .Case("super_method", ValueKind::SuperMethodInst)
     .Case("super_to_archetype_ref", ValueKind::SuperToArchetypeRefInst)
+    .Case("switch_int", ValueKind::SwitchIntInst)
     .Case("switch_union", ValueKind::SwitchUnionInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
     .Case("tuple", ValueKind::TupleInst)
@@ -1832,6 +1833,57 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     ResultVal = B.createSwitchUnion(InstLoc, Val, DefaultBB, CaseBBs);
+    break;
+  }
+  case ValueKind::SwitchIntInst: {
+    if (parseTypedValueRef(Val))
+      return true;
+
+    SmallVector<std::pair<APInt, SILBasicBlock*>, 4> CaseBBs;
+    SILBasicBlock *DefaultBB = nullptr;
+    while (P.consumeIf(tok::comma)) {
+      Identifier BBName;
+      SourceLoc BBLoc;
+      // Parse 'default' sil-identifier.
+      if (P.consumeIf(tok::kw_default)) {
+        P.parseIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
+        DefaultBB = getBBForReference(BBName, BBLoc);
+        break;
+      }
+
+      // Parse 'case' int-literal ':' sil-identifier.
+      if (P.consumeIf(tok::kw_case)) {
+        // Parse int-literal.
+        if (P.Tok.getKind() != tok::integer_literal) {
+          P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
+          return true;
+        }
+        auto intTy = Val.getType().getAs<BuiltinIntegerType>();
+        if (!intTy) {
+          P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
+          return true;
+        }
+
+        APInt value(intTy->getBitWidth(), 0);
+        bool error = P.Tok.getText().getAsInteger(0, value);
+        assert(!error && "integer_literal token did not parse as APInt?!");
+        (void)error;
+
+        if (value.getBitWidth() != intTy->getBitWidth())
+          value = value.zextOrTrunc(intTy->getBitWidth());
+        P.consumeToken(tok::integer_literal);
+
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":");
+        P.parseIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
+        CaseBBs.push_back( {value, getBBForReference(BBName, BBLoc)} );
+        continue;
+      }
+
+      P.diagnose(P.Tok.getLoc(), diag::expected_tok_in_sil_instr,
+                 "case or default");
+      return true;
+    }
+    ResultVal = B.createSwitchInt(InstLoc, Val, DefaultBB, CaseBBs);
     break;
   }
   case ValueKind::DeinitExistentialInst: {
