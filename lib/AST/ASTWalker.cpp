@@ -867,8 +867,8 @@ public:
         if (doIt(M))
           return true;
       }
-    } else if (UnionDecl *OOD = dyn_cast<UnionDecl>(D)) {
-      for (Decl *Member : OOD->getMembers())
+    } else if (UnionDecl *UD = dyn_cast<UnionDecl>(D)) {
+      for (Decl *Member : UD->getMembers())
         if (doIt(Member))
           return true;
     } else if (StructDecl *SD = dyn_cast<StructDecl>(D)) {

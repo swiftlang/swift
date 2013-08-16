@@ -1597,32 +1597,33 @@ bool Parser::parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     GenericParams = maybeParseGenericParams();
   }
 
-  UnionDecl *OOD = new (Context) UnionDecl(UnionLoc,
-                                           /*isEnum*/ false,
-                                           UnionName, UnionNameLoc,
-                                           { },
-                                           GenericParams, CurDeclContext);
-  Decls.push_back(OOD);
+  UnionDecl *UD = new (Context) UnionDecl(UnionLoc,
+                                          /*isEnum*/ false,
+                                          UnionName, UnionNameLoc,
+                                          { },
+                                          GenericParams, CurDeclContext);
+  Decls.push_back(UD);
 
   // Now that we have a context, update the generic parameters with that
   // context.
   if (GenericParams)
     for (auto Param : *GenericParams)
-      Param.setDeclContext(OOD);
+      Param.setDeclContext(UD);
 
-  if (Attributes.isValid()) OOD->getMutableAttrs() = Attributes;
+  if (Attributes.isValid())
+    UD->getMutableAttrs() = Attributes;
 
   // Parse optional inheritance clause.
   if (Tok.is(tok::colon)) {
-    ContextChange CC(*this, OOD);
+    ContextChange CC(*this, UD);
     SmallVector<TypeLoc, 2> Inherited;
     parseInheritance(Inherited);
-    OOD->setInherited(Context.AllocateCopy(Inherited));
+    UD->setInherited(Context.AllocateCopy(Inherited));
   }
 
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_union_type)) {
-    OOD->setMembers({}, Tok.getLoc());
+    UD->setMembers({}, Tok.getLoc());
     return true;
   }
 
@@ -1630,7 +1631,7 @@ bool Parser::parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   // Parse the body.
   SmallVector<Decl*, 8> MemberDecls;
   {
-    ContextChange CC(*this, OOD);
+    ContextChange CC(*this, UD);
     Scope S(this, ScopeKind::ClassBody);
     Invalid |= parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                        diag::expected_rbrace_union_type,
@@ -1638,10 +1639,10 @@ bool Parser::parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
                                          | PD_AllowUnionElement
                                          | PD_DisallowVar);
   }
-  
-  OOD->setMembers(Context.AllocateCopy(MemberDecls), {LBLoc, RBLoc});
-  addToScope(OOD);
-  
+
+  UD->setMembers(Context.AllocateCopy(MemberDecls), {LBLoc, RBLoc});
+  addToScope(UD);
+
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(UnionLoc, diag::disallowed_type);
     return true;

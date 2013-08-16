@@ -395,10 +395,10 @@ namespace {
       OS << ')';
     }
 
-    void visitUnionDecl(UnionDecl *OOD) {
-      printCommon(OOD, "union_decl");
-      printInherited(OOD->getInherited());
-      for (Decl *D : OOD->getMembers()) {
+    void visitUnionDecl(UnionDecl *UD) {
+      printCommon(UD, "union_decl");
+      printInherited(UD->getInherited());
+      for (Decl *D : UD->getMembers()) {
         if (D->isImplicit())
           continue;
 
@@ -408,8 +408,8 @@ namespace {
       OS << ')';
     }
 
-    void visitUnionElementDecl(UnionElementDecl *OOED) {
-      printCommon(OOED, "union_element_decl");
+    void visitUnionElementDecl(UnionElementDecl *UED) {
+      printCommon(UED, "union_element_decl");
       OS << ')';
     }
 

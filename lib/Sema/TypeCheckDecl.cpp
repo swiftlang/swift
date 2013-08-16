@@ -636,30 +636,30 @@ public:
       checkExplicitConformance(TAD, TAD->getDeclaredType());
   }
 
-  void visitUnionDecl(UnionDecl *OOD) {
+  void visitUnionDecl(UnionDecl *UD) {
     if (!IsSecondPass) {
-      if (auto gp = OOD->getGenericParams()) {
+      if (auto gp = UD->getGenericParams()) {
         gp->setOuterParameters(
-                            OOD->getDeclContext()->getGenericParamsOfContext());
+            UD->getDeclContext()->getGenericParamsOfContext());
         checkGenericParams(gp);
       }
 
       // Now that we have archetypes for our generic parameters (including
       // generic parameters from outer scopes), we can canonicalize our type.
-      OOD->overwriteType(OOD->getType()->getCanonicalType());
-      OOD->overwriteDeclaredType(OOD->getDeclaredType()->getCanonicalType());
-      TC.validateTypeSimple(OOD->getDeclaredTypeInContext());
+      UD->overwriteType(UD->getType()->getCanonicalType());
+      UD->overwriteDeclaredType(UD->getDeclaredType()->getCanonicalType());
+      TC.validateTypeSimple(UD->getDeclaredTypeInContext());
 
-      validateAttributes(OOD);
+      validateAttributes(UD);
 
-      checkInheritanceClause(TC, OOD);
+      checkInheritanceClause(TC, UD);
     }
 
-    for (Decl *member : OOD->getMembers())
+    for (Decl *member : UD->getMembers())
       visit(member);
 
     if (!IsFirstPass)
-      checkExplicitConformance(OOD, OOD->getDeclaredTypeInContext());
+      checkExplicitConformance(UD, UD->getDeclaredTypeInContext());
   }
 
   void visitStructDecl(StructDecl *SD) {
@@ -1100,8 +1100,8 @@ public:
     if (IsSecondPass)
       return;
 
-    UnionDecl *OOD = cast<UnionDecl>(ED->getDeclContext());
-    Type ElemTy = OOD->getDeclaredTypeInContext();
+    UnionDecl *UD = cast<UnionDecl>(ED->getDeclContext());
+    Type ElemTy = UD->getDeclaredTypeInContext();
 
     if (!ED->getArgumentTypeLoc().isNull())
       if (TC.validateType(ED->getArgumentTypeLoc()))
@@ -1114,7 +1114,7 @@ public:
     if (ED->getArgumentType().isNull()) {
       Type argTy = MetaTypeType::get(ElemTy, TC.Context);
       Type fnTy;
-      if (auto gp = OOD->getGenericParamsOfContext())
+      if (auto gp = UD->getGenericParamsOfContext())
         fnTy = PolymorphicFunctionType::get(argTy, ElemTy, gp, TC.Context);
       else
         fnTy = FunctionType::get(argTy, ElemTy, TC.Context);
@@ -1123,7 +1123,7 @@ public:
     }
 
     Type fnTy = FunctionType::get(ED->getArgumentType(), ElemTy, TC.Context);
-    if (auto gp = OOD->getGenericParamsOfContext())
+    if (auto gp = UD->getGenericParamsOfContext())
       fnTy = PolymorphicFunctionType::get(MetaTypeType::get(ElemTy, TC.Context),
                                           fnTy, gp, TC.Context);
     else
