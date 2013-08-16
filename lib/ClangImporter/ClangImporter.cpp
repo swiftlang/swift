@@ -282,7 +282,7 @@ Module *ClangImporter::loadModule(
       // FIXME: This forces the creation of wrapper modules for all imports as
       // well, and may do unnecessary work.
       cachedResult.setInt(true);
-      //result->forAllVisibleModules(path, [&](Module::ImportedModule import) {});
+      result->forAllVisibleModules(path, [&](Module::ImportedModule import) {});
     }
     return result;
   }
