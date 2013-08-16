@@ -858,6 +858,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                        getterID, setterID, overriddenID);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
+    if (declOrOffset.isComplete())
+      break;
+
     auto var = new (ctx) VarDecl(SourceLoc(), getIdentifier(nameID),
                                  getType(typeID), DC);
 
@@ -2418,3 +2421,30 @@ void ModuleFile::loadDeclsConformingTo(KnownProtocolKind kind) {
   }
 }
 
+void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
+                                    VisibleDeclConsumer &consumer) {
+  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
+
+  if (!ClassMembersByName)
+    return;
+
+  if (!accessPath.empty()) {
+    for (const auto &list : make_range(ClassMembersByName->data_begin(),
+                                       ClassMembersByName->data_end())) {
+      for (auto item : list) {
+        auto vd = cast<ValueDecl>(getDecl(item.second));
+        Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
+        if (auto nominal = ty->getAnyNominal())
+          if (nominal->getName() == accessPath.front().first)
+            consumer.foundDecl(vd);
+      }
+    }
+    return;
+  }
+
+  for (const auto &list : make_range(ClassMembersByName->data_begin(),
+                                     ClassMembersByName->data_end())) {
+    for (auto item : list)
+      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)));
+  }
+}

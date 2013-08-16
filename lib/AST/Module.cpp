@@ -85,12 +85,17 @@ void BuiltinModuleCache::lookupValue(Identifier Name, NLKind LookupKind,
 //===----------------------------------------------------------------------===//
 
 namespace {
-  /// TUModuleCache - This is the type of the cache for the TranslationUnit.
-  /// This is lazily created on its first use an hangs off
+  /// This is the type of the cache for the TranslationUnit.
+  ///
+  /// This is lazily created on its first use and hangs off
   /// Module::LookupCachePimpl.
   class TUModuleCache {
     llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> TopLevelValues;
+    llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> ClassMembers;
+    bool MemberCachePopulated = false;
     void doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators);
+    void addToMemberCache(ArrayRef<Decl*> decls);
+    void populateMemberCache(const TranslationUnit &TU);
   public:
     typedef Module::AccessPathTy AccessPathTy;
     
@@ -103,6 +108,10 @@ namespace {
     void lookupVisibleDecls(AccessPathTy AccessPath,
                             VisibleDeclConsumer &Consumer,
                             NLKind LookupKind,
+                            const TranslationUnit &TU);
+    
+    void lookupClassMembers(AccessPathTy AccessPath,
+                            VisibleDeclConsumer &consumer,
                             const TranslationUnit &TU);
 
     SmallVector<ValueDecl *, 0> AllVisibleValues;
@@ -131,6 +140,30 @@ void TUModuleCache::doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators) {
       doPopulateCache(NTD->getMembers(), true);
     if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D))
       doPopulateCache(ED->getMembers(), true);
+  }
+}
+
+void TUModuleCache::populateMemberCache(const TranslationUnit &TU) {
+  for (const Decl *D : TU.Decls) {
+    if (const NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
+      if (isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD))
+        addToMemberCache(NTD->getMembers());
+    } else if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+      Type baseTy = ED->getExtendedType();
+      assert(baseTy && "cannot use this before type-checking");
+      if (auto baseNominal = baseTy->getAnyNominal())
+        if (isa<ClassDecl>(baseNominal) || isa<ProtocolDecl>(baseNominal))
+          addToMemberCache(ED->getMembers());
+    }
+  }
+}
+
+void TUModuleCache::addToMemberCache(ArrayRef<Decl*> decls) {
+  for (Decl *D : decls) {
+    auto VD = dyn_cast<ValueDecl>(D);
+    if (!VD || !VD->canBeAccessedByDynamicLookup())
+      continue;
+    ClassMembers[VD->getName()].push_back(VD);
   }
 }
 
@@ -179,14 +212,36 @@ void TUModuleCache::lookupVisibleDecls(AccessPathTy AccessPath,
   }
 }
 
+void TUModuleCache::lookupClassMembers(AccessPathTy accessPath,
+                                       VisibleDeclConsumer &consumer,
+                                       const TranslationUnit &TU) {
+  if (!MemberCachePopulated)
+    populateMemberCache(TU);
+  
+  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
+  
+  if (!accessPath.empty()) {
+    for (auto &member : ClassMembers) {
+      for (ValueDecl *vd : member.second) {
+        Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
+        if (auto nominal = ty->getAnyNominal())
+          if (nominal->getName() == accessPath.front().first)
+            consumer.foundDecl(vd);
+      }
+    }
+    return;
+  }
+
+  for (auto &member : ClassMembers) {
+    for (ValueDecl *vd : member.second)
+      consumer.foundDecl(vd);
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
-/// lookupValue - Look up a (possibly overloaded) value set at top-level scope
-/// (but with the specified access path, which may come from an import decl)
-/// within the current module. This does a simple local lookup, not
-/// recursively looking through imports.  
 void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
                          NLKind LookupKind, 
                          SmallVectorImpl<ValueDecl*> &Result) {
@@ -206,8 +261,6 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
                                                Result);
 }
 
-/// lookupVisibleDecls - Find ValueDecls in the module and pass them to the
-/// given consumer object.
 void Module::lookupVisibleDecls(AccessPathTy AccessPath,
                                 VisibleDeclConsumer &Consumer,
                                 NLKind LookupKind) const {
@@ -224,6 +277,21 @@ void Module::lookupVisibleDecls(AccessPathTy AccessPath,
 
   return cast<LoadedModule>(this)->lookupVisibleDecls(AccessPath, Consumer,
                                                       LookupKind);
+}
+
+void Module::lookupClassMembers(AccessPathTy accessPath,
+                                VisibleDeclConsumer &consumer) const {
+  if (isa<BuiltinModule>(this)) {
+    // The Builtin module defines no classes.
+    return;
+  }
+
+  if (auto TU = dyn_cast<TranslationUnit>(this)) {
+    return getTUCachePimpl(LookupCachePimpl, *TU)
+      .lookupClassMembers(accessPath, consumer, *TU);
+  }
+
+  return cast<LoadedModule>(this)->lookupClassMembers(accessPath, consumer);
 }
 
 namespace {
@@ -473,6 +541,11 @@ void LoadedModule::lookupVisibleDecls(AccessPathTy accessPath,
                                       VisibleDeclConsumer &consumer,
                                       NLKind lookupKind) const {
   return getOwner().lookupVisibleDecls(this, accessPath, consumer, lookupKind);
+}
+
+void LoadedModule::lookupClassMembers(AccessPathTy accessPath,
+                                      VisibleDeclConsumer &consumer) const {
+  return getOwner().lookupClassMembers(this, accessPath, consumer);
 }
 
 

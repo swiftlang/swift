@@ -117,6 +117,13 @@ public:
                                   Module::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) { }
+
+  /// \brief Look for all class members.
+  ///
+  /// This is used for id-style lookup.
+  virtual void lookupClassMembers(const Module *module,
+                                  Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer) { }
 };
 
 }

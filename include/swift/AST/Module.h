@@ -134,15 +134,18 @@ public:
     return Comp;
   }
   
-  /// lookupValue - Look up a (possibly overloaded) value set at top-level scope
+  /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)
-  /// within the current module. This does a simple local lookup, not
-  /// recursively looking through imports.  
+  /// within the current module.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
   void lookupValue(AccessPathTy AccessPath, Identifier Name, NLKind LookupKind, 
                    SmallVectorImpl<ValueDecl*> &Result);
   
   /// lookupVisibleDecls - Find ValueDecls in the module and pass them to the
   /// given consumer object.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
   void lookupVisibleDecls(AccessPathTy AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind) const;
@@ -192,6 +195,12 @@ public:
   /// operator declarations).
   Optional<PostfixOperatorDecl *> lookupPostfixOperator(Identifier name,
                                               SourceLoc diagLoc = SourceLoc());
+
+  /// Finds all class members defined in this module.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  void lookupClassMembers(AccessPathTy accessPath,
+                          VisibleDeclConsumer &consumer) const;
 
   /// Looks up which modules are re-exported by this module.
   void getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const;
@@ -386,6 +395,10 @@ public:
   void lookupVisibleDecls(AccessPathTy accessPath,
                           VisibleDeclConsumer &consumer,
                           NLKind lookupKind) const;
+
+  // Inherited from Module.
+  void lookupClassMembers(AccessPathTy accessPath,
+                          VisibleDeclConsumer &consumer) const;
 
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() >= DeclContextKind::First_LoadedModule &&

@@ -92,6 +92,10 @@ public:
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) override;
 
+  virtual void lookupClassMembers(const Module *module,
+                                  Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer) override;
+
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
 

@@ -347,6 +347,12 @@ public:
   ///
   /// Note that this may cause other decls to load as well.
   void loadDeclsConformingTo(KnownProtocolKind kind);
+  
+  /// Reports all class members in the module to the given consumer.
+  ///
+  /// This is intended for use with id-style lookup and code completion.
+  void lookupClassMembers(Module::AccessPathTy accessPath,
+                          VisibleDeclConsumer &consumer);
 };
 
 class SerializedModule : public LoadedModule {

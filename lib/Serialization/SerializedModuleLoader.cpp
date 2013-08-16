@@ -281,3 +281,11 @@ SerializedModuleLoader::loadDeclsConformingTo(KnownProtocolKind kind,
   }
 }
 
+void SerializedModuleLoader::lookupClassMembers(const Module *module,
+                                                Module::AccessPathTy accessPath,
+                                                VisibleDeclConsumer &consumer) {
+  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
+  if (!moduleFile)
+    return;
+  moduleFile->lookupClassMembers(accessPath, consumer);
+}
