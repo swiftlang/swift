@@ -525,7 +525,10 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     HadParseError = parseDeclImport(Flags, Entries);
     break;
   case tok::kw_extension:
-    Entries.push_back(parseDeclExtension(Flags));
+    if (Decl *D = parseDeclExtension(Flags).getPtrOrNull())
+      Entries.push_back(D);
+    else
+      HadParseError = true;
     break;
   case tok::kw_var:
     if (StaticLoc.isValid()) {
@@ -536,7 +539,11 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     HadParseError = parseDeclVar(Flags, Entries);
     break;
   case tok::kw_typealias:
-    Entries.push_back(parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef)));
+    if (Decl *D = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef))
+            .getPtrOrNull())
+      Entries.push_back(D);
+    else
+      HadParseError = true;
     break;
   case tok::kw_union:
     HadParseError = parseDeclUnion(Flags, Entries);
@@ -551,17 +558,30 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     HadParseError = parseDeclClass(Flags, Entries);
     break;
   case tok::kw_constructor:
-    Entries.push_back(parseDeclConstructor(Flags & PD_HasContainerType));
+    if (Decl *D = parseDeclConstructor(Flags & PD_HasContainerType)
+            .getPtrOrNull())
+      Entries.push_back(D);
+    else
+      HadParseError = true;
     break;
   case tok::kw_destructor:
-    Entries.push_back(parseDeclDestructor(Flags));
+    if (Decl *D = parseDeclDestructor(Flags).getPtrOrNull())
+      Entries.push_back(D);
+    else
+      HadParseError = true;
     break;
   case tok::kw_protocol:
-    Entries.push_back(parseDeclProtocol(Flags));
+    if (Decl *D = parseDeclProtocol(Flags).getPtrOrNull())
+      Entries.push_back(D);
+    else
+      HadParseError = true;
     break;
-      
+
   case tok::kw_func:
-    Entries.push_back(parseDeclFunc(StaticLoc, Flags));
+    if (Decl *D = parseDeclFunc(StaticLoc, Flags).getPtrOrNull())
+      Entries.push_back(D);
+    else
+      HadParseError = true;
     UnhandledStatic = false;
     break;
 
@@ -578,7 +598,10 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   
   case tok::identifier:
     if (isStartOfOperatorDecl(Tok, peekToken())) {
-      Entries.push_back(parseDeclOperator(Flags & PD_AllowTopLevel));
+      if (Decl *D = parseDeclOperator(Flags & PD_AllowTopLevel).getPtrOrNull())
+        Entries.push_back(D);
+      else
+        HadParseError = true;
       break;
     }
     SWIFT_FALLTHROUGH;
@@ -591,14 +614,6 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
 
   if (!HadParseError && Tok.is(tok::semi))
     Entries.back()->TrailingSemiLoc = consumeToken(tok::semi);
-
-  // If we got back a null pointer, then a parse error happened.
-  if (Entries.empty())
-    HadParseError = true;
-  else if (Entries.back() == 0) {
-    Entries.pop_back();
-    HadParseError = true;
-  }
 
   if (HadParseError &&
       Tok.is(tok::code_complete) && isCodeCompletionFirstPass() &&
@@ -761,7 +776,7 @@ bool Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
 ///   extension:
 ///    'extension' type-identifier inheritance? '{' decl* '}'
 ///
-Decl *Parser::parseDeclExtension(unsigned Flags) {
+NullablePtr<Decl> Parser::parseDeclExtension(unsigned Flags) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
   TypeRepr *Ty = parseTypeIdentifier();
@@ -788,11 +803,9 @@ Decl *Parser::parseDeclExtension(unsigned Flags) {
 
   SmallVector<Decl*, 8> MemberDecls;
 
-  bool Invalid = parseList(tok::r_brace, LBLoc, RBLoc,
-                           tok::semi, /*OptionalSep=*/true,
-                           diag::expected_rbrace_extension,
-                           [&] () -> bool {
-    return parseDecl(MemberDecls, PD_HasContainerType|PD_DisallowVar);
+  parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/ true,
+            diag::expected_rbrace_extension, [&]()->bool {
+    return parseDecl(MemberDecls, PD_HasContainerType | PD_DisallowVar);
   });
 
   ED->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
@@ -809,7 +822,7 @@ Decl *Parser::parseDeclExtension(unsigned Flags) {
 ///   decl-typealias:
 ///     'typealias' identifier inheritance? '=' type
 ///
-TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
+NullablePtr<TypeAliasDecl> Parser::parseDeclTypeAlias(bool WantDefinition) {
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
   Identifier Id;
@@ -1362,7 +1375,8 @@ void Parser::consumeFunctionBody(FuncExpr *FE) {
 /// NOTE: The caller of this method must ensure that the token sequence is
 /// either 'func' or 'static' 'func'.
 ///
-FuncDecl *Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
+NullablePtr<FuncDecl>
+Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   bool HasContainerType = Flags & PD_HasContainerType;
 
   // Reject 'static' functions at global scope.
@@ -1924,7 +1938,7 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
 ///      decl-var-simple
 ///      decl-typealias
 ///
-Decl *Parser::parseDeclProtocol(unsigned Flags) {
+NullablePtr<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
   DeclAttributes Attributes;
@@ -2169,7 +2183,8 @@ static void AddConstructorArgumentsToScope(const Pattern *pat,
 }
 
 
-ConstructorDecl *Parser::parseDeclConstructor(bool HasContainerType) {
+NullablePtr<ConstructorDecl>
+Parser::parseDeclConstructor(bool HasContainerType) {
   SourceLoc ConstructorLoc = consumeToken(tok::kw_constructor);
   
   // Reject 'constructor' functions outside of types
@@ -2230,8 +2245,7 @@ ConstructorDecl *Parser::parseDeclConstructor(bool HasContainerType) {
   return CD;
 }
 
-
-DestructorDecl *Parser::parseDeclDestructor(unsigned Flags) {
+NullablePtr<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
   SourceLoc DestructorLoc = consumeToken(tok::kw_destructor);
 
   // attribute-list
@@ -2272,10 +2286,9 @@ DestructorDecl *Parser::parseDeclDestructor(unsigned Flags) {
   return DD;
 }
 
-OperatorDecl *Parser::parseDeclOperator(bool AllowTopLevel) {
+NullablePtr<OperatorDecl> Parser::parseDeclOperator(bool AllowTopLevel) {
   assert(Tok.isContextualKeyword("operator") &&
          "no 'operator' at start of operator decl?!");
-  
 
   SourceLoc OperatorLoc = consumeToken(tok::identifier);
 
@@ -2302,17 +2315,17 @@ OperatorDecl *Parser::parseDeclOperator(bool AllowTopLevel) {
     return nullptr;
   }
   
-  OperatorDecl *result;
+  NullablePtr<OperatorDecl> Result;
   
   switch (*kind) {
   case DeclKind::PrefixOperator:
-    result = parseDeclPrefixOperator(OperatorLoc, KindLoc, Name, NameLoc);
+    Result = parseDeclPrefixOperator(OperatorLoc, KindLoc, Name, NameLoc);
     break;
   case DeclKind::PostfixOperator:
-    result = parseDeclPostfixOperator(OperatorLoc, KindLoc, Name, NameLoc);
+    Result = parseDeclPostfixOperator(OperatorLoc, KindLoc, Name, NameLoc);
     break;
   case DeclKind::InfixOperator:
-    result = parseDeclInfixOperator(OperatorLoc, KindLoc, Name, NameLoc);
+    Result = parseDeclInfixOperator(OperatorLoc, KindLoc, Name, NameLoc);
     break;
   default:
     llvm_unreachable("impossible");
@@ -2326,13 +2339,12 @@ OperatorDecl *Parser::parseDeclOperator(bool AllowTopLevel) {
     return nullptr;
   }
   
-  return result;
+  return Result;
 }
 
-OperatorDecl *Parser::parseDeclPrefixOperator(SourceLoc OperatorLoc,
-                                              SourceLoc PrefixLoc,
-                                              Identifier Name,
-                                              SourceLoc NameLoc) {
+NullablePtr<OperatorDecl>
+Parser::parseDeclPrefixOperator(SourceLoc OperatorLoc, SourceLoc PrefixLoc,
+                                Identifier Name, SourceLoc NameLoc) {
   SourceLoc LBraceLoc = consumeToken(tok::l_brace);
   
   while (!Tok.is(tok::r_brace)) {
@@ -2354,10 +2366,9 @@ OperatorDecl *Parser::parseDeclPrefixOperator(SourceLoc OperatorLoc,
                                           LBraceLoc, RBraceLoc);
 }
 
-OperatorDecl *Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc,
-                                              SourceLoc PostfixLoc,
-                                              Identifier Name,
-                                              SourceLoc NameLoc) {
+NullablePtr<OperatorDecl>
+Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc, SourceLoc PostfixLoc,
+                                 Identifier Name, SourceLoc NameLoc) {
   SourceLoc LBraceLoc = consumeToken(tok::l_brace);
   
   while (!Tok.is(tok::r_brace)) {
@@ -2379,10 +2390,10 @@ OperatorDecl *Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc,
                                           LBraceLoc, RBraceLoc);
 }
 
-OperatorDecl *Parser::parseDeclInfixOperator(SourceLoc OperatorLoc,
-                                             SourceLoc InfixLoc,
-                                             Identifier Name,
-                                             SourceLoc NameLoc) {
+NullablePtr<OperatorDecl> Parser::parseDeclInfixOperator(SourceLoc OperatorLoc,
+                                                         SourceLoc InfixLoc,
+                                                         Identifier Name,
+                                                         SourceLoc NameLoc) {
   SourceLoc LBraceLoc = consumeToken(tok::l_brace);
 
   // Initialize InfixData with default attributes:

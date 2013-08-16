@@ -424,7 +424,8 @@ public:
     PD_AllowUnionElement    = 1 << 10,
   };
   
-  TypeAliasDecl *parseDeclTypeAlias(bool WantDefinition);
+  NullablePtr<TypeAliasDecl> parseDeclTypeAlias(bool WantDefinition);
+
   /// addVarsToScope - Add the variables in the given pattern to the current
   /// scope, collecting the variables in the vector \c Decls and applying
   /// \c Attributes to each one.
@@ -440,7 +441,7 @@ public:
   
   bool parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
-  Decl *parseDeclExtension(unsigned Flags);
+  NullablePtr<Decl> parseDeclExtension(unsigned Flags);
   bool parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseDeclUnionElement(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
@@ -455,30 +456,30 @@ public:
   
   Pattern *buildImplicitThisParameter();
   void consumeFunctionBody(FuncExpr *FE);
-  FuncDecl *parseDeclFunc(SourceLoc StaticLoc, unsigned Flags);
+  NullablePtr<FuncDecl> parseDeclFunc(SourceLoc StaticLoc, unsigned Flags);
   bool parseDeclFuncBodyDelayed(FuncDecl *FD);
-  Decl *parseDeclProtocol(unsigned Flags);
+  NullablePtr<ProtocolDecl> parseDeclProtocol(unsigned Flags);
   
   bool parseDeclSubscript(bool HasContainerType,
                           bool NeedDefinition,
                           SmallVectorImpl<Decl *> &Decls);
 
-  ConstructorDecl *parseDeclConstructor(bool HasContainerType);
-  DestructorDecl *parseDeclDestructor(unsigned Flags);
+  NullablePtr<ConstructorDecl> parseDeclConstructor(bool HasContainerType);
+  NullablePtr<DestructorDecl> parseDeclDestructor(unsigned Flags);
   
-  OperatorDecl *parseDeclOperator(bool AllowTopLevel);
-  OperatorDecl *parseDeclPrefixOperator(SourceLoc OperatorLoc,
-                                        SourceLoc PrefixLoc,
-                                        Identifier Name,
-                                        SourceLoc NameLoc);
-  OperatorDecl *parseDeclPostfixOperator(SourceLoc OperatorLoc,
-                                         SourceLoc PostfixLoc,
-                                         Identifier Name,
-                                         SourceLoc NameLoc);
-  OperatorDecl *parseDeclInfixOperator(SourceLoc OperatorLoc,
-                                       SourceLoc InfixLoc,
-                                       Identifier Name,
-                                       SourceLoc NameLoc);
+  NullablePtr<OperatorDecl> parseDeclOperator(bool AllowTopLevel);
+  NullablePtr<OperatorDecl> parseDeclPrefixOperator(SourceLoc OperatorLoc,
+                                                    SourceLoc PrefixLoc,
+                                                    Identifier Name,
+                                                    SourceLoc NameLoc);
+  NullablePtr<OperatorDecl> parseDeclPostfixOperator(SourceLoc OperatorLoc,
+                                                     SourceLoc PostfixLoc,
+                                                     Identifier Name,
+                                                     SourceLoc NameLoc);
+  NullablePtr<OperatorDecl> parseDeclInfixOperator(SourceLoc OperatorLoc,
+                                                   SourceLoc InfixLoc,
+                                                   Identifier Name,
+                                                   SourceLoc NameLoc);
 
   //===--------------------------------------------------------------------===//
   // SIL Parsing.
