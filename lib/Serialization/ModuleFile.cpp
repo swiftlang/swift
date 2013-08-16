@@ -736,11 +736,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                              superclassTypeID);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
-
+    auto underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
+    
     if (declOrOffset.isComplete())
       break;
-
-    auto underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
 
     auto alias = new (ctx) TypeAliasDecl(SourceLoc(), getIdentifier(nameID),
                                          SourceLoc(), underlyingType,
