@@ -156,7 +156,7 @@ void swift::performDelayedParsing(
 /// \brief Tokenizes a string literal, taking into account string interpolation.
 static void getStringPartTokens(const Token &Tok, SourceManager &SM,
                                 int BufID, const llvm::MemoryBuffer *Buffer,
-                         std::vector<Token> &Toks) {
+                                std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
   SmallVector<Lexer::StringSegment, 4> Segments;
   Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
