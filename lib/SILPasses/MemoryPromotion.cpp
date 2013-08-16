@@ -370,8 +370,10 @@ void ElementPromotion::doIt() {
     case UseKind::PartialStore: handleStoreUse(Use.first, true); break;
     case UseKind::ByrefUse:     handleByrefUse(Use.first); break;
     case UseKind::Escape:       handleEscape(Use.first); break;
-    // FIXME: Boxes may not be completely constructed by the time they are
+    // FIXME: Tuple boxes may not be completely constructed by the time they are
     // destroyed.  We need to handle destroying partially constructed boxes.
+    // FIXME: Non-tuple boxes may be completely uninitialized at their
+    // destruction time.
     }
 
     if (HadError) break;
@@ -430,14 +432,11 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
                                     Inst->getLoc());
   }
 
-  // FIXME: This check shouldn't be needed any longer.
-  if (Inst->getType(0) == Result.getType()) {
-    SILValue(Inst, 0).replaceAllUsesWith(Result);
-    SILValue Addr = Inst->getOperand(0);
-    Inst->eraseFromParent();
-    RemoveDeadAddressingInstructions(Addr);
-    ++NumLoadPromoted;
-  }
+  SILValue(Inst, 0).replaceAllUsesWith(Result);
+  SILValue Addr = Inst->getOperand(0);
+  Inst->eraseFromParent();
+  RemoveDeadAddressingInstructions(Addr);
+  ++NumLoadPromoted;
 }
 
 
@@ -764,8 +763,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     }
 
     if (isa<CopyAddrInst>(User)) {
-      // FIXME: Scalarize these.
-
       // If this is the source of the copy_addr, then this is a load.  If it is
       // the destination, then this is a store.
       auto Kind = InStructSubElement ? UseKind::PartialStore : UseKind::Store;
@@ -777,7 +774,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     // Initializations are definitions of the whole thing.  This is currently
     // used in constructors and should go away someday.
     if (isa<InitializeVarInst>(User)) {
-      // FIXME: Scalarize these. ??
       auto Kind = InStructSubElement ? UseKind::PartialStore : UseKind::Store;
       addElementUses(BaseElt, PointeeType, User, Kind);
       continue;
