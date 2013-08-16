@@ -453,7 +453,7 @@ public:
     OS << "function_ref ";
     DRI->getFunction()->printName(OS);
     OS << " : " << DRI->getType();
-    OS << " // " << demangleSymbol(DRI->getFunction()->getName());
+    OS << " // " << demangleSymbolAsString(DRI->getFunction()->getName());
   }
   
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
@@ -940,7 +940,7 @@ void SILFunction::dump() const {
 
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
-  OS << "// " << demangleSymbol(getName()) << '\n';
+  OS << "// " << demangleSymbolAsString(getName()) << '\n';
   OS << "sil ";
   switch (getLinkage()) {
   case SILLinkage::Internal:
