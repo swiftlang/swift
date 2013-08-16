@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/AST.h"
 #include "swift/Basic/AssertImplements.h"
@@ -61,6 +62,20 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
   // Update the parent fields in the instructions.
   for (; first != last; ++first)
     first->ParentBB = ThisParent;
+}
+
+//===----------------------------------------------------------------------===//
+// SILBuilder Implementation
+//===----------------------------------------------------------------------===//
+
+SILType SILBuilder::getTupleElementType(SILType Ty, unsigned EltNo) {
+  TupleType *TT = Ty.getAs<TupleType>();
+  auto EltTy = TT->getFields()[EltNo].getType()->getCanonicalType();
+  return SILType::getPrimitiveObjectType(EltTy);
+}
+SILType SILBuilder::getStructFieldType(VarDecl *Field) {
+  auto FieldTy = Field->getType()->getCanonicalType();
+  return SILType::getPrimitiveObjectType(FieldTy);
 }
 
 

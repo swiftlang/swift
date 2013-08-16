@@ -403,10 +403,11 @@ public:
     return insert(TupleInst::create(Loc, Ty, Elements, F));
   }
   
-  SILValue createTupleExtract(SILLocation Loc,
-                              SILValue Operand,
-                              unsigned FieldNo,
-                              SILType ResultTy) {
+  static SILType getTupleElementType(SILType Ty, unsigned EltNo);
+  static SILType getStructFieldType(VarDecl *Field);
+
+  SILValue createTupleExtract(SILLocation Loc, SILValue Operand,
+                              unsigned FieldNo, SILType ResultTy) {
     // Fold extract(tuple(a,b,c), 1) -> b.
     if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
       return TI->getElements()[FieldNo];
@@ -415,14 +416,17 @@ public:
                     TupleExtractInst(Loc, Operand, FieldNo, ResultTy));
   }
 
-  TupleExtractInst *createTupleExtractInst(SILLocation Loc,
-                              SILValue Operand,
-                              unsigned FieldNo,
-                              SILType ResultTy) {
+  SILValue createTupleExtract(SILLocation Loc, SILValue Operand,
+                              unsigned FieldNo) {
+    return createTupleExtract(Loc, Operand, FieldNo,
+                              getTupleElementType(Operand.getType(), FieldNo));
+  }
+
+  TupleExtractInst *createTupleExtractInst(SILLocation Loc, SILValue Operand,
+                                           unsigned FieldNo, SILType ResultTy) {
     return insert(new (F.getModule())
                     TupleExtractInst(Loc, Operand, FieldNo, ResultTy));
   }
-
 
   TupleElementAddrInst *createTupleElementAddr(SILLocation Loc,
                                                SILValue Operand,
@@ -431,7 +435,7 @@ public:
     return insert(new (F.getModule())
                     TupleElementAddrInst(Loc, Operand, FieldNo, ResultTy));
   }
-  
+
   StructExtractInst *createStructExtract(SILLocation Loc,
                                          SILValue Operand,
                                          VarDecl *Field,
@@ -439,7 +443,15 @@ public:
     return insert(new (F.getModule())
                     StructExtractInst(Loc, Operand, Field, ResultTy));
   }
-  
+
+  StructExtractInst *createStructExtract(SILLocation Loc,
+                                         SILValue Operand,
+                                         VarDecl *Field) {
+    return createStructExtract(Loc, Operand, Field,
+                               getStructFieldType(Field));
+  }
+
+
   StructElementAddrInst *createStructElementAddr(SILLocation Loc,
                                                  SILValue Operand,
                                                  VarDecl *Field,
