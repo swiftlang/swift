@@ -413,7 +413,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   recordDeclLoc(decl);
   OS << decl->getName().str();
   printInherited(decl->getInherited());
-  if (decl->hasUnderlyingType()) {
+  if (Options.TypeDefinitions && decl->hasUnderlyingType()) {
     OS << " = ";
     decl->getUnderlyingType().print(OS);
   }
@@ -426,7 +426,7 @@ void PrintAST::visitUnionDecl(UnionDecl *decl) {
   printNominalDeclName(decl);
   printInherited(decl->getInherited());
   if (Options.TypeDefinitions) {
-    printMembers(decl->getMembers(), /*needComma=*/true);
+    printMembers(decl->getMembers());
   }
 }
 
@@ -472,7 +472,8 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     OS << " : ";
     decl->getType().print(OS);   
   }
-  if (decl->isProperty()) {
+
+  if (decl->isProperty() && Options.FunctionDefinitions) {
     OS << " {";
     {
       if (auto getter = decl->getGetter()) {
@@ -644,11 +645,15 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 void PrintAST::visitUnionElementDecl(UnionElementDecl *decl) {
   // FIXME: Attributes?
   recordDeclLoc(decl);
+  OS << "case ";
   OS << decl->getName();
 
-  if (decl->hasArgumentType()) {
-    OS << " : ";
+  if (decl->hasArgumentType())
     decl->getArgumentType().print(OS);
+  
+  if (decl->hasResultType()) {
+    OS << " -> ";
+    decl->getResultType().print(OS);
   }
 }
 
@@ -659,6 +664,10 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printPattern(decl->getIndices());
   OS << " -> ";
   decl->getElementType().print(OS);
+
+  if (!Options.FunctionDefinitions)
+    return;
+
   OS << " {";
   {
     IndentRAII indentMore(*this);
