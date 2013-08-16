@@ -29,6 +29,7 @@ namespace swift {
   class ValueDecl;
   class Module;
   class ExprHandle;
+  class NamedTypeRepr;
 
 enum class TypeReprKind : uint8_t {
 #define TYPEREPR(ID, PARENT) ID,
@@ -301,6 +302,10 @@ public:
   SourceRange getParens() const { return Parens; }
   SourceLoc getEllipsisLoc() const { return Ellipsis; }
   bool hasEllipsis() const { return Ellipsis.isValid(); }
+
+  bool isParenType() const {
+    return Elements.size() == 1 && !isa<NamedTypeRepr>(Elements[0]);
+  }
 
   static TupleTypeRepr *create(ASTContext &C, ArrayRef<TypeRepr *> Elements,
                                SourceRange Parens, SourceLoc Ellipsis);

@@ -779,9 +779,21 @@ bool Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
 NullablePtr<Decl> Parser::parseDeclExtension(unsigned Flags) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
-  TypeRepr *Ty = parseTypeIdentifier();
+  // The grammar allows only type-identifier here, but we parse type-simple for
+  // recovery purposes and let the type checker reject types that can not be
+  // extended.
+  TypeRepr *Ty = parseTypeSimple();
   if (!Ty)
     return nullptr;
+  // Diagnose extensions for paren types in the parser because a ParenType is
+  // canonically equivalent to the wrapped type, and we are using syntactic
+  // information to differentiate between them.
+  if (auto *TTR = dyn_cast<TupleTypeRepr>(Ty)) {
+    if (TTR->isParenType()) {
+      diagnose(TTR->getStartLoc(), diag::paren_type_in_extension)
+        .highlight(TTR->getSourceRange());
+    }
+  }
   SourceLoc LBLoc, RBLoc;
   
   // Parse optional inheritance clause.
