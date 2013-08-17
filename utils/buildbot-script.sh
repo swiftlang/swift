@@ -4,14 +4,17 @@
 # - LLVM checked out to ${WORKSPACE}/llvm
 # - Clang checked out to ${WORKSPACE}/clang
 # - Swift checked out to ${WORKSPACE}/swift
+# - SourceKit checked out to ${WORKSPACE}/SourceKit
 # Jenkins is set up to restore the repositories to pristine state before
 # building, so we rebuild from scratch every time.
 
 # Flags for testing:
 # SKIP_BUILD_LLVM -- set to skip building LLVM/Clang
 # SKIP_BUILD_SWIFT -- set to skip building Swift
+# SKIP_BUILD_SOURCEKIT -- set to skip building SourceKit
 # SKIP_TEST_SWIFT -- set to skip testing Swift
 # SKIP_PACKAGE_SWIFT -- set to skip packaging Swift
+# SKIP_PACKAGE_SOURCEKIT -- set to skip packaging SourceKit
 
 # The -release flag enables a release build, which will additionally build
 # a package if the build and test succeeds.
@@ -35,6 +38,7 @@ INSTALL_PREFIX=/usr
 
 # Set this to the path on matte to which release packages should be delivered.
 PACKAGE_PATH=/Users/swift-discuss
+SOURCEKIT_PACKAGE_PATH=/Users/sourcekit-dev
 
 # Set this to the address to which release announcements should be sent.
 
@@ -45,6 +49,7 @@ test -d "$WORKSPACE/llvm"
 test -d "$WORKSPACE/llvm/tools"
 test -d "$WORKSPACE/clang"
 test -d "$WORKSPACE/swift"
+test -d "$WORKSPACE/SourceKit"
 
 # Make sure install-test-script.sh is available alongside us.
 INSTALL_TEST_SCRIPT="$(dirname "$0")/install-test-script.sh"
@@ -107,6 +112,28 @@ if [ \! "$SKIP_BUILD_SWIFT" ]; then
       -DSWIFT_PATH_TO_CLANG_BUILD="$WORKSPACE/llvm/build" \
       -DSWIFT_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
       -DSWIFT_PATH_TO_LLVM_BUILD="$WORKSPACE/llvm/build" \
+      -DSWIFT_MODULE_CACHE_PATH="$WORKSPACE/swift-module-cache" \
+      -DLLVM_ENABLE_ASSERTIONS="ON" \
+      .. &&
+    make -j8) || exit 1
+fi
+
+# Build SourceKit.
+if [ \! "$SKIP_BUILD_SOURCEKIT" ]; then
+  echo "--- Building SourceKit ---"
+  mkdir -p "$WORKSPACE/SourceKit/build"
+  (cd "$WORKSPACE/SourceKit/build" &&
+    "$CMAKE" -G "Unix Makefiles" \
+      -DCMAKE_C_COMPILER="$TOOLCHAIN/usr/bin/clang" \
+      -DCMAKE_CXX_COMPILER="$TOOLCHAIN/usr/bin/clang++" \
+      -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+      -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+      -DSOURCEKIT_PATH_TO_SWIFT_SOURCE="$WORKSPACE/swift" \
+      -DSOURCEKIT_PATH_TO_SWIFT_BUILD="$WORKSPACE/swift/build" \
+      -DSOURCEKIT_PATH_TO_CLANG_SOURCE="$WORKSPACE/llvm/tools/clang" \
+      -DSOURCEKIT_PATH_TO_CLANG_BUILD="$WORKSPACE/llvm/build" \
+      -DSOURCEKIT_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
+      -DSOURCEKIT_PATH_TO_LLVM_BUILD="$WORKSPACE/llvm/build" \
       -DSWIFT_MODULE_CACHE_PATH="$WORKSPACE/swift-module-cache" \
       -DLLVM_ENABLE_ASSERTIONS="ON" \
       .. &&
@@ -220,6 +247,46 @@ problems. Here are some of the most commonly encountered issues:
   variable whose type is that of a type parameter.
 
 .
+EOM
+  done
+
+  if [ \! "$saw_package" ]; then
+    echo "No package file built!"
+    exit 1
+  fi
+fi
+
+if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SOURCEKIT" ]; then
+  echo "--- Building SourceKit Package ---"
+  (cd "$WORKSPACE/SourceKit/build" &&
+    /bin/sh -ex "$WORKSPACE/SourceKit/utils/buildbot-package-sourcekit.sh") || exit 1
+
+  saw_package=
+  for package in "$WORKSPACE/SourceKit/build"/SourceKit-*.tar.gz; do
+    if [ "$saw_package" ]; then
+      echo "More than one package file built!"
+      exit 1
+    fi
+    saw_package=1
+
+    echo "--- Delivering $package ---"
+    cp "$package" "$SOURCEKIT_PACKAGE_PATH" || exit 1
+
+    echo "--- Announcing $package ---"
+    package_basename="$(basename "$package")"
+    sendmail -r "$SOURCEKIT_PACKAGE_ANNOUNCEMENT_ADDRESS" "$SOURCEKIT_PACKAGE_ANNOUNCEMENT_ADDRESS" <<EOM
+To: $SOURCEKIT_PACKAGE_ANNOUNCEMENT_ADDRESS
+Subject: SourceKit package $package_basename now available
+
+A new SourceKit package is available at
+sftp://matte.apple.com$SOURCEKIT_PACKAGE_PATH/$package_basename .
+You can download it using the command line:
+
+        sftp \$OD_USER@matte.apple.com:$SOURCEKIT_PACKAGE_PATH/$package_basename \
+          ~/Downloads
+
+where \$OD_USER is your Open Directory username.
+
 EOM
   done
 
