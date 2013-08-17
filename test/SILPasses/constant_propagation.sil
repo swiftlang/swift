@@ -10,7 +10,10 @@ bb0:
  %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
  return %19 : $Builtin.Int64
 // CHECK-LABEL: sil @fold_sadd_with_overflow
-// CHECK: builtin_function_ref #Builtin.int_sadd_with_overflow_Int64
+// CHECK-NOT: builtin_function_ref #Builtin.int_sadd_with_overflow_Int64
+// CHECK-NOT: integer_literal $Builtin.Int64, 2
+// CHECK-NOT: integer_literal $Builtin.Int64, 3
+// CHECK-NOT: apply
 // CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 5
 // CHECK-NEXT: [[OVERFLOW:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK_NEXT: tuple ([[RES]] : $Builtin.Int64, [[OVERFLOW]] : $Builtin.Int1)

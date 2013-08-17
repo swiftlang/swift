@@ -14,11 +14,13 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Diagnostics.h"
-#include "swift/AST/Builtins.h"
 #include "swift/Subsystems.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/Debug.h"
+
 using namespace swift;
 
 STATISTIC(NumInstFolded, "Number of constant folded instructions");
@@ -120,9 +122,9 @@ static bool CCPFunctionBody(SILFunction &F, SILModule &M) {
 
         // Remove the unused instruction.
         WorkList.erase(I);
-        I->eraseFromParent();
 
-        // FIXME: Eagerly DCE.
+        // Eagerly DCE.
+        recursivelyDeleteTriviallyDeadInstructions(I);
 
         Folded = true;
         ++NumInstFolded;
