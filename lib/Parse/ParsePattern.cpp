@@ -252,8 +252,7 @@ bool Parser::parseFunctionArguments(SmallVectorImpl<Pattern*> &argPatterns,
 bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
                                     SmallVectorImpl<Pattern*> &bodyPatterns,
                                     TypeRepr *&retType) {
-  if (parseFunctionArguments(argPatterns, bodyPatterns))
-    return true;
+  bool HadParseError = parseFunctionArguments(argPatterns, bodyPatterns);
 
   // If there's a trailing arrow, parse the rest as the result type.
   if (consumeIf(tok::arrow)) {
@@ -264,7 +263,7 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
     retType = nullptr;
   }
 
-  return false;
+  return HadParseError;
 }
 
 /// Parse a pattern.
