@@ -661,8 +661,8 @@ void Parser::parseDeclDelayed() {
   Scope S(this, DelayedState->takeScope());
   ContextChange CC(*this, DelayedState->ParentContext);
 
-  SmallVector<ExprStmtOrDecl, 4> Entries;
-  parseBraceItems(Entries, true, BraceItemListKind::TopLevelCode);
+  SmallVector<Decl *, 2> Entries;
+  parseDecl(Entries, DelayedState->Flags);
 }
 
 /// Parse an 'import' declaration, returning true (and doing no token skipping)
@@ -1456,12 +1456,31 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   }
 
   TypeRepr *FuncRetTy;
-  {
-    CodeCompletionCallbacks::FunctionSignatureGenericParams CCInfo(
-        CodeCompletion, GenericParams);
-
-    if (parseFunctionSignature(ArgParams, BodyParams, FuncRetTy))
-      return 0;
+  if (parseFunctionSignature(ArgParams, BodyParams, FuncRetTy)) {
+    if (CodeCompletion) {
+      // Create fake function signature.
+      ArgParams.clear();
+      BodyParams.clear();
+      if (HasContainerType) {
+        Pattern *thisPattern = buildImplicitThisParameter();
+        ArgParams.push_back(thisPattern);
+        BodyParams.push_back(thisPattern);
+      }
+      ArgParams.push_back(new (Context) AnyPattern(SourceLoc()));
+      BodyParams.push_back(new (Context) AnyPattern(SourceLoc()));
+      FuncRetTy = TupleTypeRepr::create(Context, {}, SourceRange(),
+                                        SourceLoc());
+      // Create function AST nodes.
+      FuncExpr *FE =
+          actOnFuncExprStart(FuncLoc, FuncRetTy, ArgParams, BodyParams);
+      FuncDecl *FD = new (Context) FuncDecl(StaticLoc, FuncLoc, Name, NameLoc,
+                                            GenericParams, Type(), FE,
+                                            CurDeclContext);
+      FE->setDecl(FD);
+      FE->setBodySkipped(Tok.getLoc());
+      CodeCompletion->setDelayedParsedDecl(FD);
+    }
+    return nullptr;
   }
 
   // Enter the arguments for the function into a new function-body scope.  We

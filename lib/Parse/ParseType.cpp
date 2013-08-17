@@ -213,19 +213,26 @@ IdentTypeRepr *Parser::parseTypeIdentifier() {
         return nullptr;
     }
     EndLoc = Loc;
-      
-    ComponentsR.push_back(IdentTypeRepr::Component(Loc, Name,
-                                              Context.AllocateCopy(GenericArgs),
-                                                   CurDeclContext));
+
+    ComponentsR.push_back(IdentTypeRepr::Component(
+        Loc, Name, Context.AllocateCopy(GenericArgs), CurDeclContext));
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
     // unless <anything> is 'metatype'.
-    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
-        peekToken().isNot(tok::kw_metatype)) {
-      consumeToken();
-    } else {
-      break;
+    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
+      if (peekToken().is(tok::code_complete) && CodeCompletion) {
+        if (auto Entry = lookupInScope(ComponentsR[0].getIdentifier()))
+          ComponentsR[0].setValue(Entry);
+        CodeCompletion->completeTypeIdentifier(
+            IdentTypeRepr::create(Context, ComponentsR));
+      }
+
+      if (peekToken().isNot(tok::kw_metatype)) {
+        consumeToken();
+        continue;
+      }
     }
+    break;
   }
 
   // Lookup element #0 through our current scope chains in case it is some thing

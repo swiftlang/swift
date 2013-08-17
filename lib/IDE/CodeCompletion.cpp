@@ -346,17 +346,19 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
     SuperExpr,
     SuperExprDot,
     TypeSimpleBeginning,
+    TypeIdentifier,
   };
 
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
+  TypeLoc ParsedTypeLoc;
   DeclContext *CurDeclContext = nullptr;
-  const GenericParamList *DeclFuncGenericParams = nullptr;
 
   /// \brief Set to true when we have delivered code completion results
   /// to the \c Consumer.
   bool DeliveredResults = false;
 
+  /// \returns true on success, false on failure.
   bool typecheckContext() {
     // Type check the function that contains the expression.
     if (CurDeclContext->getContextKind() == DeclContextKind::CapturingExpr) {
@@ -373,6 +375,13 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
     return true;
   }
 
+  /// \returns true on success, false on failure.
+  bool typecheckDelayedParsedDecl() {
+    assert(DelayedParsedDecl && "should have a delayed parsed decl");
+    return typeCheckCompletionDecl(TU, DelayedParsedDecl);
+  }
+
+  /// \returns true on success, false on failure.
   bool typecheckParsedExpr() {
     assert(ParsedExpr && "should have an expression");
 
@@ -393,6 +402,12 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
           ParsedExpr->print(llvm::dbgs());
           llvm::dbgs() << "\n");
     return true;
+  }
+
+  /// \returns true on success, false on failure.
+  bool typecheckParsedType() {
+    assert(ParsedTypeLoc.getTypeRepr() && "should have a TypeRepr");
+    return !performTypeLocChecking(TU, ParsedTypeLoc, false);
   }
 
 public:
@@ -416,6 +431,7 @@ public:
   void completeExprSuperDot(SuperRefExpr *SRE) override;
 
   void completeTypeSimpleBeginning() override;
+  void completeTypeIdentifier(IdentTypeRepr *ITR) override;
 
   void doneParsing() override;
 
@@ -445,16 +461,22 @@ class CompletionLookup : swift::VisibleDeclConsumer {
   ASTContext &SwiftContext;
   const DeclContext *CurrDeclContext;
 
-  const GenericParamList *DeclFuncGenericParams = nullptr;
-
   enum class LookupKind {
     ValueExpr,
     ValueInDeclContext,
+    Type,
     TypeInDeclContext,
   };
 
   LookupKind Kind;
+
+  /// Type of the user-provided expression for LookupKind::ValueExpr
+  /// completions.
   Type ExprType;
+
+  /// User-provided base type for LookupKind::Type completions.
+  Type BaseType;
+
   bool HaveDot = false;
   bool NeedLeadingDot = false;
   bool IsSuperRefExpr = false;
@@ -498,10 +520,6 @@ public:
       if (auto Importer = SwiftContext.getClangModuleLoader())
         static_cast<ClangImporter &>(*Importer).lookupVisibleDecls(*this);
     });
-  }
-
-  void setDeclFuncGenericParameters(const GenericParamList *GenericParams) {
-    DeclFuncGenericParams = GenericParams;
   }
 
   void setHaveDot() {
@@ -600,6 +618,7 @@ public:
           FD->getDeclContext() == CurrMethodDC->getParent() &&
           InsideStaticMethod && !FD->isStatic();
       break;
+    case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
       llvm_unreachable("can not have a method call while doing a "
                        "type completion");
@@ -710,23 +729,6 @@ public:
     else {
       Builder.addTypeAnnotation(MetaTypeType::get(TAD->getDeclaredType(),
                                                   SwiftContext)->getString());
-    }
-  }
-
-  void addDeclFuncGenericParams() {
-    if (!DeclFuncGenericParams)
-      return;
-
-    // Can not refer to generic parameters with a dot.
-    if (HaveDot)
-      return;
-
-    if (Kind != LookupKind::ValueInDeclContext &&
-        Kind != LookupKind::TypeInDeclContext)
-      return;
-
-    for (auto Param : *DeclFuncGenericParams) {
-      addTypeAliasRef(Param.getAsTypeParam());
     }
   }
 
@@ -842,6 +844,7 @@ public:
       }
       return;
 
+    case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         addNominalTypeRef(NTD);
@@ -903,7 +906,6 @@ public:
   void getValueCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::ValueInDeclContext;
     lookupVisibleDecls(*this, CurrDeclContext, Loc);
-    addDeclFuncGenericParams();
 
     // FIXME: The pedantically correct way to find the type is to resolve the
     // swift.StringLiteralType type.
@@ -915,10 +917,16 @@ public:
     CompletionContext.includeUnqualifiedClangResults();
   }
 
+  void getTypeCompletions(Type BaseType) {
+    Kind = LookupKind::Type;
+    NeedLeadingDot = !HaveDot;
+    lookupVisibleDecls(*this, MetaTypeType::get(BaseType, SwiftContext),
+                       CurrDeclContext);
+  }
+
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::TypeInDeclContext;
     lookupVisibleDecls(*this, CurrDeclContext, Loc);
-    addDeclFuncGenericParams();
   }
 };
 
@@ -963,7 +971,12 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
 void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
   Kind = CompletionKind::TypeSimpleBeginning;
   CurDeclContext = P.CurDeclContext;
-  this->DeclFuncGenericParams = CodeCompletionCallbacks::DeclFuncGenericParams;
+}
+
+void CodeCompletionCallbacksImpl::completeTypeIdentifier(IdentTypeRepr *ITR) {
+  Kind = CompletionKind::TypeIdentifier;
+  ParsedTypeLoc = TypeLoc(ITR);
+  CurDeclContext = P.CurDeclContext;
 }
 
 void CodeCompletionCallbacksImpl::doneParsing() {
@@ -975,7 +988,16 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (!typecheckContext())
     return;
 
+  if (DelayedParsedDecl && !typecheckDelayedParsedDecl())
+    return;
+
+  if (auto *FD = dyn_cast_or_null<FuncDecl>(DelayedParsedDecl))
+    CurDeclContext = FD->getBody();
+
   if (ParsedExpr && !typecheckParsedExpr())
+    return;
+
+  if (!ParsedTypeLoc.isNull() && !typecheckParsedType())
     return;
 
   CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
@@ -1016,9 +1038,14 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::TypeSimpleBeginning: {
-    Lookup.setDeclFuncGenericParameters(DeclFuncGenericParams);
     Lookup.getTypeCompletionsInDeclContext(
         TU->Ctx.SourceMgr.getCodeCompletionLoc());
+    break;
+  }
+
+  case CompletionKind::TypeIdentifier: {
+    Lookup.setHaveDot();
+    Lookup.getTypeCompletions(ParsedTypeLoc.getType());
     break;
   }
   }

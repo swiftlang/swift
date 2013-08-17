@@ -24,7 +24,10 @@ protected:
   Parser &P;
   ASTContext &Context;
   Parser::ParserPosition ExprBeginPosition;
-  const GenericParamList *DeclFuncGenericParams = nullptr;
+
+  /// The declaration parsed during delayed parsing that was caused by code
+  /// completion.  This declaration contained the code completion token.
+  Decl *DelayedParsedDecl = nullptr;
 
 public:
   CodeCompletionCallbacks(Parser &P)
@@ -37,24 +40,9 @@ public:
     ExprBeginPosition = PP;
   }
 
-  /// RAII object to inform code completion about function's generic parameters
-  /// while parsing the function signature.
-  class FunctionSignatureGenericParams {
-    CodeCompletionCallbacks *CodeCompletion;
-
-  public:
-    FunctionSignatureGenericParams(CodeCompletionCallbacks *CodeCompletion,
-                                   const GenericParamList *GenericParams)
-        : CodeCompletion(CodeCompletion) {
-      if (CodeCompletion && GenericParams)
-        CodeCompletion->DeclFuncGenericParams = GenericParams;
-    }
-
-    ~FunctionSignatureGenericParams() {
-      if (CodeCompletion)
-        CodeCompletion->DeclFuncGenericParams = nullptr;
-    }
-  };
+  void setDelayedParsedDecl(Decl *D) {
+    DelayedParsedDecl = D;
+  }
 
   /// \brief Complete the whole expression.  This is a fallback that should
   /// produce results when more specific completion methods failed.
@@ -80,6 +68,9 @@ public:
   /// \brief Complete the beginning of type-simple -- no tokens provided
   /// by user.
   virtual void completeTypeSimpleBeginning() = 0;
+
+  /// \brief Complete a given type-identifier after we have consumed the dot.
+  virtual void completeTypeIdentifier(IdentTypeRepr *ITR) = 0;
 
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

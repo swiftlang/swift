@@ -32,6 +32,7 @@ namespace llvm {
 namespace swift {
   class TranslationUnit;
   class Component;
+  class Decl;
   class DeclContext;
   class Expr;
   class FuncExpr;
@@ -113,14 +114,24 @@ namespace swift {
   /// main module.
   void performTypeChecking(TranslationUnit *TU, unsigned StartElem = 0);
 
-  /// performTypeLocChecking - recursively validate the specified type.  This is
-  /// used when dealing with partial translation units (e.g. SIL parsing).
-  bool performTypeLocChecking(TranslationUnit *TU, TypeLoc &T);
-  
-  /// typeCheckCompletionContextExpr - Typecheck an expression parsed as a
-  /// completion context.
-  bool typeCheckCompletionContextExpr(TranslationUnit *TU,
-                                      Expr *&parsedExpr);
+  /// \brief Recursively validate the specified type.
+  ///
+  /// This is used when dealing with partial translation units (e.g. SIL
+  /// parsing, code completion).
+  ///
+  /// \returns false on success, true on error.
+  bool performTypeLocChecking(TranslationUnit *TU, TypeLoc &T,
+                              bool ProduceDiagnostics = true);
+
+  /// \brief Typecheck a declaration parsed during code completion.
+  ///
+  /// \returns true on success, false on error.
+  bool typeCheckCompletionDecl(TranslationUnit *TU, Decl *D);
+
+  /// \brief Typecheck an expression parsed during code completion.
+  ///
+  /// \returns true on success, false on error.
+  bool typeCheckCompletionContextExpr(TranslationUnit *TU, Expr *&parsedExpr);
 
   /// Partially typecheck the specified function body.
   bool typeCheckFunctionBodyUntil(TranslationUnit *TU, DeclContext *DC,
