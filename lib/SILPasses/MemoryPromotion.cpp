@@ -318,6 +318,14 @@ namespace {
     /// this block.
     bool HasNonLoadUse = false;
 
+    /// Keep track of whether the element is live out of this block or not.
+    ///
+    enum LiveOutAvailability {
+      IsNotLiveOut,
+      IsLiveOut,
+      IsComputingLiveOut,
+      IsUnknown
+    } Availability = IsUnknown;
   };
 } // end anonymous namespace
 
@@ -358,7 +366,8 @@ namespace {
     };
     DIKind checkDefinitelyInit(SILInstruction *Inst, SILValue *AV = nullptr,
                                AccessPathTy *AccessPath = nullptr);
-    
+    bool isLiveOut(SILBasicBlock *BB);
+
     
     void diagnoseInitError(SILInstruction *Use,
                            Diag<StringRef> DiagMessage);
@@ -369,30 +378,41 @@ ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox,
                                    unsigned ElementNumber, ElementUses &Uses)
   : TheAllocBox(TheAllocBox), ElementNumber(ElementNumber), Uses(Uses) {
 
-  NonLoadUses.insert(TheAllocBox);
-
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
   for (auto Use : Uses) {
     // Keep track of all the uses that aren't loads.
-    if (Use.second != UseKind::Load)
-      NonLoadUses.insert(Use.first);
+    if (Use.second == UseKind::Load)
+      continue;
+
+    NonLoadUses.insert(Use.first);
+
+    auto &BBInfo = PerBlockInfo[Use.first->getParent()];
+    BBInfo.HasNonLoadUse = true;
+
+    // Each of the non-load instructions will each be checked to make sure that
+    // they are live-in or a full element store.  This means that the block they
+    // are in should be treated as a live out for cross-block analysis purposes.
+    BBInfo.Availability = LiveOutBlockState::IsLiveOut;
 
     if (Use.second == UseKind::Escape) {
       // Determine which blocks the value can escape from.  We aren't allowed to
       // promote loads in blocks reachable from an escape point.
       HasAnyEscape = true;
-      auto &BBInfo = PerBlockInfo[Use.first->getParent()];
       BBInfo.EscapeInfo = EscapeKind::Yes;
-      BBInfo.HasNonLoadUse = true;
-    } else if (Use.second == UseKind::Store ||
-               Use.second == UseKind::PartialStore ||
-               Use.second == UseKind::ByrefUse) {
-      // Keep track of which blocks have local stores.  This makes scanning for
-      // assignments cheaper later.
-      PerBlockInfo[Use.first->getParent()].HasNonLoadUse = true;
     }
   }
+
+  // If isn't really a use, but we account for the alloc_box as a use so we see
+  // it in our dataflow walks.
+  NonLoadUses.insert(TheAllocBox);
+  PerBlockInfo[TheAllocBox->getParent()].HasNonLoadUse = true;
+
+  // If there was not another store in the alloc_box block, then it is known to
+  // be not live out.
+  auto &BBInfo = PerBlockInfo[TheAllocBox->getParent()];
+  if (BBInfo.Availability == LiveOutBlockState::IsUnknown)
+    BBInfo.Availability = LiveOutBlockState::IsNotLiveOut;
 }
 
 void ElementPromotion::diagnoseInitError(SILInstruction *Use,
@@ -653,7 +673,37 @@ void ElementPromotion::handleEscape(SILInstruction *Inst) {
   diagnoseInitError(Inst, diag::variable_escape_before_initialized);
 }
 
+bool ElementPromotion::isLiveOut(SILBasicBlock *BB) {
+  LiveOutBlockState &BBState = PerBlockInfo[BB];
+  switch (BBState.Availability) {
+  case LiveOutBlockState::IsNotLiveOut: return false;
+  case LiveOutBlockState::IsLiveOut:    return true;
+  case LiveOutBlockState::IsComputingLiveOut:
+    // Speculate that it will be live out in cyclic cases.
+    return true;
+  case LiveOutBlockState::IsUnknown:
+    // Otherwise, process this block.
+    break;
+  }
 
+  // Set the block's state to reflect that we're currently processing it.  This
+  // is required to handle cycles properly.
+  BBState.Availability = LiveOutBlockState::IsComputingLiveOut;
+
+  // Recursively processes all of our predecessor blocks.  If any of them is
+  // not live out, then we aren't either.
+  for (auto PI = BB->pred_begin(), E = BB->pred_end(); PI != E; ++PI) {
+    if (!isLiveOut(*PI)) {
+      // If any predecessor fails, then we're not live out either.
+      PerBlockInfo[BB].Availability = LiveOutBlockState::IsNotLiveOut;
+      return false;
+    }
+  }
+
+  // Otherwise, we're golden.  Return success.
+  PerBlockInfo[BB].Availability = LiveOutBlockState::IsLiveOut;
+  return true;
+}
 
 
 /// The specified instruction is a use of the element.  Determine whether the
@@ -666,10 +716,11 @@ void ElementPromotion::handleEscape(SILInstruction *Inst) {
 ElementPromotion::DIKind
 ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV,
                                       AccessPathTy *AccessPath) {
+  SILBasicBlock *InstBB = Inst->getParent();
   // If there is a store in the current block, scan the block to see if the
   // store is before or after the load.  If it is before, it produces the value
   // we are looking for.
-  if (PerBlockInfo[Inst->getParent()].HasNonLoadUse) {
+  if (PerBlockInfo[InstBB].HasNonLoadUse) {
     for (SILBasicBlock::iterator BBI = Inst, E = Inst->getParent()->begin();
          BBI != E;) {
       SILInstruction *TheInst = --BBI;
@@ -697,9 +748,15 @@ ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV,
     }
   }
 
-  // FIXME: Need to do cross-block analysis.
+  // Okay, the value isn't locally available in this block.  Check to see if it
+  // is live in all predecessors and, if interested, collect the list of
+  // definitions we'll build SSA form from.
+  for (auto PI = InstBB->pred_begin(), E = InstBB->pred_end(); PI != E; ++PI) {
+    if (!isLiveOut(*PI))
+      return DI_No;
+  }
 
-  return DI_Partial;
+  return DI_Yes;
 }
 
 
