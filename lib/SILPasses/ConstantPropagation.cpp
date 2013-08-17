@@ -18,7 +18,6 @@
 #include "swift/Subsystems.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -34,17 +33,14 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 static SILInstruction *constantFoldInstruction(SILInstruction &I,
                                                SILModule &M) {
   // Constant fold function calls.
-  if (const ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
+  if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
 
     // Constant fold calls to builtins.
-    if (const BuiltinFunctionRefInst *FR =
+    if (BuiltinFunctionRefInst *FR =
         dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
-      FuncDecl *FD = FR->getFunction();
-      SmallVector<Type, 4> Types;
-      StringRef BuiltinName = getBuiltinBaseName(M.getASTContext(),
-                                                 FD->getName().str(), Types);
-
-      if (BuiltinName == "int_sadd_with_overflow") {
+      llvm::Intrinsic::ID ID = FR->getIntrinsicID();
+      
+      if (ID == llvm::Intrinsic::sadd_with_overflow) {
 
         // Check if both arguments are literals.
         OperandValueArrayRef Args = AI->getArguments();

@@ -90,7 +90,10 @@ private:
 
   /// This is a cache that memoizes the result of SILType::getFunctionTypeInfo.
   llvm::DenseMap<AnyFunctionType*, SILFunctionTypeInfo*> FunctionTypeInfoCache;
-  
+
+  /// This is a cache of intrinsic Function declarations to numeric ID mappings.
+  llvm::DenseMap<const FuncDecl*, llvm::Intrinsic::ID> IntrinsicIDCache;
+
   /// The stage of processing this module is at.
   SILStage Stage;
   
@@ -187,6 +190,13 @@ public:
     
     return BPA.Allocate(Size, Align);
   }
+
+  /// \brief Looks up the llvm intrinsic ID for the builtin function.
+  ///
+  /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
+  /// intrinsic. The particular intrinsic functions which correspond to the
+  /// retruned value are defined in llvm/Intrinsics.h.
+  llvm::Intrinsic::ID getIntrinsicID(const FuncDecl* FD);
 };
   
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){

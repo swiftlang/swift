@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILModule.h"
+#include "swift/AST/Builtins.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/FoldingSet.h"
 using namespace swift;
@@ -86,4 +87,21 @@ SILTypeList *SILModule::getSILTypeList(ArrayRef<SILType> Types) const {
   UniqueMap->InsertNode(NewList, InsertPoint);
   return NewList;
 }
+
+llvm::Intrinsic::ID SILModule::getIntrinsicID(const FuncDecl* FD) {
+  if (!IntrinsicIDCache.count(FD)) {
+    // Find the matching ID.
+    SmallVector<Type, 4> Types;
+    StringRef NameRef = getBuiltinBaseName(getASTContext(),
+                                           FD->getName().str(), Types);
+    llvm::Intrinsic::ID Id =
+      (llvm::Intrinsic::ID)getLLVMIntrinsicID(NameRef, !Types.empty());
+
+    // Store it in the cache.
+    IntrinsicIDCache[FD] = Id;
+    return Id;
+  }
+  return IntrinsicIDCache[FD];
+}
+
 
