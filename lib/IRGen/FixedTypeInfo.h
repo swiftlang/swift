@@ -110,7 +110,21 @@ public:
   /// bits.
   unsigned getSpareBitExtraInhabitantCount() const;
 
+  /// Create a constant of the given bit width holding one of the extra
+  /// inhabitants of the type.
+  /// The index must be less than the value returned by
+  /// getFixedExtraInhabitantCount().
+  virtual llvm::Constant *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                       unsigned bits,
+                                                       unsigned index) const {
+    return getSpareBitFixedExtraInhabitantValue(IGM, bits, index);
+  }
   
+  /// Create an extra inhabitant constant using the spare bits of the type.
+  llvm::Constant *getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                       unsigned bits,
+                                                       unsigned index) const;
+    
   /// True if the type representation has statically "spare" unused bits.
   bool hasFixedSpareBits() const {
     return SpareBits.any();

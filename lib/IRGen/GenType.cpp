@@ -173,6 +173,66 @@ void FixedTypeInfo::applyFixedSpareBitsMask(llvm::BitVector &bits) const {
   }
 }
 
+llvm::Constant *
+FixedTypeInfo::getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                    unsigned bits,
+                                                    unsigned index) const {
+  // FIXME: endianness.
+  SmallVector<llvm::integerPart, 2> valueParts;
+  valueParts.push_back(0);
+  
+  // Factor the index into the part that goes in the occupied bits and the
+  // part that goes in the spare bits.
+  unsigned occupiedIndex, spareIndex = 0;
+  
+  unsigned spareBitCount = SpareBits.count();
+  unsigned occupiedBitCount
+    = getFixedSize().getValueInBits() - spareBitCount;
+  
+  if (occupiedBitCount >= 31) {
+    occupiedIndex = index;
+    // The spare bit value is biased by one because all zero spare bits
+    // represents a valid value of the type.
+    spareIndex = 1;
+  } else {
+    occupiedIndex = index & ((1 << occupiedBitCount) - 1);
+    // The spare bit value is biased by one because all zero spare bits
+    // represents a valid value of the type.
+    spareIndex = (index >> occupiedBitCount) + 1;
+  }
+
+  // Interleave the occupiedIndex and spareIndex bits, taking a bit from one
+  // or the other at each position based on the spare bit mask.
+  llvm::integerPart valueBit = 1;
+  auto advanceValueBit = [&]{
+    valueBit <<= 1;
+    if (valueBit == 0) {
+      valueParts.push_back(0);
+      valueBit = 1;
+    }
+  };
+  
+  for (unsigned i = 0, e = SpareBits.size();
+       (occupiedIndex || spareIndex) && i < e;
+       ++i, advanceValueBit()) {
+    if (SpareBits[i]) {
+      if (spareIndex & 1)
+        valueParts.back() |= valueBit;
+      spareIndex >>= 1;
+    } else {
+      if (occupiedIndex & 1)
+        valueParts.back() |= valueBit;
+      occupiedIndex >>= 1;
+    }
+  }
+  assert(occupiedIndex == 0 && spareIndex == 0
+         && "did not use all extra inhabitant index bits?!");
+  
+  // Create the value.
+  llvm::APInt value(bits, valueParts);
+  return llvm::ConstantInt::get(IGM.getLLVMContext(), value);
+}
+
 namespace {
   /// A TypeInfo implementation for empty types.
   struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, LoadableTypeInfo> {
