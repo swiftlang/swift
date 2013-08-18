@@ -27,6 +27,7 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -34,6 +35,7 @@
 #include "LoadableTypeInfo.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "GenUnion.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenModule.h"
 #include "ScalarTypeInfo.h"
@@ -521,7 +523,6 @@ namespace {
                                                    UnionDecl *theUnion,
                                                    UnionImplStrategy &strategy){
     // See whether the payload case's type has extra inhabitants.
-    // FIXME: Dynamically query extra inhabitants for opaque types.
     unsigned fixedExtraInhabitants = 0;
     unsigned numTags = strategy.getNumElements() - 1;
     
@@ -730,4 +731,70 @@ void IRGenModule::emitUnionDecl(UnionDecl *theUnion) {
     }
     llvm_unreachable("bad extension member kind");
   }
+}
+
+// FIXME: PackUnionPayload and UnpackUnionPayload need to be endian-aware.
+
+PackUnionPayload::PackUnionPayload(IRGenFunction &IGF, unsigned bitSize)
+  : IGF(IGF), bitSize(bitSize)
+{}
+
+void PackUnionPayload::add(llvm::Value *v) {
+  // First, bitcast to an integer type.
+  if (!isa<llvm::IntegerType>(v->getType())) {
+    unsigned bitSize = IGF.IGM.DataLayout.getTypeSizeInBits(v->getType());
+    auto intTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), bitSize);
+    v = IGF.Builder.CreateBitCast(v, intTy);
+  }
+  auto fromTy = cast<llvm::IntegerType>(v->getType());
+  
+  // If this was the first added value, use it to start our packed value.
+  if (packedBits == 0) {
+    // Zero-extend the integer value out to the value size.
+    // FIXME: On big-endian, shift out to the value size.
+    packedBits = fromTy->getBitWidth();
+    if (packedBits < bitSize) {
+      auto toTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), bitSize);
+      v = IGF.Builder.CreateZExt(v, toTy);
+    }
+    packedValue = v;
+    return;
+  }
+  
+  // Otherwise, shift and bitor the value into the existing value.
+  packedBits += fromTy->getBitWidth();
+  v = IGF.Builder.CreateZExt(v, packedValue->getType());
+  v = IGF.Builder.CreateShl(v, packedBits);
+  packedValue = IGF.Builder.CreateOr(packedValue, v);
+}
+
+void PackUnionPayload::zeroPad(unsigned bits) {
+  packedBits += bits;
+}
+
+llvm::Value *PackUnionPayload::get() const {
+  assert(packedBits != 0 && "nothing packed into value");
+  return packedValue;
+}
+
+UnpackUnionPayload::UnpackUnionPayload(IRGenFunction &IGF,
+                                       llvm::Value *packedValue)
+  : IGF(IGF), packedValue(packedValue)
+{}
+
+llvm::Value *UnpackUnionPayload::claim(llvm::Type *ty) {
+  // Mask out the bits for the value.
+  unsigned bitSize = IGF.IGM.DataLayout.getTypeSizeInBits(ty);
+  auto bitTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), bitSize);
+  llvm::Value *unpacked = IGF.Builder.CreateLShr(packedValue, unpackedBits);
+  unpacked = IGF.Builder.CreateTrunc(unpacked, bitTy);
+
+  unpackedBits += bitSize;
+
+  // Bitcast to the destination type.
+  return IGF.Builder.CreateBitCast(unpacked, ty);
+}
+
+void UnpackUnionPayload::discardPadding(unsigned bits) {
+  unpackedBits += bits;
 }
