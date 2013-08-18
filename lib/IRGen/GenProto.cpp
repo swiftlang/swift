@@ -804,6 +804,25 @@ namespace {
       llvm::Value *value = IGF.Builder.CreateLoad(projectValue(IGF, addr));
       asDerived().emitPayloadRelease(IGF, value);
     }
+    
+    llvm::Value *packUnionPayload(IRGenFunction &IGF,
+                                  Explosion &src,
+                                  unsigned bitWidth) const override {
+      PackUnionPayload pack(IGF, bitWidth);
+      for (unsigned i = 0; i < NumProtocols; ++i)
+        pack.add(src.claimNext());
+      pack.add(src.claimNext());
+      return pack.get();
+    }
+    
+    void unpackUnionPayload(IRGenFunction &IGF,
+                            llvm::Value *payload,
+                            Explosion &dest) const override {
+      UnpackUnionPayload unpack(IGF, payload);
+      for (unsigned i = 0; i < NumProtocols; ++i)
+        dest.add(unpack.claim(IGF.IGM.WitnessTablePtrTy));
+      dest.add(unpack.claim(IGF.IGM.UnknownRefCountedPtrTy));
+    }
   };
 
   /// A type implementation for [unowned] class existential types.
@@ -821,7 +840,7 @@ namespace {
 
     void emitPayloadRelease(IRGenFunction &IGF, llvm::Value *value) const {
       IGF.emitUnknownUnownedRelease(value);
-    }    
+    }
   };
   
   /// A type info implementation for class existential types, that is,

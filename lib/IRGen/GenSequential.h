@@ -21,6 +21,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
+#include "GenUnion.h"
 #include "LoadableTypeInfo.h"
 #include "TypeInfo.h"
 #include "StructLayout.h"
@@ -71,7 +72,11 @@ public:
   Address projectAddress(IRGenFunction &IGF, Address seq,
                          NonFixedOffsets offsets) const {
     return Layout.project(IGF, seq, offsets, "." + asImpl()->getFieldName());
-  }  
+  }
+  
+  Size getFixedByteOffset() const {
+    return Layout.getByteOffset();
+  }
 
   std::pair<unsigned, unsigned> getProjectionRange(ExplosionKind kind) const {
     switch (kind) {
@@ -267,6 +272,26 @@ public:
   void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
     for (auto &field : getFields())
       cast<LoadableTypeInfo>(field.getTypeInfo()).copy(IGF, src, dest);
+  }
+      
+  llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
+                                unsigned bitWidth) const override {
+    PackUnionPayload pack(IGF, bitWidth);
+    for (auto &field : getFields()) {
+      unsigned offset = field.getFixedByteOffset().getValueInBits();
+      pack.addAtOffset(src.claimNext(), offset);
+    }
+    return pack.get();
+  }
+  
+  void unpackUnionPayload(IRGenFunction &IGF, llvm::Value *payload,
+                          Explosion &dest) const override {
+    UnpackUnionPayload unpack(IGF, payload);
+    for (auto &field : getFields()) {
+      unsigned offset = field.getFixedByteOffset().getValueInBits();
+      dest.add(unpack.claimAtOffset(field.getTypeInfo().getStorageType(),
+                                    offset));
+    }
   }
 };
 

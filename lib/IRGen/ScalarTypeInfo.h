@@ -23,6 +23,7 @@
 #include "TypeInfo.h"
 #include "IRGenFunction.h"
 #include "swift/SIL/Mangle.h"
+#include "GenUnion.h"
 
 namespace swift {
 namespace irgen {
@@ -164,6 +165,21 @@ public:
       llvm::Value *value = IGF.Builder.CreateLoad(addr, "toDestroy");
       asDerived().emitScalarRelease(IGF, value);
     }
+  }
+  
+  llvm::Value *packUnionPayload(IRGenFunction &IGF,
+                                Explosion &src,
+                                unsigned bitWidth) const override {
+    PackUnionPayload pack(IGF, bitWidth);
+    pack.add(src.claimNext());
+    return pack.get();
+  }
+  
+  void unpackUnionPayload(IRGenFunction &IGF,
+                          llvm::Value *payload,
+                          Explosion &dest) const override {
+    UnpackUnionPayload unpack(IGF, payload);
+    dest.add(unpack.claim(getScalarType()));
   }
 };
 

@@ -246,6 +246,13 @@ namespace {
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {}
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
     void destroy(IRGenFunction &IGF, Address addr) const {}
+    llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
+                                  unsigned bitWidth) const override {
+      return llvm::ConstantInt::get(
+                 llvm::IntegerType::get(IGF.IGM.getLLVMContext(), bitWidth), 0);
+    }
+    void unpackUnionPayload(IRGenFunction &IGF, llvm::Value *payload,
+                            Explosion &dest) const override {}
   };
 
   /// A TypeInfo implementation for types represented as a single

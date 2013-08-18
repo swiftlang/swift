@@ -25,6 +25,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef __SWIFT_IRGen_GenUnion_H__
+#define __SWIFT_IRGen_GenUnion_H__
+
 namespace llvm {
   class Value;
   class Type;
@@ -41,20 +44,18 @@ namespace irgen {
 class PackUnionPayload {
   IRGenFunction &IGF;
   unsigned packedBits = 0;
-  // bitSize is inhabited if packedBits is zero; otherwise, packedValue is.
-  union {
-    unsigned bitSize;
-    llvm::Value *packedValue;
-  };
+  unsigned bitSize;
+  llvm::Value *packedValue = nullptr;
 
 public:
   PackUnionPayload(IRGenFunction &IGF, unsigned bitSize);
   
-  /// Insert a value into the packed value.
+  /// Insert a value into the packed value after the previously inserted value,
+  /// or at offset zero if this is the first value.
   void add(llvm::Value *v);
   
-  /// Insert zero padding bits between values.
-  void zeroPad(unsigned bits);
+  /// Insert a value into the packed value at a specific offset.
+  void addAtOffset(llvm::Value *v, unsigned bitOffset);
   
   /// Get the packed value.
   llvm::Value *get() const;
@@ -72,13 +73,15 @@ class UnpackUnionPayload {
 public:
   UnpackUnionPayload(IRGenFunction &IGF, llvm::Value *packedValue);
   
-  /// Extract a value of the given type from the next bitSize-sized range of
-  /// bits in the value.
+  /// Extract a value of the given type that was packed after the previously
+  /// claimed value, or at offset zero if this is the first claimed value.
   llvm::Value *claim(llvm::Type *ty);
   
-  /// Skip padding bits.
-  void discardPadding(unsigned bits);
+  /// Claim a value at a specific offset inside the value.
+  llvm::Value *claimAtOffset(llvm::Type *ty, unsigned bitOffset);
 };
   
 }
 }
+
+#endif

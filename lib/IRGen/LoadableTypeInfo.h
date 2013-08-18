@@ -84,6 +84,17 @@ public:
   /// explosion levels.
   virtual void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
                     Explosion &targetExplosion) const = 0;
+  
+  /// Pack the source explosion into a union payload.
+  virtual llvm::Value *packUnionPayload(IRGenFunction &IGF,
+                                        Explosion &sourceExplosion,
+                                        unsigned bitWidth) const = 0;
+  
+  /// Unpack a union payload containing a valid value of the type into the
+  /// destination explosion.
+  virtual void unpackUnionPayload(IRGenFunction &IGF,
+                                  llvm::Value *payload,
+                                  Explosion &targetExplosion) const = 0;
 
   static bool classof(const LoadableTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isLoadable(); }

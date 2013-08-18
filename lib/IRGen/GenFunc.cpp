@@ -452,6 +452,23 @@ namespace {
     void destroy(IRGenFunction &IGF, Address addr) const {
       IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
     }
+    
+    llvm::Value *packUnionPayload(IRGenFunction &IGF,
+                                  Explosion &src,
+                                  unsigned bitWidth) const override {
+      PackUnionPayload pack(IGF, bitWidth);
+      pack.add(src.claimNext());
+      pack.add(src.claimNext());
+      return pack.get();
+    }
+    
+    void unpackUnionPayload(IRGenFunction &IGF,
+                            llvm::Value *payload,
+                            Explosion &dest) const override {
+      UnpackUnionPayload unpack(IGF, payload);
+      dest.add(unpack.claim(getStorageType()->getElementType(0)));
+      dest.add(unpack.claim(getStorageType()->getElementType(1)));
+    }
   };
 
   /// The type-info class for ObjC blocks, which are represented by an ObjC

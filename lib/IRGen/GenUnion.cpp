@@ -101,6 +101,9 @@ namespace {
   /// A UnionTypeInfo implementation which has a single case with a payload, and
   /// one or more additional no-payload cases..
   class SinglePayloadUnionTypeInfo : public UnionTypeInfo {
+    // FIXME - non-fixed payloads
+    const FixedTypeInfo *PayloadTypeInfo = nullptr;
+    bool HasExtraTagBits = false;
   public:
     /// FIXME: Spare bits from the payload not exhausted by the extra
     /// inhabitants we used.
@@ -114,7 +117,7 @@ namespace {
     }
     
     unsigned getExplosionSize(ExplosionKind kind) const {
-      return 1;
+      return HasExtraTagBits ? 2 : 1;
     }
     
     void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
@@ -151,6 +154,44 @@ namespace {
     
     void destroy(IRGenFunction &IGF, Address addr) const {
       // FIXME
+    }
+    
+    llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
+                                  unsigned bitWidth) const override {
+      assert(isComplete());
+      
+      PackUnionPayload pack(IGF, bitWidth);
+      // Pack payload.
+      pack.add(src.claimNext());
+      
+      // Pack tag bits, if any.
+      if (HasExtraTagBits) {
+        unsigned extraTagOffset
+          = PayloadTypeInfo->getFixedSize().getValueInBits();
+        
+        pack.addAtOffset(src.claimNext(), extraTagOffset);
+      }
+      
+      return pack.get();
+    }
+    
+    void unpackUnionPayload(IRGenFunction &IGF, llvm::Value *outerPayload,
+                            Explosion &dest) const override {
+      assert(isComplete());
+      
+      UnpackUnionPayload unpack(IGF, outerPayload);
+      
+      // Unpack our inner payload.
+      dest.add(unpack.claim(getStorageType()->getElementType(0)));
+      
+      // Unpack our extra tag bits, if any.
+      if (HasExtraTagBits) {
+        unsigned extraTagOffset
+          = PayloadTypeInfo->getFixedSize().getValueInBits();
+        
+        dest.add(unpack.claimAtOffset(getStorageType()->getElementType(1),
+                                      extraTagOffset));
+      }
     }
     
     void emitInjectionFunctionBody(IRGenFunction &IGF,
@@ -167,7 +208,11 @@ namespace {
 
   /// A UnionTypeInfo implementation which has multiple payloads.
   class MultiPayloadUnionTypeInfo : public UnionTypeInfo {
+    bool HasExtraTagBits = false;
+    
     // The spare bits shared by all payloads, if any.
+    // Invariant: The size of the bit
+    // vector is the size of the payload in bits, rounded up to a byte boundary.
     llvm::BitVector CommonSpareBits;
   public:
     /// FIXME: Spare bits common to aggregate elements and not used for tags.
@@ -181,7 +226,7 @@ namespace {
     }
 
     unsigned getExplosionSize(ExplosionKind kind) const {
-      return 1;
+      return HasExtraTagBits ? 2 : 1;
     }
 
     void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
@@ -218,6 +263,34 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr) const {
       // FIXME
+    }
+    
+    llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
+                                  unsigned bitWidth) const override {
+      assert(isComplete());
+      
+      PackUnionPayload pack(IGF, bitWidth);
+      // Pack the payload.
+      pack.add(src.claimNext());
+      // Pack the extra bits, if any.
+      if (HasExtraTagBits) {
+        pack.addAtOffset(src.claimNext(), CommonSpareBits.size());
+      }
+      return pack.get();
+    }
+    
+    void unpackUnionPayload(IRGenFunction &IGF, llvm::Value *outerPayload,
+                            Explosion &dest) const override {
+      assert(isComplete());
+
+      UnpackUnionPayload unpack(IGF, outerPayload);
+      // Unpack the payload.
+      dest.add(unpack.claim(getStorageType()->getElementType(0)));
+      // Unpack the extra bits, if any.
+      if (HasExtraTagBits) {
+        dest.add(unpack.claimAtOffset(getStorageType()->getElementType(1),
+                                      CommonSpareBits.size()));
+      }
     }
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,
@@ -305,6 +378,22 @@ namespace {
       if (Singleton && !isPOD(ResilienceScope::Local))
         Singleton->destroy(IGF, getSingletonAddress(IGF, addr));
     }
+    
+    llvm::Value *packUnionPayload(IRGenFunction &IGF,
+                                  Explosion &in,
+                                  unsigned bitWidth) const override {
+      if (Singleton)
+        return Singleton->packUnionPayload(IGF, in, bitWidth);
+      return llvm::ConstantInt::get(
+                llvm::IntegerType::get(IGF.IGM.getLLVMContext(), bitWidth), 0);
+    }
+    
+    void unpackUnionPayload(IRGenFunction &IGF,
+                            llvm::Value *payload,
+                            Explosion &dest) const override {
+      if (!Singleton) return;
+      Singleton->unpackUnionPayload(IGF, payload, dest);
+    }
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    UnionElementDecl *elt,
@@ -348,7 +437,7 @@ namespace {
     static Address projectScalar(IRGenFunction &IGF, Address addr) {
       return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
     }
-
+      
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    UnionElementDecl *elt,
                                    Explosion &params) const {
@@ -530,8 +619,8 @@ namespace {
       ->getCanonicalType();
     
     auto &payloadTI = TC.getCompleteTypeInfo(payloadTy);
-    auto &fixedPayloadTI = cast<FixedTypeInfo>(payloadTI); // FIXME
-    fixedExtraInhabitants = fixedPayloadTI.getFixedExtraInhabitantCount();
+    PayloadTypeInfo = cast<FixedTypeInfo>(&payloadTI); // FIXME
+    fixedExtraInhabitants = PayloadTypeInfo->getFixedExtraInhabitantCount();
     
     // Determine how many tag bits we need. Given N extra inhabitants, we
     // represent the first N tags using those inhabitants. For additional tags,
@@ -546,11 +635,11 @@ namespace {
     // If the payload size is greater than 32 bits, the calculation would
     // overflow, but one tag bit should suffice. if you have more than 2^32
     // union discriminators you have other problems.
-    } else if (fixedPayloadTI.getFixedSize().getValue() >= 4) {
+    } else if (PayloadTypeInfo->getFixedSize().getValue() >= 4) {
       extraTagBits = 1;
     } else {
       unsigned tagsPerTagBitValue =
-        1 << fixedPayloadTI.getFixedSize().getValueInBits();
+        1 << PayloadTypeInfo->getFixedSize().getValueInBits();
       unsigned tagBitValues
         = (tagsWithoutInhabitants + (tagsPerTagBitValue-1))/tagsPerTagBitValue;
       extraTagBits = llvm::Log2_32(tagBitValues-1) + 1;
@@ -558,18 +647,19 @@ namespace {
 
     // Create the body type.
     setTaggedUnionBody(TC.IGM, getStorageType(),
-                       fixedPayloadTI.getFixedSize().getValueInBits(),
+                       PayloadTypeInfo->getFixedSize().getValueInBits(),
                        extraTagBits);
     
     // The union has the alignment of the payload. The size includes the added
     // tag bits.
-    auto sizeWithTag = fixedPayloadTI.getFixedSize()
-      .roundUpToAlignment(fixedPayloadTI.getFixedAlignment())
+    auto sizeWithTag = PayloadTypeInfo->getFixedSize()
+      .roundUpToAlignment(PayloadTypeInfo->getFixedAlignment())
       .getValue();
     sizeWithTag += (extraTagBits+7U)/8U;
     
+    HasExtraTagBits = extraTagBits > 0;
     completeFixed(Size(sizeWithTag),
-                  fixedPayloadTI.getFixedAlignment());
+                  PayloadTypeInfo->getFixedAlignment());
   }
   
   void MultiPayloadUnionTypeInfo::layoutUnionType(TypeConverter &TC,
@@ -627,6 +717,7 @@ namespace {
       .getValue();
     sizeWithTag += (extraTagBits+7U)/8U;
     
+    HasExtraTagBits = extraTagBits > 0;
     completeFixed(Size(sizeWithTag), worstAlignment);
   }
 }
@@ -749,7 +840,7 @@ void PackUnionPayload::add(llvm::Value *v) {
   auto fromTy = cast<llvm::IntegerType>(v->getType());
   
   // If this was the first added value, use it to start our packed value.
-  if (packedBits == 0) {
+  if (!packedValue) {
     // Zero-extend the integer value out to the value size.
     // FIXME: On big-endian, shift out to the value size.
     packedBits = fromTy->getBitWidth();
@@ -757,6 +848,8 @@ void PackUnionPayload::add(llvm::Value *v) {
       auto toTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), bitSize);
       v = IGF.Builder.CreateZExt(v, toTy);
     }
+    if (packedBits != 0)
+      v = IGF.Builder.CreateShl(v, packedBits);
     packedValue = v;
     return;
   }
@@ -768,8 +861,9 @@ void PackUnionPayload::add(llvm::Value *v) {
   packedValue = IGF.Builder.CreateOr(packedValue, v);
 }
 
-void PackUnionPayload::zeroPad(unsigned bits) {
-  packedBits += bits;
+void PackUnionPayload::addAtOffset(llvm::Value *v, unsigned bitOffset) {
+  packedBits = bitOffset;
+  add(v);
 }
 
 llvm::Value *PackUnionPayload::get() const {
@@ -795,6 +889,8 @@ llvm::Value *UnpackUnionPayload::claim(llvm::Type *ty) {
   return IGF.Builder.CreateBitCast(unpacked, ty);
 }
 
-void UnpackUnionPayload::discardPadding(unsigned bits) {
-  unpackedBits += bits;
+llvm::Value *UnpackUnionPayload::claimAtOffset(llvm::Type *ty,
+                                               unsigned bitOffset) {
+  unpackedBits = bitOffset;
+  return claim(ty);
 }
