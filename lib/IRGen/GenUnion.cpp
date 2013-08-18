@@ -384,8 +384,7 @@ namespace {
                                   unsigned bitWidth) const override {
       if (Singleton)
         return Singleton->packUnionPayload(IGF, in, bitWidth);
-      return llvm::ConstantInt::get(
-                llvm::IntegerType::get(IGF.IGM.getLLVMContext(), bitWidth), 0);
+      return PackUnionPayload::getEmpty(IGF.IGM, bitWidth);
     }
     
     void unpackUnionPayload(IRGenFunction &IGF,
@@ -866,9 +865,14 @@ void PackUnionPayload::addAtOffset(llvm::Value *v, unsigned bitOffset) {
   add(v);
 }
 
-llvm::Value *PackUnionPayload::get() const {
-  assert(packedBits != 0 && "nothing packed into value");
+llvm::Value *PackUnionPayload::get() {
+  if (!packedValue)
+    packedValue = getEmpty(IGF.IGM, bitSize);
   return packedValue;
+}
+
+llvm::Value *PackUnionPayload::getEmpty(IRGenModule &IGM, unsigned bitSize) {
+  return llvm::ConstantInt::get(IGM.getLLVMContext(), APInt(bitSize, 0));
 }
 
 UnpackUnionPayload::UnpackUnionPayload(IRGenFunction &IGF,

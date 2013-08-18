@@ -58,7 +58,10 @@ public:
   void addAtOffset(llvm::Value *v, unsigned bitOffset);
   
   /// Get the packed value.
-  llvm::Value *get() const;
+  llvm::Value *get();
+  
+  /// Get an empty payload value of the given bit size.
+  static llvm::Value *getEmpty(IRGenModule &IGM, unsigned bitSize);
 };
 
 /// Utility class for packing union payloads. The payload of a fixed-size, non-
@@ -80,6 +83,7 @@ public:
   /// Claim a value at a specific offset inside the value.
   llvm::Value *claimAtOffset(llvm::Type *ty, unsigned bitOffset);
 };
+
   
 }
 }

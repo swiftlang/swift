@@ -248,8 +248,7 @@ namespace {
     void destroy(IRGenFunction &IGF, Address addr) const {}
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth) const override {
-      return llvm::ConstantInt::get(
-                 llvm::IntegerType::get(IGF.IGM.getLLVMContext(), bitWidth), 0);
+      return PackUnionPayload::getEmpty(IGF.IGM, bitWidth);
     }
     void unpackUnionPayload(IRGenFunction &IGF, llvm::Value *payload,
                             Explosion &dest) const override {}
