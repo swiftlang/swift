@@ -65,6 +65,21 @@ union NoPayloads {
   case z
 }
 
+// CHECK: define i2 @_TO5union10NoPayloads1xFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret i2 0
+// CHECK: }
+
+// CHECK: define i2 @_TO5union10NoPayloads1yFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret i2 1
+// CHECK: }
+
+// CHECK: define i2 @_TO5union10NoPayloads1zFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret i2 -2
+// CHECK: }
+
 
 union NoPayloads2 {
   case a
@@ -75,10 +90,54 @@ union NoPayloads2 {
   case y
 }
 
+// CHECK: define i3 @_TO5union11NoPayloads21aFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret i3 0
+// CHECK: }
+
+// CHECK: define i3 @_TO5union11NoPayloads21eFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret i3 1
+// CHECK: }
+
+// CHECK: define i3 @_TO5union11NoPayloads21iFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret i3 2
+// CHECK: }
+
+// CHECK: define i3 @_TO5union11NoPayloads21oFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret i3 3
+// CHECK: }
+
+// CHECK: define i3 @_TO5union11NoPayloads21uFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret i3 -4
+// CHECK: }
+
+// CHECK: define i3 @_TO5union11NoPayloads21yFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret i3 -3
+// CHECK: }
+
+
 union SinglePayloadNoXI {
   case x(Builtin.Int64)
   case y
 }
+
+// CHECK: define { i64, i1 } @_TO5union17SinglePayloadNoXI1xfMS0_FBi64_S0_(i64) {
+// CHECK: entry:
+// CHECK:   [[A:%.*]] = insertvalue { i64, i1 } undef, i64 %0, 0
+// CHECK:   [[B:%.*]] = insertvalue { i64, i1 } [[A]], i1 false, 1
+// CHECK:   ret { i64, i1 } [[B]]
+// CHECK: }
+
+// CHECK: define { i64, i1 } @_TO5union17SinglePayloadNoXI1yFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret { i64, i1 } { i64 0, i1 true }
+// CHECK: }
+
 
 union SinglePayloadNoXI2 {
   case x(Builtin.Int64)
@@ -86,11 +145,48 @@ union SinglePayloadNoXI2 {
   case z
 }
 
+// CHECK: define { i64, i1 } @_TO5union18SinglePayloadNoXI21xfMS0_FBi64_S0_(i64) {
+// CHECK: entry:
+// CHECK:   [[A:%.*]] = insertvalue { i64, i1 } undef, i64 %0, 0
+// CHECK:   [[B:%.*]] = insertvalue { i64, i1 } [[A]], i1 false, 1
+// CHECK:   ret { i64, i1 } [[B]]
+// CHECK: }
+
+// CHECK: define { i64, i1 } @_TO5union18SinglePayloadNoXI21yFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret { i64, i1 } { i64 0, i1 true }
+// CHECK: }
+
+// CHECK: define { i64, i1 } @_TO5union18SinglePayloadNoXI21zFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret { i64, i1 } { i64 1, i1 true }
+// CHECK: }
+
+
 union SinglePayloadSpareBit {
   case x(Builtin.Int63)
   case y
   case z
 }
+
+// CHECK: define i64 @_TO5union21SinglePayloadSpareBit1xfMS0_FBi63_S0_(i63) {
+// CHECK: entry:
+// CHECK:   [[A:%.*]] = zext i63 %0 to i64
+// CHECK:   ret i64 [[A]]
+// CHECK: }
+
+// CHECK: define i64 @_TO5union21SinglePayloadSpareBit1yFMS0_S0_() {
+// CHECK: entry:
+//                 0x8000_0000_0000_0000
+// CHECK:   ret i64 -9223372036854775808
+// CHECK: }
+
+// CHECK: define i64 @_TO5union21SinglePayloadSpareBit1zFMS0_S0_() {
+// CHECK: entry:
+//                 0x8000_0000_0000_0001
+// CHECK:   ret i64 -9223372036854775807
+// CHECK: }
+
 
 union MultiPayloadNoSpareBits {
   case x(Builtin.Int64)

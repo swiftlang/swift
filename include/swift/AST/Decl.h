@@ -1937,6 +1937,11 @@ public:
   /// True if this element is part of an 'enum' declaration.
   bool isEnumElement() const { return CaseLoc.isInvalid(); }
   
+  /// Return the containing UnionDecl.
+  UnionDecl *getParentUnion() const {
+    return cast<UnionDecl>(getDeclContext());
+  }
+  
   /// Location of the 'case' keyword for the element, or invalid if the element
   /// appears in an enum.
   SourceLoc getCaseLoc() const { return CaseLoc; }

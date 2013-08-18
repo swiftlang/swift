@@ -945,7 +945,7 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
 llvm::Function *IRGenModule::getAddrOfInjectionFunction(UnionElementDecl *D) {
   // TODO: emit at more optimal explosion kinds when reasonable!
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
-  unsigned uncurryLevel = 0;
+  unsigned uncurryLevel = D->hasArgumentType() ? 1 : 0;
 
   LinkEntity entity =
     LinkEntity::forFunction(CodeRef::forUnionElement(D, ExplosionKind::Minimal,
