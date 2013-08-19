@@ -808,6 +808,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     llvm_unreachable("there are no global destructor");
 
   case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
     return;
 
   case DeclKind::Union:
@@ -856,6 +858,8 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   case DeclKind::Class:
   case DeclKind::TopLevelCode:
   case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
   case DeclKind::Var:
   case DeclKind::Import:
   case DeclKind::Subscript:
@@ -1486,6 +1490,8 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       // Getter/setter will be handled separately.
       continue;
     case DeclKind::TypeAlias:
+    case DeclKind::GenericTypeParam:
+    case DeclKind::AssociatedType:
       continue;
     case DeclKind::Union:
       emitUnionDecl(cast<UnionDecl>(member));

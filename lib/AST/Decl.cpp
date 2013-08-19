@@ -359,6 +359,8 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
   case DeclKind::Protocol:
     return true;
   }
@@ -384,6 +386,8 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Protocol:
   case DeclKind::Struct:
   case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
     // Types are not instance members.
     return false;
 
@@ -475,6 +479,8 @@ ValueDecl::getDefaultArg(unsigned index) const {
 Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this))
     return TAD->getAliasType();
+  if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(this))
+    return typeParam->getType()->castTo<MetaTypeType>()->getInstanceType();
   return cast<NominalTypeDecl>(this)->getDeclaredType();
 }
 
@@ -538,8 +544,6 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
   ASTContext &Ctx = getASTContext();
   AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
   setType(MetaTypeType::get(AliasTy, Ctx));
-
-  TypeAliasDeclBits.GenericParameter = false;
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {
@@ -547,6 +551,44 @@ SourceRange TypeAliasDecl::getSourceRange() const {
     return { TypeAliasLoc, UnderlyingTy.getSourceRange().End };
   // FIXME: Inherits clauses
   return { TypeAliasLoc, NameLoc };
+}
+
+GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
+                                           SourceLoc nameLoc)
+  : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name),
+    NameLoc(nameLoc)
+{
+  auto &ctx = dc->getASTContext();
+  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
+  setType(MetaTypeType::get(type, ctx));
+}
+
+SourceRange GenericTypeParamDecl::getSourceRange() const {
+  SourceLoc endLoc = NameLoc;
+
+  if (!getInherited().empty()) {
+    endLoc = getInherited().back().getSourceRange().End;
+  }
+  return SourceRange(NameLoc, endLoc);
+}
+
+AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
+                                       Identifier name, SourceLoc nameLoc)
+  : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name),
+    KeywordLoc(keywordLoc), NameLoc(nameLoc)
+{
+  auto &ctx = dc->getASTContext();
+  auto type = new (ctx, AllocationArena::Permanent) AssociatedTypeType(this);
+  setType(MetaTypeType::get(type, ctx));
+}
+
+SourceRange AssociatedTypeDecl::getSourceRange() const {
+  SourceLoc endLoc = NameLoc;
+
+  if (!getInherited().empty()) {
+    endLoc = getInherited().back().getSourceRange().End;
+  }
+  return SourceRange(KeywordLoc, endLoc);
 }
 
 UnionDecl::UnionDecl(SourceLoc UnionLoc, bool Enum,
@@ -695,10 +737,10 @@ bool ProtocolDecl::requiresClassSlow() {
   return false;
 }
 
-TypeAliasDecl *ProtocolDecl::getThis() const {
+AssociatedTypeDecl *ProtocolDecl::getThis() const {
   for (auto member : getMembers()) {
-    if (auto assocType = dyn_cast<TypeAliasDecl>(member))
-      if (assocType->getName().str() == "This")
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
+      if (assocType->isThis())
         return assocType;
   }
   llvm_unreachable("No 'This' associated type?");
@@ -791,14 +833,13 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
   // For a protocol, the type of 'this' is the associated type 'This', not
   // the protocol itself.
   if (auto Protocol = ContainerType->getAs<ProtocolType>()) {
-    TypeAliasDecl *This = 0;
+    AssociatedTypeDecl *This = 0;
     for (auto Member : Protocol->getDecl()->getMembers()) {
-      This = dyn_cast<TypeAliasDecl>(Member);
+      This = dyn_cast<AssociatedTypeDecl>(Member);
       if (!This)
         continue;
 
-      // FIXME: Sane way to identify 'This'?
-      if (This->getName().str() == "This")
+      if (This->isThis())
         break;
 
       This = nullptr;

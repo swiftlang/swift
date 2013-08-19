@@ -277,12 +277,10 @@ getGenericParam(ASTContext &Context) {
     = ArchetypeType::getNew(Context, nullptr, GenericName, ArrayRef<Type>(),
                             Type(), 0);
   auto GenericTyDecl =
-      new (Context) TypeAliasDecl(SourceLoc(), GenericName,
-                                  SourceLoc(), TypeLoc::withoutLoc(Archetype),
-                                  Context.TheBuiltinModule,
-                                  MutableArrayRef<TypeLoc>());
-  GenericTyDecl->setGenericParameter();
-  Type GenericTy = GenericTyDecl->getAliasType();
+    new (Context) GenericTypeParamDecl(Context.TheBuiltinModule, GenericName,
+                                       SourceLoc());
+  GenericTyDecl->setArchetype(Archetype);
+  Type GenericTy = GenericTyDecl->getDeclaredType();
   GenericParam Param = GenericTyDecl;
   auto ParamList = GenericParamList::create(Context, SourceLoc(), Param,
                                             SourceLoc());

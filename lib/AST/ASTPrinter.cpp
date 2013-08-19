@@ -419,6 +419,20 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   }
 }
 
+void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
+  recordDeclLoc(decl);
+  OS << decl->getName().str();
+  printInherited(decl->getInherited());
+}
+
+void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
+  OS << "typealias ";
+  printAttributes(decl->getAttrs());
+  recordDeclLoc(decl);
+  OS << decl->getName().str();
+  printInherited(decl->getInherited());
+}
+
 void PrintAST::visitUnionDecl(UnionDecl *decl) {
   OS << "union ";
   printAttributes(decl->getAttrs());

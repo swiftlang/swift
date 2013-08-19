@@ -165,7 +165,7 @@ private:
       } else {
         Type protoThisTy
           = cast<ProtocolDecl>(methodName.getDecl()->getDeclContext())
-              ->getThis()->getUnderlyingType();
+              ->getThis()->getArchetype();
         thisTy = LValueType::get(protoThisTy,
                                  LValueType::Qual::DefaultForByrefThis,
                                  protoThisTy->getASTContext());
@@ -567,7 +567,7 @@ public:
         proj = ManagedValue(val, existential.getCleanup());
       } else {
         SILType protoThisTy
-          = gen.getLoweredType(proto->getThis()->getUnderlyingType());
+          = gen.getLoweredType(proto->getThis()->getArchetype());
         assert(protoThisTy.isAddress() && "This should be address-only");
         SILValue val = gen.B.createProjectExistential(e, existential.getValue(),
                                                       protoThisTy);

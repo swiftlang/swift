@@ -70,12 +70,10 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
         Inherited.push_back(Ty);
     }
 
-    // FIXME: Bad location info here
-    TypeAliasDecl *Param
-      = new (Context) TypeAliasDecl(NameLoc, Name, NameLoc, TypeLoc(),
-                                    CurDeclContext,
-                                    Context.AllocateCopy(Inherited));
-    Param->setGenericParameter();
+    auto Param = new (Context) GenericTypeParamDecl(CurDeclContext, Name,
+                                                    NameLoc);
+    if (!Inherited.empty())
+      Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);
 
     // Add this parameter to the scope.

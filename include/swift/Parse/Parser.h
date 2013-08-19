@@ -423,9 +423,11 @@ public:
     PD_DisallowTypeAliasDef = 1 << 8,
     PD_AllowDestructor      = 1 << 9,
     PD_AllowUnionElement    = 1 << 10,
+    PD_InProtocol           = 1 << 11,
   };
   
-  ParserResult<TypeAliasDecl> parseDeclTypeAlias(bool WantDefinition);
+  ParserResult<TypeDecl> parseDeclTypeAlias(bool WantDefinition,
+                                            bool isAssociatedType);
 
   /// addVarsToScope - Add the variables in the given pattern to the current
   /// scope, collecting the variables in the vector \c Decls and applying

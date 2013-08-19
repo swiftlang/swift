@@ -2050,19 +2050,19 @@ namespace {
       result->setIsObjC(true);
 
       // Add the implicit 'This' associated type.
-      // FIXME: Mark as 'implicit'.
       auto thisId = Impl.SwiftContext.getIdentifier("This");
-      auto thisDecl = new (Impl.SwiftContext) TypeAliasDecl(SourceLoc(), thisId,
-                                      SourceLoc(), TypeLoc(),
-                                      result,
-                                      MutableArrayRef<TypeLoc>());
+      auto thisDecl = new (Impl.SwiftContext) AssociatedTypeDecl(result,
+                                                                 SourceLoc(),
+                                                                 thisId,
+                                                                 SourceLoc());
+      thisDecl->setImplicit();
       auto thisArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
                                                  thisId,
                                                  Type(result->getDeclaredType()),
                                                  Type());
-      thisDecl->getUnderlyingTypeLoc() = TypeLoc::withoutLoc(thisArchetype);
-      Decl *thisDeclDecl = thisDecl;
-      result->setMembers(MutableArrayRef<Decl *>(&thisDeclDecl, 1),
+      thisDecl->setArchetype(thisArchetype);
+      result->setMembers(Impl.SwiftContext.AllocateCopy(
+                           llvm::makeArrayRef<Decl*>(thisDecl)),
                          SourceRange());
                          
       // Import each of the members.

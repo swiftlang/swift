@@ -112,12 +112,12 @@ public:
     return BeginIndex;
   }
   
-  static WitnessTableEntry forAssociatedType(TypeAliasDecl *ty,
+  static WitnessTableEntry forAssociatedType(AssociatedTypeDecl *ty,
                                              WitnessIndex index) {
     return WitnessTableEntry(ty, index);
   }
   
-  bool isAssociatedType() const { return isa<TypeAliasDecl>(Member); }
+  bool isAssociatedType() const { return isa<AssociatedTypeDecl>(Member); }
   
   WitnessIndex getAssociatedTypeIndex() const {
     assert(isAssociatedType());

@@ -390,8 +390,11 @@ DeclID Serializer::addDeclRef(const Decl *D) {
     return 0;
 
   DeclID &id = DeclIDs[D];
-  if (id != 0)
+  if (id != 0) {
+    if (id == 1037)
+      fprintf(stderr, "1037\n");
     return id;
+  }
 
   // Record any generic parameters that come from this decl, so that we can use
   // the decl to refer to the parameters later.
@@ -416,6 +419,8 @@ DeclID Serializer::addDeclRef(const Decl *D) {
 
   id = ++LastDeclID;
   DeclsAndTypesToWrite.push(D);
+  if (id == 1037)
+    fprintf(stderr, "1037\n");
   return id;
 }
 
@@ -502,6 +507,8 @@ void Serializer::writeBlockInfoBlock() {
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
   RECORD(decls_block, NAME_ALIAS_TYPE);
+  RECORD(decls_block, GENERIC_TYPE_PARAM_TYPE);
+  RECORD(decls_block, ASSOCIATED_TYPE_TYPE);
   RECORD(decls_block, NOMINAL_TYPE);
   RECORD(decls_block, PAREN_TYPE);
   RECORD(decls_block, TUPLE_TYPE);
@@ -524,6 +531,8 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, OPTIONAL_TYPE);
 
   RECORD(decls_block, TYPE_ALIAS_DECL);
+  RECORD(decls_block, GENERIC_TYPE_PARAM_DECL);
+  RECORD(decls_block, ASSOCIATED_TYPE_DECL);
   RECORD(decls_block, STRUCT_DECL);
   RECORD(decls_block, CONSTRUCTOR_DECL);
   RECORD(decls_block, VAR_DECL);
@@ -1017,20 +1026,19 @@ bool Serializer::writeCrossReference(const Decl *D) {
   if (auto value = dyn_cast<ValueDecl>(D)) {
     kind = XRefKind::SwiftValue;
 
-    if (auto alias = dyn_cast<TypeAliasDecl>(D)) {
-      if (alias->isGenericParameter()) {
-        DeclContext *DC = alias->getDeclContext();
-        auto params = DC->getGenericParamsOfContext()->getParams();
+    if (auto genericParam = dyn_cast<GenericTypeParamDecl>(D)) {
+      DeclContext *DC = genericParam->getDeclContext();
+      auto params = DC->getGenericParamsOfContext()->getParams();
 
-        auto iter = std::find_if(params.begin(), params.end(),
-                                 [=](const GenericParam &param) {
-          return param.getAsTypeParam() == alias;
-        });
-        assert(iter != params.end() && "generic param not in list");
+      auto iter = std::find_if(params.begin(), params.end(),
+                               [=](const GenericParam &param) {
+                                 return param.getAsTypeParam() == genericParam;
+                               });
+      assert(iter != params.end() && "generic param not in list");
 
-        kind = XRefKind::SwiftGenericParameter;
-        typeID = std::distance(params.begin(), iter);
-      }
+      // FIXME: Record the index in the GenericTypeParamDecl.
+      kind = XRefKind::SwiftGenericParameter;
+      typeID = std::distance(params.begin(), iter);
     }
 
     if (kind == XRefKind::SwiftValue) {
@@ -1207,14 +1215,58 @@ bool Serializer::writeDecl(const Decl *D) {
                                 addIdentifierRef(typeAlias->getName()),
                                 addDeclRef(DC),
                                 addTypeRef(underlying),
-                                typeAlias->isGenericParameter(),
-                                typeAlias->isImplicit(),
-                                typeAlias->isGenericParameter()
-                                  ? addTypeRef(typeAlias->getSuperclass())
-                                  : addTypeRef(Type()));
+                                typeAlias->isImplicit());
 
     writeConformances(typeAlias->getProtocols(), typeAlias->getConformances(),
                       typeAlias);
+    return true;
+  }
+
+  case DeclKind::GenericTypeParam: {
+    auto genericParam = cast<GenericTypeParamDecl>(D);
+    assert(!genericParam->isImplicit() && "Implicit generic parameter?");
+
+    // FIXME: Handle attributes.
+    // FIXME: Do typealiases have any interesting attributes? Resilience?
+    if (!genericParam->getAttrs().empty())
+      return false;
+
+    const Decl *DC = getDeclForContext(genericParam->getDeclContext());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamDeclLayout::Code];
+    GenericTypeParamDeclLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                addIdentifierRef(genericParam->getName()),
+                                addDeclRef(DC),
+                                addTypeRef(genericParam->getSuperclass()),
+                                addTypeRef(genericParam->getArchetype()));
+
+    writeConformances(genericParam->getProtocols(),
+                      genericParam->getConformances(),
+                      genericParam);
+    return true;
+  }
+
+  case DeclKind::AssociatedType: {
+    auto assocType = cast<AssociatedTypeDecl>(D);
+
+    // FIXME: Handle attributes.
+    // FIXME: Do typealiases have any interesting attributes? Resilience?
+    if (!assocType->getAttrs().empty())
+      return false;
+
+    const Decl *DC = getDeclForContext(assocType->getDeclContext());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[AssociatedTypeDeclLayout::Code];
+    AssociatedTypeDeclLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                         addIdentifierRef(assocType->getName()),
+                                         addDeclRef(DC),
+                                         addTypeRef(assocType->getSuperclass()),
+                                         addTypeRef(assocType->getArchetype()),
+                                         assocType->isImplicit());
+
+    writeConformances(assocType->getProtocols(),
+                      assocType->getConformances(),
+                      assocType);
     return true;
   }
 
@@ -1651,6 +1703,22 @@ bool Serializer::writeType(Type ty) {
     return true;
   }
 
+  case TypeKind::GenericTypeParam: {
+    auto genericParam = cast<GenericTypeParamType>(ty.getPointer());
+    unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
+    GenericTypeParamTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                           addDeclRef(genericParam->getDecl()));
+    return true;
+  }
+
+  case TypeKind::AssociatedType: {
+    auto assocType = cast<AssociatedTypeType>(ty.getPointer());
+    unsigned abbrCode = DeclTypeAbbrCodes[AssociatedTypeTypeLayout::Code];
+    AssociatedTypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                         addDeclRef(assocType->getDecl()));
+    return true;
+  }
+
   case TypeKind::Substituted: {
     auto subTy = cast<SubstitutedType>(ty.getPointer());
 
@@ -1812,6 +1880,8 @@ void Serializer::writeAllDeclsAndTypes() {
   {
     using namespace decls_block;
     registerDeclTypeAbbr<NameAliasTypeLayout>();
+    registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
+    registerDeclTypeAbbr<AssociatedTypeDeclLayout>();
     registerDeclTypeAbbr<NominalTypeLayout>();
     registerDeclTypeAbbr<ParenTypeLayout>();
     registerDeclTypeAbbr<TupleTypeLayout>();
@@ -1833,6 +1903,8 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<OptionalTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
+    registerDeclTypeAbbr<GenericTypeParamTypeLayout>();
+    registerDeclTypeAbbr<AssociatedTypeTypeLayout>();
     registerDeclTypeAbbr<StructLayout>();
     registerDeclTypeAbbr<ConstructorLayout>();
     registerDeclTypeAbbr<VarLayout>();

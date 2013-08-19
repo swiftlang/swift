@@ -41,7 +41,6 @@ namespace swift {
   class SubscriptDecl;
   class Stmt;
   class BraceStmt;
-  class TypeAliasDecl;
   class ASTWalker;
   class VarDecl;
   class ProtocolConformance;

@@ -29,7 +29,6 @@ namespace swift {
   class Expr;
   class ValueDecl;
   class Type;
-  class TypeAliasDecl;
   class TypeDecl;
   class Module;
   class TupleType;

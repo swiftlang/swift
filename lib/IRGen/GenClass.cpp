@@ -517,6 +517,8 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       continue;
 
     case DeclKind::TypeAlias:
+    case DeclKind::AssociatedType:
+    case DeclKind::GenericTypeParam:
       continue;
     case DeclKind::Union:
       emitUnionDecl(cast<UnionDecl>(member));

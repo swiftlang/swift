@@ -50,7 +50,6 @@ namespace swift {
   struct PrintOptions;
   class TupleType;
   class Type;
-  class TypeAliasDecl;
   class ValueDecl;
   class VisibleDeclConsumer;
   

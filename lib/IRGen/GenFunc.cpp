@@ -1986,6 +1986,8 @@ struct EmitLocalDecls : public ASTWalker {
       llvm_unreachable("declaration cannot appear in local scope");
       
     case DeclKind::TypeAlias:
+    case DeclKind::AssociatedType:
+    case DeclKind::GenericTypeParam:
       // no IR generation support required.
     case DeclKind::PatternBinding:
     case DeclKind::Var:

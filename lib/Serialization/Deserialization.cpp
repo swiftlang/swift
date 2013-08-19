@@ -242,7 +242,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
     while (numTypeWitnesses--) {
       // FIXME: We don't actually want to allocate an archetype here; we just
       // want to get an access path within the protocol.
-      auto first = cast<TypeAliasDecl>(getDecl(*rawIDIter++));
+      auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
       auto second = maybeReadSubstitution();
       assert(second.hasValue());
       typeWitnesses[first] = *second;
@@ -338,7 +338,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
   while (typeCount--) {
     // FIXME: We don't actually want to allocate an archetype here; we just
     // want to get an access path within the protocol.
-    auto first = cast<TypeAliasDecl>(getDecl(*rawIDIter++));
+    auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
     auto second = maybeReadSubstitution();
     assert(second.hasValue());
     typeWitnesses[first] = *second;
@@ -463,8 +463,8 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
     case GENERIC_PARAM: {
       DeclID paramDeclID;
       GenericParamLayout::readRecord(scratch, paramDeclID);
-      auto typeAlias = cast<TypeAliasDecl>(getDecl(paramDeclID, DC));
-      params.push_back(GenericParam(typeAlias));
+      auto genericParam = cast<GenericTypeParamDecl>(getDecl(paramDeclID, DC));
+      params.push_back(GenericParam(genericParam));
       break;
     }
     case GENERIC_REQUIREMENT: {
@@ -668,14 +668,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     IdentifierID nameID;
     DeclID contextID;
     TypeID underlyingTypeID;
-    bool isGeneric;
     bool isImplicit;
-    TypeID superclassTypeID;
 
     decls_block::TypeAliasLayout::readRecord(scratch, nameID, contextID,
-                                             underlyingTypeID,
-                                             isGeneric, isImplicit,
-                                             superclassTypeID);
+                                             underlyingTypeID, isImplicit);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     auto underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
@@ -690,16 +686,82 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     if (isImplicit)
       alias->setImplicit();
-    if (isGeneric) {
-      alias->setGenericParameter();
-      alias->setSuperclass(getType(superclassTypeID));
-    }
 
     SmallVector<ConformancePair, 16> conformances;
     while (auto conformance = maybeReadConformance(underlyingType.getType()))
       conformances.push_back(*conformance);
     processConformances(ctx, alias, conformances);
     alias->setCheckedInheritanceClause();
+    break;
+  }
+
+  case decls_block::GENERIC_TYPE_PARAM_DECL: {
+    IdentifierID nameID;
+    DeclID contextID;
+    TypeID superclassID;
+    TypeID archetypeID;
+
+    decls_block::GenericTypeParamDeclLayout::readRecord(scratch, nameID,
+                                                        contextID,
+                                                        superclassID,
+                                                        archetypeID);
+
+    auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
+
+    if (declOrOffset.isComplete())
+      break;
+
+    auto genericParam = new (ctx) GenericTypeParamDecl(DC,
+                                                       getIdentifier(nameID),
+                                                       SourceLoc());
+    declOrOffset = genericParam;
+
+    genericParam->setSuperclass(getType(superclassID));
+    genericParam->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
+
+    SmallVector<ConformancePair, 16> conformances;
+    while (auto conformance
+           = maybeReadConformance(genericParam->getDeclaredType()))
+      conformances.push_back(*conformance);
+    processConformances(ctx, genericParam, conformances);
+    genericParam->setCheckedInheritanceClause();
+    break;
+  }
+
+  case decls_block::ASSOCIATED_TYPE_DECL: {
+    IdentifierID nameID;
+    DeclID contextID;
+    TypeID superclassID;
+    TypeID archetypeID;
+    bool isImplicit;
+
+    decls_block::AssociatedTypeDeclLayout::readRecord(scratch, nameID,
+                                                      contextID,
+                                                      superclassID,
+                                                      archetypeID,
+                                                      isImplicit);
+
+    auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
+
+    if (declOrOffset.isComplete())
+      break;
+
+    auto assocType = new (ctx) AssociatedTypeDecl(DC, SourceLoc(),
+                                                  getIdentifier(nameID),
+                                                  SourceLoc());
+    declOrOffset = assocType;
+
+    assocType->setSuperclass(getType(superclassID));
+    assocType->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
+    if (isImplicit)
+      assocType->setImplicit();
+
+    SmallVector<ConformancePair, 16> conformances;
+    while (auto conformance
+           = maybeReadConformance(assocType->getDeclaredType()))
+      conformances.push_back(*conformance);
+    processConformances(ctx, assocType, conformances);
+    assocType->setCheckedInheritanceClause();
     break;
   }
 
@@ -1714,6 +1776,44 @@ Type ModuleFile::getType(TypeID TID) {
     });
     archetype->setNestedTypes(ctx, nestedTypes);
 
+    break;
+  }
+
+  case decls_block::GENERIC_TYPE_PARAM_TYPE: {
+    DeclID declID;
+
+    decls_block::GenericTypeParamTypeLayout::readRecord(scratch, declID);
+
+    auto genericParam = dyn_cast_or_null<GenericTypeParamDecl>(getDecl(declID));
+    if (!genericParam) {
+      error();
+      return nullptr;
+    }
+
+    // See if we triggered deserialization through our conformances.
+    if (typeOrOffset.isComplete())
+      break;
+
+    typeOrOffset = genericParam->getDeclaredType();
+    break;
+  }
+
+  case decls_block::ASSOCIATED_TYPE_TYPE: {
+    DeclID declID;
+
+    decls_block::AssociatedTypeTypeLayout::readRecord(scratch, declID);
+
+    auto assocType = dyn_cast_or_null<AssociatedTypeDecl>(getDecl(declID));
+    if (!assocType) {
+      error();
+      return nullptr;
+    }
+
+    // See if we triggered deserialization through our conformances.
+    if (typeOrOffset.isComplete())
+      break;
+    
+    typeOrOffset = assocType->getDeclaredType();
     break;
   }
 

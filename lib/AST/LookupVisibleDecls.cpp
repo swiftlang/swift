@@ -53,7 +53,9 @@ GlobalExtensionLookupFoundMember(SmallVectorImpl<ValueDecl *> &Found,
     // FIXME: static variables
     return;
   }
-  if (LK == LookupKind::Qualified && isa<TypeAliasDecl>(Member)) {
+  if (LK == LookupKind::Qualified &&
+      (isa<TypeAliasDecl>(Member) || isa<AssociatedTypeDecl>(Member) ||
+       isa<GenericTypeParamDecl>(Member))) {
     // Can only access nested typealiases with unqualified lookup or on
     // metatypes.
     // FIXME: other nominal types?  rdar://14489286
@@ -256,8 +258,8 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
 
       if (!LookupFromChildDeclContext) {
         // Current decl context is outside 'D', so 'This' decl is not visible.
-        if (auto TAD = dyn_cast<TypeAliasDecl>(VD))
-          if (TAD->getName().str() == "This")
+        if (auto AssocType = dyn_cast<AssociatedTypeDecl>(VD))
+          if (AssocType->isThis())
             continue;
       }
       BaseMembers.push_back(VD);

@@ -267,6 +267,8 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
       // Getter/setter will be handled separately.
       continue;
     case DeclKind::TypeAlias:
+    case DeclKind::AssociatedType:
+    case DeclKind::GenericTypeParam:
       continue;
     case DeclKind::Union:
       emitUnionDecl(cast<UnionDecl>(member));

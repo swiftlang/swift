@@ -1006,6 +1006,8 @@ namespace {
 #include "swift/AST/TypeNodes.def"
       case TypeKind::NameAlias:
       case TypeKind::ProtocolComposition:
+      case TypeKind::AssociatedType:
+      case TypeKind::GenericTypeParam:
         return;
         
       case TypeKind::Union:

@@ -49,6 +49,7 @@ namespace swift {
   class BraceStmt;
   class Component;
   class DeclAttributes;
+  class GenericTypeParamDecl;
   class Module;
   class NameAliasType;
   class UnionElementDecl;
@@ -137,16 +138,6 @@ class alignas(8) Decl {
   enum { NumTypeDeclBits = NumValueDeclBits + 1 };
   static_assert(NumTypeDeclBits <= 32, "fits in an unsigned");
 
-  class TypeAliasDeclBitFields {
-    friend class TypeAliasDecl;
-    unsigned : NumTypeDeclBits;
-
-    /// \brief Whether this type alias is a generic parameter.
-    unsigned GenericParameter : 1;
-  };
-  enum { NumTypeAliasDeclBits = NumTypeDeclBits + 1 };
-  static_assert(NumTypeAliasDeclBits <= 32, "fits in an unsigned");
-
   enum { NumNominalTypeDeclBits = NumTypeDeclBits};
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
@@ -224,7 +215,6 @@ protected:
     ValueDeclBitfields ValueDeclBits;
     FuncDeclBitFields FuncDeclBits;
     TypeDeclBitFields TypeDeclBits;
-    TypeAliasDeclBitFields TypeAliasDeclBits;
     ProtocolDeclBitFields ProtocolDeclBits;
     ClassDeclBitFields ClassDeclBits;
     InfixOperatorDeclBitFields InfixOperatorDeclBits;
@@ -366,11 +356,11 @@ public:
 /// func f<T : Range, U>(t : T, u : U) { /* ... */ }
 /// \endcode
 class GenericParam {
-  TypeAliasDecl *TypeParam;
+  GenericTypeParamDecl *TypeParam;
 
 public:
   /// Construct a generic parameter from a type parameter.
-  GenericParam(TypeAliasDecl *TypeParam) : TypeParam(TypeParam) { }
+  GenericParam(GenericTypeParamDecl *TypeParam) : TypeParam(TypeParam) { }
 
   /// getDecl - Retrieve the generic parameter declaration.
   ValueDecl *getDecl() const {
@@ -378,7 +368,7 @@ public:
   }
 
   /// getAsTypeParam - Retrieve the generic parameter as a type parameter.
-  TypeAliasDecl *getAsTypeParam() const { return TypeParam; }
+  GenericTypeParamDecl *getAsTypeParam() const { return TypeParam; }
 
   /// setDeclContext - Set the declaration context for the generic parameter,
   /// once it is known.
@@ -1121,7 +1111,7 @@ class TypeDecl : public ValueDecl {
   /// corresponds to the order of Protocols.
   ArrayRef<ProtocolConformance *> Conformances;
 
-public:
+protected:
   TypeDecl(DeclKind K, DeclContext *DC, Identifier name,
            MutableArrayRef<TypeLoc> inherited, Type ty) :
     ValueDecl(K, DC, name, ty), Inherited(inherited)
@@ -1129,6 +1119,7 @@ public:
     TypeDeclBits.CheckedInheritanceClause = false;
   }
 
+public:
   Type getDeclaredType() const;
 
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
@@ -1189,9 +1180,6 @@ class TypeAliasDecl : public TypeDecl {
   SourceLoc NameLoc; // The location of the declared type
   TypeLoc UnderlyingTy;
 
-  /// Complete hack, which stores the superclass type of a generic parameter.
-  Type SuperclassTy;
-
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                 SourceLoc NameLoc, TypeLoc UnderlyingTy,
@@ -1214,32 +1202,132 @@ public:
 
   TypeLoc &getUnderlyingTypeLoc() { return UnderlyingTy; }
 
-
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType() const { return AliasTy; }
 
-  /// \brief Determine whether this type alias is a generic parameter.
-  bool isGenericParameter() const { return TypeAliasDeclBits.GenericParameter; }
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::TypeAlias;
+  }
+};
 
-  /// Return the superclass of a generic parameter.
+/// Abstract class describing generic type parameters and associated types,
+/// whose common purpose is to anchor the abstract type parameter and specify
+/// requirements for any corresponding type argument.
+class AbstractTypeParamDecl : public TypeDecl {
+  /// The superclass of the generic parameter.
+  Type SuperclassTy;
+
+  /// The archetype describing this abstract type parameter within its scope.
+  ArchetypeType *Archetype;
+
+protected:
+  AbstractTypeParamDecl(DeclKind kind, DeclContext *dc, Identifier name)
+    : TypeDecl(kind, dc, name, { }, Type()), Archetype(nullptr) { }
+
+public:
+  /// Return the superclass of the generic parameter.
   Type getSuperclass() const {
-    assert(isGenericParameter() && "Not a generic parameter");
     return SuperclassTy;
   }
 
-  /// Set the superclass of a generic parameter.
+  /// Set the superclass of the generic parameter.
   void setSuperclass(Type superclassTy) {
-    assert(isGenericParameter() && "Not a generic parameter");
     SuperclassTy = superclassTy;
   }
 
-  /// \brief Set whether this type alias is a generic parameter.
-  void setGenericParameter(bool GP = true) {
-    TypeAliasDeclBits.GenericParameter = GP;
-  }
-  
+  /// Retrieve the archetype that describes this abstract type parameter
+  /// within its scope.
+  ArchetypeType *getArchetype() const { return Archetype; }
+
+  /// Set the archetype used to describe this abstract type parameter within
+  /// its scope.
+  void setArchetype(ArchetypeType *archetype) { Archetype = archetype; }
+
   static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::TypeAlias;
+    return D->getKind() >= DeclKind::First_AbstractTypeParamDecl &&
+           D->getKind() <= DeclKind::Last_AbstractTypeParamDecl;
+  }
+  static bool classof(const AbstractTypeParamDecl *D) { return true; }
+  static bool classof(const GenericTypeParamDecl *D) { return true; }
+};
+
+/// A declaration of a generic type parameter.
+///
+/// A generic type parameter introduces a new, named type parameter along
+/// with some set of requirements on any type argument used to realize this
+/// type parameter. The requirements involve conformances to specific
+/// protocols or inheritance from a specific class type.
+///
+/// In the following example, 'T' is a generic type parameter with the
+/// requirement that the type argument conform to the 'Comparable' protocol.
+///
+/// \code
+/// func min<T : Comparable>(x : T, y : T) -> T { ... }
+/// \endcode
+class GenericTypeParamDecl : public AbstractTypeParamDecl {
+  /// The location of the name.
+  SourceLoc NameLoc;
+
+public:
+  /// Construct a new generic type parameter.
+  ///
+  /// \param dc The DeclContext in which the generic type parameter's owner
+  /// occurs. This should later be overwritten with the actual declaration
+  /// context that owns the type parameter.
+  ///
+  /// \param name The name of the generic parameter.
+  /// \param nameLoc The location of the name.
+  GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc);
+  
+  SourceLoc getStartLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const;
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::GenericTypeParam;
+  }
+};
+
+/// A declaration of an associated type.
+///
+/// An associated type introduces a new, named type in a protocol that
+/// can vary from one conforming type to the next. Associated types have a
+/// set of requirements to which the type that replaces it much realize,
+/// describes via conformance to specific protocols, or inheritance from a
+/// specific class type.
+///
+/// In the following example, 'Element' is an associated type with no
+/// requirements.
+///
+/// \code
+/// protocol Enumerator {
+///   typealias Element
+///   func getNext() -> Element?
+/// }
+/// \endcode
+///
+/// Every protocol has an implicitly-created associated type 'This' that
+/// describes a type that conforms to the protocol.
+class AssociatedTypeDecl : public AbstractTypeParamDecl {
+  /// The location of the initial keyword.
+  SourceLoc KeywordLoc;
+
+  /// The location of the name.
+  SourceLoc NameLoc;
+
+public:
+  AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
+                     SourceLoc nameLoc);
+
+  /// Determine whether this is the implicitly-created 'This'.
+  bool isThis() const { return isImplicit(); }
+
+  SourceLoc getStartLoc() const { return KeywordLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const;
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::AssociatedType;
   }
 };
 
@@ -1623,7 +1711,7 @@ public:
   }
 
   /// \brief Retrieve the associated type 'This'.
-  TypeAliasDecl *getThis() const;
+  AssociatedTypeDecl *getThis() const;
 
   /// True if this protocol can only be conformed to by class types.
   bool requiresClass() {

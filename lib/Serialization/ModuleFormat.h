@@ -242,6 +242,8 @@ namespace decls_block {
   // VERSION_MAJOR.
   enum RecordKind : uint8_t {
     NAME_ALIAS_TYPE = 1,
+    GENERIC_TYPE_PARAM_TYPE,
+    ASSOCIATED_TYPE_TYPE,
     NOMINAL_TYPE,
     PAREN_TYPE,
     TUPLE_TYPE,
@@ -264,6 +266,8 @@ namespace decls_block {
     OPTIONAL_TYPE,
 
     TYPE_ALIAS_DECL = 100,
+    GENERIC_TYPE_PARAM_DECL,
+    ASSOCIATED_TYPE_DECL,
     STRUCT_DECL,
     CONSTRUCTOR_DECL,
     VAR_DECL,
@@ -306,6 +310,16 @@ namespace decls_block {
   using NameAliasTypeLayout = BCRecordLayout<
     NAME_ALIAS_TYPE,
     DeclIDField // typealias decl
+  >;
+
+  using GenericTypeParamTypeLayout = BCRecordLayout<
+    GENERIC_TYPE_PARAM_TYPE,
+    DeclIDField // generic type parameter decl
+  >;
+
+  using AssociatedTypeTypeLayout = BCRecordLayout<
+    ASSOCIATED_TYPE_TYPE,
+    DeclIDField // associated type decl
   >;
 
   using NominalTypeLayout = BCRecordLayout<
@@ -440,16 +454,32 @@ namespace decls_block {
     TypeIDField  // parent
   >;
 
-
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
     IdentifierIDField, // name
     DeclIDField, // context decl
     TypeIDField, // underlying type
-    BCFixed<1>,  // generic flag
-    BCFixed<1>,  // implicit flag
-    TypeIDField  // superclass type
+    BCFixed<1>  // implicit flag
     // Trailed by the conformance info (if any).
+  >;
+
+  using GenericTypeParamDeclLayout = BCRecordLayout<
+    GENERIC_TYPE_PARAM_DECL,
+    IdentifierIDField, // name
+    DeclIDField, // context decl
+    TypeIDField, // superclass type
+    TypeIDField  // archetype type
+                 // Trailed by the conformance info (if any).
+  >;
+
+  using AssociatedTypeDeclLayout = BCRecordLayout<
+    ASSOCIATED_TYPE_DECL,
+    IdentifierIDField, // name
+    DeclIDField, // context decl
+    TypeIDField, // underlying type
+    TypeIDField,  // archetype type
+    BCFixed<1>  // implicit flag
+                // Trailed by the conformance info (if any).
   >;
 
   template <unsigned Code>

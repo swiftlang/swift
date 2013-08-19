@@ -24,12 +24,12 @@
 
 namespace swift {
 
+class AbstractTypeParamDecl;
 class ArchetypeType;
 class ProtocolDecl;
 class Requirement;
 class SourceLoc;
 class Type;
-class TypeAliasDecl;
 class TypeRepr;
 class ASTContext;
 class DiagnosticEngine;
@@ -89,20 +89,21 @@ public:
   /// results of ProtocolDecl::getProtocols().
   ///
   /// \param getConformsTo A function that determines the set of protocols
-  /// to which the given associated type conforms. The produces the final
-  /// results of TypeAliasDecl::getProtocols() for an associated type.
-  ArchetypeBuilder(ASTContext &Context, DiagnosticEngine &Diags,
-                   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
-                     getInheritedProtocols,
-                   std::function<ArrayRef<ProtocolDecl *>(TypeAliasDecl *)>
-                     getConformsTo);
+  /// to which the given type parameter conforms. The produces the final
+  /// results of AbstractTypeParamDecl::getProtocols() for an associated type.
+  ArchetypeBuilder(
+    ASTContext &Context, DiagnosticEngine &Diags,
+    std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
+      getInheritedProtocols,
+    std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)>
+      getConformsTo);
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
 
   /// \brief Add a new generic parameter for which there may be requirements.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool addGenericParameter(TypeAliasDecl *GenericParam,
+  bool addGenericParameter(AbstractTypeParamDecl *GenericParam,
                            Optional<unsigned> Index = Nothing);
 
   /// \brief Add a new requirement.
@@ -113,7 +114,8 @@ public:
 
   /// \brief Add a new, implicit conformance requirement for one of the
   /// parameters.
-  bool addImplicitConformance(TypeAliasDecl *Param, ProtocolDecl *Proto);
+  bool addImplicitConformance(AbstractTypeParamDecl *Param,
+                              ProtocolDecl *Proto);
 
   /// \brief Assign archetypes to each of the generic parameters and all
   /// of their associated types, recursively.
@@ -124,7 +126,7 @@ public:
 
   /// \brief Retrieve the archetype that corresponds to the given generic
   /// parameter.
-  ArchetypeType *getArchetype(TypeAliasDecl *GenericParam) const;
+  ArchetypeType *getArchetype(AbstractTypeParamDecl *GenericParam) const;
 
   /// \brief Retrieve the array of all of the archetypes produced during
   /// archetype assignment. The 'primary' archetypes will occur first in this

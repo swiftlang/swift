@@ -107,7 +107,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
           continue;
 
         // Use the type witness.
-        auto assocType = cast<TypeAliasDecl>(typeDecl);
+        auto assocType = cast<AssociatedTypeDecl>(typeDecl);
         memberType = conformance->getTypeWitness(assocType).Replacement;
         assert(memberType && "Missing type witness?");
       }

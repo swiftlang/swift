@@ -732,6 +732,30 @@ public:
     }
   }
 
+  void addGenericTypeParamRef(const GenericTypeParamDecl *GP) {
+    CodeCompletionResultBuilder Builder(
+      CompletionContext,
+      CodeCompletionResult::ResultKind::Declaration);
+    Builder.setAssociatedDecl(GP);
+    if (needDot())
+      Builder.addLeadingDot();
+    Builder.addTextChunk(GP->getName().str());
+    Builder.addTypeAnnotation(MetaTypeType::get(GP->getDeclaredType(),
+                                                SwiftContext)->getString());
+  }
+
+  void addAssociatedTypeRef(const AssociatedTypeDecl *AT) {
+    CodeCompletionResultBuilder Builder(
+      CompletionContext,
+      CodeCompletionResult::ResultKind::Declaration);
+    Builder.setAssociatedDecl(AT);
+    if (needDot())
+      Builder.addLeadingDot();
+    Builder.addTextChunk(AT->getName().str());
+    Builder.addTypeAnnotation(MetaTypeType::get(AT->getDeclaredType(),
+                                                SwiftContext)->getString());
+  }
+
   void addKeyword(StringRef Name, Type TypeAnnotation) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
@@ -791,6 +815,16 @@ public:
         return;
       }
 
+      if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
+        addGenericTypeParamRef(GP);
+        return;
+      }
+
+      if (auto *AT = dyn_cast<AssociatedTypeDecl>(D)) {
+        addAssociatedTypeRef(AT);
+        return;
+      }
+
       if (HaveDot)
         return;
 
@@ -842,6 +876,17 @@ public:
         addTypeAliasRef(TAD);
         return;
       }
+
+      if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
+        addGenericTypeParamRef(GP);
+        return;
+      }
+
+      if (auto *AT = dyn_cast<AssociatedTypeDecl>(D)) {
+        addAssociatedTypeRef(AT);
+        return;
+      }
+
       return;
 
     case LookupKind::Type:
@@ -855,6 +900,17 @@ public:
         addTypeAliasRef(TAD);
         return;
       }
+
+      if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
+        addGenericTypeParamRef(GP);
+        return;
+      }
+
+      if (auto *AT = dyn_cast<AssociatedTypeDecl>(D)) {
+        addAssociatedTypeRef(AT);
+        return;
+      }
+
       return;
     }
   }

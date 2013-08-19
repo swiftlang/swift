@@ -26,11 +26,11 @@
 
 namespace swift {
 
+class AssociatedTypeDecl;
 class ASTContext;
 class ProtocolConformance;
 class ProtocolDecl;
 class SubstitutableType;
-class TypeAliasDecl;
 class ValueDecl;
 class Module;
   
@@ -54,7 +54,7 @@ typedef llvm::DenseMap<ValueDecl *, ProtocolConformanceWitness> WitnessMap;
 
 /// Map from associated type requirements to the corresponding substitution,
 /// which captures the replacement type along with any conformances it requires.
-typedef llvm::DenseMap<TypeAliasDecl *, Substitution> TypeWitnessMap;
+typedef llvm::DenseMap<AssociatedTypeDecl *, Substitution> TypeWitnessMap;
 
 /// Map from a directly-inherited protocol to its corresponding protocol
 /// conformance.
@@ -106,7 +106,7 @@ public:
   Module *getContainingModule() const;
 
   /// Retrieve the type witness for the given associated type.
-  const Substitution &getTypeWitness(TypeAliasDecl *assocType) const {
+  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType) const {
     const auto &typeWitnesses = getTypeWitnesses();
     auto known = typeWitnesses.find(assocType);
     assert(known != typeWitnesses.end());

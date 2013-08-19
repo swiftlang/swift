@@ -685,7 +685,14 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *D) {
     // No lowering support needed.
   }
-    
+
+  void visitGenericTypeParamDecl(GenericTypeParamDecl *D) {
+    // No lowering support needed.
+  }
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *D) {
+    // No lowering support needed.
+  }
+
   void visitVarDecl(VarDecl *D) {
     // We handle these in pattern binding.
   }

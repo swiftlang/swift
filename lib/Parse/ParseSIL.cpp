@@ -513,9 +513,7 @@ bool SILParser::handleGenericParams(GenericParamList *GenericParams) {
   Builder.assignArchetypes();
   for (auto GP : *GenericParams) {
     auto TypeParam = GP.getAsTypeParam();
-
-    TypeParam->getUnderlyingTypeLoc()
-      = TypeLoc::withoutLoc(Builder.getArchetype(TypeParam));
+    TypeParam->setArchetype(Builder.getArchetype(TypeParam));
   }
   GenericParams->setAllArchetypes(
     P.Context.AllocateCopy(Builder.getAllArchetypes()));

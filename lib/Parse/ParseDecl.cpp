@@ -539,7 +539,8 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     HadParseError = parseDeclVar(Flags, Entries);
     break;
   case tok::kw_typealias:
-    if (Decl *D = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef))
+    if (Decl *D = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
+                                     Flags & PD_InProtocol)
             .getPtrOrNull())
       Entries.push_back(D);
     else
@@ -834,7 +835,8 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
 ///   decl-typealias:
 ///     'typealias' identifier inheritance? '=' type
 ///
-ParserResult<TypeAliasDecl> Parser::parseDeclTypeAlias(bool WantDefinition) {
+ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
+                                                  bool isAssociatedType) {
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
   Identifier Id;
@@ -859,6 +861,17 @@ ParserResult<TypeAliasDecl> Parser::parseDeclTypeAlias(bool WantDefinition) {
     }
   }
 
+  // If this is an associated type, build the AST for it.
+  if (isAssociatedType) {
+    auto assocType = new (Context) AssociatedTypeDecl(CurDeclContext,
+                                                      TypeAliasLoc, Id, IdLoc);
+    if (!Inherited.empty())
+      assocType->setInherited(Context.AllocateCopy(Inherited));
+    addToScope(assocType);
+    return makeParserResult(assocType);
+  }
+
+  // Otherwise, build a typealias.
   TypeAliasDecl *TAD =
     new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc, UnderlyingTy,
                                 CurDeclContext,
@@ -2002,12 +2015,12 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
     SmallVector<Decl*, 8> Members;
 
     // Add the implicit 'This' associated type.
-    // FIXME: Mark as 'implicit'.
-    Members.push_back(new (Context) TypeAliasDecl(ProtocolLoc,
-                                                  Context.getIdentifier("This"),
-                                                  ProtocolLoc, TypeLoc(),
-                                                  CurDeclContext,
-                                                  MutableArrayRef<TypeLoc>()));
+    Members.push_back(new (Context) AssociatedTypeDecl(
+                                      CurDeclContext,
+                                      SourceLoc(),
+                                      Context.getIdentifier("This"),
+                                      SourceLoc()));
+    Members.back()->setImplicit();
 
     SourceLoc LBraceLoc = Tok.getLoc();
     if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type)) {
@@ -2021,7 +2034,8 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
                                 diag::expected_rbrace_protocol,
                                 PD_HasContainerType|PD_DisallowProperty|
                                 PD_DisallowFuncDef|PD_DisallowNominalTypes|
-                                PD_DisallowInit|PD_DisallowTypeAliasDef))
+                                PD_DisallowInit|PD_DisallowTypeAliasDef|
+                                PD_InProtocol))
       return nullptr;
 
     // Install the protocol elements.

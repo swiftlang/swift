@@ -166,8 +166,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
 
   // If we found an associated type in an inherited protocol, the base
   // for our reference to this associated type is our own 'This'.
-  if (isa<TypeAliasDecl>(typeDecl) &&
-      isa<ProtocolDecl>(ownerDC) &&
+  if (isa<AssociatedTypeDecl>(typeDecl) &&
       typeDecl->getDeclContext() != fromDC) {
     if (auto fromProto = dyn_cast<ProtocolDecl>(fromDC)) {
       return substMemberTypeWithBase(typeDecl->getDeclaredType(), typeDecl,
@@ -804,6 +803,8 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::Archetype:
+  case TypeKind::AssociatedType:
+  case TypeKind::GenericTypeParam:
   case TypeKind::UnboundGeneric:
     // These types are already canonical anyway.
     return false;
@@ -1111,6 +1112,10 @@ Type TypeChecker::transformType(Type type,
     return TupleType::get(Elements, Context);
   }
 
+  case TypeKind::AssociatedType:
+  case TypeKind::GenericTypeParam:
+    return type;
+
   case TypeKind::Substituted: {
     auto SubstAT = cast<SubstitutedType>(base);
     auto Subst = transformType(SubstAT->getReplacementType(), fn);
@@ -1246,7 +1251,7 @@ Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions,
                             bool IgnoreMissing) {
   return transformType(origType,
                        [&](Type type) -> Type {
-    auto substOrig = dyn_cast<SubstitutableType>(type.getPointer());
+    auto substOrig = type->getAs<SubstitutableType>();
     if (!substOrig)
       return type;
 
@@ -1308,8 +1313,8 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
     auto Params = BGT->getDecl()->getGenericParams()->getParams();
     auto Args = BGT->getGenericArgs();
     for (unsigned i = 0, e = BGT->getGenericArgs().size(); i != e; ++i) {
-      Type ParamTy = Params[i].getAsTypeParam()->getUnderlyingType();
-      Substitutions[ParamTy->castTo<ArchetypeType>()] = Args[i];
+      auto ParamTy = Params[i].getAsTypeParam()->getArchetype();
+      Substitutions[ParamTy] = Args[i];
     }
 
     return substType(T, Substitutions);

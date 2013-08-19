@@ -72,7 +72,6 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   return result;
 }
 
-
 /// Used to deserialize entries in the on-disk decl hash table.
 class ModuleFile::DeclTableInfo {
 public:

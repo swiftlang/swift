@@ -34,9 +34,11 @@ namespace llvm {
 namespace swift {
   enum class AllocationArena;
   class ArchetypeType;
+  class AssociatedTypeDecl;
   class ASTContext;
   class ClassDecl;
   class ExprHandle;
+  class GenericTypeParamDecl;
   class GenericParamList;
   class Identifier;
   class TypeAliasDecl;
@@ -1879,6 +1881,87 @@ private:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 
+/// Abstract class used to describe the type of a generic type parameter
+/// or associated type.
+///
+/// \sa AbstractTypeParamDecl
+class AbstractTypeParamType : public SubstitutableType {
+protected:
+  AbstractTypeParamType(TypeKind kind, const ASTContext *ctx)
+    : SubstitutableType(kind, ctx, { }, Type()) { }
+
+public:
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_AbstractTypeParamType &&
+           T->getKind() <= TypeKind::Last_AbstractTypeParamType;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(AbstractTypeParamType, SubstitutableType)
+
+/// Describes the type of a generic parameter.
+///
+/// \sa GenericTypeParamDecl
+class GenericTypeParamType : public AbstractTypeParamType {
+  /// The generic type parameter.
+  GenericTypeParamDecl *Param;
+
+public:
+  /// Retrieve the declaration of the generic type parameter.
+  GenericTypeParamDecl *getDecl() const { return Param; }
+
+  /// getDesugaredType - If this type is a sugared type, remove all levels of
+  /// sugar until we get down to a non-sugar type.
+  TypeBase *getDesugaredType();
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::GenericTypeParam;
+  }
+
+  void print(raw_ostream &OS) const;
+
+private:
+  friend class GenericTypeParamDecl;
+
+  explicit GenericTypeParamType(GenericTypeParamDecl *param)
+    : AbstractTypeParamType(TypeKind::GenericTypeParam, nullptr),
+      Param(param) { }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(GenericTypeParamType, AbstractTypeParamType)
+
+
+/// Describes the type of an associated type.
+///
+/// \sa AssociatedTypeDecl
+class AssociatedTypeType : public AbstractTypeParamType {
+  /// The generic type parameter.
+  AssociatedTypeDecl *AssocType;
+
+public:
+  /// Retrieve the declaration of the associated type.
+  AssociatedTypeDecl *getDecl() const { return AssocType; }
+
+  /// getDesugaredType - If this type is a sugared type, remove all levels of
+  /// sugar until we get down to a non-sugar type.
+  TypeBase *getDesugaredType();
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::AssociatedType;
+  }
+
+  void print(raw_ostream &OS) const;
+
+private:
+  friend class AssociatedTypeDecl;
+
+  AssociatedTypeType(AssociatedTypeDecl *assocType)
+    : AbstractTypeParamType(TypeKind::AssociatedType, nullptr),
+      AssocType(assocType) { }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(AssociatedTypeType, AbstractTypeParamType)
+
 /// SubstitutedType - A type that has been substituted for some other type,
 /// which implies that the replacement type meets all of the requirements of
 /// the original type.
@@ -2092,7 +2175,7 @@ inline SubstitutableType *SubstitutableType::getParent() const {
   if (auto Archetype = dyn_cast<ArchetypeType>(this))
     return Archetype->getParent();
 
-  llvm_unreachable("Not a substitutable type");
+  return nullptr;
 }
 
 inline ArchetypeType *SubstitutableType::getArchetype() {

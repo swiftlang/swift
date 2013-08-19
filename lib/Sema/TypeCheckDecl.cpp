@@ -48,13 +48,16 @@ static bool isPatternProperty(Pattern *pattern) {
 
 /// Determine whether the given declaration can inherit a class.
 static bool canInheritClass(Decl *decl) {
+  // Classes can inherit from a class.
   if (isa<ClassDecl>(decl))
     return true;
 
-  // FIXME: Can any typealias declare inheritance from a class?
-  if (auto typeAlias = dyn_cast<TypeAliasDecl>(decl))
-    return typeAlias->isGenericParameter();
+  // Generic type parameters can inherit a class.
+  // FIXME: Associated types.
+  if (isa<GenericTypeParamDecl>(decl))
+    return true;
 
+  // FIXME: Can any typealias declare inheritance from a class?
   return false;
 }
 
@@ -220,15 +223,12 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
     if (auto classDecl = dyn_cast<ClassDecl>(decl))
       classDecl->setSuperclass(superclassTy);
     else
-      cast<TypeAliasDecl>(decl)->setSuperclass(superclassTy);
+      cast<AbstractTypeParamDecl>(decl)->setSuperclass(superclassTy);
   }
 
   // For protocols, generic parameters, and associated types, fill in null
   // conformances.
-  if (isa<ProtocolDecl>(decl) ||
-      (isa<TypeAliasDecl>(decl) &&
-       (isa<ProtocolDecl>(decl->getDeclContext()) ||
-        cast<TypeAliasDecl>(decl)->isGenericParameter()))) {
+  if (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) {
      // Set null conformances.
      unsigned conformancesSize
          = sizeof(ProtocolConformance *) * allProtocols.size();
@@ -407,7 +407,7 @@ public:
              [&](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
                return TC.getDirectConformsTo(protocol);
              },
-             [&](TypeAliasDecl *assocType) -> ArrayRef<ProtocolDecl *> {
+             [&](AbstractTypeParamDecl *assocType) -> ArrayRef<ProtocolDecl *> {
                checkInheritanceClause(TC, assocType);
                return assocType->getProtocols();
              });
@@ -467,9 +467,7 @@ public:
     Builder.assignArchetypes();
     for (auto GP : *GenericParams) {
       auto TypeParam = GP.getAsTypeParam();
-
-      TypeParam->getUnderlyingTypeLoc()
-        = TypeLoc::withoutLoc(Builder.getArchetype(TypeParam));
+      TypeParam->setArchetype(Builder.getArchetype(TypeParam));
     }
     GenericParams->setAllArchetypes(
       TC.Context.AllocateCopy(Builder.getAllArchetypes()));
@@ -909,12 +907,12 @@ public:
     }
 
     // Fix the 'This' associated type.
-    TypeAliasDecl *thisDecl = nullptr;
+    AssociatedTypeDecl *thisDecl = nullptr;
     for (auto Member : PD->getMembers()) {
-      if (auto AssocType = dyn_cast<TypeAliasDecl>(Member)) {
+      if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
         checkInheritanceClause(TC, AssocType);
 
-        if (AssocType->getName().str() == "This") {
+        if (AssocType->isThis()) {
           thisDecl = AssocType;
           break;
         }
@@ -932,14 +930,13 @@ public:
     // appropriate archetype.
     ArchetypeType *thisArchetype = builder.getArchetype(thisDecl);
     for (auto member : PD->getMembers()) {
-      if (auto assocType = dyn_cast<TypeAliasDecl>(member)) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         TypeLoc underlyingTy;
         if (assocType == thisDecl)
-          underlyingTy = TypeLoc::withoutLoc(thisArchetype);
+          assocType->setArchetype(thisArchetype);
         else
-          underlyingTy = TypeLoc::withoutLoc(thisArchetype->getNestedType(
-                                               assocType->getName()));
-        assocType->getUnderlyingTypeLoc() = underlyingTy;
+          assocType->setArchetype(
+            thisArchetype->getNestedType(assocType->getName()));
       }
     }
 

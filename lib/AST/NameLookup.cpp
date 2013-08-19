@@ -419,8 +419,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
         // Types are local or metatype members.
         if (auto TD = dyn_cast<TypeDecl>(Result)) {
-          auto TAD = dyn_cast<TypeAliasDecl>(TD);
-          if (TAD && TAD->isGenericParameter())
+          if (isa<GenericTypeParamDecl>(TD))
             Results.push_back(Result::getLocalDecl(Result));
           else
             Results.push_back(Result::getMetatypeMember(MetaBaseDecl, Result));

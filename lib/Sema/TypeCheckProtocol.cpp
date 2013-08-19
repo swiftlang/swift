@@ -125,7 +125,8 @@ namespace {
     /// FIXME: Generic substitutions here.
 
     /// \brief Associated types determined by matching this requirement.
-    SmallVector<std::pair<TypeAliasDecl *, Type>, 2> AssociatedTypeDeductions;
+    SmallVector<std::pair<AssociatedTypeDecl *, Type>, 2>
+      AssociatedTypeDeductions;
     
     /// \brief Associated type substitutions needed to match the witness.
     SmallVector<Substitution, 2> WitnessSubstitutions;
@@ -152,7 +153,7 @@ static RequirementMatch
 matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
              ValueDecl *req, Type reqType,
              Type model, ValueDecl *witness,
-             ArrayRef<TypeAliasDecl *> unresolvedAssocTypes) {
+             ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -383,7 +384,7 @@ static bool isBetterMatch(TypeChecker &tc, const RequirementMatch &match1,
 /// \brief Add the next associated type deduction to the string representation
 /// of the deductions, used in diagnostics.
 static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
-                                        TypeAliasDecl *assocType,
+                                        AssociatedTypeDecl *assocType,
                                         Type deduced) {
   if (str.empty())
     str = " [with ";
@@ -399,7 +400,7 @@ static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
 static void
 diagnoseMatch(TypeChecker &tc, ValueDecl *req,
               const RequirementMatch &match,
-              ArrayRef<std::pair<TypeAliasDecl *, Type>> deducedAssocTypes) {
+              ArrayRef<std::pair<AssociatedTypeDecl *,Type>> deducedAssocTypes){
   // Form a string describing the associated type deductions.
   // FIXME: Determine which associated types matter, and only print those.
   llvm::SmallString<128> withAssocTypes;
@@ -524,17 +525,15 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   // First, resolve any associated type members that have bindings. We'll
   // attempt to deduce any associated types that don't have explicit
   // definitions.
-  SmallVector<TypeAliasDecl *, 4> unresolvedAssocTypes;
+  SmallVector<AssociatedTypeDecl *, 4> unresolvedAssocTypes;
   for (auto Member : Proto->getMembers()) {
-    auto AssociatedType = dyn_cast<TypeAliasDecl>(Member);
+    auto AssociatedType = dyn_cast<AssociatedTypeDecl>(Member);
     if (!AssociatedType)
       continue;
     
     // Bind the implicit 'This' type to the type T.
-    // FIXME: Should have some kind of 'implicit' bit to detect this.
-    auto archetype
-      = AssociatedType->getUnderlyingType()->castTo<ArchetypeType>();
-    if (AssociatedType->getName().str().equals("This")) {
+    auto archetype = AssociatedType->getArchetype();
+    if (AssociatedType->isThis()) {
       TypeMapping[archetype]= T;
       continue;
     }
@@ -572,8 +571,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     }
     
     if (Viable.size() == 1) {
-      auto archetype
-        = AssociatedType->getUnderlyingType()->getAs<ArchetypeType>();
+      auto archetype = AssociatedType->getArchetype();
       TypeMapping[archetype] = Viable.front().second;
       TypeWitnesses[AssociatedType]
         = getArchetypeSubstitution(TC, archetype, Viable.front().second);
@@ -645,7 +643,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     return nullptr;
 
   // Check that T provides all of the required func/variable/subscript members.
-  SmallVector<std::pair<TypeAliasDecl *, Type>, 4> deducedAssocTypes;
+  SmallVector<std::pair<AssociatedTypeDecl *, Type>, 4> deducedAssocTypes;
   bool invalid = false;
   for (auto Member : Proto->getMembers()) {
     auto Requirement = dyn_cast<ValueDecl>(Member);
@@ -653,7 +651,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       continue;
 
     // Associated type requirements handled above.
-    if (isa<TypeAliasDecl>(Requirement))
+    if (isa<AssociatedTypeDecl>(Requirement))
       continue;
 
     // Determine the type that the requirement is expected to have. If the
@@ -770,7 +768,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
           unresolvedAssocTypes.erase(
             std::remove_if(unresolvedAssocTypes.begin(),
                            unresolvedAssocTypes.end(),
-                           [&](TypeAliasDecl *assocType) {
+                           [&](AssociatedTypeDecl *assocType) {
                              auto archetype
                                = assocType->getDeclaredType()
                                    ->castTo<ArchetypeType>();
@@ -916,12 +914,12 @@ existentialConformsToItself(TypeChecker &tc,
 
   // Check whether this protocol conforms to itself.
   auto thisDecl = proto->getThis();
-  auto thisType =proto->getThis()->getUnderlyingType()->castTo<ArchetypeType>();
+  auto thisType = proto->getThis()->getArchetype();
   for (auto member : proto->getMembers()) {
     // Check for associated types.
-    if (auto associatedType = dyn_cast<TypeAliasDecl>(member)) {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       // 'This' is obviously okay.
-      if (associatedType == thisDecl)
+      if (assocType == thisDecl)
         continue;
 
       // A protocol cannot conform to itself if it has an associated type.
@@ -931,8 +929,8 @@ existentialConformsToItself(TypeChecker &tc,
 
       tc.diagnose(complainLoc, diag::type_does_not_conform, type,
                   proto->getDeclaredType());
-      tc.diagnose(associatedType, diag::protocol_existential_assoc_type,
-                  associatedType->getName());
+      tc.diagnose(assocType, diag::protocol_existential_assoc_type,
+                  assocType->getName());
       return false;
     }
 
@@ -1015,7 +1013,7 @@ static void suggestExplicitConformance(TypeChecker &tc,
 
     // Look for the owner of this witness.
     Decl *witnessOwner = nullptr;
-    if (auto assocType = dyn_cast<TypeAliasDecl>(req)) {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(req)) {
       // Ignore the 'This' declaration.
       if (assocType == proto->getThis())
         continue;

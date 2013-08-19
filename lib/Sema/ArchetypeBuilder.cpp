@@ -216,10 +216,10 @@ public:
 
 struct ArchetypeBuilder::Implementation {
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols;
-  std::function<ArrayRef<ProtocolDecl *>(TypeAliasDecl *)> getConformsTo;
-  SmallVector<TypeAliasDecl *, 4> GenericParams;
-  DenseMap<TypeAliasDecl *, PotentialArchetype *> PotentialArchetypes;
-  DenseMap<TypeAliasDecl *, ArchetypeType *> PrimaryArchetypeMap;
+  std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)> getConformsTo;
+  SmallVector<AbstractTypeParamDecl *, 4> GenericParams;
+  DenseMap<AbstractTypeParamDecl *, PotentialArchetype *> PotentialArchetypes;
+  DenseMap<AbstractTypeParamDecl *, ArchetypeType *> PrimaryArchetypeMap;
   SmallVector<ArchetypeType *, 4> AllArchetypes;
 };
 
@@ -229,7 +229,7 @@ ArchetypeBuilder::ArchetypeBuilder(ASTContext &Context, DiagnosticEngine &Diags)
   Impl->getInheritedProtocols = [](ProtocolDecl *protocol) {
     return protocol->getProtocols();
   };
-  Impl->getConformsTo = [](TypeAliasDecl *assocType) {
+  Impl->getConformsTo = [](AbstractTypeParamDecl *assocType) {
     return assocType->getProtocols();
   };
 }
@@ -237,7 +237,7 @@ ArchetypeBuilder::ArchetypeBuilder(ASTContext &Context, DiagnosticEngine &Diags)
 ArchetypeBuilder::ArchetypeBuilder(
   ASTContext &Context, DiagnosticEngine &Diags,
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols,
-  std::function<ArrayRef<ProtocolDecl *>(TypeAliasDecl *)> getConformsTo)
+  std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)> getConformsTo)
   : Context(Context), Diags(Diags), Impl(new Implementation)
 {
   Impl->getInheritedProtocols = std::move(getInheritedProtocols);
@@ -259,12 +259,12 @@ auto ArchetypeBuilder::resolveType(TypeRepr *TyR) -> PotentialArchetype * {
   PotentialArchetype *Current = nullptr;
   // The first type needs to be known as a potential archetype, e.g., a
   // generic parameter.
-  TypeAliasDecl *FirstType
-    = dyn_cast_or_null<TypeAliasDecl>(IdType->Components[0].getBoundDecl());
+  AbstractTypeParamDecl *FirstType
+    = dyn_cast_or_null<AbstractTypeParamDecl>(IdType->Components[0].getBoundDecl());
   if (!FirstType)
     return nullptr;
 
-  DenseMap<TypeAliasDecl *, PotentialArchetype *>::iterator Known
+  DenseMap<AbstractTypeParamDecl *, PotentialArchetype *>::iterator Known
     = Impl->PotentialArchetypes.find(FirstType);
   if (Known == Impl->PotentialArchetypes.end())
     return nullptr;
@@ -278,27 +278,25 @@ auto ArchetypeBuilder::resolveType(TypeRepr *TyR) -> PotentialArchetype * {
   return Current;
 }
 
-bool ArchetypeBuilder::addGenericParameter(TypeAliasDecl *GenericParam,
+bool ArchetypeBuilder::addGenericParameter(AbstractTypeParamDecl *GenericParam,
                                            Optional<unsigned> Index) {
   Impl->GenericParams.push_back(GenericParam);
 
-  // Create a potential archetype for this generic parameter.
+  // Create a potential archetype for this type parameter.
   assert(!Impl->PotentialArchetypes[GenericParam]);
   auto PA = new PotentialArchetype(nullptr, GenericParam->getName(), Index);
   Impl->PotentialArchetypes[GenericParam] = PA;
 
-  // Add each of the conformance requirements placed on this generic parameter.
+  // Add each of the conformance requirements placed on this type parameter.
   for (auto Proto : GenericParam->getProtocols()) {
     if (addConformanceRequirement(PA, Proto))
       return true;
   }
 
-  // If the generic parameter has a superclass, add that requirement.
-  if (GenericParam->isGenericParameter()) {
-    if (auto superclassTy = GenericParam->getSuperclass()) {
-      // FIXME: Poor location info.
-      addSuperclassRequirement(PA, GenericParam->getLoc(), superclassTy);
-    }
+  // If the type parameter has a superclass, add that requirement.
+  if (auto superclassTy = GenericParam->getSuperclass()) {
+    // FIXME: Poor location info.
+    addSuperclassRequirement(PA, GenericParam->getLoc(), superclassTy);
   }
 
   return false;
@@ -321,9 +319,9 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
 
   // Add requirements for each of the associated types.
   for (auto Member : Proto->getMembers()) {
-    if (auto AssocType = dyn_cast<TypeAliasDecl>(Member)) {
-      // FIXME: Another 'This' hack.
-      if (AssocType->getName().str() == "This")
+    if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
+      // Nothing to do for 'This'.
+      if (AssocType->isThis())
         continue;
 
       // Add requirements placed directly on this associated type.
@@ -475,7 +473,7 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
   llvm_unreachable("Unhandled requirement?");
 }
 
-bool ArchetypeBuilder::addImplicitConformance(TypeAliasDecl *Param,
+bool ArchetypeBuilder::addImplicitConformance(AbstractTypeParamDecl *Param,
                                               ProtocolDecl *Proto) {
   assert(Impl->PotentialArchetypes[Param] != nullptr && "Unknown parameter");
   return addConformanceRequirement(Impl->PotentialArchetypes[Param], Proto);
@@ -505,7 +503,7 @@ void ArchetypeBuilder::assignArchetypes() {
 }
 
 ArchetypeType *
-ArchetypeBuilder::getArchetype(TypeAliasDecl *GenericParam) const {
+ArchetypeBuilder::getArchetype(AbstractTypeParamDecl *GenericParam) const {
   auto Pos = Impl->PrimaryArchetypeMap.find(GenericParam);
   assert(Pos != Impl->PrimaryArchetypeMap.end() && "Not a parameter!");
   return Pos->second;

@@ -123,7 +123,7 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
     return false; // This might seem non-obvious.
 
   case TypeKind::Archetype:
-    return cast<ArchetypeType>(type)->requiresClass();
+    return cast<SubstitutableType>(type)->requiresClass();
   case TypeKind::Protocol:
     return cast<ProtocolType>(type)->requiresClass();
   case TypeKind::ProtocolComposition:
@@ -204,7 +204,6 @@ bool TypeBase::isSpecialized() {
   case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct:
     return true;
-
 
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction: {
@@ -348,6 +347,8 @@ static void gatherTypeVariables(Type wrappedTy,
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::Archetype:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::AssociatedType:
   case TypeKind::ProtocolComposition:
     // None of these types ever have type variables.
     return;
@@ -501,6 +502,8 @@ static Type getStrippedType(const ASTContext &context, Type type,
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::Archetype:
+  case TypeKind::AssociatedType:
+  case TypeKind::GenericTypeParam:
   case TypeKind::ProtocolComposition:
   case TypeKind::UnboundGeneric:
   case TypeKind::BoundGenericClass:
@@ -945,6 +948,10 @@ TypeBase *TypeBase::getDesugaredType() {
     return cast<ParenType>(this)->getDesugaredType();
   case TypeKind::NameAlias:
     return cast<NameAliasType>(this)->getDesugaredType();
+  case TypeKind::AssociatedType:
+    return cast<AssociatedTypeType>(this)->getDesugaredType();
+  case TypeKind::GenericTypeParam:
+    return cast<GenericTypeParamType>(this)->getDesugaredType();
   case TypeKind::ArraySlice:
   case TypeKind::Optional:
     return cast<SyntaxSugarType>(this)->getDesugaredType();
@@ -969,6 +976,14 @@ TypeBase *SyntaxSugarType::getDesugaredType() {
 
 TypeBase *SubstitutedType::getDesugaredType() {
   return getReplacementType()->getDesugaredType();
+}
+
+TypeBase *GenericTypeParamType::getDesugaredType() {
+  return getDecl()->getArchetype()->getDesugaredType();
+}
+
+TypeBase *AssociatedTypeType::getDesugaredType() {
+  return getDecl()->getArchetype()->getDesugaredType();
 }
 
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
@@ -1004,6 +1019,8 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::Class:
   case TypeKind::NameAlias:
   case TypeKind::Substituted:
+  case TypeKind::AssociatedType:
+  case TypeKind::GenericTypeParam:
     return false;
 
   case TypeKind::BoundGenericClass:
@@ -1563,7 +1580,7 @@ void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
   for (unsigned i = 0, e = params.size(); i != e; ++i) {
     if (i) OS << ", ";
     
-    TypeAliasDecl *paramTy = params[i].getAsTypeParam();
+    auto paramTy = params[i].getAsTypeParam();
     OS << paramTy->getName().str();
     auto inherited = paramTy->getInherited();
     if (inherited.empty()) {
@@ -1722,6 +1739,22 @@ void UnionType::print(raw_ostream &OS) const {
 
 void ArchetypeType::print(raw_ostream &OS) const {
   OS << getFullName();
+}
+
+void GenericTypeParamType::print(raw_ostream &OS) const {
+  auto name = getDecl()->getName();
+  if (name.empty())
+    OS << "<anonymous>";
+  else
+    OS << name.str();
+}
+
+void AssociatedTypeType::print(raw_ostream &OS) const {
+  auto name = getDecl()->getName();
+  if (name.empty())
+    OS << "<anonymous>";
+  else
+    OS << name.str();
 }
 
 void SubstitutedType::print(raw_ostream &OS) const {

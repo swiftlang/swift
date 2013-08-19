@@ -217,6 +217,8 @@ namespace {
       case DeclKind::InfixOperator:
       case DeclKind::PrefixOperator:
       case DeclKind::PostfixOperator:
+      case DeclKind::TypeAlias:
+      case DeclKind::GenericTypeParam:
         llvm_unreachable("declaration not legal as a protocol member");
 
       case DeclKind::Func:
@@ -231,8 +233,8 @@ namespace {
         IGM.unimplemented(member->getLoc(), "var declaration in protocol");
         return;
 
-      case DeclKind::TypeAlias:
-        return visitAssociatedType(cast<TypeAliasDecl>(member));
+      case DeclKind::AssociatedType:
+        return visitAssociatedType(cast<AssociatedTypeDecl>(member));
       }
       llvm_unreachable("bad decl kind");
     }
@@ -245,9 +247,9 @@ namespace {
       }
     }
     
-    void visitAssociatedType(TypeAliasDecl *ty) {
+    void visitAssociatedType(AssociatedTypeDecl *ty) {
       // Don't need to do anything for the implicit "This" type.
-      if (ty->getName().str() == "This")
+      if (ty->isThis())
         return;
       
       asDerived().addAssociatedType(ty);
@@ -281,7 +283,7 @@ namespace {
       Entries.push_back(WitnessTableEntry::forFunction(func, getNextIndex()));
     }
     
-    void addAssociatedType(TypeAliasDecl *ty) {
+    void addAssociatedType(AssociatedTypeDecl *ty) {
       // An associated type takes up a spot for the type metadata and for the
       // witnesses to all its conformances.
       Entries.push_back(
@@ -2669,7 +2671,7 @@ namespace {
                                       witness.Substitutions));
     }
     
-    void addAssociatedType(TypeAliasDecl *ty) {
+    void addAssociatedType(AssociatedTypeDecl *ty) {
       // Determine whether the associated type has static metadata. If it
       // doesn't, then this witness table is a template that requires runtime
       // instantiation.

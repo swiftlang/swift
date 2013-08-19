@@ -120,10 +120,12 @@ static ImportKind getBestImportKind(const ValueDecl *VD) {
   case DeclKind::PostfixOperator:
     llvm_unreachable("not a ValueDecl");
 
+  case DeclKind::AssociatedType:
   case DeclKind::Constructor:
   case DeclKind::Destructor:
-  case DeclKind::UnionElement:
+  case DeclKind::GenericTypeParam:
   case DeclKind::Subscript:
+  case DeclKind::UnionElement:
     llvm_unreachable("not a top-level ValueDecl");
 
   case DeclKind::Protocol:

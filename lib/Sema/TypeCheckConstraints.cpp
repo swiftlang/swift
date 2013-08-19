@@ -871,7 +871,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                   ownerProtoTy->getDecl(),
                                   &conformance)) {
           // FIXME: Eventually, deal with default function/property definitions.
-          if (auto assocType = dyn_cast<TypeAliasDecl>(value)) {
+          if (auto assocType = dyn_cast<AssociatedTypeDecl>(value)) {
             type = conformance->getTypeWitness(assocType).Replacement;
           }
         }

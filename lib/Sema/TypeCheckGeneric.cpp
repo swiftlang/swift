@@ -152,9 +152,9 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
   }
 
   // Find the named requirement.
-  TypeAliasDecl *requirement = nullptr;
+  AssociatedTypeDecl *requirement = nullptr;
   for (auto member : protocol->getMembers()) {
-    auto td = dyn_cast<TypeAliasDecl>(member);
+    auto td = dyn_cast<AssociatedTypeDecl>(member);
     if (!td || td->getName().empty())
       continue;
 

@@ -848,6 +848,8 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::Class:
   case DeclKind::TopLevelCode:
   case DeclKind::TypeAlias:
+  case DeclKind::AssociatedType:
+  case DeclKind::GenericTypeParam:
   case DeclKind::Var:
   case DeclKind::Import:
   case DeclKind::Subscript:
