@@ -79,7 +79,7 @@ enum class CircularityCheck {
   Unchecked,
   /// We're currently checking circularity.
   Checking,
-  // Circularity has already been checked.
+  /// Circularity has already been checked.
   Checked
 };
 
