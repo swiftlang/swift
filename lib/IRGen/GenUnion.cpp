@@ -59,24 +59,6 @@ namespace {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
     }
 
-    llvm::IntegerType *getDiscriminatorType() const {
-      llvm::StructType *Struct = getStorageType();
-      return cast<llvm::IntegerType>(Struct->getElementType(0));
-    }
-
-    /// Map the given element to the appropriate value in the
-    /// discriminator type.
-    llvm::ConstantInt *getDiscriminatorIndex(UnionElementDecl *target) const {
-      // FIXME: using a linear search here is fairly ridiculous.
-      unsigned index = 0;
-      for (auto elt : cast<UnionDecl>(target->getDeclContext())->getMembers()) {
-        if (!isa<UnionElementDecl>(elt)) continue;
-        if (elt == target) break;
-        index++;
-      }
-      return llvm::ConstantInt::get(getDiscriminatorType(), index);
-    }
-
     bool isIndirectArgument(ExplosionKind kind) const override {
       // FIXME!
       return false;
@@ -92,6 +74,12 @@ namespace {
                                            UnionElementDecl *elt,
                                            Explosion &params) const = 0;
     
+    virtual void emitSwitch(IRGenFunction &IGF,
+                            Explosion &value,
+                            ArrayRef<std::pair<UnionElementDecl*,
+                                     llvm::BasicBlock*>> dests,
+                            llvm::BasicBlock *defaultDest) const = 0;
+    
     /// Given an incomplete UnionTypeInfo, completes layout of the storage type
     /// and calculates its size and alignment.
     virtual void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
@@ -99,7 +87,7 @@ namespace {
   };
 
   /// A UnionTypeInfo implementation which has a single case with a payload, and
-  /// one or more additional no-payload cases..
+  /// one or more additional no-payload cases.
   class SinglePayloadUnionTypeInfo : public UnionTypeInfo {
     UnionElementDecl *PayloadElement = nullptr;
     // FIXME - non-fixed payloads
@@ -196,6 +184,15 @@ namespace {
         dest.add(unpack.claimAtOffset(getStorageType()->getElementType(1),
                                       extraTagOffset));
       }
+    }
+    
+    void emitSwitch(IRGenFunction &IGF,
+                    Explosion &value,
+                    ArrayRef<std::pair<UnionElementDecl*,
+                                       llvm::BasicBlock*>> dests,
+                    llvm::BasicBlock *defaultDest) const override {
+      // FIXME
+      IGF.Builder.CreateUnreachable();
     }
     
   private:
@@ -345,6 +342,15 @@ namespace {
       // FIXME
     }
     
+    void emitSwitch(IRGenFunction &IGF,
+                    Explosion &value,
+                    ArrayRef<std::pair<UnionElementDecl*,
+                                       llvm::BasicBlock*>> dests,
+                    llvm::BasicBlock *defaultDest) const override {
+      // FIXME
+      IGF.Builder.CreateUnreachable();
+    }
+    
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth) const override {
       assert(isComplete());
@@ -372,7 +378,7 @@ namespace {
                                       CommonSpareBits.size()));
       }
     }
-
+    
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    UnionElementDecl *elt,
                                    Explosion &params) const {
@@ -473,6 +479,19 @@ namespace {
       if (!Singleton) return;
       Singleton->unpackUnionPayload(IGF, payload, dest);
     }
+    
+    void emitSwitch(IRGenFunction &IGF,
+                    Explosion &value,
+                    ArrayRef<std::pair<UnionElementDecl*,
+                             llvm::BasicBlock*>> dests,
+                    llvm::BasicBlock *defaultDest) const override {
+      // No dispatch necessary. Branch straight to the destination.
+      // FIXME: Bind argument to the value itself.
+      value.claimAll();
+      
+      assert(dests.size() == 1 && "switch table mismatch");
+      IGF.Builder.CreateBr(dests[0].second);
+    }
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    UnionElementDecl *elt,
@@ -517,12 +536,55 @@ namespace {
       return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
     }
       
+    llvm::IntegerType *getDiscriminatorType() const {
+      llvm::StructType *Struct = getStorageType();
+      return cast<llvm::IntegerType>(Struct->getElementType(0));
+    }
+    
+    /// Map the given element to the appropriate value in the
+    /// discriminator type.
+    llvm::ConstantInt *getDiscriminatorIndex(UnionElementDecl *target) const {
+      // FIXME: using a linear search here is fairly ridiculous.
+      unsigned index = 0;
+      for (auto elt : target->getParentUnion()->getAllElements()) {
+        if (elt == target) break;
+        index++;
+      }
+      return llvm::ConstantInt::get(getDiscriminatorType(), index);
+    }
+    
+    void emitSwitch(IRGenFunction &IGF,
+                    Explosion &value,
+                    ArrayRef<std::pair<UnionElementDecl*,
+                             llvm::BasicBlock*>> dests,
+                    llvm::BasicBlock *defaultDest) const override {
+      llvm::Value *discriminator = value.claimNext();
+      
+      // Create an unreachable block for the default if the original SIL
+      // instruction had none.
+      bool unreachableDefault = false;
+      if (!defaultDest) {
+        unreachableDefault = true;
+        defaultDest = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+      }
+      
+      auto *i = IGF.Builder.CreateSwitch(discriminator, defaultDest,
+                                         dests.size());
+      for (auto &dest : dests)
+        i->addCase(getDiscriminatorIndex(dest.first), dest.second);
+      
+      if (unreachableDefault) {
+        IGF.Builder.emitBlock(defaultDest);
+        IGF.Builder.CreateUnreachable();
+      }
+    }
+
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    UnionElementDecl *elt,
                                    Explosion &params) const {
       IGF.Builder.CreateRet(getDiscriminatorIndex(elt));
     }
-      
+    
     void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
                          UnionImplStrategy &strategy) override;
   };
@@ -970,4 +1032,17 @@ llvm::Value *UnpackUnionPayload::claimAtOffset(llvm::Type *ty,
                                                unsigned bitOffset) {
   unpackedBits = bitOffset;
   return claim(ty);
+}
+
+void irgen::emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
+                                  SILType unionTy,
+                                  Explosion &unionValue,
+                                  ArrayRef<std::pair<UnionElementDecl *,
+                                                     llvm::BasicBlock *>> dests,
+                                  llvm::BasicBlock *defaultDest) {
+  assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
+         && "not of a union type");
+  auto &unionTI
+    = static_cast<const UnionTypeInfo &>(IGF.getFragileTypeInfo(unionTy));
+  unionTI.emitSwitch(IGF, unionValue, dests, defaultDest);
 }

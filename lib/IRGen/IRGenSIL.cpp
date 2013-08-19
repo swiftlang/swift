@@ -45,6 +45,7 @@
 #include "GenProto.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
+#include "GenUnion.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenModule.h"
 #include "Linking.h"
@@ -943,8 +944,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
 }
 
-/// Find the entry point, natural curry level, and calling convention for a
-/// SILDeclRef function.
+/// Find the entry point for a SIL function.
 llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                                   ExplosionKind level) {
   // Check whether we've created the function already.
@@ -1525,8 +1525,25 @@ void IRGenSILFunction::visitSwitchIntInst(SwitchIntInst *i) {
   llvm_unreachable("not implemented");
 }
 
-void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *i) {
-  llvm_unreachable("not implemented");
+void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *inst) {
+  Explosion value = getLoweredExplosion(inst->getOperand());
+  
+  // Map the SIL dest bbs to their LLVM bbs.
+  SmallVector<std::pair<UnionElementDecl*, llvm::BasicBlock*>, 4>
+    dests;
+  
+  for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
+    auto casePair = inst->getCase(i);
+    dests.push_back({casePair.first, getLoweredBB(casePair.second).bb});
+  }
+  
+  llvm::BasicBlock *defaultDest = nullptr;
+  if (inst->hasDefault())
+    defaultDest = getLoweredBB(inst->getDefaultBB()).bb;
+  
+  // FIXME: Does not yet bind destination arguments.
+  emitSwitchLoadableUnionDispatch(*this, inst->getOperand().getType(),
+                                  value, dests, defaultDest);
 }
 
 // Add branch arguments to destination phi nodes.

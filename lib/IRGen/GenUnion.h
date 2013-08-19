@@ -29,11 +29,14 @@
 #define __SWIFT_IRGen_GenUnion_H__
 
 namespace llvm {
+  class BasicBlock;
   class Value;
   class Type;
 }
 
 namespace swift {
+  class UnionElementDecl;
+  
 namespace irgen {
   class IRGenFunction;
   
@@ -84,7 +87,15 @@ public:
   llvm::Value *claimAtOffset(llvm::Type *ty, unsigned bitOffset);
 };
 
-  
+/// \brief Emit the dispatch branch(es) for a loadable union.
+/// Produces a mapping of each UnionElementDecl* to its llvm::Value* argument.
+void emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
+                                     SILType unionTy,
+                                     Explosion &unionValue,
+                                     ArrayRef<std::pair<UnionElementDecl*,
+                                                      llvm::BasicBlock*>> dests,
+                                     llvm::BasicBlock *defaultDest);
+
 }
 }
 

@@ -54,8 +54,26 @@ import Builtin
 //      case b:     1  0  0  0  0  0  1  1
 //      case c:     0  1  0  0  0  0  1  1
 // CHECK: %O5union24MultiPayloadTwoSpareBits = type { i64 }
+
+
+// -- switch_union lowering --
+
 union Singleton {
   case val(Builtin.Int64, Builtin.Int64)
+}
+
+// CHECK: define void @singleton_switch(i64, i64) {
+sil @singleton_switch : $(Singleton) -> () {
+// CHECK: entry:
+entry(%u : $Singleton):
+// CHECK:   br label %[[DEST:[0-9]+]]
+  switch_union %u : $Singleton, case #Singleton.val!unionelt.1: dest
+
+// CHECK: ; <label>:[[DEST]]
+dest:
+// CHECK:   ret void
+  %x = tuple ()
+  return %x : $()
 }
 
 
@@ -64,6 +82,106 @@ union NoPayloads {
   case y
   case z
 }
+
+sil @a : $[thin] () -> ()
+sil @b : $[thin] () -> ()
+sil @c : $[thin] () -> ()
+
+
+// CHECK: define void @no_payload_switch(i2) {
+sil @no_payload_switch : $[thin] (NoPayloads) -> () {
+// CHECK: entry:
+entry(%u : $NoPayloads):
+// CHECK:   switch i2 %0, label %[[DFLT:[0-9]+]] [
+// CHECK:     i2 0, label %[[X_DEST:[0-9]+]]
+// CHECK:     i2 1, label %[[Y_DEST:[0-9]+]]
+// CHECK:     i2 -2, label %[[Z_DEST:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[DFLT]]
+// CHECK:   unreachable
+  switch_union %u : $NoPayloads, case #NoPayloads.x!unionelt: x_dest, case #NoPayloads.y!unionelt: y_dest, case #NoPayloads.z!unionelt: z_dest
+
+// CHECK: ; <label>:[[X_DEST]]
+x_dest:
+// CHECK:   call void @a()
+  %a = function_ref @a : $[thin] () -> ()
+  apply %a() : $[thin] () -> ()
+// CHECK:   br label %[[END:[0-9]+]]
+  br end
+// CHECK: ; <label>:[[Y_DEST]]
+y_dest:
+// CHECK:   call void @b()
+  %b = function_ref @b : $[thin] () -> ()
+  apply %b() : $[thin] () -> ()
+// CHECK:   br label %[[END]]
+  br end
+// CHECK: ; <label>:[[Z_DEST]]
+z_dest:
+// CHECK:   call void @c()
+  %c = function_ref @c : $[thin] () -> ()
+  apply %c() : $[thin] () -> ()
+// CHECK:   br label %[[END]]
+  br end
+
+// CHECK: ; <label>:[[END]]
+end:
+// CHECK:   ret void
+  %x = tuple ()
+  return %x : $()
+}
+
+
+union NoPayloads2 {
+  case a
+  case e
+  case i
+  case o
+  case u
+  case y
+}
+
+// CHECK: define void @no_payload_switch_2(i3) {
+sil @no_payload_switch_2 : $[thin] (NoPayloads2) -> () {
+// CHECK: entry:
+entry(%u : $NoPayloads2):
+// CHECK:   switch i3 %0, label %[[DEFAULT_DEST:[0-9]+]] [
+// CHECK:     i3 -4, label %[[U_DEST:[0-9]+]]
+// CHECK:   ]
+  switch_union %u : $NoPayloads2, case #NoPayloads2.u!unionelt: u_dest, default default_dest
+
+// CHECK: ; <label>:[[U_DEST]]
+u_dest:
+// CHECK:   call void @a()
+  %a = function_ref @a : $[thin] () -> ()
+  apply %a() : $[thin] () -> ()
+// CHECK:   br label %[[END:[0-9]+]]
+  br end
+
+// CHECK: ; <label>:[[DEFAULT_DEST]]
+default_dest:
+// CHECK:   call void @b()
+  %b = function_ref @b : $[thin] () -> ()
+  apply %b() : $[thin] () -> ()
+// CHECK:   br label %[[END]]
+  br end
+
+// CHECK: ; <label>:[[END]]
+end:
+// CHECK:   ret void
+  %x = tuple ()
+  return %x : $()
+}
+
+
+// -- injection functions for unions --
+
+// CHECK: define { i64, i64 } @_TO5union9Singleton3valfMS0_FTBi64_Bi64__S0_(i64, i64) {
+// CHECK: entry:
+// CHECK:   [[A:%.*]] = insertvalue { i64, i64 } undef, i64 %0, 0
+// CHECK:   [[B:%.*]] = insertvalue { i64, i64 } [[A]], i64 %1, 1
+// CHECK:   ret { i64, i64 } [[B]]
+// CHECK: }
+
 
 // CHECK: define i2 @_TO5union10NoPayloads1xFMS0_S0_() {
 // CHECK: entry:
@@ -80,15 +198,6 @@ union NoPayloads {
 // CHECK:   ret i2 -2
 // CHECK: }
 
-
-union NoPayloads2 {
-  case a
-  case e
-  case i
-  case o
-  case u
-  case y
-}
 
 // CHECK: define i3 @_TO5union11NoPayloads21aFMS0_S0_() {
 // CHECK: entry:
