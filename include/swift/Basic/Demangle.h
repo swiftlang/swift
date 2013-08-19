@@ -1,5 +1,4 @@
-//===--- Demangle.h - Interface to Swift symbol demangling
-//-----------------===//
+//===--- Demangle.h - Interface to Swift symbol demangling -------*- C++ -*-==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,15 +16,14 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-
 #include "swift/Basic/LLVM.h"
-
-#include <string>
 
 namespace swift {
 namespace Demangle {
+
 class Node;
 typedef llvm::IntrusiveRefCntPtr<Node> NodePointer;
+
 class Node : public llvm::RefCountedBase<Node> {
 public:
   typedef llvm::SmallVector<NodePointer, 10> ChildNodes;
@@ -87,6 +85,7 @@ private:
   NodePointer NextNode;
   ChildNodes Children;
 };
+
 /// \brief Demangle the given string as a Swift symbol.
 ///
 /// Typical usage:
@@ -102,6 +101,7 @@ private:
 /// failure.
 ///
 NodePointer demangleSymbolAsNode(llvm::StringRef mangled);
+
 /// \brief Transform the node structure in a string.
 ///
 /// Typical usage:
@@ -116,6 +116,7 @@ NodePointer demangleSymbolAsNode(llvm::StringRef mangled);
 /// \returns A string representing the demangled name.
 ///
 std::string nodeToString(NodePointer pointer);
+
 /// \brief Demangle the given string as a Swift symbol.
 ///
 /// Typical usage:
@@ -130,6 +131,7 @@ std::string nodeToString(NodePointer pointer);
 /// \returns A string representing the demangled name.
 ///
 std::string demangleSymbolAsString(llvm::StringRef mangled);
+
 } // end namespace Demangle
 } // end namespace swift
 
