@@ -692,6 +692,8 @@ private:
     }
     if (c == 'S') {
       NodePointer identifier = demangleSubstitution();
+      if (!identifier)
+        return nullptr;
       identifier->setKind(Node::Kind::Module);
       return identifier;
     }
@@ -1521,10 +1523,10 @@ void toString (NodePointer pointer, DemanglerPrinter& printer) {
       printer << "type metadata for ";
       break;
     case swift::Demangle::Node::Kind::ValueWitnessKind:
-      printer << pointer->getText() << " value witness for ";
+      printer << pointer->getText() << "value witness for ";
       break;
     case swift::Demangle::Node::Kind::ValueWitnessTable:
-      printer << " value witness table for ";
+      printer << "value witness table for ";
       break;
     case swift::Demangle::Node::Kind::WitnessTableOffset:
       printer << "witness table offset for ";
@@ -1660,9 +1662,12 @@ void toString (NodePointer pointer, DemanglerPrinter& printer) {
         if (child)
           printer << ".";
       }
-      printer << ".__allocating_constructor : ";
+      printer << ".__allocating_constructor";
       child = pointer->child_at(1);
-      toString(child, printer);
+      if (child) {
+        printer << " : ";
+        toString(child, printer);
+      }
       break;
     }
     case swift::Demangle::Node::Kind::Constructor:
@@ -1674,9 +1679,12 @@ void toString (NodePointer pointer, DemanglerPrinter& printer) {
         if (child)
           printer << ".";
       }
-      printer << ".constructor : ";
+      printer << ".constructor";
       child = pointer->child_at(1);
-      toString(child, printer);
+      if (child) {
+        printer << " : ";
+        toString(child, printer);
+      }
       break;
     }
     case swift::Demangle::Node::Kind::Destructor:
@@ -1688,9 +1696,12 @@ void toString (NodePointer pointer, DemanglerPrinter& printer) {
         if (child)
           printer << ".";
       }
-      printer << ".destructor : ";
+      printer << ".destructor";
       child = pointer->child_at(1);
-      toString(child, printer);
+      if (child) {
+        printer << " : ";
+        toString(child, printer);
+      }
       break;
     }
     case swift::Demangle::Node::Kind::Deallocator:
@@ -1702,9 +1713,12 @@ void toString (NodePointer pointer, DemanglerPrinter& printer) {
         if (child)
           printer << ".";
       }
-      printer << ".__deallocating_destructor : ";
+      printer << ".__deallocating_destructor";
       child = pointer->child_at(1);
-      toString(child, printer);
+      if (child) {
+        printer << " : ";
+        toString(child, printer);
+      }
       break;
     }
     case swift::Demangle::Node::Kind::ProtocolConformance:
