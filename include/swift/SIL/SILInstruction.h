@@ -1061,7 +1061,7 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
 };
   
-/// StructInst - Represents a constructed tuple.
+/// StructInst - Represents a constructed struct.
 class StructInst : public SILInstruction {
   TailAllocatedOperandList<0> Operands;
 
@@ -1072,12 +1072,12 @@ class StructInst : public SILInstruction {
                                 ArrayRef<SILValue> Elements, SILFunction &F);
 
 public:
-  /// The elements referenced by this TupleInst.
+  /// The elements referenced by this StructInst.
   MutableArrayRef<Operand> getElementOperands() {
     return Operands.getDynamicAsArray();
   }
 
-  /// The elements referenced by this TupleInst.
+  /// The elements referenced by this StructInst.
   OperandValueArrayRef getElements() const {
     return Operands.getDynamicValuesAsArray();
   }
