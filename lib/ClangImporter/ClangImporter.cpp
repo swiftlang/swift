@@ -614,7 +614,7 @@ void ClangImporter::getReexportedModules(
 /// Returns true if the first selector piece matches the given identifier.
 static bool selectorStartsWithName(ASTContext &ctx, clang::Selector sel,
                                    Identifier name) {
-  return ctx.getIdentifier(sel.getNameForSlot(0)) == name;
+  return sel.getNameForSlot(0) == name.str();
 }
 
 namespace {
