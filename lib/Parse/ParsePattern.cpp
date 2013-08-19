@@ -36,7 +36,7 @@ static bool parseCurriedFunctionArguments(Parser &P,
   // parseFunctionArguments parsed the first argument pattern.
   // Parse additional curried argument clauses as long as we can.
   while (P.Tok.is(tok::l_paren)) {
-    NullablePtr<Pattern> pattern = P.parsePatternTuple(/*AllowInitExpr=*/false);
+    ParserResult<Pattern> pattern = P.parsePatternTuple(/*AllowInitExpr=*/false);
     if (pattern.isNull())
       return true;
     else {
@@ -73,7 +73,7 @@ static bool parseSelectorArgument(Parser &P,
                                   llvm::StringMap<VarDecl*> &selectorNames,
                                   SourceLoc &rp)
 {
-  NullablePtr<Pattern> argPattern = P.parsePatternIdentifier();
+  ParserResult<Pattern> argPattern = P.parsePatternIdentifier();
   assert(argPattern.isNonNull() &&
          "selector argument did not start with an identifier!");
   
@@ -102,7 +102,7 @@ static bool parseSelectorArgument(Parser &P,
     return true;
   }
 
-  NullablePtr<Pattern> bodyPattern = P.parsePatternAtom();
+  ParserResult<Pattern> bodyPattern = P.parsePatternAtom();
   if (bodyPattern.isNull()) {
     P.skipUntil(tok::r_paren);
     return true;
@@ -115,8 +115,10 @@ static bool parseSelectorArgument(Parser &P,
       return true;
     }
     
-    argPattern = new (P.Context) TypedPattern(argPattern.get(), type);
-    bodyPattern = new (P.Context) TypedPattern(bodyPattern.get(), type);
+    argPattern = makeParserResult(
+        new (P.Context) TypedPattern(argPattern.get(), type));
+    bodyPattern = makeParserResult(
+        new (P.Context) TypedPattern(bodyPattern.get(), type));
   }
   
   ExprHandle *init = nullptr;
@@ -220,7 +222,7 @@ static bool parseSelectorFunctionArguments(Parser &P,
 bool Parser::parseFunctionArguments(SmallVectorImpl<Pattern*> &argPatterns,
                                     SmallVectorImpl<Pattern*> &bodyPatterns) {
   // Parse the first function argument clause.
-  NullablePtr<Pattern> pattern = parsePatternTuple(/*AllowInitExpr=*/true);
+  ParserResult<Pattern> pattern = parsePatternTuple(/*AllowInitExpr=*/true);
   if (pattern.isNull())
     return true;
   else {
@@ -269,10 +271,11 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
 /// Parse a pattern.
 ///   pattern ::= pattern-atom
 ///   pattern ::= pattern-atom ':' type-annotation
-NullablePtr<Pattern> Parser::parsePattern() {
+ParserResult<Pattern> Parser::parsePattern() {
   // First, parse the pattern atom.
-  NullablePtr<Pattern> pattern = parsePatternAtom();
-  if (pattern.isNull()) return nullptr;
+  ParserResult<Pattern> pattern = parsePatternAtom();
+  if (pattern.isNull())
+    return nullptr;
 
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
@@ -280,7 +283,7 @@ NullablePtr<Pattern> Parser::parsePattern() {
     if (!type)
       return nullptr;
 
-    pattern = new (Context) TypedPattern(pattern.get(), type);
+    pattern = makeParserResult(new (Context) TypedPattern(pattern.get(), type));
   }
 
   return pattern;
@@ -304,17 +307,18 @@ Pattern *Parser::createBindingFromPattern(SourceLoc loc,
 }
 
 /// Parse an identifier as a pattern.
-NullablePtr<Pattern> Parser::parsePatternIdentifier() {
+ParserResult<Pattern> Parser::parsePatternIdentifier() {
   SourceLoc loc = Tok.getLoc();
   if (consumeIf(tok::kw__)) {
-    return new (Context) AnyPattern(loc);
+    return makeParserResult(new (Context) AnyPattern(loc));
   }
   
   StringRef text = Tok.getText();
   if (consumeIf(tok::identifier)) {
     Identifier ident = Context.getIdentifier(text);
-    return createBindingFromPattern(loc, ident);
+    return makeParserResult(createBindingFromPattern(loc, ident));
   }
+
   return nullptr;
 }
 
@@ -324,7 +328,7 @@ NullablePtr<Pattern> Parser::parsePatternIdentifier() {
 ///   pattern-atom ::= identifier
 ///   pattern-atom ::= '_'
 ///   pattern-atom ::= pattern-tuple
-NullablePtr<Pattern> Parser::parsePatternAtom() {
+ParserResult<Pattern> Parser::parsePatternAtom() {
   switch (Tok.getKind()) {
   case tok::l_paren:
     return parsePatternTuple(/*AllowInitExpr*/false);
@@ -347,7 +351,7 @@ NullablePtr<Pattern> Parser::parsePatternAtom() {
 
 Optional<TuplePatternElt> Parser::parsePatternTupleElement(bool allowInitExpr) {
   // Parse the pattern.
-  NullablePtr<Pattern> pattern = parsePattern();
+  ParserResult<Pattern> pattern = parsePattern();
   if (pattern.isNull())
     return Nothing;
 
@@ -379,7 +383,7 @@ Optional<TuplePatternElt> Parser::parsePatternTupleElement(bool allowInitExpr) {
 ///   pattern-tuple-body:
 ///     pattern-tuple-element (',' pattern-tuple-body)*
 
-NullablePtr<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
+ParserResult<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
 
@@ -433,8 +437,8 @@ NullablePtr<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
   if (Invalid)
     return nullptr;
 
-  return TuplePattern::createSimple(Context, LPLoc, elts, RPLoc,
-                                    EllipsisLoc.isValid(), EllipsisLoc);
+  return makeParserResult(TuplePattern::createSimple(
+      Context, LPLoc, elts, RPLoc, EllipsisLoc.isValid(), EllipsisLoc));
 }
 
 NullablePtr<Pattern> Parser::parseMatchingPattern() {

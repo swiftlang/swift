@@ -707,10 +707,10 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 ///   stmt-for-each:
 ///     'for' pattern 'in' expr-basic stmt-brace
 NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
-  NullablePtr<Pattern> Pattern = parsePattern();
+  ParserResult<Pattern> Pattern = parsePattern();
   if (Pattern.isNull())
     // Recover by creating a "_" pattern.
-    Pattern = new (Context) AnyPattern(SourceLoc());
+    Pattern = makeParserErrorResult(new (Context) AnyPattern(SourceLoc()));
 
   SourceLoc InLoc;
   parseToken(tok::kw_in, InLoc, diag::expected_foreach_in);

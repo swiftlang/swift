@@ -776,7 +776,7 @@ bool Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
 ///   extension:
 ///    'extension' type-identifier inheritance? '{' decl* '}'
 ///
-NullablePtr<Decl> Parser::parseDeclExtension(unsigned Flags) {
+ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
   // The grammar allows only type-identifier here, but we parse type-simple for
@@ -810,7 +810,7 @@ NullablePtr<Decl> Parser::parseDeclExtension(unsigned Flags) {
 
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
     ED->setMembers({}, Tok.getLoc());
-    return ED;
+    return makeParserErrorResult(ED);
   }
 
   SmallVector<Decl*, 8> MemberDecls;
@@ -827,14 +827,14 @@ NullablePtr<Decl> Parser::parseDeclExtension(unsigned Flags) {
     return nullptr;
   }
 
-  return ED;
+  return makeParserResult(ED);
 }
 
 /// parseDeclTypeAlias
 ///   decl-typealias:
 ///     'typealias' identifier inheritance? '=' type
 ///
-NullablePtr<TypeAliasDecl> Parser::parseDeclTypeAlias(bool WantDefinition) {
+ParserResult<TypeAliasDecl> Parser::parseDeclTypeAlias(bool WantDefinition) {
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
   Identifier Id;
@@ -864,7 +864,7 @@ NullablePtr<TypeAliasDecl> Parser::parseDeclTypeAlias(bool WantDefinition) {
                                 CurDeclContext,
                                 Context.AllocateCopy(Inherited));
   addToScope(TAD);
-  return TAD;
+  return makeParserResult(TAD);
 }
 
 namespace {
@@ -1223,7 +1223,7 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
     DeclAttributes Attributes;
     parseAttributeList(Attributes);
 
-    NullablePtr<Pattern> pattern = parsePattern();
+    ParserResult<Pattern> pattern = parsePattern();
     if (pattern.isNull()) return true;
 
     // If we syntactically match the second decl-var production, with a
@@ -1970,7 +1970,7 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
 ///      decl-var-simple
 ///      decl-typealias
 ///
-NullablePtr<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
+ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
   DeclAttributes Attributes;
@@ -1980,7 +1980,7 @@ NullablePtr<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
   Identifier ProtocolName;
   if (parseIdentifier(ProtocolName, NameLoc,
                       diag::expected_identifier_in_decl, "protocol"))
-    return 0;
+    return nullptr;
   
   SmallVector<TypeLoc, 4> InheritedProtocols;
   if (Tok.is(tok::colon))
@@ -2012,7 +2012,7 @@ NullablePtr<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
     SourceLoc LBraceLoc = Tok.getLoc();
     if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type)) {
       Proto->setMembers(Context.AllocateCopy(Members), Tok.getLoc());
-      return Proto;
+      return makeParserErrorResult(Proto);
     }
 
     SourceLoc RBraceLoc;
@@ -2037,7 +2037,7 @@ NullablePtr<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
     return nullptr;
   }
 
-  return Proto;
+  return makeParserResult(Proto);
 }
 
 namespace {
@@ -2082,7 +2082,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
     return true;
   }
 
-  NullablePtr<Pattern> Indices = parsePatternTuple(/*AllowInitExpr=*/false);
+  ParserResult<Pattern> Indices = parsePatternTuple(/*AllowInitExpr=*/false);
   if (Indices.isNull())
     return true;
   Indices.get()->walk(SetVarContext(CurDeclContext));
@@ -2215,7 +2215,7 @@ static void AddConstructorArgumentsToScope(const Pattern *pat,
 }
 
 
-NullablePtr<ConstructorDecl>
+ParserResult<ConstructorDecl>
 Parser::parseDeclConstructor(bool HasContainerType) {
   SourceLoc ConstructorLoc = consumeToken(tok::kw_constructor);
   
@@ -2239,7 +2239,7 @@ Parser::parseDeclConstructor(bool HasContainerType) {
     return nullptr;
   }
 
-  NullablePtr<Pattern> Arguments = parsePatternTuple(/*AllowInitExpr=*/true);
+  ParserResult<Pattern> Arguments = parsePatternTuple(/*AllowInitExpr=*/true);
   if (Arguments.isNull())
     return nullptr;
 
@@ -2274,10 +2274,10 @@ Parser::parseDeclConstructor(bool HasContainerType) {
 
   if (Attributes.isValid()) CD->getMutableAttrs() = Attributes;
 
-  return CD;
+  return makeParserResult(CD);
 }
 
-NullablePtr<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
+ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
   SourceLoc DestructorLoc = consumeToken(tok::kw_destructor);
 
   // attribute-list
@@ -2315,10 +2315,10 @@ NullablePtr<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
     return nullptr;
   }
 
-  return DD;
+  return makeParserResult(DD);
 }
 
-NullablePtr<OperatorDecl> Parser::parseDeclOperator(bool AllowTopLevel) {
+ParserResult<OperatorDecl> Parser::parseDeclOperator(bool AllowTopLevel) {
   assert(Tok.isContextualKeyword("operator") &&
          "no 'operator' at start of operator decl?!");
 
@@ -2347,7 +2347,7 @@ NullablePtr<OperatorDecl> Parser::parseDeclOperator(bool AllowTopLevel) {
     return nullptr;
   }
   
-  NullablePtr<OperatorDecl> Result;
+  ParserResult<OperatorDecl> Result;
   
   switch (*kind) {
   case DeclKind::PrefixOperator:
@@ -2374,7 +2374,7 @@ NullablePtr<OperatorDecl> Parser::parseDeclOperator(bool AllowTopLevel) {
   return Result;
 }
 
-NullablePtr<OperatorDecl>
+ParserResult<OperatorDecl>
 Parser::parseDeclPrefixOperator(SourceLoc OperatorLoc, SourceLoc PrefixLoc,
                                 Identifier Name, SourceLoc NameLoc) {
   SourceLoc LBraceLoc = consumeToken(tok::l_brace);
@@ -2391,14 +2391,12 @@ Parser::parseDeclPrefixOperator(SourceLoc OperatorLoc, SourceLoc PrefixLoc,
   
   SourceLoc RBraceLoc = Tok.getLoc();
 
-  return new (Context) PrefixOperatorDecl(CurDeclContext,
-                                          OperatorLoc,
-                                          PrefixLoc,
-                                          Name, NameLoc,
-                                          LBraceLoc, RBraceLoc);
+  return makeParserResult(
+      new (Context) PrefixOperatorDecl(CurDeclContext, OperatorLoc, PrefixLoc,
+                                       Name, NameLoc, LBraceLoc, RBraceLoc));
 }
 
-NullablePtr<OperatorDecl>
+ParserResult<OperatorDecl>
 Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc, SourceLoc PostfixLoc,
                                  Identifier Name, SourceLoc NameLoc) {
   SourceLoc LBraceLoc = consumeToken(tok::l_brace);
@@ -2415,17 +2413,15 @@ Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc, SourceLoc PostfixLoc,
   
   SourceLoc RBraceLoc = Tok.getLoc();
   
-  return new (Context) PostfixOperatorDecl(CurDeclContext,
-                                          OperatorLoc,
-                                          PostfixLoc,
-                                          Name, NameLoc,
-                                          LBraceLoc, RBraceLoc);
+  return makeParserResult(
+      new (Context) PostfixOperatorDecl(CurDeclContext, OperatorLoc,
+                                        PostfixLoc, Name, NameLoc, LBraceLoc,
+                                        RBraceLoc));
 }
 
-NullablePtr<OperatorDecl> Parser::parseDeclInfixOperator(SourceLoc OperatorLoc,
-                                                         SourceLoc InfixLoc,
-                                                         Identifier Name,
-                                                         SourceLoc NameLoc) {
+ParserResult<OperatorDecl>
+Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, SourceLoc InfixLoc,
+                               Identifier Name, SourceLoc NameLoc) {
   SourceLoc LBraceLoc = consumeToken(tok::l_brace);
 
   // Initialize InfixData with default attributes:
@@ -2500,12 +2496,8 @@ NullablePtr<OperatorDecl> Parser::parseDeclInfixOperator(SourceLoc OperatorLoc,
   
   SourceLoc RBraceLoc = Tok.getLoc();
   
-  return new (Context) InfixOperatorDecl(CurDeclContext,
-                                         OperatorLoc, InfixLoc,
-                                         Name, NameLoc,
-                                         LBraceLoc,
-                                         AssociativityLoc, AssociativityValueLoc,
-                                         PrecedenceLoc, PrecedenceValueLoc,
-                                         RBraceLoc,
-                                         InfixData(precedence, associativity));
+  return makeParserResult(new (Context) InfixOperatorDecl(
+      CurDeclContext, OperatorLoc, InfixLoc, Name, NameLoc, LBraceLoc,
+      AssociativityLoc, AssociativityValueLoc, PrecedenceLoc,
+      PrecedenceValueLoc, RBraceLoc, InfixData(precedence, associativity)));
 }

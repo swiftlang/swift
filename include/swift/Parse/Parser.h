@@ -23,6 +23,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
+#include "swift/Parse/ParserResult.h"
 #include "llvm/ADT/SetVector.h"
 
 namespace llvm {
@@ -424,7 +425,7 @@ public:
     PD_AllowUnionElement    = 1 << 10,
   };
   
-  NullablePtr<TypeAliasDecl> parseDeclTypeAlias(bool WantDefinition);
+  ParserResult<TypeAliasDecl> parseDeclTypeAlias(bool WantDefinition);
 
   /// addVarsToScope - Add the variables in the given pattern to the current
   /// scope, collecting the variables in the vector \c Decls and applying
@@ -441,7 +442,7 @@ public:
   
   bool parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
-  NullablePtr<Decl> parseDeclExtension(unsigned Flags);
+  ParserResult<ExtensionDecl> parseDeclExtension(unsigned Flags);
   bool parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseDeclUnionElement(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
@@ -458,28 +459,28 @@ public:
   void consumeFunctionBody(FuncExpr *FE);
   NullablePtr<FuncDecl> parseDeclFunc(SourceLoc StaticLoc, unsigned Flags);
   bool parseDeclFuncBodyDelayed(FuncDecl *FD);
-  NullablePtr<ProtocolDecl> parseDeclProtocol(unsigned Flags);
+  ParserResult<ProtocolDecl> parseDeclProtocol(unsigned Flags);
   
   bool parseDeclSubscript(bool HasContainerType,
                           bool NeedDefinition,
                           SmallVectorImpl<Decl *> &Decls);
 
-  NullablePtr<ConstructorDecl> parseDeclConstructor(bool HasContainerType);
-  NullablePtr<DestructorDecl> parseDeclDestructor(unsigned Flags);
+  ParserResult<ConstructorDecl> parseDeclConstructor(bool HasContainerType);
+  ParserResult<DestructorDecl> parseDeclDestructor(unsigned Flags);
   
-  NullablePtr<OperatorDecl> parseDeclOperator(bool AllowTopLevel);
-  NullablePtr<OperatorDecl> parseDeclPrefixOperator(SourceLoc OperatorLoc,
-                                                    SourceLoc PrefixLoc,
-                                                    Identifier Name,
-                                                    SourceLoc NameLoc);
-  NullablePtr<OperatorDecl> parseDeclPostfixOperator(SourceLoc OperatorLoc,
-                                                     SourceLoc PostfixLoc,
+  ParserResult<OperatorDecl> parseDeclOperator(bool AllowTopLevel);
+  ParserResult<OperatorDecl> parseDeclPrefixOperator(SourceLoc OperatorLoc,
+                                                     SourceLoc PrefixLoc,
                                                      Identifier Name,
                                                      SourceLoc NameLoc);
-  NullablePtr<OperatorDecl> parseDeclInfixOperator(SourceLoc OperatorLoc,
-                                                   SourceLoc InfixLoc,
-                                                   Identifier Name,
-                                                   SourceLoc NameLoc);
+  ParserResult<OperatorDecl> parseDeclPostfixOperator(SourceLoc OperatorLoc,
+                                                      SourceLoc PostfixLoc,
+                                                      Identifier Name,
+                                                      SourceLoc NameLoc);
+  ParserResult<OperatorDecl> parseDeclInfixOperator(SourceLoc OperatorLoc,
+                                                    SourceLoc InfixLoc,
+                                                    Identifier Name,
+                                                    SourceLoc NameLoc);
 
   //===--------------------------------------------------------------------===//
   // SIL Parsing.
@@ -516,7 +517,7 @@ public:
                               SmallVectorImpl<Pattern*> &bodyPatterns,
                               TypeRepr *&retLoc);
 
-  NullablePtr<Pattern> parsePattern();
+  ParserResult<Pattern> parsePattern();
 
   /// \brief Determine whether this token can start a pattern.
   bool isStartOfPattern(Token tok);
@@ -536,9 +537,9 @@ public:
   ///
   /// \returns The tuple pattern element, if successful.
   Optional<TuplePatternElt> parsePatternTupleElement(bool allowInitExpr);
-  NullablePtr<Pattern> parsePatternTuple(bool AllowInitExpr);
-  NullablePtr<Pattern> parsePatternAtom();
-  NullablePtr<Pattern> parsePatternIdentifier();
+  ParserResult<Pattern> parsePatternTuple(bool AllowInitExpr);
+  ParserResult<Pattern> parsePatternAtom();
+  ParserResult<Pattern> parsePatternIdentifier();
   
   Pattern *createBindingFromPattern(SourceLoc loc, Identifier name);
   
