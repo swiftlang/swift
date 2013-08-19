@@ -32,58 +32,105 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                          diag, std::forward<U>(args)...);
 }
 
+static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
+                                           BuiltinFunctionRefInst *FR,
+                                           SILModule &M) {
+  llvm::Intrinsic::ID ID = FR->getIntrinsicID();
+  OperandValueArrayRef Args = AI->getArguments();
+
+  if (Args.size() == 2) {
+    // Check if both arguments are literals.
+    if (IntegerLiteralInst *Op1 = dyn_cast<IntegerLiteralInst>(Args[0])) {
+      if (IntegerLiteralInst *Op2 = dyn_cast<IntegerLiteralInst>(Args[1])) {
+
+        switch (ID) {
+        default: break;
+        case llvm::Intrinsic::sadd_with_overflow:
+        case llvm::Intrinsic::uadd_with_overflow:
+        case llvm::Intrinsic::ssub_with_overflow:
+        case llvm::Intrinsic::usub_with_overflow:
+        case llvm::Intrinsic::smul_with_overflow:
+        case llvm::Intrinsic::umul_with_overflow: {
+          // Handle arithmetic intrinsics with overflow.
+          // First, Calculate the result.
+          APInt Res;
+          bool Overflow;
+          switch (ID) {
+          default: llvm_unreachable("Invalid case");
+          case llvm::Intrinsic::sadd_with_overflow:
+            Res = Op1->getValue().sadd_ov(Op2->getValue(), Overflow);
+            break;
+          case llvm::Intrinsic::uadd_with_overflow:
+            Res = Op1->getValue().uadd_ov(Op2->getValue(), Overflow);
+            break;
+          case llvm::Intrinsic::ssub_with_overflow:
+            Res = Op1->getValue().ssub_ov(Op2->getValue(), Overflow);
+            break;
+          case llvm::Intrinsic::usub_with_overflow:
+            Res = Op1->getValue().usub_ov(Op2->getValue(), Overflow);
+            break;
+          case llvm::Intrinsic::smul_with_overflow:
+            Res = Op1->getValue().smul_ov(Op2->getValue(), Overflow);
+            break;
+          case llvm::Intrinsic::umul_with_overflow:
+            Res = Op1->getValue().umul_ov(Op2->getValue(), Overflow);
+            break;
+          }
+
+          // Diagnose the overflow.
+          if (Overflow) {
+            diagnose(M.getASTContext(),
+                     AI->getLoc().getSourceLoc(),
+                     diag::arithmetic_operation_overflow);
+            return nullptr;
+          }
+
+          // Get the SIL subtypes of the returned tuple type.
+          SILType FuncResType = AI->getFunctionTypeInfo(M)->getResultType();
+          TupleType *T = FuncResType.castTo<TupleType>();
+          assert(T->getNumElements() == 2);
+          SILType ResTy1 =
+          SILType::getPrimitiveType(CanType(T->getElementType(0)),
+                                    SILValueCategory::Object);
+          SILType ResTy2 =
+          SILType::getPrimitiveType(CanType(T->getElementType(1)),
+                                    SILValueCategory::Object);
+
+          // Construct the folded instruction - a tuple of two literals, the
+          // result and overflow.
+          SILBuilder B(AI);
+          SILValue Result[] = {
+            B.createIntegerLiteral(AI->getLoc(), ResTy1, Res),
+            B.createIntegerLiteral(AI->getLoc(), ResTy2, Overflow)
+          };
+          return B.createTuple(AI->getLoc(), FuncResType, Result);
+        }
+        } // end of switch(ID)
+      }
+    }
+  }
+  return nullptr;
+}
+
 static SILInstruction *constantFoldInstruction(SILInstruction &I,
                                                SILModule &M) {
   // Constant fold function calls.
   if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
-
     // Constant fold calls to builtins.
     if (BuiltinFunctionRefInst *FR =
         dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
-      llvm::Intrinsic::ID ID = FR->getIntrinsicID();
-      
-      if (ID == llvm::Intrinsic::sadd_with_overflow) {
+      return constantFoldBuiltin(AI, FR, M);
+    }
+    return nullptr;
+  }
 
-        // Check if both arguments are literals.
-        OperandValueArrayRef Args = AI->getArguments();
-        if (IntegerLiteralInst *Op1 = dyn_cast<IntegerLiteralInst>(Args[0]))
-          if (IntegerLiteralInst *Op2 = dyn_cast<IntegerLiteralInst>(Args[1])) {
-
-            // Calculate the result.
-            APInt Res;
-            bool Overflow;
-            Res = Op1->getValue().sadd_ov(Op2->getValue(), Overflow);
-
-            // Diagnose the overflow.
-            // FIXME: This might need special handling if we are inside an
-            // inlined function.
-            if (Overflow) {
-              diagnose(M.getASTContext(),
-                       AI->getLoc().getSourceLoc(),
-                       diag::arithmetic_operation_overflow);
-              return nullptr;
-            }
-
-            // Get the SIL subtypes of the returned tuple type.
-            SILType FuncResType = AI->getFunctionTypeInfo(M)->getResultType();
-            TupleType *T = FuncResType.castTo<TupleType>();
-            assert(T->getNumElements() == 2);
-            SILType ResTy1 =
-              SILType::getPrimitiveType(CanType(T->getElementType(0)),
-                                        SILValueCategory::Object);
-            SILType ResTy2 =
-              SILType::getPrimitiveType(CanType(T->getElementType(1)),
-                                        SILValueCategory::Object);
-
-            // Construct the folded instruction - a tuple of two literals, the
-            // result and overflow.
-            SILBuilder B(&I);
-            SILValue Result[] = {
-              B.createIntegerLiteral(AI->getLoc(), ResTy1, Res),
-              B.createIntegerLiteral(AI->getLoc(), ResTy2, Overflow)
-            };
-            return B.createTuple(AI->getLoc(), FuncResType, Result);
-          }
+  // Constant fold extraction of a constant element.
+  if (TupleExtractInst *TEI = dyn_cast<TupleExtractInst>(&I)) {
+    if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand().getDef())) {
+      unsigned FieldNo = TEI->getFieldNo();
+      ValueBase *Elem = TheTuple->getElements()[FieldNo].getDef();
+      if (IntegerLiteralInst *ConstElem = dyn_cast<IntegerLiteralInst>(Elem)) {
+        return ConstElem;
       }
     }
   }
