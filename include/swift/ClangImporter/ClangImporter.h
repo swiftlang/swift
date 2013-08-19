@@ -147,6 +147,10 @@ public:
   virtual void getReexportedModules(
     const Module *module,
     SmallVectorImpl<Module::ImportedModule> &exports) override;
+  
+  virtual void lookupClassMembers(const Module *module,
+                                  Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer) override;
 
   clang::TargetInfo &getTargetInfo() const;
 };

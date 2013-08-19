@@ -611,6 +611,47 @@ void ClangImporter::getReexportedModules(
   }
 }
 
+void ClangImporter::lookupClassMembers(const Module *module,
+                                       Module::AccessPathTy accessPath,
+                                       VisibleDeclConsumer &consumer) {
+  clang::Sema &S = Impl.Instance->getSema();
+  clang::ExternalASTSource *source = S.getExternalSource();
+
+  // Force load all external methods.
+  // FIXME: Copied from Clang's SemaCodeComplete.
+  for (uint32_t i = 0, n = source->GetNumExternalSelectors(); i != n; ++i) {
+    clang::Selector sel = source->GetExternalSelector(i);
+    if (sel.isNull() || S.MethodPool.count(sel))
+      continue;
+    
+    S.ReadMethodPool(sel);
+  }
+                                       
+  // FIXME: Not limited by module.
+  // FIXME: Does not include methods from protocols.
+  // FIXME: Do we really have to import every single method?
+  for (auto entry : S.MethodPool) {
+    auto &methodListPair = entry.second;
+    
+    if (methodListPair.first.Method == nullptr)
+      continue;
+    
+    // Only include instance methods.
+    for (const clang::ObjCMethodList *list = &methodListPair.first;
+         list != nullptr; list = list->getNext()) {
+      if (list->Method->isUnavailable())
+        continue;
+
+      const clang::NamedDecl *realDecl = list->Method;
+      if (list->Method->isPropertyAccessor())
+        realDecl = list->Method->findPropertyDecl();
+
+      if (auto VD = dyn_cast_or_null<ValueDecl>(Impl.importDecl(realDecl)))
+        consumer.foundDecl(VD);
+    }
+  }
+}
+
 clang::TargetInfo &ClangImporter::getTargetInfo() const {
   return Impl.Instance->getTarget();
 }
