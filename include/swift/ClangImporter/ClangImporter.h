@@ -151,6 +151,11 @@ public:
   virtual void lookupClassMembers(const Module *module,
                                   Module::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer) override;
+  
+  virtual void lookupClassMember(const Module *module,
+                                 Module::AccessPathTy accessPath,
+                                 Identifier name,
+                                 SmallVectorImpl<ValueDecl*> &results) override;
 
   clang::TargetInfo &getTargetInfo() const;
 };

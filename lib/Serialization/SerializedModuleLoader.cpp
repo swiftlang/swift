@@ -289,3 +289,14 @@ void SerializedModuleLoader::lookupClassMembers(const Module *module,
     return;
   moduleFile->lookupClassMembers(accessPath, consumer);
 }
+
+void
+SerializedModuleLoader::lookupClassMember(const Module *module,
+                                          Module::AccessPathTy accessPath,
+                                          Identifier name,
+                                          SmallVectorImpl<ValueDecl*> &decls) {
+  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
+  if (!moduleFile)
+    return;
+  moduleFile->lookupClassMember(accessPath, name, decls);
+}

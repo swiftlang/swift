@@ -203,6 +203,13 @@ public:
   void lookupClassMembers(AccessPathTy accessPath,
                           VisibleDeclConsumer &consumer) const;
 
+  /// Finds class members defined in this module with the given name.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  void lookupClassMember(AccessPathTy accessPath,
+                         Identifier name,
+                         SmallVectorImpl<ValueDecl*> &results) const;
+
   /// Looks up which modules are re-exported by this module.
   void getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const;
 
@@ -408,6 +415,10 @@ public:
   // Inherited from Module.
   void lookupClassMembers(AccessPathTy accessPath,
                           VisibleDeclConsumer &consumer) const;
+
+  void lookupClassMember(AccessPathTy accessPath,
+                         Identifier name,
+                         SmallVectorImpl<ValueDecl*> &results) const;
 
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() >= DeclContextKind::First_LoadedModule &&

@@ -611,9 +611,29 @@ void ClangImporter::getReexportedModules(
   }
 }
 
-void ClangImporter::lookupClassMembers(const Module *module,
-                                       Module::AccessPathTy accessPath,
-                                       VisibleDeclConsumer &consumer) {
+/// Returns true if the first selector piece matches the given identifier.
+static bool selectorStartsWithName(ASTContext &ctx, clang::Selector sel,
+                                   Identifier name) {
+  return ctx.getIdentifier(sel.getNameForSlot(0)) == name;
+}
+
+namespace {
+  /// Inserts found decls into an externally-owned SmallVector.
+  class VectorDeclConsumer : public VisibleDeclConsumer {
+  public:
+    SmallVectorImpl<ValueDecl *> &results;
+    explicit VectorDeclConsumer(SmallVectorImpl<ValueDecl *> &decls)
+      : results(decls) {}
+    
+    virtual void foundDecl(ValueDecl *decl) {
+      results.push_back(decl);
+    }
+  };
+}
+
+static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
+                                   VisibleDeclConsumer &consumer,
+                                   Identifier name = Identifier()) {
   clang::Sema &S = Impl.Instance->getSema();
   clang::ExternalASTSource *source = S.getExternalSource();
 
@@ -623,16 +643,22 @@ void ClangImporter::lookupClassMembers(const Module *module,
     clang::Selector sel = source->GetExternalSelector(i);
     if (sel.isNull() || S.MethodPool.count(sel))
       continue;
+    if (!name.empty() && !selectorStartsWithName(Impl.SwiftContext, sel, name))
+      continue;
     
     S.ReadMethodPool(sel);
   }
                                        
-  // FIXME: Not limited by module.
   // FIXME: Does not include methods from protocols.
   // FIXME: Do we really have to import every single method?
+  // FIXME: Need a more efficient table in Clang to find "all selectors whose
+  // first piece is this name".
   for (auto entry : S.MethodPool) {
+    if (!name.empty() &&
+        !selectorStartsWithName(Impl.SwiftContext, entry.first, name))
+      continue;
+  
     auto &methodListPair = entry.second;
-    
     if (methodListPair.first.Method == nullptr)
       continue;
     
@@ -641,15 +667,26 @@ void ClangImporter::lookupClassMembers(const Module *module,
          list != nullptr; list = list->getNext()) {
       if (list->Method->isUnavailable())
         continue;
-
-      const clang::NamedDecl *realDecl = list->Method;
-      if (list->Method->isPropertyAccessor())
-        realDecl = list->Method->findPropertyDecl();
-
-      if (auto VD = dyn_cast_or_null<ValueDecl>(Impl.importDecl(realDecl)))
+      if (auto VD = cast_or_null<ValueDecl>(Impl.importDecl(list->Method)))
         consumer.foundDecl(VD);
     }
   }
+}
+
+void ClangImporter::lookupClassMember(const Module *module,
+                                      Module::AccessPathTy accessPath,
+                                      Identifier name,
+                                      SmallVectorImpl<ValueDecl*> &results) {
+  // FIXME: Not limited by module.
+  VectorDeclConsumer consumer(results);
+  lookupClassMembersImpl(Impl, consumer, name);
+}
+
+void ClangImporter::lookupClassMembers(const Module *module,
+                                       Module::AccessPathTy accessPath,
+                                       VisibleDeclConsumer &consumer) {
+  // FIXME: Not limited by module.
+  lookupClassMembersImpl(Impl, consumer);
 }
 
 clang::TargetInfo &ClangImporter::getTargetInfo() const {

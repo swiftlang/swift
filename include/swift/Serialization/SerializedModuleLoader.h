@@ -96,6 +96,11 @@ public:
                                   Module::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer) override;
 
+  virtual void lookupClassMember(const Module *module,
+                                 Module::AccessPathTy accessPath,
+                                 Identifier name,
+                                 SmallVectorImpl<ValueDecl*> &results) override;
+
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
 

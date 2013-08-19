@@ -113,6 +113,11 @@ namespace {
     void lookupClassMembers(AccessPathTy AccessPath,
                             VisibleDeclConsumer &consumer,
                             const TranslationUnit &TU);
+                            
+    void lookupClassMember(AccessPathTy accessPath,
+                           Identifier name,
+                           SmallVectorImpl<ValueDecl*> &results,
+                           const TranslationUnit &TU);
 
     SmallVector<ValueDecl *, 0> AllVisibleValues;
   };
@@ -238,6 +243,32 @@ void TUModuleCache::lookupClassMembers(AccessPathTy accessPath,
   }
 }
 
+void TUModuleCache::lookupClassMember(AccessPathTy accessPath,
+                                      Identifier name,
+                                      SmallVectorImpl<ValueDecl*> &results,
+                                      const TranslationUnit &TU) {
+  if (!MemberCachePopulated)
+    populateMemberCache(TU);
+  
+  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
+  
+  auto iter = ClassMembers.find(name);
+  if (iter == ClassMembers.end())
+    return;
+  
+  if (!accessPath.empty()) {
+    for (ValueDecl *vd : iter->second) {
+      Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
+      if (auto nominal = ty->getAnyNominal())
+        if (nominal->getName() == accessPath.front().first)
+          results.push_back(vd);
+    }
+    return;
+  }
+
+  results.append(iter->second.begin(), iter->second.end());
+}
+
 //===----------------------------------------------------------------------===//
 // Module Implementation
 //===----------------------------------------------------------------------===//
@@ -292,6 +323,22 @@ void Module::lookupClassMembers(AccessPathTy accessPath,
   }
 
   return cast<LoadedModule>(this)->lookupClassMembers(accessPath, consumer);
+}
+
+void Module::lookupClassMember(AccessPathTy accessPath,
+                               Identifier name,
+                               SmallVectorImpl<ValueDecl*> &results) const {
+  if (isa<BuiltinModule>(this)) {
+    // The Builtin module defines no classes.
+    return;
+  }
+  
+  if (auto TU = dyn_cast<TranslationUnit>(this)) {
+    return getTUCachePimpl(LookupCachePimpl, *TU)
+      .lookupClassMember(accessPath, name, results, *TU);
+  }
+  
+  return cast<LoadedModule>(this)->lookupClassMember(accessPath, name, results);
 }
 
 namespace {
@@ -546,6 +593,12 @@ void LoadedModule::lookupVisibleDecls(AccessPathTy accessPath,
 void LoadedModule::lookupClassMembers(AccessPathTy accessPath,
                                       VisibleDeclConsumer &consumer) const {
   return getOwner().lookupClassMembers(this, accessPath, consumer);
+}
+
+void LoadedModule::lookupClassMember(AccessPathTy accessPath,
+                                     Identifier name,
+                                     SmallVectorImpl<ValueDecl*> &decls) const {
+  return getOwner().lookupClassMember(this, accessPath, name, decls);
 }
 
 

@@ -2423,6 +2423,35 @@ void ModuleFile::loadDeclsConformingTo(KnownProtocolKind kind) {
   }
 }
 
+void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
+                                   Identifier name,
+                                   SmallVectorImpl<ValueDecl*> &results) {
+  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
+
+  if (!ClassMembersByName)
+    return;
+  
+  auto iter = ClassMembersByName->find(name);
+  if (iter == ClassMembersByName->end())
+    return;
+  
+  if (!accessPath.empty()) {
+    for (auto item : *iter) {
+      auto vd = cast<ValueDecl>(getDecl(item.second));
+      Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
+      if (auto nominal = ty->getAnyNominal())
+        if (nominal->getName() == accessPath.front().first)
+          results.push_back(vd);
+    }
+    return;
+  }
+  
+  for (auto item : *iter) {
+    auto vd = cast<ValueDecl>(getDecl(item.second));
+    results.push_back(vd);
+  }
+}
+
 void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
                                     VisibleDeclConsumer &consumer) {
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");

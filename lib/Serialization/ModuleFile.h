@@ -353,6 +353,13 @@ public:
   /// This is intended for use with id-style lookup and code completion.
   void lookupClassMembers(Module::AccessPathTy accessPath,
                           VisibleDeclConsumer &consumer);
+
+  /// Adds class members in the module with the given name to the given vector.
+  ///
+  /// This is intended for use with id-style lookup.
+  void lookupClassMember(Module::AccessPathTy accessPath,
+                         Identifier name,
+                         SmallVectorImpl<ValueDecl*> &results);
 };
 
 class SerializedModule : public LoadedModule {

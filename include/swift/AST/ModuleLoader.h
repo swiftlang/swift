@@ -124,6 +124,16 @@ public:
   virtual void lookupClassMembers(const Module *module,
                                   Module::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer) { }
+
+  /// \brief Look for class members with the given name.
+  ///
+  /// Any decls found will be stored in \p results.
+  ///
+  /// This is used for id-style lookup.
+  virtual void lookupClassMember(const Module *module,
+                                 Module::AccessPathTy accessPath,
+                                 Identifier name,
+                                 SmallVectorImpl<ValueDecl*> &results) { }
 };
 
 }
