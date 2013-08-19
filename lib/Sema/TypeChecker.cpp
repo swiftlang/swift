@@ -170,37 +170,6 @@ Type TypeChecker::lookupBoolType() {
   });
 }
 
-/// \brief Check for circular inheritance of protocols.
-///
-/// \param Path The circular path through the protocol inheritance hierarchy,
-/// which will be constructed (backwards) if there is in fact a circular path.
-///
-/// \returns True if there was circular inheritance, false otherwise.
-bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
-                              llvm::SmallPtrSet<ProtocolDecl *, 16> &Visited,
-                              llvm::SmallPtrSet<ProtocolDecl *, 16> &Local,
-                              SmallVectorImpl<ProtocolDecl *> &Path) {
-  for (auto inheritedProto : Proto->getProtocols()) {
-    if (Visited.count(inheritedProto)) {
-      // We've seen this protocol as part of another protocol search;
-      // it's not circular.
-      continue;
-    }
-
-    // Whether we've seen this protocol before in our search or visiting it
-    // detects a circularity, record it in the path and abort.
-    if (!Local.insert(inheritedProto) ||
-        checkProtocolCircularity(TC, inheritedProto, Visited, Local, Path)) {
-      Path.push_back(inheritedProto);
-      return true;
-    }
-
-
-  }
-  
-  return false;
-}
-
 static void overrideDecl(TypeChecker &TC,
                          llvm::SmallPtrSet<ValueDecl*, 16> &OverriddenDecls,
                          ValueDecl *MemberVD, ValueDecl *OverriddenDecl) {
@@ -469,44 +438,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       continue;
 
     TC.typeCheckDecl(D, /*isFirstPass*/true);
-  }
-
-  // Check for explicit conformance to protocols and for circularity in
-  // protocol definitions.
-  {
-    // FIXME: This check should be in TypeCheckDecl.
-    llvm::SmallPtrSet<ProtocolDecl *, 16> VisitedProtocols;
-    for (auto D : TU->Decls) {
-      if (auto Protocol = dyn_cast<ProtocolDecl>(D)) {
-        // Check for circular protocol definitions.
-        llvm::SmallPtrSet<ProtocolDecl *, 16> LocalVisited;
-        SmallVector<ProtocolDecl *, 4> Path;
-        if (VisitedProtocols.count(Protocol) == 0) {
-          LocalVisited.insert(Protocol);
-          if (checkProtocolCircularity(TC, Protocol, VisitedProtocols,
-                                       LocalVisited, Path)) {
-            llvm::SmallString<128> PathStr;
-            PathStr += "'";
-            PathStr += Protocol->getName().str();
-            PathStr += "'";
-            for (unsigned I = Path.size(); I != 0; --I) {
-              PathStr += " -> '";
-              PathStr += Path[I-1]->getName().str();
-              PathStr += "'";
-            }
-            
-            TC.diagnose(Protocol->getLoc(), diag::circular_protocol_def,
-                        PathStr);
-            for (unsigned I = Path.size(); I != 1; --I) {
-              TC.diagnose(Path[I-1], diag::protocol_here,
-                          Path[I-1]->getName());
-            }
-          }
-          
-          VisitedProtocols.insert(LocalVisited.begin(), LocalVisited.end());
-        }
-      }
-    }
   }
 
   // Check for correct overriding in classes.  We have to do this after the

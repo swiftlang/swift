@@ -20,6 +20,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Parse/Lexer.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -77,7 +78,7 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
     if (type->checkedInheritanceClause())
       return;
 
-    // FIXME: This breaks infinite recursion, but doesn't diagnose it well.
+    // This breaks infinite recursion, which will be diagnosed separately.
     type->setCheckedInheritanceClause();
     inheritedClause = type->getInherited();
   } else {
@@ -85,7 +86,7 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
     if (ext->checkedInheritanceClause())
       return;
 
-    // FIXME: This breaks infinite recursion, but doesn't diagnose it well.
+    // This breaks infinite recursion, which will be diagnosed separately.
     ext->setCheckedInheritanceClause();
     inheritedClause = ext->getInherited();
   }
@@ -238,6 +239,56 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
      memset(conformances, 0, conformancesSize);
      cast<TypeDecl>(decl)->setConformances(
        llvm::makeArrayRef(conformances, allProtocols.size()));
+  }
+}
+
+/// Check for circular inheritance among protocols, starting at the given
+/// protocol.
+static void checkProtocolCircularity(TypeChecker &tc, ProtocolDecl *proto,
+                                     SmallVectorImpl<ProtocolDecl *> &path) {
+  switch (proto->getCircularityCheck()) {
+  case CircularityCheck::Checked:
+    return;
+
+  case CircularityCheck::Checking: {
+    // We're already checking this protocol, which means we have a cycle.
+
+    // Find the beginning of the cycle within the full path.
+    auto cycleStart = path.end()-2;
+    while (*cycleStart != proto) {
+      assert(cycleStart != path.begin() && "Missing cycle start?");
+      --cycleStart;
+    }
+
+    // Form the textual path illustrating the cycle.
+    llvm::SmallString<128> pathStr;
+    for (auto i = cycleStart, iEnd = path.end(); i != iEnd; ++i) {
+      if (!pathStr.empty())
+        pathStr += " -> ";
+      pathStr += ("'" + (*i)->getName().str() + "'").str();
+    }
+    pathStr += (" -> '" + proto->getName().str() + "'").str();
+
+    // Diagnose the cycle.
+    tc.diagnose(proto->getLoc(), diag::circular_protocol_def, pathStr);
+    for (auto i = cycleStart + 1, iEnd = path.end(); i != iEnd; ++i) {
+      tc.diagnose(*i, diag::protocol_here, (*i)->getName());
+    }
+
+    proto->setInvalid();
+    break;
+  }
+
+  case CircularityCheck::Unchecked:
+    // Check the inherited protocols for circular inheritance.
+    path.push_back(proto);
+    proto->setCircularityCheck(CircularityCheck::Checking);
+    for (auto inheritedProto : tc.getDirectConformsTo(proto)) {
+      checkProtocolCircularity(tc, inheritedProto, path);
+    }
+    proto->setCircularityCheck(CircularityCheck::Checked);
+    path.pop_back();
+    break;
   }
 }
 
@@ -774,6 +825,12 @@ public:
     }
 
     checkInheritanceClause(TC, PD);
+
+    {
+      // Check for circular inheritance within the protocol.
+      SmallVector<ProtocolDecl *, 8> path;
+      checkProtocolCircularity(TC, PD, path);
+    }
 
     // If the protocol is [objc], it may only refine other [objc] protocols.
     // FIXME: Revisit this restriction.

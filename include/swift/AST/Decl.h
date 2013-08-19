@@ -73,6 +73,16 @@ enum class DeclKind : uint8_t {
 #include "swift/AST/DeclNodes.def"
 };
 
+/// Keeps track of stage of circularity checking for the given protocol.
+enum class CircularityCheck {
+  /// Circularity has not yet been checked.
+  Unchecked,
+  /// We're currently checking circularity.
+  Checking,
+  // Circularity has already been checked.
+  Checked
+};
+
 /// Decl - Base class for all declarations in Swift.
 class alignas(8) Decl {
   // alignas(8) because we use three tag bits on Decl*.
@@ -159,8 +169,11 @@ class alignas(8) Decl {
     /// If this is a compiler-known protocol, this will be a KnownProtocolKind
     /// value, plus one. Otherwise, it will be 0.
     unsigned KnownProtocol : 4;
+
+    /// The stage of the circularity check for this protocol.
+    unsigned Circularity : 2;
   };
-  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 8 };
+  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 10 };
   static_assert(NumProtocolDeclBits <= 32, "fits in an unsigned");
 
   class InfixOperatorDeclBitFields {
@@ -1634,6 +1647,16 @@ public:
            "can't reset known protocol kind");
     ProtocolDeclBits.KnownProtocol = static_cast<unsigned>(kind) + 1;
     assert(*getKnownProtocolKind() == kind && "not enough bits");
+  }
+
+  /// Retrieve the status of circularity checking for protocol inheritance.
+  CircularityCheck getCircularityCheck() const {
+    return static_cast<CircularityCheck>(ProtocolDeclBits.Circularity);
+  }
+
+  /// Record the current stage of circularity checking.
+  void setCircularityCheck(CircularityCheck circularity) {
+    ProtocolDeclBits.Circularity = static_cast<unsigned>(circularity);
   }
 
   // Implement isa/cast/dyncast/etc.

@@ -1036,6 +1036,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     assert(members.hasValue() && "could not read struct members");
     proto->setMembers(members.getValue(), SourceRange());
     proto->setCheckedInheritanceClause();
+    proto->setCircularityCheck(CircularityCheck::Checked);
     break;
   }
 
