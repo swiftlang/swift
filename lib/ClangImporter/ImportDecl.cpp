@@ -2039,6 +2039,7 @@ namespace {
       
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl->getCanonicalDecl());
+      result->setCircularityCheck(CircularityCheck::Checked);
 
       // Import protocols this protocol conforms to.
       result->setProtocols(importObjCProtocols(decl->getReferencedProtocols()));
@@ -2141,6 +2142,7 @@ namespace {
                                 { }, nullptr, dc);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl->getCanonicalDecl());
+      result->setCircularityCheck(CircularityCheck::Checked);
 
       // If this Objective-C class has a supertype, import it.
       if (auto objcSuper = decl->getSuperClass()) {

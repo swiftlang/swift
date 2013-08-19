@@ -176,6 +176,16 @@ class alignas(8) Decl {
   enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 10 };
   static_assert(NumProtocolDeclBits <= 32, "fits in an unsigned");
 
+  class ClassDeclBitFields {
+    friend class ClassDecl;
+    unsigned : NumNominalTypeDeclBits;
+
+    /// The stage of the inheritance circularity check for this class.
+    unsigned Circularity : 2;
+  };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 2 };
+  static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
+
   class InfixOperatorDeclBitFields {
     friend class InfixOperatorDecl;
     unsigned : NumDeclBits;
@@ -216,6 +226,7 @@ protected:
     TypeDeclBitFields TypeDeclBits;
     TypeAliasDeclBitFields TypeAliasDeclBits;
     ProtocolDeclBitFields ProtocolDeclBits;
+    ClassDeclBitFields ClassDeclBits;
     InfixOperatorDeclBitFields InfixOperatorDeclBits;
     ImportDeclBitFields ImportDeclBits;
     ExtensionDeclBitFields ExtensionDeclBits;
@@ -1549,6 +1560,16 @@ public:
 
   /// Set the superclass of this class.
   void setSuperclass(Type superclass) { Superclass = superclass; }
+
+  /// Retrieve the status of circularity checking for class inheritance.
+  CircularityCheck getCircularityCheck() const {
+    return static_cast<CircularityCheck>(ClassDeclBits.Circularity);
+  }
+
+  /// Record the current stage of circularity checking.
+  void setCircularityCheck(CircularityCheck circularity) {
+    ClassDeclBits.Circularity = static_cast<unsigned>(circularity);
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

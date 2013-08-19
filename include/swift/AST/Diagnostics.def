@@ -1296,6 +1296,10 @@ ERROR(inheritance_from_non_protocol,sema_tcd,none,
   "inheritance from non-protocol type %0", (Type))
 ERROR(superclass_not_first,sema_tcd,none,
   "superclass %0 must appear first in the inheritance clause", (Type))
+ERROR(circular_class_inheritance,sema_tcd,none,
+      "circular class inheritance %0", (StringRef))
+NOTE(class_here,sema_tcd,none,
+     "class %0 declared here", (Identifier))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

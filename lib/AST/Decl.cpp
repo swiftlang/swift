@@ -599,8 +599,10 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                                          Ctx);
   // Set the type of the ClassDecl to the right MetaTypeType.
   setType(MetaTypeType::get(DeclaredTy, Ctx));
-}
 
+  ClassDeclBits.Circularity
+    = static_cast<unsigned>(CircularityCheck::Unchecked);
+}
 
 UnionElementDecl *UnionDecl::getElement(Identifier Name) const {
   // FIXME: Linear search is not great for large union decls.

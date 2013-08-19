@@ -242,11 +242,47 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
   }
 }
 
-/// Check for circular inheritance among protocols, starting at the given
-/// protocol.
-static void checkProtocolCircularity(TypeChecker &tc, ProtocolDecl *proto,
-                                     SmallVectorImpl<ProtocolDecl *> &path) {
-  switch (proto->getCircularityCheck()) {
+/// Retrieve the set of protocols the given protocol inherits.
+static ArrayRef<ProtocolDecl *> getInheritedForCycleCheck(TypeChecker &tc,
+                                                          ProtocolDecl *proto,
+                                                          ProtocolDecl **scratch) {
+  return tc.getDirectConformsTo(proto);
+}
+
+/// Retrieve the superclass of the given class.
+static ArrayRef<ClassDecl *> getInheritedForCycleCheck(TypeChecker &tc,
+                                                       ClassDecl *classDecl,
+                                                       ClassDecl **scratch) {
+  checkInheritanceClause(tc, classDecl);
+
+  if (classDecl->hasSuperclass()) {
+    *scratch = classDecl->getSuperclass()->getClassOrBoundGenericClass();
+    return *scratch;
+  }
+  return { };
+}
+
+// Break the inheritance cycle for a protocol by removing all inherited
+// protocols.
+//
+// FIXME: Just remove the problematic inheritance?
+static void breakInheritanceCycle(ProtocolDecl *proto) {
+  proto->setProtocols({ });
+  proto->setConformances({ });
+}
+
+/// Break the inheritance cycle for a protocol by removing its superclass.
+static void breakInheritanceCycle(ClassDecl *classDecl) {
+  classDecl->setSuperclass(Type());
+}
+
+/// Check for circular inheritance.
+template<typename T>
+static void checkCircularity(TypeChecker &tc, T *decl,
+                             Diag<StringRef> circularDiag,
+                             Diag<Identifier> declHereDiag,
+                             SmallVectorImpl<T *> &path) {
+  switch (decl->getCircularityCheck()) {
   case CircularityCheck::Checked:
     return;
 
@@ -255,7 +291,7 @@ static void checkProtocolCircularity(TypeChecker &tc, ProtocolDecl *proto,
 
     // Find the beginning of the cycle within the full path.
     auto cycleStart = path.end()-2;
-    while (*cycleStart != proto) {
+    while (*cycleStart != decl) {
       assert(cycleStart != path.begin() && "Missing cycle start?");
       --cycleStart;
     }
@@ -267,28 +303,32 @@ static void checkProtocolCircularity(TypeChecker &tc, ProtocolDecl *proto,
         pathStr += " -> ";
       pathStr += ("'" + (*i)->getName().str() + "'").str();
     }
-    pathStr += (" -> '" + proto->getName().str() + "'").str();
+    pathStr += (" -> '" + decl->getName().str() + "'").str();
 
     // Diagnose the cycle.
-    tc.diagnose(proto->getLoc(), diag::circular_protocol_def, pathStr);
+    tc.diagnose(decl->getLoc(), circularDiag, pathStr);
     for (auto i = cycleStart + 1, iEnd = path.end(); i != iEnd; ++i) {
-      tc.diagnose(*i, diag::protocol_here, (*i)->getName());
+      tc.diagnose(*i, declHereDiag, (*i)->getName());
     }
 
-    proto->setInvalid();
+    // Set this declaration as invalid, then break the cycle somehow.
+    decl->setInvalid();
+    breakInheritanceCycle(decl);
     break;
   }
 
-  case CircularityCheck::Unchecked:
-    // Check the inherited protocols for circular inheritance.
-    path.push_back(proto);
-    proto->setCircularityCheck(CircularityCheck::Checking);
-    for (auto inheritedProto : tc.getDirectConformsTo(proto)) {
-      checkProtocolCircularity(tc, inheritedProto, path);
+  case CircularityCheck::Unchecked: {
+    // Walk to the inherited class or protocols.
+    path.push_back(decl);
+    decl->setCircularityCheck(CircularityCheck::Checking);
+    T *scratch = nullptr;
+    for (auto inherited : getInheritedForCycleCheck(tc, decl, &scratch)) {
+      checkCircularity(tc, inherited, circularDiag, declHereDiag, path);
     }
-    proto->setCircularityCheck(CircularityCheck::Checked);
+    decl->setCircularityCheck(CircularityCheck::Checked);
     path.pop_back();
     break;
+  }
   }
 }
 
@@ -802,6 +842,13 @@ public:
       validateAttributes(CD);
       checkInheritanceClause(TC, CD);
 
+      {
+        // Check for circular inheritance.
+        SmallVector<ClassDecl *, 8> path;
+        checkCircularity(TC, CD, diag::circular_class_inheritance,
+                         diag::class_here, path);
+      }
+
       ClassDecl *superclassDecl = CD->hasSuperclass()
         ? CD->getSuperclass()->getClassOrBoundGenericClass()
         : nullptr;
@@ -829,7 +876,8 @@ public:
     {
       // Check for circular inheritance within the protocol.
       SmallVector<ProtocolDecl *, 8> path;
-      checkProtocolCircularity(TC, PD, path);
+      checkCircularity(TC, PD, diag::circular_protocol_def,
+                       diag::protocol_here, path);
     }
 
     // If the protocol is [objc], it may only refine other [objc] protocols.

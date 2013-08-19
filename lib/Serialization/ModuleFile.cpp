@@ -1135,6 +1135,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     assert(members.hasValue() && "could not read class members");
     theClass->setMembers(members.getValue(), SourceRange());
     theClass->setCheckedInheritanceClause();
+    theClass->setCircularityCheck(CircularityCheck::Checked);
     break;
   }
 
