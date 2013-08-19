@@ -121,9 +121,9 @@ public:
                        const llvm::Twine &name);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
-  const TypeInfo &getFragileTypeInfo(Type T);
-  const TypeInfo &getFragileTypeInfo(CanType T);
-  const TypeInfo &getFragileTypeInfo(SILType T);
+  const TypeInfo &getTypeInfo(Type T);
+  const TypeInfo &getTypeInfo(CanType T);
+  const TypeInfo &getTypeInfo(SILType T);
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,
                   Size size, Alignment align);
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,

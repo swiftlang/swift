@@ -86,7 +86,7 @@ llvm::Value *IRGenFunction::emitDowncast(llvm::Value *from, SILType toType,
   // FIXME: Eventually, we may want to throw.
   call->setDoesNotThrow();
   
-  llvm::Type *subTy = getFragileTypeInfo(toType).StorageType;
+  llvm::Type *subTy = getTypeInfo(toType).StorageType;
   return Builder.CreateBitCast(call, subTy);
   
 }

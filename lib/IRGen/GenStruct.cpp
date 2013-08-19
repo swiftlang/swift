@@ -214,7 +214,7 @@ namespace {
 /// A convenient macro for delegating an operation to all of the
 /// various struct implementations.
 #define FOR_STRUCT_IMPL(IGF, type, op, ...) do {                       \
-  auto &structTI = IGF.getFragileTypeInfo(type);                       \
+  auto &structTI = IGF.getTypeInfo(type);                              \
   if (isa<LoadableStructTypeInfo>(structTI)) {                         \
     return structTI.as<LoadableStructTypeInfo>().op(IGF, __VA_ARGS__); \
   } else if (isa<FixedTypeInfo>(structTI)) {                           \
@@ -301,7 +301,7 @@ const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
     if (VarDecl *VD = dyn_cast<VarDecl>(D))
       if (!VD->isProperty()) {
         // FIXME: Type-parameter-dependent field layout isn't implemented yet.
-        if (!IGM.getFragileTypeInfo(VD->getType()).isFixedSize()) {
+        if (!IGM.getTypeInfo(VD->getType()).isFixedSize()) {
           IGM.unimplemented(VD->getLoc(), "dynamic field layout in structs");
           exit(1);
         }

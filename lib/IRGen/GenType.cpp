@@ -332,18 +332,18 @@ const TypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
 }
 
 /// Get the fragile type information for the given type.
-const TypeInfo &IRGenFunction::getFragileTypeInfo(Type T) {
-  return IGM.getFragileTypeInfo(T->getCanonicalType());
+const TypeInfo &IRGenFunction::getTypeInfo(Type T) {
+  return IGM.getTypeInfo(T->getCanonicalType());
 }
 
 /// Get the fragile type information for the given type.
-const TypeInfo &IRGenFunction::getFragileTypeInfo(CanType T) {
-  return IGM.getFragileTypeInfo(T);
+const TypeInfo &IRGenFunction::getTypeInfo(CanType T) {
+  return IGM.getTypeInfo(T);
 }
 
 /// Get the fragile type information for the given type.
-const TypeInfo &IRGenFunction::getFragileTypeInfo(SILType T) {
-  return IGM.getFragileTypeInfo(T);
+const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
+  return IGM.getTypeInfo(T);
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
@@ -366,17 +366,17 @@ llvm::Type *IRGenModule::getStorageType(CanType T) {
 }
 
 /// Get the fragile type information for the given type.
-const TypeInfo &IRGenModule::getFragileTypeInfo(Type T) {
-  return getFragileTypeInfo(T->getCanonicalType());
+const TypeInfo &IRGenModule::getTypeInfo(Type T) {
+  return getTypeInfo(T->getCanonicalType());
 }
 
 /// Get the fragile type information for the given type.
-const TypeInfo &IRGenModule::getFragileTypeInfo(CanType T) {
+const TypeInfo &IRGenModule::getTypeInfo(CanType T) {
   return Types.getCompleteTypeInfo(T);
 }
 
 /// Get the fragile type information for the given type.
-const TypeInfo &IRGenModule::getFragileTypeInfo(SILType T) {
+const TypeInfo &IRGenModule::getTypeInfo(SILType T) {
   return Types.getCompleteTypeInfo(T.getSwiftRValueType());
 }
 
@@ -419,7 +419,7 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
 }
 
 /// A convenience for grabbing the TypeInfo for a class declaration.
-const TypeInfo &TypeConverter::getFragileTypeInfo(ClassDecl *theClass) {
+const TypeInfo &TypeConverter::getTypeInfo(ClassDecl *theClass) {
   // This type doesn't really matter except for serving as a key.
   CanType theType = theClass->getDeclaredType()->getCanonicalType();
 
@@ -742,7 +742,7 @@ void IRGenModule::getSchema(CanType type, ExplosionSchema &schema) {
   }
 
   // Okay, that didn't work;  just do the general thing.
-  getFragileTypeInfo(type).getSchema(schema);
+  getTypeInfo(type).getSchema(schema);
 }
 
 /// Compute the explosion schema for the given type.
@@ -758,7 +758,7 @@ unsigned IRGenModule::getExplosionSize(CanType type, ExplosionKind kind) {
   }
 
   // If the type isn't loadable, the explosion size is always 1.
-  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&getFragileTypeInfo(type));
+  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&getTypeInfo(type));
   if (!loadableTI) return 1;
 
   // Okay, that didn't work;  just do the general thing.
@@ -784,7 +784,7 @@ llvm::PointerType *IRGenModule::isSingleIndirectValue(CanType type,
 /// Determine whether this type requires an indirect result.
 llvm::PointerType *IRGenModule::requiresIndirectResult(CanType type,
                                                        ExplosionKind kind) {
-  auto &ti = getFragileTypeInfo(type);
+  auto &ti = getTypeInfo(type);
   ExplosionSchema schema = ti.getSchema(kind);
   if (schema.requiresIndirectResult())
     return ti.getStorageType()->getPointerTo();
@@ -802,7 +802,7 @@ bool IRGenModule::isPOD(CanType type, ResilienceScope scope) {
         return false;
     return true;
   }
-  return getFragileTypeInfo(type).isPOD(scope);
+  return getTypeInfo(type).isPOD(scope);
 }
 
 

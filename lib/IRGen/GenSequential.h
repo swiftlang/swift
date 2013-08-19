@@ -333,7 +333,7 @@ public:
     unsigned maximalExplosionSize = 0, minimalExplosionSize = 0;
     for (auto &astField : astFields) {
       // Compute the field's type info.
-      auto &fieldTI = IGM.getFragileTypeInfo(asImpl()->getType(astField));
+      auto &fieldTI = IGM.getTypeInfo(asImpl()->getType(astField));
       assert(fieldTI.isComplete());
       fieldTypesForLayout.push_back(&fieldTI);
 

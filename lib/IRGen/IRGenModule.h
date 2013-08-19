@@ -180,9 +180,9 @@ private:
 //--- Types -----------------------------------------------------------------
 public:
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *D);
-  const TypeInfo &getFragileTypeInfo(CanType T);
-  const TypeInfo &getFragileTypeInfo(Type T);
-  const TypeInfo &getFragileTypeInfo(SILType T);
+  const TypeInfo &getTypeInfo(CanType T);
+  const TypeInfo &getTypeInfo(Type T);
+  const TypeInfo &getTypeInfo(SILType T);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   llvm::Type *getStorageType(CanType T);

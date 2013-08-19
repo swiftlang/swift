@@ -288,7 +288,7 @@ namespace {
     /// the runtime always provides an entry for such a type;  right
     /// now, that mapping is as one of the integer types.
     llvm::Value *visitOpaqueType(CanType type) {
-      auto &opaqueTI = cast<FixedTypeInfo>(IGF.IGM.getFragileTypeInfo(type));
+      auto &opaqueTI = cast<FixedTypeInfo>(IGF.IGM.getTypeInfo(type));
       assert(opaqueTI.getFixedSize() ==
              Size(opaqueTI.getFixedAlignment().getValue()));
       assert(opaqueTI.getFixedSize().isPowerOf2());

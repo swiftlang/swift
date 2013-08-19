@@ -681,7 +681,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
   for (SILArgument *arg : make_range(silBB->bbarg_begin(), silBB->bbarg_end())) {
     size_t first = phis.size();
     
-    const TypeInfo &ti = IGF.getFragileTypeInfo(arg->getType());
+    const TypeInfo &ti = IGF.getTypeInfo(arg->getType());
     
     if (arg->getType().isAddress()) {
       phis.push_back(IGF.Builder.CreatePHI(ti.getStorageType()->getPointerTo(),
@@ -721,18 +721,16 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
   if (funcTI->hasIndirectReturn()) {
     SILArgument *ret = entry->bbarg_begin()[0];
     SILValue retv(ret, 0);
-    TypeInfo const &retType = IGF.IGM.getFragileTypeInfo(ret->getType());
+    auto &retTI = IGF.IGM.getTypeInfo(ret->getType());
     
-    IGF.setLoweredAddress(retv,
-                          retType.getAddressForPointer(params.claimNext()));
+    IGF.setLoweredAddress(retv, retTI.getAddressForPointer(params.claimNext()));
     return entry->getBBArgs().slice(1);
   } else {
     // Map an indirect return for a type SIL considers loadable but still
     // requires an indirect return at the IR level.
     if (requiresIndirectResult()) {
-      TypeInfo const &retType
-        = IGF.IGM.getFragileTypeInfo(funcTI->getResultType());
-      IGF.IndirectReturn = retType.getAddressForPointer(params.claimNext());
+      auto &retTI = IGF.IGM.getTypeInfo(funcTI->getResultType());
+      IGF.IndirectReturn = retTI.getAddressForPointer(params.claimNext());
     }
     return entry->getBBArgs();
   }  
@@ -757,7 +755,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   // Map the remaining SIL parameters to LLVM parameters.
   for (SILArgument *param : params) {
     // Pull out the parameter value and its formal type.
-    auto &paramTI = IGF.getFragileTypeInfo(param->getType());
+    auto &paramTI = IGF.getTypeInfo(param->getType());
 
     // If the SIL parameter isn't passed indirectly, we need to map it
     // to an explosion.  Fortunately, in this case we have a guarantee
@@ -791,7 +789,7 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
                                            Explosion &params,
                                            ArrayRef<SILArgument*> args) {
   for (SILArgument *arg : args) {
-    auto &argTI = IGF.getFragileTypeInfo(arg->getType());
+    auto &argTI = IGF.getTypeInfo(arg->getType());
     if (arg->getType().isAddress()) {
       IGF.setLoweredAddress(arg,
                             argTI.getAddressForPointer(params.claimNext()));
@@ -832,7 +830,7 @@ static void emitEntryPointArgumentsObjCMethodCC(IRGenSILFunction &IGF,
   // Map the self argument. This should always be an ObjC pointer type so
   // should never need to be loaded from a byval.
   SILArgument *selfArg = args[0];
-  TypeInfo const &selfType = IGF.getFragileTypeInfo(selfArg->getType());
+  auto &selfType = IGF.getTypeInfo(selfArg->getType());
   Explosion self(IGF.CurExplosionLevel);
   cast<LoadableTypeInfo>(selfType).reexplode(IGF, params, self);
   IGF.setLoweredExplosion(selfArg, self);
@@ -993,7 +991,7 @@ void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
 
 void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   VarDecl *global = i->getGlobal();
-  TypeInfo const &type = getFragileTypeInfo(global->getType());
+  auto &type = getTypeInfo(global->getType());
   
   Address addr;
   
@@ -1139,9 +1137,8 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
     IGF.getLoweredExplosion(newArg, args);
   } else {
     Explosion temp = IGF.getLoweredExplosion(newArg);
-    auto &newArgType =
-      cast<LoadableTypeInfo>(IGF.getFragileTypeInfo(newArg.getType()));
-    newArgType.reexplode(IGF, temp, args);
+    auto &newArgTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(newArg.getType()));
+    newArgTI.reexplode(IGF, temp, args);
   }
 }
 
@@ -1370,8 +1367,8 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   // If the function takes an indirect return argument, emit into it.
   if (indirectReturn) {
     Address a = getLoweredAddress(indirectReturn);
-    TypeInfo const &ti = getFragileTypeInfo(indirectReturn.getType());
-    emission.emitToMemory(a, ti);
+    auto &retTI = getTypeInfo(indirectReturn.getType());
+    emission.emitToMemory(a, retTI);
     return;
   }
   
@@ -1500,8 +1497,8 @@ static void emitReturnInst(IRGenSILFunction &IGF,
   // Even if SIL has a direct return, the IR-level calling convention may
   // require an indirect return.
   if (IGF.IndirectReturn.isValid()) {
-    auto &retType = cast<LoadableTypeInfo>(IGF.getFragileTypeInfo(resultTy));
-    retType.initialize(IGF, result, IGF.IndirectReturn);
+    auto &retTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(resultTy));
+    retTI.initialize(IGF, result, IGF.IndirectReturn);
     IGF.Builder.CreateRetVoid();
   } else {
     IGF.emitScalarReturn(result);
@@ -1600,7 +1597,7 @@ void IRGenSILFunction::visitTupleInst(swift::TupleInst *i) {
 }
 
 void IRGenSILFunction::visitBuiltinZeroInst(swift::BuiltinZeroInst *i) {
-  auto &ti = getFragileTypeInfo(i->getType());
+  auto &ti = getTypeInfo(i->getType());
   llvm::Value *zeroValue = llvm::Constant::getNullValue(ti.getStorageType());
   Explosion out(ExplosionKind::Maximal);
   out.add(zeroValue);
@@ -1684,7 +1681,7 @@ void IRGenSILFunction::visitModuleInst(swift::ModuleInst *i) {
 void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
   Explosion lowered(ExplosionKind::Maximal);
   Address source = getLoweredAddress(i->getOperand());
-  const TypeInfo &type = getFragileTypeInfo(i->getType().getObjectType());
+  const TypeInfo &type = getTypeInfo(i->getType().getObjectType());
   cast<LoadableTypeInfo>(type).loadAsTake(*this, source, lowered);
   setLoweredExplosion(SILValue(i, 0), lowered);
 }
@@ -1692,9 +1689,7 @@ void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
 void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   Explosion source = getLoweredExplosion(i->getSrc());
   Address dest = getLoweredAddress(i->getDest());
-  const TypeInfo &type = getFragileTypeInfo(
-                              i->getSrc().getType().getObjectType());
-
+  auto &type = getTypeInfo(i->getSrc().getType().getObjectType());
   cast<LoadableTypeInfo>(type).initialize(*this, source, dest);
 }
 
@@ -1705,8 +1700,7 @@ void IRGenSILFunction::visitAssignInst(AssignInst *i) {
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
   Address source = getLoweredAddress(i->getOperand());
-  auto &weakTI =
-    cast<WeakTypeInfo>(getFragileTypeInfo(i->getOperand().getType()));
+  auto &weakTI = cast<WeakTypeInfo>(getTypeInfo(i->getOperand().getType()));
 
   Explosion result(ExplosionKind::Maximal);
   if (i->isTake()) {
@@ -1722,7 +1716,7 @@ void IRGenSILFunction::visitStoreWeakInst(swift::StoreWeakInst *i) {
   Explosion source = getLoweredExplosion(i->getSrc());
   Address dest = getLoweredAddress(i->getDest());
 
-  auto &weakTI = cast<WeakTypeInfo>(getFragileTypeInfo(i->getDest().getType()));
+  auto &weakTI = cast<WeakTypeInfo>(getTypeInfo(i->getDest().getType()));
   if (i->isInitializationOfDest()) {
     weakTI.weakInit(*this, source, dest);
   } else {
@@ -1740,8 +1734,7 @@ void IRGenSILFunction::visitRetainInst(swift::RetainInst *i) {
   }
   
   Explosion lowered = getLoweredExplosion(i->getOperand());
-  auto &ti =
-    cast<ReferenceTypeInfo>(getFragileTypeInfo(i->getOperand().getType()));
+  auto &ti = cast<ReferenceTypeInfo>(getTypeInfo(i->getOperand().getType()));
   ti.retain(*this, lowered);
 }
 
@@ -1755,8 +1748,7 @@ void IRGenSILFunction::visitReleaseInst(swift::ReleaseInst *i) {
   }
   
   Explosion lowered = getLoweredExplosion(i->getOperand());
-  auto &ti =
-    cast<ReferenceTypeInfo>(getFragileTypeInfo(i->getOperand().getType()));
+  auto &ti = cast<ReferenceTypeInfo>(getTypeInfo(i->getOperand().getType()));
   ti.release(*this, lowered);
 }
 
@@ -1774,7 +1766,7 @@ static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
   assert(silType.isObject());
   auto type = silType.getSwiftRValueType();
   type = cast<ReferenceStorageType>(type).getReferentType();
-  return cast<ReferenceTypeInfo>(IGF.getFragileTypeInfo(type));
+  return cast<ReferenceTypeInfo>(IGF.getTypeInfo(type));
 }
 
 void IRGenSILFunction::visitRetainUnownedInst(swift::RetainUnownedInst *i) {
@@ -1797,7 +1789,7 @@ void IRGenSILFunction::visitUnownedReleaseInst(swift::UnownedReleaseInst *i) {
 }
 
 void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
-  const TypeInfo &type = getFragileTypeInfo(i->getElementType());
+  const TypeInfo &type = getTypeInfo(i->getElementType());
 
   // Derive name from SIL location.
   VarDecl *Decl = i->getDecl();
@@ -1828,7 +1820,7 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
-  const TypeInfo &type = getFragileTypeInfo(i->getOperand().getType());
+  const TypeInfo &type = getTypeInfo(i->getOperand().getType());
   Address addr = getLoweredAddress(i->getOperand());
   type.deallocateStack(*this, addr);
 }
@@ -1850,7 +1842,7 @@ static StringRef getNameForLoc(SILLocation loc) {
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   SILValue boxValue(i, 0);
   SILValue ptrValue(i, 1);
-  const TypeInfo &type = getFragileTypeInfo(i->getElementType());
+  const TypeInfo &type = getTypeInfo(i->getElementType());
 
   OwnedAddress addr = type.allocateBox(*this, getNameForLoc(i->getLoc()));
   
@@ -1896,7 +1888,7 @@ void IRGenSILFunction::visitPointerToAddressInst(swift::PointerToAddressInst *i)
   Explosion from = getLoweredExplosion(i->getOperand());
   llvm::Value *ptrValue = from.claimNext();
 
-  auto &ti = getFragileTypeInfo(i->getType());
+  auto &ti = getTypeInfo(i->getType());
   
   llvm::Type *destType = ti.getStorageType()->getPointerTo();
   ptrValue = Builder.CreateBitCast(ptrValue, destType);
@@ -1927,7 +1919,7 @@ void IRGenSILFunction::visitRefToObjectPointerInst(
 
 void IRGenSILFunction::visitObjectPointerToRefInst(
                                              swift::ObjectPointerToRefInst *i) {
-  auto &ti = getFragileTypeInfo(i->getType());
+  auto &ti = getTypeInfo(i->getType());
   llvm::Type *destType = ti.getStorageType();
   emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
                       destType);
@@ -1940,7 +1932,7 @@ void IRGenSILFunction::visitRefToRawPointerInst(
 }
 
 void IRGenSILFunction::visitRawPointerToRefInst(swift::RawPointerToRefInst *i) {
-  auto &ti = getFragileTypeInfo(i->getType());
+  auto &ti = getTypeInfo(i->getType());
   llvm::Type *destType = ti.getStorageType();
   emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
                       destType);
@@ -1986,7 +1978,7 @@ void IRGenSILFunction::visitArchetypeRefToSuperInst(
   llvm::Value *in = archetype.claimNext();
   
   Explosion out(ExplosionKind::Maximal);
-  const TypeInfo &baseTypeInfo = getFragileTypeInfo(i->getType());
+  const TypeInfo &baseTypeInfo = getTypeInfo(i->getType());
   llvm::Type *baseTy = baseTypeInfo.StorageType;
   llvm::Value *cast = Builder.CreateBitCast(in, baseTy);
   out.add(cast);
@@ -2078,7 +2070,7 @@ void IRGenSILFunction::visitUpcastInst(swift::UpcastInst *i) {
   Explosion from = getLoweredExplosion(i->getOperand());
   Explosion to(from.getKind());
   assert(from.size() == 1 && "class should explode to single value");
-  const TypeInfo &toTI = getFragileTypeInfo(i->getType());
+  const TypeInfo &toTI = getTypeInfo(i->getType());
   llvm::Value *fromValue = from.claimNext();
   to.add(Builder.CreateBitCast(fromValue, toTI.getStorageType()));
   setLoweredExplosion(SILValue(i, 0), to);
@@ -2235,7 +2227,7 @@ void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
 
 void IRGenSILFunction::visitInitializeVarInst(swift::InitializeVarInst *i) {
   SILType ty = i->getOperand().getType();
-  TypeInfo const &ti = getFragileTypeInfo(ty);
+  TypeInfo const &ti = getTypeInfo(ty);
   Address dest = getLoweredAddress(i->getOperand());
   Builder.CreateMemSet(Builder.CreateBitCast(dest.getAddress(),
                                              IGM.Int8PtrTy),
@@ -2249,7 +2241,7 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   SILType addrTy = i->getSrc().getType();
   Address src = getLoweredAddress(i->getSrc());
   Address dest = getLoweredAddress(i->getDest());
-  TypeInfo const &addrTI = getFragileTypeInfo(addrTy);
+  TypeInfo const &addrTI = getTypeInfo(addrTy);
 
   unsigned takeAndOrInitialize =
     (i->isTakeOfSrc() << 1U) | i->isInitializationOfDest();
@@ -2276,7 +2268,7 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
 void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   SILType addrTy = i->getOperand().getType();
   Address base = getLoweredAddress(i->getOperand());
-  TypeInfo const &addrTI = getFragileTypeInfo(addrTy);
+  TypeInfo const &addrTI = getTypeInfo(addrTy);
   addrTI.destroy(*this, base);
 }
 

@@ -316,7 +316,7 @@ namespace {
         VarDecl *var = dyn_cast<VarDecl>(member);
         if (!var || var->isProperty()) continue;
 
-        auto &eltType = IGM.getFragileTypeInfo(var->getType());
+        auto &eltType = IGM.getTypeInfo(var->getType());
         // FIXME: Type-parameter-dependent field layout isn't implemented yet.
         if (!eltType.isFixedSize()) {
           IGM.unimplemented(var->getLoc(), "non-fixed class layout");
@@ -376,7 +376,7 @@ static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
                                         llvm::Value *base,
                                         llvm::Value *offset,
                                         VarDecl *field) {
-  auto &fieldTI = IGF.getFragileTypeInfo(field->getType());
+  auto &fieldTI = IGF.getTypeInfo(field->getType());
   auto addr = IGF.emitByteOffsetGEP(base, offset, fieldTI,
                               base->getName() + "." + field->getName().str());
   return OwnedAddress(addr, base);
@@ -386,7 +386,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
                                                       SILType baseType,
                                                       VarDecl *field) {
-  auto &baseClassTI = IGF.getFragileTypeInfo(baseType).as<ClassTypeInfo>();
+  auto &baseClassTI = IGF.getTypeInfo(baseType).as<ClassTypeInfo>();
   ClassDecl *baseClass = baseType.getClassOrBoundGenericClass();
   
   LayoutClass layout(IGF.IGM, ResilienceScope::Local, baseClass,
@@ -446,7 +446,7 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
 
   Type thisType = theClass->getDeclaredTypeInContext();
   const ClassTypeInfo &info =
-    IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
+    IGM.getTypeInfo(thisType).as<ClassTypeInfo>();
   
   llvm::Value *obj = deallocator->getArgumentList().begin();
   obj = IGF.Builder.CreateBitCast(obj, info.getStorageType());
@@ -463,7 +463,7 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType thisType) {
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
-  auto &classTI = IGF.IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
+  auto &classTI = IGF.IGM.getTypeInfo(thisType).as<ClassTypeInfo>();
   auto &layout = classTI.getLayout(IGF.IGM);
 
   llvm::Value *metadata = emitClassHeapMetadataRef(IGF, thisType);
@@ -480,7 +480,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType thisType) {
 void IRGenModule::emitClassDecl(ClassDecl *D) {
   PrettyStackTraceDecl prettyStackTrace("emitting class metadata for", D);
 
-  auto &classTI = Types.getFragileTypeInfo(D).as<ClassTypeInfo>();
+  auto &classTI = Types.getTypeInfo(D).as<ClassTypeInfo>();
   auto &layout = classTI.getLayout(*this);
 
   // Emit the class metadata.
@@ -933,7 +933,7 @@ namespace {
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
       auto typeEncode = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
-      auto &ivarTI = IGM.getFragileTypeInfo(ivar->getType());
+      auto &ivarTI = IGM.getTypeInfo(ivar->getType());
       Size size;
       Alignment alignment;
       if (auto fixedTI = dyn_cast<FixedTypeInfo>(&ivarTI)) {
@@ -1139,7 +1139,7 @@ llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
                                             ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
   CanType type = cls->getDeclaredTypeInContext()->getCanonicalType();
-  auto &classTI = IGM.getFragileTypeInfo(type).as<ClassTypeInfo>();
+  auto &classTI = IGM.getTypeInfo(type).as<ClassTypeInfo>();
   auto &fieldLayout = classTI.getLayout(IGM);
   LayoutClass layout(IGM, ResilienceScope::Universal, cls, type);
   ClassDataBuilder builder(IGM, cls, layout, fieldLayout);

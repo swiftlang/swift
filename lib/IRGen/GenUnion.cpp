@@ -896,7 +896,7 @@ static void emitInjectionFunction(IRGenModule &IGM,
     emitPolymorphicParameters(IGF, polyFn, explosion);
   }
   const UnionTypeInfo &unionTI =
-    IGM.getFragileTypeInfo(ood->getDeclaredTypeInContext()).as<UnionTypeInfo>();
+    IGM.getTypeInfo(ood->getDeclaredTypeInContext()).as<UnionTypeInfo>();
   unionTI.emitInjectionFunctionBody(IGF, elt, explosion);
 }
 
@@ -1042,7 +1042,6 @@ void irgen::emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
                                   llvm::BasicBlock *defaultDest) {
   assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
          && "not of a union type");
-  auto &unionTI
-    = static_cast<const UnionTypeInfo &>(IGF.getFragileTypeInfo(unionTy));
+  auto &unionTI = IGF.getTypeInfo(unionTy).as<UnionTypeInfo>();
   unionTI.emitSwitch(IGF, unionValue, dests, defaultDest);
 }

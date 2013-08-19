@@ -185,7 +185,7 @@ static void bindNecessaryBindings(IRGenFunction &IGF,
 
 /// Compute the basic information for how to lay out a heap array.
 HeapArrayInfo::HeapArrayInfo(IRGenFunction &IGF, CanType T)
-  : ElementTI(IGF.getFragileTypeInfo(T)), Bindings(IGF.IGM, T) {}
+  : ElementTI(IGF.getTypeInfo(T)), Bindings(IGF.IGM, T) {}
 
 /// Lay out the allocation in this IGF.
 HeapArrayInfo::Layout HeapArrayInfo::getLayout(IRGenFunction &IGF) const {

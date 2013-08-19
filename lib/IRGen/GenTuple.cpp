@@ -252,7 +252,7 @@ const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
 /// A convenient macro for delegating an operation to all of the
 /// various tuple implementations.
 #define FOR_TUPLE_IMPL(IGF, type, op, ...) do {                      \
-  auto &tupleTI = IGF.getFragileTypeInfo(type);                      \
+  auto &tupleTI = IGF.getTypeInfo(type);                             \
   if (isa<LoadableTypeInfo>(tupleTI)) {                              \
     return tupleTI.as<LoadableTupleTypeInfo>().op(IGF, __VA_ARGS__); \
   } else if (isa<FixedTypeInfo>(tupleTI)) {                          \

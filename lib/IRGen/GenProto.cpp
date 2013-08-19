@@ -1171,7 +1171,7 @@ namespace {
   /// archetype.
   static const ArchetypeTypeInfoBase &
   getArchetypeInfo(IRGenFunction &IGF, ArchetypeType *t) {
-    const TypeInfo &ti = IGF.getFragileTypeInfo(t);
+    const TypeInfo &ti = IGF.getTypeInfo(t);
     if (t->requiresClass())
       return ti.as<ClassArchetypeTypeInfo>();
     return ti.as<OpaqueArchetypeTypeInfo>();
@@ -2407,8 +2407,7 @@ namespace {
       }
 
       // Peel off the result address if necessary.
-      auto &sigResultTI =
-        IGF.getFragileTypeInfo(argSite.getSigResultType());
+      auto &sigResultTI = IGF.getTypeInfo(argSite.getSigResultType());
       llvm::Value *sigResultAddr = nullptr;
       if (sigResultTI.getSchema(ExplosionLevel).requiresIndirectResult()) {
         sigResultAddr = sigParams.claimNext();
@@ -2466,7 +2465,7 @@ namespace {
           CanType(cast<LValueType>(sigThisType)->getObjectType());
         assert(isa<ArchetypeType>(sigThisTypeForImpl));
 
-        auto &remappedThisTI = IGF.getFragileTypeInfo(implThisType);
+        auto &remappedThisTI = IGF.getTypeInfo(implThisType);
 
         // It's an l-value, so the final value is the address.  Cast to T*.
         auto sigThisValue = sigClause.takeLast();
@@ -2512,7 +2511,7 @@ namespace {
       // Emit the call.
       CanType sigResultType = argSite.getSigResultType();
       CanType implResultType = argSite.getImplResultType();
-      auto &implResultTI = IGM.getFragileTypeInfo(implResultType);
+      auto &implResultTI = IGM.getTypeInfo(implResultType);
 
       // If we have a result address, emit to memory.
       if (sigResultAddr) {
@@ -2780,7 +2779,7 @@ static llvm::Constant *buildWitnessTable(IRGenModule &IGM,
 /// be non-dependent.
 llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
                                              CanType concreteType) {
-  auto &concreteTI = IGM.getFragileTypeInfo(concreteType);
+  auto &concreteTI = IGM.getTypeInfo(concreteType);
   FixedPacking packing = computePacking(IGM, concreteTI);
 
   SmallVector<llvm::Constant*, NumRequiredValueWitnesses> witnesses;
@@ -2973,7 +2972,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
       ClassDecl *superClass = super->getClassOrBoundGenericClass();
       swiftRefcount = hasSwiftRefcount(IGM, superClass);
       
-      auto &superTI = IGM.getFragileTypeInfo(super);
+      auto &superTI = IGM.getTypeInfo(super);
       reprTy = cast<llvm::PointerType>(superTI.StorageType);
     }
     
@@ -3442,7 +3441,7 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
 
   // Otherwise, we can construct the witnesses from the protocol
   // conformances.
-  auto &replTI = IGF.getFragileTypeInfo(replType);
+  auto &replTI = IGF.getTypeInfo(replType);
 
   assert(archetypeProtos.size() == sub.Conformance.size());
   for (unsigned j = 0, je = archetypeProtos.size(); j != je; ++j) {
@@ -3528,7 +3527,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
     if (protocols.empty())
       continue;
 
-    auto &argTI = IGF.getFragileTypeInfo(argType);
+    auto &argTI = IGF.getTypeInfo(argType);
 
     // Add witness tables for each of the required protocols.
     for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
@@ -3651,7 +3650,7 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
   
   // All other source types should be concrete enough that we have conformance
   // info for them.
-  auto &srcTI = IGF.getFragileTypeInfo(srcType);
+  auto &srcTI = IGF.getTypeInfo(srcType);
 
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
     ProtocolDecl *proto = protocols[i].getProtocol();
@@ -3677,8 +3676,8 @@ void irgen::emitOpaqueExistentialContainerUpcast(IRGenFunction &IGF,
   assert(!destType.isClassExistentialType());
   assert(srcType.isExistentialType());
   assert(!srcType.isClassExistentialType());
-  auto &destTI = IGF.getFragileTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
-  auto &srcTI = IGF.getFragileTypeInfo(srcType).as<OpaqueExistentialTypeInfo>();
+  auto &destTI = IGF.getTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
+  auto &srcTI = IGF.getTypeInfo(srcType).as<OpaqueExistentialTypeInfo>();
 
   auto destLayout = destTI.getLayout();
   auto srcLayout = srcTI.getLayout();
@@ -3736,10 +3735,8 @@ void irgen::emitClassExistentialContainerUpcast(IRGenFunction &IGF,
                                                        SILType srcType) {
   assert(destType.isClassExistentialType());
   assert(srcType.isClassExistentialType());
-  auto &destTI = IGF.getFragileTypeInfo(destType)
-    .as<ClassExistentialTypeInfo>();
-  auto &srcTI = IGF.getFragileTypeInfo(srcType)
-    .as<ClassExistentialTypeInfo>();
+  auto &destTI = IGF.getTypeInfo(destType).as<ClassExistentialTypeInfo>();
+  auto &srcTI = IGF.getTypeInfo(srcType).as<ClassExistentialTypeInfo>();
 
   ArrayRef<llvm::Value*> srcTables;
   llvm::Value *instance;
@@ -3764,7 +3761,7 @@ void irgen::emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
                                                  SILType type) {
   assert(type.isExistentialType());
   assert(!type.isClassExistentialType());
-  auto &ti = IGF.getFragileTypeInfo(type).as<OpaqueExistentialTypeInfo>();
+  auto &ti = IGF.getTypeInfo(type).as<OpaqueExistentialTypeInfo>();
   auto layout = ti.getLayout();
   
   llvm::Value *metadata = layout.loadMetadataRef(IGF, container);
@@ -3783,8 +3780,7 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
   assert(outType.isClassExistentialType() &&
          "creating a non-class existential type");
   
-  auto &destTI = IGF.getFragileTypeInfo(outType)
-    .as<ClassExistentialTypeInfo>();
+  auto &destTI = IGF.getTypeInfo(outType).as<ClassExistentialTypeInfo>();
   
   // Emit the witness table pointers.
   forEachProtocolWitnessTable(IGF, instanceType, outType,
@@ -3809,8 +3805,8 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                                   ArrayRef<ProtocolConformance*> conformances) {
   assert(!destType.isClassExistentialType() &&
          "initializing a class existential container as opaque");
-  auto &destTI = IGF.getFragileTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
-  auto &srcTI = IGF.getFragileTypeInfo(srcType);
+  auto &destTI = IGF.getTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
+  auto &srcTI = IGF.getTypeInfo(srcType);
   OpaqueExistentialLayout destLayout = destTI.getLayout();
   assert(destTI.getProtocols().size() == conformances.size());
   
@@ -3948,7 +3944,7 @@ irgen::emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
          "emitting class existential as opaque existential");
   // The protocol we're calling on.
   // TODO: support protocol compositions here.
-  auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
+  auto &baseTI = IGF.getTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
   
   // The function we're going to call.
   // FIXME: Support getters and setters (and curried entry points?)
@@ -3979,8 +3975,7 @@ void irgen::emitClassProtocolMethodValue(IRGenFunction &IGF,
   assert(baseTy.isClassExistentialType());
 
   // The protocol we're calling on.
-  auto &baseTI = IGF.getFragileTypeInfo(baseTy)
-    .as<ClassExistentialTypeInfo>();
+  auto &baseTI = IGF.getTypeInfo(baseTy).as<ClassExistentialTypeInfo>();
   
   // The function we're going to call.
   // FIXME: Support getters and setters (and curried entry points?)
@@ -4017,7 +4012,7 @@ irgen::emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF, Address addr,
                                                CanType type) {
   assert(type->isExistentialType());
   assert(!type->isClassExistentialType());
-  auto &baseTI = IGF.getFragileTypeInfo(type).as<OpaqueExistentialTypeInfo>();
+  auto &baseTI = IGF.getTypeInfo(type).as<OpaqueExistentialTypeInfo>();
 
   // Get the static metadata.
   auto existLayout = baseTI.getLayout();
@@ -4034,8 +4029,7 @@ irgen::emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
                                                      Explosion &value,
                                                      CanType type) {
   assert(type->isClassExistentialType());
-  auto &baseTI = IGF.getFragileTypeInfo(type)
-    .as<ClassExistentialTypeInfo>();
+  auto &baseTI = IGF.getTypeInfo(type).as<ClassExistentialTypeInfo>();
   
   // Extract the class instance pointer.
   llvm::Value *instance = baseTI.getValue(IGF, value);
@@ -4051,7 +4045,7 @@ emitOpaqueExistentialProjectionWithMetadata(IRGenFunction &IGF,
                                             SILType baseTy) {
   assert(baseTy.isExistentialType());
   assert(!baseTy.isClassExistentialType());
-  auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
+  auto &baseTI = IGF.getTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
   auto layout = baseTI.getLayout();
 
   llvm::Value *metadata = layout.loadMetadataRef(IGF, base);
@@ -4074,8 +4068,7 @@ llvm::Value *irgen::emitClassExistentialProjection(IRGenFunction &IGF,
                                                           Explosion &base,
                                                           SILType baseTy) {
   assert(baseTy.isClassExistentialType());
-  auto &baseTI = IGF.getFragileTypeInfo(baseTy)
-    .as<ClassExistentialTypeInfo>();
+  auto &baseTI = IGF.getTypeInfo(baseTy).as<ClassExistentialTypeInfo>();
   
   return baseTI.getValue(IGF, base);
 }
@@ -4108,7 +4101,7 @@ emitOpaqueDowncast(IRGenFunction &IGF,
   call->setDoesNotThrow();
   
   // Convert the cast address to the destination type.
-  auto &destTI = IGF.getFragileTypeInfo(destType);
+  auto &destTI = IGF.getTypeInfo(destType);
   llvm::Value *ptr = IGF.Builder.CreateBitCast(call,
                                            destTI.StorageType->getPointerTo());
   return destTI.getAddressForPointer(ptr);
