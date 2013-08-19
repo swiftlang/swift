@@ -550,9 +550,9 @@ public:
   // may be able to integrate exhaustive pattern parsing in var/func decls
   // with matching pattern parsing when it matures.
   
-  NullablePtr<Pattern> parseMatchingPattern();
-  NullablePtr<Pattern> parseMatchingPatternVar();
-  NullablePtr<Pattern> parseMatchingPatternIsa();
+  ParserResult<Pattern> parseMatchingPattern();
+  ParserResult<Pattern> parseMatchingPatternVar();
+  ParserResult<Pattern> parseMatchingPatternIsa();
   
   /// \brief Determine whether this token can only start a matching pattern
   /// production and not an expression.

@@ -844,7 +844,7 @@ bool Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
       // Parse comma-separated patterns.
       SmallVector<Pattern *, 2> patterns;
       do {
-        NullablePtr<Pattern> pattern = parseMatchingPattern();
+        ParserResult<Pattern> pattern = parseMatchingPattern();
         if (pattern.isNull())
           return true;
         // Add variable bindings from the pattern to the case scope.

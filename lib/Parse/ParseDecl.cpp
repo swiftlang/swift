@@ -1685,7 +1685,7 @@ bool Parser::parseDeclUnionElement(unsigned Flags,
   // For recovery, see if the user typed something resembling a switch "case"
   // label.
   if (!Tok.is(tok::identifier)) {
-    NullablePtr<Pattern> pattern = parseMatchingPattern();
+    ParserResult<Pattern> pattern = parseMatchingPattern();
     if (pattern.isNull())
       return true;
     diagnose(CaseLoc, diag::case_outside_of_switch, "case");

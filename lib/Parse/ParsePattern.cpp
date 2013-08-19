@@ -441,7 +441,7 @@ ParserResult<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
       Context, LPLoc, elts, RPLoc, EllipsisLoc.isValid(), EllipsisLoc));
 }
 
-NullablePtr<Pattern> Parser::parseMatchingPattern() {
+ParserResult<Pattern> Parser::parseMatchingPattern() {
   // TODO: Since we expect a pattern in this position, we should optimistically
   // parse pattern nodes for productions shared by pattern and expression
   // grammar. For short-term ease of initial implementation, we always go
@@ -454,7 +454,7 @@ NullablePtr<Pattern> Parser::parseMatchingPattern() {
   }
   // matching-pattern ::= '_'
   if (Tok.is(tok::kw__)) {
-    return new (Context) AnyPattern(consumeToken());
+    return makeParserResult(new (Context) AnyPattern(consumeToken()));
   }
   // matching-pattern ::= 'is' type
   if (Tok.is(tok::kw_is)) {
@@ -468,10 +468,10 @@ NullablePtr<Pattern> Parser::parseMatchingPattern() {
   if (subExpr.isNull())
     return nullptr;
   
-  return new (Context) ExprPattern(subExpr.get());
+  return makeParserResult(new (Context) ExprPattern(subExpr.get()));
 }
 
-NullablePtr<Pattern> Parser::parseMatchingPatternVar() {
+ParserResult<Pattern> Parser::parseMatchingPatternVar() {
   // 'var' patterns shouldn't nest.
   if (VarPatternDepth >= 1)
     diagnose(Tok.getLoc(), diag::var_pattern_in_var);
@@ -479,17 +479,18 @@ NullablePtr<Pattern> Parser::parseMatchingPatternVar() {
   VarPatternScope scope(*this);
   
   SourceLoc varLoc = consumeToken(tok::kw_var);
-  NullablePtr<Pattern> subPattern = parseMatchingPattern();
-  if (subPattern.isNull()) return nullptr;
-  return new (Context) VarPattern(varLoc, subPattern.get());
+  ParserResult<Pattern> subPattern = parseMatchingPattern();
+  if (subPattern.isNull())
+    return nullptr;
+  return makeParserResult(new (Context) VarPattern(varLoc, subPattern.get()));
 }
 
-NullablePtr<Pattern> Parser::parseMatchingPatternIsa() {
+ParserResult<Pattern> Parser::parseMatchingPatternIsa() {
   SourceLoc isLoc = consumeToken(tok::kw_is);
   TypeRepr *castType = parseType();
   if (!castType)
     return nullptr;
-  return new (Context) IsaPattern(isLoc, castType);
+  return makeParserResult(new (Context) IsaPattern(isLoc, castType));
 }
 
 bool Parser::isOnlyStartOfMatchingPattern() {

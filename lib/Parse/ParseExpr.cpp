@@ -186,7 +186,7 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
   // If we see a pattern in expr position, parse it to an UnresolvedPatternExpr.
   // Name binding will resolve whether it's in a valid pattern position.
   if (isOnlyStartOfMatchingPattern()) {
-    NullablePtr<Pattern> pattern = parseMatchingPattern();
+    ParserResult<Pattern> pattern = parseMatchingPattern();
     if (pattern.isNull())
       return nullptr;
     return new (Context) UnresolvedPatternExpr(pattern.get());
