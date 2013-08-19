@@ -1523,7 +1523,7 @@ void toString (NodePointer pointer, DemanglerPrinter& printer) {
       printer << "type metadata for ";
       break;
     case swift::Demangle::Node::Kind::ValueWitnessKind:
-      printer << pointer->getText() << "value witness for ";
+      printer << pointer->getText() << " value witness for ";
       break;
     case swift::Demangle::Node::Kind::ValueWitnessTable:
       printer << "value witness table for ";
