@@ -112,36 +112,61 @@ namespace {
       return ExtraTagBitCount > 0 ? 2 : 1;
     }
     
+    Address projectPayload(IRGenFunction &IGF, Address addr) const {
+      return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
+    }
+    
+    Address projectExtraTagBits(IRGenFunction &IGF, Address addr) const {
+      assert(ExtraTagBitCount > 0 && "does not have extra tag bits");
+      return IGF.Builder.CreateStructGEP(addr, 1,
+                                         PayloadTypeInfo->getFixedSize());
+    }
+    
     void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      // FIXME
+      // FIXME handle non-trivial payloads
+      e.add(IGF.Builder.CreateLoad(projectPayload(IGF, addr)));
+      if (ExtraTagBitCount > 0)
+        e.add(IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr)));
     }
     
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      // FIXME
+      e.add(IGF.Builder.CreateLoad(projectPayload(IGF, addr)));
+      if (ExtraTagBitCount > 0)
+        e.add(IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr)));
     }
     
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      // FIXME
+      // FIXME handle non-trivial payloads
+      IGF.Builder.CreateStore(e.claimNext(), projectPayload(IGF, addr));
+      if (ExtraTagBitCount > 0)
+        IGF.Builder.CreateStore(e.claimNext(), projectExtraTagBits(IGF, addr));
     }
     
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
-      // FIXME
+      // FIXME handle non-trivial payloads
+      auto *v = IGF.Builder.CreateLoad(src);
+      IGF.Builder.CreateStore(v, dest);
     }
     
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
-      // FIXME
+      // FIXME handle non-trivial payloads
+      auto *v = IGF.Builder.CreateLoad(src);
+      IGF.Builder.CreateStore(v, dest);
     }
     
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      // FIXME
+      IGF.Builder.CreateStore(e.claimNext(), projectPayload(IGF, addr));
+      if (ExtraTagBitCount > 0)
+        IGF.Builder.CreateStore(e.claimNext(), projectExtraTagBits(IGF, addr));
     }
     
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      // FIXME
+      dest.add(src.claim(getExplosionSize(ExplosionKind::Minimal)));
     }
     
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      // FIXME
+      // FIXME handle non-trivial payloads
+      dest.add(src.claim(getExplosionSize(ExplosionKind::Minimal)));
     }
     
     void destroy(IRGenFunction &IGF, Address addr) const {
