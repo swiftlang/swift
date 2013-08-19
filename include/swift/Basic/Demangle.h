@@ -1,4 +1,5 @@
-//===--- Demangle.h - Interface to Swift symbol demangling -----------------===//
+//===--- Demangle.h - Interface to Swift symbol demangling
+//-----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -23,124 +24,69 @@
 
 namespace swift {
 namespace Demangle {
-  class Node;
-  typedef llvm::IntrusiveRefCntPtr<Node> NodePointer;
-  class Node : public llvm::RefCountedBase<Node>
-  {
-  public:
-    typedef llvm::SmallVector<NodePointer,10> ChildNodes;
-    typedef ChildNodes::iterator iterator;
-    typedef ChildNodes::const_iterator const_iterator;
-    typedef ChildNodes::size_type size_type;
-    
-    enum class Kind {
-      Failure = 0,
-      Module,
-      Class,
-      Structure,
-      Union,
-      Protocol,
-      Substitution,
-      TypeName,
-      MetaType,
-      ReturnType,
-      Constructor,
-      Destructor,
-      BaseName,
-      ObjCAttribute,
-      Directness,
-      GenericTypeMetadataPattern,
-      ProtocolWitness,
-      Metaclass,
-      TypeMetadata,
-      ArrayType,
-      Number,
-      BuiltinTypeName,
-      FunctionType,
-      UncurriedFunctionType,
-      UncurriedFunctionMetaType,
-      UncurriedFunctionFunctionType,
-      ObjCBlock,
-      GenericTypeApplication,
-      TypeList,
-      ArgumentTuple,
-      ValueWitnessKind,
-      ValueWitnessTable,
-      WitnessTableOffset,
-      FieldOffset,
-      ProtocolWitnessTable,
-      LazyProtocolWitnessTableAccessor,
-      LazyProtocolWitnessTableTemplate,
-      DependentProtocolWitnessTableGenerator,
-      DependentProtocolWitnessTableTemplate,
-      BridgeToBlockFunction,
-      ProtocolConformance,
-      PrefixOperator,
-      PostfixOperator,
-      InfixOperator,
-      Identifier,
-      DeclIdentifier,
-      LocalEntity,
-      Deallocator,
-      Allocator,
-      Declaration,
-      Addressor,
-      Getter,
-      Setter,
-      VariadicTuple,
-      NonVariadicTuple,
-      TupleElement,
-      ProtocolList,
-      ArchetypeRef,
-      ArchetypeAndProtocol,
-      ArchetypeList,
-      ByRef,
-      GenericType,
-      Unowned,
-      Weak,
-      Unknown,
-      TupleElementName,
-      TupleElementType,
-      TypeListEntry,
-      FunctionName,
-      NominalType
-    };
-    
-    Node (Kind k, std::string t = "");
-    
-    llvm::StringRef getText();
-    void setText(std::string t);
-    
-    Kind getKind();
-    void setKind(Kind k);
-    
-    NodePointer getNextNode();
-    void setNextNode(NodePointer n);
-    void insertNextNode(NodePointer n);
-    
-    void push_back_child(NodePointer c);
-    void push_front_child(NodePointer c);
-    void insert_child(iterator i, NodePointer c);
-    
-    NodePointer child_at (size_type pos);
-    
-    iterator begin();
-    iterator end();
-    
-    const_iterator begin() const;
-    const_iterator end() const;
-    
-    size_type size();
-    
-    static NodePointer makeNodePointer (Kind k, std::string t = "");
-    
-  private:
-    Node* ParentNode;
-    std::string TextContent;
-    Kind NodeKind;
-    NodePointer NextNode;
-    ChildNodes Children;
+class Node;
+typedef llvm::IntrusiveRefCntPtr<Node> NodePointer;
+class Node : public llvm::RefCountedBase<Node> {
+public:
+  typedef llvm::SmallVector<NodePointer, 10> ChildNodes;
+  typedef ChildNodes::iterator iterator;
+  typedef ChildNodes::const_iterator const_iterator;
+  typedef ChildNodes::size_type size_type;
+
+  enum class Kind {
+    Failure = 0, Module, Class, Structure, Union, Protocol, Substitution,
+    TypeName, MetaType, ReturnType, Constructor, Destructor, BaseName,
+    ObjCAttribute, Directness, GenericTypeMetadataPattern, ProtocolWitness,
+    Metaclass, TypeMetadata, ArrayType, Number, BuiltinTypeName, FunctionType,
+    UncurriedFunctionType, UncurriedFunctionMetaType,
+    UncurriedFunctionFunctionType, ObjCBlock, GenericTypeApplication, TypeList,
+    ArgumentTuple, ValueWitnessKind, ValueWitnessTable, WitnessTableOffset,
+    FieldOffset, ProtocolWitnessTable, LazyProtocolWitnessTableAccessor,
+    LazyProtocolWitnessTableTemplate, DependentProtocolWitnessTableGenerator,
+    DependentProtocolWitnessTableTemplate, BridgeToBlockFunction,
+    ProtocolConformance, PrefixOperator, PostfixOperator, InfixOperator,
+    Identifier, DeclIdentifier, LocalEntity, Deallocator, Allocator,
+    Declaration, Addressor, Getter, Setter, VariadicTuple, NonVariadicTuple,
+    TupleElement, ProtocolList, ArchetypeRef, ArchetypeAndProtocol,
+    ArchetypeList, ByRef, GenericType, Unowned, Weak, Unknown, TupleElementName,
+    TupleElementType, TypeListEntry, FunctionName, NominalType
   };
+
+  Node(Kind k, std::string t = "");
+
+  llvm::StringRef getText();
+  void setText(std::string t);
+
+  Kind getKind();
+  void setKind(Kind k);
+
+  NodePointer getNextNode();
+  void setNextNode(NodePointer n);
+  void insertNextNode(NodePointer n);
+
+  void push_back_child(NodePointer c);
+  void push_front_child(NodePointer c);
+  void insert_child(iterator i, NodePointer c);
+
+  NodePointer child_at(size_type pos);
+
+  iterator begin();
+  iterator end();
+
+  const_iterator begin() const;
+  const_iterator end() const;
+
+  size_type size();
+
+  static NodePointer makeNodePointer(Kind k, std::string t = "");
+
+private:
+  Node *ParentNode;
+  std::string TextContent;
+  Kind NodeKind;
+  NodePointer NextNode;
+  ChildNodes Children;
+};
 /// \brief Demangle the given string as a Swift symbol.
 ///
 /// Typical usage:
@@ -152,9 +98,10 @@ namespace Demangle {
 /// \param mangled The mangled string.
 ///
 ///
-/// \returns A parse tree for the demangled string - or a Failure node on failure.
+/// \returns A parse tree for the demangled string - or a Failure node on
+/// failure.
 ///
-NodePointer demangleSymbolAsNode (llvm::StringRef mangled);
+NodePointer demangleSymbolAsNode(llvm::StringRef mangled);
 /// \brief Transform the node structure in a string.
 ///
 /// Typical usage:
@@ -182,7 +129,7 @@ std::string nodeToString(NodePointer pointer);
 ///
 /// \returns A string representing the demangled name.
 ///
-std::string demangleSymbolAsString (llvm::StringRef mangled);
+std::string demangleSymbolAsString(llvm::StringRef mangled);
 } // end namespace Demangle
 } // end namespace swift
 
