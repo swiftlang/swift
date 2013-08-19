@@ -76,6 +76,13 @@ unsigned getLLVMIntrinsicID(StringRef Name, bool HasArgTypes);
 /// Returns null if the name does not identifier a known builtin value.
 ValueDecl *getBuiltinValue(ASTContext &Context, Identifier Name);
 
+/// BuiltinValueKind - The set of (possibly overloaded) builtin functions.
+enum class BuiltinValueKind {
+  None,
+#define BUILTIN(Id, Name) Id,
+#include "swift/AST/Builtins.def"
+};
+
 }
 
 #endif

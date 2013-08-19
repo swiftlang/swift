@@ -12,13 +12,14 @@
 
 #define DEBUG_TYPE "constant-propagation"
 
+#include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/Subsystems.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/IR/Intrinsics.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -32,10 +33,9 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                          diag, std::forward<U>(args)...);
 }
 
-static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
-                                           BuiltinFunctionRefInst *FR,
-                                           SILModule &M) {
-  llvm::Intrinsic::ID ID = FR->getIntrinsicID();
+static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
+                                             llvm::Intrinsic::ID ID,
+                                             SILModule &M) {
   OperandValueArrayRef Args = AI->getArguments();
 
   if (Args.size() == 2) {
@@ -109,6 +109,71 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
       }
     }
   }
+  return nullptr;
+}
+
+static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
+                                           BuiltinFunctionRefInst *FR,
+                                           SILModule &M) {
+  llvm::Intrinsic::ID ID = FR->getIntrinsicID();
+
+  // If it's an llvm intrinsic, fold the intrinsic.
+  if (ID != llvm::Intrinsic::not_intrinsic) {
+    return constantFoldIntrinsic(AI, ID, M);
+  }
+
+  // Otherwise, it should be one of the builin functions.
+  OperandValueArrayRef Args = AI->getArguments();
+  SmallVector<Type, 4> Types;
+  StringRef OperationName = getBuiltinBaseName(M.getASTContext(),
+                                            FR->getFunction()->getName().str(),
+                                            Types);
+
+  // FIXME: Make this faster by introducing a global cache, like in the
+  // intrinsics case.
+  BuiltinValueKind BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
+#define BUILTIN(id, name) \
+    .Case(name, BuiltinValueKind::id)
+#include "swift/AST/Builtins.def"
+    .Default(BuiltinValueKind::None);
+
+  switch (BV) {
+    default: break;
+    case BuiltinValueKind::Trunc:
+    case BuiltinValueKind::ZExt:
+    case BuiltinValueKind::SExt: {
+
+      // We can fold if the value being cast is a constant.
+      IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+      if (!V)
+        return nullptr;
+
+      // Get the cast result.
+      APInt CastResV;
+      Type DestTy = Types.size() == 2 ? Types[1] : Type();
+      uint32_t DestBitWidth =
+        DestTy->castTo<BuiltinIntegerType>()->getBitWidth();
+      switch (BV) {
+        default : llvm_unreachable("Invalid case.");
+        case BuiltinValueKind::Trunc:
+          CastResV = V->getValue().trunc(DestBitWidth);
+          break;
+        case BuiltinValueKind::ZExt:
+          CastResV = V->getValue().zext(DestBitWidth);
+          break;
+        case BuiltinValueKind::SExt:
+          CastResV = V->getValue().sext(DestBitWidth);
+          break;
+      }
+
+      // Add the literal instruction to represnet the result of the cast.
+      SILBuilder B(AI);
+      return B.createIntegerLiteral(AI->getLoc(),
+                                    SILType::getPrimitiveType(CanType(DestTy),
+                                                      SILValueCategory::Object),
+                                    CastResV);
+    }
+    }
   return nullptr;
 }
 

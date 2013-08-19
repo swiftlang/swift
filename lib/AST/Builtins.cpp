@@ -100,17 +100,6 @@ StringRef swift::getBuiltinBaseName(ASTContext &C, StringRef Name,
   return Name;
 }
 
-namespace {
-  /// BuiltinValueKind - The set of (possibly overloaded) builtin functions.
-  enum class BuiltinValueKind {
-    None,
-    
-#define BUILTIN(Id, Name) Id,
-#include "swift/AST/Builtins.def"
-  };
-}
-
-
 /// Build a builtin function declaration.
 static FuncDecl *getBuiltinFunction(ASTContext &Context, Identifier Id, Type T){
   return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(),

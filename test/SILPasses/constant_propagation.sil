@@ -2,7 +2,7 @@
 import Builtin
 
 // Compute an expression using a chain of arithmetic with overflow instructions: 2 * (2 + 3) - 3
-sil @fold_sadd_with_overflow : $[thin] () -> Builtin.Int64 {
+sil @fold_arithmetic_with_overflow : $[thin] () -> Builtin.Int64 {
 bb0:
  %1 = builtin_function_ref #Builtin.int_sadd_with_overflow_Int64 : $[thin] (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
  %2 = builtin_function_ref #Builtin.int_smul_with_overflow_Int64 : $[thin] (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
@@ -16,7 +16,8 @@ bb0:
  %22 = apply %3(%21, %110) : $[thin] (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
  %23 = tuple_extract %22 : $(Builtin.Int64, Builtin.Int1), 0
  return %23 : $Builtin.Int64
-// CHECK-LABEL: sil @fold_sadd_with_overflow
+
+// CHECK-LABEL: sil @fold_arithmetic_with_overflow
 // CHECK-NOT: builtin_function_ref #Builtin.int_sadd_with_overflow_Int64
 // CHECK-NOT: builtin_function_ref #Builtin.int_smul_with_overflow_Int64
 // CHECK-NOT: builtin_function_ref #Builtin.int_ssub_with_overflow_Int64
@@ -28,3 +29,31 @@ bb0:
 // CHECK-NEXT: return [[RES:%.*]] : $Builtin.Int64
 }
 
+// Fold casts.
+sil @fold_trunc : $[thin] () -> Builtin.Int64 {
+bb0:
+ %0 = integer_literal $Builtin.Int128, 22
+ %1 = builtin_function_ref #Builtin.trunc_Int128_Int64 : $[thin] Builtin.Int128 -> Builtin.Int64
+ %2 = apply %1(%0) : $[thin] Builtin.Int128 -> Builtin.Int64
+ br bb4(%2 : $Builtin.Int64)
+
+bb1:
+ %3 = integer_literal $Builtin.Int8, 23
+ %4 = builtin_function_ref #Builtin.sext_Int8_Int64 : $[thin] Builtin.Int8 -> Builtin.Int64
+ %5 = apply %4(%3) : $[thin] Builtin.Int8 -> Builtin.Int64
+ br bb4(%5 : $Builtin.Int64)
+
+bb2:
+ %6 = integer_literal $Builtin.Int8, 24
+ %7 = builtin_function_ref #Builtin.zext_Int8_Int64 : $[thin] Builtin.Int8 -> Builtin.Int64
+ %8 = apply %7(%6) : $[thin] Builtin.Int8 -> Builtin.Int64
+ br bb4(%8 : $Builtin.Int64)
+
+bb4(%100 : $Builtin.Int64):
+ return %100 : $Builtin.Int64
+// CHECK-LABEL: sil @fold_trunc
+// FIXME: Check DCE.
+// CHECK: integer_literal $Builtin.Int64, 22
+// CHECK: integer_literal $Builtin.Int64, 23
+// CHECK: integer_literal $Builtin.Int64, 24
+}
