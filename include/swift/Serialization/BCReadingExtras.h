@@ -45,4 +45,7 @@ public:
 } // end namespace serialization
 } // end namespace swift
 
+static constexpr const auto AF_DontPopBlockAtEnd =
+  llvm::BitstreamCursor::AF_DontPopBlockAtEnd;
+
 #endif
