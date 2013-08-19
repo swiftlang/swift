@@ -288,8 +288,8 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
       .lookupValue(AccessPath, Name, LookupKind, *TU, Result);
   }
 
-  return cast<LoadedModule>(this)->lookupValue(AccessPath, Name, LookupKind,
-                                               Result);
+  ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
+  return owner.lookupValue(this, AccessPath, Name, LookupKind, Result);
 }
 
 void Module::lookupVisibleDecls(AccessPathTy AccessPath,
@@ -306,8 +306,8 @@ void Module::lookupVisibleDecls(AccessPathTy AccessPath,
       .lookupVisibleDecls(AccessPath, Consumer, LookupKind, *TU);
   }
 
-  return cast<LoadedModule>(this)->lookupVisibleDecls(AccessPath, Consumer,
-                                                      LookupKind);
+  ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
+  return owner.lookupVisibleDecls(this, AccessPath, Consumer, LookupKind);
 }
 
 void Module::lookupClassMembers(AccessPathTy accessPath,
@@ -322,7 +322,8 @@ void Module::lookupClassMembers(AccessPathTy accessPath,
       .lookupClassMembers(accessPath, consumer, *TU);
   }
 
-  return cast<LoadedModule>(this)->lookupClassMembers(accessPath, consumer);
+  ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
+  return owner.lookupClassMembers(this, accessPath, consumer);
 }
 
 void Module::lookupClassMember(AccessPathTy accessPath,
@@ -338,7 +339,8 @@ void Module::lookupClassMember(AccessPathTy accessPath,
       .lookupClassMember(accessPath, name, results, *TU);
   }
   
-  return cast<LoadedModule>(this)->lookupClassMember(accessPath, name, results);
+  ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
+  return owner.lookupClassMember(this, accessPath, name, results);
 }
 
 namespace {
@@ -440,7 +442,8 @@ Module::getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const {
     return;
   }
 
-  return cast<LoadedModule>(this)->getReexportedModules(modules);
+  ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
+  return owner.getReexportedModules(this, modules);
 }
 
 namespace {
@@ -548,12 +551,6 @@ TranslationUnit::getCachedVisibleDecls() const {
 // LoadedModule Implementation
 //===----------------------------------------------------------------------===//
 
-void LoadedModule::lookupValue(AccessPathTy accessPath, Identifier name,
-                               NLKind lookupKind,
-                               SmallVectorImpl<ValueDecl*> &result) {
-  return getOwner().lookupValue(this, accessPath, name, lookupKind, result);
-}
-
 OperatorDecl *LoadedModule::lookupOperator(Identifier name, DeclKind fixity) {
   return getOwner().lookupOperator(this, name, fixity);
 }
@@ -577,28 +574,6 @@ InfixOperatorDecl *
 LoadedModule::lookupOperator<InfixOperatorDecl>(Identifier name) {
   auto result = lookupOperator(name, DeclKind::InfixOperator);
   return cast_or_null<InfixOperatorDecl>(result);
-}
-
-void LoadedModule::getReexportedModules(
-    SmallVectorImpl<ImportedModule> &exports) const {
-  return getOwner().getReexportedModules(this, exports);
-}
-
-void LoadedModule::lookupVisibleDecls(AccessPathTy accessPath,
-                                      VisibleDeclConsumer &consumer,
-                                      NLKind lookupKind) const {
-  return getOwner().lookupVisibleDecls(this, accessPath, consumer, lookupKind);
-}
-
-void LoadedModule::lookupClassMembers(AccessPathTy accessPath,
-                                      VisibleDeclConsumer &consumer) const {
-  return getOwner().lookupClassMembers(this, accessPath, consumer);
-}
-
-void LoadedModule::lookupClassMember(AccessPathTy accessPath,
-                                     Identifier name,
-                                     SmallVectorImpl<ValueDecl*> &decls) const {
-  return getOwner().lookupClassMember(this, accessPath, name, decls);
 }
 
 

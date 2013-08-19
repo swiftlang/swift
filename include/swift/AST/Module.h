@@ -368,6 +368,8 @@ public:
 /// This may be a Swift module or a Clang module.
 class LoadedModule : public Module {
 protected:
+  friend class Module;
+
   LoadedModule(DeclContextKind kind, Identifier name,
                std::string DebugModuleName, Component *comp,
                ASTContext &ctx, ModuleLoader &owner)
@@ -385,10 +387,6 @@ protected:
   std::string DebugModuleName;
 
 public:
-  // Inherited from Module.
-  void lookupValue(AccessPathTy accessPath, Identifier name, NLKind lookupKind,
-                   SmallVectorImpl<ValueDecl*> &result);
-
   /// Look up an operator declaration.
   ///
   /// \param name The operator name ("+", ">>", etc.)
@@ -403,22 +401,6 @@ public:
     static_assert(static_cast<T*>(nullptr),
                   "Must specify prefix, postfix, or infix operator decl");
   }
-
-  /// Adds any modules re-exported by this module to the given vector.
-  void getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const;
-
-  /// Find ValueDecls in the module and pass them to the given consumer object.
-  void lookupVisibleDecls(AccessPathTy accessPath,
-                          VisibleDeclConsumer &consumer,
-                          NLKind lookupKind) const;
-
-  // Inherited from Module.
-  void lookupClassMembers(AccessPathTy accessPath,
-                          VisibleDeclConsumer &consumer) const;
-
-  void lookupClassMember(AccessPathTy accessPath,
-                         Identifier name,
-                         SmallVectorImpl<ValueDecl*> &results) const;
 
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() >= DeclContextKind::First_LoadedModule &&
