@@ -292,11 +292,24 @@ private:
   }
 
   enum class ValueWitnessKind {
-    AllocateBuffer, AssignWithCopy, AssignWithTake, DeallocateBuffer, Destroy,
-        DestroyBuffer, InitializeBufferWithCopyOfBuffer,
-        InitializeBufferWithCopy, InitializeWithCopy, InitializeBufferWithTake,
-        InitializeWithTake, ProjectBuffer, Typeof, StoreExtraInhabitant,
-        GetExtraInhabitantIndex, GetUnionTag, InplaceProjectUnionData, Unknown
+    AllocateBuffer,
+    AssignWithCopy,
+    AssignWithTake,
+    DeallocateBuffer,
+    Destroy,
+    DestroyBuffer,
+    InitializeBufferWithCopyOfBuffer,
+    InitializeBufferWithCopy,
+    InitializeWithCopy,
+    InitializeBufferWithTake,
+    InitializeWithTake,
+    ProjectBuffer,
+    Typeof,
+    StoreExtraInhabitant,
+    GetExtraInhabitantIndex,
+    GetUnionTag,
+    InplaceProjectUnionData,
+    Unknown
   };
 
   const char *toString(ValueWitnessKind k) {
@@ -975,6 +988,21 @@ private:
     }
     return tuple;
   }
+  
+  NodePointer postProcessReturnTypeNode (NodePointer out_args) {
+    Node::Kind out_args_kind = out_args->getKind();
+    if (out_args_kind == Node::Kind::Identifier ||
+        out_args_kind == Node::Kind::Class ||
+        out_args_kind == Node::Kind::Module ||
+        out_args_kind == Node::Kind::Structure ||
+        out_args_kind == Node::Kind::Union) {
+      return compactNode(out_args, Node::Kind::ReturnType);
+    } else {
+      NodePointer out_node = Node::makeNodePointer(Node::Kind::ReturnType);
+      out_node->push_back_child(out_args);
+      return out_node;
+    }
+  }
 
   NodePointer demangleType() {
     if (!Mangled)
@@ -1066,19 +1094,7 @@ private:
       NodePointer in_node = Node::makeNodePointer(Node::Kind::ArgumentTuple);
       block->push_back_child(in_node);
       in_node->push_back_child(in_args);
-      Node::Kind out_args_kind = out_args->getKind();
-      if (out_args_kind == Node::Kind::Identifier ||
-          out_args_kind == Node::Kind::Class ||
-          out_args_kind == Node::Kind::Module ||
-          out_args_kind == Node::Kind::Structure ||
-          out_args_kind == Node::Kind::Union) {
-        NodePointer out_node = compactNode(out_args, Node::Kind::ReturnType);
-        block->push_back_child(out_node);
-      } else {
-        NodePointer out_node = Node::makeNodePointer(Node::Kind::ReturnType);
-        out_node->push_back_child(out_args);
-        block->push_back_child(out_node);
-      }
+      block->push_back_child(postProcessReturnTypeNode(out_args));
       return block;
     }
     if (c == 'F') {
@@ -1092,19 +1108,7 @@ private:
       NodePointer in_node = Node::makeNodePointer(Node::Kind::ArgumentTuple);
       block->push_back_child(in_node);
       in_node->push_back_child(in_args);
-      Node::Kind out_args_kind = out_args->getKind();
-      if (out_args_kind == Node::Kind::Identifier ||
-          out_args_kind == Node::Kind::Class ||
-          out_args_kind == Node::Kind::Module ||
-          out_args_kind == Node::Kind::Structure ||
-          out_args_kind == Node::Kind::Union) {
-        NodePointer out_node = compactNode(out_args, Node::Kind::ReturnType);
-        block->push_back_child(out_node);
-      } else {
-        NodePointer out_node = Node::makeNodePointer(Node::Kind::ReturnType);
-        out_node->push_back_child(out_args);
-        block->push_back_child(out_node);
-      }
+      block->push_back_child(postProcessReturnTypeNode(out_args));
       return block;
     }
     if (c == 'f') {
@@ -1120,19 +1124,7 @@ private:
           Node::makeNodePointer(Node::Kind::UncurriedFunctionMetaType);
       block->push_back_child(in_node);
       in_node->push_back_child(in_args);
-      Node::Kind out_args_kind = out_args->getKind();
-      if (out_args_kind == Node::Kind::Identifier ||
-          out_args_kind == Node::Kind::Class ||
-          out_args_kind == Node::Kind::Module ||
-          out_args_kind == Node::Kind::Structure ||
-          out_args_kind == Node::Kind::Union) {
-        NodePointer out_node = compactNode(out_args, Node::Kind::ReturnType);
-        block->push_back_child(out_node);
-      } else {
-        NodePointer out_node = Node::makeNodePointer(Node::Kind::ReturnType);
-        out_node->push_back_child(out_args);
-        block->push_back_child(out_node);
-      }
+      block->push_back_child(postProcessReturnTypeNode(out_args));
       return block;
     }
     if (c == 'G') {
@@ -1340,6 +1332,40 @@ NodePointer swift::Demangle::demangleSymbolAsNode(llvm::StringRef mangled) {
   return demangler.getDemangled();
 }
 
+void toString(NodePointer pointer, DemanglerPrinter &printer);
+
+void toStringChildren (Node::iterator begin, Node::iterator end, DemanglerPrinter &printer, const char *sep = nullptr) {
+  for (; begin != end;) {
+    toString(*begin, printer);
+    ++begin;
+    if (sep && begin != end)
+      printer << sep;
+  }
+}
+
+void toStringChildren (NodePointer pointer, DemanglerPrinter &printer, const char *sep = nullptr) {
+  if (!pointer)
+    return;
+  Node::iterator begin = pointer->begin(), end = pointer->end();
+  toStringChildren(begin, end, printer, sep);
+}
+
+void toStringLifeCycleEntity (NodePointer pointer, DemanglerPrinter &printer, const char* name) {
+  NodePointer child = pointer->child_at(0);
+  while (child) {
+    printer << child->getText();
+    child = child->getNextNode();
+    if (child)
+      printer << ".";
+  }
+  printer << name;
+  child = pointer->child_at(1);
+  if (child) {
+    printer << " : ";
+    toString(child, printer);
+  }
+}
+
 void toString(NodePointer pointer, DemanglerPrinter &printer) {
   if (!pointer)
     return;
@@ -1350,13 +1376,9 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
   case swift::Demangle::Node::Kind::Directness:
     printer << pointer->getText() << " ";
     break;
-  case swift::Demangle::Node::Kind::Declaration: {
-    Node::iterator begin = pointer->begin(), end = pointer->end();
-    for (; begin != end; begin++) {
-      toString(*begin, printer);
-    }
+  case swift::Demangle::Node::Kind::Declaration:
+    toStringChildren(pointer, printer);
     break;
-  }
   case swift::Demangle::Node::Kind::Module:
   case swift::Demangle::Node::Kind::Class:
   case swift::Demangle::Node::Kind::Structure:
@@ -1368,15 +1390,12 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     break;
   case swift::Demangle::Node::Kind::DeclIdentifier:
     printer << pointer->getText() << " : ";
+    break;
   case swift::Demangle::Node::Kind::FunctionName:
     break;
-  case swift::Demangle::Node::Kind::FunctionType: {
-    Node::iterator begin = pointer->begin(), end = pointer->end();
-    for (; begin != end; begin++) {
-      toString(*begin, printer);
-    }
+  case swift::Demangle::Node::Kind::FunctionType:
+    toStringChildren(pointer, printer);
     break;
-  }
   case swift::Demangle::Node::Kind::UncurriedFunctionType: {
     NodePointer metatype = pointer->child_at(0);
     if (!metatype)
@@ -1388,21 +1407,14 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     if (!real_func)
       break;
     real_func = real_func->child_at(0);
-    Node::iterator begin = real_func->begin(), end = real_func->end();
-    for (; begin != end; begin++) {
-      toString(*begin, printer);
-    }
+    toStringChildren(real_func, printer);
     break;
   }
-  case swift::Demangle::Node::Kind::UncurriedFunctionMetaType: {
+  case swift::Demangle::Node::Kind::UncurriedFunctionMetaType:
     printer << "(";
-    Node::iterator begin = pointer->begin(), end = pointer->end();
-    for (; begin != end; begin++) {
-      toString(*begin, printer);
-    }
+    toStringChildren(pointer, printer);
     printer << ")";
     break;
-  }
   case swift::Demangle::Node::Kind::ArgumentTuple: {
     bool need_parens = false;
     if (pointer->size() > 1)
@@ -1419,10 +1431,7 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     }
     if (need_parens)
       printer << "(";
-    Node::iterator begin = pointer->begin(), end = pointer->end();
-    for (; begin != end; begin++) {
-      toString(*begin, printer);
-    }
+    toStringChildren(pointer, printer);
     if (need_parens)
       printer << ")";
     break;
@@ -1430,12 +1439,7 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
   case swift::Demangle::Node::Kind::NonVariadicTuple:
   case swift::Demangle::Node::Kind::VariadicTuple: {
     printer << "(";
-    Node::iterator begin = pointer->begin(), end = pointer->end();
-    for (; begin != end;) {
-      toString(*begin, printer);
-      if (++begin != end)
-        printer << ", ";
-    }
+    toStringChildren(pointer, printer, ", ");
     if (pointer->getKind() == swift::Demangle::Node::Kind::VariadicTuple)
       printer << "...";
     printer << ")";
@@ -1464,10 +1468,7 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       printer << " -> " << pointer->getText();
     else {
       printer << " -> ";
-      Node::iterator begin = pointer->begin(), end = pointer->end();
-      for (; begin != end; begin++) {
-        toString(*begin, printer);
-      }
+      toStringChildren(pointer, printer);
     }
     break;
   }
@@ -1577,14 +1578,9 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     }
     break;
   }
-  case swift::Demangle::Node::Kind::TypeListEntry: {
-    Node::iterator begin = pointer->begin(), end = pointer->end();
-    while (begin != end) {
-      toString(*begin, printer);
-      ++begin;
-    }
+  case swift::Demangle::Node::Kind::TypeListEntry:
+    toStringChildren(pointer, printer);
     break;
-  }
   case swift::Demangle::Node::Kind::ObjCBlock: {
     printer << "[objc_block] ";
     NodePointer tuple = pointer->child_at(0);
@@ -1607,13 +1603,8 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       toString(pointer->child_at(0), printer);
       break;
     }
-    Node::iterator begin = pointer->begin(), end = pointer->end();
     printer << "protocol<";
-    while (begin != end) {
-      toString(*begin, printer);
-      if (++begin != end)
-        printer << ", ";
-    }
+    toStringChildren(pointer, printer, ", ");
     printer << ">";
     break;
   }
@@ -1623,13 +1614,8 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
   case swift::Demangle::Node::Kind::ArchetypeList: {
     if (pointer->size() == 0)
       break;
-    Node::iterator begin = pointer->begin(), end = pointer->end();
     printer << "<";
-    while (begin != end) {
-      toString(*begin, printer);
-      if (++begin != end)
-        printer << ", ";
-    }
+    toStringChildren(pointer, printer, ", ");
     printer << ">";
     break;
   }
@@ -1661,70 +1647,18 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     printer << " setter";
     break;
   }
-  case swift::Demangle::Node::Kind::Allocator: {
-    NodePointer child = pointer->child_at(0);
-    while (child) {
-      printer << child->getText();
-      child = child->getNextNode();
-      if (child)
-        printer << ".";
-    }
-    printer << ".__allocating_constructor";
-    child = pointer->child_at(1);
-    if (child) {
-      printer << " : ";
-      toString(child, printer);
-    }
+  case swift::Demangle::Node::Kind::Allocator:
+    toStringLifeCycleEntity(pointer, printer, ".__allocating_constructor");
     break;
-  }
-  case swift::Demangle::Node::Kind::Constructor: {
-    NodePointer child = pointer->child_at(0);
-    while (child) {
-      printer << child->getText();
-      child = child->getNextNode();
-      if (child)
-        printer << ".";
-    }
-    printer << ".constructor";
-    child = pointer->child_at(1);
-    if (child) {
-      printer << " : ";
-      toString(child, printer);
-    }
+  case swift::Demangle::Node::Kind::Constructor:
+    toStringLifeCycleEntity(pointer, printer, ".constructor");
     break;
-  }
-  case swift::Demangle::Node::Kind::Destructor: {
-    NodePointer child = pointer->child_at(0);
-    while (child) {
-      printer << child->getText();
-      child = child->getNextNode();
-      if (child)
-        printer << ".";
-    }
-    printer << ".destructor";
-    child = pointer->child_at(1);
-    if (child) {
-      printer << " : ";
-      toString(child, printer);
-    }
+  case swift::Demangle::Node::Kind::Destructor:
+    toStringLifeCycleEntity(pointer, printer, ".destructor");
     break;
-  }
-  case swift::Demangle::Node::Kind::Deallocator: {
-    NodePointer child = pointer->child_at(0);
-    while (child) {
-      printer << child->getText();
-      child = child->getNextNode();
-      if (child)
-        printer << ".";
-    }
-    printer << ".__deallocating_destructor";
-    child = pointer->child_at(1);
-    if (child) {
-      printer << " : ";
-      toString(child, printer);
-    }
+  case swift::Demangle::Node::Kind::Deallocator:
+    toStringLifeCycleEntity(pointer, printer, ".__deallocating_destructor");
     break;
-  }
   case swift::Demangle::Node::Kind::ProtocolConformance: {
     NodePointer child0 = pointer->child_at(0);
     NodePointer child1 = pointer->child_at(1);
@@ -1747,6 +1681,7 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     toString(child0, printer);
     printer << " : ";
     toString(child1, printer);
+    break;
   }
   case swift::Demangle::Node::Kind::Unknown:
     break;
