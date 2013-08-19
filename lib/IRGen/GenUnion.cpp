@@ -93,6 +93,7 @@ namespace {
     // FIXME - non-fixed payloads
     const FixedTypeInfo *PayloadTypeInfo = nullptr;
     unsigned ExtraTagBitCount = 0;
+    unsigned NumExtraTagValues = 0;
   public:
     /// FIXME: Spare bits from the payload not exhausted by the extra
     /// inhabitants we used.
@@ -216,8 +217,117 @@ namespace {
                     ArrayRef<std::pair<UnionElementDecl*,
                                        llvm::BasicBlock*>> dests,
                     llvm::BasicBlock *defaultDest) const override {
-      // FIXME
-      IGF.Builder.CreateUnreachable();
+      auto &C = IGF.IGM.getLLVMContext();
+      
+      // Create a map of the destination blocks for quicker lookup.
+      llvm::DenseMap<UnionElementDecl*,llvm::BasicBlock*> destMap(dests.begin(),
+                                                                  dests.end());
+      // Create an unreachable branch for unreachable switch defaults.
+      auto *unreachableBB = llvm::BasicBlock::Create(C);
+
+      // If there was no default branch in SIL, use the unreachable branch as
+      // the default.
+      if (!defaultDest)
+        defaultDest = unreachableBB;
+      
+      auto blockForCase = [&](UnionElementDecl *theCase) -> llvm::BasicBlock* {
+        auto found = destMap.find(theCase);
+        if (found == destMap.end())
+          return defaultDest;
+        else
+          return found->second;
+      };
+      
+      llvm::Value *payload = value.claimNext();
+      llvm::BasicBlock *payloadDest = blockForCase(PayloadElement);
+      unsigned extraInhabitantCount
+        = PayloadTypeInfo->getFixedExtraInhabitantCount();
+      
+      // If there are extra tag bits, switch over them first.
+      SmallVector<llvm::BasicBlock*, 2> tagBitBlocks;
+      if (ExtraTagBitCount > 0) {
+        llvm::Value *tagBits = value.claimNext();
+        
+        auto *swi = IGF.Builder.CreateSwitch(tagBits, unreachableBB,
+                                             NumExtraTagValues);
+        
+        // If we have extra inhabitants, we need to check for them in the
+        // zero-tag case. Otherwise, we switch directly to the payload case.
+        if (extraInhabitantCount > 0) {
+          auto bb = llvm::BasicBlock::Create(C);
+          tagBitBlocks.push_back(bb);
+          swi->addCase(llvm::ConstantInt::get(C,APInt(ExtraTagBitCount,0)), bb);
+        } else {
+          tagBitBlocks.push_back(payloadDest);
+          swi->addCase(llvm::ConstantInt::get(C,APInt(ExtraTagBitCount,0)),
+                       payloadDest);
+        }
+        
+        for (unsigned i = 1; i < NumExtraTagValues; ++i) {
+          auto bb = llvm::BasicBlock::Create(C);
+          tagBitBlocks.push_back(bb);
+          swi->addCase(llvm::ConstantInt::get(C,APInt(ExtraTagBitCount,i)), bb);
+        }
+        
+        // Continue by emitting the extra inhabitant dispatch, if any.
+        if (extraInhabitantCount > 0)
+          IGF.Builder.emitBlock(tagBitBlocks[0]);
+      }
+      
+      auto elements = PayloadElement->getParentUnion()->getAllElements();
+      auto elti = elements.begin(), eltEnd = elements.end();
+      if (*elti == PayloadElement)
+        ++elti;
+      
+      // Advance the union element iterator, skipping the payload case.
+      auto nextCase = [&]() -> UnionElementDecl* {
+        assert(elti != eltEnd);
+        auto result = *elti;
+        ++elti;
+        if (elti != eltEnd && *elti == PayloadElement)
+          ++elti;
+        return result;
+      };
+      
+      // If there are no extra tag bits, or they're set to zero, then we either
+      // have a payload, or an empty case represented using an extra inhabitant.
+      // Check the extra inhabitant cases if we have any.
+      unsigned payloadBits = PayloadTypeInfo->getFixedSize().getValueInBits();
+      if (extraInhabitantCount > 0) {
+        auto *swi = IGF.Builder.CreateSwitch(payload, payloadDest);
+        for (unsigned i = 0; i < extraInhabitantCount && elti != eltEnd; ++i) {
+          auto v = PayloadTypeInfo->getFixedExtraInhabitantValue(IGF.IGM,
+                                                               payloadBits, i);
+          swi->addCase(v, blockForCase(nextCase()));
+        }
+      }
+      
+      // We should have handled the payload case either in extra inhabitant
+      // or in extra tag dispatch by now.
+      assert(IGF.Builder.hasPostTerminatorIP() &&
+             "did not handle payload case");
+      
+      // Handle the cases covered by each tag bit.
+      unsigned casesPerTag = 1 << ExtraTagBitCount;
+      for (unsigned i = 1, e = tagBitBlocks.size(); i < e; ++i) {
+        assert(elti != eltEnd &&
+               "ran out of cases before running out of extra tags?");
+        IGF.Builder.emitBlock(tagBitBlocks[i]);
+        auto swi = IGF.Builder.CreateSwitch(payload, unreachableBB);
+        for (unsigned tag = 0; tag < casesPerTag && elti != eltEnd; ++tag) {
+          auto v = llvm::ConstantInt::get(C, APInt(payloadBits, tag));
+          swi->addCase(v, blockForCase(nextCase()));
+        }
+      }
+      
+      // Delete the unreachable default block if we didn't use it, or emit it
+      // if we did.
+      if (unreachableBB->use_empty()) {
+        delete unreachableBB;
+      } else {
+        IGF.Builder.emitBlock(unreachableBB);
+        IGF.Builder.CreateUnreachable();
+      }
     }
     
   private:
@@ -803,12 +913,13 @@ namespace {
     // union discriminators you have other problems.
     } else if (PayloadTypeInfo->getFixedSize().getValue() >= 4) {
       ExtraTagBitCount = 1;
+      NumExtraTagValues = 2;
     } else {
       unsigned tagsPerTagBitValue =
         1 << PayloadTypeInfo->getFixedSize().getValueInBits();
-      unsigned tagBitValues
-        = (tagsWithoutInhabitants + (tagsPerTagBitValue-1))/tagsPerTagBitValue;
-      ExtraTagBitCount = llvm::Log2_32(tagBitValues-1) + 1;
+      NumExtraTagValues
+        = (tagsWithoutInhabitants+(tagsPerTagBitValue-1))/tagsPerTagBitValue+1;
+      ExtraTagBitCount = llvm::Log2_32(NumExtraTagValues-1) + 1;
     }
 
     // Create the body type.

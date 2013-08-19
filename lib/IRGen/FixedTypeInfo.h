@@ -22,6 +22,10 @@
 #include "TypeInfo.h"
 #include "llvm/ADT/BitVector.h"
 
+namespace llvm {
+  class ConstantInt;
+}
+
 namespace swift {
 namespace irgen {
 
@@ -114,14 +118,14 @@ public:
   /// inhabitants of the type.
   /// The index must be less than the value returned by
   /// getFixedExtraInhabitantCount().
-  virtual llvm::Constant *getFixedExtraInhabitantValue(IRGenModule &IGM,
+  virtual llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
                                                        unsigned bits,
                                                        unsigned index) const {
     return getSpareBitFixedExtraInhabitantValue(IGM, bits, index);
   }
   
   /// Create an extra inhabitant constant using the spare bits of the type.
-  llvm::Constant *getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
+  llvm::ConstantInt *getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
                                                        unsigned bits,
                                                        unsigned index) const;
     

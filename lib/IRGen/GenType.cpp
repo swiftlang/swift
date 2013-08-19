@@ -173,7 +173,7 @@ void FixedTypeInfo::applyFixedSpareBitsMask(llvm::BitVector &bits) const {
   }
 }
 
-llvm::Constant *
+llvm::ConstantInt *
 FixedTypeInfo::getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
                                                     unsigned bits,
                                                     unsigned index) const {

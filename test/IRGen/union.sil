@@ -173,6 +173,116 @@ end:
 }
 
 
+union SinglePayloadNoXI {
+  case x(Builtin.Int64)
+  case y
+}
+
+union SinglePayloadNoXI2 {
+  case x(Builtin.Int64)
+  case y
+  case z
+}
+
+// CHECK: define void @single_payload_no_xi_switch(i64, i1) {
+sil @single_payload_no_xi_switch : $[thin] (SinglePayloadNoXI2) -> () {
+// CHECK: entry:
+entry(%u : $SinglePayloadNoXI2):
+// CHECK:   switch i1 %1, label %[[DFLT:[0-9]+]] [
+// CHECK:     i1 false, label %[[X_DEST:[0-9]+]]
+// CHECK:     i1 true, label %[[TAGS:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[TAGS]]
+// CHECK:   switch i64 %0, label %[[DFLT]] [
+// CHECK:     i64 0, label %[[Y_DEST:[0-9]+]]
+// CHECK:     i64 1, label %[[Z_DEST:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[DFLT]]
+// CHECK:   unreachable
+  switch_union %u : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.x!unionelt.1: x_dest, case #SinglePayloadNoXI2.y!unionelt: y_dest, case #SinglePayloadNoXI2.z!unionelt: z_dest
+
+// CHECK: ; <label>:[[X_DEST]]
+// CHECK:   call void @a()
+// CHECK:   br label %[[END:[0-9]+]]
+x_dest:
+  %a = function_ref @a : $[thin] () -> ()
+  apply %a() : $[thin] () -> ()
+  br end
+
+// CHECK: ; <label>:[[Y_DEST]]
+// CHECK:   call void @b()
+// CHECK:   br label %[[END]]
+y_dest:
+  %b = function_ref @b : $[thin] () -> ()
+  apply %b() : $[thin] () -> ()
+  br end
+
+// CHECK: ; <label>:[[Z_DEST]]
+// CHECK:   call void @c()
+// CHECK:   br label %[[END]]
+z_dest:
+  %c = function_ref @c : $[thin] () -> ()
+  apply %c() : $[thin] () -> ()
+  br end
+
+// CHECK: ; <label>:[[END]]
+// CHECK:   ret void
+end:
+  %x = tuple ()
+  return %x : $()
+}
+
+
+union SinglePayloadSpareBit {
+  case x(Builtin.Int63)
+  case y
+  case z
+}
+
+// CHECK: define void @single_payload_spare_bit_switch(i64) {
+sil @single_payload_spare_bit_switch : $[thin] (SinglePayloadSpareBit) -> () {
+// CHECK: entry:
+entry(%u : $SinglePayloadSpareBit):
+// CHECK:  switch i64 %0, label %[[X_DEST:[0-9]+]] [
+// --           0x8000_0000_0000_0000
+// CHECK:    i64 -9223372036854775808, label %[[Y_DEST:[0-9]+]]
+// --           0x8000_0000_0000_0001
+// CHECK:    i64 -9223372036854775807, label %[[Z_DEST:[0-9]+]]
+// CHECK:  ]
+  switch_union %u : $SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!unionelt.1: x_dest, case #SinglePayloadSpareBit.y!unionelt: y_dest, case #SinglePayloadSpareBit.z!unionelt: z_dest
+
+// CHECK: ; <label>:[[X_DEST]]
+x_dest:
+// CHECK:   call void @a()
+  %a = function_ref @a : $[thin] () -> ()
+  apply %a() : $[thin] () -> ()
+// CHECK:   br label %[[END:[0-9]+]]
+  br end
+
+// CHECK: ; <label>:[[Y_DEST]]
+y_dest:
+// CHECK:   call void @b()
+  %b = function_ref @b : $[thin] () -> ()
+  apply %b() : $[thin] () -> ()
+// CHECK:   br label %[[END]]
+  br end
+
+// CHECK: ; <label>:[[Z_DEST]]
+z_dest:
+// CHECK:   call void @c()
+  %c = function_ref @c : $[thin] () -> ()
+  apply %c() : $[thin] () -> ()
+// CHECK:   br label %[[END]]
+  br end
+
+// CHECK: ; <label>:[[END]]
+end:
+// CHECK:   ret void
+  %x = tuple ()
+  return %x : $()
+}
+
+
 // -- injection functions for unions --
 
 // CHECK: define { i64, i64 } @_TO5union9Singleton3valfMS0_FTBi64_Bi64__S0_(i64, i64) {
@@ -230,11 +340,6 @@ end:
 // CHECK: }
 
 
-union SinglePayloadNoXI {
-  case x(Builtin.Int64)
-  case y
-}
-
 // CHECK: define { i64, i1 } @_TO5union17SinglePayloadNoXI1xfMS0_FBi64_S0_(i64) {
 // CHECK: entry:
 // CHECK:   [[A:%.*]] = insertvalue { i64, i1 } undef, i64 %0, 0
@@ -247,12 +352,6 @@ union SinglePayloadNoXI {
 // CHECK:   ret { i64, i1 } { i64 0, i1 true }
 // CHECK: }
 
-
-union SinglePayloadNoXI2 {
-  case x(Builtin.Int64)
-  case y
-  case z
-}
 
 // CHECK: define { i64, i1 } @_TO5union18SinglePayloadNoXI21xfMS0_FBi64_S0_(i64) {
 // CHECK: entry:
@@ -271,12 +370,6 @@ union SinglePayloadNoXI2 {
 // CHECK:   ret { i64, i1 } { i64 1, i1 true }
 // CHECK: }
 
-
-union SinglePayloadSpareBit {
-  case x(Builtin.Int63)
-  case y
-  case z
-}
 
 // CHECK: define i64 @_TO5union21SinglePayloadSpareBit1xfMS0_FBi63_S0_(i63) {
 // CHECK: entry:
