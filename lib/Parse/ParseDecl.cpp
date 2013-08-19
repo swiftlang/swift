@@ -1387,7 +1387,7 @@ void Parser::consumeFunctionBody(FuncExpr *FE) {
 /// NOTE: The caller of this method must ensure that the token sequence is
 /// either 'func' or 'static' 'func'.
 ///
-NullablePtr<FuncDecl>
+ParserResult<FuncDecl>
 Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   bool HasContainerType = Flags & PD_HasContainerType;
 
@@ -1409,10 +1409,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   if (!(Flags & PD_AllowTopLevel) && !(Flags & PD_DisallowFuncDef) &&
       Tok.isAnyOperator()) {
     diagnose(Tok, diag::func_decl_nonglobal_operator);
-    return 0;
+    return nullptr;
   }
   if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "func"))
-    return 0;
+    return nullptr;
   
   // Parse the generic-params, if present.
   Optional<Scope> GenericsScope;
@@ -1436,7 +1436,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   //
   if (!Tok.is(tok::l_paren)) {
     diagnose(Tok, diag::func_decl_without_paren);
-    return 0;
+    return nullptr;
   }
 
   SmallVector<Pattern*, 8> ArgParams;
@@ -1513,7 +1513,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
         consumeToken();
         skipUntil(tok::r_brace);
         consumeToken();
-        return 0;
+        return nullptr;
       }
     } else if (Attributes.AsmName.empty() || Tok.is(tok::l_brace)) {
       if (!isDelayedParsingEnabled()) {
@@ -1541,7 +1541,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
     FE->setDecl(FD);
   if (Attributes.isValid()) FD->getMutableAttrs() = Attributes;
   addToScope(FD);
-  return FD;
+  return makeParserResult(FD);
 }
 
 bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {

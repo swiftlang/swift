@@ -457,7 +457,7 @@ public:
   
   Pattern *buildImplicitThisParameter();
   void consumeFunctionBody(FuncExpr *FE);
-  NullablePtr<FuncDecl> parseDeclFunc(SourceLoc StaticLoc, unsigned Flags);
+  ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc, unsigned Flags);
   bool parseDeclFuncBodyDelayed(FuncDecl *FD);
   ParserResult<ProtocolDecl> parseDeclProtocol(unsigned Flags);
   
