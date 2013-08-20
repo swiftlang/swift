@@ -74,11 +74,19 @@ namespace {
                                            UnionElementDecl *elt,
                                            Explosion &params) const = 0;
     
+    /// Emit a branch on the case contained in a union value.
     virtual void emitSwitch(IRGenFunction &IGF,
                             Explosion &value,
                             ArrayRef<std::pair<UnionElementDecl*,
-                                     llvm::BasicBlock*>> dests,
+                                               llvm::BasicBlock*>> dests,
                             llvm::BasicBlock *defaultDest) const = 0;
+    
+    /// Project a case value out of a union value. This does not check that the
+    /// union actually contains a value of the given case.
+    virtual void emitProject(IRGenFunction &IGF,
+                             Explosion &inUnion,
+                             UnionElementDecl *theCase,
+                             Explosion &out) const = 0;
     
     /// Given an incomplete UnionTypeInfo, completes layout of the storage type
     /// and calculates its size and alignment.
@@ -325,6 +333,26 @@ namespace {
       }
     }
     
+    void emitProject(IRGenFunction &IGF,
+                     Explosion &inUnion,
+                     UnionElementDecl *theCase,
+                     Explosion &out) const override {
+      // Only the payload case has anything to project. The other cases are
+      // empty.
+      if (theCase != PayloadElement) {
+        inUnion.claimAll();
+        return;
+      }
+        
+      llvm::Value *payload = inUnion.claimNext();
+      if (ExtraTagBitCount > 0)
+        inUnion.claimNext();
+      // FIXME non-loadable payloads
+      cast<LoadableTypeInfo>(PayloadTypeInfo)
+        ->unpackUnionPayload(IGF, payload, out);
+
+    }
+    
   private:
     // Get the index of a union element among the non-payload cases.
     unsigned getSimpleElementTagIndex(UnionElementDecl *elt) const {
@@ -477,6 +505,13 @@ namespace {
       IGF.Builder.CreateUnreachable();
     }
     
+    void emitProject(IRGenFunction &IGF,
+                     Explosion &inValue,
+                     UnionElementDecl *theCase,
+                     Explosion &out) const override {
+      // FIXME
+    }
+    
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth) const override {
       assert(isComplete());
@@ -608,11 +643,19 @@ namespace {
                              llvm::BasicBlock*>> dests,
                     llvm::BasicBlock *defaultDest) const override {
       // No dispatch necessary. Branch straight to the destination.
-      // FIXME: Bind argument to the value itself.
       value.claimAll();
       
       assert(dests.size() == 1 && "switch table mismatch");
       IGF.Builder.CreateBr(dests[0].second);
+    }
+    
+    void emitProject(IRGenFunction &IGF,
+                     Explosion &in,
+                     UnionElementDecl *theCase,
+                     Explosion &out) const override {
+      // The projected value is the payload.
+      if (Singleton)
+        Singleton->reexplode(IGF, in, out);
     }
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,
@@ -699,6 +742,14 @@ namespace {
         IGF.Builder.emitBlock(defaultDest);
         IGF.Builder.CreateUnreachable();
       }
+    }
+      
+    void emitProject(IRGenFunction &IGF,
+                     Explosion &in,
+                     UnionElementDecl *elt,
+                     Explosion &out) const override {
+      // All of the cases project an empty explosion.
+      in.claimAll();
     }
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,
@@ -1144,8 +1195,11 @@ llvm::Value *UnpackUnionPayload::claim(llvm::Type *ty) {
   // Mask out the bits for the value.
   unsigned bitSize = IGF.IGM.DataLayout.getTypeSizeInBits(ty);
   auto bitTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), bitSize);
-  llvm::Value *unpacked = IGF.Builder.CreateLShr(packedValue, unpackedBits);
-  unpacked = IGF.Builder.CreateTrunc(unpacked, bitTy);
+  llvm::Value *unpacked = unpackedBits == 0
+    ? packedValue
+    : IGF.Builder.CreateLShr(packedValue, unpackedBits);
+  if (bitSize < cast<llvm::IntegerType>(packedValue->getType())->getBitWidth())
+    unpacked = IGF.Builder.CreateTrunc(unpacked, bitTy);
 
   unpackedBits += bitSize;
 
@@ -1169,4 +1223,14 @@ void irgen::emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
          && "not of a union type");
   auto &unionTI = IGF.getTypeInfo(unionTy).as<UnionTypeInfo>();
   unionTI.emitSwitch(IGF, unionValue, dests, defaultDest);
+}
+
+void irgen::emitProjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
+                                     Explosion &inUnionValue,
+                                     UnionElementDecl *theCase,
+                                     Explosion &out) {
+  assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
+         && "not of a union type");
+  auto &unionTI = IGF.getTypeInfo(unionTy).as<UnionTypeInfo>();
+  unionTI.emitProject(IGF, inUnionValue, theCase, out);
 }

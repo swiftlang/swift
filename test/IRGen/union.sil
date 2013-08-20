@@ -76,6 +76,24 @@ dest:
   return %x : $()
 }
 
+// CHECK: define void @singleton_switch_arg(i64, i64) {
+sil @singleton_switch_arg : $(Singleton) -> () {
+// CHECK: entry:
+entry(%u : $Singleton):
+// CHECK:   br label %[[PREDEST:[0-9]+]]
+  switch_union %u : $Singleton, case #Singleton.val!unionelt.1: dest
+
+// CHECK: ; <label>:[[PREDEST]]
+// CHECK:   br label %[[DEST:[0-9]+]]
+// CHECK: ; <label>:[[DEST]]
+dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
+// CHECK:   {{%.*}} = phi i64 [ %0, %[[PREDEST]] ]
+// CHECK:   {{%.*}} = phi i64 [ %1, %[[PREDEST]] ]
+// CHECK:   ret void
+  %x = tuple ()
+  return %x : $()
+}
+
 
 union NoPayloads {
   case x
@@ -232,6 +250,57 @@ end:
   return %x : $()
 }
 
+// CHECK: define void @single_payload_no_xi_switch_arg(i64, i1) {
+sil @single_payload_no_xi_switch_arg : $[thin] (SinglePayloadNoXI2) -> () {
+// CHECK: entry:
+entry(%u : $SinglePayloadNoXI2):
+// CHECK:   switch i1 %1, label %[[DFLT:[0-9]+]] [
+// CHECK:     i1 false, label %[[X_PREDEST:[0-9]+]]
+// CHECK:     i1 true, label %[[TAGS:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[TAGS]]
+// CHECK:   switch i64 %0, label %[[DFLT]] [
+// CHECK:     i64 0, label %[[Y_DEST:[0-9]+]]
+// CHECK:     i64 1, label %[[Z_DEST:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[DFLT]]
+// CHECK:   unreachable
+  switch_union %u : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.x!unionelt.1: x_dest, case #SinglePayloadNoXI2.y!unionelt: y_dest, case #SinglePayloadNoXI2.z!unionelt: z_dest
+
+// CHECK: ; <label>:[[X_PREDEST]]
+// CHECK:   br label %[[X_DEST:[0-9]+]]
+// CHECK: ; <label>:[[X_DEST]]
+// CHECK:   {{%.*}} = phi i64 [ %0, %[[X_PREDEST]] ]
+x_dest(%u2 : $Builtin.Int64):
+// CHECK:   call void @a()
+// CHECK:   br label %[[END:[0-9]+]]
+  %a = function_ref @a : $[thin] () -> ()
+  apply %a() : $[thin] () -> ()
+  br end
+
+// CHECK: ; <label>:[[Y_DEST]]
+y_dest:
+// CHECK:   call void @b()
+// CHECK:   br label %[[END]]
+  %b = function_ref @b : $[thin] () -> ()
+  apply %b() : $[thin] () -> ()
+  br end
+
+// CHECK: ; <label>:[[Z_DEST]]
+z_dest:
+// CHECK:   call void @c()
+// CHECK:   br label %[[END]]
+  %c = function_ref @c : $[thin] () -> ()
+  apply %c() : $[thin] () -> ()
+  br end
+
+// CHECK: ; <label>:[[END]]
+// CHECK:   ret void
+end:
+  %x = tuple ()
+  return %x : $()
+}
+
 
 union SinglePayloadSpareBit {
   case x(Builtin.Int63)
@@ -253,6 +322,53 @@ entry(%u : $SinglePayloadSpareBit):
 
 // CHECK: ; <label>:[[X_DEST]]
 x_dest:
+// CHECK:   call void @a()
+  %a = function_ref @a : $[thin] () -> ()
+  apply %a() : $[thin] () -> ()
+// CHECK:   br label %[[END:[0-9]+]]
+  br end
+
+// CHECK: ; <label>:[[Y_DEST]]
+y_dest:
+// CHECK:   call void @b()
+  %b = function_ref @b : $[thin] () -> ()
+  apply %b() : $[thin] () -> ()
+// CHECK:   br label %[[END]]
+  br end
+
+// CHECK: ; <label>:[[Z_DEST]]
+z_dest:
+// CHECK:   call void @c()
+  %c = function_ref @c : $[thin] () -> ()
+  apply %c() : $[thin] () -> ()
+// CHECK:   br label %[[END]]
+  br end
+
+// CHECK: ; <label>:[[END]]
+end:
+// CHECK:   ret void
+  %x = tuple ()
+  return %x : $()
+}
+
+// CHECK: define void @single_payload_spare_bit_switch_arg(i64) {
+sil @single_payload_spare_bit_switch_arg : $[thin] (SinglePayloadSpareBit) -> () {
+// CHECK: entry:
+entry(%u : $SinglePayloadSpareBit):
+// CHECK:  switch i64 %0, label %[[X_PREDEST:[0-9]+]] [
+// --           0x8000_0000_0000_0000
+// CHECK:    i64 -9223372036854775808, label %[[Y_DEST:[0-9]+]]
+// --           0x8000_0000_0000_0001
+// CHECK:    i64 -9223372036854775807, label %[[Z_DEST:[0-9]+]]
+// CHECK:  ]
+  switch_union %u : $SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!unionelt.1: x_dest, case #SinglePayloadSpareBit.y!unionelt: y_dest, case #SinglePayloadSpareBit.z!unionelt: z_dest
+
+// CHECK: ; <label>:[[X_PREDEST]]
+// CHECK:   [[TRUNC_PAYLOAD:%.*]] = trunc i64 %0 to i63
+// CHECK:   br label %[[X_DEST:[0-9]+]]
+// CHECK: ; <label>:[[X_DEST]]
+// CHECK:   {{%.*}} = phi i63 [ [[TRUNC_PAYLOAD]], %[[X_PREDEST]] ]
+x_dest(%u2 : $Builtin.Int63):
 // CHECK:   call void @a()
   %a = function_ref @a : $[thin] () -> ()
   apply %a() : $[thin] () -> ()

@@ -1522,34 +1522,23 @@ void IRGenSILFunction::visitSwitchIntInst(SwitchIntInst *i) {
   llvm_unreachable("not implemented");
 }
 
-void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *inst) {
-  Explosion value = getLoweredExplosion(inst->getOperand());
-  
-  // Map the SIL dest bbs to their LLVM bbs.
-  SmallVector<std::pair<UnionElementDecl*, llvm::BasicBlock*>, 4>
-    dests;
-  
-  for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
-    auto casePair = inst->getCase(i);
-    dests.push_back({casePair.first, getLoweredBB(casePair.second).bb});
-  }
-  
-  llvm::BasicBlock *defaultDest = nullptr;
-  if (inst->hasDefault())
-    defaultDest = getLoweredBB(inst->getDefaultBB()).bb;
-  
-  // FIXME: Does not yet bind destination arguments.
-  emitSwitchLoadableUnionDispatch(*this, inst->getOperand().getType(),
-                                  value, dests, defaultDest);
+// Bind an incoming explosion value to a SILArgument's LLVM phi node(s).
+static void addIncomingExplosionToPHINodes(IRGenSILFunction &IGF,
+                                           LoweredBB &lbb,
+                                           unsigned &phiIndex,
+                                           Explosion &argValue) {
+  llvm::BasicBlock *curBB = IGF.Builder.GetInsertBlock();
+  while (!argValue.empty())
+    lbb.phis[phiIndex++]->addIncoming(argValue.claimNext(), curBB);
 }
 
 // Add branch arguments to destination phi nodes.
 static void addIncomingSILArgumentsToPHINodes(IRGenSILFunction &IGF,
-                                             LoweredBB &lbb,
-                                             OperandValueArrayRef args) {
+                                              LoweredBB &lbb,
+                                              OperandValueArrayRef args) {
   llvm::BasicBlock *curBB = IGF.Builder.GetInsertBlock();
   ArrayRef<llvm::PHINode*> phis = lbb.phis;
-  size_t phiIndex = 0;
+  unsigned phiIndex = 0;
   for (SILValue arg : args) {
     const LoweredValue &lv = IGF.getLoweredValue(arg);
     
@@ -1559,8 +1548,60 @@ static void addIncomingSILArgumentsToPHINodes(IRGenSILFunction &IGF,
     }
     
     Explosion argValue = lv.getExplosion(IGF);
-    while (!argValue.empty())
-      phis[phiIndex++]->addIncoming(argValue.claimNext(), curBB);
+    addIncomingExplosionToPHINodes(IGF, lbb, phiIndex, argValue);
+  }
+}
+
+void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *inst) {
+  Explosion value = getLoweredExplosion(inst->getOperand());
+  
+  // Map the SIL dest bbs to their LLVM bbs.
+  SmallVector<std::pair<UnionElementDecl*, llvm::BasicBlock*>, 4>
+    dests;
+  
+  for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
+    auto casePair = inst->getCase(i);
+    
+    // If the destination BB accepts the case argument, set up a waypoint BB so
+    // we can feed the values into the argument's PHI node(s).
+    //
+    // FIXME: This is cheesy when the destination BB has only the switch
+    // as a predecessor.
+    if (!casePair.second->bbarg_empty())
+      dests.push_back({casePair.first,
+                       llvm::BasicBlock::Create(IGM.getLLVMContext())});
+    else
+      dests.push_back({casePair.first, getLoweredBB(casePair.second).bb});
+  }
+  
+  llvm::BasicBlock *defaultDest = nullptr;
+  if (inst->hasDefault())
+    defaultDest = getLoweredBB(inst->getDefaultBB()).bb;
+  
+  // Emit the dispatch.
+  emitSwitchLoadableUnionDispatch(*this, inst->getOperand().getType(),
+                                  value, dests, defaultDest);
+  
+  // Bind arguments for cases that want them.
+  for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
+    auto casePair = inst->getCase(i);
+    
+    if (!casePair.second->bbarg_empty()) {
+      auto waypointBB = dests[i].second;
+      auto &destLBB = getLoweredBB(casePair.second);
+      
+      Builder.emitBlock(waypointBB);
+      
+      Explosion inValue = getLoweredExplosion(inst->getOperand());
+      Explosion projected(ExplosionKind::Minimal);
+      emitProjectLoadableUnion(*this, inst->getOperand().getType(),
+                               inValue, casePair.first, projected);
+      
+      unsigned phiIndex = 0;
+      addIncomingExplosionToPHINodes(*this, destLBB, phiIndex, projected);
+      
+      Builder.CreateBr(destLBB.bb);
+    }
   }
 }
 

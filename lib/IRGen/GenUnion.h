@@ -88,7 +88,6 @@ public:
 };
 
 /// \brief Emit the dispatch branch(es) for a loadable union.
-/// Produces a mapping of each UnionElementDecl* to its llvm::Value* argument.
 void emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
                                      SILType unionTy,
                                      Explosion &unionValue,
@@ -96,6 +95,14 @@ void emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
                                                       llvm::BasicBlock*>> dests,
                                      llvm::BasicBlock *defaultDest);
 
+/// \brief Extracts the associated data for a union case. This is an unchecked
+/// operation; the input union value must be of the given case.
+void emitProjectLoadableUnion(IRGenFunction &IGF,
+                              SILType unionTy,
+                              Explosion &inUnionValue,
+                              UnionElementDecl *theCase,
+                              Explosion &out);
+  
 }
 }
 
