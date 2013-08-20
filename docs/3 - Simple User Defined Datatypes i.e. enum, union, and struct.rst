@@ -23,27 +23,26 @@ Enums will be declared something like this::
 
 A major difference from C is that the elements of a 'union' don't get injected
 into the global scope. This means that Backwards isn't valid in the global
-scope, you have to use DataSearchFlags::Backwards or DataSearchFlags.Backwards
-or something like that. This is good because you don't have to worry about your
-enumerators clashing with other stuff in the global scope.
+scope, you have to use DataSearchFlags.Backwards. This is good because you don't
+have to worry about your enumerators clashing with other stuff in the global
+scope.
 
 Given this declaration, you could do silly things like this::
 
   var x : DataSearchFlags // default initialized.
-  var y = DataSearchFlags::Anchored
-  var z : DataSearchFlags = DataSearchFlags::Anchored // redundant type specifier.
+  var y = DataSearchFlags.Anchored
+  var z : DataSearchFlags = DataSearchFlags.Anchored // redundant type specifier.
 
 Of course, this is seriously over verbose, and it is also not typically how
-enums get used in our APIs. The solution is to take advantage of the same
-mechanics already in place for the "autoclosurification" which provides
-context-sensitive type inference.  A new ":" operator defers name lookup + type
-resolution until the context is resolved, allowing stuff like this::
+enums get used in our APIs. The solution is to take advantage of 
+context-sensitive type inference.  A new unary "." operator defers name lookup
+ + type resolution until the context is resolved, allowing stuff like this::
 
   // Declaration, somewhere not in user code.
   func CFDataFind(...., compareOptions : DataSearchFlags)
   
   // Users see this.
-  CFDataFind(a, b, c, :Anchored)
+  CFDataFind(a, b, c, .Anchored)
 
 Compare this to the existing CF call, which looks like::
 
@@ -103,7 +102,7 @@ exist yet in swift, use your imagination :-) ::
     case Download
     case FontSizeQuery(encoding : [[const unsigned short*]],
                        glyphBits : [[SInt32*]],
-                       name : string)
+                       name : String)
     case EncodingOnly
     case PrerequisiteQuery(size : int, list : int)
     case PrerequisiteItem(int)
@@ -118,14 +117,14 @@ processing stuff.
 
 With this declaration, you can use these like this::
 
-  var x1 : ScalarStream = :Download
-  var x2 = ScalarStream::Download // same as x1
+  var x1 : ScalarStream = .Download
+  var x2 = ScalarStream.Download // same as x1
   
-  var y = ScalarStream::PrerequisiteItem 42
-  x = :PrerequisiteQuery(.size = 2, .list = 42)
-  x = :PrerequisiteQuery(2, 42)
-  bar(:FontSizeQuery(.encoding = a, .glyphBits = b, .name = "foo"))
-  bar(:FontSizeQuery(a, b, "foo"))
+  var y = ScalarStream.PrerequisiteItem(42)
+  x = .PrerequisiteQuery(.size = 2, .list = 42)
+  x = .PrerequisiteQuery(2, 42)
+  bar(.FontSizeQuery(.encoding = a, .glyphBits = b, .name = "foo"))
+  bar(.FontSizeQuery(a, b, "foo"))
 
 There would also be support for doing a "switch" style pattern matching dispatch
 to get to the individual elements. A rough idea is something like this::
@@ -133,10 +132,10 @@ to get to the individual elements. A rough idea is something like this::
   switch (some_stream) {
     case EncodingOnly:
       ...
-    case PrerequisiteItem x:
+    case .PrerequisiteItem(x):
       handle(x)
       ...
-    case FontSizeQuery(encoding, glyphBits, name):
+    case .FontSizeQuery(encoding, glyphBits, name):
       do_something_with(encoding + glyphBits, name)
       ...
 
@@ -151,12 +150,12 @@ union with exactly one discriminator. While structs are just a hacky special
 case :-), they are important, because this is what most people think about. The
 following would work::
 
-  union CGRect {
+  struct CGRect {
     CGRect(origin : CGPoint, size : CGSize)
   }
 
-  var x1 = CGRect::CGRect(myorigin, CGSize::CGSize(42, 123))
-  var x2 = CGRect::CGRect(.size = CGSize::CGSize(.width = 42, .height=123), .origin = myorigin)
+  var x1 = CGRect.CGRect(myorigin, CGSize.CGSize(42, 123))
+  var x2 = CGRect.CGRect(.size = CGSize.CGSize(.width = 42, .height=123), .origin = myorigin)
 
 However, this seems like massive syntactic overkill. There are a couple ways to
 handle this, but introducing a real "struct" keyword is probably the
@@ -170,8 +169,8 @@ simplest. This would give::
 
 A struct declaration is just like a declaration of a union containing a single
 element, plus it injects the (single) constructor into the global namespace. The
-injected constructor is why "CGSize" works without requiring CGSize::CGSize or
-:CGSize in an inferred context.  Internal to the compiler, this is just
+injected constructor is why "CGSize" works without requiring CGSize.CGSize or
+.CGSize in an inferred context.  Internal to the compiler, this is just
 de-sugared and handled uniformly with the more general union case, just like
 'func' is de- sugared to 'var'.
 
@@ -187,29 +186,3 @@ Following the uniform syntax for variable and func definitions, union and struct
 should allow attributes, e.g.::
 
   struct [packed] MyPoint { x : sometype1, y : sometype2 }
-
-I don't have any specific plans for attributes here, but it could be useful when
-we want a struct to exactly match the layout of a C type or a hardware
-resource. It also allows us to specify that these are implicitly pass
-by-reference if that ever becomes important. For example, that would allow us to
-do something like this::
-
-  struct [byref] MyList {
-    data : int,
-    next : MyList
-  }
-
-Without "byref" you'd get an error about MyList not allowed to be infinite
-size. :-)
-
-This would only be appropriate if you don't want to use an object for some
-reason, which will always be "by-ref".
-
-
-
-
-
-
-
-
-
