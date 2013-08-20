@@ -455,11 +455,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       consumeToken();
     }
     SourceLoc StartLoc = Tok.getLoc();
-    ParserStatus CallbackStatus = callback();
-    if (CallbackStatus.isError())
-      Status.setIsParseError();
-    if (CallbackStatus.hasCodeCompletion())
-      Status.setHasCodeCompletion();
+    Status |= callback();
     if (Tok.is(RightK))
       break;
     // If the lexer stopped with an EOF token whose spelling is ")", then this

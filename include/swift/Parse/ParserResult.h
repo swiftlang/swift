@@ -161,6 +161,18 @@ public:
     IsError = true;
     IsCodeCompletion = true;
   }
+
+  ParserStatus &operator|=(ParserStatus RHS) {
+    IsError |= RHS.IsError;
+    IsCodeCompletion |= RHS.IsCodeCompletion;
+    return *this;
+  }
+
+  friend ParserStatus operator|(ParserStatus LHS, ParserStatus RHS) {
+    ParserStatus Result = LHS;
+    Result |= RHS;
+    return Result;
+  }
 };
 
 /// Create a successful parser status.
