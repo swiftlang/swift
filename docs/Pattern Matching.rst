@@ -196,14 +196,14 @@ pointless, but for a lot of other types (Int, enums, etc.) it's
 pervasive.
 
 The most important semantic design point here is about bound variables
-in a grouped case, e.g. (using ?x as a "bind this variable" introducer;
+in a grouped case, e.g. (using 'var' as a "bind this variable" introducer;
 see the pattern grammar)::
 
   switch (pair) {
-  case (?x,0):
-  case (0,?y):
+  case (var x, 0):
+  case (0, var y):
     return 1
-  case (?x,?y)
+  case (var x, var y)
     return foo(x-1,y) + foo(x,y-1)
   }
 
@@ -246,7 +246,7 @@ cases, it would be nice to allow different cases in a group to have
 different pattern guards::
 
   case .None:
-  case .Some(?c) where c.isSpace() || c.isASCIIControl():
+  case .Some(var c) where c.isSpace() || c.isASCIIControl():
     skipToEOL()
 
 So really I think we should permit multiple 'case' introducers::
@@ -399,7 +399,7 @@ The current Swift approximation is::
   func length(list : List) : Int {
     switch list {
       case .nil: return 0
-      case .cons(_,?tail): return 1 + length(tail)
+      case .cons(_,var tail): return 1 + length(tail)
     }
   }
 
@@ -408,7 +408,7 @@ function body. We could remove those with something like this::
 
   func length(list : List) : Int = switch list {
     case .nil: return 0
-    case .cons(_,?tail): return 1 + length(tail)
+    case .cons(_,var tail): return 1 + length(tail)
   }
 
 Anyway, that's easy to add later if we see the need.
