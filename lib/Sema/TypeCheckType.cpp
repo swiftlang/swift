@@ -587,6 +587,9 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
 
   assert(TyR && "Cannot validate null TypeReprs!");
   switch (TyR->getKind()) {
+  case TypeReprKind::Error:
+    return ErrorType::get(Context);
+
   case TypeReprKind::Attributed: {
     Type Ty;
     auto AttrTyR = cast<AttributedTypeRepr>(TyR);

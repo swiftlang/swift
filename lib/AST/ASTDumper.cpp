@@ -1258,6 +1258,10 @@ public:
     return OS;
   }
 
+  void visitErrorTypeRepr(ErrorTypeRepr *T) {
+    printCommon(T, "type_error");
+  }
+
   void visitAttributedTypeRepr(AttributedTypeRepr *T) {
     printCommon(T, "type_attributed") << " attrs=";
     T->printAttrs(OS);

@@ -736,7 +736,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return nullptr;
     return P;
   }
-  
+
+  bool visitErrorTypeRepr(ErrorTypeRepr *T) {
+    return false;
+  }
+
   bool visitAttributedTypeRepr(AttributedTypeRepr *T) {
     if (doIt(T->getTypeRepr()))
       return true;

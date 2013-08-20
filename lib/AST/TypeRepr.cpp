@@ -76,6 +76,9 @@ void TypeRepr::print(raw_ostream &OS) const {
   llvm_unreachable("unknown kind!");
 }
 
+void ErrorTypeRepr::printImpl(llvm::raw_ostream &OS) const {
+  OS << "<<error type>>";
+}
 
 void AttributedTypeRepr::printImpl(llvm::raw_ostream &OS) const {
   printAttrs(OS);

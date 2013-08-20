@@ -21,6 +21,7 @@
 # error Included TypeReprNodes.def without defining TYPEREPR!
 #endif
 
+TYPEREPR(Error, TypeRepr)
 TYPEREPR(Attributed, TypeRepr)
 TYPEREPR(Ident, TypeRepr)
 TYPEREPR(Function, TypeRepr)

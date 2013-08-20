@@ -70,6 +70,33 @@ public:
   void dump() const;
 };
 
+/// \brief A TypeRepr for a type with a syntax error.  Can be used both as a
+/// top-level TypeRepr and as a part of other TypeRepr.
+///
+/// The client should make sure to emit a diagnostic at the construction time
+/// (in the parser).  All uses of this type should be ignored and not
+/// re-diagnosed.
+class ErrorTypeRepr : public TypeRepr {
+  SourceRange Range;
+
+public:
+  ErrorTypeRepr() : TypeRepr(TypeReprKind::Error) {}
+  ErrorTypeRepr(SourceLoc Loc) : TypeRepr(TypeReprKind::Error), Range(Loc) {}
+  ErrorTypeRepr(SourceRange Range)
+      : TypeRepr(TypeReprKind::Error), Range(Range) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Error;
+  }
+  static bool classof(const ErrorTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Range.Start; }
+  SourceLoc getEndLocImpl() const { return Range.End; }
+  void printImpl(llvm::raw_ostream &OS) const;
+  friend class TypeRepr;
+};
+
 /// \brief A type with attributes.
 /// \code
 ///   [byref] Foo
