@@ -435,18 +435,18 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   return false;
 }
 
-/// parseList - Parse the list of statements, expressions, or declarations.
-bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                       tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
-                       std::function<bool()> callback) {
+ParserStatus
+Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
+                  tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
+                  std::function<ParserStatus()> callback) {
   assert(SeparatorK == tok::comma || SeparatorK == tok::semi);
 
   if (Tok.is(RightK)) {
     RightLoc = consumeToken(RightK);
-    return false;
+    return makeParserSuccess();
   }
 
-  bool Invalid = false;
+  ParserStatus Status;
   while (true) {
     while (Tok.is(SeparatorK)) {
       diagnose(Tok, diag::unexpected_separator,
@@ -455,7 +455,11 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       consumeToken();
     }
     SourceLoc StartLoc = Tok.getLoc();
-    Invalid |= callback();
+    ParserStatus CallbackStatus = callback();
+    if (CallbackStatus.isError())
+      Status.setIsParseError();
+    if (CallbackStatus.hasCodeCompletion())
+      Status.setHasCodeCompletion();
     if (Tok.is(RightK))
       break;
     // If the lexer stopped with an EOF token whose spelling is ")", then this
@@ -463,7 +467,7 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     // Just accept the ")" and build the tuple as we usually do.
     if (Tok.is(tok::eof) && Tok.getText() == ")") {
       RightLoc = Tok.getLoc();
-      return Invalid;
+      return Status;
     }
     if (consumeIf(SeparatorK))
       continue;
@@ -472,7 +476,7 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       StringRef Separator = (SeparatorK == tok::comma ? "," : ";");
       diagnose(Tok, diag::expected_separator, Separator)
         .fixItInsert(InsertLoc, Separator);
-      Invalid = true;
+      Status.setIsParseError();
     }
     // If we haven't made progress, skip ahead
     if (Tok.getLoc() == StartLoc) {
@@ -481,7 +485,7 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         break;
       if (Tok.is(tok::eof) || Tok.is(tok::code_complete)) {
         RightLoc = Tok.getLoc();
-        return true;
+        return makeParserError();
       }
       if (consumeIf(SeparatorK))
         continue;
@@ -490,10 +494,23 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   }
 
   if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
-    Invalid = true;
+    Status.setIsParseError();
     RightLoc = Tok.getLoc();
   }
-  return Invalid;
+
+  return Status;
+}
+
+bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
+                       tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
+                       std::function<bool()> callback) {
+  return parseList(RightK, LeftLoc, RightLoc, SeparatorK, OptionalSep,
+                   ErrorDiag, [&]() -> ParserStatus {
+    if (callback())
+      return makeParserError();
+    else
+      return makeParserSuccess();
+  }).isError();
 }
 
 /// diagnoseRedefinition - Diagnose a redefinition error, with a note

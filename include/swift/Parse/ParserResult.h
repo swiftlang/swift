@@ -18,6 +18,8 @@
 
 namespace swift {
 
+class ParserStatus;
+
 /// \brief A wrapper for a parser AST node result (Decl, Stmt, Expr, Pattern,
 /// etc.)
 ///
@@ -25,6 +27,9 @@ namespace swift {
 /// that indicate:
 /// \li if there was a parse error;
 /// \li if there was a code completion token.
+///
+/// If you want to return an AST node pointer in the Parser, consider using
+/// ParserResult instead.
 template <typename T> class ParserResult {
   llvm::PointerIntPair<T *, 2> PtrAndBits;
 
@@ -38,6 +43,9 @@ template <typename T> class ParserResult {
 public:
   /// Construct a null result with error bit set.
   ParserResult(std::nullptr_t = nullptr) { setIsParseError(); }
+
+  /// Construct a null result with specified error bits set.
+  ParserResult(ParserStatus Status);
 
   /// Construct a successful parser result.
   explicit ParserResult(T *Result) : PtrAndBits(Result) {
@@ -88,25 +96,99 @@ public:
 };
 
 /// Create a successful parser result.
-template <typename T> ParserResult<T> makeParserResult(T *Result) {
+template <typename T>
+static inline ParserResult<T> makeParserResult(T *Result) {
   return ParserResult<T>(Result);
 }
 
 /// Create a result (null or non-null) with error bit set.
 template <typename T>
-ParserResult<T> makeParserErrorResult(T *Result = nullptr) {
-  ParserResult<T> PR(Result);
+static inline ParserResult<T> makeParserErrorResult(T *Result = nullptr) {
+  ParserResult<T> PR;
+  if (Result)
+    PR = ParserResult<T>(Result);
   PR.setIsParseError();
   return PR;
 }
 
 /// Create a result (null or non-null) with error and code completion bits set.
 template <typename T>
-ParserResult<T> makeParserCodeCompletionResult(T *Result = nullptr) {
-  ParserResult<T> PR(Result);
+static inline ParserResult<T> makeParserCodeCompletionResult(T *Result =
+                                                                 nullptr) {
+  ParserResult<T> PR;
+  if (Result)
+    PR = ParserResult<T>(Result);
   PR.setHasCodeCompletion();
   return PR;
 }
+
+/// \brief Same as \c ParserResult, but just the status bits without the AST
+/// node.
+///
+/// Useful when the AST node is returned by some other means (for example, a in
+/// vector out parameter).
+///
+/// If you want to use 'bool' as a result type in the Parser, consider using
+/// ParserStatus instead.
+class ParserStatus {
+  unsigned IsError : 1;
+  unsigned IsCodeCompletion : 1;
+
+public:
+  /// Construct a successful parser status.
+  ParserStatus() : IsError(0), IsCodeCompletion(0) {}
+
+  /// Construct a parser status with specified bits.
+  template<typename T>
+  ParserStatus(ParserResult<T> Result) {
+    if (Result.isParseError())
+      setIsParseError();
+    if (Result.hasCodeCompletion())
+      setHasCodeCompletion();
+  }
+
+  bool isSuccess() const { return !isError(); }
+  bool isError() const { return IsError; }
+
+  /// Return true if we found a code completion token while parsing this.
+  bool hasCodeCompletion() const { return IsCodeCompletion; }
+
+  void setIsParseError() {
+    IsError = true;
+  }
+
+  void setHasCodeCompletion() {
+    IsError = true;
+    IsCodeCompletion = true;
+  }
+};
+
+/// Create a successful parser status.
+static inline ParserStatus makeParserSuccess() {
+  return ParserStatus();
+}
+
+/// Create a status with error bit set.
+static inline ParserStatus makeParserError() {
+  ParserStatus Status;
+  Status.setIsParseError();
+  return Status;
+}
+
+/// Create a status with error and code completion bits set.
+static inline ParserStatus makeParserCodeCompletionStatus() {
+  ParserStatus Status;
+  Status.setHasCodeCompletion();
+  return Status;
+}
+
+template <typename T> ParserResult<T>::ParserResult(ParserStatus Status) {
+  assert(Status.isError());
+  setIsParseError();
+  if (Status.hasCodeCompletion())
+    setHasCodeCompletion();
+}
+
 } // namespace swift
 
 #endif // LLVM_SWIFT_PARSER_PARSER_RESULT_H

@@ -388,7 +388,14 @@ public:
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
-  /// parseList - Parse the list of statements, expressions, or declarations.
+  /// \brief Parse the list of statements, expressions, or declarations.
+  ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
+                         tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
+                         std::function<ParserStatus()> callback);
+
+  /// \brief Parse the list of statements, expressions, or declarations.
+  ///
+  /// \returns false on success, true on error.
   bool parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                  tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
                  std::function<bool()> callback);
