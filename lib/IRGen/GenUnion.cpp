@@ -165,11 +165,6 @@ namespace {
       dest.add(src.claim(getExplosionSize(ExplosionKind::Minimal)));
     }
     
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      // FIXME handle non-trivial payloads
-      dest.add(src.claim(getExplosionSize(ExplosionKind::Minimal)));
-    }
-    
     void destroy(IRGenFunction &IGF, Address addr) const {
       // FIXME
     }
@@ -469,10 +464,6 @@ namespace {
       // FIXME
     }
 
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      // FIXME
-    }
-
     void destroy(IRGenFunction &IGF, Address addr) const {
       // FIXME
     }
@@ -589,10 +580,6 @@ namespace {
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       if (Singleton) Singleton->reexplode(IGF, src, dest);
-    }
-
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      if (Singleton) Singleton->copy(IGF, src, dest);
     }
 
     void destroy(IRGenFunction &IGF, Address addr) const {

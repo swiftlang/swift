@@ -79,12 +79,6 @@ public:
   virtual void reexplode(IRGenFunction &IGF, Explosion &sourceExplosion,
                          Explosion &targetExplosion) const = 0;
 
-  /// Shift values from the source explosion to the target explosion
-  /// as if by copy-initializion.  This operation may also shift
-  /// explosion levels.
-  virtual void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
-                    Explosion &targetExplosion) const = 0;
-  
   /// Pack the source explosion into a union payload.
   virtual llvm::Value *packUnionPayload(IRGenFunction &IGF,
                                         Explosion &sourceExplosion,

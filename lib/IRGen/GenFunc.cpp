@@ -419,11 +419,6 @@ namespace {
       IGF.emitInitializeRetained(e.claimNext(), dataAddr);
     }
 
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 1);
-      IGF.emitRetain(src.claimNext(), dest);
-    }
-
     void retain(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
       IGF.emitRetainCall(e.claimNext());
