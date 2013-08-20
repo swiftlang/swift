@@ -680,6 +680,14 @@ public:
   void setOuterParameters(GenericParamList *Outer) { OuterParameters = Outer; }
 
   SourceRange getSourceRange() const { return Brackets; }
+
+  /// Retrieve the depth of this generic parameter list.
+  unsigned getDepth() const {
+    unsigned depth = 0;
+    for (auto gp = getOuterParameters(); gp; gp = gp->getOuterParameters())
+      ++depth;
+    return depth;
+  }
 };
 
 /// Describes what kind of name is being imported.
@@ -1267,6 +1275,8 @@ public:
 class GenericTypeParamDecl : public AbstractTypeParamDecl {
   /// The location of the name.
   SourceLoc NameLoc;
+  unsigned Depth : 16;
+  unsigned Index : 16;
 
 public:
   /// Construct a new generic type parameter.
@@ -1277,8 +1287,38 @@ public:
   ///
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
-  GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc);
-  
+  GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
+                       unsigned depth, unsigned index);
+
+  /// The depth of this generic type parameter, i.e., the number of outer
+  /// levels of generic parameter lists that enclose this type parameter.
+  ///
+  /// \code
+  /// struct X<T> {
+  ///   func f<U>() { }
+  /// }
+  /// \endcode
+  ///
+  /// Here 'T' has depth 0 and 'U' has depth 0. Both have index 0.
+  unsigned getDepth() const { return Depth; }
+
+  /// Set the depth of this generic type parameter.
+  ///
+  /// \sa getDepth
+  void setDepth(unsigned depth) { Depth = depth; }
+
+  /// The index of this generic type parameter within its generic parameter
+  /// list.
+  ///
+  /// \code
+  /// struct X<T, U> {
+  ///   func f<V>() { }
+  /// }
+  /// \endcode
+  ///
+  /// Here 'T' and 'U' have indexes 0 and 1, respectively. 'V' has index 0.
+  unsigned getIndex() const { return Index; }
+
   SourceLoc getStartLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const;

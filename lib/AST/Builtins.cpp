@@ -267,7 +267,7 @@ getGenericParam(ASTContext &Context) {
                             Type(), 0);
   auto GenericTyDecl =
     new (Context) GenericTypeParamDecl(Context.TheBuiltinModule, GenericName,
-                                       SourceLoc());
+                                       SourceLoc(), 0, 0);
   GenericTyDecl->setArchetype(Archetype);
   Type GenericTy = GenericTyDecl->getDeclaredType();
   GenericParam Param = GenericTyDecl;

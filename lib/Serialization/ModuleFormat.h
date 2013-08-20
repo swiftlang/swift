@@ -467,6 +467,8 @@ namespace decls_block {
     GENERIC_TYPE_PARAM_DECL,
     IdentifierIDField, // name
     DeclIDField, // context decl
+    BCVBR<4>,    // depth
+    BCVBR<4>,    // index
     TypeIDField, // superclass type
     TypeIDField  // archetype type
                  // Trailed by the conformance info (if any).

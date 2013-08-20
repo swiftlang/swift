@@ -290,14 +290,8 @@ void Mangler::bindGenericParameters(const GenericParamList *genericParams,
   // Determine the depth our parameter list is at. We don't actually need to
   // emit the outer parameters because they should have been emitted as part of
   // the outer context.
-  const GenericParamList *parent = genericParams;
-  ArchetypesDepth = 0;
-  do {
-    ++ArchetypesDepth;
-  } while ((parent = parent->getOuterParameters()));
-
+  ArchetypesDepth = genericParams->getDepth() + 1;
   unsigned index = 0;
-
   for (auto archetype : genericParams->getAllArchetypes()) {
     // Remember the current depth and level.
     ArchetypeInfo info;

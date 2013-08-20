@@ -1022,18 +1022,8 @@ bool Serializer::writeCrossReference(const Decl *D) {
     kind = XRefKind::SwiftValue;
 
     if (auto genericParam = dyn_cast<GenericTypeParamDecl>(D)) {
-      DeclContext *DC = genericParam->getDeclContext();
-      auto params = DC->getGenericParamsOfContext()->getParams();
-
-      auto iter = std::find_if(params.begin(), params.end(),
-                               [=](const GenericParam &param) {
-                                 return param.getAsTypeParam() == genericParam;
-                               });
-      assert(iter != params.end() && "generic param not in list");
-
-      // FIXME: Record the index in the GenericTypeParamDecl.
       kind = XRefKind::SwiftGenericParameter;
-      typeID = std::distance(params.begin(), iter);
+      typeID = genericParam->getIndex();
     }
 
     if (kind == XRefKind::SwiftValue) {
@@ -1232,6 +1222,8 @@ bool Serializer::writeDecl(const Decl *D) {
     GenericTypeParamDeclLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addIdentifierRef(genericParam->getName()),
                                 addDeclRef(DC),
+                                genericParam->getDepth(),
+                                genericParam->getIndex(),
                                 addTypeRef(genericParam->getSuperclass()),
                                 addTypeRef(genericParam->getArchetype()));
 

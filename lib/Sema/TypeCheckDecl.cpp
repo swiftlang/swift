@@ -415,12 +415,16 @@ public:
 
   void checkGenericParams(GenericParamList *GenericParams) {
     assert(GenericParams && "Missing generic parameters");
+    unsigned Depth = GenericParams->getDepth();
 
     // Assign archetypes to each of the generic parameters.
     ArchetypeBuilder Builder = createArchetypeBuilder();
     unsigned Index = 0;
     for (auto GP : *GenericParams) {
       auto TypeParam = GP.getAsTypeParam();
+
+      // Set the depth of this type parameter.
+      TypeParam->setDepth(Depth);
 
       // Check the constraints on the type parameter.
       checkInheritanceClause(TC, TypeParam);

@@ -554,9 +554,10 @@ SourceRange TypeAliasDecl::getSourceRange() const {
 }
 
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
-                                           SourceLoc nameLoc)
+                                           SourceLoc nameLoc,
+                                           unsigned depth, unsigned index)
   : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name),
-    NameLoc(nameLoc)
+    NameLoc(nameLoc), Depth(depth), Index(index)
 {
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);

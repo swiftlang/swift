@@ -982,6 +982,14 @@ TypeBase *GenericTypeParamType::getDesugaredType() {
   return getDecl()->getArchetype()->getDesugaredType();
 }
 
+unsigned GenericTypeParamType::getDepth() const {
+  return Param->getDepth();
+}
+
+unsigned GenericTypeParamType::getIndex() const {
+  return Param->getIndex();
+}
+
 TypeBase *AssociatedTypeType::getDesugaredType() {
   return getDecl()->getArchetype()->getDesugaredType();
 }

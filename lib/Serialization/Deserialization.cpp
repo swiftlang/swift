@@ -698,11 +698,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::GENERIC_TYPE_PARAM_DECL: {
     IdentifierID nameID;
     DeclID contextID;
+    unsigned depth;
+    unsigned index;
     TypeID superclassID;
     TypeID archetypeID;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(scratch, nameID,
                                                         contextID,
+                                                        depth,
+                                                        index,
                                                         superclassID,
                                                         archetypeID);
 
@@ -713,7 +717,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto genericParam = new (ctx) GenericTypeParamDecl(DC,
                                                        getIdentifier(nameID),
-                                                       SourceLoc());
+                                                       SourceLoc(),
+                                                       depth,
+                                                       index);
     declOrOffset = genericParam;
 
     genericParam->setSuperclass(getType(superclassID));

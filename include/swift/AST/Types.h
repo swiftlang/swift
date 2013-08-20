@@ -1918,6 +1918,30 @@ public:
   /// sugar until we get down to a non-sugar type.
   TypeBase *getDesugaredType();
 
+  /// The depth of this generic type parameter, i.e., the number of outer
+  /// levels of generic parameter lists that enclose this type parameter.
+  ///
+  /// \code
+  /// struct X<T> {
+  ///   func f<U>() { }
+  /// }
+  /// \endcode
+  ///
+  /// Here 'T' has depth 0 and 'U' has depth 0. Both have index 0.
+  unsigned getDepth() const;
+
+  /// The index of this generic type parameter within its generic parameter
+  /// list.
+  ///
+  /// \code
+  /// struct X<T, U> {
+  ///   func f<V>() { }
+  /// }
+  /// \endcode
+  ///
+  /// Here 'T' and 'U' have indexes 0 and 1, respectively. 'V' has index 0.
+  unsigned getIndex() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::GenericTypeParam;
