@@ -80,7 +80,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   case tok::code_complete: {
     if (CodeCompletion)
       CodeCompletion->completeTypeSimpleBeginning();
-    return nullptr;
+    return makeParserCodeCompletionResult<TypeRepr>();
   }
   default:
     diagnose(Tok.getLoc(), MessageID);
@@ -231,11 +231,14 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
     // unless <anything> is 'metatype'.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
-      if (peekToken().is(tok::code_complete) && CodeCompletion) {
-        if (auto Entry = lookupInScope(ComponentsR[0].getIdentifier()))
-          ComponentsR[0].setValue(Entry);
-        CodeCompletion->completeTypeIdentifier(
-            IdentTypeRepr::create(Context, ComponentsR));
+      if (peekToken().is(tok::code_complete)) {
+        if (CodeCompletion) {
+          if (auto Entry = lookupInScope(ComponentsR[0].getIdentifier()))
+            ComponentsR[0].setValue(Entry);
+          CodeCompletion->completeTypeIdentifier(
+              IdentTypeRepr::create(Context, ComponentsR));
+        }
+        return makeParserCodeCompletionResult<IdentTypeRepr>();
       }
 
       if (peekToken().isNot(tok::kw_metatype)) {
