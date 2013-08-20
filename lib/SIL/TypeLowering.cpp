@@ -128,11 +128,10 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
                   t->getExtInfo(),
                   t->getASTContext()));
     }
-    auto ft = cast<FunctionType>(t);
     return CanAnyFunctionType(FunctionType::get(
                 getBridgedInputType(tc, t->getAbstractCC(), t.getInput()),
                 getBridgedResultType(tc, t->getAbstractCC(), t.getResult()),
-                ft->getExtInfo(),
+                t->getExtInfo(),
                 t->getASTContext()));
   }
 }
