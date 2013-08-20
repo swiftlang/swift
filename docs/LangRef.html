@@ -1402,9 +1402,10 @@ if vec[3] {
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    attribute-list ::= /*empty*/
-    attribute-list ::= '[' ']'
-    attribute-list ::= '[' attribute (',' attribute)* ']'
+    attribute-list        ::= /*empty*/
+    attribute-list        ::= attribute-list-clause attribute-list
+    attribute-list-clause ::= '[' ']'
+    attribute-list-clause ::= '[' attribute (',' attribute)* ']'
     
     attribute      ::= attribute-infix
     attribute      ::= attribute-resilience
@@ -1413,7 +1414,12 @@ if vec[3] {
     attribute      ::= attribute-noreturn
   </pre>
   
-  <p>An attribute is a (possibly empty) comma separated list of attributes.</p>
+  <p>An attribute list is written as a sequence of clauses delimited
+    by square brackets, each of which contains a (possibly empty)
+    comma-separated list of attributes.  Neither the ordering of
+    attributes nor the grouping of attributes into separate clauses
+    has any semantic effect.  Attributes may not be repeated within a
+    list.</p>
   
   <!-- _____________________________________________________________________ -->
   <h4 id="attribute-infix">Infix Attributes</h4>

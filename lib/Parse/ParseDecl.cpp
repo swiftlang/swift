@@ -450,22 +450,35 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
   llvm_unreachable("bad attribute kind");
 }
 
-/// parsePresentAttributeList - This is the internal implementation of
+/// parseAttributeListPresent - This is the internal implementation of
 /// parseAttributeList, which we expect to be inlined to handle the common case
 /// of an absent attribute list.
 ///   attribute-list:
-///     /*empty*/
+///     attribute-list-clause*
+///   attribute-list-clause
 ///     '[' ']'
 ///     '[' attribute (',' attribute)* ']'
 bool Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
-  Attributes.LSquareLoc = consumeToken(tok::l_square);
+  SourceLoc leftLoc = consumeToken(tok::l_square);
+  Attributes.LSquareLoc = leftLoc;
 
-  return parseList(tok::r_square, Attributes.LSquareLoc, Attributes.RSquareLoc,
-                   tok::comma, /*OptionalSep=*/false,
-                   diag::expected_in_attribute_list,
-                   [&] () -> bool {
-    return parseAttribute(Attributes);
-  });
+  do {
+    if (parseList(tok::r_square, leftLoc, Attributes.RSquareLoc,
+                  tok::comma, /*OptionalSep=*/false,
+                  diag::expected_in_attribute_list,
+                  [&] () -> bool {
+          return parseAttribute(Attributes);
+        }))
+      return true;
+
+    leftLoc = Tok.getLoc();
+
+    // A square bracket here begins another attribute-list-clause;
+    // consume it and continue.  Note that we'll overwrite
+    // Attributes.RSquareLoc so that it encompasses the entire range.
+  } while (consumeIf(tok::l_square));
+
+  return false;
 }
 
 bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
