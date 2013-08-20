@@ -336,6 +336,7 @@ FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
                            DeclContext *parent) {
   assert(argParams.size() == bodyParams.size());
   unsigned nParams = argParams.size();
+  assert(nParams > 0);
   void *buf = C.Allocate(sizeof(FuncExpr) + 2 * nParams * sizeof(Pattern*),
                          alignof(FuncExpr));
   FuncExpr *fn = ::new (buf) FuncExpr(funcLoc, nParams, fnRetType, parent);
