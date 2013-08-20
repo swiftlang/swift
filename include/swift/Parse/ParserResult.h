@@ -194,6 +194,17 @@ static inline ParserStatus makeParserCodeCompletionStatus() {
   return Status;
 }
 
+/// Create a parser result with specified bits.
+template <typename T>
+static inline ParserResult<T> makeParserResult(ParserStatus Status,
+                                               T *Result) {
+  if (Status.isSuccess())
+    return makeParserResult(Result);
+  if (Status.hasCodeCompletion())
+    return makeParserCodeCompletionResult(Result);
+  return makeParserErrorResult(Result);
+}
+
 template <typename T> ParserResult<T>::ParserResult(ParserStatus Status) {
   assert(Status.isError());
   setIsParseError();

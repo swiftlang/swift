@@ -521,11 +521,11 @@ public:
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 
-  bool parseFunctionArguments(SmallVectorImpl<Pattern*> &argPatterns,
-                              SmallVectorImpl<Pattern*> &bodyPatterns);
-  bool parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
-                              SmallVectorImpl<Pattern*> &bodyPatterns,
-                              TypeRepr *&retLoc);
+  ParserStatus parseFunctionArguments(SmallVectorImpl<Pattern*> &ArgPatterns,
+                                      SmallVectorImpl<Pattern*> &BodyPatterns);
+  ParserStatus parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
+                                      SmallVectorImpl<Pattern *> &bodyPatterns,
+                                      TypeRepr *&retLoc);
 
   ParserResult<Pattern> parsePattern();
 
@@ -546,7 +546,8 @@ public:
   /// \param allowInitExpr Whether to allow initializers.
   ///
   /// \returns The tuple pattern element, if successful.
-  Optional<TuplePatternElt> parsePatternTupleElement(bool allowInitExpr);
+  std::pair<ParserStatus, Optional<TuplePatternElt>>
+  parsePatternTupleElement(bool allowInitExpr);
   ParserResult<Pattern> parsePatternTuple(bool AllowInitExpr);
   ParserResult<Pattern> parsePatternAtom();
   ParserResult<Pattern> parsePatternIdentifier();

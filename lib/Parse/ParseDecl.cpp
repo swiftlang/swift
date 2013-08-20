@@ -1488,10 +1488,18 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
     BodyParams.push_back(thisPattern);
   }
 
-  TypeRepr *FuncRetTy;
-  if (parseFunctionSignature(ArgParams, BodyParams, FuncRetTy)) {
-    if (CodeCompletion) {
-      // Create fake function signature.
+  bool HadSignatureParseError = false;
+  TypeRepr *FuncRetTy = nullptr;
+  {
+    ParserStatus SignatureStatus =
+        parseFunctionSignature(ArgParams, BodyParams, FuncRetTy);
+
+    if (SignatureStatus.isError()) {
+      HadSignatureParseError = true;
+      // Try to recover.  Create a function signature with as much information
+      // as possible.
+      //
+      // FIXME: right now creates a '() -> ()' signature.
       ArgParams.clear();
       BodyParams.clear();
       if (HasContainerType) {
@@ -1499,10 +1507,18 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
         ArgParams.push_back(thisPattern);
         BodyParams.push_back(thisPattern);
       }
-      ArgParams.push_back(new (Context) AnyPattern(SourceLoc()));
-      BodyParams.push_back(new (Context) AnyPattern(SourceLoc()));
-      FuncRetTy = TupleTypeRepr::create(Context, {}, SourceRange(),
-                                        SourceLoc());
+      auto *VoidPattern =
+          TuplePattern::create(Context, Tok.getLoc(), {}, Tok.getLoc());
+      ArgParams.push_back(VoidPattern);
+      BodyParams.push_back(VoidPattern);
+      // FuncRetTy is always initialized by parseFunctionSignature().
+    }
+
+    if (SignatureStatus.hasCodeCompletion()) {
+      if (!CodeCompletion)
+        // Trigger delayed parsing, no need to continue.
+        return SignatureStatus;
+
       // Create function AST nodes.
       FuncExpr *FE =
           actOnFuncExprStart(FuncLoc, FuncRetTy, ArgParams, BodyParams);
@@ -1511,9 +1527,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
                                             CurDeclContext);
       FE->setDecl(FD);
       FE->setBodySkipped(Tok.getLoc());
+
+      // Pass the function signature to code completion.
       CodeCompletion->setDelayedParsedDecl(FD);
     }
-    return nullptr;
   }
 
   // Enter the arguments for the function into a new function-body scope.  We
@@ -1537,16 +1554,14 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
     ContextChange CC(*this, FE);
 
     // Check to see if we have a "{" to start a brace statement.
-    if (Flags & PD_DisallowFuncDef) {
-      if (Tok.is(tok::l_brace)) {
+    if (Tok.is(tok::l_brace)) {
+      if (Flags & PD_DisallowFuncDef) {
         diagnose(Tok.getLoc(), diag::disallowed_func_def);
         consumeToken();
         skipUntil(tok::r_brace);
         consumeToken();
-        return nullptr;
-      }
-    } else if (Attributes.AsmName.empty() || Tok.is(tok::l_brace)) {
-      if (!isDelayedParsingEnabled()) {
+        // FIXME: don't just drop the body.
+      } else if (!isDelayedParsingEnabled()) {
         NullablePtr<BraceStmt> Body =
             parseBraceItemList(diag::func_decl_without_brace);
         if (Body.isNull()) {
@@ -1557,6 +1572,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
       } else {
         consumeFunctionBody(FE);
       }
+    } else if (Attributes.AsmName.empty() && !(Flags & PD_DisallowFuncDef) &&
+               !HadSignatureParseError) {
+      diagnose(NameLoc, diag::func_decl_without_brace);
     }
   }
 

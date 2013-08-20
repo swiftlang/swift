@@ -30,21 +30,21 @@ using namespace swift;
 ///   selector-element:
 ///      identifier '(' pattern-atom (':' type-annotation)? ('=' expr)? ')'
 
-static bool parseCurriedFunctionArguments(Parser &P,
-                                          SmallVectorImpl<Pattern*> &argPat,
-                                          SmallVectorImpl<Pattern*> &bodyPat) {
+static ParserStatus
+parseCurriedFunctionArguments(Parser &P,
+                              SmallVectorImpl<Pattern *> &argPat,
+                              SmallVectorImpl<Pattern *> &bodyPat) {
   // parseFunctionArguments parsed the first argument pattern.
   // Parse additional curried argument clauses as long as we can.
   while (P.Tok.is(tok::l_paren)) {
     ParserResult<Pattern> pattern = P.parsePatternTuple(/*AllowInitExpr=*/false);
-    if (pattern.isNull())
-      return true;
-    else {
-      argPat.push_back(pattern.get());
-      bodyPat.push_back(pattern.get());
-    }
+    if (pattern.isNull() || pattern.hasCodeCompletion())
+      return pattern;
+
+    argPat.push_back(pattern.get());
+    bodyPat.push_back(pattern.get());
   }
-  return false;
+  return makeParserSuccess();
 }
 
 /// \brief Determine the kind of a default argument given a parsed
@@ -67,12 +67,12 @@ static DefaultArgumentKind getDefaultArgKind(ExprHandle *init) {
   }
 }
 
-static bool parseSelectorArgument(Parser &P,
-                                  SmallVectorImpl<TuplePatternElt> &argElts,
-                                  SmallVectorImpl<TuplePatternElt> &bodyElts,
-                                  llvm::StringMap<VarDecl*> &selectorNames,
-                                  SourceLoc &rp)
-{
+static ParserStatus
+parseSelectorArgument(Parser &P,
+                      SmallVectorImpl<TuplePatternElt> &argElts,
+                      SmallVectorImpl<TuplePatternElt> &bodyElts,
+                      llvm::StringMap<VarDecl *> &selectorNames,
+                      SourceLoc &rp) {
   ParserResult<Pattern> argPattern = P.parsePatternIdentifier();
   assert(argPattern.isNonNull() &&
          "selector argument did not start with an identifier!");
@@ -93,34 +93,39 @@ static bool parseSelectorArgument(Parser &P,
   if (!P.Tok.is(tok::l_paren)) {
     P.diagnose(P.Tok.getLoc(),
                      diag::func_selector_without_paren);
-    return true;
+    return makeParserError();
   }
   P.consumeToken();
   
   if (P.Tok.is(tok::r_paren)) {
     P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
-    return true;
+    rp = P.consumeToken(tok::r_paren);
+    return makeParserError();
   }
 
   ParserResult<Pattern> bodyPattern = P.parsePatternAtom();
   if (bodyPattern.isNull()) {
     P.skipUntil(tok::r_paren);
-    return true;
+    return makeParserError();
   }
   
   if (P.consumeIf(tok::colon)) {
     ParserResult<TypeRepr> type = P.parseTypeAnnotation();
+    bool HadParseError = false;
     if (type.isNull()) {
+      HadParseError = true;
+      type = makeParserResult(new (P.Context) ErrorTypeRepr(P.Tok.getLoc()));
       P.skipUntil(tok::r_paren);
-      return true;
     }
     if (type.hasCodeCompletion())
-      return true;
+      return makeParserCodeCompletionStatus();
     
     argPattern = makeParserResult(
         new (P.Context) TypedPattern(argPattern.get(), type.get()));
     bodyPattern = makeParserResult(
         new (P.Context) TypedPattern(bodyPattern.get(), type.get()));
+    if (HadParseError)
+      return makeParserError();
   }
   
   ExprHandle *init = nullptr;
@@ -129,7 +134,7 @@ static bool parseSelectorArgument(Parser &P,
       P.parseExpr(diag::expected_initializer_expr);
     if (initR.isNull()) {
       P.skipUntil(tok::r_paren);
-      return true;
+      return makeParserError();
     }
     init = ExprHandle::get(P.Context, initR.get());
   }
@@ -137,12 +142,12 @@ static bool parseSelectorArgument(Parser &P,
   if (P.Tok.is(tok::comma)) {
     P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
     P.skipUntil(tok::r_paren);
-    return true;
+    return makeParserError();
   }
   
   if (P.Tok.isNot(tok::r_paren)) {
     P.diagnose(P.Tok, diag::expected_rparen_tuple_pattern_list);
-    return true;
+    return makeParserError();
   }
   
   rp = P.consumeToken(tok::r_paren);
@@ -150,7 +155,7 @@ static bool parseSelectorArgument(Parser &P,
                                     getDefaultArgKind(init)));
   bodyElts.push_back(TuplePatternElt(bodyPattern.get(), init,
                                      getDefaultArgKind(init)));
-  return false;
+  return makeParserSuccess();
 }
 
 static Pattern *getFirstSelectorPattern(ASTContext &Context,
@@ -164,12 +169,13 @@ static Pattern *getFirstSelectorPattern(ASTContext &Context,
   return pattern;
 }
 
-static bool parseSelectorFunctionArguments(Parser &P,
-                                           SmallVectorImpl<Pattern*> &argPat,
-                                           SmallVectorImpl<Pattern*> &bodyPat,
-                                           Pattern *firstPattern)
-{
+static ParserStatus
+parseSelectorFunctionArguments(Parser &P,
+                               SmallVectorImpl<Pattern *> &argPat,
+                               SmallVectorImpl<Pattern *> &bodyPat,
+                               Pattern *firstPattern) {
   SourceLoc lp;
+  SourceLoc rp;
   SmallVector<TuplePatternElt, 8> argElts;
   SmallVector<TuplePatternElt, 8> bodyElts;
 
@@ -178,71 +184,72 @@ static bool parseSelectorFunctionArguments(Parser &P,
   if (ParenPattern *firstParen = dyn_cast<ParenPattern>(firstPattern)) {
     bodyElts.push_back(TuplePatternElt(firstParen->getSubPattern()));
     lp = firstParen->getLParenLoc();
+    rp = firstParen->getRParenLoc();
     argElts.push_back(TuplePatternElt(
       getFirstSelectorPattern(P.Context,
                               firstParen->getSubPattern(),
                               firstParen->getLoc())));
   } else if (TuplePattern *firstTuple = dyn_cast<TuplePattern>(firstPattern)) {
+    lp = firstTuple->getLParenLoc();
+    rp = firstTuple->getRParenLoc();
     if (firstTuple->getNumFields() != 1) {
       P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
-      return true;
+    } else {
+      TuplePatternElt const &firstElt = firstTuple->getFields()[0];
+      bodyElts.push_back(firstElt);
+      argElts.push_back(TuplePatternElt(
+          getFirstSelectorPattern(P.Context,
+                                  firstElt.getPattern(),
+                                  firstTuple->getLoc()),
+        firstElt.getInit(),
+        firstElt.getDefaultArgKind()));
     }
-
-    TuplePatternElt const &firstElt = firstTuple->getFields()[0];
-    bodyElts.push_back(firstElt);
-    lp = firstTuple->getLParenLoc();
-    argElts.push_back(TuplePatternElt(
-      getFirstSelectorPattern(P.Context,
-                              firstElt.getPattern(),
-                              firstTuple->getLoc()),
-      firstElt.getInit(),
-      firstElt.getDefaultArgKind()));
   } else
     llvm_unreachable("unexpected function argument pattern!");
   
   // Parse additional selectors as long as we can.
-  SourceLoc rp;
   llvm::StringMap<VarDecl*> selectorNames;
 
+  ParserStatus Status;
   for (;;) {
     if (P.isStartOfBindingName(P.Tok)) {
-      if (parseSelectorArgument(P, argElts, bodyElts, selectorNames, rp)) {
-        return true;
-      }
+      Status |= parseSelectorArgument(P, argElts, bodyElts, selectorNames, rp);
     } else if (P.Tok.is(tok::l_paren)) {
       P.diagnose(P.Tok, diag::func_selector_with_curry);
-      return true;
+      // FIXME: better recovery: just parse a tuple.
+      P.skipUntilDeclRBrace(tok::l_brace);
+      return makeParserError();
     } else
       break;
   }
   
   argPat.push_back(TuplePattern::create(P.Context, lp, argElts, rp));
   bodyPat.push_back(TuplePattern::create(P.Context, lp, bodyElts, rp));
-  return false;
+  return Status;
 }
 
-bool Parser::parseFunctionArguments(SmallVectorImpl<Pattern*> &argPatterns,
-                                    SmallVectorImpl<Pattern*> &bodyPatterns) {
+ParserStatus
+Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
+                               SmallVectorImpl<Pattern *> &BodyPatterns) {
   // Parse the first function argument clause.
-  ParserResult<Pattern> pattern = parsePatternTuple(/*AllowInitExpr=*/true);
-  if (pattern.isNull())
-    return true;
-  else {
-    Pattern *firstPattern = pattern.get();
-    
-    if (isStartOfBindingName(Tok)) {
-      // This looks like a selector-style argument. Try to convert the first
-      // argument pattern into a single argument type and parse subsequent
-      // selector forms.
-      return parseSelectorFunctionArguments(*this,
-                                            argPatterns, bodyPatterns,
-                                            pattern.get());
-    } else {
-      argPatterns.push_back(firstPattern);
-      bodyPatterns.push_back(firstPattern);
-      return parseCurriedFunctionArguments(*this,
-                                           argPatterns, bodyPatterns);
-    }
+  ParserResult<Pattern> FirstPattern = parsePatternTuple(/*AllowInitExpr=*/true);
+  if (FirstPattern.isNull() || FirstPattern.hasCodeCompletion())
+    // FIXME: improve recovery: we should not stop if isNull().
+    // But if we saw code completion token, there is no point in continuing.
+    return FirstPattern;
+
+  if (isStartOfBindingName(Tok)) {
+    // This looks like a selector-style argument.  Try to convert the first
+    // argument pattern into a single argument type and parse subsequent
+    // selector forms.
+    return ParserStatus(FirstPattern) |
+           parseSelectorFunctionArguments(*this, ArgPatterns, BodyPatterns,
+                                          FirstPattern.get());
+  } else {
+    ArgPatterns.push_back(FirstPattern.get());
+    BodyPatterns.push_back(FirstPattern.get());
+    return ParserStatus(FirstPattern) |
+           parseCurriedFunctionArguments(*this, ArgPatterns, BodyPatterns);
   }
 }
 
@@ -253,23 +260,28 @@ bool Parser::parseFunctionArguments(SmallVectorImpl<Pattern*> &argPatterns,
 ///     '->' type
 ///
 /// Note that this leaves retType as null if unspecified.
-bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
-                                    SmallVectorImpl<Pattern*> &bodyPatterns,
-                                    TypeRepr *&retType) {
-  bool HadParseError = parseFunctionArguments(argPatterns, bodyPatterns);
+ParserStatus
+Parser::parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
+                               SmallVectorImpl<Pattern *> &bodyPatterns,
+                               TypeRepr *&retType) {
+  ParserStatus Status = parseFunctionArguments(argPatterns, bodyPatterns);
 
   // If there's a trailing arrow, parse the rest as the result type.
   if (consumeIf(tok::arrow)) {
     ParserResult<TypeRepr> ResultType = parseType();
+    if (ResultType.hasCodeCompletion())
+      return ResultType;
     retType = ResultType.getPtrOrNull();
-    if (!retType)
-      return true;
+    if (!retType) {
+      Status.setIsParseError();
+      return Status;
+    }
   } else {
     // Otherwise, we leave retType null.
     retType = nullptr;
   }
 
-  return HadParseError;
+  return Status;
 }
 
 /// Parse a pattern.
@@ -284,8 +296,11 @@ ParserResult<Pattern> Parser::parsePattern() {
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
     ParserResult<TypeRepr> Ty = parseTypeAnnotation();
-    if (Ty.isNull() || Ty.hasCodeCompletion())
-      return nullptr;
+    if (Ty.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Pattern>();
+
+    if (Ty.isNull())
+      Ty = makeParserResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
 
     pattern = makeParserResult(
         new (Context) TypedPattern(pattern.get(), Ty.get()));
@@ -354,11 +369,15 @@ ParserResult<Pattern> Parser::parsePatternAtom() {
   }
 }
 
-Optional<TuplePatternElt> Parser::parsePatternTupleElement(bool allowInitExpr) {
+std::pair<ParserStatus, Optional<TuplePatternElt>>
+Parser::parsePatternTupleElement(bool allowInitExpr) {
   // Parse the pattern.
   ParserResult<Pattern> pattern = parsePattern();
+  if (pattern.hasCodeCompletion())
+    return std::make_pair(makeParserCodeCompletionStatus(), Nothing);
+
   if (pattern.isNull())
-    return Nothing;
+    return std::make_pair(makeParserError(), Nothing);
 
   // Parse the optional initializer.
   ExprHandle *init = nullptr;
@@ -378,7 +397,9 @@ Optional<TuplePatternElt> Parser::parsePatternTupleElement(bool allowInitExpr) {
       init = ExprHandle::get(Context, initR.get());
   }
 
-  return TuplePatternElt(pattern.get(), init, getDefaultArgKind(init));
+  return std::make_pair(
+      makeParserSuccess(),
+      TuplePatternElt(pattern.get(), init, getDefaultArgKind(init)));
 }
 
 /// Parse a tuple pattern.
@@ -394,28 +415,34 @@ ParserResult<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
 
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
-  bool Invalid = parseList(tok::r_paren, LPLoc, RPLoc,
-                           tok::comma, /*OptionalSep=*/false,
-                           diag::expected_rparen_tuple_pattern_list,
-                           [&] () -> bool {
+  ParserStatus ListStatus = parseList(tok::r_paren, LPLoc, RPLoc,
+                                      tok::comma, /*OptionalSep=*/false,
+                                      diag::expected_rparen_tuple_pattern_list,
+                                      [&] () -> ParserStatus {
     // Parse the pattern tuple element.
-    Optional<TuplePatternElt> elt = parsePatternTupleElement(AllowInitExpr);
+    ParserStatus EltStatus;
+    Optional<TuplePatternElt> elt;
+    std::tie(EltStatus, elt) = parsePatternTupleElement(AllowInitExpr);
+    if (EltStatus.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
     if (!elt)
-      return true;
+      return makeParserError();
 
     // Add this element to the list.
     elts.push_back(*elt);
 
     // If there is no ellipsis, we're done with the element.
     if (Tok.isNot(tok::ellipsis))
-      return false;
+      return makeParserSuccess();
     SourceLoc ellLoc = consumeToken(tok::ellipsis);
 
     // An element cannot have both an initializer and an ellipsis.
     if (elt->getInit()) {
       diagnose(ellLoc, diag::tuple_ellipsis_init)
         .highlight(elt->getInit()->getExpr()->getSourceRange());
-      return false;
+      // Return success since the error was semantic, and the caller should not
+      // attempt recovery.
+      return makeParserSuccess();
     }
 
     // An ellipsis element shall have a specified element type.
@@ -424,7 +451,9 @@ ParserResult<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
     if (!typedPattern) {
       diagnose(ellLoc, diag::untyped_pattern_ellipsis)
         .highlight(elt->getPattern()->getSourceRange());
-      return false;
+      // Return success so that the caller does not attempt recovery -- it
+      // should have already happened when we were parsing the tuple element.
+      return makeParserSuccess();
     }
 
     // Variadic elements must come last.
@@ -436,14 +465,12 @@ ParserResult<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
       diagnose(ellLoc, diag::ellipsis_pattern_not_at_end);
     }
 
-    return false;
+    return makeParserSuccess();
   });
 
-  if (Invalid)
-    return nullptr;
-
-  return makeParserResult(TuplePattern::createSimple(
-      Context, LPLoc, elts, RPLoc, EllipsisLoc.isValid(), EllipsisLoc));
+  return makeParserResult(ListStatus, TuplePattern::createSimple(
+                                          Context, LPLoc, elts, RPLoc,
+                                          EllipsisLoc.isValid(), EllipsisLoc));
 }
 
 ParserResult<Pattern> Parser::parseMatchingPattern() {
