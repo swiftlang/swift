@@ -748,11 +748,12 @@ llvm::DIArray IRGenDebugInfo::getStructMembers(NominalTypeDecl *D,
   SmallVector<llvm::Value *, 16> Elements;
   unsigned OffsetInBits = 0;
   for (auto Decl : D->getMembers())
-    if (VarDecl *VD = dyn_cast<VarDecl>(Decl)) {
-      auto Ty = VD->getType()->getCanonicalType();
-      Elements.push_back(createMemberType(Ty, OffsetInBits,
-                                          Scope, File, Flags));
-    }
+    if (VarDecl *VD = dyn_cast<VarDecl>(Decl))
+      if (!VD->isProperty()) {
+        auto Ty = VD->getType()->getCanonicalType();
+        Elements.push_back(createMemberType(Ty, OffsetInBits,
+                                            Scope, File, Flags));
+      }
   return DBuilder.getOrCreateArray(Elements);
 }
 
