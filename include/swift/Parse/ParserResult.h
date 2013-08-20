@@ -140,7 +140,7 @@ public:
 
   /// Construct a parser status with specified bits.
   template<typename T>
-  ParserStatus(ParserResult<T> Result) {
+  ParserStatus(ParserResult<T> Result) : IsError(0), IsCodeCompletion(0) {
     if (Result.isParseError())
       setIsParseError();
     if (Result.hasCodeCompletion())
