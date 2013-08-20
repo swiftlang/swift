@@ -178,20 +178,6 @@ NSDate *swift_createDate(void) {
   return [NSDate date];
 }
 
-/// \brief Fetch the type metadata associated with the formal dynamic
-/// type of the given (possibly Objective-C) object.  The formal
-/// dynamic type ignores dynamic subclasses such as those introduced
-/// by KVO.
-///
-/// The object pointer may be a tagged pointer, but cannot be null.
-const Metadata *swift::swift_getObjectType(id object) {
-  auto theClass = object_getClass(object);
-  auto classAsMetadata = reinterpret_cast<ClassMetadata*>(theClass);
-  if (classAsMetadata->isTypeMetadata()) return classAsMetadata;
-
-  return swift_getObjCClassMetadata(classAsMetadata);
-}
-
 extern "C" bool swift_compareObjects(id x, id y) {
   [x release];
   [y release];
