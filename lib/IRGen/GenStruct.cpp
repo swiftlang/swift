@@ -91,17 +91,15 @@ namespace {
 
     /// Given the address of a tuple, project out the address of a
     /// single element.
-    OwnedAddress projectFieldAddress(IRGenFunction &IGF,
-                                     OwnedAddress addr,
-                                     VarDecl *field) const {
+    Address projectFieldAddress(IRGenFunction &IGF,
+                                Address addr,
+                                VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
       if (fieldInfo.isEmpty())
-        return {fieldInfo.getTypeInfo().getUndefAddress(), nullptr};
+        return fieldInfo.getTypeInfo().getUndefAddress();
 
       auto offsets = asImpl().getNonFixedOffsets(IGF);
-      Address fieldAddr = fieldInfo.projectAddress(IGF, addr.getAddress(),
-                                                   offsets);
-      return {fieldAddr, addr.getOwner()};
+      return fieldInfo.projectAddress(IGF, addr, offsets);
     }
   };
 
@@ -224,10 +222,10 @@ namespace {
   }                                                                    \
 } while(0)
 
-OwnedAddress irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
-                                                       OwnedAddress base,
-                                                       SILType baseType,
-                                                       VarDecl *field) {
+Address irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
+                                                  Address base,
+                                                  SILType baseType,
+                                                  VarDecl *field) {
   FOR_STRUCT_IMPL(IGF, baseType, projectFieldAddress, base, field);
 }
 

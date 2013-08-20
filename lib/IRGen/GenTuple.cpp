@@ -93,17 +93,15 @@ namespace {
 
     /// Given the address of a tuple, project out the address of a
     /// single element.
-    OwnedAddress projectElementAddress(IRGenFunction &IGF,
-                                       OwnedAddress tuple,
-                                       unsigned fieldNo) const {
+    Address projectElementAddress(IRGenFunction &IGF,
+                                  Address tuple,
+                                  unsigned fieldNo) const {
       const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
       if (field.isEmpty())
-        return {field.getTypeInfo().getUndefAddress(), nullptr};
+        return field.getTypeInfo().getUndefAddress();
 
       auto offsets = asImpl().getNonFixedOffsets(IGF);
-      Address fieldAddr = field.projectAddress(IGF, tuple.getAddress(),
-                                               offsets);
-      return {fieldAddr, tuple.getOwner()};
+      return field.projectAddress(IGF, tuple, offsets);
     }
 
     bool isIndirectArgument(ExplosionKind kind) const override {
@@ -272,10 +270,10 @@ void irgen::projectTupleElementFromExplosion(IRGenFunction &IGF,
                  tuple, fieldNo, out);
 }
 
-OwnedAddress irgen::projectTupleElementAddress(IRGenFunction &IGF,
-                                               OwnedAddress tuple,
-                                               SILType tupleType,
-                                               unsigned fieldNo) {
+Address irgen::projectTupleElementAddress(IRGenFunction &IGF,
+                                          Address tuple,
+                                          SILType tupleType,
+                                          unsigned fieldNo) {
   FOR_TUPLE_IMPL(IGF, tupleType, projectElementAddress,
                  tuple, fieldNo);
 }

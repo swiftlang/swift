@@ -26,13 +26,12 @@ namespace irgen {
   class Address;
   class Explosion;
   class IRGenFunction;
-  class OwnedAddress;
 
   /// Project the address of a tuple element.
-  OwnedAddress projectTupleElementAddress(IRGenFunction &IGF,
-                                          OwnedAddress base,
-                                          SILType tupleType,
-                                          unsigned fieldNo);
+  Address projectTupleElementAddress(IRGenFunction &IGF,
+                                     Address base,
+                                     SILType tupleType,
+                                     unsigned fieldNo);
 
   /// Project a tuple element rvalue from an already-exploded tuple rvalue.
   void projectTupleElementFromExplosion(IRGenFunction &IGF,

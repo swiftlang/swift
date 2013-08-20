@@ -1624,10 +1624,8 @@ void IRGenSILFunction::visitTupleElementAddrInst(swift::TupleElementAddrInst *i)
   Address base = getLoweredAddress(i->getOperand());
   SILType baseType = i->getOperand().getType();
 
-  Address field = projectTupleElementAddress(*this,
-                                             OwnedAddress(base, nullptr),
-                                             baseType,
-                                             i->getFieldNo()).getAddress();
+  Address field = projectTupleElementAddress(*this, base, baseType,
+                                             i->getFieldNo());
   setLoweredAddress(SILValue(i, 0), field);
 }
 
@@ -1652,10 +1650,8 @@ void IRGenSILFunction::visitStructElementAddrInst(
   Address base = getLoweredAddress(i->getOperand());
   SILType baseType = i->getOperand().getType();
 
-  Address field = projectPhysicalStructMemberAddress(*this,
-                                                   OwnedAddress(base, nullptr),
-                                                   baseType,
-                                                   i->getField()).getAddress();
+  Address field = projectPhysicalStructMemberAddress(*this, base, baseType,
+                                                     i->getField());
   setLoweredAddress(SILValue(i, 0), field);
 }
 

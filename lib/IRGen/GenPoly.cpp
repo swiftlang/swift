@@ -457,10 +457,9 @@ namespace {
           auto &eltTI = IGF.getTypeInfo(eltType);
           if (eltTI.isKnownEmpty()) continue;
 
-          auto eltAddr = projectTupleElementAddress(IGF,
-                                                    { dest, nullptr },
-                              SILType::getPrimitiveObjectType(tupleTy),
-                                                    index).getAddress();
+          auto eltAddr = projectTupleElementAddress(IGF, dest,
+                                SILType::getPrimitiveObjectType(tupleTy),
+                                                    index);
           initIntoTemporary(eltType, eltTI, eltAddr);
         }
 

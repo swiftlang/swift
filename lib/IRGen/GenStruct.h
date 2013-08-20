@@ -25,14 +25,14 @@ namespace swift {
   class VarDecl;
 
 namespace irgen {
-  class IRGenFunction;
-  class OwnedAddress;
+  class Address;
   class Explosion;
+  class IRGenFunction;
   
-  OwnedAddress projectPhysicalStructMemberAddress(IRGenFunction &IGF,
-                                                  OwnedAddress base,
-                                                  SILType baseType,
-                                                  VarDecl *field);
+  Address projectPhysicalStructMemberAddress(IRGenFunction &IGF,
+                                             Address base,
+                                             SILType baseType,
+                                             VarDecl *field);
   void projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
                                                 SILType baseType,
                                                 Explosion &base,
