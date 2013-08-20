@@ -746,15 +746,16 @@ namespace {
       return container.claimNext();
     }
 
-    void load(IRGenFunction &IGF, Address address, Explosion &e) const override{
+    void loadAsCopy(IRGenFunction &IGF, Address address,
+                    Explosion &out) const override {
       // Load the witness table pointers.
       for (unsigned i = 0; i < NumProtocols; ++i)
-        e.add(IGF.Builder.CreateLoad(projectWitnessTable(IGF, address, i)));
+        out.add(IGF.Builder.CreateLoad(projectWitnessTable(IGF, address, i)));
       // Load the instance pointer, which is unknown-refcounted.
       llvm::Value *instance
         = IGF.Builder.CreateLoad(projectValue(IGF, address));
       asDerived().emitPayloadRetain(IGF, instance);
-      e.add(instance);
+      out.add(instance);
     }
 
     void loadAsTake(IRGenFunction &IGF, Address address,
@@ -914,15 +915,16 @@ namespace {
       return path.apply(IGF, witnesses[path.getOriginIndex()]);
     }
     
-    void load(IRGenFunction &IGF, Address address, Explosion &e) const override{
+    void loadAsCopy(IRGenFunction &IGF, Address address,
+                    Explosion &out) const override {
       // Load the witness table pointers.
       for (unsigned i = 0; i < NumProtocols; ++i)
-        e.add(IGF.Builder.CreateLoad(projectWitnessTable(IGF, address, i)));
+        out.add(IGF.Builder.CreateLoad(projectWitnessTable(IGF, address, i)));
       // Load the instance pointer, which is unknown-refcounted.
       llvm::Value *instance
         = IGF.Builder.CreateLoad(projectValue(IGF, address));
       IGF.emitUnknownRetainCall(instance);
-      e.add(instance);
+      out.add(instance);
     }
 
     void retain(IRGenFunction &IGF, Explosion &e) const override {
@@ -2481,8 +2483,8 @@ namespace {
         // Load.  In theory this might require
         // remapping, but in practice the constraints (which we
         // assert just above) don't permit that.
-        cast<LoadableTypeInfo>(remappedThisTI).load(IGF, sigThis,
-                                                    sigClauseForImpl);
+        cast<LoadableTypeInfo>(remappedThisTI).loadAsCopy(IGF, sigThis,
+                                                          sigClauseForImpl);
         sigClause = std::move(sigClauseForImpl);
         
         // Respecify the signature type with the remapped 'This' type.

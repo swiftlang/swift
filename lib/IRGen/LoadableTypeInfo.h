@@ -50,8 +50,8 @@ public:
 
   /// Load an explosion of values from an address as if copy-initializing
   /// a set of registers.
-  virtual void load(IRGenFunction &IGF, Address addr,
-                    Explosion &explosion) const = 0;
+  virtual void loadAsCopy(IRGenFunction &IGF, Address addr,
+                          Explosion &explosion) const = 0;
 
   /// Load an explosion of values from an address as if
   /// take-initializing a set of registers.

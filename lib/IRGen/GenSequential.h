@@ -240,8 +240,8 @@ private:
 public:
   using super::getFields;
 
-  void load(IRGenFunction &IGF, Address addr, Explosion &out) const {
-    forAllFields<&LoadableTypeInfo::load>(IGF, addr, out);
+  void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &out) const {
+    forAllFields<&LoadableTypeInfo::loadAsCopy>(IGF, addr, out);
   }
 
   void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &out) const {

@@ -52,13 +52,13 @@ public:
 
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
     Explosion temp(ExplosionKind::Maximal);
-    asDerived().Derived::load(IGF, src, temp);
+    asDerived().Derived::loadAsCopy(IGF, src, temp);
     asDerived().Derived::initialize(IGF, temp, dest);
   }
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
     Explosion temp(ExplosionKind::Maximal);
-    asDerived().Derived::load(IGF, src, temp);
+    asDerived().Derived::loadAsCopy(IGF, src, temp);
     asDerived().Derived::assign(IGF, temp, dest);
   }
 
@@ -121,7 +121,7 @@ public:
     IGF.Builder.CreateStore(src.claimNext(), addr);
   }
 
-  void load(IRGenFunction &IGF, Address addr, Explosion &out) const {
+  void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &out) const {
     addr = asDerived().projectScalar(IGF, addr);
     llvm::Value *value = IGF.Builder.CreateLoad(addr);
     asDerived().emitScalarRetain(IGF, value);

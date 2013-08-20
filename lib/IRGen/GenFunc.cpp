@@ -379,7 +379,7 @@ namespace {
                                          address->getName() + ".data");
     }
 
-    void load(IRGenFunction &IGF, Address address, Explosion &e) const {
+    void loadAsCopy(IRGenFunction &IGF, Address address, Explosion &e) const {
       // Load the function.
       Address fnAddr = projectFunction(IGF, address);
       e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
@@ -1743,7 +1743,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       }
 
       // Otherwise, just load out.
-      cast<LoadableTypeInfo>(fieldType).load(subIGF, fieldAddr, params);
+      cast<LoadableTypeInfo>(fieldType).loadAsCopy(subIGF, fieldAddr, params);
     }
     
     // Kill the allocated data pointer immediately.  The safety of

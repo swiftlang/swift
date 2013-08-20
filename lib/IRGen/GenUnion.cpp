@@ -123,7 +123,7 @@ namespace {
                                          PayloadTypeInfo->getFixedSize());
     }
     
-    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
       // FIXME handle non-trivial payloads
       e.add(IGF.Builder.CreateLoad(projectPayload(IGF, addr)));
       if (ExtraTagBitCount > 0)
@@ -441,7 +441,7 @@ namespace {
       return HasExtraTagBits ? 2 : 1;
     }
 
-    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
       // FIXME
     }
 
@@ -553,9 +553,9 @@ namespace {
       return Singleton->getExplosionSize(kind);
     }
 
-    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
       if (!Singleton) return;
-      Singleton->load(IGF, getSingletonAddress(IGF, addr), e);
+      Singleton->loadAsCopy(IGF, getSingletonAddress(IGF, addr), e);
     }
 
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {

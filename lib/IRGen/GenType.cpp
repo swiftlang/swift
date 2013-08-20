@@ -98,7 +98,7 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF,
 
   // Otherwise explode and re-implode.
   Explosion copy(ExplosionKind::Maximal);
-  load(IGF, srcAddr, copy);
+  loadAsCopy(IGF, srcAddr, copy);
   initialize(IGF, copy, destAddr);
 }
 
@@ -240,7 +240,7 @@ namespace {
       : ScalarTypeInfo(ty, Size(0), llvm::BitVector{}, Alignment(1), IsPOD) {}
     unsigned getExplosionSize(ExplosionKind kind) const { return 0; }
     void getSchema(ExplosionSchema &schema) const {}
-    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {}
+    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {}
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {}
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {}
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {}

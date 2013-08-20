@@ -802,7 +802,7 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     // Load and explode an argument that is 'byval' in the C calling convention.
     if (requiresExternalByvalArgument(IGF.IGM, arg->getType())) {
       Address byval = loadableArgTI.getAddressForPointer(params.claimNext());
-      loadableArgTI.load(IGF, byval, argExplosion);
+      loadableArgTI.loadAsTake(IGF, byval, argExplosion);
     } else {
       loadableArgTI.reexplode(IGF, params, argExplosion);
     }
