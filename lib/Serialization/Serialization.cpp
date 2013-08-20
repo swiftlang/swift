@@ -2012,6 +2012,9 @@ static uint8_t getRawStableKnownProtocolKind(KnownProtocolKind kind) {
 static void
 writeKnownProtocolList(const index_block::KnownProtocolLayout &AdopterList,
                        KnownProtocolKind kind, ArrayRef<DeclID> adopters) {
+  if (adopters.empty())
+    return;
+                       
   SmallVector<uint32_t, 32> scratch;
   AdopterList.emit(scratch, getRawStableKnownProtocolKind(kind), adopters);
 }
