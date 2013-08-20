@@ -237,7 +237,12 @@ function(compile_swift_files)
 
     if(SWIFT_USE_LIBRARY_MODULES)
       set(module_source_file ${module_source_dir}/${module_source_name}.swiftmodule)
-      list(APPEND swift_flags -emit-module)
+
+      add_custom_command(
+        OUTPUT ${module_source_file}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
+        COMMAND swift -emit-module ${swift_flags} -o "${module_source_file}" ${source_files}
+        DEPENDS swift ${source_files})
     else()
       # Build the module source file; a hack until we get real module
       # compilation.  In principle this separate file might not be needed
@@ -265,7 +270,7 @@ function(compile_swift_files)
   endif()
 
   add_custom_command(
-    OUTPUT ${objfile} ${module_source_file}
+    OUTPUT ${objfile}
     COMMAND swift "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
     DEPENDS swift ${stdlib_dep} ${source_files} ${module_source_file}
 #    MAIN_DEPENDENCY ${target}
