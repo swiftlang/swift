@@ -457,7 +457,7 @@ Type ConstraintSystem::openType(
     // Create type variables for all of the archetypes in a polymorphic
     // function type.
     if (auto polyFn = type->getAs<PolymorphicFunctionType>()) {
-      for (auto archetype : polyFn->getGenericParams().getAllArchetypes())
+      for (auto archetype : polyFn->getAllArchetypes())
         (void)getTypeVariable(archetype);
 
       // Transform the input and output types.
@@ -854,8 +854,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                  
                  if (auto polyTy = type->getAs<PolymorphicFunctionType>()) {
                    // Preserve generic method archetypes.
-                   for (auto archetype :
-                          polyTy->getGenericParams().getAllArchetypes())
+                   for (auto archetype : polyTy->getAllArchetypes())
                      mappedTypes[archetype] = archetype;
                  }
 

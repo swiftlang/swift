@@ -1365,6 +1365,15 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanProtocolTypes);
 }
 
+ArrayRef<GenericParam> PolymorphicFunctionType::getGenericParameters() const {
+  return Params->getParams();
+}
+
+ArrayRef<ArchetypeType *> PolymorphicFunctionType::getAllArchetypes() const {
+  return Params->getAllArchetypes();
+}
+
+
 //===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//
@@ -1576,7 +1585,7 @@ void FunctionType::print(raw_ostream &OS) const {
 
 void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
   OS << '<';
-  auto params = getGenericParams().getParams();
+  auto params = getGenericParameters();
   for (unsigned i = 0, e = params.size(); i != e; ++i) {
     if (i) OS << ", ";
     

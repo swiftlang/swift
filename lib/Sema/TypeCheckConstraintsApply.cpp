@@ -2639,9 +2639,8 @@ void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
     // FIXME: Arguably, this should be part of substType
     if (auto polyFn = otherType->getAs<PolymorphicFunctionType>()) {
       bool allReplaced = true;
-      for (auto gp : polyFn->getGenericParams().getParams()) {
-        auto archetype
-        = gp.getAsTypeParam()->getDeclaredType()->castTo<ArchetypeType>();
+      for (auto gp : polyFn->getGenericParameters()) {
+        auto archetype = gp.getAsTypeParam()->getArchetype();
         if (!substitutions.count(archetype)) {
           allReplaced = false;
           break;

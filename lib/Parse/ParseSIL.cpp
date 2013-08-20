@@ -1957,8 +1957,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         return true;
 
       // Find the corresponding ArchetypeType for ArcheId in PTy.
-      ArrayRef<ArchetypeType *> AllArchetypes =
-                                  PTy->getGenericParams().getAllArchetypes();
+      ArrayRef<ArchetypeType *> AllArchetypes = PTy->getAllArchetypes();
       for (auto ArcheTy : AllArchetypes)
         if (ArcheTy->getName() == ArcheId) {
           Sub.Archetype = ArcheTy;

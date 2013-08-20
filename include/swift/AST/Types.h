@@ -39,6 +39,7 @@ namespace swift {
   class ClassDecl;
   class ExprHandle;
   class GenericTypeParamDecl;
+  class GenericParam;
   class GenericParamList;
   class Identifier;
   class TypeAliasDecl;
@@ -1387,6 +1388,9 @@ public:
                                       GenericParamList *params,
                                       const ExtInfo &Info,
                                       const ASTContext &C);
+
+  ArrayRef<GenericParam> getGenericParameters() const;
+  ArrayRef<ArchetypeType *> getAllArchetypes() const;
 
   GenericParamList &getGenericParams() const { return *Params; }
 

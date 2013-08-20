@@ -722,10 +722,9 @@ public:
   /// rvalue.
   RValue emitLValueAsRValue(Expr *E);
   
-  /// Build an identity substitution map for the archetypes in a generic
-  /// parameter list.
+  /// Build an identity substitution map for the given set of archetypes.
   ArrayRef<Substitution>
-  buildForwardingSubstitutions(GenericParamList *gp);
+  buildForwardingSubstitutions(ArrayRef<ArchetypeType *> params);
   
   /// Return forwarding substitutions for the archetypes in the current
   /// function.

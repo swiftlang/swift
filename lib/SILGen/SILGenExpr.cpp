@@ -1759,12 +1759,11 @@ namespace {
 } // end anonymous namespace
 
 ArrayRef<Substitution>
-SILGenFunction::buildForwardingSubstitutions(GenericParamList *gp) {
-  if (!gp)
+SILGenFunction::buildForwardingSubstitutions(ArrayRef<ArchetypeType *> params) {
+  if (params.empty())
     return {};
   
   ASTContext &C = F.getASTContext();
-  ArrayRef<ArchetypeType*> params = gp->getAllArchetypes();
   
   size_t paramCount = params.size();
   Substitution *resultBuf = C.Allocate<Substitution>(paramCount);
@@ -1824,7 +1823,11 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   // Call the initializer.
   SILDeclRef initConstant = SILDeclRef(ctor, SILDeclRef::Kind::Initializer);
-  auto forwardingSubs = buildForwardingSubstitutions(ctor->getGenericParams());
+
+  ArrayRef<ArchetypeType *> archetypes;
+  if (auto genericParams = ctor->getGenericParams())
+    archetypes = genericParams->getAllArchetypes();
+  auto forwardingSubs = buildForwardingSubstitutions(archetypes);
   ManagedValue initVal = emitMethodRef(ctor, thisValue, initConstant,
                                        forwardingSubs);
   

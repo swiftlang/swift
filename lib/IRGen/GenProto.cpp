@@ -3250,12 +3250,10 @@ namespace {
 
 /// Emit a polymorphic parameters clause, binding all the metadata necessary.
 void EmitPolymorphicParameters::emit(Explosion &in) {
-  auto &generics = FnType->getGenericParams();
-
   // Compute the first source metadata.
   MetadataForDepths.push_back(emitSourceForParameters(in));
 
-  for (auto archetype : generics.getAllArchetypes()) {
+  for (auto archetype : FnType->getAllArchetypes()) {
     // Derive the appropriate metadata reference.
     llvm::Value *metadata;
 
@@ -3492,9 +3490,6 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
 void EmitPolymorphicArguments::emit(CanType substInputType,
                                     ArrayRef<Substitution> subs,
                                     Explosion &out) {
-  auto &generics = FnType->getGenericParams();
-  (void)generics;
-
   emitSource(substInputType, out);
   
   // For now, treat all archetypes independently.
@@ -3502,7 +3497,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
   // because non-primary archetypes (which correspond to associated types)
   // will have their witness tables embedded in the witness table corresponding
   // to their parent.
-  for (auto *archetype : generics.getAllArchetypes()) {
+  for (auto *archetype : FnType->getAllArchetypes()) {
     // Find the substitution for the archetype.
     auto const *subp = std::find_if(subs.begin(), subs.end(),
                                     [&](Substitution const &sub) {
@@ -3565,8 +3560,7 @@ namespace {
     void expand(SmallVectorImpl<llvm::Type*> &out) {
       addSource(out);
 
-      auto &generics = FnType->getGenericParams();
-      for (auto archetype : generics.getAllArchetypes()) {
+      for (auto archetype : FnType->getAllArchetypes()) {
         // Pass the type argument if not fulfilled.
         if (!Fulfillments.count(FulfillmentKey(archetype, nullptr)))
           out.push_back(IGM.TypeMetadataPtrTy);

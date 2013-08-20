@@ -513,7 +513,7 @@ static bool isLocalLinkageDecl(Decl *D) {
 }
 
 static bool isLocalLinkageType(CanType type);
-static bool isLocalLinkageGenericClause(const GenericParamList &params) {
+static bool isLocalLinkageGenericClause(ArrayRef<GenericParam> params) {
   // Type parameters are local-linkage if any of their constraining
   // types are.
   for (auto &param : params) {
@@ -594,7 +594,7 @@ static bool isLocalLinkageType(CanType type) {
 
   case TypeKind::PolymorphicFunction: {
     auto fn = cast<PolymorphicFunctionType>(type);
-    if (isLocalLinkageGenericClause(fn->getGenericParams()))
+    if (isLocalLinkageGenericClause(fn->getGenericParameters()))
       return true;
     SWIFT_FALLTHROUGH;
   }

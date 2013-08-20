@@ -552,11 +552,7 @@ namespace {
       }
 
       Type SubType = E->getSubExpr()->getType()->getRValueType();
-      GenericParamList *GenericParams = nullptr;
-      if (auto PolyFn = SubType->getAs<PolymorphicFunctionType>())
-        GenericParams = &PolyFn->getGenericParams();
-
-      if (!GenericParams) {
+      if (!SubType->is<PolymorphicFunctionType>()) {
         Out << "Non-polymorphic expression specialized\n";
         abort();
       }

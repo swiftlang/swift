@@ -110,7 +110,7 @@ namespace {
 
 ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
   if (auto outerPFT = F.getLoweredType().getAs<PolymorphicFunctionType>()) {
-    return buildForwardingSubstitutions(&outerPFT->getGenericParams());
+    return buildForwardingSubstitutions(outerPFT->getAllArchetypes());
   }
   return {};
 }
