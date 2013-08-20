@@ -1535,10 +1535,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
     
     // Establish the new context.
     ContextChange CC(*this, FE);
-    
-    // Then parse the expression.
-    NullablePtr<Stmt> Body;
-    
+
     // Check to see if we have a "{" to start a brace statement.
     if (Flags & PD_DisallowFuncDef) {
       if (Tok.is(tok::l_brace)) {
