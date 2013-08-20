@@ -178,17 +178,18 @@ namespace {
     }
     
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
-                                  unsigned bitWidth) const override {
+                                  unsigned bitWidth,
+                                  unsigned offset) const override {
       assert(isComplete());
       
       PackUnionPayload pack(IGF, bitWidth);
       // Pack payload.
-      pack.add(src.claimNext());
+      pack.addAtOffset(src.claimNext(), offset);
       
       // Pack tag bits, if any.
       if (ExtraTagBitCount > 0) {
         unsigned extraTagOffset
-          = PayloadTypeInfo->getFixedSize().getValueInBits();
+          = PayloadTypeInfo->getFixedSize().getValueInBits() + offset;
         
         pack.addAtOffset(src.claimNext(), extraTagOffset);
       }
@@ -197,18 +198,20 @@ namespace {
     }
     
     void unpackUnionPayload(IRGenFunction &IGF, llvm::Value *outerPayload,
-                            Explosion &dest) const override {
+                            Explosion &dest,
+                            unsigned offset) const override {
       assert(isComplete());
       
       UnpackUnionPayload unpack(IGF, outerPayload);
       
       // Unpack our inner payload.
-      dest.add(unpack.claim(getStorageType()->getElementType(0)));
+      dest.add(unpack.claimAtOffset(getStorageType()->getElementType(0),
+                                    offset));
       
       // Unpack our extra tag bits, if any.
       if (ExtraTagBitCount > 0) {
         unsigned extraTagOffset
-          = PayloadTypeInfo->getFixedSize().getValueInBits();
+          = PayloadTypeInfo->getFixedSize().getValueInBits() + offset;
         
         dest.add(unpack.claimAtOffset(getStorageType()->getElementType(1),
                                       extraTagOffset));
@@ -349,7 +352,7 @@ namespace {
         inUnion.claimNext();
       // FIXME non-loadable payloads
       cast<LoadableTypeInfo>(PayloadTypeInfo)
-        ->unpackUnionPayload(IGF, payload, out);
+        ->unpackUnionPayload(IGF, payload, out, 0);
 
     }
     
@@ -393,8 +396,8 @@ namespace {
         
         // FIXME
         auto &loadablePayloadTI = cast<LoadableTypeInfo>(*PayloadTypeInfo);
-        llvm::Value *payload = loadablePayloadTI.packUnionPayload(IGF, params,
-                                                                  payloadSize);
+        llvm::Value *payload
+          = loadablePayloadTI.packUnionPayload(IGF, params, payloadSize, 0);
         unionExplosion.add(payload);
         
         addExtraTagBitValue(IGF, unionExplosion, 0);
@@ -513,30 +516,33 @@ namespace {
     }
     
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
-                                  unsigned bitWidth) const override {
+                                  unsigned bitWidth,
+                                  unsigned offset) const override {
       assert(isComplete());
       
       PackUnionPayload pack(IGF, bitWidth);
       // Pack the payload.
-      pack.add(src.claimNext());
+      pack.addAtOffset(src.claimNext(), offset);
       // Pack the extra bits, if any.
       if (HasExtraTagBits) {
-        pack.addAtOffset(src.claimNext(), CommonSpareBits.size());
+        pack.addAtOffset(src.claimNext(), CommonSpareBits.size() + offset);
       }
       return pack.get();
     }
     
     void unpackUnionPayload(IRGenFunction &IGF, llvm::Value *outerPayload,
-                            Explosion &dest) const override {
+                            Explosion &dest,
+                            unsigned offset) const override {
       assert(isComplete());
 
       UnpackUnionPayload unpack(IGF, outerPayload);
       // Unpack the payload.
-      dest.add(unpack.claim(getStorageType()->getElementType(0)));
+      dest.add(unpack.claimAtOffset(getStorageType()->getElementType(0),
+                                    offset));
       // Unpack the extra bits, if any.
       if (HasExtraTagBits) {
         dest.add(unpack.claimAtOffset(getStorageType()->getElementType(1),
-                                      CommonSpareBits.size()));
+                                      CommonSpareBits.size() + offset));
       }
     }
     
@@ -624,17 +630,19 @@ namespace {
     
     llvm::Value *packUnionPayload(IRGenFunction &IGF,
                                   Explosion &in,
-                                  unsigned bitWidth) const override {
+                                  unsigned bitWidth,
+                                  unsigned offset) const override {
       if (Singleton)
-        return Singleton->packUnionPayload(IGF, in, bitWidth);
+        return Singleton->packUnionPayload(IGF, in, bitWidth, offset);
       return PackUnionPayload::getEmpty(IGF.IGM, bitWidth);
     }
     
     void unpackUnionPayload(IRGenFunction &IGF,
                             llvm::Value *payload,
-                            Explosion &dest) const override {
+                            Explosion &dest,
+                            unsigned offset) const override {
       if (!Singleton) return;
-      Singleton->unpackUnionPayload(IGF, payload, dest);
+      Singleton->unpackUnionPayload(IGF, payload, dest, offset);
     }
     
     void emitSwitch(IRGenFunction &IGF,
@@ -1174,6 +1182,13 @@ void PackUnionPayload::add(llvm::Value *v) {
 void PackUnionPayload::addAtOffset(llvm::Value *v, unsigned bitOffset) {
   packedBits = bitOffset;
   add(v);
+}
+
+void PackUnionPayload::combine(llvm::Value *v) {
+  if (!packedValue)
+    packedValue = v;
+  else
+    packedValue = IGF.Builder.CreateOr(packedValue, v);
 }
 
 llvm::Value *PackUnionPayload::get() {

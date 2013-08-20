@@ -302,6 +302,62 @@ end:
 }
 
 
+// -- Test unpacking aggregates.
+
+union AggregateSinglePayload {
+  case x(Builtin.Int21, Builtin.Int64)
+  case y
+  case z
+}
+
+// CHECK: define void @aggregate_single_payload_unpack(i128, i1) {
+sil @aggregate_single_payload_unpack : $[thin] (AggregateSinglePayload) -> () {
+entry(%u : $AggregateSinglePayload):
+  switch_union %u : $AggregateSinglePayload, case #AggregateSinglePayload.x!unionelt.1: x_dest, default end
+
+// CHECK:   {{%.*}} = trunc i128 %0 to i21
+// CHECK:   [[SHIFT_1:%.*]] = lshr i128 %0, 64
+// CHECK:   {{%.*}} = trunc i128 [[SHIFT_1]] to i64
+x_dest(%v : $(Builtin.Int21, Builtin.Int64)):
+  br end
+
+end:
+  %x = tuple ()
+  return %x : $()
+}
+
+struct CharLike { var value : Builtin.Int21 }
+struct IntLike { var value : Builtin.Int64 }
+struct RangeLike { var from, to : Builtin.Int64 }
+
+union AggregateSinglePayload2 {
+  case x(CharLike, IntLike, RangeLike)
+  case y
+  case z
+}
+
+// CHECK: define void @aggregate_single_payload_unpack_2(i256, i1) {
+sil @aggregate_single_payload_unpack_2 : $[thin] (AggregateSinglePayload2) -> () {
+entry(%u : $AggregateSinglePayload2):
+  switch_union %u : $AggregateSinglePayload2, case #AggregateSinglePayload2.x!unionelt.1: x_dest, default end
+
+// CHECK:   {{%.*}} = trunc i256 %0 to i21
+// CHECK:   [[SHIFT_1:%.*]] = lshr i256 %0, 64
+// CHECK:   {{%.*}} = trunc i256 [[SHIFT_1]] to i64
+// CHECK:   [[SHIFT_2_FROM:%.*]] = lshr i256 %0, 128
+// CHECK:   {{%.*}} = trunc i256 [[SHIFT_2_FROM]] to i64
+// CHECK:   [[SHIFT_2_TO:%.*]] = lshr i256 %0, 192
+// CHECK:   {{%.*}} = trunc i256 [[SHIFT_2_TO]] to i64
+x_dest(%v : $(CharLike, IntLike, RangeLike)):
+  br end
+
+end:
+  %x = tuple ()
+  return %x : $()
+}
+
+
+
 union SinglePayloadSpareBit {
   case x(Builtin.Int63)
   case y
@@ -484,6 +540,56 @@ end:
 // CHECK: define { i64, i1 } @_TO5union18SinglePayloadNoXI21zFMS0_S0_() {
 // CHECK: entry:
 // CHECK:   ret { i64, i1 } { i64 1, i1 true }
+// CHECK: }
+
+
+// CHECK: define { i128, i1 } @_TO5union22AggregateSinglePayload1xfMS0_FTBi21_Bi64__S0_(i21, i64) {
+// CHECK: entry:
+// CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to i128
+// CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i128
+// CHECK:   [[SHIFT_1:%.*]] = shl i128 [[ZEXT_1]], 64
+// CHECK:   [[PAYLOAD:%.*]] = or i128 [[ZEXT_0]], [[SHIFT_1]]
+// CHECK:   [[RES_0:%.*]] = insertvalue { i128, i1 } undef, i128 [[PAYLOAD]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i128, i1 } [[RES_0]], i1 false, 1
+// CHECK:   ret { i128, i1 } [[RES]]
+// CHECK: }
+
+// CHECK: define { i128, i1 } @_TO5union22AggregateSinglePayload1yFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret { i128, i1 } { i128 0, i1 true }
+// CHECK: }
+
+// CHECK: define { i128, i1 } @_TO5union22AggregateSinglePayload1zFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret { i128, i1 } { i128 1, i1 true }
+// CHECK: }
+
+
+// CHECK: define { i256, i1 } @_TO5union23AggregateSinglePayload21xfMS0_FTVS_8CharLikeVS_7IntLikeVS_9RangeLike_S0_(i21, i64, i64, i64) {
+// CHECK: entry:
+// CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to i256
+// CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i256
+// CHECK:   [[SHIFT_1:%.*]] = shl i256 [[ZEXT_1]], 64
+// CHECK:   [[PAYLOAD_0_1:%.*]] = or i256 [[ZEXT_0]], [[SHIFT_1]]
+// CHECK:   [[ZEXT_2_FROM:%.*]] = zext i64 %2 to i256
+// CHECK:   [[SHIFT_2_FROM:%.*]] = shl i256 [[ZEXT_2_FROM]], 128
+// CHECK:   [[ZEXT_2_TO:%.*]] = zext i64 %3 to i256
+// CHECK:   [[SHIFT_2_TO:%.*]] = shl i256 [[ZEXT_2_TO]], 192
+// CHECK:   [[PAYLOAD_2:%.*]] = or i256 [[SHIFT_2_FROM]], [[SHIFT_2_TO]]
+// CHECK:   [[PAYLOAD:%.*]] = or i256 [[PAYLOAD_0_1]], [[PAYLOAD_2]]
+// CHECK:   [[RES_0:%.*]] = insertvalue { i256, i1 } undef, i256 [[PAYLOAD]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i256, i1 } [[RES_0]], i1 false, 1
+// CHECK:   ret { i256, i1 } [[RES]]
+// CHECK: }
+
+// CHECK: define { i256, i1 } @_TO5union23AggregateSinglePayload21yFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret { i256, i1 } { i256 0, i1 true }
+// CHECK: }
+
+// CHECK: define { i256, i1 } @_TO5union23AggregateSinglePayload21zFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret { i256, i1 } { i256 1, i1 true }
 // CHECK: }
 
 

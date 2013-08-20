@@ -799,20 +799,23 @@ namespace {
     
     llvm::Value *packUnionPayload(IRGenFunction &IGF,
                                   Explosion &src,
-                                  unsigned bitWidth) const override {
+                                  unsigned bitWidth,
+                                  unsigned offset) const override {
       PackUnionPayload pack(IGF, bitWidth);
       for (unsigned i = 0; i < NumProtocols; ++i)
-        pack.add(src.claimNext());
+        pack.addAtOffset(src.claimNext(), offset);
       pack.add(src.claimNext());
       return pack.get();
     }
     
     void unpackUnionPayload(IRGenFunction &IGF,
                             llvm::Value *payload,
-                            Explosion &dest) const override {
+                            Explosion &dest,
+                            unsigned offset) const override {
       UnpackUnionPayload unpack(IGF, payload);
       for (unsigned i = 0; i < NumProtocols; ++i)
-        dest.add(unpack.claim(IGF.IGM.WitnessTablePtrTy));
+        dest.add(unpack.claimAtOffset(IGF.IGM.WitnessTablePtrTy,
+                                      offset));
       dest.add(unpack.claim(IGF.IGM.UnknownRefCountedPtrTy));
     }
   };

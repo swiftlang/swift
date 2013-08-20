@@ -270,22 +270,26 @@ public:
   }
 
   llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
-                                unsigned bitWidth) const override {
+                                unsigned bitWidth,
+                                unsigned startOffset) const override {
     PackUnionPayload pack(IGF, bitWidth);
     for (auto &field : getFields()) {
-      unsigned offset = field.getFixedByteOffset().getValueInBits();
-      pack.addAtOffset(src.claimNext(), offset);
+      unsigned offset = field.getFixedByteOffset().getValueInBits()
+        + startOffset;
+      llvm::Value *subValue = cast<LoadableTypeInfo>(field.getTypeInfo())
+        .packUnionPayload(IGF, src, bitWidth, offset);
+      pack.combine(subValue);
     }
     return pack.get();
   }
   
   void unpackUnionPayload(IRGenFunction &IGF, llvm::Value *payload,
-                          Explosion &dest) const override {
-    UnpackUnionPayload unpack(IGF, payload);
+                          Explosion &dest, unsigned startOffset) const override{
     for (auto &field : getFields()) {
-      unsigned offset = field.getFixedByteOffset().getValueInBits();
-      dest.add(unpack.claimAtOffset(field.getTypeInfo().getStorageType(),
-                                    offset));
+      unsigned offset = field.getFixedByteOffset().getValueInBits()
+        + startOffset;
+      cast<LoadableTypeInfo>(field.getTypeInfo())
+        .unpackUnionPayload(IGF, payload, dest, offset);
     }
   }
 };

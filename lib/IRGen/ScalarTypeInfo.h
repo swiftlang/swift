@@ -163,17 +163,19 @@ public:
   
   llvm::Value *packUnionPayload(IRGenFunction &IGF,
                                 Explosion &src,
-                                unsigned bitWidth) const override {
+                                unsigned bitWidth,
+                                unsigned offset) const override {
     PackUnionPayload pack(IGF, bitWidth);
-    pack.add(src.claimNext());
+    pack.addAtOffset(src.claimNext(), offset);
     return pack.get();
   }
   
   void unpackUnionPayload(IRGenFunction &IGF,
                           llvm::Value *payload,
-                          Explosion &dest) const override {
+                          Explosion &dest,
+                          unsigned offset) const override {
     UnpackUnionPayload unpack(IGF, payload);
-    dest.add(unpack.claim(getScalarType()));
+    dest.add(unpack.claimAtOffset(getScalarType(), offset));
   }
 };
 

@@ -450,18 +450,21 @@ namespace {
     
     llvm::Value *packUnionPayload(IRGenFunction &IGF,
                                   Explosion &src,
-                                  unsigned bitWidth) const override {
+                                  unsigned bitWidth,
+                                  unsigned offset) const override {
       PackUnionPayload pack(IGF, bitWidth);
-      pack.add(src.claimNext());
+      pack.addAtOffset(src.claimNext(), offset);
       pack.add(src.claimNext());
       return pack.get();
     }
     
     void unpackUnionPayload(IRGenFunction &IGF,
                             llvm::Value *payload,
-                            Explosion &dest) const override {
+                            Explosion &dest,
+                            unsigned offset) const override {
       UnpackUnionPayload unpack(IGF, payload);
-      dest.add(unpack.claim(getStorageType()->getElementType(0)));
+      dest.add(unpack.claimAtOffset(getStorageType()->getElementType(0),
+                                    offset));
       dest.add(unpack.claim(getStorageType()->getElementType(1)));
     }
   };

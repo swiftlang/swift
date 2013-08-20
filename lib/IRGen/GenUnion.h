@@ -60,6 +60,9 @@ public:
   /// Insert a value into the packed value at a specific offset.
   void addAtOffset(llvm::Value *v, unsigned bitOffset);
   
+  /// Combine a partially packed payload at a different offset into our packing.
+  void combine(llvm::Value *v);
+  
   /// Get the packed value.
   llvm::Value *get();
   
