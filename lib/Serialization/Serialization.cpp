@@ -390,11 +390,8 @@ DeclID Serializer::addDeclRef(const Decl *D) {
     return 0;
 
   DeclID &id = DeclIDs[D];
-  if (id != 0) {
-    if (id == 1037)
-      fprintf(stderr, "1037\n");
+  if (id != 0)
     return id;
-  }
 
   // Record any generic parameters that come from this decl, so that we can use
   // the decl to refer to the parameters later.
@@ -419,8 +416,6 @@ DeclID Serializer::addDeclRef(const Decl *D) {
 
   id = ++LastDeclID;
   DeclsAndTypesToWrite.push(D);
-  if (id == 1037)
-    fprintf(stderr, "1037\n");
   return id;
 }
 
