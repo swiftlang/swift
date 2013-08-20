@@ -840,7 +840,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
   Identifier Id;
-  TypeRepr *UnderlyingTy = nullptr;
+  ParserResult<TypeRepr> UnderlyingTy;
   SourceLoc IdLoc;
   if (parseIdentifier(Id, IdLoc, diag::expected_identifier_in_decl,"typealias"))
     return nullptr;
@@ -851,8 +851,12 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
     parseInheritance(Inherited);
 
   if (WantDefinition || Tok.is(tok::equal)) {
-    if (parseToken(tok::equal, diag::expected_equal_in_typealias) ||
-        !(UnderlyingTy = parseType(diag::expected_type_in_typealias)))
+    if (parseToken(tok::equal, diag::expected_equal_in_typealias))
+      return nullptr;
+    UnderlyingTy = parseType(diag::expected_type_in_typealias);
+    if (UnderlyingTy.hasCodeCompletion())
+      return makeParserCodeCompletionResult<TypeDecl>();
+    if (UnderlyingTy.isNull())
       return nullptr;
     
     if (!WantDefinition) {
@@ -873,7 +877,8 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
 
   // Otherwise, build a typealias.
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc, UnderlyingTy,
+    new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
+                                UnderlyingTy.getPtrOrNull(),
                                 CurDeclContext,
                                 Context.AllocateCopy(Inherited));
   addToScope(TAD);
@@ -1720,10 +1725,11 @@ bool Parser::parseDeclUnionElement(unsigned Flags,
   
   // See if there's a result type.
   SourceLoc ArrowLoc;
-  TypeRepr *ResultType = nullptr;
+  ParserResult<TypeRepr> ResultType;
   if (Tok.is(tok::arrow)) {
     ArrowLoc = consumeToken();
-    if (!(ResultType = parseType(diag::expected_type_union_element_result)))
+    ResultType = parseType(diag::expected_type_union_element_result);
+    if (ResultType.isNull() || ResultType.hasCodeCompletion())
       return true;
   }
   
@@ -1740,7 +1746,8 @@ bool Parser::parseDeclUnionElement(unsigned Flags,
   
   // Create the element.
   auto *result = new (Context) UnionElementDecl(CaseLoc, NameLoc, Name,
-                                                ArgType, ArrowLoc, ResultType,
+                                                ArgType, ArrowLoc,
+                                                ResultType.getPtrOrNull(),
                                                 CurDeclContext);
   if (!(Flags & PD_AllowUnionElement)) {
     diagnose(CaseLoc, diag::disallowed_union_element);
@@ -2109,15 +2116,16 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   SourceLoc ArrowLoc = consumeToken();
   
   // type
-  TypeRepr *ElementTy = parseTypeAnnotation(diag::expected_type_subscript);
-  if (!ElementTy)
+  ParserResult<TypeRepr> ElementTy =
+      parseTypeAnnotation(diag::expected_type_subscript);
+  if (ElementTy.isNull() || ElementTy.hasCodeCompletion())
     return true;
   
   if (!NeedDefinition) {
     SubscriptDecl *Subscript
       = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
                                     SubscriptLoc, Indices.get(), ArrowLoc,
-                                    ElementTy, SourceRange(),
+                                    ElementTy.get(), SourceRange(),
                                     0, 0, CurDeclContext);
     Decls.push_back(Subscript);
     return false;
@@ -2134,7 +2142,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   FuncDecl *Get = 0;
   FuncDecl *Set = 0;
   SourceLoc LastValidLoc = LBLoc;
-  if (parseGetSet(HasContainerType, Indices.get(), ElementTy,
+  if (parseGetSet(HasContainerType, Indices.get(), ElementTy.get(),
                   Get, Set, LastValidLoc))
     Invalid = true;
 
@@ -2169,7 +2177,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
     SubscriptDecl *Subscript
       = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
                                     SubscriptLoc, Indices.get(), ArrowLoc,
-                                    ElementTy, SourceRange(LBLoc, RBLoc),
+                                    ElementTy.get(), SourceRange(LBLoc, RBLoc),
                                     Get, Set, CurDeclContext);
 
     // FIXME: Order of get/set not preserved.

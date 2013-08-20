@@ -493,10 +493,10 @@ public:
   //===--------------------------------------------------------------------===//
   // Type Parsing
   
-  TypeRepr *parseType();
-  TypeRepr *parseType(Diag<> ID);
-  TypeRepr *parseTypeAnnotation();
-  TypeRepr *parseTypeAnnotation(Diag<> ID);
+  ParserResult<TypeRepr> parseType();
+  ParserResult<TypeRepr> parseType(Diag<> ID);
+  ParserResult<TypeRepr> parseTypeAnnotation();
+  ParserResult<TypeRepr> parseTypeAnnotation(Diag<> ID);
   TypeRepr *parseTypeSimple();
   TypeRepr *parseTypeSimple(Diag<> ID);
   bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,

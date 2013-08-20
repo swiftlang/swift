@@ -93,7 +93,8 @@ template <typename T> ParserResult<T> makeParserResult(T *Result) {
 }
 
 /// Create a result (null or non-null) with error bit set.
-template <typename T> ParserResult<T> makeParserErrorResult(T *Result) {
+template <typename T>
+ParserResult<T> makeParserErrorResult(T *Result = nullptr) {
   ParserResult<T> PR(Result);
   PR.setIsParseError();
   return PR;
@@ -101,7 +102,7 @@ template <typename T> ParserResult<T> makeParserErrorResult(T *Result) {
 
 /// Create a result (null or non-null) with error and code completion bits set.
 template <typename T>
-ParserResult<T> makeParserCodeCompletionResult(T *Result) {
+ParserResult<T> makeParserCodeCompletionResult(T *Result = nullptr) {
   ParserResult<T> PR(Result);
   PR.setHasCodeCompletion();
   return PR;

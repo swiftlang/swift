@@ -109,16 +109,18 @@ static bool parseSelectorArgument(Parser &P,
   }
   
   if (P.consumeIf(tok::colon)) {
-    TypeRepr *type = P.parseTypeAnnotation();
-    if (!type) {
+    ParserResult<TypeRepr> type = P.parseTypeAnnotation();
+    if (type.isNull()) {
       P.skipUntil(tok::r_paren);
       return true;
     }
+    if (type.hasCodeCompletion())
+      return true;
     
     argPattern = makeParserResult(
-        new (P.Context) TypedPattern(argPattern.get(), type));
+        new (P.Context) TypedPattern(argPattern.get(), type.get()));
     bodyPattern = makeParserResult(
-        new (P.Context) TypedPattern(bodyPattern.get(), type));
+        new (P.Context) TypedPattern(bodyPattern.get(), type.get()));
   }
   
   ExprHandle *init = nullptr;
@@ -258,7 +260,9 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
 
   // If there's a trailing arrow, parse the rest as the result type.
   if (consumeIf(tok::arrow)) {
-    if (!(retType = parseType()))
+    ParserResult<TypeRepr> ResultType = parseType();
+    retType = ResultType.getPtrOrNull();
+    if (!retType)
       return true;
   } else {
     // Otherwise, we leave retType null.
@@ -279,11 +283,12 @@ ParserResult<Pattern> Parser::parsePattern() {
 
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
-    TypeRepr *type = parseTypeAnnotation();
-    if (!type)
+    ParserResult<TypeRepr> Ty = parseTypeAnnotation();
+    if (Ty.isNull() || Ty.hasCodeCompletion())
       return nullptr;
 
-    pattern = makeParserResult(new (Context) TypedPattern(pattern.get(), type));
+    pattern = makeParserResult(
+        new (Context) TypedPattern(pattern.get(), Ty.get()));
   }
 
   return pattern;
@@ -487,10 +492,10 @@ ParserResult<Pattern> Parser::parseMatchingPatternVar() {
 
 ParserResult<Pattern> Parser::parseMatchingPatternIsa() {
   SourceLoc isLoc = consumeToken(tok::kw_is);
-  TypeRepr *castType = parseType();
-  if (!castType)
+  ParserResult<TypeRepr> castType = parseType();
+  if (castType.isNull() || castType.hasCodeCompletion())
     return nullptr;
-  return makeParserResult(new (Context) IsaPattern(isLoc, castType));
+  return makeParserResult(new (Context) IsaPattern(isLoc, castType.get()));
 }
 
 bool Parser::isOnlyStartOfMatchingPattern() {

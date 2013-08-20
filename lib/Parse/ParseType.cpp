@@ -26,21 +26,23 @@
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
-TypeRepr *Parser::parseTypeAnnotation() {
+ParserResult<TypeRepr> Parser::parseTypeAnnotation() {
   return parseTypeAnnotation(diag::expected_type);
 }
 
 /// parseTypeAnnotation
 ///   type-annotation:
 ///     attribute-list type
-TypeRepr *Parser::parseTypeAnnotation(Diag<> message) {
+ParserResult<TypeRepr> Parser::parseTypeAnnotation(Diag<> message) {
   // Parse attributes.
   DeclAttributes attrs;
   parseAttributeList(attrs);
 
   // Parse the type.
-  TypeRepr *ty = parseType(message);
-  return applyAttributeToType(ty, attrs);
+  ParserResult<TypeRepr> Ty = parseType(message);
+  if (Ty.isNull() || Ty.hasCodeCompletion())
+    return Ty;
+  return makeParserResult(applyAttributeToType(Ty.getPtrOrNull(), attrs));
 }
 
 TypeRepr *Parser::applyAttributeToType(TypeRepr *ty, DeclAttributes &attrs) {
@@ -104,7 +106,7 @@ TypeRepr *Parser::parseTypeSimple(Diag<> MessageID) {
   return ty;
 }
 
-TypeRepr *Parser::parseType() {
+ParserResult<TypeRepr> Parser::parseType() {
   return parseType(diag::expected_type);
 }
 
@@ -116,17 +118,21 @@ TypeRepr *Parser::parseType() {
 ///   type-function:
 ///     type-simple '->' type
 ///
-TypeRepr *Parser::parseType(Diag<> MessageID) {
+ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
   TypeRepr *ty = parseTypeSimple(MessageID);
   if (!ty)
     return nullptr;
 
   // Handle type-function if we have an arrow.
   if (consumeIf(tok::arrow)) {
-    TypeRepr *SecondHalf = parseType(diag::expected_type_function_result);
-    if (!SecondHalf)
+    ParserResult<TypeRepr> SecondHalf =
+        parseType(diag::expected_type_function_result);
+    if (SecondHalf.hasCodeCompletion())
+      return makeParserCodeCompletionResult<TypeRepr>();
+    if (SecondHalf.isNull())
       return nullptr;
-    return new (Context) FunctionTypeRepr(ty, SecondHalf);
+    return makeParserResult(
+        new (Context) FunctionTypeRepr(ty, SecondHalf.get()));
   }
 
   // Parse array types, plus recovery for optional array types.
@@ -148,7 +154,10 @@ TypeRepr *Parser::parseType(Diag<> MessageID) {
     }
   }
 
-  return ty;
+  if (ty)
+    return makeParserResult(ty);
+  else
+    return makeParserErrorResult<TypeRepr>();
 }
 
 bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
@@ -159,8 +168,8 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
   LAngleLoc = consumeStartingLess();
 
   do {
-    TypeRepr *Ty = parseType(diag::expected_type);
-    if (!Ty) {
+    ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
+    if (Ty.isNull() || Ty.hasCodeCompletion()) {
       // Skip until we hit the '>'.
       skipUntilAnyOperator();
       if (startsWithGreater(Tok))
@@ -168,7 +177,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
       return true;
     }
 
-    Args.push_back(Ty);
+    Args.push_back(Ty.get());
     // Parse the comma, if the list continues.
   } while (consumeIf(tok::comma));
 
@@ -335,17 +344,18 @@ TupleTypeRepr *Parser::parseTypeTupleBody() {
       consumeToken(tok::colon);
 
       // Parse the type annotation.
-      TypeRepr *type = parseTypeAnnotation(diag::expected_type);
-      if (!type)
+      ParserResult<TypeRepr> type = parseTypeAnnotation(diag::expected_type);
+      if (type.isNull() || type.hasCodeCompletion())
         return true;
 
-      ElementsR.push_back(new (Context) NamedTypeRepr(name, type, nameLoc));
+      ElementsR.push_back(
+          new (Context) NamedTypeRepr(name, type.get(), nameLoc));
     } else {
       // Otherwise, this has to be a type.
-      TypeRepr *type = parseTypeAnnotation();
-      if (!type)
+      ParserResult<TypeRepr> type = parseTypeAnnotation();
+      if (type.isNull() || type.hasCodeCompletion())
         return true;
-      ElementsR.push_back(type);
+      ElementsR.push_back(type.get());
     }
 
     // Parse '= expr' here so we can complain about it directly, rather

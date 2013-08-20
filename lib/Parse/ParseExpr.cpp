@@ -281,11 +281,11 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
 NullablePtr<Expr> Parser::parseExprIs() {
   SourceLoc isLoc = consumeToken(tok::kw_is);
   
-  TypeRepr *type = parseType(diag::expected_type_after_is);
-  if (!type)
+  ParserResult<TypeRepr> type = parseType(diag::expected_type_after_is);
+  if (type.isNull() || type.hasCodeCompletion())
     return nullptr;
   
-  return new (Context) IsaExpr(isLoc, type);
+  return new (Context) IsaExpr(isLoc, type.get());
 }
 
 /// parseExprAs
@@ -300,13 +300,15 @@ NullablePtr<Expr> Parser::parseExprAs() {
     bangLoc = consumeToken();
   }
   
-  TypeRepr *type = parseType(diag::expected_type_after_as);
-  if (!type)
+  ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as);
+  if (type.isNull() || type.hasCodeCompletion())
     return nullptr;
   
-  return bangLoc.isValid()
-    ? (Expr*) new (Context) UnconditionalCheckedCastExpr(asLoc, bangLoc, type)
-    : (Expr*) new (Context) CoerceExpr(asLoc, type);
+  if (bangLoc.isValid())
+    return new (Context)
+        UnconditionalCheckedCastExpr(asLoc, bangLoc, type.get());
+  else
+    return new (Context) CoerceExpr(asLoc, type.get());
 }
 
 /// parseExprSequence
@@ -1152,7 +1154,9 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
     arrowLoc = consumeToken();
 
     // Parse the type.
-    if (!(explicitResultType = parseType(diag::expected_closure_result_type))) {
+    ParserResult<TypeRepr> ResultType = parseType(diag::expected_closure_result_type);
+    explicitResultType = ResultType.getPtrOrNull();
+    if (!explicitResultType) {
       // If we couldn't parse the result type, clear out the arrow location.
       arrowLoc = SourceLoc();
       invalid = true;

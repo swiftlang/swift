@@ -589,14 +589,12 @@ bool SILParser::parseSILType(SILType &Result) {
   // body.
   GenericParamList *PList = P.maybeParseGenericParams();
 
-  TypeRepr *TyR = P.parseType(diag::expected_sil_type);
-  if (!TyR)
+  ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type);
+  if (TyR.isNull())
     return true;
   
   // Apply attributes to the type.
-  TyR = P.applyAttributeToType(TyR, attrs);
-
-  TypeLoc Ty = TyR;
+  TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs);
 
   if (PList)
     if (handleGenericParams(PList))
