@@ -505,8 +505,8 @@ public:
   ParserResult<IdentTypeRepr> parseTypeIdentifier();
   ParserResult<ProtocolCompositionTypeRepr> parseTypeComposition();
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
-  ArrayTypeRepr *parseTypeArray(TypeRepr *Base);
-  OptionalTypeRepr *parseTypeOptional(TypeRepr *Base);
+  ParserResult<ArrayTypeRepr> parseTypeArray(TypeRepr *Base);
+  ParserResult<OptionalTypeRepr> parseTypeOptional(TypeRepr *Base);
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, DeclAttributes &Attr);
 

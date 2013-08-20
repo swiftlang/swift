@@ -98,7 +98,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
       continue;
     }
     if (!Tok.isAtStartOfLine() && Tok.is(tok::question)) {
-      ty = makeParserResult(parseTypeOptional(ty.get()));
+      ty = parseTypeOptional(ty.get());
       continue;
     }
     break;
@@ -144,7 +144,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
   // or "Optional<T[]>".
   while (ty.isNonNull() && !Tok.isAtStartOfLine()) {
     if (Tok.is(tok::l_square)) {
-      ty = makeParserResult(parseTypeArray(ty.get()));
+      ty = parseTypeArray(ty.get());
     } else if (Tok.is(tok::question)) {
       if (isa<ArrayTypeRepr>(ty.get())) {
         diagnose(Tok, diag::unsupported_unparenthesized_array_optional)
@@ -153,7 +153,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
                                                     ty.get()->getEndLoc()),
                          ")");
       }
-      ty = makeParserResult(parseTypeOptional(ty.get()));
+      ty = parseTypeOptional(ty.get());
     } else {
       break;
     }
@@ -402,25 +402,39 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 ///     type-array '[' ']'
 ///     type-array '[' expr ']'
 ///
-ArrayTypeRepr *Parser::parseTypeArray(TypeRepr *Base) {
+ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   assert(Tok.isFollowingLSquare());
   SourceLoc lsquareLoc = consumeToken();
 
   // Handle the [] production, meaning an array slice.
   if (Tok.is(tok::r_square)) {
     SourceLoc rsquareLoc = consumeToken(tok::r_square);
+    ParserResult<TypeRepr> NestedType = makeParserResult(Base);
 
     // If we're starting another square-bracket clause, recur.
-    if (Tok.isFollowingLSquare() && !(Base = parseTypeArray(Base)))
-      return nullptr;
+    if (Tok.isFollowingLSquare()) {
+      NestedType = parseTypeArray(Base);
+      if (NestedType.hasCodeCompletion())
+        return makeParserCodeCompletionResult<ArrayTypeRepr>();
+      if (NestedType.isNull()) {
+        // We could not parse the rest of the type, but we still have the base
+        // type.
+        NestedType = makeParserErrorResult(Base);
+      }
+    }
 
     // Just build a normal array slice type.
-    return new (Context) ArrayTypeRepr(Base, nullptr,
-                                       SourceRange(lsquareLoc, rsquareLoc));
+    auto ATR = new (Context) ArrayTypeRepr(
+        NestedType.get(), nullptr, SourceRange(lsquareLoc, rsquareLoc));
+    if (NestedType.isParseError())
+      return makeParserErrorResult(ATR);
+    else
+      return makeParserResult(ATR);
   }
 
   NullablePtr<Expr> sizeEx = parseExpr(diag::expected_expr_array_type);
-  if (sizeEx.isNull()) return nullptr;
+  if (sizeEx.isNull())
+    return nullptr;
 
   SourceLoc rsquareLoc;
   if (parseMatchingToken(tok::r_square, rsquareLoc,
@@ -428,7 +442,7 @@ ArrayTypeRepr *Parser::parseTypeArray(TypeRepr *Base) {
     return nullptr;
 
   // If we're starting another square-bracket clause, recur.
-  if (Tok.isFollowingLSquare() && !(Base = parseTypeArray(Base)))
+  if (Tok.isFollowingLSquare() && parseTypeArray(Base).isParseError())
     return nullptr;
   
   // FIXME: We don't supported fixed-length arrays yet.
@@ -440,10 +454,10 @@ ArrayTypeRepr *Parser::parseTypeArray(TypeRepr *Base) {
 
 /// Parse a single optional suffix, given that we are looking at the
 /// question mark.
-OptionalTypeRepr *Parser::parseTypeOptional(TypeRepr *base) {
+ParserResult<OptionalTypeRepr> Parser::parseTypeOptional(TypeRepr *base) {
   assert(Tok.is(tok::question));
   SourceLoc questionLoc = consumeToken();
-  return new (Context) OptionalTypeRepr(base, questionLoc);
+  return makeParserResult(new (Context) OptionalTypeRepr(base, questionLoc));
 }
 
 //===--------------------------------------------------------------------===//
