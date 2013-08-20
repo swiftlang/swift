@@ -18,12 +18,13 @@
 #define SWIFT_AST_BUILTINS_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/SmallVector.h"
+#include "swift/AST/Type.h"
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
   class ASTContext;
   class Identifier;
-  class Type;
   class ValueDecl;
 
 /// Get the builtin type for the given name.
@@ -81,6 +82,12 @@ enum class BuiltinValueKind {
   None,
 #define BUILTIN(Id, Name) Id,
 #include "swift/AST/Builtins.def"
+};
+
+/// \brief The information identifying the builtin - it's kind and types.
+struct BuiltinInfo {
+  BuiltinValueKind ID;
+  SmallVector<Type, 4> Types;
 };
 
 }

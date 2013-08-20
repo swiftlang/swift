@@ -18,6 +18,7 @@
 #define SWIFT_SIL_SILMODULE_H
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Builtins.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -93,6 +94,9 @@ private:
 
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<const FuncDecl*, llvm::Intrinsic::ID> IntrinsicIDCache;
+
+  /// This is a cache of builtin Function declarations to numeric ID mappings.
+  llvm::DenseMap<const FuncDecl*, BuiltinInfo> BuiltinIDCache;
 
   /// The stage of processing this module is at.
   SILStage Stage;
@@ -197,6 +201,12 @@ public:
   /// intrinsic. The particular intrinsic functions which correspond to the
   /// retruned value are defined in llvm/Intrinsics.h.
   llvm::Intrinsic::ID getIntrinsicID(const FuncDecl* FD);
+
+  /// \brief Looks up the lazily cached identification for the builtin function.
+  ///
+  /// \returns Returns builtin info of BuiltinValueKind::None kind if the
+  /// decalation is not a builtin.
+  const BuiltinInfo &getBuiltinInfo(const FuncDecl* FD);
 };
   
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){

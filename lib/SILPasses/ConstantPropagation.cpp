@@ -15,6 +15,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/Type.h"
 #include "swift/Subsystems.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
@@ -124,20 +125,9 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 
   // Otherwise, it should be one of the builin functions.
   OperandValueArrayRef Args = AI->getArguments();
-  SmallVector<Type, 4> Types;
-  StringRef OperationName = getBuiltinBaseName(M.getASTContext(),
-                                            FR->getFunction()->getName().str(),
-                                            Types);
+  const BuiltinInfo &Builtin = M.getBuiltinInfo(FR->getFunction());
 
-  // FIXME: Make this faster by introducing a global cache, like in the
-  // intrinsics case.
-  BuiltinValueKind BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
-#define BUILTIN(id, name) \
-    .Case(name, BuiltinValueKind::id)
-#include "swift/AST/Builtins.def"
-    .Default(BuiltinValueKind::None);
-
-  switch (BV) {
+  switch (Builtin.ID) {
     default: break;
     case BuiltinValueKind::Trunc:
     case BuiltinValueKind::ZExt:
@@ -150,10 +140,10 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 
       // Get the cast result.
       APInt CastResV;
-      Type DestTy = Types.size() == 2 ? Types[1] : Type();
+      Type DestTy = Builtin.Types.size() == 2 ? Builtin.Types[1] : Type();
       uint32_t DestBitWidth =
         DestTy->castTo<BuiltinIntegerType>()->getBitWidth();
-      switch (BV) {
+      switch (Builtin.ID) {
         default : llvm_unreachable("Invalid case.");
         case BuiltinValueKind::Trunc:
           CastResV = V->getValue().trunc(DestBitWidth);

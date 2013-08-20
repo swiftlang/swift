@@ -11,9 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILModule.h"
-#include "swift/AST/Builtins.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/StringSwitch.h"
+
 using namespace swift;
 
 namespace swift {
@@ -104,4 +105,23 @@ llvm::Intrinsic::ID SILModule::getIntrinsicID(const FuncDecl* FD) {
   return IntrinsicIDCache[FD];
 }
 
+const BuiltinInfo &SILModule::getBuiltinInfo(const FuncDecl* FD) {
+  unsigned OldSize = BuiltinIDCache.size();
+  BuiltinInfo &Info = BuiltinIDCache[FD];
 
+  // If the element was not in the cache, lookup the ID and Type.
+  if (OldSize != BuiltinIDCache.size()) {
+    // Find the matching ID.
+    StringRef OperationName = getBuiltinBaseName(getASTContext(),
+                                                 FD->getName().str(),
+                                                 Info.Types);
+
+    Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
+#define BUILTIN(id, name) \
+      .Case(name, BuiltinValueKind::id)
+#include "swift/AST/Builtins.def"
+      .Default(BuiltinValueKind::None);
+  }
+
+  return Info;
+}
