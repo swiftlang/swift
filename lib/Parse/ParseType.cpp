@@ -52,7 +52,7 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty, DeclAttributes &attrs) {
   return new (Context) AttributedTypeRepr(attrs, ty);
 }
 
-TypeRepr *Parser::parseTypeSimple() {
+ParserResult<TypeRepr> Parser::parseTypeSimple() {
   return parseTypeSimple(diag::expected_type);
 }
 
@@ -63,8 +63,8 @@ TypeRepr *Parser::parseTypeSimple() {
 ///     type-composition
 ///     type-simple '.metatype'
 ///     type-simple '?'
-TypeRepr *Parser::parseTypeSimple(Diag<> MessageID) {
-  TypeRepr *ty = nullptr;
+ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
+  ParserResult<TypeRepr> ty;
   switch (Tok.getKind()) {
   case tok::kw_This:
   case tok::identifier:
@@ -88,16 +88,17 @@ TypeRepr *Parser::parseTypeSimple(Diag<> MessageID) {
   }
 
   // '.metatype' and '?' still leave us with type-simple.
-  while (ty) {
+  while (ty.isNonNull()) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         peekToken().is(tok::kw_metatype)) {
       consumeToken();
       SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);
-      ty = new (Context) MetaTypeTypeRepr(ty, metatypeLoc);
+      ty = makeParserResult(
+          new (Context) MetaTypeTypeRepr(ty.get(), metatypeLoc));
       continue;
     }
     if (!Tok.isAtStartOfLine() && Tok.is(tok::question)) {
-      ty = parseTypeOptional(ty);
+      ty = makeParserResult(parseTypeOptional(ty.get()));
       continue;
     }
     break;
@@ -119,8 +120,11 @@ ParserResult<TypeRepr> Parser::parseType() {
 ///     type-simple '->' type
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
-  TypeRepr *ty = parseTypeSimple(MessageID);
-  if (!ty)
+  ParserResult<TypeRepr> ty = parseTypeSimple(MessageID);
+  if (ty.hasCodeCompletion())
+    return makeParserCodeCompletionResult<TypeRepr>();
+
+  if (ty.isNull())
     return nullptr;
 
   // Handle type-function if we have an arrow.
@@ -132,32 +136,30 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
     if (SecondHalf.isNull())
       return nullptr;
     return makeParserResult(
-        new (Context) FunctionTypeRepr(ty, SecondHalf.get()));
+        new (Context) FunctionTypeRepr(ty.get(), SecondHalf.get()));
   }
 
   // Parse array types, plus recovery for optional array types.
   // If we see "T[]?", emit a diagnostic; this type must be written "(T[])?"
   // or "Optional<T[]>".
-  while (ty && !Tok.isAtStartOfLine()) {
+  while (ty.isNonNull() && !Tok.isAtStartOfLine()) {
     if (Tok.is(tok::l_square)) {
-      ty = parseTypeArray(ty);
+      ty = makeParserResult(parseTypeArray(ty.get()));
     } else if (Tok.is(tok::question)) {
-      if (isa<ArrayTypeRepr>(ty)) {
+      if (isa<ArrayTypeRepr>(ty.get())) {
         diagnose(Tok, diag::unsupported_unparenthesized_array_optional)
-          .fixItInsert(ty->getStartLoc(), "(")
-          .fixItInsert(Lexer::getLocForEndOfToken(SourceMgr, ty->getEndLoc()),
-                       ")");
+            .fixItInsert(ty.get()->getStartLoc(), "(")
+            .fixItInsert(Lexer::getLocForEndOfToken(SourceMgr,
+                                                    ty.get()->getEndLoc()),
+                         ")");
       }
-      ty = parseTypeOptional(ty);
+      ty = makeParserResult(parseTypeOptional(ty.get()));
     } else {
       break;
     }
   }
 
-  if (ty)
-    return makeParserResult(ty);
-  else
-    return makeParserErrorResult<TypeRepr>();
+  return ty;
 }
 
 bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
@@ -202,7 +204,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-IdentTypeRepr *Parser::parseTypeIdentifier() {
+ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_This)) {
     diagnose(Tok.getLoc(), diag::expected_identifier_for_type);
     return nullptr;
@@ -249,7 +251,7 @@ IdentTypeRepr *Parser::parseTypeIdentifier() {
   if (auto Entry = lookupInScope(ComponentsR[0].getIdentifier()))
     ComponentsR[0].setValue(Entry);
 
-  return IdentTypeRepr::create(Context, ComponentsR);
+  return makeParserResult(IdentTypeRepr::create(Context, ComponentsR));
 }
 
 /// parseTypeComposition
@@ -260,7 +262,7 @@ IdentTypeRepr *Parser::parseTypeIdentifier() {
 ///   type-composition-list:
 ///     type-identifier (',' type-identifier)*
 ///
-ProtocolCompositionTypeRepr *Parser::parseTypeComposition() {
+ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
  
   // Check for the starting '<'.
@@ -273,10 +275,10 @@ ProtocolCompositionTypeRepr *Parser::parseTypeComposition() {
   // Check for empty protocol composition.
   if (startsWithGreater(Tok)) {
     SourceLoc RAngleLoc = consumeStartingGreater();
-    return new (Context) ProtocolCompositionTypeRepr(
+    return makeParserResult(new (Context) ProtocolCompositionTypeRepr(
                                              MutableArrayRef<IdentTypeRepr *>(),
                                              ProtocolLoc,
-                                             SourceRange(LAngleLoc, RAngleLoc));
+                                             SourceRange(LAngleLoc, RAngleLoc)));
   }
   
   // Parse the type-composition-list.
@@ -284,13 +286,13 @@ ProtocolCompositionTypeRepr *Parser::parseTypeComposition() {
   SmallVector<IdentTypeRepr*, 4> Protocols;
   do {
     // Parse the type-identifier.
-    IdentTypeRepr *Protocol = parseTypeIdentifier();
-    if (!Protocol) {
+    ParserResult<IdentTypeRepr> Protocol = parseTypeIdentifier();
+    if (Protocol.isNull() || Protocol.hasCodeCompletion()) {
       Invalid = true;
       break;
     }
     
-    Protocols.push_back(Protocol);
+    Protocols.push_back(Protocol.get());
   } while (consumeIf(tok::comma));
   
   // Check for the terminating '>'.
@@ -309,8 +311,8 @@ ProtocolCompositionTypeRepr *Parser::parseTypeComposition() {
     EndLoc = consumeStartingGreater();
   }
 
-  return ProtocolCompositionTypeRepr::create(Context, Protocols, ProtocolLoc,
-                                             SourceRange(LAngleLoc, EndLoc));
+  return makeParserResult(ProtocolCompositionTypeRepr::create(
+      Context, Protocols, ProtocolLoc, SourceRange(LAngleLoc, EndLoc)));
 }
 
 /// parseTypeTupleBody
@@ -321,7 +323,7 @@ ProtocolCompositionTypeRepr *Parser::parseTypeComposition() {
 ///   type-tuple-element:
 ///     identifier ':' type-annotation
 ///     type-annotation
-TupleTypeRepr *Parser::parseTypeTupleBody() {
+ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
   SmallVector<TypeRepr *, 8> ElementsR;
@@ -385,9 +387,9 @@ TupleTypeRepr *Parser::parseTypeTupleBody() {
     return nullptr;
   }
 
-  return TupleTypeRepr::create(Context, ElementsR,
-                               SourceRange(LPLoc, Tok.getLoc()),
-                               HadEllipsis ? EllipsisLoc : SourceLoc());
+  return makeParserResult(TupleTypeRepr::create(
+      Context, ElementsR, SourceRange(LPLoc, Tok.getLoc()),
+      HadEllipsis ? EllipsisLoc : SourceLoc()));
 }
 
 

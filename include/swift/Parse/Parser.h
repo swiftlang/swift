@@ -497,14 +497,14 @@ public:
   ParserResult<TypeRepr> parseType(Diag<> ID);
   ParserResult<TypeRepr> parseTypeAnnotation();
   ParserResult<TypeRepr> parseTypeAnnotation(Diag<> ID);
-  TypeRepr *parseTypeSimple();
-  TypeRepr *parseTypeSimple(Diag<> ID);
+  ParserResult<TypeRepr> parseTypeSimple();
+  ParserResult<TypeRepr> parseTypeSimple(Diag<> ID);
   bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
-  IdentTypeRepr *parseTypeIdentifier();
-  ProtocolCompositionTypeRepr *parseTypeComposition();
-  TupleTypeRepr *parseTypeTupleBody();
+  ParserResult<IdentTypeRepr> parseTypeIdentifier();
+  ParserResult<ProtocolCompositionTypeRepr> parseTypeComposition();
+  ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ArrayTypeRepr *parseTypeArray(TypeRepr *Base);
   OptionalTypeRepr *parseTypeOptional(TypeRepr *Base);
 

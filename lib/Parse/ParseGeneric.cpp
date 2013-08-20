@@ -56,7 +56,7 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     SmallVector<TypeLoc, 1> Inherited;
     if (Tok.is(tok::colon)) {
       (void)consumeToken();
-      TypeRepr *Ty = nullptr;
+      ParserResult<TypeRepr> Ty;
       if (Tok.getKind() == tok::identifier) {
         Ty = parseTypeIdentifier();
       } else if (Tok.getKind() == tok::kw_protocol) {
@@ -66,8 +66,9 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
         Invalid = true;
       }
 
-      if (Ty)
-        Inherited.push_back(Ty);
+      // FIXME: code completion not handled.
+      if (Ty.isNonNull())
+        Inherited.push_back(Ty.get());
     }
 
     auto Param = new (Context) GenericTypeParamDecl(CurDeclContext, Name,
@@ -148,8 +149,8 @@ bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
   do {
     // Parse the leading type-identifier.
     // FIXME: Dropping TypeLocs left and right.
-    TypeRepr *FirstType = parseTypeIdentifier();
-    if (!FirstType) {
+    ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
+    if (FirstType.isNull() || FirstType.hasCodeCompletion()) {
       Invalid = true;
       break;
     }
@@ -159,21 +160,21 @@ bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
       SourceLoc ColonLoc = consumeToken();
 
       // Parse the protocol or composition.
-      TypeRepr *Protocol = nullptr;
+      ParserResult<TypeRepr> Protocol;
       if (Tok.is(tok::kw_protocol)) {
         Protocol = parseTypeComposition();
       } else {
         Protocol = parseTypeIdentifier();   
       }
-      if (!Protocol) {
+      if (Protocol.isNull() || Protocol.hasCodeCompletion()) {
         Invalid = true;
         break;
       }
 
       // Add the requirement.
-      Requirements.push_back(Requirement::getConformance(FirstType,
+      Requirements.push_back(Requirement::getConformance(FirstType.get(),
                                                          ColonLoc,
-                                                         Protocol));
+                                                         Protocol.get()));
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
       // A same-type-requirement
@@ -184,16 +185,16 @@ bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
       SourceLoc EqualLoc = consumeToken();
 
       // Parse the second type.
-      TypeRepr *SecondType = parseTypeIdentifier();
-      if (!SecondType) {
+      ParserResult<TypeRepr> SecondType = parseTypeIdentifier();
+      if (SecondType.isNull() || SecondType.hasCodeCompletion()) {
         Invalid = true;
         break;
       }
 
       // Add the requirement
-      Requirements.push_back(Requirement::getSameType(FirstType,
+      Requirements.push_back(Requirement::getSameType(FirstType.get(),
                                                       EqualLoc,
-                                                      SecondType));
+                                                      SecondType.get()));
     } else {
       diagnose(Tok, diag::expected_requirement_delim);
       Invalid = true;

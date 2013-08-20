@@ -760,12 +760,12 @@ bool Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
   
   do {
     // Parse the inherited type (which must be a protocol).
-    TypeRepr *Ty = parseTypeIdentifier();
-    if (!Ty)
+    ParserResult<TypeRepr> Ty = parseTypeIdentifier();
+    if (Ty.isNull() || Ty.hasCodeCompletion())
       return true;
     
     // Record the type.
-    Inherited.push_back(Ty);
+    Inherited.push_back(Ty.get());
     
     // Check for a ',', which indicates that there are more protocols coming.
   } while (consumeIf(tok::comma));
@@ -783,13 +783,15 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
   // The grammar allows only type-identifier here, but we parse type-simple for
   // recovery purposes and let the type checker reject types that can not be
   // extended.
-  TypeRepr *Ty = parseTypeSimple();
-  if (!Ty)
+  ParserResult<TypeRepr> Ty = parseTypeSimple();
+  if (Ty.hasCodeCompletion())
+    return makeParserCodeCompletionResult<ExtensionDecl>();
+  if (Ty.isNull())
     return nullptr;
   // Diagnose extensions for paren types in the parser because a ParenType is
   // canonically equivalent to the wrapped type, and we are using syntactic
   // information to differentiate between them.
-  if (auto *TTR = dyn_cast<TupleTypeRepr>(Ty)) {
+  if (auto *TTR = dyn_cast<TupleTypeRepr>(Ty.get())) {
     if (TTR->isParenType()) {
       diagnose(TTR->getStartLoc(), diag::paren_type_in_extension)
         .highlight(TTR->getSourceRange());
@@ -803,7 +805,7 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
     parseInheritance(Inherited);
 
   ExtensionDecl *ED
-    = new (Context) ExtensionDecl(ExtensionLoc, Ty,
+    = new (Context) ExtensionDecl(ExtensionLoc, Ty.get(),
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
   ContextChange CC(*this, ED);
@@ -1717,9 +1719,10 @@ bool Parser::parseDeclUnionElement(unsigned Flags,
     return true;
   
   // See if there's a following argument type.
-  TypeRepr *ArgType = nullptr;
+  ParserResult<TypeRepr> ArgType;
   if (Tok.isFollowingLParen()) {
-    if (!(ArgType = parseTypeTupleBody()))
+    ArgType = parseTypeTupleBody();
+    if (ArgType.isNull() || ArgType.hasCodeCompletion())
       return true;
   }
   
@@ -1746,7 +1749,8 @@ bool Parser::parseDeclUnionElement(unsigned Flags,
   
   // Create the element.
   auto *result = new (Context) UnionElementDecl(CaseLoc, NameLoc, Name,
-                                                ArgType, ArrowLoc,
+                                                ArgType.getPtrOrNull(),
+                                                ArrowLoc,
                                                 ResultType.getPtrOrNull(),
                                                 CurDeclContext);
   if (!(Flags & PD_AllowUnionElement)) {

@@ -515,8 +515,8 @@ NullablePtr<Expr> Parser::parseExprNew() {
   SourceLoc newLoc = Tok.getLoc();
   consumeToken(tok::kw_new);
 
-  TypeRepr *elementTy = parseTypeSimple();
-  if (!elementTy)
+  ParserResult<TypeRepr> elementTy = parseTypeSimple();
+  if (elementTy.isNull() || elementTy.hasCodeCompletion())
     return nullptr;
 
   bool hadInvalid = false;
@@ -559,7 +559,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
     return new (Context) ErrorExpr({newLoc, PreviousLoc});
   }
 
-  return NewArrayExpr::create(Context, newLoc, elementTy, bounds);
+  return NewArrayExpr::create(Context, newLoc, elementTy.get(), bounds);
 }
 
 static VarDecl *getImplicitThisDeclForSuperContext(Parser &P,
@@ -1154,8 +1154,8 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
     arrowLoc = consumeToken();
 
     // Parse the type.
-    ParserResult<TypeRepr> ResultType = parseType(diag::expected_closure_result_type);
-    explicitResultType = ResultType.getPtrOrNull();
+    explicitResultType =
+        parseType(diag::expected_closure_result_type).getPtrOrNull();
     if (!explicitResultType) {
       // If we couldn't parse the result type, clear out the arrow location.
       arrowLoc = SourceLoc();
