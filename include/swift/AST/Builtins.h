@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Attributes.h"
 #include "swift/AST/Type.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -96,6 +97,7 @@ struct BuiltinInfo {
 struct IntrinsicInfo {
   llvm::Intrinsic::ID ID;
   SmallVector<Type, 4> Types;
+  bool hasAttribute(llvm::Attribute::AttrKind Kind) const;
 };
 
 }

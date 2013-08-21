@@ -39,6 +39,13 @@ bool BuiltinInfo::isReadNone() const {
   return strchr(BuiltinExtraInfo[(unsigned)ID].Attributes, 'n') != 0;
 }
 
+bool IntrinsicInfo::hasAttribute(llvm::Attribute::AttrKind Kind) const {
+  // FIXME: We should not be relying on the global LLVM context.
+  llvm::AttributeSet attrs
+    = llvm::Intrinsic::getAttributes(llvm::getGlobalContext(), ID);
+  return (attrs.hasAttribute(llvm::AttributeSet::FunctionIndex, Kind));
+}
+
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   // Vectors are VecNxT, where "N" is the number of elements and
   // T is the element type.
