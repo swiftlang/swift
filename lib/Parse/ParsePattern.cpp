@@ -289,12 +289,15 @@ Parser::parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
 ///   pattern ::= pattern-atom ':' type-annotation
 ParserResult<Pattern> Parser::parsePattern() {
   // First, parse the pattern atom.
-  ParserResult<Pattern> pattern = parsePatternAtom();
-  if (pattern.isNull())
-    return nullptr;
+  ParserResult<Pattern> Result = parsePatternAtom();
 
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
+    if (Result.isNull()) {
+      // Recover by creating AnyPattern.
+      Result = makeParserErrorResult(new (Context) AnyPattern(Tok.getLoc()));
+    }
+
     ParserResult<TypeRepr> Ty = parseTypeAnnotation();
     if (Ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
@@ -302,11 +305,11 @@ ParserResult<Pattern> Parser::parsePattern() {
     if (Ty.isNull())
       Ty = makeParserResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
 
-    pattern = makeParserResult(
-        new (Context) TypedPattern(pattern.get(), Ty.get()));
+    Result = makeParserResult(Result,
+        new (Context) TypedPattern(Result.get(), Ty.get()));
   }
 
-  return pattern;
+  return Result;
 }
 
 /// \brief Determine whether this token can start a pattern.
