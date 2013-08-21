@@ -23,5 +23,7 @@ add_swift_library(swiftIRGen
   IRGenSIL.cpp
   Linking.cpp
   OptimizeARC.cpp
+  SwiftASTStreamerPass.cpp
+  SwiftTargetMachine.cpp
   StructLayout.cpp
   DEPENDS swiftAST)

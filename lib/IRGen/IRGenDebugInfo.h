@@ -84,6 +84,7 @@ class IRGenDebugInfo {
   SILBasicBlock::const_bbarg_iterator LastArg, LastEnd;
   unsigned LastArgNo;
 
+  StringRef MainFilename;
   StringRef CWDName; /// The current working directory.
   llvm::BumpPtrAllocator DebugInfoNames;
   llvm::DICompileUnit TheCU;
@@ -174,6 +175,8 @@ public:
                                      StringRef LinkageName,
                                      DebugTypeInfo DebugType,
                                      SILLocation Loc);
+
+  StringRef getMainFilename() const { return MainFilename; }
 
 private:
   llvm::DIType createType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope,

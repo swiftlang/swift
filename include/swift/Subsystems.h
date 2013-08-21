@@ -182,6 +182,11 @@ namespace swift {
   void serialize(const TranslationUnit *TU, const char *outputPath,
                  ArrayRef<unsigned> inputFileBufferIDs = {});
 
+  /// Serializes a translation unit to a stream.
+  void serializeToStream(const TranslationUnit *TU, llvm::raw_ostream &out,
+                         ArrayRef<unsigned> inputFileBufferIDs = {});
+
+
   /// Turn the given translation unit into either LLVM IR or native code.
   ///
   /// \param SILMod  A SIL module to translate to LLVM IR. If null, IRGen works

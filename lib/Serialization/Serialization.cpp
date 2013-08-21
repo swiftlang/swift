@@ -2114,3 +2114,9 @@ void swift::serialize(const TranslationUnit *TU, const char *outputPath,
   Serializer S;
   S.writeToStream(out, TU, inputFiles);
 }
+
+void swift::serializeToStream(const TranslationUnit *TU, raw_ostream &out,
+                              FileBufferIDs inputFiles) {
+  Serializer S;
+  S.writeToStream(out, TU, inputFiles);
+}

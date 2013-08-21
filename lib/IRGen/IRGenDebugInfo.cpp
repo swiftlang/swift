@@ -100,7 +100,7 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
     LastFn(nullptr), LastLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfo);
   StringRef Dir, Filename;
-  StringRef MainFilename = Opts.MainInputFilename;
+  MainFilename = Opts.MainInputFilename;
   if (MainFilename.empty()) {
     Filename = "<unknown>";
     Dir = getCurrentDirname();

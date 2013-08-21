@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "SwiftTargetMachine.h"
 #include "swift/Subsystems.h"
 #include "swift/IRGen/Options.h"
 #include "swift/AST/AST.h"
@@ -103,7 +104,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
 //  TargetOpts.NoFramePointerElimNonLeaf = true;
   
   // Create a target machine.
-  TargetMachine *TargetMachine
+  llvm::TargetMachine *TargetMachine
     = Target->createTargetMachine(Opts.Triple, /*cpu*/ "generic",
                                   /*features*/ "",
                                   TargetOpts, Reloc::Default,
@@ -300,13 +301,23 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
     break;
   case OutputKind::NativeAssembly:
   case OutputKind::ObjectFile: {
-    TargetMachine::CodeGenFileType FileType;
+    llvm::TargetMachine::CodeGenFileType FileType;
     FileType = (Opts.OutputKind == OutputKind::NativeAssembly
-                  ? TargetMachine::CGFT_AssemblyFile
-                  : TargetMachine::CGFT_ObjectFile);
+                  ? llvm::TargetMachine::CGFT_AssemblyFile
+                  : llvm::TargetMachine::CGFT_ObjectFile);
 
-    if (TargetMachine->addPassesToEmitFile(EmitPasses, FormattedOS,
-                                           FileType, !Opts.Verify)) {
+    bool fail;
+    if (Opts.DebugInfo) {
+      // Use our own wrapper for TargetMachine which schedules a
+      // SwiftASTStreamerPass to be run after the code generation.
+      swift::irgen::TargetMachine
+        PatchedTargetMachine(TargetMachine, TU, IGM.DebugInfo);
+      fail = PatchedTargetMachine.
+        addPassesToEmitFile(EmitPasses, FormattedOS, FileType, !Opts.Verify);
+    } else
+      fail = TargetMachine->addPassesToEmitFile(EmitPasses, FormattedOS,
+                                                FileType, !Opts.Verify);
+    if (fail) {
       TU->Ctx.Diags.diagnose(SourceLoc(), diag::error_codegen_init_fail);
       return;
     }
