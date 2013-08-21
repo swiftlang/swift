@@ -848,10 +848,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     break;
 
   case tok::l_square:
-    if (Expr *E = parseExprCollection().getPtrOrNull())
-      Result = makeParserResult(E);
-    else
-      Result = makeParserErrorResult<Expr>();
+    Result = parseExprCollection();
     break;
 
   case tok::code_complete:
@@ -1525,15 +1522,16 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 ///     expr-array
 ///     expr-dictionary
 //      lsquare-starting ']'
-NullablePtr<Expr> Parser::parseExprCollection() {
+ParserResult<Expr> Parser::parseExprCollection() {
   SourceLoc LSquareLoc = consumeToken(tok::l_square);
 
   // Parse an empty collection literal.
   if (Tok.is(tok::r_square)) {
     // FIXME: We want a special 'empty collection' literal kind.
     SourceLoc RSquareLoc = consumeToken();
-    return new (Context) TupleExpr(RSquareLoc, { }, nullptr, RSquareLoc,
-                                   /*hasTrailingClosure=*/false);
+    return makeParserResult(
+        new (Context) TupleExpr(LSquareLoc, { }, nullptr, RSquareLoc,
+                                /*hasTrailingClosure=*/false));
   }
 
   // Parse the first expression.
@@ -1543,7 +1541,9 @@ NullablePtr<Expr> Parser::parseExprCollection() {
     skipUntil(tok::r_square);
     if (Tok.is(tok::r_square))
       consumeToken();
-    return 0;
+    if (FirstExpr.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Expr>();
+    return nullptr;
   }
 
   // If we have a ':', this is a dictionary literal.
@@ -1562,34 +1562,36 @@ NullablePtr<Expr> Parser::parseExprCollection() {
 ///
 ///   expr-array:
 ///     lsquare-starting expr (',' expr)* ']'
-NullablePtr<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
-                                         Expr *FirstExpr) {
+ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
+                                          Expr *FirstExpr) {
   SmallVector<Expr *, 8> SubExprs;
   SubExprs.push_back(FirstExpr);
+
   SourceLoc RSquareLoc;
-  bool Invalid = false;
+  ParserStatus Status;
 
   if (Tok.isNot(tok::r_square) && !consumeIf(tok::comma)) {
     SourceLoc InsertLoc = Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
     diagnose(Tok, diag::expected_separator, ",")
-      .fixItInsert(InsertLoc, ",");
-    Invalid |= true;
+        .fixItInsert(InsertLoc, ",");
+    Status.setIsParseError();
   }
 
-  Invalid = parseList(tok::r_square, LSquareLoc, RSquareLoc,
+  Status |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
                       tok::comma, /*OptionalSep=*/false,
                       diag::expected_rsquare_array_expr,
-                      [&] () -> bool {
+                      [&] () -> ParserStatus {
     ParserResult<Expr> Element
       = parseExpr(diag::expected_expr_in_collection_literal);
-    if (Element.isNull() || Element.hasCodeCompletion())
-      return true;
-
-    SubExprs.push_back(Element.get());
-    return false;
+    if (Element.isNonNull())
+      SubExprs.push_back(Element.get());
+    return Element;
   });
 
-  if (Invalid) return nullptr;
+  if (Status.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+
+  assert(SubExprs.size() >= 1);
 
   Expr *SubExpr;
   if (SubExprs.size() == 1)
@@ -1602,7 +1604,8 @@ NullablePtr<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
                                       nullptr, RSquareLoc,
                                       /*hasTrailingClosure=*/false);
 
-  return new (Context) ArrayExpr(LSquareLoc, SubExpr, RSquareLoc);
+  return makeParserResult(
+      Status, new (Context) ArrayExpr(LSquareLoc, SubExpr, RSquareLoc));
 }
 
 /// parseExprDictionary - Parse a dictionary literal expression.
@@ -1612,13 +1615,13 @@ NullablePtr<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
 ///
 ///   expr-dictionary:
 ///     lsquare-starting expr ':' expr (',' expr ':' expr)* ']'
-NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
-                                              Expr *FirstKey) {
+ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
+                                               Expr *FirstKey) {
   // Each subexpression is a (key, value) tuple. 
   // FIXME: We're not tracking the colon locations in the AST.
   SmallVector<Expr *, 8> SubExprs;
   SourceLoc RSquareLoc;
-  bool Invalid = false;
+  ParserStatus Status;
 
   // Consume the ':'.
   consumeToken(tok::colon);
@@ -1638,28 +1641,30 @@ NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
   // Parse the first value.
   ParserResult<Expr> FirstValue
     = parseExpr(diag::expected_value_in_dictionary_literal);
-  if (FirstValue.isNull() || FirstValue.hasCodeCompletion()) {
-    Invalid |= true;
-  } else {
+  if (FirstValue.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+  Status |= FirstValue;
+  if (FirstValue.isNonNull()) {
     // Add the first key/value pair.
     addKeyValuePair(FirstKey, FirstValue.get());
   }
 
   consumeIf(tok::comma);
 
-  Invalid |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
-                       tok::comma, /*OptionalSep=*/false,
-                       diag::expected_rsquare_array_expr, [&] {
+  Status |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
+                      tok::comma, /*OptionalSep=*/false,
+                      diag::expected_rsquare_array_expr,
+                      [&] () -> ParserStatus {
     // Parse the next key.
     ParserResult<Expr> Key
       = parseExpr(diag::expected_key_in_dictionary_literal);
     if (Key.isNull() || Key.hasCodeCompletion())
-      return true;
+      return Key;
 
     // Parse the ':'.
     if (Tok.isNot(tok::colon)) {
       diagnose(Tok, diag::expected_colon_in_dictionary_literal);
-      return true;
+      return makeParserError();
     }
     consumeToken();
 
@@ -1667,14 +1672,17 @@ NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
     ParserResult<Expr> Value
       = parseExpr(diag::expected_value_in_dictionary_literal);
     if (Value.isNull() || Value.hasCodeCompletion())
-      return true;
+      return Value;
 
     // Add this key/value pair.
     addKeyValuePair(Key.get(), Value.get());
-    return false;
+    return makeParserSuccess();
   });
 
-  if (Invalid) return nullptr;
+  if (Status.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+
+  assert(SubExprs.size() >= 1);
 
   Expr *SubExpr;
   if (SubExprs.size() == 1)
@@ -1687,7 +1695,8 @@ NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
                                       nullptr, RSquareLoc,
                                       /*hasTrailingClosure=*/false);
 
-  return new (Context) DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc);
+  return makeParserResult(
+      new (Context) DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc));
 }
 
 /// AddFuncArgumentsToScope - Walk the type specified for a Func object (which

@@ -645,11 +645,9 @@ public:
 
   Expr *parseExprAnonClosureArg();
   NullablePtr<Expr> parseExprList(tok LeftTok, tok RightTok);
-  NullablePtr<Expr> parseExprCollection();
-  NullablePtr<Expr> parseExprArray(SourceLoc LSquareLoc,
-                                   Expr *FirstExpr);
-  NullablePtr<Expr> parseExprDictionary(SourceLoc LSquareLoc,
-                                        Expr *FirstKey);
+  ParserResult<Expr> parseExprCollection();
+  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc, Expr *FirstExpr);
+  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc, Expr *FirstKey);
 
   Expr *parseExprOperator();
   Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
