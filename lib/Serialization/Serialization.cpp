@@ -2111,8 +2111,7 @@ void swift::serialize(const TranslationUnit *TU, const char *outputPath,
     return;
   }
 
-  Serializer S;
-  S.writeToStream(out, TU, inputFiles);
+  serializeToStream(TU, out, inputFiles);
 }
 
 void swift::serializeToStream(const TranslationUnit *TU, raw_ostream &out,
