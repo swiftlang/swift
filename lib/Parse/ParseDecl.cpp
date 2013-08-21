@@ -535,7 +535,10 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   bool HadParseError = false;
   switch (Tok.getKind()) {
   case tok::kw_import:
-    HadParseError = parseDeclImport(Flags, Entries);
+    if (Decl *D = parseDeclImport(Flags).getPtrOrNull())
+      Entries.push_back(D);
+    else
+      HadParseError = true;
     break;
   case tok::kw_extension:
     if (Decl *D = parseDeclExtension(Flags).getPtrOrNull())
@@ -704,7 +707,7 @@ void Parser::parseDeclDelayed() {
 ///   import-path:
 ///     any-identifier ('.' any-identifier)*
 ///
-bool Parser::parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
+ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
   
   bool Exported;
@@ -720,7 +723,7 @@ bool Parser::parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
 
   if (!(Flags & PD_AllowTopLevel)) {
     diagnose(ImportLoc, diag::decl_inner_scope);
-    return true;
+    return nullptr;
   }
 
   ImportKind Kind = ImportKind::Module;
@@ -750,7 +753,7 @@ bool Parser::parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
       break;
     default:
       diagnose(Tok, diag::expected_identifier_in_decl, "import");
-      return true;
+      return nullptr;
     }
     KindLoc = consumeToken();
   }
@@ -760,17 +763,16 @@ bool Parser::parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
     if (parseAnyIdentifier(ImportPath.back().first,
                         diag::expected_identifier_in_decl, "import"))
-      return true;
+      return nullptr;
   } while (consumeIf(tok::period));
 
   if (Kind != ImportKind::Module && ImportPath.size() == 1) {
     diagnose(ImportPath.front().second, diag::decl_expected_module_name);
-  } else {
-    Decls.push_back(ImportDecl::create(Context, CurDeclContext, ImportLoc,
-                                       Kind, KindLoc, Exported, ImportPath));
+    return nullptr;
   }
 
-  return false;
+  return makeParserResult(ImportDecl::create(
+      Context, CurDeclContext, ImportLoc, Kind, KindLoc, Exported, ImportPath));
 }
 
 /// parseInheritance - Parse an inheritance clause.
