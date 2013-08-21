@@ -1299,7 +1299,7 @@ public:
   /// }
   /// \endcode
   ///
-  /// Here 'T' has depth 0 and 'U' has depth 0. Both have index 0.
+  /// Here 'T' has depth 0 and 'U' has depth 1. Both have index 0.
   unsigned getDepth() const { return Depth; }
 
   /// Set the depth of this generic type parameter.
