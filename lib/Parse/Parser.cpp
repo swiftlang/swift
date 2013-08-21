@@ -479,7 +479,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       skipUntilDeclRBrace(RightK, SeparatorK);
       if (Tok.is(RightK))
         break;
-      if (Tok.is(tok::eof) || Tok.is(tok::code_complete)) {
+      if (Tok.is(tok::eof)) {
         RightLoc = Tok.getLoc();
         Status.setIsParseError();
         return Status;
