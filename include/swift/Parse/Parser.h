@@ -595,12 +595,9 @@ public:
   
   //===--------------------------------------------------------------------===//
   // Expression Parsing
-  
-  // Each of these parsing methods returns null (in a NullablePtr) on a parse
-  // error, or an ErrorExpr on a semantic error.  If the method cannot fail, it
-  // returns a raw Expr*.
-  NullablePtr<Expr> parseExpr(Diag<> ID, bool isExprBasic = false);
-  NullablePtr<Expr> parseExprBasic(Diag<> ID) {
+
+  ParserResult<Expr> parseExpr(Diag<> ID, bool isExprBasic = false);
+  ParserResult<Expr> parseExprBasic(Diag<> ID) {
     return parseExpr(ID, /*isExprBasic=*/true);
   }
   NullablePtr<Expr> parseExprIs();

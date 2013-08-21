@@ -182,14 +182,16 @@ static bool isExprPostfix(Expr *expr) {
 ///     expr-postfix expr-closure+
 ///
 /// \param isExprBasic Whether we're only parsing an expr-basic.
-NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
+ParserResult<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
   // If we see a pattern in expr position, parse it to an UnresolvedPatternExpr.
   // Name binding will resolve whether it's in a valid pattern position.
   if (isOnlyStartOfMatchingPattern()) {
     ParserResult<Pattern> pattern = parseMatchingPattern();
     if (pattern.isNull())
       return nullptr;
-    return new (Context) UnresolvedPatternExpr(pattern.get());
+    if (pattern.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Expr>();
+    return makeParserResult(new (Context) UnresolvedPatternExpr(pattern.get()));
   }
   
   NullablePtr<Expr> expr = parseExprSequence(Message);
@@ -208,12 +210,12 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
       // resolution.
       auto pattern = createBindingFromPattern(declRef->getLoc(),
                                               declRef->getDecl()->getName());
-      return new (Context) UnresolvedPatternExpr(pattern);
+      return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
     if (auto *udre = dyn_cast<UnresolvedDeclRefExpr>(expr.get())) {
       auto pattern = createBindingFromPattern(udre->getLoc(),
                                               udre->getName());
-      return new (Context) UnresolvedPatternExpr(pattern);
+      return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
   }
 
@@ -272,7 +274,7 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
     }
   }
 
-  return expr;
+  return makeParserResult(expr.get());
 }
 
 /// parseExprIs
@@ -1441,8 +1443,8 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
                                                          Loc);
       SubExprs.push_back(SubExpr);
     } else {
-      NullablePtr<Expr> SubExpr = parseExpr(diag::expected_expr_in_expr_list);
-      if (SubExpr.isNull()) {
+      ParserResult<Expr> SubExpr = parseExpr(diag::expected_expr_in_expr_list);
+      if (SubExpr.isNull() || SubExpr.hasCodeCompletion()) {
         return true;
       }
       SubExprs.push_back(SubExpr.get());
@@ -1489,9 +1491,9 @@ NullablePtr<Expr> Parser::parseExprCollection() {
   }
 
   // Parse the first expression.
-  NullablePtr<Expr> FirstExpr
+  ParserResult<Expr> FirstExpr
     = parseExpr(diag::expected_expr_in_collection_literal);
-  if (FirstExpr.isNull()) {
+  if (FirstExpr.isNull() || FirstExpr.hasCodeCompletion()) {
     skipUntil(tok::r_square);
     if (Tok.is(tok::r_square))
       consumeToken();
@@ -1532,9 +1534,9 @@ NullablePtr<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
                       tok::comma, /*OptionalSep=*/false,
                       diag::expected_rsquare_array_expr,
                       [&] () -> bool {
-    NullablePtr<Expr> Element
+    ParserResult<Expr> Element
       = parseExpr(diag::expected_expr_in_collection_literal);
-    if (Element.isNull())
+    if (Element.isNull() || Element.hasCodeCompletion())
       return true;
 
     SubExprs.push_back(Element.get());
@@ -1588,9 +1590,9 @@ NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
   };
 
   // Parse the first value.
-  NullablePtr<Expr> FirstValue 
+  ParserResult<Expr> FirstValue
     = parseExpr(diag::expected_value_in_dictionary_literal);
-  if (FirstValue.isNull()) {
+  if (FirstValue.isNull() || FirstValue.hasCodeCompletion()) {
     Invalid |= true;
   } else {
     // Add the first key/value pair.
@@ -1603,9 +1605,9 @@ NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
                        tok::comma, /*OptionalSep=*/false,
                        diag::expected_rsquare_array_expr, [&] {
     // Parse the next key.
-    NullablePtr<Expr> Key
+    ParserResult<Expr> Key
       = parseExpr(diag::expected_key_in_dictionary_literal);
-    if (Key.isNull())
+    if (Key.isNull() || Key.hasCodeCompletion())
       return true;
 
     // Parse the ':'.
@@ -1616,9 +1618,9 @@ NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
     consumeToken();
 
     // Parse the next value.
-    NullablePtr<Expr> Value
+    ParserResult<Expr> Value
       = parseExpr(diag::expected_value_in_dictionary_literal);
-    if (Value.isNull())
+    if (Value.isNull() || Value.hasCodeCompletion())
       return true;
 
     // Add this key/value pair.

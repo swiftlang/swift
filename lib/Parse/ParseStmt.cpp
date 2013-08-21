@@ -88,12 +88,14 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
   if (CodeCompletion)
     CodeCompletion->setExprBeginning(getParserPosition());
 
-  NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr,
-                                           /*usesExprBasic*/ false);
+  ParserResult<Expr> ResultExpr = parseExpr(diag::expected_expr,
+                                            /*usesExprBasic*/ false);
+  if (ResultExpr.hasCodeCompletion() && CodeCompletion) {
+    CodeCompletion->completeExpr();
+    return true;
+  }
+
   if (ResultExpr.isNull()) {
-    if (CodeCompletion) {
-      CodeCompletion->completeExpr();
-    }
     return true;
   }
   
@@ -401,9 +403,9 @@ NullablePtr<Stmt> Parser::parseStmtReturn() {
   Expr *RetExpr = nullptr;
   if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi) &&
       !isStartOfStmt(Tok)) {
-    NullablePtr<Expr> Result = parseExpr(diag::expected_expr_return);
-    if (Result.isNull())
-      return 0;
+    ParserResult<Expr> Result = parseExpr(diag::expected_expr_return);
+    if (Result.isNull() || Result.hasCodeCompletion())
+      return nullptr;
     RetExpr = Result.get();
   }
 
@@ -420,8 +422,8 @@ NullablePtr<Stmt> Parser::parseStmtReturn() {
 NullablePtr<Stmt> Parser::parseStmtIf() {
   SourceLoc IfLoc = consumeToken(tok::kw_if);
 
-  NullablePtr<Expr> Condition = parseExprBasic(diag::expected_expr_if);
-  if (Condition.isNull())
+  ParserResult<Expr> Condition = parseExprBasic(diag::expected_expr_if);
+  if (Condition.isNull() || Condition.hasCodeCompletion())
     return nullptr; // FIXME: better recovery
 
   NullablePtr<BraceStmt> NormalBody;
@@ -432,7 +434,7 @@ NullablePtr<Stmt> Parser::parseStmtIf() {
     auto ClosureBody = CE->getBody();
     SourceLoc LBraceLoc = ClosureBody->getStartLoc();
     NormalBody = ClosureBody;
-    Condition = new (Context) ErrorExpr(LBraceLoc);
+    Condition = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
     diagnose(IfLoc, diag::missing_condition_after_if)
         .highlight(SourceRange(IfLoc, LBraceLoc));
   }
@@ -465,9 +467,9 @@ NullablePtr<Stmt> Parser::parseStmtIf() {
 ///     'while' expr-basic stmt-brace
 NullablePtr<Stmt> Parser::parseStmtWhile() {
   SourceLoc WhileLoc = consumeToken(tok::kw_while);
-  
-  NullablePtr<Expr> Condition = parseExprBasic(diag::expected_expr_while);
-  if (Condition.isNull())
+
+  ParserResult<Expr> Condition = parseExprBasic(diag::expected_expr_while);
+  if (Condition.isNull() || Condition.hasCodeCompletion())
     return nullptr; // FIXME: better recovery
 
   NullablePtr<BraceStmt> Body;
@@ -478,7 +480,7 @@ NullablePtr<Stmt> Parser::parseStmtWhile() {
     auto ClosureBody = CE->getBody();
     SourceLoc LBraceLoc = ClosureBody->getStartLoc();
     Body = ClosureBody;
-    Condition = new (Context) ErrorExpr(LBraceLoc);
+    Condition = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
     diagnose(WhileLoc, diag::missing_condition_after_while)
         .highlight(SourceRange(WhileLoc, LBraceLoc));
   }
@@ -514,8 +516,8 @@ NullablePtr<Stmt> Parser::parseStmtDoWhile() {
     ConditionStartState = getParserPosition();
   }
 
-  NullablePtr<Expr> Condition = parseExpr(diag::expected_expr_do_while);
-  if (Condition.isNull())
+  ParserResult<Expr> Condition = parseExpr(diag::expected_expr_do_while);
+  if (Condition.isNull() || Condition.hasCodeCompletion())
     return nullptr; // FIXME: better recovery
 
   if (auto *CE = dyn_cast<PipeClosureExpr>(Condition.get())) {
@@ -524,7 +526,7 @@ NullablePtr<Stmt> Parser::parseStmtDoWhile() {
     // bare closure in a 'do ... while' condition because closures don't
     // conform to LogicValue.
     SourceLoc LBraceLoc = CE->getBody()->getStartLoc();
-    Condition = new (Context) ErrorExpr(LBraceLoc);
+    Condition = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
     diagnose(WhileLoc, diag::missing_condition_after_while);
 
     // We did not actually want to parse the next statement.
@@ -567,7 +569,8 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
 
 static bool parseExprForCStyle(Parser &P, NullablePtr<Expr> &Result,
                                bool UsesExprBasic = false) {
-  Result = P.parseExpr(diag::expected_expr, UsesExprBasic);
+  ParserResult<Expr> E = P.parseExpr(diag::expected_expr, UsesExprBasic);
+  Result = E.getPtrOrNull();
   return Result.isNull();
 }
 
@@ -586,7 +589,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 
   NullablePtr<Expr> First;
   SmallVector<Decl*, 2> FirstDecls;
-  NullablePtr<Expr> Second;
+  ParserResult<Expr> Second;
   NullablePtr<Expr> Third;
   NullablePtr<BraceStmt> Body;
   
@@ -627,7 +630,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 
       return new (Context) ForStmt(ForLoc, First.getPtrOrNull(),
                                    FirstDeclsContext,
-                                   Semi1Loc, Second,
+                                   Semi1Loc, Second.getPtrOrNull(),
                                    Semi2Loc, Third.getPtrOrNull(),
                                    Body.get());
     }
@@ -671,7 +674,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     }
     if (RecoveredBody) {
       SourceLoc LBraceLoc = RecoveredBody->getStartLoc();
-      Second = RecoveredCondition;
+      Second = makeParserErrorResult(RecoveredCondition);
       Third = nullptr;
       Body = RecoveredBody;
       diagnose(LBraceLoc, diag::expected_semi_for_stmt)
@@ -679,7 +682,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 
       return new (Context) ForStmt(ForLoc, First.getPtrOrNull(),
                                    FirstDeclsContext,
-                                   Semi1Loc, Second,
+                                   Semi1Loc, Second.getPtrOrNull(),
                                    Semi2Loc, Third.getPtrOrNull(),
                                    Body.get());
     }
@@ -700,7 +703,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     return nullptr; // FIXME: better recovery
 
   return new (Context) ForStmt(ForLoc, First.getPtrOrNull(), FirstDeclsContext,
-                               Semi1Loc, Second,
+                               Semi1Loc, Second.getPtrOrNull(),
                                Semi2Loc, Third.getPtrOrNull(), Body.get());
 }
 
@@ -724,10 +727,13 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
     ContainerStartState = getParserPosition();
   }
 
-  NullablePtr<Expr> Container =
+  ParserResult<Expr> Container =
       parseExprBasic(diag::expected_foreach_container);
+  if (Container.hasCodeCompletion())
+    return nullptr;
   if (Container.isNull())
-    Container = new (Context) ErrorExpr(Tok.getLoc());
+    Container =
+        makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
 
   if (auto *CE = dyn_cast<PipeClosureExpr>(Container.get())) {
     diagnose(CE->getStartLoc(), diag::expected_foreach_container);
@@ -736,7 +742,8 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
     // the container expression, but the 'for' statement body.  We can not have
     // a bare closure as a container expression because closures don't conform
     // to Enumerable.
-    Container = new (Context) ErrorExpr(CE->getStartLoc());
+    Container =
+        makeParserErrorResult(new (Context) ErrorExpr(CE->getStartLoc()));
 
     // Backtrack to the '{' so that we can re-parse the body in the correct
     // lexical scope.
@@ -768,9 +775,9 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
 ///      'switch' expr-basic '{' stmt-case* '}'
 NullablePtr<Stmt> Parser::parseStmtSwitch() {
   SourceLoc switchLoc = consumeToken(tok::kw_switch);
-  NullablePtr<Expr> subjectExpr = parseExprBasic(diag::expected_switch_expr);
+  ParserResult<Expr> subjectExpr = parseExprBasic(diag::expected_switch_expr);
   
-  if (subjectExpr.isNull())
+  if (subjectExpr.isNull() || subjectExpr.hasCodeCompletion())
     return nullptr;
   
   if (!Tok.is(tok::l_brace)) {
@@ -861,8 +868,8 @@ bool Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
       
       if (Tok.is(tok::kw_where)) {
         whereLoc = consumeToken();
-        NullablePtr<Expr> guard = parseExpr(diag::expected_case_where_expr);
-        if (guard.isNull())
+        ParserResult<Expr> guard = parseExpr(diag::expected_case_where_expr);
+        if (guard.isNull() || guard.hasCodeCompletion())
           return true;
         guardExpr = guard.get();
       }
@@ -898,8 +905,8 @@ bool Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
     if (Tok.is(tok::kw_where)) {
       diagnose(Tok, diag::default_with_where);
       whereLoc = consumeToken();
-      NullablePtr<Expr> guard = parseExpr(diag::expected_case_where_expr);
-      if (guard.isNull())
+      ParserResult<Expr> guard = parseExpr(diag::expected_case_where_expr);
+      if (guard.isNull() || guard.hasCodeCompletion())
         return true;
       guardExpr = guard.get();
     }

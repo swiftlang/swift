@@ -129,8 +129,12 @@ parseSelectorArgument(Parser &P,
   
   ExprHandle *init = nullptr;
   if (P.consumeIf(tok::equal)) {
-    NullablePtr<Expr> initR =
+    ParserResult<Expr> initR =
       P.parseExpr(diag::expected_initializer_expr);
+    if (initR.hasCodeCompletion()) {
+      P.skipUntil(tok::r_paren);
+      return makeParserCodeCompletionStatus();
+    }
     if (initR.isNull()) {
       P.skipUntil(tok::r_paren);
       return makeParserError();
@@ -386,7 +390,7 @@ Parser::parsePatternTupleElement(bool allowInitExpr) {
   ExprHandle *init = nullptr;
   if (Tok.is(tok::equal)) {
     SourceLoc EqualLoc = consumeToken();
-    NullablePtr<Expr> initR = parseExpr(diag::expected_initializer_expr);
+    ParserResult<Expr> initR = parseExpr(diag::expected_initializer_expr);
 
     if (!allowInitExpr) {
       auto inFlight = diagnose(EqualLoc, diag::non_func_decl_pattern_init);
@@ -499,7 +503,9 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
   // matching-pattern ::= expr
   // Fall back to expression parsing for ambiguous forms. Name lookup will
   // disambiguate.
-  NullablePtr<Expr> subExpr = parseExpr(diag::expected_pattern);
+  ParserResult<Expr> subExpr = parseExpr(diag::expected_pattern);
+  if (subExpr.hasCodeCompletion())
+    return makeParserCodeCompletionStatus();
   if (subExpr.isNull())
     return nullptr;
   

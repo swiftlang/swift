@@ -1284,7 +1284,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
       HasGetSet = true;
     }
 
-    NullablePtr<Expr> Init;
+    ParserResult<Expr> Init;
     if (Tok.is(tok::equal)) {
       // Record the variables that we're trying to initialize.
       SmallVector<VarDecl *, 4> Vars;
@@ -1295,6 +1295,8 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
 
       SourceLoc EqualLoc = consumeToken(tok::equal);
       Init = parseExpr(diag::expected_initializer_expr);
+      if (Init.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
       if (Init.isNull()) {
         Status.setIsParseError();
         break;
@@ -1353,7 +1355,8 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
     }
   } else if (Flags & PD_DisallowVar) {
     diagnose(VarLoc, diag::disallowed_var_decl);
-    return makeParserError();
+    Status.setIsParseError();
+    return Status;
   }
 
   // If this is a var in the top-level of script/repl translation unit, then

@@ -93,7 +93,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
         peekToken().is(tok::kw_metatype)) {
       consumeToken();
       SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);
-      ty = makeParserResult(
+      ty = makeParserResult(ty,
           new (Context) MetaTypeTypeRepr(ty.get(), metatypeLoc));
       continue;
     }
@@ -435,7 +435,9 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
       return makeParserResult(ATR);
   }
 
-  NullablePtr<Expr> sizeEx = parseExpr(diag::expected_expr_array_type);
+  ParserResult<Expr> sizeEx = parseExpr(diag::expected_expr_array_type);
+  if (sizeEx.hasCodeCompletion())
+    return makeParserCodeCompletionStatus();
   if (sizeEx.isNull())
     return nullptr;
 
