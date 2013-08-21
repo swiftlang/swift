@@ -59,3 +59,17 @@ bb4(%100 : $Builtin.Int64):
 // CHECK-NOT: integer_literal $Builtin.Int8, 24
 // CHECK: integer_literal $Builtin.Int64, 24
 }
+
+sil @test_tuple_extract_folding : $[thin] () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int1)
+  %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int1), 0
+  return %3 : $Builtin.Int64
+// CHECK-LABEL: sil @test_tuple_extract_folding
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 5
+// CHECK-NEXT: return %0 : $Builtin.Int64
+// CHECK-NEXT: }
+}

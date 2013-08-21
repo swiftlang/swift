@@ -408,10 +408,6 @@ public:
 
   SILValue createTupleExtract(SILLocation Loc, SILValue Operand,
                               unsigned FieldNo, SILType ResultTy) {
-    // Fold extract(tuple(a,b,c), 1) -> b.
-    if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
-      return TI->getElements()[FieldNo];
-
     return insert(new (F.getModule())
                     TupleExtractInst(Loc, Operand, FieldNo, ResultTy));
   }
