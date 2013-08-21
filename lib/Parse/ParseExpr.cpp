@@ -440,23 +440,27 @@ done:
 ///     operator-prefix expr-unary
 ///     '&' expr-unary
 ///
-NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
+ParserResult<Expr> Parser::parseExprUnary(Diag<> Message) {
   Expr *Operator;
   switch (Tok.getKind()) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
-    return parseExprPostfix(Message).getPtrOrNull();
+    return parseExprPostfix(Message);
       
   // If the next token is the keyword 'new', this must be expr-new.
   case tok::kw_new:
-    return parseExprNew().getPtrOrNull();
+    return parseExprNew();
     
   case tok::amp_prefix: {
     SourceLoc Loc = consumeToken(tok::amp_prefix);
-    
-    if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
-      return new (Context) AddressOfExpr(Loc, SubExpr, Type());
-    return 0;
+
+    ParserResult<Expr> SubExpr = parseExprUnary(Message);
+    if (SubExpr.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Expr>();
+    if (SubExpr.isNull())
+      return nullptr;
+    return makeParserResult(
+        new (Context) AddressOfExpr(Loc, SubExpr.get(), Type()));
   }
 
   case tok::oper_postfix:
@@ -482,9 +486,14 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
   }
   }
 
-  if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
-    return new (Context) PrefixUnaryExpr(Operator, SubExpr);
-  return 0;
+  ParserResult<Expr> SubExpr = parseExprUnary(Message);
+  if (SubExpr.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+  if (SubExpr.isNull())
+    return nullptr;
+
+  return makeParserResult(
+      new (Context) PrefixUnaryExpr(Operator, SubExpr.get()));
 }
 
 static DeclRefKind getDeclRefKindForOperator(tok kind) {
