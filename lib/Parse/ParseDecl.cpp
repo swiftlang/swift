@@ -560,7 +560,10 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
       HadParseError = true;
     break;
   case tok::kw_union:
-    HadParseError = parseDeclUnion(Flags, Entries);
+    if (Decl *D = parseDeclUnion(Flags).getPtrOrNull())
+      Entries.push_back(D);
+    else
+      HadParseError = true;
     break;
   case tok::kw_case:
     HadParseError = parseDeclUnionElement(Flags, Entries);
@@ -1645,7 +1648,7 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
 ///   decl-union-body:
 ///      decl*
 ///
-bool Parser::parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
+ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
   SourceLoc UnionLoc = consumeToken(tok::kw_union);
 
   DeclAttributes Attributes;
@@ -1655,7 +1658,7 @@ bool Parser::parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SourceLoc UnionNameLoc;
   if (parseIdentifier(UnionName, UnionNameLoc,
                       diag::expected_identifier_in_decl, "union"))
-    return true;
+    return nullptr;
 
   // Parse the generic-params, if present.
   GenericParamList *GenericParams = nullptr;
@@ -1669,7 +1672,6 @@ bool Parser::parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
                                           UnionName, UnionNameLoc,
                                           { },
                                           GenericParams, CurDeclContext);
-  Decls.push_back(UD);
 
   // Now that we have a context, update the generic parameters with that
   // context.
@@ -1691,7 +1693,7 @@ bool Parser::parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_union_type)) {
     UD->setMembers({}, Tok.getLoc());
-    return true;
+    return makeParserErrorResult(UD);
   }
 
   bool Invalid = false;
@@ -1712,10 +1714,13 @@ bool Parser::parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
 
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(UnionLoc, diag::disallowed_type);
-    return true;
+    return makeParserErrorResult(UD);
   }
-  
-  return Invalid;
+
+  if (Invalid)
+    return makeParserErrorResult(UD);
+  else
+    return makeParserResult(UD);
 }
 
 /// parseDeclUnionElement - Parse a 'case' of a union, returning true on error.
