@@ -89,33 +89,49 @@ SILTypeList *SILModule::getSILTypeList(ArrayRef<SILType> Types) const {
   return NewList;
 }
 
-llvm::Intrinsic::ID SILModule::getIntrinsicID(const FuncDecl* FD) {
-  if (!IntrinsicIDCache.count(FD)) {
-    // Find the matching ID.
-    SmallVector<Type, 4> Types;
-    StringRef NameRef = getBuiltinBaseName(getASTContext(),
-                                           FD->getName().str(), Types);
-    llvm::Intrinsic::ID Id =
-      (llvm::Intrinsic::ID)getLLVMIntrinsicID(NameRef, !Types.empty());
+const IntrinsicInfo &SILModule::getIntrinsicInfo(const FuncDecl* FD) {
+  unsigned OldSize = IntrinsicIDCache.size();
+  IntrinsicInfo &Info = IntrinsicIDCache[FD];
 
-    // Store it in the cache.
-    IntrinsicIDCache[FD] = Id;
-    return Id;
-  }
-  return IntrinsicIDCache[FD];
+  // If the element was is in the cache, return it.
+  if (OldSize == IntrinsicIDCache.size())
+    return Info;
+
+  // Otherwise, lookup the ID and Type and store them in the map.
+  StringRef NameRef = getBuiltinBaseName(getASTContext(),
+                                         FD->getName().str(), Info.Types);
+  Info.ID =
+    (llvm::Intrinsic::ID)getLLVMIntrinsicID(NameRef, !Info.Types.empty());
+
+  return Info;
 }
 
 const BuiltinInfo &SILModule::getBuiltinInfo(const FuncDecl* FD) {
   unsigned OldSize = BuiltinIDCache.size();
   BuiltinInfo &Info = BuiltinIDCache[FD];
 
-  // If the element was not in the cache, lookup the ID and Type.
-  if (OldSize != BuiltinIDCache.size()) {
-    // Find the matching ID.
-    StringRef OperationName = getBuiltinBaseName(getASTContext(),
-                                                 FD->getName().str(),
-                                                 Info.Types);
+  // If the element was is in the cache, return it.
+  if (OldSize == BuiltinIDCache.size())
+    return Info;
 
+  // Otherwise, lookup the ID and Type and store them in the map.
+  // Find the matching ID.
+  StringRef OperationName = getBuiltinBaseName(getASTContext(),
+                                               FD->getName().str(),
+                                               Info.Types);
+
+  // Several operation names have suffixes and don't match the name from
+  // Builtins.def, so handle those first.
+  if (OperationName.startswith("fence_")) {
+    Info.ID = BuiltinValueKind::Fence;
+  } else
+  if (OperationName.startswith("cmpxchg_")) {
+    Info.ID = BuiltinValueKind::CmpXChg;
+  } else
+  if (OperationName.startswith("atomicrmw_")) {
+    Info.ID = BuiltinValueKind::AtomicRMW;
+  } else {
+    // Switch through the rest of builtins.
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name) \
       .Case(name, BuiltinValueKind::id)

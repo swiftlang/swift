@@ -343,7 +343,7 @@ namespace llvm {
   template<> struct DenseMapInfo<Serializer::DeclTypeUnion> {
     using DeclTypeUnion = Serializer::DeclTypeUnion;
     static inline DeclTypeUnion getEmptyKey() { return nullptr; }
-    static inline DeclTypeUnion getTombstoneKey() { return Type(); }
+    static inline DeclTypeUnion getTombstoneKey() { return swift::Type(); }
     static unsigned getHashValue(const DeclTypeUnion &val) {
       return DenseMapInfo<const void *>::getHashValue(val.getOpaqueValue());
     }

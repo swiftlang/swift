@@ -18,6 +18,7 @@
 #define SWIFT_SIL_INSTRUCTION_H
 
 #include "swift/SIL/SILLocation.h"
+#include "swift/AST/Builtins.h"
 #include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILValue.h"
@@ -25,7 +26,6 @@
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/IR/Intrinsics.h"
 
 namespace swift {
 
@@ -405,12 +405,12 @@ public:
   
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  /// \brief Looks up the llvm intrinsic ID for the builtin function.
+  /// \brief Looks up the llvm intrinsic ID and type for the builtin function.
   ///
   /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
   /// intrinsic. The particular intrinsic functions which correspond to the
   /// retruned value are defined in llvm/Intrinsics.h.
-  llvm::Intrinsic::ID getIntrinsicID();
+  const IntrinsicInfo &getIntrinsicInfo();
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }

@@ -116,11 +116,11 @@ static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
 static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
                                            BuiltinFunctionRefInst *FR,
                                            SILModule &M) {
-  llvm::Intrinsic::ID ID = FR->getIntrinsicID();
+  const IntrinsicInfo &Intrinsic = FR->getIntrinsicInfo();
 
   // If it's an llvm intrinsic, fold the intrinsic.
-  if (ID != llvm::Intrinsic::not_intrinsic) {
-    return constantFoldIntrinsic(AI, ID, M);
+  if (Intrinsic.ID != llvm::Intrinsic::not_intrinsic) {
+    return constantFoldIntrinsic(AI, Intrinsic.ID, M);
   }
 
   // Otherwise, it should be one of the builin functions.

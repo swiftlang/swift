@@ -20,6 +20,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/Type.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
@@ -87,6 +88,12 @@ enum class BuiltinValueKind {
 /// \brief The information identifying the builtin - it's kind and types.
 struct BuiltinInfo {
   BuiltinValueKind ID;
+  SmallVector<Type, 4> Types;
+};
+
+/// \brief The information identifying the llvm intrinsic - it's id and types.
+struct IntrinsicInfo {
+  llvm::Intrinsic::ID ID;
   SmallVector<Type, 4> Types;
 };
 

@@ -299,9 +299,9 @@ FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
     Function(F) {
 }
 
-llvm::Intrinsic::ID BuiltinFunctionRefInst::getIntrinsicID() {
+const IntrinsicInfo &BuiltinFunctionRefInst::getIntrinsicInfo() {
   SILModule *M = getParent()->getParent()->getParent();
-  return M->getIntrinsicID(Function);
+  return M->getIntrinsicInfo(Function);
 }
 
 static unsigned getWordsForBitWidth(unsigned bits) {

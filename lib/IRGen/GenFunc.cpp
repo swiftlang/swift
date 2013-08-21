@@ -835,12 +835,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
          "cannot emit builtin to both explosion and memory");
   
   // Decompose the function's name into a builtin name and type list.
-  SmallVector<Type, 4> Types;
-  StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
-                                             fn->getName().str(), Types);
+  const BuiltinInfo &Builtin = IGF.IGM.SILMod->getBuiltinInfo(fn);
 
   // These builtins don't care about their argument:
-  if (BuiltinName == "sizeof") {
+  if (Builtin.ID == BuiltinValueKind::Sizeof) {
     args.claimAll();
     Type valueTy = substitutions[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getTypeInfo(valueTy);
@@ -848,7 +846,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return;
   }
 
-  if (BuiltinName == "strideof") {
+  if (Builtin.ID == BuiltinValueKind::Strideof) {
     args.claimAll();
     Type valueTy = substitutions[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getTypeInfo(valueTy);
@@ -856,7 +854,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return;
   }
 
-  if (BuiltinName == "alignof") {
+  if (Builtin.ID == BuiltinValueKind::Alignof) {
     args.claimAll();
     Type valueTy = substitutions[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getTypeInfo(valueTy);
@@ -867,7 +865,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   }
   
   // addressof expects an lvalue argument.
-  if (BuiltinName == "addressof") {
+  if (Builtin.ID == BuiltinValueKind::AddressOf) {
     llvm::Value *address = args.claimNext();
     llvm::Value *value = IGF.Builder.CreateBitCast(address,
                                                    IGF.IGM.Int8PtrTy);
@@ -876,11 +874,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   }
 
   // Everything else cares about the (rvalue) argument.
-  
+
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
-  if (unsigned IID = getLLVMIntrinsicID(BuiltinName, !Types.empty())) {
+  const IntrinsicInfo &IInfo = IGF.IGM.SILMod->getIntrinsicInfo(fn);
+  llvm::Intrinsic::ID IID = IInfo.ID;
+  if (IID != llvm::Intrinsic::not_intrinsic) {
     SmallVector<llvm::Type*, 4> ArgTys;
-    for (auto T : Types)
+    for (auto T : IInfo.Types)
       ArgTys.push_back(IGF.IGM.getTypeInfo(T).getStorageType());
       
     auto F = llvm::Intrinsic::getDeclaration(&IGF.IGM.Module,
@@ -896,18 +896,18 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
 
     return;
   }
-  
+
   // TODO: A linear series of ifs is suboptimal.
 #define BUILTIN_SIL_OPERATION(id, name, overload) \
-  if (BuiltinName == name) \
+  if (Builtin.ID == BuiltinValueKind::id) \
     llvm_unreachable(name " builtin should be lowered away by SILGen!");
 
 #define BUILTIN_CAST_OPERATION(id, name) \
-  if (BuiltinName == name) \
+  if (Builtin.ID == BuiltinValueKind::id) \
     return emitCastBuiltin(IGF, fn, *out, args, llvm::Instruction::id);
   
 #define BUILTIN_BINARY_OPERATION(id, name, overload) \
-  if (BuiltinName == name) { \
+  if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *lhs = args.claimNext(); \
     llvm::Value *rhs = args.claimNext(); \
     llvm::Value *v = IGF.Builder.Create##id(lhs, rhs); \
@@ -915,19 +915,19 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   }
 
 #define BUILTIN_BINARY_PREDICATE(id, name, overload) \
-  if (BuiltinName == name) \
+  if (Builtin.ID == BuiltinValueKind::id) \
     return emitCompareBuiltin(IGF, fn, *out, args, llvm::CmpInst::id);
 #define BUILTIN(ID, Name)  // Ignore the rest.
 #include "swift/AST/Builtins.def"
 
-  if (BuiltinName == "fneg") {
+  if (Builtin.ID == BuiltinValueKind::FNeg) {
     llvm::Value *rhs = args.claimNext();
     llvm::Value *lhs = llvm::ConstantFP::get(rhs->getType(), "-0.0");
     llvm::Value *v = IGF.Builder.CreateFSub(lhs, rhs);
     return out->add(v);
   }
   
-  if (BuiltinName == "allocRaw") {
+  if (Builtin.ID == BuiltinValueKind::AllocRaw) {
     auto size = args.claimNext();
     auto align = args.claimNext();
     // Translate the alignment to a mask.
@@ -937,14 +937,17 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return;
   }
 
-  if (BuiltinName == "deallocRaw") {
+  if (Builtin.ID == BuiltinValueKind::DeallocRaw) {
     auto pointer = args.claimNext();
     auto size = args.claimNext();
     IGF.emitDeallocRawCall(pointer, size);
     return;
   }
 
-  if (BuiltinName.startswith("fence_")) {
+  if (Builtin.ID == BuiltinValueKind::Fence) {
+    SmallVector<Type, 4> Types;
+    StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
+                                               fn->getName().str(), Types);
     BuiltinName = BuiltinName.drop_front(strlen("fence_"));
     // Decode the ordering argument, which is required.
     auto underscore = BuiltinName.find('_');
@@ -963,7 +966,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   }
 
   
-  if (BuiltinName.startswith("cmpxchg_")) {
+  if (Builtin.ID == BuiltinValueKind::CmpXChg) {
+    SmallVector<Type, 4> Types;
+    StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
+                                               fn->getName().str(), Types);
     BuiltinName = BuiltinName.drop_front(strlen("cmpxchg_"));
     // Decode the ordering argument, which is required.
     auto underscore = BuiltinName.find('_');
@@ -1003,9 +1009,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return;
   }
   
-  if (BuiltinName.startswith("atomicrmw_")) {
+  if (Builtin.ID == BuiltinValueKind::AtomicRMW) {
     using namespace llvm;
-    
+
+    SmallVector<Type, 4> Types;
+    StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
+                                               fn->getName().str(), Types);
     BuiltinName = BuiltinName.drop_front(strlen("atomicrmw_"));
     auto underscore = BuiltinName.find('_');
     StringRef SubOp = BuiltinName.substr(0, underscore);
@@ -1060,7 +1069,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return;
   }
 
-  if (BuiltinName == "extractelement") {
+  if (Builtin.ID == BuiltinValueKind::ExtractElement) {
     using namespace llvm;
 
     auto vector = args.claimNext();
@@ -1069,7 +1078,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return;
   }
 
-  if (BuiltinName == "insertelement") {
+  if (Builtin.ID == BuiltinValueKind::InsertElement) {
     using namespace llvm;
 
     auto vector = args.claimNext();

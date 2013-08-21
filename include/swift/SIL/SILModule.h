@@ -61,7 +61,7 @@ enum class SILStage {
   /// forms.
   Canonical,
 };
-  
+
 /// \brief A SIL module. The SIL module owns all of the SILFunctions generated
 /// when a Shily module is lowered to SIL.
 class SILModule {
@@ -93,7 +93,7 @@ private:
   llvm::DenseMap<AnyFunctionType*, SILFunctionTypeInfo*> FunctionTypeInfoCache;
 
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
-  llvm::DenseMap<const FuncDecl*, llvm::Intrinsic::ID> IntrinsicIDCache;
+  llvm::DenseMap<const FuncDecl*, IntrinsicInfo> IntrinsicIDCache;
 
   /// This is a cache of builtin Function declarations to numeric ID mappings.
   llvm::DenseMap<const FuncDecl*, BuiltinInfo> BuiltinIDCache;
@@ -195,12 +195,12 @@ public:
     return BPA.Allocate(Size, Align);
   }
 
-  /// \brief Looks up the llvm intrinsic ID for the builtin function.
+  /// \brief Looks up the llvm intrinsic ID and type for the builtin function.
   ///
   /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
   /// intrinsic. The particular intrinsic functions which correspond to the
   /// retruned value are defined in llvm/Intrinsics.h.
-  llvm::Intrinsic::ID getIntrinsicID(const FuncDecl* FD);
+  const IntrinsicInfo &getIntrinsicInfo(const FuncDecl* FD);
 
   /// \brief Looks up the lazily cached identification for the builtin function.
   ///

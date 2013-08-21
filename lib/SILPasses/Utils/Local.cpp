@@ -17,7 +17,7 @@ using namespace swift;
 static bool isSideEffectFree(BuiltinFunctionRefInst *FR) {
   // FIXME: This list might not be complete. Would be good to derive this
   // info from llvm.
-  switch (FR->getIntrinsicID()) {
+  switch (FR->getIntrinsicInfo().ID) {
     default:
       return false;
     case llvm::Intrinsic::fabs:
