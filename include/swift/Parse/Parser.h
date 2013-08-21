@@ -459,7 +459,7 @@ public:
                                SourceLoc LBLoc, SourceLoc &RBLoc,
                                Diag<> ErrorDiag, unsigned flags);
   ParserResult<StructDecl> parseDeclStruct(unsigned Flags);
-  bool parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
+  ParserResult<ClassDecl> parseDeclClass(unsigned Flags);
   bool parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseGetSet(bool HasContainerType, Pattern *Indices, TypeLoc ElementTy,
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc);

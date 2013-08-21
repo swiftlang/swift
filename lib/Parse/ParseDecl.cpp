@@ -575,7 +575,10 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
       HadParseError = true;
     break;
   case tok::kw_class:
-    HadParseError = parseDeclClass(Flags, Entries);
+    if (Decl *D = parseDeclClass(Flags).getPtrOrNull())
+      Entries.push_back(D);
+    else
+      HadParseError = true;
     break;
   case tok::kw_constructor:
     if (Decl *D = parseDeclConstructor(Flags & PD_HasContainerType)
@@ -1923,7 +1926,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
 ///   decl-class-body:
 ///      decl*
 ///
-bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
+ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
   SourceLoc ClassLoc = consumeToken(tok::kw_class);
   
   DeclAttributes Attributes;
@@ -1934,7 +1937,7 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SourceLoc LBLoc, RBLoc;
   if (parseIdentifier(ClassName, ClassNameLoc,
                       diag::expected_identifier_in_decl, "class"))
-    return true;
+    return nullptr;
 
   // Parse the generic-params, if present.
   GenericParamList *GenericParams = nullptr;
@@ -1946,7 +1949,6 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   // Create the class.
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
                                           { }, GenericParams, CurDeclContext);
-  Decls.push_back(CD);
 
   // Now that we have a context, update the generic parameters with that
   // context.
@@ -1970,7 +1972,7 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   // Parse the class body.
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
     CD->setMembers({}, Tok.getLoc());
-    return true;
+    return makeParserErrorResult(CD);
   }
 
   bool Invalid = false;
@@ -2012,10 +2014,13 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
 
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(ClassLoc, diag::disallowed_type);
-    return true;
+    return makeParserErrorResult(CD);
   }
 
-  return Invalid;
+  if (Invalid)
+    return makeParserErrorResult(CD);
+  else
+    return makeParserResult(CD);
 }
 
 /// parseDeclProtocol - Parse a 'protocol' declaration, returning null (and
