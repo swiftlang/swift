@@ -327,13 +327,16 @@ static Expr *foldSequence(TypeChecker &TC,
   return makeBinOp(TC, Op1.op, LHS, RHS);
 }
 
+Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, SourceLoc loc) {
+  return new (Context) DeclRefExpr(value, loc, value->getTypeOfReference());
+}
+
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
                                 bool isSpecialized) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
   if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
-    auto result = new (Context) DeclRefExpr(Decls[0], NameLoc,
-                                            Decls[0]->getTypeOfReference());
+    auto result = new (Context) DeclRefExpr(Decls[0], NameLoc);
     result->setSpecialized(isSpecialized);
     return result;
   }

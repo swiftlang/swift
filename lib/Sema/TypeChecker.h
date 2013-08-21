@@ -447,6 +447,13 @@ public:
   /// \brief Compute the set of captures for the given function or closure.
   void computeCaptures(CapturingExpr *capturing);
 
+  /// Return the type-of-reference of the given value.  This does not
+  /// open values of polymorphic function type.
+  ///
+  /// \param baseType - if non-null, return the type of a member reference to
+  ///   this value when the base has the given type
+  Type getUnopenedTypeOfReference(ValueDecl *value, Type baseType = Type());
+
   /// \brief Retrieve the default type for the given protocol.
   ///
   /// Some protocols, particularly those that correspond to literals, have
@@ -627,6 +634,9 @@ public:
   SpecializeExpr *buildSpecializeExpr(Expr *Sub, Type Ty,
                                       const TypeSubstitutionMap &Substitutions,
                                       const ConformanceMap &Conformances);
+
+  /// \brief Build a type-checked reference to the given value.
+  Expr *buildCheckedRefExpr(ValueDecl *D, SourceLoc nameLoc);
 
   /// \brief Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.

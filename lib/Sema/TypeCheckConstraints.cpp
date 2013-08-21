@@ -672,7 +672,7 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
     assert(func->isOperator() && "Lookup should only find operators");
 
     // Skip the 'this' metatype parameter. It's not used for deduction.
-    auto type = func->getTypeOfReference()->castTo<FunctionType>()->getResult();
+    auto type = func->getType()->castTo<FunctionType>()->getResult();
 
     // Find the archetype for 'This'. We'll be opening it.
     auto thisArchetype
@@ -3169,8 +3169,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
                                       TC.Context);
       BaseExpr = new (TC.Context) MetatypeExpr(nullptr, Loc, BaseTy);
     } else {
-      BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc,
-                                              Base->getTypeOfReference());
+      BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc);
     }
     return new (TC.Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name, Loc);
   }
@@ -4140,7 +4139,7 @@ void ConstraintSystem::dump() {
           if (choice.getBaseType())
             out << choice.getBaseType()->getString() << ".";
           out << choice.getDecl()->getName().str() << ": ";
-          out << choice.getDecl()->getTypeOfReference()->getString() << '\n';
+          out << choice.getDecl()->getType() << '\n';
           break;
 
         case OverloadChoiceKind::BaseType:

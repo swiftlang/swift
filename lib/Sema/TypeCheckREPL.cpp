@@ -24,7 +24,7 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
-void
+static void
 PrintLiteralString(StringRef Str, TypeChecker &TC, SourceLoc Loc,
                    SmallVectorImpl<ValueDecl*> &PrintDecls,
                    SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent) {
@@ -90,8 +90,7 @@ getArgRefExpr(TypeChecker &TC,
               SourceLoc Loc) {
   ASTContext &Context = TC.Context;
 
-  Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc,
-                                           Arg->getTypeOfReference());
+  Expr *ArgRef = TC.buildCheckedRefExpr(Arg, Loc);
   ArgRef = TC.coerceToRValue(ArgRef);
   for (unsigned i : MemberIndexes) {
     bool failed = TC.typeCheckExpression(ArgRef, &TC.TU, Type(),
@@ -208,8 +207,7 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
     pattern = new (context) TypedPattern(pattern, TypeLoc::withoutLoc(boolTy));
     pattern->setType(boolTy);
 
-    Expr *init = new (context) DeclRefExpr(trueDecl, Loc,
-                                           trueDecl->getTypeOfReference());
+    Expr *init = TC.buildCheckedRefExpr(trueDecl, Loc);
     BodyContent.push_back(new (context) PatternBindingDecl(Loc, pattern, init,
                                                            &TC.TU));
   }
@@ -267,10 +265,8 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
   // First, print the ", " between elements.
   if (firstVar) {
     // if branch: set first to false
-    Expr *firstRef = new (context) DeclRefExpr(firstVar, Loc,
-                                               firstVar->getTypeOfReference());
-    Expr *falseRef = new (context) DeclRefExpr(falseDecl, Loc,
-                                               falseDecl->getTypeOfReference());
+    Expr *firstRef = TC.buildCheckedRefExpr(firstVar, Loc);
+    Expr *falseRef = TC.buildCheckedRefExpr(falseDecl, Loc);
     Expr *setFirstToFalse
       = new (context) AssignExpr(firstRef, Loc, falseRef);
     Stmt *thenStmt = BraceStmt::create(context, Loc,
@@ -282,8 +278,7 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
     Stmt *elseStmt = BraceStmt::create(context, Loc, elseBodyContents, Loc);
 
     // if-then-else statement.
-    firstRef = new (context) DeclRefExpr(firstVar, Loc,
-                                         firstVar->getTypeOfReference());
+    firstRef = TC.buildCheckedRefExpr(firstVar, Loc);
     loopBodyContents.push_back(new (context) IfStmt(Loc, firstRef,
                                                     thenStmt,
                                                     Loc, elseStmt));
@@ -615,8 +610,7 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC) {
   TC->TU.Decls.push_back(metavarBinding);
 
   // Finally, print the variable's value.
-  E = new (TC->Context) DeclRefExpr(vd, E->getStartLoc(),
-                                    vd->getTypeOfReference());
+  E = TC->buildCheckedRefExpr(vd, E->getStartLoc());
   generatePrintOfExpression(vd->getName().str(), E, TC);
 }
 
@@ -631,8 +625,7 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   // Decl to print it.
   if (auto *NP = dyn_cast<NamedPattern>(PBD->getPattern()->
                                            getSemanticsProvidingPattern())) {
-    Expr *E = new (TC->Context) DeclRefExpr(NP->getDecl(), PBD->getStartLoc(),
-                                            NP->getDecl()->getTypeOfReference());
+    Expr *E = TC->buildCheckedRefExpr(NP->getDecl(), PBD->getStartLoc());
     generatePrintOfExpression(PatternString, E, TC);
     return;
   }
@@ -673,15 +666,13 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
 
   
   // Replace the initializer of PBD with a reference to our repl temporary.
-  Expr *E = new (TC->Context) DeclRefExpr(vd, vd->getStartLoc(),
-                                          vd->getTypeOfReference());
+  Expr *E = TC->buildCheckedRefExpr(vd, vd->getStartLoc());
   E = TC->coerceToMaterializable(E);
   PBD->setInit(E);
   TC->TU.Decls.push_back(PBTLCD);
 
   // Finally, print out the result, by referring to the repl temp.
-  E = new (TC->Context) DeclRefExpr(vd, vd->getStartLoc(),
-                                    vd->getTypeOfReference());
+  E = TC->buildCheckedRefExpr(vd, vd->getStartLoc());
   generatePrintOfExpression(PatternString, E, TC);
 }
 
