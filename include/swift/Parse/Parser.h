@@ -471,9 +471,9 @@ public:
   bool parseDeclFuncBodyDelayed(FuncDecl *FD);
   ParserResult<ProtocolDecl> parseDeclProtocol(unsigned Flags);
   
-  bool parseDeclSubscript(bool HasContainerType,
-                          bool NeedDefinition,
-                          SmallVectorImpl<Decl *> &Decls);
+  ParserStatus parseDeclSubscript(bool HasContainerType,
+                                  bool NeedDefinition,
+                                  SmallVectorImpl<Decl *> &Decls);
 
   ParserResult<ConstructorDecl> parseDeclConstructor(bool HasContainerType);
   ParserResult<DestructorDecl> parseDeclDestructor(unsigned Flags);

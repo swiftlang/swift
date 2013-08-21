@@ -622,7 +622,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     }
     HadParseError = parseDeclSubscript(Flags & PD_HasContainerType,
                                        !(Flags & PD_DisallowFuncDef),
-                                       Entries);
+                                       Entries).isError();
     break;
   
   case tok::identifier:
@@ -2141,10 +2141,10 @@ namespace {
 ///   subscript-head
 ///     'subscript' attribute-list pattern-tuple '->' type
 ///
-bool Parser::parseDeclSubscript(bool HasContainerType,
-                                bool NeedDefinition,
-                                SmallVectorImpl<Decl *> &Decls) {
-  bool Invalid = false;
+ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
+                                        bool NeedDefinition,
+                                        SmallVectorImpl<Decl *> &Decls) {
+  ParserStatus Status;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
 
   // attribute-list
@@ -2154,18 +2154,18 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   // pattern-tuple
   if (Tok.isNot(tok::l_paren)) {
     diagnose(Tok, diag::expected_lparen_subscript);
-    return true;
+    return makeParserError();
   }
 
   ParserResult<Pattern> Indices = parsePatternTuple(/*AllowInitExpr=*/false);
-  if (Indices.isNull())
-    return true;
+  if (Indices.isNull() || Indices.hasCodeCompletion())
+    return Indices;
   Indices.get()->walk(SetVarContext(CurDeclContext));
 
   // '->'
   if (!Tok.is(tok::arrow)) {
     diagnose(Tok, diag::expected_arrow_subscript);
-    return true;
+    return makeParserError();
   }
   SourceLoc ArrowLoc = consumeToken();
   
@@ -2173,7 +2173,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   ParserResult<TypeRepr> ElementTy =
       parseTypeAnnotation(diag::expected_type_subscript);
   if (ElementTy.isNull() || ElementTy.hasCodeCompletion())
-    return true;
+    return ElementTy;
   
   if (!NeedDefinition) {
     SubscriptDecl *Subscript
@@ -2182,13 +2182,13 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
                                     ElementTy.get(), SourceRange(),
                                     0, 0, CurDeclContext);
     Decls.push_back(Subscript);
-    return false;
+    return makeParserSuccess();
   }
   
   // '{'
   if (!Tok.is(tok::l_brace)) {
     diagnose(Tok, diag::expected_lbrace_subscript);
-    return true;
+    return makeParserError();
   }
   SourceLoc LBLoc = consumeToken();
   
@@ -2198,11 +2198,11 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   SourceLoc LastValidLoc = LBLoc;
   if (parseGetSet(HasContainerType, Indices.get(), ElementTy.get(),
                   Get, Set, LastValidLoc))
-    Invalid = true;
+    Status.setIsParseError();
 
   // Parse the final '}'.
   SourceLoc RBLoc;
-  if (Invalid) {
+  if (Status.isError()) {
     skipUntilDeclRBrace();
     RBLoc = LastValidLoc;
   }
@@ -2213,18 +2213,18 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   }
 
   if (!Get) {
-    if (!Invalid)
+    if (Status.isSuccess())
       diagnose(SubscriptLoc, diag::subscript_without_get);
-    Invalid = true;
+    Status.setIsParseError();
   }
 
   // Reject 'subscript' functions outside of type decls
   if (!HasContainerType) {
     diagnose(SubscriptLoc, diag::subscript_decl_wrong_scope);
-    Invalid = true;
+    Status.setIsParseError();
   }
 
-  if (!Invalid) {
+  if (Status.isSuccess()) {
     // FIXME: We should build the declarations even if they are invalid.
 
     // Build an AST for the subscript declaration.
@@ -2249,7 +2249,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
 
     Decls.push_back(Subscript);
   }
-  return Invalid;
+  return Status;
 }
 
 static void AddConstructorArgumentsToScope(const Pattern *pat,
