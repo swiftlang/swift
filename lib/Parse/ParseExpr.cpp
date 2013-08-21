@@ -445,7 +445,7 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
   switch (Tok.getKind()) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
-    return parseExprPostfix(Message);
+    return parseExprPostfix(Message).getPtrOrNull();
       
   // If the next token is the keyword 'new', this must be expr-new.
   case tok::kw_new:
@@ -747,60 +747,64 @@ static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
   return StringRef(start, p - start);
 }
 
-NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
-  NullablePtr<Expr> Result;
+ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
+  ParserResult<Expr> Result;
   switch (Tok.getKind()) {
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
-    Result = new (Context) IntegerLiteralExpr(Text, Loc);
+    Result = makeParserResult(new (Context) IntegerLiteralExpr(Text, Loc));
     break;
   }
   case tok::floating_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::floating_literal);
-    Result = new (Context) FloatLiteralExpr(Text, Loc);
+    Result = makeParserResult(new (Context) FloatLiteralExpr(Text, Loc));
     break;
   }
   case tok::character_literal: {
     uint32_t Codepoint = L->getEncodedCharacterLiteral(Tok);
     SourceLoc Loc = consumeToken(tok::character_literal);
-    Result = new (Context) CharacterLiteralExpr(Codepoint, Loc);
+    Result = makeParserResult(
+        new (Context) CharacterLiteralExpr(Codepoint, Loc));
     break;
   }
   case tok::string_literal:  // "foo"
-    Result = parseExprStringLiteral();
+    Result = makeParserResult(parseExprStringLiteral());
     break;
   case tok::kw___FILE__: {  // __FILE__
     auto Kind = MagicIdentifierLiteralExpr::File;
     SourceLoc Loc = consumeToken(tok::kw___FILE__);
-    Result = new (Context) MagicIdentifierLiteralExpr(Kind, Loc);
+    Result = makeParserResult(
+        new (Context) MagicIdentifierLiteralExpr(Kind, Loc));
     break;
   }
   case tok::kw___LINE__: {  // __LINE__
     auto Kind = MagicIdentifierLiteralExpr::Line;
     SourceLoc Loc = consumeToken(tok::kw___LINE__);
-    Result = new (Context) MagicIdentifierLiteralExpr(Kind, Loc);
+    Result = makeParserResult(
+        new (Context) MagicIdentifierLiteralExpr(Kind, Loc));
     break;
   }
 
   case tok::kw___COLUMN__: { // __COLUMN__
     auto Kind = MagicIdentifierLiteralExpr::Column;
     SourceLoc Loc = consumeToken(tok::kw___COLUMN__);
-    Result = new (Context) MagicIdentifierLiteralExpr(Kind, Loc);
+    Result = makeParserResult(
+        new (Context) MagicIdentifierLiteralExpr(Kind, Loc));
     break;
   }
       
   case tok::kw_this:     // this
   case tok::identifier:  // foo
-    Result = parseExprIdentifier();
+    Result = makeParserResult(parseExprIdentifier());
     break;
   case tok::dollarident: // $1
-    Result = parseExprAnonClosureArg();
+    Result = makeParserResult(parseExprAnonClosureArg());
     break;
 
   case tok::l_brace:     // expr-closure
-    Result = parseExprClosure();
+    Result = makeParserResult(parseExprClosure());
     break;
 
   case tok::period_prefix: {     // .foo
@@ -811,21 +815,28 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       return nullptr;
     
     // Handle .foo by just making an AST node.
-    Result = new (Context) UnresolvedMemberExpr(DotLoc, NameLoc, Name);
+    Result = makeParserResult(
+        new (Context) UnresolvedMemberExpr(DotLoc, NameLoc, Name));
     break;
   }
       
   case tok::kw_super: {      // super.foo or super[foo]
-    Result = parseExprSuper().getPtrOrNull();
+    Result = parseExprSuper();
     break;
   }
 
   case tok::l_paren:
-    Result = parseExprList(tok::l_paren, tok::r_paren);
+    if (Expr *E = parseExprList(tok::l_paren, tok::r_paren).getPtrOrNull())
+      Result = makeParserResult(E);
+    else
+      Result = makeParserErrorResult<Expr>();
     break;
 
   case tok::l_square:
-    Result = parseExprCollection();
+    if (Expr *E = parseExprCollection().getPtrOrNull())
+      Result = makeParserResult(E);
+    else
+      Result = makeParserErrorResult<Expr>();
     break;
 
   case tok::code_complete:
@@ -867,8 +878,9 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
         // an identifier with the same spelling as the keyword.
         if (Tok.isKeyword() && peekToken().is(tok::code_complete)) {
           Identifier Name = Context.getIdentifier(Tok.getText());
-          Result = new (Context) UnresolvedDotExpr(Result.get(), TokLoc,
-                                                   Name, Tok.getLoc());
+          Result = makeParserResult(
+              new (Context) UnresolvedDotExpr(Result.get(), TokLoc,
+                                              Name, Tok.getLoc()));
           consumeToken();
         }
         if (Tok.is(tok::code_complete) && CodeCompletion && Result.isNonNull()) {
@@ -891,8 +903,9 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       }
 
       Identifier Name = Context.getIdentifier(Tok.getText());
-      Result = new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
-                                               Tok.getLoc());
+      Result = makeParserResult(
+          new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
+                                          Tok.getLoc()));
       if (Tok.is(tok::identifier)) {
         consumeToken(tok::identifier);
         if (canParseAsGenericArgumentList()) {
@@ -905,10 +918,9 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
           SmallVector<TypeLoc, 8> locArgs;
           for (auto ty : args)
             locArgs.push_back(ty);
-          Result = new (Context) UnresolvedSpecializeExpr(Result.get(),
-                                                          LAngleLoc,
-                                                  Context.AllocateCopy(locArgs),
-                                                          RAngleLoc);
+          Result = makeParserResult(new (Context) UnresolvedSpecializeExpr(
+              Result.get(), LAngleLoc, Context.AllocateCopy(locArgs),
+              RAngleLoc));
         }
       } else {
         consumeToken(tok::integer_literal);
@@ -923,7 +935,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       NullablePtr<Expr> Arg =parseExprList(tok::l_paren, tok::r_paren);
       if (Arg.isNull())
         return nullptr;
-      Result = new (Context) CallExpr(Result.get(), Arg.get());
+      Result = makeParserResult(
+          new (Context) CallExpr(Result.get(), Arg.get()));
       continue;
     }
     
@@ -934,14 +947,16 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
                                             tok::r_square);
       if (Idx.isNull())
         return nullptr;
-      Result = new (Context) SubscriptExpr(Result.get(), Idx.get());
+      Result = makeParserResult(
+          new (Context) SubscriptExpr(Result.get(), Idx.get()));
       continue;
     }
 
     // Check for a postfix-operator suffix.
     if (Tok.is(tok::oper_postfix)) {
       Expr *oper = parseExprOperator();
-      Result = new (Context) PostfixUnaryExpr(oper, Result.get());
+      Result = makeParserResult(
+          new (Context) PostfixUnaryExpr(oper, Result.get()));
       continue;
     }
 
