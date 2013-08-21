@@ -141,6 +141,7 @@ parseSelectorArgument(Parser &P,
   if (P.Tok.is(tok::comma)) {
     P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
     P.skipUntil(tok::r_paren);
+    P.consumeIf(tok::r_paren);
     return makeParserError();
   }
   
