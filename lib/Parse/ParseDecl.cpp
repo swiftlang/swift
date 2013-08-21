@@ -569,7 +569,10 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
       HadParseError = true;
     break;
   case tok::kw_case:
-    HadParseError = parseDeclUnionElement(Flags, Entries);
+    if (Decl *D = parseDeclUnionElement(Flags).getPtrOrNull())
+      Entries.push_back(D);
+    else
+      HadParseError = true;
     break;
   case tok::kw_struct:
     if (Decl *D = parseDeclStruct(Flags).getPtrOrNull())
@@ -1735,8 +1738,7 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
 ///
 ///   decl-union-element:
 ///      'case' identifier type-tuple? ('->' type)?
-bool Parser::parseDeclUnionElement(unsigned Flags,
-                                   SmallVectorImpl<Decl*> &Decls) {
+ParserResult<UnionElementDecl> Parser::parseDeclUnionElement(unsigned Flags) {
   SourceLoc CaseLoc = consumeToken(tok::kw_case);
   
   // TODO: Accept attributes here?
@@ -1748,23 +1750,25 @@ bool Parser::parseDeclUnionElement(unsigned Flags,
   if (!Tok.is(tok::identifier)) {
     ParserResult<Pattern> pattern = parseMatchingPattern();
     if (pattern.isNull())
-      return true;
+      return nullptr;
     diagnose(CaseLoc, diag::case_outside_of_switch, "case");
     skipUntil(tok::colon);
     consumeIf(tok::colon);
-    return true;
+    return nullptr;
   }
-  
+
   if (parseIdentifier(Name, NameLoc,
                       diag::expected_identifier_in_decl, "union case"))
-    return true;
+    return nullptr;
   
   // See if there's a following argument type.
   ParserResult<TypeRepr> ArgType;
   if (Tok.isFollowingLParen()) {
     ArgType = parseTypeTupleBody();
-    if (ArgType.isNull() || ArgType.hasCodeCompletion())
-      return true;
+    if (ArgType.hasCodeCompletion())
+      return makeParserCodeCompletionResult<UnionElementDecl>();
+    if (ArgType.isNull())
+      return nullptr;
   }
   
   // See if there's a result type.
@@ -1773,8 +1777,10 @@ bool Parser::parseDeclUnionElement(unsigned Flags,
   if (Tok.is(tok::arrow)) {
     ArrowLoc = consumeToken();
     ResultType = parseType(diag::expected_type_union_element_result);
-    if (ResultType.isNull() || ResultType.hasCodeCompletion())
-      return true;
+    if (ResultType.hasCodeCompletion())
+      return makeParserCodeCompletionResult<UnionElementDecl>();
+    if (ResultType.isNull())
+      return nullptr;
   }
   
   // For recovery, again make sure the the user didn't try to spell a switch
@@ -1785,7 +1791,7 @@ bool Parser::parseDeclUnionElement(unsigned Flags,
   if (Tok.is(tok::colon) || Tok.is(tok::comma) || Tok.is(tok::kw_where)) {
     diagnose(CaseLoc, diag::case_outside_of_switch, "case");
     skipUntilDeclRBrace();
-    return true;
+    return nullptr;
   }
   
   // Create the element.
@@ -1796,13 +1802,12 @@ bool Parser::parseDeclUnionElement(unsigned Flags,
                                                 CurDeclContext);
   if (!(Flags & PD_AllowUnionElement)) {
     diagnose(CaseLoc, diag::disallowed_union_element);
-    return true;
+    // Don't return the UnionElementDecl unless it is allowed to have
+    // a UnionElementDecl in the current context.
+    return nullptr;
   }
-  // Don't add the UnionElementDecl to a DeclContext unless it is allowed to
-  // have a UnionElementDecl in that context.
-  Decls.push_back(result);
 
-  return false;
+  return makeParserResult(result);
 }
 
 /// \brief Parse the members in a struct/class/protocol definition.
