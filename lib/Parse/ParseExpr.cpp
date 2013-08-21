@@ -449,7 +449,7 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
       
   // If the next token is the keyword 'new', this must be expr-new.
   case tok::kw_new:
-    return parseExprNew();
+    return parseExprNew().getPtrOrNull();
     
   case tok::amp_prefix: {
     SourceLoc Loc = consumeToken(tok::amp_prefix);
@@ -519,12 +519,14 @@ Expr *Parser::parseExprOperator() {
 ///     expr-new-bounds expr-new-bound
 ///   expr-new-bound:
 ///     lsquare-unspaced expr ']'
-NullablePtr<Expr> Parser::parseExprNew() {
+ParserResult<Expr> Parser::parseExprNew() {
   SourceLoc newLoc = Tok.getLoc();
   consumeToken(tok::kw_new);
 
   ParserResult<TypeRepr> elementTy = parseTypeSimple();
-  if (elementTy.isNull() || elementTy.hasCodeCompletion())
+  if (elementTy.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+  if (elementTy.isNull())
     return nullptr;
 
   bool hadInvalid = false;
@@ -551,7 +553,8 @@ NullablePtr<Expr> Parser::parseExprNew() {
         diagnose(Tok, diag::expected_bracket_array_new);
 
       skipUntil(tok::r_square);
-      if (!Tok.is(tok::r_square)) return nullptr;
+      if (!Tok.is(tok::r_square))
+        return nullptr;
       hadInvalid = true;
     }
 
@@ -560,14 +563,18 @@ NullablePtr<Expr> Parser::parseExprNew() {
     bounds.push_back(NewArrayExpr::Bound(boundValue.get(), brackets));
   }
 
-  if (hadInvalid) return nullptr;
+  if (hadInvalid)
+    return nullptr;
 
   if (bounds.empty()) {
     diagnose(newLoc, diag::expected_bracket_array_new);
-    return new (Context) ErrorExpr({newLoc, PreviousLoc});
+    // No need to indicate the error to the caller because it was not a parse
+    // error.
+    return makeParserResult(new (Context) ErrorExpr({newLoc, PreviousLoc}));
   }
 
-  return NewArrayExpr::create(Context, newLoc, elementTy.get(), bounds);
+  return makeParserResult(
+      NewArrayExpr::create(Context, newLoc, elementTy.get(), bounds));
 }
 
 static VarDecl *getImplicitThisDeclForSuperContext(Parser &P,
