@@ -713,7 +713,7 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
   }
 
   // Determine the type of the value, opening up that type if necessary.
-  Type valueType = value->getTypeOfReference();
+  Type valueType = TC.getUnopenedTypeOfReference(value);
   valueType = adjustLValueForReference(openType(valueType),
                                        value->getAttrs().isAssignment(),
                                        TC.Context);
@@ -832,7 +832,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     type = FunctionType::get(subscript->getIndices()->getType(), resultTy,
                              TC.Context);
   } else {
-    type = value->getTypeOfReference(baseTy);
+    type = TC.getUnopenedTypeOfReference(value, baseTy);
   }
 
   // If the declaration is a protocol member, we may have more substitutions to

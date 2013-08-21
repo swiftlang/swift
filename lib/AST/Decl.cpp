@@ -316,23 +316,6 @@ Type ValueDecl::getTypeOfRValue() const {
   return type;
 }
 
-/// getTypeOfReference - Return the full type judgement for a non-member
-/// reference to this value.
-Type ValueDecl::getTypeOfReference(Type baseType) const {
-  if (isReferencedAsLValue()) {
-    // Determine the qualifiers we want.
-    LValueType::Qual quals =
-      (baseType ? LValueType::Qual::DefaultForMemberAccess
-                : LValueType::Qual::DefaultForVar);
-    if (!isSettableOnBase(baseType))
-      quals |= LValueType::Qual::NonSettable;
-
-    return LValueType::get(getRValueType(getType()), quals, getASTContext());
-  }
-
-  return Ty;
-}
-
 /// isDefinition - Return true if this is a definition of a decl, not a
 /// forward declaration (e.g. of a function) that is implemented outside of
 /// the swift code.

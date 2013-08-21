@@ -290,7 +290,7 @@ namespace {
         TypeSubstitutionMap substitutions;
         ConformanceMap conformances;
         Type otherTypes[2] = {
-          member->getTypeOfReference(),
+          tc.getUnopenedTypeOfReference(member),
           member->getDeclContext()->getDeclaredTypeInContext()
         };
 
@@ -325,8 +325,7 @@ namespace {
           // type.
 
           // Reference to the generic member.
-          Expr *ref = new (context) DeclRefExpr(member, memberLoc,
-                                                member->getTypeOfReference());
+          Expr *ref = tc.buildCheckedRefExpr(member, memberLoc);
 
           // Specialize the member with the types deduced from the object
           // argument. This eliminates the genericity that comes from being
@@ -382,8 +381,7 @@ namespace {
 
       // Handle references to non-variable struct/class/union members, as
       // well as module members.
-      Expr *ref = new (context) DeclRefExpr(member, memberLoc,
-                                            member->getTypeOfReference());
+      Expr *ref = tc.buildCheckedRefExpr(member, memberLoc);
 
       // Refer to a member function that binds 'this':
       if ((isa<FuncDecl>(member) && member->getDeclContext()->isTypeContext()) ||
@@ -911,7 +909,7 @@ namespace {
       // FIXME: The openedType is wrong for generic string types.
       Expr *memberRef = buildMemberRef(typeRef, expr->getStartLoc(), member,
                                        expr->getStartLoc(),
-                                       member->getTypeOfReference(),
+                                       tc.getUnopenedTypeOfReference(member),
                                        cs.getConstraintLocator(expr, { }));
 
       // Create a tuple containing all of the coerced segments.
@@ -975,7 +973,7 @@ namespace {
         return MetaTypeType::get(type, cs.getASTContext());
       }
 
-      Type type = decl->getTypeOfReference();
+      Type type = cs.TC.getUnopenedTypeOfReference(decl);
       return adjustLValueForReference(type, decl->getAttrs().isAssignment(),
                                       cs.TC.Context);
     }

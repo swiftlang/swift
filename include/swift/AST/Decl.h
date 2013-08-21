@@ -1041,12 +1041,6 @@ public:
   /// reference to this declaration.
   Type getTypeOfRValue() const;
 
-  /// getTypeOfReference - Returns the type that would arise from a
-  /// normal reference to this declaration.  For isReferencedAsLValue()'d decls,
-  /// this returns a reference to the value's type.  For non-lvalue decls, this
-  /// just returns the decl's type.
-  Type getTypeOfReference(Type baseType = Type()) const;
-
   /// isReferencedAsLValue - Returns 'true' if references to this
   /// declaration are l-values.
   bool isReferencedAsLValue() const {

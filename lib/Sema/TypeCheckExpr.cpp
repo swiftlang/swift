@@ -327,8 +327,24 @@ static Expr *foldSequence(TypeChecker &TC,
   return makeBinOp(TC, Op1.op, LHS, RHS);
 }
 
+Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType) {
+  if (value->isReferencedAsLValue()) {
+    // Determine the qualifiers we want.
+    LValueType::Qual quals =
+      (baseType ? LValueType::Qual::DefaultForMemberAccess
+                : LValueType::Qual::DefaultForVar);
+    if (!value->isSettableOnBase(baseType))
+      quals |= LValueType::Qual::NonSettable;
+
+    return LValueType::get(value->getTypeOfRValue(), quals, Context);
+  }
+
+  return value->getType();
+}
+
 Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, SourceLoc loc) {
-  return new (Context) DeclRefExpr(value, loc, value->getTypeOfReference());
+  auto type = getUnopenedTypeOfReference(value);
+  return new (Context) DeclRefExpr(value, loc, type);
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
