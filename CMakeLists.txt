@@ -132,7 +132,6 @@ option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
 option(SWIFT_ASSERTS "Enable assertions for the Swift standard library" YES)
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
-option(SWIFT_USE_LIBRARY_MODULES "Use modules for Swift libraries" YES)
 
 # Xcode: use libc++ and c++11 using proper build settings.
 if ( XCODE )
@@ -239,34 +238,16 @@ function(compile_swift_files)
 
   if(SWIFTFILE_IS_MAIN)
     set(module_source_file)
+    set(postprocessing)
   else()
     get_filename_component(module_source_name ${objfile} NAME_WE)
     set(module_source_dir ${SWIFTLIB_DIR}/swift)
 
-    if(SWIFT_USE_LIBRARY_MODULES)
-      set(module_source_file ${module_source_dir}/${module_source_name}.swiftmodule)
+    set(module_source_file ${module_source_dir}/${module_source_name}.swiftmodule)
+    set(intermediate_module_source_file ${CMAKE_CURRENT_BINARY_DIR}/${module_source_name}.swiftmodule)
+    list(APPEND swift_flags -emit-module)
+    set(postprocessing COMMAND ${CMAKE_COMMAND} -E rename ${intermediate_module_source_file} ${module_source_file})
 
-      add_custom_command(
-        OUTPUT ${module_source_file}
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
-        COMMAND swift -emit-module ${swift_flags} -o "${module_source_file}" ${source_files}
-        DEPENDS swift ${source_files})
-    else()
-      # Build the module source file; a hack until we get real module
-      # compilation.  In principle this separate file might not be needed
-      # except for swift.swift, which is composed of multiple .swift
-      # files.
-      set(module_source_file ${module_source_dir}/${module_source_name}.swift)
-
-      add_custom_command(
-        OUTPUT ${module_source_file}
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
-        COMMAND cat ${source_files} > "${module_source_file}"
-        DEPENDS ${source_files}
-        COMMENT "FIXME: generating module source file ${module_source_name}.swift")
-    endif()
-
-    set_source_files_properties("${module_source_file}" PROPERTIES GENERATED ON)
     install(FILES ${module_source_file}
       DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
   endif()
@@ -278,9 +259,10 @@ function(compile_swift_files)
   endif()
 
   add_custom_command(
-    OUTPUT ${objfile}
+    OUTPUT ${objfile} ${module_source_file}
     COMMAND swift "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
-    DEPENDS swift ${stdlib_dep} ${source_files} ${module_source_file}
+    ${postprocessing} 
+    DEPENDS swift ${stdlib_dep} ${source_files}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${objfile}")
   
@@ -294,7 +276,7 @@ function(compile_swift_files)
 
   # Make sure this object file gets cleaned up.
   set_directory_properties(
-    PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${objfile}")
+    PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${objfile};${module_source_file}")
 endfunction()
 
 # Compile an assembler file into an object file.

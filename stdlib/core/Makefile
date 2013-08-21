@@ -75,19 +75,14 @@ LDFLAGS += -Xlinker -reexport-lobjc \
 
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
 
-$(SWIFT_HEADER_DIR)/swift.swift: $(PATH_TO_SWIFT_SOURCES) $(SWIFT_HEADER_DIR)
-	$(Echo) FIXME -- HACK -- Concatenating $(SWIFT_SOURCES) to build dir
-	$(Verb) cat $(PATH_TO_SWIFT_SOURCES) > $@
-
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
 
-$(SWIFT_HEADER_DIR)/swift.swiftmodule: $(PATH_TO_SWIFT_SOURCES) $(SWIFT_HEADER_DIR)
-	$(Echo) "Building module $(notdir $@) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) -o $@ -module-name swift -parse-stdlib -parse-as-library -emit-module $(PATH_TO_SWIFT_SOURCES)
+$(SWIFT_HEADER_DIR)/swift.swiftmodule: $(ObjDir)/swift.o $(SWIFT_HEADER_DIR)
 
 $(ObjDir)/swift.o: $(PATH_TO_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $@) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) -o $@ -module-name swift -parse-stdlib -parse-as-library $(PATH_TO_SWIFT_SOURCES)
+	$(Verb) $(SWIFT_COMPILER) -o $@ -c -emit-module -parse-stdlib -parse-as-library $(PATH_TO_SWIFT_SOURCES)
+	@mv $(ObjDir)/swift.swiftmodule $(SWIFT_HEADER_DIR)
 
 $(SharedLibDir)/swift/%.$(SHLIBEXT): $(SharedLibDir)/swift/.dir
 	ln -s ../$(@F) $@
