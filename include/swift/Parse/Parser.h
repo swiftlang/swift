@@ -606,7 +606,7 @@ public:
   NullablePtr<Expr> parseExprPostfix(Diag<> ID);
   NullablePtr<Expr> parseExprUnary(Diag<> ID);
   NullablePtr<Expr> parseExprNew();
-  NullablePtr<Expr> parseExprSuper();
+  ParserResult<Expr> parseExprSuper();
   Expr *parseExprStringLiteral();
   
   Expr *parseExprIdentifier();

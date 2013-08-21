@@ -599,7 +599,7 @@ static VarDecl *getImplicitThisDeclForSuperContext(Parser &P,
 ///     'super' '.' 'constructor' '.' selector-args
 ///   expr-super-subscript:
 ///     'super' '[' expr ']'
-NullablePtr<Expr> Parser::parseExprSuper() {
+ParserResult<Expr> Parser::parseExprSuper() {
   // Parse the 'super' reference.
   SourceLoc superLoc = consumeToken(tok::kw_super);
   
@@ -622,8 +622,10 @@ NullablePtr<Expr> Parser::parseExprSuper() {
       // Check that we're actually in a constructor.
       if (!isa<ConstructorDecl>(CurDeclContext)) {
         diagnose(ctorLoc, diag::super_constructor_not_in_constructor);
-        return new (Context) ErrorExpr(SourceRange(superLoc, ctorLoc),
-                                       ErrorType::get(Context));
+        // No need to indicate error to the caller because this is not a parse
+        // error.
+        return makeParserResult(new (Context) ErrorExpr(
+            SourceRange(superLoc, ctorLoc), ErrorType::get(Context)));
       }
       // The constructor decl will be resolved by sema.
       Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
@@ -636,15 +638,16 @@ NullablePtr<Expr> Parser::parseExprSuper() {
           return nullptr;
         
         result = new (Context) CallExpr(result, arg.get());
-      } // It's invalid to refer to an uncalled constructor.
-        else {
+      } else {
+        // It's invalid to refer to an uncalled constructor.
         diagnose(ctorLoc, diag::super_constructor_must_be_called);
         result->setType(ErrorType::get(Context));
-        return result;
+        return makeParserErrorResult(result);
       }
 
       // The result of the called constructor is used to rebind 'this'.
-      return new (Context) RebindThisInConstructorExpr(result, thisDecl);
+      return makeParserResult(
+          new (Context) RebindThisInConstructorExpr(result, thisDecl));
     } else if (Tok.is(tok::code_complete) && CodeCompletion) {
       if (auto *SRE = dyn_cast<SuperRefExpr>(superRef)) {
         CodeCompletion->completeExprSuperDot(SRE);
@@ -659,19 +662,19 @@ NullablePtr<Expr> Parser::parseExprSuper() {
         return nullptr;
       
       if (!thisDecl)
-        return new (Context) ErrorExpr(SourceRange(superLoc, nameLoc),
-                                       ErrorType::get(Context));
+        return makeParserErrorResult(new (Context) ErrorExpr(
+            SourceRange(superLoc, nameLoc), ErrorType::get(Context)));
       
-      return new (Context) UnresolvedDotExpr(superRef, dotLoc,
-                                             name, nameLoc);
+      return makeParserResult(new (Context) UnresolvedDotExpr(superRef, dotLoc,
+                                                              name, nameLoc));
     }
   } else if (Tok.isFollowingLSquare()) {
     // super[expr]
     NullablePtr<Expr> idx = parseExprList(tok::l_square,
                                           tok::r_square);
     if (idx.isNull())
-      return 0;
-    return new (Context) SubscriptExpr(superRef, idx.get());
+      return nullptr;
+    return makeParserResult(new (Context) SubscriptExpr(superRef, idx.get()));
   }
   if (Tok.is(tok::code_complete) && CodeCompletion) {
     if (auto *SRE = dyn_cast<SuperRefExpr>(superRef)) {
@@ -806,7 +809,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   }
       
   case tok::kw_super: {      // super.foo or super[foo]
-    Result = parseExprSuper();
+    Result = parseExprSuper().getPtrOrNull();
     break;
   }
 
