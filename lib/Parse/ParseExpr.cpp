@@ -187,14 +187,16 @@ ParserResult<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
   // Name binding will resolve whether it's in a valid pattern position.
   if (isOnlyStartOfMatchingPattern()) {
     ParserResult<Pattern> pattern = parseMatchingPattern();
-    if (pattern.isNull())
-      return nullptr;
     if (pattern.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
+    if (pattern.isNull())
+      return nullptr;
     return makeParserResult(new (Context) UnresolvedPatternExpr(pattern.get()));
   }
   
-  NullablePtr<Expr> expr = parseExprSequence(Message);
+  ParserResult<Expr> expr = parseExprSequence(Message);
+  if (expr.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
   if (expr.isNull())
     return nullptr;
   
@@ -270,7 +272,7 @@ ParserResult<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
       // Otherwise, the closure implicitly forms a call.
       Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
                                                nullptr, SourceLoc(), closure);
-      expr = new (Context) CallExpr(expr.get(), arg);
+      expr = makeParserResult(new (Context) CallExpr(expr.get(), arg));
     }
   }
 
@@ -332,7 +334,7 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// The sequencing for binary exprs is not structural, i.e., binary operators
 /// are not inherently right-associative. If present, '?' and ':' tokens must
 /// match.
-NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
+ParserResult<Expr> Parser::parseExprSequence(Diag<> Message) {
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
   
@@ -340,7 +342,9 @@ NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
 
   while (true) {
     // Parse a unary expression.
-    auto Primary = parseExprUnary(Message);
+    ParserResult<Expr> Primary = parseExprUnary(Message);
+    if (Primary.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Expr>();
     if (Primary.isNull())
       return nullptr;
     SequencedExprs.push_back(Primary.get());
@@ -361,8 +365,10 @@ NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
       SourceLoc questionLoc = consumeToken();
       
       // Parse the middle expression of the ternary.
-      NullablePtr<Expr> middle
-        = parseExprSequence(diag::expected_expr_after_if_question);
+      ParserResult<Expr> middle =
+          parseExprSequence(diag::expected_expr_after_if_question);
+      if (middle.hasCodeCompletion())
+        return makeParserCodeCompletionResult<Expr>();
       if (middle.isNull())
         return nullptr;
       
@@ -370,8 +376,8 @@ NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
       if (!Tok.is(tok::colon)) {
         diagnose(questionLoc, diag::expected_colon_after_if_question);
 
-        return new (Context) ErrorExpr({startLoc,
-                                        middle.get()->getSourceRange().End});
+        return makeParserErrorResult(new (Context) ErrorExpr(
+            {startLoc, middle.get()->getSourceRange().End}));
       }
       
       SourceLoc colonLoc = consumeToken();
@@ -427,9 +433,9 @@ done:
 
   // If we saw no operators, don't build a sequence.
   if (SequencedExprs.size() == 1)
-    return SequencedExprs[0];
+    return makeParserResult(SequencedExprs[0]);
 
-  return SequenceExpr::create(Context, SequencedExprs);
+  return makeParserResult(SequenceExpr::create(Context, SequencedExprs));
 }
 
 /// parseExprUnary

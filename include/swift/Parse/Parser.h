@@ -602,7 +602,7 @@ public:
   }
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
-  NullablePtr<Expr> parseExprSequence(Diag<> ID);
+  ParserResult<Expr> parseExprSequence(Diag<> ID);
   ParserResult<Expr> parseExprPostfix(Diag<> ID);
   ParserResult<Expr> parseExprUnary(Diag<> ID);
   ParserResult<Expr> parseExprNew();
