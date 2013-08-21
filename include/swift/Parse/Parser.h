@@ -600,8 +600,8 @@ public:
   ParserResult<Expr> parseExprBasic(Diag<> ID) {
     return parseExpr(ID, /*isExprBasic=*/true);
   }
-  NullablePtr<Expr> parseExprIs();
-  NullablePtr<Expr> parseExprAs();
+  ParserResult<Expr> parseExprIs();
+  ParserResult<Expr> parseExprAs();
   NullablePtr<Expr> parseExprSequence(Diag<> ID);
   NullablePtr<Expr> parseExprPostfix(Diag<> ID);
   NullablePtr<Expr> parseExprUnary(Diag<> ID);

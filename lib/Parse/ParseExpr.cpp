@@ -280,21 +280,23 @@ ParserResult<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
 /// parseExprIs
 ///   expr-is:
 ///     'is' type
-NullablePtr<Expr> Parser::parseExprIs() {
+ParserResult<Expr> Parser::parseExprIs() {
   SourceLoc isLoc = consumeToken(tok::kw_is);
-  
+
   ParserResult<TypeRepr> type = parseType(diag::expected_type_after_is);
-  if (type.isNull() || type.hasCodeCompletion())
+  if (type.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+  if (type.isNull())
     return nullptr;
-  
-  return new (Context) IsaExpr(isLoc, type.get());
+
+  return makeParserResult(new (Context) IsaExpr(isLoc, type.get()));
 }
 
 /// parseExprAs
 ///   expr-as:
 ///     'as' type
 ///     'as' '!' type
-NullablePtr<Expr> Parser::parseExprAs() {
+ParserResult<Expr> Parser::parseExprAs() {
   SourceLoc asLoc = consumeToken(tok::kw_as);
   SourceLoc bangLoc;
   
@@ -303,14 +305,16 @@ NullablePtr<Expr> Parser::parseExprAs() {
   }
   
   ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as);
-  if (type.isNull() || type.hasCodeCompletion())
+  if (type.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+  if (type.isNull())
     return nullptr;
   
   if (bangLoc.isValid())
-    return new (Context)
-        UnconditionalCheckedCastExpr(asLoc, bangLoc, type.get());
+    return makeParserResult(new (Context)
+        UnconditionalCheckedCastExpr(asLoc, bangLoc, type.get()));
   else
-    return new (Context) CoerceExpr(asLoc, type.get());
+    return makeParserResult(new (Context) CoerceExpr(asLoc, type.get()));
 }
 
 /// parseExprSequence
@@ -399,13 +403,15 @@ done:
   
   // Check for a cast suffix.
   if (Tok.is(tok::kw_is)) {
-    NullablePtr<Expr> is = parseExprIs();
-    if (is.isNull()) return nullptr;
+    ParserResult<Expr> is = parseExprIs();
+    if (is.isNull() || is.hasCodeCompletion())
+      return nullptr;
     suffix = is.get();
   }
   else if (Tok.is(tok::kw_as)) {
-    NullablePtr<Expr> as = parseExprAs();
-    if (as.isNull()) return nullptr;
+    ParserResult<Expr> as = parseExprAs();
+    if (as.isNull() || as.hasCodeCompletion())
+      return nullptr;
     suffix = as.get();
   }
   
