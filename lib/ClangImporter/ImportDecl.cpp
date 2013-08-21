@@ -362,14 +362,12 @@ namespace {
           continue;
 
         // Construct left-hand side.
-        Expr *lhs = new (context) DeclRefExpr(thisDecl, SourceLoc(),
-                                              thisDecl->getTypeOfReference());
+        Expr *lhs = new (context) DeclRefExpr(thisDecl, SourceLoc());
         lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, SourceLoc());
 
         // Construct right-hand side.
         auto param = params[paramIdx++];
-        auto rhs = new (context) DeclRefExpr(param, SourceLoc(),
-                                             param->getTypeOfReference());
+        auto rhs = new (context) DeclRefExpr(param, SourceLoc());
 
         // Add assignment.
         stmts.push_back(new (context) AssignExpr(lhs, SourceLoc(), rhs));
@@ -1231,9 +1229,7 @@ namespace {
                                                               thisMetaTy);
 
         // For an 'init' method, we need to call alloc first.
-        Expr *allocRef
-          = new (Impl.SwiftContext) DeclRefExpr(alloc, loc,
-                                                alloc->getTypeOfReference());
+        Expr *allocRef = new (Impl.SwiftContext) DeclRefExpr(alloc, loc);
 
         auto allocCall = new (Impl.SwiftContext) DotSyntaxCallExpr(allocRef,
                                                                    loc,
@@ -1258,15 +1254,11 @@ namespace {
       
       // Create the body of the constructor, which will call the
       // corresponding init method.
-      Expr *initExpr
-        = new (Impl.SwiftContext) DeclRefExpr(thisVar, loc,
-                                              thisVar->getTypeOfReference());
+      Expr *initExpr = new (Impl.SwiftContext) DeclRefExpr(thisVar, loc);
       
       // Form a reference to the actual method.
       auto func = cast<FuncDecl>(decl);
-      auto funcRef
-        = new (Impl.SwiftContext) DeclRefExpr(func, loc,
-                                              func->getTypeOfReference());
+      auto funcRef = new (Impl.SwiftContext) DeclRefExpr(func, loc);
       initExpr = new (Impl.SwiftContext) DotSyntaxCallExpr(funcRef, loc,
                                                            initExpr);
 
@@ -1327,9 +1319,7 @@ namespace {
       initExpr = cast;
 
       // Form the assignment statement.
-      auto refThis
-        = new (Impl.SwiftContext) DeclRefExpr(thisVar, loc,
-                                              thisVar->getTypeOfReference());
+      auto refThis = new (Impl.SwiftContext) DeclRefExpr(thisVar, loc);
       auto assign = new (Impl.SwiftContext) AssignExpr(refThis, loc, initExpr);
 
       // Set the body of the constructor.
@@ -1449,11 +1439,8 @@ namespace {
                                           getter->getDeclContext());
 
       // Create the body of the thunk, which calls the Objective-C getter.
-      auto thisRef = new (context) DeclRefExpr(thisVar, loc,
-                                               thisVar->getTypeOfReference());
-      auto getterRef
-        = new (context) DeclRefExpr(getter, loc,
-                                    getter->getTypeOfReference());
+      auto thisRef = new (context) DeclRefExpr(thisVar, loc);
+      auto getterRef = new (context) DeclRefExpr(getter, loc);
 
       // First, bind 'this' to the method.
       Expr *call = new (context) DotSyntaxCallExpr(getterRef, loc, thisRef);
@@ -1462,9 +1449,7 @@ namespace {
       if (indices) {
         // For a subscript, pass the index.
         auto indexVar = getSingleVar(getterArgs[1]);
-        auto indexRef
-          = new (context) DeclRefExpr(indexVar, loc,
-                                      indexVar->getTypeOfReference());
+        auto indexRef = new (context) DeclRefExpr(indexVar, loc);
         call = new (context) CallExpr(call, indexRef);
       } else {
         // For a property, call with no arguments.
@@ -1575,14 +1560,9 @@ namespace {
       // Create the body of the thunk, which calls the Objective-C setter.
       auto valueVar = getSingleVar(setterArgs.back());
 
-      auto thisRef = new (context) DeclRefExpr(thisVar, loc,
-                                               thisVar->getTypeOfReference());
-      auto valueRef
-        = new (context) DeclRefExpr(valueVar, loc,
-                                    valueVar->getTypeOfReference());
-      auto setterRef
-        = new (context) DeclRefExpr(setter, loc,
-                                    setter->getTypeOfReference());
+      auto thisRef = new (context) DeclRefExpr(thisVar, loc);
+      auto valueRef = new (context) DeclRefExpr(valueVar, loc);
+      auto setterRef = new (context) DeclRefExpr(setter, loc);
 
       // First, bind 'this' to the method.
       Expr *call = new (context) DotSyntaxCallExpr(setterRef, loc, thisRef);
@@ -1592,9 +1572,7 @@ namespace {
       if (indices) {
         // For subscript setters, we have both value and index.
         auto indexVar = getSingleVar(setterArgs[1]);
-        auto indexRef
-          = new (context) DeclRefExpr(indexVar, loc,
-                                      indexVar->getTypeOfReference());
+        auto indexRef = new (context) DeclRefExpr(indexVar, loc);
 
         Expr *callArgsArray[2] = { valueRef, indexRef };
         callArgs
@@ -2608,9 +2586,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
       return nullptr;
 
     if (found.size() == 1) {
-      minusRef = new (context) DeclRefExpr(found[0],
-                                           SourceLoc(),
-                                           found[0]->getTypeOfReference());
+      minusRef = new (context) DeclRefExpr(found[0], SourceLoc());
     } else {
       auto foundCopy = context.AllocateCopy(found);
       minusRef = new (context) OverloadedDeclRefExpr(
