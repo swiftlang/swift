@@ -624,13 +624,9 @@ public:
   ///
   /// \param Conformances The set of protocol-conformance structures for each
   /// of the substitutions.
-  ///
-  /// \param OnlyInnermostParams Whether we're specializing only the innermost
-  /// generic parameters (rather than all levels of generic parameters).
   SpecializeExpr *buildSpecializeExpr(Expr *Sub, Type Ty,
                                       const TypeSubstitutionMap &Substitutions,
-                                      const ConformanceMap &Conformances,
-                                      bool OnlyInnermostParams);
+                                      const ConformanceMap &Conformances);
 
   /// \brief Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.

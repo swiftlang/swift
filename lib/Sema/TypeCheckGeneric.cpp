@@ -19,14 +19,13 @@ using namespace swift;
 SpecializeExpr *
 TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
                                  const TypeSubstitutionMap &Substitutions,
-                                 const ConformanceMap &Conformances,
-                                 bool OnlyInnermostParams) {
+                                 const ConformanceMap &Conformances) {
   auto polyFn = Sub->getType()->castTo<PolymorphicFunctionType>();
   return new (Context) SpecializeExpr(Sub, Ty,
                          encodeSubstitutions(&polyFn->getGenericParams(),
                                              Substitutions,
                                              Conformances,
-                                             OnlyInnermostParams));
+                                             /*OnlyInnermostParams=*/false));
 }
 
 ArrayRef<Substitution>

@@ -332,9 +332,7 @@ namespace {
           // argument. This eliminates the genericity that comes from being
           // an instance method of a generic class.
           Expr *specializedRef
-            = tc.buildSpecializeExpr(ref, substTy, substitutions,
-                                     conformances,
-                                     /*OnlyInnermostParams=*/false);
+            = tc.buildSpecializeExpr(ref, substTy, substitutions, conformances);
 
           ApplyExpr *apply;
           if (isa<ConstructorDecl>(member)) {
