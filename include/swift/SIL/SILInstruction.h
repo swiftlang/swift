@@ -412,6 +412,9 @@ public:
   /// retruned value are defined in llvm/Intrinsics.h.
   const IntrinsicInfo &getIntrinsicInfo();
 
+  /// \brief Looks up the lazily cached identification for the builtin function.
+  const BuiltinInfo &getBuiltinInfo();
+
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 

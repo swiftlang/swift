@@ -80,8 +80,8 @@ ValueDecl *getBuiltinValue(ASTContext &Context, Identifier Name);
 
 /// BuiltinValueKind - The set of (possibly overloaded) builtin functions.
 enum class BuiltinValueKind {
-  None,
-#define BUILTIN(Id, Name) Id,
+  None = 0,
+#define BUILTIN(Id, Name, Attrs) Id,
 #include "swift/AST/Builtins.def"
 };
 
@@ -89,6 +89,7 @@ enum class BuiltinValueKind {
 struct BuiltinInfo {
   BuiltinValueKind ID;
   SmallVector<Type, 4> Types;
+  bool isReadNone() const;
 };
 
 /// \brief The information identifying the llvm intrinsic - it's id and types.

@@ -304,6 +304,11 @@ const IntrinsicInfo &BuiltinFunctionRefInst::getIntrinsicInfo() {
   return M->getIntrinsicInfo(Function);
 }
 
+const BuiltinInfo &BuiltinFunctionRefInst::getBuiltinInfo() {
+  SILModule *M = getParent()->getParent()->getParent();
+  return M->getBuiltinInfo(Function);
+}
+
 static unsigned getWordsForBitWidth(unsigned bits) {
   return (bits + llvm::integerPartWidth - 1)/llvm::integerPartWidth;
 }

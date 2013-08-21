@@ -133,8 +133,8 @@ const BuiltinInfo &SILModule::getBuiltinInfo(const FuncDecl* FD) {
   } else {
     // Switch through the rest of builtins.
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
-#define BUILTIN(id, name) \
-      .Case(name, BuiltinValueKind::id)
+#define BUILTIN(ID, Name, Attrs) \
+      .Case(Name, BuiltinValueKind::ID)
 #include "swift/AST/Builtins.def"
       .Default(BuiltinValueKind::None);
   }

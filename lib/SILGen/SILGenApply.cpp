@@ -1250,7 +1250,7 @@ namespace {
       getBuiltinBaseName(decl->getASTContext(), decl->getName().str(), types);
 
     // Match SIL builtins to their emitters.
-    #define BUILTIN(Id, Name)
+    #define BUILTIN(Id, Name, Attrs)
     #define BUILTIN_SIL_OPERATION(Id, Name, Overload) \
       if (name.equals(Name)) \
         return &emitBuiltin##Id;

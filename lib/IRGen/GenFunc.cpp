@@ -902,11 +902,11 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   if (Builtin.ID == BuiltinValueKind::id) \
     llvm_unreachable(name " builtin should be lowered away by SILGen!");
 
-#define BUILTIN_CAST_OPERATION(id, name) \
+#define BUILTIN_CAST_OPERATION(id, name, attrs) \
   if (Builtin.ID == BuiltinValueKind::id) \
     return emitCastBuiltin(IGF, fn, *out, args, llvm::Instruction::id);
   
-#define BUILTIN_BINARY_OPERATION(id, name, overload) \
+#define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
   if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *lhs = args.claimNext(); \
     llvm::Value *rhs = args.claimNext(); \
@@ -914,10 +914,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return out->add(v); \
   }
 
-#define BUILTIN_BINARY_PREDICATE(id, name, overload) \
+#define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
   if (Builtin.ID == BuiltinValueKind::id) \
     return emitCompareBuiltin(IGF, fn, *out, args, llvm::CmpInst::id);
-#define BUILTIN(ID, Name)  // Ignore the rest.
+#define BUILTIN(ID, Name, Attrs)  // Ignore the rest.
 #include "swift/AST/Builtins.def"
 
   if (Builtin.ID == BuiltinValueKind::FNeg) {

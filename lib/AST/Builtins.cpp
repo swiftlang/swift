@@ -21,8 +21,23 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
+#include <cstring>
 #include <tuple>
 using namespace swift;
+
+struct BuiltinExtraInfoTy {
+  const char *Attributes;
+};
+
+static const BuiltinExtraInfoTy BuiltinExtraInfo[] = {
+  {0},
+#define BUILTIN(Id, Name, Attrs) {Attrs},
+#include "swift/AST/Builtins.def"
+};
+
+bool BuiltinInfo::isReadNone() const {
+  return strchr(BuiltinExtraInfo[(unsigned)ID].Attributes, 'n') != 0;
+}
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   // Vectors are VecNxT, where "N" is the number of elements and
@@ -510,16 +525,16 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 
 // There's deliberately no BUILTIN clause here so that we'll blow up
 // if new builtin categories are added there and not here.
-#define BUILTIN_CAST_OPERATION(id, name) OverloadedBuiltinKind::Special,
-#define BUILTIN_BINARY_OPERATION(id, name, overload) \
+#define BUILTIN_CAST_OPERATION(id, attrs, name) OverloadedBuiltinKind::Special,
+#define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
    OverloadedBuiltinKind::overload,
-#define BUILTIN_BINARY_PREDICATE(id, name, overload) \
+#define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
    OverloadedBuiltinKind::overload,
-#define BUILTIN_UNARY_OPERATION(id, name, overload) \
+#define BUILTIN_UNARY_OPERATION(id, name, attrs, overload) \
    OverloadedBuiltinKind::overload,
 #define BUILTIN_SIL_OPERATION(id, name, overload) \
    OverloadedBuiltinKind::overload,
-#define BUILTIN_MISC_OPERATION(id, name, overload) \
+#define BUILTIN_MISC_OPERATION(id, name, attrs, overload) \
    OverloadedBuiltinKind::overload,
 #include "swift/AST/Builtins.def"
 };
@@ -776,7 +791,7 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   }
   
   BuiltinValueKind BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
-#define BUILTIN(id, name) \
+#define BUILTIN(id, name, Attrs) \
        .Case(name, BuiltinValueKind::id)
 #include "swift/AST/Builtins.def"
        .Default(BuiltinValueKind::None);
@@ -800,26 +815,26 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     if (Types.size() != 1) return nullptr;
     return getGepOperation(Context, Id, Types[0]);
 
-#define BUILTIN(id, name)
-#define BUILTIN_BINARY_OPERATION(id, name, overload)  case BuiltinValueKind::id:
+#define BUILTIN(id, name, Attrs)
+#define BUILTIN_BINARY_OPERATION(id, name, attrs, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     if (Types.size() != 1) return nullptr;
     return getBinaryOperation(Context, Id, Types[0]);
 
-#define BUILTIN(id, name)
-#define BUILTIN_BINARY_PREDICATE(id, name, overload)  case BuiltinValueKind::id:
+#define BUILTIN(id, name, Attrs)
+#define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     if (Types.size() != 1) return nullptr;
     return getBinaryPredicate(Context, Id, Types[0]);
 
-#define BUILTIN(id, name)
-#define BUILTIN_UNARY_OPERATION(id, name, overload)   case BuiltinValueKind::id:
+#define BUILTIN(id, name, Attrs)
+#define BUILTIN_UNARY_OPERATION(id, name, attrs, overload)   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     if (Types.size() != 1) return nullptr;
     return getUnaryOperation(Context, Id, Types[0]);
       
-#define BUILTIN(id, name)
-#define BUILTIN_CAST_OPERATION(id, name)  case BuiltinValueKind::id:
+#define BUILTIN(id, name, Attrs)
+#define BUILTIN_CAST_OPERATION(id, name, attrs)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     return getCastOperation(Context, Id, BV, Types);
       

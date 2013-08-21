@@ -29,7 +29,7 @@ bb0:
 // CHECK-NEXT: return [[RES:%.*]] : $Builtin.Int64
 }
 
-// Fold casts.
+// Fold casts. (This test assumes that DCE does not run, otherwise the unreachable blocks will get removed.)
 sil @fold_trunc : $[thin] () -> Builtin.Int64 {
 bb0:
  %0 = integer_literal $Builtin.Int128, 22
@@ -52,8 +52,10 @@ bb2:
 bb4(%100 : $Builtin.Int64):
  return %100 : $Builtin.Int64
 // CHECK-LABEL: sil @fold_trunc
-// FIXME: Check DCE.
+// CHECK-NOT: integer_literal $Builtin.Int128, 22
 // CHECK: integer_literal $Builtin.Int64, 22
+// CHECK-NOT: integer_literal $Builtin.Int8, 23
 // CHECK: integer_literal $Builtin.Int64, 23
+// CHECK-NOT: integer_literal $Builtin.Int8, 24
 // CHECK: integer_literal $Builtin.Int64, 24
 }

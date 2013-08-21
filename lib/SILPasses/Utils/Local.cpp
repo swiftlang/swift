@@ -15,6 +15,14 @@
 using namespace swift;
 
 static bool isSideEffectFree(BuiltinFunctionRefInst *FR) {
+
+  // First, check if we are dealing with a swift builtin.
+  const BuiltinInfo &Info = FR->getBuiltinInfo();
+  if (Info.ID != BuiltinValueKind::None) {
+    return Info.isReadNone();
+  }
+
+  // Second, specialcase llvm intrinsic.
   // FIXME: This list might not be complete. Would be good to derive this
   // info from llvm.
   switch (FR->getIntrinsicInfo().ID) {
