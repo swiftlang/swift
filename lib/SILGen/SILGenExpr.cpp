@@ -498,8 +498,7 @@ namespace {
     SILValue valueAddr;
   public:
     ExistentialValueInitialization(SILValue valueAddr)
-      : SingleInitializationBase(valueAddr.getType().getSwiftRValueType()),
-        valueAddr(valueAddr)
+      : valueAddr(valueAddr)
     {}
     
     SILValue getAddressOrNull() override {
@@ -735,11 +734,13 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
 }
 
 RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
+  auto type = cast<TupleType>(E->getType()->getCanonicalType());
+
   // If we have an Initialization, emit the tuple elements into its elements.
   if (Initialization *I = C.getEmitInto()) {
     SmallVector<InitializationPtr, 4> subInitializationBuf;
-    auto subInitializations = I->getSubInitializations(SGF,
-                                                       subInitializationBuf);
+    auto subInitializations =
+      I->getSubInitializations(SGF, type, subInitializationBuf);
     assert(subInitializations.size() == E->getElements().size() &&
            "initialization for tuple has wrong number of elements");
     for (unsigned i = 0, size = subInitializations.size(); i < size; ++i) {
@@ -749,7 +750,7 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
     return RValue();
   }
   
-  RValue result(E->getType()->getCanonicalType());
+  RValue result(type);
   for (Expr *elt : E->getElements()) {
     result.addElement(visit(elt));
   }
@@ -1010,13 +1011,15 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
 static void emitScalarToTupleExprInto(SILGenFunction &gen,
                                       ScalarToTupleExpr *E,
                                       Initialization *I) {
-  auto outerFields = E->getType()->castTo<TupleType>()->getFields();
+  auto tupleType = cast<TupleType>(E->getType()->getCanonicalType());
+  auto outerFields = tupleType->getFields();
   unsigned scalarField = E->getScalarField();
   bool isScalarFieldVariadic = outerFields[scalarField].isVararg();
 
   // Decompose the initialization.
   SmallVector<InitializationPtr, 4> subInitializationBuf;
-  auto subInitializations = I->getSubInitializations(gen, subInitializationBuf);
+  auto subInitializations = I->getSubInitializations(gen, tupleType,
+                                                     subInitializationBuf);
   assert(subInitializations.size() == outerFields.size() &&
          "initialization size does not match tuple size?!");
   
@@ -1519,8 +1522,7 @@ namespace {
   class ImplicitValueInitialization : public SingleInitializationBase {
     SILValue slot;
   public:
-    ImplicitValueInitialization(SILValue slot, Type type)
-      : SingleInitializationBase(type), slot(slot)
+    ImplicitValueInitialization(SILValue slot) : slot(slot)
     {}
     
     SILValue getAddressOrNull() override {
@@ -1606,8 +1608,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
       SILValue slot = gen.B.createStructElementAddr(ctor, resultSlot,
                                                     cast<VarDecl>(field),
                                     fieldTL.getLoweredType().getAddressType());
-      InitializationPtr init(new ImplicitValueInitialization(slot,
-                                                         elements[i].getType()));
+      InitializationPtr init(new ImplicitValueInitialization(slot));
       std::move(elements[i]).forwardInto(gen, init.get(), ctor);
       ++memberIndex;
       findNextPhysicalField();

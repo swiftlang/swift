@@ -58,10 +58,8 @@ public:
   
   /// The Kind of initialization.
   const Kind kind;
-  /// The Swift type of the value to be initialized.
-  const Type type;
   
-  Initialization(Kind kind, Type type) : kind(kind), type(type) {}
+  Initialization(Kind kind) : kind(kind) {}
   virtual ~Initialization() {}
 
   /// If this initialization represents a single contiguous buffer, return the
@@ -103,6 +101,7 @@ public:
   /// is given to this vector.
   ArrayRef<InitializationPtr> getSubInitializations(
                                       SILGenFunction &gen,
+                                      CanType type,
                                       SmallVectorImpl<InitializationPtr> &buf);
   
   /// Perform post-initialization bookkeeping for this initialization.
@@ -122,8 +121,8 @@ private:
 /// Abstract base class for single-buffer initializations.
 class SingleInitializationBase : public Initialization {
 public:
-  SingleInitializationBase(Type type)
-    : Initialization(Initialization::Kind::SingleBuffer, type)
+  SingleInitializationBase()
+    : Initialization(Initialization::Kind::SingleBuffer)
   {}
   
   ArrayRef<InitializationPtr> getSubInitializations() override {

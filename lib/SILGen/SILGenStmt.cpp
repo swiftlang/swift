@@ -113,8 +113,7 @@ class IndirectReturnInitialization : public SingleInitializationBase {
   SILValue address;
 public:
   IndirectReturnInitialization(SILValue address)
-    : SingleInitializationBase(address.getType().getSwiftRValueType()),
-      address(address) {}
+    : address(address) {}
   
   SILValue getAddressOrNull() override { return address; }
 };

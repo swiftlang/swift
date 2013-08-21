@@ -35,8 +35,8 @@ namespace {
   /// (that is, 'var (_)') that bind to values without storing them.
   class BlackHoleInitialization : public Initialization {
   public:
-    BlackHoleInitialization(Type type)
-      : Initialization(Initialization::Kind::Ignored, type)
+    BlackHoleInitialization()
+      : Initialization(Initialization::Kind::Ignored)
     {}
     
     SILValue getAddressOrNull() override { return SILValue(); }
@@ -54,8 +54,7 @@ namespace {
     SILValue elementAddr;
     
     TupleElementInitialization(SILValue addr)
-      : SingleInitializationBase(addr.getType().getSwiftRValueType()),
-        elementAddr(addr)
+      : elementAddr(addr)
     {}
     
     SILValue getAddressOrNull() override { return elementAddr; }
@@ -66,15 +65,17 @@ namespace {
 
 ArrayRef<InitializationPtr> Initialization::getSubInitializations(
                                      SILGenFunction &gen,
+                                     CanType type,
                                      SmallVectorImpl<InitializationPtr> &buf) {
-  TupleType *tupleTy = type->castTo<TupleType>();
+  auto tupleTy = cast<TupleType>(type);
   switch (kind) {
   case Kind::Tuple:
     return getSubInitializations();
   case Kind::Ignored: {
     // "Destructure" an ignored binding into multiple ignored bindings.
     for (auto fieldType : tupleTy->getElementTypes()) {
-      buf.push_back(InitializationPtr(new BlackHoleInitialization(fieldType)));
+      (void) fieldType;
+      buf.push_back(InitializationPtr(new BlackHoleInitialization()));
     }
     return buf;
   }
@@ -82,7 +83,7 @@ ArrayRef<InitializationPtr> Initialization::getSubInitializations(
     // Destructure the buffer into per-element buffers.
     SILValue baseAddr = getAddress();
     for (unsigned i = 0, size = tupleTy->getNumElements(); i < size; ++i) {
-      auto fieldType = tupleTy->getElementType(i);
+      auto fieldType = tupleTy.getElementType(i);
       SILType fieldTy = gen.getLoweredType(fieldType).getAddressType();
       SILValue fieldAddr = gen.B.createTupleElementAddr(SILLocation(),
                                                         baseAddr, i,
@@ -141,8 +142,7 @@ public:
   /// here.
   SmallVector<InitializationPtr, 4> subInitializations;
 
-  TupleInitialization(Type type)
-    : Initialization(Initialization::Kind::Tuple, type)
+  TupleInitialization() : Initialization(Initialization::Kind::Tuple)
   {}
   
   SILValue getAddressOrNull() override {
@@ -214,10 +214,7 @@ public:
   /// CleanupUninitializedBox cleanup that will be replaced when
   /// initialization is completed.
   LocalVariableInitialization(VarDecl *var, SILGenFunction &gen)
-    : SingleInitializationBase(var->getType()),
-      var(var),
-      gen(gen),
-      didFinish(false)
+    : var(var), gen(gen), didFinish(false)
   {
     gen.Cleanups.pushCleanup<CleanupLocalVariable>(var);
   }
@@ -245,9 +242,7 @@ class GlobalInitialization : public SingleInitializationBase {
   SILValue address;
   
 public:
-  GlobalInitialization(SILValue address)
-    : SingleInitializationBase(address.getType().getSwiftRValueType()),
-      address(address)
+  GlobalInitialization(SILValue address) : address(address)
   {}
   
   SILValue getAddressOrNull() override {
@@ -266,15 +261,16 @@ class AddressBindingInitialization : public Initialization {
   VarDecl *vd;
 public:
   AddressBindingInitialization(VarDecl *vd)
-    : Initialization(Initialization::Kind::AddressBinding,
-                     vd->getTypeOfReference()),
+    : Initialization(Initialization::Kind::AddressBinding),
       vd(vd)
   {}
   
   SILValue getAddressOrNull() override {
     llvm_unreachable("byref argument does not have an address to store to");
   }
-  ArrayRef<InitializationPtr> getSubInitializations() override { return {}; }
+  ArrayRef<InitializationPtr> getSubInitializations() override {
+    return {};
+  }
 
   void bindAddress(SILValue address, SILGenFunction &gen) override {
     // Use the input address as the var's address.
@@ -309,7 +305,7 @@ struct InitializationForPattern
   // AnyPatterns (i.e, _) don't require any storage. Any value bound here will
   // just be dropped.
   InitializationPtr visitAnyPattern(AnyPattern *P) {
-    return InitializationPtr(new BlackHoleInitialization(P->getType()));
+    return InitializationPtr(new BlackHoleInitialization());
   }
   
   // Bind to a named pattern by creating a memory location and initializing it
@@ -320,7 +316,7 @@ struct InitializationForPattern
     // If this is a property, we don't need to do anything here. We'll generate
     // the getter and setter when we see their FuncDecls.
     if (vd->isProperty())
-      return InitializationPtr(new BlackHoleInitialization(vd->getType()));
+      return InitializationPtr(new BlackHoleInitialization());
 
     // If this is a [byref] argument, bind the argument lvalue as our
     // address.
@@ -342,7 +338,7 @@ struct InitializationForPattern
   // Bind a tuple pattern by aggregating the component variables into a
   // TupleInitialization.
   InitializationPtr visitTuplePattern(TuplePattern *P) {
-    TupleInitialization *init = new TupleInitialization(P->getType());
+    TupleInitialization *init = new TupleInitialization();
     for (auto &elt : P->getFields())
       init->subInitializations.push_back(visit(elt.getPattern()));
     return InitializationPtr(init);
@@ -492,7 +488,8 @@ struct ArgumentInitVisitor :
     
     // Destructure the initialization into per-element Initializations.
     SmallVector<InitializationPtr, 2> buf;
-    ArrayRef<InitializationPtr> subInits = I->getSubInitializations(gen, buf);
+    ArrayRef<InitializationPtr> subInits =
+      I->getSubInitializations(gen, P->getType()->getCanonicalType(), buf);
 
     assert(P->getFields().size() == subInits.size() &&
            "TupleInitialization size does not match tuple pattern size!");
