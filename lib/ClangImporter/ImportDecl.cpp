@@ -791,6 +791,7 @@ namespace {
                                        argPatterns, bodyPatterns,
                                        TypeLoc::withoutLoc(resultTy), dc);
       funcExpr->setType(type);
+      funcExpr->setBodyResultType(resultTy);
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto result = new (Impl.SwiftContext) FuncDecl(SourceLoc(), loc,
                                                      name, nameLoc,
@@ -961,7 +962,7 @@ namespace {
                                        argPatterns, bodyPatterns,
                                        TypeLoc::withoutLoc(resultTy), dc);
       funcExpr->setType(type);
-
+      funcExpr->setBodyResultType(resultTy);
       auto result = new (Impl.SwiftContext) FuncDecl(SourceLoc(), loc,
                                                      name, nameLoc,
                                                      /*GenericParams=*/0,
@@ -1438,6 +1439,7 @@ namespace {
                                        TypeLoc::withoutLoc(elementTy),
                                        getter->getDeclContext());
       funcExpr->setType(getterType);
+      funcExpr->setBodyResultType(elementTy);
       setVarDeclContexts(getterArgs, funcExpr);
 
       // Create the getter thunk.
@@ -1562,6 +1564,7 @@ namespace {
                               TypeLoc::withoutLoc(TupleType::getEmpty(context)),
                                        setter->getDeclContext());
       funcExpr->setType(setterType);
+      funcExpr->setBodyResultType(TupleType::getEmpty(context));
       setVarDeclContexts(setterArgs, funcExpr);
 
       // Create the setter thunk.
@@ -2530,6 +2533,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                    TypeLoc::withoutLoc(type),
                                    dc);
   funcExpr->setType(getterType);
+  funcExpr->setBodyResultType(type);
   setVarDeclContexts(getterArgs, funcExpr);
 
   // Create the getter function declaration.

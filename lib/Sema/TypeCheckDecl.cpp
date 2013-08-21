@@ -1035,6 +1035,7 @@ public:
     if (!funcTy) {
       funcTy = TupleType::getEmpty(TC.Context);
     }
+    auto bodyResultType = funcTy;
 
     // FIXME: it would be nice to have comments explaining what this is all about.
     auto patterns = FE->getArgParamPatterns();
@@ -1069,6 +1070,7 @@ public:
 
     }
     FE->setType(funcTy);
+    FE->setBodyResultType(bodyResultType);
   }
 
   /// Bind the given function declaration, which declares an operator, to

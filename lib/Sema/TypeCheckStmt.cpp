@@ -132,14 +132,7 @@ public:
   
   Type returnTypeOfFunc() {
     if (auto fe = TheFunc.dyn_cast<FuncExpr*>()) {
-      Type resultTy = fe->getType();
-      if (resultTy->is<ErrorType>())
-        return resultTy;
-      for (unsigned i = 0, e = fe->getNumParamPatterns();
-           i != e;
-           ++i)
-        resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
-      return resultTy;
+      return fe->getBodyResultType();
     } else if (auto closure = TheFunc.dyn_cast<PipeClosureExpr *>()) {
       return closure->getResultType();
     } else

@@ -1688,6 +1688,11 @@ class FuncExpr : public CapturingExpr {
 
   TypeLoc FnRetType;
 
+  /// The result type as seen from the body of the function.
+  ///
+  /// \sa getBodyResultType()
+  Type BodyResultType;
+
   Pattern **getParamsBuffer() {
     return reinterpret_cast<Pattern**>(this+1);
   }
@@ -1843,8 +1848,28 @@ public:
 
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
 
-  /// \brief Retrieve the result type of this function.
+  /// Retrieve the result type of this function.
+  ///
+  /// \sa getBodyResultType
   Type getResultType(ASTContext &Ctx) const;
+
+  /// Retrieve the result type of this function for use within the function
+  /// definition.
+  ///
+  /// FIXME: The statement below is a wish, not reality.
+  /// The "body" result type will only differ from the result type within the
+  /// interface to the function for a polymorphic function, where the interface
+  /// may contain generic parameters while the definition will contain
+  /// the corresponding archetypes.
+  Type getBodyResultType() const { return BodyResultType; }
+
+  /// Set the result type as viewed from the function body.
+  ///
+  /// \sa getBodyResultType
+  void setBodyResultType(Type bodyResultType) {
+    assert(BodyResultType.isNull() && "Already set body result type");
+    BodyResultType = bodyResultType;
+  }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Func; }
   static bool classof(const DeclContext *DC) {

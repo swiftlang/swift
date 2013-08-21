@@ -532,6 +532,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   Type FuncTy = FunctionType::get(ParamPat->getType(), TupleType::getEmpty(C),
                                   C);
   FE->setType(FuncTy);
+  FE->setBodyResultType(TupleType::getEmpty(C));
   Arg->setDeclContext(FE);
   
   // Convert the pattern to a string we can print.
