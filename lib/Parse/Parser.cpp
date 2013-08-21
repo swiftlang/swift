@@ -381,7 +381,7 @@ bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
     consumeToken();
     return false;
   default:
-    Diags.diagnose(Tok.getLoc(), D);
+    diagnose(Tok.getLoc(), D);
     return true;
   }
 }
@@ -397,7 +397,7 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
     return false;
   }
   
-  Diags.diagnose(Tok.getLoc(), D);
+  diagnose(Tok.getLoc(), D);
   return true;
 }
 
