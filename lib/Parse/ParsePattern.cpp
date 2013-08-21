@@ -91,8 +91,7 @@ parseSelectorArgument(Parser &P,
   }
   
   if (!P.Tok.is(tok::l_paren)) {
-    P.diagnose(P.Tok.getLoc(),
-                     diag::func_selector_without_paren);
+    P.diagnose(P.Tok.getLoc(), diag::func_selector_without_paren);
     return makeParserError();
   }
   P.consumeToken();
