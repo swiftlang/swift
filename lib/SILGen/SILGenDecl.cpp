@@ -557,7 +557,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   case CaptureKind::Byref: {
     // Byref captures are non-escaping, so it's sufficient to capture only the
     // address.
-    SILType ty = gen.getLoweredType(capture->getType().getAddressType());
+    SILType ty = gen.getLoweredType(capture->getType()).getAddressType();
     SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin());
     gen.VarLocs[capture] = {SILValue(), addr};
     break;

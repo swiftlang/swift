@@ -746,7 +746,7 @@ public:
   void printSubstitutions(ArrayRef<Substitution> Substitutions) {
     for (auto S : Substitutions) {
       OS.indent(Indent + 2) << "(with " << S.Archetype->getFullName()
-                            << " = " << S.Replacement.getString() << ")\n";
+                            << " = " << S.Replacement << ")\n";
     }
   }
 
@@ -818,7 +818,7 @@ public:
     for (ValueDecl *D : E->getDecls()) {
       OS << '\n';
       OS.indent(Indent);
-      OS << "  type=" << D->getTypeOfReference().getString();
+      OS << "  type=" << D->getType();
     }
     OS << ')';
   }
@@ -830,7 +830,7 @@ public:
     for (ValueDecl *D : E->getDecls()) {
       OS << '\n';
       OS.indent(Indent);
-      OS << "  type=" << D->getTypeOfReference().getString();
+      OS << "  type=" << D->getType();
     }
     OS << ')';
   }
