@@ -460,7 +460,7 @@ public:
                                Diag<> ErrorDiag, unsigned flags);
   ParserResult<StructDecl> parseDeclStruct(unsigned Flags);
   ParserResult<ClassDecl> parseDeclClass(unsigned Flags);
-  bool parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
+  ParserStatus parseDeclVar(unsigned Flags, SmallVectorImpl<Decl *> &Decls);
   bool parseGetSet(bool HasContainerType, Pattern *Indices, TypeLoc ElementTy,
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc);
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);

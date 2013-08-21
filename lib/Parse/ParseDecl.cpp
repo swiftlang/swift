@@ -552,7 +552,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
         .highlight(SourceRange(StaticLoc));
       UnhandledStatic = false;
     }
-    HadParseError = parseDeclVar(Flags, Entries);
+    HadParseError = parseDeclVar(Flags, Entries).isError();
     break;
   case tok::kw_typealias:
     if (Decl *D = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
@@ -1257,12 +1257,13 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
 ///   decl-var:
 ///      'var' attribute-list pattern initializer? (',' pattern initializer? )*
 ///      'var' attribute-list identifier : type-annotation { get-set }
-bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
+ParserStatus Parser::parseDeclVar(unsigned Flags,
+                                  SmallVectorImpl<Decl *> &Decls) {
   SourceLoc VarLoc = consumeToken(tok::kw_var);
 
   SmallVector<PatternBindingDecl*, 4> PBDs;
   bool HasGetSet = false;
-  bool isInvalid = false;
+  ParserStatus Status;
 
   unsigned FirstDecl = Decls.size();
 
@@ -1271,7 +1272,10 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
     parseAttributeList(Attributes);
 
     ParserResult<Pattern> pattern = parsePattern();
-    if (pattern.isNull()) return true;
+    if (pattern.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
+    if (pattern.isNull())
+      return makeParserError();
 
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
@@ -1292,7 +1296,7 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
       SourceLoc EqualLoc = consumeToken(tok::equal);
       Init = parseExpr(diag::expected_initializer_expr);
       if (Init.isNull()) {
-        isInvalid = true;
+        Status.setIsParseError();
         break;
       }
     
@@ -1303,7 +1307,7 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
       }
       if (Flags & PD_DisallowInit) {
         diagnose(EqualLoc, diag::disallowed_init);
-        isInvalid = true;
+        Status.setIsParseError();
       }
     }
 
@@ -1326,7 +1330,7 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
           if (HasGetSet) {
             // FIXME -- offer a fixit to explicitly specify the type
             diagnose(PrevPat->getLoc(), diag::getset_cannot_be_implied);
-            isInvalid = true;
+            Status.setIsParseError();
           }
 
           TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
@@ -1341,15 +1345,15 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
   if (HasGetSet) {
     if (PBDs.size() > 1) {
       diagnose(VarLoc, diag::disallowed_property_multiple_getset);
-      isInvalid = true;
+      Status.setIsParseError();
     }
     if (Flags & PD_DisallowProperty) {
       diagnose(VarLoc, diag::disallowed_property_decl);
-      isInvalid = true;
+      Status.setIsParseError();
     }
   } else if (Flags & PD_DisallowVar) {
     diagnose(VarLoc, diag::disallowed_var_decl);
-    return true;
+    return makeParserError();
   }
 
   // If this is a var in the top-level of script/repl translation unit, then
@@ -1368,7 +1372,7 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
     }
   }
 
-  return isInvalid;
+  return Status;
 }
 
 /// addImplicitThisParameter - Add an implicit 'this' parameter to the given

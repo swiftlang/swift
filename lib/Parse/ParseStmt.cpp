@@ -599,7 +599,8 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   }
   // Parse the first part, either a var, expr, or stmt-assign.
   if (Tok.is(tok::kw_var)) {
-    if (parseDeclVar(false, FirstDecls)) return 0;
+    if (parseDeclVar(false, FirstDecls).isError())
+      return nullptr;
   } else if ((Tok.isNot(tok::semi) && parseExprForCStyle(*this, First)))
     return nullptr; // FIXME: better recovery
 
