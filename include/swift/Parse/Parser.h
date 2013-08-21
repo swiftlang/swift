@@ -458,7 +458,7 @@ public:
   bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
                                SourceLoc LBLoc, SourceLoc &RBLoc,
                                Diag<> ErrorDiag, unsigned flags);
-  bool parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
+  ParserResult<StructDecl> parseDeclStruct(unsigned Flags);
   bool parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseGetSet(bool HasContainerType, Pattern *Indices, TypeLoc ElementTy,

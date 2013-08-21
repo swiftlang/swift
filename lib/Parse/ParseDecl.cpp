@@ -569,7 +569,10 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     HadParseError = parseDeclUnionElement(Flags, Entries);
     break;
   case tok::kw_struct:
-    HadParseError = parseDeclStruct(Flags, Entries);
+    if (Decl *D = parseDeclStruct(Flags).getPtrOrNull())
+      Entries.push_back(D);
+    else
+      HadParseError = true;
     break;
   case tok::kw_class:
     HadParseError = parseDeclClass(Flags, Entries);
@@ -1836,7 +1839,7 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
 ///   decl-struct-body:
 ///      decl*
 ///
-bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
+ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
   
   DeclAttributes Attributes;
@@ -1846,7 +1849,7 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SourceLoc StructNameLoc;
   if (parseIdentifier(StructName, StructNameLoc,
                       diag::expected_identifier_in_decl, "struct"))
-    return true;
+    return nullptr;
 
   // Parse the generic-params, if present.
   GenericParamList *GenericParams = nullptr;
@@ -1860,7 +1863,6 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
                                             { },
                                             GenericParams,
                                             CurDeclContext);
-  Decls.push_back(SD);
 
   if (Attributes.isValid()) SD->getMutableAttrs() = Attributes;
 
@@ -1883,7 +1885,7 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
     SD->setMembers({}, Tok.getLoc());
-    return true;
+    return makeParserErrorResult(SD);
   }
 
   bool Invalid = false;
@@ -1903,10 +1905,13 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
 
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(StructLoc, diag::disallowed_type);
-    return true;
+    return makeParserErrorResult(SD);
   }
 
-  return Invalid;
+  if (Invalid)
+    return makeParserErrorResult(SD);
+  else
+    return makeParserResult(SD);
 }
 
 /// parseDeclClass - Parse a 'class' declaration, returning true (and doing no
