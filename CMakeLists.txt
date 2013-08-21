@@ -169,6 +169,14 @@ else ()
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -stdlib=libc++")
 endif ()
 
+# Compile with -Wdocumentation.
+check_cxx_compiler_flag("-Werror -Wdocumentation" CXX_SUPPORTS_DOCUMENTATION_FLAG)
+if( CXX_SUPPORTS_DOCUMENTATION_FLAG )
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdocumentation" )
+endif()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++ -fno-rtti -fno-exceptions")
+
 # Compile a swift file into an object file (as a library).
 #
 # Usage:
