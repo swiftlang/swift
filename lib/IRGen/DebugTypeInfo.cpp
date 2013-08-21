@@ -23,11 +23,11 @@ using namespace swift;
 using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, uint64_t Size, uint64_t Align)
-  : Ty(Ty), SizeInBytes(Size), AlignmentInBytes(Align) {
+  : Ty(Ty), SizeInBytes(Size), AlignInBytes(Align) {
 }
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, Size Size, Alignment Align)
-  : Ty(Ty), SizeInBytes(Size.getValue()), AlignmentInBytes(Align.getValue()) {
+  : Ty(Ty), SizeInBytes(Size.getValue()), AlignInBytes(Align.getValue()) {
 }
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
@@ -35,7 +35,7 @@ DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     SizeInBytes = FixTy.getFixedSize().getValue();
-    AlignmentInBytes = FixTy.getBestKnownAlignment().getValue();
+    AlignInBytes = FixTy.getBestKnownAlignment().getValue();
   }
 }
 
@@ -45,14 +45,14 @@ DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, const TypeInfo &Info)
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     SizeInBytes = FixTy.getFixedSize().getValue();
-    AlignmentInBytes = FixTy.getBestKnownAlignment().getValue();
+    AlignInBytes = FixTy.getBestKnownAlignment().getValue();
   }
 }
 
 DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, Size Size, Alignment Align)
   : Ty(Decl.getType()),
     SizeInBytes(Size.getValue()),
-    AlignmentInBytes(Align.getValue()) {
+    AlignInBytes(Align.getValue()) {
 }
 
 static bool typesEqual(Type A, Type B) {
@@ -76,7 +76,7 @@ static bool typesEqual(Type A, Type B) {
 bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
   return typesEqual(Ty, T.Ty)
     && SizeInBytes == T.SizeInBytes
-    && AlignmentInBytes == T.AlignmentInBytes;
+    && AlignInBytes == T.AlignInBytes;
 }
 
 bool DebugTypeInfo::operator!=(DebugTypeInfo T) const {

@@ -807,7 +807,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // to emit the (target!) size of the underlying basic type.
   unsigned SizeOfByte = TargetInfo.getCharWidth();
   uint64_t SizeInBits = DbgTy.SizeInBytes * SizeOfByte;
-  uint64_t AlignInBits = DbgTy.AlignmentInBytes * SizeOfByte;
+  uint64_t AlignInBits = DbgTy.AlignInBytes * SizeOfByte;
   unsigned Encoding = 0;
   unsigned Flags = 0;
 
@@ -827,7 +827,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // FIXME: Translate this into the actually allocated number of
     // bits using TargetInfo.
     SizeInBits = IntegerTy->getBitWidth();
-    Name = "_TtSi";
+    switch (SizeInBits) {
+    case 8:   Name = "Int8";   break;
+    case 16:  Name = "Int16";  break;
+    case 32:  Name = "Int32";  break;
+    case 64:  Name = "Int64";  break;
+    case 128: Name = "Int128"; break;
+    default:  Name = "Int";
+    }
     Encoding = llvm::dwarf::DW_ATE_unsigned;
     break;
   }
@@ -837,7 +844,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Assuming that the bitwidth and FloatTy->getFPKind() are identical.
     SizeInBits = FloatTy->getBitWidth();
     Encoding = llvm::dwarf::DW_ATE_float;
-    Name = "_TtSf";
+    switch (SizeInBits) {
+    case 16:  Name = "Float16";  break;
+    case 32:  Name = "Float32";  break;
+    case 64:  Name = "Float64";  break;
+    case 80:  Name = "Float80";  break;
+    case 128: Name = "Float128"; break;
+    default:  Name = "Float";
+    }
     break;
   }
 
@@ -962,7 +976,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // FIXME: handle LValueTy->getQualifiers();
     auto LValueTy = BaseTy->castTo<LValueType>();
     auto CanTy = LValueTy->getObjectType()->getCanonicalType();
-    return getOrCreateType(DebugTypeInfo(CanTy, SizeInBits, AlignInBits), Scope);
+    auto DTI = DebugTypeInfo(CanTy, DbgTy.SizeInBytes, DbgTy.AlignInBytes);
+    return getOrCreateType(DTI, Scope);
   }
 
   case TypeKind::Archetype: {
@@ -977,9 +992,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto Metatype = BaseTy->castTo<MetaTypeType>();
     auto CanTy = Metatype->getInstanceType()->getCanonicalType();
     // The type this metatype is describing.
-    auto InstanceDTI = DebugTypeInfo(CanTy, SizeInBits, AlignInBits);
+    auto DTI = DebugTypeInfo(CanTy, DbgTy.SizeInBytes, DbgTy.AlignInBytes);
     return DBuilder.createQualifiedType(DW_TAG_meta_type,
-                                        getOrCreateType(InstanceDTI, Scope));
+                                        getOrCreateType(DTI, Scope));
   }
 
   case TypeKind::Function: {
@@ -1004,8 +1019,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       auto AliasedTy = Decl->hasUnderlyingType()
         ? Decl->getUnderlyingType()
         : NameAliasTy->getDesugaredType();
-      auto CanDTI = DebugTypeInfo(AliasedTy, SizeInBits, AlignInBits);
-      return DBuilder.createTypedef(getOrCreateType(CanDTI, Scope), Name,
+      auto DTI =DebugTypeInfo(AliasedTy, DbgTy.SizeInBytes, DbgTy.AlignInBytes);
+      return DBuilder.createTypedef(getOrCreateType(DTI, Scope), Name,
                                     getOrCreateFile(L.Filename), L.Line, Scope);
     }
     DEBUG(llvm::dbgs() << "Name alias without Decl: ";
@@ -1016,8 +1031,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::ArraySlice: {
     auto ArraySliceTy = cast<ArraySliceType>(BaseTy);
     auto CanTy = ArraySliceTy->getDesugaredType();
-    auto CanDTI = DebugTypeInfo(CanTy, SizeInBits, AlignInBits);
-    return getOrCreateType(CanDTI, Scope);
+    auto DTI = DebugTypeInfo(CanTy, DbgTy.SizeInBytes, DbgTy.AlignInBytes);
+    return getOrCreateType(DTI, Scope);
   }
 
   default:

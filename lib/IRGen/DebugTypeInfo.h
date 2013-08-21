@@ -37,10 +37,10 @@ namespace swift {
     public:
       Type Ty;
       uint64_t SizeInBytes;
-      uint64_t AlignmentInBytes;
+      uint64_t AlignInBytes;
 
       DebugTypeInfo()
-        : Ty(),  SizeInBytes(0), AlignmentInBytes(0) {
+        : Ty(),  SizeInBytes(0), AlignInBytes(0) {
       }
       DebugTypeInfo(Type Ty, uint64_t Size, uint64_t Align);
       DebugTypeInfo(Type Ty, Size Size, Alignment Align);
