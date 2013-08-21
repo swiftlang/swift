@@ -356,9 +356,7 @@ public:
     
     // Compute the expression that determines whether the range is empty.
     Expr *Empty
-      = TC.callWitness(new (TC.Context) DeclRefExpr(
-                                          Range, S->getInLoc(),
-                                          Range->getTypeOfReference()),
+      = TC.callWitness(TC.buildCheckedRefExpr(Range, S->getInLoc()),
                        DC, EnumeratorProto, Conformance,
                        TC.Context.getIdentifier("isEmpty"),
                        { },
@@ -369,9 +367,7 @@ public:
     
     // Compute the expression that extracts a value from the range.
     Expr *GetFirstAndAdvance
-      = TC.callWitness(new (TC.Context) DeclRefExpr(
-                                          Range, S->getInLoc(),
-                                          Range->getTypeOfReference()),
+      = TC.callWitness(TC.buildCheckedRefExpr(Range, S->getInLoc()),
                        DC, EnumeratorProto, Conformance,
                        TC.Context.getIdentifier("next"),
                        { },
@@ -634,9 +630,7 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *thisDecl,
 
   case PatternKind::Named:
     return new (tc.Context) UnresolvedDotExpr(
-             new (tc.Context) DeclRefExpr(thisDecl,
-                                          SourceLoc(),
-                                          thisDecl->getTypeOfReference()),
+             tc.buildRefExpr(thisDecl, SourceLoc()),
              SourceLoc(), 
              cast<NamedPattern>(pattern)->getDecl()->getName(), 
              SourceLoc());
@@ -808,9 +802,7 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
           auto thisDecl = ctor->getImplicitThisDecl();
           Expr *dest
             = new (Context) UnresolvedDotExpr(
-                new (Context) DeclRefExpr(thisDecl,
-                                          SourceLoc(),
-                                          thisDecl->getTypeOfReference()),
+                new (Context) DeclRefExpr(thisDecl, SourceLoc()),
                 SourceLoc(), 
                 var->getName(),
                 SourceLoc());
