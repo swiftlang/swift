@@ -295,9 +295,8 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   
   // If the referenced decl isn't a VarDecl, it should be a constant of some
   // sort.
-  assert(!decl->getTypeOfReference()->is<LValueType>() &&
-         "unexpected lvalue decl ref?!");
-  
+  assert(!decl->isReferencedAsLValue());
+
   // If the referenced decl is a local func with context, then the SILDeclRef
   // uncurry level is one deeper (for the context vars).
   if (auto *fd = dyn_cast<FuncDecl>(decl)) {
@@ -1911,7 +1910,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
 
   switch (getDeclCaptureKind(capture)) {
   case CaptureKind::Box: {
-    SILType ty = gen.getLoweredType(capture->getTypeOfReference());
+    SILType ty = gen.getLoweredType(capture->getType()).getAddressType();
     // Forward the captured owning ObjectPointer.
     addSILArgument(SILType::getObjectPointerType(c));
     // Forward the captured value address.
@@ -1920,7 +1919,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   }
   case CaptureKind::Byref: {
     // Forward the captured address.
-    SILType ty = gen.getLoweredType(capture->getTypeOfReference());
+    SILType ty = gen.getLoweredType(capture->getType()).getAddressType();
     addSILArgument(ty);
     break;
   }

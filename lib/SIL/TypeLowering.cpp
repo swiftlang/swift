@@ -290,8 +290,9 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
 
   if (capture->getType()->is<LValueType>())
     return CaptureKind::Byref;
-  if (capture->getTypeOfReference()->is<LValueType>()) {
-    // FIXME: Not-used-as-lvalue captures can be captured by value.
+  if (capture->isReferencedAsLValue()) {
+    // FIXME: variables that aren't modified after capture can be
+    // captured by value.
 
     // Otherwise, we need to pass a box.
     return CaptureKind::Box;
@@ -1447,7 +1448,7 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
     switch (getDeclCaptureKind(capture)) {
     case CaptureKind::Constant:
       // Constants are captured by value.
-      assert(!capture->getTypeOfReference()->is<LValueType>() &&
+      assert(!capture->isReferencedAsLValue() &&
              "constant capture is an lvalue?!");
       inputFields.push_back(TupleTypeElt(capture->getType()));
       break;
@@ -1479,7 +1480,7 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
     }
     case CaptureKind::Box:
       // Capture the owning ObjectPointer and the address of the value.
-      assert(capture->getTypeOfReference()->is<LValueType>() &&
+      assert(capture->isReferencedAsLValue() &&
              "lvalue capture not an lvalue?!");
       inputFields.push_back(Context.TheObjectPointerType);
       LValueType *lvType = LValueType::get(capture->getType(),
@@ -1513,7 +1514,7 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
                                          e->getParent());
     } else {
       FuncDecl *func = cast<FuncDecl>(vd);
-      auto *funcTy = func->getTypeOfReference()->castTo<AnyFunctionType>();
+      auto *funcTy = func->getType()->castTo<AnyFunctionType>();
       return getFunctionTypeWithCaptures(funcTy,
                                          func->getCaptures(),
                                          func->getDeclContext());
@@ -1561,7 +1562,7 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
       
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::UnionElement:
-    return vd->getTypeOfReference();
+    return vd->getType();
   
   case SILDeclRef::Kind::Initializer:
     return cast<ConstructorDecl>(vd)->getInitializerType();
@@ -1600,7 +1601,7 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
 SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
                                                  Type lvalueType) {
   // The l-value type is the result of applying substitutions to
-  // value->getTypeOfReference().  Essentially, we want to apply those
+  // the type-of-reference.  Essentially, we want to apply those
   // same substitutions to value->getType().
 
   // Canonicalize and lower the l-value's object type.
@@ -1615,9 +1616,9 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
   if (valueType == substType)
     return silSubstType;
 
-  // Type substitution preserves structural type structure, and
-  // getTypeOfReference() only adjusts the outermost structural types.
-  // So, basically, we just need to undo the changes made by
+  // Type substitution preserves structural type structure, and the
+  // type-of-reference is only different in the outermost structural
+  // types.  So, basically, we just need to undo the changes made by
   // getTypeOfReference and then reapply them on the substituted type.
 
   // The only really significant manipulation there is with [weak] and

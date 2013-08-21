@@ -546,11 +546,10 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   case CaptureKind::Box: {
     // LValues are captured as two arguments: a retained ObjectPointer that owns
     // the captured value, and the address of the value itself.
-    SILType ty = gen.getLoweredType(capture->getTypeOfReference());
+    SILType ty = gen.getLoweredType(capture->getType()).getAddressType();
     SILValue box = new (gen.SGM.M) SILArgument(SILType::getObjectPointerType(c),
-                                           gen.F.begin());
-    SILValue addr = new (gen.SGM.M) SILArgument(ty,
-                                            gen.F.begin());
+                                               gen.F.begin());
+    SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin());
     gen.VarLocs[capture] = {box, addr};
     gen.Cleanups.pushCleanup<CleanupCaptureBox>(box);
     break;
@@ -558,7 +557,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   case CaptureKind::Byref: {
     // Byref captures are non-escaping, so it's sufficient to capture only the
     // address.
-    SILType ty = gen.getLoweredType(capture->getTypeOfReference());
+    SILType ty = gen.getLoweredType(capture->getType().getAddressType());
     SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin());
     gen.VarLocs[capture] = {SILValue(), addr};
     break;
