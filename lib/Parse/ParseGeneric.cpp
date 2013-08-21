@@ -62,7 +62,7 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
       } else if (Tok.getKind() == tok::kw_protocol) {
         Ty = parseTypeComposition();
       } else {
-        diagnose(Tok.getLoc(), diag::expected_generics_type_restriction, Name);
+        diagnose(Tok, diag::expected_generics_type_restriction, Name);
         Invalid = true;
       }
 
@@ -99,7 +99,7 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   SourceLoc RAngleLoc;
   if (!startsWithGreater(Tok)) {
     if (!Invalid) {
-      diagnose(Tok.getLoc(), diag::expected_rangle_generics_param);
+      diagnose(Tok, diag::expected_rangle_generics_param);
       diagnose(LAngleLoc, diag::opening_angle);
       
       Invalid = true;

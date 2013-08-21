@@ -1824,8 +1824,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         continue;
       }
 
-      P.diagnose(P.Tok.getLoc(), diag::expected_tok_in_sil_instr,
-                 "case or default");
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "case or default");
       return true;
     }
     ResultVal = B.createSwitchUnion(InstLoc, Val, DefaultBB, CaseBBs);
@@ -1875,8 +1874,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         continue;
       }
 
-      P.diagnose(P.Tok.getLoc(), diag::expected_tok_in_sil_instr,
-                 "case or default");
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "case or default");
       return true;
     }
     ResultVal = B.createSwitchInt(InstLoc, Val, DefaultBB, CaseBBs);

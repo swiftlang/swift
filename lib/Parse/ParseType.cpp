@@ -83,7 +83,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     return makeParserCodeCompletionResult<TypeRepr>();
   }
   default:
-    diagnose(Tok.getLoc(), MessageID);
+    diagnose(Tok, MessageID);
     return nullptr;
   }
 
@@ -184,7 +184,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
   } while (consumeIf(tok::comma));
 
   if (!startsWithGreater(Tok)) {
-    diagnose(Tok.getLoc(), diag::expected_rangle_generic_arg_list);
+    diagnose(Tok, diag::expected_rangle_generic_arg_list);
     diagnose(LAngleLoc, diag::opening_angle);
 
     // Skip until we hit the '>'.
@@ -206,7 +206,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 ///
 ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_This)) {
-    diagnose(Tok.getLoc(), diag::expected_identifier_for_type);
+    diagnose(Tok, diag::expected_identifier_for_type);
     return nullptr;
   }
 
@@ -270,7 +270,7 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
  
   // Check for the starting '<'.
   if (!startsWithLess(Tok)) {
-    diagnose(Tok.getLoc(), diag::expected_langle_protocol);
+    diagnose(Tok, diag::expected_langle_protocol);
     return nullptr;
   }
   SourceLoc LAngleLoc = consumeStartingLess();
@@ -302,7 +302,7 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
   SourceLoc EndLoc = Tok.getLoc();
   if (!startsWithGreater(Tok)) {
     if (!Invalid) {
-      diagnose(Tok.getLoc(), diag::expected_rangle_protocol);
+      diagnose(Tok, diag::expected_rangle_protocol);
       diagnose(LAngleLoc, diag::opening_angle);
     }
 

@@ -455,7 +455,7 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
     // Postfix operators cannot start a subexpression, but can happen
     // syntactically because the operator may just follow whatever preceeds this
     // expression (and that may not always be an expression).
-    diagnose(Tok.getLoc(), diag::invalid_postfix_operator);
+    diagnose(Tok, diag::invalid_postfix_operator);
     Tok.setKind(tok::oper_prefix);
     SWIFT_FALLTHROUGH;
   case tok::oper_prefix:
@@ -528,7 +528,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
     // If the bound is missing, that's okay unless this is the first bound.
     if (Tok.is(tok::r_square)) {
       if (bounds.empty()) {
-        diagnose(Tok.getLoc(), diag::array_new_missing_first_bound);
+        diagnose(Tok, diag::array_new_missing_first_bound);
         hadInvalid = true;
       }
 
@@ -540,7 +540,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
     auto boundValue = parseExpr(diag::expected_expr_new_array_bound);
     if (boundValue.isNull() || !Tok.is(tok::r_square)) {
       if (!boundValue.isNull())
-        diagnose(Tok.getLoc(), diag::expected_bracket_array_new);
+        diagnose(Tok, diag::expected_bracket_array_new);
 
       skipUntil(tok::r_square);
       if (!Tok.is(tok::r_square)) return nullptr;
@@ -822,7 +822,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     return nullptr;
 
   default:
-    diagnose(Tok.getLoc(), ID);
+    diagnose(Tok, ID);
     return nullptr;
   }
   

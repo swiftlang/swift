@@ -91,7 +91,7 @@ parseSelectorArgument(Parser &P,
   }
   
   if (!P.Tok.is(tok::l_paren)) {
-    P.diagnose(P.Tok.getLoc(), diag::func_selector_without_paren);
+    P.diagnose(P.Tok, diag::func_selector_without_paren);
     return makeParserError();
   }
   P.consumeToken();
@@ -505,7 +505,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 ParserResult<Pattern> Parser::parseMatchingPatternVar() {
   // 'var' patterns shouldn't nest.
   if (VarPatternDepth >= 1)
-    diagnose(Tok.getLoc(), diag::var_pattern_in_var);
+    diagnose(Tok, diag::var_pattern_in_var);
   
   VarPatternScope scope(*this);
   

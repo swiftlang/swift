@@ -73,7 +73,7 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
 
 bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
   if (Tok.is(tok::semi)) {
-    diagnose(Tok.getLoc(), diag::illegal_semi_stmt)
+    diagnose(Tok, diag::illegal_semi_stmt)
       .fixItRemove(SourceRange(Tok.getLoc()));
     consumeToken();
     return true;
@@ -321,7 +321,7 @@ void Parser::parseTopLevelCodeDeclDelayed() {
 static NullablePtr<Stmt> recoverFromInvalidCase(Parser &P) {
   assert(P.Tok.is(tok::kw_case) || P.Tok.is(tok::kw_default)
          && "not case or default?!");
-  P.diagnose(P.Tok.getLoc(), diag::case_outside_of_switch, P.Tok.getText());
+  P.diagnose(P.Tok, diag::case_outside_of_switch, P.Tok.getText());
   P.skipUntil(tok::colon);
   // FIXME: Return an ErrorStmt?
   return nullptr;
@@ -359,7 +359,7 @@ NullablePtr<Stmt> Parser::parseStmt() {
 ///
 NullablePtr<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   if (Tok.isNot(tok::l_brace)) {
-    diagnose(Tok.getLoc(), ID);
+    diagnose(Tok, ID);
     return 0;
   }
   SourceLoc LBLoc = consumeToken(tok::l_brace);
@@ -773,7 +773,7 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
     return nullptr;
   
   if (!Tok.is(tok::l_brace)) {
-    diagnose(Tok.getLoc(), diag::expected_lbrace_after_switch);
+    diagnose(Tok, diag::expected_lbrace_after_switch);
     return nullptr;
   }
   
@@ -786,7 +786,7 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
   while (!Tok.is(tok::kw_case) && !Tok.is(tok::kw_default)
          && !Tok.is(tok::r_brace) && !Tok.is(tok::eof)) {
     if (!uncoveredStmt)
-      diagnose(Tok.getLoc(), diag::stmt_in_switch_not_covered_by_case);
+      diagnose(Tok, diag::stmt_in_switch_not_covered_by_case);
     if (parseExprOrStmt(uncoveredStmt))
       return nullptr;
   }
@@ -799,7 +799,7 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
     // the first offender.
     if (parsedDefault && !parsedBlockAfterDefault) {
       parsedBlockAfterDefault = true;
-      diagnose(Tok.getLoc(), diag::case_after_default);
+      diagnose(Tok, diag::case_after_default);
     }
     
     NullablePtr<CaseStmt> c = parseStmtCase();
@@ -832,7 +832,7 @@ bool Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
   do {
     // 'default' should label a block by itself.
     if (parsedDefault && !parsedOtherLabelWithDefault) {
-      diagnose(Tok.getLoc(), diag::default_with_other_labels);
+      diagnose(Tok, diag::default_with_other_labels);
       parsedOtherLabelWithDefault = true;
     }
 
@@ -868,7 +868,7 @@ bool Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
       
       SourceLoc colonLoc = Tok.getLoc();
       if (!Tok.is(tok::colon))
-        diagnose(Tok.getLoc(), diag::expected_case_colon, "case");
+        diagnose(Tok, diag::expected_case_colon, "case");
       else
         colonLoc = consumeToken();
       
@@ -883,7 +883,7 @@ bool Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
     
     // 'default' should label a block by itself.
     if (!labels.empty() && !parsedOtherLabelWithDefault) {
-      diagnose(Tok.getLoc(), diag::default_with_other_labels);
+      diagnose(Tok, diag::default_with_other_labels);
       parsedOtherLabelWithDefault = true;
     }
     
@@ -895,7 +895,7 @@ bool Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
     SourceLoc whereLoc;
     Expr *guardExpr = nullptr;
     if (Tok.is(tok::kw_where)) {
-      diagnose(Tok.getLoc(), diag::default_with_where);
+      diagnose(Tok, diag::default_with_where);
       whereLoc = consumeToken();
       NullablePtr<Expr> guard = parseExpr(diag::expected_case_where_expr);
       if (guard.isNull())
@@ -905,7 +905,7 @@ bool Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
     
     SourceLoc colonLoc = Tok.getLoc();
     if (!Tok.is(tok::colon))
-      diagnose(Tok.getLoc(), diag::expected_case_colon, "default");
+      diagnose(Tok, diag::expected_case_colon, "default");
     colonLoc = consumeToken();
     
     // Create an implicit AnyPattern to represent the default match.

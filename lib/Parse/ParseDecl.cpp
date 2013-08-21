@@ -49,7 +49,7 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   SmallVector<ExprStmtOrDecl, 128> Items;
 
   if (Tok.is(tok::r_brace)) {
-    diagnose(Tok.getLoc(), diag::extra_rbrace)
+    diagnose(Tok, diag::extra_rbrace)
       .fixItRemove(SourceRange(Tok.getLoc()));
     consumeToken();
   }
@@ -988,7 +988,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       
       // Have we already parsed a get clause?
       if (Get) {
-        diagnose(Tok.getLoc(), diag::duplicate_getset, false);
+        diagnose(Tok, diag::duplicate_getset, false);
         diagnose(Get->getLoc(), diag::previous_getset, false);
         
         // Forget the previous version.
@@ -999,7 +999,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       if (Tok.isContextualKeyword("get")) {
         GetLoc = consumeToken();
         if (Tok.isNot(tok::colon)) {
-          diagnose(Tok.getLoc(), diag::expected_colon_get);
+          diagnose(Tok, diag::expected_colon_get);
           Invalid = true;
           break;
         }
@@ -1061,7 +1061,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     
     // Have we already parsed a var-set clause?
     if (Set) {
-      diagnose(Tok.getLoc(), diag::duplicate_getset, true);
+      diagnose(Tok, diag::duplicate_getset, true);
       diagnose(Set->getLoc(), diag::previous_getset, true);
 
       // Forget the previous setter.
@@ -1088,14 +1088,14 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
           EndLoc = SetNameLoc;
         SetNameParens = SourceRange(StartLoc, EndLoc);
       } else {
-        diagnose(Tok.getLoc(), diag::expected_setname);
+        diagnose(Tok, diag::expected_setname);
         skipUntil(tok::r_paren, tok::l_brace);
         if (Tok.is(tok::r_paren))
           consumeToken();
       }
     }
     if (Tok.isNot(tok::colon)) {
-      diagnose(Tok.getLoc(), diag::expected_colon_set);
+      diagnose(Tok, diag::expected_colon_set);
       Invalid = true;
       break;
     }
@@ -1556,7 +1556,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
       if (Flags & PD_DisallowFuncDef) {
-        diagnose(Tok.getLoc(), diag::disallowed_func_def);
+        diagnose(Tok, diag::disallowed_func_def);
         consumeToken();
         skipUntil(tok::r_brace);
         consumeToken();
@@ -2131,7 +2131,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   
   // pattern-tuple
   if (Tok.isNot(tok::l_paren)) {
-    diagnose(Tok.getLoc(), diag::expected_lparen_subscript);
+    diagnose(Tok, diag::expected_lparen_subscript);
     return true;
   }
 
@@ -2142,7 +2142,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
 
   // '->'
   if (!Tok.is(tok::arrow)) {
-    diagnose(Tok.getLoc(), diag::expected_arrow_subscript);
+    diagnose(Tok, diag::expected_arrow_subscript);
     return true;
   }
   SourceLoc ArrowLoc = consumeToken();
@@ -2165,7 +2165,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   
   // '{'
   if (!Tok.is(tok::l_brace)) {
-    diagnose(Tok.getLoc(), diag::expected_lbrace_subscript);
+    diagnose(Tok, diag::expected_lbrace_subscript);
     return true;
   }
   SourceLoc LBLoc = consumeToken();
@@ -2289,7 +2289,7 @@ Parser::parseDeclConstructor(bool HasContainerType) {
 
   // pattern-tuple
   if (!Tok.is(tok::l_paren)) {
-    diagnose(Tok.getLoc(), diag::expected_lparen_constructor);
+    diagnose(Tok, diag::expected_lparen_constructor);
     return nullptr;
   }
 
@@ -2299,7 +2299,7 @@ Parser::parseDeclConstructor(bool HasContainerType) {
 
   // '{'
   if (!Tok.is(tok::l_brace)) {
-    diagnose(Tok.getLoc(), diag::expected_lbrace_constructor);
+    diagnose(Tok, diag::expected_lbrace_constructor);
     return nullptr;
   }
 
@@ -2340,7 +2340,7 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
 
   // '{'
   if (!Tok.is(tok::l_brace)) {
-    diagnose(Tok.getLoc(), diag::expected_lbrace_destructor);
+    diagnose(Tok, diag::expected_lbrace_destructor);
     return nullptr;
   }
 
