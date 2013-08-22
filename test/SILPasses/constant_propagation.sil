@@ -1,5 +1,6 @@
 // RUN: %sil-opt %s -constant-propagation | FileCheck %s
 import Builtin
+import swift
 
 // Compute an expression using a chain of arithmetic with overflow instructions: 2 * (2 + 3) - 3
 sil @fold_arithmetic_with_overflow : $[thin] () -> Builtin.Int64 {
@@ -73,3 +74,36 @@ bb0:
 // CHECK-NEXT: return %0 : $Builtin.Int64
 // CHECK-NEXT: }
 }
+
+sil @test_struct_extract_folding_first : $[thin] () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 2
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = struct_extract %1 : $Int64, #value
+  return %2 : $Builtin.Int64
+// CHECK-LABEL: sil @test_struct_extract_folding_first
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT: return %0 : $Builtin.Int64
+// CHECK-NEXT: }
+}
+
+struct TwoValueStruct {
+  var a : Builtin.Int64
+  var b : Builtin.Int64
+}
+
+sil @test_struct_extract_folding_second : $[thin] () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 2
+  %1 = integer_literal $Builtin.Int64, 20
+  %2 = struct $TwoValueStruct (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+  %3 = struct_extract %2 : $TwoValueStruct, #b
+  return %3 : $Builtin.Int64
+// CHECK-LABEL: sil @test_struct_extract_folding_second
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 20
+// CHECK-NEXT: return %0 : $Builtin.Int64
+// CHECK-NEXT: }
+}
+

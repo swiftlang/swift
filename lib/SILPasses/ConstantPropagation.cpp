@@ -189,6 +189,28 @@ static SILInstruction *constantFoldInstruction(SILInstruction &I,
       }
     }
   }
+
+  // Constant fold extraction of a constant element.
+  if (StructExtractInst *SEI = dyn_cast<StructExtractInst>(&I)) {
+    if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand().getDef())) {
+      // Find the Field number corresponding to the FieldDecl.
+      unsigned FieldNo = 0;
+      const StructType *T =
+        dyn_cast<StructType>(Struct->getType().getSwiftType().getPointer());
+      for (auto MD : T->getDecl()->getPhysicalFields()) {
+        if (MD == SEI->getField()) {
+          ValueBase *E = Struct->getElements()[FieldNo].getDef();
+          // If the element the struct_extract is extraciong is const, fold it.
+          if (IntegerLiteralInst *ConstE = dyn_cast<IntegerLiteralInst>(E)) {
+            return ConstE;
+          }
+          break;
+        }
+        ++FieldNo;
+      }
+    }
+  }
+
   return nullptr;
 }
 
