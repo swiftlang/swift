@@ -45,10 +45,7 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     if (!decl->hasType())
       continue;
 
-    if (isa<TypeDecl>(decl))
-      signature = cast<TypeDecl>(decl)->getDeclaredType()->getCanonicalType();
-    else
-      signature = decl->getType()->getCanonicalType();
+    signature = decl->getType()->getCanonicalType();
 
     // If we've seen a declaration with this signature before, note it.
     auto &knownDecls =
