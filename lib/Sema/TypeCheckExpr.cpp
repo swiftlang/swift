@@ -327,6 +327,29 @@ static Expr *foldSequence(TypeChecker &TC,
   return makeBinOp(TC, Op1.op, LHS, RHS);
 }
 
+Type TypeChecker::getTypeOfRValue(ValueDecl *value) {
+  Type type = value->getType();
+  if (!value->isReferencedAsLValue())
+    return type;
+
+  // Look at the canonical type just for efficiency.  We won't
+  // use this as the source of the result.
+  CanType canType = type->getCanonicalType();
+
+  // Strip l-value-ness.
+  if (isa<LValueType>(canType)) {
+    return type->castTo<LValueType>()->getObjectType();
+
+  // Ignore ownership qualification.
+  } else if (isa<ReferenceStorageType>(canType)) {
+    return type->castTo<ReferenceStorageType>()->getReferentType();
+
+  // No other transforms necessary.
+  } else {
+    return type;
+  }
+}
+
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType) {
   if (value->isReferencedAsLValue()) {
     // Determine the qualifiers we want.
@@ -336,7 +359,7 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType) {
     if (!value->isSettableOnBase(baseType))
       quals |= LValueType::Qual::NonSettable;
 
-    return LValueType::get(value->getTypeOfRValue(), quals, Context);
+    return LValueType::get(getTypeOfRValue(value), quals, Context);
   }
 
   return value->getType();

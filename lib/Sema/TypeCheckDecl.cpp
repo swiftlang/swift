@@ -1540,13 +1540,15 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       if (var->isProperty())
         continue;
 
+      auto varType = tc.getTypeOfRValue(var);
+
       // Create the parameter.
       auto *arg = new (context) VarDecl(SourceLoc(),
                                         var->getName(),
-                                        var->getTypeOfRValue(), structDecl);
+                                        varType, structDecl);
       allArgs.push_back(arg);
       Pattern *pattern = new (context) NamedPattern(arg);
-      TypeLoc tyLoc = TypeLoc::withoutLoc(var->getTypeOfRValue());
+      TypeLoc tyLoc = TypeLoc::withoutLoc(varType);
       pattern = new (context) TypedPattern(pattern, tyLoc);
       patternElts.push_back(TuplePatternElt(pattern));
     }
@@ -1650,11 +1652,8 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
 
   case TypeKind::UnownedStorage:
   case TypeKind::WeakStorage:
-    // [weak] and [unowned] references are default-initializable if
-    // their underlying type is. FIXME: this should be getTypeOfRValue().
-    return isDefaultInitializable(
-                cast<ReferenceStorageType>(canTy).getReferentType(),
-                                  initializer);
+    llvm_unreachable("should not be directly asking whether a [weak] or "
+                     "[unowned] type is default-initializable");
 
   case TypeKind::BoundGenericClass:
   case TypeKind::Class:
@@ -1830,7 +1829,7 @@ void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
 
       // If this variable is not default-initializable, we're done: we can't
       // add the default constructor because it will be ill-formed.
-      if (!isDefaultInitializable(var->getType(), nullptr))
+      if (!isDefaultInitializable(getTypeOfRValue(var), nullptr))
         return;
     }
   }

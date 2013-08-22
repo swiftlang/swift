@@ -457,6 +457,9 @@ public:
   ///   this value when the base has the given type
   Type getUnopenedTypeOfReference(ValueDecl *value, Type baseType = Type());
 
+  /// Return the non-lvalue type-of-reference of the given value.
+  Type getTypeOfRValue(ValueDecl *value);
+
   /// \brief Retrieve the default type for the given protocol.
   ///
   /// Some protocols, particularly those that correspond to literals, have

@@ -790,10 +790,11 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
 
           // If this variable is not default-initializable, we're done: we can't
           // add the default constructor because it will be ill-formed.
+          auto varType = getTypeOfRValue(var);
           Expr *initializer = nullptr;
-          if (!isDefaultInitializable(var->getType(), &initializer)) {
+          if (!isDefaultInitializable(varType, &initializer)) {
             diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar,
-                     var->getName(), var->getType());
+                     var->getName(), varType);
             diagnose(var->getLoc(), diag::decl_declared_here, var->getName());
             continue;
           }

@@ -452,9 +452,9 @@ namespace {
         E->dump();
         abort();
       }
-      
-      checkSameType(E->getDecl()->getTypeOfRValue(), ResultLV->getObjectType(),
-                    "member reference result type and referenced member");
+
+      checkIsTypeOfRValue(E->getDecl(), ResultLV->getObjectType(),
+                          "member reference result type and referenced member");
       
       Type ContainerTy
         = E->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
@@ -787,6 +787,13 @@ namespace {
       type.print(Out);
       Out << "\n";
       abort();
+    }
+
+    void checkIsTypeOfRValue(ValueDecl *D, Type rvalueType, const char *what) {
+      auto declType = D->getType();
+      if (auto refType = declType->getAs<ReferenceStorageType>())
+        declType = refType->getReferentType();
+      checkSameType(declType, rvalueType, what);
     }
 
     void checkSameType(Type T0, Type T1, const char *what) {

@@ -1037,10 +1037,6 @@ public:
     Ty = T;
   }
 
-  /// getTypeOfRValue - Returns the type would arise from an r-value
-  /// reference to this declaration.
-  Type getTypeOfRValue() const;
-
   /// isReferencedAsLValue - Returns 'true' if references to this
   /// declaration are l-values.
   bool isReferencedAsLValue() const {

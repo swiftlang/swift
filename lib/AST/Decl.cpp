@@ -290,32 +290,6 @@ bool ValueDecl::isSettableOnBase(Type baseType) const {
           baseType->getRValueType()->hasReferenceSemantics());
 }
 
-static Type getRValueType(Type type) {
-  CanType canType = type->getCanonicalType();
-
-  // Strip l-valueness.
-  if (isa<LValueType>(canType)) {
-    return type->castTo<LValueType>()->getObjectType();
-
-  // Ignore ownership qualification.
-  } else if (isa<ReferenceStorageType>(canType)) {
-    return type->castTo<ReferenceStorageType>()->getReferentType();
-
-  // No other transforms necessary.
-  } else {
-    return type;
-  }
-}
-
-/// getTypeOfRValue - Return the type of an r-value reference to this value.
-Type ValueDecl::getTypeOfRValue() const {
-  Type type = getType();
-  if (isReferencedAsLValue()) {
-    type = getRValueType(type);
-  }
-  return type;
-}
-
 /// isDefinition - Return true if this is a definition of a decl, not a
 /// forward declaration (e.g. of a function) that is implemented outside of
 /// the swift code.
