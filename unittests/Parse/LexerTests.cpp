@@ -80,3 +80,31 @@ TEST_F(LexerTest, EOFTokenLengthIsZero) {
   EXPECT_EQ(Toks[1].getLength(), 0U);
 }
 
+TEST_F(LexerTest, CharacterLiterals) {
+  const char *Source =
+      R"('' '\n' '\t' '\v' '\b' '\r' '\f' '\a' '\\' '\?' '\'' '\"')";
+  std::vector<uint32_t> ExpectedCodePoints{
+      0xFFFD, '\n', '\t', 0xFFFD, 0xFFFD, '\r', 0xFFFD, 0xFFFD, '\\', 0xFFFD,
+      '\'', '\"' };
+
+  MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(Source);
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr->AddNewSourceBuffer(Buf, llvm::SMLoc());
+
+  Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+
+  std::vector<Token> Tokens;
+  do {
+    Tokens.emplace_back();
+    L.lex(Tokens.back());
+  } while (Tokens.back().isNot(tok::eof));
+  Tokens.pop_back(); // Remove tok::eof.
+
+  ASSERT_EQ(ExpectedCodePoints.size(), Tokens.size());
+  for (size_t i = 0, e = Tokens.size(); i != e; ++i) {
+    auto Tok = Tokens[i];
+    ASSERT_EQ(tok::character_literal, Tok.getKind());
+    EXPECT_EQ(ExpectedCodePoints[i], L.getEncodedCharacterLiteral(Tok));
+  }
+}
+

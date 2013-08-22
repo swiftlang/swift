@@ -877,7 +877,8 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
     SWIFT_FALLTHROUGH;
   case '\n':  // String literals cannot have \n or \r in them.
   case '\r':
-    diagnose(CurPtr-1, diag::lex_unterminated_string);
+    if (EmitDiagnostics)
+      diagnose(CurPtr-1, diag::lex_unterminated_string);
     return ~1U;
   case '\\':  // Escapes.
     break;
@@ -887,7 +888,8 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
   // Escape processing.  We already ate the "\".
   switch (*CurPtr) {
   default:  // Invalid escape.
-    diagnose(CurPtr, diag::lex_invalid_escape);
+    if (EmitDiagnostics)
+      diagnose(CurPtr, diag::lex_invalid_escape);
     // If this looks like a plausible escape character, recover as though this
     // is an invalid escape.
     if (isalnum(*CurPtr)) ++CurPtr;
@@ -980,7 +982,9 @@ void Lexer::lexCharacterLiteral() {
   // If we have '', we have an invalid character literal.
   if (CharValue == ~0U) {
     diagnose(TokStart, diag::lex_invalid_character_literal);
-    return formToken(tok::unknown, TokStart);
+    if (*CurPtr == '\'')
+      ++CurPtr;
+    return formToken(tok::character_literal, TokStart);
   }
 
   // If this wasn't a normal character, then this is a malformed character.
@@ -997,7 +1001,7 @@ void Lexer::lexCharacterLiteral() {
     // terminates the character literal and eat it now.
     if (*CurPtr == '\'')
       ++CurPtr;
-    return formToken(tok::unknown, TokStart);
+    return formToken(tok::character_literal, TokStart);
   }
 
   if (*CurPtr != '\'') {
@@ -1023,7 +1027,13 @@ void Lexer::lexCharacterLiteral() {
 uint32_t Lexer::getEncodedCharacterLiteral(const Token &Tok) {
   assert(Tok.is(tok::character_literal));
   const char *CharStart = Tok.getText().data() + 1;
-  return lexCharacter(CharStart, false, false);
+  uint32_t CodePoint = lexCharacter(CharStart, false, false);
+  if (CodePoint == ~0U || CodePoint == ~1U) {
+    // We have already diagnosed an error.  Return REPLACEMENT CHARACTER as the
+    // value.
+    return 0xFFFD;
+  }
+  return CodePoint;
 }
 
 /// skipToEndOfInterpolatedExpression - Given the first character after a \(
