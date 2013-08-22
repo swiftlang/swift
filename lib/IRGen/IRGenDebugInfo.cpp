@@ -506,9 +506,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
     if (Scope.isType() && llvm::DIType(Scope).isForwardDecl())
       Scope->replaceAllUsesWith(Namespace);
 
-    auto ImportedDecl =
-      DBuilder.createImportedDeclaration(llvm::DIScope(Import), SP, L.Line);
-    SP->replaceAllUsesWith(ImportedDecl);
+    DBuilder.createImportedDeclaration(llvm::DIScope(Import), SP, L.Line);
   }
 }
 
