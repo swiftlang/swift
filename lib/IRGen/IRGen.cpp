@@ -130,58 +130,6 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   // Bail out if there are any errors.
   if (TU->Ctx.hadError()) return;
 
-  // Ugly standard library optimization hack, part 1: pull in the relevant
-  // IR from swift.swift.
-  // FIXME: We should pre-generate a swift.bc; it would be substantially
-  // faster we could skip both generating and optimizing the standard library.
-  // FIXME: Figure out how to get this working for the REPL.
-  bool UseStandardLibraryHack = Opts.OptLevel != 0;
-  if (UseStandardLibraryHack) {
-    for (auto ModPair : TU->getImports()) {
-      if (isa<BuiltinModule>(ModPair.first.second) ||
-          isa<LoadedModule>(ModPair.first.second))
-        continue;
-
-      TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.first.second);
-
-      if (SubTU->Name.str() == "swift") {
-        Options SubOpts;
-        SubOpts.Triple = Opts.Triple;
-        SubOpts.OutputKind = OutputKind::Module;
-        SubOpts.OptLevel = 2;
-	SubOpts.DebugInfo = Opts.DebugInfo;
-        llvm::Module SubModule(SubTU->Name.str(), Module->getContext());
-        performIRGeneration(SubOpts, &SubModule, SubTU, SILMod);
-
-        SmallVector<GlobalValue*, 8> DeclsToErase;
-        for (llvm::Function &F : SubModule)
-          if (!F.isDeclaration() && F.hasExternalLinkage())
-            F.setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
-        for (llvm::GlobalVariable &G : SubModule.getGlobalList()) {
-          if (!G.isDeclaration() && G.hasExternalLinkage())
-            G.setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
-          if (G.hasAppendingLinkage())
-            DeclsToErase.push_back(&G);
-        }
-        for (llvm::GlobalAlias &A : SubModule.getAliasList())
-          if (!A.isDeclaration() && A.hasExternalLinkage())
-            A.setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
-
-        for (auto G : DeclsToErase)
-          G->eraseFromParent();
-
-        std::string ErrorMessage;
-        if (llvm::Linker::LinkModules(Module, &SubModule,
-                                      llvm::Linker::DestroySource,
-                                      &ErrorMessage)) {
-          llvm::errs() << "Error linking swift modules\n";
-          llvm::errs() << ErrorMessage << "\n";
-          return;
-        }
-      }
-    }
-  }
-
   llvm::OwningPtr<raw_fd_ostream> RawOS;
   formatted_raw_ostream FormattedOS;
   if (!Opts.OutputFilename.empty()) {
@@ -243,51 +191,6 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   ModulePasses.run(*Module);
 
   PassManager EmitPasses;
-
-  // Ugly standard library optimization hack, part 2: eliminate the crap
-  // we don't need anymore from the module.
-  // FIXME: It would be nice if LLVM provided a simpler way to do this...
-  if (UseStandardLibraryHack) {
-    for (llvm::Function &F : *Module)
-      if (F.hasAvailableExternallyLinkage()) {
-        F.deleteBody();
-        F.setLinkage(llvm::GlobalValue::ExternalLinkage);
-      }
-    for (llvm::GlobalVariable &G : Module->getGlobalList())
-      if (G.hasAvailableExternallyLinkage()) {
-        G.setInitializer(nullptr);
-        G.setLinkage(llvm::GlobalValue::ExternalLinkage);
-      }
-    for (llvm::GlobalAlias &A : Module->getAliasList())
-      if (A.hasAvailableExternallyLinkage()) {
-        A.setAliasee(nullptr);
-        A.setLinkage(llvm::GlobalValue::ExternalLinkage);
-      }
-    bool changed;
-    do {
-      std::vector<llvm::GlobalValue *> vals;
-      for (llvm::GlobalVariable &G : Module->getGlobalList()) {
-        G.removeDeadConstantUsers();
-        if ((G.hasLocalLinkage() || G.isDeclaration()) && G.use_empty()) {
-          vals.push_back(&G);
-        }
-      }
-      for (llvm::Function &F : *Module) {
-        F.removeDeadConstantUsers();
-        if ((F.hasLocalLinkage() || F.isDeclaration()) && F.use_empty()) {
-          vals.push_back(&F);
-        }
-      }
-      for (llvm::GlobalAlias &A : Module->getAliasList()) {
-        A.removeDeadConstantUsers();
-        if ((A.hasLocalLinkage() || A.isDeclaration()) && A.use_empty()) {
-          vals.push_back(&A);
-        }
-      }
-      for (auto val : vals) val->eraseFromParent();
-      changed = !vals.empty();
-    } while (changed);
-  }
 
   // Set up the final emission passes.
   switch (Opts.OutputKind) {
