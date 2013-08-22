@@ -631,16 +631,19 @@ namespace {
         auto *tagBB = llvm::BasicBlock::Create(C);
         tagSwitch->addCase(llvm::ConstantInt::get(C,APInt(numTagBits,tagIndex)),
                            tagBB);
-        ++tagIndex;
         
         // Switch over the cases for this tag.
         IGF.Builder.emitBlock(tagBB);
         auto *caseSwitch = IGF.Builder.CreateSwitch(payload, unreachableBB);
-        for (unsigned tag = 0; tag < casesPerTag && elti != eltEnd; ++tag) {
-          auto v = llvm::ConstantInt::get(C, APInt(CommonSpareBits.size(),tag));
+        for (unsigned idx = 0; idx < casesPerTag && elti != eltEnd; ++idx) {
+          auto v = interleaveSpareBits(IGF.IGM, CommonSpareBits,
+                                       CommonSpareBits.size(),
+                                       tagIndex, idx);
           caseSwitch->addCase(v, blockForCase(*elti));
           ++elti;
         }
+
+        ++tagIndex;
       }
       
       // Delete the unreachable default block if we didn't use it, or emit it
