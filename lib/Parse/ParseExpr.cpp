@@ -986,7 +986,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
       }
       if (CodeCompletion && Result.isNonNull())
         CodeCompletion->completePostfixExpr(Result.get());
-      return nullptr;
+      return makeParserCodeCompletionResult<Expr>();
     }
     break;
   }
