@@ -1419,6 +1419,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 #include "swift/AST/TypeNodes.def"
       llvm_unreachable("Type has not been desugared completely");
 
+#define ARTIFICIAL_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+      llvm_unreachable("artificial type in constraint");
+
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
@@ -1441,9 +1446,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::GenericTypeParam:
     case TypeKind::DependentMember:
       llvm_unreachable("unmapped dependent type in type checker");
-
-    case TypeKind::ReferenceStorage:
-      llvm_unreachable("storage type in typechecker");
 
     case TypeKind::TypeVariable:
     case TypeKind::Archetype:
@@ -2025,6 +2027,11 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
     llvm_unreachable("Type has not been desugared completely");
+
+#define ARTIFICIAL_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+      llvm_unreachable("artificial type in constraint");
     
   case TypeKind::Error:
     return SolutionKind::Error;
@@ -2032,9 +2039,6 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     llvm_unreachable("unmapped dependent type");
-
-  case TypeKind::ReferenceStorage:
-    llvm_unreachable("storage type in typechecker");
 
   case TypeKind::TypeVariable:
     return SolutionKind::Unsolved;

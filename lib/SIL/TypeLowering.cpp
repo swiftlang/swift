@@ -367,13 +367,12 @@ namespace {
       llvm_unreachable("shouldn't get a dependent member type here");
     }
 
-    RetTy visitReferenceStorageType(CanReferenceStorageType type) {
-      switch (type->getOwnership()) {
-      case Ownership::Strong:  llvm_unreachable("explicit strong ownership");
-      case Ownership::Unowned: return asImpl().handleReference(type);
-      case Ownership::Weak:    return asImpl().handleAddressOnly(type);
-      }
-      llvm_unreachable("bad ownership kind");
+    RetTy visitUnownedStorageType(CanUnownedStorageType type) {
+      return asImpl().handleReference(type);
+    }
+
+    RetTy visitWeakStorageType(CanWeakStorageType type) {
+      return asImpl().handleAddressOnly(type);
     }
 
     // These types are address-only unless they're class-constrained.
@@ -1121,17 +1120,12 @@ namespace {
     }
 
     /// We have special lowerings for reference storage types.
-    const TypeLowering *visitReferenceStorageType(CanReferenceStorageType type) {
-      switch (type->getOwnership()) {
-      case Ownership::Strong:  llvm_unreachable("explicit strong ownership");
-      case Ownership::Unowned:
-        return new (TC) UnownedTypeLowering(
-                                  SILType::getPrimitiveObjectType(type));
-      case Ownership::Weak:
-        return new (TC) WeakTypeLowering(
-                                  SILType::getPrimitiveAddressType(type));
-      }
-      llvm_unreachable("bad ownership kind");
+    const TypeLowering *visitUnownedStorageType(CanUnownedStorageType type) {
+      return new (TC) UnownedTypeLowering(
+                                      SILType::getPrimitiveObjectType(type));
+    }
+    const TypeLowering *visitWeakStorageType(CanWeakStorageType type) {
+      return new (TC) WeakTypeLowering(SILType::getPrimitiveObjectType(type));
     }
 
     const TypeLowering *visitTupleType(CanTupleType tupleType) {

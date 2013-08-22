@@ -1821,7 +1821,8 @@ bool Serializer::writeType(Type ty) {
     return true;
   }
 
-  case TypeKind::ReferenceStorage: {
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage: {
     auto refTy = cast<ReferenceStorageType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];

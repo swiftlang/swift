@@ -37,6 +37,14 @@
 ///   This type is not present in valid, type-checked programs.
 ///   The default behavior is TYPE(id, parent).
 
+/// ARTIFICIAL_TYPE(id, parent)
+///   This type is not part of the user-facing type system. It may be
+///   used freely in SIL, and it may appear as the type of a
+///   declaration in the AST (due to e.g. the application of the
+///   [weak] attribute), but it cannot be written directly in normal
+///   programs and it cannot be the type of an expression.
+///   The default behavior is TYPE(id, parent).
+
 #ifndef ALWAYS_CANONICAL_TYPE
 #define ALWAYS_CANONICAL_TYPE(id, parent) TYPE(id, parent)
 #endif
@@ -51,6 +59,10 @@
 
 #ifndef UNCHECKED_TYPE
 #define UNCHECKED_TYPE(id, parent) TYPE(id, parent)
+#endif
+
+#ifndef ARTIFICIAL_TYPE
+#define ARTIFICIAL_TYPE(id, parent) TYPE(id, parent)
 #endif
 
 /// Most metaprograms do not care about abstract types, so the default
@@ -81,7 +93,10 @@ ABSTRACT_TYPE(Builtin, Type)
 SUGARED_TYPE(NameAlias, Type)
 SUGARED_TYPE(Paren, Type)
 TYPE(Tuple, Type)
-TYPE(ReferenceStorage, Type)
+ABSTRACT_TYPE(ReferenceStorage, Type)
+  ARTIFICIAL_TYPE(UnownedStorage, ReferenceStorageType)
+  ARTIFICIAL_TYPE(WeakStorage, ReferenceStorageType)
+  TYPE_RANGE(ReferenceStorage, UnownedStorage, WeakStorage)
 ABSTRACT_TYPE(Nominal, Type)
   TYPE(Union, NominalType)
   TYPE(Struct, NominalType)
@@ -122,6 +137,7 @@ UNCHECKED_TYPE(TypeVariable, Type)
 #undef ABSTRACT_SUGARED_TYPE
 #undef ABSTRACT_TYPE
 #undef UNCHECKED_TYPE
+#undef ARTIFICIAL_TYPE
 #undef SUGARED_TYPE
 #undef BUILTIN_TYPE
 #undef ALWAYS_CANONICAL_TYPE

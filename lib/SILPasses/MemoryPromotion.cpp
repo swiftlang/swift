@@ -597,9 +597,7 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
   SILBuilder B(Inst);
 
   // "unowned" assignments are expanded to unowned operations.
-  bool isOwned = true;
-  if (auto *RST =StoredType.getSwiftRValueType()->getAs<ReferenceStorageType>())
-    isOwned = RST->getOwnership() != Ownership::Unowned;
+  bool isOwned = !StoredType.is<UnownedStorageType>();
 
   // Otherwise, if it has trivial type, we can always just replace the
   // assignment with a store.  If it has non-trivial type and is an

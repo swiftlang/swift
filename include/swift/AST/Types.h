@@ -2062,38 +2062,83 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 
-/// \brief The storage type of a variable with non-standard reference
-/// ownership semantics, like a [weak] or [unowned] variable.
+/// \brief The storage type of a variable with non-strong reference
+/// ownership semantics.
 ///
 /// The referent type always satisfies allowsOwnership().
 ///
-/// This type may appear in the AST only as the type of a variable;
-/// getTypeOfReference then strips it.  However, it is extremely
-/// useful in SIL and IR-generation.
+/// These types may appear in the AST only as the type of a variable;
+/// getTypeOfReference strips this layer from the formal type of a
+/// reference to the variable.  However, it is extremely useful to
+/// represent this as a distinct type in SIL and IR-generation.
 class ReferenceStorageType : public TypeBase {
-  ReferenceStorageType(Type referent, Ownership ownership, const ASTContext *C)
-    : TypeBase(TypeKind::ReferenceStorage, C, false),
-      Referent(referent), Oship(ownership) {}
+protected:
+  ReferenceStorageType(TypeKind kind, Type referent, const ASTContext *C)
+    : TypeBase(kind, C, false), Referent(referent) {}
 
+private:
   Type Referent;
-  Ownership Oship;
 public:
   static ReferenceStorageType *get(Type referent, Ownership ownership,
                                    const ASTContext &C);
 
   Type getReferentType() const { return Referent; }
-  Ownership getOwnership() const { return Oship; }
-
-  void print(raw_ostream &OS) const;
+  Ownership getOwnership() const {
+    return (getKind() == TypeKind::WeakStorage ? Ownership::Weak
+                                               : Ownership::Unowned);
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::ReferenceStorage;
+    return T->getKind() >= TypeKind::First_ReferenceStorageType &&
+           T->getKind() <= TypeKind::Last_ReferenceStorageType;
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getReferentType)
 END_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
+
+/// \brief The storage type of a variable with [unowned] ownership semantics.
+class UnownedStorageType : public ReferenceStorageType {
+  friend class ReferenceStorageType;
+  UnownedStorageType(Type referent, const ASTContext *C)
+    : ReferenceStorageType(TypeKind::UnownedStorage, referent, C) {}
+
+public:
+  static UnownedStorageType *get(Type referent, const ASTContext &C) {
+    return static_cast<UnownedStorageType*>(
+                 ReferenceStorageType::get(referent, Ownership::Unowned, C));
+  }
+
+  void print(raw_ostream &OS) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::UnownedStorage;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnownedStorageType, ReferenceStorageType)
+
+/// \brief The storage type of a variable with [weak] ownership semantics.
+class WeakStorageType : public ReferenceStorageType {
+  friend class ReferenceStorageType;
+  WeakStorageType(Type referent, const ASTContext *C)
+    : ReferenceStorageType(TypeKind::WeakStorage, referent, C) {}
+
+public:
+  static WeakStorageType *get(Type referent, const ASTContext &C) {
+    return static_cast<WeakStorageType*>(
+                    ReferenceStorageType::get(referent, Ownership::Weak, C));
+  }
+
+  void print(raw_ostream &OS) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::WeakStorage;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(WeakStorageType, ReferenceStorageType)
 
 /// \brief A type variable used during type checking.
 class TypeVariableType : public TypeBase {

@@ -520,11 +520,13 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
     return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
-  case TypeKind::ReferenceStorage:
-    return convertReferenceStorageType(cast<ReferenceStorageType>(ty));
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     llvm_unreachable("can't convert dependent type");
+  case TypeKind::UnownedStorage:
+    return convertUnownedStorageType(cast<UnownedStorageType>(ty));
+  case TypeKind::WeakStorage:
+    return convertWeakStorageType(cast<WeakStorageType>(ty));
   }
   llvm_unreachable("bad type kind");
 }
@@ -541,20 +543,24 @@ const TypeInfo *TypeConverter::convertLValueType(LValueType *T) {
                          IGM.getPointerAlignment());
 }
 
-/// Convert a ReferenceStorageType.  The implementation here depends
-/// on the underlying reference type.
+/// Convert an [unowned] storage type.  The implementation here
+/// depends on the underlying reference type.
 const TypeInfo *
-TypeConverter::convertReferenceStorageType(ReferenceStorageType *refType) {
+TypeConverter::convertUnownedStorageType(UnownedStorageType *refType) {
   CanType referent = CanType(refType->getReferentType());
   assert(referent->allowsOwnership());
   auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
+  return referentTI.createUnownedStorageType(*this);
+}
 
-  switch (refType->getOwnership()) {
-  case Ownership::Strong: llvm_unreachable("explicit strong ownership");
-  case Ownership::Weak: return referentTI.createWeakStorageType(*this);
-  case Ownership::Unowned: return referentTI.createUnownedStorageType(*this);
-  }
-  llvm_unreachable("bad ownership");
+/// Convert a [weak] storage type.  The implementation here
+/// depends on the underlying reference type.
+const TypeInfo *
+TypeConverter::convertWeakStorageType(WeakStorageType *refType) {
+  CanType referent = CanType(refType->getReferentType());
+  assert(referent->allowsOwnership());
+  auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
+  return referentTI.createWeakStorageType(*this);
 }
 
 static void overwriteForwardDecl(llvm::DenseMap<TypeBase*, TypeCacheEntry> &cache,

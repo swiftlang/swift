@@ -846,8 +846,11 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
     // Nothing to validate.
     return false;
 
-  case TypeKind::ReferenceStorage:
-    llvm_unreachable("storage type in typechecker");
+#define ARTIFICIAL_TYPE(Id, Parent) \
+  case TypeKind::Id:
+#define TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+    llvm_unreachable("should not need to validate an artificial type");
 
   case TypeKind::Substituted:
     return validateTypeSimple(cast<SubstitutedType>(T)->getReplacementType());
@@ -1006,8 +1009,11 @@ Type TypeChecker::transformType(Type type,
     return type;
   }
 
-  case TypeKind::ReferenceStorage:
-    llvm_unreachable("storage type in typechecker");
+#define ARTIFICIAL_TYPE(Id, Parent) \
+  case TypeKind::Id:
+#define TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+    llvm_unreachable("transforming artificial type?");
 
   case TypeKind::UnboundGeneric: {
     auto unbound = cast<UnboundGenericType>(base);

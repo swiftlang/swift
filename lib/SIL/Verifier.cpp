@@ -431,22 +431,16 @@ public:
     requireReferenceValue(RI->getOperand(), "Operand of release");
   }
   void checkRetainUnownedInst(RetainUnownedInst *RI) {
-    auto type = requireObjectType(ReferenceStorageType, RI->getOperand(),
-                                  "Operand of retain_unowned");
-    require(type->getOwnership() == Ownership::Unowned,
-            "Operand of retain_unowned must be unowned reference");
+    requireObjectType(UnownedStorageType, RI->getOperand(),
+                      "Operand of retain_unowned");
   }
   void checkUnownedRetainInst(UnownedRetainInst *RI) {
-    auto type = requireObjectType(ReferenceStorageType, RI->getOperand(),
-                                  "Operand of unowned_retain");
-    require(type->getOwnership() == Ownership::Unowned,
-            "Operand of unowned_retain must be unowned reference");
+    requireObjectType(UnownedStorageType, RI->getOperand(),
+                      "Operand of unowned_retain");
   }
   void checkUnownedReleaseInst(UnownedReleaseInst *RI) {
-    auto type = requireObjectType(ReferenceStorageType, RI->getOperand(),
-                                  "Operand of unowned_release");
-    require(type->getOwnership() == Ownership::Unowned,
-            "Operand of unowned_release must be unowned reference");
+    requireObjectType(UnownedStorageType, RI->getOperand(),
+                      "Operand of unowned_release");
   }
   void checkDeallocStackInst(DeallocStackInst *DI) {
     require(DI->getOperand().getType().isLocalStorage(),
@@ -922,17 +916,15 @@ public:
   void checkRefToUnownedInst(RefToUnownedInst *I) {
     requireReferenceValue(I->getOperand(), "Operand of ref_to_unowned");
     auto operandType = I->getOperand().getType().getSwiftRValueType();
-    auto resultType = requireObjectType(ReferenceStorageType, I,
+    auto resultType = requireObjectType(UnownedStorageType, I,
                                         "Result of ref_to_unowned");
     require(resultType.getReferentType() == operandType,
             "Result of ref_to_unowned does not have the "
             "operand's type as its referent type");
-    require(resultType->getOwnership() == Ownership::Unowned,
-            "Result of ref_to_unowned must be [unowned]");
   }
 
   void checkUnownedToRefInst(UnownedToRefInst *I) {
-    auto operandType = requireObjectType(ReferenceStorageType,
+    auto operandType = requireObjectType(UnownedStorageType,
                                          I->getOperand(),
                                          "Operand of unowned_to_ref");
     requireReferenceValue(I, "Result of unowned_to_ref");
@@ -940,8 +932,6 @@ public:
     require(operandType.getReferentType() == resultType,
             "Operand of unowned_to_ref does not have the "
             "operand's type as its referent type");
-    require(operandType->getOwnership() == Ownership::Unowned,
-            "Operand of unowned_to_ref must be [unowned]");
   }
   
   void checkUpcastInst(UpcastInst *UI) {

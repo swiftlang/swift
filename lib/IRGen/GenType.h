@@ -38,11 +38,12 @@ namespace swift {
   class ProtocolCompositionType;
   class ProtocolDecl;
   class ProtocolType;
-  class ReferenceStorageType;
   class StructDecl;
   class TupleType;
   class TypeBase;
   class Type;
+  class UnownedStorageType;
+  class WeakStorageType;
 
 namespace irgen {
   class Alignment;
@@ -87,7 +88,8 @@ private:
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
   const TypeInfo *convertBuiltinObjectPointer();
   const TypeInfo *convertBuiltinObjCPointer();
-  const TypeInfo *convertReferenceStorageType(ReferenceStorageType *T);
+  const TypeInfo *convertUnownedStorageType(UnownedStorageType *T);
+  const TypeInfo *convertWeakStorageType(WeakStorageType *T);
 
 public:
   TypeConverter(IRGenModule &IGM);

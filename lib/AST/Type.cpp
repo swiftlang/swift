@@ -119,7 +119,8 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::BoundGenericStruct:
     return false;
 
-  case TypeKind::ReferenceStorage:
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage:
     return false; // This might seem non-obvious.
 
   case TypeKind::Archetype:
@@ -238,7 +239,8 @@ bool TypeBase::isSpecialized() {
     return false;
   }
 
-  case TypeKind::ReferenceStorage:
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage:
     return cast<ReferenceStorageType>(this)->getReferentType()->isSpecialized();
 
   case TypeKind::Archetype:
@@ -303,7 +305,8 @@ bool TypeBase::isUnspecializedGeneric() {
     return cast<MetaTypeType>(this)->getInstanceType()
              ->isUnspecializedGeneric();
 
-  case TypeKind::ReferenceStorage:
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage:
     return cast<ReferenceStorageType>(this)->getReferentType()
              ->isUnspecializedGeneric();
 
@@ -388,7 +391,8 @@ static void gatherTypeVariables(Type wrappedTy,
     return gatherTypeVariables(cast<MetaTypeType>(ty)->getInstanceType(),
                                typeVariables);
 
-  case TypeKind::ReferenceStorage:
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage:
     return gatherTypeVariables(
                              cast<ReferenceStorageType>(ty)->getReferentType(),
                                typeVariables);
@@ -527,7 +531,8 @@ static Type getStrippedType(const ASTContext &context, Type type,
   case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct:
   case TypeKind::TypeVariable:
-  case TypeKind::ReferenceStorage:
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage:
     return type;
 
   case TypeKind::NameAlias:
@@ -879,11 +884,17 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
 
-  case TypeKind::ReferenceStorage: {
-    auto ref = cast<ReferenceStorageType>(this);
+  case TypeKind::UnownedStorage: {
+    auto ref = cast<UnownedStorageType>(this);
     Type referentType = ref->getReferentType()->getCanonicalType();
-    Result = ReferenceStorageType::get(referentType, ref->getOwnership(),
-                                       referentType->getASTContext());
+    Result = UnownedStorageType::get(referentType,
+                                     referentType->getASTContext());
+    break;
+  }
+  case TypeKind::WeakStorage: {
+    auto ref = cast<WeakStorageType>(this);
+    Type referentType = ref->getReferentType()->getCanonicalType();
+    Result = WeakStorageType::get(referentType, referentType->getASTContext());
     break;
   }
   case TypeKind::LValue: {
@@ -983,9 +994,10 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Union:
   case TypeKind::Struct:
   case TypeKind::Class:
-  case TypeKind::ReferenceStorage:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage:
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::Paren:
@@ -1169,7 +1181,8 @@ bool TypeBase::isSpelledLike(Type other) {
     auto aThem = cast<SyntaxSugarType>(them);
     return aMe->getBaseType()->isSpelledLike(aThem->getBaseType());
   }
-  case TypeKind::ReferenceStorage: {
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage: {
     auto rMe = cast<ReferenceStorageType>(me);
     auto rThem = cast<ReferenceStorageType>(them);
     return rMe->getReferentType()->isSpelledLike(rThem->getReferentType());
@@ -1821,11 +1834,10 @@ void DependentMemberType::print(raw_ostream &OS) const {
   OS << "." << getName().str();
 }
 
-void ReferenceStorageType::print(raw_ostream &OS) const {
-  switch (getOwnership()) {
-  case Ownership::Strong: llvm_unreachable("strong reference storage");
-  case Ownership::Unowned: OS << "[unowned] "; break;
-  case Ownership::Weak: OS << "[weak] "; break;
-  }
-  getReferentType().print(OS);
+void UnownedStorageType::print(raw_ostream &OS) const {
+  OS << "[unowned] " << getReferentType();
+}
+
+void WeakStorageType::print(raw_ostream &OS) const {
+  OS << "[weak] " << getReferentType();
 }

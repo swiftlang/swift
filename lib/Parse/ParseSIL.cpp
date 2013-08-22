@@ -1343,8 +1343,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     if (Opcode == ValueKind::StoreWeakInst) {
-      auto refType = addrVal.getType().getAs<ReferenceStorageType>();
-      if (!refType || refType->getOwnership() != Ownership::Weak) {
+      auto refType = addrVal.getType().getAs<WeakStorageType>();
+      if (!refType) {
         P.diagnose(addrLoc, diag::sil_operand_not_weak_address,
                    "destination", OpcodeName);
         return true;

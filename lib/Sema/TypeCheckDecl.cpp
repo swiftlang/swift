@@ -1648,6 +1648,14 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
     // FIXME: We don't implement this rule yet, so just fail.
     return false;
 
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage:
+    // [weak] and [unowned] references are default-initializable if
+    // their underlying type is. FIXME: this should be getTypeOfRValue().
+    return isDefaultInitializable(
+                cast<ReferenceStorageType>(canTy).getReferentType(),
+                                  initializer);
+
   case TypeKind::BoundGenericClass:
   case TypeKind::Class:
     // Classes are default-initializable (with 0).
@@ -1722,11 +1730,6 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
   case TypeKind::MetaType:
   case TypeKind::Module:
       return false;
-
-  case TypeKind::ReferenceStorage: {
-    auto referent = cast<ReferenceStorageType>(canTy)->getReferentType();
-    return isDefaultInitializable(referent, initializer);
-  }
 
   // Sugar types.
 #define TYPE(Id, Parent)

@@ -499,17 +499,15 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     return mangleType(cast<LValueType>(type).getObjectType(),
                       ExplosionKind::Minimal, 0);
 
-  case TypeKind::ReferenceStorage: {
-    auto ref = cast<ReferenceStorageType>(type);
-    Buffer << 'X';
-    switch (ref->getOwnership()) {
-    case Ownership::Strong: llvm_unreachable("strong reference storage");
-    case Ownership::Unowned: Buffer << 'o'; break;
-    case Ownership::Weak: Buffer << 'w'; break;
-    }
-    return mangleType(ref.getReferentType(),
+  case TypeKind::UnownedStorage:
+    Buffer << "Xo";
+    return mangleType(cast<UnownedStorageType>(type).getReferentType(),
                       ExplosionKind::Minimal, 0);
-  }
+
+  case TypeKind::WeakStorage:
+    Buffer << "Xw";
+    return mangleType(cast<WeakStorageType>(type).getReferentType(),
+                      ExplosionKind::Minimal, 0);
 
   case TypeKind::Tuple: {
     auto tuple = cast<TupleType>(type);

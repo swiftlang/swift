@@ -1037,7 +1037,8 @@ namespace {
         return checkBoundGenericTypes(
                                cast<MetaTypeType>(typePtr)->getInstanceType());
 
-      case TypeKind::ReferenceStorage:
+      case TypeKind::UnownedStorage:
+      case TypeKind::WeakStorage:
         return checkBoundGenericTypes(
                        cast<ReferenceStorageType>(typePtr)->getReferentType());
 

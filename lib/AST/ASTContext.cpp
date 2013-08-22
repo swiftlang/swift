@@ -756,8 +756,16 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
   auto &entry = C.Impl.getArena(arena).ReferenceStorageTypes[key];
   if (entry) return entry;
 
-  return entry = new (C, arena) ReferenceStorageType(T, ownership,
-                                                     T->isCanonical() ? &C : 0);
+  switch (ownership) {
+  case Ownership::Strong: llvm_unreachable("not possible");
+  case Ownership::Unowned:
+    return entry =
+      new (C, arena) UnownedStorageType(T, T->isCanonical() ? &C : 0);
+  case Ownership::Weak:
+    return entry =
+      new (C, arena) WeakStorageType(T, T->isCanonical() ? &C : 0);
+  }
+  llvm_unreachable("bad ownership");
 }
 
 MetaTypeType *MetaTypeType::get(Type T, const ASTContext &C) {

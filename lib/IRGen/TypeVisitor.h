@@ -126,7 +126,8 @@ public:
     DISPATCH(LValue)
     DISPATCH(MetaType)
     DISPATCH(PolymorphicFunction)
-    DISPATCH(ReferenceStorage)
+    DISPATCH(UnownedStorage)
+    DISPATCH(WeakStorage)
     DISPATCH(Tuple)
 #undef DISPATCH
     }
@@ -143,6 +144,8 @@ public:
   DEFER_TO_SUPERTYPE(BoundGenericClass, BoundGeneric)
   DEFER_TO_SUPERTYPE(BoundGenericUnion, BoundGeneric)
   DEFER_TO_SUPERTYPE(BoundGenericStruct, BoundGeneric)
+  DEFER_TO_SUPERTYPE(UnownedStorage, ReferenceStorage)
+  DEFER_TO_SUPERTYPE(WeakStorage, ReferenceStorage)
 #undef DEFER_TO_SUPERTYPE
 };
   
