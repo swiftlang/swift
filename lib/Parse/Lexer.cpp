@@ -866,11 +866,13 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
     return CurPtr[-1];
       
   case 0:
-    if (CurPtr-2 != BufferEnd) {
+    if (CurPtr-1 != BufferEnd) {
       if (EmitDiagnostics)
-        diagnose(CurPtr-2, diag::lex_nul_character);
-      return 0;
+        diagnose(CurPtr-1, diag::lex_nul_character);
+      return ~0U;
     }
+    // Move the pointer back to EOF.
+    --CurPtr;
     SWIFT_FALLTHROUGH;
   case '\n':  // String literals cannot have \n or \r in them.
   case '\r':
