@@ -445,7 +445,7 @@ Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
   }
 
   ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
-  return owner.getImportedModules(this, modules);
+  return owner.getImportedModules(this, modules, includePrivate);
 }
 
 namespace {
@@ -524,6 +524,26 @@ static void forAllImportedModules(Module *current,
 void Module::forAllVisibleModules(Optional<AccessPathTy> thisPath,
                                   std::function<bool(ImportedModule)> fn) {
   forAllImportedModules<true>(this, thisPath, fn);
+}
+
+void Module::collectLinkLibraries(LinkLibraryCallback callback) {
+  forAllImportedModules<false>(this, AccessPathTy(),
+                               [=](ImportedModule import) -> bool {
+    Module *module = import.second;
+    if (isa<BuiltinModule>(module)) {
+      // The Builtin module requires no libraries.
+      return true;
+    }
+    
+    if (isa<TranslationUnit>(module)) {
+      // FIXME: Should we include libraries specified by the user here?
+      return true;
+    }
+    
+    ModuleLoader &owner = cast<LoadedModule>(module)->getOwner();
+    owner.getLinkLibraries(module, callback);
+    return true;
+  });
 }
 
 

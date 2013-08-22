@@ -25,16 +25,15 @@
 #include "swift/AST/Component.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/DiagnosticConsumer.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/SIL/SILModule.h"
-#include "clang/Basic/Module.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/SmallString.h"
@@ -189,6 +188,30 @@ static bool IRGenImportedModules(TranslationUnit *TU,
                                  SmallVectorImpl<llvm::Function*> &InitFns,
                                  irgen::Options &Options,
                                  bool IsREPL = true) {
+  // Perform autolinking.
+  TU->collectLinkLibraries([&](LinkLibrary linkLib) {
+    // If we have an absolute path, just try to load it now.
+    llvm::SmallString<128> path = linkLib.getName();
+    if (llvm::sys::path::is_absolute(linkLib.getName())) {
+      dlopen(path.c_str(), 0);
+      return;
+    }
+
+    switch (linkLib.getKind()) {
+    case LibraryKind::Library:
+      break;
+    case LibraryKind::Framework:
+      // If we have a framework, mangle the name to point to the framework
+      // binary.
+      llvm::sys::path::replace_extension(path, "framework");
+      llvm::sys::path::append(path, linkLib.getName());
+      break;
+    }
+
+    // Let dlopen determine the best search paths.
+    dlopen(path.c_str(), 0);
+  });
+  
   // IRGen the modules this module depends on.
   // FIXME: "all visible modules" may not actually include "all modules this
   // module depends on". This is just a stopgap measure before we have real
@@ -198,37 +221,6 @@ static bool IRGenImportedModules(TranslationUnit *TU,
     // Nothing to do for the builtin module.
     if (isa<BuiltinModule>(ModPair.second))
       return true;
-
-    if (auto clangMod = dyn_cast<ClangModule>(ModPair.second)) {
-      // Automatically link against whatever the Clang module requires.
-      // FIXME: Can we be sure to find what the static linker would find?
-      // This is pretty hacky.
-      for (auto &linkLib : clangMod->getClangModule()->LinkLibraries) {
-        // If we have an absolute path, just try to load it now.
-        if (llvm::sys::path::is_absolute(linkLib.Library)) {
-          dlopen(linkLib.Library.c_str(), 0);
-          continue;
-        }
-
-        // If we have a framework, try /System/Library/Frameworks.
-        if (linkLib.IsFramework) {
-          std::string path = "/System/Library/Frameworks/";
-          path += linkLib.Library;
-          path += ".framework/";
-          path += linkLib.Library;
-          dlopen(path.c_str(), 0);
-          continue;
-        }
-
-        // Try /usr/lib.
-        std::string path = "/usr/lib/";
-        path += linkLib.Library;
-        path += ".dylib";
-        dlopen(path.c_str(), 0);
-      }
-
-      return true;
-    }
 
     // Load the shared library corresponding to this module.
     // FIXME: Swift and Clang modules alike need to record the dylibs against
@@ -244,7 +236,6 @@ static bool IRGenImportedModules(TranslationUnit *TU,
     if (!sharedLibName.empty())
       loadRuntimeLib(sharedLibName, CmdLine);
 
-    // FIXME: Handle Swift modules that need IRGen here.
     if (isa<LoadedModule>(ModPair.second))
       return true;
     

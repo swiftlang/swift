@@ -40,6 +40,7 @@ namespace swift {
   enum class DeclKind : uint8_t;
   class ExtensionDecl;
   class InfixOperatorDecl;
+  class LinkLibrary;
   class LookupCache;
   class ModuleLoader;
   class NameAliasType;
@@ -240,6 +241,16 @@ public:
     using RetTy = typename as_function<Fn>::type::result_type;
     std::function<RetTy(ImportedModule)> wrapped = std::cref(fn);
     forAllVisibleModules(topLevelAccessPath, wrapped);
+  }
+  
+  using LinkLibraryCallback = std::function<void(LinkLibrary)>;
+
+  void collectLinkLibraries(LinkLibraryCallback callback);
+  
+  template <typename Fn>
+  void collectLinkLibraries(const Fn &fn) {
+    LinkLibraryCallback wrapped = std::cref(fn);
+    collectLinkLibraries(wrapped);
   }
 
   /// Returns true if the two access paths contain the same chain of

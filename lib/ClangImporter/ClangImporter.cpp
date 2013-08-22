@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
@@ -581,9 +582,13 @@ void ClangImporter::getImportedModules(
   auto topLevelAdapter = cast<ClangModule>(module)->getAdapterModule();
 
   SmallVector<clang::Module *, 8> imported;
-  if (includePrivate)
+  if (includePrivate) {
     imported.append(underlying->Imports.begin(), underlying->Imports.end());
-  else
+    // FIXME: The parent module isn't exactly a private import, but it is
+    // needed for link dependencies.
+    if (underlying->Parent)
+      imported.push_back(underlying->Parent);
+  } else
     underlying->getExportedModules(imported);
 
   for (auto importMod : imported) {
@@ -674,6 +679,20 @@ void ClangImporter::lookupClassMembers(const Module *module,
                                        VisibleDeclConsumer &consumer) {
   // FIXME: Not limited by module.
   lookupClassMembersImpl(Impl, consumer);
+}
+
+void ClangImporter::getLinkLibraries(const Module *module,
+                                     Module::LinkLibraryCallback callback) {
+  auto underlying = cast<ClangModule>(module)->clangModule;
+  for (auto clangLinkLib : underlying->LinkLibraries) {
+    LibraryKind kind;
+    if (clangLinkLib.IsFramework)
+      kind = LibraryKind::Framework;
+    else
+      kind = LibraryKind::Library;
+    
+    callback(LinkLibrary(clangLinkLib.Library, kind));
+  }
 }
 
 clang::TargetInfo &ClangImporter::getTargetInfo() const {

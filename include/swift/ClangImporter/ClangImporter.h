@@ -161,6 +161,9 @@ public:
                                  Identifier name,
                                  SmallVectorImpl<ValueDecl*> &results) override;
 
+  virtual void getLinkLibraries(const Module *module,
+                                Module::LinkLibraryCallback callback) override;
+
   clang::TargetInfo &getTargetInfo() const;
 };
 

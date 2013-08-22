@@ -113,7 +113,7 @@ public:
   virtual void
   getImportedModules(const Module *module,
                      SmallVectorImpl<Module::ImportedModule> &exports,
-                     bool includePrivate = false) { }
+                     bool includePrivate) { }
 
   /// \brief Look for all visible top-level decls in the module.
   virtual void lookupVisibleDecls(const Module *module,
@@ -137,6 +137,13 @@ public:
                                  Module::AccessPathTy accessPath,
                                  Identifier name,
                                  SmallVectorImpl<ValueDecl*> &results) { }
+
+  /// \brief Find all libraries and frameworks that need to be linked with this
+  /// module.
+  ///
+  /// Does not include dependencies.
+  virtual void getLinkLibraries(const Module *module,
+                                Module::LinkLibraryCallback callback) { }
 };
 
 }
