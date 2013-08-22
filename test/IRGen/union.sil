@@ -104,6 +104,9 @@ union NoPayloads {
 sil @a : $[thin] () -> ()
 sil @b : $[thin] () -> ()
 sil @c : $[thin] () -> ()
+sil @d : $[thin] () -> ()
+sil @e : $[thin] () -> ()
+sil @f : $[thin] () -> ()
 
 
 // CHECK: define void @no_payload_switch(i2) {
@@ -455,6 +458,176 @@ end:
 }
 
 
+union MultiPayloadNoSpareBits {
+  case x(Builtin.Int64)
+  case y(Builtin.Int32)
+  case z(Builtin.Int63)
+  case a
+  case b
+  case c
+}
+
+// CHECK: define void @multi_payload_no_spare_bits_switch(i64, i2) {
+sil @multi_payload_no_spare_bits_switch : $(MultiPayloadNoSpareBits) -> () {
+entry(%u : $MultiPayloadNoSpareBits):
+// CHECK:   switch i2 %1, label %[[UNREACHABLE:[0-9]+]] [
+// CHECK:     i2 0, label %[[X_DEST:[0-9]+]]
+// CHECK:     i2 1, label %[[Y_DEST:[0-9]+]]
+// CHECK:     i2 -2, label %[[Z_DEST:[0-9]+]]
+// CHECK:     i2 -1, label %[[EMPTY:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[EMPTY]]
+// CHECK:   switch i64 %0, label %[[UNREACHABLE]] [
+// CHECK:     i64 0, label %[[A_DEST:[0-9]+]]
+// CHECK:     i64 1, label %[[B_DEST:[0-9]+]]
+// CHECK:     i64 2, label %[[C_DEST:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[UNREACHABLE]]
+// CHECK:   unreachable
+  switch_union %u : $MultiPayloadNoSpareBits, case #MultiPayloadNoSpareBits.x!unionelt.1: x_dest, case #MultiPayloadNoSpareBits.y!unionelt.1: y_dest, case #MultiPayloadNoSpareBits.z!unionelt.1: z_dest, case #MultiPayloadNoSpareBits.a!unionelt: a_dest, case #MultiPayloadNoSpareBits.b!unionelt: b_dest, case #MultiPayloadNoSpareBits.c!unionelt: c_dest
+
+// CHECK: ; <label>:[[X_DEST]]
+x_dest:
+  %a = function_ref @a : $[thin] () -> ()
+  apply %a() : $[thin] () -> ()
+  br end
+
+// CHECK: ; <label>:[[Y_DEST]]
+y_dest:
+  %b = function_ref @b : $[thin] () -> ()
+  apply %b() : $[thin] () -> ()
+  br end
+
+// CHECK: ; <label>:[[Z_DEST]]
+z_dest:
+  %c = function_ref @c : $[thin] () -> ()
+  apply %c() : $[thin] () -> ()
+  br end
+
+// CHECK: ; <label>:[[A_DEST]]
+a_dest:
+  %d = function_ref @d : $[thin] () -> ()
+  apply %d() : $[thin] () -> ()
+  br end
+
+// CHECK: ; <label>:[[B_DEST]]
+b_dest:
+  %e = function_ref @e : $[thin] () -> ()
+  apply %e() : $[thin] () -> ()
+  br end
+
+// CHECK: ; <label>:[[C_DEST]]
+c_dest:
+  %f = function_ref @f : $[thin] () -> ()
+  apply %f() : $[thin] () -> ()
+  br end
+
+end:
+  %x = tuple ()
+  return %x : $()
+}
+
+
+union MultiPayloadOneSpareBit {
+  case x(Builtin.Int62)
+  case y(Builtin.Int63)
+  case z(Builtin.Int61)
+  case a
+  case b
+  case c
+}
+
+sil @multi_payload_one_spare_bit_switch : $(MultiPayloadOneSpareBit) -> () {
+entry(%u : $MultiPayloadOneSpareBit):
+  switch_union %u : $MultiPayloadOneSpareBit, case #MultiPayloadOneSpareBit.x!unionelt.1: x_dest, case #MultiPayloadOneSpareBit.y!unionelt.1: y_dest, case #MultiPayloadOneSpareBit.z!unionelt.1: z_dest, case #MultiPayloadOneSpareBit.a!unionelt: a_dest, case #MultiPayloadOneSpareBit.b!unionelt: b_dest, case #MultiPayloadOneSpareBit.c!unionelt: c_dest
+
+x_dest:
+  %a = function_ref @a : $[thin] () -> ()
+  apply %a() : $[thin] () -> ()
+  br end
+
+y_dest:
+  %b = function_ref @b : $[thin] () -> ()
+  apply %b() : $[thin] () -> ()
+  br end
+
+z_dest:
+  %c = function_ref @c : $[thin] () -> ()
+  apply %c() : $[thin] () -> ()
+  br end
+
+a_dest:
+  %d = function_ref @d : $[thin] () -> ()
+  apply %d() : $[thin] () -> ()
+  br end
+
+b_dest:
+  %e = function_ref @e : $[thin] () -> ()
+  apply %e() : $[thin] () -> ()
+  br end
+
+c_dest:
+  %f = function_ref @f : $[thin] () -> ()
+  apply %f() : $[thin] () -> ()
+  br end
+
+end:
+  %x = tuple ()
+  return %x : $()
+}
+
+
+union MultiPayloadTwoSpareBits {
+  case x(Builtin.Int62)
+  case y(Builtin.Int60)
+  case z(Builtin.Int61)
+  case a
+  case b
+  case c
+}
+
+sil @multi_payload_two_spare_bits_switch : $(MultiPayloadTwoSpareBits) -> () {
+entry(%u : $MultiPayloadTwoSpareBits):
+  switch_union %u : $MultiPayloadTwoSpareBits, case #MultiPayloadTwoSpareBits.x!unionelt.1: x_dest, case #MultiPayloadTwoSpareBits.y!unionelt.1: y_dest, case #MultiPayloadTwoSpareBits.z!unionelt.1: z_dest, case #MultiPayloadTwoSpareBits.a!unionelt: a_dest, case #MultiPayloadTwoSpareBits.b!unionelt: b_dest, case #MultiPayloadTwoSpareBits.c!unionelt: c_dest
+
+x_dest:
+  %a = function_ref @a : $[thin] () -> ()
+  apply %a() : $[thin] () -> ()
+  br end
+
+y_dest:
+  %b = function_ref @b : $[thin] () -> ()
+  apply %b() : $[thin] () -> ()
+  br end
+
+z_dest:
+  %c = function_ref @c : $[thin] () -> ()
+  apply %c() : $[thin] () -> ()
+  br end
+
+a_dest:
+  %d = function_ref @d : $[thin] () -> ()
+  apply %d() : $[thin] () -> ()
+  br end
+
+b_dest:
+  %e = function_ref @e : $[thin] () -> ()
+  apply %e() : $[thin] () -> ()
+  br end
+
+c_dest:
+  %f = function_ref @f : $[thin] () -> ()
+  apply %f() : $[thin] () -> ()
+  br end
+
+end:
+  %x = tuple ()
+  return %x : $()
+}
+
+
+
+
 // -- injection functions for unions --
 
 // CHECK: define { i64, i64 } @_TO5union9Singleton3valfMS0_FTBi64_Bi64__S0_(i64, i64) {
@@ -611,33 +784,6 @@ end:
 // CHECK:   ret i64 -9223372036854775807
 // CHECK: }
 
-
-union MultiPayloadNoSpareBits {
-  case x(Builtin.Int64)
-  case y(Builtin.Int32)
-  case z(Builtin.Int63)
-  case a
-  case b
-  case c
-}
-
-union MultiPayloadOneSpareBit {
-  case x(Builtin.Int62)
-  case y(Builtin.Int63)
-  case z(Builtin.Int61)
-  case a
-  case b
-  case c
-}
-
-union MultiPayloadTwoSpareBits {
-  case x(Builtin.Int62)
-  case y(Builtin.Int60)
-  case z(Builtin.Int61)
-  case a
-  case b
-  case c
-}
 
 // Force the storage types to all be generated.
 typealias AllTestUnions = (

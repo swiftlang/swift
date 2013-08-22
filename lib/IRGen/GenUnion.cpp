@@ -333,7 +333,7 @@ namespace {
       assert(IGF.Builder.hasPostTerminatorIP() &&
              "did not handle payload case");
       
-      // Handle the cases covered by each tag bit.
+      // Handle the cases covered by each tag bit value.
       unsigned casesPerTag = 1 << ExtraTagBitCount;
       for (unsigned i = 1, e = tagBitBlocks.size(); i < e; ++i) {
         assert(elti != eltEnd &&
@@ -470,19 +470,176 @@ namespace {
     // Invariant: The size of the bit
     // vector is the size of the payload in bits, rounded up to a byte boundary.
     llvm::BitVector CommonSpareBits;
+    
+    // The cases with payloads, in tag order.
+    // FIXME: non-fixed type info
+    std::vector<std::pair<UnionElementDecl*, const FixedTypeInfo*>>
+      PayloadCases;
+    
+    // The cases without payloads, in discriminator order.
+    std::vector<UnionElementDecl *> NoPayloadCases;
+    
+    // The number of tag values used for no-payload cases.
+    unsigned NumEmptyElementTags;
   public:
     /// FIXME: Spare bits common to aggregate elements and not used for tags.
     MultiPayloadUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
                            IsPOD_t isPOD)
       : PayloadUnionTypeInfoBase(T, S, A, isPOD) {}
 
+    Size getExtraTagBitOffset() const override {
+      return Size(CommonSpareBits.size()+7U/8U);
+    }
+    
+  private:
+    /// Gather spare bits into the low bits of a smaller integer value.
+    llvm::Value *gatherSpareBits(IRGenFunction &IGF,
+                                 llvm::Value *spareBits,
+                                 unsigned resultBitWidth) const {
+      auto destTy
+        = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), resultBitWidth);
+      unsigned usedBits = 0;
+      llvm::Value *result = nullptr;
+      
+      for (int i = CommonSpareBits.find_first(); i != -1;
+           i = CommonSpareBits.find_next(i)) {
+        assert(i >= 0);
+        unsigned u = i;
+        assert(u >= usedBits && "used more bits than we've processed?!");
+        
+        // Shift the bits into place.
+        llvm::Value *newBits;
+        if (u > 0)
+          newBits = IGF.Builder.CreateLShr(spareBits, u - usedBits);
+        else
+          newBits = spareBits;
+        newBits = IGF.Builder.CreateTrunc(newBits, destTy);
+        
+        // See how many consecutive bits we have.
+        unsigned numBits = 1;
+        ++u;
+        for (unsigned e = CommonSpareBits.size();
+             u < e && CommonSpareBits[u]; ++u)
+          ++numBits;
+        
+        // Mask out the selected bits.
+        auto val = APInt::getAllOnesValue(numBits);
+        if (numBits < resultBitWidth)
+          val = val.zext(resultBitWidth);
+        val = val.shl(usedBits);
+        auto *mask = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), val);
+        newBits = IGF.Builder.CreateAnd(newBits, mask);
+        
+        // Accumulate the result.
+        if (result)
+          result = IGF.Builder.CreateOr(result, newBits);
+        else
+          result = newBits;
+        
+        usedBits += numBits;
+        i = u;
+      }
+      
+      return result;
+    }
+
+  public:
     void emitSwitch(IRGenFunction &IGF,
                     Explosion &value,
                     ArrayRef<std::pair<UnionElementDecl*,
                                        llvm::BasicBlock*>> dests,
                     llvm::BasicBlock *defaultDest) const override {
-      // FIXME
-      IGF.Builder.CreateUnreachable();
+      auto &C = IGF.IGM.getLLVMContext();
+
+      // Create a map of the destination blocks for quicker lookup.
+      llvm::DenseMap<UnionElementDecl*,llvm::BasicBlock*> destMap(dests.begin(),
+                                                                  dests.end());
+      
+      // Create an unreachable branch for unreachable switch defaults.
+      auto *unreachableBB = llvm::BasicBlock::Create(C);
+      
+      // If there was no default branch in SIL, use the unreachable branch as
+      // the default.
+      if (!defaultDest)
+        defaultDest = unreachableBB;
+      
+      auto blockForCase = [&](UnionElementDecl *theCase) -> llvm::BasicBlock* {
+        auto found = destMap.find(theCase);
+        if (found == destMap.end())
+          return defaultDest;
+        else
+          return found->second;
+      };
+
+      llvm::Value *payload = value.claimNext();
+
+      // Condense the tag bits.
+      unsigned numSpareBits = CommonSpareBits.count();
+      llvm::Value *tag = nullptr;
+      unsigned numTagBits = numSpareBits + ExtraTagBitCount;
+      
+      // Get the tag bits from spare bits, if any.
+      if (numSpareBits > 0) {
+        tag = gatherSpareBits(IGF, payload, numTagBits);
+      }
+      
+      // Get the extra tag bits, if any.
+      if (ExtraTagBitCount > 0) {
+        llvm::Value *extraTagBits = value.claimNext();
+        if (!tag) {
+          tag = extraTagBits;
+        } else {
+          extraTagBits = IGF.Builder.CreateZExt(extraTagBits, tag->getType());
+          extraTagBits = IGF.Builder.CreateShl(extraTagBits,
+                                               numTagBits - ExtraTagBitCount);
+          tag = IGF.Builder.CreateOr(tag, extraTagBits);
+        }
+      }
+      
+      auto *tagSwitch = IGF.Builder.CreateSwitch(tag, unreachableBB,
+                                       PayloadCases.size() + NumEmptyElementTags);
+      
+      // Switch over the tag bits for payload cases.
+      unsigned tagIndex = 0;
+      for (auto &payloadCasePair : PayloadCases) {
+        UnionElementDecl *payloadCase = payloadCasePair.first;
+        tagSwitch->addCase(llvm::ConstantInt::get(C,APInt(numTagBits,tagIndex)),
+                           blockForCase(payloadCase));
+        ++tagIndex;
+      }
+      
+      // Switch over the no-payload cases.
+      unsigned casesPerTag = CommonSpareBits.size() >= 32
+        ? 0x80000000 : 1 << CommonSpareBits.size();
+      
+      auto elti = NoPayloadCases.begin(), eltEnd = NoPayloadCases.end();
+      
+      for (unsigned i = 0; i < NumEmptyElementTags; ++i) {
+        assert(elti != eltEnd &&
+               "ran out of cases before running out of extra tags?");
+        auto *tagBB = llvm::BasicBlock::Create(C);
+        tagSwitch->addCase(llvm::ConstantInt::get(C,APInt(numTagBits,tagIndex)),
+                           tagBB);
+        ++tagIndex;
+        
+        // Switch over the cases for this tag.
+        IGF.Builder.emitBlock(tagBB);
+        auto *caseSwitch = IGF.Builder.CreateSwitch(payload, unreachableBB);
+        for (unsigned tag = 0; tag < casesPerTag && elti != eltEnd; ++tag) {
+          auto v = llvm::ConstantInt::get(C, APInt(CommonSpareBits.size(),tag));
+          caseSwitch->addCase(v, blockForCase(*elti));
+          ++elti;
+        }
+      }
+      
+      // Delete the unreachable default block if we didn't use it, or emit it
+      // if we did.
+      if (unreachableBB->use_empty()) {
+        delete unreachableBB;
+      } else {
+        IGF.Builder.emitBlock(unreachableBB);
+        IGF.Builder.CreateUnreachable();
+      }
     }
     
     void emitProject(IRGenFunction &IGF,
@@ -490,10 +647,6 @@ namespace {
                      UnionElementDecl *theCase,
                      Explosion &out) const override {
       // FIXME
-    }
-    
-    Size getExtraTagBitOffset() const override {
-      return Size(CommonSpareBits.size()+7U/8U);
     }
     
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
@@ -986,6 +1139,16 @@ namespace {
       fixedPayloadTI.applyFixedSpareBitsMask(CommonSpareBits);
       if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
         worstAlignment = fixedPayloadTI.getFixedAlignment();
+      PayloadCases.emplace_back(elt, &fixedPayloadTI);
+    }
+    
+    // Collect the no-payload cases.
+    // FIXME: O(n^2)
+    for (auto *elt : theUnion->getAllElements()) {
+      if (std::find(strategy.getElementsWithPayload().begin(),
+                    strategy.getElementsWithPayload().end(),
+                    elt) == strategy.getElementsWithPayload().end())
+        NoPayloadCases.push_back(elt);
     }
     
     unsigned commonSpareBitCount = CommonSpareBits.count();
@@ -993,16 +1156,15 @@ namespace {
     
     // We can store tags for the empty elements using the inhabited bits with
     // their own tag(s).
-    unsigned numEmptyElementTags;
     if (usedBitCount >= 32) {
-      numEmptyElementTags = 1;
+      NumEmptyElementTags = 1;
     } else {
       unsigned emptyElementsPerTag = 1 << usedBitCount;
-      numEmptyElementTags
+      NumEmptyElementTags
         = (numEmptyElements + (emptyElementsPerTag-1))/emptyElementsPerTag;
     }
     
-    unsigned numTags = numPayloadTags + numEmptyElementTags;
+    unsigned numTags = numPayloadTags + NumEmptyElementTags;
     unsigned numTagBits = llvm::Log2_32(numTags-1) + 1;
     ExtraTagBitCount = numTagBits <= commonSpareBitCount
       ? 0 : numTagBits - commonSpareBitCount;
