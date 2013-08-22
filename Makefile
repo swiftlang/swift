@@ -51,6 +51,13 @@ ifdef SWIFT_VENDOR
 CPP.Flags += -DSWIFT_VENDOR='"$(SWIFT_VENDOR) "'
 endif
 
+# Turn on swift debug symbols in debug builds.
+ifeq ($(DEBUG_SYMBOLS),1)
+  SWIFT_DEBUGFLAG="-g"
+else
+  SWIFT_DEBUGFLAG=
+endif
+
 ###
 # Create a symlink lib/swift to lib so that we can provide a consistent
 # path schema for installed and build-directory environments.

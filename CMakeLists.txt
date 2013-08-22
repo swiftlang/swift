@@ -210,6 +210,11 @@ function(compile_swift_files)
   else()
     list(APPEND swift_flags "-O0")
   endif()
+
+  # Turn on debug symbols in debug builds.
+  if(CMAKE_BUILD_TYPE MATCHES Debug)
+    list(APPEND swift_flags "-g")
+  endif()
   
   # If we have a modules SDK, use it for building.
   if (HAVE_DARWIN_MODULES_SDK)
