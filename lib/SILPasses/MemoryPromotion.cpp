@@ -284,7 +284,11 @@ namespace {
 
     /// This instruction is a general escape of the value, e.g. a call to a
     /// closure that captures it.
-    Escape
+    Escape,
+
+    /// This instruction is a release, which may be a last use.
+    /// TODO: remove this when we support partially constructed values.
+    Release
   };
 
   /// ElementUses - This class keeps track of all of the uses of a single
@@ -349,6 +353,7 @@ namespace {
     void handleStoreUse(SILInstruction *Inst, bool isPartialStore);
     void handleByrefUse(SILInstruction *Inst);
     void handleEscape(SILInstruction *Inst);
+    void handleRelease(SILInstruction *Inst);
 
     enum DIKind {
       DI_Yes,
@@ -447,10 +452,7 @@ void ElementPromotion::doIt() {
     case UseKind::PartialStore: handleStoreUse(Use.first, true); break;
     case UseKind::ByrefUse:     handleByrefUse(Use.first); break;
     case UseKind::Escape:       handleEscape(Use.first); break;
-    // FIXME: Tuple boxes may not be completely constructed by the time they are
-    // destroyed.  We need to handle destroying partially constructed boxes.
-    // FIXME: Non-tuple boxes may be completely uninitialized at their
-    // destruction time.
+    case UseKind::Release:      handleRelease(Use.first); break;
     }
 
     if (HadError) break;
@@ -664,6 +666,25 @@ void ElementPromotion::handleEscape(SILInstruction *Inst) {
   diagnoseInitError(Inst, diag::variable_escape_before_initialized);
 }
 
+/// At the time when a box is destroyed, it might be completely uninitialized,
+/// and if it is a tuple, it may only be partially initialized.  To avoid
+/// ambiguity, we require that all elements of the value are completely
+/// initialized at the point of a release.
+///
+/// TODO: We could make this more powerful to directly support these cases, at
+/// lease when the value doesn't escape.
+///
+void ElementPromotion::handleRelease(SILInstruction *Inst) {
+  auto DI = checkDefinitelyInit(Inst);
+  if (DI == DI_Yes)
+    return;
+
+  // Otherwise, this is a release of an uninitialized value.  Emit a diagnostic.
+  diagnoseInitError(Inst, diag::variable_destroyed_before_initialized);
+}
+
+
+
 bool ElementPromotion::isLiveOut(SILBasicBlock *BB) {
   LiveOutBlockState &BBState = PerBlockInfo[BB];
   switch (BBState.Availability) {
@@ -841,13 +862,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
   for (auto UI : Pointer.getUses()) {
     auto *User = cast<SILInstruction>(UI->getUser());
 
-    // These show up as uses but aren't significant for this analysis.
-    if (isa<DeallocStackInst>(User) ||
-        isa<RetainInst>(User) ||
-        isa<ReleaseInst>(User) ||
-        isa<DeallocRefInst>(User))
-      continue;
-    
     // Instructions that compute a subelement are handled by a helper.
     if (isa<TupleElementAddrInst>(User) || isa<StructElementAddrInst>(User)) {
       collectElementUses(User, BaseElt);
@@ -999,6 +1013,17 @@ static void optimizeAllocBox(AllocBoxInst *ABI) {
 
   // Walk the use list of the pointer, collecting them into the Uses array.
   ElementUseCollector(Uses).collectUses(SILValue(ABI, 1), 0);
+
+  // Collect information about the retain count result as well.
+  for (auto UI : SILValue(ABI, 0).getUses()) {
+    auto *User = cast<SILInstruction>(UI->getUser());
+
+    // If this is a release, then remember it as such.
+    if (isa<ReleaseInst>(User)) {
+      for (auto &UseArray : Uses)
+        UseArray.push_back({ User, UseKind::Release });
+    }
+  }
 
   // Process each scalar value in the uses array individually.
   unsigned EltNo = 0;
