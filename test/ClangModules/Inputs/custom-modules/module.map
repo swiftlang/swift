@@ -1,3 +1,9 @@
 module ExternIntX { header "x.h" }
 module Swarm { header "Swarm.h" }
 module TestProtocols { header "Protocols.h" }
+
+module LinkMusket {
+  link "Lock"
+  link "Stock"
+  link framework "Barrel"
+}

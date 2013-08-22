@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
@@ -228,6 +229,39 @@ static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
   return initFn;
 }
 
+static void emitModuleLinkOptions(llvm::Module &module, TranslationUnit *TU) {
+  // FIXME: This constant should be vended by LLVM somewhere.
+  static const char * const LinkerOptionsFlagName = "Linker Options";
+  
+  SmallVector<llvm::Value *, 32> metadata;
+  llvm::LLVMContext &ctx = module.getContext();
+  
+  TU->collectLinkLibraries([&](LinkLibrary linkLib) {
+    switch (linkLib.getKind()) {
+    case LibraryKind::Library: {
+      // FIXME: Use target-independent linker option.
+      // Clang uses CGM.getTargetCodeGenInfo().getDependentLibraryOption(...).
+      llvm::SmallString<32> buf;
+      buf += "-l";
+      buf += linkLib.getName();
+      auto flag = llvm::MDString::get(ctx, buf);
+      metadata.push_back(llvm::MDNode::get(ctx, flag));
+      break;
+    }
+    case LibraryKind::Framework:
+      llvm::Value *args[] = {
+        llvm::MDString::get(ctx, "-framework"),
+        llvm::MDString::get(ctx, linkLib.getName())
+      };
+      metadata.push_back(llvm::MDNode::get(ctx, args));
+      break;
+    }
+  });
+  
+  module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
+                       llvm::MDNode::get(ctx, metadata));
+}
+
 /// Emit all the top-level code in the translation unit.
 void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                                       unsigned StartElem) {
@@ -400,6 +434,8 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   Module.addModuleFlag(llvm::Module::Override,
                        "Objective-C Garbage Collection", (uint32_t)0);
   // FIXME: Simulator flag.
+  
+  emitModuleLinkOptions(Module, tunit);
 
   // Fix up the DICompileUnit.
   if (DebugInfo)
