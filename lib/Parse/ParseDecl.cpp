@@ -519,7 +519,8 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags) {
 ///     decl-import
 ///     decl-operator
 ///
-bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
+ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
+                               unsigned Flags) {
   ParserPosition BeginParserPosition;
   if (isCodeCompletionFirstPass())
     BeginParserPosition = getParserPosition();
@@ -532,19 +533,16 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     UnhandledStatic = true;
   }
 
-  bool HadParseError = false;
+  ParserResult<Decl> DeclResult;
+  ParserStatus Status;
   switch (Tok.getKind()) {
   case tok::kw_import:
-    if (Decl *D = parseDeclImport(Flags).getPtrOrNull())
-      Entries.push_back(D);
-    else
-      HadParseError = true;
+    DeclResult = parseDeclImport(Flags);
+    Status = DeclResult;
     break;
   case tok::kw_extension:
-    if (Decl *D = parseDeclExtension(Flags).getPtrOrNull())
-      Entries.push_back(D);
-    else
-      HadParseError = true;
+    DeclResult = parseDeclExtension(Flags);
+    Status = DeclResult;
     break;
   case tok::kw_var:
     if (StaticLoc.isValid()) {
@@ -552,65 +550,45 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
         .highlight(SourceRange(StaticLoc));
       UnhandledStatic = false;
     }
-    HadParseError = parseDeclVar(Flags, Entries).isError();
+    Status = parseDeclVar(Flags, Entries);
     break;
   case tok::kw_typealias:
-    if (Decl *D = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
-                                     Flags & PD_InProtocol)
-            .getPtrOrNull())
-      Entries.push_back(D);
-    else
-      HadParseError = true;
+    DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
+                                     Flags & PD_InProtocol);
+    Status = DeclResult;
     break;
   case tok::kw_union:
-    if (Decl *D = parseDeclUnion(Flags).getPtrOrNull())
-      Entries.push_back(D);
-    else
-      HadParseError = true;
+    DeclResult = parseDeclUnion(Flags);
+    Status = DeclResult;
     break;
   case tok::kw_case:
-    if (Decl *D = parseDeclUnionElement(Flags).getPtrOrNull())
-      Entries.push_back(D);
-    else
-      HadParseError = true;
+    DeclResult = parseDeclUnionElement(Flags);
+    Status = DeclResult;
     break;
   case tok::kw_struct:
-    if (Decl *D = parseDeclStruct(Flags).getPtrOrNull())
-      Entries.push_back(D);
-    else
-      HadParseError = true;
+    DeclResult = parseDeclStruct(Flags);
+    Status = DeclResult;
     break;
   case tok::kw_class:
-    if (Decl *D = parseDeclClass(Flags).getPtrOrNull())
-      Entries.push_back(D);
-    else
-      HadParseError = true;
+    DeclResult = parseDeclClass(Flags);
+    Status = DeclResult;
     break;
   case tok::kw_constructor:
-    if (Decl *D = parseDeclConstructor(Flags & PD_HasContainerType)
-            .getPtrOrNull())
-      Entries.push_back(D);
-    else
-      HadParseError = true;
+    DeclResult = parseDeclConstructor(Flags & PD_HasContainerType);
+    Status = DeclResult;
     break;
   case tok::kw_destructor:
-    if (Decl *D = parseDeclDestructor(Flags).getPtrOrNull())
-      Entries.push_back(D);
-    else
-      HadParseError = true;
+    DeclResult = parseDeclDestructor(Flags);
+    Status = DeclResult;
     break;
   case tok::kw_protocol:
-    if (Decl *D = parseDeclProtocol(Flags).getPtrOrNull())
-      Entries.push_back(D);
-    else
-      HadParseError = true;
+    DeclResult = parseDeclProtocol(Flags);
+    Status = DeclResult;
     break;
 
   case tok::kw_func:
-    if (Decl *D = parseDeclFunc(StaticLoc, Flags).getPtrOrNull())
-      Entries.push_back(D);
-    else
-      HadParseError = true;
+    DeclResult = parseDeclFunc(StaticLoc, Flags);
+    Status = DeclResult;
     UnhandledStatic = false;
     break;
 
@@ -620,47 +598,47 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
         .fixItRemove(SourceRange(StaticLoc));
       UnhandledStatic = false;
     }
-    HadParseError = parseDeclSubscript(Flags & PD_HasContainerType,
-                                       !(Flags & PD_DisallowFuncDef),
-                                       Entries).isError();
+    Status = parseDeclSubscript(Flags & PD_HasContainerType,
+                                !(Flags & PD_DisallowFuncDef),
+                                Entries);
     break;
   
   case tok::identifier:
     if (isStartOfOperatorDecl(Tok, peekToken())) {
-      if (Decl *D = parseDeclOperator(Flags & PD_AllowTopLevel).getPtrOrNull())
-        Entries.push_back(D);
-      else
-        HadParseError = true;
+      DeclResult = parseDeclOperator(Flags & PD_AllowTopLevel);
       break;
     }
     SWIFT_FALLTHROUGH;
 
   default:
     diagnose(Tok, diag::expected_decl);
-    HadParseError = true;
+    DeclResult = makeParserErrorResult<Decl>();
+    Status = DeclResult;
     break;
   }
 
-  if (!HadParseError && Tok.is(tok::semi))
+  if (DeclResult.isNonNull())
+    Entries.push_back(DeclResult.get());
+
+  if (Status.isSuccess() && Tok.is(tok::semi))
     Entries.back()->TrailingSemiLoc = consumeToken(tok::semi);
 
-  if (HadParseError &&
-      Tok.is(tok::code_complete) && isCodeCompletionFirstPass() &&
+  if (Status.hasCodeCompletion() && isCodeCompletionFirstPass() &&
       !CurDeclContext->isModuleContext()) {
     // Only consume non-toplevel decls.
     consumeDecl(BeginParserPosition, Flags);
 
     // Pretend that there was no error.
-    return false;
+    return makeParserSuccess();
   }
 
   // If we parsed 'static' but didn't handle it above, complain about it.
-  if (!HadParseError && UnhandledStatic) {
+  if (Status.isSuccess() && UnhandledStatic) {
     diagnose(Entries.back()->getLoc(), diag::decl_not_static)
       .fixItRemove(SourceRange(StaticLoc));
   }
 
-  return HadParseError;
+  return Status;
 }
 
 void Parser::parseDeclDelayed() {
@@ -846,7 +824,7 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
   SmallVector<Decl*, 8> MemberDecls;
 
   parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/ true,
-            diag::expected_rbrace_extension, [&]()->bool {
+            diag::expected_rbrace_extension, [&]() -> ParserStatus {
     return parseDecl(MemberDecls, PD_HasContainerType | PD_DisallowVar);
   });
 
@@ -1836,7 +1814,7 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
     }
 
     previousHadSemi = false;
-    if (parseDecl(memberDecls, flags))
+    if (parseDecl(memberDecls, flags).isError())
       return true;
 
     // Check whether the previous declaration had a semicolon after it.

@@ -417,7 +417,7 @@ public:
 
   bool parseTranslationUnit(TranslationUnit *TU);
   void consumeDecl(ParserPosition BeginParserPosition, unsigned Flags);
-  bool parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
+  ParserStatus parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
   void parseDeclDelayed();
   enum {
     PD_Default              = 0,

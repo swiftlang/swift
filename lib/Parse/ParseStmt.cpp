@@ -206,15 +206,16 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     // Parse the decl, stmt, or expression.
     previousHadSemi = false;
     if (isStartOfDecl(Tok, peekToken())) {
-      bool FailedToParse =
+      ParserStatus Status =
           parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
-      if (FailedToParse && IsTopLevel &&
-          Tok.is(tok::code_complete) && isCodeCompletionFirstPass()) {
-        consumeTopLevelDecl(BeginParserPosition);
-        return;
-      }
-      if (FailedToParse)
+      if (Status.isError()) {
         NeedParseErrorRecovery = true;
+        if (Status.hasCodeCompletion() && IsTopLevel &&
+            isCodeCompletionFirstPass()) {
+          consumeTopLevelDecl(BeginParserPosition);
+          return;
+        }
+      }
 
       for (Decl *D : TmpDecls)
         Entries.push_back(D);
