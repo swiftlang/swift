@@ -730,6 +730,7 @@ llvm::DIArray IRGenDebugInfo::getStructMembers(NominalTypeDecl *D,
   return DBuilder.getOrCreateArray(Elements);
 }
 
+
 /// Create a temporary forward declaration for a struct and add it to
 /// the type cache so we can safely build recursive types.
 llvm::DICompositeType
@@ -752,6 +753,48 @@ IRGenDebugInfo::createStructType(DebugTypeInfo DbgTy,
     (Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
      getStructMembers(Decl, Scope, File, Flags), RuntimeLang);
 
+  FwdDecl->replaceAllUsesWith(DTy);
+  return DTy;
+}
+
+
+/// Return an array with the DITypes for each of a union's elements.
+llvm::DIArray IRGenDebugInfo::
+getUnionElements(UnionDecl *D, llvm::DIDescriptor Scope, llvm::DIFile File,
+                 unsigned SizeInBytes, unsigned AlignInBytes, unsigned Flags) {
+  SmallVector<llvm::Value *, 16> Elements;
+  for (auto Decl : D->getAllElements()) {
+    auto CanTy = Decl->getType()->getCanonicalType();
+    auto DTI = DebugTypeInfo(CanTy, SizeInBytes, AlignInBytes);
+    Elements.push_back(getOrCreateType(DTI, Scope));
+  }
+  return DBuilder.getOrCreateArray(Elements);
+}
+
+/// Create a temporary forward declaration for a union and add it to
+/// the type cache so we can safely build recursive types.
+llvm::DICompositeType
+IRGenDebugInfo::createUnionType(DebugTypeInfo DbgTy,
+                                UnionDecl *Decl,
+                                StringRef Name,
+                                llvm::DIDescriptor Scope,
+                                llvm::DIFile File, unsigned Line,
+                                unsigned SizeInBytes, unsigned AlignInBytes,
+                                unsigned Flags) {
+  unsigned SizeOfByte = TargetInfo.getCharWidth();
+  uint64_t SizeInBits = SizeInBytes * SizeOfByte;
+  uint64_t AlignInBits = AlignInBytes * SizeOfByte;
+  auto FwdDecl = DBuilder.createForwardDecl
+    (llvm::dwarf::DW_TAG_union_type,
+     Name, Scope, File, Line, dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
+
+  DITypeCache[DbgTy] = llvm::WeakVH(FwdDecl);
+
+  auto DTy = DBuilder.createUnionType(Scope, Name, File, Line,
+                                      SizeInBits, AlignInBits, Flags,
+                                      getUnionElements(Decl, Scope, File, Flags,
+                                                       SizeInBits, AlignInBits),
+                                      dwarf::DW_LANG_Swift);
   FwdDecl->replaceAllUsesWith(DTy);
   return DTy;
 }
@@ -816,7 +859,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto FloatTy = BaseTy->castTo<BuiltinFloatType>();
     // Assuming that the bitwidth and FloatTy->getFPKind() are identical.
     SizeInBits = FloatTy->getBitWidth();
-    Encoding = llvm::dwarf::DW_ATE_float;
     switch (SizeInBits) {
     case 16:  Name = "Float16";  break;
     case 32:  Name = "Float32";  break;
@@ -825,6 +867,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     case 128: Name = "Float128"; break;
     default:  Name = "Float";
     }
+    Encoding = llvm::dwarf::DW_ATE_float;
     break;
   }
 
@@ -965,6 +1008,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto Metatype = BaseTy->castTo<MetaTypeType>();
     auto CanTy = Metatype->getInstanceType()->getCanonicalType();
     // The type this metatype is describing.
+    // FIXME: Reusing the size and alignment of the metatype for the type is wrong.
     auto DTI = DebugTypeInfo(CanTy, DbgTy.SizeInBytes, DbgTy.AlignInBytes);
     return DBuilder.createQualifiedType(DW_TAG_meta_type,
                                         getOrCreateType(DTI, Scope));
@@ -976,8 +1020,18 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto FnTy = DBuilder.createSubroutineType(getFile(Scope), llvm::DIArray());
     return DBuilder.createPointerType(FnTy, SizeInBits, AlignInBits);
   }
+
   case TypeKind::Union: {
-    Name = getMangledName(DbgTy.Ty->getCanonicalType());
+    auto UnionTy = BaseTy->castTo<UnionType>();
+    if (auto Decl = UnionTy->getDecl()) {
+      Name = getMangledName(DbgTy.Ty->getCanonicalType());
+      Location L = getStartLoc(SM, Decl);
+      return createUnionType(DbgTy, Decl, Name, Scope,
+                             getOrCreateFile(L.Filename), L.Line,
+                             DbgTy.SizeInBytes, DbgTy.AlignInBytes, Flags);
+    }
+    DEBUG(llvm::dbgs() << "Union type without Decl: ";
+          DbgTy.Ty.dump(); llvm::dbgs() << "\n");
     break;
   }
 
