@@ -612,12 +612,6 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   : NominalTypeDecl(DeclKind::Protocol, DC, Name, Inherited, nullptr),
     ProtocolLoc(ProtocolLoc), NameLoc(NameLoc)
 {
-  // Compute the associated type for this ClassDecl.
-  ASTContext &Ctx = DC->getASTContext();
-  DeclaredTy = new (Ctx, AllocationArena::Permanent) ProtocolType(this, Ctx);
-  // Set the type of the ProtocolDecl to the right MetaTypeType.
-  setType(MetaTypeType::get(DeclaredTy, Ctx));
-
   ProtocolDeclBits.RequiresClassValid = false;
   ProtocolDeclBits.RequiresClass = false;
   ProtocolDeclBits.ExistentialConformsToSelfValid = false;

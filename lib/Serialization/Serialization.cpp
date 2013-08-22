@@ -1352,6 +1352,7 @@ bool Serializer::writeDecl(const Decl *D) {
     ProtocolLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                addIdentifierRef(proto->getName()),
                                addDeclRef(DC),
+                               addTypeRef(proto->getDeclaredType()),
                                proto->isImplicit(),
                                proto->getAttrs().isClassProtocol(),
                                proto->isObjC(),

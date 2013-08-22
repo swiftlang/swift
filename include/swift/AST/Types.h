@@ -1512,6 +1512,8 @@ public:
 /// by another type.
 class ProtocolType : public NominalType {
 public:
+  static ProtocolType *get(ProtocolDecl *D, const ASTContext &C);
+
   ProtocolDecl *getDecl() const {
     return reinterpret_cast<ProtocolDecl *>(NominalType::getDecl());
   }
@@ -1527,7 +1529,6 @@ public:
   }
 
 private:
-  friend class ProtocolDecl;
   ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx);
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ProtocolType, NominalType)

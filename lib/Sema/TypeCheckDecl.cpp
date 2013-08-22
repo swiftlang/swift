@@ -839,6 +839,7 @@ public:
       return;
     }
 
+    TC.validateTypeDecl(PD);
     checkInheritanceClause(TC, PD);
 
     {
@@ -1418,7 +1419,7 @@ void TypeChecker::validateTypeDecl(TypeDecl *D) {
     } else if (auto unionDecl = dyn_cast<UnionDecl>(nominal)) {
       declaredType = UnionType::get(unionDecl, parentTy, Context);
     } else if (auto protocolDecl = dyn_cast<ProtocolDecl>(nominal)) {
-      declaredType = ProtocolType::get(protocolDecl, parentTy, Context);
+      declaredType = ProtocolType::get(protocolDecl, Context);
     } else {
       llvm_unreachable("Unhandled nominal type?");
     }

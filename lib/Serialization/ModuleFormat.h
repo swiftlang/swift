@@ -514,6 +514,7 @@ namespace decls_block {
     PROTOCOL_DECL,
     IdentifierIDField, // name
     DeclIDField, // context decl
+    TypeIDField, // declared type
     BCFixed<1>,  // implicit flag
     BCFixed<1>,  // class protocol?
     BCFixed<1>,  // objc?

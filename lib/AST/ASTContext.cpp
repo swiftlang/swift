@@ -627,7 +627,8 @@ NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext 
   case DeclKind::Class:
     return ClassType::get(cast<ClassDecl>(D), Parent, C);
   case DeclKind::Protocol:
-    return D->getDeclaredType()->castTo<ProtocolType>();
+    assert(!Parent && "Protocols cannot have parents");
+    return ProtocolType::get(cast<ProtocolDecl>(D), C);
 
   default:
     llvm_unreachable("Not a nominal declaration!");
@@ -876,6 +877,14 @@ OptionalType *OptionalType::get(Type base, const ASTContext &C) {
   if (entry) return entry;
 
   return entry = new (C, arena) OptionalType(base, hasTypeVariable);
+}
+
+ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {
+  // If the declaration already has a type, return that.
+  if (D->hasType())
+    return D->getDeclaredType()->castTo<ProtocolType>();
+
+  return new (C, AllocationArena::Permanent) ProtocolType(D, C);
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)

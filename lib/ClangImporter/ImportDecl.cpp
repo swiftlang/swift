@@ -396,8 +396,7 @@ namespace {
       } else if (auto unionDecl = dyn_cast<UnionDecl>(nominal)) {
         declaredType = UnionType::get(unionDecl, parentTy, Impl.SwiftContext);
       } else if (auto protocolDecl = dyn_cast<ProtocolDecl>(nominal)) {
-        declaredType = ProtocolType::get(protocolDecl, parentTy,
-                                         Impl.SwiftContext);
+        declaredType = ProtocolType::get(protocolDecl, Impl.SwiftContext);
       } else {
         llvm_unreachable("Unhandled nominal type?");
       }
@@ -2044,6 +2043,7 @@ namespace {
                                    { });
       
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+      setNominalType(result);
       result->setClangNode(decl->getCanonicalDecl());
       result->setCircularityCheck(CircularityCheck::Checked);
 

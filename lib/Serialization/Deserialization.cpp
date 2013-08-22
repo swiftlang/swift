@@ -1020,10 +1020,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::PROTOCOL_DECL: {
     IdentifierID nameID;
     DeclID contextID;
+    TypeID declaredTypeID;
     bool isImplicit, isClassProtocol, isObjC;
     ArrayRef<uint64_t> protocolIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
+                                            declaredTypeID,
                                             isImplicit, isClassProtocol, isObjC,
                                             protocolIDs);
 
@@ -1038,6 +1040,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       (*DidRecord)(proto);
       DidRecord.reset();
     }
+
+    // Set up the type of the protocol.
+    auto declaredType = getType(declaredTypeID);
+    if (!declaredType) {
+      error();
+      return nullptr;
+    }
+    proto->setDeclaredType(declaredType);
+    proto->setType(MetaTypeType::get(declaredType, ctx));
 
     if (isImplicit)
       proto->setImplicit();
