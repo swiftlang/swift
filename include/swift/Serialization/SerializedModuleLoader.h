@@ -83,9 +83,10 @@ public:
   virtual OperatorDecl *lookupOperator(Module *module, Identifier name,
                                        DeclKind fixity) override;
 
-  virtual void getReexportedModules(
+  virtual void getImportedModules(
     const Module *module,
-    SmallVectorImpl<Module::ImportedModule> &exports) override;
+    SmallVectorImpl<Module::ImportedModule> &imports,
+    bool includePrivate) override;
 
   virtual void lookupVisibleDecls(const Module *module,
                                   Module::AccessPathTy accessPath,

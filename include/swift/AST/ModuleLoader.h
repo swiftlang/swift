@@ -107,10 +107,13 @@ public:
     return nullptr;
   }
 
-  /// \brief Look for modules re-exported by the given module.
+  /// \brief Look for modules imported by the given module.
+  ///
+  /// Unless \p includePrivate is true, only re-exported modules are included.
   virtual void
-  getReexportedModules(const Module *module,
-                       SmallVectorImpl<Module::ImportedModule> &exports) { }
+  getImportedModules(const Module *module,
+                     SmallVectorImpl<Module::ImportedModule> &exports,
+                     bool includePrivate = false) { }
 
   /// \brief Look for all visible top-level decls in the module.
   virtual void lookupVisibleDecls(const Module *module,

@@ -238,15 +238,16 @@ OperatorDecl *SerializedModuleLoader::lookupOperator(Module *module,
   return moduleFile->lookupOperator(name, fixity);
 }
 
-void SerializedModuleLoader::getReexportedModules(
+void SerializedModuleLoader::getImportedModules(
     const Module *module,
-    SmallVectorImpl<Module::ImportedModule> &exports) {
+    SmallVectorImpl<Module::ImportedModule> &imports,
+    bool includePrivate) {
 
   ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
   if (!moduleFile)
     return;
 
-  moduleFile->getReexportedModules(exports);
+  moduleFile->getImportedModules(imports, includePrivate);
 }
 
 void

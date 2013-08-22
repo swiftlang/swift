@@ -330,10 +330,13 @@ public:
   /// If none is found, returns null.
   OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
 
-  /// Adds any reexported modules to the given vector.
-  void getReexportedModules(SmallVectorImpl<Module::ImportedModule> &results);
+  /// Adds any imported modules to the given vector.
+  ///
+  /// Unless \p includePrivate is true, only re-exported modules are included.
+  void getImportedModules(SmallVectorImpl<Module::ImportedModule> &results,
+                          bool includePrivate);
 
-  /// Adds any reexported modules to the given vector.
+  /// Reports all visible top-level members in this module.
   void lookupVisibleDecls(Module::AccessPathTy accessPath,
                           VisibleDeclConsumer &consumer,
                           NLKind lookupKind);

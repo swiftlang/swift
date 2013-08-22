@@ -147,9 +147,10 @@ public:
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
 
-  virtual void getReexportedModules(
+  virtual void getImportedModules(
     const Module *module,
-    SmallVectorImpl<Module::ImportedModule> &exports) override;
+    SmallVectorImpl<Module::ImportedModule> &exports,
+    bool includePrivate) override;
   
   virtual void lookupClassMembers(const Module *module,
                                   Module::AccessPathTy accessPath,

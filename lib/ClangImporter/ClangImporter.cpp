@@ -572,25 +572,29 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
   }
 }
 
-void ClangImporter::getReexportedModules(
+void ClangImporter::getImportedModules(
     const Module *module,
-    SmallVectorImpl<Module::ImportedModule> &exports) {
+    SmallVectorImpl<Module::ImportedModule> &imports,
+    bool includePrivate) {
 
   auto underlying = cast<ClangModule>(module)->clangModule;
   auto topLevelAdapter = cast<ClangModule>(module)->getAdapterModule();
 
-  SmallVector<clang::Module *, 8> exported;
-  underlying->getExportedModules(exported);
+  SmallVector<clang::Module *, 8> imported;
+  if (includePrivate)
+    imported.append(underlying->Imports.begin(), underlying->Imports.end());
+  else
+    underlying->getExportedModules(imported);
 
-  for (auto exportMod : exported) {
-    auto exportWrapper = Impl.getWrapperModule(*this, exportMod,
-                                               module->getComponent());
+  for (auto importMod : imported) {
+    auto wrapper = Impl.getWrapperModule(*this, importMod,
+                                         module->getComponent());
 
-    auto actualExport = exportWrapper->getAdapterModule();
-    if (!actualExport || actualExport == topLevelAdapter)
-      actualExport = exportWrapper;
+    auto actualMod = wrapper->getAdapterModule();
+    if (!actualMod || actualMod == topLevelAdapter)
+      actualMod = wrapper;
 
-    exports.push_back({Module::AccessPathTy(), actualExport});
+    imports.push_back({Module::AccessPathTy(), actualMod});
   }
 }
 

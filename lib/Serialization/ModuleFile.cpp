@@ -494,10 +494,11 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
   return nullptr;
 }
 
-void ModuleFile::getReexportedModules(
-    SmallVectorImpl<Module::ImportedModule> &results) {
+void ModuleFile::getImportedModules(
+    SmallVectorImpl<Module::ImportedModule> &results,
+    bool includePrivate) {
   for (auto &dep : Dependencies) {
-    if (!dep.IsExported)
+    if (!includePrivate && !dep.IsExported)
       continue;
     assert(dep.isLoaded());
     results.push_back(dep.Import);

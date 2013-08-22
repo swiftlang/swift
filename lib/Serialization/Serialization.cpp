@@ -640,7 +640,7 @@ void Serializer::writeInputFiles(const TranslationUnit *TU,
     SourceFile.emit(ScratchRecord, path);
   }
 
-  for (auto import : TU->getImportedModules()) {
+  for (auto import : TU->getImports()) {
     if (import.first.second == TU->Ctx.TheBuiltinModule)
       continue;
 

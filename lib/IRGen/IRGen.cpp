@@ -137,7 +137,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   // FIXME: Figure out how to get this working for the REPL.
   bool UseStandardLibraryHack = Opts.OptLevel != 0;
   if (UseStandardLibraryHack) {
-    for (auto ModPair : TU->getImportedModules()) {
+    for (auto ModPair : TU->getImports()) {
       if (isa<BuiltinModule>(ModPair.first.second) ||
           isa<LoadedModule>(ModPair.first.second))
         continue;

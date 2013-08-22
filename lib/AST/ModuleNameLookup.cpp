@@ -166,7 +166,7 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
   if (!foundDecls || !canReturnEarly ||
       resolutionKind == ResolutionKind::Overloadable) {
     SmallVector<Module::ImportedModule, 8> reexports;
-    module->getReexportedModules(reexports);
+    module->getImportedModules(reexports);
 
     // Prefer scoped imports (import func swift.max) to whole-module imports.
     SmallVector<ValueDecl *, 8> unscopedValues;

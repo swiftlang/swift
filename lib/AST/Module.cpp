@@ -367,7 +367,7 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
   // Look for imported operator decls.
   
   llvm::DenseSet<OP_DECL*> importedOperators;
-  for (auto &imported : TU->getImportedModules()) {
+  for (auto &imported : TU->getImports()) {
     Optional<OP_DECL *> maybeOp
       = lookupOperatorDeclForName(imported.first.second, Loc, Name, OP_MAP);
     if (!maybeOp)
@@ -429,7 +429,8 @@ Optional<InfixOperatorDecl *> Module::lookupInfixOperator(Identifier name,
 }
 
 void
-Module::getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const {
+Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
+                           bool includePrivate) const {
   if (isa<BuiltinModule>(this))
     return;
 
@@ -437,13 +438,14 @@ Module::getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const {
     // A translation unit doesn't really re-export all of its imported modules,
     // but for the purposes of lookup a TU is always top-level, so we want to
     // look at regular imports as well as re-exports.
-    for (auto importPair : TU->getImportedModules())
+    // FIXME: With includePrivate, this isn't really the case any more.
+    for (auto importPair : TU->getImports())
       modules.push_back(importPair.first);
     return;
   }
 
   ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
-  return owner.getReexportedModules(this, modules);
+  return owner.getImportedModules(this, modules);
 }
 
 namespace {
@@ -475,18 +477,24 @@ bool Module::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
   return iters.first == lhs.end();
 }
 
-void Module::forAllVisibleModules(Optional<AccessPathTy> thisPath,
-                                  std::function<bool(ImportedModule)> fn) {
+template<bool respectVisibility, typename Callback>
+static void forAllImportedModules(Module *current,
+                                  Optional<Module::AccessPathTy> thisPath,
+                                  const Callback &fn) {
+  using ImportedModule = Module::ImportedModule;
+  using AccessPathTy = Module::AccessPathTy;
+  
   llvm::SmallSet<ImportedModule, 32, OrderImportedModules> visited;
   SmallVector<ImportedModule, 32> queue;
 
   AccessPathTy overridingPath;
   if (thisPath.hasValue()) {
-    overridingPath = thisPath.getValue();
-    queue.push_back(ImportedModule(overridingPath, this));
+    if (respectVisibility)
+      overridingPath = thisPath.getValue();
+    queue.push_back(ImportedModule(overridingPath, current));
   } else {
-    visited.insert(ImportedModule({}, this));
-    getReexportedModules(queue);
+    visited.insert(ImportedModule({}, current));
+    current->getImportedModules(queue, !respectVisibility);
   }
 
   while (!queue.empty()) {
@@ -494,10 +502,10 @@ void Module::forAllVisibleModules(Optional<AccessPathTy> thisPath,
 
     // Filter any whole-module imports, and skip specific-decl imports if the
     // import path doesn't match exactly.
-    if (next.first.empty())
+    if (next.first.empty() || !respectVisibility)
       next.first = overridingPath;
     else if (!overridingPath.empty() &&
-             !isSameAccessPath(next.first, overridingPath)) {
+             !Module::isSameAccessPath(next.first, overridingPath)) {
       // If we ever allow importing non-top-level decls, it's possible the rule
       // above isn't what we want.
       assert(next.first.size() == 1 && "import of non-top-level decl");
@@ -509,8 +517,13 @@ void Module::forAllVisibleModules(Optional<AccessPathTy> thisPath,
 
     if (!fn(next))
       break;
-    next.second->getReexportedModules(queue);
+    next.second->getImportedModules(queue, !respectVisibility);
   }
+}
+
+void Module::forAllVisibleModules(Optional<AccessPathTy> thisPath,
+                                  std::function<bool(ImportedModule)> fn) {
+  forAllImportedModules<true>(this, thisPath, fn);
 }
 
 

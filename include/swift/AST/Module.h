@@ -210,7 +210,8 @@ public:
                          SmallVectorImpl<ValueDecl*> &results) const;
 
   /// Looks up which modules are re-exported by this module.
-  void getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const;
+  void getImportedModules(SmallVectorImpl<ImportedModule> &modules,
+                          bool includePrivate = false) const;
 
   /// Perform an action for every module visible from this module.
   ///
@@ -272,7 +273,7 @@ private:
   /// second element of the pair declaring whether the module is reexported.
   ///
   /// This is filled in by the Name Binding phase.
-  ArrayRef<std::pair<ImportedModule, bool>> ImportedModules;
+  ArrayRef<std::pair<ImportedModule, bool>> Imports;
 
 public:
   /// Kind - This is the sort of file the translation unit was parsed for, which
@@ -310,15 +311,12 @@ public:
     : Module(DeclContextKind::TranslationUnit, Name, Comp, C), Kind(Kind) {
   }
   
-  /// ImportedModules - This is the list of modules that are imported by this
-  /// module.  This is filled in as the first thing that the Name Binding phase
-  /// does.
-  ArrayRef<std::pair<ImportedModule, bool>> getImportedModules() const {
+  ArrayRef<std::pair<ImportedModule, bool>> getImports() const {
     assert(ASTStage >= Parsed || Kind == SIL);
-    return ImportedModules;
+    return Imports;
   }
-  void setImportedModules(ArrayRef<std::pair<ImportedModule, bool>> IM) {
-    ImportedModules = IM;
+  void setImports(ArrayRef<std::pair<ImportedModule, bool>> IM) {
+    Imports = IM;
   }
 
   void clearLookupCache();

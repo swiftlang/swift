@@ -48,7 +48,7 @@ namespace {
     ASTContext &Context;
 
     NameBinder(TranslationUnit *TU) : TU(TU), Context(TU->Ctx) {
-      for (auto importPair : TU->getImportedModules()) {
+      for (auto importPair : TU->getImports()) {
         Module *M = importPair.first.second;
         // Don't add the builtin module to the LoadedModules list.
         if (isa<BuiltinModule>(M))
@@ -288,7 +288,7 @@ void swift::performAutoImport(TranslationUnit *TU) {
                                          SourceLoc()));
 
   auto Import = std::make_pair(ImportedModule({}, M), false);
-  TU->setImportedModules(TU->Ctx.AllocateCopy(llvm::makeArrayRef(Import)));
+  TU->setImports(TU->Ctx.AllocateCopy(llvm::makeArrayRef(Import)));
 }
 
 //===----------------------------------------------------------------------===//
@@ -364,8 +364,8 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   NameBinder Binder(TU);
 
   SmallVector<std::pair<ImportedModule, bool>, 8> ImportedModules;
-  ImportedModules.append(TU->getImportedModules().begin(),
-                         TU->getImportedModules().end());
+  ImportedModules.append(TU->getImports().begin(),
+                         TU->getImports().end());
 
   // Do a prepass over the declarations to find and load the imported modules
   // and map operator decls.
@@ -381,8 +381,8 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
       insertOperatorDecl(Binder, TU->InfixOperators, OD);
   }
 
-  if (ImportedModules.size() > TU->getImportedModules().size())
-    TU->setImportedModules(TU->Ctx.AllocateCopy(ImportedModules));
+  if (ImportedModules.size() > TU->getImports().size())
+    TU->setImports(TU->Ctx.AllocateCopy(ImportedModules));
 
   // FIXME: This algorithm has quadratic memory usage.  (In practice,
   // import statements after the first "chunk" should be rare, though.)
