@@ -747,18 +747,7 @@ public:
 
   void visitUnionDecl(UnionDecl *UD) {
     if (!IsSecondPass) {
-      if (auto gp = UD->getGenericParams()) {
-        gp->setOuterParameters(
-            UD->getDeclContext()->getGenericParamsOfContext());
-        checkGenericParams(gp);
-      }
-
-      // Now that we have archetypes for our generic parameters (including
-      // generic parameters from outer scopes), we can canonicalize our type.
-      UD->overwriteType(UD->getType()->getCanonicalType());
-      UD->overwriteDeclaredType(UD->getDeclaredType()->getCanonicalType());
-      TC.validateTypeSimple(UD->getDeclaredTypeInContext());
-
+      TC.validateTypeDecl(UD);
       validateAttributes(UD);
 
       checkInheritanceClause(TC, UD);
@@ -772,21 +761,10 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
+
     if (!IsSecondPass) {
-      if (auto gp = SD->getGenericParams()) {
-        gp->setOuterParameters(
-                             SD->getDeclContext()->getGenericParamsOfContext());
-        checkGenericParams(gp);
-      }
-
-      // Now that we have archetypes for our generic parameters (including
-      // generic parameters from outer scopes), we can canonicalize our type.
-      SD->overwriteType(SD->getType()->getCanonicalType());
-      SD->overwriteDeclaredType(SD->getDeclaredType()->getCanonicalType());
-      TC.validateTypeSimple(SD->getDeclaredTypeInContext());
-
+      TC.validateTypeDecl(SD);
       validateAttributes(SD);
-
       checkInheritanceClause(TC, SD);
     }
 
@@ -828,19 +806,7 @@ public:
 
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
-      // Check our generic parameters first.
-      if (auto gp = CD->getGenericParams()) {
-        gp->setOuterParameters(
-          CD->getDeclContext()->getGenericParamsOfContext());
-        checkGenericParams(gp);
-      }
-
-      // Now that we have archetypes for our generic parameters (including
-      // generic parameters from outer scopes), we can canonicalize our type.
-      CD->overwriteType(CD->getType()->getCanonicalType());
-      CD->overwriteDeclaredType(CD->getDeclaredType()->getCanonicalType());
-      TC.validateTypeSimple(CD->getDeclaredTypeInContext());
-
+      TC.validateTypeDecl(CD);
       validateAttributes(CD);
       checkInheritanceClause(TC, CD);
 
@@ -1418,6 +1384,54 @@ public:
 void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   bool isSecondPass = !isFirstPass && D->getDeclContext()->isModuleContext();
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
+}
+
+void TypeChecker::validateTypeDecl(TypeDecl *D) {
+  // Type aliases may not have an underlying type yet.
+  if (auto typeAlias = dyn_cast<TypeAliasDecl>(D)) {
+    if (typeAlias->getUnderlyingTypeLoc().getTypeRepr())
+      validateType(typeAlias->getUnderlyingTypeLoc());
+    return;
+  }
+
+  // Nominal declarations may not have a type yet.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
+    if (nominal->hasType())
+      return;
+
+    // Check generic parameters, if needed.
+    if (auto gp = nominal->getGenericParams()) {
+      gp->setOuterParameters(
+        nominal->getDeclContext()->getGenericParamsOfContext());
+      DeclChecker(*this, false, false).checkGenericParams(gp);
+    }
+
+    // Compute the declared type.
+    Type declaredType;
+    Type parentTy = nominal->getDeclContext()->getDeclaredTypeInContext();
+    if (nominal->getGenericParams()) {
+      declaredType = UnboundGenericType::get(nominal, parentTy, Context);
+    } else if (auto structDecl = dyn_cast<StructDecl>(nominal)) {
+      declaredType = StructType::get(structDecl, parentTy, Context);
+    } else if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+      declaredType = ClassType::get(classDecl, parentTy, Context);
+    } else if (auto unionDecl = dyn_cast<UnionDecl>(nominal)) {
+      declaredType = UnionType::get(unionDecl, parentTy, Context);
+    } else if (auto protocolDecl = dyn_cast<ProtocolDecl>(nominal)) {
+      declaredType = ProtocolType::get(protocolDecl, parentTy, Context);
+    } else {
+      llvm_unreachable("Unhandled nominal type?");
+    }
+
+    nominal->setDeclaredType(declaredType);
+    nominal->setType(MetaTypeType::get(declaredType, Context));
+
+    // Now that we have archetypes for our generic parameters (including
+    // generic parameters from outer scopes), we can canonicalize our type.
+    validateTypeSimple(nominal->getDeclaredTypeInContext());
+
+    return;
+  }
 }
 
 ArrayRef<ProtocolDecl *>

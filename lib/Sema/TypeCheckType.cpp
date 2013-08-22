@@ -55,6 +55,7 @@ static bool buildSugarImplType(TypeChecker &TC, SyntaxSugarType *sugarTy,
                                   /*IsTypeLookup=*/true);
 
   if (TypeDecl *lookupDecl = genericLookup.getSingleTypeResult()) {
+    TC.validateTypeDecl(lookupDecl);
     if (NominalTypeDecl *ND = lookupDecl->getDeclaredType()->getAnyNominal()) {
       if (auto Params = ND->getGenericParams()) {
         if (Params->size() == 1) {
@@ -572,14 +573,6 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
 
   Loc.setType(ty, true);
   return !Loc.isError();
-}
-
-void TypeChecker::validateTypeDecl(TypeDecl *D) {
-  if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D)) {
-    // TypeAliasDecls may not have a type reference.
-    if (TAD->getUnderlyingTypeLoc().getTypeRepr())
-      validateType(TAD->getUnderlyingTypeLoc());
-  }
 }
 
 Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {

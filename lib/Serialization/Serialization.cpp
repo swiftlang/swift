@@ -1270,6 +1270,7 @@ bool Serializer::writeDecl(const Decl *D) {
     StructLayout::emitRecord(Out, ScratchRecord, abbrCode,
                              addIdentifierRef(theStruct->getName()),
                              addDeclRef(DC),
+                             addTypeRef(theStruct->getDeclaredType()),
                              theStruct->isImplicit());
 
     writeGenericParams(theStruct->getGenericParams());
@@ -1292,6 +1293,7 @@ bool Serializer::writeDecl(const Decl *D) {
     UnionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                             addIdentifierRef(theUnion->getName()),
                             addDeclRef(DC),
+                            addTypeRef(theUnion->getDeclaredType()),
                             theUnion->isImplicit());
 
     writeGenericParams(theUnion->getGenericParams());
@@ -1316,6 +1318,7 @@ bool Serializer::writeDecl(const Decl *D) {
     ClassLayout::emitRecord(Out, ScratchRecord, abbrCode,
                             addIdentifierRef(theClass->getName()),
                             addDeclRef(DC),
+                            addTypeRef(theClass->getDeclaredType()),
                             theClass->isImplicit(),
                             theClass->isObjC(),
                             addTypeRef(theClass->getSuperclass()));

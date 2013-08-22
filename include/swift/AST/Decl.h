@@ -1495,11 +1495,13 @@ public:
   /// getDeclaredType - Retrieve the type declared by this entity.
   Type getDeclaredType() const { return DeclaredTy; }
 
-  Type getDeclaredTypeInContext();
-  
-  void overwriteDeclaredType(Type DT) {
+  // Set the declared type of this type.
+  void setDeclaredType(Type DT) {
+    assert(!DeclaredTy && "Already set declared type");
     DeclaredTy = DT;
   }
+
+  Type getDeclaredTypeInContext();
 
   /// \brief Add a new extension to this nominal type.
   void addExtension(ExtensionDecl *extension);

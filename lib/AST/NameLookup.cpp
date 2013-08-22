@@ -40,6 +40,11 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     // canonicalize away default arguments and don't canonicalize polymorphic
     // types well.
     CanType signature;
+
+    // FIXME: Egregious hack to avoid failing when there are no declared types.
+    if (!decl->hasType())
+      continue;
+
     if (isa<TypeDecl>(decl))
       signature = cast<TypeDecl>(decl)->getDeclaredType()->getCanonicalType();
     else

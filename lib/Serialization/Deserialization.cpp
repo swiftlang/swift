@@ -774,10 +774,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::STRUCT_DECL: {
     IdentifierID nameID;
     DeclID contextID;
+    TypeID declaredTypeID;
     bool isImplicit;
 
     decls_block::StructLayout::readRecord(scratch, nameID, contextID,
-                                          isImplicit);
+                                          declaredTypeID, isImplicit);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -792,6 +793,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       (*DidRecord)(theStruct);
       DidRecord.reset();
     }
+
+    // Set up the type of the struct.
+    auto declaredType = getType(declaredTypeID);
+    if (!declaredType) {
+      error();
+      return nullptr;
+    }
+    theStruct->setDeclaredType(declaredType);
+    theStruct->setType(MetaTypeType::get(declaredType, ctx));
 
     if (isImplicit)
       theStruct->setImplicit();
@@ -1106,10 +1116,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::CLASS_DECL: {
     IdentifierID nameID;
     DeclID contextID;
+    TypeID declaredTypeID;
     bool isImplicit, isObjC;
     TypeID superclassID;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
-                                         isImplicit, isObjC, superclassID);
+                                         declaredTypeID, isImplicit, isObjC,
+                                         superclassID);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1124,6 +1136,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       (*DidRecord)(theClass);
       DidRecord.reset();
     }
+
+    // Set up the type of the union.
+    auto declaredType = getType(declaredTypeID);
+    if (!declaredType) {
+      error();
+      return nullptr;
+    }
+    theClass->setDeclaredType(declaredType);
+    theClass->setType(MetaTypeType::get(declaredType, ctx));
 
     if (isImplicit)
       theClass->setImplicit();
@@ -1152,10 +1173,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::UNION_DECL: {
     IdentifierID nameID;
     DeclID contextID;
+    TypeID declaredTypeID;
     bool isImplicit;
 
     decls_block::UnionLayout::readRecord(scratch, nameID, contextID,
-                                         isImplicit);
+                                         declaredTypeID, isImplicit);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1169,11 +1191,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                      getIdentifier(nameID),
                                      SourceLoc(), { },
                                      genericParams, DC);
+
     declOrOffset = theUnion;
     if (DidRecord) {
       (*DidRecord)(theUnion);
       DidRecord.reset();
     }
+
+    // Set up the type of the union.
+    auto declaredType = getType(declaredTypeID);
+    if (!declaredType) {
+      error();
+      return nullptr;
+    }
+    theUnion->setDeclaredType(declaredType);
+    theUnion->setType(MetaTypeType::get(declaredType, ctx));
 
     if (isImplicit)
       theUnion->setImplicit();

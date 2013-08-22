@@ -580,52 +580,19 @@ UnionDecl::UnionDecl(SourceLoc UnionLoc, bool Enum,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Union, Parent, Name, Inherited, GenericParams),
-    UnionLoc(UnionLoc), NameLoc(NameLoc) {
-  // Compute the associated type for this UnionDecl.
-  ASTContext &Ctx = Parent->getASTContext();
-  if (!GenericParams)
-    DeclaredTy = UnionType::get(this, Parent->getDeclaredTypeInContext(), Ctx);
-  else
-    DeclaredTy = UnboundGenericType::get(this,
-                                         Parent->getDeclaredTypeInContext(),
-                                         Ctx);
-  // Set the type of the UnionDecl to the right MetaTypeType.
-  setType(MetaTypeType::get(DeclaredTy, Ctx));
-}
+    UnionLoc(UnionLoc), NameLoc(NameLoc) { }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
                        MutableArrayRef<TypeLoc> Inherited,
                        GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Struct, Parent, Name, Inherited, GenericParams),
-    StructLoc(StructLoc), NameLoc(NameLoc){
-  // Compute the associated type for this StructDecl.
-  ASTContext &Ctx = Parent->getASTContext();
-  if (!GenericParams)
-    DeclaredTy = StructType::get(this, Parent->getDeclaredTypeInContext(), Ctx);
-  else
-    DeclaredTy = UnboundGenericType::get(this,
-                                         Parent->getDeclaredTypeInContext(),
-                                         Ctx);
-  // Set the type of the StructDecl to the right MetaTypeType.
-  setType(MetaTypeType::get(DeclaredTy, Ctx));
-}
+    StructLoc(StructLoc), NameLoc(NameLoc) { }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Class, Parent, Name, Inherited, GenericParams),
     ClassLoc(ClassLoc), NameLoc(NameLoc) {
-  // Compute the associated type for this ClassDecl.
-  ASTContext &Ctx = Parent->getASTContext();
-  if (!GenericParams)
-    DeclaredTy = ClassType::get(this, Parent->getDeclaredTypeInContext(), Ctx);
-  else
-    DeclaredTy = UnboundGenericType::get(this,
-                                         Parent->getDeclaredTypeInContext(),
-                                         Ctx);
-  // Set the type of the ClassDecl to the right MetaTypeType.
-  setType(MetaTypeType::get(DeclaredTy, Ctx));
-
   ClassDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
 }

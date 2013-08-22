@@ -489,6 +489,7 @@ namespace decls_block {
     Code,
     IdentifierIDField, // name
     DeclIDField, // context decl
+    TypeIDField, // declared type
     BCFixed<1>  // implicit flag
     // Trailed by the generic parameters (if any), conformance info (if any),
     // and finally the decl context record.
@@ -501,6 +502,7 @@ namespace decls_block {
     CLASS_DECL,
     IdentifierIDField, // name
     DeclIDField,       // context decl
+    TypeIDField, // declared type
     BCFixed<1>,        // implicit?
     BCFixed<1>,        // explicitly objc?
     TypeIDField        // superclass

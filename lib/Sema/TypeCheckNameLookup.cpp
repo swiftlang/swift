@@ -85,6 +85,9 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
     if (!typeDecl)
       continue;
 
+    // FIXME: This should happen before we attempt shadowing checks.
+    validateTypeDecl(typeDecl);
+
     // If there are any type variables in the base type, don't substitute.
     // FIXME: This is a total hack that won't actually work.
     if (type->hasTypeVariable()) {
