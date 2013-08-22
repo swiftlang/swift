@@ -146,7 +146,7 @@ public:
   bool NoReturn = false;
   bool Assignment = false;
   bool Conversion = false;
-  bool ForceInline = false;
+  bool Transparent = false;
   bool ObjC = false;
   bool ObjCBlock = false;
   bool ExplicitPrefix = false;
@@ -172,7 +172,7 @@ public:
   bool isNoReturn() const { return NoReturn; }
   bool isAssignment() const { return Assignment; }
   bool isConversion() const { return Conversion; }
-  bool isForceInline() const { return ForceInline; }
+  bool isTransparent() const { return Transparent; }
   bool isPrefix() const { return ExplicitPrefix; }
   bool isPostfix() const { return ExplicitPostfix; }
   bool isInfix() const { return ExplicitInfix; }
@@ -197,7 +197,7 @@ public:
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&
            !isAutoClosure() && !isThin() && !isNoReturn() && !isAssignment() &&
-           !isConversion() && !isForceInline() && !isPostfix() && !isPrefix() &&
+           !isConversion() && !isTransparent() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
            !isClassProtocol() && !hasCC() && !hasOwnership() &&
            !isLocalStorage() && !isExported() && AsmName.empty();

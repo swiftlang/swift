@@ -1153,12 +1153,12 @@ ERROR(assignment_without_byref,sema_tcd,none,
 ERROR(conversion_not_instance_method,sema_tcd,none,
       "conversion function %0 is not an instance method",
       (Identifier))
-ERROR(force_inline_not_function,sema_tcd,none,
-      "force_inline can only be applied to functions", ())
-ERROR(force_inline_curry_not_supported,sema_tcd,none,
-      "force_inline not yet supported for curried functions", ())
-ERROR(force_inline_generic_not_supported,sema_tcd,none,
-      "force_inline not yet supported for generic functions", ())
+ERROR(transparent_not_function,sema_tcd,none,
+      "'transparent' attribute can only be applied to functions", ())
+ERROR(transparent_curry_not_supported,sema_tcd,none,
+      "'transparent' attribute not supported for curried functions", ())
+ERROR(transparent_generic_not_supported,sema_tcd,none,
+      "'transparent' attribute not supported for generic functions", ())
 ERROR(conversion_params,sema_tcd,none,
       "conversion function %0 has non-defaulted parameters", (Identifier))
 ERROR(invalid_objc_decl,sema_tcd,none,
@@ -1611,9 +1611,9 @@ ERROR(return_from_noreturn,sil_analysis,none,
       "return from a 'noreturn' function", ())
 ERROR(non_exhaustive_switch,sil_gen,none, "switch must be exhaustive", ())
 
-// Force inline diagnostics
-ERROR(circular_force_inline,sil_analysis,none,
-      "forced inlining forms circular loop", ())
+// 'transparent' diagnostics
+ERROR(circular_transparent,sil_analysis,none,
+      "inlining 'transparent' functions forms circular loop", ())
 NOTE(note_while_inlining,sil_analysis,none,
      "while inlining here", ())
 

@@ -269,10 +269,10 @@ public:
                      e->getType()->getCanonicalType(), callDepth);
   }
 
-  bool isForceInline() const {
+  bool isTransparent() const {
     if (kind == Kind::StandaloneFunction && standaloneFunction.hasDecl()) {
       ValueDecl *VD = standaloneFunction.getDecl();
-      if (VD->getAttrs().isForceInline())
+      if (VD->getAttrs().isTransparent())
         return true;
     }
     return false;
@@ -669,7 +669,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                        ArrayRef<ManagedValue> Args,
                                        CanType NativeResultTy,
                                        OwnershipConventions const &Ownership,
-                                       bool ForceInline,
+                                       bool Transparent,
                                        SGFContext C) {
   AbstractCC cc = Fn.getType().getAbstractCC();
   
@@ -715,7 +715,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
   }
   
   SILValue result = B.createApply(Loc, fnValue, instructionTy, argValues,
-                                  ForceInline);
+                                  Transparent);
   
   // Take ownership of the return value, if necessary.
   ManagedValue bridgedResult;
@@ -935,7 +935,7 @@ namespace {
       else
         result = gen.emitApply(uncurriedLoc, calleeValue, uncurriedArgs,
                                uncurriedResultTy, ownership,
-                               callee.isForceInline(), uncurriedContext);
+                               callee.isTransparent(), uncurriedContext);
       
       // End the initial writeback scope, if any.
       initialWritebackScope.reset();

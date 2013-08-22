@@ -1985,9 +1985,9 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   UnresolvedValueName FnName;
   SmallVector<UnresolvedValueName, 4> ArgNames;
 
-  bool ForceInline = false;
+  bool Transparent = false;
   if ((Opcode == ValueKind::ApplyInst &&
-       parseSILOptional(ForceInline, P, "force_inline")) ||
+       parseSILOptional(Transparent, P, "transparent")) ||
       parseValueName(FnName) ||
       P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
     return true;
@@ -2033,7 +2033,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   default: assert(0 && "Unexpected case");
   case ValueKind::ApplyInst:
     ResultVal = B.createApply(InstLoc, FnVal, FTI->getResultType(), Args,
-                              ForceInline);
+                              Transparent);
     break;
   case ValueKind::PartialApplyInst: {
     SmallVector<TupleTypeElt, 4> NewArgTypes;

@@ -379,12 +379,12 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;
   }
       
-  case AttrName::force_inline: {
-    if (Attributes.isForceInline())
+  case AttrName::transparent: {
+    if (Attributes.isTransparent())
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
     consumeToken(tok::identifier);
     
-    Attributes.ForceInline = true;
+    Attributes.Transparent = true;
     return false;
   }
 

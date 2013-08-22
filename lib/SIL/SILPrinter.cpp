@@ -431,8 +431,8 @@ public:
   
   void visitApplyInst(ApplyInst *AI) {
     OS << "apply ";
-    if (AI->isForceInline())
-      OS << "[force_inline] ";
+    if (AI->isTransparent())
+      OS << "[transparent] ";
     OS << getID(AI->getCallee()) << '(';
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { OS << getID(arg); },

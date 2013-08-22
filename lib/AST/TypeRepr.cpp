@@ -105,7 +105,7 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
   if (Attrs.isNoReturn()) AttrOS << "noreturn,";
   if (Attrs.isAssignment()) AttrOS << "assignment,";
   if (Attrs.isConversion()) AttrOS << "conversion,";
-  if (Attrs.isForceInline()) AttrOS << "force_inline,";
+  if (Attrs.isTransparent()) AttrOS << "transparent,";
   if (Attrs.isObjC()) AttrOS << "objc,";
   if (Attrs.isObjCBlock()) AttrOS << "objc_block,";
   if (Attrs.isPrefix()) AttrOS << "prefix,";

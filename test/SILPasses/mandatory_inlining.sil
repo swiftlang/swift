@@ -65,7 +65,7 @@ bb0(%0 : $Int64):
   %9 = integer_literal $Builtin.Int128, 10
   %10 = apply %7(%9, %8) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %11 = apply %5(%6, %10) : $[thin] (lhs : Int64, rhs : Int64) -> Int64
-  %12 = apply [force_inline] %4(%11) : $[thin] (x : Int64) -> Int64
+  %12 = apply [transparent] %4(%11) : $[thin] (x : Int64) -> Int64
   %13 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %14 = metatype $Int64.metatype
   %15 = integer_literal $Builtin.Int128, 30
@@ -128,8 +128,8 @@ bb0(%0 : $Int64):
   %10 = integer_literal $Builtin.Int128, 10
   %11 = apply %8(%10, %9) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %12 = apply %6(%7, %11) : $[thin] (lhs : Int64, rhs : Int64) -> Int64
-  %13 = apply [force_inline] %5(%12) : $[thin] (x : Int64) -> Int64
-  %14 = apply [force_inline] %4(%13) : $[thin] (x : Int64) -> Int64
+  %13 = apply [transparent] %5(%12) : $[thin] (x : Int64) -> Int64
+  %14 = apply [transparent] %4(%13) : $[thin] (x : Int64) -> Int64
   %15 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %16 = metatype $Int64.metatype
   %17 = integer_literal $Builtin.Int128, 30
@@ -170,7 +170,7 @@ bb0(%0 : $*SomeProtocol):
   // CHECK: release [[VAL1]]#0
   // CHECK: return [[VAL6]]
   %1 = function_ref @test_protocol_metatype : $[thin] (p : SomeProtocol) -> SomeProtocol.metatype
-  %2 = apply [force_inline] %1(%0) : $[thin] (p : SomeProtocol) -> SomeProtocol.metatype
+  %2 = apply [transparent] %1(%0) : $[thin] (p : SomeProtocol) -> SomeProtocol.metatype
   %3 = return %2 : $SomeProtocol.metatype
 }
 
@@ -341,7 +341,7 @@ bb0(%0 : $Float32):
   %13 = metatype $Float32.metatype
   %14 = float_literal $Builtin.FPIEEE64, 0x4000000000000000
   %15 = apply %12(%14, %13) : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
-  %16 = apply [force_inline] %4(%11, %15) : $[thin] (x : Float32, y : Float32) -> Float32
+  %16 = apply [transparent] %4(%11, %15) : $[thin] (x : Float32, y : Float32) -> Float32
   %17 = function_ref @_TSf31_convertFromBuiltinFloatLiteralfMSfFT5valueBf64__Sf : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
   %18 = metatype $Float32.metatype
   %19 = float_literal $Builtin.FPIEEE64, 0x4008000000000000
@@ -358,7 +358,7 @@ bb0(%0 : $Float32):
   // CHECK-NOT: apply
   // CHECK: return %0
   %3 = function_ref @test_recursive_bar : $[thin] (x : Float32) -> Float32 // test.bar : (x : swift.Float32) -> swift.Float32 // user: %5
-  %5 = apply [force_inline] %3(%0) : $[thin] (x : Float32) -> Float32 // user: %7
+  %5 = apply [transparent] %3(%0) : $[thin] (x : Float32) -> Float32 // user: %7
   return %5 : $Float32
 }
 
@@ -369,7 +369,7 @@ bb0(%0 : $Float32):
   // CHECK-NOT: apply
   // CHECK: return %0
   %3 = function_ref @test_recursive_baz : $[thin] (x : Float32) -> Float32 // test.baz : (x : swift.Float32) -> swift.Float32 // user: %5
-  %5 = apply [force_inline] %3(%0) : $[thin] (x : Float32) -> Float32 // user: %7
+  %5 = apply [transparent] %3(%0) : $[thin] (x : Float32) -> Float32 // user: %7
   return %5 : $Float32
 }
 

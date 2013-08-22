@@ -262,18 +262,18 @@ AllocArrayInst::AllocArrayInst(SILLocation Loc, SILType ElementType,
 
 ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
                      SILType Result, ArrayRef<SILValue> Args,
-                     bool ForceInline)
-  : SILInstruction(ValueKind::ApplyInst, Loc, Result), ForceInline(ForceInline),
+                     bool Transparent)
+  : SILInstruction(ValueKind::ApplyInst, Loc, Result), Transparent(Transparent),
     Operands(this, Args, Callee) {
 }
 
 ApplyInst *ApplyInst::create(SILLocation Loc, SILValue Callee,
                              SILType Result, ArrayRef<SILValue> Args,
-                             bool ForceInline, SILFunction &F) {
+                             bool Transparent, SILFunction &F) {
   void *Buffer = F.getModule().allocate(sizeof(ApplyInst) +
                             decltype(Operands)::getExtraSize(Args.size()),
                             alignof(ApplyInst));
-  return ::new(Buffer) ApplyInst(Loc, Callee, Result, Args, ForceInline);
+  return ::new(Buffer) ApplyInst(Loc, Callee, Result, Args, Transparent);
 }
 
 PartialApplyInst::PartialApplyInst(SILLocation Loc, SILValue Callee,

@@ -866,12 +866,12 @@ bb0(%0 : $Int64, %1 : $*Int64):
   unreachable
 }
 
-// CHECK: sil @test_force_inline : $[thin] () -> () {
-sil @test_force_inline : $[thin] () -> () {
+// CHECK: sil @test_transparent : $[thin] () -> () {
+sil @test_transparent : $[thin] () -> () {
 bb0:
   %0 = function_ref @classes : $[thin] () -> ()
-  // CHECK: apply [force_inline] %{{.*}}() : $[thin] () -> ()
-  %1 = apply [force_inline] %0() : $[thin] () -> ()
+  // CHECK: apply [transparent] %{{.*}}() : $[thin] () -> ()
+  %1 = apply [transparent] %0() : $[thin] () -> ()
   %2 = tuple ()
   %3 = return %2 : $()
 }

@@ -2035,20 +2035,20 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
   }
 
-  if (Attrs.isForceInline()) {
-    // Only functions can be force_inline.
+  if (Attrs.isTransparent()) {
+    // Only functions can be 'transparent'.
     auto *FD = dyn_cast<FuncDecl>(VD);
     if (!FD) {
-      TC.diagnose(VD->getStartLoc(), diag::force_inline_not_function);
-      VD->getMutableAttrs().ForceInline = false;
+      TC.diagnose(VD->getStartLoc(), diag::transparent_not_function);
+      VD->getMutableAttrs().Transparent = false;
     } else if (FD->getBody()->getNumParamPatterns() > 1) {
-      // We don't yet support force_inline of curried functions.
-      TC.diagnose(VD->getStartLoc(), diag::force_inline_curry_not_supported);
-      VD->getMutableAttrs().ForceInline = false;
+      // We don't yet support transparent of curried functions.
+      TC.diagnose(VD->getStartLoc(), diag::transparent_curry_not_supported);
+      VD->getMutableAttrs().Transparent = false;
     } else if (FD->getGenericParams()) {
-      // We don't yet support force_inline of generic functions.
-      TC.diagnose(VD->getStartLoc(), diag::force_inline_generic_not_supported);
-      VD->getMutableAttrs().ForceInline = false;
+      // We don't yet support transparent of generic functions.
+      TC.diagnose(VD->getStartLoc(), diag::transparent_generic_not_supported);
+      VD->getMutableAttrs().Transparent = false;
     }
   }
 

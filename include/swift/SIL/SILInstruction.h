@@ -291,21 +291,21 @@ class ApplyInst : public SILInstruction {
     Callee
   };
 
-  // Whether the callee had the attribute [force_inline];
+  // Whether the callee had the attribute [transparent].
   // FIXME: pack this somewhere
-  bool ForceInline;
+  bool Transparent;
 
   /// The fixed operand is the callee;  the rest are arguments.
   TailAllocatedOperandList<1> Operands;
 
   ApplyInst(SILLocation Loc, SILValue Callee, SILType ReturnType,
-            ArrayRef<SILValue> Args, bool ForceInline);
+            ArrayRef<SILValue> Args, bool Transparent);
 
 public:
   static ApplyInst *create(SILLocation Loc, SILValue Callee,
                            SILType ReturnType,
                            ArrayRef<SILValue> Args,
-                           bool ForceInline,
+                           bool Transparent,
                            SILFunction &F);
   SILValue getCallee() const { return Operands[Callee].get(); }
   SILFunctionTypeInfo *getFunctionTypeInfo(SILModule &M) const {
@@ -322,7 +322,7 @@ public:
     return Operands.getDynamicValuesAsArray();
   }
 
-  bool isForceInline() const { return ForceInline; }
+  bool isTransparent() const { return Transparent; }
 
   bool hasIndirectReturn(SILModule &M) const {
     return getFunctionTypeInfo(M)->hasIndirectReturn();

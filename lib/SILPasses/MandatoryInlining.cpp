@@ -1,4 +1,4 @@
-//===--- MandatoryInlining.cpp - Perform inlining of "force_inline" sites -===//
+//===--- MandatoryInlining.cpp - Perform inlining of "transparent" sites --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -63,9 +63,9 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
     // This cannot happen on a top-level call, so AI should be non-null.
     assert(AI && "Cannot have circular inline without apply");
     SILLocation L = AI->getLoc();
-    assert(L && "Must have location for forced inline apply");
+    assert(L && "Must have location for transparent inline apply");
     diagnose(F->getModule().getASTContext(), L.getStartSourceLoc(),
-             diag::circular_force_inline);
+             diag::circular_transparent);
     return false;
   }
 
@@ -77,10 +77,10 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
   for (auto &BB : *F) {
     for (auto &I : BB) {
       ApplyInst *InnerAI;
-      if ((InnerAI = dyn_cast<ApplyInst>(&I)) && InnerAI->isForceInline()) {
+      if ((InnerAI = dyn_cast<ApplyInst>(&I)) && InnerAI->isTransparent()) {
         // Figure out of this is something we have the body for
         // FIXME: once fragile SIL is serialized in modules, these can be
-        // asserts, since forced inline functions should always have their
+        // asserts, since transparent inline functions should always have their
         // bodies available.
         SILValue Callee = InnerAI->getCallee();
         FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef());
@@ -101,7 +101,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
           // propogating the failure.
           if (AI) {
             SILLocation L = AI->getLoc();
-            assert(L && "Must have location for forced inline apply");
+            assert(L && "Must have location for transparent inline apply");
             diagnose(F->getModule().getASTContext(), L.getStartSourceLoc(),
                      diag::note_while_inlining);
           }

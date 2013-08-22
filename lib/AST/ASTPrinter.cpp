@@ -115,9 +115,9 @@ void PrintAST::printAttributes(const DeclAttributes &attrs) {
     comma();
     OS << "conversion";
   }
-  if (attrs.isForceInline()) {
+  if (attrs.isTransparent()) {
     comma();
-    OS << "force_inline";
+    OS << "transparent";
   }
   if (attrs.isInfix()) {
     comma();
