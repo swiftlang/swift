@@ -258,6 +258,7 @@ function type thus mangles as ``fTCC3zim4zang4zungCS1_CS_7zippity_CS0_zoo``.
   known-nominal-type ::= 'Sd'                // swift.Float64
   known-nominal-type ::= 'Sf'                // swift.Float32
   known-nominal-type ::= 'Si'                // swift.Int64
+  known-nominal-type ::= 'Sq'                // swift.Optional
   known-nominal-type ::= 'SS'                // swift.String
   known-nominal-type ::= 'Su'                // swift.UInt64
 

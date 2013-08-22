@@ -662,6 +662,8 @@ private:
       return { "swift.Float32", IsProtocol::no };
     if (Mangled.nextIf('i'))
       return { "swift.Int64", IsProtocol::no };
+    if (Mangled.nextIf('q'))
+      return { "swift.Optional", IsProtocol::no };
     if (Mangled.nextIf('S'))
       return { "swift.String", IsProtocol::no };
     if (Mangled.nextIf('u'))

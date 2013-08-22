@@ -720,6 +720,9 @@ bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
   } else if (name == "Float32") {
     Buffer << "Sf";
     return true;
+  } else if (name == "Optional") {
+    Buffer << "Sq";
+    return true;
   } else if (name == "Slice") {
     Buffer << "Sa";
     return true;
