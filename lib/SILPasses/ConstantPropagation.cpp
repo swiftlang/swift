@@ -201,7 +201,7 @@ static SILInstruction *constantFoldInstruction(SILInstruction &I,
       for (auto MD : SD->getPhysicalFields()) {
         if (MD == SEI->getField()) {
           ValueBase *E = Struct->getElements()[FieldNo].getDef();
-          // If the element the struct_extract is extraciong is const, fold it.
+          // If the element the struct_extract is extracting is const, fold it.
           if (IntegerLiteralInst *ConstE = dyn_cast<IntegerLiteralInst>(E)) {
             return ConstE;
           }
