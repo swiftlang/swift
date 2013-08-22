@@ -85,11 +85,11 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
   link_directories("${PATH_TO_LLVM_BUILD}/lib"
                    "${PATH_TO_CLANG_BUILD}/lib")
 
-  if( EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/tblgen${CMAKE_EXECUTABLE_SUFFIX}" )
-    set(LLVM_TABLEGEN_EXE "${PATH_TO_LLVM_BUILD}/bin/tblgen")
+  if( EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/llvm-tblgen${CMAKE_EXECUTABLE_SUFFIX}" )
+    set(LLVM_TABLEGEN_EXE "${PATH_TO_LLVM_BUILD}/bin/llvm-tblgen${CMAKE_EXECUTABLE_SUFFIX}")
   else()
-    # FIXME: The fallback to a 'Debug' tblgen is madness
-    set(LLVM_TABLEGEN_EXE "${PATH_TO_LLVM_BUILD}/bin/Debug/tblgen")
+    # FIXME: This is an utter hack.
+    set(LLVM_TABLEGEN_EXE "${PATH_TO_LLVM_BUILD}/bin/Debug/llvm-tblgen${CMAKE_EXECUTABLE_SUFFIX}")
   endif()
   
   set(LIT_ARGS_DEFAULT "-sv")
