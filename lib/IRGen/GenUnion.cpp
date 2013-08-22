@@ -93,22 +93,25 @@ namespace {
     virtual void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
                                  UnionImplStrategy &strategy) = 0;
   };
-
-  /// A UnionTypeInfo implementation which has a single case with a payload, and
-  /// one or more additional no-payload cases.
-  class SinglePayloadUnionTypeInfo : public UnionTypeInfo {
-    UnionElementDecl *PayloadElement = nullptr;
-    // FIXME - non-fixed payloads
-    const FixedTypeInfo *PayloadTypeInfo = nullptr;
+  
+  /// Abstract base class for unions with one or cases that carry payloads.
+  class PayloadUnionTypeInfoBase : public UnionTypeInfo {
+  protected:
+    // The number of extra tag bits outside of the payload required to
+    // discriminate union cases.
     unsigned ExtraTagBitCount = 0;
+    // The number of possible values for the extra tag bits that are used.
+    // Log2(NumExtraTagValues - 1) + 1 == ExtraTagBitCount
     unsigned NumExtraTagValues = 0;
-  public:
-    /// FIXME: Spare bits from the payload not exhausted by the extra
-    /// inhabitants we used.
-    SinglePayloadUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
-                              IsPOD_t isPOD)
-      : UnionTypeInfo(T, S, {}, A, isPOD) {}
     
+  public:
+    PayloadUnionTypeInfoBase(llvm::StructType *T, Size S, Alignment A,
+                             IsPOD_t isPOD)
+      : UnionTypeInfo(T, S, {}, A, isPOD)
+    {}
+    
+    virtual Size getExtraTagBitOffset() const = 0;
+
     void getSchema(ExplosionSchema &schema) const {
       schema.add(ExplosionSchema::Element::forScalar(
                                          getStorageType()->getElementType(0)));
@@ -127,8 +130,7 @@ namespace {
     
     Address projectExtraTagBits(IRGenFunction &IGF, Address addr) const {
       assert(ExtraTagBitCount > 0 && "does not have extra tag bits");
-      return IGF.Builder.CreateStructGEP(addr, 1,
-                                         PayloadTypeInfo->getFixedSize());
+      return IGF.Builder.CreateStructGEP(addr, 1, getExtraTagBitOffset());
     }
     
     void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
@@ -175,6 +177,24 @@ namespace {
     
     void destroy(IRGenFunction &IGF, Address addr) const {
       // FIXME
+    }
+  };
+
+  /// A UnionTypeInfo implementation which has a single case with a payload, and
+  /// one or more additional no-payload cases.
+  class SinglePayloadUnionTypeInfo : public PayloadUnionTypeInfoBase {
+    UnionElementDecl *PayloadElement = nullptr;
+    // FIXME - non-fixed payloads
+    const FixedTypeInfo *PayloadTypeInfo = nullptr;
+  public:
+    /// FIXME: Spare bits from the payload not exhausted by the extra
+    /// inhabitants we used.
+    SinglePayloadUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
+                              IsPOD_t isPOD)
+      : PayloadUnionTypeInfoBase(T, S, A, isPOD) {}
+    
+    Size getExtraTagBitOffset() const override {
+      return PayloadTypeInfo->getFixedSize();
     }
     
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
@@ -445,9 +465,7 @@ namespace {
   };
 
   /// A UnionTypeInfo implementation which has multiple payloads.
-  class MultiPayloadUnionTypeInfo : public UnionTypeInfo {
-    bool HasExtraTagBits = false;
-    
+  class MultiPayloadUnionTypeInfo : public PayloadUnionTypeInfoBase {
     // The spare bits shared by all payloads, if any.
     // Invariant: The size of the bit
     // vector is the size of the payload in bits, rounded up to a byte boundary.
@@ -456,49 +474,8 @@ namespace {
     /// FIXME: Spare bits common to aggregate elements and not used for tags.
     MultiPayloadUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
                            IsPOD_t isPOD)
-      : UnionTypeInfo(T, S, {}, A, isPOD) {}
+      : PayloadUnionTypeInfoBase(T, S, A, isPOD) {}
 
-    void getSchema(ExplosionSchema &schema) const {
-      schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
-                                                        getFixedAlignment()));
-    }
-
-    unsigned getExplosionSize(ExplosionKind kind) const {
-      return HasExtraTagBits ? 2 : 1;
-    }
-
-    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      // FIXME
-    }
-
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      // FIXME
-    }
-
-    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      // FIXME
-    }
-
-    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
-      // FIXME
-    }
-
-    void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
-      // FIXME
-    }
-
-    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      // FIXME
-    }
-
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      // FIXME
-    }
-
-    void destroy(IRGenFunction &IGF, Address addr) const {
-      // FIXME
-    }
-    
     void emitSwitch(IRGenFunction &IGF,
                     Explosion &value,
                     ArrayRef<std::pair<UnionElementDecl*,
@@ -515,6 +492,10 @@ namespace {
       // FIXME
     }
     
+    Size getExtraTagBitOffset() const override {
+      return Size(CommonSpareBits.size()+7U/8U);
+    }
+    
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth,
                                   unsigned offset) const override {
@@ -524,7 +505,7 @@ namespace {
       // Pack the payload.
       pack.addAtOffset(src.claimNext(), offset);
       // Pack the extra bits, if any.
-      if (HasExtraTagBits) {
+      if (ExtraTagBitCount > 0) {
         pack.addAtOffset(src.claimNext(), CommonSpareBits.size() + offset);
       }
       return pack.get();
@@ -540,7 +521,7 @@ namespace {
       dest.add(unpack.claimAtOffset(getStorageType()->getElementType(0),
                                     offset));
       // Unpack the extra bits, if any.
-      if (HasExtraTagBits) {
+      if (ExtraTagBitCount > 0) {
         dest.add(unpack.claimAtOffset(getStorageType()->getElementType(1),
                                       CommonSpareBits.size() + offset));
       }
@@ -551,7 +532,7 @@ namespace {
                                    Explosion &params) const {
       // FIXME
       params.markClaimed(params.size());
-      IGF.Builder.CreateRetVoid();
+      IGF.Builder.CreateUnreachable();
     }
     
     void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
@@ -1023,23 +1004,23 @@ namespace {
     
     unsigned numTags = numPayloadTags + numEmptyElementTags;
     unsigned numTagBits = llvm::Log2_32(numTags-1) + 1;
-    unsigned extraTagBits = numTagBits <= commonSpareBitCount
+    ExtraTagBitCount = numTagBits <= commonSpareBitCount
       ? 0 : numTagBits - commonSpareBitCount;
+    NumExtraTagValues = numTags >> commonSpareBitCount;
     
     // Create the type. We need enough bits to store the largest payload plus
     // extra tag bits we need.
     setTaggedUnionBody(TC.IGM, getStorageType(),
                        CommonSpareBits.size(),
-                       extraTagBits);
+                       ExtraTagBitCount);
     
     // The union has the worst alignment of its payloads. The size includes the
     // added tag bits.
     auto sizeWithTag = Size((CommonSpareBits.size() + 7U)/8U)
       .roundUpToAlignment(worstAlignment)
       .getValue();
-    sizeWithTag += (extraTagBits+7U)/8U;
+    sizeWithTag += (ExtraTagBitCount+7U)/8U;
     
-    HasExtraTagBits = extraTagBits > 0;
     completeFixed(Size(sizeWithTag), worstAlignment);
   }
 }
