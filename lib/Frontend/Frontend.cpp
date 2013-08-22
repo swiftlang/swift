@@ -27,21 +27,8 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 
 using namespace swift;
-
-swift::CompilerInvocation::CompilerInvocation() {
-  TargetTriple = llvm::sys::getDefaultTargetTriple();
-}
-
-void CompilerInvocation::setMainExecutablePath(StringRef Path) {
-  llvm::SmallString<128> LibPath(Path);
-  llvm::sys::path::remove_filename(LibPath); // Remove /swift
-  llvm::sys::path::remove_filename(LibPath); // Remove /bin
-  llvm::sys::path::append(LibPath, "lib", "swift");
-  setRuntimeIncludePath(LibPath.str());
-}
 
 void swift::CompilerInstance::createSILModule() {
   TheSILModule.reset(SILModule::createEmptyModule(getASTContext()));
