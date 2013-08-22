@@ -112,6 +112,15 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType,
 Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
                                        DeclContext *fromDC,
                                        bool isSpecialized) {
+  // If we found a generic parameter, map to the archetype if there is one.
+  if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
+    if (auto archetype = genericParam->getArchetype()) {
+      return archetype;
+    }
+
+    return genericParam->getDeclaredType();
+  }
+
   // If we're referring to a generic type and no generic arguments have been
   // provided, and we are in the context of that generic type or one of its
   // extensions, imply the generic arguments
@@ -259,8 +268,7 @@ Type TypeChecker::applyGenericArguments(Type type,
     unsigned Index = 0;
     for (Type Arg : BGT->getGenericArgs()) {
       auto GP = genericParams->getParams()[Index++];
-      auto Archetype = GP.getAsTypeParam()->getDeclaredType()
-                         ->getAs<ArchetypeType>();
+      auto Archetype = GP.getAsTypeParam()->getArchetype();
       Substitutions[Archetype] = Arg;
     }
 
@@ -316,6 +324,13 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
       genericArgs.empty() && !allowUnboundGenerics) {
     diagnoseUnboundGenericType(TC, type, loc);
     return ErrorType::get(TC.Context);
+  }
+
+  // If we found a generic parameter, map to the archetype if there is one.
+  if (auto genericParam = type->getAs<GenericTypeParamType>()) {
+    if (auto archetype = genericParam->getDecl()->getArchetype()) {
+      type = archetype;
+    }
   }
 
   if (!genericArgs.empty()) {
@@ -428,12 +443,31 @@ resolveIdentTypeComponent(TypeChecker &TC,
                                            allowUnboundGenerics);
       // If the last resolved component is a type, perform member type lookup.
       if (parent.is<Type>()) {
-        if (parent.get<Type>()->is<ErrorType>())
+        auto parentTy = parent.get<Type>();
+        if (parentTy->is<ErrorType>())
           return parent.get<Type>();
 
+        // If the parent is a dependent type, the member is a dependent member.
+        if (parentTy->isDependentType()) {
+          // Form a dependent member type.
+          Type memberType = DependentMemberType::get(parentTy,
+                                                     comp.getIdentifier(),
+                                                     TC.Context);
+
+          if (!comp.getGenericArgs().empty()) {
+            // FIXME: Highlight generic arguments and introduce a Fix-It to
+            // remove them.
+            TC.diagnose(comp.getIdLoc(), diag::not_a_generic_type, memberType);
+
+            // Drop the arguments.
+          }
+
+          comp.setValue(memberType);
+          return memberType;
+        }
+
         // Look for member types with the given name.
-        auto memberTypes = TC.lookupMemberType(parent.get<Type>(),
-                                               comp.getIdentifier());
+        auto memberTypes = TC.lookupMemberType(parentTy, comp.getIdentifier());
 
         // If we didn't find anything, complain.
         // FIXME: Typo correction!
@@ -466,7 +500,7 @@ resolveIdentTypeComponent(TypeChecker &TC,
         // If there are generic arguments, apply them now.
         if (!comp.getGenericArgs().empty())
           memberType = applyGenericTypeReprArgs(TC, memberType, comp.getIdLoc(),
-                                             comp.getGenericArgs());
+                                                comp.getGenericArgs());
 
         comp.setValue(memberType);
         return memberType;
@@ -808,6 +842,7 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::TypeVariable:
+  case TypeKind::DependentMember:
     // Nothing to validate.
     return false;
 
@@ -917,8 +952,7 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
       auto genericParams = BGT->getDecl()->getGenericParams();
       for (Type Arg : BGT->getGenericArgs()) {
         auto GP = genericParams->getParams()[Index++];
-        auto Archetype = GP.getAsTypeParam()->getDeclaredType()
-                           ->getAs<ArchetypeType>();
+        auto Archetype = GP.getAsTypeParam()->getArchetype();
         Substitutions[Archetype] = Arg;
       }
 
@@ -1112,6 +1146,19 @@ Type TypeChecker::transformType(Type type,
   case TypeKind::GenericTypeParam:
     return type;
 
+  case TypeKind::DependentMember: {
+    auto dependent = cast<DependentMemberType>(base);
+    auto dependentBase = transformType(dependent->getBase(), fn);
+    if (!dependentBase)
+      return Type();
+
+    if (dependentBase.getPointer() == dependent->getBase().getPointer())
+      return type;
+
+    return DependentMemberType::get(dependentBase, dependent->getName(),
+                                    Context);
+  }
+
   case TypeKind::Substituted: {
     auto SubstAT = cast<SubstitutedType>(base);
     auto Subst = transformType(SubstAT->getReplacementType(), fn);
@@ -1294,6 +1341,36 @@ Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions,
   });
 }
 
+Type TypeChecker::substArchetypesForGenericParams(Type origType) {
+  return transformType(origType, [&](Type type) -> Type {
+    if (auto genericParam = type->getAs<GenericTypeParamType>()) {
+      return genericParam->getDecl()->getArchetype();
+    }
+
+    if (auto dependentMember = type->getAs<DependentMemberType>()) {
+      auto baseTy = substArchetypesForGenericParams(dependentMember->getBase());
+      if (!baseTy)
+        return Type();
+
+      if (baseTy.getPointer() == dependentMember->getBase().getPointer())
+        return origType;
+
+      if (baseTy->isDependentType())
+        return DependentMemberType::get(baseTy, dependentMember->getName(),
+                                        Context);
+
+      // FIXME: Error handling here is awful.
+      // FIXME: Might have to perform lookup here if we got a non-archetype.
+      // This only matters when we allow same-type constraints that
+      // map dependent types to concrete types.
+      return baseTy->castTo<ArchetypeType>()->getNestedType(
+               dependentMember->getName());
+    }
+
+    return type;
+  });
+}
+
 Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
                                           Type BaseTy) {
   if (!BaseTy)
@@ -1328,7 +1405,7 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
   auto Proto = ProtoType->getDecl();
   auto ThisDecl = Proto->getThis();
   TypeSubstitutionMap Substitutions;
-  Substitutions[ThisDecl->getDeclaredType()->castTo<ArchetypeType>()]
+  Substitutions[ThisDecl->getArchetype()]
     = BaseArchetype;
   return substType(T, Substitutions);
 }
@@ -1372,7 +1449,7 @@ Type TypeChecker::getSuperClassOf(Type type) {
     auto gp = boundTy->getDecl()->getGenericParams()->getParams();
     for (unsigned i = 0, n = boundTy->getGenericArgs().size(); i != n; ++i) {
       auto archetype
-        = gp[i].getAsTypeParam()->getDeclaredType()->castTo<ArchetypeType>();
+        = gp[i].getAsTypeParam()->getArchetype();
       substitutions[archetype] = boundTy->getGenericArgs()[i];
     }
 

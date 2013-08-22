@@ -251,31 +251,25 @@ ArchetypeBuilder::~ArchetypeBuilder() {
     delete PA.second;
 }
 
-auto ArchetypeBuilder::resolveType(TypeRepr *TyR) -> PotentialArchetype * {
-  auto IdType = dyn_cast<IdentTypeRepr>(TyR);
-  if (!IdType)
-    return nullptr;
+auto ArchetypeBuilder::resolveType(Type type) -> PotentialArchetype * {
+  if (auto genericParam = type->getAs<GenericTypeParamType>()) {
+    // FIXME: Shouldn't have to rely on getDecl() here...
+    auto known = Impl->PotentialArchetypes.find(genericParam->getDecl());
+    if (known == Impl->PotentialArchetypes.end())
+      return nullptr;
 
-  PotentialArchetype *Current = nullptr;
-  // The first type needs to be known as a potential archetype, e.g., a
-  // generic parameter.
-  AbstractTypeParamDecl *FirstType
-    = dyn_cast_or_null<AbstractTypeParamDecl>(IdType->Components[0].getBoundDecl());
-  if (!FirstType)
-    return nullptr;
-
-  DenseMap<AbstractTypeParamDecl *, PotentialArchetype *>::iterator Known
-    = Impl->PotentialArchetypes.find(FirstType);
-  if (Known == Impl->PotentialArchetypes.end())
-    return nullptr;
-
-  // Resolve nested types.
-  Current = Known->second;
-  for (unsigned I = 1, N = IdType->Components.size(); I != N; ++I) {
-    Current = Current->getNestedType(IdType->Components[I].getIdentifier());
+    return known->second;
   }
 
-  return Current;
+  if (auto dependentMember = type->getAs<DependentMemberType>()) {
+    auto base = resolveType(dependentMember->getBase());
+    if (!base)
+      return nullptr;
+
+    return base->getNestedType(dependentMember->getName());
+  }
+
+  return nullptr;
 }
 
 bool ArchetypeBuilder::addGenericParameter(AbstractTypeParamDecl *GenericParam,
@@ -417,7 +411,7 @@ bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
 bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
   switch (Req.getKind()) {
   case RequirementKind::Conformance: {
-    PotentialArchetype *PA = resolveType(Req.getSubjectRepr());
+    PotentialArchetype *PA = resolveType(Req.getSubject());
     if (!PA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
@@ -449,7 +443,7 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
   case RequirementKind::SameType: {
     // FIXME: Allow one of the types to not be a potential archetype, e.g.,
     // T.Element == Int?
-    PotentialArchetype *FirstPA = resolveType(Req.getFirstTypeRepr());
+    PotentialArchetype *FirstPA = resolveType(Req.getFirstType());
     if (!FirstPA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
@@ -458,7 +452,7 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
       return true;
     }
 
-    PotentialArchetype *SecondPA = resolveType(Req.getSecondTypeRepr());
+    PotentialArchetype *SecondPA = resolveType(Req.getSecondType());
     if (!SecondPA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?

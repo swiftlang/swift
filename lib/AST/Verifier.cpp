@@ -1004,6 +1004,7 @@ namespace {
       case TypeKind::ProtocolComposition:
       case TypeKind::AssociatedType:
       case TypeKind::GenericTypeParam:
+      case TypeKind::DependentMember:
         return;
         
       case TypeKind::Union:

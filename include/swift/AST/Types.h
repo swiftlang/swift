@@ -199,6 +199,16 @@ public:
   /// type variables referenced by this type.
   void getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables);
 
+  /// Determine whether the type is directly dependent on a generic type
+  /// parameter.
+  ///
+  /// Unlike the C++ notion of "dependent", for which nearly any occurrence of
+  /// a generic parameter within the type causes the type to be dependent,
+  /// the Swift definition of "dependent" is fairly shallow: we either have
+  /// a generic parameter or a member of that generic parameter. Types such
+  /// as X<T>, where T is a generic parameter, are not considered "dependent".
+  bool isDependentType();
+
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
   /// some set of protocols. Protocol and protocol-conformance types are
@@ -1914,10 +1924,6 @@ public:
   /// Retrieve the declaration of the generic type parameter.
   GenericTypeParamDecl *getDecl() const { return Param; }
 
-  /// getDesugaredType - If this type is a sugared type, remove all levels of
-  /// sugar until we get down to a non-sugar type.
-  TypeBase *getDesugaredType();
-
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
   ///
@@ -1952,8 +1958,9 @@ public:
 private:
   friend class GenericTypeParamDecl;
 
-  explicit GenericTypeParamType(GenericTypeParamDecl *param)
-    : AbstractTypeParamType(TypeKind::GenericTypeParam, nullptr),
+  explicit GenericTypeParamType(GenericTypeParamDecl *param,
+                                const ASTContext *context)
+    : AbstractTypeParamType(TypeKind::GenericTypeParam, context),
       Param(param) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(GenericTypeParamType, AbstractTypeParamType)
@@ -2024,6 +2031,36 @@ public:
     return T->getKind() == TypeKind::Substituted;
   }
 };
+
+/// A type that refers to a member type of some type that is dependent on a
+/// generic parameter.
+class DependentMemberType : public TypeBase {
+  Type Base;
+  Identifier Name;
+
+  DependentMemberType(Type base, Identifier name, const ASTContext *ctx,
+                      bool hasTypeVariable)
+    : TypeBase(TypeKind::DependentMember, ctx, hasTypeVariable),
+      Base(base), Name(name) { }
+
+public:
+  static DependentMemberType *get(Type base, Identifier name,
+                                  const ASTContext &ctx);
+
+  /// Retrieve the base type.
+  Type getBase() const { return Base; }
+
+  /// Retrieve the name of the member type.
+  Identifier getName() const { return Name; }
+
+  void print(raw_ostream &OS) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::DependentMember;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 
 /// \brief The storage type of a variable with non-standard reference
 /// ownership semantics, like a [weak] or [unowned] variable.
@@ -2112,7 +2149,13 @@ inline bool TypeBase::isExistentialType() {
   return T->getKind() == TypeKind::Protocol
          || T->getKind() == TypeKind::ProtocolComposition;
 }
-  
+
+inline bool TypeBase::isDependentType() {
+  CanType T = getCanonicalType();
+  return T->getKind() == TypeKind::GenericTypeParam
+         || T->getKind() == TypeKind::DependentMember;
+}
+
 inline bool TypeBase::isClassExistentialType() {
   CanType T = getCanonicalType();
   if (auto pt = dyn_cast<ProtocolType>(T))

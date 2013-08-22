@@ -186,6 +186,8 @@ public:
     void setValue(ValueDecl *VD) { Value = VD; }
     void setValue(Type T) { Value = T; }
     void setValue(Module *M) { Value = M; }
+
+    void revertToContext(DeclContext *DC) { Value = DC; }
   };
 
 public:

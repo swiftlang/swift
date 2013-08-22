@@ -356,6 +356,14 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
   bool visitReferenceStorageType(CanReferenceStorageType type) {
     return visit(type.getReferentType());
   }
+  bool visitGenericTypeParamType(CanGenericTypeParamType type) {
+    // FIXME: These might map down to an archetype.
+    return false;
+  }
+  bool visitDependentMemberType(CanDependentMemberType type) {
+    // FIXME: These might map down to an archetype.
+    return false;
+  }
   bool visitProtocolDecl(ProtocolDecl *decl) { return false; }
   bool visitClassDecl(ClassDecl *decl) { return false; }
   bool visitStructDecl(StructDecl *decl) {

@@ -3351,6 +3351,12 @@ namespace {
     // argument archetypes from this type and its parent.
     void visitNominalType(CanNominalType type) {}
     void visitBoundGenericType(CanBoundGenericType type) {}
+
+    // FIXME: Will need to bind the archetype that this eventually refers to.
+    void visitGenericTypeParamType(CanGenericTypeParamType type) { }
+
+    // FIXME: Will need to bind the archetype that this eventually refers to.
+    void visitDependentMemberType(CanDependentMemberType type) { }
   };
 }
 

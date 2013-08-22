@@ -504,6 +504,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, NAME_ALIAS_TYPE);
   RECORD(decls_block, GENERIC_TYPE_PARAM_TYPE);
   RECORD(decls_block, ASSOCIATED_TYPE_TYPE);
+  RECORD(decls_block, DEPENDENT_MEMBER_TYPE);
   RECORD(decls_block, NOMINAL_TYPE);
   RECORD(decls_block, PAREN_TYPE);
   RECORD(decls_block, TUPLE_TYPE);
@@ -1716,6 +1717,17 @@ bool Serializer::writeType(Type ty) {
     return true;
   }
 
+  case TypeKind::DependentMember: {
+    auto dependent = cast<DependentMemberType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[DependentMemberTypeLayout::Code];
+    DependentMemberTypeLayout::emitRecord(
+      Out, ScratchRecord, abbrCode,
+      addTypeRef(dependent->getBase()),
+      addIdentifierRef(dependent->getName()));
+    return true;
+  }
+
   case TypeKind::Function: {
     auto fnTy = cast<FunctionType>(ty.getPointer());
 
@@ -1892,6 +1904,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<GenericTypeParamTypeLayout>();
     registerDeclTypeAbbr<AssociatedTypeTypeLayout>();
+    registerDeclTypeAbbr<DependentMemberTypeLayout>();
     registerDeclTypeAbbr<StructLayout>();
     registerDeclTypeAbbr<ConstructorLayout>();
     registerDeclTypeAbbr<VarLayout>();

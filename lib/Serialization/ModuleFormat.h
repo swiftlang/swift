@@ -244,6 +244,7 @@ namespace decls_block {
     NAME_ALIAS_TYPE = 1,
     GENERIC_TYPE_PARAM_TYPE,
     ASSOCIATED_TYPE_TYPE,
+    DEPENDENT_MEMBER_TYPE,
     NOMINAL_TYPE,
     PAREN_TYPE,
     TUPLE_TYPE,
@@ -322,6 +323,11 @@ namespace decls_block {
     DeclIDField // associated type decl
   >;
 
+  using DependentMemberTypeLayout = BCRecordLayout<
+    DEPENDENT_MEMBER_TYPE,
+    TypeIDField,      // base type
+    IdentifierIDField // member name
+  >;
   using NominalTypeLayout = BCRecordLayout<
     NOMINAL_TYPE,
     DeclIDField, // decl

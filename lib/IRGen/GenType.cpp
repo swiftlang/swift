@@ -522,6 +522,9 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
   case TypeKind::ReferenceStorage:
     return convertReferenceStorageType(cast<ReferenceStorageType>(ty));
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    llvm_unreachable("can't convert dependent type");
   }
   llvm_unreachable("bad type kind");
 }

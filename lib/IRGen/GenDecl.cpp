@@ -533,7 +533,9 @@ static bool isLocalLinkageType(CanType type) {
     llvm_unreachable("error type in IRGen");
   case TypeKind::TypeVariable:
     llvm_unreachable("type variable in IRgen");
-      
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    return false;
   case TypeKind::MetaType:
     return isLocalLinkageType(cast<MetaTypeType>(type).getInstanceType());
   case TypeKind::Module:

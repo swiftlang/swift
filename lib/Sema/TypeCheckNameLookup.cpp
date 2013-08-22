@@ -71,6 +71,9 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
   if (auto metaT = type->getAs<MetaTypeType>())
     type = metaT->getInstanceType();
 
+  // Callers must cope with dependent types directly.
+  assert(!type->isDependentType());
+
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
   unsigned options = NL_QualifiedDefault | NL_ProtocolMembers;

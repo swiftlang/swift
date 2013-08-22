@@ -737,7 +737,7 @@ getTypeForArchetype(ConstraintSystem &cs, ArchetypeType *archetype,
   // Look for this member type.
   // FIXME: Ambiguity check.
   auto &tc = cs.getTypeChecker();
-  LookupTypeResult lookup = tc.lookupMemberType(parentTy,archetype->getName());
+  LookupTypeResult lookup = tc.lookupMemberType(parentTy, archetype->getName());
   assert(lookup.size() == 1 && "Couldn't find archetype for member lookup");
   auto type = lookup.front().second;
   mappedTypes[archetype] = type;
@@ -1438,6 +1438,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::Error:
       return SolutionKind::Error;
 
+    case TypeKind::GenericTypeParam:
+    case TypeKind::DependentMember:
+      llvm_unreachable("unmapped dependent type in type checker");
+
     case TypeKind::ReferenceStorage:
       llvm_unreachable("storage type in typechecker");
 
@@ -2024,6 +2028,10 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
     
   case TypeKind::Error:
     return SolutionKind::Error;
+
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    llvm_unreachable("unmapped dependent type");
 
   case TypeKind::ReferenceStorage:
     llvm_unreachable("storage type in typechecker");

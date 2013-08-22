@@ -227,8 +227,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
   SmallVector<ArchetypeType *, 4> unresolvedArchetypes;
   if (!unresolvedAssocTypes.empty()) {
     for (auto assoc : unresolvedAssocTypes)
-      unresolvedArchetypes.push_back(
-        assoc->getDeclaredType()->castTo<ArchetypeType>());
+      unresolvedArchetypes.push_back(assoc->getArchetype());
 
     reqType = cs.openType(reqType, unresolvedArchetypes, replacements);
   }
@@ -313,7 +312,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
   // If we deduced any associated types, record them in the result.
   if (!replacements.empty()) {
     for (auto assocType : unresolvedAssocTypes) {
-      auto archetype = assocType->getDeclaredType()->castTo<ArchetypeType>();
+      auto archetype = assocType->getArchetype();
       auto known = replacements.find(archetype);
       if (known == replacements.end())
         continue;
@@ -466,6 +465,7 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   Substitution result;
   result.Archetype = archetype;
   result.Replacement = replacement;
+  assert(!result.Replacement->isDependentType() && "Can't be dependent");
   SmallVector<ProtocolConformance *, 4> conformances;
 
   for (auto proto : archetype->getConformsTo()) {
@@ -755,7 +755,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
           // Record the deductions.
           for (auto deduction : best.AssociatedTypeDeductions) {
             auto assocType = deduction.first;
-            auto archetype = assocType->getDeclaredType()->castTo<ArchetypeType>();
+            auto archetype = assocType->getArchetype();
             TypeMapping[archetype] = deduction.second;
 
             // Compute the archetype substitution.
@@ -769,9 +769,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
             std::remove_if(unresolvedAssocTypes.begin(),
                            unresolvedAssocTypes.end(),
                            [&](AssociatedTypeDecl *assocType) {
-                             auto archetype
-                               = assocType->getDeclaredType()
-                                   ->castTo<ArchetypeType>();
+                             auto archetype = assocType->getArchetype();
 
                              auto known = TypeMapping.find(archetype);
                              if (known == TypeMapping.end())
@@ -1118,9 +1116,9 @@ ArrayRef<Substitution> gatherSubstitutions(TypeChecker &tc, Type type) {
         unsigned index = 0;
         for (auto gp : *boundGeneric->getDecl()->getGenericParams()) {
           Substitution sub;
-          sub.Archetype
-            = gp.getAsTypeParam()->getDeclaredType()->castTo<ArchetypeType>();
+          sub.Archetype = gp.getAsTypeParam()->getArchetype();
           sub.Replacement = boundGeneric->getGenericArgs()[index++];
+          assert(!sub.Replacement->isDependentType() && "Can't be dependent");
           SmallVector<ProtocolConformance *, 4> conformances;
           conformances.assign(sub.Archetype->getConformsTo().size(), nullptr);
           sub.Conformance

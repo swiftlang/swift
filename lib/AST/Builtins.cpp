@@ -291,13 +291,12 @@ getGenericParam(ASTContext &Context) {
     new (Context) GenericTypeParamDecl(Context.TheBuiltinModule, GenericName,
                                        SourceLoc(), 0, 0);
   GenericTyDecl->setArchetype(Archetype);
-  Type GenericTy = GenericTyDecl->getDeclaredType();
   GenericParam Param = GenericTyDecl;
   auto ParamList = GenericParamList::create(Context, SourceLoc(), Param,
                                             SourceLoc());
   ParamList->setAllArchetypes(
     Context.AllocateCopy(ArrayRef<ArchetypeType *>(&Archetype, 1)));
-  return std::make_tuple(GenericTy, ParamList);
+  return std::make_tuple(Archetype, ParamList);
 }
 
 static ValueDecl *getLoadOperation(ASTContext &Context, Identifier Id) {

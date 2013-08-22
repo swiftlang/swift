@@ -602,6 +602,14 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     return;
   }
 
+  case TypeKind::GenericTypeParam: {
+    llvm_unreachable("cannot mangle generic type parameters yet");
+  }
+
+  case TypeKind::DependentMember: {
+    llvm_unreachable("cannot mangle dependent member types yet");
+  }
+
   case TypeKind::Function:
     mangleFunctionType(cast<FunctionType>(type), explosion, uncurryLevel);
     return;

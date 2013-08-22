@@ -139,6 +139,10 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
 
   case TypeKind::UnboundGeneric:
     return isa<ClassDecl>(cast<UnboundGenericType>(type)->getDecl());
+
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    llvm_unreachable("Dependent types can't answer reference-semantics query");
   }
 
   llvm_unreachable("Unhandled type kind!");
@@ -251,6 +255,10 @@ bool TypeBase::isSpecialized() {
 
   case TypeKind::Array:
     return cast<ArrayType>(this)->getBaseType()->isSpecialized();
+
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    return false;
   }
 }
 
@@ -325,6 +333,10 @@ bool TypeBase::isUnspecializedGeneric() {
     
   case TypeKind::Array:
     return cast<ArrayType>(this)->getBaseType()->isUnspecializedGeneric();
+
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    return false;
   }
 }
 
@@ -423,6 +435,11 @@ static void gatherTypeVariables(Type wrappedTy,
 
   case TypeKind::TypeVariable:
     typeVariables.push_back(cast<TypeVariableType>(ty));
+    return;
+
+  case TypeKind::DependentMember:
+    gatherTypeVariables(cast<DependentMemberType>(ty)->getBase(),
+                        typeVariables);
     return;
   }
 
@@ -660,6 +677,16 @@ static Type getStrippedType(const ASTContext &context, Type type,
                                   context);
     return type;
   }
+
+  case TypeKind::DependentMember: {
+    auto dependent = cast<DependentMemberType>(type.getPointer());
+    auto base = getStrippedType(context, dependent->getBase(), stripLabels,
+                                stripDefaultArgs);
+    if (base.getPointer() == dependent->getBase().getPointer())
+      return type;
+
+    return DependentMemberType::get(base, dependent->getName(), context);
+  }
   }
 }
 
@@ -837,6 +864,21 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
 
+  case TypeKind::GenericTypeParam: {
+    // FIXME: Actually canonicalize to a sensible representation that doesn't
+    // contain the declaration.
+    Result = this;
+    break;
+  }
+
+  case TypeKind::DependentMember: {
+    auto dependent = cast<DependentMemberType>(this);
+    auto base = dependent->getBase()->getCanonicalType();
+    const ASTContext &ctx = base->getASTContext();
+    Result = DependentMemberType::get(base, dependent->getName(), ctx);
+    break;
+  }
+
   case TypeKind::ReferenceStorage: {
     auto ref = cast<ReferenceStorageType>(this);
     Type referentType = ref->getReferentType()->getCanonicalType();
@@ -942,6 +984,8 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::ReferenceStorage:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::Paren:
@@ -950,8 +994,6 @@ TypeBase *TypeBase::getDesugaredType() {
     return cast<NameAliasType>(this)->getDesugaredType();
   case TypeKind::AssociatedType:
     return cast<AssociatedTypeType>(this)->getDesugaredType();
-  case TypeKind::GenericTypeParam:
-    return cast<GenericTypeParamType>(this)->getDesugaredType();
   case TypeKind::ArraySlice:
   case TypeKind::Optional:
     return cast<SyntaxSugarType>(this)->getDesugaredType();
@@ -976,10 +1018,6 @@ TypeBase *SyntaxSugarType::getDesugaredType() {
 
 TypeBase *SubstitutedType::getDesugaredType() {
   return getReplacementType()->getDesugaredType();
-}
-
-TypeBase *GenericTypeParamType::getDesugaredType() {
-  return getDecl()->getArchetype()->getDesugaredType();
 }
 
 unsigned GenericTypeParamType::getDepth() const {
@@ -1029,6 +1067,7 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::Substituted:
   case TypeKind::AssociatedType:
   case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
     return false;
 
   case TypeKind::BoundGenericClass:
@@ -1053,8 +1092,7 @@ bool TypeBase::isSpelledLike(Type other) {
       return false;
     for (size_t i = 0, sz = tMe->getFields().size(); i < sz; ++i) {
       auto &myField = tMe->getFields()[i], &theirField = tThem->getFields()[i];
-      // FIXME: Should tuple types w/ same initializer be considered the same?
-      if (myField.hasInit() || theirField.hasInit())
+      if (myField.hasInit() != theirField.hasInit())
         return false;
       
       if (myField.getName() != theirField.getName())
@@ -1776,6 +1814,11 @@ void AssociatedTypeType::print(raw_ostream &OS) const {
 
 void SubstitutedType::print(raw_ostream &OS) const {
   getReplacementType().print(OS);
+}
+
+void DependentMemberType::print(raw_ostream &OS) const {
+  getBase().print(OS);
+  OS << "." << getName().str();
 }
 
 void ReferenceStorageType::print(raw_ostream &OS) const {

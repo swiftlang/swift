@@ -481,6 +481,16 @@ namespace {
       return IGF.getLocalTypeData(type, LocalTypeData::Metatype);
     }
 
+    llvm::Value *visitGenericTypeParamType(CanGenericTypeParamType type) {
+      IGF.unimplemented(SourceLoc(), "metadata ref for generic type parameter");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
+
+    llvm::Value *visitDependentMemberType(CanDependentMemberType type) {
+      IGF.unimplemented(SourceLoc(), "metadata ref for dependent member type");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
+
     llvm::Value *visitLValueType(CanLValueType type) {
       IGF.unimplemented(SourceLoc(), "metadata ref for l-value type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);

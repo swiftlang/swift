@@ -359,6 +359,14 @@ namespace {
       llvm_unreachable("shouldn't get an l-value type here");
     }
 
+    RetTy visitGenericTypeParamType(CanGenericTypeParamType type) {
+      llvm_unreachable("shouldn't get a generic type parameter type here");
+    }
+
+    RetTy visitDependentMemberType(CanDependentMemberType type) {
+      llvm_unreachable("shouldn't get a dependent member type here");
+    }
+
     RetTy visitReferenceStorageType(CanReferenceStorageType type) {
       switch (type->getOwnership()) {
       case Ownership::Strong:  llvm_unreachable("explicit strong ownership");

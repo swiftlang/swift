@@ -496,7 +496,7 @@ Type NominalTypeDecl::getDeclaredTypeInContext() {
     NominalTypeDecl *D = UGT->getDecl();
     SmallVector<Type, 4> GenericArgs;
     for (auto Param : *D->getGenericParams())
-      GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
+      GenericArgs.push_back(Param.getAsTypeParam()->getArchetype());
     Ty = BoundGenericType::get(D, getDeclContext()->getDeclaredTypeInContext(),
                                GenericArgs);
   }
@@ -560,8 +560,11 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
   : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name),
     NameLoc(nameLoc), Depth(depth), Index(index)
 {
+  // FIXME: Arbitrarily consider this generic type parameter type to be
+  // canonical. In the long run, it won't be.
   auto &ctx = dc->getASTContext();
-  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
+  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this,
+                                                                         &ctx);
   setType(MetaTypeType::get(type, ctx));
 }
 

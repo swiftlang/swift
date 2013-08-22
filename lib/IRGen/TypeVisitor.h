@@ -108,6 +108,11 @@ public:
         ->visitArchetypeType(cast<ArchetypeType>(origTy),
                              substTy);
 
+    case TypeKind::GenericTypeParam:
+    case TypeKind::DependentMember:
+      // FIXME: This should duplicate, then subsume, the archetype path?
+      llvm_unreachable("can't visit dependent types");
+
 #define DISPATCH(Concrete)                                      \
     case TypeKind::Concrete:                                    \
       return static_cast<Impl*>(this)                           \

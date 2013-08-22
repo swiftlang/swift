@@ -78,6 +78,8 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
       LValueTypes;
     llvm::DenseMap<std::pair<Type, Type>, SubstitutedType *> SubstitutedTypes;
+    llvm::DenseMap<std::pair<Type, Identifier>, DependentMemberType *>
+      DependentMemberTypes;
     llvm::FoldingSet<UnionType> UnionTypes;
     llvm::FoldingSet<StructType> StructTypes;
     llvm::FoldingSet<ClassType> ClassTypes;
@@ -915,6 +917,20 @@ SubstitutedType *SubstitutedType::get(Type Original, Type Replacement,
                                            hasTypeVariable);
   }
   return Known;
+}
+
+DependentMemberType *DependentMemberType::get(Type base, Identifier name,
+                                              const ASTContext &ctx) {
+  bool hasTypeVariable = base->hasTypeVariable();
+  auto arena = getArena(hasTypeVariable);
+
+  auto *&known = ctx.Impl.getArena(arena).DependentMemberTypes[{base, name}];
+  if (!known) {
+    const ASTContext *canonicalCtx = base->isCanonical() ? &ctx : nullptr;
+    known = new (ctx, arena) DependentMemberType(base, name, canonicalCtx,
+                                                 hasTypeVariable);
+  }
+  return known;
 }
 
 void *ExprHandle::operator new(size_t Bytes, ASTContext &C,

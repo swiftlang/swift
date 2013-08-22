@@ -57,7 +57,7 @@ class ArchetypeBuilder {
   /// signature are fully resolved).
   ///
   /// For any type that cannot refer to an archetype, this routine returns null.
-  PotentialArchetype *resolveType(TypeRepr *TyR);
+  PotentialArchetype *resolveType(Type type);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype conforms to the given protocol.
