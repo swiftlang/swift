@@ -324,6 +324,10 @@ public:
   // SILInstruction Printing Logic
 
   void print(SILValue V) {
+    if (auto *FRI = dyn_cast<FunctionRefInst>(V))
+      OS << "  // function_ref "
+         << demangleSymbolAsString(FRI->getFunction()->getName()) << "\n";
+
     OS << "  ";
 
     // Print result.
@@ -449,11 +453,10 @@ public:
     OS << ") : " << CI->getCallee().getType();
   }
 
-  void visitFunctionRefInst(FunctionRefInst *DRI) {
+  void visitFunctionRefInst(FunctionRefInst *FRI) {
     OS << "function_ref ";
-    DRI->getFunction()->printName(OS);
-    OS << " : " << DRI->getType();
-    OS << " // " << demangleSymbolAsString(DRI->getFunction()->getName());
+    FRI->getFunction()->printName(OS);
+    OS << " : " << FRI->getType();
   }
   
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {

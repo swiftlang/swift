@@ -234,6 +234,7 @@ bb2:                                              // Preds: bb1 bb0
 }
 // CHECK-LABEL: sil @code_removed_after_a_call_to_noreturn
 // CHECK: bb0
+// CHECK-NEXT:  exit
 // CHECK-NEXT:  function_ref
 // CHECK-NEXT:  apply
 // CHECK-NEXT:  unreachable
