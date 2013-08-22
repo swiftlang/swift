@@ -22,7 +22,7 @@
 #include "swift/Basic/Range.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/DenseSet.h"
-
+#include "llvm/ADT/StringSet.h"
 using namespace swift;
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
@@ -1339,3 +1339,17 @@ void SILFunction::verify() const {
 #endif
 }
 
+
+/// Verify the module.
+void SILModule::verify() const {
+#ifndef NDEBUG
+  llvm::StringSet<> functionNames;
+  for (SILFunction const &f : *this) {
+    if (!functionNames.insert(f.getName())) {
+      llvm::errs() << "Function redefined: " << f.getName() << "!\n";
+      assert(false && "triggering standard assertion failure routine");
+    }
+    f.verify();
+  }
+#endif
+}

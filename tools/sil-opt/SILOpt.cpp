@@ -146,6 +146,9 @@ int main(int argc, char **argv) {
       performSILMandatoryInlining(CI.getSILModule());
       break;
     }
+
+    // Verify the module after every pass.
+    CI.getSILModule()->verify();
   }
 
   std::string ErrorInfo;

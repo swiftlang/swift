@@ -29,7 +29,6 @@
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/FormattedStream.h"
 
 using namespace swift;
@@ -972,20 +971,6 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
 /// '@function_mangled_name'.
 void SILFunction::printName(raw_ostream &OS) const {
   OS << "@" << Name;  
-}
-
-/// Verify the module.
-void SILModule::verify() const {
-#ifndef NDEBUG
-  llvm::StringSet<> functionNames;
-  for (SILFunction const &f : *this) {
-    if (!functionNames.insert(f.getName())) {
-      llvm::errs() << "Function redefined: " << f.getName() << "!\n";
-      assert(false && "triggering standard assertion failure routine");
-    }
-    f.verify();
-  }
-#endif
 }
       
 /// Pretty-print the SILModule to errs.
