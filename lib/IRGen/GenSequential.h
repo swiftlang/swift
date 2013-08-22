@@ -185,7 +185,7 @@ class SequentialTypeInfo;
 
 /// An implementation of SequentialTypeInfo for non-loadable types. 
 template <class Impl, class Base, class FieldImpl>
-class SequentialTypeInfo<Impl, Base, FieldImpl, false>
+class SequentialTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ false>
     : public SequentialTypeInfoImpl<Impl, Base, FieldImpl> {
   typedef SequentialTypeInfoImpl<Impl, Base, FieldImpl> super;
 protected:
@@ -195,7 +195,7 @@ protected:
 
 /// An implementation of SequentialTypeInfo for loadable types. 
 template <class Impl, class Base, class FieldImpl>
-class SequentialTypeInfo<Impl, Base, FieldImpl, true>
+class SequentialTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ true>
     : public SequentialTypeInfoImpl<Impl, Base, FieldImpl> {
   typedef SequentialTypeInfoImpl<Impl, Base, FieldImpl> super;
 

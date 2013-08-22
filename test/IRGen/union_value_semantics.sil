@@ -1,0 +1,56 @@
+// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm | FileCheck %s
+
+import Builtin
+
+union SinglePayloadTrivial {
+  case payload(Builtin.Int64)
+  case a
+  case b
+  case c
+}
+
+sil @destroy_trivial : $[thin] ([byref] SinglePayloadTrivial) -> () {
+entry(%u : $*SinglePayloadTrivial):
+  destroy_addr %u : $*SinglePayloadTrivial
+  %x = tuple ()
+  return %x : $()
+}
+// CHECK: define void @destroy_trivial(%O21union_value_semantics20SinglePayloadTrivial*) {
+// CHECK-NOT: swift_release
+// CHECK:   ret void
+// CHECK: }
+
+union SinglePayloadNontrivial {
+  case payload(Builtin.ObjectPointer)
+  case a
+  case b
+  case c
+}
+
+sil @destroy_nontrivial : $[thin] ([byref] SinglePayloadNontrivial) -> () {
+entry(%u : $*SinglePayloadNontrivial):
+  destroy_addr %u : $*SinglePayloadNontrivial
+  %x = tuple ()
+  return %x : $()
+}
+// CHECK: define void @destroy_nontrivial(%O21union_value_semantics23SinglePayloadNontrivial*) {
+// CHECK: entry:
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics23SinglePayloadNontrivial* %0, i32 0, i32 0
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics23SinglePayloadNontrivial* %0, i32 0, i32 1
+// CHECK:   [[TAG:%.*]] = load i1* [[TAG_ADDR]], align 8
+// CHECK:   [[IS_PAYLOAD:%.*]] = icmp eq i1 [[TAG]], false
+// CHECK:   br i1 [[IS_PAYLOAD]], label %[[DESTROY_PAYLOAD:[0-9]+]], label %[[DONE:[0-9]+]]
+// CHECK: ; <label>:[[DESTROY_PAYLOAD]]
+// CHECK:   [[VALUE_ADDR:%.*]] = bitcast i64* [[PAYLOAD_ADDR]] to %swift.refcounted**
+// CHECK:   [[VALUE:%.*]] = load %swift.refcounted** [[VALUE_ADDR]], align 8
+// CHECK:   call void @swift_release(%swift.refcounted* [[VALUE]]) #0
+// CHECK:   br label %[[DONE]]
+// CHECK: ; <label>:[[DONE]]
+// CHECK:   ret void
+// CHECK: }
+
+sil @top_level_code : $[thin] () -> () {
+entry:
+  %x = tuple ()
+  return %x : $()
+}

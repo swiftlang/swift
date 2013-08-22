@@ -175,10 +175,6 @@ namespace {
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       dest.add(src.claim(getExplosionSize(ExplosionKind::Minimal)));
     }
-    
-    void destroy(IRGenFunction &IGF, Address addr) const {
-      // FIXME
-    }
   };
 
   /// A UnionTypeInfo implementation which has a single case with a payload and
@@ -374,7 +370,6 @@ namespace {
       // FIXME non-loadable payloads
       cast<LoadableTypeInfo>(PayloadTypeInfo)
         ->unpackUnionPayload(IGF, payload, out, 0);
-
     }
     
   private:
@@ -459,6 +454,65 @@ namespace {
       unionExplosion.add(payload);
       addExtraTagBitValue(IGF, unionExplosion, extraTagValue);
       IGF.emitScalarReturn(unionExplosion);
+    }
+    
+    void destroy(IRGenFunction &IGF, Address addr) const override {
+      if (isPOD(ResilienceScope::Local))
+        return;
+      
+      auto *endBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+      
+      Address payloadAddr = projectPayload(IGF, addr);
+
+      // We only need to invoke the destructor if the union contains a value of
+      // the payload case.
+      
+      // If we have extra tag bits, they will be zero if we contain a payload.
+      if (ExtraTagBitCount > 0) {
+        Address extraBitAddr = projectExtraTagBits(IGF, addr);
+        llvm::Value *extraBits = IGF.Builder.CreateLoad(extraBitAddr);
+        llvm::Value *zero = llvm::ConstantInt::get(extraBits->getType(), 0);
+        llvm::Value *isZero = IGF.Builder.CreateICmp(llvm::CmpInst::ICMP_EQ,
+                                                     extraBits, zero);
+        
+        auto *trueBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+        IGF.Builder.CreateCondBr(isZero, trueBB, endBB);
+        
+        IGF.Builder.emitBlock(trueBB);
+      }
+      
+      // If we used extra inhabitants to represent empty case discriminators,
+      // weed them out.
+      unsigned numExtraInhabitants
+        = PayloadTypeInfo->getFixedExtraInhabitantCount();
+      if (numExtraInhabitants > 0) {
+        auto *payloadBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+        llvm::Value *payload = IGF.Builder.CreateLoad(payloadAddr);
+        auto *swi = IGF.Builder.CreateSwitch(payload, payloadBB);
+        
+        auto elements = PayloadElement->getParentUnion()->getAllElements();
+        unsigned inhabitant = 0;
+        for (auto i = elements.begin(), end = elements.end();
+             i != end && inhabitant < numExtraInhabitants;
+             ++i, ++inhabitant) {
+          if (*i == PayloadElement)
+            ++i;
+          auto xi = PayloadTypeInfo->getFixedExtraInhabitantValue(IGF.IGM,
+                              PayloadTypeInfo->getFixedSize().getValueInBits(),
+                              inhabitant);
+          swi->addCase(xi, endBB);
+        }
+        
+        IGF.Builder.emitBlock(payloadBB);
+      }
+
+      // We know now we have a valid payload value. Destroy it.
+      Address valueAddr = IGF.Builder.CreateBitCast(payloadAddr,
+                            PayloadTypeInfo->getStorageType()->getPointerTo());
+      PayloadTypeInfo->destroy(IGF, valueAddr);
+      
+      IGF.Builder.CreateBr(endBB);
+      IGF.Builder.emitBlock(endBB);
     }
     
     void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
@@ -839,6 +893,11 @@ namespace {
     }
     
   public:
+    
+    void destroy(IRGenFunction &IGF, Address addr) const override {
+      // FIXME
+    }
+    
     void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
                          UnionImplStrategy &strategy) override;
   };
@@ -1265,6 +1324,7 @@ namespace {
       .getValue();
     sizeWithTag += (ExtraTagBitCount+7U)/8U;
     
+    setPOD(PayloadTypeInfo->isPOD(ResilienceScope::Component));
     completeFixed(Size(sizeWithTag),
                   PayloadTypeInfo->getFixedAlignment());
   }
@@ -1283,6 +1343,7 @@ namespace {
     // of the largest payload.
     CommonSpareBits = {};
     Alignment worstAlignment(1);
+    IsPOD_t isPOD = IsPOD;
     for (auto *elt : strategy.getElementsWithPayload()) {
       auto payloadTy = elt->getArgumentType()->getCanonicalType();
       auto &payloadTI = TC.getCompleteTypeInfo(payloadTy);
@@ -1290,6 +1351,8 @@ namespace {
       fixedPayloadTI.applyFixedSpareBitsMask(CommonSpareBits);
       if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
         worstAlignment = fixedPayloadTI.getFixedAlignment();
+      if (!fixedPayloadTI.isPOD(ResilienceScope::Component))
+        isPOD = IsNotPOD;
       PayloadCases.emplace_back(elt, &fixedPayloadTI);
     }
     
@@ -1334,6 +1397,7 @@ namespace {
       .getValue();
     sizeWithTag += (ExtraTagBitCount+7U)/8U;
     
+    setPOD(isPOD);
     completeFixed(Size(sizeWithTag), worstAlignment);
   }
 }
@@ -1444,7 +1508,9 @@ PackUnionPayload::PackUnionPayload(IRGenFunction &IGF, unsigned bitSize)
 
 void PackUnionPayload::add(llvm::Value *v) {
   // First, bitcast to an integer type.
-  if (!isa<llvm::IntegerType>(v->getType())) {
+  if (isa<llvm::PointerType>(v->getType())) {
+    v = IGF.Builder.CreatePtrToInt(v, IGF.IGM.SizeTy);
+  } else if (!isa<llvm::IntegerType>(v->getType())) {
     unsigned bitSize = IGF.IGM.DataLayout.getTypeSizeInBits(v->getType());
     auto intTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), bitSize);
     v = IGF.Builder.CreateBitCast(v, intTy);
@@ -1513,6 +1579,8 @@ llvm::Value *UnpackUnionPayload::claim(llvm::Type *ty) {
   unpackedBits += bitSize;
 
   // Bitcast to the destination type.
+  if (isa<llvm::PointerType>(ty))
+    return IGF.Builder.CreateIntToPtr(unpacked, ty);
   return IGF.Builder.CreateBitCast(unpacked, ty);
 }
 
