@@ -110,21 +110,21 @@ parseSelectorArgument(Parser &P,
   
   if (P.consumeIf(tok::colon)) {
     ParserResult<TypeRepr> type = P.parseTypeAnnotation();
-    bool HadParseError = false;
+    ParserStatus Status = type;
+
     if (type.isNull()) {
-      HadParseError = true;
-      type = makeParserResult(new (P.Context) ErrorTypeRepr(P.Tok.getLoc()));
+      type = makeParserErrorResult(
+          new (P.Context) ErrorTypeRepr(P.Tok.getLoc()));
       P.skipUntil(tok::r_paren);
+      P.consumeIf(tok::r_paren);
     }
-    if (type.hasCodeCompletion())
-      return makeParserCodeCompletionStatus();
-    
+
     argPattern = makeParserResult(
         new (P.Context) TypedPattern(argPattern.get(), type.get()));
     bodyPattern = makeParserResult(
         new (P.Context) TypedPattern(bodyPattern.get(), type.get()));
-    if (HadParseError)
-      return makeParserError();
+    if (Status.isError())
+      return Status;
   }
   
   ExprHandle *init = nullptr;
