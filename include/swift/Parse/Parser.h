@@ -644,7 +644,7 @@ public:
                                       SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
-  NullablePtr<Expr> parseExprList(tok LeftTok, tok RightTok);
+  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
   ParserResult<Expr> parseExprCollection();
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc, Expr *FirstExpr);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc, Expr *FirstKey);

@@ -654,7 +654,9 @@ ParserResult<Expr> Parser::parseExprSuper() {
                                                              dotLoc, ctorLoc);
       if (Tok.isFollowingLParen()) {
         // Parse Swift-style constructor arguments.
-        NullablePtr<Expr> arg = parseExprList(tok::l_paren, tok::r_paren);
+        ParserResult<Expr> arg = parseExprList(tok::l_paren, tok::r_paren);
+        if (arg.hasCodeCompletion())
+          return makeParserCodeCompletionResult<Expr>();
         // FIXME: Unfortunate recovery here.
         if (arg.isNull())
           return nullptr;
@@ -692,8 +694,9 @@ ParserResult<Expr> Parser::parseExprSuper() {
     }
   } else if (Tok.isFollowingLSquare()) {
     // super[expr]
-    NullablePtr<Expr> idx = parseExprList(tok::l_square,
-                                          tok::r_square);
+    ParserResult<Expr> idx = parseExprList(tok::l_square, tok::r_square);
+    if (idx.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Expr>();
     if (idx.isNull())
       return nullptr;
     return makeParserResult(new (Context) SubscriptExpr(superRef, idx.get()));
@@ -854,7 +857,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
   case tok::code_complete:
     if (CodeCompletion)
       CodeCompletion->completePostfixExprBeginning();
-    return nullptr;
+    return makeParserCodeCompletionResult<Expr>();
 
   // Eat an invalid token in an expression context.  Error tokens are diagnosed
   // by the lexer, so there is no reason to emit another diagnostic.
@@ -944,7 +947,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     // Check for a () suffix, which indicates a call.
     // Note that this cannot be the start of a new line.
     if (Tok.isFollowingLParen()) {
-      NullablePtr<Expr> Arg =parseExprList(tok::l_paren, tok::r_paren);
+      ParserResult<Expr> Arg = parseExprList(tok::l_paren, tok::r_paren);
+      if (Arg.hasCodeCompletion())
+        return makeParserCodeCompletionResult<Expr>();
       if (Arg.isNull())
         return nullptr;
       Result = makeParserResult(
@@ -955,8 +960,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     // Check for a [expr] suffix.
     // Note that this cannot be the start of a new line.
     if (Tok.isFollowingLSquare()) {
-      NullablePtr<Expr> Idx = parseExprList(tok::l_square,
-                                            tok::r_square);
+      ParserResult<Expr> Idx = parseExprList(tok::l_square, tok::r_square);
+      if (Idx.hasCodeCompletion())
+        return makeParserCodeCompletionResult<Expr>();
       if (Idx.isNull())
         return nullptr;
       Result = makeParserResult(
@@ -1050,7 +1056,7 @@ Expr *Parser::parseExprStringLiteral() {
       consumeToken();
       assert(Tok.is(tok::l_paren));
       
-      NullablePtr<Expr> E = parseExprList(tok::l_paren, tok::r_paren);
+      ParserResult<Expr> E = parseExprList(tok::l_paren, tok::r_paren);
       if (E.isNonNull()) {
         Exprs.push_back(E.get());
         
@@ -1439,24 +1445,25 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
 ///   expr-paren-element:
 ///     (identifier ':')? expr
 ///
-NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
-  SourceLoc RLoc, LLoc = consumeToken(LeftTok);
+ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
+  SourceLoc LLoc = consumeToken(LeftTok);
+  SourceLoc RLoc;
 
   SmallVector<Expr*, 8> SubExprs;
   SmallVector<Identifier, 8> SubExprNames;
 
-  bool Invalid = parseList(RightTok, LLoc, RLoc,
-                           tok::comma, /*OptionalSep=*/false,
-                           RightTok == tok::r_paren ?
-                           diag::expected_rparen_expr_list :
-                           diag::expected_rsquare_expr_list,
-                           [&] () -> bool {
+  ParserStatus Status = parseList(RightTok, LLoc, RLoc,
+                                  tok::comma, /*OptionalSep=*/false,
+                                  RightTok == tok::r_paren ?
+                                  diag::expected_rparen_expr_list :
+                                  diag::expected_rsquare_expr_list,
+                                  [&] () -> ParserStatus {
     Identifier FieldName;
     // Check to see if there is a field specifier
     if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
       if (parseIdentifier(FieldName,
                           diag::expected_field_spec_name_tuple_expr)) {
-        return true;
+        return makeParserError();
       }
       consumeToken(tok::colon);
     }
@@ -1476,7 +1483,7 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
       SourceLoc Loc;
       Identifier OperName;
       if (parseAnyIdentifier(OperName, Loc, diag::expected_operator_ref)) {
-        return true;
+        return makeParserError();
       }
       // Bypass local lookup. Use an 'Ordinary' reference kind so that the
       // reference may resolve to any unary or binary operator based on
@@ -1487,15 +1494,15 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
       SubExprs.push_back(SubExpr);
     } else {
       ParserResult<Expr> SubExpr = parseExpr(diag::expected_expr_in_expr_list);
-      if (SubExpr.isNull() || SubExpr.hasCodeCompletion()) {
-        return true;
-      }
-      SubExprs.push_back(SubExpr.get());
+      if (SubExpr.isNonNull())
+        SubExprs.push_back(SubExpr.get());
+      return SubExpr;
     }
-    return false;
+    return makeParserSuccess();
   });
 
-  if (Invalid) return nullptr;
+  if (Status.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
 
   MutableArrayRef<Expr *> NewSubExprs = Context.AllocateCopy(SubExprs);
   
@@ -1508,12 +1515,14 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
   // A tuple with a single, unlabelled element is just parentheses.
   if (SubExprs.size() == 1 &&
       (SubExprNames.empty() || SubExprNames[0].empty())) {
-    return new (Context) ParenExpr(LLoc, SubExprs[0], RLoc,
-                                   /*hasTrailingClosure=*/false);
+    return makeParserResult(
+        Status, new (Context) ParenExpr(LLoc, SubExprs[0], RLoc,
+                                        /*hasTrailingClosure=*/false));
   }
 
-  return new (Context) TupleExpr(LLoc, NewSubExprs, NewSubExprsNames, RLoc,
-                                 /*hasTrailingClosure=*/false);
+  return makeParserResult(
+      new (Context) TupleExpr(LLoc, NewSubExprs, NewSubExprsNames, RLoc,
+                              /*hasTrailingClosure=*/false));
 }
 
 /// parseExprCollection - Parse a collection literal expression.
