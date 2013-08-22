@@ -984,14 +984,35 @@ void Lexer::lexCharacterLiteral() {
 
   // If this wasn't a normal character, then this is a malformed character.
   if (CharValue == ~1U) {
-    // If we successfully skipped to the ending ', eat it now to avoid confusing
-    // error recovery.
-    if (*CurPtr == '\'') ++CurPtr;
+    // Skip until we see a single quote, newline, or EOF, whatever comes first.
+    while (true) {
+      const char C = *CurPtr;
+      if (C == '\n' || C == '\r' || C == '\'' || C == 0)
+        break;
+      CurPtr++;
+    }
+
+    // If we successfully skipped to the single quote, assume that it
+    // terminates the character literal and eat it now.
+    if (*CurPtr == '\'')
+      ++CurPtr;
     return formToken(tok::unknown, TokStart);
   }
 
   if (*CurPtr != '\'') {
     diagnose(TokStart, diag::lex_unterminated_character_literal);
+    // Skip until we see a single quote, newline, or EOF, whatever comes first.
+    while (true) {
+      const char C = *CurPtr;
+      if (C == '\n' || C == '\r' || C == '\'' || C == 0)
+        break;
+      CurPtr++;
+    }
+
+    // If we successfully skipped to the single quote, assume that it
+    // terminates the character literal and eat it now.
+    if (*CurPtr == '\'')
+      ++CurPtr;
     return formToken(tok::unknown, TokStart);
   }
   ++CurPtr;
