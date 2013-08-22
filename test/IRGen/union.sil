@@ -785,6 +785,131 @@ end:
 // CHECK: }
 
 
+// CHECK: define { i64, i2 } @_TO5union23MultiPayloadNoSpareBits1xfMS0_FBi64_S0_(i64) {
+// CHECK: entry:
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 %0, 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 0, 1
+// CHECK:   ret { i64, i2 } [[RES]]
+// CHECK: }
+
+// CHECK: define { i64, i2 } @_TO5union23MultiPayloadNoSpareBits1yfMS0_FBi32_S0_(i32) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i32 %0 to i64
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 [[ZEXT]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 1, 1
+// CHECK:   ret { i64, i2 } [[RES]]
+// CHECK: }
+
+// CHECK: define { i64, i2 } @_TO5union23MultiPayloadNoSpareBits1zfMS0_FBi63_S0_(i63) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i63 %0 to i64
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 [[ZEXT]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 -2, 1
+// CHECK:   ret { i64, i2 } [[RES]]
+// CHECK: }
+
+// CHECK: define { i64, i2 } @_TO5union23MultiPayloadNoSpareBits1aFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret { i64, i2 } { i64 0, i2 -1 }
+// CHECK: }
+
+// CHECK: define { i64, i2 } @_TO5union23MultiPayloadNoSpareBits1bFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret { i64, i2 } { i64 1, i2 -1 }
+// CHECK: }
+
+// CHECK: define { i64, i2 } @_TO5union23MultiPayloadNoSpareBits1cFMS0_S0_() {
+// CHECK: entry:
+// CHECK:   ret { i64, i2 } { i64 2, i2 -1 }
+// CHECK: }
+
+
+// CHECK: define { i64, i1 } @_TO5union23MultiPayloadOneSpareBit1xfMS0_FBi62_S0_(i62) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i62 %0 to i64
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[ZEXT]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 false, 1
+// CHECK:   ret { i64, i1 } [[RES]]
+// CHECK: }
+
+// CHECK: define { i64, i1 } @_TO5union23MultiPayloadOneSpareBit1yfMS0_FBi63_S0_(i63) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i63 %0 to i64
+// --                                        0x8000_0000_0000_0000
+// CHECK:   [[TAGGED:%.*]] = or i64 [[ZEXT]], -9223372036854775808
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[TAGGED]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 false, 1
+// CHECK:   ret { i64, i1 } [[RES]]
+// CHECK: }
+
+// CHECK: define { i64, i1 } @_TO5union23MultiPayloadOneSpareBit1zfMS0_FBi61_S0_(i61) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i61 %0 to i64
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[ZEXT]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 true, 1
+// CHECK:   ret { i64, i1 } [[RES]]
+// CHECK: }
+
+// CHECK: define { i64, i1 } @_TO5union23MultiPayloadOneSpareBit1aFMS0_S0_() {
+// CHECK: entry:
+// --                            0x8000_0000_0000_0000
+// CHECK:   ret { i64, i1 } { i64 -9223372036854775808, i1 true }
+// CHECK: }
+
+// CHECK: define { i64, i1 } @_TO5union23MultiPayloadOneSpareBit1bFMS0_S0_() {
+// CHECK: entry:
+// --                            0x8000_0000_0000_0001
+// CHECK:   ret { i64, i1 } { i64 -9223372036854775807, i1 true }
+// CHECK: }
+
+// CHECK: define { i64, i1 } @_TO5union23MultiPayloadOneSpareBit1cFMS0_S0_() {
+// CHECK: entry:
+// --                            0x8000_0000_0000_0002
+// CHECK:   ret { i64, i1 } { i64 -9223372036854775806, i1 true }
+// CHECK: }
+
+
+// CHECK: define i64 @_TO5union24MultiPayloadTwoSpareBits1xfMS0_FBi62_S0_(i62) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i62 %0 to i64
+// CHECK:   ret i64 [[ZEXT]]
+// CHECK: }
+
+// CHECK: define i64 @_TO5union24MultiPayloadTwoSpareBits1yfMS0_FBi60_S0_(i60) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i60 %0 to i64
+// --                     0x4000_0000_0000_0000
+// CHECK:   [[TAGGED:%.*]] = or i64 [[ZEXT]], 4611686018427387904
+// CHECK:   ret i64 [[TAGGED]]
+// CHECK: }
+
+// CHECK: define i64 @_TO5union24MultiPayloadTwoSpareBits1zfMS0_FBi61_S0_(i61) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i61 %0 to i64
+// --                      0x8000_0000_0000_0000
+// CHECK:   [[TAGGED:%.*]] = or i64 [[ZEXT]], -9223372036854775808
+// CHECK:   ret i64 [[TAGGED]]
+// CHECK: }
+
+// CHECK: define i64 @_TO5union24MultiPayloadTwoSpareBits1aFMS0_S0_() {
+// CHECK: entry:
+// --              0xC000_0000_0000_0000
+// CHECK:   ret i64 -4611686018427387904
+// CHECK: }
+
+// CHECK: define i64 @_TO5union24MultiPayloadTwoSpareBits1bFMS0_S0_() {
+// CHECK: entry:
+// --              0xC000_0000_0000_0001
+// CHECK:   ret i64 -4611686018427387903
+// CHECK: }
+
+// CHECK: define i64 @_TO5union24MultiPayloadTwoSpareBits1cFMS0_S0_() {
+// CHECK: entry:
+// --              0xC000_0000_0000_0002
+// CHECK:   ret i64 -4611686018427387902
+// CHECK: }
+
+
 // Force the storage types to all be generated.
 typealias AllTestUnions = (
   Singleton,

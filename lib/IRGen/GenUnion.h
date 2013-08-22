@@ -32,6 +32,8 @@ namespace llvm {
   class BasicBlock;
   class Value;
   class Type;
+  
+  class BitVector;
 }
 
 namespace swift {
@@ -106,6 +108,12 @@ void emitProjectLoadableUnion(IRGenFunction &IGF,
                               UnionElementDecl *theCase,
                               Explosion &out);
   
+/// Interleave the occupiedValue and spareValue bits, taking a bit from one
+/// or the other at each position based on the spareBits mask.
+llvm::ConstantInt *
+interleaveSpareBits(IRGenModule &IGM, const llvm::BitVector &spareBits,
+                    unsigned bits, unsigned spareValue, unsigned occupiedValue);
+
 }
 }
 

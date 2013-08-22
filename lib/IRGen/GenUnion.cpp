@@ -542,6 +542,18 @@ namespace {
       
       return result;
     }
+    
+    /// The number of empty cases representable by each tag value.
+    /// Equal to the size of the payload minus the spare bits used for tags.
+    unsigned getNumCaseBits() const {
+      return CommonSpareBits.size() - CommonSpareBits.count();
+    }
+    
+    unsigned getNumCasesPerTag() const {
+      unsigned numCaseBits = getNumCaseBits();
+      return numCaseBits >= 32
+        ? 0x80000000 : 1 << numCaseBits;
+    }
 
   public:
     void emitSwitch(IRGenFunction &IGF,
@@ -609,8 +621,7 @@ namespace {
       }
       
       // Switch over the no-payload cases.
-      unsigned casesPerTag = CommonSpareBits.size() >= 32
-        ? 0x80000000 : 1 << CommonSpareBits.size();
+      unsigned casesPerTag = getNumCasesPerTag();
       
       auto elti = NoPayloadCases.begin(), eltEnd = NoPayloadCases.end();
       
@@ -683,11 +694,95 @@ namespace {
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    UnionElementDecl *elt,
                                    Explosion &params) const {
-      // FIXME
-      params.markClaimed(params.size());
-      IGF.Builder.CreateUnreachable();
+      // See whether this is a payload or empty case we're emitting.
+      auto payloadI = std::find_if(PayloadCases.begin(), PayloadCases.end(),
+         [&](const std::pair<UnionElementDecl*, const FixedTypeInfo*> &p) {
+           return p.first == elt;
+         });
+      if (payloadI != PayloadCases.end()) {
+        return emitPayloadInjection(IGF, elt, *payloadI->second, params,
+                                    payloadI - PayloadCases.begin());
+      }
+      auto emptyI = std::find(NoPayloadCases.begin(),NoPayloadCases.end(), elt);
+      assert(emptyI != NoPayloadCases.end() && "case not in union");
+      emitEmptyInjection(IGF, emptyI - NoPayloadCases.begin());
     }
     
+  private:
+    void emitPayloadInjection(IRGenFunction &IGF, UnionElementDecl *elt,
+                              const FixedTypeInfo &payloadTI,
+                              Explosion &params,
+                              unsigned tag) const {
+      Explosion result(ExplosionKind::Minimal);
+      
+      // Pack the payload.
+      auto &loadablePayloadTI = cast<LoadableTypeInfo>(payloadTI); // FIXME
+      llvm::Value *payload = loadablePayloadTI.packUnionPayload(IGF, params,
+                                                     CommonSpareBits.size(), 0);
+      
+      // If we have spare bits, pack tag bits into them.
+      unsigned numSpareBits = CommonSpareBits.count();
+      if (numSpareBits > 0) {
+        llvm::ConstantInt *tagMask
+          = interleaveSpareBits(IGF.IGM, CommonSpareBits,CommonSpareBits.size(),
+                                tag, 0);
+        payload = IGF.Builder.CreateOr(payload, tagMask);
+      }
+      
+      result.add(payload);
+      
+      // If we have extra tag bits, pack the remaining tag bits into them.
+      if (ExtraTagBitCount > 0) {
+        tag >>= numSpareBits;
+        auto extra = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
+                                            APInt(ExtraTagBitCount, tag));
+        result.add(extra);
+      }
+      
+      IGF.emitScalarReturn(result);
+    }
+    
+    void emitEmptyInjection(IRGenFunction &IGF, unsigned index) const {
+      Explosion result(ExplosionKind::Minimal);
+      
+      // Figure out the tag and payload for the empty case.
+      unsigned numCaseBits = getNumCaseBits();
+      unsigned tag, tagIndex;
+      if (numCaseBits >= 32) {
+        tag = PayloadCases.size();
+        tagIndex = index;
+      } else {
+        tag = (index >> numCaseBits) + PayloadCases.size();
+        tagIndex = index & ((1 << numCaseBits) - 1);
+      }
+      
+      llvm::Value *payload;
+      unsigned numSpareBits = CommonSpareBits.count();
+      if (numSpareBits > 0) {
+        // If we have spare bits, pack tag bits into them.
+        payload = interleaveSpareBits(IGF.IGM,
+                                      CommonSpareBits, CommonSpareBits.size(),
+                                      tag, tagIndex);
+      } else {
+        // Otherwise the payload is just the index.
+        payload = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
+                                       APInt(CommonSpareBits.size(), tagIndex));
+      }
+      
+      result.add(payload);
+      
+      // If we have extra tag bits, pack the remaining tag bits into them.
+      if (ExtraTagBitCount > 0) {
+        tag >>= numSpareBits;
+        auto extra = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
+                                            APInt(ExtraTagBitCount, tag));
+        result.add(extra);
+      }
+      
+      IGF.emitScalarReturn(result);
+    }
+    
+  public:
     void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
                          UnionImplStrategy &strategy) override;
   };
@@ -1391,4 +1486,42 @@ void irgen::emitProjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
          && "not of a union type");
   auto &unionTI = IGF.getTypeInfo(unionTy).as<UnionTypeInfo>();
   unionTI.emitProject(IGF, inUnionValue, theCase, out);
+}
+
+/// Interleave the occupiedValue and spareValue bits, taking a bit from one
+/// or the other at each position based on the spareBits mask.
+llvm::ConstantInt *
+irgen::interleaveSpareBits(IRGenModule &IGM, const llvm::BitVector &spareBits,
+                           unsigned bits,
+                           unsigned spareValue, unsigned occupiedValue) {
+  // FIXME: endianness.
+  SmallVector<llvm::integerPart, 2> valueParts;
+  valueParts.push_back(0);
+  
+  llvm::integerPart valueBit = 1;
+  auto advanceValueBit = [&]{
+    valueBit <<= 1;
+    if (valueBit == 0) {
+      valueParts.push_back(0);
+      valueBit = 1;
+    }
+  };
+  
+  for (unsigned i = 0, e = spareBits.size();
+       (occupiedValue || spareValue) && i < e;
+       ++i, advanceValueBit()) {
+    if (spareBits[i]) {
+      if (spareValue & 1)
+      valueParts.back() |= valueBit;
+      spareValue >>= 1;
+    } else {
+      if (occupiedValue & 1)
+      valueParts.back() |= valueBit;
+      occupiedValue >>= 1;
+    }
+  }
+  
+  // Create the value.
+  llvm::APInt value(bits, valueParts);
+  return llvm::ConstantInt::get(IGM.getLLVMContext(), value);
 }
