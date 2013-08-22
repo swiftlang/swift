@@ -332,10 +332,10 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   SmallVector<TypeRepr *, 8> ElementsR;
   bool HadEllipsis = false;
 
-  bool Invalid = parseList(tok::r_paren, LPLoc, RPLoc,
-                           tok::comma, /*OptionalSep=*/false,
-                           diag::expected_rparen_tuple_type_list,
-                           [&] () -> bool {
+  ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
+                                  tok::comma, /*OptionalSep=*/false,
+                                  diag::expected_rparen_tuple_type_list,
+                                  [&] () -> ParserStatus {
     // If the tuple element starts with "ident :", then
     // the identifier is an element tag, and it is followed by a type
     // annotation.
@@ -350,16 +350,20 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 
       // Parse the type annotation.
       ParserResult<TypeRepr> type = parseTypeAnnotation(diag::expected_type);
-      if (type.isNull() || type.hasCodeCompletion())
-        return true;
+      if (type.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
+      if (type.isNull())
+        return makeParserError();
 
       ElementsR.push_back(
           new (Context) NamedTypeRepr(name, type.get(), nameLoc));
     } else {
       // Otherwise, this has to be a type.
       ParserResult<TypeRepr> type = parseTypeAnnotation();
-      if (type.isNull() || type.hasCodeCompletion())
-        return true;
+      if (type.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
+      if (type.isNull())
+        return makeParserError();
       ElementsR.push_back(type.get());
     }
 
@@ -379,10 +383,10 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         HadEllipsis = true;
       } else {
         diagnose(EllipsisLoc, diag::unexpected_ellipsis_in_tuple);
-        Invalid = true;
+        return makeParserError();
       }
     }
-    return false;
+    return makeParserSuccess();
   });
 
   if (HadEllipsis && ElementsR.empty()) {
@@ -390,7 +394,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     return nullptr;
   }
 
-  return makeParserResult(TupleTypeRepr::create(
+  return makeParserResult(Status, TupleTypeRepr::create(
       Context, ElementsR, SourceRange(LPLoc, Tok.getLoc()),
       HadEllipsis ? EllipsisLoc : SourceLoc()));
 }

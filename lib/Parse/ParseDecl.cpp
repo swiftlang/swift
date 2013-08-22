@@ -847,7 +847,6 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
   Identifier Id;
-  ParserResult<TypeRepr> UnderlyingTy;
   SourceLoc IdLoc;
   if (parseIdentifier(Id, IdLoc, diag::expected_identifier_in_decl,"typealias"))
     return nullptr;
@@ -857,6 +856,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   if (Tok.is(tok::colon))
     parseInheritance(Inherited);
 
+  ParserResult<TypeRepr> UnderlyingTy;
   if (WantDefinition || Tok.is(tok::equal)) {
     if (parseToken(tok::equal, diag::expected_equal_in_typealias))
       return nullptr;
