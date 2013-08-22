@@ -33,18 +33,12 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Path.h"
 #include <memory>
-#include <cstdlib>
-#include <dlfcn.h>
-#include <sys/param.h>
 
 using namespace swift;
 
 // Commonly-used Clang classes.
 using clang::CompilerInstance;
 using clang::CompilerInvocation;
-
-// Dummy function used with dladdr.
-void swift_clang_importer() { }
 
 ClangImporterCtorTy swift::getClangImporterCtor() {
   return &ClangImporter::create;
@@ -84,6 +78,7 @@ ClangImporter::~ClangImporter() {
 
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
                                      StringRef targetTriple,
+                                     StringRef swiftRuntimeIncludePath,
                                      StringRef moduleCachePath,
                                      ArrayRef<std::string> importSearchPaths,
                                      ArrayRef<std::string> frameworkSearchPaths,
@@ -137,29 +132,13 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
     invocationArgStrs.back().append(moduleCachePath.str());
   }
 
-  // Figure out where Swift lives.
-  // This silly cast below avoids a C++ warning.
-  Dl_info info;
-  if (dladdr((void *)(uintptr_t)swift_clang_importer, &info) == 0)
-    llvm_unreachable("Call to dladdr() failed");
-
-  // Resolve symlinks.
-  char swiftPath[MAXPATHLEN];
-  if (!realpath(info.dli_fname, swiftPath)) {
-    // FIXME: Diagnose this.
-    return nullptr;
-  }
-
   if (overrideResourceDir.empty()) {
-    llvm::SmallString<128> resourceDir(swiftPath);
+    llvm::SmallString<128> resourceDir(swiftRuntimeIncludePath);
   
-    // We now have the swift executable/library path. Adjust it to refer to our
-    // copy of the Clang headers under lib/swift/clang.
+    // Adjust the path torefer to our copy of the Clang headers under
+    // lib/swift/clang.
   
-    llvm::sys::path::remove_filename(resourceDir);
-    llvm::sys::path::remove_filename(resourceDir);
-    llvm::sys::path::append(resourceDir, "lib", "swift",
-                            "clang", CLANG_VERSION_STRING);
+    llvm::sys::path::append(resourceDir, "clang", CLANG_VERSION_STRING);
   
     // Set the Clang resource directory to the path we computed.
     invocationArgStrs.push_back("-resource-dir");

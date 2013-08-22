@@ -56,6 +56,7 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
     auto clangImporter =
         ImporterCtor(*Context, Invocation.getSDKPath(),
                      Invocation.getTargetTriple(),
+                     Invocation.getRuntimeIncludePath(),
                      Invocation.getClangModuleCachePath(),
                      Invocation.getImportSearchPaths(),
                      Invocation.getFrameworkSearchPaths(),

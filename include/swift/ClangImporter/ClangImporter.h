@@ -54,6 +54,9 @@ public:
   ///
   /// \param moduleCachePath The module cache path.
   ///
+  /// \param swiftRuntimeIncludePath The /path/to/lib/swift. Can be empty if
+  /// \c overrideResourceDir is set instead.
+  ///
   /// \param importSearchPaths Additional paths to search for user modules.
   ///
   /// \param frameworkSearchPaths Additional paths to search for user
@@ -62,13 +65,14 @@ public:
   /// \param overrideResourceDir If nonempty, the path to use to locate the
   /// resources for Clang.  This should at least have an include/ subdirectory
   /// containing Clang's built-in headers.  The default (empty) argument causes
-  /// this function to assume the common case, where the current executable is
-  /// in the bin/ directory of a regular Swift build tree.
+  /// this function to assume that the headers are inside the
+  /// \c swiftRuntimeIncludePath.
   ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static ClangImporter *create(ASTContext &ctx, StringRef sdkroot,
                                StringRef targetTriple,
+                               StringRef swiftRuntimeIncludePath,
                                StringRef moduleCachePath,
                                ArrayRef<std::string> importSearchPaths = {},
                                ArrayRef<std::string> frameworkSearchPaths = {},
