@@ -25,8 +25,6 @@ using namespace swift;
 using namespace Lowering;
 
 namespace {
-
-class CallEmission;
   
 /// Abstractly represents a callee, and knows how to emit the entry point
 /// reference for a callee at any valid uncurry level.
@@ -87,7 +85,8 @@ private:
   // The pointer back to the AST node that produced the callee.
   SILLocation Loc;
 
-  static SpecializedEmitter getSpecializedEmitterForSILBuiltin(SILDeclRef c);
+  static SpecializedEmitter getSpecializedEmitterForSILBuiltin(SILDeclRef c,
+                                                               SILModule &M);
 
   Callee(ManagedValue indirectValue)
     : kind(Kind::IndirectValue),
@@ -413,7 +412,8 @@ public:
   /// Return a specialized emission function if this is a function with a known
   /// lowering, such as a builtin, or return null if there is no specialized
   /// emitter.
-  SpecializedEmitter getSpecializedEmitter(unsigned uncurryLevel) const {
+  SpecializedEmitter getSpecializedEmitter(unsigned uncurryLevel,
+                                           SILModule &SILM) const {
     // Currently we have no curried known functions.
     if (uncurryLevel != 0)
       return nullptr;
@@ -421,7 +421,7 @@ public:
     switch (kind) {
     case Kind::StandaloneFunction: {
       if (SpecializedEmitter e
-            = getSpecializedEmitterForSILBuiltin(standaloneFunction))
+            = getSpecializedEmitterForSILBuiltin(standaloneFunction, SILM))
         return e;
       SWIFT_FALLTHROUGH;
     }
@@ -882,7 +882,7 @@ namespace {
       // Get either the specialized emitter for a known function, or the
       // function value for a normal callee.
       Callee::SpecializedEmitter specializedEmitter
-        = callee.getSpecializedEmitter(uncurryLevel);
+        = callee.getSpecializedEmitter(uncurryLevel, gen.SGM.M);
 
       ManagedValue calleeValue;
       OwnershipConventions ownership;
@@ -1232,7 +1232,8 @@ namespace {
   }
 
   Callee::SpecializedEmitter
-  Callee::getSpecializedEmitterForSILBuiltin(SILDeclRef function) {
+  Callee::getSpecializedEmitterForSILBuiltin(SILDeclRef function,
+                                             SILModule &SILM) {
     // Filter out non-function members and non-builtin modules.
 
     if (function.kind != SILDeclRef::Kind::Func)
@@ -1244,15 +1245,13 @@ namespace {
     
     if (!isa<BuiltinModule>(decl->getDeclContext()))
       return nullptr;
-    
-    SmallVector<Type, 2> types;
-    StringRef name =
-      getBuiltinBaseName(decl->getASTContext(), decl->getName().str(), types);
+
+    const BuiltinInfo &Builtin = SILM.getBuiltinInfo(cast<FuncDecl>(decl));
 
     // Match SIL builtins to their emitters.
     #define BUILTIN(Id, Name, Attrs)
     #define BUILTIN_SIL_OPERATION(Id, Name, Overload) \
-      if (name.equals(Name)) \
+      if (Builtin.ID == BuiltinValueKind::Id) \
         return &emitBuiltin##Id;
 
     #include "swift/AST/Builtins.def"
