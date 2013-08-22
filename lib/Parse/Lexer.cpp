@@ -991,7 +991,7 @@ void Lexer::lexCharacterLiteral() {
   }
 
   if (*CurPtr != '\'') {
-    diagnose(TokStart, diag::lex_invalid_character_literal);
+    diagnose(TokStart, diag::lex_unterminated_character_literal);
     return formToken(tok::unknown, TokStart);
   }
   ++CurPtr;
