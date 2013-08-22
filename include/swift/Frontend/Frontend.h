@@ -68,6 +68,10 @@ class CompilerInvocation {
 public:
   CompilerInvocation();
 
+  /// \brief Initializes the compiler invocation for the list of arguments.
+  /// \returns true if there was an error, false on success.
+  bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags);
+
   void setTargetTriple(StringRef Triple) {
     TargetTriple = Triple.str();
   }
