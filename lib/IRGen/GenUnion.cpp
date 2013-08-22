@@ -70,6 +70,7 @@ namespace {
       initialize(IGF, params, dest);
     }
 
+    /// Emit the constructor function for a union case.
     virtual void emitInjectionFunctionBody(IRGenFunction &IGF,
                                            UnionElementDecl *elt,
                                            Explosion &params) const = 0;
@@ -180,7 +181,7 @@ namespace {
     }
   };
 
-  /// A UnionTypeInfo implementation which has a single case with a payload, and
+  /// A UnionTypeInfo implementation which has a single case with a payload and
   /// one or more additional no-payload cases.
   class SinglePayloadUnionTypeInfo : public PayloadUnionTypeInfoBase {
     UnionElementDecl *PayloadElement = nullptr;
@@ -656,11 +657,63 @@ namespace {
       }
     }
     
+  private:
+    static APInt getAPIntFromBitVector(const llvm::BitVector &bits) {
+      SmallVector<llvm::integerPart, 2> parts;
+      
+      for (unsigned i = 0; i < bits.size();) {
+        llvm::integerPart part = 0UL;
+        for (llvm::integerPart bit = 1; bit != 0 && i < bits.size();
+             ++i, bit <<= 1) {
+          if (bits[i])
+            part |= bit;
+        }
+        parts.push_back(part);
+      }
+      
+      return APInt(bits.size(), parts);
+    }
+  public:
+    
     void emitProject(IRGenFunction &IGF,
                      Explosion &inValue,
                      UnionElementDecl *theCase,
                      Explosion &out) const override {
+      auto foundPayload = std::find_if(PayloadCases.begin(), PayloadCases.end(),
+        [&](const std::pair<UnionElementDecl*, const FixedTypeInfo*> &e) {
+          return e.first == theCase;
+        });
+      
+      // Non-payload cases project to an empty explosion.
+      if (foundPayload == PayloadCases.end()) {
+        inValue.claimAll();
+        return;
+      }
+      
+      llvm::Value *payload = inValue.claimNext();
+      // We don't need the tag bits.
+      if (ExtraTagBitCount > 0)
+        inValue.claimNext();
+      
+      // If we have spare bits, we have to mask out any set tag bits packed
+      // there.
+      if (CommonSpareBits.any()) {
+        unsigned spareBitCount = CommonSpareBits.count();
+        unsigned payloadTag = foundPayload - PayloadCases.begin();
+        if (spareBitCount < 32)
+          payloadTag &= (1U << spareBitCount) - 1U;
+        if (payloadTag != 0) {
+          APInt mask = ~getAPIntFromBitVector(CommonSpareBits);
+          auto maskVal = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
+                                                mask);
+          payload = IGF.Builder.CreateAnd(payload, maskVal);
+        }
+      }
+      
+      // Unpack the payload.
       // FIXME
+      auto &loadablePayloadTI = cast<LoadableTypeInfo>(*foundPayload->second);
+      loadablePayloadTI.unpackUnionPayload(IGF, payload, out, 0);
     }
     
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,

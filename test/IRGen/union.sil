@@ -471,9 +471,9 @@ union MultiPayloadNoSpareBits {
 sil @multi_payload_no_spare_bits_switch : $(MultiPayloadNoSpareBits) -> () {
 entry(%u : $MultiPayloadNoSpareBits):
 // CHECK:   switch i2 %1, label %[[UNREACHABLE:[0-9]+]] [
-// CHECK:     i2 0, label %[[X_DEST:[0-9]+]]
-// CHECK:     i2 1, label %[[Y_DEST:[0-9]+]]
-// CHECK:     i2 -2, label %[[Z_DEST:[0-9]+]]
+// CHECK:     i2 0, label %[[X_PREDEST:[0-9]+]]
+// CHECK:     i2 1, label %[[Y_PREDEST:[0-9]+]]
+// CHECK:     i2 -2, label %[[Z_PREDEST:[0-9]+]]
 // CHECK:     i2 -1, label %[[EMPTY:[0-9]+]]
 // CHECK:   ]
 // CHECK: ; <label>:[[EMPTY]]
@@ -486,20 +486,32 @@ entry(%u : $MultiPayloadNoSpareBits):
 // CHECK:   unreachable
   switch_union %u : $MultiPayloadNoSpareBits, case #MultiPayloadNoSpareBits.x!unionelt.1: x_dest, case #MultiPayloadNoSpareBits.y!unionelt.1: y_dest, case #MultiPayloadNoSpareBits.z!unionelt.1: z_dest, case #MultiPayloadNoSpareBits.a!unionelt: a_dest, case #MultiPayloadNoSpareBits.b!unionelt: b_dest, case #MultiPayloadNoSpareBits.c!unionelt: c_dest
 
+// CHECK: ; <label>:[[X_PREDEST]]
+// CHECK:   br label %[[X_DEST:[0-9]+]]
+// CHECK: ; <label>:[[Y_PREDEST]]
+// CHECK:   [[Y_VALUE:%.*]] = trunc i64 %0 to i32
+// CHECK:   br label %[[Y_DEST:[0-9]+]]
+// CHECK: ; <label>:[[Z_PREDEST]]
+// CHECK:   [[Z_VALUE:%.*]] = trunc i64 %0 to i63
+// CHECK:   br label %[[Z_DEST:[0-9]+]]
+
 // CHECK: ; <label>:[[X_DEST]]
-x_dest:
+// CHECK:   phi i64 [ %0, %[[X_PREDEST]] ]
+x_dest(%x : $Builtin.Int64):
   %a = function_ref @a : $[thin] () -> ()
   apply %a() : $[thin] () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
-y_dest:
+// CHECK:   phi i32 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
+y_dest(%y : $Builtin.Int32):
   %b = function_ref @b : $[thin] () -> ()
   apply %b() : $[thin] () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
-z_dest:
+// CHECK:   phi i63 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
+z_dest(%z : $Builtin.Int63):
   %c = function_ref @c : $[thin] () -> ()
   apply %c() : $[thin] () -> ()
   br end
@@ -523,8 +535,8 @@ c_dest:
   br end
 
 end:
-  %x = tuple ()
-  return %x : $()
+  %v = tuple ()
+  return %v : $()
 }
 
 
@@ -547,9 +559,9 @@ entry(%u : $MultiPayloadOneSpareBit):
 // CHECK:   [[EXTRA_TAG:%.*]] = shl i2 [[EXTRA_TAG_ZEXT]], 1
 // CHECK:   [[TAG:%.*]] = or i2 [[SPARE_TAG]], [[EXTRA_TAG]]
 // CHECK:   switch i2 [[TAG]], label %[[UNREACHABLE:[0-9]+]] [
-// CHECK:     i2 0, label %[[X_DEST:[0-9]+]]
-// CHECK:     i2 1, label %[[Y_DEST:[0-9]+]]
-// CHECK:     i2 -2, label %[[Z_DEST:[0-9]+]]
+// CHECK:     i2 0, label %[[X_PREDEST:[0-9]+]]
+// CHECK:     i2 1, label %[[Y_PREDEST:[0-9]+]]
+// CHECK:     i2 -2, label %[[Z_PREDEST:[0-9]+]]
 // CHECK:     i2 -1, label %[[EMPTY_DEST:[0-9]+]]
 // CHECK:   ]
 
@@ -567,20 +579,35 @@ entry(%u : $MultiPayloadOneSpareBit):
 // CHECK:   unreachable
   switch_union %u : $MultiPayloadOneSpareBit, case #MultiPayloadOneSpareBit.x!unionelt.1: x_dest, case #MultiPayloadOneSpareBit.y!unionelt.1: y_dest, case #MultiPayloadOneSpareBit.z!unionelt.1: z_dest, case #MultiPayloadOneSpareBit.a!unionelt: a_dest, case #MultiPayloadOneSpareBit.b!unionelt: b_dest, case #MultiPayloadOneSpareBit.c!unionelt: c_dest
 
+// CHECK: ; <label>:[[X_PREDEST]]
+// CHECK:   [[X_VALUE:%.*]] = trunc i64 %0 to i62
+// CHECK:   br label %[[X_DEST:[0-9]+]]
+// CHECK: ; <label>:[[Y_PREDEST]]
+// --                                    0x7FFF_FFFF_FFFF_FFFF
+// CHECK:   [[Y_MASKED:%.*]] = and i64 %0, 9223372036854775807
+// CHECK:   [[Y_VALUE:%.*]] = trunc i64 [[Y_MASKED]] to i63
+// CHECK:   br label %[[Y_DEST:[0-9]+]]
+// CHECK: ; <label>:[[Z_PREDEST]]
+// CHECK:   [[Z_VALUE:%.*]] = trunc i64 %0 to i61
+// CHECK:   br label %[[Z_DEST:[0-9]+]]
+
 // CHECK: ; <label>:[[X_DEST]]
-x_dest:
+// CHECK:   phi i62 [ [[X_VALUE]], %[[X_PREDEST]] ]
+x_dest(%x : $Builtin.Int62):
   %a = function_ref @a : $[thin] () -> ()
   apply %a() : $[thin] () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
-y_dest:
+// CHECK:   phi i63 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
+y_dest(%y : $Builtin.Int63):
   %b = function_ref @b : $[thin] () -> ()
   apply %b() : $[thin] () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
-z_dest:
+// CHECK:   phi i61 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
+z_dest(%z : $Builtin.Int61):
   %c = function_ref @c : $[thin] () -> ()
   apply %c() : $[thin] () -> ()
   br end
@@ -604,8 +631,8 @@ c_dest:
   br end
 
 end:
-  %x = tuple ()
-  return %x : $()
+  %v = tuple ()
+  return %v : $()
 }
 
 
@@ -624,9 +651,9 @@ entry(%u : $MultiPayloadTwoSpareBits):
 // CHECK:   [[TAG_LSHR:%.*]] = lshr i64 %0, 62
 // CHECK:   [[TAG:%.*]] = trunc i64 [[TAG_LSHR]] to i2
 // CHECK:   switch i2 [[TAG]], label %[[UNREACHABLE:[0-9]+]] [
-// CHECK:     i2 0, label %[[X_DEST:[0-9]+]]
-// CHECK:     i2 1, label %[[Y_DEST:[0-9]+]]
-// CHECK:     i2 -2, label %[[Z_DEST:[0-9]+]]
+// CHECK:     i2 0, label %[[X_PREDEST:[0-9]+]]
+// CHECK:     i2 1, label %[[Y_PREDEST:[0-9]+]]
+// CHECK:     i2 -2, label %[[Z_PREDEST:[0-9]+]]
 // CHECK:     i2 -1, label %[[EMPTY_DEST:[0-9]+]]
 // CHECK:   ]
 // CHECK: ; <label>:[[EMPTY_DEST]]
@@ -642,20 +669,39 @@ entry(%u : $MultiPayloadTwoSpareBits):
 // CHECK:   unreachable
   switch_union %u : $MultiPayloadTwoSpareBits, case #MultiPayloadTwoSpareBits.x!unionelt.1: x_dest, case #MultiPayloadTwoSpareBits.y!unionelt.1: y_dest, case #MultiPayloadTwoSpareBits.z!unionelt.1: z_dest, case #MultiPayloadTwoSpareBits.a!unionelt: a_dest, case #MultiPayloadTwoSpareBits.b!unionelt: b_dest, case #MultiPayloadTwoSpareBits.c!unionelt: c_dest
 
+// CHECK: ; <label>:[[X_PREDEST]]
+// CHECK:   [[X_VALUE:%.*]] = trunc i64 %0 to i62
+// CHECK:   br label %[[X_DEST:[0-9]+]]
+
+// CHECK: ; <label>:[[Y_PREDEST]]
+// --                                    0x3FFF_FFFF_FFFF_FFFF
+// CHECK:   [[Y_MASKED:%.*]] = and i64 %0, 4611686018427387903
+// CHECK:   [[Y_VALUE:%.*]] = trunc i64 [[Y_MASKED]] to i60
+// CHECK:   br label %[[Y_DEST:[0-9]+]]
+
+// CHECK: ; <label>:[[Z_PREDEST]]
+// --                                    0x3FFF_FFFF_FFFF_FFFF
+// CHECK:   [[Z_MASKED:%.*]] = and i64 %0, 4611686018427387903
+// CHECK:   [[Z_VALUE:%.*]] = trunc i64 [[Z_MASKED]] to i61
+// CHECK:   br label %[[Z_DEST:[0-9]+]]
+
 // CHECK: ; <label>:[[X_DEST]]
-x_dest:
+// CHECK:   phi i62 [ [[X_VALUE]], %[[X_PREDEST]] ]
+x_dest(%x : $Builtin.Int62):
   %a = function_ref @a : $[thin] () -> ()
   apply %a() : $[thin] () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
-y_dest:
+// CHECK:   phi i60 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
+y_dest(%y : $Builtin.Int60):
   %b = function_ref @b : $[thin] () -> ()
   apply %b() : $[thin] () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
-z_dest:
+// CHECK:   phi i61 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
+z_dest(%z : $Builtin.Int61):
   %c = function_ref @c : $[thin] () -> ()
   apply %c() : $[thin] () -> ()
   br end
@@ -679,8 +725,8 @@ c_dest:
   br end
 
 end:
-  %x = tuple ()
-  return %x : $()
+  %v = tuple ()
+  return %v : $()
 }
 
 
