@@ -934,8 +934,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // them.
     Name = "<tuple>";
     // We could use the mangled Name instead of emitting the typ, but no:
-    // FIXME: getMangledName(DbgTy.CanTy) crashes if one of the elements
-    // is an ArcheType.
+    // FIXME: getMangledName(DbgTy.Ty->getCanonicalType()) crashes if
+    // one of the elements is an ArcheType.
     return DBuilder.
       createStructType(Scope, Name,
                        File, 0,
