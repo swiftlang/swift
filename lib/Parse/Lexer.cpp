@@ -1112,7 +1112,7 @@ void Lexer::lexStringLiteral() {
     }
 
     // String literals cannot have \n or \r in them.
-    if (*CurPtr == '\r' || *CurPtr == '\n') {
+    if (*CurPtr == '\r' || *CurPtr == '\n' || CurPtr == BufferEnd) {
       diagnose(TokStart, diag::lex_unterminated_string);
       return formToken(tok::unknown, TokStart);
     }
