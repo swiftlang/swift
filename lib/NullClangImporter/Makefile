@@ -1,4 +1,4 @@
-##===- lib/Makefile ----------------------------------------*- Makefile -*-===##
+##===- swift/lib/NullClangImporter/Makefile ----------------*- Makefile -*-===##
 # 
 # This source file is part of the Swift.org open source project
 #
@@ -9,9 +9,10 @@
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 ##===----------------------------------------------------------------------===##
-SWIFT_LEVEL := ..
 
-PARALLEL_DIRS = Basic AST Sema Parse SIL SILGen SILPasses IRGen ClangImporter \
-                NullClangImporter Serialization IDE Frontend
+SWIFT_LEVEL := ../..
+include $(SWIFT_LEVEL)/../../Makefile.config
+
+LIBRARYNAME := swiftNullClangImporter
 
 include $(SWIFT_LEVEL)/Makefile

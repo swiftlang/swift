@@ -46,6 +46,10 @@ using clang::CompilerInvocation;
 // Dummy function used with dladdr.
 void swift_clang_importer() { }
 
+ClangImporterCtorTy swift::getClangImporterCtor() {
+  return &ClangImporter::create;
+}
+
 #pragma mark Internal data structures
 namespace {
   class SwiftModuleLoaderAction : public clang::SyntaxOnlyAction {

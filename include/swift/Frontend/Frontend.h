@@ -65,9 +65,6 @@ class CompilerInvocation {
 
   bool DelayedFunctionBodyParsing = false;
 
-  typedef decltype(&ClangImporter::create) ClangImporterCtorTy;
-  ClangImporterCtorTy ImporterCtor = nullptr;
-
 public:
   CompilerInvocation();
 
@@ -114,14 +111,7 @@ public:
   }
 
   void setSDKPath(const std::string &Path) {
-    // Capture the clang importer entrypoint here, so that clients that don't
-    // want to link in clang don't have to.
-    ImporterCtor = &ClangImporter::create;
     SDKPath = Path;
-  }
-
-  ClangImporterCtorTy getClangImporterCtor() {
-    return ImporterCtor;
   }
 
   StringRef getSDKPath() const {

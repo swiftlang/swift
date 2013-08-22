@@ -67,7 +67,6 @@ public:
   ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
-  LLVM_ATTRIBUTE_WEAK
   static ClangImporter *create(ASTContext &ctx, StringRef sdkroot,
                                StringRef targetTriple,
                                StringRef moduleCachePath,
@@ -159,6 +158,9 @@ public:
 
   clang::TargetInfo &getTargetInfo() const;
 };
+
+typedef decltype(&ClangImporter::create) ClangImporterCtorTy;
+ClangImporterCtorTy getClangImporterCtor();
 
 }
 

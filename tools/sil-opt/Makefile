@@ -20,7 +20,9 @@ TOOLNAME = sil-opt
 include $(SWIFT_LEVEL)/../../Makefile.config
 
 LINK_COMPONENTS := option bitreader
-USEDLIBS = swiftFrontend.a swiftParse.a swiftSema.a swiftSerialization.a swiftSIL.a swiftSILGen.a swiftSILPassesUtils.a swiftSILPasses.a swiftAST.a swiftBasic.a
+USEDLIBS = swiftFrontend.a swiftParse.a swiftSema.a swiftSerialization.a \
+           swiftSIL.a swiftSILGen.a swiftSILPassesUtils.a swiftSILPasses.a \
+           swiftAST.a swiftBasic.a swiftNullClangImporter.a
 
 LLVMLibsOptions :=     \
   $(LLVMLibsOptions)  

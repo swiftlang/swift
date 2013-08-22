@@ -47,7 +47,7 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   // If the user has specified an SDK, wire up the Clang module importer
   // and point it at that SDK.
   if (!Invocation.getSDKPath().empty()) {
-    auto ImporterCtor = Invocation.getClangImporterCtor();
+    auto ImporterCtor = swift::getClangImporterCtor();
     if (!ImporterCtor) {
       Diagnostics.diagnose(SourceLoc(),
                            diag::error_clang_importer_not_linked_in);
