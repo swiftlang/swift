@@ -1495,11 +1495,8 @@ public:
   /// getDeclaredType - Retrieve the type declared by this entity.
   Type getDeclaredType() const { return DeclaredTy; }
 
-  // Set the declared type of this type.
-  void setDeclaredType(Type DT) {
-    assert(!DeclaredTy && "Already set declared type");
-    DeclaredTy = DT;
-  }
+  /// Compute the type (and declared type) of this nominal type.
+  void computeType();
 
   Type getDeclaredTypeInContext();
 

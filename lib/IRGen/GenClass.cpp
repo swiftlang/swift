@@ -1186,9 +1186,7 @@ ClassDecl *IRGenModule::getSwiftRootClass() {
                                            MutableArrayRef<TypeLoc>(),
                                            /*generics*/ nullptr,
                                            Context.TheBuiltinModule);
-  auto declaredType = ClassType::get(SwiftRootClass, Type(), Context);
-  SwiftRootClass->setDeclaredType(declaredType);
-  SwiftRootClass->setType(MetaTypeType::get(declaredType, Context));
+  SwiftRootClass->computeType();
   SwiftRootClass->getMutableAttrs().ObjC = true;
   SwiftRootClass->setIsObjC(true);
   return SwiftRootClass;

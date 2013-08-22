@@ -774,11 +774,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::STRUCT_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    TypeID declaredTypeID;
     bool isImplicit;
 
     decls_block::StructLayout::readRecord(scratch, nameID, contextID,
-                                          declaredTypeID, isImplicit);
+                                          isImplicit);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -794,20 +793,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       DidRecord.reset();
     }
 
-    // Set up the type of the struct.
-    auto declaredType = getType(declaredTypeID);
-    if (!declaredType) {
-      error();
-      return nullptr;
-    }
-    theStruct->setDeclaredType(declaredType);
-    theStruct->setType(MetaTypeType::get(declaredType, ctx));
-
     if (isImplicit)
       theStruct->setImplicit();
     if (genericParams)
       for (auto &genericParam : *theStruct->getGenericParams())
         genericParam.getAsTypeParam()->setDeclContext(theStruct);
+
+    theStruct->computeType();
 
     CanType canTy = theStruct->getDeclaredTypeInContext()->getCanonicalType();
 
@@ -1020,12 +1012,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::PROTOCOL_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    TypeID declaredTypeID;
     bool isImplicit, isClassProtocol, isObjC;
     ArrayRef<uint64_t> protocolIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
-                                            declaredTypeID,
                                             isImplicit, isClassProtocol, isObjC,
                                             protocolIDs);
 
@@ -1036,19 +1026,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto proto = new (ctx) ProtocolDecl(DC, SourceLoc(), SourceLoc(),
                                         getIdentifier(nameID), { });
     declOrOffset = proto;
+    proto->computeType();
+
     if (DidRecord) {
       (*DidRecord)(proto);
       DidRecord.reset();
     }
 
-    // Set up the type of the protocol.
-    auto declaredType = getType(declaredTypeID);
-    if (!declaredType) {
-      error();
-      return nullptr;
-    }
-    proto->setDeclaredType(declaredType);
-    proto->setType(MetaTypeType::get(declaredType, ctx));
 
     if (isImplicit)
       proto->setImplicit();
@@ -1127,12 +1111,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::CLASS_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    TypeID declaredTypeID;
     bool isImplicit, isObjC;
     TypeID superclassID;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
-                                         declaredTypeID, isImplicit, isObjC,
-                                         superclassID);
+                                         isImplicit, isObjC, superclassID);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1148,15 +1130,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       DidRecord.reset();
     }
 
-    // Set up the type of the union.
-    auto declaredType = getType(declaredTypeID);
-    if (!declaredType) {
-      error();
-      return nullptr;
-    }
-    theClass->setDeclaredType(declaredType);
-    theClass->setType(MetaTypeType::get(declaredType, ctx));
-
     if (isImplicit)
       theClass->setImplicit();
     if (superclassID)
@@ -1165,6 +1138,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       for (auto &genericParam : *theClass->getGenericParams())
         genericParam.getAsTypeParam()->setDeclContext(theClass);
     theClass->setIsObjC(isObjC);
+    theClass->computeType();
 
     CanType canTy = theClass->getDeclaredTypeInContext()->getCanonicalType();
 
@@ -1184,11 +1158,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::UNION_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    TypeID declaredTypeID;
     bool isImplicit;
 
     decls_block::UnionLayout::readRecord(scratch, nameID, contextID,
-                                         declaredTypeID, isImplicit);
+                                         isImplicit);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1209,21 +1182,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       DidRecord.reset();
     }
 
-    // Set up the type of the union.
-    auto declaredType = getType(declaredTypeID);
-    if (!declaredType) {
-      error();
-      return nullptr;
-    }
-    theUnion->setDeclaredType(declaredType);
-    theUnion->setType(MetaTypeType::get(declaredType, ctx));
-
     if (isImplicit)
       theUnion->setImplicit();
     if (genericParams)
       for (auto &genericParam : *theUnion->getGenericParams())
         genericParam.getAsTypeParam()->setDeclContext(theUnion);
 
+    theUnion->computeType();
     CanType canTy = theUnion->getDeclaredTypeInContext()->getCanonicalType();
 
     SmallVector<ConformancePair, 16> conformances;

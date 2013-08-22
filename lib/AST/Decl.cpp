@@ -467,6 +467,24 @@ Type TypeDecl::getDeclaredType() const {
   return cast<NominalTypeDecl>(this)->getDeclaredType();
 }
 
+void NominalTypeDecl::computeType() {
+  assert(!hasType() && "Nominal type declaration already has a type");
+
+  // Compute the declared type.
+  Type parentTy = getDeclContext()->getDeclaredTypeInContext();
+  ASTContext &ctx = getASTContext();
+  if (getGenericParams()) {
+    DeclaredTy = UnboundGenericType::get(this, parentTy, ctx);
+  } else if (auto proto = dyn_cast<ProtocolDecl>(this)) {
+    DeclaredTy = new (ctx, AllocationArena::Permanent) ProtocolType(proto, ctx);
+  } else {
+    DeclaredTy = NominalType::get(this, parentTy, ctx);
+  }
+
+  // Set the type.
+  setType(MetaTypeType::get(DeclaredTy, ctx));
+}
+
 Type NominalTypeDecl::getDeclaredTypeInContext() {
   if (DeclaredTyInContext)
     return DeclaredTyInContext;

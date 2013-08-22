@@ -384,26 +384,6 @@ namespace {
       return constructor;
     }
 
-    /// Sets the type of a struct.
-    void setNominalType(NominalTypeDecl *nominal) {
-      auto parentTy = nominal->getDeclContext()->getDeclaredTypeInContext();
-
-      Type declaredType;
-      if (auto structDecl = dyn_cast<StructDecl>(nominal)) {
-        declaredType = StructType::get(structDecl, parentTy, Impl.SwiftContext);
-      } else if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-        declaredType = ClassType::get(classDecl, parentTy, Impl.SwiftContext);
-      } else if (auto unionDecl = dyn_cast<UnionDecl>(nominal)) {
-        declaredType = UnionType::get(unionDecl, parentTy, Impl.SwiftContext);
-      } else if (auto protocolDecl = dyn_cast<ProtocolDecl>(nominal)) {
-        declaredType = ProtocolType::get(protocolDecl, Impl.SwiftContext);
-      } else {
-        llvm_unreachable("Unhandled nominal type?");
-      }
-      nominal->setDeclaredType(declaredType);
-      nominal->setType(MetaTypeType::get(declaredType, Impl.SwiftContext));
-    }
-
     Decl *VisitEnumDecl(const clang::EnumDecl *decl) {
       decl = decl->getDefinition();
       if (!decl) {
@@ -437,9 +417,7 @@ namespace {
       case EnumKind::Options: {
         auto structDecl = new (Impl.SwiftContext)
           StructDecl(SourceLoc(), name, SourceLoc(), { }, nullptr, dc);
-
-        // Compute the declared type of this struct.
-        setNominalType(structDecl);
+        structDecl->computeType();
 
         // Compute the underlying type of the enumeration.
         auto underlyingType = Impl.importType(decl->getIntegerType(),
@@ -563,7 +541,7 @@ namespace {
                                  name,
                                  Impl.importSourceLoc(decl->getLocation()),
                                  { }, nullptr, dc);
-      setNominalType(result);
+      result->computeType();
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl->getCanonicalDecl());
 
@@ -2041,9 +2019,9 @@ namespace {
                                    Impl.importSourceLoc(decl->getLocation()),
                                    name,
                                    { });
-      
+      result->computeType();
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-      setNominalType(result);
+
       result->setClangNode(decl->getCanonicalDecl());
       result->setCircularityCheck(CircularityCheck::Checked);
 
@@ -2146,7 +2124,7 @@ namespace {
                                 name,
                                 Impl.importSourceLoc(decl->getLocation()),
                                 { }, nullptr, dc);
-      setNominalType(result);
+      result->computeType();
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl->getCanonicalDecl());
       result->setCircularityCheck(CircularityCheck::Checked);

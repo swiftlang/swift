@@ -1408,24 +1408,7 @@ void TypeChecker::validateTypeDecl(TypeDecl *D) {
     }
 
     // Compute the declared type.
-    Type declaredType;
-    Type parentTy = nominal->getDeclContext()->getDeclaredTypeInContext();
-    if (nominal->getGenericParams()) {
-      declaredType = UnboundGenericType::get(nominal, parentTy, Context);
-    } else if (auto structDecl = dyn_cast<StructDecl>(nominal)) {
-      declaredType = StructType::get(structDecl, parentTy, Context);
-    } else if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-      declaredType = ClassType::get(classDecl, parentTy, Context);
-    } else if (auto unionDecl = dyn_cast<UnionDecl>(nominal)) {
-      declaredType = UnionType::get(unionDecl, parentTy, Context);
-    } else if (auto protocolDecl = dyn_cast<ProtocolDecl>(nominal)) {
-      declaredType = ProtocolType::get(protocolDecl, Context);
-    } else {
-      llvm_unreachable("Unhandled nominal type?");
-    }
-
-    nominal->setDeclaredType(declaredType);
-    nominal->setType(MetaTypeType::get(declaredType, Context));
+    nominal->computeType();
 
     // Now that we have archetypes for our generic parameters (including
     // generic parameters from outer scopes), we can canonicalize our type.
