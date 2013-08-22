@@ -839,7 +839,8 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
     // If this is a "high" UTF-8 character, validate it.
     if ((signed char)(CurPtr[-1]) >= 0) {
       if (isprint(CurPtr[-1]) == 0)
-        diagnose(CharStart, diag::lex_unprintable_ascii_character);
+        if (EmitDiagnostics)
+          diagnose(CharStart, diag::lex_unprintable_ascii_character);
       return CurPtr[-1];
     }
     --CurPtr;
