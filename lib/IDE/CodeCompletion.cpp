@@ -346,7 +346,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
     SuperExpr,
     SuperExprDot,
     TypeSimpleBeginning,
-    TypeIdentifier,
+    TypeIdentifierWithDot,
+    TypeIdentifierWithoutDot,
   };
 
   CompletionKind Kind = CompletionKind::None;
@@ -431,7 +432,8 @@ public:
   void completeExprSuperDot(SuperRefExpr *SRE) override;
 
   void completeTypeSimpleBeginning() override;
-  void completeTypeIdentifier(IdentTypeRepr *ITR) override;
+  void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
+  void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override;
 
   void doneParsing() override;
 
@@ -1029,12 +1031,21 @@ void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeTypeIdentifier(IdentTypeRepr *ITR) {
+void CodeCompletionCallbacksImpl::completeTypeIdentifierWithDot(
+    IdentTypeRepr *ITR) {
   if (!ITR) {
     completeTypeSimpleBeginning();
     return;
   }
-  Kind = CompletionKind::TypeIdentifier;
+  Kind = CompletionKind::TypeIdentifierWithDot;
+  ParsedTypeLoc = TypeLoc(ITR);
+  CurDeclContext = P.CurDeclContext;
+}
+
+void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot(
+    IdentTypeRepr *ITR) {
+  assert(ITR);
+  Kind = CompletionKind::TypeIdentifierWithoutDot;
   ParsedTypeLoc = TypeLoc(ITR);
   CurDeclContext = P.CurDeclContext;
 }
@@ -1103,8 +1114,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::TypeIdentifier: {
+  case CompletionKind::TypeIdentifierWithDot: {
     Lookup.setHaveDot();
+    Lookup.getTypeCompletions(ParsedTypeLoc.getType());
+    break;
+  }
+
+  case CompletionKind::TypeIdentifierWithoutDot: {
     Lookup.getTypeCompletions(ParsedTypeLoc.getType());
     break;
   }

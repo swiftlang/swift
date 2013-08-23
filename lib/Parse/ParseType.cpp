@@ -67,16 +67,9 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   ParserResult<TypeRepr> ty;
   switch (Tok.getKind()) {
   case tok::kw_This:
-  case tok::identifier: {
-    ParserResult<IdentTypeRepr> ITR = parseTypeIdentifier();
-    if (ITR.hasCodeCompletion()) {
-      if (CodeCompletion)
-        CodeCompletion->completeTypeIdentifier(ITR.getPtrOrNull());
-      return makeParserCodeCompletionResult<TypeRepr>();
-    }
-    ty = ITR;
+  case tok::identifier:
+    ty = parseTypeIdentifier();
     break;
-  }
   case tok::kw_protocol:
     ty = parseTypeComposition();
     break;
@@ -213,8 +206,12 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 ///
 ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_This)) {
-    if (Tok.is(tok::code_complete))
+    if (Tok.is(tok::code_complete)) {
+      if (CodeCompletion)
+        CodeCompletion->completeTypeIdentifierWithDot(nullptr);
+
       return makeParserCodeCompletionResult<IdentTypeRepr>();
+    }
 
     diagnose(Tok, diag::expected_identifier_for_type);
     return nullptr;
@@ -246,27 +243,42 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
       if (peekToken().is(tok::code_complete)) {
         Status.setHasCodeCompletion();
-        consumeToken();
-        consumeToken(tok::code_complete);
         break;
       }
       if (peekToken().isNot(tok::kw_metatype)) {
         consumeToken();
         continue;
       }
+    } else if (Tok.is(tok::code_complete)) {
+      Status.setHasCodeCompletion();
+      break;
     }
     break;
   }
 
-  if (ComponentsR.size() == 0)
-    return makeParserResult<IdentTypeRepr>(Status, nullptr);
+  IdentTypeRepr *ITR = nullptr;
+  if (ComponentsR.size() != 0) {
+    // Lookup element #0 through our current scope chains in case it is some thing
+    // local (this returns null if nothing is found).
+    if (auto Entry = lookupInScope(ComponentsR[0].getIdentifier()))
+      ComponentsR[0].setValue(Entry);
 
-  // Lookup element #0 through our current scope chains in case it is some thing
-  // local (this returns null if nothing is found).
-  if (auto Entry = lookupInScope(ComponentsR[0].getIdentifier()))
-    ComponentsR[0].setValue(Entry);
+    ITR = IdentTypeRepr::create(Context, ComponentsR);
+  }
 
-  return makeParserResult(Status, IdentTypeRepr::create(Context, ComponentsR));
+  if (Status.hasCodeCompletion() && CodeCompletion) {
+    if (Tok.isNot(tok::code_complete)) {
+      // We have a dot.
+      consumeToken();
+      consumeToken(tok::code_complete);
+      CodeCompletion->completeTypeIdentifierWithDot(ITR);
+    } else {
+      consumeToken(tok::code_complete);
+      CodeCompletion->completeTypeIdentifierWithoutDot(ITR);
+    }
+  }
+
+  return makeParserResult(Status, ITR);
 }
 
 /// parseTypeComposition
@@ -303,9 +315,6 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
     // Parse the type-identifier.
     ParserResult<IdentTypeRepr> Protocol = parseTypeIdentifier();
     Status |= Protocol;
-    if (Protocol.hasCodeCompletion() && CodeCompletion) {
-      CodeCompletion->completeTypeIdentifier(Protocol.getPtrOrNull());
-    }
     if (Protocol.isNonNull())
       Protocols.push_back(Protocol.get());
   } while (consumeIf(tok::comma));

@@ -70,7 +70,10 @@ public:
   virtual void completeTypeSimpleBeginning() = 0;
 
   /// \brief Complete a given type-identifier after we have consumed the dot.
-  virtual void completeTypeIdentifier(IdentTypeRepr *ITR) = 0;
+  virtual void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) = 0;
+
+  /// \brief Complete a given type-identifier when there is no trailing dot.
+  virtual void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) = 0;
 
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.
