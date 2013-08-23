@@ -525,7 +525,7 @@ namespace {
   };
 
   /// A class for trivial, loadable types.
-  class TrivialTypeLowering : public LoadableTypeLowering {
+  class TrivialTypeLowering final : public LoadableTypeLowering {
   public:
     TrivialTypeLowering(SILType type)
       : LoadableTypeLowering(type, IsTrivial) {}
@@ -686,7 +686,7 @@ namespace {
   };
 
   /// A lowering for loadable but non-trivial tuple types.
-  class LoadableTupleTypeLowering
+  class LoadableTupleTypeLowering final
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
   public:
     LoadableTupleTypeLowering(SILType type,
@@ -702,7 +702,7 @@ namespace {
   };
 
   /// A lowering for loadable but non-trivial struct types.
-  class LoadableStructTypeLowering
+  class LoadableStructTypeLowering final
       : public LoadableAggTypeLowering<LoadableStructTypeLowering, VarDecl*> {
   public:
     LoadableStructTypeLowering(SILType type,
@@ -718,7 +718,7 @@ namespace {
   };
   
   /// A lowering for loadable but non-trivial union types.
-  class LoadableUnionTypeLowering : public LoadableTypeLowering {
+  class LoadableUnionTypeLowering final : public LoadableTypeLowering {
   public:
     /// A non-trivial case of the union.
     class NonTrivialElement {
@@ -888,7 +888,7 @@ namespace {
   /// A class for function types, which currently require a minor hack
   /// to a lack of proper conversions in the AST for thin functions
   /// and CCs.
-  class FunctionTypeLowering : public ReferenceTypeLowering {
+  class FunctionTypeLowering final : public ReferenceTypeLowering {
   public:
     FunctionTypeLowering(SILType type) : ReferenceTypeLowering(type) {}
 
@@ -970,7 +970,7 @@ namespace {
 
   /// A type lowering for [weak] types.  [weak] types are address-only
   /// in memory, but their r-value form is scalar.
-  class WeakTypeLowering : public AddressOnlyTypeLowering {
+  class WeakTypeLowering final : public AddressOnlyTypeLowering {
   public:
     WeakTypeLowering(SILType type) : AddressOnlyTypeLowering(type) {}
 
@@ -1015,7 +1015,7 @@ namespace {
   };
 
   /// A type lowering for [unowned] types.
-  class UnownedTypeLowering : public LoadableTypeLowering {
+  class UnownedTypeLowering final : public LoadableTypeLowering {
   public:
     UnownedTypeLowering(SILType type)
       : LoadableTypeLowering(type, IsNotTrivial) {}
