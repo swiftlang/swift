@@ -9,13 +9,13 @@ union SinglePayloadTrivial {
   case c
 }
 
-sil @destroy_trivial : $[thin] ([byref] SinglePayloadTrivial) -> () {
+sil @destroy_single_trivial : $[thin] ([byref] SinglePayloadTrivial) -> () {
 entry(%u : $*SinglePayloadTrivial):
   destroy_addr %u : $*SinglePayloadTrivial
   %x = tuple ()
   return %x : $()
 }
-// CHECK: define void @destroy_trivial(%O21union_value_semantics20SinglePayloadTrivial*) {
+// CHECK: define void @destroy_single_trivial(%O21union_value_semantics20SinglePayloadTrivial*) {
 // CHECK-NOT: swift_release
 // CHECK:   ret void
 // CHECK: }
@@ -27,13 +27,13 @@ union SinglePayloadNontrivial {
   case c
 }
 
-sil @destroy_nontrivial : $[thin] ([byref] SinglePayloadNontrivial) -> () {
+sil @destroy_single_nontrivial : $[thin] ([byref] SinglePayloadNontrivial) -> () {
 entry(%u : $*SinglePayloadNontrivial):
   destroy_addr %u : $*SinglePayloadNontrivial
   %x = tuple ()
   return %x : $()
 }
-// CHECK: define void @destroy_nontrivial(%O21union_value_semantics23SinglePayloadNontrivial*) {
+// CHECK: define void @destroy_single_nontrivial(%O21union_value_semantics23SinglePayloadNontrivial*) {
 // CHECK: entry:
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics23SinglePayloadNontrivial* %0, i32 0, i32 0
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
@@ -46,6 +46,65 @@ entry(%u : $*SinglePayloadNontrivial):
 // CHECK:   call void @swift_release(%swift.refcounted* [[VALUE]])
 // CHECK:   br label %[[DONE]]
 // CHECK: ; <label>:[[DONE]]
+// CHECK:   ret void
+// CHECK: }
+
+union MultiPayloadTrivial {
+  case payload1(Builtin.Int64)
+  case payload2(Builtin.Int32, Builtin.Int32)
+  case a
+  case b
+  case c
+}
+
+sil @destroy_multi_trivial : $[thin] ([byref] MultiPayloadTrivial) -> () {
+entry(%u : $*MultiPayloadTrivial):
+  destroy_addr %u : $*MultiPayloadTrivial
+  %x = tuple ()
+  return %x : $()
+}
+// CHECK: define void @destroy_multi_trivial(%O21union_value_semantics19MultiPayloadTrivial*) {
+// CHECK: entry:
+// CHECK:   ret void
+// CHECK: }
+
+union MultiPayloadNontrivial {
+  case payload1(Builtin.ObjectPointer)
+  case payload2(Builtin.Int64)
+  case payload3(Builtin.Int64, Builtin.ObjCPointer)
+  case a
+  case b
+  case c
+}
+
+sil @destroy_multi_nontrivial : $[thin] ([byref] MultiPayloadNontrivial) -> () {
+entry(%u : $*MultiPayloadNontrivial):
+  destroy_addr %u : $*MultiPayloadNontrivial
+  %x = tuple ()
+  return %x : $()
+}
+// CHECK: define void @destroy_multi_nontrivial(%O21union_value_semantics22MultiPayloadNontrivial*) {
+// CHECK: entry:
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics22MultiPayloadNontrivial* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD:%.*]] = load i128* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics22MultiPayloadNontrivial* %0, i32 0, i32 1
+// CHECK:   [[TAG:%.*]] = load i2* [[TAG_ADDR]], align 8
+// CHECK:   switch i2 [[TAG]], label %[[END:[0-9]+]] [
+// CHECK:     i2 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
+// CHECK:     i2 -2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[PAYLOAD1_DESTROY]]
+// CHECK:   [[PAYLOAD1_TRUNC:%.*]] = trunc i128 [[PAYLOAD]] to i64
+// CHECK:   [[PAYLOAD1_VAL:%.*]] = inttoptr i64 [[PAYLOAD1_TRUNC]] to %swift.refcounted*
+// CHECK:   call void @swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
+// CHECK:   br label %[[END]]
+// CHECK: ; <label>:[[PAYLOAD3_DESTROY]]
+// CHECK:   [[PAYLOAD3_1_LSHR:%.*]] = lshr i128 [[PAYLOAD]], 64
+// CHECK:   [[PAYLOAD3_1_TRUNC:%.*]] = trunc i128 [[PAYLOAD3_1_LSHR]] to i64
+// CHECK:   [[PAYLOAD3_1_VAL:%.*]] = inttoptr i64 [[PAYLOAD3_1_TRUNC]] to %objc_object*
+// CHECK:   call void @objc_release(%objc_object* [[PAYLOAD3_1_VAL]])
+// CHECK:   br label %[[END]]
+// CHECK: ; <label>:[[END]]
 // CHECK:   ret void
 // CHECK: }
 

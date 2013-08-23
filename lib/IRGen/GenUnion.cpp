@@ -659,6 +659,36 @@ namespace {
       return numCaseBits >= 32
         ? 0x80000000 : 1 << numCaseBits;
     }
+    
+    /// Extract the payload-discriminating tag from a payload and optional
+    /// extra tag value.
+    llvm::Value *extractPayloadTag(IRGenFunction &IGF,
+                                   llvm::Value *payload,
+                                   llvm::Value *extraTagBits) const {
+      unsigned numSpareBits = CommonSpareBits.count();
+      llvm::Value *tag = nullptr;
+      unsigned numTagBits = numSpareBits + ExtraTagBitCount;
+      
+      // Get the tag bits from spare bits, if any.
+      if (numSpareBits > 0) {
+        tag = gatherSpareBits(IGF, payload, numTagBits);
+      }
+      
+      // Get the extra tag bits, if any.
+      if (ExtraTagBitCount > 0) {
+        assert(extraTagBits);
+        if (!tag) {
+          return extraTagBits;
+        } else {
+          extraTagBits = IGF.Builder.CreateZExt(extraTagBits, tag->getType());
+          extraTagBits = IGF.Builder.CreateShl(extraTagBits,
+                                               numTagBits - ExtraTagBitCount);
+          return IGF.Builder.CreateOr(tag, extraTagBits);
+        }
+      }
+      assert(!extraTagBits);
+      return tag;
+    }
 
   public:
     void emitSwitch(IRGenFunction &IGF,
@@ -689,29 +719,14 @@ namespace {
       };
 
       llvm::Value *payload = value.claimNext();
+      llvm::Value *extraTagBits = nullptr;
+      if (ExtraTagBitCount > 0)
+        extraTagBits = value.claimNext();
 
-      // Condense the tag bits.
-      unsigned numSpareBits = CommonSpareBits.count();
-      llvm::Value *tag = nullptr;
-      unsigned numTagBits = numSpareBits + ExtraTagBitCount;
-      
-      // Get the tag bits from spare bits, if any.
-      if (numSpareBits > 0) {
-        tag = gatherSpareBits(IGF, payload, numTagBits);
-      }
-      
-      // Get the extra tag bits, if any.
-      if (ExtraTagBitCount > 0) {
-        llvm::Value *extraTagBits = value.claimNext();
-        if (!tag) {
-          tag = extraTagBits;
-        } else {
-          extraTagBits = IGF.Builder.CreateZExt(extraTagBits, tag->getType());
-          extraTagBits = IGF.Builder.CreateShl(extraTagBits,
-                                               numTagBits - ExtraTagBitCount);
-          tag = IGF.Builder.CreateOr(tag, extraTagBits);
-        }
-      }
+      // Extract and switch on the tag bits.
+      llvm::Value *tag = extractPayloadTag(IGF, payload, extraTagBits);
+      unsigned numTagBits
+        = cast<llvm::IntegerType>(tag->getType())->getBitWidth();
       
       auto *tagSwitch = IGF.Builder.CreateSwitch(tag, unreachableBB,
                                        PayloadCases.size() + NumEmptyElementTags);
@@ -777,8 +792,31 @@ namespace {
       
       return APInt(bits.size(), parts);
     }
-  public:
+
+    void projectPayload(IRGenFunction &IGF,
+                        llvm::Value *payload,
+                        unsigned payloadTag,
+                        const LoadableTypeInfo &payloadTI,
+                        Explosion &out) const {
+      // If we have spare bits, we have to mask out any set tag bits packed
+      // there.
+      if (CommonSpareBits.any()) {
+        unsigned spareBitCount = CommonSpareBits.count();
+        if (spareBitCount < 32)
+          payloadTag &= (1U << spareBitCount) - 1U;
+        if (payloadTag != 0) {
+          APInt mask = ~getAPIntFromBitVector(CommonSpareBits);
+          auto maskVal = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
+                                                mask);
+          payload = IGF.Builder.CreateAnd(payload, maskVal);
+        }
+      }
+      
+      // Unpack the payload.
+      payloadTI.unpackUnionPayload(IGF, payload, out, 0);
+    }
     
+  public:
     void emitProject(IRGenFunction &IGF,
                      Explosion &inValue,
                      UnionElementDecl *theCase,
@@ -799,25 +837,9 @@ namespace {
       if (ExtraTagBitCount > 0)
         inValue.claimNext();
       
-      // If we have spare bits, we have to mask out any set tag bits packed
-      // there.
-      if (CommonSpareBits.any()) {
-        unsigned spareBitCount = CommonSpareBits.count();
-        unsigned payloadTag = foundPayload - PayloadCases.begin();
-        if (spareBitCount < 32)
-          payloadTag &= (1U << spareBitCount) - 1U;
-        if (payloadTag != 0) {
-          APInt mask = ~getAPIntFromBitVector(CommonSpareBits);
-          auto maskVal = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
-                                                mask);
-          payload = IGF.Builder.CreateAnd(payload, maskVal);
-        }
-      }
-      
       // Unpack the payload.
-      // FIXME
-      auto &loadablePayloadTI = cast<LoadableTypeInfo>(*foundPayload->second);
-      loadablePayloadTI.unpackUnionPayload(IGF, payload, out, 0);
+      projectPayload(IGF, payload, foundPayload - PayloadCases.begin(),
+                     cast<LoadableTypeInfo>(*foundPayload->second), out);
     }
     
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
@@ -942,17 +964,82 @@ namespace {
       IGF.emitScalarReturn(result);
     }
     
-  public:
+    void forNontrivialPayloads(IRGenFunction &IGF,
+               llvm::Value *payload, llvm::Value *extraTagBits,
+               std::function<void (Explosion &payloadValue,
+                                   const LoadableTypeInfo &payloadTI)> f) const
+    {
+      auto *endBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+      
+      llvm::Value *tag = extractPayloadTag(IGF, payload, extraTagBits);
+      auto *swi = IGF.Builder.CreateSwitch(tag, endBB);
+      auto *tagTy = cast<llvm::IntegerType>(tag->getType());
+      
+      // Handle nontrivial tags.
+      unsigned tagIndex = 0;
+      for (auto &payloadCasePair : PayloadCases) {
+        auto &payloadTI = cast<LoadableTypeInfo>(*payloadCasePair.second);
+        
+        // Trivial payloads don't need any work.
+        if (payloadTI.isPOD(ResilienceScope::Local)) {
+          ++tagIndex;
+          continue;
+        }
+        
+        // Unpack and handle nontrivial payloads.
+        auto *caseBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+        swi->addCase(llvm::ConstantInt::get(tagTy, tagIndex), caseBB);
+        
+        IGF.Builder.emitBlock(caseBB);
+        Explosion value(ExplosionKind::Minimal);
+        projectPayload(IGF, payload, tagIndex, payloadTI, value);
+        f(value, payloadTI);
+        IGF.Builder.CreateBr(endBB);
+        
+        ++tagIndex;
+      }
+      
+      IGF.Builder.emitBlock(endBB);
+    }
     
+  public:
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
     const override {
-      // FIXME
-      reexplode(IGF, src, dest);
+      if (isPOD(ResilienceScope::Local)) {
+        reexplode(IGF, src, dest);
+        return;
+      }
+      
+      llvm::Value *payload = src.claimNext();
+      llvm::Value *extraTagBits = ExtraTagBitCount > 0
+        ? src.claimNext() : nullptr;
+      
+      forNontrivialPayloads(IGF, payload, extraTagBits,
+                            [&](Explosion &value, const LoadableTypeInfo &ti) {
+                              Explosion tmp(value.getKind());
+                              ti.copy(IGF, value, tmp);
+                              tmp.claimAll();
+                            });
+      
+      dest.add(payload);
+      if (extraTagBits)
+        dest.add(extraTagBits);
     }
     
     void consume(IRGenFunction &IGF, Explosion &src) const override {
-      // FIXME
-      src.claimAll();
+      if (isPOD(ResilienceScope::Local)) {
+        src.claimAll();
+        return;
+      }
+
+      llvm::Value *payload = src.claimNext();
+      llvm::Value *extraTagBits = ExtraTagBitCount > 0
+        ? src.claimNext() : nullptr;
+      
+      forNontrivialPayloads(IGF, payload, extraTagBits,
+                            [&](Explosion &value, const LoadableTypeInfo &ti) {
+                              ti.consume(IGF, value);
+                            });
     }
     
     void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
