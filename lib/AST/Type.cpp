@@ -276,118 +276,19 @@ bool TypeBase::isUnspecializedGeneric() {
   }
 }
 
-/// \brief Gather the type variables in the given type, recursively.
-static void gatherTypeVariables(Type wrappedTy,
-                          SmallVectorImpl<TypeVariableType *> &typeVariables) {
-  auto ty = wrappedTy.getPointer();
-  if (!ty)
-    return;
-
-  switch (ty->getKind()) {
-  case TypeKind::Error:
-  case TypeKind::BuiltinInteger:
-  case TypeKind::BuiltinFloat:
-  case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinObjectPointer:
-  case TypeKind::BuiltinObjCPointer:
-  case TypeKind::BuiltinVector:
-  case TypeKind::NameAlias:
-  case TypeKind::Module:
-  case TypeKind::Protocol:
-  case TypeKind::Archetype:
-  case TypeKind::GenericTypeParam:
-  case TypeKind::AssociatedType:
-  case TypeKind::ProtocolComposition:
-    // None of these types ever have type variables.
-    return;
-
-  case TypeKind::Paren:
-    return gatherTypeVariables(cast<ParenType>(ty)->getUnderlyingType(),
-                               typeVariables);
-
-  case TypeKind::Tuple: {
-    const TupleType *tupleTy = cast<TupleType>(ty);
-    // FIXME: Always walk default arguments.
-    for (const auto &field : tupleTy->getFields()) {
-      gatherTypeVariables(field.getType(), typeVariables);
-    }
-    return;
-  }
-
-  case TypeKind::Union:
-  case TypeKind::Struct:
-  case TypeKind::Class:
-    return gatherTypeVariables(cast<NominalType>(ty)->getParent(),
-                               typeVariables);
-
-  case TypeKind::MetaType:
-    return gatherTypeVariables(cast<MetaTypeType>(ty)->getInstanceType(),
-                               typeVariables);
-
-  case TypeKind::UnownedStorage:
-  case TypeKind::WeakStorage:
-    return gatherTypeVariables(
-                             cast<ReferenceStorageType>(ty)->getReferentType(),
-                               typeVariables);
-
-  case TypeKind::Substituted:
-    return gatherTypeVariables(cast<SubstitutedType>(ty)->getReplacementType(),
-                               typeVariables);
-
-  case TypeKind::Function:
-  case TypeKind::PolymorphicFunction: {
-    auto fnType = cast<AnyFunctionType>(ty);
-    gatherTypeVariables(fnType->getInput(), typeVariables);
-    gatherTypeVariables(fnType->getResult(), typeVariables);
-    return;
-  }
-
-  case TypeKind::Array:
-    return gatherTypeVariables(cast<ArrayType>(ty)->getBaseType(),
-                               typeVariables);
-
-  case TypeKind::ArraySlice:
-  case TypeKind::Optional:
-    gatherTypeVariables(cast<SyntaxSugarType>(ty)->getImplementationType(),
-                        typeVariables);
-    return;
-
-  case TypeKind::LValue:
-    return gatherTypeVariables(cast<LValueType>(ty)->getObjectType(),
-                               typeVariables);
-
-  case TypeKind::UnboundGeneric:
-    return gatherTypeVariables(cast<UnboundGenericType>(ty)->getParent(),
-                               typeVariables);
-
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericUnion:
-  case TypeKind::BoundGenericStruct: {
-    auto boundTy = cast<BoundGenericType>(ty);
-    gatherTypeVariables(boundTy->getParent(), typeVariables);
-    for (auto arg : boundTy->getGenericArgs())
-      gatherTypeVariables(arg, typeVariables);
-    return;
-  }
-
-  case TypeKind::TypeVariable:
-    typeVariables.push_back(cast<TypeVariableType>(ty));
-    return;
-
-  case TypeKind::DependentMember:
-    gatherTypeVariables(cast<DependentMemberType>(ty)->getBase(),
-                        typeVariables);
-    return;
-  }
-
-  llvm_unreachable("Unhandling type kind");
-}
-
 void
 TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
   // If we know we don't have any type variables, we're done.
   if (hasTypeVariable()) {
-    gatherTypeVariables(this, typeVariables);
+    // Use Type::findIf() to walk the types, finding type variables along the
+    // way.
+    getCanonicalType().findIf([&](Type type) -> bool {
+      if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+        typeVariables.push_back(tv);
+      }
+
+      return false;
+    });
     assert(!typeVariables.empty() && "Did not find type variables!");
   }
 }

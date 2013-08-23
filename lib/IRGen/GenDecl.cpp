@@ -564,100 +564,21 @@ static bool isLocalLinkageGenericClause(ArrayRef<GenericParam> params) {
 }
 
 static bool isLocalLinkageType(CanType type) {
-  switch (type->getKind()) {
-  case TypeKind::Error:
-    llvm_unreachable("error type in IRGen");
-  case TypeKind::TypeVariable:
-    llvm_unreachable("type variable in IRgen");
-  case TypeKind::GenericTypeParam:
-  case TypeKind::DependentMember:
-    return false;
-  case TypeKind::MetaType:
-    return isLocalLinkageType(cast<MetaTypeType>(type).getInstanceType());
-  case TypeKind::Module:
-    return false;
-
-  case TypeKind::Archetype:
-    return false;
-
-  // We don't care about these types being a bit verbose because we
-  // don't expect them to come up that often in API names.
-  case TypeKind::BuiltinFloat:
-  case TypeKind::BuiltinInteger:
-  case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinObjectPointer:
-  case TypeKind::BuiltinObjCPointer:
-  case TypeKind::BuiltinVector:
-    return false;
-
-#define SUGARED_TYPE(id, parent)                \
-  case TypeKind::id:                            \
-    llvm_unreachable("type is not canonical!");
-#define TYPE(id, parent)
-#include "swift/AST/TypeNodes.def"
-
-  case TypeKind::LValue:
-    return isLocalLinkageType(cast<LValueType>(type).getObjectType());
-
-  case TypeKind::Tuple: {
-    CanTupleType tuple = cast<TupleType>(type);
-    for (auto fieldType : tuple.getElementTypes()) {
-      if (isLocalLinkageType(fieldType))
-        return true;
+  return type.findIf([](Type type) -> bool {
+    // For any nominal type reference, look at the type declaration.
+    if (auto nominal = type->getAnyNominal()) {
+      return isLocalLinkageDecl(nominal);
     }
-    return false;
-  }
 
-  case TypeKind::UnboundGeneric:
-    return isLocalLinkageDecl(cast<UnboundGenericType>(type)->getDecl());
-
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericUnion:
-  case TypeKind::BoundGenericStruct: {
-    CanBoundGenericType BGT = cast<BoundGenericType>(type);
-    if (isLocalLinkageDecl(BGT->getDecl()))
-      return true;
-    for (Type arg : BGT->getGenericArgs()) {
-      if (isLocalLinkageType(CanType(arg)))
-        return true;
+    // For polymorphic function types, look at the generic parameters.
+    // FIXME: findIf should do this, once polymorphic function types can be
+    // canonicalized and re-formed properly.
+    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(type.getPointer())) {
+      return isLocalLinkageGenericClause(polyFn->getGenericParameters());
     }
+
     return false;
-  }
-
-  case TypeKind::Union:
-  case TypeKind::Struct:
-  case TypeKind::Class:
-  case TypeKind::Protocol:
-    return isLocalLinkageDecl(cast<NominalType>(type)->getDecl());
-
-  case TypeKind::PolymorphicFunction: {
-    auto fn = cast<PolymorphicFunctionType>(type);
-    if (isLocalLinkageGenericClause(fn->getGenericParameters()))
-      return true;
-    SWIFT_FALLTHROUGH;
-  }
-  case TypeKind::Function: {
-    CanAnyFunctionType fn = cast<AnyFunctionType>(type);
-    return isLocalLinkageType(fn.getInput()) ||
-           isLocalLinkageType(fn.getResult());
-  }
-
-  case TypeKind::UnownedStorage:
-  case TypeKind::WeakStorage: {
-    auto ref = cast<ReferenceStorageType>(type);
-    return isLocalLinkageType(ref.getReferentType());
-  }
-
-  case TypeKind::Array:
-    return isLocalLinkageType(cast<ArrayType>(type).getBaseType());
-
-  case TypeKind::ProtocolComposition:
-    for (Type t : cast<ProtocolCompositionType>(type)->getProtocols())
-      if (isLocalLinkageType(CanType(t)))
-        return true;
-    return false;
-  }
-  llvm_unreachable("bad type kind");
+  });
 }
 
 bool LinkEntity::isLocalLinkage() const {
