@@ -1875,7 +1875,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
 
   ParserStatus Status;
 
-  // Parse optional inheritance clause.
+  // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
     ContextChange CC(*this, SD);
     SmallVector<TypeLoc, 2> Inherited;
@@ -1930,7 +1930,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
 
   Identifier ClassName;
   SourceLoc ClassNameLoc;
-  SourceLoc LBLoc, RBLoc;
   if (parseIdentifier(ClassName, ClassNameLoc,
                       diag::expected_identifier_in_decl, "class"))
     return nullptr;
@@ -1946,6 +1945,10 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
                                           { }, GenericParams, CurDeclContext);
 
+  // Attach attributes.
+  if (Attributes.isValid())
+    CD->getMutableAttrs() = Attributes;
+
   // Now that we have a context, update the generic parameters with that
   // context.
   if (GenericParams) {
@@ -1954,33 +1957,30 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
     }
   }
 
-  // Attach attributes.
-  if (Attributes.isValid()) CD->getMutableAttrs() = Attributes;
+  ParserStatus Status;
 
   // Parse optional inheritance clause within the context of the class.
-  SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon)) {
-    ContextChange CC(*this, CD);    
-    parseInheritance(Inherited);
+    ContextChange CC(*this, CD);
+    SmallVector<TypeLoc, 2> Inherited;
+    Status |= parseInheritance(Inherited);
     CD->setInherited(Context.AllocateCopy(Inherited));
   }
 
-  // Parse the class body.
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
-    CD->setMembers({}, Tok.getLoc());
-    return makeParserErrorResult(CD);
-  }
-
-  bool Invalid = false;
-
-  // Parse the body.
   SmallVector<Decl*, 8> MemberDecls;
-  {
+  SourceLoc LBLoc, RBLoc;
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
+    LBLoc = Tok.getLoc();
+    RBLoc = LBLoc;
+    Status.setIsParseError();
+  } else {
+    // Parse the body.
     ContextChange CC(*this, CD);
     Scope S(this, ScopeKind::ClassBody);
-    Invalid |= parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
-                                       diag::expected_rbrace_class,
-                                       PD_HasContainerType|PD_AllowDestructor);
+    if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
+                                diag::expected_rbrace_class,
+                                PD_HasContainerType | PD_AllowDestructor))
+      Status.setIsParseError();
   }
 
   bool hasConstructor = false;
@@ -2013,10 +2013,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
     return makeParserErrorResult(CD);
   }
 
-  if (Invalid)
-    return makeParserErrorResult(CD);
-  else
-    return makeParserResult(CD);
+  return makeParserResult(Status, CD);
 }
 
 /// parseDeclProtocol - Parse a 'protocol' declaration, returning null (and
