@@ -1350,6 +1350,36 @@ void TypeBase::dump() const {
   llvm::errs() << '\n';
 }
 
+namespace {
+  /// Helper wrapper for printing a type that is embedded within a larger type.
+  ///
+  /// This is necessary whenever the inner type may not normally be represented
+  /// as a 'type-simple' production in the type grammar.
+  struct ParensIfNotSimple {
+    Type ty;
+  };
+
+  static inline raw_ostream &operator<<(raw_ostream &OS,
+                                        ParensIfNotSimple wrapper) {
+    if (wrapper.ty.isNull()) {
+      wrapper.ty.print(OS);
+    } else {
+      switch (wrapper.ty->getKind()) {
+      case TypeKind::Array:
+      case TypeKind::ArraySlice:
+      case TypeKind::Function:
+      case TypeKind::PolymorphicFunction:
+        OS << '(' << wrapper.ty << ')';
+        break;
+
+      default:
+        wrapper.ty.print(OS);
+      }
+    }
+    return OS;
+  }
+}
+
 void TypeBase::print(raw_ostream &OS) const {
   switch (getKind()) {
 #define TYPE(id, parent) \
@@ -1433,8 +1463,7 @@ static void printGenericArgs(raw_ostream &OS, ArrayRef<Type> Args) {
 }
 
 void MetaTypeType::print(raw_ostream &OS) const {
-  InstanceType->print(OS);
-  OS << ".metatype";
+  OS << ParensIfNotSimple{InstanceType} << ".metatype";
 }
 
 void ModuleType::print(raw_ostream &OS) const {
@@ -1516,12 +1545,7 @@ void FunctionType::print(raw_ostream &OS) const {
 
   attrs.finish();
   
-  Type inputType = getInput();
-  if (inputType->is<AnyFunctionType>())
-    OS << "(" << inputType << ")";
-  else
-    OS << inputType;
-  OS << " -> " << getResult();
+  OS << ParensIfNotSimple{getInput()} << " -> " << getResult();
 }
 
 void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
@@ -1585,24 +1609,19 @@ void PolymorphicFunctionType::print(raw_ostream &OS) const {
     
   printGenericParams(OS);
 
-  Type inputType = getInput();
-  if (inputType->is<AnyFunctionType>())
-    OS << " (" << inputType << ")";
-  else
-    OS << " " << inputType;
-  OS << " -> " << getResult();
+  OS << ' ' << ParensIfNotSimple{getInput()} << " -> " << getResult();
 }
 
 void ArraySliceType::print(raw_ostream &OS) const {
-  OS << getBaseType() << "[]";
+  OS << ParensIfNotSimple{getBaseType()} << "[]";
 }
 
 void OptionalType::print(raw_ostream &OS) const {
-  OS << getBaseType() << '?';
+  OS << ParensIfNotSimple{getBaseType()} << '?';
 }
 
 void ArrayType::print(raw_ostream &OS) const {
-  OS << Base << '[' << Size << ']';
+  OS << ParensIfNotSimple{Base} << '[' << Size << ']';
 }
 
 void ProtocolType::print(raw_ostream &OS) const {
