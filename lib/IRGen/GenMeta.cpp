@@ -1921,6 +1921,91 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
   var->setInitializer(init);
 }
 
+// Unions
+
+namespace {
+
+class UnionMetadataBuilder : public MetadataLayout<UnionMetadataBuilder> {
+  using super = MetadataLayout<UnionMetadataBuilder>;
+  
+  UnionDecl *const Target;
+  SmallVector<llvm::Constant *, 8> Fields;
+
+public:
+  UnionMetadataBuilder(IRGenModule &IGM, UnionDecl *theUnion)
+    : super(IGM), Target(theUnion) {}
+  
+  void layout() {
+    // Metadata header.
+    super::layout();
+    
+    // UnionMetadata header.
+    addNominalTypeDescriptor();
+    addParentMetadataRef();
+    
+    // If changing this layout, you must update the magic number in
+    // emitParentMetadataRef.
+    
+    // TODO generic parameters
+    //// Instantiation-specific.
+    //if (auto generics = Target->getGenericParamsOfContext()) {
+    //  this->addGenericFields(*generics);
+    //}
+  }
+  
+  void addValueWitnessTable() {
+    auto type = Target->getDeclaredType()->getCanonicalType();
+    Fields.push_back(emitValueWitnessTable(IGM, type));
+  }
+
+  void addMetadataFlags() {
+    Fields.push_back(getMetadataKind(IGM, MetadataKind::Union));
+  }
+  
+  void addNominalTypeDescriptor() {
+    // FIXME!
+    Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+  }
+  
+  void addParentMetadataRef() {
+    // FIXME!
+    Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+  }
+  
+  llvm::Constant *getInit() {
+    return llvm::ConstantStruct::getAnon(Fields);
+  }
+};
+
+}
+
+void irgen::emitUnionMetadata(IRGenModule &IGM, UnionDecl *theUnion) {
+  // TODO: unions nested inside generic types
+  llvm::Constant *init;
+  
+  bool isPattern;
+  if (/*auto *generics = */ theUnion->getGenericParamsOfContext()) {
+    // TODO: generic union metadata
+    return;
+  } else {
+    UnionMetadataBuilder builder(IGM, theUnion);
+    builder.layout();
+    init = builder.getInit();
+    isPattern = false;
+  }
+  
+  // For now, all type metadata is directly stored.
+  bool isIndirect = false;
+  
+  CanType declaredType = theUnion->getDeclaredType()->getCanonicalType();
+  auto var = cast<llvm::GlobalVariable>(
+                              IGM.getAddrOfTypeMetadata(declaredType,
+                                                        isIndirect, isPattern,
+                                                        init->getType()));
+  var->setConstant(!isPattern);
+  var->setInitializer(init);
+}
+
 // Protocols
 
 namespace {

@@ -31,8 +31,10 @@
 #include "swift/Basic/Optional.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalVariable.h"
 
 #include "LoadableTypeInfo.h"
+#include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "GenUnion.h"
@@ -1594,6 +1596,8 @@ static void emitInjectionFunction(IRGenModule &IGM,
 
 /// emitUnionDecl - Emit all the declarations associated with this union type.
 void IRGenModule::emitUnionDecl(UnionDecl *theUnion) {
+  emitUnionMetadata(*this, theUnion);
+  
   // FIXME: This is mostly copy-paste from emitExtension;
   // figure out how to refactor! 
   for (Decl *member : theUnion->getMembers()) {

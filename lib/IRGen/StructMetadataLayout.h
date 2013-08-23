@@ -33,7 +33,7 @@ protected:
   using super::IGM;
   using super::asImpl;
 
-  /// The most-derived class.
+  /// The struct.
   StructDecl *const Target;
 
   StructMetadataLayout(IRGenModule &IGM, StructDecl *target)
