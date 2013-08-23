@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "Scope.h"
 #include "Cleanup.h"
 #include "Initialization.h"
 #include "RValue.h"

@@ -30,7 +30,8 @@ using namespace Lowering;
 //===--------------------------------------------------------------------===//
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
-  : SGM(SGM), F(F), B(new (F.getModule()) SILBasicBlock(&F)),
+  : SGM(SGM), F(F), LastInsnWithoutScope(0),
+    B(new (F.getModule()) SILBasicBlock(&F), &InsertedInstrs),
     CurrentSILLoc(F.getLocation()), Cleanups(*this)
 {
 }

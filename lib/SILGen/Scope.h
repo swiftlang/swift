@@ -17,7 +17,7 @@
 #ifndef SCOPE_H
 #define SCOPE_H
 
-#include "swift/SIL/SILBuilder.h"
+#include "SILGen.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "Cleanup.h"
 
@@ -74,19 +74,19 @@ public:
 
 /// A LexicalScope is a Scope that is also exposed to the debug info.
 class LLVM_LIBRARY_VISIBILITY LexicalScope : private Scope {
-  SILBuilder& Builder;
+  SILGenFunction& SGF;
 public:
   explicit LexicalScope(CleanupManager &Cleanups,
-                        SILBuilder& B,
+                        SILGenFunction& SGF,
                         SILLocation Loc)
-    : Scope(Cleanups), Builder(B) {
-    SILDebugScope *DS = new (B.getFunction().getModule()) SILDebugScope(Loc);
-    Builder.enterDebugScope(DS);
+    : Scope(Cleanups), SGF(SGF) {
+    SILDebugScope *DS = new (SGF.SGM.M) SILDebugScope(Loc);
+    SGF.enterDebugScope(DS);
   }
   using Scope::pop;
 
   ~LexicalScope() {
-    Builder.leaveDebugScope();
+    SGF.leaveDebugScope();
   }
 };
 

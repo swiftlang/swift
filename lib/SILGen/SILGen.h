@@ -16,10 +16,10 @@
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "Condition.h"
-#include "Scope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/Optional.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
@@ -259,6 +259,10 @@ public:
     
   /// The SILFunction being constructed.
   SILFunction &F;
+
+  /// This is used to keep track of all SILInstructions inserted by \c B.
+  SmallVector<SILInstruction*, 32> InsertedInstrs;
+  size_t LastInsnWithoutScope;
   
   /// B - The SILBuilder used to construct the SILFunction.  It is what maintains
   /// the notion of the current block being emitted into.
@@ -272,7 +276,9 @@ public:
   std::vector<JumpDest> BreakDestStack;
   std::vector<JumpDest> ContinueDestStack;
   std::vector<SwitchContext *> SwitchStack;
-  
+  /// Keep track of our current nested scope.
+  std::vector<SILDebugScope*> DebugScopeStack;
+
   /// The cleanup depth and epilog BB for "return" instructions.
   JumpDest ReturnDest;
   /// True if a non-void return is required in this function.
@@ -290,7 +296,7 @@ public:
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
-  
+
   /// A pending writeback.
   struct Writeback {
     SILLocation loc;
@@ -373,6 +379,32 @@ public:
   }
   const TypeLowering &getTypeLowering(SILType type) {
     return SGM.Types.getTypeLowering(type);
+  }
+
+  /// enterDebugScope - Push a new debug scope and set its parent pointer.
+  void enterDebugScope(SILDebugScope *DS) {
+    if (DebugScopeStack.size())
+      DS->setParent(DebugScopeStack.back());
+    else
+      DS->setParent(F.getDebugScope());
+    DebugScopeStack.push_back(DS);
+    setDebugScopeForInsertedInstrs(DS->Parent);
+  }
+
+  /// enterDebugScope - return to the previous debug scope.
+  void leaveDebugScope() {
+    assert(DebugScopeStack.size());
+    setDebugScopeForInsertedInstrs(DebugScopeStack.back());
+    DebugScopeStack.pop_back();
+  }
+
+  /// Set the debug scope for all SILInstructions that where emitted
+  /// from when we entered the last scope up to the current one.
+  void setDebugScopeForInsertedInstrs(SILDebugScope *DS) {
+    while (LastInsnWithoutScope < InsertedInstrs.size()) {
+      InsertedInstrs[LastInsnWithoutScope]->setDebugScope(DS);
+      ++LastInsnWithoutScope;
+    }
   }
 
   //===--------------------------------------------------------------------===//
