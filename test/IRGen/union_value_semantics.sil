@@ -36,14 +36,14 @@ entry(%u : $*SinglePayloadNontrivial):
 // CHECK: define void @destroy_nontrivial(%O21union_value_semantics23SinglePayloadNontrivial*) {
 // CHECK: entry:
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics23SinglePayloadNontrivial* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics23SinglePayloadNontrivial* %0, i32 0, i32 1
 // CHECK:   [[TAG:%.*]] = load i1* [[TAG_ADDR]], align 8
-// CHECK:   [[IS_PAYLOAD:%.*]] = icmp eq i1 [[TAG]], false
-// CHECK:   br i1 [[IS_PAYLOAD]], label %[[DESTROY_PAYLOAD:[0-9]+]], label %[[DONE:[0-9]+]]
-// CHECK: ; <label>:[[DESTROY_PAYLOAD]]
-// CHECK:   [[VALUE_ADDR:%.*]] = bitcast i64* [[PAYLOAD_ADDR]] to %swift.refcounted**
-// CHECK:   [[VALUE:%.*]] = load %swift.refcounted** [[VALUE_ADDR]], align 8
-// CHECK:   call void @swift_release(%swift.refcounted* [[VALUE]]) #0
+// CHECK:   [[HAS_PAYLOAD:%.*]] = icmp eq i1 [[TAG]], false
+// CHECK:   br i1 [[HAS_PAYLOAD]], label %[[RELEASE_PAYLOAD:[0-9]+]], label %[[DONE:[0-9]+]]
+// CHECK: ; <label>:[[RELEASE_PAYLOAD]]
+// CHECK:   [[VALUE:%.*]] = inttoptr i64 [[PAYLOAD]] to %swift.refcounted*
+// CHECK:   call void @swift_release(%swift.refcounted* [[VALUE]])
 // CHECK:   br label %[[DONE]]
 // CHECK: ; <label>:[[DONE]]
 // CHECK:   ret void

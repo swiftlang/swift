@@ -134,46 +134,37 @@ namespace {
       return IGF.Builder.CreateStructGEP(addr, 1, getExtraTagBitOffset());
     }
 
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      // FIXME handle non-trivial payloads
-      dest.add(src.claim(getExplosionSize(ExplosionKind::Minimal)));
-    }
-
-    void consume(IRGenFunction &IGF, Explosion &src) const {
-      // FIXME handle non-trivial payloads
-      src.claim(getExplosionSize(ExplosionKind::Minimal));
-    }
-    
-    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      // FIXME handle non-trivial payloads
-      e.add(IGF.Builder.CreateLoad(projectPayload(IGF, addr)));
-      if (ExtraTagBitCount > 0)
-        e.add(IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr)));
-    }
-    
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
       e.add(IGF.Builder.CreateLoad(projectPayload(IGF, addr)));
       if (ExtraTagBitCount > 0)
         e.add(IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr)));
     }
     
+    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      Explosion tmp(e.getKind());
+      loadAsTake(IGF, addr, tmp);
+      copy(IGF, tmp, e);
+    }
+    
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      // FIXME handle non-trivial payloads
-      IGF.Builder.CreateStore(e.claimNext(), projectPayload(IGF, addr));
-      if (ExtraTagBitCount > 0)
-        IGF.Builder.CreateStore(e.claimNext(), projectExtraTagBits(IGF, addr));
+      Explosion old(e.getKind());
+      if (!isPOD(ResilienceScope::Local))
+        loadAsTake(IGF, addr, old);
+      initialize(IGF, e, addr);
+      if (!isPOD(ResilienceScope::Local))
+        consume(IGF, old);
     }
     
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
-      // FIXME handle non-trivial payloads
-      auto *v = IGF.Builder.CreateLoad(src);
-      IGF.Builder.CreateStore(v, dest);
+      Explosion srcVal(ExplosionKind::Minimal);
+      loadAsCopy(IGF, src, srcVal);
+      assign(IGF, srcVal, dest);
     }
     
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
-      // FIXME handle non-trivial payloads
-      auto *v = IGF.Builder.CreateLoad(src);
-      IGF.Builder.CreateStore(v, dest);
+      Explosion srcVal(ExplosionKind::Minimal);
+      loadAsTake(IGF, src, srcVal);
+      assign(IGF, srcVal, dest);
     }
     
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
@@ -184,6 +175,15 @@ namespace {
     
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       dest.add(src.claim(getExplosionSize(ExplosionKind::Minimal)));
+    }
+    
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      if (isPOD(ResilienceScope::Local))
+        return;
+
+      Explosion val(ExplosionKind::Minimal);
+      loadAsTake(IGF, addr, val);
+      consume(IGF, val);
     }
   };
 
@@ -466,21 +466,20 @@ namespace {
       IGF.emitScalarReturn(unionExplosion);
     }
     
-    void destroy(IRGenFunction &IGF, Address addr) const override {
-      if (isPOD(ResilienceScope::Local))
-        return;
-      
+  private:
+    std::tuple<llvm::BasicBlock *, llvm::Value*, llvm::Value*>
+    testUnionContainsPayload(IRGenFunction &IGF, Explosion &src) const {
       auto *endBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
-      
-      Address payloadAddr = projectPayload(IGF, addr);
 
-      // We only need to invoke the destructor if the union contains a value of
-      // the payload case.
+      llvm::Value *payload = src.claimNext();
+      llvm::Value *extraBits = nullptr;
+
+      // We only need to apply the payload operation if the union contains a
+      // value of the payload case.
       
       // If we have extra tag bits, they will be zero if we contain a payload.
       if (ExtraTagBitCount > 0) {
-        Address extraBitAddr = projectExtraTagBits(IGF, addr);
-        llvm::Value *extraBits = IGF.Builder.CreateLoad(extraBitAddr);
+        extraBits = src.claimNext();
         llvm::Value *zero = llvm::ConstantInt::get(extraBits->getType(), 0);
         llvm::Value *isZero = IGF.Builder.CreateICmp(llvm::CmpInst::ICMP_EQ,
                                                      extraBits, zero);
@@ -497,7 +496,6 @@ namespace {
         = PayloadTypeInfo->getFixedExtraInhabitantCount();
       if (numExtraInhabitants > 0) {
         auto *payloadBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
-        llvm::Value *payload = IGF.Builder.CreateLoad(payloadAddr);
         auto *swi = IGF.Builder.CreateSwitch(payload, payloadBB);
         
         auto elements = PayloadElement->getParentUnion()->getAllElements();
@@ -515,12 +513,54 @@ namespace {
         
         IGF.Builder.emitBlock(payloadBB);
       }
-
-      // We know now we have a valid payload value. Destroy it.
-      Address valueAddr = IGF.Builder.CreateBitCast(payloadAddr,
-                            PayloadTypeInfo->getStorageType()->getPointerTo());
-      PayloadTypeInfo->destroy(IGF, valueAddr);
       
+      return {endBB, payload, extraBits};
+    }
+
+  public:
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      if (isPOD(ResilienceScope::Local)) {
+        reexplode(IGF, src, dest);
+        return;
+      }
+      
+      // Copy the payload, if we have it.
+      llvm::BasicBlock *endBB;
+      llvm::Value *payload, *extraTag;
+      std::tie(endBB, payload, extraTag) = testUnionContainsPayload(IGF, src);
+
+      Explosion payloadValue(ExplosionKind::Minimal);
+      Explosion payloadCopy(ExplosionKind::Minimal);
+      auto &loadableTI = cast<LoadableTypeInfo>(*PayloadTypeInfo);
+      loadableTI.unpackUnionPayload(IGF, payload, payloadValue, 0);
+      loadableTI.copy(IGF, payloadValue, payloadCopy);
+      payloadCopy.claimAll();
+      
+      IGF.Builder.CreateBr(endBB);
+      IGF.Builder.emitBlock(endBB);
+      
+      // Copy to the new explosion.
+      dest.add(payload);
+      if (extraTag) dest.add(extraTag);
+    }
+    
+    void consume(IRGenFunction &IGF, Explosion &src) const {
+      if (isPOD(ResilienceScope::Local)) {
+        src.claimAll();
+        return;
+      }
+
+      // Check that we have a payload.
+      llvm::BasicBlock *endBB;
+      llvm::Value *payload, *extraTag;
+      std::tie(endBB, payload, extraTag) = testUnionContainsPayload(IGF, src);
+
+      // If we did, consume it.
+      Explosion payloadValue(ExplosionKind::Minimal);
+      auto &loadableTI = cast<LoadableTypeInfo>(*PayloadTypeInfo);
+      loadableTI.unpackUnionPayload(IGF, payload, payloadValue, 0);
+      loadableTI.consume(IGF, payloadValue);
+
       IGF.Builder.CreateBr(endBB);
       IGF.Builder.emitBlock(endBB);
     }
@@ -904,8 +944,15 @@ namespace {
     
   public:
     
-    void destroy(IRGenFunction &IGF, Address addr) const override {
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
+    const override {
       // FIXME
+      reexplode(IGF, src, dest);
+    }
+    
+    void consume(IRGenFunction &IGF, Explosion &src) const override {
+      // FIXME
+      src.claimAll();
     }
     
     void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
