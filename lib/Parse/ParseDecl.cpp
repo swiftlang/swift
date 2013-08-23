@@ -2041,17 +2041,21 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
   if (parseIdentifier(ProtocolName, NameLoc,
                       diag::expected_identifier_in_decl, "protocol"))
     return nullptr;
-  
+
+  ParserStatus Status;
+
+  // Parse optional inheritance clause.
   SmallVector<TypeLoc, 4> InheritedProtocols;
   if (Tok.is(tok::colon))
-    parseInheritance(InheritedProtocols);
+    Status |= parseInheritance(InheritedProtocols);
 
   ProtocolDecl *Proto
     = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc,
                                  ProtocolName,
                                  Context.AllocateCopy(InheritedProtocols));
 
-  if (Attributes.isValid()) Proto->getMutableAttrs() = Attributes;
+  if (Attributes.isValid())
+    Proto->getMutableAttrs() = Attributes;
 
   ContextChange CC(*this, Proto);
   Scope ProtocolBodyScope(this, ScopeKind::ProtocolBody);
@@ -2069,36 +2073,37 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
                                       SourceLoc()));
     Members.back()->setImplicit();
 
-    SourceLoc LBraceLoc = Tok.getLoc();
-    if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type)) {
-      Proto->setMembers(Context.AllocateCopy(Members), Tok.getLoc());
-      return makeParserErrorResult(Proto);
+    SourceLoc LBraceLoc;
+    SourceLoc RBraceLoc;
+    if (parseToken(tok::l_brace, LBraceLoc,
+                   diag::expected_lbrace_protocol_type)) {
+      LBraceLoc = Tok.getLoc();
+      RBraceLoc = LBraceLoc;
+      Status.setIsParseError();
+    } else {
+      // Parse the members.
+      if (parseNominalDeclMembers(Members, LBraceLoc, RBraceLoc,
+                                  diag::expected_rbrace_protocol,
+                                  PD_HasContainerType | PD_DisallowProperty |
+                                  PD_DisallowFuncDef | PD_DisallowNominalTypes |
+                                  PD_DisallowInit | PD_DisallowTypeAliasDef |
+                                  PD_InProtocol))
+        Status.setIsParseError();
     }
 
-    SourceLoc RBraceLoc;
-    // Parse the members.
-    if (parseNominalDeclMembers(Members, LBraceLoc, RBraceLoc,
-                                diag::expected_rbrace_protocol,
-                                PD_HasContainerType|PD_DisallowProperty|
-                                PD_DisallowFuncDef|PD_DisallowNominalTypes|
-                                PD_DisallowInit|PD_DisallowTypeAliasDef|
-                                PD_InProtocol))
-      return nullptr;
-
     // Install the protocol elements.
-    Proto->setMembers(Context.AllocateCopy(Members),
-                      SourceRange(LBraceLoc, RBraceLoc));
+    Proto->setMembers(Context.AllocateCopy(Members), { LBraceLoc, RBraceLoc });
   }
   
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(ProtocolLoc, diag::disallowed_type);
-    return nullptr;
+    Status.setIsParseError();
   } else if (!(Flags & PD_AllowTopLevel)) {
     diagnose(ProtocolLoc, diag::decl_inner_scope);
-    return nullptr;
+    Status.setIsParseError();
   }
 
-  return makeParserResult(Proto);
+  return makeParserResult(Status, Proto);
 }
 
 namespace {
