@@ -28,22 +28,32 @@ class SILBuilder {
   SILBasicBlock::iterator InsertPt;
   /// Keep track of our current nested scope.
   std::vector<SILDebugScope*> DebugScopeStack;
+
+  /// InsertedInstrs - If this pointer is non-null, then any inserted
+  /// instruction is recorded in this list.
+  SmallVectorImpl<SILInstruction*> *InsertedInstrs = nullptr;
 public:
   SILBuilder(SILFunction &F) : F(F), BB(0) {}
 
-  explicit SILBuilder(SILInstruction *I)
-    : F(*I->getParent()->getParent()) {
+  explicit SILBuilder(SILInstruction *I,
+                      SmallVectorImpl<SILInstruction*> *InsertedInstrs = 0)
+    : F(*I->getParent()->getParent()), InsertedInstrs(InsertedInstrs) {
     setInsertionPoint(I);
   }
 
-  explicit SILBuilder(SILBasicBlock *BB) : F(*BB->getParent()) {
+  explicit SILBuilder(SILBasicBlock *BB,
+                      SmallVectorImpl<SILInstruction*> *InsertedInstrs = 0)
+    : F(*BB->getParent()), InsertedInstrs(InsertedInstrs) {
     setInsertionPoint(BB);
   }
 
-  SILBuilder(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt)
-    : F(*BB->getParent()) {
+  SILBuilder(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt,
+             SmallVectorImpl<SILInstruction*> *InsertedInstrs = 0)
+    : F(*BB->getParent()), InsertedInstrs(InsertedInstrs) {
     setInsertionPoint(BB, InsertPt);
   }
+
+  SILFunction &getFunction() const { return F; }
 
   //===--------------------------------------------------------------------===//
   // Insertion Point Management
@@ -80,7 +90,25 @@ public:
   SILBasicBlock *getInsertionPoint() const {
     return BB;
   }
-  
+
+  //===--------------------------------------------------------------------===//
+  // Instruction Tracking
+  //===--------------------------------------------------------------------===//
+
+  /// Clients of SILBuilder who want to know about any newly created
+  /// instructions can install a SmallVector into the builder to collect them.
+  void setTrackingList(SmallVectorImpl<SILInstruction*> *II) {
+    InsertedInstrs = II;
+  }
+
+  SmallVectorImpl<SILInstruction*> *getTrackingList() {
+    return InsertedInstrs;
+  }
+
+  //===--------------------------------------------------------------------===//
+  // CFG Manipulation
+  //===--------------------------------------------------------------------===//
+
   /// moveBlockToEnd - Reorder a block to the end of its containing function.
   void moveBlockToEnd(SILBasicBlock *BB) {
     SILFunction *F = BB->getParent();
@@ -129,8 +157,6 @@ public:
     assert(DebugScopeStack.size());
     DebugScopeStack.pop_back();
   }
-  
-  SILFunction& getFunction() const { return F; }
   
   //===--------------------------------------------------------------------===//
   // SILInstruction Creation Methods
@@ -769,6 +795,11 @@ private:
 
     if (DebugScopeStack.size())
       TheInst->setDebugScope(DebugScopeStack.back());
+
+    // If the SILBuilder client wants to know about new instructions, record
+    // this.
+    if (InsertedInstrs)
+      InsertedInstrs->push_back(TheInst);
 
     BB->getInsts().insert(InsertPt, TheInst);
   }
