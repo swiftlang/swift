@@ -211,6 +211,8 @@ namespace {
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {}
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {}
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {}
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
+    void consume(IRGenFunction &IGF, Explosion &src) const {}
     void destroy(IRGenFunction &IGF, Address addr) const {}
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth,

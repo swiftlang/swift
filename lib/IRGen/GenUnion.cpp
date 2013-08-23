@@ -133,6 +133,16 @@ namespace {
       assert(ExtraTagBitCount > 0 && "does not have extra tag bits");
       return IGF.Builder.CreateStructGEP(addr, 1, getExtraTagBitOffset());
     }
+
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      // FIXME handle non-trivial payloads
+      dest.add(src.claim(getExplosionSize(ExplosionKind::Minimal)));
+    }
+
+    void consume(IRGenFunction &IGF, Explosion &src) const {
+      // FIXME handle non-trivial payloads
+      src.claim(getExplosionSize(ExplosionKind::Minimal));
+    }
     
     void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
       // FIXME handle non-trivial payloads
@@ -967,6 +977,14 @@ namespace {
       if (Singleton) Singleton->reexplode(IGF, src, dest);
     }
 
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      if (Singleton) Singleton->copy(IGF, src, dest);
+    }
+
+    void consume(IRGenFunction &IGF, Explosion &src) const {
+      if (Singleton) Singleton->consume(IGF, src);
+    }
+    
     void destroy(IRGenFunction &IGF, Address addr) const {
       if (Singleton && !isPOD(ResilienceScope::Local))
         Singleton->destroy(IGF, getSingletonAddress(IGF, addr));

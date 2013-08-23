@@ -792,6 +792,27 @@ namespace {
                               projectValue(IGF, address));
     }
     
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
+    const override {
+      // Transfer the witness table pointers.
+      src.transferInto(dest, NumProtocols);
+
+      // Copy the instance pointer.
+      llvm::Value *value = src.claimNext();
+      dest.add(value);
+      asDerived().emitPayloadRetain(IGF, value);
+    }
+
+    void consume(IRGenFunction &IGF, Explosion &src)
+    const override {
+      // Throw out the witness table pointers.
+      src.claim(NumProtocols);
+      
+      // Copy the instance pointer.
+      llvm::Value *value = src.claimNext();
+      asDerived().emitPayloadRelease(IGF, value);
+    }
+    
     void destroy(IRGenFunction &IGF, Address addr) const override {
       llvm::Value *value = IGF.Builder.CreateLoad(projectValue(IGF, addr));
       asDerived().emitPayloadRelease(IGF, value);

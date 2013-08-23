@@ -153,6 +153,17 @@ public:
     }
   }
 
+  void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
+    llvm::Value *value = in.claimNext();
+    asDerived().emitScalarRetain(IGF, value);
+    out.add(value);
+  }
+  
+  void consume(IRGenFunction &IGF, Explosion &in) const {
+    llvm::Value *value = in.claimNext();
+    asDerived().emitScalarRelease(IGF, value);
+  }
+  
   void destroy(IRGenFunction &IGF, Address addr) const {
     if (!Derived::IsScalarPOD) {
       addr = asDerived().projectScalar(IGF, addr);

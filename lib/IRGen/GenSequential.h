@@ -269,6 +269,16 @@ public:
       cast<LoadableTypeInfo>(field.getTypeInfo()).reexplode(IGF, src, dest);
   }
 
+  void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+    for (auto &field : getFields())
+      cast<LoadableTypeInfo>(field.getTypeInfo()).copy(IGF, src, dest);
+  }
+      
+  void consume(IRGenFunction &IGF, Explosion &src) const {
+    for (auto &field : getFields())
+      cast<LoadableTypeInfo>(field.getTypeInfo()).consume(IGF, src);
+  }
+  
   llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
                                 unsigned bitWidth,
                                 unsigned startOffset) const override {
