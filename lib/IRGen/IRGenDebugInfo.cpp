@@ -171,6 +171,9 @@ static Location getStartLoc(SourceManager &SM, SILLocation Loc) {
 }
 
 /// getStartLocForLinetable - extract the start location from a SILLocation.
+/// NOTE: Depending on how we decide to resolve
+/// rdar://problem/14627460, we may want to use the regular
+/// getStartLoc instead and rather use the column info.
 static Location getStartLocForLinetable(SourceManager &SM, SILLocation Loc) {
   if (Expr* E = Loc.getAs<Expr>()) {
     // Implicit closures should not show up in the line table. Note
@@ -382,8 +385,10 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
                                   AbstractCC CC, SILType SILTy) {
   StringRef Name;
   Location L = {};
+  Location PrologLoc = {};
   if (DS) {
     L = getStartLoc(SM, DS->Loc);
+    PrologLoc = getStartLocForLinetable(SM, DS->Loc);
     Name = getName(DS->Loc);
   }
   assert(Fn);
@@ -395,7 +400,7 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
                                           LinkageName, MainFile, MainFile, 0);
   auto Line = L.Line;
   // This is the source line used for the function prologue.
-  unsigned ScopeLine = 0;
+  unsigned ScopeLine = PrologLoc.Line;
 
   AnyFunctionType* FnTy = getFunctionType(SILTy);
   auto Params = createParameterTypes(SILMod, SILTy, Fn->getFunctionType(),
