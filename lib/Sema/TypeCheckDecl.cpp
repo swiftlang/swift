@@ -1520,11 +1520,30 @@ public:
     TC.validateTypeSimple(ThisTy);
     CD->getImplicitThisDecl()->setType(ThisTy);
 
+    Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
+      // Write up generic parameters and check the generic parameter list.
       gp->setOuterParameters(outerGenericParams);
-      checkGenericParams(gp, CD);
+      ArchetypeBuilder builder = createArchetypeBuilder();
+      checkGenericParamList(builder, gp);
+
+      // Type check the constructor parameters.
+      if (TC.typeCheckPattern(CD->getArguments(),
+                              CD,
+                              /*allowUnknownTypes*/false)) {
+        CD->overwriteType(ErrorType::get(TC.Context));
+        CD->setInvalid();
+      }
+
+      // Assign archetypes.
+      finalizeGenericParamList(builder, gp, CD);
+
+      // Reverse the constructor parameter pattern; it will be checked
+      // again, with archetypes, below.
+      revertDependentPattern(CD->getArguments(), CD);
     }
 
+    // Type check the constructor parameters.
     if (TC.typeCheckPattern(CD->getArguments(),
                             CD,
                             /*allowUnknownTypes*/false)) {
