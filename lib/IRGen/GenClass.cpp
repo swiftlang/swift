@@ -813,7 +813,10 @@ namespace {
       // Otherwise, we need to mangle the type.
       auto type = TheClass->getDeclaredType()->getCanonicalType();
 
-      SmallVector<char, 128> buffer;
+      // We add the "_Tt" prefix to make this a reserved name that
+      // will not conflict with any valid Objective-C class name.
+      llvm::SmallString<128> buffer;
+      buffer += "_Tt";
       Name = IGM.getAddrOfGlobalString(IGM.mangleType(type, buffer));
       return Name;
     }

@@ -1,0 +1,41 @@
+// RUN: %swift -emit-llvm -triple=x86_64-apple-darwin10 %s | FileCheck %s
+
+// CHECK: [[OBJCCLASS:%objc_class]] = type
+// CHECK: [[OPAQUE:%swift.opaque]] = type opaque
+// CHECK: [[TYPE:%swift.type]] = type
+// CHECK: [[REF:%swift.refcounted]] = type
+
+class C {}
+
+// <rdar://14812566>: include _Tt prefix here
+//   CHECK: [[C_NAME:@.*]] = private unnamed_addr constant [13 x i8] c"_TtC5class1C\00"
+
+//   CHECK: @_DATA_C = private constant {{.*}} {
+// \ CHECK:   i32 128,
+// \ CHECK:   i32 16,
+// \ CHECK:   i32 16,
+// \ CHECK:   i32 0,
+// \ CHECK:   i8* null,
+// \ CHECK:   i8* getelementptr inbounds ([13 x i8]* [[C_NAME]], i64 0, i64 0),
+// \ CHECK:   i8* null,
+// \ CHECK:   i8* null,
+// \ CHECK:   i8* null,
+// \ CHECK:   i8* null,
+// \ CHECK:   i8* null
+// \ CHECK: }
+
+//   CHECK: @_TMdC5class1C = global { {{.*}} } {
+// \ CHECK:   void ([[REF]]*)* @_TC5class1CD,
+// \ CHECK:   i8** @_TWVBo,
+// \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1C to i64),
+// \ CHECK:   [[TYPE]]* @"OBJC_CLASS_$_SwiftObject",
+// \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
+// \ CHECK:   [[OPAQUE]]* @_objc_empty_vtable,
+// \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA_C to i64), i64 1)
+// \ CHECK: }
+
+sil @top_level_code : $[thin] () -> () {
+  %0 = tuple ()
+  %1 = return %0 : $()
+}
+
