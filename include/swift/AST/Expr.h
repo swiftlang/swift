@@ -1871,6 +1871,12 @@ public:
     BodyResultType = bodyResultType;
   }
 
+  /// Revert to an empty type.
+  void revertType() {
+    BodyResultType = Type();
+    setType(Type());
+  }
+
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Func; }
   static bool classof(const DeclContext *DC) {
     return isa<CapturingExpr>(DC) && classof(cast<CapturingExpr>(DC));
