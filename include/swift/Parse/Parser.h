@@ -451,7 +451,7 @@ public:
   bool parseAttribute(DeclAttributes &Attributes);
   
   ParserResult<ImportDecl> parseDeclImport(unsigned Flags);
-  bool parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
+  ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
   ParserResult<ExtensionDecl> parseDeclExtension(unsigned Flags);
   ParserResult<UnionDecl> parseDeclUnion(unsigned Flags);
   ParserResult<UnionElementDecl> parseDeclUnionElement(unsigned Flags);

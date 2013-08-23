@@ -760,22 +760,23 @@ ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags) {
 ///
 ///   inheritance:
 ///      ':' type-identifier (',' type-identifier)*
-bool Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
+ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
   consumeToken(tok::colon);
-  
+
+  ParserStatus Status;
   do {
     // Parse the inherited type (which must be a protocol).
     ParserResult<TypeRepr> Ty = parseTypeIdentifier();
-    if (Ty.isNull() || Ty.hasCodeCompletion())
-      return true;
-    
+    Status |= Ty;
+
     // Record the type.
-    Inherited.push_back(Ty.get());
-    
+    if (Ty.isNonNull())
+      Inherited.push_back(Ty.get());
+
     // Check for a ',', which indicates that there are more protocols coming.
   } while (consumeIf(tok::comma));
-  
-  return false;
+
+  return Status;
 }
 
 /// parseDeclExtension - Parse an 'extension' declaration.
@@ -851,20 +852,23 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   if (parseIdentifier(Id, IdLoc, diag::expected_identifier_in_decl,"typealias"))
     return nullptr;
 
+  ParserStatus Status;
+
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
-    parseInheritance(Inherited);
+    Status |= parseInheritance(Inherited);
 
   ParserResult<TypeRepr> UnderlyingTy;
   if (WantDefinition || Tok.is(tok::equal)) {
-    if (parseToken(tok::equal, diag::expected_equal_in_typealias))
-      return nullptr;
+    if (parseToken(tok::equal, diag::expected_equal_in_typealias)) {
+      Status.setIsParseError();
+      return Status;
+    }
     UnderlyingTy = parseType(diag::expected_type_in_typealias);
-    if (UnderlyingTy.hasCodeCompletion())
-      return makeParserCodeCompletionResult<TypeDecl>();
+    Status |= UnderlyingTy;
     if (UnderlyingTy.isNull())
-      return nullptr;
+      return Status;
     
     if (!WantDefinition) {
       diagnose(IdLoc, diag::associated_type_def, Id);
@@ -879,7 +883,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
     if (!Inherited.empty())
       assocType->setInherited(Context.AllocateCopy(Inherited));
     addToScope(assocType);
-    return makeParserResult(assocType);
+    return makeParserResult(Status, assocType);
   }
 
   // Otherwise, build a typealias.
@@ -889,7 +893,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
                                 CurDeclContext,
                                 Context.AllocateCopy(Inherited));
   addToScope(TAD);
-  return makeParserResult(TAD);
+  return makeParserResult(Status, TAD);
 }
 
 namespace {
