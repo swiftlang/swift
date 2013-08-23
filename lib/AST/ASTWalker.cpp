@@ -456,193 +456,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
-  Stmt *visitBreakStmt(BreakStmt *BS) {
-    return BS;
-  }
-
-  Stmt *visitContinueStmt(ContinueStmt *CS) {
-    return CS;
-  }
-
-  Stmt *visitFallthroughStmt(FallthroughStmt *CS) {
-    return CS;
-  }
-  
-  Stmt *visitBraceStmt(BraceStmt *BS) {
-    for (auto &Elem : BS->getElements()) {
-      if (Expr *SubExpr = Elem.dyn_cast<Expr*>()) {
-        if (Expr *E2 = doIt(SubExpr))
-          Elem = E2;
-        else
-          return nullptr;
-        continue;
-      }
-      
-      if (Stmt *S = Elem.dyn_cast<Stmt*>()) {
-        if (Stmt *S2 = doIt(S))
-          Elem = S2;
-        else
-          return nullptr;
-        continue;
-      }
-
-      if (doIt(Elem.get<Decl*>()))
-        return nullptr;
-    }
-    
-    return BS;
-  }
-
-  Stmt *visitReturnStmt(ReturnStmt *RS) {
-    if (!RS->hasResult())
-      return RS;
-    if (Expr *E = doIt(RS->getResult()))
-      RS->setResult(E);
-    else
-      return nullptr;
-    return RS;
-  }
-  
-  Stmt *visitIfStmt(IfStmt *IS) {
-    if (Expr *E2 = doIt(IS->getCond()))
-      IS->setCond(E2);
-    else
-      return nullptr;
-    
-    if (Stmt *S2 = doIt(IS->getThenStmt()))
-      IS->setThenStmt(S2);
-    else
-      return nullptr;
-    
-    if (IS->getElseStmt()) {
-      if (Stmt *S2 = doIt(IS->getElseStmt()))
-        IS->setElseStmt(S2);
-      else
-        return nullptr;
-    }
-    return IS;
-  }
-  
-  Stmt *visitWhileStmt(WhileStmt *WS) {
-    if (Expr *E2 = doIt(WS->getCond()))
-      WS->setCond(E2);
-    else
-      return nullptr;
-    
-    if (Stmt *S2 = doIt(WS->getBody()))
-      WS->setBody(S2);
-    else
-      return nullptr;
-    return WS;
-  }
-
-  Stmt *visitDoWhileStmt(DoWhileStmt *DWS) {
-    if (Stmt *S2 = doIt(DWS->getBody()))
-      DWS->setBody(S2);
-    else
-      return nullptr;
-    
-    if (Expr *E2 = doIt(DWS->getCond()))
-      DWS->setCond(E2);
-    else
-      return nullptr;
-
-    return DWS;
-  }
-
-  Stmt *visitForStmt(ForStmt *FS) {
-    // Visit any var decls in the initializer.
-    for (auto D : FS->getInitializerVarDecls())
-      if (doIt(D))
-        return nullptr;
-    
-    if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
-      if (Expr *E = doIt(Initializer))
-        FS->setInitializer(E);
-      else
-        return nullptr;
-    }
-    
-    if (auto *Cond = FS->getCond().getPtrOrNull()) {
-      if (Expr *E2 = doIt(Cond))
-        FS->setCond(E2);
-      else
-        return nullptr;
-
-    }
-
-    if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
-      if (Expr *E = doIt(Increment))
-        FS->setIncrement(E);
-      else
-        return nullptr;
-    }
-    
-    if (Stmt *S = doIt(FS->getBody()))
-      FS->setBody(S);
-    else
-      return nullptr;
-    return FS;
-  }
-
-  Stmt *visitForEachStmt(ForEachStmt *S) {
-    if (Expr *Container = S->getContainer()) {
-      if ((Container = doIt(Container)))
-        S->setContainer(Container);
-      else
-        return nullptr;
-    }
-    
-    if (Stmt *Body = S->getBody()) {
-      if ((Body = doIt(Body)))
-        S->setBody(cast<BraceStmt>(Body));
-      else
-        return nullptr;
-    }
-    
-    return S;
-  }
-  
-  Stmt *visitSwitchStmt(SwitchStmt *S) {
-    if (Expr *newSubject = doIt(S->getSubjectExpr()))
-      S->setSubjectExpr(newSubject);
-    else
-      return nullptr;
-
-    for (CaseStmt *aCase : S->getCases()) {
-      if (Stmt *aStmt = doIt(aCase)) {
-        assert(aCase == aStmt && "switch case remap not supported");
-        (void)aStmt;
-      } else
-        return nullptr;
-    }
-    
-    return S;
-  }
-  
-  Stmt *visitCaseStmt(CaseStmt *S) {
-    for (CaseLabel *label : S->getCaseLabels()) {
-      for (Pattern *&pattern : label->getPatterns()) {
-        if (Pattern *newPattern = doIt(pattern))
-          pattern = newPattern;
-        else
-          return nullptr;
-      }
-      if (label->getGuardExpr()) {
-        if (Expr *newGuard = doIt(label->getGuardExpr()))
-          label->setGuardExpr(newGuard);
-        else
-          return nullptr;
-      }
-    }
-    
-    if (Stmt *newBody = doIt(S->getBody()))
-      S->setBody(newBody);
-    else
-      return nullptr;
-
-    return S;
-  }
+#define STMT(Id, Parent) Stmt *visit##Id##Stmt(Id##Stmt *S);
+#include "swift/AST/StmtNodes.def"
 
 #define PATTERN(Id, Parent) Pattern *visit##Id##Pattern(Id##Pattern *P);
 #include "swift/AST/PatternNodes.def"
@@ -791,6 +606,196 @@ public:
 
 } // end anonymous namespace.
 
+#pragma mark Statement traversal
+Stmt *Traversal::visitBreakStmt(BreakStmt *BS) {
+  return BS;
+}
+
+Stmt *Traversal::visitContinueStmt(ContinueStmt *CS) {
+  return CS;
+}
+
+Stmt *Traversal::visitFallthroughStmt(FallthroughStmt *CS) {
+  return CS;
+}
+
+Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
+  for (auto &Elem : BS->getElements()) {
+    if (Expr *SubExpr = Elem.dyn_cast<Expr*>()) {
+      if (Expr *E2 = doIt(SubExpr))
+        Elem = E2;
+      else
+        return nullptr;
+      continue;
+    }
+
+    if (Stmt *S = Elem.dyn_cast<Stmt*>()) {
+      if (Stmt *S2 = doIt(S))
+        Elem = S2;
+      else
+        return nullptr;
+      continue;
+    }
+
+    if (doIt(Elem.get<Decl*>()))
+      return nullptr;
+  }
+
+  return BS;
+}
+
+Stmt *Traversal::visitReturnStmt(ReturnStmt *RS) {
+  if (!RS->hasResult())
+    return RS;
+  if (Expr *E = doIt(RS->getResult()))
+    RS->setResult(E);
+  else
+    return nullptr;
+  return RS;
+}
+
+Stmt *Traversal::visitIfStmt(IfStmt *IS) {
+  if (Expr *E2 = doIt(IS->getCond()))
+    IS->setCond(E2);
+  else
+    return nullptr;
+
+  if (Stmt *S2 = doIt(IS->getThenStmt()))
+    IS->setThenStmt(S2);
+  else
+    return nullptr;
+
+  if (IS->getElseStmt()) {
+    if (Stmt *S2 = doIt(IS->getElseStmt()))
+      IS->setElseStmt(S2);
+    else
+      return nullptr;
+  }
+  return IS;
+}
+
+Stmt *Traversal::visitWhileStmt(WhileStmt *WS) {
+  if (Expr *E2 = doIt(WS->getCond()))
+    WS->setCond(E2);
+  else
+    return nullptr;
+
+  if (Stmt *S2 = doIt(WS->getBody()))
+    WS->setBody(S2);
+  else
+    return nullptr;
+  return WS;
+}
+
+Stmt *Traversal::visitDoWhileStmt(DoWhileStmt *DWS) {
+  if (Stmt *S2 = doIt(DWS->getBody()))
+    DWS->setBody(S2);
+  else
+    return nullptr;
+
+  if (Expr *E2 = doIt(DWS->getCond()))
+    DWS->setCond(E2);
+  else
+    return nullptr;
+
+  return DWS;
+}
+
+Stmt *Traversal::visitForStmt(ForStmt *FS) {
+  // Visit any var decls in the initializer.
+  for (auto D : FS->getInitializerVarDecls())
+    if (doIt(D))
+      return nullptr;
+
+  if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
+    if (Expr *E = doIt(Initializer))
+      FS->setInitializer(E);
+    else
+      return nullptr;
+  }
+
+  if (auto *Cond = FS->getCond().getPtrOrNull()) {
+    if (Expr *E2 = doIt(Cond))
+      FS->setCond(E2);
+    else
+      return nullptr;
+
+  }
+
+  if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
+    if (Expr *E = doIt(Increment))
+      FS->setIncrement(E);
+    else
+      return nullptr;
+  }
+
+  if (Stmt *S = doIt(FS->getBody()))
+    FS->setBody(S);
+  else
+    return nullptr;
+  return FS;
+}
+
+Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
+  if (Expr *Container = S->getContainer()) {
+    if ((Container = doIt(Container)))
+      S->setContainer(Container);
+    else
+      return nullptr;
+  }
+
+  if (Stmt *Body = S->getBody()) {
+    if ((Body = doIt(Body)))
+      S->setBody(cast<BraceStmt>(Body));
+    else
+      return nullptr;
+  }
+
+  return S;
+}
+
+Stmt *Traversal::visitSwitchStmt(SwitchStmt *S) {
+  if (Expr *newSubject = doIt(S->getSubjectExpr()))
+    S->setSubjectExpr(newSubject);
+  else
+    return nullptr;
+
+  for (CaseStmt *aCase : S->getCases()) {
+    if (Stmt *aStmt = doIt(aCase)) {
+      assert(aCase == aStmt && "switch case remap not supported");
+      (void)aStmt;
+    } else
+      return nullptr;
+  }
+
+  return S;
+}
+
+Stmt *Traversal::visitCaseStmt(CaseStmt *S) {
+  for (CaseLabel *label : S->getCaseLabels()) {
+    for (Pattern *&pattern : label->getPatterns()) {
+      if (Pattern *newPattern = doIt(pattern))
+        pattern = newPattern;
+      else
+        return nullptr;
+    }
+    if (label->getGuardExpr()) {
+      if (Expr *newGuard = doIt(label->getGuardExpr()))
+        label->setGuardExpr(newGuard);
+      else
+        return nullptr;
+    }
+  }
+
+  if (Stmt *newBody = doIt(S->getBody()))
+    S->setBody(newBody);
+  else
+    return nullptr;
+
+  return S;
+}
+
+#pragma mark Pattern traversal
 Pattern *Traversal::visitParenPattern(ParenPattern *P) {
   if (Pattern *newSub = doIt(P->getSubPattern()))
     P->setSubPattern(newSub);
@@ -884,6 +889,7 @@ Pattern *Traversal::visitVarPattern(VarPattern *P) {
   return P;
 }
 
+#pragma mark Type representation traversal
 bool Traversal::visitErrorTypeRepr(ErrorTypeRepr *T) {
   return false;
 }
