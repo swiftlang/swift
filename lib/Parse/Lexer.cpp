@@ -542,13 +542,18 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
 
 /// Is the operator ending at the given character (actually one past the end)
 /// "right-bound"?
-static bool isRightBound(const char *tokEnd) {
+static bool isRightBound(const char *tokEnd, bool isLeftBound) {
   switch (*tokEnd) {
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case ')': case ']': case '}':              // closing delimiters
   case ',': case ';': case ':':              // expression separators
   case '\0':                                 // whitespace / last char in file
     return false;
+
+  case '.':
+    // Prefer the '!' in "x!.y" to be a postfix op, not binary, but the '!' in
+    // "!.y" to be a prefix op, not binary.
+    return !isLeftBound;
 
   default:
     return true;
@@ -581,7 +586,7 @@ void Lexer::lexOperatorIdentifier() {
   // It's binary if either both sides are bound or both sides are not bound.
   // Otherwise, it's postfix if left-bound and prefix if right-bound.
   bool leftBound = isLeftBound(TokStart, BufferStart);
-  bool rightBound = isRightBound(CurPtr);
+  bool rightBound = isRightBound(CurPtr, leftBound);
 
   // Match various reserved words.
   if (CurPtr-TokStart == 1) {
