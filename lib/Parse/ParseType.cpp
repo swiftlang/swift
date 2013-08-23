@@ -67,9 +67,16 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   ParserResult<TypeRepr> ty;
   switch (Tok.getKind()) {
   case tok::kw_This:
-  case tok::identifier:
-    ty = parseTypeIdentifier();
+  case tok::identifier: {
+    ParserResult<IdentTypeRepr> ITR = parseTypeIdentifier();
+    if (ITR.hasCodeCompletion()) {
+      if (CodeCompletion)
+        CodeCompletion->completeTypeIdentifier(ITR.getPtrOrNull());
+      return makeParserCodeCompletionResult<TypeRepr>();
+    }
+    ty = ITR;
     break;
+  }
   case tok::kw_protocol:
     ty = parseTypeComposition();
     break;
@@ -206,17 +213,23 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 ///
 ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_This)) {
+    if (Tok.is(tok::code_complete))
+      return makeParserCodeCompletionResult<IdentTypeRepr>();
+
     diagnose(Tok, diag::expected_identifier_for_type);
     return nullptr;
   }
 
+  ParserStatus Status;
   SmallVector<IdentTypeRepr::Component, 4> ComponentsR;
   SourceLoc EndLoc;
   while (true) {
     SourceLoc Loc;
     Identifier Name;
-    if (parseIdentifier(Name, Loc, diag::expected_identifier_in_dotted_type))
-      return nullptr;
+    if (parseIdentifier(Name, Loc, diag::expected_identifier_in_dotted_type)) {
+      Status.setIsParseError();
+      break;
+    }
     SourceLoc LAngle, RAngle;
     SmallVector<TypeRepr*, 8> GenericArgs;
     if (startsWithLess(Tok)) {
@@ -232,15 +245,11 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     // unless <anything> is 'metatype'.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
       if (peekToken().is(tok::code_complete)) {
-        if (CodeCompletion) {
-          if (auto Entry = lookupInScope(ComponentsR[0].getIdentifier()))
-            ComponentsR[0].setValue(Entry);
-          CodeCompletion->completeTypeIdentifier(
-              IdentTypeRepr::create(Context, ComponentsR));
-        }
-        return makeParserCodeCompletionResult<IdentTypeRepr>();
+        Status.setHasCodeCompletion();
+        consumeToken();
+        consumeToken(tok::code_complete);
+        break;
       }
-
       if (peekToken().isNot(tok::kw_metatype)) {
         consumeToken();
         continue;
@@ -249,12 +258,15 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     break;
   }
 
+  if (ComponentsR.size() == 0)
+    return makeParserResult<IdentTypeRepr>(Status, nullptr);
+
   // Lookup element #0 through our current scope chains in case it is some thing
   // local (this returns null if nothing is found).
   if (auto Entry = lookupInScope(ComponentsR[0].getIdentifier()))
     ComponentsR[0].setValue(Entry);
 
-  return makeParserResult(IdentTypeRepr::create(Context, ComponentsR));
+  return makeParserResult(Status, IdentTypeRepr::create(Context, ComponentsR));
 }
 
 /// parseTypeComposition
@@ -285,25 +297,26 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
   }
   
   // Parse the type-composition-list.
-  bool Invalid = false;
-  SmallVector<IdentTypeRepr*, 4> Protocols;
+  ParserStatus Status;
+  SmallVector<IdentTypeRepr *, 4> Protocols;
   do {
     // Parse the type-identifier.
     ParserResult<IdentTypeRepr> Protocol = parseTypeIdentifier();
-    if (Protocol.isNull() || Protocol.hasCodeCompletion()) {
-      Invalid = true;
-      break;
+    Status |= Protocol;
+    if (Protocol.hasCodeCompletion() && CodeCompletion) {
+      CodeCompletion->completeTypeIdentifier(Protocol.getPtrOrNull());
     }
-    
-    Protocols.push_back(Protocol.get());
+    if (Protocol.isNonNull())
+      Protocols.push_back(Protocol.get());
   } while (consumeIf(tok::comma));
   
   // Check for the terminating '>'.
   SourceLoc EndLoc = Tok.getLoc();
   if (!startsWithGreater(Tok)) {
-    if (!Invalid) {
+    if (Status.isSuccess()) {
       diagnose(Tok, diag::expected_rangle_protocol);
       diagnose(LAngleLoc, diag::opening_angle);
+      Status.setIsParseError();
     }
 
     // Skip until we hit the '>'.
@@ -314,7 +327,7 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
     EndLoc = consumeStartingGreater();
   }
 
-  return makeParserResult(ProtocolCompositionTypeRepr::create(
+  return makeParserResult(Status, ProtocolCompositionTypeRepr::create(
       Context, Protocols, ProtocolLoc, SourceRange(LAngleLoc, EndLoc)));
 }
 

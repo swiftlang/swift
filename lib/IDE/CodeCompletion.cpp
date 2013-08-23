@@ -1030,6 +1030,10 @@ void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
 }
 
 void CodeCompletionCallbacksImpl::completeTypeIdentifier(IdentTypeRepr *ITR) {
+  if (!ITR) {
+    completeTypeSimpleBeginning();
+    return;
+  }
   Kind = CompletionKind::TypeIdentifier;
   ParsedTypeLoc = TypeLoc(ITR);
   CurDeclContext = P.CurDeclContext;

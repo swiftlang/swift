@@ -336,7 +336,7 @@ void Parser::skipUntil(tok T1, tok T2, bool StopAtCodeComplete) {
 
 void Parser::skipUntilAnyOperator() {
   while (Tok.isNot(tok::eof) && Tok.isNotAnyOperator())
-    skipSingle();
+    skipSingle(false);
 }
 
 void Parser::skipUntilDeclRBrace() {
