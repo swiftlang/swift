@@ -250,16 +250,23 @@ static bool checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
 
   SILValue StoredVal = Inst->getOperand(0);
 
-  // If we have an exact match (which is common), we are done.  Early exit.
+  SILBuilder B(Inst);
   if (LoadUnwrapLevel == 0) {
+    // Exact match (which is common).
     LoadResultVal = StoredVal;
-    return false;
+  } else {
+    LoadResultVal = ExtractElement(StoredVal,
+       ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(0, LoadUnwrapLevel),
+                                   B, Inst->getLoc());
   }
 
-  SILBuilder B(Inst);
-  LoadResultVal = ExtractElement(StoredVal,
-       ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(0, LoadUnwrapLevel),
-                                 B, Inst->getLoc());
+  // If this is an assign to an unowned pointer, the stored value needs to be
+  // converted to an unowned pointer.
+  if (auto AI = dyn_cast<AssignInst>(Inst))
+    if (AI->isUnownedAssign())
+      LoadResultVal = B.createRefToUnowned(Inst->getLoc(), LoadResultVal,
+                                     AI->getDest().getType().getObjectType());
+
   return false;
 }
 
@@ -532,7 +539,7 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
     }
   }
 
-  SILType StoredType = Inst->getOperand(0).getType();
+  SILType StoredType = Inst->getOperand(1).getType().getObjectType();
 
   // If we are lowering/expanding an "assign", we may turn it into a read/write
   // operation to release the old value.  If so, we want to determine a live-in
@@ -597,22 +604,25 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
   SILBuilder B(Inst);
 
   // "unowned" assignments are expanded to unowned operations.
-  bool isOwned = !StoredType.is<UnownedStorageType>();
+  bool isOwned = !cast<AssignInst>(Inst)->isUnownedAssign();
 
   // Otherwise, if it has trivial type, we can always just replace the
   // assignment with a store.  If it has non-trivial type and is an
   // initialization, we can also replace it with a store.
   if (HasTrivialType || DI == DI_No) {
-    auto NewStore =
-      B.createStore(Inst->getLoc(), Inst->getOperand(0), Inst->getOperand(1));
+    SILValue Val = Inst->getOperand(0);
+    if (!isOwned)
+      Val = B.createRefToUnowned(Inst->getLoc(), Val, StoredType);
+
+    auto NewStore = B.createStore(Inst->getLoc(), Val, Inst->getOperand(1));
 
     // Non-trivial values must be retained, since the box owns them.
     if (HasTrivialType)
       ;
     else if (isOwned)
-      B.createRetainInst(Inst->getLoc(), Inst->getOperand(0));
+      B.createRetainInst(Inst->getLoc(), Val);
     else
-      B.createUnownedRetain(Inst->getLoc(), Inst->getOperand(0));
+      B.createUnownedRetain(Inst->getLoc(), Val);
 
     NonLoadUses.insert(NewStore);
     NonLoadUses.erase(Inst);
@@ -626,13 +636,16 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
   if (!IncomingVal)
     IncomingVal = B.createLoad(Inst->getLoc(), Inst->getOperand(1));
 
-  if (isOwned)
-    B.createRetainInst(Inst->getLoc(), Inst->getOperand(0));
-  else
-    B.createUnownedRetain(Inst->getLoc(), Inst->getOperand(0));
+  SILValue Val = Inst->getOperand(0);
+  if (!isOwned)
+    Val = B.createRefToUnowned(Inst->getLoc(), Val, StoredType);
 
-  auto NewStore =
-    B.createStore(Inst->getLoc(), Inst->getOperand(0), Inst->getOperand(1));
+  if (isOwned)
+    B.createRetainInst(Inst->getLoc(), Val);
+  else
+    B.createUnownedRetain(Inst->getLoc(), Val);
+
+  auto NewStore = B.createStore(Inst->getLoc(), Val, Inst->getOperand(1));
 
   if (isOwned)
     B.createReleaseInst(Inst->getLoc(), IncomingVal);
