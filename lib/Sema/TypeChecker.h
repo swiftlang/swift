@@ -226,9 +226,6 @@ public:
   Type substType(Type T, TypeSubstitutionMap &Substitutions,
                  bool IgnoreMissing = false);
 
-  /// Substitute archetypes for the generic parameters they represent.
-  Type substArchetypesForGenericParams(Type origType);
-
   /// \brief Apply generic arguments to the given type.
   ///
   /// \param type         The unbound generic type to which to apply arguments.

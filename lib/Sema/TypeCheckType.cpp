@@ -1348,36 +1348,6 @@ Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions,
   });
 }
 
-Type TypeChecker::substArchetypesForGenericParams(Type origType) {
-  return transformType(origType, [&](Type type) -> Type {
-    if (auto genericParam = type->getAs<GenericTypeParamType>()) {
-      return genericParam->getDecl()->getArchetype();
-    }
-
-    if (auto dependentMember = type->getAs<DependentMemberType>()) {
-      auto baseTy = substArchetypesForGenericParams(dependentMember->getBase());
-      if (!baseTy)
-        return Type();
-
-      if (baseTy.getPointer() == dependentMember->getBase().getPointer())
-        return origType;
-
-      if (baseTy->isDependentType())
-        return DependentMemberType::get(baseTy, dependentMember->getName(),
-                                        Context);
-
-      // FIXME: Error handling here is awful.
-      // FIXME: Might have to perform lookup here if we got a non-archetype.
-      // This only matters when we allow same-type constraints that
-      // map dependent types to concrete types.
-      return baseTy->castTo<ArchetypeType>()->getNestedType(
-               dependentMember->getName());
-    }
-
-    return type;
-  });
-}
-
 Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
                                           Type BaseTy) {
   if (!BaseTy)
