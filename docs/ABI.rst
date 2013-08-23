@@ -96,8 +96,8 @@ represent the no-data cases, with extra inhabitants in order of ascending
 numeric value matching no-data cases in declaration order. The only
 currently considered extra inhabitants are those that use *spare bits*
 (see `Multi-Payload Unions`_) of an integer type, such as the top 11 bits of
-an ``i21``. The union value is then represented as an integer with the bit size
-of the data type.
+an ``i21``. The union value is then represented as an integer with the storage
+size in bits of the data type.
 
 ::
 
@@ -135,13 +135,8 @@ discriminate the data types. The ABI will first try to find common
 either fixed-zero or ignored by valid values of all of the data types. The tag
 will be scattered into these spare bits as much as possible. Currently only
 spare bits of primitive integer types, such as the high bits of an ``i21``
-type, are considered.
-
-If there are not enough spare bits to contain the tag, then additional bits are
-added to the representation to contain the tag. Tag values are
-assigned to data cases in declaration order. If there are no-data cases, they
-are collected under a common tag, and assigned values in the data area of the
-union in declaration order.
+type, are considered. The union data is represented as an integer with the
+storage size in bits of the largest data type.
 
 ::
 
@@ -153,6 +148,14 @@ union in declaration order.
     case Empty           => i32 0x0080_0000
     case Cursor          => i32 0x0080_0001
   }
+
+If there are not enough spare bits to contain the tag, then additional bits are
+added to the representation to contain the tag. Tag values are
+assigned to data cases in declaration order. If there are no-data cases, they
+are collected under a common tag, and assigned values in the data area of the
+union in declaration order.
+
+::
 
   class Bignum {}
 
