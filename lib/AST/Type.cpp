@@ -1725,7 +1725,12 @@ void FunctionType::print(raw_ostream &OS) const {
 
   attrs.finish();
   
-  OS << getInput() << " -> " << getResult();
+  Type inputType = getInput();
+  if (inputType->is<AnyFunctionType>())
+    OS << "(" << inputType << ")";
+  else
+    OS << inputType;
+  OS << " -> " << getResult();
 }
 
 void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
@@ -1788,7 +1793,13 @@ void PolymorphicFunctionType::print(raw_ostream &OS) const {
   attrs.finish();
     
   printGenericParams(OS);
-  OS << ' ' << getInput() << " -> " << getResult();
+
+  Type inputType = getInput();
+  if (inputType->is<AnyFunctionType>())
+    OS << " (" << inputType << ")";
+  else
+    OS << " " << inputType;
+  OS << " -> " << getResult();
 }
 
 void ArraySliceType::print(raw_ostream &OS) const {

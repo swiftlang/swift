@@ -866,7 +866,7 @@ bb0(%0 : $Int64, %1 : $*Int64):
   unreachable
 }
 
-// CHECK: sil @test_transparent : $[thin] () -> () {
+// CHECK-LABEL: sil @test_transparent : $[thin] () -> () {
 sil @test_transparent : $[thin] () -> () {
 bb0:
   %0 = function_ref @classes : $[thin] () -> ()
@@ -875,3 +875,6 @@ bb0:
   %2 = tuple ()
   %3 = return %2 : $()
 }
+
+// CHECK-LABEL: sil @takes_unnamed_closure : $[thin] (() -> Int64) -> () -> () -> Int64
+sil @takes_unnamed_closure : $[thin] (() -> Int64) -> () -> () -> Int64
