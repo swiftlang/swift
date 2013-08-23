@@ -1,3 +1,45 @@
+2013-08-28
+----------
+
+* Swift now supports unions. Unlike C unions, Swift's 'union' is type-safe
+  and always knows what type it contains at runtime. Union members are labeled
+  using 'case' declarations; each case may have a different set of
+  types or no type:
+
+    union MaybeInt {
+      case Some(Int)
+      case None
+    }
+
+    union HTMLTag {
+      case A(href:String)
+      case IMG(src:String, alt:String)
+      case BR
+    }
+
+  Each 'case' with a type defines a static constructor function for the union
+  type. 'case' declarations without types become static members:
+
+    var br = HTMLTag.BR
+    var a = HTMLTag.A(href:"http://www.apple.com/")
+    // 'HTMLTag' scope deduced for '.IMG' from context
+    var img : HTMLTag = .IMG(src:"http://www.apple.com/mac-pro.png",
+                             alt:"The new Mac Pro")
+
+  Cases can be pattern-matched using 'switch':
+
+    switch tag {
+    case .BR:
+      println("<br>")
+    case .IMG(var src, var alt):
+      println("<img src=\"\(escape(src))\" alt=\"\(escape(alt))\">")
+    case .A(var href):
+      println("<a href=\"\(escape(href))\">")
+    }
+
+  Due to implementation limitations, unions cannot yet contain values of
+  protocol type, weak reference type, or generic parameter type.
+
 2013-08-14
 ----------
 
