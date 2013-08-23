@@ -951,15 +951,23 @@ an lvalue unless it has a <code>var-get</code> clause but not
 
     <i>// A function with selector-style signature.</i>
 
-    union PersonOfInterest { case ColonelMustard, MissScarlet }
-    union Room { case Conservatory, Ballroom }
-    union Weapon { case Candlestick, LeadPipe }
+    union PersonOfInterest {
+      case ColonelMustard
+      case MissScarlet
+    }
+    union Room {
+      case Conservatory
+      case Ballroom
+    }
+    union Weapon {
+      case Candlestick
+      case LeadPipe
+    }
 
     func accuseSuspect(suspect:PersonOfInterest)
         inRoom(room:Room)
         withWeapon(weapon:Weapon) {
-        println("It was " + suspect + " in the " + room + " with the " +
-                weapon);
+      println("It was \(suspect) in the \(room) with the \(weapon)")
     }
 
     <i>// Calling a selector-style function.</i>
@@ -1006,13 +1014,8 @@ an lvalue unless it has a <code>var-get</code> clause but not
     union-case ::= <a href="#identifier">identifier</a> <a href="#type-tuple">type-tuple</a>? ('->' <a href="#type">type</a>)?
   </pre>
   
-  <p>A union declaration provides direct access to <a 
-     href="#type-union">union</a> types with a <a
-     href="#decl-typealias">typealias</a> declaration specifying a name.  Please
-    see <a href="#type-union">union types</a> for more information about their
-    capabilities.</p>
-  
-  <p>Here are some examples of union declarations:</p>
+  <p>A union declaration creates a <a href="#type-union">union type</a>.
+  Here are some examples of union declarations:</p>
   
   <pre class="example">
     <i>// Declare discriminated union with union decl.</i>
@@ -1024,7 +1027,9 @@ an lvalue unless it has a <code>var-get</code> clause but not
     
     <i>// Declares three "enums".</i>
     union DataSearchFlags {
-      case None, Backward, Anchored
+      case None
+      case Backward
+      case Anchored
     }
     
     func f1(searchpolicy : DataSearchFlags)  <i>// DataSearchFlags is a valid type name</i>
@@ -1037,7 +1042,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
     }
     
     union SomeMoreInts {
-      case None,          <i>// Doesn't conflict with previous "None".</i>
+      case None           <i>// Doesn't conflict with previous "None".</i>
       case One(Int)
       case Two(Int, Int)
     }
@@ -1698,7 +1703,9 @@ if vec[3] {
   func foo(x : Int, y : Int) -&gt; (val : Int, err : Int)
 
   <i>// union and struct declarations with tuple values.</i>
-  struct S { a : Int, b : Int }
+  struct S {
+    var (a : Int, b : Int)
+  }
   union Vertex {
     case Point2(x : Int, y : Int)
     case Point3(x : Int, y : Int, z : Int)
@@ -1760,7 +1767,7 @@ if vec[3] {
   </pre>
   
   <!-- ===================================================================== -->
-  <h3 id="type-union">union Types</h3>
+  <h3 id="type-union">Union Types</h3>
   <!-- ===================================================================== -->
   
   <div class="commentary">
@@ -1793,9 +1800,12 @@ if vec[3] {
   with <a href="#typecheck_context">context sensitive type inference</a>.
   </p>
 
+  <p>The union's value can be tested and accessed by pattern-matching the union
+    against a <a href="#pattern-union-element">union element pattern</a>.
+
   <p>TODO: Should attributes be allowed on union elements?
   TODO: Eventually, with generics we'll have equality and inequality operators.
-    Union decls should implicitly define these for their types.
+    Union decls should be able to implicitly define these for their types.
   TODO: Need pattern matching and element extraction.
   </p>
 
@@ -2033,6 +2043,7 @@ ill-formed if the type does not conform to the protocol.</p>
     pattern-atom ::= <a href="#pattern-any">pattern-any</a>
     pattern-atom ::= <a href="#pattern-tuple">pattern-tuple</a>
     pattern-atom ::= <a href="#pattern-is">pattern-is</a>
+    pattern-atom ::= <a href="#pattern-union-element">pattern-union-element</a>
     pattern-atom ::= <a href="#pattern-expr">expr</a>
 
     pattern      ::= pattern-atom
@@ -2241,6 +2252,41 @@ ill-formed if the type does not conform to the protocol.</p>
       }
     }
   </pre>
+
+  <!-- ********************************************************************* -->
+  <h3 id="pattern-union-element">Union Element Patterns</h3>
+  <!-- ********************************************************************* -->
+
+  <pre class="grammar">
+    pattern-union-element ::= <a href="#type-identifier">type-identifier</a>? '.' identifier <a href="#pattern-tuple">pattern-tuple</a>?
+  </pre>
+
+  <p>Union element patterns match a value of
+    <a href="#type-union">union type</a> if the value matches the referenced
+    <tt>case</tt> of the union. If the <tt>case</tt> has a type, the value
+    of that type can be matched against an optional subpattern.</pre>
+
+  <pre class="example">
+    union HTMLTag {
+      case A(href:String)
+      case IMG(src:String, alt:String)
+      case BR
+    }
+
+    switch tag {
+    case .BR:
+      println("&lt;br&gt;")
+    case .IMG(var src, var alt):
+      println("&lt;img src=\"\(escape(src))\" alt=\"\(escape(alt))\"&gt;")
+    case .A(var href):
+      println("&lt;a href=\"\(escape(href))\"&gt;")
+    }
+  </pre>
+
+  <p>Union element patterns are refutable and thus cannot appear in
+    declarations.
+    (They are currently considered refutable even if the union contains only
+    a single <tt>case</tt>.)
 
   <!-- ********************************************************************* -->
   <h3 id="pattern-expr">Expressions in Patterns</h3>
