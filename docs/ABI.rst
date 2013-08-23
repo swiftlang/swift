@@ -12,6 +12,156 @@ invalidating the metaclass hierarchy.  Note a Swift class without an
 explicit base class is implicitly rooted in the SwiftObject
 Objective-C class.
 
+Fragile Struct Layout
+---------------------
+
+Structs are currently laid out in declared field order, which then follows
+the size and alignment conventions of LLVM on the target platform.
+
+::
+
+  struct S { var x:Int; var y:Double } // => LLVM { i64, double }
+  struct S2 { var x:Char; var s:S }    // => LLVM { i21, { i64, double } }
+
+Class Layout
+------------
+
+TODO
+
+Fragile Union Layout
+--------------------
+
+In laying out union types, the ABI attempts to avoid requiring additional
+storage to store the tag for the union case. The ABI chooses one of five
+strategies based on the layout of the union:
+
+Empty Unions
+````````````
+
+In the degenerate case of a union with no cases, the union is an empty type.
+
+::
+
+  union Empty {} // => empty type
+
+Single-Case Unions
+``````````````````
+
+In the degenerate case of a union with a single case, there is no
+discriminator needed, and the union type has the exact same layout as its
+case's data type, or is empty if the case has no data type.
+
+::
+
+  union EmptyCase { case X }             // => empty type
+  union DataCase { case Y(Int, Double) } // => LLVM { i64, double }
+
+Enum-Like Unions
+````````````````
+
+If none of the cases has a data type (an "enum-like" union), then the union
+is laid out as an integer tag with the minimal number of bits to contain
+all of the cases. The machine-level layout of the type then follows LLVM's
+data layout rules for integer types on the target platform. The cases are
+assigned tag values in declaration order.
+
+::
+
+  union EnumLike2 { // => LLVM i1
+    case A          // => i1 0
+    case B          // => i1 1
+  }
+
+  union EnumLike8 { // => LLVM i3
+    case A          // => i3 0
+    case B          // => i3 1
+    case C          // => i3 2
+    case D          // etc.
+    case E
+    case F
+    case G
+    case H
+  }
+
+Single-Payload Unions
+`````````````````````
+
+If a union has a single case with a data type and one or more no-data cases
+(a "single-payload" union), then the case with data type is represented using
+the data type's binary representation, with added zero bits for tag if
+necessary. If the data type's binary representation
+has *extra inhabitants*, that is, bit patterns with the size and alignment of
+the type but which do not form valid values of that type, they are used to
+represent the no-data cases, with extra inhabitants in order of ascending
+numeric value matching no-data cases in declaration order. The only
+currently considered extra inhabitants are those that use *spare bits*
+(see `Multi-Payload Unions`_) of an integer type, such as the top 11 bits of
+an ``i21``. The union value is then represented as an integer with the bit size
+of the data type.
+
+::
+
+  union CharOrSectionMarker { => LLVM i32
+    case Paragraph            => i32 0x0020_0000
+    case Char(Char)           => i32 (zext i21 %Char to i32)
+    case Chapter              => i32 0x0020_0001
+  }
+
+  CharOrSectionMarker.Char('\x00') => i32 0x0000_0000
+  CharOrSectionMarker.Char('\u10FFFF') => i32 0x0010_FFFF
+
+If the data type has no extra inhabitants, or there are not enough extra
+inhabitants to represent all of the no-data cases, then a tag bit is added
+to the union's representation. The tag bit is set for the no-data cases, which
+are then assigned values in the data area of the union in declaration order.
+
+::
+
+  union IntOrInfinity { => LLVM { i64, i1 }
+    case NegInfinity    => { i64, i1 } {    0, 1 }
+    case Int(Int)       => { i64, i1 } { %Int, 0 }
+    case PosInfinity    => { i64, i1 } {    1, 1 }
+  }
+
+  IntOrInfinity.Int(    0) => { i64, i1 } {     0, 0 }
+  IntOrInfinity.Int(20721) => { i64, i1 } { 20721, 0 }
+
+Multi-Payload Unions
+````````````````````
+
+If a union has more than one case with data type, then a tag is necessary to
+discriminate the data types. The ABI will first try to find common
+*spare bits*, that is, bits in the data types' binary representations which are
+either fixed-zero or ignored by valid values of all of the data types. The tag
+will be scattered into these spare bits as much as possible. Currently only
+spare bits of primitive integer types, such as the high bits of an ``i21``
+type, are considered.
+
+If there are not enough spare bits to contain the tag, then additional bits are
+added to the representation to contain the tag. Tag values are
+assigned to data cases in declaration order. If there are no-data cases, they
+are collected under a common tag, and assigned values in the data area of the
+union in declaration order.
+
+::
+
+  union TerminalChar {   => LLVM i32
+    case Plain(Char)     => i32     (zext i21 %Plain     to i32)
+    case Bold(Char)      => i32 (or (zext i21 %Bold      to i32), 0x0020_0000)
+    case Underline(Char) => i32 (or (zext i21 %Underline to i32), 0x0040_0000)
+    case Blink(Char)     => i32 (or (zext i21 %Blink     to i32), 0x0060_0000)
+    case Empty           => i32 0x0080_0000
+    case Cursor          => i32 0x0080_0001
+  }
+
+  class Bignum {}
+
+  union IntDoubleOrBignum { => LLVM { i64, i2 }
+    case Int(Int)           => { i64, i2 } {           %Int,            0 }
+    case Double(Double)     => { i64, i2 } { (bitcast  %Double to i64), 1 }
+    case Bignum(Bignum)     => { i64, i2 } { (ptrtoint %Bignum to i64), 2 }
+  }
+
 Mangling
 --------
 ::
@@ -277,4 +427,3 @@ classes as <type>s.
 
 <index> is a production for encoding numbers in contexts that can't
 end in a digit; it's optimized for encoding smaller numbers.
-
