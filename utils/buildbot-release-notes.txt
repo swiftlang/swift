@@ -38,7 +38,8 @@
     }
 
   Due to implementation limitations, unions cannot yet contain values of
-  protocol type, weak reference type, or generic parameter type.
+  protocol type, weak reference type, or generic parameter type. Recursive
+  unions are also not yet supported.
 
 2013-08-14
 ----------
