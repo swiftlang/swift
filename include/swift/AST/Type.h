@@ -41,6 +41,17 @@ public:
   TypeBase *operator->() const { return Ptr; }
   explicit operator bool() const { return Ptr != 0; }
 
+  /// Look through the given type and its children to find a type for
+  /// which the given predicate returns true.
+  ///
+  /// \param pred A predicate function object with the signature
+  /// \c bool(Type). It should r
+  ///
+  /// \returns true if the predicate returns true for the given type or any of
+  /// its children.
+  template<typename Pred>
+  bool findIf(const Pred &pred) const;
+
   /// Transform the given type by applying the user-provided function to
   /// each type
   ///
@@ -59,7 +70,7 @@ public:
   ///
   /// \returns the result of transforming the type.
   template<typename F>
-  Type transform(const ASTContext &ctx, const F &fn);
+  Type transform(const ASTContext &ctx, const F &fn) const;
 
   void dump() const;
   void print(raw_ostream &OS) const;

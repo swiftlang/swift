@@ -192,77 +192,9 @@ bool TypeBase::isSpecialized() {
   if (CT.getPointer() != this)
     return CT->isSpecialized();
 
-  switch (getKind()) {
-#define SUGARED_TYPE(id, parent) case TypeKind::id:
-#define TYPE(id, parent)
-#include "swift/AST/TypeNodes.def"
-  case TypeKind::Error:
-  case TypeKind::TypeVariable:
-      return false;
-
-  case TypeKind::UnboundGeneric:
-    if (auto parentTy = cast<UnboundGenericType>(this)->getParent())
-      return parentTy->isSpecialized();
-
-    return false;
-
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericUnion:
-  case TypeKind::BoundGenericStruct:
-    return true;
-
-  case TypeKind::Function:
-  case TypeKind::PolymorphicFunction: {
-    auto funcTy = cast<AnyFunctionType>(this);
-    return funcTy->getInput()->isSpecialized() ||
-           funcTy->getResult()->isSpecialized();
-  }
-
-  case TypeKind::Class:
-  case TypeKind::Struct:
-  case TypeKind::Union:
-    if (auto parentTy = cast<NominalType>(this)->getParent())
-      return parentTy->isSpecialized();
-    return false;
-
-  case TypeKind::MetaType:
-    return cast<MetaTypeType>(this)->getInstanceType()->isSpecialized();
-
-  case TypeKind::LValue:
-    return cast<LValueType>(this)->getObjectType()->isSpecialized();
-
-  case TypeKind::Tuple: {
-    auto tupleTy = cast<TupleType>(this);
-    for (auto &Elt : tupleTy->getFields())
-      if (Elt.getType()->isSpecialized())
-        return true;
-    
-    return false;
-  }
-
-  case TypeKind::UnownedStorage:
-  case TypeKind::WeakStorage:
-    return cast<ReferenceStorageType>(this)->getReferentType()->isSpecialized();
-
-  case TypeKind::Archetype:
-  case TypeKind::BuiltinFloat:
-  case TypeKind::BuiltinInteger:
-  case TypeKind::BuiltinObjCPointer:
-  case TypeKind::BuiltinObjectPointer:
-  case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinVector:
-  case TypeKind::Module:
-  case TypeKind::Protocol:
-  case TypeKind::ProtocolComposition:
-    return false;
-
-  case TypeKind::Array:
-    return cast<ArrayType>(this)->getBaseType()->isSpecialized();
-
-  case TypeKind::GenericTypeParam:
-  case TypeKind::DependentMember:
-    return false;
-  }
+  return CT.findIf([&](Type type) -> bool {
+    return isa<BoundGenericType>(type.getPointer());
+  });
 }
 
 bool TypeBase::isUnspecializedGeneric() {
@@ -1060,14 +992,10 @@ bool TypeBase::isSpelledLike(Type other) {
 
 bool TypeBase::isDependentType() {
   auto canon = getCanonicalType();
-  return canon.transform(canon->getASTContext(),
-                          [&](Type type) -> Type {
+  return canon.findIf([&](Type type) -> bool {
     // The presence of a generic type parameter indicates a dependent type.
-    if (isa<GenericTypeParamType>(type.getPointer()))
-      return Type();
-
-    return type;
-  }).isNull();
+    return isa<GenericTypeParamType>(type.getPointer());
+  });
 }
 
 TupleType::TupleType(ArrayRef<TupleTypeElt> fields, const ASTContext *CanCtx,

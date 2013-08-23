@@ -2199,8 +2199,131 @@ namespace detail {
   }
 }
 
+template<typename Pred>
+bool Type::findIf(const Pred &pred) const {
+  // Check this type node.
+  if (pred(*this))
+    return true;
+
+  // Recursive into children of this type.
+  TypeBase *base = getPointer();
+  switch (base->getKind()) {
+#define ALWAYS_CANONICAL_TYPE(Id, Parent) \
+case TypeKind::Id:
+#define TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+    case TypeKind::Error:
+    case TypeKind::TypeVariable:
+    case TypeKind::AssociatedType:
+    case TypeKind::GenericTypeParam:
+      return false;
+
+    case TypeKind::Union:
+    case TypeKind::Struct:
+    case TypeKind::Class:
+      if (auto parentTy = cast<NominalType>(base)->getParent()) {
+        return parentTy.findIf(pred);
+      }
+
+      return false;
+
+#define ARTIFICIAL_TYPE(Id, Parent) \
+case TypeKind::Id:
+#define TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+      llvm_unreachable("transforming artificial type?");
+
+    case TypeKind::UnboundGeneric: {
+      if (auto parentTy = cast<UnboundGenericType>(base)->getParent()) {
+        return parentTy.findIf(pred);
+      }
+
+      return false;
+    }
+
+    case TypeKind::BoundGenericClass:
+    case TypeKind::BoundGenericUnion:
+    case TypeKind::BoundGenericStruct: {
+      auto bound = cast<BoundGenericType>(base);
+
+      // Check the parent.
+      if (auto parentTy = bound->getParent()) {
+        if (parentTy.findIf(pred))
+          return true;
+      }
+
+      for (auto arg : bound->getGenericArgs()) {
+        if (arg.findIf(pred))
+          return true;
+      }
+
+      return false;
+    }
+
+    case TypeKind::MetaType:
+      return cast<MetaTypeType>(base)->getInstanceType().findIf(pred);
+
+    case TypeKind::NameAlias: {
+      auto dependentDecl
+        = detail::dependentIdentity<Pred>(cast<NameAliasType>(base)->getDecl());
+      return dependentDecl->getUnderlyingType().findIf(pred);
+    }
+
+    case TypeKind::Paren:
+      return cast<ParenType>(base)->getUnderlyingType().findIf(pred);
+
+    case TypeKind::Tuple: {
+      auto tuple = cast<TupleType>(base);
+      for (const auto &elt : tuple->getFields()) {
+        if (elt.getType().findIf(pred))
+          return true;
+      }
+
+      return false;
+    }
+
+    case TypeKind::DependentMember:
+      return cast<DependentMemberType>(base)->getBase().findIf(pred);
+
+    case TypeKind::Substituted:
+      return cast<SubstitutedType>(base)->getReplacementType().findIf(pred);
+
+    case TypeKind::Function:
+    case TypeKind::PolymorphicFunction: {
+      auto function = cast<AnyFunctionType>(base);
+      // FIXME: Polymorphic function's generic parameters and requirements.
+      return function->getInput().findIf(pred) ||
+             function->getResult().findIf(pred);
+    }
+
+    case TypeKind::Array:
+      return cast<ArrayType>(base)->getBaseType().findIf(pred);
+
+    case TypeKind::ArraySlice:
+      return cast<ArraySliceType>(base)->getBaseType().findIf(pred);
+
+    case TypeKind::Optional:
+      return cast<OptionalType>(base)->getBaseType().findIf(pred);
+
+    case TypeKind::LValue:
+      return cast<LValueType>(base)->getObjectType().findIf(pred);
+
+    case TypeKind::ProtocolComposition: {
+      auto pc = cast<ProtocolCompositionType>(base);
+      for (auto proto : pc->getProtocols()) {
+        if (proto.findIf(pred))
+          return true;
+      }
+
+      return false;
+    }
+  }
+  
+  llvm_unreachable("Unhandled type in transformation");
+}
+
 template<typename F>
-Type Type::transform(const ASTContext &ctx, const F &fn) {
+Type Type::transform(const ASTContext &ctx, const F &fn) const {
   // Transform this type node.
   Type transformed = fn(*this);
 
