@@ -30,6 +30,45 @@ static void diagnose(SILModule *M, SILLocation loc, ArgTypes... args) {
   M->getASTContext().Diags.diagnose(loc.getSourceLoc(), Diagnostic(args...));
 }
 
+/// Emit the sequence that an assign instruction lowers to once we know
+/// if it is an initialization or an assignment.  If it is an assignment,
+/// a live-in value can be provided to optimize out the reload.
+static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
+                                   bool isInitialization,
+                                   SILValue IncomingVal) {
+  ++NumAssignRewritten;
+
+  auto &TL = Inst->getModule()->getTypeLowering(Inst->getSrc().getType());
+
+  // Otherwise, if it has trivial type, we can always just replace the
+  // assignment with a store.  If it has non-trivial type and is an
+  // initialization, we can also replace it with a store.
+  if (isInitialization) {
+    B.createStore(Inst->getLoc(), Inst->getOperand(0), Inst->getOperand(1));
+
+    // Non-trivial values must be retained, since the box owns them.
+    TL.emitRetain(B, Inst->getLoc(), Inst->getOperand(0));
+    Inst->eraseFromParent();
+    return;
+  }
+
+  // Otherwise, we need to replace the assignment with the full
+  // load/store/retain/release dance.  If we have a live-in value available, we
+  // can use that instead of doing a reload.
+  if (!IncomingVal)
+    IncomingVal = B.createLoad(Inst->getLoc(), Inst->getOperand(1));
+
+  TL.emitRetain(B, Inst->getLoc(), Inst->getOperand(0));
+
+  B.createStore(Inst->getLoc(), Inst->getOperand(0), Inst->getOperand(1));
+
+  TL.emitRelease(B, Inst->getLoc(), IncomingVal);
+
+  Inst->eraseFromParent();
+}
+
+
+
 //===----------------------------------------------------------------------===//
 // Tuple Element Flattening/Counting Logic
 //===----------------------------------------------------------------------===//
@@ -347,7 +386,7 @@ namespace {
                      ElementUses &Uses);
 
     void doIt();
-    
+
   private:
     void handleLoadUse(SILInstruction *Inst);
     void handleStoreUse(SILInstruction *Inst, bool isPartialStore);
@@ -369,6 +408,7 @@ namespace {
                            Diag<StringRef> DiagMessage);
   };
 } // end anonymous namespace
+
 
 ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox,
                                    unsigned ElementNumber, ElementUses &Uses)
@@ -589,48 +629,23 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
     return;
   }
 
-  // Other stores (e.g. initialize_var) don't need further processing.
-  if (!isa<AssignInst>(Inst))
-    return;
-
-  ++NumAssignRewritten;
-  SILBuilder B(Inst);
-
-  auto &TL = Inst->getModule()->getTypeLowering(StoredType);
-
-  // Otherwise, if it has trivial type, we can always just replace the
-  // assignment with a store.  If it has non-trivial type and is an
-  // initialization, we can also replace it with a store.
-  if (HasTrivialType || DI == DI_No) {
-    auto NewStore =
-      B.createStore(Inst->getLoc(), Inst->getOperand(0), Inst->getOperand(1));
-
-    // Non-trivial values must be retained, since the box owns them.
-    TL.emitRetain(B, Inst->getLoc(), Inst->getOperand(0));
-
-    NonLoadUses.insert(NewStore);
+  // If this is an assign, rewrite it based on whether it is an initialization
+  // or not.
+  if (auto *AI = dyn_cast<AssignInst>(Inst)) {
     NonLoadUses.erase(Inst);
-    Inst->eraseFromParent();
-    return;
+
+    SmallVector<SILInstruction*, 8> InsertedInsts;
+    SILBuilder B(Inst, &InsertedInsts);
+
+    LowerAssignInstruction(B, AI, HasTrivialType || DI == DI_No, IncomingVal);
+
+    // If lowering of the assign introduced any new stores, keep track of them.
+    for (auto I : InsertedInsts)
+      if (isa<StoreInst>(I))
+        NonLoadUses.insert(I);
   }
-
-  // Otherwise, we need to replace the assignment with the full
-  // load/store/retain/release dance.  If we have a live-in value available, we
-  // can use that instead of doing a reload.
-  if (!IncomingVal)
-    IncomingVal = B.createLoad(Inst->getLoc(), Inst->getOperand(1));
-
-  TL.emitRetain(B, Inst->getLoc(), Inst->getOperand(0));
-
-  auto NewStore =
-    B.createStore(Inst->getLoc(), Inst->getOperand(0), Inst->getOperand(1));
-
-  TL.emitRelease(B, Inst->getLoc(), IncomingVal);
-
-  NonLoadUses.insert(NewStore);
-  NonLoadUses.erase(Inst);
-  Inst->eraseFromParent();
 }
+
 
 /// Given a byref use (an Apply), determine whether the loaded
 /// value is definitely assigned or not.  If not, produce a diagnostic.
@@ -1018,13 +1033,41 @@ static void optimizeAllocBox(AllocBoxInst *ABI) {
 }
 
 
+/// processAssign - It is an invariant of this pass that all assign instructions
+/// are processed.  Assignments into boxes are handled in a flow sensitive way
+/// when the box is promoted.  Free standing assignments (e.g. into global
+/// variables or anything else) are always known to be assignments (not
+/// initializations) and are lowered as such.
+static void processAssign(AssignInst *AI) {
+  // Check to see if this is actually referring to a box.  If so, ignore it.
+  SILValue Pointer = AI->getDest();
+  while (isa<TupleElementAddrInst>(Pointer) ||
+         isa<StructElementAddrInst>(Pointer))
+    Pointer = cast<SILInstruction>(Pointer)->getOperand(0);
+
+  if (isa<AllocBoxInst>(Pointer))
+    return;
+
+  // If this isn't an assignment into a box, lower it as an assignment (not an
+  // initialization).
+  SILBuilder B(AI);
+  LowerAssignInstruction(B, AI, false, SILValue());
+}
+
 /// performSILMemoryPromotion - Promote alloc_box uses into SSA registers and
 /// perform definitive initialization analysis.
 void swift::performSILMemoryPromotion(SILModule *M) {
   for (auto &Fn : *M) {
+    // Walk through an promote all of the alloc_box's that we can.
     for (auto &BB : Fn) {
       auto I = BB.begin(), E = BB.end();
       while (I != E) {
+        if (auto *AI = dyn_cast<AssignInst>(I)) {
+          ++I;
+          processAssign(AI);
+          continue;
+        }
+
         auto *ABI = dyn_cast<AllocBoxInst>(I);
         if (ABI == nullptr) {
           ++I;
