@@ -14,6 +14,9 @@ def sdk : Separate<["-"], "sdk">,
 def module_cache_path : Separate<["-"], "module-cache-path">,
   HelpText<"Clang module cache path">;
 
+def parse_as_library : Flag<["-"], "parse-as-library">,
+  HelpText<"Declare that the input is a library, not a script">;
+
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
   HelpText<"Parse the input as the swift standard library">;
 

@@ -70,6 +70,9 @@ public:
 
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags) {
+  if (Args.empty())
+    return false;
+
   // Parse command line options using FrontendOptions.td
   std::unique_ptr<llvm::opt::InputArgList> ParsedArgs;
   FrontendOptTable Table;
@@ -103,6 +106,10 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
 
     case OPT_module_cache_path:
       setClangModuleCachePath(InputArg->getValue());
+      break;
+
+    case OPT_parse_as_library:
+      setTUKind(TranslationUnit::Library);
       break;
 
     case OPT_parse_stdlib:
