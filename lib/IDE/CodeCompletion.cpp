@@ -373,6 +373,12 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
                                           EndTypeCheckLoc);
       return false;
     }
+    if (CurDeclContext->getContextKind() == DeclContextKind::NominalTypeDecl) {
+      auto *NTD = cast<NominalTypeDecl>(CurDeclContext);
+      if (NTD->hasType())
+        return true;
+      return typeCheckCompletionDecl(TU, cast<NominalTypeDecl>(CurDeclContext));
+    }
     return true;
   }
 

@@ -617,12 +617,6 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     break;
   }
 
-  if (DeclResult.isNonNull())
-    Entries.push_back(DeclResult.get());
-
-  if (Status.isSuccess() && Tok.is(tok::semi))
-    Entries.back()->TrailingSemiLoc = consumeToken(tok::semi);
-
   if (Status.hasCodeCompletion() && isCodeCompletionFirstPass() &&
       !CurDeclContext->isModuleContext()) {
     // Only consume non-toplevel decls.
@@ -631,6 +625,12 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     // Pretend that there was no error.
     return makeParserSuccess();
   }
+
+  if (DeclResult.isNonNull())
+    Entries.push_back(DeclResult.get());
+
+  if (Status.isSuccess() && Tok.is(tok::semi))
+    Entries.back()->TrailingSemiLoc = consumeToken(tok::semi);
 
   // If we parsed 'static' but didn't handle it above, complain about it.
   if (Status.isSuccess() && UnhandledStatic) {
@@ -1873,44 +1873,44 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
     }
   }
 
+  ParserStatus Status;
+
   // Parse optional inheritance clause.
   if (Tok.is(tok::colon)) {
     ContextChange CC(*this, SD);
     SmallVector<TypeLoc, 2> Inherited;
-    parseInheritance(Inherited);
+    Status |= parseInheritance(Inherited);
     SD->setInherited(Context.AllocateCopy(Inherited));
   }
 
+  SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
-    SD->setMembers({}, Tok.getLoc());
-    return makeParserErrorResult(SD);
-  }
-
-  bool Invalid = false;
-
-  // Parse the body.
-  SmallVector<Decl*, 8> MemberDecls;
-  {
+    LBLoc = Tok.getLoc();
+    RBLoc = LBLoc;
+    Status.setIsParseError();
+  } else {
+    // Parse the body.
     ContextChange CC(*this, SD);
     Scope S(this, ScopeKind::StructBody);
-    Invalid |= parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
-                                       diag::expected_rbrace_struct,
-                                       PD_HasContainerType);
+    if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
+                                diag::expected_rbrace_struct,
+                                PD_HasContainerType))
+      Status.setIsParseError();
   }
 
-  SD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
+  if (MemberDecls.empty())
+    SD->setMembers({}, { LBLoc, RBLoc });
+  else
+    SD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
   addToScope(SD);
 
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(StructLoc, diag::disallowed_type);
-    return makeParserErrorResult(SD);
+    Status.setIsParseError();
   }
 
-  if (Invalid)
-    return makeParserErrorResult(SD);
-  else
-    return makeParserResult(SD);
+  return makeParserResult(Status, SD);
 }
 
 /// parseDeclClass - Parse a 'class' declaration, returning true (and doing no
