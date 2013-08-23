@@ -737,75 +737,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return P;
   }
 
-  bool visitErrorTypeRepr(ErrorTypeRepr *T) {
-    return false;
-  }
-
-  bool visitAttributedTypeRepr(AttributedTypeRepr *T) {
-    if (doIt(T->getTypeRepr()))
-      return true;
-    return false;
-  }
-
-  bool visitIdentTypeRepr(IdentTypeRepr *T) {
-    for (auto &comp : T->Components) {
-      for (auto genArg : comp.getGenericArgs()) {
-        if (doIt(genArg))
-          return true;
-      }
-    }
-    return false;
-  }
-
-  bool visitFunctionTypeRepr(FunctionTypeRepr *T) {
-    if (doIt(T->getArgsTypeRepr()))
-      return true;
-    if (doIt(T->getResultTypeRepr()))
-      return true;
-    return false;
-  }
-
-  bool visitArrayTypeRepr(ArrayTypeRepr *T) {
-    if (doIt(T->getBase()))
-      return true;
-    return false;
-  }
-
-  bool visitOptionalTypeRepr(OptionalTypeRepr *T) {
-    if (doIt(T->getBase()))
-      return true;
-    return false;
-  }
-
-  bool visitTupleTypeRepr(TupleTypeRepr *T) {
-    for (auto elem : T->getElements()) {
-      if (doIt(elem))
-        return true;
-    }
-    return false;
-  }
-
-  bool visitNamedTypeRepr(NamedTypeRepr *T) {
-    if (T->getTypeRepr()) {
-      if (doIt(T->getTypeRepr()))
-        return true;
-    }
-    return false;
-  }
-
-  bool visitProtocolCompositionTypeRepr(ProtocolCompositionTypeRepr *T) {
-    for (auto elem : T->getProtocols()) {
-      if (doIt(elem))
-        return true;
-    }
-    return false;
-  }
-
-  bool visitMetaTypeTypeRepr(MetaTypeTypeRepr *T) {
-    if (doIt(T->getBase()))
-      return true;
-    return false;
-  }
+#define TYPEREPR(Id, Parent) bool visit##Id##TypeRepr(Id##TypeRepr *T);
+#include "swift/AST/TypeReprNodes.def"
 
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
@@ -947,6 +880,77 @@ public:
 };
 
 } // end anonymous namespace.
+
+bool Traversal::visitErrorTypeRepr(ErrorTypeRepr *T) {
+  return false;
+}
+
+bool Traversal::visitAttributedTypeRepr(AttributedTypeRepr *T) {
+  if (doIt(T->getTypeRepr()))
+    return true;
+  return false;
+}
+
+bool Traversal::visitIdentTypeRepr(IdentTypeRepr *T) {
+  for (auto &comp : T->Components) {
+    for (auto genArg : comp.getGenericArgs()) {
+      if (doIt(genArg))
+        return true;
+    }
+  }
+  return false;
+}
+
+bool Traversal::visitFunctionTypeRepr(FunctionTypeRepr *T) {
+  if (doIt(T->getArgsTypeRepr()))
+    return true;
+  if (doIt(T->getResultTypeRepr()))
+    return true;
+  return false;
+}
+
+bool Traversal::visitArrayTypeRepr(ArrayTypeRepr *T) {
+  if (doIt(T->getBase()))
+    return true;
+  return false;
+}
+
+bool Traversal::visitOptionalTypeRepr(OptionalTypeRepr *T) {
+  if (doIt(T->getBase()))
+    return true;
+  return false;
+}
+
+bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {
+  for (auto elem : T->getElements()) {
+    if (doIt(elem))
+      return true;
+  }
+  return false;
+}
+
+bool Traversal::visitNamedTypeRepr(NamedTypeRepr *T) {
+  if (T->getTypeRepr()) {
+    if (doIt(T->getTypeRepr()))
+      return true;
+  }
+  return false;
+}
+
+bool Traversal::visitProtocolCompositionTypeRepr(
+       ProtocolCompositionTypeRepr *T) {
+  for (auto elem : T->getProtocols()) {
+    if (doIt(elem))
+      return true;
+  }
+  return false;
+}
+
+bool Traversal::visitMetaTypeTypeRepr(MetaTypeTypeRepr *T) {
+  if (doIt(T->getBase()))
+    return true;
+  return false;
+}
 
 Expr *Expr::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
