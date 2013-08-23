@@ -2011,7 +2011,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(ClassLoc, diag::disallowed_type);
     Status.setIsParseError();
-    return makeParserResult(Status, CD);
   }
 
   return makeParserResult(Status, CD);
