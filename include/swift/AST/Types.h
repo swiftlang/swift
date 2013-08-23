@@ -2195,12 +2195,6 @@ inline bool TypeBase::isExistentialType() {
          || T->getKind() == TypeKind::ProtocolComposition;
 }
 
-inline bool TypeBase::isDependentType() {
-  CanType T = getCanonicalType();
-  return T->getKind() == TypeKind::GenericTypeParam
-         || T->getKind() == TypeKind::DependentMember;
-}
-
 inline bool TypeBase::isClassExistentialType() {
   CanType T = getCanonicalType();
   if (auto pt = dyn_cast<ProtocolType>(T))

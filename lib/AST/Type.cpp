@@ -1190,7 +1190,93 @@ bool TypeBase::isSpelledLike(Type other) {
   }
 
   llvm_unreachable("Unknown type kind");
+}
 
+bool TypeBase::isDependentType() {
+  CanType T = getCanonicalType();
+  switch (T->getKind()) {
+#define TYPE(Id, Parent)
+#define SUGARED_TYPE(Id, Parent) case TypeKind::Id:
+#include "swift/AST/TypeNodes.def"
+    llvm_unreachable("Type is not canonical");
+
+   // The presence of a generic type parameter indicates that the type is
+   // dependent.
+  case TypeKind::GenericTypeParam:
+    return true;
+
+  // Types that can never be dependent.
+  case TypeKind::Archetype:
+  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinObjCPointer:
+  case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinVector:
+  case TypeKind::Error:
+  case TypeKind::Module:
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::TypeVariable:
+    return false;
+
+   // Types with potentially-dependent children.
+  case TypeKind::Array:
+    return cast<ArrayType>(T.getPointer())->getBaseType()->isDependentType();
+
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::BoundGenericUnion: {
+    auto bound = cast<BoundGenericType>(T.getPointer());
+    for (auto arg : bound->getGenericArgs()) {
+      if (arg->isDependentType())
+        return true;
+    }
+    return bound->getParent() && bound->getParent()->isDependentType();
+  }
+
+  case TypeKind::Class:
+  case TypeKind::Struct:
+  case TypeKind::Union: {
+    auto nominal = cast<NominalType>(T.getPointer());
+    return nominal->getParent() && nominal->getParent()->isDependentType();
+  }
+
+  case TypeKind::UnboundGeneric: {
+    auto unbound = cast<UnboundGenericType>(T.getPointer());
+    return unbound->getParent() && unbound->getParent()->isDependentType();
+  }
+
+  case TypeKind::DependentMember:
+    return cast<DependentMemberType>(T.getPointer())->getBase()
+             ->isDependentType();
+
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction: {
+    auto function = cast<AnyFunctionType>(T.getPointer());
+    return function->getInput()->isDependentType() ||
+           function->getResult()->isDependentType();
+  }
+
+  case TypeKind::LValue:
+    return cast<LValueType>(T.getPointer())->getObjectType()->isDependentType();
+
+  case TypeKind::MetaType:
+    return cast<MetaTypeType>(T.getPointer())->getInstanceType()
+             ->isDependentType();
+
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage:
+      return cast<ReferenceStorageType>(T.getPointer())->getReferentType()
+               ->isDependentType();
+
+  case TypeKind::Tuple:
+    for (auto &elt : cast<TupleType>(T.getPointer())->getFields()) {
+      if (elt.getType()->isDependentType())
+        return true;
+    }
+    return false;
+  }
 }
 
 TupleType::TupleType(ArrayRef<TupleTypeElt> fields, const ASTContext *CanCtx,
