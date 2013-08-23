@@ -2052,9 +2052,9 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
     // Compute the result type of the partial_apply, based on which arguments
     // are getting applied.
-    unsigned ArgNo = ArgTys.size() - ArgNames.size();
-    for (unsigned i = 0, e = ArgNo; i != e; ++i)
-      NewArgTypes.push_back(ArgTys[i].getSwiftType());
+    unsigned ArgNo = 0, NewArgCount = ArgTys.size() - ArgNames.size();
+    while (ArgNo != NewArgCount)
+      NewArgTypes.push_back(ArgTys[ArgNo++].getSwiftType());
 
     SILValue FnVal = getLocalValue(FnName, Ty);
     SmallVector<SILValue, 4> Args;
