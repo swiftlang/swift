@@ -878,3 +878,14 @@ bb0:
 
 // CHECK-LABEL: sil @takes_unnamed_closure : $[thin] (() -> Int64) -> () -> () -> Int64
 sil @takes_unnamed_closure : $[thin] (() -> Int64) -> () -> () -> Int64
+
+sil @takes_int64_float32 : $[thin] (Int64, Float32) -> ()
+
+// CHECK-LABEL: sil @test_partial_apply : $[thin] Float32 -> Int64 -> () {
+sil @test_partial_apply : $[thin] Float32 -> Int64 -> () {
+bb0(%0 : $Float32):
+  %1 = function_ref @takes_int64_float32 : $[thin] (Int64, Float32) -> ()
+  // CHECK: partial_apply %{{.*}}(%{{.*}}) : $[thin] (Int64, Float32) -> ()
+  %2 = partial_apply %1(%0) : $[thin] (Int64, Float32) -> ()
+  %3 = return %2 : $Int64 -> ()
+}

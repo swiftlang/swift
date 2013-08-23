@@ -2019,34 +2019,47 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   }
 
   SILFunctionTypeInfo *FTI = Ty.getFunctionTypeInfo(SILMod);
-
+  
   auto ArgTys = FTI->getInputTypes();
-  if (ArgTys.size() != ArgNames.size()) {
-    P.diagnose(TypeLoc, diag::expected_sil_type_kind,
-               " have the right argument types");
-    return true;
-  }
-
-
-  SILValue FnVal = getLocalValue(FnName, Ty);
-  unsigned ArgNo = 0;
-  SmallVector<SILValue, 4> Args;
-  for (auto &ArgName : ArgNames)
-    Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++]));
 
   switch (Opcode) {
   default: assert(0 && "Unexpected case");
-  case ValueKind::ApplyInst:
+  case ValueKind::ApplyInst : {
+    if (ArgTys.size() != ArgNames.size()) {
+      P.diagnose(TypeLoc, diag::expected_sil_type_kind,
+                 "have the right argument types");
+      return true;
+    }
+
+    SILValue FnVal = getLocalValue(FnName, Ty);
+    unsigned ArgNo = 0;
+    SmallVector<SILValue, 4> Args;
+    for (auto &ArgName : ArgNames)
+      Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++]));
+
     ResultVal = B.createApply(InstLoc, FnVal, FTI->getResultType(), Args,
                               Transparent);
     break;
+  }
   case ValueKind::PartialApplyInst: {
+    if (ArgTys.size() < ArgNames.size()) {
+      P.diagnose(TypeLoc, diag::expected_sil_type_kind,
+                 "have the right argument types");
+      return true;
+    }
+
     SmallVector<TupleTypeElt, 4> NewArgTypes;
 
     // Compute the result type of the partial_apply, based on which arguments
     // are getting applied.
-    for (unsigned i = 0, e = ArgTys.size()-ArgNames.size(); i != e; ++i)
+    unsigned ArgNo = ArgTys.size() - ArgNames.size();
+    for (unsigned i = 0, e = ArgNo; i != e; ++i)
       NewArgTypes.push_back(ArgTys[i].getSwiftType());
+
+    SILValue FnVal = getLocalValue(FnName, Ty);
+    SmallVector<SILValue, 4> Args;
+    for (auto &ArgName : ArgNames)
+      Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++]));
 
     Type ArgTy = TupleType::get(NewArgTypes, P.Context);
     Type ResTy = FunctionType::get(ArgTy, FTI->getResultType().getSwiftType(),
