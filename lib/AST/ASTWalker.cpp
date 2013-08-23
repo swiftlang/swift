@@ -643,99 +643,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     return S;
   }
-  
-  Pattern *visitParenPattern(ParenPattern *P) {
-    if (Pattern *newSub = doIt(P->getSubPattern()))
-      P->setSubPattern(newSub);
-    else
-      return nullptr;
-    return P;
-  }
-  
-  Pattern *visitTuplePattern(TuplePattern *P) {
-    for (auto &field : P->getFields()) {
-      if (Pattern *newField = doIt(field.getPattern()))
-        field.setPattern(newField);
-      else
-        return nullptr;
 
-      if (auto handle = field.getInit()) {
-        if (auto init = doIt(handle->getExpr())) {
-          handle->setExpr(init, handle->alreadyChecked());
-        } else {
-          return nullptr;
-        }
-      }
-    }
-    return P;
-  }
-  
-  Pattern *visitNamedPattern(NamedPattern *P) {
-    return P;
-  }
-  
-  Pattern *visitAnyPattern(AnyPattern *P) {
-    return P;
-  }
-  
-  Pattern *visitTypedPattern(TypedPattern *P) {
-    if (Pattern *newSub = doIt(P->getSubPattern()))
-      P->setSubPattern(newSub);
-    else
-      return nullptr;
-    if (P->getTypeLoc().getTypeRepr())
-      if (doIt(P->getTypeLoc().getTypeRepr()))
-        return nullptr;
-    return P;
-  }
-  
-  Pattern *visitIsaPattern(IsaPattern *P) {
-    return P;
-  }
-  
-  Pattern *visitNominalTypePattern(NominalTypePattern *P) {
-    if (Pattern *newSub = doIt(P->getSubPattern()))
-      P->setSubPattern(newSub);
-    else
-      return nullptr;
-    return P;
-  }
-  
-  Pattern *visitUnionElementPattern(UnionElementPattern *P) {
-    if (P->hasSubPattern()) {
-      if (Pattern *newSub = doIt(P->getSubPattern()))
-        P->setSubPattern(newSub);
-      else
-        return nullptr;
-    }
-    return P;
-  }
-  
-  Pattern *visitExprPattern(ExprPattern *P) {
-    // If the pattern has been type-checked, walk the match expression, which
-    // includes the explicit subexpression.
-    if (P->getMatchExpr()) {
-      if (Expr *newMatch = doIt(P->getMatchExpr()))
-        P->setMatchExpr(newMatch);
-      else
-        return nullptr;
-      return P;
-    }
-    
-    if (Expr *newSub = doIt(P->getSubExpr()))
-      P->setSubExpr(newSub);
-    else
-      return nullptr;
-    return P;
-  }
-  
-  Pattern *visitVarPattern(VarPattern *P) {
-    if (Pattern *newSub = doIt(P->getSubPattern()))
-      P->setSubPattern(newSub);
-    else
-      return nullptr;
-    return P;
-  }
+#define PATTERN(Id, Parent) Pattern *visit##Id##Pattern(Id##Pattern *P);
+#include "swift/AST/PatternNodes.def"
 
 #define TYPEREPR(Id, Parent) bool visit##Id##TypeRepr(Id##TypeRepr *T);
 #include "swift/AST/TypeReprNodes.def"
@@ -880,6 +790,99 @@ public:
 };
 
 } // end anonymous namespace.
+
+Pattern *Traversal::visitParenPattern(ParenPattern *P) {
+  if (Pattern *newSub = doIt(P->getSubPattern()))
+    P->setSubPattern(newSub);
+  else
+    return nullptr;
+  return P;
+}
+
+Pattern *Traversal::visitTuplePattern(TuplePattern *P) {
+  for (auto &field : P->getFields()) {
+    if (Pattern *newField = doIt(field.getPattern()))
+      field.setPattern(newField);
+    else
+      return nullptr;
+
+    if (auto handle = field.getInit()) {
+      if (auto init = doIt(handle->getExpr())) {
+        handle->setExpr(init, handle->alreadyChecked());
+      } else {
+        return nullptr;
+      }
+    }
+  }
+  return P;
+}
+
+Pattern *Traversal::visitNamedPattern(NamedPattern *P) {
+  return P;
+}
+
+Pattern *Traversal::visitAnyPattern(AnyPattern *P) {
+  return P;
+}
+
+Pattern *Traversal::visitTypedPattern(TypedPattern *P) {
+  if (Pattern *newSub = doIt(P->getSubPattern()))
+    P->setSubPattern(newSub);
+  else
+    return nullptr;
+  if (P->getTypeLoc().getTypeRepr())
+    if (doIt(P->getTypeLoc().getTypeRepr()))
+      return nullptr;
+  return P;
+}
+
+Pattern *Traversal::visitIsaPattern(IsaPattern *P) {
+  return P;
+}
+
+Pattern *Traversal::visitNominalTypePattern(NominalTypePattern *P) {
+  if (Pattern *newSub = doIt(P->getSubPattern()))
+    P->setSubPattern(newSub);
+  else
+    return nullptr;
+  return P;
+}
+
+Pattern *Traversal::visitUnionElementPattern(UnionElementPattern *P) {
+  if (P->hasSubPattern()) {
+    if (Pattern *newSub = doIt(P->getSubPattern()))
+      P->setSubPattern(newSub);
+    else
+      return nullptr;
+  }
+  return P;
+}
+
+Pattern *Traversal::visitExprPattern(ExprPattern *P) {
+  // If the pattern has been type-checked, walk the match expression, which
+  // includes the explicit subexpression.
+  if (P->getMatchExpr()) {
+    if (Expr *newMatch = doIt(P->getMatchExpr()))
+      P->setMatchExpr(newMatch);
+    else
+      return nullptr;
+    return P;
+  }
+
+  if (Expr *newSub = doIt(P->getSubExpr()))
+    P->setSubExpr(newSub);
+  else
+    return nullptr;
+  return P;
+}
+
+Pattern *Traversal::visitVarPattern(VarPattern *P) {
+  if (Pattern *newSub = doIt(P->getSubPattern()))
+    P->setSubPattern(newSub);
+  else
+    return nullptr;
+  return P;
+}
 
 bool Traversal::visitErrorTypeRepr(ErrorTypeRepr *T) {
   return false;
