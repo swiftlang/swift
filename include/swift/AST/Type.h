@@ -22,6 +22,7 @@
 #include <string>
 
 namespace swift {
+  class ASTContext;
   class TypeBase;
 
 /// Type - This is a simple value object that contains a pointer to a type
@@ -39,7 +40,27 @@ public:
   
   TypeBase *operator->() const { return Ptr; }
   explicit operator bool() const { return Ptr != 0; }
-  
+
+  /// Transform the given type by applying the user-provided function to
+  /// each type
+  ///
+  /// This routine applies the given function to transform one type into
+  /// another. If the function leaves the type unchanged, recurse into the
+  /// child type nodes and transform those. If any child type node changes,
+  /// the parent type node will be rebuilt.
+  ///
+  /// If at any time the function returns a null type, the null will be
+  /// propagated out.
+  ///
+  /// \param ctx The ASTContext in which the type resides.
+  ///
+  /// \param fn A function object with the signature \c Type(Type), which
+  /// accepts a type and returns either a transformed type or a null type.
+  ///
+  /// \returns the result of transforming the type.
+  template<typename F>
+  Type transform(const ASTContext &ctx, const F &fn);
+
   void dump() const;
   void print(raw_ostream &OS) const;
 

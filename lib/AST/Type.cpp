@@ -24,6 +24,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <functional>
 #include <iterator>
 using namespace swift;
 
@@ -508,191 +509,56 @@ NominalTypeDecl *TypeBase::getAnyNominal() {
 
 static Type getStrippedType(const ASTContext &context, Type type,
                             bool stripLabels, bool stripDefaultArgs) {
-  switch (type->getKind()) {
-  case TypeKind::Error: 
-  case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinObjectPointer:
-  case TypeKind::BuiltinObjCPointer:
-  case TypeKind::BuiltinInteger:
-  case TypeKind::BuiltinFloat:
-  case TypeKind::BuiltinVector:
-  case TypeKind::Union:
-  case TypeKind::Struct:
-  case TypeKind::Class:
-  case TypeKind::MetaType:
-  case TypeKind::Module:
-  case TypeKind::Protocol:
-  case TypeKind::Archetype:
-  case TypeKind::AssociatedType:
-  case TypeKind::GenericTypeParam:
-  case TypeKind::ProtocolComposition:
-  case TypeKind::UnboundGeneric:
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericUnion:
-  case TypeKind::BoundGenericStruct:
-  case TypeKind::TypeVariable:
-  case TypeKind::UnownedStorage:
-  case TypeKind::WeakStorage:
-    return type;
+  return type.transform(context,
+                        [&](Type type) -> Type {
+    auto *tuple = dyn_cast<TupleType>(type.getPointer());
+    if (!tuple)
+      return type;
 
-  case TypeKind::NameAlias:
-    if (TypeAliasDecl *D = cast<NameAliasType>(type.getPointer())->getDecl()) {
-      Type UnderlingTy = getStrippedType(context, D->getUnderlyingType(),
-                                         stripLabels, stripDefaultArgs);
-      if (UnderlingTy.getPointer() != D->getUnderlyingType().getPointer())
-        return UnderlingTy;
-    }
-    
-    return type;
-  
-  case TypeKind::Paren: {
-    ParenType *ParenTy = cast<ParenType>(type.getPointer());
-    Type UnderlyingTy = getStrippedType(context, ParenTy->getUnderlyingType(),
-                                        stripLabels, stripDefaultArgs);
-    if (UnderlyingTy.getPointer() != ParenTy->getUnderlyingType().getPointer())
-      return ParenType::get(context, UnderlyingTy);
-    return type;
-  }
-      
-  case TypeKind::Tuple: {
-    TupleType *TupleTy = cast<TupleType>(type.getPointer());
-    SmallVector<TupleTypeElt, 4> Elements;
-    bool Rebuild = false;
-    unsigned Idx = 0;
-    for (const TupleTypeElt &Elt : TupleTy->getFields()) {
-      Type EltTy = getStrippedType(context, Elt.getType(),
+    SmallVector<TupleTypeElt, 4> elements;
+    bool anyChanged = false;
+    unsigned idx = 0;
+    for (const auto &elt : tuple->getFields()) {
+      Type eltTy = getStrippedType(context, elt.getType(),
                                    stripLabels, stripDefaultArgs);
-      if (Rebuild || EltTy.getPointer() != Elt.getType().getPointer() ||
-          (Elt.hasInit() && stripDefaultArgs) ||
-          (!Elt.getName().empty() && stripLabels)) {
-        if (!Rebuild) {
-          Elements.reserve(TupleTy->getFields().size());
-          for (unsigned I = 0; I != Idx; ++I) {
-            const TupleTypeElt &Elt = TupleTy->getFields()[I];
-            Identifier newName = stripLabels? Identifier() : Elt.getName();
+      if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
+          (elt.hasInit() && stripDefaultArgs) ||
+          (!elt.getName().empty() && stripLabels)) {
+        if (!anyChanged) {
+          elements.reserve(tuple->getFields().size());
+          for (unsigned i = 0; i != idx; ++i) {
+            const TupleTypeElt &elt = tuple->getFields()[i];
+            Identifier newName = stripLabels? Identifier() : elt.getName();
             DefaultArgumentKind newDefArg
               = stripDefaultArgs? DefaultArgumentKind::None
-                                : Elt.getDefaultArgKind();
-            Elements.push_back(TupleTypeElt(Elt.getType(), newName, newDefArg,
-                                            Elt.isVararg()));
+                                : elt.getDefaultArgKind();
+            elements.push_back(TupleTypeElt(elt.getType(), newName, newDefArg,
+                                            elt.isVararg()));
           }
-          Rebuild = true;
+          anyChanged = true;
         }
 
-        Identifier newName = stripLabels? Identifier() : Elt.getName();
+        Identifier newName = stripLabels? Identifier() : elt.getName();
         DefaultArgumentKind newDefArg
           = stripDefaultArgs? DefaultArgumentKind::None
-                            : Elt.getDefaultArgKind();
-        Elements.push_back(TupleTypeElt(EltTy, newName, newDefArg,
-                                        Elt.isVararg()));
+                            : elt.getDefaultArgKind();
+        elements.push_back(TupleTypeElt(eltTy, newName, newDefArg,
+                                        elt.isVararg()));
       }
-      ++Idx;
+      ++idx;
     }
     
-    if (!Rebuild)
+    if (!anyChanged)
       return type;
     
     // An unlabeled 1-element tuple type is represented as a parenthesized
     // type.
-    if (Elements.size() == 1 && !Elements[0].isVararg() && 
-        Elements[0].getName().empty())
-      return ParenType::get(context, Elements[0].getType());
+    if (elements.size() == 1 && !elements[0].isVararg() && 
+        elements[0].getName().empty())
+      return ParenType::get(context, elements[0].getType());
     
-    return TupleType::get(Elements, context);
-  }
-      
-  case TypeKind::Function:
-  case TypeKind::PolymorphicFunction: {
-    AnyFunctionType *FunctionTy = cast<AnyFunctionType>(type.getPointer());
-    Type InputTy = getStrippedType(context, FunctionTy->getInput(),
-                                   stripLabels, stripDefaultArgs);
-    Type ResultTy = getStrippedType(context, FunctionTy->getResult(),
-                                    stripLabels, stripDefaultArgs);
-    if (InputTy.getPointer() != FunctionTy->getInput().getPointer() ||
-        ResultTy.getPointer() != FunctionTy->getResult().getPointer()) {
-      if (auto monoFn = dyn_cast<FunctionType>(FunctionTy)) {
-        auto Info = FunctionType::ExtInfo()
-                      .withIsAutoClosure(monoFn->isAutoClosure());
-        return FunctionType::get(InputTy, ResultTy,
-                                 Info, context);
-      } else {
-        auto polyFn = cast<PolymorphicFunctionType>(FunctionTy);
-        return PolymorphicFunctionType::get(InputTy, ResultTy,
-                                            &polyFn->getGenericParams(),
-                                            context);
-      }
-    }
-    
-    return type;
-  }
-      
-  case TypeKind::Array: {
-    ArrayType *ArrayTy = cast<ArrayType>(type.getPointer());
-    Type BaseTy = getStrippedType(context, ArrayTy->getBaseType(),
-                                  stripLabels, stripDefaultArgs);
-    if (BaseTy.getPointer() != ArrayTy->getBaseType().getPointer())
-      return ArrayType::get(BaseTy, ArrayTy->getSize(), context);
-    
-    return type;
-  }
-
-  case TypeKind::ArraySlice: {
-    ArraySliceType *sliceTy = cast<ArraySliceType>(type.getPointer());
-    Type baseTy = getStrippedType(context, sliceTy->getBaseType(),
-                                  stripLabels, stripDefaultArgs);
-    if (baseTy.getPointer() != sliceTy->getBaseType().getPointer()) {
-      ArraySliceType *newSliceTy = ArraySliceType::get(baseTy, context);
-      if (!newSliceTy->hasImplementationType())
-        newSliceTy->setImplementationType(sliceTy->getImplementationType());
-      return newSliceTy;
-    }
-    
-    return type;
-  }
-
-  case TypeKind::Optional: {
-    auto optionalTy = cast<OptionalType>(type.getPointer());
-    Type baseTy = getStrippedType(context, optionalTy->getBaseType(),
-                                  stripLabels, stripDefaultArgs);
-    if (baseTy.getPointer() != optionalTy->getBaseType().getPointer()) {
-      auto newOptTy = OptionalType::get(baseTy, context);
-      if (!newOptTy->hasImplementationType())
-        newOptTy->setImplementationType(optionalTy->getImplementationType());
-      return newOptTy;
-    }
-    
-    return type;
-  }
-
-  case TypeKind::LValue: {
-    LValueType *LValueTy = cast<LValueType>(type.getPointer());
-    Type ObjectTy = getStrippedType(context, LValueTy->getObjectType(),
-                                    stripLabels, stripDefaultArgs);
-    if (ObjectTy.getPointer() != LValueTy->getObjectType().getPointer())
-      return LValueType::get(ObjectTy, LValueTy->getQualifiers(), context);
-    return type;
-  }
-      
-  case TypeKind::Substituted: {
-    SubstitutedType *SubstTy = cast<SubstitutedType>(type.getPointer());
-    Type NewSubstTy = getStrippedType(context, SubstTy->getReplacementType(),
-                                      stripLabels, stripDefaultArgs);
-    if (NewSubstTy.getPointer() != SubstTy->getReplacementType().getPointer())
-      return SubstitutedType::get(SubstTy->getOriginal(), NewSubstTy,
-                                  context);
-    return type;
-  }
-
-  case TypeKind::DependentMember: {
-    auto dependent = cast<DependentMemberType>(type.getPointer());
-    auto base = getStrippedType(context, dependent->getBase(), stripLabels,
-                                stripDefaultArgs);
-    if (base.getPointer() == dependent->getBase().getPointer())
-      return type;
-
-    return DependentMemberType::get(base, dependent->getName(), context);
-  }
-  }
+    return TupleType::get(elements, context);
+  });
 }
 
 Type TypeBase::getUnlabeledType(ASTContext &Context) {

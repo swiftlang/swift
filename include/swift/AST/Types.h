@@ -2185,6 +2185,338 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 
+namespace detail {
+  /// An identity function whose sole purpose is to turn a non-dependent value
+  /// into a type-dependent value, e.g., to delay type checking for incomplete
+  /// types.
+  ///
+  /// \code
+  ///
+  /// \endcode
+  template<typename Dependent, typename T>
+  T &&dependentIdentity(T &&value) {
+    return static_cast<T&&>(value);
+  }
+}
+
+template<typename F>
+Type Type::transform(const ASTContext &ctx, const F &fn) {
+  // Transform this type node.
+  Type transformed = fn(*this);
+
+  // If the transform returned a null type, propagate the null.
+  if (!transformed)
+    return Type();
+
+  // Recursive into children of this type.
+  TypeBase *base = getPointer();
+  switch (base->getKind()) {
+#define ALWAYS_CANONICAL_TYPE(Id, Parent) \
+case TypeKind::Id:
+#define TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+  case TypeKind::TypeVariable:
+  case TypeKind::AssociatedType:
+  case TypeKind::GenericTypeParam:
+    return *this;
+
+  case TypeKind::Union:
+  case TypeKind::Struct:
+  case TypeKind::Class: {
+    auto nominalTy = cast<NominalType>(base);
+    if (auto parentTy = nominalTy->getParent()) {
+      parentTy = parentTy.transform(ctx, fn);
+      if (!parentTy)
+        return Type();
+
+      if (parentTy.getPointer() == nominalTy->getParent().getPointer())
+        return *this;
+
+      return NominalType::get(nominalTy->getDecl(), parentTy, ctx);
+    }
+
+    return *this;
+  }
+
+#define ARTIFICIAL_TYPE(Id, Parent) \
+case TypeKind::Id:
+#define TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+    llvm_unreachable("transforming artificial type?");
+
+  case TypeKind::UnboundGeneric: {
+    auto unbound = cast<UnboundGenericType>(base);
+    Type substParentTy;
+    if (auto parentTy = unbound->getParent()) {
+      substParentTy = parentTy.transform(ctx, fn);
+      if (!substParentTy)
+        return Type();
+
+      if (substParentTy.getPointer() == parentTy.getPointer())
+        return *this;
+
+      return UnboundGenericType::get(unbound->getDecl(), substParentTy, ctx);
+    }
+
+    return *this;
+  }
+
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericUnion:
+  case TypeKind::BoundGenericStruct: {
+    auto bound = cast<BoundGenericType>(base);
+    SmallVector<Type, 4> substArgs;
+    bool anyChanged = false;
+    Type substParentTy;
+    if (auto parentTy = bound->getParent()) {
+      substParentTy = parentTy.transform(ctx, fn);
+      if (!substParentTy)
+        return Type();
+
+      if (substParentTy.getPointer() != parentTy.getPointer())
+        anyChanged = true;
+    }
+
+    for (auto arg : bound->getGenericArgs()) {
+      Type substArg = arg.transform(ctx, fn);
+      if (!substArg)
+        return Type();
+      substArgs.push_back(substArg);
+      if (substArg.getPointer() != arg.getPointer())
+        anyChanged = true;
+    }
+
+    if (!anyChanged)
+      return *this;
+
+    return BoundGenericType::get(bound->getDecl(), substParentTy, substArgs);
+  }
+
+  case TypeKind::MetaType: {
+    auto meta = cast<MetaTypeType>(base);
+    auto instanceTy = meta->getInstanceType().transform(ctx, fn);
+    if (!instanceTy)
+      return Type();
+
+    if (instanceTy.getPointer() == meta->getInstanceType().getPointer())
+      return *this;
+
+    return MetaTypeType::get(instanceTy, ctx);
+  }
+
+  case TypeKind::NameAlias: {
+    auto alias = cast<NameAliasType>(base);
+    auto dependentDecl = detail::dependentIdentity<F>(alias->getDecl());
+    auto underlyingTy = dependentDecl->getUnderlyingType().transform(ctx,fn);
+    if (!underlyingTy)
+      return Type();
+
+    if (underlyingTy.getPointer()
+          == dependentDecl->getUnderlyingType().getPointer())
+      return *this;
+
+    return SubstitutedType::get(*this, underlyingTy, ctx);
+  }
+
+  case TypeKind::Paren: {
+    auto paren = cast<ParenType>(base);
+    Type underlying = paren->getUnderlyingType().transform(ctx, fn);
+    if (!underlying)
+      return Type();
+
+    if (underlying.getPointer() == paren->getUnderlyingType().getPointer())
+      return *this;
+
+    return ParenType::get(ctx, underlying);
+  }
+
+  case TypeKind::Tuple: {
+    auto tuple = cast<TupleType>(base);
+    bool anyChanged = false;
+    SmallVector<TupleTypeElt, 4> elements;
+    unsigned Index = 0;
+    for (const auto &elt : tuple->getFields()) {
+      Type eltTy = elt.getType().transform(ctx, fn);
+      if (!eltTy)
+        return Type();
+
+      // If nothing has changd, just keep going.
+      if (!anyChanged && eltTy.getPointer() == elt.getType().getPointer()) {
+        ++Index;
+        continue;
+      }
+
+      // If this is the first change we've seen, copy all of the previous
+      // elements.
+      if (!anyChanged) {
+        // Copy all of the previous elements.
+        for (unsigned I = 0; I != Index; ++I) {
+          const TupleTypeElt &FromElt =tuple->getFields()[I];
+          elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
+                                          FromElt.getDefaultArgKind(),
+                                          FromElt.isVararg()));
+        }
+
+        anyChanged = true;
+      }
+
+      // Add the new tuple element, with the new type, no initializer,
+      elements.push_back(TupleTypeElt(eltTy, elt.getName(),
+                                      elt.getDefaultArgKind(), elt.isVararg()));
+      ++Index;
+    }
+
+    if (!anyChanged)
+      return *this;
+
+    return TupleType::get(elements, ctx);
+  }
+
+
+  case TypeKind::DependentMember: {
+    auto dependent = cast<DependentMemberType>(base);
+    auto dependentBase = dependent->getBase().transform(ctx, fn);
+    if (!dependentBase)
+      return Type();
+
+    if (dependentBase.getPointer() == dependent->getBase().getPointer())
+      return *this;
+
+    return DependentMemberType::get(dependentBase, dependent->getName(),
+                                    ctx);
+  }
+
+  case TypeKind::Substituted: {
+    auto substAT = cast<SubstitutedType>(base);
+    auto substTy = substAT->getReplacementType().transform(ctx, fn);
+    if (!substTy)
+      return Type();
+
+    if (substTy.getPointer() == substAT->getReplacementType().getPointer())
+      return *this;
+
+    return SubstitutedType::get(substAT->getOriginal(), substTy, ctx);
+  }
+
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction: {
+    auto function = cast<AnyFunctionType>(base);
+    auto inputTy = function->getInput().transform(ctx, fn);
+    if (!inputTy)
+      return Type();
+    auto resultTy = function->getResult().transform(ctx, fn);
+    if (!resultTy)
+      return Type();
+
+    if (inputTy.getPointer() == function->getInput().getPointer() &&
+        resultTy.getPointer() == function->getResult().getPointer())
+      return *this;
+
+    // Function types always parenthesized input types, but some clients
+    // (e.g., the type-checker) occasionally perform transformations that
+    // don't abide this. Fix up the input type appropriately.
+    if (!inputTy->hasTypeVariable() &&
+        !isa<ParenType>(inputTy.getPointer()) &&
+        !isa<TupleType>(inputTy.getPointer())) {
+      inputTy = ParenType::get(ctx, inputTy);
+    }
+
+    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(function)) {
+      return PolymorphicFunctionType::get(inputTy, resultTy,
+                                          &polyFn->getGenericParams(),
+                                          function->getExtInfo(),
+                                          ctx);
+    }
+
+    return FunctionType::get(inputTy, resultTy,
+                             function->getExtInfo(),
+                             ctx);
+  }
+
+  case TypeKind::Array: {
+    auto array = cast<ArrayType>(base);
+    auto baseTy = array->getBaseType().transform(ctx, fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == array->getBaseType().getPointer())
+      return *this;
+
+    return ArrayType::get(baseTy, array->getSize(), ctx);
+  }
+
+  case TypeKind::ArraySlice: {
+    auto slice = cast<ArraySliceType>(base);
+    auto baseTy = slice->getBaseType().transform(ctx, fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == slice->getBaseType().getPointer())
+      return *this;
+
+    return ArraySliceType::get(baseTy, ctx);
+  }
+
+  case TypeKind::Optional: {
+    auto optional = cast<OptionalType>(base);
+    auto baseTy = optional->getBaseType().transform(ctx, fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == optional->getBaseType().getPointer())
+      return *this;
+
+    return OptionalType::get(baseTy, ctx);
+  }
+
+  case TypeKind::LValue: {
+    auto lvalue = cast<LValueType>(base);
+    auto objectTy = lvalue->getObjectType().transform(ctx, fn);
+    if (!objectTy)
+      return Type();
+
+    if (objectTy.getPointer() == lvalue->getObjectType().getPointer())
+      return *this;
+
+    return LValueType::get(objectTy, lvalue->getQualifiers(), ctx);
+  }
+
+  case TypeKind::ProtocolComposition: {
+    auto pc = cast<ProtocolCompositionType>(base);
+    SmallVector<Type, 4> protocols;
+    bool anyChanged = false;
+    unsigned index = 0;
+    for (auto proto : pc->getProtocols()) {
+      auto substProto = proto.transform(ctx, fn);
+      if (!substProto)
+        return Type();
+      
+      if (anyChanged) {
+        protocols.push_back(substProto);
+        ++index;
+        continue;
+      }
+      
+      if (substProto.getPointer() != proto.getPointer()) {
+        anyChanged = true;
+        protocols.append(protocols.begin(), protocols.begin() + index);
+        protocols.push_back(substProto);
+      }
+      
+      ++index;
+    }
+    
+    if (!anyChanged)
+      return *this;
+    
+    return ProtocolCompositionType::get(ctx, protocols);
+  }
+  }
+  
+  llvm_unreachable("Unhandled type in transformation");
+}
+
 inline bool TypeBase::hasTypeVariable() const {
   return TypeBits.TypeBase.HasTypeVariable;
 }
