@@ -192,7 +192,7 @@ bool TypeBase::isSpecialized() {
   if (CT.getPointer() != this)
     return CT->isSpecialized();
 
-  return CT.findIf([&](Type type) -> bool {
+  return CT.findIf([](Type type) -> bool {
     return isa<BoundGenericType>(type.getPointer());
   });
 }
@@ -992,7 +992,7 @@ bool TypeBase::isSpelledLike(Type other) {
 
 bool TypeBase::isDependentType() {
   auto canon = getCanonicalType();
-  return canon.findIf([&](Type type) -> bool {
+  return canon.findIf([](Type type) -> bool {
     // The presence of a generic type parameter indicates a dependent type.
     return isa<GenericTypeParamType>(type.getPointer());
   });

@@ -45,7 +45,8 @@ public:
   /// which the given predicate returns true.
   ///
   /// \param pred A predicate function object with the signature
-  /// \c bool(Type). It should r
+  /// \c bool(Type). It should return true if the give type node satisfies the
+  /// criteria.
   ///
   /// \returns true if the predicate returns true for the given type or any of
   /// its children.
