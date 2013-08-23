@@ -596,8 +596,7 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
   ++NumAssignRewritten;
   SILBuilder B(Inst);
 
-  // "unowned" assignments are expanded to unowned operations.
-  bool isOwned = !StoredType.is<UnownedStorageType>();
+  auto &TL = Inst->getModule()->getTypeLowering(StoredType);
 
   // Otherwise, if it has trivial type, we can always just replace the
   // assignment with a store.  If it has non-trivial type and is an
@@ -607,12 +606,7 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
       B.createStore(Inst->getLoc(), Inst->getOperand(0), Inst->getOperand(1));
 
     // Non-trivial values must be retained, since the box owns them.
-    if (HasTrivialType)
-      ;
-    else if (isOwned)
-      B.createRetainInst(Inst->getLoc(), Inst->getOperand(0));
-    else
-      B.createUnownedRetain(Inst->getLoc(), Inst->getOperand(0));
+    TL.emitRetain(B, Inst->getLoc(), Inst->getOperand(0));
 
     NonLoadUses.insert(NewStore);
     NonLoadUses.erase(Inst);
@@ -626,18 +620,12 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
   if (!IncomingVal)
     IncomingVal = B.createLoad(Inst->getLoc(), Inst->getOperand(1));
 
-  if (isOwned)
-    B.createRetainInst(Inst->getLoc(), Inst->getOperand(0));
-  else
-    B.createUnownedRetain(Inst->getLoc(), Inst->getOperand(0));
+  TL.emitRetain(B, Inst->getLoc(), Inst->getOperand(0));
 
   auto NewStore =
     B.createStore(Inst->getLoc(), Inst->getOperand(0), Inst->getOperand(1));
 
-  if (isOwned)
-    B.createReleaseInst(Inst->getLoc(), IncomingVal);
-  else
-    B.createUnownedRelease(Inst->getLoc(), IncomingVal);
+  TL.emitRelease(B, Inst->getLoc(), IncomingVal);
 
   NonLoadUses.insert(NewStore);
   NonLoadUses.erase(Inst);

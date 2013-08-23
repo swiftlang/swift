@@ -377,4 +377,19 @@ bb0:
 
 
 
+struct ContainsObjectPointer {
+  var x : Int 
+  var y : Builtin.ObjectPointer
+}
+
+sil @test_struct : $[thin] (value : [byref] ContainsObjectPointer) -> () {
+bb0(%0 : $*ContainsObjectPointer):
+  %b = alloc_box $ContainsObjectPointer
+  %1 = load %0 : $*ContainsObjectPointer
+  assign %1 to %b#1 : $*ContainsObjectPointer
+  
+  release %b#0 : $Builtin.ObjectPointer
+  %x = tuple ()
+  return %x : $()
+}
 

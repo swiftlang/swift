@@ -193,7 +193,7 @@ public:
   ///
   /// This should be used for duplicating a value from place to place
   /// with exactly the same semantics.  For example, it performs an
-  /// unowned_release on a value of [unknown] type.  It is therefore
+  /// unowned_retain on a value of [unknown] type.  It is therefore
   /// not necessarily the right thing to do on a semantic load.
   virtual void emitRetain(SILBuilder &B, SILLocation loc,
                           SILValue value) const = 0;
