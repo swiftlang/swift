@@ -25,6 +25,7 @@
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
+  class ASTWalker;
   class DeclContext;
   class ValueDecl;
   class Module;
@@ -55,6 +56,12 @@ public:
   SourceRange getSourceRange() const;
 
   static bool classof(const TypeRepr *T) { return true; }
+
+  /// Walk this type representation.
+  TypeRepr *walk(ASTWalker &walker);
+  TypeRepr *walk(ASTWalker &&walker) {
+    return walk(walker);
+  }
 
   //*** Allocation Routines ************************************************/
 

@@ -771,6 +771,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitOptionalTypeRepr(OptionalTypeRepr *T) {
+    if (doIt(T->getBase()))
+      return true;
+    return false;
+  }
+
   bool visitTupleTypeRepr(TupleTypeRepr *T) {
     for (auto elem : T->getElements()) {
       if (doIt(elem))
@@ -952,6 +958,11 @@ Stmt *Stmt::walk(ASTWalker &walker) {
 
 Pattern *Pattern::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
+}
+
+TypeRepr *TypeRepr::walk(ASTWalker &walker) {
+  Traversal(walker).doIt(this);
+  return this;
 }
 
 bool Decl::walk(ASTWalker &walker) {
