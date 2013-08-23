@@ -1055,8 +1055,11 @@ namespace {
     }
 
     void emitSemanticUnknownAssignment(SILBuilder &B, SILLocation loc,
-                                 SILValue value, SILValue addr) const override {
-      B.createAssign(loc, value, addr);
+                                       SILValue value,
+                                       SILValue addr) const override {
+      // Convert the new value to [unowned] type.
+      auto unownedValue = B.createRefToUnowned(loc, value, getLoweredType());
+      B.createAssign(loc, unownedValue, addr);
     }
 
 

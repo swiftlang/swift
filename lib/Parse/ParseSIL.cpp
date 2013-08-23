@@ -1355,19 +1355,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     }
 
-    SILType ValType = addrVal.getType().getObjectType();
-
-    if (Opcode == ValueKind::StoreInst) {
-      ResultVal = B.createStore(InstLoc, getLocalValue(from, ValType), addrVal);
-      break;
+    SILValue fromVal = getLocalValue(from, addrVal.getType().getObjectType());
+    if (Opcode == ValueKind::StoreInst)
+      ResultVal = B.createStore(InstLoc, fromVal, addrVal);
+    else {
+      assert(Opcode == ValueKind::AssignInst);
+      ResultVal = B.createAssign(InstLoc, fromVal, addrVal);
     }
 
-    assert(Opcode == ValueKind::AssignInst);
-
-    // The ValType of an assignment to [unowned] is a strong pointer.
-    if (auto T = ValType.getAs<UnownedStorageType>())
-      ValType = SILType::getPrimitiveObjectType(T.getReferentType());
-    ResultVal = B.createAssign(InstLoc, getLocalValue(from, ValType),addrVal);
     break;
   }
   case ValueKind::AllocStackInst:

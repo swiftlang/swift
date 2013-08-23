@@ -615,10 +615,6 @@ public:
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
-  bool isUnownedAssign() const {
-    return getDest().getType().getObjectType().is<UnownedStorageType>();
-  }
-
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
