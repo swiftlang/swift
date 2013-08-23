@@ -105,6 +105,8 @@ public:
   };
 
   Node(Kind k, std::string t = "");
+  
+  Node (const Node& other);
 
   llvm::StringRef getText();
   void setText(std::string t);
@@ -113,15 +115,15 @@ public:
   void setKind(Kind k);
 
   NodePointer getNextNode();
-  void setNextNode(NodePointer n);
-  void insertNextNode(NodePointer n);
+  NodePointer setNextNode(NodePointer n);
 
-  void push_back_child(NodePointer c);
-  void push_front_child(NodePointer c);
-  void insert_child(iterator i, NodePointer c);
+  NodePointer push_back_child(NodePointer c);
 
   NodePointer child_at(size_type pos);
 
+  NodePointer front();
+  NodePointer back();
+  
   iterator begin();
   iterator end();
 

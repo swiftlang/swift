@@ -28,6 +28,14 @@ swift::Demangle::Node::Node(Kind k, std::string t)
     : ParentNode(nullptr), TextContent(t), NodeKind(k), NextNode(nullptr),
       Children() {}
 
+swift::Demangle::Node::Node (const Node& other) {
+  NodeKind = other.NodeKind;
+  TextContent = other.TextContent;
+  ParentNode = other.ParentNode;
+  Children = other.Children;
+  NextNode = other.NextNode;
+}
+
 llvm::StringRef swift::Demangle::Node::getText() { return TextContent; }
 void swift::Demangle::Node::setText(std::string t) { TextContent.assign(t); }
 
@@ -39,40 +47,34 @@ void swift::Demangle::Node::setKind(swift::Demangle::Node::Kind k) {
 }
 
 NodePointer swift::Demangle::Node::getNextNode() { return NextNode; }
-void swift::Demangle::Node::setNextNode(NodePointer n) {
+NodePointer swift::Demangle::Node::setNextNode(NodePointer n) {
   NextNode = n;
   if (ParentNode)
     ParentNode->push_back_child(n);
-}
-void swift::Demangle::Node::insertNextNode(NodePointer n) {
-  if (!n || !NextNode) {
-    setNextNode(n);
-    return;
-  }
-  NodePointer prev_next = NextNode;
-  NextNode = n;
-  NodePointer end_of_chain = NextNode;
-  while (end_of_chain->getNextNode())
-    end_of_chain = end_of_chain->getNextNode();
-  end_of_chain->setNextNode(prev_next);
+  return n;
 }
 
-void swift::Demangle::Node::push_back_child(NodePointer c) {
+NodePointer swift::Demangle::Node::push_back_child(NodePointer c) {
   Children.push_back(c);
   c->ParentNode = this;
-}
-void swift::Demangle::Node::push_front_child(NodePointer c) {
-  Children.insert(begin(), c);
-}
-void swift::Demangle::Node::insert_child(swift::Demangle::Node::iterator i,
-                                         NodePointer c) {
-  Children.insert(i, c);
+  return c;
 }
 
 NodePointer
 swift::Demangle::Node::child_at(swift::Demangle::Node::size_type pos) {
   if (pos < size())
     return Children[pos];
+  return NodePointer(nullptr);
+}
+
+NodePointer swift::Demangle::Node::front() {
+  if (size())
+    return Children.front();
+  return NodePointer(nullptr);
+}
+NodePointer swift::Demangle::Node::back() {
+  if (size())
+    return Children.back();
   return NodePointer(nullptr);
 }
 
@@ -231,7 +233,7 @@ private:
     yes = true, no = false
   };
 
-  typedef std::pair<std::string, IsProtocol> Substitution;
+  typedef std::pair<NodePointer, IsProtocol> Substitution;
 
   enum class Directness {
     Direct, Indirect, Unkown
@@ -643,48 +645,80 @@ private:
 
   Substitution demangleSubstitutionIndexWithProtocol() {
     if (!Mangled)
-      return { "", IsProtocol::no };
+      return { Node::makeNodePointer(Node::Kind::Failure), IsProtocol::no };
     if (Mangled.nextIf('o'))
-      return { "ObjectiveC", IsProtocol::no };
+      return { Node::makeNodePointer(Node::Kind::Module,"ObjectiveC"), IsProtocol::no };
     if (Mangled.nextIf('C'))
-      return { "C", IsProtocol::no };
+      return { Node::makeNodePointer(Node::Kind::Module,"C"), IsProtocol::no };
     if (Mangled.nextIf('s'))
-      return { "swift", IsProtocol::no };
-    if (Mangled.nextIf('a'))
-      return { "swift.Slice", IsProtocol::no };
-    if (Mangled.nextIf('b'))
-      return { "swift.Bool", IsProtocol::no };
-    if (Mangled.nextIf('c'))
-      return { "swift.Char", IsProtocol::no };
-    if (Mangled.nextIf('d'))
-      return { "swift.Float64", IsProtocol::no };
-    if (Mangled.nextIf('f'))
-      return { "swift.Float32", IsProtocol::no };
-    if (Mangled.nextIf('i'))
-      return { "swift.Int64", IsProtocol::no };
-    if (Mangled.nextIf('q'))
-      return { "swift.Optional", IsProtocol::no };
-    if (Mangled.nextIf('S'))
-      return { "swift.String", IsProtocol::no };
-    if (Mangled.nextIf('u'))
-      return { "swift.UInt64", IsProtocol::no };
+      return { Node::makeNodePointer(Node::Kind::Module,"swift"), IsProtocol::no };
+    if (Mangled.nextIf('a')) {
+      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::makeNodePointer(Node::Kind::Structure,"Slice"));
+      return { type, IsProtocol::no };
+    }
+    if (Mangled.nextIf('b')) {
+      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
+                                                                                            Node::makeNodePointer(Node::Kind::Structure,"Bool"));
+      return { type, IsProtocol::no };
+    }
+    if (Mangled.nextIf('c')) {
+      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::makeNodePointer(Node::Kind::Structure,"Char"));
+      return { type, IsProtocol::no };
+    }
+    if (Mangled.nextIf('d')) {
+      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::makeNodePointer(Node::Kind::Structure,"Float64"));
+      return { type, IsProtocol::no };
+    }
+    if (Mangled.nextIf('f')) {
+      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::makeNodePointer(Node::Kind::Structure,"Float32"));
+      return { type, IsProtocol::no };
+    }
+    if (Mangled.nextIf('i')) {
+      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::makeNodePointer(Node::Kind::Structure,"Int64"));
+      return { type, IsProtocol::no };
+    }
+    if (Mangled.nextIf('q')) {
+      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::makeNodePointer(Node::Kind::Structure,"Optional"));
+      return { type, IsProtocol::no };
+    }
+    if (Mangled.nextIf('S')) {
+      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::makeNodePointer(Node::Kind::Structure,"String"));
+      return { type, IsProtocol::no };
+    }
+    if (Mangled.nextIf('u')) {
+      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
+                            Node::makeNodePointer(Node::Kind::Structure,"UInt64"));
+      return { type, IsProtocol::no };
+    }
     size_t index_sub;
     if (!demangleIndex(index_sub))
-      return { "", IsProtocol::no };
+      return { Node::makeNodePointer(Node::Kind::Failure), IsProtocol::no };
     if (index_sub >= Substitutions.size())
-      return { "", IsProtocol::no };
+      return { Node::makeNodePointer(Node::Kind::Failure), IsProtocol::no };
     return Substitutions[index_sub];
   }
 
   NodePointer demangleSubstitutionIndex() {
     Substitution sub = demangleSubstitutionIndexWithProtocol();
-    if (sub.first.empty())
+    if (!sub.first)
       return nullptr;
-    if (sub.second == IsProtocol::yes) {
-      return Node::makeNodePointer(Node::Kind::Protocol, sub.first);
-    } else {
-      return Node::makeNodePointer(Node::Kind::Identifier, sub.first);
-    }
+    return NodePointer(new Node(*sub.first.getPtr()));
   }
 
   NodePointer demangleSubstitution() {
@@ -699,9 +733,10 @@ private:
       NodePointer identifier = demangleIdentifier();
       if (!identifier)
         return nullptr;
-      Substitutions.push_back({ identifier->getText(), IsProtocol::no });
       if (identifier->getKind() == Node::Kind::Identifier)
         identifier->setKind(Node::Kind::Module);
+      NodePointer copy_identifier = Node::makeNodePointer(identifier->getKind(),identifier->getText());
+      Substitutions.push_back( { copy_identifier, IsProtocol::no });
       return identifier;
     }
     if (c == 'S') {
@@ -725,7 +760,13 @@ private:
       return false;
     DemanglerPrinter printer;
     printer << context->getText() << "." << identifier->getText();
-    Substitutions.push_back({ printer.str(), isA });
+    NodePointer nominaltype = Node::makeNodePointer(Node::Kind::NominalType);
+    NodePointer copy_context = Node::makeNodePointer(context->getKind(),context->getText());
+    NodePointer copy_identifier = Node::makeNodePointer(identifier->getKind(),identifier->getText());
+    if (isA == IsProtocol::yes)
+      copy_identifier->setKind(Node::Kind::Protocol);
+    nominaltype->push_back_child(copy_context)->setNextNode(copy_identifier);
+    Substitutions.push_back({ nominaltype, isA });
     if (context_type != Node::Kind::Unknown)
       identifier->setKind(context_type);
     return true;
@@ -734,19 +775,20 @@ private:
   NodePointer demangleProtocolName() {
     if (Mangled.nextIf('S')) {
       Substitution sub = demangleSubstitutionIndexWithProtocol();
-      if (sub.first.empty())
+      if (!sub.first)
         return nullptr;
       if (sub.second == IsProtocol::yes)
-        return Node::makeNodePointer(Node::Kind::Protocol, sub.first);
+        return sub.first;
       NodePointer identifier = demangleIdentifier();
       if (!identifier)
         return nullptr;
-      DemanglerPrinter printer;
-      printer << sub.first << "." << identifier->getText();
-      NodePointer result =
-          Node::makeNodePointer(Node::Kind::Protocol, printer.str());
-      Substitutions.push_back({ result->getText(), IsProtocol::yes });
-      return result;
+      NodePointer nominaltype = Node::makeNodePointer(Node::Kind::NominalType);
+      NodePointer copy_context = NodePointer(new Node(*sub.first.getPtr()));
+      identifier->setKind(Node::Kind::Protocol);
+      NodePointer copy_identifier = Node::makeNodePointer(identifier->getKind(),identifier->getText());
+      nominaltype->push_back_child(copy_context)->setNextNode(copy_identifier);
+      Substitutions.push_back({ nominaltype, IsProtocol::yes });
+      return nominaltype;
     }
     NodePointer context, identifier;
     if (demangleDeclarationName(context, identifier, IsProtocol::yes)) {
@@ -1230,7 +1272,7 @@ private:
       return nullptr;
     }
     if (isStartOfNominalType(c)) {
-      NodePointer context, identifier;
+      NodePointer context(nullptr), identifier(nullptr);
       if (!demangleDeclarationName(context, identifier, IsProtocol::no))
         return nullptr;
       context->setNextNode(identifier);
