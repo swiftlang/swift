@@ -19,11 +19,14 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
     endif()
   endif()
 
-  # FIXME: The check for a 'Debug' tblgen is madness
-  if( NOT EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/llvm-tblgen${CMAKE_EXECUTABLE_SUFFIX}" )
-    if ( NOT EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/Debug/llvm-tblgen${CMAKE_EXECUTABLE_SUFFIX}" )
-      message(FATAL_ERROR "Please set SWIFT_PATH_TO_LLVM_BUILD to a directory containing an LLVM build.")
-    endif()
+  if (EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/llvm-config${CMAKE_EXECUTABLE_SUFFIX}")
+    set (PATH_TO_LLVM_CONFIG "${SWIFT_PATH_TO_LLVM_BUILD}/bin/llvm-config${CMAKE_EXECUTABLE_SUFFIX}")
+  elseif (EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/Debug/llvm-config${CMAKE_EXECUTABLE_SUFFIX}")
+    # Looking for bin/Debug/llvm-config is a complete hack. How can we get
+    # around this?
+    set (PATH_TO_LLVM_CONFIG "${SWIFT_PATH_TO_LLVM_BUILD}/bin/Debug/llvm-config${CMAKE_EXECUTABLE_SUFFIX}")
+  else()
+    message(FATAL_ERROR "Please set SWIFT_PATH_TO_LLVM_BUILD to a directory containing a LLVM build.")
   endif()
 
   set(SWIFT_PATH_TO_CLANG_SOURCE "${SWIFT_PATH_TO_LLVM_SOURCE}/tools/clang"
@@ -85,13 +88,9 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
   link_directories("${PATH_TO_LLVM_BUILD}/lib"
                    "${PATH_TO_CLANG_BUILD}/lib")
 
-  if( EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/llvm-tblgen${CMAKE_EXECUTABLE_SUFFIX}" )
-    set(LLVM_TABLEGEN_EXE "${PATH_TO_LLVM_BUILD}/bin/llvm-tblgen${CMAKE_EXECUTABLE_SUFFIX}")
-  else()
-    # FIXME: This is an utter hack.
-    set(LLVM_TABLEGEN_EXE "${PATH_TO_LLVM_BUILD}/bin/Debug/llvm-tblgen${CMAKE_EXECUTABLE_SUFFIX}")
-  endif()
-  
+  exec_program("${PATH_TO_LLVM_CONFIG} --bindir" OUTPUT_VARIABLE LLVM_BINARY_DIR)
+  set(LLVM_TABLEGEN_EXE "${LLVM_BINARY_DIR}/llvm-tblgen${CMAKE_EXECUTABLE_SUFFIX}")
+
   set(LIT_ARGS_DEFAULT "-sv")
   if (MSVC OR XCODE)
     set(LIT_ARGS_DEFAULT "${LIT_ARGS_DEFAULT} --no-progress-bar")
