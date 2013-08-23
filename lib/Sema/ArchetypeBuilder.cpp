@@ -247,6 +247,9 @@ ArchetypeBuilder::ArchetypeBuilder(
 ArchetypeBuilder::ArchetypeBuilder(ArchetypeBuilder &&) = default;
 
 ArchetypeBuilder::~ArchetypeBuilder() {
+  if (!Impl)
+    return;
+
   for (auto PA : Impl->PotentialArchetypes)
     delete PA.second;
 }
