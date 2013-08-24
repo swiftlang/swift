@@ -1673,54 +1673,53 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
                                           { },
                                           GenericParams, CurDeclContext);
 
+  if (Attributes.isValid())
+    UD->getMutableAttrs() = Attributes;
+
   // Now that we have a context, update the generic parameters with that
   // context.
   if (GenericParams)
     for (auto Param : *GenericParams)
       Param.setDeclContext(UD);
 
-  if (Attributes.isValid())
-    UD->getMutableAttrs() = Attributes;
+  ParserStatus Status;
 
-  // Parse optional inheritance clause.
+  // Parse optional inheritance clause within the context of the union.
   if (Tok.is(tok::colon)) {
     ContextChange CC(*this, UD);
     SmallVector<TypeLoc, 2> Inherited;
-    parseInheritance(Inherited);
+    Status |= parseInheritance(Inherited);
     UD->setInherited(Context.AllocateCopy(Inherited));
   }
 
+  SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_union_type)) {
-    UD->setMembers({}, Tok.getLoc());
-    return makeParserErrorResult(UD);
-  }
-
-  bool Invalid = false;
-  // Parse the body.
-  SmallVector<Decl*, 8> MemberDecls;
-  {
+    LBLoc = Tok.getLoc();
+    RBLoc = LBLoc;
+    Status.setIsParseError();
+  } else {
     ContextChange CC(*this, UD);
     Scope S(this, ScopeKind::ClassBody);
-    Invalid |= parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
-                                       diag::expected_rbrace_union_type,
-                                       PD_HasContainerType
-                                         | PD_AllowUnionElement
-                                         | PD_DisallowVar);
+    if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
+                                diag::expected_rbrace_union_type,
+                                PD_HasContainerType | PD_AllowUnionElement |
+                                PD_DisallowVar))
+      Status.setIsParseError();
   }
 
-  UD->setMembers(Context.AllocateCopy(MemberDecls), {LBLoc, RBLoc});
+  if (MemberDecls.empty())
+    UD->setMembers({}, { LBLoc, RBLoc });
+  else
+    UD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
   addToScope(UD);
 
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(UnionLoc, diag::disallowed_type);
-    return makeParserErrorResult(UD);
+    Status.setIsParseError();
   }
 
-  if (Invalid)
-    return makeParserErrorResult(UD);
-  else
-    return makeParserResult(UD);
+  return makeParserResult(Status, UD);
 }
 
 /// parseDeclUnionElement - Parse a 'case' of a union, returning true on error.
@@ -1863,7 +1862,8 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
                                             GenericParams,
                                             CurDeclContext);
 
-  if (Attributes.isValid()) SD->getMutableAttrs() = Attributes;
+  if (Attributes.isValid())
+    SD->getMutableAttrs() = Attributes;
 
   // Now that we have a context, update the generic parameters with that
   // context.
