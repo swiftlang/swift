@@ -596,12 +596,20 @@ include_directories(BEFORE
 # Add all of the subdirectories, where we actually do work.
 add_subdirectory(lib)
 add_subdirectory(tools)
-add_subdirectory(test)
 add_subdirectory(stdlib)
 add_subdirectory(utils)
   add_subdirectory(examples)
-add_subdirectory(unittests)
-add_subdirectory(docs)
+
+option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." "${LLVM_INCLUDE_TESTS}")
+if (SWIFT_INCLUDE_TESTS)
+  add_subdirectory(test)
+  add_subdirectory(unittests)
+endif()
+
+option(SWIFT_INCLUDE_DOCS "Create targets for building docs." "${LLVM_INCLUDE_DOCS}")
+if (SWIFT_INCLUDE_DOCS)
+  add_subdirectory(docs)
+endif()
 
 # Add a documentation target so that documentation shows up in the
 # Xcode project.
