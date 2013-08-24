@@ -370,6 +370,13 @@ ParserResult<Pattern> Parser::parsePatternAtom() {
     consumeToken();
     return nullptr;
 
+  case tok::code_complete:
+    // Just eat the token and return an error status, *not* the code completion
+    // status.  We can not code complete anything here -- we expect an
+    // identifier.
+    consumeToken(tok::code_complete);
+    return nullptr;
+
   default:
     diagnose(Tok, diag::expected_pattern);
     return nullptr;
