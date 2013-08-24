@@ -1402,7 +1402,7 @@ public:
     if (IsSecondPass)
       return;
 
-    UnionDecl *UD = cast<UnionDecl>(ED->getDeclContext());
+    UnionDecl *UD = ED->getParentUnion();
     Type ElemTy = UD->getDeclaredTypeInContext();
 
     if (!ED->getArgumentTypeLoc().isNull())

@@ -1583,14 +1583,14 @@ static void emitInjectionFunction(IRGenModule &IGM,
     IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
   Explosion explosion = IGF.collectParameters();
-  UnionDecl *ood = cast<UnionDecl>(elt->getDeclContext());
-  if (ood->getGenericParamsOfContext()) {
+  UnionDecl *ud = elt->getParentUnion();
+  if (ud->getGenericParamsOfContext()) {
     auto polyFn =
       cast<PolymorphicFunctionType>(elt->getType()->getCanonicalType());
     emitPolymorphicParameters(IGF, polyFn, explosion);
   }
   const UnionTypeInfo &unionTI =
-    IGM.getTypeInfo(ood->getDeclaredTypeInContext()).as<UnionTypeInfo>();
+    IGM.getTypeInfo(ud->getDeclaredTypeInContext()).as<UnionTypeInfo>();
   unionTI.emitInjectionFunctionBody(IGF, elt, explosion);
 }
 
