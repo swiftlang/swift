@@ -31,11 +31,14 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
-/// parseTranslationUnit - Main entrypoint for the parser.
+/// \brief Main entrypoint for the parser.
+///
+/// \verbatim
 ///   translation-unit:
 ///     stmt-brace-item*
 ///     decl-sil       [[only in SIL mode]
 ///     decl-sil-stage [[only in SIL mode]
+/// \endverbatim
 bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   TU->ASTStage = TranslationUnit::Parsing;
 
@@ -120,7 +123,7 @@ static Resilience getResilience(AttrName attr) {
   }
 }
 
-/// parseAttribute
+/// \verbatim
 ///   attribute:
 ///     'asmname' '=' identifier  (FIXME: This is a temporary hack until we
 ///                                       can import C modules.)
@@ -132,6 +135,7 @@ static Resilience getResilience(AttrName attr) {
 ///     'weak'
 ///     'unowned'
 ///     'noreturn'
+/// \endverbatim
 bool Parser::parseAttribute(DeclAttributes &Attributes) {
   if (Tok.is(tok::kw_weak)) {
     if (Attributes.hasOwnership()) {
@@ -450,14 +454,17 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
   llvm_unreachable("bad attribute kind");
 }
 
-/// parseAttributeListPresent - This is the internal implementation of
-/// parseAttributeList, which we expect to be inlined to handle the common case
-/// of an absent attribute list.
+/// \brief This is the internal implementation of \c parseAttributeList, which
+/// we expect to be inlined to handle the common case of an absent attribute
+/// list.
+///
+/// \verbatim
 ///   attribute-list:
 ///     attribute-list-clause*
 ///   attribute-list-clause
 ///     '[' ']'
 ///     '[' attribute (',' attribute)* ']'
+/// \endverbatim
 bool Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
   SourceLoc leftLoc = consumeToken(tok::l_square);
   Attributes.LSquareLoc = leftLoc;
@@ -503,12 +510,11 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags) {
                    BeginParserPosition.PreviousLoc);
 }
 
-/// parseDecl - Parse a single syntactic declaration and return a list of decl
+/// \brief Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
 /// values, structs that define a struct decl and a constructor, etc.
 ///
-/// This method returns true on a parser error that requires recovery.
-///
+/// \verbatim
 ///   decl:
 ///     decl-typealias
 ///     decl-extension
@@ -518,7 +524,7 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags) {
 ///     decl-struct
 ///     decl-import
 ///     decl-operator
-///
+/// \endverbatim
 ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
                                unsigned Flags) {
   ParserPosition BeginParserPosition;
@@ -672,9 +678,9 @@ void Parser::parseDeclDelayed() {
   parseDecl(Entries, DelayedState->Flags);
 }
 
-/// Parse an 'import' declaration, returning true (and doing no token skipping)
-/// on error.
+/// \brief Parse an 'import' declaration, doing no token skipping on error.
 ///
+/// \verbatim
 ///   decl-import:
 ///     'import' attribute-list import-kind? import-path
 ///   import-kind:
@@ -687,7 +693,7 @@ void Parser::parseDeclDelayed() {
 ///     'func'
 ///   import-path:
 ///     any-identifier ('.' any-identifier)*
-///
+/// \endverbatim
 ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
   
@@ -756,10 +762,12 @@ ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags) {
       Context, CurDeclContext, ImportLoc, Kind, KindLoc, Exported, ImportPath));
 }
 
-/// parseInheritance - Parse an inheritance clause.
+/// \brief Parse an inheritance clause.
 ///
+/// \verbatim
 ///   inheritance:
 ///      ':' type-identifier (',' type-identifier)*
+/// \endverbatim
 ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
   consumeToken(tok::colon);
 
@@ -779,10 +787,12 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
   return Status;
 }
 
-/// parseDeclExtension - Parse an 'extension' declaration.
+/// \brief Parse an 'extension' declaration.
+///
+/// \verbatim
 ///   extension:
 ///    'extension' type-identifier inheritance? '{' decl* '}'
-///
+/// \endverbatim
 ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
@@ -839,10 +849,12 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
   return makeParserResult(ED);
 }
 
-/// parseDeclTypeAlias
+/// \brief Parse a typealias decl.
+///
+/// \verbatim
 ///   decl-typealias:
 ///     'typealias' identifier inheritance? '=' type
-///
+/// \endverbatim
 ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
                                                   bool isAssociatedType) {
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
@@ -952,9 +964,10 @@ void Parser::addVarsToScope(Pattern *Pat,
                            Decls, Attributes));
 }
 
-/// parseSetGet - Parse a get-set clause, containing a getter and (optionally)
+/// \brief Parse a get-set clause, containing a getter and (optionally)
 /// a setter.
 ///
+/// \verbatim
 ///   get-set:
 ///      get var-set?
 ///      set var-get
@@ -967,6 +980,7 @@ void Parser::addVarsToScope(Pattern *Pat,
 ///
 ///   set-name:
 ///     '(' identifier ')'
+/// \endverbatim
 bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                          TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
                          SourceLoc &LastValidLoc) {
@@ -1166,10 +1180,12 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
   return Invalid;
 }
 
-/// parseDeclVarGetSet - Parse the brace-enclosed getter and setter for a variable.
+/// \brief Parse the brace-enclosed getter and setter for a variable.
 ///
+/// \verbatim
 ///   decl-var:
 ///      'var' attribute-list identifier : type-annotation { get-set }
+/// \endverbatim
 void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
   bool Invalid = false;
     
@@ -1233,12 +1249,13 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
     PrimaryVar->setProperty(Context, LBLoc, Get, Set, RBLoc);
 }
 
-/// parseDeclVar - Parse a 'var' declaration, returning true (and doing no
-/// token skipping) on error.
+/// \brief Parse a 'var' declaration, doing no token skipping on error.
 ///
+/// \verbatim
 ///   decl-var:
 ///      'var' attribute-list pattern initializer? (',' pattern initializer? )*
 ///      'var' attribute-list identifier : type-annotation { get-set }
+/// \endverbatim
 ParserStatus Parser::parseDeclVar(unsigned Flags,
                                   SmallVectorImpl<Decl *> &Decls) {
   SourceLoc VarLoc = consumeToken(tok::kw_var);
@@ -1360,8 +1377,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
   return Status;
 }
 
-/// addImplicitThisParameter - Add an implicit 'this' parameter to the given
-/// set of parameter clauses.
+/// \brief Build an implicit 'this' parameter for the current DeclContext.
 Pattern *Parser::buildImplicitThisParameter() {
   VarDecl *D
     = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
@@ -1413,16 +1429,16 @@ void Parser::consumeFunctionBody(FuncExpr *FE) {
   }
 }
 
-/// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
-/// caller handles this case and does recovery as appropriate.
+/// \brief Parse a 'func' declaration, returning null on error.  The caller
+/// handles this case and does recovery as appropriate.
 ///
+/// \verbatim
 ///   decl-func:
 ///     'static'? 'func' attribute-list any-identifier generic-params?
 ///               func-signature stmt-brace?
+/// \endverbatim
 ///
-/// NOTE: The caller of this method must ensure that the token sequence is
-/// either 'func' or 'static' 'func'.
-///
+/// \note The caller of this method must ensure that the next token is 'func'.
 ParserResult<FuncDecl>
 Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   bool HasContainerType = Flags & PD_HasContainerType;
@@ -1639,15 +1655,16 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
   return false;
 }
 
-/// parseDeclUnion - Parse a 'union' declaration, returning true (and doing no
-/// token skipping) on error.
+/// \brief Parse a 'union' declaration, returning true (and doing no token
+/// skipping) on error.
 ///
+/// \verbatim
 ///   decl-union:
 ///      'union' attribute-list identifier generic-params? inheritance?
 ///          '{' decl-union-body '}'
 ///   decl-union-body:
 ///      decl*
-///
+/// \endverbatim
 ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
   SourceLoc UnionLoc = consumeToken(tok::kw_union);
 
@@ -1722,10 +1739,12 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
   return makeParserResult(Status, UD);
 }
 
-/// parseDeclUnionElement - Parse a 'case' of a union, returning true on error.
+/// \brief Parse a 'case' of a union.
 ///
+/// \verbatim
 ///   decl-union-element:
 ///      'case' identifier type-tuple? ('->' type)?
+/// \endverbatim
 ParserResult<UnionElementDecl> Parser::parseDeclUnionElement(unsigned Flags) {
   SourceLoc CaseLoc = consumeToken(tok::kw_case);
   
@@ -1800,7 +1819,9 @@ ParserResult<UnionElementDecl> Parser::parseDeclUnionElement(unsigned Flags) {
 
 /// \brief Parse the members in a struct/class/protocol definition.
 ///
+/// \verbatim
 ///    decl*
+/// \endverbatim
 bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
                                      SourceLoc LBLoc, SourceLoc &RBLoc,
                                      Diag<> ErrorDiag, unsigned flags) {
@@ -1828,15 +1849,16 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
   });
 }
 
-/// parseDeclStruct - Parse a 'struct' declaration, returning true (and doing no
-/// token skipping) on error.
+/// \brief Parse a 'struct' declaration, returning true (and doing no token
+/// skipping) on error.
 ///
+/// \verbatim
 ///   decl-struct:
 ///      'struct' attribute-list identifier generic-params? inheritance?
 ///          '{' decl-struct-body '}
 ///   decl-struct-body:
 ///      decl*
-///
+/// \endverbatim
 ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
   
@@ -1913,15 +1935,15 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
   return makeParserResult(Status, SD);
 }
 
-/// parseDeclClass - Parse a 'class' declaration, returning true (and doing no
-/// token skipping) on error.  
+/// \brief Parse a 'class' declaration, doing no token skipping on error.
 ///
+/// \verbatim
 ///   decl-class:
 ///      'class' attribute-list identifier generic-params? inheritance?
 ///          '{' decl-class-body '}
 ///   decl-class-body:
 ///      decl*
-///
+/// \endverbatim
 ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
   SourceLoc ClassLoc = consumeToken(tok::kw_class);
   
@@ -2016,9 +2038,9 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
   return makeParserResult(Status, CD);
 }
 
-/// parseDeclProtocol - Parse a 'protocol' declaration, returning null (and
-/// doing no token skipping) on error.
+/// \brief Parse a 'protocol' declaration, doing no token skipping on error.
 ///
+/// \verbatim
 ///   decl-protocol:
 ///      protocol-head '{' protocol-member* '}'
 ///
@@ -2029,7 +2051,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
 ///      decl-func
 ///      decl-var-simple
 ///      decl-typealias
-///
+/// \endverbatim
 ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
@@ -2124,14 +2146,14 @@ namespace {
   };
 }
 
-/// parseDeclSubscript - Parse a 'subscript' declaration, returning true
-/// on error.
+/// \brief Parse a 'subscript' declaration.
 ///
+/// \verbatim
 ///   decl-subscript:
 ///     subscript-head get-set
 ///   subscript-head
 ///     'subscript' attribute-list pattern-tuple '->' type
-///
+/// \endverbatim
 ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
                                         bool NeedDefinition,
                                         SmallVectorImpl<Decl *> &Decls) {

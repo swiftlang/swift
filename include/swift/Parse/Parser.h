@@ -103,7 +103,7 @@ public:
            TU->Kind == TranslationUnit::REPL;
   }
 
-  /// Tok - This is the current token being considered by the parser.
+  /// \brief This is the current token being considered by the parser.
   Token Tok;
 
   /// \brief The location of the previous token.
@@ -243,7 +243,7 @@ public:
   /// source location.
   SourceLoc getEndOfPreviousLoc();
 
-  /// consumeIf - If the current token is the specified kind, consume it and
+  /// \brief If the current token is the specified kind, consume it and
   /// return true.  Otherwise, return false without consuming it.
   bool consumeIf(tok K) {
     if (Tok.isNot(K)) return false;
@@ -256,10 +256,9 @@ public:
     return consumeIf(K);
   }
   
-  /// skipUntil - Read tokens until we get to one of the specified tokens, then
-  /// return without consuming it.  Because we cannot guarantee that the token 
+  /// \brief Read tokens until we get to one of the specified tokens, then
+  /// return without consuming it.  Because we cannot guarantee that the token
   /// will ever occur, this skips to some likely good stopping point.
-  ///
   void skipUntil(tok T1, bool StopAtCodeComplete = true) {
     skipUntil(T1, tok::unknown, StopAtCodeComplete);
   }
@@ -279,7 +278,7 @@ private:
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///
   /// Note: this does \em not match angle brackets ("<" and ">")! These are
-  /// matched in the source when they refer to a generic type, 
+  /// matched in the source when they refer to a generic type,
   /// but not when used as comparison operators.
   void skipSingle(bool StopAtCodeComplete = true);
 
@@ -329,9 +328,8 @@ public:
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
 
-  /// parseIdentifier - Consume an identifier (but not an operator) if
-  /// present and return its name in Result.  Otherwise, emit an error and
-  /// return true.
+  /// \brief Consume an identifier (but not an operator) if present and return
+  /// its name in \p Result.  Otherwise, emit an error and return true.
   bool parseIdentifier(Identifier &Result, SourceLoc &Loc, const Diagnostic &D);
   
   template<typename ...DiagArgTypes, typename ...ArgTypes>
@@ -348,8 +346,8 @@ public:
   }
   
 
-  /// parseAnyIdentifier - Consume an identifier or operator if present and
-  /// return its name in Result.  Otherwise, emit an error and return true.
+  /// \brief Consume an identifier or operator if present and return its name
+  /// in \p Result.  Otherwise, emit an error and return true.
   bool parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
                           const Diagnostic &D);
 
@@ -366,8 +364,8 @@ public:
     return parseAnyIdentifier(Result, L, Diagnostic(ID, Args...));
   }
 
-  /// parseToken - The parser expects that 'K' is next in the input.  If so, it
-  /// is consumed and false is returned.
+  /// \brief The parser expects that \p K is next token in the input.  If so,
+  /// it is consumed and false is returned.
   ///
   /// If the input is malformed, this emits the specified error diagnostic.
   bool parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D);
@@ -383,8 +381,8 @@ public:
     return parseToken(K, L, Diagnostic(ID, Args...));
   }
   
-  /// parseMatchingToken - Parse the specified expected token and return its
-  /// location on success.  On failure, emit the specified error diagnostic, and
+  /// \brief Parse the specified expected token and return its location
+  /// on success.  On failure, emit the specified error diagnostic, and
   /// a note at the specified note location.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
@@ -437,8 +435,8 @@ public:
   ParserResult<TypeDecl> parseDeclTypeAlias(bool WantDefinition,
                                             bool isAssociatedType);
 
-  /// addVarsToScope - Add the variables in the given pattern to the current
-  /// scope, collecting the variables in the vector \c Decls and applying
+  /// \brief Add the variables in the given pattern to the current scope,
+  /// collecting the variables in the vector \c Decls and applying
   /// \c Attributes to each one.
   void addVarsToScope(Pattern *Pat, SmallVectorImpl<Decl*> &Decls,
                       DeclAttributes &Attributes);
@@ -611,8 +609,9 @@ public:
   
   Expr *parseExprIdentifier();
 
-  /// Parse a closure expression after the opening brace.
+  /// \brief Parse a closure expression after the opening brace.
   ///
+  /// \verbatim
   ///   expr-closure:
   ///     '{' closure-signature? brace-item-list* '}'
   ///
@@ -624,13 +623,16 @@ public:
   ///
   ///   closure-signature-result:
   ///     '->' type
+  /// \endverbatim
   Expr *parseExprClosure();
 
-  /// Parse the closure signature, if present.
+  /// \brief Parse the closure signature, if present.
   ///
+  /// \verbatim
   ///   closure-signature:
   ///     pattern-tuple func-signature-result? 'in'
   ///     identifier (',' identifier)* func-signature-result? 'in'
+  /// \endverbatim
   ///
   /// \param params The parsed parameter list, or null if none was provided.
   /// \param arrowLoc The location of the arrow, if present.
