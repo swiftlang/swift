@@ -1833,31 +1833,19 @@ namespace {
       return llvm::ConstantStruct::getAnon(Fields);
     }
   };
-
-  /// A builder for metadata templates.
-  class GenericStructMetadataBuilder :
-    public GenericMetadataBuilderBase<GenericStructMetadataBuilder,
-                      StructMetadataBuilderBase<GenericStructMetadataBuilder>> {
-
-    typedef GenericMetadataBuilderBase super;
-
-  public:
-    GenericStructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct,
-                                const GenericParamList &classGenerics)
-      : super(IGM, classGenerics, theStruct) {}
-
-    // FIXME.  This is a *horrendous* hack, but:  just apply the generic
-    // type at the empty-tuple type a bunch.  I don't have a theory right
-    // now for how this should actually work when the witnesses really
-    // need stuff from the type.  Laying out the VWT within the pattern,
-    // probably, and then making the value witnesses expect that.
-    Type buildFakeBoundType(NominalTypeDecl *target) {
-      auto generics = target->getGenericParams();
-      if (!generics) return target->getDeclaredType();
-
-      Type parent;
-      auto DC = target->getDeclContext();
-      switch (DC->getContextKind()) {
+  
+  // FIXME.  This is a *horrendous* hack, but:  just apply the generic
+  // type at the empty-tuple type a bunch.  I don't have a theory right
+  // now for how this should actually work when the witnesses really
+  // need stuff from the type.  Laying out the VWT within the pattern,
+  // probably, and then making the value witnesses expect that.
+  static Type buildFakeBoundType(IRGenModule &IGM, NominalTypeDecl *target) {
+    auto generics = target->getGenericParams();
+    if (!generics) return target->getDeclaredType();
+    
+    Type parent;
+    auto DC = target->getDeclContext();
+    switch (DC->getContextKind()) {
       case DeclContextKind::TranslationUnit:
       case DeclContextKind::BuiltinModule:
       case DeclContextKind::SerializedModule:
@@ -1868,25 +1856,37 @@ namespace {
       case DeclContextKind::DestructorDecl:
         parent = Type();
         break;
-
+        
       case DeclContextKind::ExtensionDecl:
         parent = Type(); // FIXME?
         break;
-
+        
       case DeclContextKind::NominalTypeDecl:
-        parent = buildFakeBoundType(cast<NominalTypeDecl>(DC));
+        parent = buildFakeBoundType(IGM, cast<NominalTypeDecl>(DC));
         break;
-      }
-
-      SmallVector<Type, 8> args;
-      args.append(generics->getAllArchetypes().size(),
-                  TupleType::getEmpty(IGM.Context));
-
-      return BoundGenericType::get(target, parent, args);
     }
+    
+    SmallVector<Type, 8> args;
+    args.append(generics->getAllArchetypes().size(),
+                TupleType::getEmpty(IGM.Context));
+    
+    return BoundGenericType::get(target, parent, args);
+  }
+
+  /// A builder for metadata templates.
+  class GenericStructMetadataBuilder :
+    public GenericMetadataBuilderBase<GenericStructMetadataBuilder,
+                      StructMetadataBuilderBase<GenericStructMetadataBuilder>> {
+
+    typedef GenericMetadataBuilderBase super;
+
+  public:
+    GenericStructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct,
+                                const GenericParamList &structGenerics)
+      : super(IGM, structGenerics, theStruct) {}
 
     void addValueWitnessTable() {
-      CanType fakeType = buildFakeBoundType(Target)->getCanonicalType();
+      CanType fakeType = buildFakeBoundType(IGM, Target)->getCanonicalType();
       Fields.push_back(emitValueWitnessTable(IGM, fakeType));
     }
   };
@@ -1925,14 +1925,19 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 
 namespace {
 
-class UnionMetadataBuilder : public MetadataLayout<UnionMetadataBuilder> {
-  using super = MetadataLayout<UnionMetadataBuilder>;
-  
+template<class Impl>
+class UnionMetadataBuilderBase : public MetadataLayout<Impl> {
+  using super = MetadataLayout<Impl>;
+
+protected:
+  using super::IGM;
   UnionDecl *const Target;
   SmallVector<llvm::Constant *, 8> Fields;
 
+  unsigned getNextIndex() const { return Fields.size(); }
+
 public:
-  UnionMetadataBuilder(IRGenModule &IGM, UnionDecl *theUnion)
+  UnionMetadataBuilderBase(IRGenModule &IGM, UnionDecl *theUnion)
     : super(IGM), Target(theUnion) {}
   
   void layout() {
@@ -1946,18 +1951,12 @@ public:
     // If changing this layout, you must update the magic number in
     // emitParentMetadataRef.
     
-    // TODO generic parameters
-    //// Instantiation-specific.
-    //if (auto generics = Target->getGenericParamsOfContext()) {
-    //  this->addGenericFields(*generics);
-    //}
+    // Instantiation-specific.
+    if (auto generics = Target->getGenericParamsOfContext()) {
+      this->addGenericFields(*generics);
+    }
   }
   
-  void addValueWitnessTable() {
-    auto type = Target->getDeclaredType()->getCanonicalType();
-    Fields.push_back(emitValueWitnessTable(IGM, type));
-  }
-
   void addMetadataFlags() {
     Fields.push_back(getMetadataKind(IGM, MetadataKind::Union));
   }
@@ -1972,11 +1971,51 @@ public:
     Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
   }
   
+  void addGenericArgument(ArchetypeType *type) {
+    Fields.push_back(llvm::Constant::getNullValue(IGM.TypeMetadataPtrTy));
+  }
+  
+  void addGenericWitnessTable(ArchetypeType *type, ProtocolDecl *protocol) {
+    Fields.push_back(llvm::Constant::getNullValue(IGM.WitnessTablePtrTy));
+  }
+  
   llvm::Constant *getInit() {
     return llvm::ConstantStruct::getAnon(Fields);
   }
 };
-
+  
+class UnionMetadataBuilder
+  : public UnionMetadataBuilderBase<UnionMetadataBuilder>
+{
+public:
+  UnionMetadataBuilder(IRGenModule &IGM, UnionDecl *theUnion)
+    : UnionMetadataBuilderBase(IGM, theUnion) {}
+  
+  void addValueWitnessTable() {
+    auto type = Target->getDeclaredType()->getCanonicalType();
+    Fields.push_back(emitValueWitnessTable(IGM, type));
+  }
+  
+  llvm::Constant *getInit() {
+    return llvm::ConstantStruct::getAnon(Fields);
+  }
+};
+  
+class GenericUnionMetadataBuilder
+  : public GenericMetadataBuilderBase<GenericUnionMetadataBuilder,
+                        UnionMetadataBuilderBase<GenericUnionMetadataBuilder>>
+{
+public:
+  GenericUnionMetadataBuilder(IRGenModule &IGM, UnionDecl *theUnion,
+                              const GenericParamList &unionGenerics)
+    : GenericMetadataBuilderBase(IGM, unionGenerics, theUnion) {}
+  
+  void addValueWitnessTable() {
+    CanType fakeType = buildFakeBoundType(IGM, Target)->getCanonicalType();
+    Fields.push_back(emitValueWitnessTable(IGM, fakeType));
+  }
+};
+  
 }
 
 void irgen::emitUnionMetadata(IRGenModule &IGM, UnionDecl *theUnion) {
@@ -1984,8 +2023,10 @@ void irgen::emitUnionMetadata(IRGenModule &IGM, UnionDecl *theUnion) {
   llvm::Constant *init;
   
   bool isPattern;
-  if (/*auto *generics = */ theUnion->getGenericParamsOfContext()) {
-    // TODO: generic union metadata
+  if (auto *generics = theUnion->getGenericParamsOfContext()) {
+    GenericUnionMetadataBuilder builder(IGM, theUnion, *generics);
+    builder.layout();
+    init = builder.getInit();
     return;
   } else {
     UnionMetadataBuilder builder(IGM, theUnion);
