@@ -887,6 +887,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("tuple", ValueKind::TupleInst)
     .Case("tuple_element_addr", ValueKind::TupleElementAddrInst)
     .Case("tuple_extract", ValueKind::TupleExtractInst)
+    .Case("union", ValueKind::UnionInst)
     .Case("unreachable", ValueKind::UnreachableInst)
     .Case("upcast", ValueKind::UpcastInst)
     .Case("upcast_existential", ValueKind::UpcastExistentialInst)
@@ -982,7 +983,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   // opcode we find.
   ValueBase *ResultVal;
   switch (Opcode) {
-  default: assert(0 && "Unreachable");
+  case ValueKind::SILArgument:
+    llvm_unreachable("not an instruction");
+
   case ValueKind::AllocBoxInst: {
     SILType Ty;
     if (parseSILType(Ty)) return true;
@@ -1487,6 +1490,25 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     ResultVal = B.createTuple(InstLoc, Ty, OpList);
+    break;
+  }
+  case ValueKind::UnionInst: {
+    SILType Ty;
+    SILDeclRef Elt;
+    SILValue Operand;
+    if (parseSILType(Ty) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILDeclRef(Elt))
+      return true;
+    
+    if (P.Tok.is(tok::comma)) {
+      P.consumeToken(tok::comma);
+      if (parseTypedValueRef(Operand))
+        return true;
+    }
+    
+    ResultVal = B.createUnion(InstLoc, Operand,
+                              cast<UnionElementDecl>(Elt.getDecl()), Ty);
     break;
   }
   case ValueKind::TupleElementAddrInst:

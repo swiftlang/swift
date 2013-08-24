@@ -345,6 +345,27 @@ bb0(%0 : $Aleph.metatype):
   %18 = return %14 : $Aleph
 }
 
+union Beth {
+  case EmptyCase
+  case DataCase(Int)
+}
+
+// CHECK: sil @test_union_empty_case : $() -> Beth {
+sil @test_union_empty_case : $() -> Beth {
+bb0:
+  // CHECK: %0 = union $Beth, #Beth.EmptyCase!unionelt
+  %0 = union $Beth, #Beth.EmptyCase!unionelt
+  return %0 : $Beth
+}
+
+// CHECK: sil @test_union_data_case : $Int64 -> Beth {
+sil @test_union_data_case : $Int64 -> Beth {
+bb0(%0 : $Int):
+  // CHECK: %1 = union $Beth, #Beth.DataCase!unionelt.1, %0 : $Int64
+  %1 = union $Beth, #Beth.DataCase!unionelt.1, %0 : $Int64
+  return %1 : $Beth
+}
+
 sil @_T5tuple5floatFT1xSf_T_ : $[thin] (x : Float32) -> ()
 sil @_T5tuple5tupleFT_TSiSf_ : $[thin] () -> (Int64, Float32)
 

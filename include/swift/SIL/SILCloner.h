@@ -516,6 +516,17 @@ SILCloner<ImplClass>::visitTupleInst(TupleInst* Inst) {
 
 template<typename ImplClass>
 SILValue
+SILCloner<ImplClass>::visitUnionInst(UnionInst* Inst) {
+  return doPostProcess(Inst,
+    Builder.createUnion(getOpLocation(Inst->getLoc()),
+                        Inst->hasOperand() ? getOpValue(Inst->getOperand())
+                                           : SILValue(),
+                        Inst->getElement(),
+                        getOpType(Inst->getType())));
+}
+  
+template<typename ImplClass>
+SILValue
 SILCloner<ImplClass>::visitBuiltinZeroInst(BuiltinZeroInst* Inst) {
   return doPostProcess(Inst,
     Builder.createBuiltinZero(getOpLocation(Inst->getLoc()),

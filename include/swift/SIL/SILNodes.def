@@ -130,6 +130,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(StructInst, SILInstruction, None)
   INST(StructExtractInst, SILInstruction, None)
   INST(StructElementAddrInst, SILInstruction, None)
+  INST(UnionInst, SILInstruction, None)
   INST(RefElementAddrInst, SILInstruction, None)
 
   // Protocol and Protocol Composition Types

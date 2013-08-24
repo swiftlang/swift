@@ -1828,6 +1828,23 @@ Given an instance of a class, derives the address of a physical instance
 variable inside the instance. It is undefined behavior if the class value
 is null.
 
+union
+`````
+::
+
+  sil-instruction ::= 'union' sil-type ',' sil-decl-ref (',' sil-operand)?
+
+  %1 = union $U, #U.EmptyCase
+  %1 = union $U, #U.DataCase, %0 : $T
+  // $U must be a union type
+  // #U.Case must be a case of union $U
+  // If #U.Case has a data type $T, %0 must be a value of type $T
+  // If #U.Case has no data type, the operand must be omitted
+  // %1 will be of type $U
+
+Creates a loadable union value in the given ``case``. If the ``case`` has a
+data type, the union value will contain the operand value.
+
 Protocol and Protocol Composition Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

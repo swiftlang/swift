@@ -661,6 +661,15 @@ public:
       OS << ')';
     }
   }
+  
+  void visitUnionInst(UnionInst *UI) {
+    OS << "union " << UI->getType() << ", "
+       << SILDeclRef(UI->getElement(), SILDeclRef::Kind::UnionElement);
+    if (UI->hasOperand()) {
+      OS << ", " << getIDAndType(UI->getOperand());
+    }
+  }
+  
   void visitTupleExtractInst(TupleExtractInst *EI) {
     OS << "tuple_extract " << getIDAndType(EI->getOperand()) << ", "
        << EI->getFieldNo();

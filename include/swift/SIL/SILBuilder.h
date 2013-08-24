@@ -402,13 +402,18 @@ public:
   }
 
   StructInst *createStruct(SILLocation Loc, SILType Ty,
-                           ArrayRef<SILValue> Elements){
+                           ArrayRef<SILValue> Elements) {
     return insert(StructInst::create(Loc, Ty, Elements, F));
   }
 
   TupleInst *createTuple(SILLocation Loc, SILType Ty,
-                         ArrayRef<SILValue> Elements){
+                         ArrayRef<SILValue> Elements) {
     return insert(TupleInst::create(Loc, Ty, Elements, F));
+  }
+  
+  UnionInst *createUnion(SILLocation Loc, SILValue Operand,
+                         UnionElementDecl *Element, SILType Ty) {
+    return insert(new (F.getModule()) UnionInst(Loc, Operand, Element, Ty));
   }
   
   static SILType getTupleElementType(SILType Ty, unsigned EltNo);

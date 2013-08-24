@@ -515,6 +515,7 @@ public:
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
+  void visitUnionInst(UnionInst *i);
   void visitBuiltinZeroInst(BuiltinZeroInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitClassMetatypeInst(ClassMetatypeInst *i);
@@ -1692,6 +1693,10 @@ void IRGenSILFunction::visitTupleInst(swift::TupleInst *i) {
   for (SILValue elt : i->getElements())
     out.add(getLoweredExplosion(elt).claimAll());
   setLoweredExplosion(SILValue(i, 0), out);
+}
+
+void IRGenSILFunction::visitUnionInst(swift::UnionInst *i) {
+  llvm_unreachable("unimplemented");
 }
 
 void IRGenSILFunction::visitBuiltinZeroInst(swift::BuiltinZeroInst *i) {

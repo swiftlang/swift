@@ -354,11 +354,23 @@ public:
   void checkStructInst(StructInst *SI) {
     require(SI->getType().is<StructType>()
             || SI->getType().is<BoundGenericStructType>(),
-            "StructInst should return a struct");
+            "StructInst must return a struct");
     require(SI->getType().isObject(),
             "StructInst must produce an object");
     
     // FIXME: Verify element count and types.
+  }
+  
+  void checkUnionInst(UnionInst *UI) {
+    require(UI->getType().is<UnionType>()
+            || UI->getType().is<BoundGenericUnionType>(),
+            "UnionInst must return a union");
+    require(UI->getType().isObject(),
+            "UnionInst must produce an object");
+    require(UI->hasOperand() == UI->getElement()->hasArgumentType(),
+            "UnionInst must take an argument iff the element does");
+    
+    // FIXME: Match up generic parameters of generic unions.
   }
 
   void checkTupleInst(TupleInst *TI) {

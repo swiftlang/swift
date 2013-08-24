@@ -1064,7 +1064,7 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
 };
   
-/// StructInst - Represents a constructed struct.
+/// StructInst - Represents a constructed loadable struct.
 class StructInst : public SILInstruction {
   TailAllocatedOperandList<0> Operands;
 
@@ -1102,7 +1102,7 @@ public:
   }
 };
 
-/// TupleInst - Represents a constructed tuple.
+/// TupleInst - Represents a constructed loadable tuple.
 class TupleInst : public SILInstruction {
   TailAllocatedOperandList<0> Operands;
 
@@ -1137,6 +1137,44 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::TupleInst;
+  }
+};
+  
+/// UnionInst - Represents a loadable union constructed from one of its
+/// elements.
+class UnionInst : public SILInstruction {
+  Optional<FixedOperandList<1>> OptionalOperand;
+  UnionElementDecl *Element;
+
+public:
+  UnionInst(SILLocation Loc, SILValue Operand, UnionElementDecl *Element,
+            SILType ResultTy)
+    : SILInstruction(ValueKind::UnionInst, Loc, ResultTy),
+      Element(Element)
+  {
+    if (Operand) {
+      OptionalOperand.emplace(this, Operand);
+    }
+  }
+  
+  UnionElementDecl *getElement() const { return Element; }
+  
+  bool hasOperand() const { return OptionalOperand.hasValue(); }
+  SILValue getOperand() const { return OptionalOperand->asValueArray()[0]; }
+  
+  ArrayRef<Operand> getAllOperands() const {
+    return OptionalOperand ? OptionalOperand->asArray() : ArrayRef<Operand>{};
+  }
+  
+  MutableArrayRef<Operand> getAllOperands() {
+    return OptionalOperand
+      ? OptionalOperand->asArray() : MutableArrayRef<Operand>{};
+  }
+  
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::UnionInst;
   }
 };
 
@@ -1231,7 +1269,7 @@ class TupleExtractInst
   unsigned FieldNo;
 public:
   TupleExtractInst(SILLocation Loc, SILValue Operand, unsigned FieldNo,
-              SILType ResultTy)
+                   SILType ResultTy)
     : UnaryInstructionBase(Loc, Operand, ResultTy), FieldNo(FieldNo) {}
   
   unsigned getFieldNo() const { return FieldNo; }
