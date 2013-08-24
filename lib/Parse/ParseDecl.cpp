@@ -813,40 +813,56 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
         .highlight(TTR->getSourceRange());
     }
   }
-  SourceLoc LBLoc, RBLoc;
-  
+
+  ParserStatus Status;
+
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
-    parseInheritance(Inherited);
+    Status |= parseInheritance(Inherited);
 
   ExtensionDecl *ED
     = new (Context) ExtensionDecl(ExtensionLoc, Ty.get(),
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
-  ContextChange CC(*this, ED);
-  Scope S(this, ScopeKind::Extension);
-
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
-    ED->setMembers({}, Tok.getLoc());
-    return makeParserErrorResult(ED);
-  }
 
   SmallVector<Decl*, 8> MemberDecls;
+  SourceLoc LBLoc, RBLoc;
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
+    LBLoc = Tok.getLoc();
+    RBLoc = LBLoc;
+    Status.setIsParseError();
+  } else {
+    // Parse the body.
+    ContextChange CC(*this, ED);
+    Scope S(this, ScopeKind::Extension);
 
-  parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/ true,
-            diag::expected_rbrace_extension, [&]() -> ParserStatus {
-    return parseDecl(MemberDecls, PD_HasContainerType | PD_DisallowVar);
-  });
+    ParserStatus BodyStatus =
+        parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/true,
+                  diag::expected_rbrace_extension, [&]()->ParserStatus{
+      return parseDecl(MemberDecls, PD_HasContainerType | PD_DisallowVar);
+    });
+    // Don't propagate the code completion bit from members: we can not help
+    // code completion inside a member decl, and our callers can not do
+    // anything about it either.  But propagate the error bit.
+    if (BodyStatus.isError())
+      Status.setIsParseError();
+  }
 
-  ED->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
+  if (MemberDecls.empty())
+    ED->setMembers({}, { LBLoc, RBLoc });
+  else
+    ED->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
 
   if (!(Flags & PD_AllowTopLevel)) {
     diagnose(ExtensionLoc, diag::decl_inner_scope);
-    return nullptr;
+    Status.setIsParseError();
+
+    // Tell the type checker not to touch this extension.
+    ED->setInvalid();
   }
 
-  return makeParserResult(ED);
+  return makeParserResult(Status, ED);
 }
 
 /// \brief Parse a typealias decl.
