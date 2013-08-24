@@ -912,9 +912,66 @@ void IRGenSILFunction::emitSILFunction() {
   
   assert(params.empty() && "did not map all llvm params to SIL params?!");
 
-  // Emit the function body.
+  // It's really nice to be able to assume that we've already emitted
+  // all the values from dominating blocks --- it makes simple
+  // peepholing more powerful and allows us to avoid the need for
+  // nasty "forward-declared" values.  We can do this by emitting
+  // blocks using a simple walk through the successor graph.
+  //
+  // We do want to preserve the original source order, but that's done
+  // by having previously added all the primary blocks to the LLVM
+  // function in their original order.  As long as any secondary
+  // blocks are inserted after the current IP instead of at the end
+  // of the function, we're fine.
+
+  // Invariant: for every block in the work queue, we have visited all
+  // of its dominators.
+  llvm::SmallPtrSet<SILBasicBlock*, 8> visitedBlocks;
+  SmallVector<SILBasicBlock*, 8> workQueue; // really a stack
+
+  // Queue up the entry block, for which the invariant trivially holds.
+  visitedBlocks.insert(CurSILFn->begin());
+  workQueue.push_back(CurSILFn->begin());
+
+  while (!workQueue.empty()) {
+    auto bb = workQueue.pop_back_val();
+
+    // Emit the block.
+    visitSILBasicBlock(bb);
+
+#ifndef NDEBUG
+    // Assert that the current IR IP (if valid) is immediately prior
+    // to the initial IR block for the next primary SIL block.
+    // It's not semantically necessary to preserve SIL block order,
+    // but we really should.
+    if (auto curBB = Builder.GetInsertBlock()) {
+      auto next = llvm::next(SILFunction::iterator(bb));
+      if (next != CurSILFn->end()) {
+        auto nextBB = LoweredBBs[&*next].bb;
+        assert(curBB->getNextNode() == nextBB &&
+               "lost source SIL order?");
+      }
+    }
+#endif
+
+    // The immediate dominator of a successor of this block needn't be
+    // this block, but it has to be something which dominates this
+    // block.  In either case, we've visited it.
+    //
+    // Therefore the invariant holds of all the successors, and we can
+    // queue them up if we haven't already visited them.
+    for (auto &succ : bb->getSuccs()) {
+      auto succBB = succ.getBB();
+      if (visitedBlocks.insert(succBB))
+        workQueue.push_back(succBB);
+    }
+  }
+
+  // If there are dead blocks in the SIL function, we might have left
+  // invalid blocks in the IR.  Do another pass and kill them off.
   for (SILBasicBlock &bb : *CurSILFn)
-    visitSILBasicBlock(&bb);
+    if (!visitedBlocks.count(&bb))
+      LoweredBBs[&bb].bb->eraseFromParent();
 }
 
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
