@@ -54,6 +54,17 @@ import Builtin
 // CHECK:   %swift.type* null
 // CHECK: }
 
+// CHECK: @_TMPdO21union_value_semantics18GenericFixedLayout = global {{[{].*\* [}]}} {
+// CHECK:   i32 1, i32 1, i32 40, i32 8,
+// CHECK:   [8 x i8*] zeroinitializer,
+// CHECK:   [1 x { i32, i32 }] [{ i32, i32 } { i32 0, i32 4 }],
+// CHECK:   i8** getelementptr inbounds ([16 x i8*]* @_TWVGO21union_value_semantics18GenericFixedLayoutT__, i32 0, i32 0),
+// CHECK:   i64 2,
+// CHECK:   i8* null,
+// CHECK:   %swift.type* null,
+// CHECK:   %swift.type* null
+// CHECK: }
+
 union SinglePayloadTrivial {
   case payload(Builtin.Int64)
   case a
@@ -159,6 +170,11 @@ entry(%u : $*MultiPayloadNontrivial):
 // CHECK: ; <label>:[[END]]
 // CHECK:   ret void
 // CHECK: }
+
+union GenericFixedLayout<T> {
+  case foo(Builtin.Int64)
+  case bar(Builtin.ObjectPointer)
+}
 
 sil @top_level_code : $[thin] () -> () {
 entry:

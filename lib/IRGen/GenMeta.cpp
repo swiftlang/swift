@@ -2027,7 +2027,7 @@ void irgen::emitUnionMetadata(IRGenModule &IGM, UnionDecl *theUnion) {
     GenericUnionMetadataBuilder builder(IGM, theUnion, *generics);
     builder.layout();
     init = builder.getInit();
-    return;
+    isPattern = true;
   } else {
     UnionMetadataBuilder builder(IGM, theUnion);
     builder.layout();
