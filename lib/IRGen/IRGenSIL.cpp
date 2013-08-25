@@ -1696,7 +1696,15 @@ void IRGenSILFunction::visitTupleInst(swift::TupleInst *i) {
 }
 
 void IRGenSILFunction::visitUnionInst(swift::UnionInst *i) {
-  llvm_unreachable("unimplemented");
+  Explosion data = [&]{
+    if (i->hasOperand())
+      return getLoweredExplosion(i->getOperand());
+    // Empty explosion if no operand.
+    return Explosion(ExplosionKind::Minimal);
+  }();
+  Explosion out(ExplosionKind::Maximal);
+  emitInjectLoadableUnion(*this, i->getType(), i->getElement(), data, out);
+  setLoweredExplosion(SILValue(i, 0), out);
 }
 
 void IRGenSILFunction::visitBuiltinZeroInst(swift::BuiltinZeroInst *i) {

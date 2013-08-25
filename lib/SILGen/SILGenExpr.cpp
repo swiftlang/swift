@@ -1491,7 +1491,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
 }
 
 static void emitConstructorMetatypeArg(SILGenFunction &gen,
-                                       ConstructorDecl *ctor) {
+                                       ValueDecl *ctor) {
   // In addition to the declared arguments, the constructor implicitly takes
   // the metatype as its first argument, like a static function.
   Type metatype = ctor->getType()->castTo<AnyFunctionType>()->getInput();
@@ -1695,6 +1695,28 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   B.createRelease(ctor, thisBox);
 
   B.createReturn(ctor, thisValue);
+}
+
+void SILGenFunction::emitUnionConstructor(UnionElementDecl *element) {
+  Type unionTy = element->getType()->getAs<AnyFunctionType>()->getResult();
+  if (element->hasArgumentType())
+    unionTy = unionTy->getAs<AnyFunctionType>()->getResult();
+  // FIXME: Address-only unions.
+  SILType unionSILTy = getLoweredLoadableType(unionTy);
+  
+  // Emit the exploded constructor argument.
+  SILValue argValue;
+  if (element->hasArgumentType()) {
+    RValue arg = emitImplicitValueConstructorArg(*this, element,
+                                                 element->getArgumentType());
+    argValue = std::move(arg).forwardAsSingleValue(*this);
+  }
+  
+  emitConstructorMetatypeArg(*this, element);
+  
+  // Create and return the union value.
+  SILValue result = B.createUnion(element, argValue, element, unionSILTy);
+  B.createReturn(element, result);
 }
 
 namespace {

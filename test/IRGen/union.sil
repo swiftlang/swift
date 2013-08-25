@@ -56,8 +56,6 @@ import Builtin
 // CHECK: %O5union24MultiPayloadTwoSpareBits = type { i64 }
 
 
-// -- switch_union lowering --
-
 union Singleton {
   case val(Builtin.Int64, Builtin.Int64)
 }
@@ -92,6 +90,19 @@ dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
 // CHECK:   ret void
   %x = tuple ()
   return %x : $()
+}
+
+// CHECK: define { i64, i64 } @singleton_inject(i64, i64) {
+// CHECK: entry:
+// CHECK:   [[A:%.*]] = insertvalue { i64, i64 } undef, i64 %0, 0
+// CHECK:   [[B:%.*]] = insertvalue { i64, i64 } [[A]], i64 %1, 1
+// CHECK:   ret { i64, i64 } [[B]]
+// CHECK: }
+sil @singleton_inject : $(Builtin.Int64, Builtin.Int64) -> Singleton {
+entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %t = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+  %u = union $Singleton, #Singleton.val!unionelt.1, %t : $(Builtin.Int64, Builtin.Int64)
+  return %u : $Singleton
 }
 
 
@@ -149,6 +160,36 @@ end:
 // CHECK:   ret void
   %x = tuple ()
   return %x : $()
+}
+
+// CHECK: define i2 @no_payload_inject_x() {
+// CHECK: entry:
+// CHECK:   ret i2 0
+// CHECK: }
+sil @no_payload_inject_x : $() -> NoPayloads {
+entry:
+  %u = union $NoPayloads, #NoPayloads.x!unionelt
+  return %u : $NoPayloads
+}
+
+// CHECK: define i2 @no_payload_inject_y() {
+// CHECK: entry:
+// CHECK:   ret i2 1
+// CHECK: }
+sil @no_payload_inject_y : $() -> NoPayloads {
+entry:
+  %u = union $NoPayloads, #NoPayloads.y!unionelt
+  return %u : $NoPayloads
+}
+
+// CHECK: define i2 @no_payload_inject_z() {
+// CHECK: entry:
+// CHECK:   ret i2 -2
+// CHECK: }
+sil @no_payload_inject_z : $() -> NoPayloads {
+entry:
+  %u = union $NoPayloads, #NoPayloads.z!unionelt
+  return %u : $NoPayloads
 }
 
 
@@ -304,8 +345,40 @@ end:
   return %x : $()
 }
 
+// CHECK: define { i64, i1 } @single_payload_no_xi_inject_x(i64) {
+// CHECK: entry:
+// CHECK:   [[A:%.*]] = insertvalue { i64, i1 } undef, i64 %0, 0
+// CHECK:   [[B:%.*]] = insertvalue { i64, i1 } [[A]], i1 false, 1
+// CHECK:   ret { i64, i1 } [[B]]
+// CHECK: }
+sil @single_payload_no_xi_inject_x : $(Builtin.Int64) -> SinglePayloadNoXI2 {
+entry(%0 : $Builtin.Int64):
+  %u = union $SinglePayloadNoXI2, #SinglePayloadNoXI2.x!unionelt.1, %0 : $Builtin.Int64
+  return %u : $SinglePayloadNoXI2
+}
 
-// -- Test unpacking aggregates.
+// CHECK: define { i64, i1 } @single_payload_no_xi_inject_y() {
+// CHECK: entry:
+// CHECK:   ret { i64, i1 } { i64 0, i1 true }
+// CHECK: }
+sil @single_payload_no_xi_inject_y : $() -> SinglePayloadNoXI2 {
+entry:
+  %u = union $SinglePayloadNoXI2, #SinglePayloadNoXI2.y!unionelt
+  return %u : $SinglePayloadNoXI2
+}
+
+// CHECK: define { i64, i1 } @single_payload_no_xi_inject_z() {
+// CHECK: entry:
+// CHECK:   ret { i64, i1 } { i64 1, i1 true }
+// CHECK: }
+sil @single_payload_no_xi_inject_z : $() -> SinglePayloadNoXI2 {
+entry:
+  %u = union $SinglePayloadNoXI2, #SinglePayloadNoXI2.z!unionelt
+  return %u : $SinglePayloadNoXI2
+}
+
+
+// -- Test packing and unpacking aggregates.
 
 union AggregateSinglePayload {
   case x(Builtin.Int21, Builtin.Int64)
@@ -327,6 +400,23 @@ x_dest(%v : $(Builtin.Int21, Builtin.Int64)):
 end:
   %x = tuple ()
   return %x : $()
+}
+
+// CHECK: define { i128, i1 } @aggregate_single_payload_inject(i21, i64) {
+// CHECK: entry:
+// CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to i128
+// CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i128
+// CHECK:   [[SHIFT_1:%.*]] = shl i128 [[ZEXT_1]], 64
+// CHECK:   [[PAYLOAD:%.*]] = or i128 [[ZEXT_0]], [[SHIFT_1]]
+// CHECK:   [[RES_0:%.*]] = insertvalue { i128, i1 } undef, i128 [[PAYLOAD]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i128, i1 } [[RES_0]], i1 false, 1
+// CHECK:   ret { i128, i1 } [[RES]]
+// CHECK: }
+sil @aggregate_single_payload_inject : $(Builtin.Int21, Builtin.Int64) -> AggregateSinglePayload {
+entry(%0 : $Builtin.Int21, %1 : $Builtin.Int64):
+  %t = tuple (%0 : $Builtin.Int21, %1 : $Builtin.Int64)
+  %u = union $AggregateSinglePayload, #AggregateSinglePayload.x!unionelt.1, %t : $(Builtin.Int21, Builtin.Int64)
+  return %u : $AggregateSinglePayload
 }
 
 struct CharLike { var value : Builtin.Int21 }
@@ -359,6 +449,28 @@ end:
   return %x : $()
 }
 
+// CHECK: define { i256, i1 } @aggregate_single_payload_2_inject(i21, i64, i64, i64) {
+// CHECK: entry:
+// CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to i256
+// CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i256
+// CHECK:   [[SHIFT_1:%.*]] = shl i256 [[ZEXT_1]], 64
+// CHECK:   [[PAYLOAD_0_1:%.*]] = or i256 [[ZEXT_0]], [[SHIFT_1]]
+// CHECK:   [[ZEXT_2_FROM:%.*]] = zext i64 %2 to i256
+// CHECK:   [[SHIFT_2_FROM:%.*]] = shl i256 [[ZEXT_2_FROM]], 128
+// CHECK:   [[ZEXT_2_TO:%.*]] = zext i64 %3 to i256
+// CHECK:   [[SHIFT_2_TO:%.*]] = shl i256 [[ZEXT_2_TO]], 192
+// CHECK:   [[PAYLOAD_2:%.*]] = or i256 [[SHIFT_2_FROM]], [[SHIFT_2_TO]]
+// CHECK:   [[PAYLOAD:%.*]] = or i256 [[PAYLOAD_0_1]], [[PAYLOAD_2]]
+// CHECK:   [[RES_0:%.*]] = insertvalue { i256, i1 } undef, i256 [[PAYLOAD]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i256, i1 } [[RES_0]], i1 false, 1
+// CHECK:   ret { i256, i1 } [[RES]]
+// CHECK: }
+sil @aggregate_single_payload_2_inject : $(CharLike, IntLike, RangeLike) -> AggregateSinglePayload2 {
+entry(%0 : $CharLike, %1 : $IntLike, %2 : $RangeLike):
+  %t = tuple (%0 : $CharLike, %1 : $IntLike, %2 : $RangeLike)
+  %u = union $AggregateSinglePayload2, #AggregateSinglePayload2.x!unionelt.1, %t : $(CharLike, IntLike, RangeLike)
+  return %u : $AggregateSinglePayload2
+}
 
 
 union SinglePayloadSpareBit {
@@ -457,6 +569,39 @@ end:
   return %x : $()
 }
 
+// CHECK: define i64 @single_payload_spare_bit_inject_x(i63) {
+// CHECK: entry:
+// CHECK:   [[A:%.*]] = zext i63 %0 to i64
+// CHECK:   ret i64 [[A]]
+// CHECK: }
+sil @single_payload_spare_bit_inject_x : $(Builtin.Int63) -> SinglePayloadSpareBit {
+entry(%0 : $Builtin.Int63):
+  %u = union $SinglePayloadSpareBit, #SinglePayloadSpareBit.x!unionelt.1, %0 : $Builtin.Int63
+  return %u : $SinglePayloadSpareBit
+}
+
+// CHECK: define i64 @single_payload_spare_bit_inject_y() {
+// CHECK: entry:
+//                 0x8000_0000_0000_0000
+// CHECK:   ret i64 -9223372036854775808
+// CHECK: }
+sil @single_payload_spare_bit_inject_y : $() -> SinglePayloadSpareBit {
+entry:
+  %u = union $SinglePayloadSpareBit, #SinglePayloadSpareBit.y!unionelt
+  return %u : $SinglePayloadSpareBit
+}
+
+// CHECK: define i64 @single_payload_spare_bit_inject_z() {
+// CHECK: entry:
+//                 0x8000_0000_0000_0001
+// CHECK:   ret i64 -9223372036854775807
+// CHECK: }
+sil @single_payload_spare_bit_inject_z : $() -> SinglePayloadSpareBit {
+entry:
+  %u = union $SinglePayloadSpareBit, #SinglePayloadSpareBit.z!unionelt
+  return %u : $SinglePayloadSpareBit
+}
+
 
 union MultiPayloadNoSpareBits {
   case x(Builtin.Int64)
@@ -539,6 +684,73 @@ end:
   return %v : $()
 }
 
+// CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_x(i64) {
+// CHECK: entry:
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 %0, 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 0, 1
+// CHECK:   ret { i64, i2 } [[RES]]
+// CHECK: }
+sil @multi_payload_no_spare_bit_inject_x : $(Builtin.Int64) -> MultiPayloadNoSpareBits {
+entry(%0 : $Builtin.Int64):
+  %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!unionelt.1, %0 : $Builtin.Int64
+  return %u : $MultiPayloadNoSpareBits
+}
+
+// CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_y(i32) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i32 %0 to i64
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 [[ZEXT]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 1, 1
+// CHECK:   ret { i64, i2 } [[RES]]
+// CHECK: }
+sil @multi_payload_no_spare_bit_inject_y : $(Builtin.Int32) -> MultiPayloadNoSpareBits {
+entry(%0 : $Builtin.Int32):
+  %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.y!unionelt.1, %0 : $Builtin.Int32
+  return %u : $MultiPayloadNoSpareBits
+}
+
+// CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_z(i63) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i63 %0 to i64
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 [[ZEXT]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 -2, 1
+// CHECK:   ret { i64, i2 } [[RES]]
+// CHECK: }
+sil @multi_payload_no_spare_bit_inject_z : $(Builtin.Int63) -> MultiPayloadNoSpareBits {
+entry(%0 : $Builtin.Int63):
+  %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.z!unionelt.1, %0 : $Builtin.Int63
+  return %u : $MultiPayloadNoSpareBits
+}
+
+// CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_a() {
+// CHECK: entry:
+// CHECK:   ret { i64, i2 } { i64 0, i2 -1 }
+// CHECK: }
+sil @multi_payload_no_spare_bit_inject_a : $() -> MultiPayloadNoSpareBits {
+entry:
+  %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.a!unionelt
+  return %u : $MultiPayloadNoSpareBits
+}
+
+// CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_b() {
+// CHECK: entry:
+// CHECK:   ret { i64, i2 } { i64 1, i2 -1 }
+// CHECK: }
+sil @multi_payload_no_spare_bit_inject_b : $() -> MultiPayloadNoSpareBits {
+entry:
+  %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.b!unionelt
+  return %u : $MultiPayloadNoSpareBits
+}
+
+// CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_c() {
+// CHECK: entry:
+// CHECK:   ret { i64, i2 } { i64 2, i2 -1 }
+// CHECK: }
+sil @multi_payload_no_spare_bit_inject_c : $() -> MultiPayloadNoSpareBits {
+entry:
+  %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.c!unionelt
+  return %u : $MultiPayloadNoSpareBits
+}
 
 union MultiPayloadOneSpareBit {
   case x(Builtin.Int62)
@@ -635,6 +847,80 @@ end:
   return %v : $()
 }
 
+// CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_x(i62) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i62 %0 to i64
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[ZEXT]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 false, 1
+// CHECK:   ret { i64, i1 } [[RES]]
+// CHECK: }
+sil @multi_payload_one_spare_bit_inject_x : $(Builtin.Int62) -> MultiPayloadOneSpareBit {
+entry(%0 : $Builtin.Int62):
+  %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!unionelt.1, %0 : $Builtin.Int62
+  return %u : $MultiPayloadOneSpareBit
+}
+
+// CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_y(i63) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i63 %0 to i64
+// --                                        0x8000_0000_0000_0000
+// CHECK:   [[TAGGED:%.*]] = or i64 [[ZEXT]], -9223372036854775808
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[TAGGED]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 false, 1
+// CHECK:   ret { i64, i1 } [[RES]]
+// CHECK: }
+sil @multi_payload_one_spare_bit_inject_y : $(Builtin.Int63) -> MultiPayloadOneSpareBit {
+entry(%0 : $Builtin.Int63):
+  %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!unionelt.1, %0 : $Builtin.Int63
+  return %u : $MultiPayloadOneSpareBit
+}
+
+// CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_z(i61) {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i61 %0 to i64
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[ZEXT]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 true, 1
+// CHECK:   ret { i64, i1 } [[RES]]
+// CHECK: }
+sil @multi_payload_one_spare_bit_inject_z : $(Builtin.Int61) -> MultiPayloadOneSpareBit {
+entry(%0 : $Builtin.Int61):
+  %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.z!unionelt.1, %0 : $Builtin.Int61
+  return %u : $MultiPayloadOneSpareBit
+}
+
+// CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_a() {
+// CHECK: entry:
+// --                            0x8000_0000_0000_0000
+// CHECK:   ret { i64, i1 } { i64 -9223372036854775808, i1 true }
+// CHECK: }
+sil @multi_payload_one_spare_bit_inject_a : $() -> MultiPayloadOneSpareBit {
+entry:
+  %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.a!unionelt
+  return %u : $MultiPayloadOneSpareBit
+}
+
+// CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_b() {
+// CHECK: entry:
+// --                            0x8000_0000_0000_0001
+// CHECK:   ret { i64, i1 } { i64 -9223372036854775807, i1 true }
+// CHECK: }
+sil @multi_payload_one_spare_bit_inject_b : $() -> MultiPayloadOneSpareBit {
+entry:
+  %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.b!unionelt
+  return %u : $MultiPayloadOneSpareBit
+}
+
+// CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_c() {
+// CHECK: entry:
+// --                            0x8000_0000_0000_0002
+// CHECK:   ret { i64, i1 } { i64 -9223372036854775806, i1 true }
+// CHECK: }
+sil @multi_payload_one_spare_bit_inject_c : $() -> MultiPayloadOneSpareBit {
+entry:
+  %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.c!unionelt
+  return %u : $MultiPayloadOneSpareBit
+}
+
 
 union MultiPayloadTwoSpareBits {
   case x(Builtin.Int62)
@@ -729,289 +1015,75 @@ end:
   return %v : $()
 }
 
-
-
-
-// -- injection functions for unions --
-
-// CHECK: define { i64, i64 } @_TO5union9Singleton3valfMS0_FTBi64_Bi64__S0_(i64, i64) {
-// CHECK: entry:
-// CHECK:   [[A:%.*]] = insertvalue { i64, i64 } undef, i64 %0, 0
-// CHECK:   [[B:%.*]] = insertvalue { i64, i64 } [[A]], i64 %1, 1
-// CHECK:   ret { i64, i64 } [[B]]
-// CHECK: }
-
-
-// CHECK: define i2 @_TO5union10NoPayloads1xFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret i2 0
-// CHECK: }
-
-// CHECK: define i2 @_TO5union10NoPayloads1yFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret i2 1
-// CHECK: }
-
-// CHECK: define i2 @_TO5union10NoPayloads1zFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret i2 -2
-// CHECK: }
-
-
-// CHECK: define i3 @_TO5union11NoPayloads21aFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret i3 0
-// CHECK: }
-
-// CHECK: define i3 @_TO5union11NoPayloads21eFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret i3 1
-// CHECK: }
-
-// CHECK: define i3 @_TO5union11NoPayloads21iFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret i3 2
-// CHECK: }
-
-// CHECK: define i3 @_TO5union11NoPayloads21oFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret i3 3
-// CHECK: }
-
-// CHECK: define i3 @_TO5union11NoPayloads21uFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret i3 -4
-// CHECK: }
-
-// CHECK: define i3 @_TO5union11NoPayloads21yFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret i3 -3
-// CHECK: }
-
-
-// CHECK: define { i64, i1 } @_TO5union17SinglePayloadNoXI1xfMS0_FBi64_S0_(i64) {
-// CHECK: entry:
-// CHECK:   [[A:%.*]] = insertvalue { i64, i1 } undef, i64 %0, 0
-// CHECK:   [[B:%.*]] = insertvalue { i64, i1 } [[A]], i1 false, 1
-// CHECK:   ret { i64, i1 } [[B]]
-// CHECK: }
-
-// CHECK: define { i64, i1 } @_TO5union17SinglePayloadNoXI1yFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret { i64, i1 } { i64 0, i1 true }
-// CHECK: }
-
-
-// CHECK: define { i64, i1 } @_TO5union18SinglePayloadNoXI21xfMS0_FBi64_S0_(i64) {
-// CHECK: entry:
-// CHECK:   [[A:%.*]] = insertvalue { i64, i1 } undef, i64 %0, 0
-// CHECK:   [[B:%.*]] = insertvalue { i64, i1 } [[A]], i1 false, 1
-// CHECK:   ret { i64, i1 } [[B]]
-// CHECK: }
-
-// CHECK: define { i64, i1 } @_TO5union18SinglePayloadNoXI21yFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret { i64, i1 } { i64 0, i1 true }
-// CHECK: }
-
-// CHECK: define { i64, i1 } @_TO5union18SinglePayloadNoXI21zFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret { i64, i1 } { i64 1, i1 true }
-// CHECK: }
-
-
-// CHECK: define { i128, i1 } @_TO5union22AggregateSinglePayload1xfMS0_FTBi21_Bi64__S0_(i21, i64) {
-// CHECK: entry:
-// CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to i128
-// CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i128
-// CHECK:   [[SHIFT_1:%.*]] = shl i128 [[ZEXT_1]], 64
-// CHECK:   [[PAYLOAD:%.*]] = or i128 [[ZEXT_0]], [[SHIFT_1]]
-// CHECK:   [[RES_0:%.*]] = insertvalue { i128, i1 } undef, i128 [[PAYLOAD]], 0
-// CHECK:   [[RES:%.*]] = insertvalue { i128, i1 } [[RES_0]], i1 false, 1
-// CHECK:   ret { i128, i1 } [[RES]]
-// CHECK: }
-
-// CHECK: define { i128, i1 } @_TO5union22AggregateSinglePayload1yFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret { i128, i1 } { i128 0, i1 true }
-// CHECK: }
-
-// CHECK: define { i128, i1 } @_TO5union22AggregateSinglePayload1zFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret { i128, i1 } { i128 1, i1 true }
-// CHECK: }
-
-
-// CHECK: define { i256, i1 } @_TO5union23AggregateSinglePayload21xfMS0_FTVS_8CharLikeVS_7IntLikeVS_9RangeLike_S0_(i21, i64, i64, i64) {
-// CHECK: entry:
-// CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to i256
-// CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i256
-// CHECK:   [[SHIFT_1:%.*]] = shl i256 [[ZEXT_1]], 64
-// CHECK:   [[PAYLOAD_0_1:%.*]] = or i256 [[ZEXT_0]], [[SHIFT_1]]
-// CHECK:   [[ZEXT_2_FROM:%.*]] = zext i64 %2 to i256
-// CHECK:   [[SHIFT_2_FROM:%.*]] = shl i256 [[ZEXT_2_FROM]], 128
-// CHECK:   [[ZEXT_2_TO:%.*]] = zext i64 %3 to i256
-// CHECK:   [[SHIFT_2_TO:%.*]] = shl i256 [[ZEXT_2_TO]], 192
-// CHECK:   [[PAYLOAD_2:%.*]] = or i256 [[SHIFT_2_FROM]], [[SHIFT_2_TO]]
-// CHECK:   [[PAYLOAD:%.*]] = or i256 [[PAYLOAD_0_1]], [[PAYLOAD_2]]
-// CHECK:   [[RES_0:%.*]] = insertvalue { i256, i1 } undef, i256 [[PAYLOAD]], 0
-// CHECK:   [[RES:%.*]] = insertvalue { i256, i1 } [[RES_0]], i1 false, 1
-// CHECK:   ret { i256, i1 } [[RES]]
-// CHECK: }
-
-// CHECK: define { i256, i1 } @_TO5union23AggregateSinglePayload21yFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret { i256, i1 } { i256 0, i1 true }
-// CHECK: }
-
-// CHECK: define { i256, i1 } @_TO5union23AggregateSinglePayload21zFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret { i256, i1 } { i256 1, i1 true }
-// CHECK: }
-
-
-// CHECK: define i64 @_TO5union21SinglePayloadSpareBit1xfMS0_FBi63_S0_(i63) {
-// CHECK: entry:
-// CHECK:   [[A:%.*]] = zext i63 %0 to i64
-// CHECK:   ret i64 [[A]]
-// CHECK: }
-
-// CHECK: define i64 @_TO5union21SinglePayloadSpareBit1yFMS0_S0_() {
-// CHECK: entry:
-//                 0x8000_0000_0000_0000
-// CHECK:   ret i64 -9223372036854775808
-// CHECK: }
-
-// CHECK: define i64 @_TO5union21SinglePayloadSpareBit1zFMS0_S0_() {
-// CHECK: entry:
-//                 0x8000_0000_0000_0001
-// CHECK:   ret i64 -9223372036854775807
-// CHECK: }
-
-
-// CHECK: define { i64, i2 } @_TO5union23MultiPayloadNoSpareBits1xfMS0_FBi64_S0_(i64) {
-// CHECK: entry:
-// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 %0, 0
-// CHECK:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 0, 1
-// CHECK:   ret { i64, i2 } [[RES]]
-// CHECK: }
-
-// CHECK: define { i64, i2 } @_TO5union23MultiPayloadNoSpareBits1yfMS0_FBi32_S0_(i32) {
-// CHECK: entry:
-// CHECK:   [[ZEXT:%.*]] = zext i32 %0 to i64
-// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 [[ZEXT]], 0
-// CHECK:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 1, 1
-// CHECK:   ret { i64, i2 } [[RES]]
-// CHECK: }
-
-// CHECK: define { i64, i2 } @_TO5union23MultiPayloadNoSpareBits1zfMS0_FBi63_S0_(i63) {
-// CHECK: entry:
-// CHECK:   [[ZEXT:%.*]] = zext i63 %0 to i64
-// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 [[ZEXT]], 0
-// CHECK:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 -2, 1
-// CHECK:   ret { i64, i2 } [[RES]]
-// CHECK: }
-
-// CHECK: define { i64, i2 } @_TO5union23MultiPayloadNoSpareBits1aFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret { i64, i2 } { i64 0, i2 -1 }
-// CHECK: }
-
-// CHECK: define { i64, i2 } @_TO5union23MultiPayloadNoSpareBits1bFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret { i64, i2 } { i64 1, i2 -1 }
-// CHECK: }
-
-// CHECK: define { i64, i2 } @_TO5union23MultiPayloadNoSpareBits1cFMS0_S0_() {
-// CHECK: entry:
-// CHECK:   ret { i64, i2 } { i64 2, i2 -1 }
-// CHECK: }
-
-
-// CHECK: define { i64, i1 } @_TO5union23MultiPayloadOneSpareBit1xfMS0_FBi62_S0_(i62) {
-// CHECK: entry:
-// CHECK:   [[ZEXT:%.*]] = zext i62 %0 to i64
-// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[ZEXT]], 0
-// CHECK:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 false, 1
-// CHECK:   ret { i64, i1 } [[RES]]
-// CHECK: }
-
-// CHECK: define { i64, i1 } @_TO5union23MultiPayloadOneSpareBit1yfMS0_FBi63_S0_(i63) {
-// CHECK: entry:
-// CHECK:   [[ZEXT:%.*]] = zext i63 %0 to i64
-// --                                        0x8000_0000_0000_0000
-// CHECK:   [[TAGGED:%.*]] = or i64 [[ZEXT]], -9223372036854775808
-// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[TAGGED]], 0
-// CHECK:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 false, 1
-// CHECK:   ret { i64, i1 } [[RES]]
-// CHECK: }
-
-// CHECK: define { i64, i1 } @_TO5union23MultiPayloadOneSpareBit1zfMS0_FBi61_S0_(i61) {
-// CHECK: entry:
-// CHECK:   [[ZEXT:%.*]] = zext i61 %0 to i64
-// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[ZEXT]], 0
-// CHECK:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 true, 1
-// CHECK:   ret { i64, i1 } [[RES]]
-// CHECK: }
-
-// CHECK: define { i64, i1 } @_TO5union23MultiPayloadOneSpareBit1aFMS0_S0_() {
-// CHECK: entry:
-// --                            0x8000_0000_0000_0000
-// CHECK:   ret { i64, i1 } { i64 -9223372036854775808, i1 true }
-// CHECK: }
-
-// CHECK: define { i64, i1 } @_TO5union23MultiPayloadOneSpareBit1bFMS0_S0_() {
-// CHECK: entry:
-// --                            0x8000_0000_0000_0001
-// CHECK:   ret { i64, i1 } { i64 -9223372036854775807, i1 true }
-// CHECK: }
-
-// CHECK: define { i64, i1 } @_TO5union23MultiPayloadOneSpareBit1cFMS0_S0_() {
-// CHECK: entry:
-// --                            0x8000_0000_0000_0002
-// CHECK:   ret { i64, i1 } { i64 -9223372036854775806, i1 true }
-// CHECK: }
-
-
-// CHECK: define i64 @_TO5union24MultiPayloadTwoSpareBits1xfMS0_FBi62_S0_(i62) {
+// CHECK: define i64 @multi_payload_two_spare_bits_inject_x(i62) {
 // CHECK: entry:
 // CHECK:   [[ZEXT:%.*]] = zext i62 %0 to i64
 // CHECK:   ret i64 [[ZEXT]]
 // CHECK: }
+sil @multi_payload_two_spare_bits_inject_x : $(Builtin.Int62) -> MultiPayloadTwoSpareBits {
+entry(%0 : $Builtin.Int62):
+  %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!unionelt.1, %0 : $Builtin.Int62
+  return %u : $MultiPayloadTwoSpareBits
+}
 
-// CHECK: define i64 @_TO5union24MultiPayloadTwoSpareBits1yfMS0_FBi60_S0_(i60) {
+// CHECK: define i64 @multi_payload_two_spare_bits_inject_y(i60) {
 // CHECK: entry:
 // CHECK:   [[ZEXT:%.*]] = zext i60 %0 to i64
 // --                     0x4000_0000_0000_0000
 // CHECK:   [[TAGGED:%.*]] = or i64 [[ZEXT]], 4611686018427387904
 // CHECK:   ret i64 [[TAGGED]]
 // CHECK: }
+sil @multi_payload_two_spare_bits_inject_y : $(Builtin.Int60) -> MultiPayloadTwoSpareBits {
+entry(%0 : $Builtin.Int60):
+  %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!unionelt.1, %0 : $Builtin.Int60
+  return %u : $MultiPayloadTwoSpareBits
+}
 
-// CHECK: define i64 @_TO5union24MultiPayloadTwoSpareBits1zfMS0_FBi61_S0_(i61) {
+// CHECK: define i64 @multi_payload_two_spare_bits_inject_z(i61) {
 // CHECK: entry:
 // CHECK:   [[ZEXT:%.*]] = zext i61 %0 to i64
 // --                      0x8000_0000_0000_0000
 // CHECK:   [[TAGGED:%.*]] = or i64 [[ZEXT]], -9223372036854775808
 // CHECK:   ret i64 [[TAGGED]]
 // CHECK: }
+sil @multi_payload_two_spare_bits_inject_z : $(Builtin.Int61) -> MultiPayloadTwoSpareBits {
+entry(%0 : $Builtin.Int61):
+  %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.z!unionelt.1, %0 : $Builtin.Int61
+  return %u : $MultiPayloadTwoSpareBits
+}
 
-// CHECK: define i64 @_TO5union24MultiPayloadTwoSpareBits1aFMS0_S0_() {
+// CHECK: define i64 @multi_payload_two_spare_bits_inject_a() {
 // CHECK: entry:
 // --              0xC000_0000_0000_0000
 // CHECK:   ret i64 -4611686018427387904
 // CHECK: }
+sil @multi_payload_two_spare_bits_inject_a : $() -> MultiPayloadTwoSpareBits {
+entry:
+  %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.a!unionelt
+  return %u : $MultiPayloadTwoSpareBits
+}
 
-// CHECK: define i64 @_TO5union24MultiPayloadTwoSpareBits1bFMS0_S0_() {
+// CHECK: define i64 @multi_payload_two_spare_bits_inject_b() {
 // CHECK: entry:
 // --              0xC000_0000_0000_0001
 // CHECK:   ret i64 -4611686018427387903
 // CHECK: }
+sil @multi_payload_two_spare_bits_inject_b : $() -> MultiPayloadTwoSpareBits {
+entry:
+  %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.b!unionelt
+  return %u : $MultiPayloadTwoSpareBits
+}
 
-// CHECK: define i64 @_TO5union24MultiPayloadTwoSpareBits1cFMS0_S0_() {
+// CHECK: define i64 @multi_payload_two_spare_bits_inject_c() {
 // CHECK: entry:
 // --              0xC000_0000_0000_0002
 // CHECK:   ret i64 -4611686018427387902
 // CHECK: }
+sil @multi_payload_two_spare_bits_inject_c : $() -> MultiPayloadTwoSpareBits {
+entry:
+  %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.c!unionelt
+  return %u : $MultiPayloadTwoSpareBits
+}
 
 
 // Force the storage types to all be generated.

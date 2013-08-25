@@ -803,6 +803,11 @@ public:
     explicitDestructor = dd;
   }
   
+  void visitUnionElementDecl(UnionElementDecl *ued) {
+    assert(isa<UnionDecl>(theType));
+    SGM.emitUnionConstructor(ued);
+  }
+  
   // no-op. We don't deal with the layout of types here.
   void visitPatternBindingDecl(PatternBindingDecl *) {}
   

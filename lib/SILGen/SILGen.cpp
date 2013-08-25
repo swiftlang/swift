@@ -368,6 +368,13 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   }  
 }
 
+void SILGenModule::emitUnionConstructor(UnionElementDecl *decl) {
+  SILDeclRef constant(decl);
+  SILFunction *f = preEmitFunction(constant, decl);
+  SILGenFunction(*this, *f).emitUnionConstructor(decl);
+  postEmitFunction(constant, f);
+}
+
 void SILGenModule::emitClosure(PipeClosureExpr *ce) {
   SILDeclRef constant(ce);
   SILFunction *f = preEmitFunction(constant, ce);

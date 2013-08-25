@@ -72,10 +72,11 @@ namespace {
       initialize(IGF, params, dest);
     }
 
-    /// Emit the constructor function for a union case.
-    virtual void emitInjectionFunctionBody(IRGenFunction &IGF,
-                                           UnionElementDecl *elt,
-                                           Explosion &params) const = 0;
+    /// Emit the construction sequence for a union case.
+    virtual void emitInjection(IRGenFunction &IGF,
+                               UnionElementDecl *elt,
+                               Explosion &params,
+                               Explosion &out) const = 0;
     
     /// Emit a branch on the case contained in a union value.
     virtual void emitSwitch(IRGenFunction &IGF,
@@ -412,24 +413,22 @@ namespace {
     }
     
   public:
-    void emitInjectionFunctionBody(IRGenFunction &IGF,
-                                   UnionElementDecl *elt,
-                                   Explosion &params) const {
+    void emitInjection(IRGenFunction &IGF,
+                       UnionElementDecl *elt,
+                       Explosion &params,
+                       Explosion &out) const {
       // The payload case gets its native representation. If there are extra
       // tag bits, set them to zero.
       unsigned payloadSize = PayloadTypeInfo->getFixedSize().getValueInBits();
       
       if (elt == PayloadElement) {
-        Explosion unionExplosion(ExplosionKind::Minimal);
-        
         // FIXME
         auto &loadablePayloadTI = cast<LoadableTypeInfo>(*PayloadTypeInfo);
         llvm::Value *payload
           = loadablePayloadTI.packUnionPayload(IGF, params, payloadSize, 0);
-        unionExplosion.add(payload);
+        out.add(payload);
         
-        addExtraTagBitValue(IGF, unionExplosion, 0);
-        IGF.emitScalarReturn(unionExplosion);
+        addExtraTagBitValue(IGF, out, 0);
         return;
       }
       
@@ -462,10 +461,8 @@ namespace {
                                          APInt(payloadSize, payloadValue));
       }
 
-      Explosion unionExplosion(ExplosionKind::Minimal);
-      unionExplosion.add(payload);
-      addExtraTagBitValue(IGF, unionExplosion, extraTagValue);
-      IGF.emitScalarReturn(unionExplosion);
+      out.add(payload);
+      addExtraTagBitValue(IGF, out, extraTagValue);
     }
     
   private:
@@ -875,30 +872,29 @@ namespace {
       }
     }
     
-    void emitInjectionFunctionBody(IRGenFunction &IGF,
-                                   UnionElementDecl *elt,
-                                   Explosion &params) const {
+    void emitInjection(IRGenFunction &IGF,
+                       UnionElementDecl *elt,
+                       Explosion &params,
+                       Explosion &out) const {
       // See whether this is a payload or empty case we're emitting.
       auto payloadI = std::find_if(PayloadCases.begin(), PayloadCases.end(),
          [&](const std::pair<UnionElementDecl*, const FixedTypeInfo*> &p) {
            return p.first == elt;
          });
       if (payloadI != PayloadCases.end()) {
-        return emitPayloadInjection(IGF, elt, *payloadI->second, params,
+        return emitPayloadInjection(IGF, elt, *payloadI->second, params, out,
                                     payloadI - PayloadCases.begin());
       }
       auto emptyI = std::find(NoPayloadCases.begin(),NoPayloadCases.end(), elt);
       assert(emptyI != NoPayloadCases.end() && "case not in union");
-      emitEmptyInjection(IGF, emptyI - NoPayloadCases.begin());
+      emitEmptyInjection(IGF, out, emptyI - NoPayloadCases.begin());
     }
     
   private:
     void emitPayloadInjection(IRGenFunction &IGF, UnionElementDecl *elt,
                               const FixedTypeInfo &payloadTI,
-                              Explosion &params,
+                              Explosion &params, Explosion &out,
                               unsigned tag) const {
-      Explosion result(ExplosionKind::Minimal);
-      
       // Pack the payload.
       auto &loadablePayloadTI = cast<LoadableTypeInfo>(payloadTI); // FIXME
       llvm::Value *payload = loadablePayloadTI.packUnionPayload(IGF, params,
@@ -913,22 +909,19 @@ namespace {
         payload = IGF.Builder.CreateOr(payload, tagMask);
       }
       
-      result.add(payload);
+      out.add(payload);
       
       // If we have extra tag bits, pack the remaining tag bits into them.
       if (ExtraTagBitCount > 0) {
         tag >>= numSpareBits;
         auto extra = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
                                             APInt(ExtraTagBitCount, tag));
-        result.add(extra);
+        out.add(extra);
       }
-      
-      IGF.emitScalarReturn(result);
     }
     
-    void emitEmptyInjection(IRGenFunction &IGF, unsigned index) const {
-      Explosion result(ExplosionKind::Minimal);
-      
+    void emitEmptyInjection(IRGenFunction &IGF, Explosion &out,
+                            unsigned index) const {
       // Figure out the tag and payload for the empty case.
       unsigned numCaseBits = getNumCaseBits();
       unsigned tag, tagIndex;
@@ -953,17 +946,15 @@ namespace {
                                        APInt(CommonSpareBits.size(), tagIndex));
       }
       
-      result.add(payload);
+      out.add(payload);
       
       // If we have extra tag bits, pack the remaining tag bits into them.
       if (ExtraTagBitCount > 0) {
         tag >>= numSpareBits;
         auto extra = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
                                             APInt(ExtraTagBitCount, tag));
-        result.add(extra);
+        out.add(extra);
       }
-      
-      IGF.emitScalarReturn(result);
     }
     
     void forNontrivialPayloads(IRGenFunction &IGF,
@@ -1164,27 +1155,17 @@ namespace {
         Singleton->reexplode(IGF, in, out);
     }
 
-    void emitInjectionFunctionBody(IRGenFunction &IGF,
-                                   UnionElementDecl *elt,
-                                   Explosion &params) const {
-      // If this union carries no data, the function must take no
-      // arguments and return void.
+    void emitInjection(IRGenFunction &IGF,
+                       UnionElementDecl *elt,
+                       Explosion &params,
+                       Explosion &out) const {
+      // If the element carries no data, neither does the injection.
       if (!Singleton) {
-        IGF.Builder.CreateRetVoid();
         return;
       }
 
       // Otherwise, package up the result.
-      ExplosionSchema schema(params.getKind());
-      Singleton->getSchema(schema);
-      if (schema.requiresIndirectResult()) {
-        Address returnSlot =
-          Singleton->getAddressForPointer(params.claimNext());
-        initialize(IGF, params, returnSlot);
-        IGF.Builder.CreateRetVoid();
-      } else {
-        IGF.emitScalarReturn(params);
-      }
+      reexplode(IGF, params, out);
     }
     
     void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
@@ -1227,7 +1208,7 @@ namespace {
     void emitSwitch(IRGenFunction &IGF,
                     Explosion &value,
                     ArrayRef<std::pair<UnionElementDecl*,
-                             llvm::BasicBlock*>> dests,
+                                       llvm::BasicBlock*>> dests,
                     llvm::BasicBlock *defaultDest) const override {
       llvm::Value *discriminator = value.claimNext();
       
@@ -1258,10 +1239,11 @@ namespace {
       in.claimAll();
     }
 
-    void emitInjectionFunctionBody(IRGenFunction &IGF,
-                                   UnionElementDecl *elt,
-                                   Explosion &params) const {
-      IGF.Builder.CreateRet(getDiscriminatorIndex(elt));
+    void emitInjection(IRGenFunction &IGF,
+                       UnionElementDecl *elt,
+                       Explosion &params,
+                       Explosion &out) const {
+      out.add(getDiscriminatorIndex(elt));
     }
     
     void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
@@ -1573,27 +1555,6 @@ const TypeInfo *TypeConverter::convertUnionType(UnionDecl *theUnion) {
   return convertedTI;
 }
 
-/// Emit the injection function for the given element.
-static void emitInjectionFunction(IRGenModule &IGM,
-                                  llvm::Function *fn,
-                                  UnionElementDecl *elt) {
-  ExplosionKind explosionKind = ExplosionKind::Minimal;
-  IRGenFunction IGF(IGM, explosionKind, fn);
-  if (IGM.DebugInfo)
-    IGM.DebugInfo->emitArtificialFunction(IGF, fn);
-
-  Explosion explosion = IGF.collectParameters();
-  UnionDecl *ud = elt->getParentUnion();
-  if (ud->getGenericParamsOfContext()) {
-    auto polyFn =
-      cast<PolymorphicFunctionType>(elt->getType()->getCanonicalType());
-    emitPolymorphicParameters(IGF, polyFn, explosion);
-  }
-  const UnionTypeInfo &unionTI =
-    IGM.getTypeInfo(ud->getDeclaredTypeInContext()).as<UnionTypeInfo>();
-  unionTI.emitInjectionFunctionBody(IGF, elt, explosion);
-}
-
 /// emitUnionDecl - Emit all the declarations associated with this union type.
 void IRGenModule::emitUnionDecl(UnionDecl *theUnion) {
   emitUnionMetadata(*this, theUnion);
@@ -1645,12 +1606,9 @@ void IRGenModule::emitUnionDecl(UnionDecl *theUnion) {
     case DeclKind::Constructor:
       emitLocalDecls(cast<ConstructorDecl>(member));
       continue;
-    case DeclKind::UnionElement: {
-      UnionElementDecl *elt = cast<UnionElementDecl>(member);
-      llvm::Function *fn = getAddrOfInjectionFunction(elt);
-      emitInjectionFunction(*this, fn, elt);
+    case DeclKind::UnionElement:
+      // Lowered in SIL.
       continue;
-    }
     }
     llvm_unreachable("bad extension member kind");
   }
@@ -1756,6 +1714,16 @@ void irgen::emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
          && "not of a union type");
   auto &unionTI = IGF.getTypeInfo(unionTy).as<UnionTypeInfo>();
   unionTI.emitSwitch(IGF, unionValue, dests, defaultDest);
+}
+
+void irgen::emitInjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
+                                    UnionElementDecl *theCase,
+                                    Explosion &data,
+                                    Explosion &out) {
+  assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
+         && "not of a union type");
+  auto &unionTI = IGF.getTypeInfo(unionTy).as<UnionTypeInfo>();
+  unionTI.emitInjection(IGF, theCase, data, out);
 }
 
 void irgen::emitProjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,

@@ -100,14 +100,22 @@ void emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
                                                       llvm::BasicBlock*>> dests,
                                      llvm::BasicBlock *defaultDest);
 
+/// \brief Injects a case and its associated data, if any, into a loadable union
+/// value.
+void emitInjectLoadableUnion(IRGenFunction &IGF,
+                             SILType unionTy,
+                             UnionElementDecl *theCase,
+                             Explosion &data,
+                             Explosion &out);
+  
 /// \brief Extracts the associated data for a union case. This is an unchecked
 /// operation; the input union value must be of the given case.
 void emitProjectLoadableUnion(IRGenFunction &IGF,
                               SILType unionTy,
-                              Explosion &inUnionValue,
+                              Explosion &inData,
                               UnionElementDecl *theCase,
                               Explosion &out);
-  
+
 /// Interleave the occupiedValue and spareValue bits, taking a bit from one
 /// or the other at each position based on the spareBits mask.
 llvm::ConstantInt *

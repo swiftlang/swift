@@ -111,7 +111,7 @@ public:
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
 
-  /// emitFunction - Generates code for the given FuncExpr and adds the
+  /// Generates code for the given FuncExpr and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(decl). For
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
@@ -119,17 +119,20 @@ public:
   /// \brief Generates code for the given closure expression and adds the 
   /// SILFunction to the current SILModule under the nane SILDeclRef(ce).
   void emitClosure(PipeClosureExpr *ce);
-  /// emitClosure - Generates code for the given ClosureExpr and adds the
+  /// Generates code for the given ClosureExpr and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
   void emitClosure(ClosureExpr *ce);
-  /// emitConstructor - Generates code for the given ConstructorDecl and adds
+  /// Generates code for the given ConstructorDecl and adds
   /// the SILFunction to the current SILModule under the name SILDeclRef(decl).
   void emitConstructor(ConstructorDecl *decl);
-  /// emitDestructor - Generates code for the given class's destructor and adds
+  /// Generates code for the given class's destructor and adds
   /// the SILFunction to the current SILModule under the name
   /// SILDeclRef(cd, Destructor). If a DestructorDecl is provided, it will be
   /// used, otherwise only the implicit destruction behavior will be emitted.
   void emitDestructor(ClassDecl *cd, DestructorDecl /*nullable*/ *dd);
+  /// Generates the union constructor for the given
+  /// UnionElementDecl under the name SILDeclRef(decl).
+  void emitUnionConstructor(UnionElementDecl *decl);
 
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, Expr *arg);
@@ -424,19 +427,23 @@ public:
   /// class destructor.
   void emitDestructor(ClassDecl *cd, DestructorDecl *dd);
   
-  /// emitValueConstructor - Generates code for a struct constructor.
+  /// Generates code for a struct constructor.
   /// This allocates the new 'this' value, emits the
   /// body code, then returns the final initialized 'this'.
   void emitValueConstructor(ConstructorDecl *ctor);
-  /// emitClassConstructorAllocator - Generates code for a class constructor's
+  /// Generates code for a union case constructor.
+  /// This allocates the new 'this' value, injects the union case,
+  /// then returns the final initialized 'this'.
+  void emitUnionConstructor(UnionElementDecl *element);
+  /// Generates code for a class constructor's
   /// allocating entry point. This allocates the new 'this' value, passes it to
   /// the initializer entry point, then returns the initialized 'this'.
   void emitClassConstructorAllocator(ConstructorDecl *ctor);
-  /// emitClassConstructorInitializer - Generates code for a class constructor's
+  /// Generates code for a class constructor's
   /// initializing entry point. This takes 'this' and the constructor arguments
   /// as parameters and executes the constructor body to initialize 'this'.
   void emitClassConstructorInitializer(ConstructorDecl *ctor);
-  /// emitCurryThunk - Generates code for a curry thunk from one uncurry level
+  /// Generates code for a curry thunk from one uncurry level
   /// of a function to another.
   void emitCurryThunk(FuncExpr *fe, SILDeclRef fromLevel, SILDeclRef toLevel);
 
