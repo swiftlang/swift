@@ -373,6 +373,9 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
     result_t visitDestructorDecl(DestructorDecl *D) {
       return { true, false };
     }
+    result_t visitUnionElementDecl(UnionElementDecl *D) {
+      return { true, false };
+    }
 
     /// All other values need to have contextual archetypes bound.
     result_t visitVarDecl(VarDecl *D) {
@@ -380,9 +383,6 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
     }
     result_t visitSubscriptDecl(SubscriptDecl *D) {
       return { true, true };
-    }
-    result_t visitUnionElementDecl(UnionElementDecl *D) {
-      return { true, D->hasArgumentType() };
     }
 
     /// Make sure we have a case for every ValueDecl.
