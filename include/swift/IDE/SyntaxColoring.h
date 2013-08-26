@@ -21,8 +21,9 @@ namespace swift {
 
 namespace ide {
 
-enum class SyntaxColor {
+enum class SyntaxNodeKind : uint8_t {
   Keyword,
+  Identifier,
   DollarIdent,
   Integer,
   Floating,
@@ -34,10 +35,10 @@ enum class SyntaxColor {
 };
 
 struct SyntaxNode {
-  SyntaxColor Kind;
+  SyntaxNodeKind Kind;
   CharSourceRange Range;
 
-  SyntaxNode(SyntaxColor Kind, CharSourceRange Range)
+  SyntaxNode(SyntaxNodeKind Kind, CharSourceRange Range)
     : Kind(Kind), Range(Range) { }
 };
 

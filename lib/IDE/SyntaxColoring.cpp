@@ -43,22 +43,23 @@ SyntaxColoringContext::SyntaxColoringContext(SourceManager &SM,
                                            /*TokenizeInterpolatedString=*/true);
   std::vector<SyntaxNode> Nodes;
   for (auto &Tok : Tokens) {
-    SyntaxColor Kind;
+    SyntaxNodeKind Kind;
     switch(Tok.getKind()) {
-#define KEYWORD(X) case tok::kw_##X: Kind = SyntaxColor::Keyword; break;
+#define KEYWORD(X) case tok::kw_##X: Kind = SyntaxNodeKind::Keyword; break;
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
 
-    case tok::dollarident: Kind = SyntaxColor::DollarIdent; break;
-    case tok::integer_literal: Kind = SyntaxColor::Integer; break;
-    case tok::floating_literal: Kind = SyntaxColor::Floating; break;
-    case tok::string_literal: Kind = SyntaxColor::String; break;
-    case tok::character_literal: Kind = SyntaxColor::Character; break;
+    case tok::identifier: Kind = SyntaxNodeKind::Identifier; break;
+    case tok::dollarident: Kind = SyntaxNodeKind::DollarIdent; break;
+    case tok::integer_literal: Kind = SyntaxNodeKind::Integer; break;
+    case tok::floating_literal: Kind = SyntaxNodeKind::Floating; break;
+    case tok::string_literal: Kind = SyntaxNodeKind::String; break;
+    case tok::character_literal: Kind = SyntaxNodeKind::Character; break;
     case tok::comment:
       if (Tok.getText().startswith("//"))
-        Kind = SyntaxColor::CommentLine;
+        Kind = SyntaxNodeKind::CommentLine;
       else
-        Kind = SyntaxColor::CommentBlock;
+        Kind = SyntaxNodeKind::CommentBlock;
       break;
 
     default:
@@ -122,7 +123,7 @@ void ColorASTWalker::visitTranslationUnit(TranslationUnit &TU,
 bool ColorASTWalker::walkToTypeReprPre(TypeRepr *T) {
   if (IdentTypeRepr *IdT = dyn_cast<IdentTypeRepr>(T)) {
     for (auto &comp : IdT->Components) {
-      if (!passNonTokenNode({ SyntaxColor::TypeId,
+      if (!passNonTokenNode({ SyntaxNodeKind::TypeId,
                               CharSourceRange(comp.getIdLoc(),
                                               comp.getIdentifier().getLength())
                             }))
