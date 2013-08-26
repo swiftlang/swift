@@ -97,6 +97,7 @@ public:
 
   TypeCacheEntry getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
+  const TypeInfo *tryGetCompleteTypeInfo(CanType type);
   const TypeInfo &getTypeInfo(ClassDecl *D);
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getWitnessTablePtrTypeInfo();

@@ -48,13 +48,13 @@ using namespace irgen;
 namespace {
   class UnionImplStrategy;
   
-  /// An abstract base class for TypeInfo implementations of union types.
+  /// An abstract base class for LoadableTypeInfo implementations of union types.
   // FIXME: not always loadable or even fixed-size!
-  class UnionTypeInfo : public LoadableTypeInfo {
+  class LoadableUnionTypeInfoBase : public LoadableTypeInfo {
   public:
     // FIXME: Derive spare bits from element layout.
-    UnionTypeInfo(llvm::StructType *T, Size S, llvm::BitVector SB,
-                  Alignment A, IsPOD_t isPOD)
+    LoadableUnionTypeInfoBase(llvm::StructType *T, Size S, llvm::BitVector SB,
+                      Alignment A, IsPOD_t isPOD)
       : LoadableTypeInfo(T, S, std::move(SB), A, isPOD) {}
 
     llvm::StructType *getStorageType() const {
@@ -73,13 +73,13 @@ namespace {
     }
 
     /// Emit the construction sequence for a union case.
-    virtual void emitInjection(IRGenFunction &IGF,
+    virtual void emitValueInjection(IRGenFunction &IGF,
                                UnionElementDecl *elt,
                                Explosion &params,
                                Explosion &out) const = 0;
     
     /// Emit a branch on the case contained in a union value.
-    virtual void emitSwitch(IRGenFunction &IGF,
+    virtual void emitValueSwitch(IRGenFunction &IGF,
                             Explosion &value,
                             ArrayRef<std::pair<UnionElementDecl*,
                                                llvm::BasicBlock*>> dests,
@@ -87,7 +87,7 @@ namespace {
     
     /// Project a case value out of a union value. This does not check that the
     /// union actually contains a value of the given case.
-    virtual void emitProject(IRGenFunction &IGF,
+    virtual void emitValueProject(IRGenFunction &IGF,
                              Explosion &inUnion,
                              UnionElementDecl *theCase,
                              Explosion &out) const = 0;
@@ -99,7 +99,7 @@ namespace {
   };
   
   /// Abstract base class for unions with one or cases that carry payloads.
-  class PayloadUnionTypeInfoBase : public UnionTypeInfo {
+  class PayloadUnionTypeInfoBase : public LoadableUnionTypeInfoBase {
   protected:
     // The number of extra tag bits outside of the payload required to
     // discriminate union cases.
@@ -111,7 +111,7 @@ namespace {
   public:
     PayloadUnionTypeInfoBase(llvm::StructType *T, Size S, Alignment A,
                              IsPOD_t isPOD)
-      : UnionTypeInfo(T, S, {}, A, isPOD)
+      : LoadableUnionTypeInfoBase(T, S, {}, A, isPOD)
     {}
     
     virtual Size getExtraTagBitOffset() const = 0;
@@ -248,7 +248,7 @@ namespace {
       }
     }
     
-    void emitSwitch(IRGenFunction &IGF,
+    void emitValueSwitch(IRGenFunction &IGF,
                     Explosion &value,
                     ArrayRef<std::pair<UnionElementDecl*,
                                        llvm::BasicBlock*>> dests,
@@ -366,7 +366,7 @@ namespace {
       }
     }
     
-    void emitProject(IRGenFunction &IGF,
+    void emitValueProject(IRGenFunction &IGF,
                      Explosion &inUnion,
                      UnionElementDecl *theCase,
                      Explosion &out) const override {
@@ -413,7 +413,7 @@ namespace {
     }
     
   public:
-    void emitInjection(IRGenFunction &IGF,
+    void emitValueInjection(IRGenFunction &IGF,
                        UnionElementDecl *elt,
                        Explosion &params,
                        Explosion &out) const {
@@ -690,7 +690,7 @@ namespace {
     }
 
   public:
-    void emitSwitch(IRGenFunction &IGF,
+    void emitValueSwitch(IRGenFunction &IGF,
                     Explosion &value,
                     ArrayRef<std::pair<UnionElementDecl*,
                                        llvm::BasicBlock*>> dests,
@@ -816,7 +816,7 @@ namespace {
     }
     
   public:
-    void emitProject(IRGenFunction &IGF,
+    void emitValueProject(IRGenFunction &IGF,
                      Explosion &inValue,
                      UnionElementDecl *theCase,
                      Explosion &out) const override {
@@ -872,7 +872,7 @@ namespace {
       }
     }
     
-    void emitInjection(IRGenFunction &IGF,
+    void emitValueInjection(IRGenFunction &IGF,
                        UnionElementDecl *elt,
                        Explosion &params,
                        Explosion &out) const {
@@ -1040,7 +1040,7 @@ namespace {
   };
 
   /// A UnionTypeInfo implementation for singleton unions.
-  class SingletonUnionTypeInfo : public UnionTypeInfo {
+  class SingletonUnionTypeInfo : public LoadableUnionTypeInfoBase {
   public:
     static Address getSingletonAddress(IRGenFunction &IGF, Address addr) {
       llvm::Value *singletonAddr =
@@ -1053,7 +1053,7 @@ namespace {
 
     SingletonUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
                            IsPOD_t isPOD)
-      : UnionTypeInfo(T, S, {}, A, isPOD), Singleton(nullptr) {}
+      : LoadableUnionTypeInfoBase(T, S, {}, A, isPOD), Singleton(nullptr) {}
 
     void getSchema(ExplosionSchema &schema) const {
       assert(isComplete());
@@ -1134,7 +1134,7 @@ namespace {
       Singleton->unpackUnionPayload(IGF, payload, dest, offset);
     }
     
-    void emitSwitch(IRGenFunction &IGF,
+    void emitValueSwitch(IRGenFunction &IGF,
                     Explosion &value,
                     ArrayRef<std::pair<UnionElementDecl*,
                              llvm::BasicBlock*>> dests,
@@ -1146,7 +1146,7 @@ namespace {
       IGF.Builder.CreateBr(dests[0].second);
     }
     
-    void emitProject(IRGenFunction &IGF,
+    void emitValueProject(IRGenFunction &IGF,
                      Explosion &in,
                      UnionElementDecl *theCase,
                      Explosion &out) const override {
@@ -1155,7 +1155,7 @@ namespace {
         Singleton->reexplode(IGF, in, out);
     }
 
-    void emitInjection(IRGenFunction &IGF,
+    void emitValueInjection(IRGenFunction &IGF,
                        UnionElementDecl *elt,
                        Explosion &params,
                        Explosion &out) const {
@@ -1174,7 +1174,7 @@ namespace {
 
   /// A UnionTypeInfo implementation for unions with no payload.
   class NoPayloadUnionTypeInfo :
-    public PODSingleScalarTypeInfo<NoPayloadUnionTypeInfo,UnionTypeInfo> {
+    public PODSingleScalarTypeInfo<NoPayloadUnionTypeInfo,LoadableUnionTypeInfoBase> {
   public:
     NoPayloadUnionTypeInfo(llvm::StructType *T, Size S, Alignment A)
       : PODSingleScalarTypeInfo(T, S, {}, A) {}
@@ -1205,7 +1205,7 @@ namespace {
       return llvm::ConstantInt::get(getDiscriminatorType(), index);
     }
     
-    void emitSwitch(IRGenFunction &IGF,
+    void emitValueSwitch(IRGenFunction &IGF,
                     Explosion &value,
                     ArrayRef<std::pair<UnionElementDecl*,
                                        llvm::BasicBlock*>> dests,
@@ -1231,7 +1231,7 @@ namespace {
       }
     }
       
-    void emitProject(IRGenFunction &IGF,
+    void emitValueProject(IRGenFunction &IGF,
                      Explosion &in,
                      UnionElementDecl *elt,
                      Explosion &out) const override {
@@ -1239,7 +1239,7 @@ namespace {
       in.claimAll();
     }
 
-    void emitInjection(IRGenFunction &IGF,
+    void emitValueInjection(IRGenFunction &IGF,
                        UnionElementDecl *elt,
                        Explosion &params,
                        Explosion &out) const {
@@ -1249,17 +1249,6 @@ namespace {
     void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
                          UnionImplStrategy &strategy) override;
   };
-
-  bool isObviouslyEmptyType(CanType type) {
-    if (auto tuple = dyn_cast<TupleType>(type)) {
-      for (auto eltType : tuple.getElementTypes())
-        if (!isObviouslyEmptyType(eltType))
-          return false;
-      return true;
-    }
-    // Add more cases here?  Meh.
-    return false;
-  }
 
   /// An implementation strategy for a union.
   class UnionImplStrategy {
@@ -1273,30 +1262,53 @@ namespace {
       SinglePayload,
       /// A fully general union with more than one case with payload.
       MultiPayload,
+      /// A union with dynamic layout.
+      Dynamic,
     };
 
   private:
+    TypeConverter &TC;
+    UnionDecl *Union;
     unsigned NumElements;
     Kind TheKind;
     std::vector<UnionElementDecl *> ElementsWithPayload;
+    std::vector<UnionElementDecl *> ElementsWithRecursivePayload;
+    bool Loadable;
 
   public:
-    explicit UnionImplStrategy(UnionDecl *theUnion) {
+    explicit UnionImplStrategy(TypeConverter &TC, UnionDecl *theUnion)
+      : TC(TC), Union(theUnion)
+    {
       NumElements = 0;
+      bool dynamic = false;
+      Loadable = true;
 
       for (auto elt : theUnion->getAllElements()) {
         NumElements++;
 
-        // Compute whether this gives us an apparent payload.
+        // Compute whether this gives us an apparent payload or dynamic layout.
         Type argType = elt->getArgumentType();
-        if (!argType.isNull() &&
-            !isObviouslyEmptyType(argType->getCanonicalType())) {
-          ElementsWithPayload.push_back(elt);
+        if (argType.isNull())
+          continue;
+        auto *argTI = TC.tryGetCompleteTypeInfo(argType->getCanonicalType());
+        if (!argTI) {
+          ElementsWithRecursivePayload.push_back(elt);
+          continue;
         }
+        if (!argTI->isFixedSize())
+          dynamic = true;
+        
+        auto loadableArgTI = dyn_cast<LoadableTypeInfo>(argTI);
+        if (!loadableArgTI)
+          Loadable = false;
+        else if (loadableArgTI->getExplosionSize(ExplosionKind::Minimal) != 0)
+          ElementsWithPayload.push_back(elt);
       }
 
       assert(NumElements != 0);
-      if (NumElements == 1) {
+      if (dynamic) {
+        TheKind = Dynamic;
+      } else if (NumElements == 1) {
         TheKind = Singleton;
       } else if (ElementsWithPayload.size() > 1) {
         TheKind = MultiPayload;
@@ -1326,7 +1338,18 @@ namespace {
     }
     
     /// Create a forward declaration for the union.
-    UnionTypeInfo *create(llvm::StructType *convertedStruct) const {
+    LoadableUnionTypeInfoBase *create(llvm::StructType *convertedStruct) const {
+      // FIXME non-loadable unions
+      if (!Loadable) {
+        TC.IGM.unimplemented(Union->getLoc(), "non-loadable union layout");
+        exit(1);
+      }
+      // FIXME recursive unions
+      if (!ElementsWithRecursivePayload.empty()) {
+        TC.IGM.unimplemented(Union->getLoc(), "recursive union layout");
+        exit(1);
+      }
+      
       switch (getKind()) {
       case Singleton:
         return new SingletonUnionTypeInfo(convertedStruct,
@@ -1342,6 +1365,11 @@ namespace {
       case MultiPayload:
         return new MultiPayloadUnionTypeInfo(convertedStruct,
                                              Size(0), Alignment(0), IsPOD);
+
+      case Dynamic:
+        // FIXME dynamic union layout
+        TC.IGM.unimplemented(Union->getLoc(), "non-fixed union layout");
+        exit(1);
       }
     }
   };
@@ -1546,10 +1574,10 @@ const TypeInfo *TypeConverter::convertUnionType(UnionDecl *theUnion) {
   addForwardDecl(typeCacheKey, convertedStruct);
 
   // Compute the implementation strategy.
-  UnionImplStrategy strategy(theUnion);
+  UnionImplStrategy strategy(*this, theUnion);
 
   // Create the TI as a forward declaration and map it in the table.
-  UnionTypeInfo *convertedTI = strategy.create(convertedStruct);
+  LoadableUnionTypeInfoBase *convertedTI = strategy.create(convertedStruct);
 
   convertedTI->layoutUnionType(*this, theUnion, strategy);
   return convertedTI;
@@ -1712,8 +1740,8 @@ void irgen::emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
                                   llvm::BasicBlock *defaultDest) {
   assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
          && "not of a union type");
-  auto &unionTI = IGF.getTypeInfo(unionTy).as<UnionTypeInfo>();
-  unionTI.emitSwitch(IGF, unionValue, dests, defaultDest);
+  auto &unionTI = IGF.getTypeInfo(unionTy).as<LoadableUnionTypeInfoBase>();
+  unionTI.emitValueSwitch(IGF, unionValue, dests, defaultDest);
 }
 
 void irgen::emitInjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
@@ -1722,8 +1750,8 @@ void irgen::emitInjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
                                     Explosion &out) {
   assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
          && "not of a union type");
-  auto &unionTI = IGF.getTypeInfo(unionTy).as<UnionTypeInfo>();
-  unionTI.emitInjection(IGF, theCase, data, out);
+  auto &unionTI = IGF.getTypeInfo(unionTy).as<LoadableUnionTypeInfoBase>();
+  unionTI.emitValueInjection(IGF, theCase, data, out);
 }
 
 void irgen::emitProjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
@@ -1732,8 +1760,8 @@ void irgen::emitProjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
                                      Explosion &out) {
   assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
          && "not of a union type");
-  auto &unionTI = IGF.getTypeInfo(unionTy).as<UnionTypeInfo>();
-  unionTI.emitProject(IGF, inUnionValue, theCase, out);
+  auto &unionTI = IGF.getTypeInfo(unionTy).as<LoadableUnionTypeInfoBase>();
+  unionTI.emitValueProject(IGF, inUnionValue, theCase, out);
 }
 
 /// Interleave the occupiedValue and spareValue bits, taking a bit from one

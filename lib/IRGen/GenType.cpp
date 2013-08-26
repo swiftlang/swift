@@ -359,6 +359,14 @@ const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
   return ti;
 }
 
+const TypeInfo *TypeConverter::tryGetCompleteTypeInfo(CanType T) {
+  auto entry = getTypeEntry(T);
+  if (!entry.is<const TypeInfo*>()) return nullptr;
+  auto &ti = *entry.get<const TypeInfo*>();
+  if (!ti.isComplete()) return nullptr;
+  return &ti;
+}
+
 TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   auto it = Types.Cache.find(canonicalTy.getPointer());
   if (it != Types.Cache.end())
