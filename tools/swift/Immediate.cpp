@@ -277,23 +277,22 @@ static bool IRGenImportedModules(TranslationUnit *TU,
   return hadError;
 }
 
-void swift::RunImmediately(irgen::Options &Options,
-                           TranslationUnit *TU,
-                           const ProcessCmdLine &CmdLine, SILModule *SILMod) {
-  ASTContext &Context = TU->Ctx;
+void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
+                           irgen::Options &Options) {
+  ASTContext &Context = CI.getASTContext();
   
   // IRGen the main module.
   llvm::LLVMContext LLVMContext;
-  llvm::Module Module(TU->Name.str(), LLVMContext);
-  performIRGeneration(Options, &Module, TU, SILMod);
+  llvm::Module Module(CI.getTU()->Name.str(), LLVMContext);
+  performIRGeneration(Options, &Module, CI.getTU(), CI.getSILModule());
 
   if (Context.hadError())
     return;
 
   SmallVector<llvm::Function*, 8> InitFns;
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
-  if (IRGenImportedModules(TU, Module, CmdLine, ImportedModules, InitFns, Options,
-                           /*IsREPL*/false))
+  if (IRGenImportedModules(CI.getTU(), Module, CmdLine, ImportedModules,
+                           InitFns, Options, /*IsREPL*/false))
     return;
 
   llvm::PassManagerBuilder PMBuilder;

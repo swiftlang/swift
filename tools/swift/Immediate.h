@@ -52,12 +52,9 @@ namespace swift {
     bool RanREPLApplicationMain;
   };
 
-  void RunImmediately(irgen::Options &Options,
-                      TranslationUnit *TU,
-                      const ProcessCmdLine &CmdLine,
-                      SILModule *SILMod = nullptr
-                      );
-  
+  void RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
+                      irgen::Options &Options);
+
   void REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine);
   void REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine);
 }
