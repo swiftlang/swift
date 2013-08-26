@@ -870,10 +870,10 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("ref_to_object_pointer", ValueKind::RefToObjectPointerInst)
     .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
     .Case("ref_to_unowned", ValueKind::RefToUnownedInst)
-    .Case("release", ValueKind::ReleaseInst)
-    .Case("retain", ValueKind::RetainInst)
-    .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
-    .Case("retain_unowned", ValueKind::RetainUnownedInst)
+    .Case("strong_release", ValueKind::StrongReleaseInst)
+    .Case("strong_retain", ValueKind::StrongRetainInst)
+    .Case("strong_retain_autoreleased", ValueKind::StrongRetainAutoreleasedInst)
+    .Case("strong_retain_unowned", ValueKind::StrongRetainUnownedInst)
     .Case("return", ValueKind::ReturnInst)
     .Case("specialize", ValueKind::SpecializeInst)
     .Case("store", ValueKind::StoreInst)
@@ -1132,25 +1132,25 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createProjectExistentialRef(InstLoc, Val);
     break;
       
-  case ValueKind::RetainInst:
+  case ValueKind::StrongRetainInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createRetainInst(InstLoc, Val);
+    ResultVal = B.createStrongRetainInst(InstLoc, Val);
     break;
-  case ValueKind::ReleaseInst:
+  case ValueKind::StrongReleaseInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createReleaseInst(InstLoc, Val);
+    ResultVal = B.createStrongReleaseInst(InstLoc, Val);
     break;
-  case ValueKind::RetainAutoreleasedInst:
+  case ValueKind::StrongRetainAutoreleasedInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createRetainAutoreleased(InstLoc, Val);
+    ResultVal = B.createStrongRetainAutoreleased(InstLoc, Val);
     break;
   case ValueKind::AutoreleaseReturnInst:
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createAutoreleaseReturn(InstLoc, Val);
     break;
-  case ValueKind::RetainUnownedInst:
+  case ValueKind::StrongRetainUnownedInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createRetainUnowned(InstLoc, Val);
+    ResultVal = B.createStrongRetainUnowned(InstLoc, Val);
     break;
   case ValueKind::UnownedRetainInst:
     if (parseTypedValueRef(Val)) return true;

@@ -461,19 +461,20 @@ public:
             "module instruction must be of module type");
   }
   
-  void checkRetainInst(RetainInst *RI) {
-    requireReferenceValue(RI->getOperand(), "Operand of retain");
+  void checkStrongRetainInst(StrongRetainInst *RI) {
+    requireReferenceValue(RI->getOperand(), "Operand of strong_retain");
   }
-  void checkRetainAutoreleasedInst(RetainAutoreleasedInst *RI) {
-    requireReferenceValue(RI->getOperand(), "Operand of retain_autoreleased");
+  void checkStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *RI) {
+    requireReferenceValue(RI->getOperand(), "Operand of "
+                          "strong_retain_autoreleased");
     require(isa<ApplyInst>(RI->getOperand()),
-            "Operand of retain_autoreleased must be the return value of "
+            "Operand of strong_retain_autoreleased must be the return value of "
             "an apply instruction");
   }
-  void checkReleaseInst(ReleaseInst *RI) {
+  void checkStrongReleaseInst(StrongReleaseInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of release");
   }
-  void checkRetainUnownedInst(RetainUnownedInst *RI) {
+  void checkStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
     requireObjectType(UnownedStorageType, RI->getOperand(),
                       "Operand of retain_unowned");
   }

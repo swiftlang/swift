@@ -755,33 +755,35 @@ SILCloner<ImplClass>::visitUpcastExistentialRefInst(UpcastExistentialRefInst* In
 
 template<typename ImplClass>
 SILValue
-SILCloner<ImplClass>::visitRetainInst(RetainInst* Inst) {
+SILCloner<ImplClass>::visitStrongRetainInst(StrongRetainInst* Inst) {
   return doPostProcess(Inst,
-    Builder.createRetainInst(getOpLocation(Inst->getLoc()),
-                             getOpValue(Inst->getOperand())));
+    Builder.createStrongRetainInst(getOpLocation(Inst->getLoc()),
+                                   getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>
 SILValue
-SILCloner<ImplClass>::visitRetainAutoreleasedInst(RetainAutoreleasedInst* Inst) {
+SILCloner<ImplClass>::
+visitStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst* Inst) {
   return doPostProcess(Inst,
-    Builder.createRetainAutoreleased(getOpLocation(Inst->getLoc()),
-                         getOpValue(Inst->getOperand())));
+    Builder.createStrongRetainAutoreleased(getOpLocation(Inst->getLoc()),
+                                           getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>
 SILValue
-SILCloner<ImplClass>::visitReleaseInst(ReleaseInst* Inst) {
+SILCloner<ImplClass>::visitStrongReleaseInst(StrongReleaseInst* Inst) {
   return doPostProcess(Inst,
-    Builder.createReleaseInst(getOpLocation(Inst->getLoc()),
-                              getOpValue(Inst->getOperand())));
+    Builder.createStrongReleaseInst(getOpLocation(Inst->getLoc()),
+                                    getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>
 SILValue
-SILCloner<ImplClass>::visitRetainUnownedInst(RetainUnownedInst* Inst) {
+SILCloner<ImplClass>::
+visitStrongRetainUnownedInst(StrongRetainUnownedInst* Inst) {
   return doPostProcess(Inst,
-    Builder.createRetainUnowned(getOpLocation(Inst->getLoc()),
+    Builder.createStrongRetainUnowned(getOpLocation(Inst->getLoc()),
                                 getOpValue(Inst->getOperand())));
 }
 

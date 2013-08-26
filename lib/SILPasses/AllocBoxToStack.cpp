@@ -113,7 +113,7 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
   // releases in the block, make sure we're looking at the last one.
   if (MultipleReleasesInBlock) {
     for (auto MBBI = --LastRelease->getParent()->end(); ; --MBBI) {
-      auto *RI = dyn_cast<ReleaseInst>(MBBI);
+      auto *RI = dyn_cast<StrongReleaseInst>(MBBI);
       if (RI == nullptr ||
           RI->getOperand() != SILValue(ABI, 1)) {
         assert(MBBI != LastRelease->getParent()->begin() &&
@@ -137,7 +137,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     auto *User = cast<SILInstruction>(UI->getUser());
     
     // These instructions do not cause the box's address to escape.
-    if (isa<RetainInst>(User) ||
+    if (isa<StrongRetainInst>(User) ||
         isa<CopyAddrInst>(User) ||
         isa<LoadInst>(User) ||
         isa<InitializeVarInst>(User) ||
@@ -149,7 +149,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     
     // Release doesn't either, but we want to keep track of where this value
     // gets released.
-    if (isa<ReleaseInst>(User) || isa<DeallocBoxInst>(User)) {
+    if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User)) {
       Releases.push_back(User);
       Users.push_back(User);
       continue;
@@ -244,7 +244,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   // pointer).
   while (!ABI->use_empty()) {
     auto *User = cast<SILInstruction>((*ABI->use_begin())->getUser());
-    assert(isa<ReleaseInst>(User) || isa<RetainInst>(User) ||
+    assert(isa<StrongReleaseInst>(User) || isa<StrongRetainInst>(User) ||
            isa<DeallocBoxInst>(User));
     
     User->eraseFromParent();

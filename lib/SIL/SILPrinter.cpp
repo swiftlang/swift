@@ -783,17 +783,17 @@ public:
     OS << "module #" << MI->getType().castTo<ModuleType>()->getModule()->Name;
   }
   
-  void visitRetainInst(RetainInst *RI) {
-    OS << "retain " << getIDAndType(RI->getOperand());
+  void visitStrongRetainInst(StrongRetainInst *RI) {
+    OS << "strong_retain " << getIDAndType(RI->getOperand());
   }
-  void visitRetainAutoreleasedInst(RetainAutoreleasedInst *RI) {
-    OS << "retain_autoreleased " << getIDAndType(RI->getOperand());
+  void visitStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *RI) {
+    OS << "strong_retain_autoreleased " << getIDAndType(RI->getOperand());
   }
-  void visitReleaseInst(ReleaseInst *RI) {
-    OS << "release " << getIDAndType(RI->getOperand());
+  void visitStrongReleaseInst(StrongReleaseInst *RI) {
+    OS << "strong_release " << getIDAndType(RI->getOperand());
   }
-  void visitRetainUnownedInst(RetainUnownedInst *RI) {
-    OS << "retain_unowned " << getIDAndType(RI->getOperand());
+  void visitStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
+    OS << "strong_retain_unowned " << getIDAndType(RI->getOperand());
   }
   void visitUnownedRetainInst(UnownedRetainInst *RI) {
     OS << "unowned_retain " << getIDAndType(RI->getOperand());

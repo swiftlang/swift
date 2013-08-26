@@ -1057,7 +1057,7 @@ static void optimizeAllocBox(AllocBoxInst *ABI) {
     auto *User = cast<SILInstruction>(UI->getUser());
 
     // If this is a release, then remember it as such.
-    if (isa<ReleaseInst>(User)) {
+    if (isa<StrongReleaseInst>(User)) {
       for (auto &UseArray : Uses)
         UseArray.push_back({ User, UseKind::Release });
     }

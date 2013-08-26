@@ -1586,51 +1586,52 @@ public:
   }
 };
 
-/// RetainInst - Increase the strong reference count of an object.
-class RetainInst : public UnaryInstructionBase<ValueKind::RetainInst,
-                                               RefCountingInst,
-                                               /*HAS_RESULT*/ false>
+/// StrongRetainInst - Increase the strong reference count of an object.
+class StrongRetainInst
+  : public UnaryInstructionBase<ValueKind::StrongRetainInst,
+                                RefCountingInst,
+                                /*HAS_RESULT*/ false>
 {
 public:
-  RetainInst(SILLocation Loc, SILValue Operand)
+  StrongRetainInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
 };
   
-/// RetainAutoreleasedInst - Take ownership of the autoreleased return value of
-/// an ObjC method.
-class RetainAutoreleasedInst
-  : public UnaryInstructionBase<ValueKind::RetainAutoreleasedInst,
+/// StrongRetainAutoreleasedInst - Take ownership of the autoreleased return
+/// value of an ObjC method.
+class StrongRetainAutoreleasedInst
+  : public UnaryInstructionBase<ValueKind::StrongRetainAutoreleasedInst,
                                 RefCountingInst, /*HAS_RESULT*/ false>
 {
 public:
-  RetainAutoreleasedInst(SILLocation Loc, SILValue Operand)
+  StrongRetainAutoreleasedInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
-/// ReleaseInst - Decrease the strong reference count of an object.
+/// StrongReleaseInst - Decrease the strong reference count of an object.
 ///
 /// An object can be destroyed when its strong reference count is
 /// zero.  It can be deallocated when both its strong reference and
 /// weak reference counts reach zero.
-class ReleaseInst
-  : public UnaryInstructionBase<ValueKind::ReleaseInst,
+class StrongReleaseInst
+  : public UnaryInstructionBase<ValueKind::StrongReleaseInst,
                                 RefCountingInst, /*HAS_RESULT*/ false>
 {
 public:
-  ReleaseInst(SILLocation Loc, SILValue Operand)
+  StrongReleaseInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
-/// RetainUnownedInst - Increase the strong reference count of an
-/// object and assert that it has not been deallocated.
+/// StrongRetainUnownedInst - Increase the strong reference count of an object
+/// and assert that it has not been deallocated.
 ///
 /// The operand must be an [unowned] type.
-class RetainUnownedInst :
-    public UnaryInstructionBase<ValueKind::RetainUnownedInst,
+class StrongRetainUnownedInst :
+    public UnaryInstructionBase<ValueKind::StrongRetainUnownedInst,
                                 RefCountingInst, /*HAS_RESULT*/ false>
 {
 public:
-  RetainUnownedInst(SILLocation loc, SILValue operand)
+  StrongRetainUnownedInst(SILLocation loc, SILValue operand)
     : UnaryInstructionBase(loc, operand) {}
 };
 

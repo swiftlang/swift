@@ -19,7 +19,7 @@ bb0(%0 : $Int64):
   %7 = integer_literal $Builtin.Int128, 20
   %8 = apply %5(%7, %6) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %9 = apply %3(%4, %8) : $[thin] (lhs : Int64, rhs : Int64) -> Int64
-  release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.ObjectPointer
   return %9 : $Int64
 }
 
@@ -46,13 +46,13 @@ bb0(%0 : $Int64):
   // CHECK: [[VAL17:%.*]] = integer_literal $Builtin.Int128, 20
   // CHECK: [[VAL18:%.*]] = apply [[VAL15]]([[VAL17]], [[VAL16]])
   // CHECK: [[VAL19:%.*]] = apply [[VAL13]]([[VAL14]], [[VAL18]])
-  // CHECK: release [[VAL11]]#0
+  // CHECK: strong_release [[VAL11]]#0
   // CHECK: [[VAL21:%.*]] = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si
   // CHECK: [[VAL22:%.*]] = metatype $Int64.metatype
   // CHECK: [[VAL23:%.*]] = integer_literal $Builtin.Int128, 30
   // CHECK: [[VAL24:%.*]] = apply [[VAL21]]([[VAL23]], [[VAL22]])
   // CHECK: [[VAL25:%.*]] = apply [[VAL3]]([[VAL19]], [[VAL24]])
-  // CHECK: release [[VAL1]]#0
+  // CHECK: strong_release [[VAL1]]#0
   // CHECK: return [[VAL25]]
   %1 = alloc_box $Int64
   store %0 to %1#1 : $*Int64
@@ -71,7 +71,7 @@ bb0(%0 : $Int64):
   %15 = integer_literal $Builtin.Int128, 30
   %16 = apply %13(%15, %14) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %17 = apply %3(%12, %16) : $[thin] (lhs : Int64, rhs : Int64) -> Int64
-  release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.ObjectPointer
   return %17 : $Int64
 }
 
@@ -98,7 +98,7 @@ bb0(%0 : $Int64):
   // CHECK: [[VAL17:%.*]] = integer_literal $Builtin.Int128, 20
   // CHECK: [[VAL18:%.*]] = apply [[VAL15]]([[VAL17]], [[VAL16]])
   // CHECK: [[VAL19:%.*]] = apply [[VAL13]]([[VAL14]], [[VAL18]])
-  // CHECK: release [[VAL11]]#0
+  // CHECK: strong_release [[VAL11]]#0
   // CHECK: [[VAL21:%.*]] = alloc_box $Int64
   // CHECK: store [[VAL19]] to [[VAL21]]#1
   // CHECK: [[VAL23:%.*]] = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si
@@ -108,13 +108,13 @@ bb0(%0 : $Int64):
   // CHECK: [[VAL27:%.*]] = integer_literal $Builtin.Int128, 20
   // CHECK: [[VAL28:%.*]] = apply [[VAL25]]([[VAL27]], [[VAL26]])
   // CHECK: [[VAL29:%.*]] = apply [[VAL23]]([[VAL24]], [[VAL28]])
-  // CHECK: release [[VAL21]]#0
+  // CHECK: strong_release [[VAL21]]#0
   // CHECK: [[VAL31:%.*]] = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si
   // CHECK: [[VAL32:%.*]] = metatype $Int64.metatype
   // CHECK: [[VAL33:%.*]] = integer_literal $Builtin.Int128, 30
   // CHECK: [[VAL34:%.*]] = apply [[VAL31]]([[VAL33]], [[VAL32]])
   // CHECK: [[VAL35:%.*]] = apply [[VAL3]]([[VAL29]], [[VAL34]])
-  // CHECK: release [[VAL1]]#0
+  // CHECK: strong_release [[VAL1]]#0
   // CHECK: return [[VAL35]]
   %1 = alloc_box $Int64
   store %0 to %1#1 : $*Int64
@@ -135,7 +135,7 @@ bb0(%0 : $Int64):
   %17 = integer_literal $Builtin.Int128, 30
   %18 = apply %15(%17, %16) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %19 = apply %3(%14, %18) : $[thin] (lhs : Int64, rhs : Int64) -> Int64
-  release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.ObjectPointer
   return %19 : $Int64
 }
 
@@ -152,7 +152,7 @@ bb0(%0 : $*SomeProtocol):
   %6 = protocol_metatype $SomeProtocol.metatype, %4#1 : $*SomeProtocol
   destroy_addr %4#1 : $*SomeProtocol
   dealloc_stack %4#0 : $*[local_storage] SomeProtocol
-  release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.ObjectPointer
   return %6 : $SomeProtocol.metatype
 }
 
@@ -167,7 +167,7 @@ bb0(%0 : $*SomeProtocol):
   // CHECK: [[VAL6:%.*]] = protocol_metatype $SomeProtocol.metatype, [[VAL4]]#1
   // CHECK: destroy_addr [[VAL4]]#1
   // CHECK: dealloc_stack [[VAL4]]#0
-  // CHECK: release [[VAL1]]#0
+  // CHECK: strong_release [[VAL1]]#0
   // CHECK: return [[VAL6]]
   %1 = function_ref @test_protocol_metatype : $[thin] (p : SomeProtocol) -> SomeProtocol.metatype
   %2 = apply [transparent] %1(%0) : $[thin] (p : SomeProtocol) -> SomeProtocol.metatype
@@ -240,8 +240,8 @@ bb5:
   br bb6(%37 : $Float32)
 
 bb6(%39 : $Float32):
-  release %3#0 : $Builtin.ObjectPointer
-  release %2#0 : $Builtin.ObjectPointer
+  strong_release %3#0 : $Builtin.ObjectPointer
+  strong_release %2#0 : $Builtin.ObjectPointer
   return %39 : $Float32
 }
 
@@ -312,8 +312,8 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
   // CHECK: br [[BB6:.*]]([[VAL50]]
 
 // CHECK: [[BB6]]([[VAL52:%.*]] : $Float32):
-  // CHECK: release [[VAL16]]#0
-  // CHECK: release [[VAL15]]#0
+  // CHECK: strong_release [[VAL16]]#0
+  // CHECK: strong_release [[VAL15]]#0
   // CHECK: br [[BB7:.*]]([[VAL52]]
 
 // CHECK: [[BB7]]([[VAL56:%.*]] : $Float32):
@@ -322,7 +322,7 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
   // CHECK: [[VAL59:%.*]] = float_literal $Builtin.FPIEEE64, 0x4008000000000000
   // CHECK: [[VAL60:%.*]] = apply [[VAL57]]([[VAL59]], [[VAL58]])
   // CHECK: [[VAL61:%.*]] = apply [[VAL3]]([[VAL56]], [[VAL60]])
-  // CHECK: release [[VAL1]]#0
+  // CHECK: strong_release [[VAL1]]#0
   // CHECK: return [[VAL61]]
 
 bb0(%0 : $Float32):
@@ -347,7 +347,7 @@ bb0(%0 : $Float32):
   %19 = float_literal $Builtin.FPIEEE64, 0x4008000000000000
   %20 = apply %17(%19, %18) : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
   %21 = apply %3(%16, %20) : $[thin] (lhs : Float32, rhs : Float32) -> Float32
-  release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.ObjectPointer
   return %21 : $Float32
 }
 

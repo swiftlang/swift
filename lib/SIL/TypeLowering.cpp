@@ -493,7 +493,7 @@ static void emitReferenceSemanticStore(SILBuilder &B, SILLocation loc,
   } else {
     SILValue oldValue = B.createLoad(loc, addr);
     B.createStore(loc, value, addr);
-    B.createRelease(loc, oldValue);
+    B.createStrongRelease(loc, oldValue);
   }
 }
 
@@ -865,23 +865,23 @@ namespace {
     SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
                               SILValue addr, IsTake_t isTake) const override {
       SILValue value = B.createLoad(loc, addr);
-      if (!isTake) B.createRetain(loc, value);
+      if (!isTake) B.createStrongRetain(loc, value);
       return value;
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      B.createRelease(loc, value);
+      B.createStrongRelease(loc, value);
     }
 
     void emitRetain(SILBuilder &B, SILLocation loc,
                     SILValue value) const override {
-      B.createRetain(loc, value);
+      B.createStrongRetain(loc, value);
     }
 
     void emitRelease(SILBuilder &B, SILLocation loc,
                      SILValue value) const override {
-      B.createRelease(loc, value);
+      B.createStrongRelease(loc, value);
     }
   };
 
@@ -980,7 +980,7 @@ namespace {
 
       // store_weak does not consume a retain on its input, so we have
       // to balance that out.
-      B.createRelease(loc, value);
+      B.createStrongRelease(loc, value);
     }
     void emitSemanticAssignment(SILBuilder &B, SILLocation loc,
                                 SILValue value, SILValue addr) const override {
@@ -988,7 +988,7 @@ namespace {
 
       // store_weak does not consume a retain on its input, so we have
       // to balance that out.
-      B.createRelease(loc, value);
+      B.createStrongRelease(loc, value);
     }
     void emitSemanticUnknownAssignment(SILBuilder &B, SILLocation loc,
                                        SILValue value,
@@ -997,7 +997,7 @@ namespace {
 
       // store_weak does not consume a retain on its input, so we have
       // to balance that out.
-      B.createRelease(loc, value);
+      B.createStrongRelease(loc, value);
     }
 
     SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
@@ -1035,7 +1035,7 @@ namespace {
       // and release the old +1 value.
       B.createUnownedRetain(loc, unownedValue);
       B.createStore(loc, unownedValue, addr);
-      B.createRelease(loc, value);
+      B.createStrongRelease(loc, value);
     }
 
     void emitSemanticAssignment(SILBuilder &B, SILLocation loc,
@@ -1048,7 +1048,7 @@ namespace {
       // unowned_retain the new value, and release the old +1 value.
       B.createUnownedRetain(loc, unownedValue);
       B.createStore(loc, unownedValue, addr);
-      B.createRelease(loc, value);
+      B.createStrongRelease(loc, value);
       
       // Release the old value.
       B.createUnownedRelease(loc, oldValue);
@@ -1066,7 +1066,7 @@ namespace {
     SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
                               SILValue addr, IsTake_t isTake) const override {
       auto unownedValue = B.createLoad(loc, addr);
-      B.createRetainUnowned(loc, unownedValue);
+      B.createStrongRetainUnowned(loc, unownedValue);
       if (isTake) B.createUnownedRelease(loc, unownedValue);
       return B.createUnownedToRef(loc, unownedValue, getSemanticType());
     }

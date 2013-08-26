@@ -10,12 +10,12 @@ bb0(%0 : $Int64):
   %1 = alloc_box $Int64
   %2 = store %0 to %1#1 : $*Int64
   %3 = load %1#1 : $*Int64
-  %4 = release %1#0 : $Builtin.ObjectPointer
+  %4 = strong_release %1#0 : $Builtin.ObjectPointer
   %5 = return %3 : $Int64
 
 // CHECK: alloc_stack
 // CHECK-NOT: alloc_box
-// CHECK-NOT: release
+// CHECK-NOT: strong_release
 // CHECK: return
 }
 
@@ -25,29 +25,29 @@ bb0:
   %1 = alloc_box $Int64
   %2 = initialize_var %1#1 : $*Int64
   %3 = load %1#1 : $*Int64
-  %4 = release %1#0 : $Builtin.ObjectPointer
+  %4 = strong_release %1#0 : $Builtin.ObjectPointer
   %5 = return %3 : $Int64
 
 // CHECK: %0 = alloc_stack
 // CHECK-NOT: alloc_box
-// CHECK-NOT: release
+// CHECK-NOT: strong_release
 // CHECK-NOT: destroy_addr
 // CHECK: dealloc_stack %0#0 : $*[local_storage] Int64
 // CHECK: return
 }
 
-// CHECK-LABEL: sil @multi_release
-sil @multi_release : $() -> Int64 {
+// CHECK-LABEL: sil @multi_strong_release
+sil @multi_strong_release : $() -> Int64 {
 bb0:
   %1 = alloc_box $Int64
   %2 = initialize_var %1#1 : $*Int64
   %3 = load %1#1 : $*Int64
-  %x = retain %1#0 : $Builtin.ObjectPointer
-  %y = release %1#0 : $Builtin.ObjectPointer
+  %x = strong_retain %1#0 : $Builtin.ObjectPointer
+  %y = strong_release %1#0 : $Builtin.ObjectPointer
   %b = br bb1
 bb1:
 
-  %4 = release %1#0 : $Builtin.ObjectPointer
+  %4 = strong_release %1#0 : $Builtin.ObjectPointer
   %5 = return %3 : $Int64
 
 // CHECK: %0 = alloc_stack
@@ -74,8 +74,8 @@ bb1(%0 : $Int64):
 
   %6 = struct_element_addr %1#1 : $*TestStruct, #Elt
   %7 = load %6 : $*Int64
-  %8 = release %1#0 : $Builtin.ObjectPointer
-  %x = release %a#0 : $Builtin.ObjectPointer
+  %8 = strong_release %1#0 : $Builtin.ObjectPointer
+  %x = strong_release %a#0 : $Builtin.ObjectPointer
 
 
   %9 = return %7 : $Int64
@@ -100,7 +100,7 @@ bb0:
   %6 = function_ref @callee : $[thin] (a : [byref] Int64) -> ()
   %7 = apply %6(%1#1) : $[thin] (a : [byref] Int64) -> ()
   %8 = load %1#1 : $*Int64
-  %9 = release %1#0 : $Builtin.ObjectPointer
+  %9 = strong_release %1#0 : $Builtin.ObjectPointer
   %10 = return %8 : $Int64
   // CHECK: return
 }
@@ -118,7 +118,7 @@ bb0:
   %1 = function_ref @returns_protocol : $[thin] () -> P
   %2 = alloc_box $P
   %3 = apply %1(%2#1) : $[thin] () -> P
-  %5 = release %2#0 : $Builtin.ObjectPointer
+  %5 = strong_release %2#0 : $Builtin.ObjectPointer
   %0 = tuple ()
   %6 = return %0 : $()
   // CHECK: return
@@ -132,13 +132,13 @@ bb0(%0 : $SomeClass):
   %1 = alloc_box $SomeClass
   %2 = store %0 to %1#1 : $*SomeClass
   %3 = load %1#1 : $*SomeClass
-  %4 = release %1#0 : $Builtin.ObjectPointer
+  %4 = strong_release %1#0 : $Builtin.ObjectPointer
   %5 = return %3 : $SomeClass
 
 // CHECK: %1 = alloc_stack
 // CHECK-NOT: alloc_box
-// CHECK-NOT: release
-// CHECK: release {{.*}} : $SomeClass
+// CHECK-NOT: strong_release
+// CHECK: strong_release {{.*}} : $SomeClass
 // CHECK: return
 }
 
@@ -155,7 +155,7 @@ bb0(%0 : $*LogicValue, %1 : $Bool.metatype):
   %6 = project_existential %2#1 : $*LogicValue to $*LogicValue.This
   %7 = protocol_method %2#1 : $*LogicValue, #LogicValue.getLogicValue!1 : $[cc(method)] ((), [byref] LogicValue.This) -> Bool
   %8 = apply %7(%6) : $[cc(method)] ((), [byref] LogicValue.This) -> Bool
-  release %2#0 : $Builtin.ObjectPointer
+  strong_release %2#0 : $Builtin.ObjectPointer
 // CHECK:  destroy_addr %2#1 : $*LogicValue
 // CHECK-NEXT:  dealloc_stack %2#0 : $*[local_storage] LogicValue
 // CHECK-NEXT:  return

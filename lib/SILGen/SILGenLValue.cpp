@@ -286,7 +286,7 @@ namespace {
       AccessorArgs result;      
       if (base) {
         if (base.getType().hasReferenceSemantics()) {
-          gen.B.createRetain(loc, base);
+          gen.B.createStrongRetain(loc, base);
           result.base = RValue(gen, gen.emitManagedRValueWithCleanup(base));
         } else {
           result.base = RValue(gen, ManagedValue(base, ManagedValue::LValue));

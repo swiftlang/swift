@@ -141,10 +141,10 @@ bb0(%0 : $B):
   %1 = alloc_box $B                           
   %2 = store %0 to %1#1 : $*B                 // CHECK: store
   %3 = load %1#1 : $*B                        
-  %4 = retain %3 : $B                         // CHECK: retain
+  %4 = strong_retain %3 : $B                         // CHECK: strong_retain
   %5 = downcast conditional %3 : $B to $E     // CHECK-NOT: downcast
-  %7 = release %3 : $B                        // CHECK: release
-  %8 = release %1#0 : $Builtin.ObjectPointer  // CHECK-NEXT: release
+  %7 = strong_release %3 : $B                        // CHECK: strong_release
+  %8 = strong_release %1#0 : $Builtin.ObjectPointer  // CHECK-NEXT: strong_release
   %9 = function_ref @exit : $[thin, noreturn] () -> () // ret.exit : () -> ()
   %10 = apply %9() : $[thin, noreturn] () -> ()
   %6 = is_nonnull %5 : $E                     // CHECK-NOT: is_nonnull

@@ -733,7 +733,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
 
     case OwnershipConventions::Return::Autoreleased:
       // Autoreleased. Retain using retain_autoreleased.
-      B.createRetainAutoreleased(Loc, result);
+      B.createStrongRetainAutoreleased(Loc, result);
       break;
     
     case OwnershipConventions::Return::Unretained:

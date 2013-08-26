@@ -16,8 +16,8 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
   store %4 to %3#1 : $*Int64         // CHECK-NEXT: store
   %6 = load %3#1 : $*Int64
   // CHECK-NEXT: struct $Int64
-  release %3#0 : $Builtin.ObjectPointer   // CHECK-NEXT: release
-  release %1#0 : $Builtin.ObjectPointer
+  strong_release %3#0 : $Builtin.ObjectPointer   // CHECK-NEXT: release
+  strong_release %1#0 : $Builtin.ObjectPointer
   return %6 : $Int64
 
   // CHECK: return {{.*}} : $Int64
@@ -40,7 +40,7 @@ bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
   %c = load %1#1 : $*(Int64, Int64)
   %d = tuple_extract %c : $(Int64, Int64), 0
 
-  release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.ObjectPointer
 
   return %d : $Int64
 
@@ -58,7 +58,7 @@ sil @use_before_init : $[thin] () -> Int64 {
 bb0:
   %1 = alloc_box $Int64                   // expected-note {{variable defined here}}
   %4 = load %1#1 : $*Int64                // expected-error {{variable '<unknown>' used before being initialized}}
-  release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.ObjectPointer
   %9 = return %4 : $Int64
 }
 
@@ -74,7 +74,7 @@ bb0:
   %6 = apply %5(%1#1) : $[thin] (a : [byref] Int64) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
   
   %0 = tuple ()
-  release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.ObjectPointer
   return %0 : $()
 }
 
@@ -108,7 +108,7 @@ bb0(%0 : $Int64):
   // This should use the incoming argument to the function.
   // CHECK: tuple ({{.*}} : $Int64, {{.*}} : $Int64)
   %8 = tuple (%3 : $Int64, %7 : $Int64)
-  release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.ObjectPointer
   %11 = return %8 : $(Int64, Int64)
 }
 
@@ -130,7 +130,7 @@ bb0:
   %3 = apply %2(%1#1) : $[thin] () -> GenericStruct<Int64>
   %4 = struct_element_addr %1#1 : $*GenericStruct<Int64>, #b
   %5 = load %4 : $*Int64
-  release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.ObjectPointer
   return %5 : $Int64
 }
 
@@ -145,7 +145,7 @@ bb0(%0 : $Int64):
   %15 = tuple_element_addr %3#1 : $*(Int64, Int64), 1
   %16 = apply %14(%15) : $[thin] (a : [byref] Int64) -> ()  // expected-error {{variable '<unknown>.1' passed by reference before being initialized}}
 
-  release %3#0 : $Builtin.ObjectPointer   // expected-error {{variable '<unknown>.0' destroyed without being fully initialized on all paths}}
+  strong_release %3#0 : $Builtin.ObjectPointer   // expected-error {{variable '<unknown>.0' destroyed without being fully initialized on all paths}}
   %99 = tuple ()
   return %99 : $()
 }
@@ -160,7 +160,7 @@ bb0(%0 : $Int64):
   %21 = tuple_extract %20 : $(Int64, Int64), 0
   %22 = tuple_extract %20 : $(Int64, Int64), 1
   %23 = tuple (%21 : $Int64, %22 : $Int64)
-  release %3#0 : $Builtin.ObjectPointer
+  strong_release %3#0 : $Builtin.ObjectPointer
   return %23 : $(Int64, Int64)
 }
 
@@ -173,7 +173,7 @@ bb0(%0 : $*T, %1 : $*T):
   %4 = alloc_box $T
   copy_addr [take] %1 to [initialization] %4#1 : $*T
   copy_addr %4#1 to [initialization] %0 : $*T
-  release %4#0 : $Builtin.ObjectPointer
+  strong_release %4#0 : $Builtin.ObjectPointer
   %9 = tuple ()
   return %9 : $()
 }
@@ -183,7 +183,7 @@ sil @copy_addr2 : $[thin] <T> (v : T) -> T {
 bb0(%0 : $*T, %1 : $*T):
   %4 = alloc_box $T         // expected-note {{variable defined here}}
   copy_addr %4#1 to [initialization] %0 : $*T   // expected-error {{variable '<unknown>' used before being initialized}}
-  release %4#0 : $Builtin.ObjectPointer
+  strong_release %4#0 : $Builtin.ObjectPointer
   %9 = tuple ()
   return %9 : $()
 }
@@ -199,10 +199,10 @@ bb0:
 
   %5 = function_ref @takes_closure : $[thin] (x : () -> ()) -> ()
   %6 = function_ref @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
-  retain %0#0 : $Builtin.ObjectPointer
+  strong_retain %0#0 : $Builtin.ObjectPointer
   %8 = partial_apply %6(%0#0, %0#1) : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
   %9 = apply %5(%8) : $[thin] (x : () -> ()) -> ()
-  release %0#0 : $Builtin.ObjectPointer
+  strong_release %0#0 : $Builtin.ObjectPointer
 
   %11 = tuple ()
   return %11 : $()
@@ -227,7 +227,7 @@ bb0(%0 : $Int64):
   // CHECK-NEXT: struct $Int64
 
   %2 = load %1#1 : $*Int64
-  release %1#0 : $Builtin.ObjectPointer            // CHECK-NEXT: release %1#0
+  strong_release %1#0 : $Builtin.ObjectPointer            // CHECK-NEXT: strong_release %1#0
 
   // Verify that the load got forwarded from an assign.
   return %2 : $Int64                        // CHECK: return {{.*}} : $Int64
@@ -250,7 +250,7 @@ bb0:
   // CHECK-NEXT: store [[C1]]
   // CHECK-NEXT: retain [[C1]]
 
-  release %4 : $SomeClass
+  strong_release %4 : $SomeClass
   // CHECK-NEXT: release [[C1]]
 
   %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
@@ -261,10 +261,10 @@ bb0:
   // CHECK-NEXT: store [[C2]]
   // CHECK-NEXT: release [[C1]]
 
-  release %8 : $SomeClass
+  strong_release %8 : $SomeClass
   // CHECK-NEXT: release [[C2]]
 
-  release %c#0 : $Builtin.ObjectPointer
+  strong_release %c#0 : $Builtin.ObjectPointer
 
   %11 = tuple ()
   return %11 : $()
@@ -289,8 +289,8 @@ bb0(%0 : $*T, %1 : $*T):
   copy_addr %2#1 to [initialization] %0 : $*T
   // CHECK-NEXT: copy_addr %2#1 to [initialization] %0 : $*T
 
-  release %2#0 : $Builtin.ObjectPointer
-  // CHECK-NEXT: release %2#0
+  strong_release %2#0 : $Builtin.ObjectPointer
+  // CHECK-NEXT: strong_release %2#0
   %9 = tuple ()
   return %9 : $()
 }
@@ -312,7 +312,7 @@ bb0:
   store_weak %4 to %c#1 : $*[weak] SomeClass
   // CHECK-NEXT: store_weak [[C1]] to [initialization] %0#1
 
-  release %4 : $SomeClass
+  strong_release %4 : $SomeClass
   // CHECK-NEXT: release [[C1]]
 
   %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
@@ -321,10 +321,10 @@ bb0:
   store_weak %8 to %c#1 : $*[weak] SomeClass
   // CHECK-NEXT: store_weak [[C2]] to %0#1
 
-  release %8 : $SomeClass
+  strong_release %8 : $SomeClass
   // CHECK-NEXT: release [[C2]]
 
-  release %c#0 : $Builtin.ObjectPointer
+  strong_release %c#0 : $Builtin.ObjectPointer
 
   %11 = tuple ()
   return %11 : $()
@@ -352,7 +352,7 @@ bb0:
   // CHECK-NEXT: store [[C1]] to [[BOX]]#1
   // CHECK-NEXT: unowned_retain [[C1]]
 
-  release %4 : $SomeClass
+  strong_release %4 : $SomeClass
   // CHECK-NEXT: release [[C1x]]
 
   %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
@@ -366,10 +366,10 @@ bb0:
   // CHECK-NEXT: store [[C2]] to [[BOX]]#1
   // CHECK-NEXT: unowned_release [[C1]]
 
-  release %8 : $SomeClass
+  strong_release %8 : $SomeClass
   // CHECK-NEXT: release [[C2x]]
 
-  release %c#0 : $Builtin.ObjectPointer
+  strong_release %c#0 : $Builtin.ObjectPointer
 
   %11 = tuple ()
   return %11 : $()
@@ -388,7 +388,7 @@ bb0(%0 : $*ContainsObjectPointer):
   %1 = load %0 : $*ContainsObjectPointer
   assign %1 to %b#1 : $*ContainsObjectPointer
   
-  release %b#0 : $Builtin.ObjectPointer
+  strong_release %b#0 : $Builtin.ObjectPointer
   %x = tuple ()
   return %x : $()
 }

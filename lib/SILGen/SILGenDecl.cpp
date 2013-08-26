@@ -105,7 +105,7 @@ namespace {
   public:
     CleanupClosureConstant(SILValue closure) : closure(closure) {}
     void emit(SILGenFunction &gen) override {
-      gen.B.createRelease(SILLocation(), closure);
+      gen.B.createStrongRelease(SILLocation(), closure);
     }
   };
 }
@@ -535,7 +535,7 @@ class CleanupCaptureBox : public Cleanup {
 public:
   CleanupCaptureBox(SILValue box) : box(box) {}
   void emit(SILGenFunction &gen) override {
-    gen.B.createRelease(SILLocation(), box);
+    gen.B.createStrongRelease(SILLocation(), box);
   }
 };
   
@@ -979,7 +979,7 @@ void SILGenFunction::destroyLocalVariable(VarDecl *vd) {
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
   assert(loc.box && "captured var should have been given a box");
-  B.createRelease(vd, loc.box);
+  B.createStrongRelease(vd, loc.box);
 }
 
 void SILGenFunction::deallocateUninitializedLocalVariable(VarDecl *vd) {
@@ -1178,14 +1178,14 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
     // transferring ownership in aggregates.
     fieldLowering.emitSemanticLoadInto(B, var, addr, indirectReturn,
                                        IsNotTake, IsInitialization);
-    B.createRelease(getter.getDecl(), thisValue);
+    B.createStrongRelease(getter.getDecl(), thisValue);
     B.createReturn(var, emitEmptyTuple(var));
     return;
   }
 
   // Bridge the result.
   SILValue result = fieldLowering.emitSemanticLoad(B, var, addr, IsNotTake);
-  B.createRelease(var, thisValue);
+  B.createStrongRelease(var, thisValue);
   return emitObjCReturnValue(*this, var, result, objcResultTy,
                              ownership);
 }
@@ -1217,6 +1217,6 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
                                  varTI.getLoweredType().getAddressType());
   varTI.emitSemanticAssignment(B, setter.getDecl(), setValue, addr);
   
-  B.createRelease(setter.getDecl(), thisValue);
+  B.createStrongRelease(setter.getDecl(), thisValue);
   B.createReturn(var, emitEmptyTuple(var));
 }

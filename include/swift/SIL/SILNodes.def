@@ -86,13 +86,13 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Reference Counting
   ABSTRACT_VALUE(RefCountingInst, SILInstruction)
-    INST(RetainInst, RefCountingInst, MayHaveSideEffects)
-    INST(RetainAutoreleasedInst, RefCountingInst, MayHaveSideEffects)
-    INST(ReleaseInst, RefCountingInst, MayHaveSideEffects)
-    INST(RetainUnownedInst, RefCountingInst, MayHaveSideEffects)
+    INST(StrongRetainInst, RefCountingInst, MayHaveSideEffects)
+    INST(StrongRetainAutoreleasedInst, RefCountingInst, MayHaveSideEffects)
+    INST(StrongReleaseInst, RefCountingInst, MayHaveSideEffects)
+    INST(StrongRetainUnownedInst, RefCountingInst, MayHaveSideEffects)
     INST(UnownedRetainInst, RefCountingInst, MayHaveSideEffects)
     INST(UnownedReleaseInst, RefCountingInst, MayHaveSideEffects)
-    VALUE_RANGE(RefCountingInst, RetainInst, UnownedReleaseInst)
+    VALUE_RANGE(RefCountingInst, StrongRetainInst, UnownedReleaseInst)
 
   // Literals
   INST(FunctionRefInst, SILInstruction, None)

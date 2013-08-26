@@ -620,31 +620,31 @@ public:
                     ModuleInst(Loc, ModuleType));
   }
   
-  void createRetain(SILLocation Loc, SILValue Operand) {
+  void createStrongRetain(SILLocation Loc, SILValue Operand) {
     // Retaining a function_ref is a no-op.
     if (!isa<FunctionRefInst>(Operand))
-      createRetainInst(Loc, Operand);
+      createStrongRetainInst(Loc, Operand);
   }
-  RetainInst *createRetainInst(SILLocation Loc, SILValue Operand) {
+  StrongRetainInst *createStrongRetainInst(SILLocation Loc, SILValue Operand) {
     // Retaining a function_ref is a no-op.
     return insert(new (F.getModule())
-                    RetainInst(Loc, Operand));
+                    StrongRetainInst(Loc, Operand));
   }
-  void createRelease(SILLocation Loc, SILValue Operand) {
+  void createStrongRelease(SILLocation Loc, SILValue Operand) {
     // Releasing a function_ref is a no-op.
     if (!isa<FunctionRefInst>(Operand))
-      createReleaseInst(Loc, Operand);
+      createStrongReleaseInst(Loc, Operand);
   }
-  ReleaseInst *createReleaseInst(SILLocation Loc, SILValue Operand) {
-    return insert(new (F.getModule()) ReleaseInst(Loc, Operand));
+  StrongReleaseInst *createStrongReleaseInst(SILLocation Loc, SILValue Operand) {
+    return insert(new (F.getModule()) StrongReleaseInst(Loc, Operand));
   }
-  RetainAutoreleasedInst *
-  createRetainAutoreleased(SILLocation Loc, SILValue Operand) {
-    return insert(new (F.getModule()) RetainAutoreleasedInst(Loc, Operand));
+  StrongRetainAutoreleasedInst *
+  createStrongRetainAutoreleased(SILLocation Loc, SILValue Operand) {
+    return insert(new (F.getModule()) StrongRetainAutoreleasedInst(Loc, Operand));
   }
-  RetainUnownedInst *createRetainUnowned(SILLocation Loc,
-                                         SILValue Operand) {
-    return insert(new (F.getModule()) RetainUnownedInst(Loc, Operand));
+  StrongRetainUnownedInst *createStrongRetainUnowned(SILLocation Loc,
+                                                     SILValue Operand) {
+    return insert(new (F.getModule()) StrongRetainUnownedInst(Loc, Operand));
   }
   UnownedRetainInst *createUnownedRetain(SILLocation Loc,
                                          SILValue Operand) {

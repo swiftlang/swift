@@ -543,10 +543,10 @@ public:
   void visitUpcastExistentialRefInst(UpcastExistentialRefInst *i);
   void visitDeinitExistentialInst(DeinitExistentialInst *i);
 
-  void visitRetainInst(RetainInst *i);
-  void visitReleaseInst(ReleaseInst *i);
-  void visitRetainAutoreleasedInst(RetainAutoreleasedInst *i);
-  void visitRetainUnownedInst(RetainUnownedInst *i);
+  void visitStrongRetainInst(StrongRetainInst *i);
+  void visitStrongReleaseInst(StrongReleaseInst *i);
+  void visitStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *i);
+  void visitStrongRetainUnownedInst(StrongRetainUnownedInst *i);
   void visitUnownedRetainInst(UnownedRetainInst *i);
   void visitUnownedReleaseInst(UnownedReleaseInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
@@ -1848,7 +1848,7 @@ void IRGenSILFunction::visitStoreWeakInst(swift::StoreWeakInst *i) {
   }
 }
 
-void IRGenSILFunction::visitRetainInst(swift::RetainInst *i) {
+void IRGenSILFunction::visitStrongRetainInst(swift::StrongRetainInst *i) {
   // FIXME: Specialization thunks may eventually require retaining. For now,
   // since we don't yet thunk specialized function values, ignore retains
   // of lowered SpecializedValues.
@@ -1862,7 +1862,7 @@ void IRGenSILFunction::visitRetainInst(swift::RetainInst *i) {
   ti.retain(*this, lowered);
 }
 
-void IRGenSILFunction::visitReleaseInst(swift::ReleaseInst *i) {
+void IRGenSILFunction::visitStrongReleaseInst(swift::StrongReleaseInst *i) {
   // FIXME: Specialization thunks may eventually require retaining. For now,
   // since we don't yet thunk specialized function values, ignore retains
   // of lowered SpecializedValues.
@@ -1876,8 +1876,8 @@ void IRGenSILFunction::visitReleaseInst(swift::ReleaseInst *i) {
   ti.release(*this, lowered);
 }
 
-void IRGenSILFunction::visitRetainAutoreleasedInst(
-                                             swift::RetainAutoreleasedInst *i) {
+void IRGenSILFunction::
+visitStrongRetainAutoreleasedInst(swift::StrongRetainAutoreleasedInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   llvm::Value *value = lowered.claimNext();
   emitObjCRetainAutoreleasedReturnValue(*this, value);
@@ -1893,7 +1893,8 @@ static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
   return cast<ReferenceTypeInfo>(IGF.getTypeInfo(type));
 }
 
-void IRGenSILFunction::visitRetainUnownedInst(swift::RetainUnownedInst *i) {
+void IRGenSILFunction::
+visitStrongRetainUnownedInst(swift::StrongRetainUnownedInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = getReferentTypeInfo(*this, i->getOperand().getType());
   ti.retainUnowned(*this, lowered);

@@ -21,7 +21,7 @@ bb0(%0 : $Int64, %1 : $*Triple):
   %8 = struct_element_addr %4#1 : $*Triple, #b
   store %0 to %8 : $*Int64
   %10 = load %4#1 : $*Triple
-  release %4#0 : $Builtin.ObjectPointer
+  strong_release %4#0 : $Builtin.ObjectPointer
   return %10 : $Triple
 }
 
@@ -41,7 +41,7 @@ bb0(%0 : $*Single, %1 : $Int64):
   store %1 to %8 : $*Int64
 
   %10 = load %4#1 : $*Single
-  release %4#0 : $Builtin.ObjectPointer
+  strong_release %4#0 : $Builtin.ObjectPointer
   return %10 : $Single
 }
 

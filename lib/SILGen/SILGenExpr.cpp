@@ -1242,7 +1242,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
           VarLoc const &vl = VarLocs[capture];
           assert(vl.box && "no box for captured var!");
           assert(vl.address && "no address for captured var!");
-          B.createRetain(loc, vl.box);
+          B.createStrongRetain(loc, vl.box);
           capturedArgs.push_back(vl.box);
           capturedArgs.push_back(vl.address);
           break;
@@ -1674,7 +1674,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     // We have to do a non-take copy because someone else may be using the box.
     B.createCopyAddr(ctor, thisLV, IndirectReturnAddress,
                      IsNotTake, IsInitialization);
-    B.createRelease(ctor, thisBox);
+    B.createStrongRelease(ctor, thisBox);
     B.createReturn(ctor, emitEmptyTuple(ctor));
     return;
   }
@@ -1688,7 +1688,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   lowering.emitRetain(B, ctor, thisValue);
 
   // Release the box.
-  B.createRelease(ctor, thisBox);
+  B.createStrongRelease(ctor, thisBox);
 
   B.createReturn(ctor, thisValue);
 }
@@ -1951,7 +1951,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // We have to do a retain because someone else may be using the box.
   B.emitRetainValue(ctor, thisValue);
-  B.createRelease(ctor, thisBox);
+  B.createStrongRelease(ctor, thisBox);
 
   B.createReturn(ctor, thisValue);
 }
