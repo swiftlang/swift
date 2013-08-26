@@ -641,6 +641,9 @@ void ModuleFile::getLinkLibraries(Module::LinkLibraryCallback callback) const {
 }
 
 void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
+  if (ShadowedModule)
+    ShadowedModule->getDisplayDecls(results);
+  
   if (OperatorDecls) {
     for (auto entry : make_range(OperatorDecls->data_begin(),
                                  OperatorDecls->data_end())) {

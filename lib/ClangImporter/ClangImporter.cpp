@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Range.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
@@ -326,6 +327,8 @@ ClangModule *ClangImporter::Implementation::getClangModuleForDecl(
     D = OID->getDefinition();
   else
     D = D->getCanonicalDecl();
+  if (!D)
+    return nullptr;
 
   clang::Module *M = D->getOwningModule();
   if (!M)
@@ -692,6 +695,24 @@ void ClangImporter::getLinkLibraries(const Module *module,
       kind = LibraryKind::Library;
     
     callback(LinkLibrary(clangLinkLib.Library, kind));
+  }
+}
+
+void ClangImporter::getDisplayDecls(const Module *module,
+                                    SmallVectorImpl<Decl*> &results) {
+  clang::ASTContext &clangCtx = Impl.Instance->getASTContext();
+  const clang::TranslationUnitDecl *clangTU = clangCtx.getTranslationUnitDecl();
+  
+  // FIXME: Do we want a noload variant here?
+  for (auto D : make_range(clangTU->decls_begin(),
+                           clangTU->decls_end())) {
+    auto named = dyn_cast<clang::NamedDecl>(D);
+    if (!named)
+       continue;
+    if (Impl.getClangModuleForDecl(D) != module)
+      continue;
+    if (auto imported = Impl.importDecl(named))
+      results.push_back(imported);
   }
 }
 
