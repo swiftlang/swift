@@ -1,4 +1,4 @@
-//===-- Frontend.cpp - frontend utility methods ---------------------------===//
+//===-- Helpers.cpp - frontend utility methods ----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Frontend.h"
+#include "Helpers.h"
 #include "Immediate.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/AST/ASTContext.h"

@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Immediate.h"
-#include "Frontend.h"
+#include "Helpers.h"
 #include "swift/Subsystems.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IRGen/Options.h"

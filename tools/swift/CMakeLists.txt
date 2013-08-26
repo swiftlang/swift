@@ -1,5 +1,5 @@
 add_swift_executable(swift
-  Frontend.cpp
+  Helpers.cpp
   Immediate.cpp
   SerializedDiagnosticConsumer.cpp
   swift.cpp

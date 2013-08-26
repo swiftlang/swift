@@ -15,6 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_FRONTEND_H
+#define SWIFT_FRONTEND_H
+
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
@@ -201,7 +204,9 @@ public:
     DelayedFunctionBodyParsing = Val;
   }
 
-  bool isDelayedFunctionBodyParsing() const { return DelayedFunctionBodyParsing; }
+  bool isDelayedFunctionBodyParsing() const {
+    return DelayedFunctionBodyParsing;
+  }
 };
 
 class CompilerInstance {
@@ -258,3 +263,4 @@ public:
 
 } // namespace swift
 
+#endif
