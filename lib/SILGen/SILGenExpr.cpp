@@ -1697,26 +1697,64 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   B.createReturn(ctor, thisValue);
 }
 
+static void emitAddressOnlyUnionConstructor(SILGenFunction &gen,
+                                            SILType unionTy,
+                                            UnionElementDecl *element) {
+  // Emit the indirect return slot.
+  SILValue resultSlot
+    = new (gen.F.getModule()) SILArgument(unionTy, gen.F.begin());
+  
+  // Emit the exploded constructor argument.
+  ManagedValue argValue;
+  if (element->hasArgumentType()) {
+    RValue arg = emitImplicitValueConstructorArg(gen, element,
+                                                 element->getArgumentType());
+    argValue = std::move(arg).getAsSingleValue(gen);
+  }
+  emitConstructorMetatypeArg(gen, element);
+  
+  // Store the data, if any.
+  if (element->hasArgumentType()) {
+    SILValue resultData = gen.B.createUnionDataAddr(element, resultSlot,
+      element, gen.getLoweredType(element->getArgumentType()).getAddressType());
+    argValue.forwardInto(gen, element, resultData);
+  }
+  
+  // Apply the tag.
+  gen.B.createInjectUnionAddr(element, resultSlot, element);
+  gen.B.createReturn(element, gen.emitEmptyTuple(element));
+}
+
+static void emitLoadableUnionConstructor(SILGenFunction &gen,
+                                         SILType unionTy,
+                                         UnionElementDecl *element) {
+  // Emit the exploded constructor argument.
+  SILValue argValue;
+  if (element->hasArgumentType()) {
+    RValue arg = emitImplicitValueConstructorArg(gen, element,
+                                                 element->getArgumentType());
+    argValue = std::move(arg).forwardAsSingleValue(gen);
+  }
+  
+  emitConstructorMetatypeArg(gen, element);
+  
+  // Create and return the union value.
+  SILValue result = gen.B.createUnion(element, argValue, element, unionTy);
+  gen.B.createReturn(element, result);
+}
+
 void SILGenFunction::emitUnionConstructor(UnionElementDecl *element) {
   Type unionTy = element->getType()->getAs<AnyFunctionType>()->getResult();
   if (element->hasArgumentType())
     unionTy = unionTy->getAs<AnyFunctionType>()->getResult();
-  // FIXME: Address-only unions.
-  SILType unionSILTy = getLoweredLoadableType(unionTy);
+  auto &unionTI = getTypeLowering(unionTy);
   
-  // Emit the exploded constructor argument.
-  SILValue argValue;
-  if (element->hasArgumentType()) {
-    RValue arg = emitImplicitValueConstructorArg(*this, element,
-                                                 element->getArgumentType());
-    argValue = std::move(arg).forwardAsSingleValue(*this);
+  if (unionTI.isAddressOnly()) {
+    return emitAddressOnlyUnionConstructor(*this, unionTI.getLoweredType(),
+                                           element);
   }
-  
-  emitConstructorMetatypeArg(*this, element);
-  
-  // Create and return the union value.
-  SILValue result = B.createUnion(element, argValue, element, unionSILTy);
-  B.createReturn(element, result);
+  return emitLoadableUnionConstructor(*this, unionTI.getLoweredType(),
+                                      element);
 }
 
 namespace {
