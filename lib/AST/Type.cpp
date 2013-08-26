@@ -727,6 +727,28 @@ TypeBase *SyntaxSugarType::getDesugaredType() {
   return getImplementationType()->getDesugaredType();
 }
 
+Type SyntaxSugarType::getImplementationType() {
+  if (ImplOrContext.is<Type>())
+    return ImplOrContext.get<Type>();
+
+  // Find the generic type that implements this syntactic sugar type.
+  auto &ctx = *ImplOrContext.get<const ASTContext *>();
+  NominalTypeDecl *implDecl;
+  if (isa<ArraySliceType>(this)) {
+    implDecl = ctx.getSliceDecl();
+    assert(implDecl && "Slice type has not been set yet");
+  } else if (isa<OptionalType>(this)) {
+    implDecl = ctx.getOptionalDecl();
+    assert(implDecl && "Optional type has not been set yet");
+  } else {
+    llvm_unreachable("Unhandled syntax sugar type");
+  }
+
+  // Record the implementation type.
+  ImplOrContext = BoundGenericType::get(implDecl, Type(), Base);
+  return ImplOrContext.get<Type>();
+}
+
 TypeBase *SubstitutedType::getDesugaredType() {
   return getReplacementType()->getDesugaredType();
 }

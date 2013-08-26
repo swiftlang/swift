@@ -438,7 +438,7 @@ static bool validateTypedPattern(TypeChecker &TC, TypedPattern *TP,
 
   if (isVararg && !hadError) {
     // FIXME: Use ellipsis loc for diagnostic.
-    Ty = TC.getArraySliceType(TP->getLoc(), Ty, false);
+    Ty = TC.getArraySliceType(TP->getLoc(), Ty);
     if (Ty.isNull())
       hadError = true;
   }

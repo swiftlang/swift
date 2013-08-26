@@ -45,6 +45,12 @@ struct ASTContext::Implementation {
 
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
 
+  /// The declaration of swift.Slice<T>.
+  NominalTypeDecl *SliceDecl = nullptr;
+
+  /// The declaration of swift.Optional<T>.
+  NominalTypeDecl *OptionalDecl = nullptr;
+
   /// \brief The various module loaders that import external modules into this
   /// ASTContext.
   SmallVector<llvm::IntrusiveRefCntPtr<swift::ModuleLoader>, 4> ModuleLoaders;
@@ -218,11 +224,53 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the
 /// specified string.
-Identifier ASTContext::getIdentifier(StringRef Str) {
+Identifier ASTContext::getIdentifier(StringRef Str) const {
   // Make sure null pointers stay null.
   if (Str.data() == nullptr) return Identifier(0);
   
   return Identifier(Impl.IdentifierTable.GetOrCreateValue(Str).getKeyData());
+}
+
+/// Find the generic implementation declaration for the named syntactic-sugar
+/// type.
+static NominalTypeDecl *findSyntaxSugarImpl(const ASTContext &ctx,
+                                            StringRef name) {
+  // Find the "swift" module.
+  auto module = ctx.LoadedModules.find("swift");
+  if (module == ctx.LoadedModules.end())
+    return nullptr;
+
+  // Find all of the declarations with this name in the Swift module.
+  auto identifier = ctx.getIdentifier(name);
+  SmallVector<ValueDecl *, 1> results;
+  module->second->lookupValue({ }, identifier, NLKind::UnqualifiedLookup,
+                              results);
+  for (auto result : results) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
+      if (auto params = nominal->getGenericParams()) {
+        if (params->size() == 1) {
+          // We found it.
+          return nominal;
+        }
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+NominalTypeDecl *ASTContext::getSliceDecl() const {
+  if (!Impl.SliceDecl)
+    Impl.SliceDecl = findSyntaxSugarImpl(*this, "Slice");
+
+  return Impl.SliceDecl;
+}
+
+NominalTypeDecl *ASTContext::getOptionalDecl() const {
+  if (!Impl.OptionalDecl)
+    Impl.OptionalDecl = findSyntaxSugarImpl(*this, "Optional");
+
+  return Impl.OptionalDecl;
 }
 
 void ASTContext::addMutationListener(ASTMutationListener &listener) {
@@ -256,13 +304,26 @@ bool ASTContext::hadError() const {
 }
 
 Optional<ArrayRef<Substitution>>
-ASTContext::getSubstitutions(BoundGenericType* Bound) const {
-  assert(Bound->isCanonical() && "Requesting non-canonical substitutions");
-  auto Known = Impl.BoundGenericSubstitutions.find(Bound);
-  if (Known == Impl.BoundGenericSubstitutions.end())
-    return Nothing;
+ASTContext::getSubstitutions(BoundGenericType* bound) const {
+  assert(bound->isCanonical() && "Requesting non-canonical substitutions");
+  auto known = Impl.BoundGenericSubstitutions.find(bound);
+  if (known != Impl.BoundGenericSubstitutions.end())
+    return known->second;
 
-  return Known->second;
+  // We can trivially create substitutions for Slice and Optional.
+  if (bound->getDecl() == getSliceDecl() ||
+      bound->getDecl() == getOptionalDecl()) {
+    auto param = bound->getDecl()->getGenericParams()->getParams()[0];
+    assert(param.getAsTypeParam()->getArchetype() && "Not type-checked yet");
+    Substitution substitution;
+    substitution.Archetype = param.getAsTypeParam()->getArchetype();
+    substitution.Replacement = bound->getGenericArgs()[0];
+    auto substitutions = AllocateCopy(llvm::makeArrayRef(substitution));
+    Impl.BoundGenericSubstitutions.insert(std::make_pair(bound, substitutions));
+    return substitutions;
+  }
+
+  return Nothing;
 }
 
 void ASTContext::setSubstitutions(BoundGenericType* Bound,
@@ -881,7 +942,7 @@ ArraySliceType *ArraySliceType::get(Type base, const ASTContext &C) {
   ArraySliceType *&entry = C.Impl.getArena(arena).ArraySliceTypes[base];
   if (entry) return entry;
 
-  return entry = new (C, arena) ArraySliceType(base, hasTypeVariable);
+  return entry = new (C, arena) ArraySliceType(C, base, hasTypeVariable);
 }
 
 OptionalType *OptionalType::get(Type base, const ASTContext &C) {
@@ -891,7 +952,7 @@ OptionalType *OptionalType::get(Type base, const ASTContext &C) {
   OptionalType *&entry = C.Impl.getArena(arena).OptionalTypes[base];
   if (entry) return entry;
 
-  return entry = new (C, arena) OptionalType(base, hasTypeVariable);
+  return entry = new (C, arena) OptionalType(C, base, hasTypeVariable);
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)

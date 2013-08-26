@@ -1446,10 +1446,11 @@ namespace {
       // canonicalization mapped it down to Slice<T>.
       auto sliceType = dyn_cast<ArraySliceType>(resultType.getPointer());
       if (!sliceType) {
-        sliceType = ArraySliceType::get(elementType, tc.Context);
-        sliceType->setImplementationType(
-          resultType->castTo<BoundGenericType>());
-        resultType = sliceType;
+        resultType = tc.getArraySliceType(expr->getLoc(), elementType);
+        if (!resultType)
+          return nullptr;
+
+        sliceType = cast<ArraySliceType>(resultType.getPointer());
       }
       expr->setType(resultType);
 

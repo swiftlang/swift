@@ -1455,12 +1455,13 @@ END_CAN_TYPE_WRAPPER(ArrayType, Type)
 /// optionals (T? -> Optional<T>).
 class SyntaxSugarType : public TypeBase {
   Type Base;
-  Type Impl;
+  llvm::PointerUnion<Type, const ASTContext *> ImplOrContext;
 
 protected:
   // Syntax sugar types are never canonical.
-  SyntaxSugarType(TypeKind K, Type base, bool hasTypeVariable)
-    : TypeBase(K, nullptr, hasTypeVariable), Base(base) {}
+  SyntaxSugarType(TypeKind K, const ASTContext &ctx, Type base,
+                  bool hasTypeVariable)
+    : TypeBase(K, nullptr, hasTypeVariable), Base(base), ImplOrContext(&ctx) {}
 
 public:
   Type getBaseType() const {
@@ -1469,15 +1470,7 @@ public:
 
   TypeBase *getDesugaredType();
 
-  bool hasImplementationType() const { return !Impl.isNull(); }
-  void setImplementationType(Type ty) {
-    assert(!hasImplementationType());
-    Impl = ty;
-  }
-  Type getImplementationType() const {
-    assert(hasImplementationType());
-    return Impl;
-  }
+  Type getImplementationType();
 
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_SyntaxSugarType &&
@@ -1487,8 +1480,8 @@ public:
   
 /// The type T[], which is always sugar for a library type.
 class ArraySliceType : public SyntaxSugarType {
-  ArraySliceType(Type base, bool hasTypeVariable)
-    : SyntaxSugarType(TypeKind::ArraySlice, base, hasTypeVariable) {}
+  ArraySliceType(const ASTContext &ctx, Type base, bool hasTypeVariable)
+    : SyntaxSugarType(TypeKind::ArraySlice, ctx, base, hasTypeVariable) {}
 
 public:
   /// Return a uniqued array slice type with the specified base type.
@@ -1503,8 +1496,8 @@ public:
 
 /// The type T?, which is always sugar for a library type.
 class OptionalType : public SyntaxSugarType {
-  OptionalType(Type base, bool hasTypeVariable)
-    : SyntaxSugarType(TypeKind::Optional, base, hasTypeVariable) {}
+  OptionalType(const ASTContext &ctx,Type base, bool hasTypeVariable)
+    : SyntaxSugarType(TypeKind::Optional, ctx, base, hasTypeVariable) {}
 
 public:
   /// Return a uniqued optional type with the specified base type.

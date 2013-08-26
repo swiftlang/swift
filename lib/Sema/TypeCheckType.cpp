@@ -25,88 +25,22 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
-enum class SugarImplTypeKind {
-  Slice,
-  Optional
-};
-
-/// Given a sugar type with a valid base type and no implementation type,
-/// find its canonicalization by looking for a generic nominal with the
-/// appropriate name.
-static bool buildSugarImplType(TypeChecker &TC, SyntaxSugarType *sugarTy,
-                               SourceLoc loc, SugarImplTypeKind K) {
-  if (sugarTy->hasImplementationType())
-    return false;
-  
-  Type baseTy = sugarTy->getBaseType();
-
-  StringRef name;
-  switch (K) {
-  case SugarImplTypeKind::Slice:
-    name = "Slice";
-    break;
-  case SugarImplTypeKind::Optional:
-    name = "Optional";
-    break;
-  }
-  UnqualifiedLookup genericLookup(TC.Context.getIdentifier(name),
-                                  TC.getStdlibModule(),
-                                  SourceLoc(),
-                                  /*IsTypeLookup=*/true);
-
-  if (TypeDecl *lookupDecl = genericLookup.getSingleTypeResult()) {
-    TC.validateTypeDecl(lookupDecl);
-    if (NominalTypeDecl *ND = lookupDecl->getDeclaredType()->getAnyNominal()) {
-      if (auto Params = ND->getGenericParams()) {
-        if (Params->size() == 1) {
-          Type implTy = BoundGenericType::get(ND, Type(), baseTy);
-          sugarTy->setImplementationType(implTy);
-          return false;
-        }
-      }
-    }
+Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
+  if (!Context.getSliceDecl()) {
+    diagnose(loc, diag::sugar_type_not_found, 0);
+    return Type();
   }
 
-  TC.diagnose(loc, diag::sugar_type_not_found, static_cast<unsigned>(K));
-  return true;
+  return ArraySliceType::get(elementType, Context);
 }
 
-/// Given an array slice type with a valid base type and no
-/// implementation type, find its canonicalization.
-static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy,
-                                SourceLoc loc) {
-  return buildSugarImplType(TC, sliceTy, loc, SugarImplTypeKind::Slice);
-}
-
-/// Given an optional type with a valid base type and no
-/// implementation type, find its canonicalization.
-static bool buildOptionalType(TypeChecker &TC, OptionalType *optionalTy,
-                              SourceLoc loc) {
-  return buildSugarImplType(TC, optionalTy, loc, SugarImplTypeKind::Optional);
-}
-
-Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType,
-                                    bool canonicalize) {
-  ArraySliceType *sliceTy = ArraySliceType::get(elementType, Context);
-  if (sliceTy->hasCanonicalTypeComputed()) return sliceTy;
-  if (buildArraySliceType(*this, sliceTy, loc)) return Type();
-  if (canonicalize) {
-    sliceTy->getCanonicalType();
-    validateTypeSimple(sliceTy->getImplementationType());
+Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
+  if (!Context.getOptionalDecl()) {
+    diagnose(loc, diag::sugar_type_not_found, 1);
+    return Type();
   }
-  return sliceTy;
-}
 
-Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType,
-                                  bool canonicalize) {
-  auto optionalTy = OptionalType::get(elementType, Context);
-  if (optionalTy->hasCanonicalTypeComputed()) return optionalTy;
-  if (buildOptionalType(*this, optionalTy, loc)) return Type();
-  if (canonicalize) {
-    optionalTy->getCanonicalType();
-    validateTypeSimple(optionalTy->getImplementationType());
-  }
-  return optionalTy;
+  return OptionalType::get(elementType, Context);
 }
 
 Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
@@ -734,8 +668,8 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
       return ErrorType::get(Context);
     }
 
-    auto sliceTy = ArraySliceType::get(baseTy, Context);
-    if (buildArraySliceType(*this, sliceTy, ArrTyR->getBrackets().Start))
+    auto sliceTy = getArraySliceType(ArrTyR->getBrackets().Start, baseTy);
+    if (!sliceTy)
       return ErrorType::get(Context);
 
     return sliceTy;
@@ -748,8 +682,8 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
     if (baseTy->is<ErrorType>())
       return baseTy;
 
-    auto optionalTy = OptionalType::get(baseTy, Context);
-    if (buildOptionalType(*this, optionalTy, optTyR->getQuestionLoc()))
+    auto optionalTy = getOptionalType(optTyR->getQuestionLoc(), baseTy);
+    if (!optionalTy)
       return ErrorType::get(Context);
 
     return optionalTy;
@@ -900,9 +834,6 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
     ArraySliceType *AT = cast<ArraySliceType>(T);
     if (validateTypeSimple(AT->getBaseType()))
       return true;
-    if (!AT->hasImplementationType()) {
-      buildArraySliceType(*this, AT, SourceLoc());
-    }
     if (validateTypeSimple(AT->getImplementationType()))
       return true;
     break;
@@ -911,9 +842,6 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
     OptionalType *OT = cast<OptionalType>(T);
     if (validateTypeSimple(OT->getBaseType()))
       return true;
-    if (!OT->hasImplementationType()) {
-      buildOptionalType(*this, OT, SourceLoc());
-    }
     if (validateTypeSimple(OT->getImplementationType()))
       return true;
     break;

@@ -149,10 +149,8 @@ public:
     return Diags.diagnose(Args...);
   }
 
-  Type getArraySliceType(SourceLoc loc, Type elementType,
-                         bool canonicalize = true);
-  Type getOptionalType(SourceLoc loc, Type elementType,
-                       bool canonicalize = true);
+  Type getArraySliceType(SourceLoc loc, Type elementType);
+  Type getOptionalType(SourceLoc loc, Type elementType);
   Expr *buildArrayInjectionFnRef(DeclContext *dc,
                                  ArraySliceType *sliceType,
                                  Type lenTy, SourceLoc Loc);

@@ -1954,30 +1954,20 @@ Type ModuleFile::getType(TypeID TID) {
   }
 
   case decls_block::ARRAY_SLICE_TYPE: {
-    TypeID baseID, implID;
-    decls_block::ArraySliceTypeLayout::readRecord(scratch, baseID, implID);
+    TypeID baseID;
+    decls_block::ArraySliceTypeLayout::readRecord(scratch, baseID);
 
     auto sliceTy = ArraySliceType::get(getType(baseID), ctx);
     typeOrOffset = sliceTy;
-
-    // Slice types are uniqued by the ASTContext, so they may already have
-    // type information. If so, ignore the information in the module.
-    if (!sliceTy->hasImplementationType())
-      sliceTy->setImplementationType(getType(implID));
     break;
   }
 
   case decls_block::OPTIONAL_TYPE: {
-    TypeID baseID, implID;
-    decls_block::OptionalTypeLayout::readRecord(scratch, baseID, implID);
+    TypeID baseID;
+    decls_block::OptionalTypeLayout::readRecord(scratch, baseID);
 
     auto optionalTy = OptionalType::get(getType(baseID), ctx);
     typeOrOffset = optionalTy;
-
-    // Optional types are uniqued by the ASTContext, so they may already have
-    // type information. If so, ignore the information in the module.
-    if (!optionalTy->hasImplementationType())
-      optionalTy->setImplementationType(getType(implID));
     break;
   }
 

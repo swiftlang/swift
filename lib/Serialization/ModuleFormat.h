@@ -450,8 +450,7 @@ namespace decls_block {
   template <unsigned Code>
   using SyntaxSugarTypeLayout = BCRecordLayout<
     Code,
-    TypeIDField, // element type
-    TypeIDField  // implementation type
+    TypeIDField // element type
   >;
 
   using ArraySliceTypeLayout = SyntaxSugarTypeLayout<ARRAY_SLICE_TYPE>;

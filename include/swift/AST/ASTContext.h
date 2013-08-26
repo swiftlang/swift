@@ -282,8 +282,13 @@ public:
 
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
-  Identifier getIdentifier(StringRef Str);
+  Identifier getIdentifier(StringRef Str) const;
 
+  /// Retrieve the declaration of swift.Slice<T>.
+  NominalTypeDecl *getSliceDecl() const;
+
+  /// Retrieve the declaration of swift.Optional<T>.
+  NominalTypeDecl *getOptionalDecl() const;
 
   /// \brief Add a new mutation listener to this AST context.
   ///

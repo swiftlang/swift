@@ -1786,11 +1786,10 @@ bool Serializer::writeType(Type ty) {
     auto sliceTy = cast<ArraySliceType>(ty.getPointer());
 
     Type base = sliceTy->getBaseType();
-    Type impl = sliceTy->getImplementationType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ArraySliceTypeLayout::Code];
     ArraySliceTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     addTypeRef(base), addTypeRef(impl));
+                                     addTypeRef(base));
     return true;
   }
 
@@ -1798,11 +1797,10 @@ bool Serializer::writeType(Type ty) {
     auto sliceTy = cast<OptionalType>(ty.getPointer());
 
     Type base = sliceTy->getBaseType();
-    Type impl = sliceTy->getImplementationType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[OptionalTypeLayout::Code];
     OptionalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addTypeRef(base), addTypeRef(impl));
+                                   addTypeRef(base));
     return true;
   }
 
@@ -2071,6 +2069,8 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
 
   writeAllDeclsAndTypes();
   writeAllIdentifiers();
+
+  //
 
   {
     BCBlockRAII restoreBlock(Out, INDEX_BLOCK_ID, 3);
