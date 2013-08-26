@@ -1005,9 +1005,6 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
 void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
   assert(P.Tok.is(tok::code_complete));
 
-  if (Kind != CompletionKind::None)
-    return;
-
   Kind = CompletionKind::PostfixExprBeginning;
   CurDeclContext = P.CurDeclContext;
 }

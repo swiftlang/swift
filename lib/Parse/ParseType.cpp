@@ -80,6 +80,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   case tok::code_complete: {
     if (CodeCompletion)
       CodeCompletion->completeTypeSimpleBeginning();
+    // Eat the code completion token because we handled it.
+    consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult<TypeRepr>();
   }
   default:
