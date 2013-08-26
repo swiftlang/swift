@@ -43,9 +43,9 @@
 		    "destroy_addr" "index_addr" "index_raw_pointer")
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Reference Counting.
-   `(,(regexp-opt '("retain" "retain_autoreleased" "release" "retain_unowned"
-		    "strong_retain" "strong_retain_autoreleased" "strong_release" "strong_retain_unowned"
-		    "unowned_retain" "unowned_release" "load_weak" "store_weak")
+   `(,(regexp-opt '("strong_retain" "strong_retain_autoreleased" "strong_release"
+		    "strong_retain_unowned" "unowned_retain" "unowned_release"
+		    "load_weak" "store_weak")
 		  'words) . font-lock-keyword-face)
    ;; Literals
    `(,(regexp-opt '("function_ref" "builtin_function_ref" "global_addr"
