@@ -611,7 +611,7 @@ ERROR(expected_foreach_lbrace,stmt_parsing,none,
 
 // Switch Stmt
 ERROR(expected_switch_expr,stmt_parsing,none,
-      "expected expression for 'switch' statement", ())
+      "expected expression in 'switch' statement", ())
 ERROR(expected_lbrace_after_switch,stmt_parsing,none,
       "expected '{' after 'switch' subject", ())
 ERROR(expected_rbrace_switch,stmt_parsing,none,
