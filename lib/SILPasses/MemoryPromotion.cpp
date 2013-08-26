@@ -567,6 +567,10 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
       if (CA->isInitializationOfDest()) return;
     } else if (auto SW = dyn_cast<StoreWeakInst>(Inst)) {
       if (SW->isInitializationOfDest()) return;
+    } else if (isa<InitExistentialInst>(Inst)) {
+      // init_existential *on a box* is only formed by direct initialization
+      // like "var x : Proto = foo".
+      return;
     } else {
       return;
     }
@@ -946,7 +950,21 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       // Otherwise, it is an escape.
     }
 
-     // Otherwise, the use is something complicated, it escapes.
+    // init_existential is modeled as a initialization store, where the uses are
+    // treated as subelement accesses.
+    if (auto *IE = dyn_cast<InitExistentialInst>(User)) {
+      assert(!InStructSubElement &&
+             "init_existential the subelement of a struct unless in a ctor");
+      Uses[BaseElt].push_back({ User, UseKind::Store });
+
+      // Set the "InStructSubElement" flag (so we don't consider stores to be
+      // full definitions) and recursively process the uses.
+      llvm::SaveAndRestore<bool> X(InStructSubElement, true);
+      collectUses(SILValue(IE, 0), BaseElt);
+      continue;
+    }
+
+    // Otherwise, the use is something complicated, it escapes.
     addElementUses(BaseElt, PointeeType, User, UseKind::Escape);
   }
 
