@@ -199,18 +199,29 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     }
 
     switch (linkLib.getKind()) {
-    case LibraryKind::Library:
+    case LibraryKind::Library: {
+      // FIXME: Try the appropriate extension for the current platform?
+      llvm::SmallString<32> stem{"lib"};
+      stem += llvm::sys::path::stem(path);
+      llvm::sys::path::remove_filename(path);
+      llvm::sys::path::append(path, stem.str());
+      path += ".dylib";
       break;
+    }
     case LibraryKind::Framework:
       // If we have a framework, mangle the name to point to the framework
       // binary.
-      llvm::sys::path::replace_extension(path, "framework");
+      path += ".framework";
       llvm::sys::path::append(path, linkLib.getName());
       break;
     }
 
     // Let dlopen determine the best search paths.
-    dlopen(path.c_str(), 0);
+    bool success = dlopen(path.c_str(), 0);
+    if (!success && linkLib.getKind() == LibraryKind::Library) {
+      // Try our runtime library path.
+      loadRuntimeLib(path, CmdLine);
+    }
   });
   
   // IRGen the modules this module depends on.
