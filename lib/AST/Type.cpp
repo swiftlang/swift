@@ -30,7 +30,7 @@ using namespace swift;
 
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
-  return !getType()->is<ErrorType>();
+  return getType()->is<ErrorType>();
 }
 
 SourceRange TypeLoc::getSourceRange() const {

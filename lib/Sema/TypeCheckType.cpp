@@ -595,11 +595,11 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
   
   // If we've already validated this type, don't do so again.
   if (Loc.wasValidated())
-    return !Loc.isError();
+    return Loc.isError();
 
   if (Loc.getType().isNull()) {
     Loc.setType(resolveType(Loc.getTypeRepr(), allowUnboundGenerics), true);
-    return !Loc.isError();
+    return Loc.isError();
   }
 
   Type ty = Loc.getType();
@@ -607,7 +607,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
     ty = ErrorType::get(Context);
 
   Loc.setType(ty, true);
-  return !Loc.isError();
+  return Loc.isError();
 }
 
 Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
