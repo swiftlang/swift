@@ -552,6 +552,11 @@ public:
 
       // Add the generic parameter to the builder.
       builder.addGenericParameter(TypeParam, Index++);
+
+      // Infer requirements from the "inherited" types.
+      for (auto &inherited : TypeParam->getInherited()) {
+        builder.inferRequirements(inherited.getTypeRepr());
+      }
     }
 
     // Add the requirements clause to the builder, validating the types in
@@ -1335,10 +1340,19 @@ public:
 
     // If we have generic parameters, create archetypes now.
     if (builder) {
+      // Infer requirements from the parameters of the function.
+      for (auto pattern : body->getArgParamPatterns()) {
+        builder->inferRequirements(pattern);
+      }
+
+      // Infer requirements from the result type.
+      if (auto resultType = body->getBodyResultTypeLoc().getTypeRepr())
+        builder->inferRequirements(resultType);
+
       // Assign archetypes.
       finalizeGenericParamList(*builder, FD->getGenericParams(), body);
 
-      // Go through and revert all of the
+      // Go through and revert all of the dependent types we computed.
 
       // Revert the result type.
       if (!body->getBodyResultTypeLoc().isNull()) {
@@ -1535,6 +1549,9 @@ public:
         CD->overwriteType(ErrorType::get(TC.Context));
         CD->setInvalid();
       }
+
+      // Infer requirements from the parameters of the constructor.
+      builder.inferRequirements(CD->getArguments());
 
       // Assign archetypes.
       finalizeGenericParamList(builder, gp, CD);

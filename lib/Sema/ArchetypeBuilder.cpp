@@ -17,6 +17,8 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/ASTWalker.h"
+#include "swift/AST/Pattern.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -488,6 +490,81 @@ static void addNestedArchetypes(ArchetypeType *Archetype,
       addNestedArchetypes(Nested.second, Known, All);
     }
   }
+}
+
+/// AST walker that infers requirements from type representations.
+class ArchetypeBuilder::InferRequirementsWalker : public ASTWalker {
+  ArchetypeBuilder &Builder;
+  bool HadError = false;
+
+public:
+  explicit InferRequirementsWalker(ArchetypeBuilder &builder)
+    : Builder(builder) { }
+
+  bool hadError() const { return HadError; }
+
+  virtual bool walkToTypeReprPost(TypeRepr *T) {
+    if (HadError)
+      return false;
+
+    auto identRepr = dyn_cast<IdentTypeRepr>(T);
+    if (!identRepr)
+      return true;
+
+    // For each of the components...
+    for (auto &comp : identRepr->Components) {
+      // If there is no type binding, we don't care.
+      if (!comp.isBoundType())
+        continue;
+
+      // If there are no generic arguments, we don't care.
+      if (comp.getGenericArgs().empty())
+        continue;
+
+      // If it's not a bound generic type, we don't care.
+      auto boundGeneric = comp.getBoundType()->getAs<BoundGenericType>();
+      if (!boundGeneric)
+        continue;
+
+      // Infer superclass and protocol-conformance requirements from the
+      // generic parameters.
+      auto params = boundGeneric->getDecl()->getGenericParams()->getParams();
+      auto args = boundGeneric->getGenericArgs();
+      for (unsigned i = 0, n = params.size(); i != n; ++i) {
+        auto arg = args[i];
+        auto param = params[i].getAsTypeParam();
+
+        // Try to resolve the argument to a potential archetype.
+        auto argPA = Builder.resolveType(arg);
+        if (!argPA)
+          continue;
+
+        // Add implicit conformances for all of the protocol requirements on
+        // FIXME: This won't capture same-type requirements that map down to
+        // fixed types, although that isn't permitted yet.
+        for (auto proto : param->getArchetype()->getConformsTo()) {
+          if (Builder.addConformanceRequirement(argPA, proto)) {
+            HadError = true;
+            return false;
+          }
+        }
+      }
+    }
+
+    return true;
+  }
+};
+
+bool ArchetypeBuilder::inferRequirements(TypeRepr *type) {
+  InferRequirementsWalker walker(*this);
+  type->walk(walker);
+  return walker.hadError();
+}
+
+bool ArchetypeBuilder::inferRequirements(Pattern *pattern) {
+  InferRequirementsWalker walker(*this);
+  pattern->walk(walker);
+  return walker.hadError();
 }
 
 void ArchetypeBuilder::assignArchetypes() {

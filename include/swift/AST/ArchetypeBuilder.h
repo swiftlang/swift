@@ -26,6 +26,7 @@ namespace swift {
 
 class AbstractTypeParamDecl;
 class ArchetypeType;
+class Pattern;
 class ProtocolDecl;
 class Requirement;
 class SourceLoc;
@@ -39,6 +40,8 @@ class DiagnosticEngine;
 /// the generic parameters.
 class ArchetypeBuilder {
   struct PotentialArchetype;
+  class InferRequirementsWalker;
+  friend class InferRequirementsWalker;
 
   ASTContext &Context;
   DiagnosticEngine &Diags;
@@ -116,6 +119,38 @@ public:
   /// parameters.
   bool addImplicitConformance(AbstractTypeParamDecl *Param,
                               ProtocolDecl *Proto);
+
+  /// Infer requirements from the given type representation, recursively.
+  ///
+  /// This routine infers requirements from a type that occurs within the
+  /// signature of a generic function. For example, given:
+  ///
+  /// \code
+  /// func f<K, V>(dict : Dictionary<K, V>) { ... }
+  /// \endcode
+  ///
+  /// where \c Dictionary requires that its key type be \c Hashable,
+  /// the requirement \c K : Hashable is inferred from the parameter type,
+  /// because the type \c Dictionary<K,V> cannot be formed without it.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool inferRequirements(TypeRepr *type);
+
+  /// Infer requirements from the given pattern, recursively.
+  ///
+  /// This routine infers requirements from a type that occurs within the
+  /// signature of a generic function. For example, given:
+  ///
+  /// \code
+  /// func f<K, V>(dict : Dictionary<K, V>) { ... }
+  /// \endcode
+  ///
+  /// where \c Dictionary requires that its key type be \c Hashable,
+  /// the requirement \c K : Hashable is inferred from the parameter type,
+  /// because the type \c Dictionary<K,V> cannot be formed without it.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool inferRequirements(Pattern *pattern);
 
   /// \brief Assign archetypes to each of the generic parameters and all
   /// of their associated types, recursively.
