@@ -900,7 +900,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
         }
         if (Tok.is(tok::code_complete) && CodeCompletion && Result.isNonNull()) {
           CodeCompletion->completeDotExpr(Result.get());
-          return nullptr;
+          consumeToken(tok::code_complete);
+          Result.setHasCodeCompletion();
+          return Result;
         }
         diagnose(Tok, diag::expected_field_name);
         return nullptr;

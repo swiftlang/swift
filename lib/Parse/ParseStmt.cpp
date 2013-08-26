@@ -335,7 +335,7 @@ NullablePtr<Stmt> Parser::parseStmt() {
   default:
     diagnose(Tok, diag::expected_stmt);
     return 0;
-  case tok::kw_return: return parseStmtReturn();
+  case tok::kw_return: return parseStmtReturn().getPtrOrNull();
   case tok::kw_if:     return parseStmtIf();
   case tok::kw_while:  return parseStmtWhile();
   case tok::kw_do:     return parseStmtDoWhile();
@@ -395,22 +395,19 @@ NullablePtr<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
 ///   stmt-return:
 ///     return expr?
 ///   
-NullablePtr<Stmt> Parser::parseStmtReturn() {
+ParserResult<Stmt> Parser::parseStmtReturn() {
   SourceLoc ReturnLoc = consumeToken(tok::kw_return);
 
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
   // followed by a '}', ';', or statement keyword.
-  Expr *RetExpr = nullptr;
-  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi) &&
-      !isStartOfStmt(Tok)) {
+  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi) && !isStartOfStmt(Tok)) {
     ParserResult<Expr> Result = parseExpr(diag::expected_expr_return);
-    if (Result.isNull() || Result.hasCodeCompletion())
-      return nullptr;
-    RetExpr = Result.get();
+    return makeParserResult(
+        Result, new (Context) ReturnStmt(ReturnLoc, Result.getPtrOrNull()));
   }
 
-  return new (Context) ReturnStmt(ReturnLoc, RetExpr);
+  return makeParserResult(new (Context) ReturnStmt(ReturnLoc, nullptr));
 }
 
 

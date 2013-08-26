@@ -664,7 +664,7 @@ public:
   static bool isStartOfStmt(const Token &Tok);
   NullablePtr<Stmt> parseStmt();
   bool parseExprOrStmt(ExprStmtOrDecl &Results);
-  NullablePtr<Stmt> parseStmtReturn();
+  ParserResult<Stmt> parseStmtReturn();
   NullablePtr<Stmt> parseStmtIf();
   NullablePtr<Stmt> parseStmtWhile();
   NullablePtr<Stmt> parseStmtDoWhile();
