@@ -813,9 +813,10 @@ public:
       Expr *initializer = nullptr;
       if (isPatternProperty(PBD->getPattern())) {
         // Properties don't have initializers.
-      } else if (TC.Context.LangOpts.UseDefiniteInit) {
+      } else if (TC.Context.LangOpts.UseDefiniteInit &&
+                 !isa<TopLevelCodeDecl>(PBD->getDeclContext())) {
         // If we are using the new definite initialization rules, we don't
-        // default initialize anything!
+        // default initialize local variables, only globals.
       } else if (!TC.isDefaultInitializable(ty, &initializer)) {
         // FIXME: Better diagnostics here.
         TC.diagnose(PBD, diag::decl_no_default_init, ty);
