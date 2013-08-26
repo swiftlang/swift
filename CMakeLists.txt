@@ -573,7 +573,7 @@ endmacro(add_swift_optimization_flags)
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(MODULES_SDK "" CACHE PATH
       "Path to the modules-enabled SDK to use")
-  if (NOT ${MODULES_SDK})
+  if (MODULES_SDK STREQUAL "")
     execute_process(COMMAND xcrun --sdk macosx --show-sdk-path
       OUTPUT_VARIABLE MODULES_SDK
       OUTPUT_STRIP_TRAILING_WHITESPACE)
