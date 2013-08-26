@@ -337,7 +337,7 @@ NullablePtr<Stmt> Parser::parseStmt() {
     return 0;
   case tok::kw_return: return parseStmtReturn().getPtrOrNull();
   case tok::kw_if:     return parseStmtIf().getPtrOrNull();
-  case tok::kw_while:  return parseStmtWhile();
+  case tok::kw_while:  return parseStmtWhile().getPtrOrNull();
   case tok::kw_do:     return parseStmtDoWhile();
   case tok::kw_for:    return parseStmtFor();
   case tok::kw_switch: return parseStmtSwitch();
@@ -461,12 +461,12 @@ ParserResult<Stmt> Parser::parseStmtIf() {
 /// 
 ///   stmt-while:
 ///     'while' expr-basic stmt-brace
-NullablePtr<Stmt> Parser::parseStmtWhile() {
+ParserResult<Stmt> Parser::parseStmtWhile() {
   SourceLoc WhileLoc = consumeToken(tok::kw_while);
 
   ParserResult<Expr> Condition = parseExprBasic(diag::expected_expr_while);
   if (Condition.isNull() || Condition.hasCodeCompletion())
-    return nullptr; // FIXME: better recovery
+    return makeParserResult<Stmt>(Condition, nullptr); // FIXME: better recovery
 
   NullablePtr<BraceStmt> Body;
   if (auto *CE = dyn_cast<PipeClosureExpr>(Condition.get())) {
@@ -483,10 +483,10 @@ NullablePtr<Stmt> Parser::parseStmtWhile() {
   if (Body.isNull())
     Body = parseBraceItemList(diag::expected_lbrace_after_while);
   if (Body.isNull())
-    return nullptr; // FIXME: better recovery
+    return makeParserErrorResult<Stmt>(); // FIXME: better recovery
 
-  // If our normal expression parsed correctly, build an AST.
-  return new (Context) WhileStmt(WhileLoc, Condition.get(), Body.get());
+  return makeParserResult(
+      new (Context) WhileStmt(WhileLoc, Condition.get(), Body.get()));
 }
 
 /// 

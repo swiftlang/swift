@@ -666,7 +666,7 @@ public:
   bool parseExprOrStmt(ExprStmtOrDecl &Results);
   ParserResult<Stmt> parseStmtReturn();
   ParserResult<Stmt> parseStmtIf();
-  NullablePtr<Stmt> parseStmtWhile();
+  ParserResult<Stmt> parseStmtWhile();
   NullablePtr<Stmt> parseStmtDoWhile();
   NullablePtr<Stmt> parseStmtFor();
   NullablePtr<Stmt> parseStmtForCStyle(SourceLoc ForLoc);
