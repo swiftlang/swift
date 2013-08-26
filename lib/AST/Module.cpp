@@ -344,6 +344,23 @@ void Module::lookupClassMember(AccessPathTy accessPath,
   return owner.lookupClassMember(this, accessPath, name, results);
 }
 
+void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) {
+  if (isa<BuiltinModule>(this)) {
+    // FIXME: The Builtin module isn't usually visible, but it would be nice
+    // to have the option to display its decls. Unfortunately those decls are
+    // lazily generated.
+    return;
+  }
+  
+  if (auto TU = dyn_cast<TranslationUnit>(this)) {
+    results.append(TU->Decls.begin(), TU->Decls.end());
+    return;
+  }
+  
+  ModuleLoader &owner = cast<LoadedModule>(this)->getOwner();
+  return owner.getDisplayDecls(this, results);
+}
+
 namespace {
 // Returns Nothing on error, Optional(nullptr) if no operator decl found, or
 // Optional(decl) if decl was found.

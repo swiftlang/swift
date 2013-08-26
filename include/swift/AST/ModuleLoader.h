@@ -144,6 +144,11 @@ public:
   /// Does not include dependencies.
   virtual void getLinkLibraries(const Module *module,
                                 Module::LinkLibraryCallback callback) { }
+  
+  /// \brief Look for all top-level decls that should be displayed to a client
+  /// of the module.
+  virtual void getDisplayDecls(const Module *module,
+                               SmallVectorImpl<Decl*> &results) { }
 };
 
 }

@@ -639,3 +639,29 @@ void ModuleFile::getLinkLibraries(Module::LinkLibraryCallback callback) const {
   for (auto &lib : LinkLibraries)
     callback(lib);
 }
+
+void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
+  if (OperatorDecls) {
+    for (auto entry : make_range(OperatorDecls->data_begin(),
+                                 OperatorDecls->data_end())) {
+      for (auto item : entry)
+        results.push_back(getDecl(item.second));
+    }
+  }
+
+  if (TopLevelDecls) {
+    for (auto entry : make_range(TopLevelDecls->data_begin(),
+                                 TopLevelDecls->data_end())) {
+      for (auto item : entry)
+        results.push_back(getDecl(item.second));
+    }
+  }
+
+  if (ExtensionDecls) {
+    for (auto entry : make_range(ExtensionDecls->data_begin(),
+                                 ExtensionDecls->data_end())) {
+      for (auto item : entry)
+        results.push_back(getDecl(item.second));
+    }
+  }
+}

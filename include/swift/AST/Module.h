@@ -214,6 +214,13 @@ public:
   void getImportedModules(SmallVectorImpl<ImportedModule> &modules,
                           bool includePrivate = false) const;
 
+  /// Finds all top-level decls that should be displayed to a client of this
+  /// module.
+  ///
+  /// This includes types, variables, functions, and extensions.
+  /// This does a simple local lookup, not recursively looking through imports.
+  void getDisplayDecls(SmallVectorImpl<Decl*> &results);
+  
   /// Perform an action for every module visible from this module.
   ///
   /// For most modules this means any re-exports, but for a translation unit
@@ -252,7 +259,7 @@ public:
     LinkLibraryCallback wrapped = std::cref(fn);
     collectLinkLibraries(wrapped);
   }
-
+  
   /// Returns true if the two access paths contain the same chain of
   /// identifiers.
   ///

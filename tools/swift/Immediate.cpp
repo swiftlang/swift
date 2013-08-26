@@ -1092,6 +1092,8 @@ public:
                      " lines with errors)\n"
                  "  :print_decl <name> - print the AST representation of the "
                      "named declarations\n"
+                 "  :print_module <name> - print the decls in the given "
+                     "module, but not submodules\n"
                  "API documentation etc. will be here eventually.\n");
         } else if (L.peekNextToken().getText() == "quit" ||
                    L.peekNextToken().getText() == "exit") {
@@ -1133,6 +1135,46 @@ public:
           }
         } else if (L.peekNextToken().getText() == "dump_source") {
           llvm::errs() << DumpSource;
+        } else if (L.peekNextToken().getText() == "print_module") {
+          L.lex(Tok);
+          SmallVector<ImportDecl::AccessPathElement, 4> accessPath;
+          ASTContext &ctx = CI.getASTContext();
+
+          L.lex(Tok);
+          if (Tok.is(tok::identifier)) {
+            accessPath.push_back({ctx.getIdentifier(Tok.getText()),
+                                  Tok.getLoc()});
+            
+            while (L.peekNextToken().is(tok::period)) {
+              L.lex(Tok);
+              L.lex(Tok);
+              if (Tok.is(tok::identifier)) {
+                accessPath.push_back({ctx.getIdentifier(Tok.getText()),
+                                      Tok.getLoc()});
+              } else {
+                llvm::outs() << "Not a submodule name: '" << Tok.getText()
+                             << "'\n";
+                accessPath.clear();
+              }
+            }
+          } else {
+            llvm::outs() << "Not a module name: '" << Tok.getText() << "'\n";
+          }
+          
+          if (!accessPath.empty()) {
+            auto M = ctx.getModule(accessPath);
+            if (!M)
+              llvm::outs() << "No such module\n";
+            else {
+              SmallVector<Decl *, 64> decls;
+              M->getDisplayDecls(decls);
+              for (const Decl *D : decls) {
+                D->print(llvm::outs());
+                llvm::outs() << '\n';
+              }
+            }
+          }
+          
         } else if (L.peekNextToken().getText() == "constraints") {
           L.lex(Tok);
           L.lex(Tok);

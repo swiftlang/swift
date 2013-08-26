@@ -370,6 +370,11 @@ public:
 
   /// Reports all link-time dependencies.
   void getLinkLibraries(Module::LinkLibraryCallback callback) const;
+  
+  /// Adds all top-level decls to the given vector.
+  ///
+  /// This includes all decls that should be displayed to clients of the module.
+  void getDisplayDecls(SmallVectorImpl<Decl*> &results);
 };
 
 class SerializedModule : public LoadedModule {

@@ -310,3 +310,11 @@ SerializedModuleLoader::getLinkLibraries(const Module *module,
     return;
   moduleFile->getLinkLibraries(callback);
 }
+
+void SerializedModuleLoader::getDisplayDecls(const Module *module,
+                                             SmallVectorImpl<Decl*> &results) {
+  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
+  if (!moduleFile)
+    return;
+  moduleFile->getDisplayDecls(results);
+}

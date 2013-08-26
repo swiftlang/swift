@@ -110,6 +110,9 @@ public:
 
   virtual void getLinkLibraries(const Module *module,
                                 Module::LinkLibraryCallback callback) override;
+  
+  virtual void getDisplayDecls(const Module *module,
+                               SmallVectorImpl<Decl*> &results) override;
 };
 
 } // end namespace swift
