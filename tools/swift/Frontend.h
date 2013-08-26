@@ -15,6 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef HELPERS_H
+#define HELPERS_H
+
 #include "swift/Basic/LLVM.h"
 
 namespace llvm {
@@ -24,9 +27,14 @@ namespace llvm {
 namespace swift {
   class REPLContext;
   class TranslationUnit;
+  class SILModule;
 
   bool appendToREPLTranslationUnit(TranslationUnit *TU,
                                    REPLContext &RC,
                                    llvm::MemoryBuffer *Buffer);
+
+  bool runSILDiagnosticPasses(SILModule &Module);
+
 } // namespace swift
 
+#endif

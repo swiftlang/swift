@@ -9,32 +9,15 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file contains utility methods for parsing and performing semantic
-// on modules.
-//
-//===----------------------------------------------------------------------===//
 
 #include "Frontend.h"
 #include "Immediate.h"
-#include "swift/AST/Identifier.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Component.h"
-#include "swift/AST/Diagnostics.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/NameLookup.h"
-#include "swift/AST/Pattern.h"
-#include "swift/AST/Stmt.h"
-#include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Subsystems.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
-
 using namespace swift;
 
 bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
@@ -57,4 +40,26 @@ bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
     CurTUElem = TU->Decls.size();
   } while (!Done);
   return FoundAnySideEffects;
+}
+
+
+/// \brief Returns true if the diagnostic passes produced an error.
+bool swift::runSILDiagnosticPasses(SILModule &Module) {
+  auto &Ctx = Module.getASTContext();
+  performSILMandatoryInlining(&Module);
+
+  if (Ctx.LangOpts.UseDefiniteInit)
+    performSILMemoryPromotion(&Module);
+
+  performSILAllocBoxToStackPromotion(&Module);
+  performSILStackToSSAPromotion(&Module);
+
+  performSILConstantPropagation(&Module);
+  performSILDeadCodeElimination(&Module);
+
+  // Generate diagnostics.
+  emitSILDataflowDiagnostics(&Module);
+
+  // If errors were produced during SIL analysis, return true.
+  return Ctx.hadError();
 }

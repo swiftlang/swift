@@ -15,6 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_IMMEDIATE_H
+#define SWIFT_IMMEDIATE_H
+
 #include <string>
 #include <vector>
 
@@ -57,4 +60,7 @@ namespace swift {
 
   void REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine);
   void REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine);
-}
+}  // end namespace swift
+
+#endif
+

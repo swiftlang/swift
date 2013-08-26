@@ -180,7 +180,7 @@ static void loadSwiftRuntime(const ProcessCmdLine &CmdLine) {
   loadRuntimeLib("libswift_stdlib_core.dylib", CmdLine);
 }
 
-static bool IRGenImportedModules(TranslationUnit *TU,
+static bool IRGenImportedModules(CompilerInstance &CI,
                                  llvm::Module &Module,
                                  const ProcessCmdLine &CmdLine,
                                  llvm::SmallPtrSet<TranslationUnit*, 8>
@@ -188,6 +188,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
                                  SmallVectorImpl<llvm::Function*> &InitFns,
                                  irgen::Options &Options,
                                  bool IsREPL = true) {
+  TranslationUnit *TU = CI.getTU();
   // Perform autolinking.
   TU->collectLinkLibraries([&](LinkLibrary linkLib) {
     // If we have an absolute path, just try to load it now.
@@ -246,6 +247,12 @@ static bool IRGenImportedModules(TranslationUnit *TU,
     // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
     llvm::OwningPtr<SILModule> SILMod(performSILGeneration(SubTU));
+
+    if (runSILDiagnosticPasses(*SILMod.get())) {
+      hadError = true;
+      return false;
+    }
+
     performIRGeneration(Options, &SubModule, SubTU, SILMod.get());
 
     if (TU->Ctx.hadError()) {
@@ -291,7 +298,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
 
   SmallVector<llvm::Function*, 8> InitFns;
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
-  if (IRGenImportedModules(CI.getTU(), Module, CmdLine, ImportedModules,
+  if (IRGenImportedModules(CI, Module, CmdLine, ImportedModules,
                            InitFns, Options, /*IsREPL*/false))
     return;
 
@@ -971,7 +978,7 @@ class REPLEnvironment {
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
     DumpModuleMain->setName("repl.line");
     
-    if (IRGenImportedModules(TU, Module, CmdLine, ImportedModules, InitFns,
+    if (IRGenImportedModules(CI, Module, CmdLine, ImportedModules, InitFns,
                              Options, sil.get()))
       return false;
     
