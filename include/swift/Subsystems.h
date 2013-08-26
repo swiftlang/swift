@@ -20,6 +20,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
 
 #include <memory>
 
@@ -180,11 +181,13 @@ namespace swift {
   ///
   /// This interface is still prone to change!
   void serialize(const TranslationUnit *TU, const char *outputPath,
-                 ArrayRef<unsigned> inputFileBufferIDs = {});
+                 ArrayRef<unsigned> inputFileBufferIDs = {},
+                 StringRef moduleLinkName = {});
 
   /// Serializes a translation unit to a stream.
   void serializeToStream(const TranslationUnit *TU, llvm::raw_ostream &out,
-                         ArrayRef<unsigned> inputFileBufferIDs = {});
+                         ArrayRef<unsigned> inputFileBufferIDs = {},
+                         StringRef moduleLinkName = {});
 
 
   /// Turn the given translation unit into either LLVM IR or native code.

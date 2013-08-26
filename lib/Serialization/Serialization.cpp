@@ -15,6 +15,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/KnownProtocols.h"
+#include "swift/AST/LinkLibrary.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Serialization/BCRecordLayout.h"
@@ -239,7 +240,8 @@ namespace {
 
     /// Writes the dependencies used to build this module: its imported
     /// modules and its source files.
-    void writeInputFiles(const TranslationUnit *TU, FileBufferIDs inputFiles);
+    void writeInputFiles(const TranslationUnit *TU, FileBufferIDs inputFiles,
+                         StringRef moduleLinkName);
 
     /// Writes the given pattern, recursively.
     void writePattern(const Pattern *pattern);
@@ -335,7 +337,7 @@ namespace {
 
     /// Serialize a translation unit to the given stream.
     void writeToStream(raw_ostream &os, const TranslationUnit *TU,
-                       FileBufferIDs inputFiles);
+                       FileBufferIDs inputFiles, StringRef moduleLinkName);
   };
 } // end anonymous namespace
 
@@ -499,6 +501,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK(INPUT_BLOCK);
   RECORD(input_block, SOURCE_FILE);
   RECORD(input_block, IMPORTED_MODULE);
+  RECORD(input_block, LINK_LIBRARY);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
   RECORD(decls_block, NAME_ALIAS_TYPE);
@@ -621,10 +624,12 @@ void flattenImportPath(const Module::ImportedModule &import,
 }
 
 void Serializer::writeInputFiles(const TranslationUnit *TU,
-                                 FileBufferIDs inputFiles) {
+                                 FileBufferIDs inputFiles,
+                                 StringRef moduleLinkName) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 3);
   input_block::SourceFileLayout SourceFile(Out);
   input_block::ImportedModuleLayout ImportedModule(Out);
+  input_block::LinkLibraryLayout LinkLibrary(Out);
 
   auto &sourceMgr = TU->Ctx.SourceMgr;
   for (auto bufferID : inputFiles) {
@@ -647,6 +652,11 @@ void Serializer::writeInputFiles(const TranslationUnit *TU,
     ImportPathBlob importPath;
     flattenImportPath(import.first, importPath);
     ImportedModule.emit(ScratchRecord, import.second, importPath);
+  }
+
+  if (!moduleLinkName.empty()) {
+    LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
+                     moduleLinkName);
   }
 }
 
@@ -2095,13 +2105,14 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
 }
 
 void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,
-                               FileBufferIDs inputFiles) {
+                               FileBufferIDs inputFiles,
+                               StringRef moduleLinkName) {
   // Write the signature through the BitstreamWriter for alignment purposes.
   for (unsigned char byte : SIGNATURE)
     Out.Emit(byte, 8);
 
   writeHeader();
-  writeInputFiles(TU, inputFiles);
+  writeInputFiles(TU, inputFiles, moduleLinkName);
   writeTranslationUnit(TU);
 
   if (ShouldFallBackToTranslationUnit)
@@ -2113,7 +2124,7 @@ void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,
 }
 
 void swift::serialize(const TranslationUnit *TU, const char *outputPath,
-                      FileBufferIDs inputFiles) {
+                      FileBufferIDs inputFiles, StringRef moduleLinkName) {
   std::string errorInfo;
   llvm::raw_fd_ostream out(outputPath, errorInfo,
                            llvm::sys::fs::F_Binary);
@@ -2125,11 +2136,12 @@ void swift::serialize(const TranslationUnit *TU, const char *outputPath,
     return;
   }
 
-  serializeToStream(TU, out, inputFiles);
+  serializeToStream(TU, out, inputFiles, moduleLinkName);
 }
 
 void swift::serializeToStream(const TranslationUnit *TU, raw_ostream &out,
-                              FileBufferIDs inputFiles) {
+                              FileBufferIDs inputFiles,
+                              StringRef moduleLinkName) {
   Serializer S;
-  S.writeToStream(out, TU, inputFiles);
+  S.writeToStream(out, TU, inputFiles, moduleLinkName);
 }

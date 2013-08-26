@@ -140,6 +140,14 @@ enum DefaultArgumentKind : uint8_t {
 };
 using DefaultArgumentField = BCFixed<3>;
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum LibraryKind : uint8_t {
+  Library = 0,
+  Framework
+};
+using LibraryKindField = BCFixed<1>;
+
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
 ///
@@ -219,7 +227,8 @@ namespace input_block {
   // VERSION_MAJOR.
   enum {
     SOURCE_FILE = 1,
-    IMPORTED_MODULE
+    IMPORTED_MODULE,
+    LINK_LIBRARY
   };
 
   using SourceFileLayout = BCRecordLayout<
@@ -231,6 +240,12 @@ namespace input_block {
     IMPORTED_MODULE,
     BCFixed<1>, // exported?
     BCBlob // module name, optionally followed by a null and then an import path
+  >;
+
+  using LinkLibraryLayout = BCRecordLayout<
+    LINK_LIBRARY,
+    LibraryKindField, // kind
+    BCBlob // library name
   >;
 }
 

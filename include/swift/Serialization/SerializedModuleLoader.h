@@ -107,6 +107,9 @@ public:
 
   virtual void loadDeclsConformingTo(KnownProtocolKind kind,
                                      unsigned previousGeneration) override;
+
+  virtual void getLinkLibraries(const Module *module,
+                                Module::LinkLibraryCallback callback) override;
 };
 
 } // end namespace swift

@@ -251,6 +251,23 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
   } while (true);
 }
 
+static Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
+  auto stableKind = static_cast<serialization::LibraryKind>(rawKind);
+  if (stableKind != rawKind)
+    return Nothing;
+
+  switch (stableKind) {
+  case serialization::LibraryKind::Library:
+    return swift::LibraryKind::Library;
+  case serialization::LibraryKind::Framework:
+    return swift::LibraryKind::Framework;
+  }
+
+  // If there's a new case value in the module file, ignore it.
+  return Nothing;
+}
+
+
 ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
   : ModuleContext(nullptr),
     InputFile(std::move(input)),
@@ -308,6 +325,14 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
           bool exported;
           input_block::ImportedModuleLayout::readRecord(scratch, exported);
           Dependencies.push_back({blobData, exported});
+          break;
+        }
+        case input_block::LINK_LIBRARY: {
+          uint8_t rawKind;
+          input_block::ImportedModuleLayout::readRecord(scratch, rawKind);
+          if (auto libKind = getActualLibraryKind(rawKind))
+            LinkLibraries.push_back({blobData, *libKind});
+          // else ignore the dependency...it'll show up as a linker error.
           break;
         }
         default:
@@ -608,4 +633,9 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
     for (auto item : list)
       consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)));
   }
+}
+
+void ModuleFile::getLinkLibraries(Module::LinkLibraryCallback callback) const {
+  for (auto &lib : LinkLibraries)
+    callback(lib);
 }

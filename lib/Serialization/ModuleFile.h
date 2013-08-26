@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
+#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -108,6 +109,9 @@ public:
 private:
   /// All modules this module depends on.
   SmallVector<Dependency, 8> Dependencies;
+
+  /// All of this module's link-time dependencies.
+  SmallVector<LinkLibrary, 8> LinkLibraries;
 
   template <typename T>
   class Serialized {
@@ -363,6 +367,9 @@ public:
   void lookupClassMember(Module::AccessPathTy accessPath,
                          Identifier name,
                          SmallVectorImpl<ValueDecl*> &results);
+
+  /// Reports all link-time dependencies.
+  void getLinkLibraries(Module::LinkLibraryCallback callback) const;
 };
 
 class SerializedModule : public LoadedModule {

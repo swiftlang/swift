@@ -301,3 +301,12 @@ SerializedModuleLoader::lookupClassMember(const Module *module,
     return;
   moduleFile->lookupClassMember(accessPath, name, decls);
 }
+
+void
+SerializedModuleLoader::getLinkLibraries(const Module *module,
+                                         Module::LinkLibraryCallback callback) {
+  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
+  if (!moduleFile)
+    return;
+  moduleFile->getLinkLibraries(callback);
+}
