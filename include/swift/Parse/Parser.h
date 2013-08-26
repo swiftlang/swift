@@ -665,7 +665,7 @@ public:
   NullablePtr<Stmt> parseStmt();
   bool parseExprOrStmt(ExprStmtOrDecl &Results);
   ParserResult<Stmt> parseStmtReturn();
-  NullablePtr<Stmt> parseStmtIf();
+  ParserResult<Stmt> parseStmtIf();
   NullablePtr<Stmt> parseStmtWhile();
   NullablePtr<Stmt> parseStmtDoWhile();
   NullablePtr<Stmt> parseStmtFor();

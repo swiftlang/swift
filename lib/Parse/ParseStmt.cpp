@@ -336,7 +336,7 @@ NullablePtr<Stmt> Parser::parseStmt() {
     diagnose(Tok, diag::expected_stmt);
     return 0;
   case tok::kw_return: return parseStmtReturn().getPtrOrNull();
-  case tok::kw_if:     return parseStmtIf();
+  case tok::kw_if:     return parseStmtIf().getPtrOrNull();
   case tok::kw_while:  return parseStmtWhile();
   case tok::kw_do:     return parseStmtDoWhile();
   case tok::kw_for:    return parseStmtFor();
@@ -417,12 +417,12 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
 ///   stmt-if-else:
 ///    'else' stmt-brace
 ///    'else' stmt-if
-NullablePtr<Stmt> Parser::parseStmtIf() {
+ParserResult<Stmt> Parser::parseStmtIf() {
   SourceLoc IfLoc = consumeToken(tok::kw_if);
 
   ParserResult<Expr> Condition = parseExprBasic(diag::expected_expr_if);
   if (Condition.isNull() || Condition.hasCodeCompletion())
-    return nullptr; // FIXME: better recovery
+    return makeParserResult<Stmt>(Condition, nullptr); // FIXME: better recovery
 
   NullablePtr<BraceStmt> NormalBody;
   if (auto *CE = dyn_cast<PipeClosureExpr>(Condition.get())) {
@@ -439,25 +439,23 @@ NullablePtr<Stmt> Parser::parseStmtIf() {
   if (NormalBody.isNull())
     NormalBody = parseBraceItemList(diag::expected_lbrace_after_if);
   if (NormalBody.isNull())
-    return nullptr; // FIXME: better recovery
+    return makeParserErrorResult<Stmt>(); // FIXME: better recovery
 
-  NullablePtr<Stmt> ElseBody;
+  ParserResult<Stmt> ElseBody;
   SourceLoc ElseLoc = Tok.getLoc();
   if (consumeIf(tok::kw_else)) {
     if (Tok.is(tok::kw_if))
       ElseBody = parseStmtIf();
-    else
-      ElseBody = parseBraceItemList(diag::expected_lbrace_after_else)
-        .getPtrOrNull();
-    if (ElseBody.isNull())
-      return 0;
+    else if (auto *BS = parseBraceItemList(diag::expected_lbrace_after_else)
+                 .getPtrOrNull())
+      ElseBody = makeParserResult(BS);
   } else {
     ElseLoc = SourceLoc();
   }
 
-  // If our condition and normal expression parsed correctly, build an AST.
-  return new (Context) IfStmt(IfLoc, Condition.get(), NormalBody.get(),
-                              ElseLoc, ElseBody.getPtrOrNull());
+  return makeParserResult(
+      new (Context) IfStmt(IfLoc, Condition.get(), NormalBody.get(),
+                           ElseLoc, ElseBody.getPtrOrNull()));
 }
 
 /// 
