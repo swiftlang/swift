@@ -78,6 +78,9 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
                                      ConformanceMap &Conformance,
                                      SourceLoc ComplainLoc,
                                      TypeSubstitutionMap *RecordSubstitutions) {
+  // FIXME: We want to migrate to a world where we don't need ComplainLoc, and
+  // this routine can't fail, because the type checker checks everything in
+  // advance.
   llvm::SmallPtrSet<ArchetypeType *, 8> knownArchetypes;
   SmallVector<ArchetypeType *, 8> archetypeStack;
 
@@ -108,8 +111,13 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
 
     // If the archetype has a superclass requirement, check that now.
     if (auto superclass = archetype->getSuperclass()) {
-      if (!isSubtypeOf(T, superclass))
+      if (!isSubtypeOf(T, superclass)) {
+        if (ComplainLoc.isValid()) {
+          diagnose(ComplainLoc, diag::type_does_not_inherit, T, superclass);
+          // FIXME: Show where the requirement came from?
+        }
         return true;
+      }
     }
 
     SmallVectorImpl<ProtocolConformance *> &Conformances
@@ -120,7 +128,6 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
         if (conformsToProtocol(T, Proto, &Conformance, ComplainLoc)) {
           Conformances.push_back(Conformance);
         } else {
-          // FIXME: Diagnose, if requested.
           return true;
         }
       }
