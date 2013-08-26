@@ -499,9 +499,9 @@ void ElementPromotion::doIt() {
   }
 }
 
-/// Given a load (i.e., a LoadInst or CopyAddr), determine whether the loaded
-/// value is definitely assigned or not.  If not, produce a diagnostic.  If so,
-/// attempt to promote the value into SSA form.
+/// Given a load (i.e., a LoadInst, CopyAddr, LoadWeak, or ProjectExistential),
+/// determine whether the loaded value is definitely assigned or not.  If not,
+/// produce a diagnostic.  If so, attempt to promote the value into SSA form.
 void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   SILValue Result;
 
@@ -961,6 +961,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       // full definitions) and recursively process the uses.
       llvm::SaveAndRestore<bool> X(InStructSubElement, true);
       collectUses(SILValue(IE, 0), BaseElt);
+      continue;
+    }
+
+    // project_existential is a use of the protocol value, so it is modeled as a
+    // load.
+    if (isa<ProjectExistentialInst>(User) || isa<ProtocolMethodInst>(User)) {
+      Uses[BaseElt].push_back({User, UseKind::Load});
+      // TODO: Is it safe to ignore all uses of the project_existential?
       continue;
     }
 
