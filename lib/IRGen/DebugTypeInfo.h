@@ -47,6 +47,7 @@ namespace swift {
       DebugTypeInfo(Type Ty, const TypeInfo &Info);
       DebugTypeInfo(const ValueDecl &Decl, const TypeInfo &Info);
       DebugTypeInfo(const ValueDecl &Decl, Size Size, Alignment Align);
+      inline TypeBase* getHash() const { return Ty.getPointer(); }
 
       bool operator==(DebugTypeInfo T) const;
       bool operator!=(DebugTypeInfo T) const;

@@ -693,14 +693,15 @@ llvm::DIDerivedType IRGenDebugInfo::createMemberType(CanType CTy,
                                                      llvm::DIDescriptor Scope,
                                                      llvm::DIFile File,
                                                      unsigned Flags) {
+  unsigned SizeOfByte = TargetInfo.getCharWidth();
   DebugTypeInfo DTI(CTy, Types.getCompleteTypeInfo(CTy));
   auto Ty = getOrCreateType(DTI, Scope);
   auto DTy = DBuilder.createMemberType(Scope, StringRef(), File, 0,
-                                       Ty.getSizeInBits(),
-                                       Ty.getAlignInBits(),
+                                       SizeOfByte*DTI.SizeInBytes,
+                                       SizeOfByte*DTI.AlignInBytes,
                                        OffsetInBits, Flags, Ty);
   OffsetInBits += Ty.getSizeInBits();
-  OffsetInBits = llvm::RoundUpToAlignment(OffsetInBits, Ty.getAlignInBits());
+  OffsetInBits = llvm::RoundUpToAlignment(OffsetInBits, SizeOfByte*DTI.AlignInBytes);
   return DTy;
 }
 
@@ -752,7 +753,7 @@ IRGenDebugInfo::createStructType(DebugTypeInfo DbgTy,
     (llvm::dwarf::DW_TAG_structure_type,
      Name, Scope, File, Line, DW_LANG_Swift, SizeInBits, AlignInBits);
 
-  DITypeCache[DbgTy] = llvm::WeakVH(FwdDecl);
+  DITypeCache[DbgTy.getHash()] = llvm::WeakVH(FwdDecl);
 
   auto DTy = DBuilder.createStructType
     (Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
@@ -793,7 +794,7 @@ IRGenDebugInfo::createUnionType(DebugTypeInfo DbgTy,
     (llvm::dwarf::DW_TAG_union_type,
      Name, Scope, File, Line, dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
 
-  DITypeCache[DbgTy] = llvm::WeakVH(FwdDecl);
+  DITypeCache[DbgTy.getHash()] = llvm::WeakVH(FwdDecl);
 
   auto DTy = DBuilder.createUnionType(Scope, Name, File, Line,
                                       SizeInBits, AlignInBits, Flags,
@@ -832,7 +833,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   unsigned Encoding = 0;
   unsigned Flags = 0;
 
-  TypeBase* BaseTy = DbgTy.Ty.getPointer();
+  TypeBase* BaseTy = DbgTy.getHash();
   if (!BaseTy) {
     DEBUG(llvm::dbgs() << "Type without TypeBase: "; DbgTy.Ty.dump();
           llvm::dbgs() << "\n");
@@ -1076,7 +1077,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 }
 
 /// Get the DIType corresponding to this DebugTypeInfo from the cache,
-/// or build a fresh DIType otherwise.
+/// or build a fresh DIType otherwise.  There is the underlying
+/// assumption that no two types that share the same canonical type
+/// can have different storage size or alignment.
 llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy,
                                              llvm::DIDescriptor Scope) {
   // Is this an empty type?
@@ -1085,7 +1088,7 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy,
     return createType(DbgTy, Scope, getFile(Scope));
 
   // Look in the cache first.
-  auto CachedType = DITypeCache.find(DbgTy);
+  auto CachedType = DITypeCache.find(DbgTy.getHash());
 
   if (CachedType != DITypeCache.end()) {
     // Verify that the information still exists.
@@ -1099,6 +1102,6 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy,
   llvm::DIType DITy = createType(DbgTy, Scope, getFile(Scope));
   DITy.Verify();
 
-  DITypeCache[DbgTy] = llvm::WeakVH(DITy);
+  DITypeCache[DbgTy.getHash()] = llvm::WeakVH(DITy);
   return DITy;
 }

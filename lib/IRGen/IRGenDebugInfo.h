@@ -95,7 +95,7 @@ class IRGenDebugInfo {
   // Various caches.
   llvm::DenseMap<SILDebugScope *, llvm::WeakVH> ScopeCache;
   llvm::DenseMap<const char *, llvm::WeakVH> DIFileCache;
-  llvm::DenseMap<DebugTypeInfo, llvm::WeakVH> DITypeCache;
+  llvm::DenseMap<TypeBase*, llvm::WeakVH> DITypeCache;
   std::map<std::string, llvm::WeakVH> DINameSpaceCache;
 
   // Subprograms need their scope to be RAUW'd when we work through
