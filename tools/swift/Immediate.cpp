@@ -230,28 +230,9 @@ static bool IRGenImportedModules(CompilerInstance &CI,
   // autolinking.
   bool hadError = false;
   TU->forAllVisibleModules(Nothing, [&](Module::ImportedModule ModPair) -> bool{
-    // Nothing to do for the builtin module.
-    if (isa<BuiltinModule>(ModPair.second))
+    TranslationUnit *SubTU = dyn_cast<TranslationUnit>(ModPair.second);
+    if (!SubTU)
       return true;
-
-    // Load the shared library corresponding to this module.
-    // FIXME: Swift and Clang modules alike need to record the dylibs against
-    // which one needs to link when using the module. For now, just hardcode
-    // the Swift libraries we care about.
-    StringRef sharedLibName
-      = llvm::StringSwitch<StringRef>(ModPair.second->Name.str())
-          .Case("Foundation", "libswiftFoundation.dylib")
-          .Case("ObjectiveC", "libswiftObjectiveC.dylib")
-          .Case("AppKit",     "libswiftAppKit.dylib")
-          .Case("POSIX",      "libswift_stdlib_posix.dylib")
-          .Default("");
-    if (!sharedLibName.empty())
-      loadRuntimeLib(sharedLibName, CmdLine);
-
-    if (isa<LoadedModule>(ModPair.second))
-      return true;
-    
-    TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);
     if (!ImportedModules.insert(SubTU))
       return true;
 

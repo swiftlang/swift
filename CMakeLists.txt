@@ -183,16 +183,18 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++ -fno-rtti -fno
 # Usage:
 #   compile_swift_files(OUTPUT objfile  # Name of the resulting object file
 #     SOURCES swift_src [swift_src...]  # Swift source files to compile
+#     FLAGS -module-name foo            # Flags to add to the compilation
 #     [IS_MAIN]                         # This is an executable, not a library
 #     [IS_STDLIB_CORE])                 # This is the core standard library
 function(compile_swift_files)	
-  parse_arguments(SWIFTFILE "OUTPUT;SOURCES" "IS_MAIN;IS_STDLIB_CORE" ${ARGN})
+  parse_arguments(SWIFTFILE "OUTPUT;SOURCES;FLAGS" "IS_MAIN;IS_STDLIB_CORE"
+    ${ARGN})
   
   if(SWIFTFILE_IS_MAIN AND SWIFTFILE_IS_STDLIB_CORE)
     error(SEND_ERROR "Cannot set both IS_MAIN and IS_STDLIB_CORE")
   endif()
   
-  set(swift_flags)
+  set(swift_flags ${SWIFTFILE_FLAGS})
 
   set(source_files)
   foreach(file ${SWIFTFILE_SOURCES})
@@ -354,9 +356,12 @@ function(handle_swift_sources sourcesvar externalvar target)
     endif()
   endforeach()
 
+  set(swift_flags)
   set(IS_MAIN_arg)
   if (SWIFTSOURCES_IS_MAIN)
     set(IS_MAIN_arg IS_MAIN)
+  else()
+    set(swift_flags -module-link-name "${target}")
   endif()
   set(IS_STDLIB_CORE_arg)
   if(SWIFTSOURCES_IS_STDLIB_CORE)
@@ -378,7 +383,9 @@ function(handle_swift_sources sourcesvar externalvar target)
     endif()
 
     set(swift_obj "${swift_obj_base}${CMAKE_C_OUTPUT_EXTENSION}")
-    compile_swift_files(OUTPUT ${swift_obj} SOURCES ${swift_sources}
+    compile_swift_files(OUTPUT ${swift_obj}
+      SOURCES ${swift_sources}
+      FLAGS ${swift_flags}
       ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg})
     list(APPEND result ${swift_obj})
   endif()

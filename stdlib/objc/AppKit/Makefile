@@ -47,7 +47,7 @@ SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
 $(SWIFT_HEADER_DIR)/AppKit.swiftmodule: $(ObjDir)/AppKit.o $(SWIFT_HEADER_DIR)
 $(ObjDir)/AppKit.o: $(PATH_TO_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $@) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) $(SWIFT_SDKFLAG) $(SWIFT_DEBUGFLAG) -o $@ -c -emit-module -parse-as-library $(SWIFT_OPTFLAG) $(PATH_TO_SWIFT_SOURCES)
+	$(Verb) $(SWIFT_COMPILER) $(SWIFT_SDKFLAG) $(SWIFT_DEBUGFLAG) -o $@ -c -emit-module -module-link-name $(LIBRARYNAME) -parse-as-library $(SWIFT_OPTFLAG) $(PATH_TO_SWIFT_SOURCES)
 	@mv $(ObjDir)/AppKit.swiftmodule $(SWIFT_HEADER_DIR)
 
 all-local:: $(SWIFT_HEADER_DIR)/AppKit.swiftmodule
