@@ -334,7 +334,7 @@ to multiple-value instructions choose the value by following the ``%name`` with
   // value address %box#1
   %box = alloc_box $Int64
   // Refer to the refcounted pointer
-  %1 = retain %box#0 : $Builtin.ObjectPointer
+  %1 = strong_retain %box#0 : $Builtin.ObjectPointer
   // Refer to the address
   store %value to %box#1 : $*Int64
 
@@ -626,11 +626,11 @@ type components each retained and released the same way. This Swift function::
 gets called in SIL as::
 
   %bar = function_ref @bar : $(A) -> (Int, A)
-  retain %x : $A
+  strong_retain %x : $A
   %z = apply %bar(%x) : $(A) -> (Int, A)
   // ... use %z ...
   %z_1 = tuple_extract %z : $(Int, A), 1
-  release %z_1
+  strong_release %z_1
 
 When applying a thick function value as a callee, the function value is also
 consumed at +1 retain count.
@@ -1036,8 +1036,8 @@ is equivalent to::
 
   %new = load %0 : $*T        // Load the new value from the source
   %old = load %1 : $*T        // Load the old value from the destination
-  retain %new : $T            // Retain the new value
-  release %old : $T           // Release the old
+  strong_retain %new : $T            // Retain the new value
+  strong_release %old : $T           // Release the old
   store %new to %1 : $*T      // Store the new value to the destination
 
 except that ``copy_addr`` may be used even if ``%0`` is of an address-only
@@ -1060,14 +1060,14 @@ operations::
     %new = load %0 : $*T
     %old = load %1 : $*T
     // no retain of %new!
-    release %old : $T
+    strong_release %old : $T
     store %new to %1 : $*T
 
   // copy-initialization
     copy_addr %0 to [initialization] %1 : $*T
   // is equivalent to:
     %new = load %0 : $*T
-    retain %new : $T
+    strong_retain %new : $T
     // no load/release of %old!
     store %new to %1 : $*T
 
@@ -1091,7 +1091,7 @@ destroy_addr
 Destroys the value in memory at address ``%0``. This is equivalent to::
 
   %1 = load %0
-  release %1
+  strong_release %1
 
 except that ``destroy_addr`` may be used even if ``%0`` is of an
 address-only type.  This does not deallocate memory; it only destroys the
@@ -1145,58 +1145,58 @@ maintained for the uses of the value.
 
 TODO: Weak and unowned references.
 
-retain
-``````
+strong_retain
+`````````````
 ::
   
-  sil-instruction ::= 'retain' sil-operand
+  sil-instruction ::= 'strong_retain' sil-operand
 
-  retain %0 : $T
+  strong_retain %0 : $T
   // $T must be a reference type
 
 Increases the strong retain count of the heap object referenced by ``%0``.
 
-retain_autoreleased
-```````````````````
+strong_retain_autoreleased
+``````````````````````````
 ::
 
-  sil-instruction ::= 'retain_autoreleased' sil-operand
+  sil-instruction ::= 'strong_retain_autoreleased' sil-operand
 
-  retain_autoreleased %0 : $T
+  strong_retain_autoreleased %0 : $T
   // $T must be a reference type
 
 Retains the heap object referenced by ``%0`` using the Objective-C ARC
-"autoreleased return value" optimization. The operand must be the result of
-an ``apply`` instruction with an Objective-C method callee, and the
-``retain_autoreleased`` instruction must be first use of the value after the
-defining ``apply`` instruction.
+"autoreleased return value" optimization. The operand must be the result of an
+``apply`` instruction with an Objective-C method callee, and the
+``strong_retain_autoreleased`` instruction must be first use of the value after
+the defining ``apply`` instruction.
 
-TODO: Specify all the other retain_autoreleased constraints here.
+TODO: Specify all the other strong_retain_autoreleased constraints here.
 
-release
-```````
+strong_release
+``````````````
 ::
 
-  release %0 : $T
+  strong_release %0 : $T
   // $T must be a reference type.
 
 Decrements the strong reference count of the heap object referenced by ``%0``.
-If the release operation brings the strong reference count of the object
-to zero, the object is destroyed and ``[weak]`` references are cleared.
-When both its strong and unowned reference counts reach zero, the object's
-memory is deallocated.
+If the release operation brings the strong reference count of the object to
+zero, the object is destroyed and ``[weak]`` references are cleared.  When both
+its strong and unowned reference counts reach zero, the object's memory is
+deallocated.
 
-retain_unowned
-``````````````
+strong_retain_unowned
+`````````````````````
 ::
   
-  sil-instruction ::= 'retain_unowned' sil-operand
+  sil-instruction ::= 'strong_retain_unowned' sil-operand
 
-  retain_unowned %0 : $[unowned] T
+  strong_retain_unowned %0 : $[unowned] T
   // $T must be a reference type
 
-Asserts that the strong reference count of the heap object referenced by
-``%0`` is still positive, then increases it by one.
+Asserts that the strong reference count of the heap object referenced by ``%0``
+is still positive, then increases it by one.
 
 unowned_retain
 ``````````````
@@ -1232,14 +1232,13 @@ load_weak
   load_weak [take] %0 : $*[weak] T
   // $T must be a reference type
 
-Increments the strong reference count of the heap object held in the
-operand, which must be an initialized weak reference.  The result is
-value of type ``$T``, except that it is ``null`` if the heap object
-has begun deallocation.
+Increments the strong reference count of the heap object held in the operand,
+which must be an initialized weak reference.  The result is value of type
+``$T``, except that it is ``null`` if the heap object has begun deallocation.
 
-This operation must be atomic with respect to the final ``release`` on
-the operand heap object.  It need not be atomic with respect to
-``store_weak`` operations on the same address.
+This operation must be atomic with respect to the final ``strong_release`` on
+the operand heap object.  It need not be atomic with respect to ``store_weak``
+operations on the same address.
 
 store_weak
 ``````````
@@ -1251,15 +1250,15 @@ store_weak
   store_weak %0 to [initialization] %1 : $*[weak] T
   // $T must be a reference type
 
-Initializes or reassigns a weak reference.  The operand may be ``null``.]
+Initializes or reassigns a weak reference.  The operand may be ``null``.
 
-If ``[initialization]`` is given, the weak reference must currently
-either be uninitialized or destroyed.  If it is not given, the weak
-reference must currently be initialized.
+If ``[initialization]`` is given, the weak reference must currently either be
+uninitialized or destroyed.  If it is not given, the weak reference must
+currently be initialized.
 
-This operation must be atomic with respect to the final ``release`` on
-the operand (source) heap object.  It need not be atomic with respect
-to ``store_weak`` or ``load_weak`` operations on the same address.
+This operation must be atomic with respect to the final ``strong_release`` on
+the operand (source) heap object.  It need not be atomic with respect to
+``store_weak`` or ``load_weak`` operations on the same address.
 
 
 Literals
