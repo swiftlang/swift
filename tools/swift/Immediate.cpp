@@ -952,7 +952,9 @@ class REPLEnvironment {
     llvm::Module LineModule("REPLLine", LLVMContext);
     
     llvm::OwningPtr<SILModule> sil(performSILGeneration(TU, RC.CurIRGenElem));
-    
+    if (runSILDiagnosticPasses(*sil.get()))
+      return false;
+
     performIRGeneration(Options, &LineModule, TU, sil.get(),
                         RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurTUElem;
