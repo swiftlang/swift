@@ -667,7 +667,7 @@ public:
   ParserResult<Stmt> parseStmtReturn();
   ParserResult<Stmt> parseStmtIf();
   ParserResult<Stmt> parseStmtWhile();
-  NullablePtr<Stmt> parseStmtDoWhile();
+  ParserResult<Stmt> parseStmtDoWhile();
   NullablePtr<Stmt> parseStmtFor();
   NullablePtr<Stmt> parseStmtForCStyle(SourceLoc ForLoc);
   NullablePtr<Stmt> parseStmtForEach(SourceLoc ForLoc);

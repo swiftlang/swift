@@ -338,7 +338,7 @@ NullablePtr<Stmt> Parser::parseStmt() {
   case tok::kw_return: return parseStmtReturn().getPtrOrNull();
   case tok::kw_if:     return parseStmtIf().getPtrOrNull();
   case tok::kw_while:  return parseStmtWhile().getPtrOrNull();
-  case tok::kw_do:     return parseStmtDoWhile();
+  case tok::kw_do:     return parseStmtDoWhile().getPtrOrNull();
   case tok::kw_for:    return parseStmtFor();
   case tok::kw_switch: return parseStmtSwitch();
   /// 'case' and 'default' are only valid at the top level of a switch.
@@ -439,7 +439,7 @@ ParserResult<Stmt> Parser::parseStmtIf() {
   if (NormalBody.isNull())
     NormalBody = parseBraceItemList(diag::expected_lbrace_after_if);
   if (NormalBody.isNull())
-    return makeParserErrorResult<Stmt>(); // FIXME: better recovery
+    return nullptr; // FIXME: better recovery
 
   ParserResult<Stmt> ElseBody;
   SourceLoc ElseLoc = Tok.getLoc();
@@ -483,7 +483,7 @@ ParserResult<Stmt> Parser::parseStmtWhile() {
   if (Body.isNull())
     Body = parseBraceItemList(diag::expected_lbrace_after_while);
   if (Body.isNull())
-    return makeParserErrorResult<Stmt>(); // FIXME: better recovery
+    return nullptr; // FIXME: better recovery
 
   return makeParserResult(
       new (Context) WhileStmt(WhileLoc, Condition.get(), Body.get()));
@@ -492,7 +492,7 @@ ParserResult<Stmt> Parser::parseStmtWhile() {
 /// 
 ///   stmt-do-while:
 ///     'do' stmt-brace 'while' expr
-NullablePtr<Stmt> Parser::parseStmtDoWhile() {
+ParserResult<Stmt> Parser::parseStmtDoWhile() {
   SourceLoc DoLoc = consumeToken(tok::kw_do);
 
   NullablePtr<BraceStmt> Body =
@@ -514,7 +514,7 @@ NullablePtr<Stmt> Parser::parseStmtDoWhile() {
 
   ParserResult<Expr> Condition = parseExpr(diag::expected_expr_do_while);
   if (Condition.isNull() || Condition.hasCodeCompletion())
-    return nullptr; // FIXME: better recovery
+    return makeParserResult<Stmt>(Condition, nullptr); // FIXME: better recovery
 
   if (auto *CE = dyn_cast<PipeClosureExpr>(Condition.get())) {
     // If we parsed a closure after 'do ... while', then it was not the
@@ -529,7 +529,8 @@ NullablePtr<Stmt> Parser::parseStmtDoWhile() {
     backtrackToPosition(ConditionStartState);
   }
 
-  return new (Context) DoWhileStmt(DoLoc, Condition.get(), WhileLoc, Body.get());
+  return makeParserResult(
+      new (Context) DoWhileStmt(DoLoc, Condition.get(), WhileLoc, Body.get()));
 }
 
 NullablePtr<Stmt> Parser::parseStmtFor() {
