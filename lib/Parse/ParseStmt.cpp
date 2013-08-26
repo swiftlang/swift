@@ -830,7 +830,7 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
   SmallVector<CaseStmt*, 8> cases;
   bool parsedDefault = false;
   bool parsedBlockAfterDefault = false;
-  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+  while (Tok.is(tok::kw_case) || Tok.is(tok::kw_default)) {
     // We cannot have additional cases after a default clause. Complain on
     // the first offender.
     if (parsedDefault && !parsedBlockAfterDefault) {
@@ -839,11 +839,11 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
     }
     
     NullablePtr<CaseStmt> c = parseStmtCase();
-    if (c.isNull())
-      return nullptr;
-    cases.push_back(c.get());
-    if (c.get()->isDefault())
-      parsedDefault = true;
+    if (c.isNonNull()) {
+      cases.push_back(c.get());
+      if (c.get()->isDefault())
+        parsedDefault = true;
+    }
   }
   
   if (parseMatchingToken(tok::r_brace, rBraceLoc,
