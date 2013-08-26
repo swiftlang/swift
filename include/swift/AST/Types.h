@@ -2320,9 +2320,9 @@ Type Type::transform(const ASTContext &ctx, const F &fn) const {
   // Transform this type node.
   Type transformed = fn(*this);
 
-  // If the transform returned a null type, propagate the null.
-  if (!transformed)
-    return Type();
+  // If the client changed the type, we're done.
+  if (!transformed || transformed.getPointer() != getPointer())
+    return transformed;
 
   // Recursive into children of this type.
   TypeBase *base = getPointer();
