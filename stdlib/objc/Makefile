@@ -19,7 +19,7 @@ LIBRARYNAME := swiftObjectiveC
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
 SWIFT_SOURCES := ObjectiveC.swift
-SOURCES := ObjectiveC.swift
+SOURCES := ObjectiveC.swift BridgeObjectiveC.mm
 NO_BUILD_ARCHIVE := 1
 
 DIRS := Foundation AppKit
