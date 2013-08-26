@@ -775,17 +775,44 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
 ///    stmt-switch:
 ///      'switch' expr-basic '{' stmt-case* '}'
 NullablePtr<Stmt> Parser::parseStmtSwitch() {
-  SourceLoc switchLoc = consumeToken(tok::kw_switch);
-  ParserResult<Expr> subjectExpr = parseExprBasic(diag::expected_switch_expr);
-  
-  if (subjectExpr.isNull() || subjectExpr.hasCodeCompletion())
-    return nullptr;
-  
-  if (!Tok.is(tok::l_brace)) {
-    diagnose(Tok, diag::expected_lbrace_after_switch);
-    return nullptr;
+  SourceLoc SwitchLoc = consumeToken(tok::kw_switch);
+
+  bool SubjectStartsWithLBrace = Tok.is(tok::l_brace);
+  ParserPosition SubjectStartState;
+  if (SubjectStartsWithLBrace) {
+    // It is unusual for the subject expression to start with a left brace, and
+    // we anticipate the need to do recovery.  Save the parser state so that we
+    // can rewind.
+    SubjectStartState = getParserPosition();
   }
-  
+
+  ParserResult<Expr> SubjectExpr = parseExprBasic(diag::expected_switch_expr);
+  if (SubjectExpr.hasCodeCompletion())
+    return nullptr;
+
+  if (!Tok.is(tok::l_brace)) {
+    if (SubjectStartsWithLBrace)
+      diagnose(SwitchLoc, diag::expected_switch_expr);
+    else
+      diagnose(Tok, diag::expected_lbrace_after_switch);
+
+    if (!SubjectStartsWithLBrace)
+      return nullptr;
+
+    // We are going to reparse what we parsed as subject expr.
+    SubjectExpr = nullptr;
+
+    // Backtrack to the '{' so that we can re-parse the switch body correctly.
+    //
+    // FIXME: Even though we are going to re-parse the body, we have already
+    // emitted errors about 'case' outside of switch, when we were parsing this
+    // as a subject expr.
+    backtrackToPosition(SubjectStartState);
+  }
+
+  if (SubjectExpr.isNull())
+    SubjectExpr = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
+
   SourceLoc lBraceLoc = consumeToken(tok::l_brace);
   SourceLoc rBraceLoc;
   
@@ -823,8 +850,8 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
                          diag::expected_rbrace_switch, lBraceLoc))
     return nullptr;
   
-  return SwitchStmt::create(switchLoc,
-                            subjectExpr.get(),
+  return SwitchStmt::create(SwitchLoc,
+                            SubjectExpr.get(),
                             lBraceLoc,
                             cases,
                             rBraceLoc,
