@@ -30,8 +30,8 @@ using namespace Lowering;
 void Initialization::_anchor() {}
 
 namespace {
-  /// A "null" initialization that indicates that any value being initialized into
-  /// this initialization should be discarded. This represents AnyPatterns
+  /// A "null" initialization that indicates that any value being initialized
+  /// into this initialization should be discarded. This represents AnyPatterns
   /// (that is, 'var (_)') that bind to values without storing them.
   class BlackHoleInitialization : public Initialization {
   public:
@@ -63,10 +63,9 @@ namespace {
   };
 }
 
-ArrayRef<InitializationPtr> Initialization::getSubInitializations(
-                                     SILGenFunction &gen,
-                                     CanType type,
-                                     SmallVectorImpl<InitializationPtr> &buf) {
+ArrayRef<InitializationPtr>
+Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
+                                      SmallVectorImpl<InitializationPtr> &buf) {
   auto tupleTy = cast<TupleType>(type);
   switch (kind) {
   case Kind::Tuple:
@@ -89,8 +88,10 @@ ArrayRef<InitializationPtr> Initialization::getSubInitializations(
                                                         baseAddr, i,
                                                         fieldTy);
                           
-      buf.push_back(InitializationPtr(new TupleElementInitialization(fieldAddr)));
+      buf.push_back(InitializationPtr(new
+                                        TupleElementInitialization(fieldAddr)));
     }
+    finishInitialization(gen);
     return buf;
   }
   case Kind::AddressBinding:
@@ -159,6 +160,11 @@ public:
   void defaultInitialize(SILGenFunction &gen) override {
     for (auto &sub : subInitializations)
       sub->defaultInitialize(gen);
+  }
+
+  void finishInitialization(SILGenFunction &gen) override {
+    for (auto &sub : subInitializations)
+      sub->finishInitialization(gen);
   }
 };
 
@@ -409,7 +415,8 @@ struct ArgumentInitVisitor :
                                    gen, parent).forwardAsSingleValue(gen);
   }
   
-  void storeArgumentInto(Type ty, SILValue arg, SILLocation loc, Initialization *I)
+  void storeArgumentInto(Type ty, SILValue arg, SILLocation loc,
+                         Initialization *I)
   {
     assert(ty && "no type?!");
     if (!I) return;
@@ -489,7 +496,8 @@ struct ArgumentInitVisitor :
     // Destructure the initialization into per-element Initializations.
     SmallVector<InitializationPtr, 2> buf;
     ArrayRef<InitializationPtr> subInits =
-      I->getSubInitializations(gen, P->getType()->getCanonicalType(), buf);
+      I->getSubInitializationsForTuple(gen, P->getType()->getCanonicalType(),
+                                       buf);
 
     assert(P->getFields().size() == subInits.size() &&
            "TupleInitialization size does not match tuple pattern size!");

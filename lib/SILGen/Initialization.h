@@ -99,10 +99,9 @@ public:
   ///
   /// \param buf - If new Initializations need to be created, their ownership
   /// is given to this vector.
-  ArrayRef<InitializationPtr> getSubInitializations(
-                                      SILGenFunction &gen,
-                                      CanType type,
-                                      SmallVectorImpl<InitializationPtr> &buf);
+  ArrayRef<InitializationPtr>
+  getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
+                                SmallVectorImpl<InitializationPtr> &buf);
   
   /// Perform post-initialization bookkeeping for this initialization.
   virtual void finishInitialization(SILGenFunction &gen) {}

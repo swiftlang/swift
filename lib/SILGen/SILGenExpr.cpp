@@ -565,7 +565,6 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
     // Initialize the concrete value in-place.
     InitializationPtr init(new ExistentialValueInitialization(valueAddr));
     gen.emitExprInto(E->getSubExpr(), init.get());
-    init->finishInitialization(gen);
   }
   
   return RValue(gen, gen.emitManagedRValueWithCleanup(existential));
@@ -740,13 +739,12 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
   if (Initialization *I = C.getEmitInto()) {
     SmallVector<InitializationPtr, 4> subInitializationBuf;
     auto subInitializations =
-      I->getSubInitializations(SGF, type, subInitializationBuf);
+      I->getSubInitializationsForTuple(SGF, type, subInitializationBuf);
     assert(subInitializations.size() == E->getElements().size() &&
            "initialization for tuple has wrong number of elements");
     for (unsigned i = 0, size = subInitializations.size(); i < size; ++i) {
       SGF.emitExprInto(E->getElements()[i], subInitializations[i].get());
     }
-    I->finishInitialization(SGF);
     return RValue();
   }
   
@@ -1018,17 +1016,17 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
 
   // Decompose the initialization.
   SmallVector<InitializationPtr, 4> subInitializationBuf;
-  auto subInitializations = I->getSubInitializations(gen, tupleType,
-                                                     subInitializationBuf);
+  auto subInitializations = I->getSubInitializationsForTuple(gen, tupleType,
+                                                          subInitializationBuf);
   assert(subInitializations.size() == outerFields.size() &&
          "initialization size does not match tuple size?!");
   
   // If the scalar field isn't variadic, emit it into the destination field of
   // the tuple.
   Initialization *scalarInit = subInitializations[E->getScalarField()].get();
-  if (!isScalarFieldVariadic)
+  if (!isScalarFieldVariadic) {
     gen.emitExprInto(E->getSubExpr(), scalarInit);
-  else {
+  } else {
     // Otherwise, create the vararg and store it to the vararg field.
     ManagedValue scalar = gen.emitRValue(E->getSubExpr()).getAsSingleValue(gen);
     ManagedValue varargs = emitVarargs(gen, E, E->getSubExpr()->getType(),
@@ -1068,6 +1066,7 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
                                                                   generatorTy));
       apply.forwardInto(gen, E,
                         subInitializations[i].get()->getAddressOrNull());
+      subInitializations[i]->finishInitialization(gen);
       continue;
     }
 
@@ -1075,9 +1074,6 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
     Expr *defArg = element.get<Expr *>();
     gen.emitExprInto(defArg, subInitializations[i].get());
   }
-  
-  // Finish the aggregate initialization.
-  I->finishInitialization(gen);
 }
 
 RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
