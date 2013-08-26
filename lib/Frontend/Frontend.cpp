@@ -124,6 +124,7 @@ void swift::CompilerInstance::doIt() {
   Context->LoadedModules[ID.str()] = TU;
 
   TU->HasBuiltinModuleAccess = Invocation.getParseStdlib();
+  TU->setLinkLibraries(Invocation.getLinkLibraries());
 
   // If we're in SIL mode, don't auto import any libraries.
   // Also don't perform auto import if we are not going to do semantic

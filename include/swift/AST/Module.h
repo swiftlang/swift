@@ -279,12 +279,14 @@ public:
 /// external references in a translation unit, which is one file.
 class TranslationUnit : public Module {
 private:
-
   /// This is the list of modules that are imported by this module, with the
   /// second element of the pair declaring whether the module is reexported.
   ///
   /// This is filled in by the Name Binding phase.
   ArrayRef<std::pair<ImportedModule, bool>> Imports;
+
+  /// The list of libraries specified as link-time dependencies at compile time.
+  ArrayRef<LinkLibrary> LinkLibraries;
 
 public:
   /// Kind - This is the sort of file the translation unit was parsed for, which
@@ -328,6 +330,14 @@ public:
   }
   void setImports(ArrayRef<std::pair<ImportedModule, bool>> IM) {
     Imports = IM;
+  }
+
+  void setLinkLibraries(ArrayRef<LinkLibrary> libs) {
+    assert(LinkLibraries.empty() && "link libraries already set");
+    LinkLibraries = libs;
+  }
+  ArrayRef<LinkLibrary> getLinkLibraries() const {
+    return LinkLibraries;
   }
 
   void clearLookupCache();

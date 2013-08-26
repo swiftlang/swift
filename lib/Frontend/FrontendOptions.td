@@ -20,6 +20,9 @@ def parse_as_library : Flag<["-"], "parse-as-library">,
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
   HelpText<"Parse the input as the swift standard library">;
 
+def link_library : Joined<["-"], "l">,
+  HelpText<"Link the given library into the output product">;
+
 // LangOptions
 def debug_constraints : Flag<["-"], "debug-constraints">,
   HelpText<"Debug the constraint-based type checker">;

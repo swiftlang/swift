@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -535,8 +536,9 @@ void Module::collectLinkLibraries(LinkLibraryCallback callback) {
       return true;
     }
     
-    if (isa<TranslationUnit>(module)) {
-      // FIXME: Should we include libraries specified by the user here?
+    if (auto TU = dyn_cast<TranslationUnit>(module)) {
+      for (auto lib : TU->getLinkLibraries())
+        callback(lib);
       return true;
     }
     

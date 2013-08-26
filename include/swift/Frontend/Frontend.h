@@ -22,6 +22,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
@@ -44,6 +45,7 @@ class CompilerInvocation {
   std::string ClangModuleCachePath;
   std::vector<std::string> ImportSearchPaths;
   std::vector<std::string> FrameworkSearchPaths;
+  SmallVector<LinkLibrary, 4> LinkLibraries;
   std::string RuntimeIncludePath;
   std::string SDKPath;
 
@@ -105,6 +107,14 @@ public:
 
   std::vector<std::string> getFrameworkSearchPaths() const {
     return FrameworkSearchPaths;
+  }
+
+  void addLinkLibrary(StringRef name, LibraryKind kind) {
+    LinkLibraries.push_back({name, kind});
+  }
+
+  ArrayRef<LinkLibrary> getLinkLibraries() const {
+    return LinkLibraries;
   }
 
   void setMainExecutablePath(StringRef Path);
