@@ -567,8 +567,9 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
       if (CA->isInitializationOfDest()) return;
     } else if (auto SW = dyn_cast<StoreWeakInst>(Inst)) {
       if (SW->isInitializationOfDest()) return;
-    } else if (isa<InitExistentialInst>(Inst)) {
-      // init_existential *on a box* is only formed by direct initialization
+    } else if (isa<InitExistentialInst>(Inst) ||
+               isa<UpcastExistentialInst>(Inst)) {
+      // These instructions *on a box* are only formed by direct initialization
       // like "var x : Proto = foo".
       return;
     } else {
@@ -961,6 +962,16 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       // full definitions) and recursively process the uses.
       llvm::SaveAndRestore<bool> X(InStructSubElement, true);
       collectUses(SILValue(IE, 0), BaseElt);
+      continue;
+    }
+
+    // upcast_existential is modeled as a load or store depending on which
+    // operand we're looking at.
+    if (isa<UpcastExistentialInst>(User)) {
+      if (UI->getOperandNumber() == 1)
+        Uses[BaseElt].push_back({ User, UseKind::Store });
+      else
+        Uses[BaseElt].push_back({ User, UseKind::Load });
       continue;
     }
 
