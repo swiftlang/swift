@@ -835,6 +835,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("dealloc_stack", ValueKind::DeallocStackInst)
     .Case("deinit_existential", ValueKind::DeinitExistentialInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
+    .Case("destructive_switch_union_addr",
+          ValueKind::DestructiveSwitchUnionAddrInst)
     .Case("downcast", ValueKind::DowncastInst)
     .Case("downcast_archetype_addr", ValueKind::DowncastArchetypeAddrInst)
     .Case("downcast_archetype_ref", ValueKind::DowncastArchetypeRefInst)
@@ -846,6 +848,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("init_existential", ValueKind::InitExistentialInst)
     .Case("init_existential_ref", ValueKind::InitExistentialRefInst)
     .Case("initialize_var", ValueKind::InitializeVarInst)
+    .Case("inject_union_addr", ValueKind::InjectUnionAddrInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("is_nonnull", ValueKind::IsNonnullInst)
     .Case("function_ref", ValueKind::FunctionRefInst)
@@ -888,6 +891,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("tuple_element_addr", ValueKind::TupleElementAddrInst)
     .Case("tuple_extract", ValueKind::TupleExtractInst)
     .Case("union", ValueKind::UnionInst)
+    .Case("union_data_addr", ValueKind::UnionDataAddrInst)
     .Case("unreachable", ValueKind::UnreachableInst)
     .Case("upcast", ValueKind::UpcastInst)
     .Case("upcast_existential", ValueKind::UpcastExistentialInst)
@@ -1511,6 +1515,34 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                               cast<UnionElementDecl>(Elt.getDecl()), Ty);
     break;
   }
+  case ValueKind::UnionDataAddrInst: {
+    SILValue Operand;
+    SILDeclRef EltRef;
+    if (parseTypedValueRef(Operand) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILDeclRef(EltRef))
+      return true;
+    
+    UnionElementDecl *Elt = cast<UnionElementDecl>(EltRef.getDecl());
+    
+    // FIXME: substitution means this needs to be explicit.
+    auto ResultTy = Elt->getArgumentType()->getCanonicalType();
+    ResultVal = B.createUnionDataAddr(InstLoc, Operand, Elt,
+                                    SILType::getPrimitiveAddressType(ResultTy));
+    break;
+  }
+  case ValueKind::InjectUnionAddrInst: {
+    SILValue Operand;
+    SILDeclRef EltRef;
+    if (parseTypedValueRef(Operand) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILDeclRef(EltRef))
+      return true;
+    
+    UnionElementDecl *Elt = cast<UnionElementDecl>(EltRef.getDecl());
+    ResultVal = B.createInjectUnionAddr(InstLoc, Operand, Elt);
+    break;
+  }
   case ValueKind::TupleElementAddrInst:
   case ValueKind::TupleExtractInst: {
     Identifier ElemId;
@@ -1817,7 +1849,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createGlobalAddr(InstLoc, cast<VarDecl>(VD), Ty);
     break;
   }
-  case ValueKind::SwitchUnionInst: {
+  case ValueKind::SwitchUnionInst:
+  case ValueKind::DestructiveSwitchUnionAddrInst: {
     if (parseTypedValueRef(Val))
       return true;
 
@@ -1849,7 +1882,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "case or default");
       return true;
     }
-    ResultVal = B.createSwitchUnion(InstLoc, Val, DefaultBB, CaseBBs);
+    if (Opcode == ValueKind::SwitchUnionInst)
+      ResultVal = B.createSwitchUnion(InstLoc, Val, DefaultBB, CaseBBs);
+    else
+      ResultVal = B.createDestructiveSwitchUnionAddr(
+                                             InstLoc, Val, DefaultBB, CaseBBs);
     break;
   }
   case ValueKind::SwitchIntInst: {

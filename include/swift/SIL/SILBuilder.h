@@ -416,6 +416,18 @@ public:
     return insert(new (F.getModule()) UnionInst(Loc, Operand, Element, Ty));
   }
   
+  UnionDataAddrInst *createUnionDataAddr(SILLocation Loc, SILValue Operand,
+                                         UnionElementDecl *Element, SILType Ty){
+    return insert(
+              new (F.getModule()) UnionDataAddrInst(Loc, Operand, Element, Ty));
+  }
+  
+  InjectUnionAddrInst *createInjectUnionAddr(SILLocation Loc, SILValue Operand,
+                                             UnionElementDecl *Element) {
+    return insert(new (F.getModule())
+                    InjectUnionAddrInst(Loc, Operand, Element));
+  }
+  
   static SILType getTupleElementType(SILType Ty, unsigned EltNo);
   static SILType getStructFieldType(VarDecl *Field);
 
@@ -731,7 +743,16 @@ public:
     return insertTerminator(SwitchUnionInst::create(Loc, Operand, DefaultBB,
                                                     CaseBBs, F));
   }
-         
+
+  DestructiveSwitchUnionAddrInst *
+  createDestructiveSwitchUnionAddr(SILLocation Loc, SILValue Operand,
+         SILBasicBlock *DefaultBB,
+         ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs) {
+    return insertTerminator(
+              DestructiveSwitchUnionAddrInst::create(Loc, Operand, DefaultBB,
+                                                     CaseBBs, F));
+  }
+
   //===--------------------------------------------------------------------===//
   // Memory management helpers
   //===--------------------------------------------------------------------===//

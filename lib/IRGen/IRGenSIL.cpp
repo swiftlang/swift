@@ -516,6 +516,8 @@ public:
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
   void visitUnionInst(UnionInst *i);
+  void visitUnionDataAddrInst(UnionDataAddrInst *i);
+  void visitInjectUnionAddrInst(InjectUnionAddrInst *i);
   void visitBuiltinZeroInst(BuiltinZeroInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitClassMetatypeInst(ClassMetatypeInst *i);
@@ -590,6 +592,7 @@ public:
   void visitAutoreleaseReturnInst(AutoreleaseReturnInst *i);
   void visitSwitchIntInst(SwitchIntInst *i);
   void visitSwitchUnionInst(SwitchUnionInst *i);
+  void visitDestructiveSwitchUnionAddrInst(DestructiveSwitchUnionAddrInst *i);
 };
 
 }
@@ -1663,6 +1666,12 @@ void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *inst) {
   }
 }
 
+void
+IRGenSILFunction::visitDestructiveSwitchUnionAddrInst(
+                                            DestructiveSwitchUnionAddrInst *i) {
+  llvm_unreachable("unimplemented");
+}
+
 void IRGenSILFunction::visitBranchInst(swift::BranchInst *i) {
   LoweredBB &lbb = getLoweredBB(i->getDestBB());
   addIncomingSILArgumentsToPHINodes(*this, lbb, i->getArgs());
@@ -1705,6 +1714,14 @@ void IRGenSILFunction::visitUnionInst(swift::UnionInst *i) {
   Explosion out(ExplosionKind::Maximal);
   emitInjectLoadableUnion(*this, i->getType(), i->getElement(), data, out);
   setLoweredExplosion(SILValue(i, 0), out);
+}
+
+void IRGenSILFunction::visitUnionDataAddrInst(swift::UnionDataAddrInst *i) {
+  llvm_unreachable("unimplemented");
+}
+
+void IRGenSILFunction::visitInjectUnionAddrInst(swift::InjectUnionAddrInst *i) {
+  llvm_unreachable("unimplemented");
 }
 
 void IRGenSILFunction::visitBuiltinZeroInst(swift::BuiltinZeroInst *i) {

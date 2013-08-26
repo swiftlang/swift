@@ -366,6 +366,31 @@ bb0(%0 : $Int):
   return %1 : $Beth
 }
 
+protocol Q {}
+
+union Gimel {
+  case EmptyCase
+  case DataCase(Q)
+}
+
+sil @test_union_addr_empty_case : $() -> Gimel {
+bb0(%0 : $*Gimel):
+  // CHECK: inject_union_addr {{%.*}} : $*Gimel, #Gimel.EmptyCase!unionelt
+  inject_union_addr %0 : $*Gimel, #Gimel.EmptyCase!unionelt
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @test_union_addr_data_case : $(Q) -> Gimel {
+bb0(%0 : $*Gimel, %1 : $*Q):
+  // CHECK: {{%.*}} = union_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!unionelt.1
+  %p = union_data_addr %0 : $*Gimel, #Gimel.DataCase!unionelt.1
+  copy_addr [take] %1 to [initialization] %p : $*Q
+  inject_union_addr %0 : $*Gimel, #Gimel.DataCase!unionelt.1
+  %t = tuple ()
+  return %t : $()
+}
+
 sil @_T5tuple5floatFT1xSf_T_ : $[thin] (x : Float32) -> ()
 sil @_T5tuple5tupleFT_TSiSf_ : $[thin] () -> (Int64, Float32)
 
@@ -824,6 +849,28 @@ bb5:
   release %1#0 : $Builtin.ObjectPointer                   // CHECK: release
   %18 = tuple ()
   return %18 : $()                                        // CHECK: return
+}
+
+union MaybeAddressOnlyPair {
+  case Neither
+  case Left(Q)
+}
+
+// CHECK-LABEL: sil @test_switch_union_addr : $[thin] (u : MaybeAddressOnlyPair) -> ()
+sil @test_switch_union_addr : $[thin] (u : MaybeAddressOnlyPair) -> () {
+bb0(%0 : $*MaybeAddressOnlyPair):
+  // CHECK: destructive_switch_union_addr %{{.*}} : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!unionelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!unionelt.1: bb
+  destructive_switch_union_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!unionelt: bb1, case #MaybeAddressOnlyPair.Left!unionelt.1: bb2
+
+bb1:
+  br bb3
+
+bb2(%q : $*Q):
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
 }
 
 // CHECK-LABEL: sil @test_switch_int : $[thin] (u : Builtin.Int64) -> ()

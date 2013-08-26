@@ -1177,6 +1177,37 @@ public:
     return V->getKind() == ValueKind::UnionInst;
   }
 };
+  
+/// UnionDataAddrInst - Projects the address of the data for a case inside the
+/// union.
+class UnionDataAddrInst
+  : public UnaryInstructionBase<ValueKind::UnionDataAddrInst>
+{
+  UnionElementDecl *Element;
+public:
+  UnionDataAddrInst(SILLocation Loc, SILValue Operand,
+                    UnionElementDecl *Element, SILType ResultTy)
+    : UnaryInstructionBase(Loc, Operand, ResultTy),
+      Element(Element) {}
+  
+  UnionElementDecl *getElement() const { return Element; }
+};
+  
+/// InjectUnionAddrInst - Tags a union as containing a case. The data for
+/// that case, if any, must have been written into the union first.
+class InjectUnionAddrInst
+  : public UnaryInstructionBase<ValueKind::InjectUnionAddrInst,
+                                SILInstruction,
+                                /*HAS_RESULT*/ false>
+{
+  UnionElementDecl *Element;
+public:
+  InjectUnionAddrInst(SILLocation Loc, SILValue Operand,
+                      UnionElementDecl *Element)
+    : UnaryInstructionBase(Loc, Operand), Element(Element) {}
+  
+  UnionElementDecl *getElement() const { return Element; }
+};
 
 /// BuiltinZeroInst - Represents the zero value of a builtin integer,
 /// floating-point, or pointer type.
@@ -2019,17 +2050,13 @@ public:
     return V->getKind() == ValueKind::SwitchIntInst;
   }
 };
-  
-/// A switch on a union discriminator. The data for each discriminator is passed
-/// into the corresponding destination block as block arguments.
-class SwitchUnionInst : public TermInst {
+
+/// Common implementation for the switch_union and
+/// destructive_switch_union_addr instructions.
+class SwitchUnionInstBase : public TermInst {
   FixedOperandList<1> Operands;
   unsigned NumCases : 31;
   unsigned HasDefault : 1;
-  
-  SwitchUnionInst(SILLocation Loc, SILValue Operand,
-                SILBasicBlock *DefaultBB,
-                ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs);
   
   // Tail-allocated after the SwitchUnionInst record are:
   // - an array of `NumCases` UnionElementDecl* pointers, referencing the case
@@ -2053,15 +2080,22 @@ class SwitchUnionInst : public TermInst {
   const SILSuccessor *getSuccessorBuf() const {
     return reinterpret_cast<const SILSuccessor*>(getCaseBuf() + NumCases);
   }
+
+protected:
+  SwitchUnionInstBase(ValueKind Kind, SILLocation Loc, SILValue Operand,
+                SILBasicBlock *DefaultBB,
+                ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs);
+
+  template<typename SWITCH_UNION_INST>
+  static SWITCH_UNION_INST *
+  createSwitchUnion(SILLocation Loc, SILValue Operand,
+                SILBasicBlock *DefaultBB,
+                ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
+                SILFunction &F);
   
 public:
   /// Clean up tail-allocated successor records for the switch cases.
-  ~SwitchUnionInst();
-  
-  static SwitchUnionInst *create(SILLocation Loc, SILValue Operand,
-                 SILBasicBlock *DefaultBB,
-                 ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
-                 SILFunction &F);
+  ~SwitchUnionInstBase();
   
   SILValue getOperand() const { return Operands[0].get(); }
   
@@ -2084,12 +2118,58 @@ public:
     assert(HasDefault && "doesn't have a default");
     return getSuccessorBuf()[NumCases];
   }
+};
   
+/// A switch on a loadable union's discriminator. The data for each case is
+/// passed into the corresponding destination block as an argument.
+class SwitchUnionInst : public SwitchUnionInstBase {
+private:
+  friend class SwitchUnionInstBase;
+  
+  SwitchUnionInst(SILLocation Loc, SILValue Operand,
+              SILBasicBlock *DefaultBB,
+              ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs)
+    : SwitchUnionInstBase(ValueKind::SwitchUnionInst, Loc, Operand, DefaultBB,
+                          CaseBBs)
+    {}
+  
+public:
+  static SwitchUnionInst *create(SILLocation Loc, SILValue Operand,
+               SILBasicBlock *DefaultBB,
+               ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
+               SILFunction &F);
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::SwitchUnionInst;
   }
 };
+
+/// A switch on an address-only union's discriminator. If a case is matched, the
+/// tag is invalidated and the address of the data for the case is passed as
+/// an argument to the destination block.
+class DestructiveSwitchUnionAddrInst : public SwitchUnionInstBase {
+private:
+  friend class SwitchUnionInstBase;
+
+  DestructiveSwitchUnionAddrInst(SILLocation Loc, SILValue Operand,
+              SILBasicBlock *DefaultBB,
+              ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs)
+    : SwitchUnionInstBase(ValueKind::DestructiveSwitchUnionAddrInst,
+                          Loc, Operand, DefaultBB, CaseBBs)
+    {}
   
+public:
+  static DestructiveSwitchUnionAddrInst *create(
+               SILLocation Loc, SILValue Operand,
+               SILBasicBlock *DefaultBB,
+               ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
+               SILFunction &F);
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::DestructiveSwitchUnionAddrInst;
+  }
+};
+
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//

@@ -130,8 +130,12 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(StructInst, SILInstruction, None)
   INST(StructExtractInst, SILInstruction, None)
   INST(StructElementAddrInst, SILInstruction, None)
-  INST(UnionInst, SILInstruction, None)
   INST(RefElementAddrInst, SILInstruction, None)
+
+  // Unions
+  INST(UnionInst, SILInstruction, None)
+  INST(UnionDataAddrInst, SILInstruction, None)
+  INST(InjectUnionAddrInst, SILInstruction, MayWrite)
 
   // Protocol and Protocol Composition Types
   INST(InitExistentialInst, SILInstruction, MayWrite)
@@ -182,7 +186,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     TERMINATOR(CondBranchInst, TermInst, None)
     TERMINATOR(SwitchIntInst, TermInst, None)
     TERMINATOR(SwitchUnionInst, TermInst, None)
-    VALUE_RANGE(TermInst, UnreachableInst, SwitchUnionInst)
+    TERMINATOR(DestructiveSwitchUnionAddrInst, TermInst, MayWrite)
+    VALUE_RANGE(TermInst, UnreachableInst, DestructiveSwitchUnionAddrInst)
 
   VALUE_RANGE(SILInstruction, AllocStackInst, SwitchUnionInst)
 

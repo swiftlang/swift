@@ -1828,6 +1828,40 @@ Given an instance of a class, derives the address of a physical instance
 variable inside the instance. It is undefined behavior if the class value
 is null.
 
+Unions
+~~~~~~
+
+These instructions construct values of union type. Loadable union values are
+created with the ``union`` instruction. Address-only unions require two-step
+initialization: first, if the case requires data, that data is stored into
+the union at the address projected by ``union_data_addr``, then the tag for
+the union is overlaid with an ``inject_union_addr`` instruction::
+
+  union AddressOnlyUnion {
+    case HasData(AddressOnlyType)
+    case NoData
+  }
+
+  sil @init_with_data : $(AddressOnlyType) -> AddressOnlyUnion {
+  entry(%0 : $*AddressOnlyUnion, %1 : $*AddressOnlyType):
+    // Store the data argument for the case.
+    %2 = union_data_addr %0 : $*AddressOnlyUnion, #AddressOnlyUnion.HasData
+    copy_addr [take] %2 to [initialization] %1 : $*AddressOnlyType
+    // Inject the tag.
+    inject_union_addr %0 : $*AddressOnlyUnion, #AddressOnlyUnion.HasData
+    return
+  }
+
+  sil @init_without_data : $() -> AddressOnlyUnion {
+    // No data. We only need to inject the tag.
+    inject_union_addr %0 : $*AddressOnlyUnion, #AddressOnlyUnion.NoData
+    return
+  }
+
+Accessing the value of a union is tied to dispatching on its discriminator,
+which is done with the ``switch_union`` and
+``destructive_switch_union_addr`` `terminators`_.
+
 union
 `````
 ::
@@ -1837,13 +1871,52 @@ union
   %1 = union $U, #U.EmptyCase
   %1 = union $U, #U.DataCase, %0 : $T
   // $U must be a union type
-  // #U.Case must be a case of union $U
+  // #U.DataCase or #U.EmptyCase must be a case of union $U
   // If #U.Case has a data type $T, %0 must be a value of type $T
   // If #U.Case has no data type, the operand must be omitted
   // %1 will be of type $U
 
 Creates a loadable union value in the given ``case``. If the ``case`` has a
 data type, the union value will contain the operand value.
+
+union_data_addr
+```````````````
+::
+
+  sil-instruction ::= 'union_data_addr' sil-operand ',' sil-decl-ref
+
+  %1 = union_data_addr %0 : $*U, #U.DataCase
+  // $U must be a union type
+  // #U.DataCase must be a case of union $U with data
+  // %1 will be of address type $*T for the data type of case U.DataCase
+
+Projects the address of the data for a union ``case`` inside a union. This
+does not modify the union or check its value. It is intended to be used as
+part of the initialization sequence for an address-only union. Storing to
+the ``union_data_addr`` for a case followed by ``inject_union_addr`` with that
+same case is guaranteed to result in a fully-initialized union value of that
+case being stored. Loading from the ``union_data_addr`` of an initialized
+union value or injecting a mismatched case tag is undefined behavior.
+
+inject_union_addr
+`````````````````
+::
+
+  sil-instruction ::= 'inject_union_addr' sil-operand ',' sil-decl-ref
+
+  inject_union_addr %0 : $*U, #U.Case
+  // $U must be a union type
+  // #U.Case must be a case of union $U
+  // %0 will be overlaid with the tag for #U.Case
+
+Initializes the union value referenced by the given address by overlaying the
+tag for the given case. If the case has no data, this instruction is sufficient
+to initialize the union value. If the case has data, the data must be stored
+into the union at the ``union_data_addr`` address for the case *before*
+``inject_union_addr`` is applied. It is undefined behavior if
+``inject_union_addr`` is applied for a case with data to an uninitialized union,
+or if ``inject_union_addr`` is applied for a case with data when data for a
+mismatched case has been stored to the union.
 
 Protocol and Protocol Composition Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2520,17 +2593,18 @@ switch_union
   //   of the type of #U.Foo's data
   // label2 must take either no basic block arguments, or a single argument
   //   of the type of #U.Bar's data, etc.
+  // labelN must take no basic block arguments
 
 Conditionally branches to one of several destination basic blocks based on the
-discriminator in a ``union`` value. Unlike ``switch_int``, ``switch_union``
-requires coverage of the operand type: If the ``union`` type is resilient, the
-``default`` branch is required; if the ``union`` type is fragile, the
-``default`` branch is required unless a destination is assigned to every
-``case`` of the ``union``. The destination basic block for a ``case`` may take
-an argument of the corresponding ``union`` ``case``'s data type (or of the
+discriminator in a loadable ``union`` value. Unlike ``switch_int``,
+``switch_union`` requires coverage of the operand type: If the ``union`` type
+is resilient, the ``default`` branch is required; if the ``union`` type is
+fragile, the ``default`` branch is required unless a destination is assigned to
+every ``case`` of the ``union``. The destination basic block for a ``case`` may
+take an argument of the corresponding ``union`` ``case``'s data type (or of the
 address type, if the operand is an address). If the branch is taken, the
-argument will be bound to the associated data inside the
-original union value. For example::
+destination's argument will be bound to the associated data inside the
+original union value.  For example::
 
   union Foo {
     case Nothing
@@ -2560,3 +2634,37 @@ original union value. For example::
     return %result : $Int
   }
 
+destructive_switch_union_addr
+`````````````````````````````
+::
+
+  sil-terminator ::= 'destructive_switch_union_addr' sil-operand
+                       (',' sil-switch-union-case)*
+                       (',' sil-switch-default)?
+
+  destructive_switch_union_addr %0 : $*U, case #U.Foo: label1, \
+                                          case #U.Bar: label2, \
+                                          ...,                 \
+                                          default labelN
+
+  // %0 must be the address of a union type $*U
+  // #U.Foo, #U.Bar, etc. must be cases of $U
+  // `label1` through `labelN` must refer to block labels within the current
+  //   function
+  // label1 must take a single argument of the address type of #U.Foo's data
+  // label2 must take a single argument of the address type of #U.Bar's data
+  // labelN must take no basic block arguments
+
+Conditionally branches to one of several destination basic blocks based on
+the discriminator in the union value referenced by the address operand.
+If a case is matched by the switch, the union value is destructured in-place,
+invalidating the union value, and the address of the data for the matched case
+is passed to the destination basic block as an argument. Destroying the
+data is guaranteed equivalent to destroying the original value.
+Destroying the original union after it has been successfully matched by a case
+is undefined behavior.  In the default case, the union is left unmodified.
+
+Unlike ``switch_int``, ``switch_union`` requires coverage of the operand type:
+If the ``union`` type is resilient, the ``default`` branch is required; if the
+``union`` type is fragile, the ``default`` branch is required unless a
+destination is assigned to every ``case`` of the ``union``.

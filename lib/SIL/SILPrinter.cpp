@@ -670,6 +670,18 @@ public:
     }
   }
   
+  void visitUnionDataAddrInst(UnionDataAddrInst *UDAI) {
+    OS << "union_data_addr "
+       << getIDAndType(UDAI->getOperand()) << ", "
+       << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::UnionElement);
+  }
+  
+  void visitInjectUnionAddrInst(InjectUnionAddrInst *IUAI) {
+    OS << "inject_union_addr "
+       << getIDAndType(IUAI->getOperand()) << ", "
+       << SILDeclRef(IUAI->getElement(), SILDeclRef::Kind::UnionElement);
+  }
+  
   void visitTupleExtractInst(TupleExtractInst *EI) {
     OS << "tuple_extract " << getIDAndType(EI->getOperand()) << ", "
        << EI->getFieldNo();
@@ -837,17 +849,26 @@ public:
       OS << ", default " << getID(SII->getDefaultBB());
   }
   
-  void visitSwitchUnionInst(SwitchUnionInst *SOI) {
-    OS << "switch_union " << getIDAndType(SOI->getOperand());
+  void printSwitchUnionInst(SwitchUnionInstBase *SOI) {
+    OS << getIDAndType(SOI->getOperand());
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
       UnionElementDecl *elt;
       SILBasicBlock *dest;
       std::tie(elt, dest) = SOI->getCase(i);
       OS << ", case " << SILDeclRef(elt, SILDeclRef::Kind::UnionElement)
-         << ": " << getID(dest);
+      << ": " << getID(dest);
     }
     if (SOI->hasDefault())
       OS << ", default " << getID(SOI->getDefaultBB());
+  }
+  
+  void visitSwitchUnionInst(SwitchUnionInst *SOI) {
+    OS << "switch_union ";
+    printSwitchUnionInst(SOI);
+  }
+  void visitDestructiveSwitchUnionAddrInst(DestructiveSwitchUnionAddrInst *SOI){
+    OS << "destructive_switch_union_addr ";
+    printSwitchUnionInst(SOI);
   }
 
   void printBranchArgs(OperandValueArrayRef args) {

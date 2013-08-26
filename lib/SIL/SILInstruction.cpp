@@ -673,10 +673,12 @@ SwitchIntInst *SwitchIntInst::create(SILLocation Loc, SILValue Operand,
   return ::new (buf) SwitchIntInst(Loc, Operand, DefaultBB, CaseBBs);
 }
 
-SwitchUnionInst::SwitchUnionInst(SILLocation Loc, SILValue Operand,
+SwitchUnionInstBase::SwitchUnionInstBase(
+                ValueKind Kind,
+                SILLocation Loc, SILValue Operand,
                 SILBasicBlock *DefaultBB,
                 ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs)
-  : TermInst(ValueKind::SwitchUnionInst, Loc),
+  : TermInst(Kind, Loc),
     Operands(this, Operand),
     NumCases(CaseBBs.size()),
     HasDefault(bool(DefaultBB))
@@ -693,7 +695,7 @@ SwitchUnionInst::SwitchUnionInst(SILLocation Loc, SILValue Operand,
     ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
 }
 
-SwitchUnionInst::~SwitchUnionInst() {
+SwitchUnionInstBase::~SwitchUnionInstBase() {
   // Destroy the successor records to keep the CFG up to date.
   auto *succs = getSuccessorBuf();
   for (unsigned i = 0, end = NumCases + HasDefault; i < end; ++i) {
@@ -701,19 +703,38 @@ SwitchUnionInst::~SwitchUnionInst() {
   }
 }
 
-SwitchUnionInst *SwitchUnionInst::create(SILLocation Loc, SILValue Operand,
-                SILBasicBlock *DefaultBB,
-                ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
-                SILFunction &F) {
+template<typename SWITCH_UNION_INST>
+SWITCH_UNION_INST *
+SwitchUnionInstBase::createSwitchUnion(SILLocation Loc, SILValue Operand,
+                 SILBasicBlock *DefaultBB,
+                 ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
+                 SILFunction &F) {
   // Allocate enough room for the instruction with tail-allocated
   // UnionElementDecl and SILSuccessor arrays. There are `CaseBBs.size()` decls
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
   unsigned numCases = CaseBBs.size();
   unsigned numSuccessors = numCases + (DefaultBB ? 1 : 0);
   
-  void *buf = F.getModule().allocate(sizeof(SwitchUnionInst)
+  void *buf = F.getModule().allocate(sizeof(SWITCH_UNION_INST)
                                        + sizeof(UnionElementDecl*) * numCases
                                        + sizeof(SILSuccessor) * numSuccessors,
-                                     alignof(SwitchUnionInst));
-  return ::new (buf) SwitchUnionInst(Loc, Operand, DefaultBB, CaseBBs);
+                                     alignof(SWITCH_UNION_INST));
+  return ::new (buf) SWITCH_UNION_INST(Loc, Operand, DefaultBB, CaseBBs);
+}
+
+SwitchUnionInst *SwitchUnionInst::create(SILLocation Loc, SILValue Operand,
+                SILBasicBlock *DefaultBB,
+                ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
+                SILFunction &F) {
+  return
+    createSwitchUnion<SwitchUnionInst>(Loc, Operand, DefaultBB, CaseBBs, F);
+}
+
+DestructiveSwitchUnionAddrInst *
+DestructiveSwitchUnionAddrInst::create(SILLocation Loc, SILValue Operand,
+               SILBasicBlock *DefaultBB,
+               ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
+               SILFunction &F) {
+  return createSwitchUnion<DestructiveSwitchUnionAddrInst>
+    (Loc, Operand, DefaultBB, CaseBBs, F);
 }

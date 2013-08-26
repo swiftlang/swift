@@ -527,6 +527,25 @@ SILCloner<ImplClass>::visitUnionInst(UnionInst* Inst) {
   
 template<typename ImplClass>
 SILValue
+SILCloner<ImplClass>::visitUnionDataAddrInst(UnionDataAddrInst* Inst) {
+  return doPostProcess(Inst,
+    Builder.createUnionDataAddr(getOpLocation(Inst->getLoc()),
+                                getOpValue(Inst->getOperand()),
+                                Inst->getElement(),
+                                getOpType(Inst->getType())));
+}
+  
+template<typename ImplClass>
+SILValue
+SILCloner<ImplClass>::visitInjectUnionAddrInst(InjectUnionAddrInst* Inst) {
+  return doPostProcess(Inst,
+    Builder.createInjectUnionAddr(getOpLocation(Inst->getLoc()),
+                                  getOpValue(Inst->getOperand()),
+                                  Inst->getElement()));
+}
+  
+template<typename ImplClass>
+SILValue
 SILCloner<ImplClass>::visitBuiltinZeroInst(BuiltinZeroInst* Inst) {
   return doPostProcess(Inst,
     Builder.createBuiltinZero(getOpLocation(Inst->getLoc()),
@@ -909,6 +928,23 @@ SILCloner<ImplClass>::visitSwitchUnionInst(SwitchUnionInst* Inst) {
                             DefaultBB, CaseBBs));
 }
 
+template<typename ImplClass>
+SILValue
+SILCloner<ImplClass>::visitDestructiveSwitchUnionAddrInst(
+                                        DestructiveSwitchUnionAddrInst* Inst) {
+  SILBasicBlock *DefaultBB = nullptr;
+  if (Inst->hasDefault())
+    DefaultBB = getOpBasicBlock(Inst->getDefaultBB());
+  SmallVector<std::pair<UnionElementDecl*, SILBasicBlock*>, 8> CaseBBs;
+  for(int i = 0, e = Inst->getNumCases(); i != e; ++i)
+    CaseBBs.push_back(std::make_pair(Inst->getCase(i).first,
+                                     getOpBasicBlock(Inst->getCase(i).second)));
+  return doPostProcess(Inst,
+    Builder.createDestructiveSwitchUnionAddr(getOpLocation(Inst->getLoc()),
+                                             getOpValue(Inst->getOperand()),
+                                             DefaultBB, CaseBBs));
+}
+  
 } // end namespace swift
 
 #endif

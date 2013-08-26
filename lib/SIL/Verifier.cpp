@@ -362,17 +362,48 @@ public:
   }
   
   void checkUnionInst(UnionInst *UI) {
-    require(UI->getType().is<UnionType>()
-            || UI->getType().is<BoundGenericUnionType>(),
+    require(UI->getType().getUnionOrBoundGenericUnion(),
             "UnionInst must return a union");
+    require(UI->getElement()->getParentUnion()
+              == UI->getType().getUnionOrBoundGenericUnion(),
+            "UnionInst case must be a case of the result union type");
     require(UI->getType().isObject(),
             "UnionInst must produce an object");
     require(UI->hasOperand() == UI->getElement()->hasArgumentType(),
             "UnionInst must take an argument iff the element does");
     
-    // FIXME: Match up generic parameters of generic unions.
+    // FIXME: Match up generic parameters of generic unions to check the type
+    // of the operand.
   }
 
+  void checkUnionDataAddrInst(UnionDataAddrInst *UI) {
+    require(UI->getOperand().getType().getUnionOrBoundGenericUnion(),
+            "UnionDataAddrInst must take a union operand");
+    require(UI->getElement()->getParentUnion()
+              == UI->getOperand().getType().getUnionOrBoundGenericUnion(),
+            "UnionDataAddrInst case must be a case of the union operand type");
+    require(UI->getElement()->hasArgumentType(),
+            "UnionDataAddrInst case must have a data type");
+    require(UI->getOperand().getType().isAddress(),
+            "UnionDataAddrInst must take an address operand");
+    require(UI->getType().isAddress(),
+            "UnionDataAddrInst must produce an address");
+    
+    // FIXME: Match up generic parameters of generic unions to check the type
+    // of the result.
+  }
+  
+  void checkInjectUnionAddrInst(InjectUnionAddrInst *IUAI) {
+    require(IUAI->getOperand().getType().is<UnionType>()
+              || IUAI->getOperand().getType().is<BoundGenericUnionType>(),
+            "InjectUnionAddrInst must take a union operand");
+    require(IUAI->getElement()->getParentUnion()
+              == IUAI->getOperand().getType().getUnionOrBoundGenericUnion(),
+            "InjectUnionAddrInst case must be a case of the union operand type");
+    require(IUAI->getOperand().getType().isAddress(),
+            "InjectUnionAddrInst must take an address operand");
+  }
+  
   void checkTupleInst(TupleInst *TI) {
     CanTupleType ResTy = requireObjectType(TupleType, TI, "Result of tuple");
 
@@ -1176,22 +1207,20 @@ public:
       require(SII->getDefaultBB()->bbarg_empty(),
               "switch_int default destination cannot take arguments");
   }
-  
+
   void checkSwitchUnionInst(SwitchUnionInst *SOI) {
+    require(SOI->getOperand().getType().isObject(),
+            "switch_union operand must be an object");
+    
+    UnionDecl *uDecl
+      = SOI->getOperand().getType().getUnionOrBoundGenericUnion();
+    require(uDecl, "switch_union operand is not a union");
+    
     // Find the set of union elements for the type so we can verify
     // exhaustiveness.
     // FIXME: We also need to consider if the union is resilient, in which case
     // we're never guaranteed to be exhaustive.
     llvm::DenseSet<UnionElementDecl*> unswitchedElts;
-    
-    require(SOI->getOperand().getType().isObject(),
-            "switch_union operand must be an object");
-    
-    UnionDecl *uDecl
-      = SOI->getOperand().getType().getSwiftRValueType()
-        ->getUnionOrBoundGenericUnion();
-    require(uDecl, "switch_union operand is not a union");
-    
     uDecl->getAllElements(unswitchedElts);
     
     // Verify the set of unions we dispatch on.
@@ -1237,6 +1266,67 @@ public:
     if (SOI->hasDefault())
       require(SOI->getDefaultBB()->bbarg_empty(),
               "switch_union default destination must take no arguments");
+  }
+  
+  void checkDestructiveSwitchUnionAddrInst(DestructiveSwitchUnionAddrInst *SOI){
+    require(SOI->getOperand().getType().isAddress(),
+            "destructive_switch_union_addr operand must be an object");
+    
+    UnionDecl *uDecl
+      = SOI->getOperand().getType().getUnionOrBoundGenericUnion();
+    require(uDecl, "destructive_switch_union_addr operand must be a union");
+    
+    // Find the set of union elements for the type so we can verify
+    // exhaustiveness.
+    // FIXME: We also need to consider if the union is resilient, in which case
+    // we're never guaranteed to be exhaustive.
+    llvm::DenseSet<UnionElementDecl*> unswitchedElts;
+    uDecl->getAllElements(unswitchedElts);
+    
+    // Verify the set of unions we dispatch on.
+    for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
+      UnionElementDecl *elt;
+      SILBasicBlock *dest;
+      std::tie(elt, dest) = SOI->getCase(i);
+      
+      require(elt->getDeclContext() == uDecl,
+              "destructive_switch_union_addr dispatches on union element that "
+              "is not part of its type");
+      require(unswitchedElts.count(elt),
+              "destructive_switch_union_addr dispatches on same union element "
+              "more than once");
+      unswitchedElts.erase(elt);
+      
+      // The destination BB must take the argument payload, if any, as a BB
+      // argument.
+      if (elt->hasArgumentType()) {
+        require(dest->getBBArgs().size() == 1,
+                "destructive_switch_union_addr destination for case w/ args "
+                "must take an argument");
+        
+        Type eltArgTy = elt->getArgumentType();
+        CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
+        require(eltArgTy->isEqual(bbArgTy),
+                "destructive_switch_union_addr destination bbarg must match "
+                "case arg type");
+        require(dest->getBBArgs()[0]->getType().isAddress(),
+                "destructive_switch_union_addr destination bbarg type must "
+                "be an address");
+      } else {
+        require(dest->getBBArgs().size() == 0,
+                "destructive_switch_union_addr destination for no-argument "
+                "case must take no arguments");
+      }
+    }
+    
+    // If the switch is non-exhaustive, we require a default.
+    require(unswitchedElts.empty() || SOI->hasDefault(),
+            "nonexhaustive destructive_switch_union_addr must have a default "
+            "destination");
+    if (SOI->hasDefault())
+      require(SOI->getDefaultBB()->bbarg_empty(),
+              "destructive_switch_union_addr default destination must take "
+              "no arguments");
   }
   
   void checkBranchInst(BranchInst *BI) {

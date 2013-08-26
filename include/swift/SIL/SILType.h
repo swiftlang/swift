@@ -190,6 +190,11 @@ public:
   ClassDecl *getClassOrBoundGenericClass() const {
     return getSwiftRValueType()->getClassOrBoundGenericClass();
   }
+  /// Retrieve the UnionDecl for a type that maps to a Swift union or
+  /// bound generic union type.
+  UnionDecl *getUnionOrBoundGenericUnion() const {
+    return getSwiftRValueType()->getUnionOrBoundGenericUnion();
+  }
   
   /// True if the type is an address type.
   bool isAddress() const { return getCategory() == SILValueCategory::Address; }
