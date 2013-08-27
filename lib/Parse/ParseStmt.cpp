@@ -339,7 +339,7 @@ NullablePtr<Stmt> Parser::parseStmt() {
   case tok::kw_if:     return parseStmtIf().getPtrOrNull();
   case tok::kw_while:  return parseStmtWhile().getPtrOrNull();
   case tok::kw_do:     return parseStmtDoWhile().getPtrOrNull();
-  case tok::kw_for:    return parseStmtFor();
+  case tok::kw_for:    return parseStmtFor().getPtrOrNull();
   case tok::kw_switch: return parseStmtSwitch();
   /// 'case' and 'default' are only valid at the top level of a switch.
   case tok::kw_case:
@@ -533,7 +533,7 @@ ParserResult<Stmt> Parser::parseStmtDoWhile() {
       new (Context) DoWhileStmt(DoLoc, Condition.get(), WhileLoc, Body.get()));
 }
 
-NullablePtr<Stmt> Parser::parseStmtFor() {
+ParserResult<Stmt> Parser::parseStmtFor() {
   SourceLoc ForLoc = consumeToken(tok::kw_for);
 
   // The c-style-for loop and foreach-style-for loop are conflated together into
@@ -564,13 +564,6 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   return parseStmtForCStyle(ForLoc);
 }
 
-static bool parseExprForCStyle(Parser &P, NullablePtr<Expr> &Result,
-                               bool UsesExprBasic = false) {
-  ParserResult<Expr> E = P.parseExpr(diag::expected_expr, UsesExprBasic);
-  Result = E.getPtrOrNull();
-  return Result.isNull();
-}
-
 ///   stmt-for-c-style:
 ///     'for' stmt-for-c-style-init? ';' expr? ';' expr-or-stmt-assign-basic?
 ///           stmt-brace
@@ -579,15 +572,18 @@ static bool parseExprForCStyle(Parser &P, NullablePtr<Expr> &Result,
 ///   stmt-for-c-style-init:
 ///     decl-var
 ///     expr-basic-or-stmt-assign
-NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
+ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   SourceLoc Semi1Loc, Semi2Loc;
   SourceLoc LPLoc, RPLoc;
   bool LPLocConsumed = false;
 
-  NullablePtr<Expr> First;
+  ParserStatus Status;
+
+  bool HaveFirst = false;
+  ParserResult<Expr> First;
   SmallVector<Decl*, 2> FirstDecls;
   ParserResult<Expr> Second;
-  NullablePtr<Expr> Third;
+  ParserResult<Expr> Third;
   NullablePtr<BraceStmt> Body;
   
   // Introduce a new scope to contain any var decls in the init value.
@@ -599,10 +595,16 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   }
   // Parse the first part, either a var, expr, or stmt-assign.
   if (Tok.is(tok::kw_var)) {
-    if (parseDeclVar(false, FirstDecls).isError())
-      return nullptr;
-  } else if ((Tok.isNot(tok::semi) && parseExprForCStyle(*this, First)))
-    return nullptr; // FIXME: better recovery
+    ParserStatus VarDeclStatus = parseDeclVar(false, FirstDecls);
+    if (VarDeclStatus.isError())
+      return VarDeclStatus; // FIXME: better recovery
+  } else if (Tok.isNot(tok::semi)) {
+    HaveFirst = true;
+    First = parseExpr(diag::expected_expr);
+    Status |= First;
+    if (First.isNull() || First.hasCodeCompletion())
+      return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
+  }
 
   ArrayRef<Decl *> FirstDeclsContext;
   if (!FirstDecls.empty())
@@ -618,18 +620,20 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
       // brace statement as a 'for' body.
       auto ClosureBody = CE->getBody();
       SourceLoc LBraceLoc = ClosureBody->getStartLoc();
-      First = new (Context) ErrorExpr(LBraceLoc);
+      First = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
       Second = nullptr;
       Third = nullptr;
       Body = ClosureBody;
       diagnose(ForLoc, diag::missing_init_for_stmt)
           .highlight(SourceRange(ForLoc, LBraceLoc));
+      Status.setIsParseError();
 
-      return new (Context) ForStmt(ForLoc, First.getPtrOrNull(),
-                                   FirstDeclsContext,
-                                   Semi1Loc, Second.getPtrOrNull(),
-                                   Semi2Loc, Third.getPtrOrNull(),
-                                   Body.get());
+      return makeParserResult(
+          Status, new (Context) ForStmt(ForLoc, First.getPtrOrNull(),
+                                        FirstDeclsContext,
+                                        Semi1Loc, Second.getPtrOrNull(),
+                                        Semi2Loc, Third.getPtrOrNull(),
+                                        Body.get()));
     }
   }
 
@@ -637,9 +641,12 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   if (parseToken(tok::semi, Semi1Loc, diag::expected_semi_for_stmt))
     return nullptr; // FIXME: better recovery
 
-  if (Tok.isNot(tok::semi) &&
-      (Second = parseExpr(diag::expected_cond_for_stmt)).isNull())
-    return nullptr; // FIXME: better recovery
+  if (Tok.isNot(tok::semi)) {
+    Second = parseExpr(diag::expected_cond_for_stmt);
+    Status |= Second;
+    if (Second.isNull() || Second.hasCodeCompletion())
+      return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
+  }
 
   if (Tok.isNot(tok::semi)) {
     Expr *RecoveredCondition = nullptr;
@@ -676,12 +683,14 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
       Body = RecoveredBody;
       diagnose(LBraceLoc, diag::expected_semi_for_stmt)
           .highlight(SourceRange(ForLoc, LBraceLoc));
+      Status.setIsParseError();
 
-      return new (Context) ForStmt(ForLoc, First.getPtrOrNull(),
-                                   FirstDeclsContext,
-                                   Semi1Loc, Second.getPtrOrNull(),
-                                   Semi2Loc, Third.getPtrOrNull(),
-                                   Body.get());
+      return makeParserResult(
+          Status, new (Context) ForStmt(ForLoc, First.getPtrOrNull(),
+                                        FirstDeclsContext,
+                                        Semi1Loc, Second.getPtrOrNull(),
+                                        Semi2Loc, Third.getPtrOrNull(),
+                                        Body.get()));
     }
   }
 
@@ -689,8 +698,12 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   if (parseToken(tok::semi, Semi2Loc, diag::expected_semi_for_stmt))
     return nullptr; // FIXME: better recovery
 
-  if (Tok.isNot(tok::l_brace) && parseExprForCStyle(*this, Third, true))
-    return nullptr; // FIXME: better recovery
+  if (Tok.isNot(tok::l_brace)) {
+    Third = parseExpr(diag::expected_expr, /*isExprBasic=*/true);
+    Status |= Third;
+    if (Third.isNull() || Third.hasCodeCompletion())
+      return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
+  }
 
   if (LPLocConsumed && parseMatchingToken(tok::r_paren, RPLoc,
                                           diag::expected_rparen_for_stmt,LPLoc))
@@ -699,15 +712,16 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   if ((Body = parseBraceItemList(diag::expected_lbrace_after_for)).isNull())
     return nullptr; // FIXME: better recovery
 
-  return new (Context) ForStmt(ForLoc, First.getPtrOrNull(), FirstDeclsContext,
-                               Semi1Loc, Second.getPtrOrNull(),
-                               Semi2Loc, Third.getPtrOrNull(), Body.get());
+  return makeParserResult(
+      new (Context) ForStmt(ForLoc, First.getPtrOrNull(), FirstDeclsContext,
+                            Semi1Loc, Second.getPtrOrNull(),
+                            Semi2Loc, Third.getPtrOrNull(), Body.get()));
 }
 
 /// 
 ///   stmt-for-each:
 ///     'for' pattern 'in' expr-basic stmt-brace
-NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
+ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   ParserResult<Pattern> Pattern = parsePattern();
   if (Pattern.isNull())
     // Recover by creating a "_" pattern.
@@ -727,7 +741,7 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   ParserResult<Expr> Container =
       parseExprBasic(diag::expected_foreach_container);
   if (Container.hasCodeCompletion())
-    return nullptr;
+    return makeParserCodeCompletionResult<Stmt>();
   if (Container.isNull())
     Container =
         makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
@@ -763,8 +777,9 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   if (Body.isNull())
     return nullptr; // FIXME: better recovery
 
-  return new (Context) ForEachStmt(ForLoc, Pattern.get(), InLoc,
-                                   Container.get(), Body.get());
+  return makeParserResult(
+      new (Context) ForEachStmt(ForLoc, Pattern.get(), InLoc,
+                                Container.get(), Body.get()));
 }
 
 ///

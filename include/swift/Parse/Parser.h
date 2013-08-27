@@ -668,9 +668,9 @@ public:
   ParserResult<Stmt> parseStmtIf();
   ParserResult<Stmt> parseStmtWhile();
   ParserResult<Stmt> parseStmtDoWhile();
-  NullablePtr<Stmt> parseStmtFor();
-  NullablePtr<Stmt> parseStmtForCStyle(SourceLoc ForLoc);
-  NullablePtr<Stmt> parseStmtForEach(SourceLoc ForLoc);
+  ParserResult<Stmt> parseStmtFor();
+  ParserResult<Stmt> parseStmtForCStyle(SourceLoc ForLoc);
+  ParserResult<Stmt> parseStmtForEach(SourceLoc ForLoc);
   NullablePtr<Stmt> parseStmtSwitch();
   NullablePtr<CaseStmt> parseStmtCase();
   bool parseStmtCaseLabels(SmallVectorImpl<CaseLabel*> &labels,
