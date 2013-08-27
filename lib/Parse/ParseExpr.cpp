@@ -672,11 +672,14 @@ ParserResult<Expr> Parser::parseExprSuper() {
       // The result of the called constructor is used to rebind 'self'.
       return makeParserResult(
           new (Context) RebindThisInConstructorExpr(result, thisDecl));
-    } else if (Tok.is(tok::code_complete) && CodeCompletion) {
-      if (auto *SRE = dyn_cast<SuperRefExpr>(superRef)) {
-        CodeCompletion->completeExprSuperDot(SRE);
+    } else if (Tok.is(tok::code_complete)) {
+      if (CodeCompletion) {
+        if (auto *SRE = dyn_cast<SuperRefExpr>(superRef))
+          CodeCompletion->completeExprSuperDot(SRE);
       }
-      return nullptr;
+      // Eat the code completion token because we handled it.
+      consumeToken(tok::code_complete);
+      return makeParserCodeCompletionResult(superRef);
     } else {
       // super.foo
       SourceLoc nameLoc;
@@ -701,11 +704,14 @@ ParserResult<Expr> Parser::parseExprSuper() {
       return nullptr;
     return makeParserResult(new (Context) SubscriptExpr(superRef, idx.get()));
   }
-  if (Tok.is(tok::code_complete) && CodeCompletion) {
-    if (auto *SRE = dyn_cast<SuperRefExpr>(superRef)) {
+  if (Tok.is(tok::code_complete)) {
+    if (CodeCompletion) {
+      if (auto *SRE = dyn_cast<SuperRefExpr>(superRef))
       CodeCompletion->completeExprSuper(SRE);
-      return nullptr;
     }
+    // Eat the code completion token because we handled it.
+    consumeToken(tok::code_complete);
+    return makeParserCodeCompletionResult(superRef);
   }
   diagnose(superLoc, diag::expected_dot_or_subscript_after_super);
   return nullptr;
@@ -857,6 +863,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
   case tok::code_complete:
     if (CodeCompletion)
       CodeCompletion->completePostfixExprBeginning();
+    consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult<Expr>();
 
   // Eat an invalid token in an expression context.  Error tokens are diagnosed
@@ -901,6 +908,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
         if (Tok.is(tok::code_complete)) {
           if (CodeCompletion && Result.isNonNull())
             CodeCompletion->completeDotExpr(Result.get());
+          // Eat the code completion token because we handled it.
           consumeToken(tok::code_complete);
           Result.setHasCodeCompletion();
           return Result;
@@ -989,6 +997,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
       }
       if (CodeCompletion && Result.isNonNull())
         CodeCompletion->completePostfixExpr(Result.get());
+      // Eat the code completion token because we handled it.
+      consumeToken(tok::code_complete);
       return makeParserCodeCompletionResult<Expr>();
     }
     break;

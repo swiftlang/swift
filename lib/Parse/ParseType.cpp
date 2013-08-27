@@ -211,7 +211,8 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
         CodeCompletion->completeTypeIdentifierWithDot(nullptr);
-
+      // Eat the code completion token because we handled it.
+      consumeToken(tok::code_complete);
       return makeParserCodeCompletionResult<IdentTypeRepr>();
     }
 
@@ -272,12 +273,12 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     if (Tok.isNot(tok::code_complete)) {
       // We have a dot.
       consumeToken();
-      consumeToken(tok::code_complete);
       CodeCompletion->completeTypeIdentifierWithDot(ITR);
     } else {
-      consumeToken(tok::code_complete);
       CodeCompletion->completeTypeIdentifierWithoutDot(ITR);
     }
+    // Eat the code completion token because we handled it.
+    consumeToken(tok::code_complete);
   }
 
   return makeParserResult(Status, ITR);

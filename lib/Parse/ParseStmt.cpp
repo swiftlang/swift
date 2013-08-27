@@ -272,9 +272,6 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     // but distinguishing the start of an expression from the middle of one is
     // "hard".
     if (NeedParseErrorRecovery) {
-      // If there was a parse error and we stopped at the code completion
-      // token, then it should have been already handled, so just skip it.
-      consumeIf(tok::code_complete);
       skipUntilDeclStmtRBrace();
 
       // If we have to recover, pretend that we had a semicolon; it's less
