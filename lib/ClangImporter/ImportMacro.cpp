@@ -35,7 +35,6 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
                                        Identifier name,
                                        clang::Token const *signTok,
                                        clang::Token const &tok) {
-  auto &clangContext = Impl.getClangASTContext();
   DeclContext *dc = Impl.firstClangModule;
   
   assert(tok.getKind() == clang::tok::numeric_constant &&
@@ -45,9 +44,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
   if (result.isUsable()) {
     clang::Expr *parsed = result.get();
     if (auto *integer = dyn_cast<clang::IntegerLiteral>(parsed)) {
-      // Note: all integer literals are imported with type 'int'.
-      // FIXME: What if int is too small?
-      auto type = Impl.importType(clangContext.IntTy, ImportTypeKind::Normal);
+      auto type = Impl.importType(integer->getType(), ImportTypeKind::Normal);
       if (!type)
         return nullptr;
 
@@ -56,7 +53,8 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
                          integer->getType()->isUnsignedIntegerType());
 
       // If there was a - sign, negate the value.
-      if (signTok && signTok->getKind() == clang::tok::minus) {
+      if (signTok && signTok->getKind() == clang::tok::minus &&
+          !value.isMinSignedValue()) {
         value = -value;
       }
 
@@ -65,10 +63,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
     }
 
     if (auto *floating = dyn_cast<clang::FloatingLiteral>(parsed)) {
-      // Note: all integer literals are imported with type 'double'.
-      // FIXME: What if double is too small?
-      auto type = Impl.importType(clangContext.DoubleTy,
-                                  ImportTypeKind::Normal);
+      auto type = Impl.importType(floating->getType(), ImportTypeKind::Normal);
       if (!type)
         return nullptr;
 

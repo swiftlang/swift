@@ -2546,6 +2546,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     if (value.getKind() == clang::APValue::Int) {
       value.getInt().toString(printedValue);
     } else {
+      assert(value.getFloat().isFinite() && "can't handle infinities or NaNs");
       value.getFloat().toString(printedValue);
     }
 
