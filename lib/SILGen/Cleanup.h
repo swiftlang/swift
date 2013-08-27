@@ -96,8 +96,10 @@ public:
   /// cleanup stack.
   ///
   /// \param Dest  The destination scope and block.
+  /// \param Loc   The location of the branch instruction.
   /// \param Args  Arguments to pass to the destination block.
-  void emitBranchAndCleanups(JumpDest Dest, ArrayRef<SILValue> Args = {});
+  void emitBranchAndCleanups(JumpDest Dest, SILLocation Loc,
+                             ArrayRef<SILValue> Args = {});
   
   /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a
   /// return from the function.

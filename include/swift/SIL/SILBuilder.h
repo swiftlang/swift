@@ -126,11 +126,11 @@ public:
   ///
   /// This function also sets the insertion point of the builder to be the newly
   /// emitted block.
-  void emitBlock(SILBasicBlock *BB) {
+  void emitBlock(SILBasicBlock *BB, SILLocation BranchLoc = SILLocation()) {
     // If this is a fall through into BB, emit the fall through branch.
     if (hasValidInsertionPoint()) {
       assert(BB->bbarg_empty() && "cannot fall through to bb with args");
-      createBranch(SILLocation(), BB);
+      createBranch(BranchLoc, BB);
     }
     
     // Start inserting into that block.

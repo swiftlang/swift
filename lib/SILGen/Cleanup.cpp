@@ -88,6 +88,7 @@ void CleanupManager::endScope(CleanupsDepth depth) {
 /// threading out through any cleanups we might need to run.  This does not
 /// pop the cleanup stack.
 void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
+                                           SILLocation Loc,
                                            ArrayRef<SILValue> Args) {
   SILBuilder &B = Gen.getBuilder();
   assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
@@ -100,7 +101,7 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
       cleanup->emit(Gen);
   }
 
-  B.createBranch(Gen.CurrentSILLoc, Dest.getBlock(), Args);
+  B.createBranch(Loc, Dest.getBlock(), Args);
 }
 
 void CleanupManager::emitCleanupsForReturn(SILLocation loc) {

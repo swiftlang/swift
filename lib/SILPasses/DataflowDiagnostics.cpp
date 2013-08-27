@@ -98,19 +98,20 @@ static void diagnoseUnreachable(const SILInstruction *I,
 }
 
 static void diagnoseReturn(const SILInstruction *I, ASTContext &Context) {
-  auto *RI = dyn_cast<ReturnInst>(I);
-  if (!RI)
+  auto *TI = dyn_cast<TermInst>(I);
+  if (!TI || !(isa<BranchInst>(TI) || isa<ReturnInst>(TI)))
     return;
 
-  const SILBasicBlock *BB = RI->getParent();
+  const SILBasicBlock *BB = TI->getParent();
   const SILFunction *F = BB->getParent();
   SILLocation FLoc = F->getLocation();
 
   if (const FuncExpr *FExpr = FLoc.getAsASTNode<FuncExpr>()) {
     if (AnyFunctionType *T = FExpr->getType()->castTo<AnyFunctionType>()) {
       if (T->isNoReturn()) {
-        SILLocation L = RI->getLoc();
-        if (L)
+        SILLocation L = TI->getLoc();
+        // Warn if we have an explicit return.
+        if (L.is<ReturnLocation>())
           diagnose(Context, L.getEndSourceLoc(), diag::return_from_noreturn);
       }
     }

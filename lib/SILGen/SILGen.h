@@ -359,7 +359,6 @@ public:
   /// of the original expr.
   SourceLoc overrideLocationForMagicIdentifiers;
   
-public:
   SILGenFunction(SILGenModule &SGM, SILFunction &F);
   ~SILGenFunction();
   
@@ -383,6 +382,8 @@ public:
   const TypeLowering &getTypeLowering(SILType type) {
     return SGM.Types.getTypeLowering(type);
   }
+
+  SourceManager &getSourceManager() { return SGM.M.getASTContext().SourceMgr; }
 
   /// enterDebugScope - Push a new debug scope and set its parent pointer.
   void enterDebugScope(SILDebugScope *DS) {
@@ -504,14 +505,25 @@ public:
   /// The insertion point will be moved into the epilog block if it is
   /// reachable.
   ///
+  /// \param Loc The location of the top level AST node for which we are
+  ///            constructing the epilog, such as a CapturingExpr.
   /// \returns Nothing if the epilog block is unreachable. Otherwise, returns
   ///          the epilog block's return value argument, or a null SILValue if
-  ///          the epilog doesn't take a return value.
-  Optional<SILValue> emitEpilogBB(SILLocation loc);
+  ///          the epilog doesn't take a return value. Also returns the location
+  ///          of the return instrcution if the epilog block is supposed to host
+  ///          the ReturnLocation (This happens in case the predecessor block is
+  ///          merged with the epilog block.)
+  std::pair<Optional<SILValue>,
+            Optional<SILLocation>> emitEpilogBB(SILLocation TopLevelLoc);
   
   /// \brief Emits a standard epilog which runs top-level cleanups then returns
   /// the function return value, if any.
-  void emitEpilog(SILLocation loc);
+  ///
+  /// \param TopLevel The location of the top-level expression during whose
+  ///        evaluation the epilog is being produced, for example, the
+  ///        CapturingExpr.
+  /// \param IsAutoGen Flags if the prolog is auto-generated.
+  void emitEpilog(SILLocation TopLevelLoc, bool IsAutoGen = false);
   
   /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
   /// a normal function, the destructor does not consume a reference to its

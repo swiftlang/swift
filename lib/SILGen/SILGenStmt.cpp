@@ -134,23 +134,23 @@ void SILGenFunction::emitReturnExpr(SILLocation loc, Expr *ret) {
     RValue resultRValue = emitRValue(ret);
     if (!resultRValue.getType()->isVoid()) {
       result = std::move(resultRValue).forwardAsSingleValue(*this);
-      result = emitGeneralizedValue(loc, result);
+      result = emitGeneralizedValue(ret, result);
     }
   }
-  Cleanups.emitBranchAndCleanups(ReturnDest,
+  Cleanups.emitBranchAndCleanups(ReturnDest, loc,
                                  result ? result : ArrayRef<SILValue>{});
 }
 
 void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
-  ReturnLoc = S;
+  ReturnLoc = ReturnLocation(S);
   CurrentSILLoc = S;
 
   SILValue ArgV;
   if (!S->hasResult())
     // Void return.
-    Cleanups.emitBranchAndCleanups(ReturnDest);
+    Cleanups.emitBranchAndCleanups(ReturnDest, ReturnLoc);
   else
-    emitReturnExpr(S, S->getResult());
+    emitReturnExpr(ReturnLoc, S->getResult());
 }
 
 void SILGenFunction::visitIfStmt(IfStmt *S) {
@@ -346,12 +346,12 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
 
 void SILGenFunction::visitBreakStmt(BreakStmt *S) {
   CurrentSILLoc = S;
-  Cleanups.emitBranchAndCleanups(BreakDestStack.back());
+  Cleanups.emitBranchAndCleanups(BreakDestStack.back(), S);
 }
 
 void SILGenFunction::visitContinueStmt(ContinueStmt *S) {
   CurrentSILLoc = S;
-  Cleanups.emitBranchAndCleanups(ContinueDestStack.back());
+  Cleanups.emitBranchAndCleanups(ContinueDestStack.back(), S);
 }
 
 void SILGenFunction::visitSwitchStmt(SwitchStmt *S) {

@@ -60,7 +60,7 @@ SILGenModule::SILGenModule(SILModule &M)
 }
 
 SILGenModule::~SILGenModule() {
-  TopLevelSGF->emitEpilog(SILLocation());
+  TopLevelSGF->emitEpilog(SILLocation(), /* AutoGen */ true);
   SILFunction *toplevel = &TopLevelSGF->getFunction();
   delete TopLevelSGF;
   DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";

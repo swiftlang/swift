@@ -704,7 +704,8 @@ public:
       SILBasicBlock *caseBB = emitCaseBlock(gen, caseMap);
       
       if (caseBB != insertionBB)
-        gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB, getCleanupsDepth()});
+        gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB, getCleanupsDepth()},
+                                           gen.CurrentSILLoc);
       
       gen.B.moveBlockToEnd(caseBB);
       return true;
@@ -770,7 +771,8 @@ public:
     
     // On the true block, jump to the case block, unwinding if necessary.
     gen.B.emitBlock(trueBB);
-    gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB, getCleanupsDepth()});
+    gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB, getCleanupsDepth()},
+                                       gen.CurrentSILLoc);
     
     // Position the case block logically.
     gen.B.moveBlockToEnd(caseBB);
@@ -1466,5 +1468,5 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
                                       context->outerContBB);
   
   // Jump to it.
-  Cleanups.emitBranchAndCleanups(JumpDest{dest, context->outerScope});
+  Cleanups.emitBranchAndCleanups(JumpDest{dest, context->outerScope}, S);
 }
