@@ -108,3 +108,152 @@ TEST_F(LexerTest, CharacterLiterals) {
   }
 }
 
+TEST_F(LexerTest, RestoreBasic) {
+  const char *Source = "aaa \t\0 bbb ccc";
+
+  MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(StringRef(Source, 14));
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr->AddNewSourceBuffer(Buf, llvm::SMLoc());
+
+  Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+
+  Token Tok;
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("bbb", Tok.getText());
+  ASSERT_FALSE(Tok.isAtStartOfLine());
+
+  Lexer::State S = L.getStateForBeginningOfToken(Tok);
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("ccc", Tok.getText());
+  ASSERT_FALSE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::eof, Tok.getKind());
+
+  L.restoreState(S);
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("bbb", Tok.getText());
+  ASSERT_FALSE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("ccc", Tok.getText());
+  ASSERT_FALSE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::eof, Tok.getKind());
+}
+
+TEST_F(LexerTest, RestoreNewlineFlag) {
+  const char *Source = "aaa \n \0\tbbb \nccc";
+
+  MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(StringRef(Source, 16));
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr->AddNewSourceBuffer(Buf, llvm::SMLoc());
+
+  Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+
+  Token Tok;
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("bbb", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+
+  Lexer::State S = L.getStateForBeginningOfToken(Tok);
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("ccc", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::eof, Tok.getKind());
+
+  L.restoreState(S);
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("bbb", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("ccc", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::eof, Tok.getKind());
+}
+
+TEST_F(LexerTest, RestoreStopAtCodeCompletion) {
+  const char *Source = "aaa \n \0\tbbb \nccc";
+
+  MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(StringRef(Source, 16));
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr->AddNewSourceBuffer(Buf, llvm::SMLoc());
+  SourceMgr.setCodeCompletionPoint(BufferID, 6);
+
+  Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+
+  Token Tok;
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::code_complete, Tok.getKind());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("bbb", Tok.getText());
+  ASSERT_FALSE(Tok.isAtStartOfLine());
+
+  Lexer::State S = L.getStateForBeginningOfToken(Tok);
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("ccc", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::eof, Tok.getKind());
+
+  L.restoreState(S);
+
+  // Ensure that we don't get tok::code_complete here.  We saved the lexer
+  // position after it, so we should not be getting it.
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("bbb", Tok.getText());
+  ASSERT_FALSE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("ccc", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::eof, Tok.getKind());
+}
+

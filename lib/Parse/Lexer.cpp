@@ -239,7 +239,15 @@ Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
   // correctly lex the token if it is at the beginning of the line.
   while (Ptr >= BufferStart + 1) {
     char C = Ptr[-1];
-    if (C == ' ' || C == '\t' || C == 0) {
+    if (C == ' ' || C == '\t') {
+      Ptr--;
+      continue;
+    }
+    if (C == 0) {
+      // A NUL character can be either whitespace we diagnose or a code
+      // completion token.
+      if (Ptr - 1 == CodeCompletionPtr)
+        break;
       Ptr--;
       continue;
     }
