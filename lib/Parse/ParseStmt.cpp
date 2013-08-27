@@ -361,10 +361,10 @@ ParserResult<Stmt> Parser::parseStmt() {
 ///   brace-item-list:
 ///     '{' brace-item* '}'
 ///
-NullablePtr<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
+ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   if (Tok.isNot(tok::l_brace)) {
     diagnose(Tok, ID);
-    return 0;
+    return nullptr;
   }
   SourceLoc LBLoc = consumeToken(tok::l_brace);
 
@@ -388,7 +388,7 @@ NullablePtr<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
     }
   }
 
-  return BraceStmt::create(Context, LBLoc, Entries, RBLoc);
+  return makeParserResult(BraceStmt::create(Context, LBLoc, Entries, RBLoc));
 }
 
 /// parseStmtReturn
@@ -425,14 +425,14 @@ ParserResult<Stmt> Parser::parseStmtIf() {
   if (Condition.isNull() || Condition.hasCodeCompletion())
     return makeParserResult<Stmt>(Condition, nullptr); // FIXME: better recovery
 
-  NullablePtr<BraceStmt> NormalBody;
+  ParserResult<BraceStmt> NormalBody;
   if (auto *CE = dyn_cast<PipeClosureExpr>(Condition.get())) {
     // If we parsed closure after 'if', then it was not the condition, but the
     // 'if' statement body.  We can not have a bare closure in an 'if'
     // condition because closures don't conform to LogicValue.
     auto ClosureBody = CE->getBody();
     SourceLoc LBraceLoc = ClosureBody->getStartLoc();
-    NormalBody = ClosureBody;
+    NormalBody = makeParserErrorResult(ClosureBody);
     Condition = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
     diagnose(IfLoc, diag::missing_condition_after_if)
         .highlight(SourceRange(IfLoc, LBraceLoc));
@@ -442,16 +442,14 @@ ParserResult<Stmt> Parser::parseStmtIf() {
   if (NormalBody.isNull())
     return nullptr; // FIXME: better recovery
 
+  SourceLoc ElseLoc;
   ParserResult<Stmt> ElseBody;
-  SourceLoc ElseLoc = Tok.getLoc();
-  if (consumeIf(tok::kw_else)) {
+  if (Tok.is(tok::kw_else)) {
+    ElseLoc = consumeToken(tok::kw_else);
     if (Tok.is(tok::kw_if))
       ElseBody = parseStmtIf();
-    else if (auto *BS = parseBraceItemList(diag::expected_lbrace_after_else)
-                 .getPtrOrNull())
-      ElseBody = makeParserResult(BS);
-  } else {
-    ElseLoc = SourceLoc();
+    else
+      ElseBody = parseBraceItemList(diag::expected_lbrace_after_else);
   }
 
   return makeParserResult(
@@ -465,18 +463,21 @@ ParserResult<Stmt> Parser::parseStmtIf() {
 ParserResult<Stmt> Parser::parseStmtWhile() {
   SourceLoc WhileLoc = consumeToken(tok::kw_while);
 
-  ParserResult<Expr> Condition = parseExprBasic(diag::expected_expr_while);
-  if (Condition.isNull() || Condition.hasCodeCompletion())
-    return makeParserResult<Stmt>(Condition, nullptr); // FIXME: better recovery
+  ParserStatus Status;
 
-  NullablePtr<BraceStmt> Body;
+  ParserResult<Expr> Condition = parseExprBasic(diag::expected_expr_while);
+  Status |= Condition;
+  if (Condition.isNull() || Condition.hasCodeCompletion())
+    return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
+
+  ParserResult<BraceStmt> Body;
   if (auto *CE = dyn_cast<PipeClosureExpr>(Condition.get())) {
     // If we parsed a closure after 'while', then it was not the condition, but
     // the 'while' statement body.  We can not have a bare closure in a 'while'
     // condition because closures don't conform to LogicValue.
     auto ClosureBody = CE->getBody();
     SourceLoc LBraceLoc = ClosureBody->getStartLoc();
-    Body = ClosureBody;
+    Body = makeParserErrorResult(ClosureBody);
     Condition = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
     diagnose(WhileLoc, diag::missing_condition_after_while)
         .highlight(SourceRange(WhileLoc, LBraceLoc));
@@ -486,8 +487,10 @@ ParserResult<Stmt> Parser::parseStmtWhile() {
   if (Body.isNull())
     return nullptr; // FIXME: better recovery
 
+  Status |= Body;
+
   return makeParserResult(
-      new (Context) WhileStmt(WhileLoc, Condition.get(), Body.get()));
+      Status, new (Context) WhileStmt(WhileLoc, Condition.get(), Body.get()));
 }
 
 /// 
@@ -496,8 +499,8 @@ ParserResult<Stmt> Parser::parseStmtWhile() {
 ParserResult<Stmt> Parser::parseStmtDoWhile() {
   SourceLoc DoLoc = consumeToken(tok::kw_do);
 
-  NullablePtr<BraceStmt> Body =
-    parseBraceItemList(diag::expected_lbrace_after_do);
+  ParserResult<BraceStmt> Body =
+      parseBraceItemList(diag::expected_lbrace_after_do);
   if (Body.isNull())
     return nullptr; // FIXME: better recovery
 
@@ -585,7 +588,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   SmallVector<Decl*, 2> FirstDecls;
   ParserResult<Expr> Second;
   ParserResult<Expr> Third;
-  NullablePtr<BraceStmt> Body;
+  ParserResult<BraceStmt> Body;
   
   // Introduce a new scope to contain any var decls in the init value.
   Scope S(this, ScopeKind::ForVars);
@@ -624,7 +627,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
       First = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
       Second = nullptr;
       Third = nullptr;
-      Body = ClosureBody;
+      Body = makeParserErrorResult(ClosureBody);
       diagnose(ForLoc, diag::missing_init_for_stmt)
           .highlight(SourceRange(ForLoc, LBraceLoc));
       Status.setIsParseError();
@@ -681,7 +684,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
       SourceLoc LBraceLoc = RecoveredBody->getStartLoc();
       Second = makeParserErrorResult(RecoveredCondition);
       Third = nullptr;
-      Body = RecoveredBody;
+      Body = makeParserErrorResult(RecoveredBody);
       diagnose(LBraceLoc, diag::expected_semi_for_stmt)
           .highlight(SourceRange(ForLoc, LBraceLoc));
       Status.setIsParseError();
@@ -772,7 +775,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   addVarsToScope(Pattern.get(), Decls, Attributes);
 
   // stmt-brace
-  NullablePtr<BraceStmt> Body =
+  ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::expected_foreach_lbrace);
 
   if (Body.isNull())

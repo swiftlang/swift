@@ -1597,7 +1597,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
         consumeToken();
         // FIXME: don't just drop the body.
       } else if (!isDelayedParsingEnabled()) {
-        NullablePtr<BraceStmt> Body =
+        ParserResult<BraceStmt> Body =
             parseBraceItemList(diag::func_decl_without_brace);
         if (Body.isNull()) {
           // FIXME: Should do some sort of error recovery here?
@@ -1659,7 +1659,7 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
   Scope S(this, FunctionParserState->takeScope());
   ContextChange CC(*this, FE);
 
-  NullablePtr<BraceStmt> Body =
+  ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::func_decl_without_brace);
   if (Body.isNull()) {
     // FIXME: Should do some sort of error recovery here?
@@ -2372,12 +2372,13 @@ Parser::parseDeclConstructor(bool HasContainerType) {
   addToScope(ThisDecl);
   ContextChange CC(*this, CD);
 
-  NullablePtr<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+  ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
 
   if (!Body.isNull())
     CD->setBody(Body.get());
 
-  if (Attributes.isValid()) CD->getMutableAttrs() = Attributes;
+  if (Attributes.isValid())
+    CD->getMutableAttrs() = Attributes;
 
   return makeParserResult(CD);
 }
@@ -2407,12 +2408,13 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
   addToScope(ThisDecl);
   ContextChange CC(*this, DD);
 
-  NullablePtr<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+  ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
 
   if (!Body.isNull())
     DD->setBody(Body.get());
 
-  if (Attributes.isValid()) DD->getMutableAttrs() = Attributes;
+  if (Attributes.isValid())
+    DD->getMutableAttrs() = Attributes;
 
   // Reject 'destructor' functions outside of classes
   if (!(Flags & PD_AllowDestructor)) {

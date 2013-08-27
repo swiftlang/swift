@@ -404,7 +404,7 @@ public:
   void parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Decls,
                        bool IsTopLevel,
                        BraceItemListKind Kind = BraceItemListKind::Brace);
-  NullablePtr<BraceStmt> parseBraceItemList(Diag<> ID);
+  ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
 
   void parseTopLevelCodeDeclDelayed();
 
