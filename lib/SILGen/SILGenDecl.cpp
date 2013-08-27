@@ -1057,6 +1057,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
 static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
                                              SILDeclRef thunk,
                                              SmallVectorImpl<SILValue> &args) {
+  // FIXME: Which locations are used here?
   SILType objcTy = gen.SGM.getConstantType(thunk),
           swiftTy = gen.SGM.getConstantType(thunk.asObjC(false));
   
@@ -1128,11 +1129,13 @@ void SILGenFunction::emitObjCMethodThunk(SILDeclRef thunk) {
     = SGM.getConstantType(thunk).getFunctionTypeInfo(SGM.M)->getResultType();
   
   // Call the native entry point.
-  SILValue nativeFn = emitGlobalFunctionRef(thunk.getDecl(), native);
-  SILValue result = B.createApply(thunk.getDecl(),
-                                  nativeFn, swiftResultTy, args);
-  // FIXME: This should have artificial location.
-  emitObjCReturnValue(*this, thunk.getDecl(), result, objcResultTy, ownership);
+  // FIXME: Which location should be used here? This is auto generated code
+  // for thunk.
+  RegularLocation loc(thunk.getDecl());
+
+  SILValue nativeFn = emitGlobalFunctionRef(loc, native);
+  SILValue result = B.createApply(loc, nativeFn, swiftResultTy, args);
+  emitObjCReturnValue(*this, loc, result, objcResultTy, ownership);
 }
 
 void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
@@ -1144,13 +1147,16 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
   SILType objcResultTy
     = SGM.getConstantType(getter).getFunctionTypeInfo(SGM.M)->getResultType();
 
+  // FIXME: Which location should be used here? This is auto generated code
+  // for thunk.
+  RegularLocation loc(getter.getDecl());
+
   // If the property is logical, forward to the native getter.
   auto *var = cast<VarDecl>(getter.getDecl());
   if (var->isProperty()) {
-    SILValue nativeFn = emitGlobalFunctionRef(var, native);
-    SILValue result = B.createApply(var, nativeFn, swiftResultTy, args);
-    // FIXME: This should have artificial location.
-    emitObjCReturnValue(*this, var, result, objcResultTy, ownership);
+    SILValue nativeFn = emitGlobalFunctionRef(loc, native);
+    SILValue result = B.createApply(loc, nativeFn, swiftResultTy, args);
+    emitObjCReturnValue(*this, loc, result, objcResultTy, ownership);
     return;
   }
 
@@ -1169,7 +1175,7 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
 
   auto &fieldLowering = getTypeLowering(var->getType());
 
-  SILValue addr = B.createRefElementAddr(var, thisValue, var,
+  SILValue addr = B.createRefElementAddr(loc, thisValue, var,
                              fieldLowering.getLoweredType().getAddressType());
   if (indirectReturn) {
     assert(ownership.getReturn() == OwnershipConventions::Return::Unretained
@@ -1177,20 +1183,20 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
     // This is basically returning +1, but there's no obvious
     // alternative, and there really isn't an ObjC convention for
     // transferring ownership in aggregates.
-    fieldLowering.emitSemanticLoadInto(B, var, addr, indirectReturn,
+    fieldLowering.emitSemanticLoadInto(B, loc, addr, indirectReturn,
                                        IsNotTake, IsInitialization);
     // FIXME: This should have artificial location.
-    B.createStrongRelease(getter.getDecl(), thisValue);
-    B.createReturn(var, emitEmptyTuple(var));
+    B.createStrongRelease(loc, thisValue);
+    B.createReturn(loc, emitEmptyTuple(var));
     return;
   }
 
   // Bridge the result.
-  SILValue result = fieldLowering.emitSemanticLoad(B, var, addr, IsNotTake);
+  SILValue result = fieldLowering.emitSemanticLoad(B, loc, addr, IsNotTake);
 
   // FIXME: This should have artificial location.
-  B.createStrongRelease(var, thisValue);
-  return emitObjCReturnValue(*this, var, result, objcResultTy,
+  B.createStrongRelease(loc, thisValue);
+  return emitObjCReturnValue(*this, loc, result, objcResultTy,
                              ownership);
 }
 
@@ -1198,7 +1204,11 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
   SmallVector<SILValue, 2> args;
   auto ownership = emitObjCThunkArguments(*this, setter, args);
   SILDeclRef native = setter.asObjC(false);
-  
+
+  // FIXME: Which location should be used here? This is auto generated code
+  // for thunk.
+  RegularLocation loc(setter.getDecl());
+
   // If the native property is logical, store to the native setter.
   auto *var = cast<VarDecl>(setter.getDecl());
   if (var->isProperty()) {
@@ -1218,11 +1228,11 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
   
   // If the native property is physical, store to it.
   auto &varTI = getTypeLowering(var->getType());
-  SILValue addr = B.createRefElementAddr(var, thisValue, var,
+  SILValue addr = B.createRefElementAddr(loc, thisValue, var,
                                  varTI.getLoweredType().getAddressType());
-  varTI.emitSemanticAssignment(B, setter.getDecl(), setValue, addr);
+  varTI.emitSemanticAssignment(B, loc, setValue, addr);
   
   // FIXME: This should have artificial location.
-  B.createStrongRelease(setter.getDecl(), thisValue);
-  B.createReturn(var, emitEmptyTuple(var));
+  B.createStrongRelease(loc, thisValue);
+  B.createReturn(loc, emitEmptyTuple(var));
 }
