@@ -49,6 +49,7 @@ SyntaxColoringContext::SyntaxColoringContext(SourceManager &SM,
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
 
+    case tok::identifier: Kind = SyntaxNodeKind::Identifier; break;
     case tok::dollarident: Kind = SyntaxNodeKind::DollarIdent; break;
     case tok::integer_literal: Kind = SyntaxNodeKind::Integer; break;
     case tok::floating_literal: Kind = SyntaxNodeKind::Floating; break;
@@ -95,7 +96,15 @@ public:
   virtual bool walkToTypeReprPre(TypeRepr *T);
 
 private:
-  bool passTokenNodesUntil(SourceLoc Loc, bool Inclusive);
+  enum PassNodesBehavior {
+    //Pass all nodes up to but not including the location
+    ExcludeNodeAtLocation,
+    //Pass all nodes up to and including the location
+    IncludeNodeAtLocation,
+    //Like ExcludeNodeAtLocation, and skip past any node at the location
+    DisplaceNodeAtLocation
+  };
+  bool passTokenNodesUntil(SourceLoc Loc, PassNodesBehavior Behavior);
   bool passNonTokenNode(const SyntaxNode &Node);
   bool passNode(const SyntaxNode &Node);
 };
@@ -132,12 +141,21 @@ bool ColorASTWalker::walkToTypeReprPre(TypeRepr *T) {
   return true;
 }
 
-bool ColorASTWalker::passTokenNodesUntil(SourceLoc Loc, bool Inclusive) {
+bool ColorASTWalker::passTokenNodesUntil(SourceLoc Loc,
+                                         PassNodesBehavior Behavior) {
   assert(Loc.isValid());
   unsigned I = 0;
   for (unsigned E = TokenNodes.size(); I != E; ++I) {
     SourceLoc TokLoc = TokenNodes[I].Range.getStart();
-    if (SM.isBeforeInBuffer(Loc, TokLoc) || (!Inclusive && TokLoc == Loc)) {
+    if (SM.isBeforeInBuffer(Loc, TokLoc)) {
+      break;
+    }
+    if (TokLoc == Loc && Behavior != IncludeNodeAtLocation) {
+      if (Behavior == DisplaceNodeAtLocation) {
+        //Skip past the node directly at the specified location, allowing the
+        //caller to effectively replace it.
+        ++I;
+      }
       break;
     }
     if (!passNode(TokenNodes[I]))
@@ -149,7 +167,7 @@ bool ColorASTWalker::passTokenNodesUntil(SourceLoc Loc, bool Inclusive) {
 }
 
 bool ColorASTWalker::passNonTokenNode(const SyntaxNode &Node) {
-  if (!passTokenNodesUntil(Node.Range.getStart(), /*Inclusive=*/false))
+  if (!passTokenNodesUntil(Node.Range.getStart(), DisplaceNodeAtLocation))
     return false;
   if (!passNode(Node))
     return false;
