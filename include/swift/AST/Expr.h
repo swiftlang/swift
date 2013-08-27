@@ -22,7 +22,6 @@
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
