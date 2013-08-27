@@ -663,7 +663,7 @@ public:
   // ErrorStmt on a semantic error.
   static bool isStartOfStmt(const Token &Tok);
   NullablePtr<Stmt> parseStmt();
-  bool parseExprOrStmt(ExprStmtOrDecl &Results);
+  ParserStatus parseExprOrStmt(ExprStmtOrDecl &Results);
   ParserResult<Stmt> parseStmtReturn();
   ParserResult<Stmt> parseStmtIf();
   ParserResult<Stmt> parseStmtWhile();

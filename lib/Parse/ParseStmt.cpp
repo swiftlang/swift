@@ -71,18 +71,19 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   }
 }
 
-bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
+ParserStatus Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
   if (Tok.is(tok::semi)) {
     diagnose(Tok, diag::illegal_semi_stmt)
       .fixItRemove(SourceRange(Tok.getLoc()));
     consumeToken();
-    return true;
-  } else if (isStartOfStmt(Tok)) {
+    return makeParserError();
+  }
+  if (isStartOfStmt(Tok)) {
     NullablePtr<Stmt> Res = parseStmt();
     if (Res.isNull())
-      return true;
+      return makeParserError();
     Result = Res.get();
-    return false;
+    return makeParserSuccess();
   }
 
   if (CodeCompletion)
@@ -92,15 +93,13 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
                                             /*usesExprBasic*/ false);
   if (ResultExpr.hasCodeCompletion() && CodeCompletion) {
     CodeCompletion->completeExpr();
-    return true;
+    return ResultExpr;
   }
 
-  if (ResultExpr.isNull()) {
-    return true;
-  }
-  
-  Result = ResultExpr.get();
-  return false;
+  if (ResultExpr.isNonNull())
+    Result = ResultExpr.get();
+
+  return ResultExpr;
 }
 
 static bool isTerminatorForBraceItemListKind(const Token &Tok,
@@ -229,12 +228,14 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       ContextChange CC(*this, TLCD);
       SourceLoc StartLoc = Tok.getLoc();
 
-      bool FailedToParse = parseExprOrStmt(Result);
-      if (Tok.is(tok::code_complete) && isCodeCompletionFirstPass()) {
+      ParserStatus Status = parseExprOrStmt(Result);
+      if (Tok.is(tok::code_complete))
+        Status.setHasCodeCompletion();
+      if (Status.hasCodeCompletion() && isCodeCompletionFirstPass()) {
         consumeTopLevelDecl(BeginParserPosition);
         return;
       }
-      if (FailedToParse) {
+      if (Status.isError()) {
         NeedParseErrorRecovery = true;
       } else {
         auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
@@ -243,7 +244,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       }
     } else {
       SourceLoc StartLoc = Tok.getLoc();
-      if (parseExprOrStmt(Result))
+      if (parseExprOrStmt(Result).isError())
         NeedParseErrorRecovery = true;
       else {
 
@@ -826,16 +827,20 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
 
   SourceLoc lBraceLoc = consumeToken(tok::l_brace);
   SourceLoc rBraceLoc;
-  
+
+  ParserStatus Status;
+
   // If there are non-case-label statements at the start of the switch body,
   // raise an error and recover by parsing and discarding them.
-  ExprStmtOrDecl uncoveredStmt;
+  bool DiagnosedNotCoveredStmt = false;
   while (!Tok.is(tok::kw_case) && !Tok.is(tok::kw_default)
          && !Tok.is(tok::r_brace) && !Tok.is(tok::eof)) {
-    if (!uncoveredStmt)
+    if (!DiagnosedNotCoveredStmt) {
       diagnose(Tok, diag::stmt_in_switch_not_covered_by_case);
-    if (parseExprOrStmt(uncoveredStmt))
-      return nullptr;
+      DiagnosedNotCoveredStmt = true;
+    }
+    ExprStmtOrDecl NotCoveredStmt;
+    Status |= parseExprOrStmt(NotCoveredStmt);
   }
   
   SmallVector<CaseStmt*, 8> cases;
@@ -856,17 +861,17 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
         parsedDefault = true;
     }
   }
-  
+
   if (parseMatchingToken(tok::r_brace, rBraceLoc,
-                         diag::expected_rbrace_switch, lBraceLoc))
+                         diag::expected_rbrace_switch, lBraceLoc)) {
+    Status.setIsParseError();
+  }
+
+  if (Status.isError())
     return nullptr;
-  
-  return SwitchStmt::create(SwitchLoc,
-                            SubjectExpr.get(),
-                            lBraceLoc,
-                            cases,
-                            rBraceLoc,
-                            Context);
+
+  return SwitchStmt::create(SwitchLoc, SubjectExpr.get(), lBraceLoc,
+                            cases, rBraceLoc, Context);
 }
 
 bool Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
