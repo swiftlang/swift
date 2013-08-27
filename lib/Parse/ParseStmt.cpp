@@ -79,11 +79,10 @@ ParserStatus Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
     return makeParserError();
   }
   if (isStartOfStmt(Tok)) {
-    NullablePtr<Stmt> Res = parseStmt();
-    if (Res.isNull())
-      return makeParserError();
-    Result = Res.get();
-    return makeParserSuccess();
+    ParserResult<Stmt> Res = parseStmt();
+    if (Res.isNonNull())
+      Result = Res.get();
+    return Res;
   }
 
   if (CodeCompletion)
@@ -320,7 +319,7 @@ void Parser::parseTopLevelCodeDeclDelayed() {
 
 /// Recover from a 'case' or 'default' outside of a 'switch' by consuming up to
 /// the next ':'.
-static NullablePtr<Stmt> recoverFromInvalidCase(Parser &P) {
+static ParserResult<Stmt> recoverFromInvalidCase(Parser &P) {
   assert(P.Tok.is(tok::kw_case) || P.Tok.is(tok::kw_default)
          && "not case or default?!");
   P.diagnose(P.Tok, diag::case_outside_of_switch, P.Tok.getText());
@@ -329,26 +328,29 @@ static NullablePtr<Stmt> recoverFromInvalidCase(Parser &P) {
   return nullptr;
 }
 
-NullablePtr<Stmt> Parser::parseStmt() {
+ParserResult<Stmt> Parser::parseStmt() {
   switch (Tok.getKind()) {
   default:
     diagnose(Tok, diag::expected_stmt);
-    return 0;
-  case tok::kw_return: return parseStmtReturn().getPtrOrNull();
-  case tok::kw_if:     return parseStmtIf().getPtrOrNull();
-  case tok::kw_while:  return parseStmtWhile().getPtrOrNull();
-  case tok::kw_do:     return parseStmtDoWhile().getPtrOrNull();
-  case tok::kw_for:    return parseStmtFor().getPtrOrNull();
-  case tok::kw_switch: return parseStmtSwitch().getPtrOrNull();
+    return nullptr;
+  case tok::kw_return: return parseStmtReturn();
+  case tok::kw_if:     return parseStmtIf();
+  case tok::kw_while:  return parseStmtWhile();
+  case tok::kw_do:     return parseStmtDoWhile();
+  case tok::kw_for:    return parseStmtFor();
+  case tok::kw_switch: return parseStmtSwitch();
   /// 'case' and 'default' are only valid at the top level of a switch.
   case tok::kw_case:
   case tok::kw_default: return recoverFromInvalidCase(*this);
   case tok::kw_break:
-    return new (Context) BreakStmt(consumeToken(tok::kw_break));
+    return makeParserResult(
+        new (Context) BreakStmt(consumeToken(tok::kw_break)));
   case tok::kw_continue:
-    return new (Context) ContinueStmt(consumeToken(tok::kw_continue));
+    return makeParserResult(
+        new (Context) ContinueStmt(consumeToken(tok::kw_continue)));
   case tok::kw_fallthrough:
-    return new (Context) FallthroughStmt(consumeToken(tok::kw_fallthrough));
+    return makeParserResult(
+        new (Context) FallthroughStmt(consumeToken(tok::kw_fallthrough)));
   }
 }
 
@@ -863,11 +865,6 @@ ParserResult<Stmt> Parser::parseStmtSwitch() {
                          diag::expected_rbrace_switch, lBraceLoc)) {
     Status.setIsParseError();
   }
-
-  if (Status.isError())
-    // FIXME: this should not be needed when we propagate code completion bits
-    // all the way up correctly.
-    return nullptr;
 
   return makeParserResult(
       Status, SwitchStmt::create(SwitchLoc, SubjectExpr.get(), lBraceLoc,

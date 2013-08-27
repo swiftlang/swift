@@ -662,7 +662,7 @@ public:
   // Each of these returns null (in a NullablePtr) on a parse error, or an
   // ErrorStmt on a semantic error.
   static bool isStartOfStmt(const Token &Tok);
-  NullablePtr<Stmt> parseStmt();
+  ParserResult<Stmt> parseStmt();
   ParserStatus parseExprOrStmt(ExprStmtOrDecl &Result);
   ParserResult<Stmt> parseStmtReturn();
   ParserResult<Stmt> parseStmtIf();
