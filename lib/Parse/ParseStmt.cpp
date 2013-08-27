@@ -421,7 +421,10 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
 ParserResult<Stmt> Parser::parseStmtIf() {
   SourceLoc IfLoc = consumeToken(tok::kw_if);
 
+  ParserStatus Status;
+
   ParserResult<Expr> Condition = parseExprBasic(diag::expected_expr_if);
+  //Status |= Condition;
   if (Condition.isNull() || Condition.hasCodeCompletion())
     return makeParserResult<Stmt>(Condition, nullptr); // FIXME: better recovery
 
@@ -442,6 +445,8 @@ ParserResult<Stmt> Parser::parseStmtIf() {
   if (NormalBody.isNull())
     return nullptr; // FIXME: better recovery
 
+  Status |= NormalBody;
+
   SourceLoc ElseLoc;
   ParserResult<Stmt> ElseBody;
   if (Tok.is(tok::kw_else)) {
@@ -450,11 +455,12 @@ ParserResult<Stmt> Parser::parseStmtIf() {
       ElseBody = parseStmtIf();
     else
       ElseBody = parseBraceItemList(diag::expected_lbrace_after_else);
+    Status |= ElseBody;
   }
 
   return makeParserResult(
-      new (Context) IfStmt(IfLoc, Condition.get(), NormalBody.get(),
-                           ElseLoc, ElseBody.getPtrOrNull()));
+      Status, new (Context) IfStmt(IfLoc, Condition.get(), NormalBody.get(),
+                                   ElseLoc, ElseBody.getPtrOrNull()));
 }
 
 /// 
