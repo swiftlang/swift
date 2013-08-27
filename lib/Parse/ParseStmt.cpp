@@ -341,7 +341,7 @@ NullablePtr<Stmt> Parser::parseStmt() {
   case tok::kw_while:  return parseStmtWhile().getPtrOrNull();
   case tok::kw_do:     return parseStmtDoWhile().getPtrOrNull();
   case tok::kw_for:    return parseStmtFor().getPtrOrNull();
-  case tok::kw_switch: return parseStmtSwitch();
+  case tok::kw_switch: return parseStmtSwitch().getPtrOrNull();
   /// 'case' and 'default' are only valid at the top level of a switch.
   case tok::kw_case:
   case tok::kw_default: return recoverFromInvalidCase(*this);
@@ -786,7 +786,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
 ///
 ///    stmt-switch:
 ///      'switch' expr-basic '{' stmt-case* '}'
-NullablePtr<Stmt> Parser::parseStmtSwitch() {
+ParserResult<Stmt> Parser::parseStmtSwitch() {
   SourceLoc SwitchLoc = consumeToken(tok::kw_switch);
 
   bool SubjectStartsWithLBrace = Tok.is(tok::l_brace);
@@ -800,16 +800,15 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
 
   ParserResult<Expr> SubjectExpr = parseExprBasic(diag::expected_switch_expr);
   if (SubjectExpr.hasCodeCompletion())
-    return nullptr;
+    return makeParserCodeCompletionResult<Stmt>();
 
   if (!Tok.is(tok::l_brace)) {
-    if (SubjectStartsWithLBrace)
-      diagnose(SwitchLoc, diag::expected_switch_expr);
-    else
+    if (!SubjectStartsWithLBrace) {
       diagnose(Tok, diag::expected_lbrace_after_switch);
-
-    if (!SubjectStartsWithLBrace)
       return nullptr;
+    }
+
+    diagnose(SwitchLoc, diag::expected_switch_expr);
 
     // We are going to reparse what we parsed as subject expr.
     SubjectExpr = nullptr;
@@ -868,10 +867,13 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
   }
 
   if (Status.isError())
+    // FIXME: this should not be needed when we propagate code completion bits
+    // all the way up correctly.
     return nullptr;
 
-  return SwitchStmt::create(SwitchLoc, SubjectExpr.get(), lBraceLoc,
-                            cases, rBraceLoc, Context);
+  return makeParserResult(
+      Status, SwitchStmt::create(SwitchLoc, SubjectExpr.get(), lBraceLoc,
+                                 cases, rBraceLoc, Context));
 }
 
 bool Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
