@@ -108,10 +108,13 @@ static void diagnoseReturn(const SILInstruction *I, ASTContext &Context) {
 
   if (const FuncExpr *FExpr = FLoc.getAsASTNode<FuncExpr>()) {
     if (AnyFunctionType *T = FExpr->getType()->castTo<AnyFunctionType>()) {
+
+      // Warn if we reach a return inside a noreturn function.
       if (T->isNoReturn()) {
         SILLocation L = TI->getLoc();
-        // Warn if we have an explicit return.
         if (L.is<ReturnLocation>())
+          diagnose(Context, L.getStartSourceLoc(), diag::return_from_noreturn);
+        if (L.is<ImplicitReturnLocation>())
           diagnose(Context, L.getEndSourceLoc(), diag::return_from_noreturn);
       }
     }
