@@ -62,7 +62,7 @@ Passes(llvm::cl::desc("Passes:"),
                                    "Emit SIL diagnostics"),
                         clEnumValN(PassKind::MandatoryInlining,
                                    "mandatory-inlining",
-                                   "Inline [force_inline] functions"),
+                                   "Inline transparent functions"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>

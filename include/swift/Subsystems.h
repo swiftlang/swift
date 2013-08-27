@@ -173,8 +173,8 @@ namespace swift {
   /// diagnostics if any.
   void emitSILDataflowDiagnostics(const SILModule *M);
 
-  /// \brief Inline functions marked [force_inline]. Diagnose attempts to force
-  /// circular inlining
+  /// \brief Inline functions marked transparent. Diagnose attempts to
+  /// circularly inline
   void performSILMandatoryInlining(SILModule *M);
 
   /// Serializes a translation unit to the given output file.
