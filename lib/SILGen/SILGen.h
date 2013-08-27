@@ -519,7 +519,7 @@ public:
   /// \brief Emits a standard epilog which runs top-level cleanups then returns
   /// the function return value, if any.
   ///
-  /// \param TopLevel The location of the top-level expression during whose
+  /// \param TopLevelLoc The location of the top-level expression during whose
   ///        evaluation the epilog is being produced, for example, the
   ///        CapturingExpr.
   /// \param IsAutoGen Flags if the prolog is auto-generated.
