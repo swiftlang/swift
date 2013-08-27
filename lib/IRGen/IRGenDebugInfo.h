@@ -197,7 +197,7 @@ public:
                                      StringRef Name,
                                      StringRef LinkageName,
                                      DebugTypeInfo DebugType,
-                                     SILLocation Loc);
+                                     RegularLocation Loc);
 
   StringRef getMainFilename() const { return MainFilename; }
 

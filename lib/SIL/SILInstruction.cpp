@@ -230,7 +230,7 @@ AllocStackInst::AllocStackInst(SILLocation loc, SILType elementType, SILFunction
 /// getDecl - Return the underlying variable declaration associated with this
 /// allocation, or null if this is a temporary allocation.
 VarDecl *AllocStackInst::getDecl() const {
-  return getLoc().getAs<VarDecl>();
+  return getLoc().getAsASTNode<VarDecl>();
 }
 
 AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F)

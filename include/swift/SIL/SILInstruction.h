@@ -68,8 +68,6 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
   /// ilist_traits<SILInstruction>.
   SILBasicBlock *ParentBB;
 
-  /// This instruction's location (i.e., AST).
-  SILLocation Loc;
   /// This instruction's containing lexical scope used for debug info.
   SILDebugScope* DebugScope;
 
@@ -79,12 +77,15 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
   void operator delete(void *Ptr, size_t) = delete;
 
 protected:
+  /// This instruction's location (i.e., AST).
+  SILLocation Loc;
+
   SILInstruction(ValueKind Kind, SILLocation Loc, SILType Ty,
                  SILDebugScope *DS=0)
-    : ValueBase(Kind, Ty), ParentBB(0), Loc(Loc), DebugScope(DS) {}
+    : ValueBase(Kind, Ty), ParentBB(0), DebugScope(DS), Loc(Loc) {}
   SILInstruction(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList = 0,
                  SILDebugScope *DS=0)
-    : ValueBase(Kind, TypeList), ParentBB(0), Loc(Loc), DebugScope(DS) {}
+    : ValueBase(Kind, TypeList), ParentBB(0), DebugScope(DS), Loc(Loc) {}
 
 public:
 

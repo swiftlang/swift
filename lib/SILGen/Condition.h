@@ -49,8 +49,9 @@ public:
             SILLocation L)
     : TrueBB(TrueBB), FalseBB(FalseBB), ContBB(ContBB), Loc(L)
   {
-    assert(L.is<IfStmt>() || L.is<ForEachStmt>() || L.is<ForStmt>() ||
-           L.is<IfExpr>() || L.is<WhileStmt>() || L.is<DoWhileStmt>()  );
+    assert(L.isASTNode<IfStmt>() || L.isASTNode<ForEachStmt>() ||
+           L.isASTNode<ForStmt>() || L.isASTNode<IfExpr>() ||
+           L.isASTNode<WhileStmt>() || L.isASTNode<DoWhileStmt>());
   }
   
   bool hasTrue() const { return TrueBB; }

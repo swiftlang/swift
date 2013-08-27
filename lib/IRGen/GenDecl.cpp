@@ -711,7 +711,7 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
 llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
                                                llvm::Type *storageType,
                                                DebugTypeInfo DebugType,
-                                               SILLocation DebugLoc,
+                                               RegularLocation DebugLoc,
                                                StringRef DebugName) {
   llvm::GlobalValue *existing = IGM.Module.getNamedGlobal(getName());
   if (existing) {

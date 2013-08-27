@@ -37,12 +37,13 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
   Type ResTy;
 
   // Should be an Expr as it's the parent of the basic block.
-  if (const FuncExpr *FExpr = FLoc.getAs<FuncExpr>()) {
+  if (const FuncExpr *FExpr = FLoc.getAsASTNode<FuncExpr>()) {
     ResTy = FExpr->getResultType(Context);
     if (ResTy->isVoid())
       return;
 
-    if (AnyFunctionType *T = FExpr->getType()->castTo<AnyFunctionType>()) {
+    if (AnyFunctionType *T =
+          FExpr->getType()->castTo<AnyFunctionType>()) {
       if (T->isNoReturn())
         return;
     }
@@ -83,13 +84,13 @@ static void diagnoseUnreachable(const SILInstruction *I,
     // The most common case of getting an unreachable instruction is a
     // missing return statement. In this case, we know that the instruction
     // location will be the enclosing function.
-    if (L.is<FuncExpr>()) {
+    if (L.isASTNode<FuncExpr>()) {
       diagnoseMissingReturn(UI, Context);
       return;
     }
 
     // A non-exhaustive switch would also produce an unreachable instruction.
-    if (L.is<SwitchStmt>()) {
+    if (L.isASTNode<SwitchStmt>()) {
       diagnoseNonExhaustiveSwitch(UI, Context);
       return;
     }
@@ -105,7 +106,7 @@ static void diagnoseReturn(const SILInstruction *I, ASTContext &Context) {
   const SILFunction *F = BB->getParent();
   SILLocation FLoc = F->getLocation();
 
-  if (const FuncExpr *FExpr = FLoc.getAs<FuncExpr>()) {
+  if (const FuncExpr *FExpr = FLoc.getAsASTNode<FuncExpr>()) {
     if (AnyFunctionType *T = FExpr->getType()->castTo<AnyFunctionType>()) {
       if (T->isNoReturn()) {
         SILLocation L = RI->getLoc();

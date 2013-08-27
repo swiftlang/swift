@@ -981,7 +981,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   SmallVector<SILValue, 4> OpList;
   SILValue Val;
 
-  SILLocation InstLoc = SILLocation::getSILFileLoc(OpcodeLoc);
+  SILLocation InstLoc = SILFileLocation(OpcodeLoc);
 
   // Validate the opcode name, and do opcode-specific parsing logic based on the
   // opcode we find.

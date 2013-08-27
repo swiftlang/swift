@@ -1959,7 +1959,7 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
 }
 
 static StringRef getNameForLoc(SILLocation loc) {
-  if (auto decl = loc.getAs<ValueDecl>())
+  if (auto decl = loc.getAsASTNode<ValueDecl>())
     return decl->getName().str();
   return "";
 }

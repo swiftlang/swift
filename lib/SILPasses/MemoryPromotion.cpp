@@ -459,7 +459,7 @@ void ElementPromotion::diagnoseInitError(SILInstruction *Use,
   // optionally an access path to the uninitialized element.
   std::string Name;
   if (ValueDecl *VD =
-        dyn_cast_or_null<ValueDecl>(TheAllocBox->getLoc().getAs<Decl>()))
+        dyn_cast_or_null<ValueDecl>(TheAllocBox->getLoc().getAsASTNode<Decl>()))
     Name = VD->getName().str();
   else
     Name = "<unknown>";

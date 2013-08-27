@@ -1131,7 +1131,7 @@ void SILGenFunction::emitObjCMethodThunk(SILDeclRef thunk) {
   SILValue nativeFn = emitGlobalFunctionRef(thunk.getDecl(), native);
   SILValue result = B.createApply(thunk.getDecl(),
                                   nativeFn, swiftResultTy, args);
-  
+  // FIXME: This should have artificial location.
   emitObjCReturnValue(*this, thunk.getDecl(), result, objcResultTy, ownership);
 }
 
@@ -1149,6 +1149,7 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
   if (var->isProperty()) {
     SILValue nativeFn = emitGlobalFunctionRef(var, native);
     SILValue result = B.createApply(var, nativeFn, swiftResultTy, args);
+    // FIXME: This should have artificial location.
     emitObjCReturnValue(*this, var, result, objcResultTy, ownership);
     return;
   }
@@ -1178,6 +1179,7 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
     // transferring ownership in aggregates.
     fieldLowering.emitSemanticLoadInto(B, var, addr, indirectReturn,
                                        IsNotTake, IsInitialization);
+    // FIXME: This should have artificial location.
     B.createStrongRelease(getter.getDecl(), thisValue);
     B.createReturn(var, emitEmptyTuple(var));
     return;
@@ -1185,6 +1187,8 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
 
   // Bridge the result.
   SILValue result = fieldLowering.emitSemanticLoad(B, var, addr, IsNotTake);
+
+  // FIXME: This should have artificial location.
   B.createStrongRelease(var, thisValue);
   return emitObjCReturnValue(*this, var, result, objcResultTy,
                              ownership);
@@ -1203,6 +1207,7 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
                                     SGM.Types.getEmptyTupleType(),
                                     args);
     // Result should be void.
+    // FIXME: This should have artificial location.
     B.createReturn(setter.getDecl(), result);
     return;
   }
@@ -1217,6 +1222,7 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
                                  varTI.getLoweredType().getAddressType());
   varTI.emitSemanticAssignment(B, setter.getDecl(), setValue, addr);
   
+  // FIXME: This should have artificial location.
   B.createStrongRelease(setter.getDecl(), thisValue);
   B.createReturn(var, emitEmptyTuple(var));
 }

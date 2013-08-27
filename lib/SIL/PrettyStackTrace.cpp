@@ -24,14 +24,14 @@ using namespace swift;
 
 static void printSILLocation(llvm::raw_ostream &out, SILLocation loc,
                              ASTContext &Context) {
-  if (auto decl = loc.getAs<Decl>()) {
+  if (auto decl = loc.getAsASTNode<Decl>()) {
     printDeclDescription(out, decl, Context);
-  } else if (auto expr = loc.getAs<Expr>()) {
+  } else if (auto expr = loc.getAsASTNode<Expr>()) {
     printExprDescription(out, expr, Context);
-  } else if (auto stmt = loc.getAs<Stmt>()) {
+  } else if (auto stmt = loc.getAsASTNode<Stmt>()) {
     printStmtDescription(out, stmt, Context);
   } else {
-    auto pattern = loc.castTo<Pattern>();
+    auto pattern = loc.castToASTNode<Pattern>();
     printPatternDescription(out, pattern, Context);
   }
 }

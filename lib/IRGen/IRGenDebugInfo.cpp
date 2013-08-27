@@ -161,10 +161,10 @@ Location getStartLoc(SourceManager &SM, WithLoc *S) {
 
 /// getStartLoc - extract the start location from a SILLocation.
 static Location getStartLoc(SourceManager &SM, SILLocation Loc) {
-  if (Expr* E = Loc.getAs<Expr>()) return getStartLoc(SM, E);
-  if (Stmt* S = Loc.getAs<Stmt>()) return getStartLoc(SM, S);
-  if (Decl* D = Loc.getAs<Decl>()) return getStartLoc(SM, D);
-  if (Pattern* P = Loc.getAs<Pattern>()) return getStartLoc(SM, P);
+  if (Expr* E = Loc.getAsASTNode<Expr>()) return getStartLoc(SM, E);
+  if (Stmt* S = Loc.getAsASTNode<Stmt>()) return getStartLoc(SM, S);
+  if (Decl* D = Loc.getAsASTNode<Decl>()) return getStartLoc(SM, D);
+  if (Pattern* P = Loc.getAsASTNode<Pattern>()) return getStartLoc(SM, P);
 
   Location None = {};
   return None;
@@ -175,7 +175,7 @@ static Location getStartLoc(SourceManager &SM, SILLocation Loc) {
 /// rdar://problem/14627460, we may want to use the regular
 /// getStartLoc instead and rather use the column info.
 static Location getStartLocForLinetable(SourceManager &SM, SILLocation Loc) {
-  if (Expr* E = Loc.getAs<Expr>()) {
+  if (Expr* E = Loc.getAsASTNode<Expr>()) {
     // Implicit closures should not show up in the line table. Note
     // that the closure function still has a valid DW_AT_decl_line.
     if (E->getKind() == ExprKind::ImplicitClosure)
@@ -183,9 +183,9 @@ static Location getStartLocForLinetable(SourceManager &SM, SILLocation Loc) {
     return getStartLoc(SM, E);
   }
 
-  if (Stmt* S = Loc.getAs<Stmt>()) return getStartLoc(SM, S);
-  if (Decl* D = Loc.getAs<Decl>()) return getStartLoc(SM, D);
-  if (Pattern* P = Loc.getAs<Pattern>()) return getStartLoc(SM, P);
+  if (Stmt* S = Loc.getAsASTNode<Stmt>()) return getStartLoc(SM, S);
+  if (Decl* D = Loc.getAsASTNode<Decl>()) return getStartLoc(SM, D);
+  if (Pattern* P = Loc.getAsASTNode<Pattern>()) return getStartLoc(SM, P);
 
   Location None = {};
   return None;
@@ -194,7 +194,7 @@ static Location getStartLocForLinetable(SourceManager &SM, SILLocation Loc) {
 /// Determine whether this debug scope belongs to a pipe closure.
 static bool isPipeClosure(SILDebugScope *DS) {
   if (DS)
-    if (Expr* E = DS->Loc.getAs<Expr>())
+    if (Expr* E = DS->Loc.getAsASTNode<Expr>())
       if (E->getKind() == ExprKind::PipeClosure)
         return true;
   return false;
@@ -326,14 +326,14 @@ StringRef IRGenDebugInfo::getName(SILLocation L) {
   if (L.isNull())
     return StringRef();
 
-  if (FuncExpr* FE = L.getAs<FuncExpr>())
+  if (FuncExpr* FE = L.getAsASTNode<FuncExpr>())
     if (FuncDecl* FD = FE->getDecl())
       return getName(*FD);
 
-  if (FuncDecl* FD = L.getAs<FuncDecl>())
+  if (FuncDecl* FD = L.getAsASTNode<FuncDecl>())
     return getName(*FD);
 
-  if (L.is<ConstructorDecl>())
+  if (L.isASTNode<ConstructorDecl>())
     return "constructor";
 
   return StringRef();
@@ -668,7 +668,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                                    StringRef Name,
                                                    StringRef LinkageName,
                                                    DebugTypeInfo DebugType,
-                                                   SILLocation Loc) {
+                                                   RegularLocation Loc) {
   Location L = getStartLoc(SM, Loc);
   llvm::DIFile Unit = getOrCreateFile(L.Filename);
 

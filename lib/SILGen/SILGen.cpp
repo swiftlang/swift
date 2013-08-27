@@ -254,9 +254,9 @@ SILFunction *SILGenModule::preEmitFunction(SILDeclRef constant, T *astNode) {
   assert(f->empty() && "already emitted function?!");
 
   // Create a debug scope for the function using astNode as source location.
-  f->setDebugScope(new (M) SILDebugScope(astNode));
+  f->setDebugScope(new (M) SILDebugScope(RegularLocation(astNode)));
 
-  f->setLocation(astNode);
+  f->setLocation(RegularLocation(astNode));
 
   DEBUG(llvm::dbgs() << "lowering ";
         f->printName(llvm::dbgs());
