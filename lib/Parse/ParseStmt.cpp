@@ -424,7 +424,7 @@ ParserResult<Stmt> Parser::parseStmtIf() {
   ParserStatus Status;
 
   ParserResult<Expr> Condition = parseExprBasic(diag::expected_expr_if);
-  //Status |= Condition;
+  Status |= Condition;
   if (Condition.isNull() || Condition.hasCodeCompletion())
     return makeParserResult<Stmt>(Condition, nullptr); // FIXME: better recovery
 
