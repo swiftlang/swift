@@ -97,11 +97,11 @@ public:
 
 private:
   enum PassNodesBehavior {
-    //Pass all nodes up to but not including the location
+    /// Pass all nodes up to but not including the location.
     ExcludeNodeAtLocation,
-    //Pass all nodes up to and including the location
+    /// Pass all nodes up to and including the location.
     IncludeNodeAtLocation,
-    //Like ExcludeNodeAtLocation, and skip past any node at the location
+    /// Like ExcludeNodeAtLocation, and skip past any node at the location.
     DisplaceNodeAtLocation
   };
   bool passTokenNodesUntil(SourceLoc Loc, PassNodesBehavior Behavior);
@@ -152,8 +152,8 @@ bool ColorASTWalker::passTokenNodesUntil(SourceLoc Loc,
     }
     if (TokLoc == Loc && Behavior != IncludeNodeAtLocation) {
       if (Behavior == DisplaceNodeAtLocation) {
-        //Skip past the node directly at the specified location, allowing the
-        //caller to effectively replace it.
+        // Skip past the node directly at the specified location, allowing the
+        // caller to effectively replace it.
         ++I;
       }
       break;
