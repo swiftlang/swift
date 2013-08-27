@@ -29,7 +29,7 @@ impose an “assignment-only” limitation, I'd still be free to write::
 
   extension String {
     func inplace_upper() {
-        this = this.upper()
+        this = self.upper()
     }
   }
 
@@ -140,7 +140,7 @@ those cases where the string's buffer is uniquely referenced::
     ...
 
     func inplace_upper() {
-      this.unique()                  // copy buffer iff refcount > 1
+      self.unique()                  // copy buffer iff refcount > 1
       for i in 0..buffer.length {
         buffer[i].inplace_upper()    // naïve ASCII-only implementation
       }
@@ -335,7 +335,7 @@ assigns the result to its left argument, as if written::
 
       extension String {
         func inplace_upper() {
-          this = this.upper()
+          this = self.upper()
         }
       }
 

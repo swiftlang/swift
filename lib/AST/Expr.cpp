@@ -386,18 +386,18 @@ ValueDecl *ApplyExpr::getCalledValue() const {
 }
 
 /// getImplicitThisDecl - If this FuncExpr is a non-static method in an
-/// extension context, it will have a 'this' argument.  This method returns it
+/// extension context, it will have a 'self' argument.  This method returns it
 /// if present, or returns null if not.
 VarDecl *FuncExpr::getImplicitThisDecl() const {
   if (getNumParamPatterns() == 0) return nullptr;
   
-  // "this" is represented as (typed_pattern (named_pattern (var_decl 'this')).
+  // "self" is represented as (typed_pattern (named_pattern (var_decl 'self')).
   auto TP = dyn_cast<TypedPattern>(getArgParamPatterns()[0]);
   if (TP == 0) return nullptr;
   
-  // The decl should be named 'this' and have no location information.
+  // The decl should be named 'self' and have no location information.
   auto NP = dyn_cast<NamedPattern>(TP->getSubPattern());
-  if (NP && NP->getBoundName().str() == "this" && !NP->getLoc().isValid())
+  if (NP && NP->getBoundName().str() == "self" && !NP->getLoc().isValid())
     return NP->getDecl();
   return nullptr;
 }

@@ -300,7 +300,7 @@ public:
   void setImplicit() { DeclBits.Implicit = true; }
 
   /// \brief Returns true if there is a Clang AST node associated
-  /// with this.
+  /// with self.
   bool hasClangNode() const {
     return DeclBits.FromClang;
   }
@@ -1336,7 +1336,7 @@ public:
 /// }
 /// \endcode
 ///
-/// Every protocol has an implicitly-created associated type 'This' that
+/// Every protocol has an implicitly-created associated type 'Self' that
 /// describes a type that conforms to the protocol.
 class AssociatedTypeDecl : public AbstractTypeParamDecl {
   /// The location of the initial keyword.
@@ -1349,7 +1349,7 @@ public:
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
                      SourceLoc nameLoc);
 
-  /// Determine whether this is the implicitly-created 'This'.
+  /// Determine whether this is the implicitly-created 'Self'.
   bool isThis() const { return isImplicit(); }
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
@@ -1739,7 +1739,7 @@ public:
     return SourceRange(ProtocolLoc, getBraces().End);
   }
 
-  /// \brief Retrieve the associated type 'This'.
+  /// \brief Retrieve the associated type 'Self'.
   AssociatedTypeDecl *getThis() const;
 
   /// True if this protocol can only be conformed to by class types.
@@ -1935,9 +1935,9 @@ public:
   Type getExtensionType() const;
   
   /// computeThisType - If this is a method in a type extension for some type,
-  /// compute and return the type to be used for the 'this' argument of the
+  /// compute and return the type to be used for the 'self' argument of the
   /// type (which varies based on whether the extended type is a reference type
-  /// or not), or an empty Type() if no 'this' argument should exist.  This can
+  /// or not), or an empty Type() if no 'self' argument should exist.  This can
   /// only be used after name binding has resolved types.
   ///
   /// \param OuterGenericParams If non-NULL, and this function is an instance
@@ -1946,7 +1946,7 @@ public:
   Type computeThisType(GenericParamList **OuterGenericParams = nullptr) const;
   
   /// getImplicitThisDecl - If this FuncDecl is a non-static method in an
-  /// extension context, it will have a 'this' argument.  This method returns it
+  /// extension context, it will have a 'self' argument.  This method returns it
   /// if present, or returns null if not.
   VarDecl *getImplicitThisDecl() const;
   
@@ -2223,7 +2223,7 @@ class ConstructorDecl : public ValueDecl, public DeclContext {
   Type InitializerType = Type();
 
   /// \brief When non-null, the expression that should be used to
-  /// allocate 'this'.
+  /// allocate 'self'.
   Expr *AllocThis = nullptr;
   
 public:
@@ -2249,7 +2249,7 @@ public:
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *b) { Body = b; }
 
-  /// computeThisType - compute and return the type of 'this'.
+  /// computeThisType - compute and return the type of 'self'.
   Type computeThisType(GenericParamList **OuterGenericParams = nullptr) const;
 
   /// getArgumentType - get the type of the argument tuple
@@ -2258,21 +2258,21 @@ public:
   /// \brief Get the type of the constructed object.
   Type getResultType() const;
 
-  /// getImplicitThisDecl - This method returns the implicit 'this' decl.
+  /// getImplicitThisDecl - This method returns the implicit 'self' decl.
   VarDecl *getImplicitThisDecl() const { return ImplicitThisDecl; }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
   bool isGeneric() const { return GenericParams != nullptr; }
 
   /// \brief Retrieve the expression that should be evaluated to allocate
-  /// 'this', or null if 'this' should be allocated via the normal path.
+  /// 'self', or null if 'self' should be allocated via the normal path.
   ///
   /// There is no way to describe this expression in the Swift language.
   /// However, the \c ClangImporter synthesizes this-allocation expressions
   /// for "constructors" of Objective-C classes (which call 'alloc').
   Expr *getAllocThisExpr() const { return AllocThis; }
 
-  /// \brief Set the expression used to allocate this.
+  /// \brief Set the expression used to allocate self.
   void setAllocThisExpr(Expr *expr) { AllocThis = expr; }
 
   /// Given that this is an Objective-C method declaration, produce
@@ -2323,10 +2323,10 @@ public:
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *b) { Body = b; }
 
-  /// computeThisType - compute and return the type of 'this'.
+  /// computeThisType - compute and return the type of 'self'.
   Type computeThisType(GenericParamList **OuterGenericParams = nullptr) const;
 
-  /// getImplicitThisDecl - This method returns the implicit 'this' decl.
+  /// getImplicitThisDecl - This method returns the implicit 'self' decl.
   VarDecl *getImplicitThisDecl() const { return ImplicitThisDecl; }
 
   static bool classof(const Decl *D) {

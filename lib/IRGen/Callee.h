@@ -141,7 +141,7 @@ namespace irgen {
 
     /// Prepare a callee for a known instance method.  Methods never
     /// require a data pointer.  The formal type here should
-    /// include the 'this' clause.
+    /// include the 'self' clause.
     static Callee forMethod(CanType origFormalType, CanType substResultType,
                             ArrayRef<Substitution> subs,
                             llvm::Constant *fn,

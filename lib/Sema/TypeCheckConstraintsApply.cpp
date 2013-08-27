@@ -258,7 +258,7 @@ namespace {
               // far. For existentials, this is trivial (it's
               // resultTy, but FIXME: this may change if we start
               // introducing archetypes for existentials). For
-              // archetypes, we need to substitute 'this' through.
+              // archetypes, we need to substitute 'self' through.
               if (baseTy->is<ArchetypeType>()) {
                 auto protocol = containerTy->castTo<ProtocolType>()->getDecl();
                 auto thisArchetype
@@ -365,7 +365,7 @@ namespace {
       // Reference to a variable within a class.
       if (auto var = dyn_cast<VarDecl>(member)) {
         if (!baseTy->is<ModuleType>()) {
-          // Convert the base to the type of the 'this' parameter.
+          // Convert the base to the type of the 'self' parameter.
           assert(baseIsInstance && "Can only access variables of an instance");
 
           // Convert the base to the appropriate container type, turning it
@@ -383,7 +383,7 @@ namespace {
       // well as module members.
       Expr *ref = tc.buildCheckedRefExpr(member, memberLoc);
 
-      // Refer to a member function that binds 'this':
+      // Refer to a member function that binds 'self':
       if ((isa<FuncDecl>(member) && member->getDeclContext()->isTypeContext()) ||
           isa<UnionElementDecl>(member) || isa<ConstructorDecl>(member)) {
         // Constructor calls.
@@ -653,7 +653,7 @@ namespace {
       assert(cast<FuncDecl>(value)->isOperator() && "Only operators allowed");
 
       // Figure out the base type, which we do by finding the type variable
-      // in the open type that corresponds to the 'This' archetype, which
+      // in the open type that corresponds to the 'Self' archetype, which
       // we opened.
       // FIXME: This is both inefficient and suspicious. We should probably
       // find a place to cache the type variable, rather than searching for it
@@ -2514,7 +2514,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (auto fnType = fn->getType()->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
     Expr *arg = nullptr;
-    if (isa<ThisApplyExpr>(apply))
+    if (isa<SelfApplyExpr>(apply))
       arg = coerceObjectArgumentToType(origArg, fnType->getInput(), nullptr);
     else
       arg = coerceToType(origArg, fnType->getInput(),

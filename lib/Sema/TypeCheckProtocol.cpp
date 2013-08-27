@@ -194,7 +194,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
     witnessType = witness->getType();
 
     // If the witness resides within a type context, substitute through the
-    // based type and ignore 'this'.
+    // based type and ignore 'self'.
     if (witness->getDeclContext()->isTypeContext()) {
       witnessType = witness->getType()->castTo<AnyFunctionType>()->getResult();
       witnessType = tc.substMemberTypeWithBase(witnessType, witness, model);
@@ -531,7 +531,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     if (!AssociatedType)
       continue;
     
-    // Bind the implicit 'This' type to the type T.
+    // Bind the implicit 'Self' type to the type T.
     auto archetype = AssociatedType->getArchetype();
     if (AssociatedType->isThis()) {
       TypeMapping[archetype]= T;
@@ -655,7 +655,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       continue;
 
     // Determine the type that the requirement is expected to have. If the
-    // requirement is for a function, look past the 'this' parameter.
+    // requirement is for a function, look past the 'self' parameter.
     Type reqType = Requirement->getType();
     if (isa<FuncDecl>(Requirement))
       reqType = reqType->castTo<AnyFunctionType>()->getResult();
@@ -916,7 +916,7 @@ existentialConformsToItself(TypeChecker &tc,
   for (auto member : proto->getMembers()) {
     // Check for associated types.
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      // 'This' is obviously okay.
+      // 'Self' is obviously okay.
       if (assocType == thisDecl)
         continue;
 
@@ -937,7 +937,7 @@ existentialConformsToItself(TypeChecker &tc,
     if (!valueMember)
       continue;
 
-    // Extract the type of the member, ignoring the 'this' parameter of
+    // Extract the type of the member, ignoring the 'self' parameter of
     // functions.
     auto memberTy = valueMember->getType();
     if (memberTy->is<ErrorType>())
@@ -945,7 +945,7 @@ existentialConformsToItself(TypeChecker &tc,
     if (isa<FuncDecl>(valueMember))
       memberTy = memberTy->castTo<AnyFunctionType>()->getResult();
 
-    // "Transform" the type to walk the whole type. If we find 'This', return
+    // "Transform" the type to walk the whole type. If we find 'Self', return
     // null. Otherwise, make this the identity transform and throw away the
     // result.
     if (tc.transformType(memberTy, [&](Type type) -> Type {
@@ -956,12 +956,12 @@ existentialConformsToItself(TypeChecker &tc,
 
           return type;
         })) {
-      // We didn't find 'This'. We're okay.
+      // We didn't find 'Self'. We're okay.
       continue;
     }
 
     // A protocol cannot conform to itself if any of its value members
-    // refers to 'This'.
+    // refers to 'Self'.
     proto->setExistentialConformsToSelf(false);
     if (complainLoc.isInvalid())
       return false;
@@ -1012,7 +1012,7 @@ static void suggestExplicitConformance(TypeChecker &tc,
     // Look for the owner of this witness.
     Decl *witnessOwner = nullptr;
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(req)) {
-      // Ignore the 'This' declaration.
+      // Ignore the 'Self' declaration.
       if (assocType == proto->getThis())
         continue;
 

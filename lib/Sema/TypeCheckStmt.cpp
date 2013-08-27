@@ -614,11 +614,11 @@ bool TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
 }
 
 /// \brief Given a pattern declaring some number of member variables, build an
-/// expression that references the variables relative to 'this' with the same
+/// expression that references the variables relative to 'self' with the same
 /// structure as the pattern.
 ///
 /// \param tc The type checker.
-/// \param thisDecl The 'this' declaration.
+/// \param thisDecl The 'self' declaration.
 /// \param pattern The pattern.
 static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *thisDecl,
                                         Pattern *pattern) {
@@ -722,7 +722,7 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
       else if (auto memberRef = dyn_cast<UnresolvedDotExpr>(dest)) {
         if (auto base = dyn_cast<DeclRefExpr>(
                           memberRef->getBase()->getSemanticsProvidingExpr())) {
-          if (base->getDecl()->getName().str().equals("this")) {
+          if (base->getDecl()->getName().str().equals("self")) {
             // Look for the member within this type.
             auto memberDecls
               = lookupMember(nominalDecl->getDeclaredTypeInContext(),
@@ -732,9 +732,9 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
           }
         }
       } else if (auto declRef = dyn_cast<DeclRefExpr>(dest)) {
-        // If the left-hand side is 'this', we're initializing the
+        // If the left-hand side is 'self', we're initializing the
         // whole object.
-        if (declRef->getDecl()->getName().str().equals("this")) {
+        if (declRef->getDecl()->getName().str().equals("self")) {
           allOfThisInitialized = true;
           break;
         }

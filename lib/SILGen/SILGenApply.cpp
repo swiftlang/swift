@@ -152,9 +152,9 @@ private:
                                        SILValue proto,
                                        SILDeclRef methodName,
                                        Type memberType) {
-    // 'this' for instance methods is projected out of the existential container
+    // 'self' for instance methods is projected out of the existential container
     // as an ObjCPointer or as the address of its This archetype.
-    // 'this' for existential metatypes is the metatype itself.
+    // 'self' for existential metatypes is the metatype itself.
     Type thisTy;
     bool isThin;
     if (methodName.getDecl()->isInstanceMember()) {
@@ -176,7 +176,7 @@ private:
     }
     
     // This is a method reference. Extract the method implementation from the
-    // archetype and apply the "this" argument.
+    // archetype and apply the "self" argument.
     auto Info = FunctionType::ExtInfo()
                   .withCallingConv(gen.SGM.getConstantCC(methodName))
                   .withIsThin(isThin);
@@ -233,7 +233,7 @@ public:
     // be able to stack specializations.
     // FIXME: Generic local functions can add type parameters to arbitrary
     // depth.
-    assert(callDepth < 2 && "specialization below 'this' or argument depth?!");
+    assert(callDepth < 2 && "specialization below 'self' or argument depth?!");
     substitutions.insert(substitutions.end(),
                          newSubs.begin(),
                          newSubs.end());
@@ -302,7 +302,7 @@ public:
     /// ownership conventions into the 'ownership' local variable.
     auto getMethodAndSetOwnership = [&]() -> SILDeclRef {
       assert(level >= 1
-             && "currying 'this' of dynamic method dispatch not yet supported");
+             && "currying 'self' of dynamic method dispatch not yet supported");
       assert(level <= method.methodName.uncurryLevel
              && "uncurrying past natural uncurry level of method");
       SILDeclRef c = method.methodName.atUncurryLevel(level);
@@ -349,7 +349,7 @@ public:
     }
     case Kind::ArchetypeMethod: {
       assert(level >= 1
-             && "currying 'this' of dynamic method dispatch not yet supported");
+             && "currying 'self' of dynamic method dispatch not yet supported");
       assert(level <= method.methodName.uncurryLevel
              && "uncurrying past natural uncurry level of method");
 
@@ -369,7 +369,7 @@ public:
     }
     case Kind::ProtocolMethod: {
       assert(level >= 1
-             && "currying 'this' of dynamic method dispatch not yet supported");
+             && "currying 'self' of dynamic method dispatch not yet supported");
       assert(level <= method.methodName.uncurryLevel
              && "uncurrying past natural uncurry level of method");
       
@@ -445,8 +445,8 @@ class SILGenApply : public Lowering::ExprVisitor<SILGenApply>
 public:
   SILGenFunction &gen;
   Optional<Callee> callee;
-  RValue thisParam;
-  Expr *thisApplyExpr = nullptr;
+  RValue selfParam;
+  Expr *SelfApplyExpr = nullptr;
   std::vector<ApplyExpr*> callSites;
   Expr *sideEffect = nullptr;
   unsigned callDepth = 0;
@@ -456,7 +456,7 @@ public:
   {}
   
   void setCallee(Callee &&c) {
-    assert((thisParam ? callDepth == 1 : callDepth == 0)
+    assert((selfParam ? callDepth == 1 : callDepth == 0)
            && "setting callee at non-zero call depth?!");
     assert(!callee && "already set callee!");
     callee.emplace(std::move(c));
@@ -467,10 +467,10 @@ public:
     sideEffect = sideEffectExpr;
   }
   
-  void setThisParam(RValue &&theThisParam, Expr *theThisApplyExpr) {
-    assert(!thisParam && "already set this!");
-    thisParam = std::move(theThisParam);
-    thisApplyExpr = theThisApplyExpr;
+  void setSelfParam(RValue &&theSelfParam, Expr *theSelfApplyExpr) {
+    assert(!selfParam && "already set this!");
+    selfParam = std::move(theSelfParam);
+    SelfApplyExpr = theSelfApplyExpr;
     ++callDepth;
   }
 
@@ -510,16 +510,16 @@ public:
       if (isa<ClassDecl>(fd->getDeclContext()) || fd->isObjC()) {
         ApplyExpr *thisCallSite = callSites.back();
         callSites.pop_back();
-        setThisParam(gen.emitRValue(thisCallSite->getArg()), thisCallSite);
+        setSelfParam(gen.emitRValue(thisCallSite->getArg()), thisCallSite);
         SILDeclRef constant(fd,
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
                              gen.SGM.requiresObjCDispatch(fd));
         
-        setCallee(Callee::forClassMethod(gen, thisParam.peekScalarValue(),
+        setCallee(Callee::forClassMethod(gen, selfParam.peekScalarValue(),
                                          constant, e));
         
-        // setThisParam bumps the callDepth, but we aren't really past the
-        // 'this' call depth in this case.
+        // setSelfParam bumps the callDepth, but we aren't really past the
+        // 'self' call depth in this case.
         --callDepth;
         return;
       }
@@ -574,11 +574,11 @@ public:
         proj = ManagedValue(val, ManagedValue::Unmanaged);
       }
 
-      setThisParam(RValue(gen, proj), e);
+      setSelfParam(RValue(gen, proj), e);
     } else {
       assert(existential.getType().is<MetaTypeType>() &&
              "non-existential-metatype for existential static method?!");
-      setThisParam(RValue(gen, existential), e);
+      setSelfParam(RValue(gen, existential), e);
     }
 
     // Method calls through ObjC protocols require ObjC dispatch.
@@ -589,7 +589,7 @@ public:
                                   e->getType(), e));
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
-    setThisParam(gen.emitRValue(e->getBase()), e);
+    setSelfParam(gen.emitRValue(e->getBase()), e);
     
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "archetype properties not yet supported");
@@ -597,7 +597,7 @@ public:
     // Method calls through ObjC protocols require ObjC dispatch.
     bool isObjC = cast<ProtocolDecl>(fd->getDeclContext())->isObjC();
     
-    setCallee(Callee::forArchetype(gen, thisParam.peekScalarValue(),
+    setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
                                    SILDeclRef(fd).asObjC(isObjC),
                                    e->getType(), e));
   }
@@ -637,13 +637,13 @@ public:
     } else
       llvm_unreachable("invalid super callee");
 
-    // Upcast 'this' parameter to the super type.
+    // Upcast 'self' parameter to the super type.
     SILType superTy
       = gen.getLoweredLoadableType(apply->getArg()->getType()->getRValueType());
     SILValue superUpcast = gen.B.createUpcast(apply->getArg(), super.getValue(),
                                               superTy);
     
-    setThisParam(RValue(gen, ManagedValue(superUpcast, super.getCleanup())),
+    setSelfParam(RValue(gen, ManagedValue(superUpcast, super.getCleanup())),
                  apply);
     
     SILValue superMethod;
@@ -1278,10 +1278,10 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   // nested calls.
   CallEmission emission(gen, apply.getCallee(), std::move(writebacks));
   
-  // Apply 'this' if provided.
-  if (apply.thisParam)
-    emission.addCallSite(SILLocation(), std::move(apply.thisParam),
-                         apply.thisApplyExpr->getType());
+  // Apply 'self' if provided.
+  if (apply.selfParam)
+    emission.addCallSite(SILLocation(), std::move(apply.selfParam),
+                         apply.SelfApplyExpr->getType());
 
   // Apply arguments from call sites, innermost to outermost.
   for (auto site = apply.callSites.rbegin(), end = apply.callSites.rend();

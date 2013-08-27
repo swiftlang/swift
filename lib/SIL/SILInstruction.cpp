@@ -30,7 +30,7 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 // The trait object is embedded into a basic block.  Use dirty hacks to
-// reconstruct the BB from the 'this' pointer of the trait.
+// reconstruct the BB from the 'self' pointer of the trait.
 SILBasicBlock *llvm::ilist_traits<SILInstruction>::getContainingBlock() {
   typedef iplist<SILInstruction> SILBasicBlock::*Sublist;
 size_t Offset(size_t(&((SILBasicBlock*)0->*SILBasicBlock::getSublistAccess())));
@@ -104,14 +104,14 @@ const SILModule *SILInstruction::getModule() const {
 }
 
 
-/// removeFromParent - This method unlinks 'this' from the containing basic
+/// removeFromParent - This method unlinks 'self' from the containing basic
 /// block, but does not delete it.
 ///
 void SILInstruction::removeFromParent() {
   getParent()->getInsts().remove(this);
 }
 
-/// eraseFromParent - This method unlinks 'this' from the containing basic
+/// eraseFromParent - This method unlinks 'self' from the containing basic
 /// block and deletes it.
 ///
 void SILInstruction::eraseFromParent() {

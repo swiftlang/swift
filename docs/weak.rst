@@ -607,10 +607,10 @@ These implicit conversions require some thought.  Consider code like
 the following::
 
   func moveToWindow(newWindow : Window) {
-    var oldWindow = this.window   // an [unowned] back reference
+    var oldWindow = self.window   // an [unowned] back reference
     oldWindow.hide()              // might remove the UI's strong reference
-    oldWindow.remove(this)
-    newWindow.add(this)
+    oldWindow.remove(self)
+    newWindow.add(self)
   }
 
 It would be very unfortunate if the back-reference nature of the
@@ -876,8 +876,8 @@ there's anything to optimize for in the grammar, it's this.
 
 I propose this fairly obvious syntax::
 
-    button1.setAction { unowned(this).tapOut() }
-    button2.setAction { if (weak(this)) { weak(this).swapIn() } }
+    button1.setAction { unowned(self).tapOut() }
+    button2.setAction { if (weak(self)) { weak(self).swapIn() } }
 
 The operand is evaluated at the time of closure formation.  Since
 these references can be a long way from the top of the closure, we
@@ -899,7 +899,7 @@ invoked).
 
 Therefore I also suggest a closely-related form of decoration::
 
-    button3.setAction { capture(this.model).addProfitStep() }
+    button3.setAction { capture(self.model).addProfitStep() }
 
 This syntax would force :code:`capture` to become a real keyword.
 
@@ -916,7 +916,7 @@ identifier to the top of the closure::
       if (_V2) { _V2.swapIn() }
     }
     button3.setAction {
-      capture _V3 = this.model
+      capture _V3 = self.model
       _V3.addProfitStep()
     }
 
@@ -941,8 +941,8 @@ redundant computation, such as with the :code:`state` property in this
 example::
 
     resetButton.setAction {
-      log("resetting state to " + capture(this.state))
-      capture(this.model).setState(capture(this.state))
+      log("resetting state to " + capture(self.state))
+      capture(self.model).setState(capture(self.state))
     }
 
 I don't see any immediate need for other kinds of capture decoration.
@@ -1095,7 +1095,7 @@ of when and how many times the closures will be called.
 Suppose that we capture the value at the earlier point, when we form
 the outer closure.  This will behave very surprisingly if :code:`view`
 is in fact mutated; it may be easier to imagine this if, instead of a
-simple local variable, it was instead a path like :code:`this.view`.
+simple local variable, it was instead a path like :code:`self.view`.
 And it's not clear that forming a back-reference at this earlier point
 is actually valid; it is easy to imagine code that would rely on the
 intermediate closure holding a strong reference to the view.

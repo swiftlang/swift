@@ -460,7 +460,7 @@ struct ArgumentInitVisitor :
     return visit(P->getSubPattern(), I);
   }
   SILValue visitTypedPattern(TypedPattern *P, Initialization *I) {
-    // FIXME: work around a bug in visiting the "this" argument of methods
+    // FIXME: work around a bug in visiting the "self" argument of methods
     if (NamedPattern *np = dyn_cast<NamedPattern>(P->getSubPattern()))
       return makeArgumentInto(P->getType(), f.begin(),
                               np->getDecl(), I);
@@ -660,7 +660,7 @@ namespace {
     }
     
     void emit(SILGenFunction &gen) override {
-      // 'this' is passed in at +0 (and will be deallocated when we return),
+      // 'self' is passed in at +0 (and will be deallocated when we return),
       // so don't release the value, only deallocate the variable.
       gen.deallocateUninitializedLocalVariable(thisDecl);
     }
@@ -669,7 +669,7 @@ namespace {
 
 SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
                                               DestructorDecl *DD) {
-  // Emit the implicit 'this' argument.
+  // Emit the implicit 'self' argument.
   VarDecl *thisDecl = DD ? DD->getImplicitThisDecl() : nullptr;
   assert((!thisDecl || thisDecl->getType()->hasReferenceSemantics()) &&
          "destructor's implicit this is a value type?!");
@@ -681,7 +681,7 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
   SILValue thisValue = new (SGM.M) SILArgument(thisType, F.begin());
   
   if (DD) {
-    // Make a local variable for 'this'.
+    // Make a local variable for 'self'.
     emitLocalVariable(thisDecl);
     SILValue thisAddr = VarLocs[thisDecl].address;
     B.createStore(DD, thisValue, thisAddr);
@@ -1090,7 +1090,7 @@ static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
 
     auto managedArg = gen.emitManagedRValueWithCleanup(arg);
 
-    // Re-order 'this' to the end.
+    // Re-order 'self' to the end.
     if (i == 0) {
       thisArg = managedArg;
     } else {

@@ -315,7 +315,7 @@ public:
                                    ArrayRef<ValueDecl*> captures,
                                    DeclContext *parentContext);
   
-  /// Returns the type of the "this" parameter to methods of a type.
+  /// Returns the type of the "self" parameter to methods of a type.
   Type getMethodThisType(Type thisType) const;
   
   /// Returns the type of a property accessor, () -> T for a getter,

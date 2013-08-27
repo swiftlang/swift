@@ -101,12 +101,12 @@ public:
   SILDebugScope *getDebugScope() const { return DebugScope; }
   void setDebugScope(SILDebugScope *DS)  { DebugScope = DS; }
 
-  /// removeFromParent - This method unlinks 'this' from the containing basic
+  /// removeFromParent - This method unlinks 'self' from the containing basic
   /// block, but does not delete it.
   ///
   void removeFromParent();
   
-  /// eraseFromParent - This method unlinks 'this' from the containing basic
+  /// eraseFromParent - This method unlinks 'self' from the containing basic
   /// block and deletes it.
   ///
   void eraseFromParent();
@@ -1434,7 +1434,7 @@ public:
 /// ProtocolMethodInst - Given the address of an existential and a method
 /// constant, extracts the implementation of that method for the existential.
 /// The result will be of the type RawPointer -> F for a method of function type
-/// F. The RawPointer "this" argument can be derived from the same existential
+/// F. The RawPointer "self" argument can be derived from the same existential
 /// using a ProjectExistentialInst.
 class ProtocolMethodInst
   : public UnaryInstructionBase<ValueKind::ProtocolMethodInst,

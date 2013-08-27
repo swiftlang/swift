@@ -783,7 +783,7 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
                                              SGM.getFunction(methodConstant));
   SILType methodType = SGM.getConstantType(methodConstant.atUncurryLevel(0));
   
-  /// If the 'this' type is a bound generic, specialize the method ref with
+  /// If the 'self' type is a bound generic, specialize the method ref with
   /// its substitutions.
   ArrayRef<Substitution> outerSubs;
   
@@ -1598,7 +1598,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
     for (size_t i = 0, size = elements.size(); i < size; ++i) {
       assert(memberIndex < decl->getMembers().size() &&
              "not enough physical struct members for value constructor?!");
-      // Store each argument in the corresponding element of 'this'.
+      // Store each argument in the corresponding element of 'self'.
       auto *field = cast<VarDecl>(decl->getMembers()[memberIndex]);
       auto &fieldTL = gen.getTypeLowering(field->getType());
       SILValue slot = gen.B.createStructElementAddr(ctor, resultSlot,
@@ -1633,14 +1633,14 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   emitProlog(ctor->getArguments(), ctor->getImplicitThisDecl()->getType());
   emitConstructorMetatypeArg(*this, ctor);
   
-  // Get the 'this' decl and type.
+  // Get the 'self' decl and type.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
   auto &lowering = getTypeLowering(thisDecl->getType());
   SILType thisTy = lowering.getLoweredType();
   assert(!thisTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
   assert(!ctor->getAllocThisExpr() && "alloc_this expr for value type?!");
 
-  // Emit a local variable for 'this'.
+  // Emit a local variable for 'self'.
   // FIXME: The (potentially partially initialized) variable would need to be
   // cleaned up on an error unwind.
   emitLocalVariable(thisDecl);
@@ -1652,19 +1652,19 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // default constructor--we're already in a constructor!
   B.createInitializeVar(ctor, thisLV, /*CanDefaultConstruct*/ false);
   
-  // Create a basic block to jump to for the implicit 'this' return.
+  // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
-  // The epilog takes a void return because the return of 'this' is implicit.
+  // The epilog takes a void return because the return of 'self' is implicit.
   prepareEpilog(Type());
 
   // Emit the constructor body.
   visit(ctor->getBody());
   
-  // Return 'this' in the epilog.
+  // Return 'self' in the epilog.
   if (!emitEpilogBB(ctor))
     return;
 
-  // If 'this' is address-only, copy 'this' into the indirect return slot.
+  // If 'self' is address-only, copy 'self' into the indirect return slot.
   if (lowering.isAddressOnly()) {
     assert(IndirectReturnAddress &&
            "no indirect return for address-only ctor?!");
@@ -1679,7 +1679,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     return;
   }
 
-  // Otherwise, load and return the final 'this' value.
+  // Otherwise, load and return the final 'self' value.
   SILValue thisValue = B.createLoad(ctor, thisLV);
   SILValue thisBox = VarLocs[thisDecl].box;
   assert(thisBox);
@@ -1785,7 +1785,7 @@ namespace {
     }
     
     void visitTypedPattern(TypedPattern *P) {
-      // FIXME: work around a bug in visiting the "this" argument of methods
+      // FIXME: work around a bug in visiting the "self" argument of methods
       if (isa<NamedPattern>(P->getSubPattern()))
         makeArgument(P->getType());
       else
@@ -1858,7 +1858,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   emitConstructorMetatypeArg(*this, ctor);
 
-  // Allocate the "this" value.
+  // Allocate the "self" value.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
   SILType thisTy = getLoweredType(thisDecl->getType());
   assert(thisTy.hasReferenceSemantics() &&
@@ -1866,7 +1866,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   SILValue thisValue;
   if (ctor->getAllocThisExpr()) {
     FullExpr allocThisScope(Cleanups);
-    // If the constructor has an alloc-this expr, emit it to get "this".
+    // If the constructor has an alloc-this expr, emit it to get "self".
     thisValue = emitRValue(ctor->getAllocThisExpr()).forwardAsSingleValue(*this);
     assert(thisValue.getType() == thisTy &&
            "alloc-this expr type did not match this type?!");
@@ -1891,13 +1891,13 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   SILValue initedThisValue
     = B.createApply(ctor, initVal.forward(*this), thisTy, args);
   
-  // Return the initialized 'this'.
+  // Return the initialized 'self'.
   B.createReturn(ctor, initedThisValue);
 }
 
 static void emitClassImplicitConstructorInitializer(SILGenFunction &gen,
                                                     ConstructorDecl *ctor) {
-  // The default constructor is currently a no-op. Just return back 'this'.
+  // The default constructor is currently a no-op. Just return back 'self'.
   // FIXME: We should default-construct fields maybe?
 
   assert(cast<TuplePattern>(ctor->getArguments())->getNumFields() == 0
@@ -1920,7 +1920,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Emit the prolog for the non-this arguments.
   emitProlog(ctor->getArguments(), TupleType::getEmpty(F.getASTContext()));
   
-  // Emit the 'this' argument and make an lvalue for it.
+  // Emit the 'self' argument and make an lvalue for it.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
   SILType thisTy = getLoweredLoadableType(thisDecl->getType());
   SILValue thisArg = new (SGM.M) SILArgument(thisTy, F.begin());
@@ -1933,18 +1933,18 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   SILValue thisLV = VarLocs[thisDecl].address;
   B.createStore(ctor, thisArg, thisLV);
   
-  // Create a basic block to jump to for the implicit 'this' return.
+  // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
   prepareEpilog(Type());
   
   // Emit the constructor body.
   visit(ctor->getBody());
   
-  // Return 'this' in the epilog.
+  // Return 'self' in the epilog.
   if (!emitEpilogBB(ctor))
     return;
 
-  // Load and return the final 'this'.
+  // Load and return the final 'self'.
   SILValue thisValue = B.createLoad(ctor, thisLV);
   SILValue thisBox = VarLocs[thisDecl].box;
   assert(thisBox);

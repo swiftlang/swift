@@ -392,7 +392,7 @@ ValueDecl::getDefaultArg(unsigned index) const {
   if (auto func = dyn_cast<FuncDecl>(this)) {
     patterns = func->getBody()->getArgParamPatterns();
 
-    // Skip the 'this' parameter; it is not counted.
+    // Skip the 'self' parameter; it is not counted.
     if (func->getDeclContext()->isTypeContext())
       patterns = patterns.slice(1);
   } else {
@@ -683,7 +683,7 @@ AssociatedTypeDecl *ProtocolDecl::getThis() const {
       if (assocType->isThis())
         return assocType;
   }
-  llvm_unreachable("No 'This' associated type?");
+  llvm_unreachable("No 'Self' associated type?");
 }
 
 void VarDecl::setProperty(ASTContext &Context, SourceLoc LBraceLoc,
@@ -759,9 +759,9 @@ Type FuncDecl::getExtensionType() const {
 
 
 /// computeThisType - If this is a method in a type extension for some type,
-/// compute and return the type to be used for the 'this' argument of the
+/// compute and return the type to be used for the 'self' argument of the
 /// type (which varies based on whether the extended type is a reference type
-/// or not), or an empty Type() if no 'this' argument should exist.  This can
+/// or not), or an empty Type() if no 'self' argument should exist.  This can
 /// only be used after name binding has resolved types.
 Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
   if (OuterGenericParams)
@@ -770,7 +770,7 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
   Type ContainerType = getExtensionType();
   if (ContainerType.isNull()) return ContainerType;
 
-  // For a protocol, the type of 'this' is the associated type 'This', not
+  // For a protocol, the type of 'self' is the associated type 'Self', not
   // the protocol itself.
   if (auto Protocol = ContainerType->getAs<ProtocolType>()) {
     AssociatedTypeDecl *This = 0;
@@ -785,7 +785,7 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
       This = nullptr;
     }
 
-    assert(This && "Missing 'This' associated type in protocol");
+    assert(This && "Missing 'Self' associated type in protocol");
     ContainerType = This->getDeclaredType();
   }
 
@@ -801,7 +801,7 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
     *OuterGenericParams = getDeclContext()->getGenericParamsOfContext();
   }
 
-  // 'static' functions have 'this' of type metatype<T>.
+  // 'static' functions have 'self' of type metatype<T>.
   if (isStatic())
     return MetaTypeType::get(ContainerType, getASTContext());
 

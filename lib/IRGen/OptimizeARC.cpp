@@ -737,7 +737,7 @@ static DtorKind analyzeDestructor(Value *P) {
       case RT_RetainAndReturnThree:  // swift_retainAndReturnThree(obj,a,b,c)
       case RT_RetainNoResult: {      // swift_retain_noresult(obj)
 
-        // Ignore retains of the "this" object, no ressurection is possible.
+        // Ignore retains of the "self" object, no ressurection is possible.
         Value *ThisRetainedObject = cast<CallInst>(I).getArgOperand(0);
         if (ThisRetainedObject->stripPointerCasts() ==
             ThisObject->stripPointerCasts())

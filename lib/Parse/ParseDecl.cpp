@@ -1037,9 +1037,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       // Create the parameter list(s) for the getter.
       SmallVector<Pattern *, 3> Params;
       
-      // Add the implicit 'this' to Params, if needed.
+      // Add the implicit 'self' to Params, if needed.
       if (HasContainerType)
-        Params.push_back(buildImplicitThisParameter());
+        Params.push_back(buildImplicitSelfParameter());
 
       // Add the index clause if necessary.
       if (Indices) {
@@ -1132,9 +1132,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     // Create the parameter list(s) for the setter.
     SmallVector<Pattern *, 3> Params;
     
-    // Add the implicit 'this' to Params, if needed.
+    // Add the implicit 'self' to Params, if needed.
     if (HasContainerType)
-      Params.push_back(buildImplicitThisParameter());
+      Params.push_back(buildImplicitSelfParameter());
 
     // Add the index parameters, if necessary.
     if (Indices) {
@@ -1393,10 +1393,10 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
   return Status;
 }
 
-/// \brief Build an implicit 'this' parameter for the current DeclContext.
-Pattern *Parser::buildImplicitThisParameter() {
+/// \brief Build an implicit 'self' parameter for the current DeclContext.
+Pattern *Parser::buildImplicitSelfParameter() {
   VarDecl *D
-    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
+    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
                             Type(), CurDeclContext);
   Pattern *P = new (Context) NamedPattern(D);
   return new (Context) TypedPattern(P, TypeLoc());
@@ -1511,14 +1511,14 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   SmallVector<Pattern*, 8> BodyParams;
   
   // If we're within a container, add an implicit first pattern to match the
-  // container type as an element named 'this'.
+  // container type as an element named 'self'.
   //
   // This turns an instance function "(int)->int" on FooTy into
   // "(this: [byref] FooTy)->(int)->int", and a static function
   // "(int)->int" on FooTy into "(this: [byref] FooTy.metatype)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
   if (HasContainerType) {
-    Pattern *thisPattern = buildImplicitThisParameter();
+    Pattern *thisPattern = buildImplicitSelfParameter();
     ArgParams.push_back(thisPattern);
     BodyParams.push_back(thisPattern);
   }
@@ -1538,7 +1538,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
       ArgParams.clear();
       BodyParams.clear();
       if (HasContainerType) {
-        Pattern *thisPattern = buildImplicitThisParameter();
+        Pattern *thisPattern = buildImplicitSelfParameter();
         ArgParams.push_back(thisPattern);
         BodyParams.push_back(thisPattern);
       }
@@ -2029,7 +2029,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
 
   if (!hasConstructor) {
     VarDecl *ThisDecl
-      = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
+      = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
                               Type(), CD);
     Pattern *Arguments = TuplePattern::create(Context, SourceLoc(),
                                               ArrayRef<TuplePatternElt>(),
@@ -2103,11 +2103,11 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
     // The list of protocol elements.
     SmallVector<Decl*, 8> Members;
 
-    // Add the implicit 'This' associated type.
+    // Add the implicit 'Self' associated type.
     Members.push_back(new (Context) AssociatedTypeDecl(
                                       CurDeclContext,
                                       SourceLoc(),
-                                      Context.getIdentifier("This"),
+                                      Context.getIdentifier("Self"),
                                       SourceLoc()));
     Members.back()->setImplicit();
 
@@ -2355,7 +2355,7 @@ Parser::parseDeclConstructor(bool HasContainerType) {
   }
 
   VarDecl *ThisDecl
-    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
+    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
                             Type(), CurDeclContext);
 
   Scope S2(this, ScopeKind::ConstructorBody);
@@ -2397,7 +2397,7 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
   }
 
   VarDecl *ThisDecl
-    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
+    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
                             Type(), CurDeclContext);
 
   Scope S(this, ScopeKind::DestructorBody);

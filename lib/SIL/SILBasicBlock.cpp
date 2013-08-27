@@ -66,7 +66,7 @@ const SILModule *SILBasicBlock::getModule() const {
   return getParent()->getParent();
 }
 
-/// eraseFromParent - This method unlinks 'this' from the containing SIL and
+/// eraseFromParent - This method unlinks 'self' from the containing SIL and
 /// deletes it.
 ///
 void SILBasicBlock::eraseFromParent() {

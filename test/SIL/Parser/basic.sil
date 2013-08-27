@@ -166,12 +166,12 @@ protocol P {
 
 sil @existentials : $[thin] (n : P) -> () {
 bb0(%0 : $*P):
-  %1 = project_existential %0 : $*P to $*P.This // CHECK: project_existential %0
+  %1 = project_existential %0 : $*P to $*P.Self // CHECK: project_existential %0
 
   // CHECK: protocol_method {{.*}} : $*P, #P.doIt!1
-  %2 = protocol_method %0 : $*P, #P.doIt!1 : $[cc(method)] ((), [byref] P.This) -> ()
+  %2 = protocol_method %0 : $*P, #P.doIt!1 : $[cc(method)] ((), [byref] P.Self) -> ()
   // CHECK: apply
-  %3 = apply %2(%1) : $[cc(method)] ((), [byref] P.This) -> ()
+  %3 = apply %2(%1) : $[cc(method)] ((), [byref] P.Self) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
   %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
   %6 = return %4 : $()                // CHECK: return 

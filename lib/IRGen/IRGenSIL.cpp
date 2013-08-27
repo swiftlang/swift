@@ -1087,7 +1087,7 @@ static void getMetatypeUses(ValueBase *i,
       }
     }
     
-    // If we're applied as the 'this' argument to a class_method of an objc
+    // If we're applied as the 'self' argument to a class_method of an objc
     // method, we'll need the objc class.
     // FIXME: Metatypes as other arguments should probably also pass the
     // Class too.
@@ -1396,13 +1396,13 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     indirectReturn = i->getIndirectReturn(*IGM.SILMod);
   }
   
-  // ObjC message sends need special handling for the 'this' argument. It may
+  // ObjC message sends need special handling for the 'self' argument. It may
   // need to be wrapped in an objc_super struct, and the '_cmd' argument needs
   // to be passed alongside it.
   if (calleeLV.kind == LoweredValue::Kind::ObjCMethod) {
     SILValue thisValue = i->getArguments()[0];
     llvm::Value *selfArg;
-    // Convert a metatype 'this' argument to the ObjC Class pointer.
+    // Convert a metatype 'self' argument to the ObjC Class pointer.
     if (thisValue.getType().is<MetaTypeType>()) {
       selfArg = getObjCClassForValue(*this, thisValue);
     } else {

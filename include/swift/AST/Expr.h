@@ -372,7 +372,7 @@ public:
 };
   
 /// A reference to 'super'. References to members of 'super' resolve to members
-/// of a superclass of 'this'.
+/// of a superclass of 'self'.
 class SuperRefExpr : public Expr {
   ValueDecl *This;
   SourceLoc Loc;
@@ -684,7 +684,7 @@ public:
   ArchetypeType *getArchetype() const;
 
   /// isBaseIgnored - Determine whether the base expression is actually ignored,
-  /// rather than being used as, e.g.,  the 'this' argument passed to an
+  /// rather than being used as, e.g.,  the 'self' argument passed to an
   /// instance method or the base of a variable access.
   bool isBaseIgnored() const;
 
@@ -729,7 +729,7 @@ public:
   }
 
   /// isBaseIgnored - Determine whether the base expression is actually
-  /// ignored, rather than being used as, e.g., the 'this' argument passed
+  /// ignored, rather than being used as, e.g., the 'self' argument passed
   /// to an instance method or the base of a variable access.
   bool isBaseIgnored() const;
 
@@ -1797,7 +1797,7 @@ public:
   }
   
   /// getImplicitThisDecl - If this FuncExpr is a non-static method in an
-  /// extension context, it will have a 'this' argument.  This method returns it
+  /// extension context, it will have a 'self' argument.  This method returns it
   /// if present, or returns null if not.
   VarDecl *getImplicitThisDecl() const;
   
@@ -2293,33 +2293,33 @@ public:
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Binary;}
 };
 
-/// ThisApplyExpr - Abstract application that provides the 'this' pointer for
-/// a method curried as (this : This) -> (params) -> result.
+/// SelfApplyExpr - Abstract application that provides the 'self' pointer for
+/// a method curried as (this : Self) -> (params) -> result.
 ///
-/// The application of a curried method to 'this' semantically differs from
-/// normal function application because the 'this' parameter can be implicitly
+/// The application of a curried method to 'self' semantically differs from
+/// normal function application because the 'self' parameter can be implicitly
 /// materialized from an rvalue.
-class ThisApplyExpr : public ApplyExpr {
+class SelfApplyExpr : public ApplyExpr {
 protected:
-  ThisApplyExpr(ExprKind K, Expr *FnExpr, Expr *BaseExpr, Type Ty)
+  SelfApplyExpr(ExprKind K, Expr *FnExpr, Expr *BaseExpr, Type Ty)
     : ApplyExpr(K, FnExpr, BaseExpr, Ty) { }
   
 public:
   static bool classof(const Expr *E) {
-    return E->getKind() >= ExprKind::First_ThisApplyExpr &&
-           E->getKind() <= ExprKind::Last_ThisApplyExpr;
+    return E->getKind() >= ExprKind::First_SelfApplyExpr &&
+           E->getKind() <= ExprKind::Last_SelfApplyExpr;
   }
 };
 
 /// DotSyntaxCallExpr - Refer to a method of a type, e.g. P.x.  'x'
 /// is modeled as a DeclRefExpr or OverloadSetRefExpr on the method.
-class DotSyntaxCallExpr : public ThisApplyExpr {
+class DotSyntaxCallExpr : public SelfApplyExpr {
   SourceLoc DotLoc;
   
 public:
   DotSyntaxCallExpr(Expr *FnExpr, SourceLoc DotLoc, Expr *BaseExpr,
                     Type Ty = Type())
-    : ThisApplyExpr(ExprKind::DotSyntaxCall, FnExpr, BaseExpr, Ty),
+    : SelfApplyExpr(ExprKind::DotSyntaxCall, FnExpr, BaseExpr, Ty),
       DotLoc(DotLoc) {
   }
 
@@ -2332,7 +2332,7 @@ public:
   }
   
   SourceRange getSourceRange() const {
-    // Implicit 'this' receivers don't have location info for DotLoc or the
+    // Implicit 'self' receivers don't have location info for DotLoc or the
     // 'arg' expression.
     if (DotLoc.isValid())
       return SourceRange(getArg()->getStartLoc(), getEndLoc());
@@ -2347,10 +2347,10 @@ public:
 /// ConstructorRefCallExpr - Refer to a constructor for a type P.  The
 /// actual reference to function which returns the constructor is modeled
 /// as a DeclRefExpr.
-class ConstructorRefCallExpr : public ThisApplyExpr {
+class ConstructorRefCallExpr : public SelfApplyExpr {
 public:
   ConstructorRefCallExpr(Expr *FnExpr, Expr *BaseExpr, Type Ty = Type())
-    : ThisApplyExpr(ExprKind::ConstructorRefCall, FnExpr, BaseExpr, Ty) {}
+    : SelfApplyExpr(ExprKind::ConstructorRefCall, FnExpr, BaseExpr, Ty) {}
 
   SourceLoc getLoc() const {
     return getArg()->getLoc();
@@ -2562,17 +2562,17 @@ public:
   }
 };
   
-/// \brief Represents the rebinding of 'this' in a constructor that calls out
+/// \brief Represents the rebinding of 'self' in a constructor that calls out
 /// to another constructor. The result of the subexpression is assigned to
-/// 'this', and the expression returns void.
+/// 'self', and the expression returns void.
 ///
-/// When a super.constructor or delegating constructor is invoked, 'this' is
+/// When a super.constructor or delegating constructor is invoked, 'self' is
 /// reassigned to the result of the constructor (after being downcast in the
 /// case of super.constructor).
 /// This is needed for reference types with ObjC interop, where
 /// reassigning 'self' is a supported feature, and for value type delegating
 /// constructors, where the delegatee constructor is responsible for
-/// initializing 'this' in-place before the delegator's logic executes.
+/// initializing 'self' in-place before the delegator's logic executes.
 class RebindThisInConstructorExpr : public Expr {
   Expr *SubExpr;
   ValueDecl *This;

@@ -582,7 +582,7 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// The second element is the type @encoding. Handle some simple cases, and
   /// leave the rest as null for now.
   AnyFunctionType *methodType = method->getType()->castTo<AnyFunctionType>();
-  // Account for the 'this' pointer being curried.
+  // Account for the 'self' pointer being curried.
   methodType = methodType->getResult()->castTo<AnyFunctionType>();
   
   if (isObjCGetterSignature(IGM, methodType))

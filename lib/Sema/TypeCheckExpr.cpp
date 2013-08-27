@@ -486,10 +486,10 @@ namespace {
         if (DRE->getDecl()->getDeclContext()->isLocalContext() &&
             DRE->getDecl()->getDeclContext() != curExpr) {
           // A [byref] parameter cannot be captured.
-          // FIXME: As a temporary hack, ignore 'this', which is an implicit
+          // FIXME: As a temporary hack, ignore 'self', which is an implicit
           // [byref] parameter for instance methods of structs.
           if (DRE->getDecl()->getType()->is<LValueType>() && !
-              DRE->getDecl()->getName().str().equals("this")) {
+              DRE->getDecl()->getName().str().equals("self")) {
             tc.diagnose(DRE->getLoc(), diag::byref_capture,
                         DRE->getDecl()->getName());
           }

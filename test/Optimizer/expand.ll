@@ -44,9 +44,9 @@ entry:
 ; CHECK: ret
 
 
-define { i8*, i64, %swift.refcounted* } @retain3_test3(i8*, i64, %swift.refcounted** %this.owner) nounwind {
+define { i8*, i64, %swift.refcounted* } @retain3_test3(i8*, i64, %swift.refcounted** %self.owner) nounwind {
 entry:
-  %2 = load %swift.refcounted** %this.owner, align 8
+  %2 = load %swift.refcounted** %self.owner, align 8
   %3 = insertvalue { i8*, i64, %swift.refcounted* } undef, i8* %0, 0
   %4 = insertvalue { i8*, i64, %swift.refcounted* } %3, i64 %1, 1
   %5 = insertvalue { i8*, i64, %swift.refcounted* } %4, %swift.refcounted* %2, 2

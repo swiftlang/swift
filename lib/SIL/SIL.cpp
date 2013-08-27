@@ -89,7 +89,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
     if (isGlobal) {
       naturalUncurryLevel = 0;
     } else {
-      // Instance properties have a 'this' curry.
+      // Instance properties have a 'self' curry.
       if (var->isInstanceMember())
         naturalUncurryLevel = 1;
       // Local properties may have captures that affect the natural uncurry

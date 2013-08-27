@@ -596,7 +596,7 @@ public:
   /// than the other.
   ///
   /// A declaration is more specialized than another declaration if its type
-  /// is a subtype of the other declaration's type (ignoring the 'this'
+  /// is a subtype of the other declaration's type (ignoring the 'self'
   /// parameter of function declarations) and if
   Comparison compareDeclarations(ValueDecl *decl1, ValueDecl *decl2);
 

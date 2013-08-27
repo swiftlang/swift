@@ -671,10 +671,10 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto func = cast<FuncDecl>(value);
     assert(func->isOperator() && "Lookup should only find operators");
 
-    // Skip the 'this' metatype parameter. It's not used for deduction.
+    // Skip the 'self' metatype parameter. It's not used for deduction.
     auto type = func->getType()->castTo<FunctionType>()->getResult();
 
-    // Find the archetype for 'This'. We'll be opening it.
+    // Find the archetype for 'Self'. We'll be opening it.
     auto thisArchetype
       = proto->getThis()->getDeclaredType()->castTo<ArchetypeType>();
     llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
@@ -683,7 +683,7 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                     func->getAttrs().isAssignment(),
                                     TC.Context);
 
-    // The type variable to which 'This' was opened must be bound to an
+    // The type variable to which 'Self' was opened must be bound to an
     // archetype.
     // FIXME: We may eventually want to loosen this constraint, to allow us
     // to find operator functions both in classes and in protocols to which
@@ -838,7 +838,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   // If the declaration is a protocol member, we may have more substitutions to
   // perform.
   if (auto ownerProtoTy = ownerTy->getAs<ProtocolType>()) {
-    // For a member of an archetype, substitute the base type for the 'This'
+    // For a member of an archetype, substitute the base type for the 'Self'
     // type.
     if (baseObjTy->is<ArchetypeType>()) {
       auto thisArchetype = ownerProtoTy->getDecl()->getThis()->getDeclaredType()
@@ -880,7 +880,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   type = openType(type, { }, replacements);
 
-  // Skip the 'this' argument if it's already been bound by the base.
+  // Skip the 'self' argument if it's already been bound by the base.
   if (auto func = dyn_cast<FuncDecl>(value)) {
     if (func->isStatic() || isInstance)
       type = type->castTo<AnyFunctionType>()->getResult();
@@ -2660,7 +2660,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc,
     type1 = func1->getType();
     type2 = func2->getType();
 
-    // Skip the 'this' parameter.
+    // Skip the 'self' parameter.
     // FIXME: Might not actually be what we want to do. Think about this more.
     if (func1->getDeclContext()->isTypeContext())
       type1 = type1->castTo<AnyFunctionType>()->getResult();
@@ -2671,7 +2671,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc,
     type1 = constructor1->getType();
     type2 = constructor2->getType();
 
-    // Skip the 'this' parameter.
+    // Skip the 'self' parameter.
     // FIXME: Might not actually be what we want to do. Think about this more.
     type1 = type1->castTo<AnyFunctionType>()->getResult();
     type2 = type2->castTo<AnyFunctionType>()->getResult();
@@ -3115,7 +3115,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
       case UnqualifiedLookupResult::ArchetypeMember:
       case UnqualifiedLookupResult::MetaArchetypeMember:
       case UnqualifiedLookupResult::ModuleName:
-        // Types are never referenced with an implicit 'this'.
+        // Types are never referenced with an implicit 'self'.
         if (!isa<TypeDecl>(Result.getValueDecl())) {
           AllDeclRefs = false;
           break;

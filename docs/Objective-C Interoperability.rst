@@ -143,7 +143,7 @@ Guidelines:
    
      // Note: This syntax is not final!
      func [API, objc] accessibilityDescription {
-       return "\(this.givenName) \(this.familyName)"
+       return "\(self.givenName) \(self.familyName)"
      }
 
 New Framework Writer

@@ -109,7 +109,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
   }
 
   // If we found an associated type in an inherited protocol, the base
-  // for our reference to this associated type is our own 'This'.
+  // for our reference to this associated type is our own 'Self'.
   if (isa<AssociatedTypeDecl>(typeDecl) &&
       typeDecl->getDeclContext() != fromDC) {
     if (auto fromProto = dyn_cast<ProtocolDecl>(fromDC)) {

@@ -197,7 +197,7 @@ CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
     resultType = getBridgedResultType(*this, outerCC, resultType);
     break;
   case AbstractCC::ObjCMethod:
-    // The "this" parameter should not get bridged.
+    // The "self" parameter should not get bridged.
     for (auto &input : make_range(inputs.begin()+1, inputs.end()))
       input = input.getWithType(
                 getBridgedInputType(*this, outerCC, CanType(input.getType())));
@@ -1416,7 +1416,7 @@ Type TypeConverter::getSubscriptPropertyType(SILDeclRef::Kind kind,
   return FunctionType::get(indexType, propertyType, Context);
 }
 
-/// Get the type of the 'this' parameter for methods of a type.
+/// Get the type of the 'self' parameter for methods of a type.
 Type TypeConverter::getMethodThisType(Type thisType) const {
   if (thisType->hasReferenceSemantics()) {
     return thisType;

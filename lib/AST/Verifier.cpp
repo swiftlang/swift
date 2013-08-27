@@ -395,7 +395,7 @@ namespace {
       }
       if (InputExprTy != FT->getInput()->getCanonicalType()) {
         TupleType *TT = FT->getInput()->getAs<TupleType>();
-        if (isa<ThisApplyExpr>(E)) {
+        if (isa<SelfApplyExpr>(E)) {
           LValueType::Qual InputExprQuals;
           Type InputExprObjectTy;
           if (InputExprTy->hasReferenceSemantics() ||
@@ -407,10 +407,10 @@ namespace {
           LValueType::Qual FunctionInputQuals;
           Type FunctionInputObjectTy = checkLValue(FT->getInput(),
                                                    FunctionInputQuals,
-                                                   "'this' parameter");
+                                                   "'self' parameter");
           
           checkSameOrSubType(InputExprObjectTy, FunctionInputObjectTy,
-                             "object argument and 'this' parameter");
+                             "object argument and 'self' parameter");
         } else if (!TT || TT->getFields().size() != 1 ||
                    TT->getFields()[0].getType()->getCanonicalType()
                      != InputExprTy) {

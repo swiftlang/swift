@@ -62,7 +62,7 @@ public:
   SILModule *getModule();
   const SILModule *getModule() const;
 
-  /// eraseFromParent - This method unlinks 'this' from the containing
+  /// eraseFromParent - This method unlinks 'self' from the containing
   /// SILFunction and deletes it.
   ///
   void eraseFromParent();

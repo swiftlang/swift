@@ -1049,7 +1049,7 @@ public:
       PD->setIsObjC(isObjC);
     }
 
-    // Fix the 'This' associated type.
+    // Fix the 'Self' associated type.
     AssociatedTypeDecl *thisDecl = nullptr;
     for (auto Member : PD->getMembers()) {
       if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
@@ -1314,7 +1314,7 @@ public:
 
     FuncExpr *body = FD->getBody();
 
-    // Before anything else, set up the 'this' argument correctly.
+    // Before anything else, set up the 'self' argument correctly.
     GenericParamList *outerGenericParams = nullptr;
     if (Type thisType = FD->computeThisType(&outerGenericParams)) {
       FD->getImplicitThisDecl()->setType(thisType);
@@ -1720,7 +1720,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   auto constructorID = context.getIdentifier("constructor");
   VarDecl *thisDecl
     = new (context) VarDecl(SourceLoc(),
-                            context.getIdentifier("this"),
+                            context.getIdentifier("self"),
                             Type(), structDecl);
   ConstructorDecl *ctor
     = new (context) ConstructorDecl(constructorID, structDecl->getLoc(),

@@ -285,8 +285,8 @@
     keyword ::= 'is'
     keyword ::= 'new'
     keyword ::= 'super'
-    keyword ::= 'this'
-    keyword ::= 'This'
+    keyword ::= 'self'
+    keyword ::= 'Self'
     keyword ::= '__COLUMN__'
     keyword ::= '__FILE__'
     keyword ::= '__LINE__'
@@ -839,14 +839,14 @@ an lvalue unless it has a <code>var-get</code> clause but not
   
   <p>A function in an <a  href="#decl-extension">extension</a> of some type (or
   in other places that are semantically equivalent to an extension) implicitly
-  get a 'this' argument with these rules ... [todo]</p>
+  get a 'self' argument with these rules ... [todo]</p>
   
   <p>'static' functions are only allowed in an <a 
      href="#decl-extension">extension</a> of some type (or in other places
      that are semantically equivalent to an extension).  They indicate that
      the function is actually defined on the <a href="#metatype">metatype</a>
      for the type, not on the 
-     type itself.  Thus it does not implicitly get a first 'this' argument, and
+     type itself.  Thus it does not implicitly get a first 'self' argument, and
      can be used with dot syntax on the metatype.</p>
   
   <p>TODO: Func should be an immutable name binding, it should implicitly add
@@ -1194,7 +1194,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   
   <p>'func' members of a protocol define a value of function type that may be
   accessed with dot syntax on a value of the protocol's type.  The function
-  gets an implicit "this" argument of the protocol type and shall not
+  gets an implicit "self" argument of the protocol type and shall not
   be static.</p>
   
  <!-- _____________________________________________________________________ -->
@@ -1358,7 +1358,7 @@ if vec[3] {
     class View {
       var bounds : Rect
       constructor(bounds:Rect) {
-        this.bounds = bounds
+        self.bounds = bounds
       }
     }
 
@@ -1366,7 +1366,7 @@ if vec[3] {
       var onClick : () -&gt; ()
       constructor(bounds:Rect, onClick:() -&gt; ()) {
         super.constructor(bounds)
-        this.onClick = onClick
+        self.onClick = onClick
       }
     }
   </pre>
@@ -1386,7 +1386,7 @@ if vec[3] {
      invoke their superclass destructors after executing.</p>
 
   <p>FIXME: We haven't really decided the precise rules here, but it's probably
-     a fatal error to either throw an exception or stash a reference to 'this'
+     a fatal error to either throw an exception or stash a reference to 'self'
      in a destructor.  Not sure what happens when we cause the reference count
      of another object to reach zero inside a destructor.  We might eventually
      allow destructors in extensions once we have ivars in extensions.</p>

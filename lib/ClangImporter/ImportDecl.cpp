@@ -302,10 +302,10 @@ namespace {
       // FIXME: Name hack.
       auto name = context.getIdentifier("constructor");
 
-      // Create the 'this' declaration.
+      // Create the 'self' declaration.
       auto thisType = structDecl->getDeclaredTypeInContext();
       auto thisMetaType = MetaTypeType::get(thisType, context);
-      auto thisName = context.getIdentifier("this");
+      auto thisName = context.getIdentifier("self");
       auto thisDecl = new (context) VarDecl(SourceLoc(), thisName, thisType,
                                             structDecl);
 
@@ -919,13 +919,13 @@ namespace {
 
       assert(dc->getDeclaredTypeOfContext() && "Method in non-type context?");
 
-      // Add the implicit 'this' parameter patterns.
+      // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
       auto thisTy = getThisTypeForContext(dc);
       if (decl->isClassMethod())
         thisTy = MetaTypeType::get(thisTy, Impl.SwiftContext);
-      auto thisName = Impl.SwiftContext.getIdentifier("this");
+      auto thisName = Impl.SwiftContext.getIdentifier("self");
       auto thisVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), thisName,
                                                      thisTy,
                                                      Impl.firstClangModule);
@@ -951,7 +951,7 @@ namespace {
 
       auto resultTy = type->castTo<FunctionType>()->getResult();
 
-      // Add the 'this' parameter to the function type.
+      // Add the 'self' parameter to the function type.
       type = FunctionType::get(thisTy, type, Impl.SwiftContext);
 
       // FIXME: Related result type?
@@ -1166,12 +1166,12 @@ namespace {
       auto loc = decl->getLoc();
       auto name = Impl.SwiftContext.getIdentifier("constructor");
 
-      // Add the implicit 'this' parameter patterns.
+      // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
       auto thisTy = getThisTypeForContext(dc);
       auto thisMetaTy = MetaTypeType::get(thisTy, Impl.SwiftContext);
-      auto thisName = Impl.SwiftContext.getIdentifier("this");
+      auto thisName = Impl.SwiftContext.getIdentifier("self");
       auto thisMetaVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), thisName,
                                                          thisMetaTy,
                                                          Impl.firstClangModule);
@@ -1203,7 +1203,7 @@ namespace {
       type = FunctionType::get(type->castTo<FunctionType>()->getInput(),
                                thisTy, Impl.SwiftContext);
 
-      // Add the 'this' parameter to the function types.
+      // Add the 'self' parameter to the function types.
       Type allocType = FunctionType::get(thisMetaTy, type, Impl.SwiftContext);
       Type initType = FunctionType::get(thisTy, type, Impl.SwiftContext);
 
@@ -1223,9 +1223,9 @@ namespace {
       setVarDeclContexts(argPatterns, result);
       setVarDeclContexts(bodyPatterns, result);
 
-      // Create the call to alloc that allocates 'this'.
+      // Create the call to alloc that allocates 'self'.
       {
-        // FIXME: Use the 'this' of metaclass type rather than a metatype
+        // FIXME: Use the 'self' of metaclass type rather than a metatype
         // expression.
         Expr* initExpr = new (Impl.SwiftContext) MetatypeExpr(nullptr, loc,
                                                               thisMetaTy);
@@ -1241,7 +1241,7 @@ namespace {
                                               /*hasTrailingClosure=*/false);
         initExpr = new (Impl.SwiftContext) CallExpr(allocCall, emptyTuple);
 
-        // Cast the result of the alloc call to the (metatype) 'this'.
+        // Cast the result of the alloc call to the (metatype) 'self'.
         // FIXME: instancetype should make this unnecessary.
         auto cast = new (Impl.SwiftContext) UnconditionalCheckedCastExpr(
                                              initExpr,
@@ -1310,7 +1310,7 @@ namespace {
 
       initExpr = new (Impl.SwiftContext) CallExpr(initExpr, callArg);
 
-      // Cast the result of the alloc call to the (metatype) 'this'.
+      // Cast the result of the alloc call to the (metatype) 'self'.
       // FIXME: instancetype should make this unnecessary.
       auto cast = new (Impl.SwiftContext) UnconditionalCheckedCastExpr(
                                            initExpr,
@@ -1349,14 +1349,14 @@ namespace {
       return cast<NamedPattern>(pattern)->getDecl();
     }
 
-    /// \brief Add the implicit 'this' pattern to the given list of patterns.
+    /// \brief Add the implicit 'self' pattern to the given list of patterns.
     ///
-    /// \param thisTy The type of the 'this' parameter.
+    /// \param thisTy The type of the 'self' parameter.
     ///
     /// \param args The set of arguments 
-    VarDecl *addImplicitThisParameter(Type thisTy,
+    VarDecl *addImplicitSelfParameter(Type thisTy,
                                       SmallVectorImpl<Pattern *> &args) {
-      auto thisName = Impl.SwiftContext.getIdentifier("this");
+      auto thisName = Impl.SwiftContext.getIdentifier("self");
       auto thisVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), thisName,
                                                      thisTy,
                                                      Impl.firstClangModule);
@@ -1386,7 +1386,7 @@ namespace {
       auto &context = Impl.SwiftContext;
       auto loc = getter->getLoc();
 
-      // Figure out the element type, by looking through 'this' and the normal
+      // Figure out the element type, by looking through 'self' and the normal
       // parameters.
       auto elementTy
         = getter->getType()->castTo<FunctionType>()->getResult()
@@ -1395,8 +1395,8 @@ namespace {
       // Form the argument patterns.
       SmallVector<Pattern *, 3> getterArgs;
 
-      // 'this'
-      auto thisVar = addImplicitThisParameter(dc->getDeclaredTypeOfContext(),
+      // 'self'
+      auto thisVar = addImplicitSelfParameter(dc->getDeclaredTypeOfContext(),
                                               getterArgs);
 
       // index, for subscript operations.
@@ -1444,7 +1444,7 @@ namespace {
       auto thisRef = new (context) DeclRefExpr(thisVar, loc);
       auto getterRef = new (context) DeclRefExpr(getter, loc);
 
-      // First, bind 'this' to the method.
+      // First, bind 'self' to the method.
       Expr *call = new (context) DotSyntaxCallExpr(getterRef, loc, thisRef);
 
       // Call the method itself.
@@ -1508,8 +1508,8 @@ namespace {
       // Form the argument patterns.
       SmallVector<Pattern *, 3> setterArgs;
 
-      // 'this'
-      auto thisVar = addImplicitThisParameter(dc->getDeclaredTypeOfContext(),
+      // 'self'
+      auto thisVar = addImplicitSelfParameter(dc->getDeclaredTypeOfContext(),
                                               setterArgs);
 
       // index, for subscript operations.
@@ -1566,7 +1566,7 @@ namespace {
       auto valueRef = new (context) DeclRefExpr(valueVar, loc);
       auto setterRef = new (context) DeclRefExpr(setter, loc);
 
-      // First, bind 'this' to the method.
+      // First, bind 'self' to the method.
       Expr *call = new (context) DotSyntaxCallExpr(setterRef, loc, thisRef);
 
       // Next, call the Objective-C setter.
@@ -1680,7 +1680,7 @@ namespace {
       if (Impl.Subscripts[{getter, setter}])
         return nullptr;
 
-      // Compute the element type, looking through the implicit 'this'
+      // Compute the element type, looking through the implicit 'self'
       // parameter and the normal function parameters.
       auto elementTy
         = getter->getType()->castTo<AnyFunctionType>()->getResult()
@@ -1794,9 +1794,9 @@ namespace {
     }
 
   public:
-    /// \brief Retrieve the type of 'this' for the given context.
+    /// \brief Retrieve the type of 'self' for the given context.
     Type getThisTypeForContext(DeclContext *dc) {
-      // For a protocol, the type is 'This'.
+      // For a protocol, the type is 'Self'.
       if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
         return proto->getThis()->getDeclaredType();
       }
@@ -2033,8 +2033,8 @@ namespace {
       result->getMutableAttrs().ClassProtocol = true;
       result->setIsObjC(true);
 
-      // Add the implicit 'This' associated type.
-      auto thisId = Impl.SwiftContext.getIdentifier("This");
+      // Add the implicit 'Self' associated type.
+      auto thisId = Impl.SwiftContext.getIdentifier("Self");
       auto thisDecl = new (Impl.SwiftContext) AssociatedTypeDecl(result,
                                                                  SourceLoc(),
                                                                  thisId,

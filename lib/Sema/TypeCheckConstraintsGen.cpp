@@ -247,7 +247,7 @@ namespace {
 
     Type visitSuperRefExpr(SuperRefExpr *E) {
       if (!E->getType()) {
-        // Resolve the super type of 'this'.
+        // Resolve the super type of 'self'.
         Type superTy = getSuperType(E->getThis(), E->getLoc(),
                                     diag::super_not_in_class_method,
                                     diag::super_with_no_base_class);
@@ -279,7 +279,7 @@ namespace {
         CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
       
       // The result of the expression is the partial application of the
-      // constructor to 'this'.
+      // constructor to 'self'.
       return methodTy;
     }
     
@@ -908,7 +908,7 @@ namespace {
     }
     
     Type visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *expr) {
-      // The subexpression must be a supertype of 'this' type.
+      // The subexpression must be a supertype of 'self' type.
       CS.addConstraint(ConstraintKind::Subtype,
                        expr->getThis()->getType(),
                        expr->getSubExpr()->getType());

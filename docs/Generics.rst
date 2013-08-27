@@ -134,7 +134,7 @@ In its most basic form, a protocol is a collection of function signatures::
   }
 
 Document describes types that have a title() operation that accepts no arguments
-and returns a String. Note that there is implicitly a 'self' or 'this' type,
+and returns a String. Note that there is implicitly a 'self' or 'self' type,
 which is the type that conforms to the protocol itself. This follows how most
 object-oriented languages describe interfaces, but deviates from Haskell type
 classes and C++ concepts, which require explicit type parameters for all of the
@@ -185,7 +185,7 @@ referred to as the binary method problem
 problem, including the solution I'm proposing below).
 
 Neither C++ concepts nor Haskell type classes have this particular problem,
-because they don't have the notion of an implicit 'this' or 'self' type. Rather,
+because they don't have the notion of an implicit 'self' or 'self' type. Rather,
 they explicitly parameterize everything. In C++ concepts::
 
   concept Comparable<typename T> {
@@ -212,11 +212,11 @@ http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6479372 .
 
 Scala and Strongtalk have the notion of the 'Self' type, which effectively
 allows one to refer to the eventual type of 'self' (which we call
-'this'). 'Self' (which we call 'This' in Swift) allows us to express the
+'self'). 'Self' (which we call 'Self' in Swift) allows us to express the
 Comparable protocol in a natural way::
 
   protocol Comparable {
-    func isEqual(other : This) -> bool
+    func isEqual(other : Self) -> bool
   }
 
 By expressing Comparable in this way, we know that if we have two objects of
@@ -236,7 +236,7 @@ Associated Types
 ----------------
 
 In addition to This, a protocol's operations often need to refer to types that
-are related to the type of 'This', such as a type of data stored in a
+are related to the type of 'Self', such as a type of data stored in a
 collection, or the node and edge types of a graph. For example, this would allow
 us to cleanly describe a protocol for collections::
 
@@ -262,7 +262,7 @@ operators::
   
   protocol RandomAccessContainer : Collection {
     var length : Int
-    func ==(lhs : This, rhs : This)
+    func ==(lhs : Self, rhs : Self)
     subscript (i : Int) -> Element
   }
 
@@ -384,10 +384,10 @@ and smaller protocols that make it easier to write conforming types. For
 example, should a Numeric protocol implement all operations, e.g.,::
   
   protocol Numeric {
-    func +(lhs : This, rhs : This) -> This
-    func -(lhs : This, rhs : This) -> This
-    func +(x : This) -> This
-    func -(x : This) -> This
+    func +(lhs : Self, rhs : Self) -> Self
+    func -(lhs : Self, rhs : Self) -> Self
+    func +(x : Self) -> Self
+    func -(x : Self) -> Self
   }
 
 which would make it easy to write general numeric algorithms, but requires the
@@ -395,8 +395,8 @@ author of some BigInt class to implement a lot of functionality, or should the
 numeric protocol implement just the core operations::
 
   protocol Numeric {
-    func +(lhs : This, rhs : This) -> This
-    func -(x : This) -> This
+    func +(lhs : Self, rhs : Self) -> Self
+    func -(x : Self) -> Self
   }
 
 to make it easier to adopt the protocol (but harder to write numeric
@@ -406,10 +406,10 @@ other algorithms. However, it's far easier to allow the protocol itself to
 provide default implementations::
   
   protocol Numeric {
-    func +(lhs : This, rhs : This) -> This
-    func -(lhs : this, rhs : This) -> This { return lhs + -rhs }
-    func +(x : This) -> This { return x }
-    func -(x : This) -> This
+    func +(lhs : Self, rhs : Self) -> Self
+    func -(lhs : this, rhs : Self) -> Self { return lhs + -rhs }
+    func +(x : Self) -> Self { return x }
+    func -(x : Self) -> Self
   }
 
 This makes it easier both to implement generic algorithms (which can use the

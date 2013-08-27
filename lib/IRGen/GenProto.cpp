@@ -248,7 +248,7 @@ namespace {
     }
     
     void visitAssociatedType(AssociatedTypeDecl *ty) {
-      // Don't need to do anything for the implicit "This" type.
+      // Don't need to do anything for the implicit "Self" type.
       if (ty->isThis())
         return;
       
@@ -2376,10 +2376,10 @@ namespace {
       }
     };
 
-    /// Bind the metatype for 'This' in this witness.
+    /// Bind the metatype for 'Self' in this witness.
     void bindThisArchetype(IRGenFunction &IGF, llvm::Value *metadata) {
       // Set a name for the metadata value.
-      metadata->setName("This");
+      metadata->setName("Self");
 
       // Find the This archetype.
       auto thisTy = SignatureTy;
@@ -2466,7 +2466,7 @@ namespace {
       // expressed in terms of signature archetypes.
       CanType sigInputTypeForImpl = sigInputType;
       
-      // We need some special treatment for 'this'.
+      // We need some special treatment for 'self'.
       if (HasAbstractedThis) {
         auto sigTupleType = cast<TupleType>(sigInputType);
         
@@ -2500,7 +2500,7 @@ namespace {
                                                           sigClauseForImpl);
         sigClause = std::move(sigClauseForImpl);
         
-        // Respecify the signature type with the remapped 'This' type.
+        // Respecify the signature type with the remapped 'Self' type.
         SmallVector<TupleTypeElt, 4> sigInputFieldsForImpl;
         std::copy(sigTupleType->getFields().begin(),
                   sigTupleType->getFields().end() - 1,
@@ -3243,7 +3243,7 @@ namespace {
 
       case SourceKind::GenericLValueMetadata: {
         llvm::Value *metatype = in.claimNext();
-        metatype->setName("This");
+        metatype->setName("Self");
 
         // Mark this as the cached metatype for the l-value's object type.
         CanType argTy = CanType(cast<LValueType>(getArgType())->getObjectType());

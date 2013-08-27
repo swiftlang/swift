@@ -655,7 +655,7 @@ public:
     ArchetypeType *archetype = dyn_cast<ArchetypeType>(t);
     if (!archetype)
       return false;
-    if (archetype->getName().str() != "This")
+    if (archetype->getName().str() != "Self")
       return false;
     // FIXME: Walk back to the protocol for verification?
     return true;

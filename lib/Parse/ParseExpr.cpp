@@ -669,7 +669,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
         return makeParserErrorResult(result);
       }
 
-      // The result of the called constructor is used to rebind 'this'.
+      // The result of the called constructor is used to rebind 'self'.
       return makeParserResult(
           new (Context) RebindThisInConstructorExpr(result, thisDecl));
     } else if (Tok.is(tok::code_complete) && CodeCompletion) {

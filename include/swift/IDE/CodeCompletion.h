@@ -306,9 +306,9 @@ public:
     if (!Name.empty()) {
       StringRef NameStr = Name.str();
 
-      // 'this' is a keyword, we can not allow to insert it into the source
+      // 'self' is a keyword, we can not allow to insert it into the source
       // buffer.
-      bool IsAnnotation = (NameStr == "this");
+      bool IsAnnotation = (NameStr == "self");
 
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterName, NameStr);

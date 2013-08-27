@@ -482,8 +482,8 @@ function value carrying the partially applied arguments for its context.
 
 `Dynamic dispatch`_ instructions such as ``class method`` require their method
 declaration reference to be uncurried to at least uncurry level 1 (which applies
-both the "this" argument and the method arguments), because uncurry level zero
-represents the application of the method to its "this" argument, as in
+both the "self" argument and the method arguments), because uncurry level zero
+represents the application of the method to its "self" argument, as in
 ``foo.method``, which is where the dynamic dispatch semantically occurs
 in Swift.
 
@@ -731,8 +731,8 @@ Swift Method Calling Convention [cc(method)]
 
 The method calling convention is currently identical to the freestanding
 function convention. Methods are considered to be curried functions, taking
-the "this" argument as their outer argument clause, and the method arguments
-as the inner argument clause(s). When uncurried, the "this" argument is thus
+the "self" argument as their outer argument clause, and the method arguments
+as the inner argument clause(s). When uncurried, the "self" argument is thus
 passed last::
 
   struct Foo {
@@ -768,7 +768,7 @@ Applying an ``[objc_block]`` value does not consume the block.
 Method Currying
 ```````````````
 
-The "this" argument of an Objective-C method is uncurried to the *first*
+The "self" argument of an Objective-C method is uncurried to the *first*
 argument of the uncurried type, opposite to the native Swift convention::
 
   class [objc] NSString {
@@ -1477,31 +1477,31 @@ protocol_method
   //   or metatype of protocol type $P.metatype
   // #P.method!1 must be a reference to a method of one of the protocols of P
   //
-  // If %0 is an address-only protocol address, then the "this" argument of
+  // If %0 is an address-only protocol address, then the "self" argument of
   //   the method type $[thin] U -> V must be $*P.This for #P.method's protocol
   //   of P
-  // If %0 is a class protocol value, then the "this" argument of
+  // If %0 is a class protocol value, then the "self" argument of
   //   the method type $[thin] U -> V must be Builtin.ObjCPointer
-  // If %0 is a protocol metatype, then the "this" argument of
+  // If %0 is a protocol metatype, then the "self" argument of
   //   the method type $[thin] U -> V must be P.metatype
 
 Looks up the implementation of a protocol method for the dynamic type of the
-value inside an existential container. The "this" operand of the result
+value inside an existential container. The "self" operand of the result
 function value is represented using an opaque type, the value for which must
 be projected out of the same existential container as the ``protocol_method``
 operand:
 
 - If the operand is the address of an address-only protocol type, then the
-  "this" argument of the method is of type ``$*P.This``, the ``This`` archetype
+  "self" argument of the method is of type ``$*P.This``, the ``This`` archetype
   of the method's protocol.
-- If the operand is a value of a class protocol type, then the "this"
+- If the operand is a value of a class protocol type, then the "self"
   argument of the method is of type ``Builtin.ObjCPointer``, and can be
   projected using the ``project_existential_ref`` instruction.
 - If the operand is a protocol metatype, it does not need to be projected, and
-  the "this" argument of the method is the protocol metatype itself.
+  the "self" argument of the method is the protocol metatype itself.
 
 It is undefined behavior if the ``protocol_method`` function value is invoked
-with a "this" argument not derived from the same existential container as the
+with a "self" argument not derived from the same existential container as the
 method itself.
 
 Function Application
@@ -2040,7 +2040,7 @@ compiles to this SIL sequence::
   apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.OpaquePointer) -> ()
 
 It is undefined behavior for the address to be passed as the
-"this" argument to a method value obtained by ``protocol_method`` from
+"self" argument to a method value obtained by ``protocol_method`` from
 a different existential container. It is also undefined behavior if the
 ``OpaquePointer`` value is dereferenced, cast, or passed to a method after
 the originating existential container has been mutated.
@@ -2105,7 +2105,7 @@ compiles to this SIL sequence::
   apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.ObjCPointer) -> ()
 
 It is undefined behavior for the ``ObjCPointer`` value to be passed as the
-"this" argument to a method value obtained by ``protocol_method`` from
+"self" argument to a method value obtained by ``protocol_method`` from
 a different existential container. It is also undefined behavior if the
 ``ObjCPointer`` value is dereferenced, cast, or passed to a method after the
 originating existential container has been mutated.

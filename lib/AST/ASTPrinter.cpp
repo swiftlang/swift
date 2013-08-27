@@ -511,7 +511,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
 bool PrintAST::printSelectorStyleArgs(ValueDecl *decl,
                                       ArrayRef<Pattern *> argPatterns,
                                       ArrayRef<Pattern *> bodyPatterns) {
-  // Skip over the implicit 'this'.
+  // Skip over the implicit 'self'.
   if (decl->getDeclContext()->isTypeContext()) {
     argPatterns = argPatterns.slice(1);
     bodyPatterns = bodyPatterns.slice(1);
@@ -631,7 +631,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         if (first) {
           first = false;
 
-          // Don't print the implicit 'this' parameter.
+          // Don't print the implicit 'self' parameter.
           if (decl->getDeclContext()->isTypeContext())
             continue;
         }

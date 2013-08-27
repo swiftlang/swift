@@ -428,20 +428,20 @@ public:
   void emitDestructor(ClassDecl *cd, DestructorDecl *dd);
   
   /// Generates code for a struct constructor.
-  /// This allocates the new 'this' value, emits the
-  /// body code, then returns the final initialized 'this'.
+  /// This allocates the new 'self' value, emits the
+  /// body code, then returns the final initialized 'self'.
   void emitValueConstructor(ConstructorDecl *ctor);
   /// Generates code for a union case constructor.
-  /// This allocates the new 'this' value, injects the union case,
-  /// then returns the final initialized 'this'.
+  /// This allocates the new 'self' value, injects the union case,
+  /// then returns the final initialized 'self'.
   void emitUnionConstructor(UnionElementDecl *element);
   /// Generates code for a class constructor's
-  /// allocating entry point. This allocates the new 'this' value, passes it to
-  /// the initializer entry point, then returns the initialized 'this'.
+  /// allocating entry point. This allocates the new 'self' value, passes it to
+  /// the initializer entry point, then returns the initialized 'self'.
   void emitClassConstructorAllocator(ConstructorDecl *ctor);
   /// Generates code for a class constructor's
-  /// initializing entry point. This takes 'this' and the constructor arguments
-  /// as parameters and executes the constructor body to initialize 'this'.
+  /// initializing entry point. This takes 'self' and the constructor arguments
+  /// as parameters and executes the constructor body to initialize 'self'.
   void emitClassConstructorInitializer(ConstructorDecl *ctor);
   /// Generates code for a curry thunk from one uncurry level
   /// of a function to another.
@@ -515,7 +515,7 @@ public:
   
   /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
   /// a normal function, the destructor does not consume a reference to its
-  /// argument. Returns the 'this' argument SILValue.
+  /// argument. Returns the 'self' argument SILValue.
   SILValue emitDestructorProlog(ClassDecl *CD, DestructorDecl *DD);
   
   /// Emits a temporary allocation that will be deallocated automatically at the

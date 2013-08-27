@@ -1636,7 +1636,7 @@ public:
       /// The default for a [byref] type.
       DefaultForType = 0,
 
-      /// The default for a [byref] 'this' parameter.
+      /// The default for a [byref] 'self' parameter.
       DefaultForByrefThis = 0,
 
       /// The default for a variable reference.

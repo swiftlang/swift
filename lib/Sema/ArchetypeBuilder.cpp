@@ -126,8 +126,8 @@ public:
 
     PotentialArchetype *&Result = NestedTypes[Name];
     if (!Result) {
-      // FIXME: The 'This' hack is pretty ugly.
-      if (Name.str() == "This")
+      // FIXME: The 'Self' hack is pretty ugly.
+      if (Name.str() == "Self")
         Result = this;
       else
         Result = new PotentialArchetype(this, Name);
@@ -343,7 +343,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
   // Add requirements for each of the associated types.
   for (auto Member : Proto->getMembers()) {
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
-      // Nothing to do for 'This'.
+      // Nothing to do for 'Self'.
       if (AssocType->isThis())
         continue;
 

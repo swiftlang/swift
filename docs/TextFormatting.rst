@@ -185,7 +185,7 @@ implement::
     /// You'll never want to reimplement this
     func toString() -> String {
       var result: String
-      this.format().write(result)
+      self.format().write(result)
       return result
     }
   }
@@ -216,7 +216,7 @@ adds surrounding quotes and escapes special characters::
 
   extension String : DebugPrintable {
     func debugFormat() -> EscapedStringRepresentation {
-      return EscapedStringRepresentation(this)
+      return EscapedStringRepresentation(self)
     }
   }
 
@@ -237,7 +237,7 @@ Besides modeling ``OutputStream``, ``String`` also conforms to
 
   extension String : Streamable {
     func writeTo<T: OutputStream>(target: [byref] T) {
-      target.append(this) // Append yourself to the stream
+      target.append(self) // Append yourself to the stream
     }
 
     func format() -> String {
@@ -259,8 +259,8 @@ complicated ``format(…)`` might be written::
 
   protocol PrintableInteger 
     : IntegerLiteralConvertible, Comparable, SignedNumber, Printable {
-    func %(lhs: This, rhs: This) -> This
-    func /(lhs: This, rhs: This) -> This
+    func %(lhs: Self, rhs: Self) -> Self
+    func /(lhs: Self, rhs: Self) -> Self
     constructor(x: Int)
     func toInt() -> Int
 
@@ -283,7 +283,7 @@ complicated ``format(…)`` might be written::
       value: T, stream: [byref] S
     ) -> Int {
       if value == 0 { return 0 }
-      var radix: T = T.fromInt(this.radix)
+      var radix: T = T.fromInt(self.radix)
       var rest: T = value / radix
       var nDigits = _writePositive(rest, &stream)
       var digit = UInt32((value % radix).toInt())
@@ -373,7 +373,7 @@ For every conceivable ``OutputStream`` adaptor there's a corresponding
 
     func writeTo<T: OutputStream>(target: [byref] T) {
       var adaptedStream = UpperStream(target)
-      this.base.writeTo(&adaptedStream)
+      self.base.writeTo(&adaptedStream)
       target = adaptedStream.base
     }
   }
@@ -383,7 +383,7 @@ Then, we could extend ``Streamable`` as follows::
   extension Streamable {
     typealias Upcased : Streamable = UpperStreamable<This>
     func toUpper() -> UpperStreamable<This> {
-      return Upcased(this)
+      return Upcased(self)
     }
   }
 

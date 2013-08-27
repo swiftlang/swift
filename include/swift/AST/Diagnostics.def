@@ -1238,7 +1238,7 @@ NOTE(protocol_existential_assoc_type,sema_tcd,none,
      "associated type %0 prevents protocol from conforming to itself",
      (Identifier))
 NOTE(protocol_existential_refers_to_this,sema_tcd,none,
-     "%0 requirement refers to 'This' type", (Identifier))
+     "%0 requirement refers to 'Self' type", (Identifier))
 
 ERROR(circular_protocol_def,sema_tcd,none,
       "circular protocol inheritance %0", (StringRef))

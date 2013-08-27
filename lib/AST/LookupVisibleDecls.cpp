@@ -122,7 +122,7 @@ static void lookupVisibleMemberDecls(Type BaseTy,
 
 /// \brief Lookup a member 'Name' in 'BaseTy' within the context
 /// of a given module 'M'.  This operation corresponds to a standard "dot"
-/// lookup operation like "a.b" where 'this' is the type of 'a'.  This
+/// lookup operation like "a.b" where 'self' is the type of 'a'.  This
 /// operation is only valid after name binding.
 static void doMemberLookup(Type BaseTy,
                            VisibleDeclConsumer &Consumer,
@@ -257,7 +257,7 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
         continue;
 
       if (!LookupFromChildDeclContext) {
-        // Current decl context is outside 'D', so 'This' decl is not visible.
+        // Current decl context is outside 'D', so 'Self' decl is not visible.
         if (auto AssocType = dyn_cast<AssociatedTypeDecl>(VD))
           if (AssocType->isThis())
             continue;
