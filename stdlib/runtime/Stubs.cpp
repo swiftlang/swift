@@ -32,25 +32,6 @@
 #include <limits.h>
 #include "llvm/ADT/StringExtras.h"
 
-// FIXME: We shouldn't be writing implemenetations for functions in the swift
-// module in C, and this isn't really an ideal place to put those
-// implementations.
-extern "C" void _TSs5printFT3valSi_T_(int64_t l) {
-  printf("%lld", l);
-}
-
-extern "C" void _TSs5printFT3valSu_T_(uint64_t l) {
-  printf("%llu", l);
-}
-
-extern "C" void _TSs5printFT3valSd_T_(double l) {
-  char Buffer[256];
-  sprintf(Buffer, "%g", l);
-  if (strchr(Buffer, 'e') == nullptr && strchr(Buffer, '.') == nullptr)
-    strcat(Buffer, ".0");
-  printf("%s", Buffer);
-}
-
 // static func String(v : Int128, radix : Int) -> String
 extern "C"
 unsigned long long
@@ -114,7 +95,10 @@ extern "C"
 unsigned long long
 print_double(char* Buffer, double X) {
   long long i = sprintf(Buffer, "%g", X);
-  if (strchr(Buffer, 'e') == nullptr && strchr(Buffer, '.') == nullptr) {
+  // Add ".0" to a float that (a) is not in scientific notation, (b) does not
+  // already have a fractional part, and (c) is not infinite.
+  if (strchr(Buffer, 'e') == nullptr && strchr(Buffer, '.') == nullptr &&
+      strchr(Buffer, 'n') == nullptr) {
     Buffer[i++] = '.';
     Buffer[i++] = '0';
   }
@@ -122,6 +106,24 @@ print_double(char* Buffer, double X) {
     __builtin_trap();
   }
   return i;
+}
+
+// FIXME: We shouldn't be writing implemenetations for functions in the swift
+// module in C, and this isn't really an ideal place to put those
+// implementations.
+extern "C" void _TSs5printFT3valSi_T_(int64_t l) {
+  printf("%lld", l);
+}
+
+extern "C" void _TSs5printFT3valSu_T_(uint64_t l) {
+  printf("%llu", l);
+}
+
+extern "C" void _TSs5printFT3valSd_T_(double l) {
+  char Buffer[256];
+  unsigned long long i = print_double(Buffer, l);
+  Buffer[i] = '\0';
+  printf("%s", Buffer);
 }
 
 extern "C" bool _TSb13getLogicValuefRSbFT_Bi1_(bool* b) {
