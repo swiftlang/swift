@@ -1720,11 +1720,13 @@ Type ModuleFile::getType(TypeID TID) {
     IdentifierID nameID;
     bool isPrimary;
     TypeID parentOrIndex;
+    DeclID assocTypeID;
     TypeID superclassID;
     ArrayRef<uint64_t> rawConformanceIDs;
 
     decls_block::ArchetypeTypeLayout::readRecord(scratch, nameID, isPrimary,
-                                                 parentOrIndex, superclassID,
+                                                 parentOrIndex, assocTypeID,
+                                                 superclassID,
                                                  rawConformanceIDs);
 
     ArchetypeType *parent = nullptr;
@@ -1737,6 +1739,8 @@ Type ModuleFile::getType(TypeID TID) {
     else
       parent = getType(parentOrIndex)->castTo<ArchetypeType>();
 
+    AssociatedTypeDecl *assocType
+      = cast_or_null<AssociatedTypeDecl>(getDecl(assocTypeID));
     superclass = getType(superclassID);
 
     for (DeclID protoID : rawConformanceIDs)
@@ -1746,8 +1750,9 @@ Type ModuleFile::getType(TypeID TID) {
     if (typeOrOffset.isComplete())
       break;
 
-    auto archetype = ArchetypeType::getNew(ctx, parent, getIdentifier(nameID),
-                                           conformances, superclass, index);
+    auto archetype = ArchetypeType::getNew(ctx, parent, assocType,
+                                           getIdentifier(nameID), conformances,
+                                           superclass, index);
     typeOrOffset = archetype;
 
     auto entry = DeclTypeCursor.advance();

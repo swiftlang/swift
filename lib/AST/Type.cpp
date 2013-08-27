@@ -988,6 +988,7 @@ bool SubstitutableType::requiresClass() const {
 
 ArchetypeType *ArchetypeType::getNew(const ASTContext &Ctx,
                                      ArchetypeType *Parent,
+                                     AssociatedTypeDecl *AssocType,
                                      Identifier Name, ArrayRef<Type> ConformsTo,
                                      Type Superclass,
                                      Optional<unsigned> Index) {
@@ -1001,13 +1002,14 @@ ArchetypeType *ArchetypeType::getNew(const ASTContext &Ctx,
                        compareProtocols);
 
   auto arena = AllocationArena::Permanent;
-  return new (Ctx, arena) ArchetypeType(Ctx, Parent, Name,
+  return new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocType, Name,
                                         Ctx.AllocateCopy(ConformsToProtos),
                                         Superclass, Index);
 }
 
 ArchetypeType *
 ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
+                      AssociatedTypeDecl *AssocType,
                       Identifier Name,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass, Optional<unsigned> Index) {
@@ -1016,7 +1018,7 @@ ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
   llvm::array_pod_sort(ConformsTo.begin(), ConformsTo.end(), compareProtocols);
 
   auto arena = AllocationArena::Permanent;
-  return new (Ctx, arena) ArchetypeType(Ctx, Parent, Name,
+  return new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocType, Name,
                                         Ctx.AllocateCopy(ConformsTo),
                                         Superclass, Index);
 }

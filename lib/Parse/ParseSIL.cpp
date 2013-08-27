@@ -469,7 +469,7 @@ static bool parseSILOptional(bool &Result, Parser &P, StringRef Expected) {
 
 /// Construct ArchetypeType from Generic Params.
 bool SILParser::handleGenericParams(GenericParamList *GenericParams) {
-  ArchetypeBuilder Builder(P.Context, P.Diags);
+  ArchetypeBuilder Builder(*P.TU, P.Diags);
   unsigned Index = 0;
   for (auto GP : *GenericParams) {
     auto TypeParam = GP.getAsTypeParam();

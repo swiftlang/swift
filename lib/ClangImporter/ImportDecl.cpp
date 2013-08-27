@@ -2041,7 +2041,7 @@ namespace {
                                                                  SourceLoc());
       thisDecl->setImplicit();
       auto thisArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
-                                                 thisId,
+                                                 nullptr, thisId,
                                                  Type(result->getDeclaredType()),
                                                  Type());
       thisDecl->setArchetype(thisArchetype);

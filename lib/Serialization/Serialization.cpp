@@ -1680,6 +1680,7 @@ bool Serializer::writeType(Type ty) {
                                     addIdentifierRef(archetypeTy->getName()),
                                     archetypeTy->isPrimary(),
                                     indexOrParentID,
+                                    addDeclRef(archetypeTy->getAssocType()),
                                     addTypeRef(archetypeTy->getSuperclass()),
                                     conformances);
 

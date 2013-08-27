@@ -394,6 +394,7 @@ namespace decls_block {
     IdentifierIDField,   // name
     BCFixed<1>,          // primary?
     TypeIDField,         // index if primary, parent if non-primary
+    DeclIDField,         // associated type decl
     TypeIDField,         // superclass
     BCArray<DeclIDField> // conformances
     // Trailed by the nested types record.

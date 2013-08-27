@@ -404,7 +404,7 @@ public:
   /// Create a fresh archetype building.
   ArchetypeBuilder createArchetypeBuilder() {
     return ArchetypeBuilder(
-             TC.Context, TC.Diags,
+             TC.TU, TC.Diags,
              [&](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
                return TC.getDirectConformsTo(protocol);
              },

@@ -937,15 +937,33 @@ Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions,
     if (auto ArchetypeParent = SubstParent->getAs<ArchetypeType>()) {
       return ArchetypeParent->getNestedType(substOrig->getName());
     }
-     
+
     // Retrieve the type with the given name.
 
     // Tuples don't have member types.
     // FIXME: Feels like a hack.
-     if (SubstParent->is<TupleType>()) {
-       assert(IgnoreMissing && "Expect member type within tuple type");
-       return type;
-     }
+    if (SubstParent->is<TupleType>()) {
+      assert(IgnoreMissing && "Expect member type within tuple type");
+      return type;
+    }
+
+    // If we have an archetype for which we know the associated type,
+    // look in the witness table.
+    if (auto archetype = substOrig->getAs<ArchetypeType>()) {
+      if (auto assocType = archetype->getAssocType()) {
+        ProtocolConformance *conformance = nullptr;
+        auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
+        bool conforms = conformsToProtocol(SubstParent, proto, &conformance);
+        if (!conforms && IgnoreMissing)
+          return type;
+
+        assert(conforms && "Type does not conform");
+        assert(conformance && "Missing conformance information");
+
+        // FIXME: Introduce substituted type node here?
+        return conformance->getTypeWitness(assocType).Replacement;
+      }
+    }
 
     // FIXME: Shouldn't we be using protocol-conformance information here?
     LookupTypeResult MemberTypes

@@ -63,7 +63,7 @@ struct ArchetypeBuilder::PotentialArchetype {
   /// \brief The list of protocols to which this archetype will conform.
   llvm::SetVector<ProtocolDecl *> ConformsTo;
 
-  /// \brief The set of nested typed stored within this protocol.
+  /// \brief The set of nested typed stores within this archetype.
   DenseMap<Identifier, PotentialArchetype *> NestedTypes;
 
   /// \brief The actual archetype, once it has been assigned.
@@ -138,16 +138,39 @@ public:
 
   /// \brief Retrieve (or build) the archetype corresponding to the potential
   /// archetype.
-  ArchetypeType *getArchetype(ASTContext &Context) {
+  ArchetypeType *getArchetype(TranslationUnit &tu) {
     // Retrieve the archetype from the representation of this set.
     if (Representative != this)
-      return getRepresentative()->getArchetype(Context);
+      return getRepresentative()->getArchetype(tu);
 
+    AssociatedTypeDecl *assocType = nullptr;
     if (!Archetype) {
       // Allocate a new archetype.
       ArchetypeType *ParentArchetype = nullptr;
-      if (Parent)
-        ParentArchetype = Parent->getArchetype(Context);
+      if (Parent) {
+        ParentArchetype = Parent->getArchetype(tu);
+
+        if (!ParentArchetype)
+          return nullptr;
+
+        // Find the protocol that has an associated type with this name.
+        llvm::SmallSetVector<AssociatedTypeDecl *, 2> assocTypes;
+        for (auto proto : ParentArchetype->getConformsTo()) {
+          SmallVector<ValueDecl *, 2> decls;
+          if (tu.lookupQualified(proto->getDeclaredType(), Name,
+                                 NL_VisitSupertypes, decls)) {
+            for (auto decl : decls) {
+              assocType = dyn_cast<AssociatedTypeDecl>(decl);
+              if (assocType)
+                break;
+            }
+          }
+        }
+
+        // FIXME: If assocType is null, we will diagnose it later.
+        // It would be far nicer to know now, and be able to recover, e.g.,
+        // via typo correction.
+      }
 
       // If we ended up building our parent archetype, then we'll have
       // already filled in our own archetype.
@@ -156,17 +179,18 @@ public:
 
       SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
                                             ConformsTo.end());
-      Archetype = ArchetypeType::getNew(Context, ParentArchetype,
-                                        Name, Protos, Superclass, Index);
+      Archetype = ArchetypeType::getNew(tu.getASTContext(), ParentArchetype,
+                                        assocType, Name, Protos, Superclass,
+                                        Index);
 
       // Collect the set of nested types of this archetype, and put them into
       // the archetype itself.
       SmallVector<std::pair<Identifier, ArchetypeType *>, 4> FlatNestedTypes;
       for (auto Nested : NestedTypes) {
         FlatNestedTypes.push_back({ Nested.first,
-                                    Nested.second->getArchetype(Context) });
+                                    Nested.second->getArchetype(tu) });
       }
-      Archetype->setNestedTypes(Context, FlatNestedTypes);
+      Archetype->setNestedTypes(tu.getASTContext(), FlatNestedTypes);
     }
 
     return Archetype;
@@ -225,8 +249,8 @@ struct ArchetypeBuilder::Implementation {
   SmallVector<ArchetypeType *, 4> AllArchetypes;
 };
 
-ArchetypeBuilder::ArchetypeBuilder(ASTContext &Context, DiagnosticEngine &Diags)
-  : Context(Context), Diags(Diags), Impl(new Implementation)
+ArchetypeBuilder::ArchetypeBuilder(TranslationUnit &tu, DiagnosticEngine &diags)
+  : TU(tu), Context(tu.getASTContext()), Diags(diags), Impl(new Implementation)
 {
   Impl->getInheritedProtocols = [](ProtocolDecl *protocol) {
     return protocol->getProtocols();
@@ -237,10 +261,10 @@ ArchetypeBuilder::ArchetypeBuilder(ASTContext &Context, DiagnosticEngine &Diags)
 }
 
 ArchetypeBuilder::ArchetypeBuilder(
-  ASTContext &Context, DiagnosticEngine &Diags,
+  TranslationUnit &tu, DiagnosticEngine &diags,
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols,
   std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)> getConformsTo)
-  : Context(Context), Diags(Diags), Impl(new Implementation)
+  : TU(tu), Context(tu.getASTContext()), Diags(diags), Impl(new Implementation)
 {
   Impl->getInheritedProtocols = std::move(getInheritedProtocols);
   Impl->getConformsTo = std::move(getConformsTo);
@@ -571,7 +595,7 @@ void ArchetypeBuilder::assignArchetypes() {
   // Compute the archetypes for each of the potential archetypes (i.e., the
   // generic parameters).
   for (const auto& PA : Impl->PotentialArchetypes) {
-    auto Archetype = PA.second->getArchetype(Context);
+    auto Archetype = PA.second->getArchetype(TU);
     Impl->PrimaryArchetypeMap[PA.first] = Archetype;
   }
 }

@@ -30,6 +30,7 @@ class Pattern;
 class ProtocolDecl;
 class Requirement;
 class SourceLoc;
+class TranslationUnit;
 class Type;
 class TypeRepr;
 class ASTContext;
@@ -43,6 +44,7 @@ class ArchetypeBuilder {
   class InferRequirementsWalker;
   friend class InferRequirementsWalker;
 
+  TranslationUnit &TU;
   ASTContext &Context;
   DiagnosticEngine &Diags;
   struct Implementation;
@@ -79,13 +81,14 @@ class ArchetypeBuilder {
                               PotentialArchetype *T2);
 
 public:
-  ArchetypeBuilder(ASTContext &Context, DiagnosticEngine &Diags);
+  ArchetypeBuilder(TranslationUnit &tu, DiagnosticEngine &diags);
 
   /// Construct a new archtype builder.
   ///
-  /// \param Context The ASTContext in which the builder will create archetypes.
+  /// \param tu The translation unit in which the builder will create
+  /// archetypes.
   ///
-  /// \param Diags The diagnostics entity to use.
+  /// \param diags The diagnostics entity to use.
   ///
   /// \param getInheritedProtocols A function that determines the set of
   /// protocols inherited from the given protocol. This produces the final
@@ -95,7 +98,7 @@ public:
   /// to which the given type parameter conforms. The produces the final
   /// results of AbstractTypeParamDecl::getProtocols() for an associated type.
   ArchetypeBuilder(
-    ASTContext &Context, DiagnosticEngine &Diags,
+    TranslationUnit &tu, DiagnosticEngine &diags,
     std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
       getInheritedProtocols,
     std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)>

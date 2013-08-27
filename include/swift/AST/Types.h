@@ -1815,6 +1815,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SubstitutableType, Type)
 /// at run time due to the use of generic types.
 class ArchetypeType : public SubstitutableType {
   ArchetypeType *Parent;
+  AssociatedTypeDecl *AssocType;
   Identifier Name;
   unsigned IndexIfPrimary;
   ArrayRef<std::pair<Identifier, ArchetypeType *>> NestedTypes;
@@ -1824,6 +1825,7 @@ public:
   ///
   /// The ConformsTo array will be copied into the ASTContext by this routine.
   static ArchetypeType *getNew(const ASTContext &Ctx, ArchetypeType *Parent,
+                               AssociatedTypeDecl *AssocType,
                                Identifier Name, ArrayRef<Type> ConformsTo,
                                Type Superclass,
                                Optional<unsigned> Index = Optional<unsigned>());
@@ -1833,10 +1835,11 @@ public:
   /// The ConformsTo array will be minimized then copied into the ASTContext
   /// by this routine.
   static ArchetypeType *getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                          Identifier Name,
-                          SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                          Type Superclass,
-                          Optional<unsigned> Index = Optional<unsigned>());
+                               AssociatedTypeDecl *AssocType,
+                               Identifier Name,
+                               SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                               Type Superclass,
+                               Optional<unsigned> Index = Optional<unsigned>());
 
   void print(raw_ostream &OS) const;
 
@@ -1850,6 +1853,14 @@ public:
   /// \brief Retrieve the parent of this archetype, or null if this is a
   /// primary archetype.
   ArchetypeType *getParent() const { return Parent; }
+
+  /// Retrieve the associated type to which this archetype (if it is a nested
+  /// archetype) corresponds.
+  ///
+  /// This associated type will have the same name as the archetype and will
+  /// be a member of one of the protocols to which the parent archetype
+  /// conforms.
+  AssociatedTypeDecl *getAssocType() const { return AssocType; }
 
   /// \brief Retrieve the nested type with the given name.
   ArchetypeType *getNestedType(Identifier Name) const;
@@ -1881,10 +1892,12 @@ public:
   
 private:
   ArchetypeType(const ASTContext &Ctx, ArchetypeType *Parent,
+                AssociatedTypeDecl *AssocType,
                 Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass, Optional<unsigned> Index)
     : SubstitutableType(TypeKind::Archetype, &Ctx, ConformsTo, Superclass),
-      Parent(Parent), Name(Name), IndexIfPrimary(Index? *Index + 1 : 0) { }
+      Parent(Parent), AssocType(AssocType), Name(Name),
+      IndexIfPrimary(Index? *Index + 1 : 0) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 
