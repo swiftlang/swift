@@ -229,8 +229,6 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       SourceLoc StartLoc = Tok.getLoc();
 
       ParserStatus Status = parseExprOrStmt(Result);
-      if (Tok.is(tok::code_complete))
-        Status.setHasCodeCompletion();
       if (Status.hasCodeCompletion() && isCodeCompletionFirstPass()) {
         consumeTopLevelDecl(BeginParserPosition);
         return;

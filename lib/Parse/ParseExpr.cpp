@@ -898,8 +898,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
                                               Name, Tok.getLoc()));
           consumeToken();
         }
-        if (Tok.is(tok::code_complete) && CodeCompletion && Result.isNonNull()) {
-          CodeCompletion->completeDotExpr(Result.get());
+        if (Tok.is(tok::code_complete)) {
+          if (CodeCompletion && Result.isNonNull())
+            CodeCompletion->completeDotExpr(Result.get());
           consumeToken(tok::code_complete);
           Result.setHasCodeCompletion();
           return Result;
