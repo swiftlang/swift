@@ -148,7 +148,8 @@ public:
                       FuncExpr *fe);
   
   template<typename T>
-  SILFunction *preEmitFunction(SILDeclRef constant, T *astNode);
+  SILFunction *preEmitFunction(SILDeclRef constant, T *astNode,
+                               SILLocation L = SILLocation());
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
   
   /// Add a global variable to the SILModule.
