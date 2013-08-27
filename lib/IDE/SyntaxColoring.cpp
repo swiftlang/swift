@@ -49,7 +49,6 @@ SyntaxColoringContext::SyntaxColoringContext(SourceManager &SM,
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
 
-    case tok::identifier: Kind = SyntaxNodeKind::Identifier; break;
     case tok::dollarident: Kind = SyntaxNodeKind::DollarIdent; break;
     case tok::integer_literal: Kind = SyntaxNodeKind::Integer; break;
     case tok::floating_literal: Kind = SyntaxNodeKind::Floating; break;
