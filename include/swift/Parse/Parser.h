@@ -659,8 +659,7 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Statement Parsing
-  // Each of these returns null (in a NullablePtr) on a parse error, or an
-  // ErrorStmt on a semantic error.
+
   static bool isStartOfStmt(const Token &Tok);
   ParserResult<Stmt> parseStmt();
   ParserStatus parseExprOrStmt(ExprStmtOrDecl &Result);
@@ -678,6 +677,7 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing
+
   GenericParamList *parseGenericParameters();
   GenericParamList *parseGenericParameters(SourceLoc LAngleLoc);
   GenericParamList *maybeParseGenericParams();
