@@ -1,6 +1,9 @@
 2013-08-28
 ----------
 
+* 'this' has been renamed to 'self'.  Similarly, 'This' has been renamed to
+  'Self'.
+
 * Swift now supports unions. Unlike C unions, Swift's 'union' is type-safe
   and always knows what type it contains at runtime. Union members are labeled
   using 'case' declarations; each case may have a different set of
