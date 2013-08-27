@@ -672,9 +672,9 @@ public:
   ParserResult<Stmt> parseStmtForCStyle(SourceLoc ForLoc);
   ParserResult<Stmt> parseStmtForEach(SourceLoc ForLoc);
   ParserResult<Stmt> parseStmtSwitch();
-  NullablePtr<CaseStmt> parseStmtCase();
-  bool parseStmtCaseLabels(SmallVectorImpl<CaseLabel*> &labels,
-                           SmallVectorImpl<Decl *> &boundDecls);
+  ParserResult<CaseStmt> parseStmtCase();
+  ParserStatus parseStmtCaseLabels(SmallVectorImpl<CaseLabel*> &labels,
+                                   SmallVectorImpl<Decl *> &boundDecls);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing
