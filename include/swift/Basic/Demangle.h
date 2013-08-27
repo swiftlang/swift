@@ -26,13 +26,11 @@ typedef llvm::IntrusiveRefCntPtr<Node> NodePointer;
 
 class Node : public llvm::RefCountedBase<Node> {
 public:
+  typedef llvm::SmallVector<NodePointer, 10> ChildNodes;
+  typedef ChildNodes::iterator iterator;
+  typedef ChildNodes::const_iterator const_iterator;
+  typedef ChildNodes::size_type size_type;
 
-  typedef llvm::SmallVector<NodePointer,10> NodeVector;
-  
-  typedef NodeVector::iterator iterator;
-  typedef NodeVector::const_iterator const_iterator;
-  typedef NodeVector::size_type size_type;
-  
   enum class Kind {
     Failure = 0,
     Module,
@@ -79,6 +77,7 @@ public:
     PostfixOperator,
     InfixOperator,
     Identifier,
+    DeclIdentifier,
     LocalEntity,
     Deallocator,
     Allocator,
@@ -102,67 +101,47 @@ public:
     TupleElementType,
     TypeListEntry,
     FunctionName,
-    NominalType,
-    DeclarationName,
-    DeclarationContext,
-    DeclarationIdentifier,
-    DeclarationType
+    NominalType
   };
+
+  Node(Kind k, std::string t = "");
   
-  size_type size ();
-  iterator begin ();
-  iterator end ();
-  const_iterator begin () const;
-  const_iterator end () const;
-  
-  NodePointer front ();
-  NodePointer back ();
-  
-  NodePointer child_at (size_type idx);
-  
-  Node (Kind k, std::string t);
-  
-  Node* getParent ();
-  
-  NodePointer getNextNode ();
-  Node* getPreviousNode ();
-  
-  NodePointer push_back_child (NodePointer child);
-  
-  void setParent (Node *parent);
-  void setNextNode (NodePointer successor);
-  
+  Node (const Node& other);
+
+  llvm::StringRef getText();
+  void setText(std::string t);
+
   Kind getKind();
-  void setKind (Kind k);
+  void setKind(Kind k);
+
+  NodePointer getNextNode();
+  NodePointer setNextNode(NodePointer n);
+
+  NodePointer push_back_child(NodePointer c);
+
+  NodePointer child_at(size_type pos);
+
+  NodePointer front();
+  NodePointer back();
   
-  std::string getText();
-  void setText (const std::string &t);
-  
+  iterator begin();
+  iterator end();
+
+  const_iterator begin() const;
+  const_iterator end() const;
+
+  size_type size();
+
   static NodePointer makeNodePointer(Kind k, std::string t = "");
-  
+
 private:
-  struct FindPtr {
-    FindPtr(Node* v) : ptr_val(v) {}
-    bool operator () (NodePointer sp) {
-      return sp.getPtr() == ptr_val;
-    }
-  private:
-    Node* ptr_val;
-  };
-  
+  Node *ParentNode;
+  std::string TextContent;
   Kind NodeKind;
-  std::string NodeText;
-  NodePointer Successor;
-  NodeVector Children;
-  Node* Parent;
-  Node* Predecessor;
-  
-  void setParentImpl (Node *parent);
-  void setSuccessorImpl (NodePointer successor);
-  void push_back_childImpl (NodePointer child);
-  void insertSiblingImpl (NodePointer child);
+  NodePointer NextNode;
+  ChildNodes Children;
 };
-  
+
 /// \brief Demangle the given string as a Swift symbol.
 ///
 /// Typical usage:
