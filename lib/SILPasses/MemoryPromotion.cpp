@@ -376,6 +376,7 @@ namespace {
     /// ByrefUses, and Escapes).
     llvm::SmallPtrSet<SILInstruction*, 16> NonLoadUses;
 
+    /// Does this value escape anywhere in the function.
     bool HasAnyEscape = false;
 
     // Keep track of whether we've emitted an error.  We only emit one error per
@@ -403,7 +404,8 @@ namespace {
                                AccessPathTy *AccessPath = nullptr);
     bool isLiveOut(SILBasicBlock *BB);
 
-    
+    bool hasEscapedAt(SILInstruction *I);
+
     void diagnoseInitError(SILInstruction *Use,
                            Diag<StringRef> DiagMessage);
   };
@@ -510,6 +512,11 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // value to avoid constructing SSA for the value.
   bool WantValue = isa<LoadInst>(Inst);
 
+  // If the box has escaped at this instruction, we do not want to promote the
+  // load, so don't try to compute the result value.
+  if (WantValue && hasEscapedAt(Inst))
+    WantValue = false;
+
   // If this is a load from a struct field that we want to promote, compute the
   // access path down to the field so we can determine precise def/use behavior.
   AccessPathTy AccessPath;
@@ -539,9 +546,6 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // If the value is definitely initialized, check to see if this is a load
   // that we have a value available for.
   if (!Result) return;
-
-  // FIXME: We cannot do load promotion in regions where the value has
-  // escaped!
 
   assert(!isStructOrTupleToScalarize(Inst->getType(0)));
 
@@ -689,6 +693,12 @@ void ElementPromotion::handleRelease(SILInstruction *Inst) {
   diagnoseInitError(Inst, diag::variable_destroyed_before_initialized);
 }
 
+/// hasEscapedAt - Return true if the box has escaped at the specified
+/// instruction.  We are not allowed to do load promotion in an escape region.
+bool ElementPromotion::hasEscapedAt(SILInstruction *I) {
+  // FIXME: This is not an aggressive implementation.  :)
+  return HasAnyEscape;
+}
 
 
 bool ElementPromotion::isLiveOut(SILBasicBlock *BB) {

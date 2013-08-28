@@ -208,6 +208,28 @@ bb0:
   return %11 : $()
 }
 
+// CHECK-LABEL: sil @closure_test2
+sil @closure_test2 : $[thin] (a : Int64) -> Int64 {
+bb0(%1 : $Int64):
+  %0 = alloc_box $Int64
+  store %1 to %0#1 : $*Int64  // CHECK: store
+
+  %5 = function_ref @takes_closure : $[thin] (x : () -> ()) -> ()
+  %6 = function_ref @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
+  strong_retain %0#0 : $Builtin.ObjectPointer
+  %8 = partial_apply %6(%0#0, %0#1) : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
+  %9 = apply %5(%8) : $[thin] (x : () -> ()) -> ()
+  strong_release %0#0 : $Builtin.ObjectPointer
+
+  store %1 to %0#1 : $*Int64 // CHECK: store
+
+  // In an escape region, we should not promote loads.
+  %r = load %0#1 : $*Int64 // CHECK: load
+  return %r : $Int64
+}
+
+
+
 class SomeClass {}
 
 sil @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass
