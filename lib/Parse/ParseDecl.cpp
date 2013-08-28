@@ -2338,18 +2338,26 @@ Parser::parseDeclConstructor(bool HasContainerType) {
   GenericParamList *GenericParams = maybeParseGenericParams();
 
   // pattern-tuple
-  if (!Tok.is(tok::l_paren)) {
+  ParserResult<Pattern> Arguments;
+  if (!Tok.is(tok::l_paren))
     diagnose(Tok, diag::expected_lparen_constructor);
-    return nullptr;
-  }
+  else
+    Arguments = parsePatternTuple(/*AllowInitExpr=*/true);
 
-  ParserResult<Pattern> Arguments = parsePatternTuple(/*AllowInitExpr=*/true);
+  // FIXME: handle code completion in Arguments.
+
   if (Arguments.isNull())
-    return nullptr;
+    // Recover by creating an empty parameter tuple.
+    Arguments = makeParserErrorResult(
+        TuplePattern::createSimple(Context, Tok.getLoc(), {}, Tok.getLoc()));
 
   // '{'
   if (!Tok.is(tok::l_brace)) {
-    diagnose(Tok, diag::expected_lbrace_constructor);
+    if (!Arguments.isParseError()) {
+      // Don't emit this diagnostic if we already complained about this
+      // constructor decl.
+      diagnose(Tok, diag::expected_lbrace_constructor);
+    }
     return nullptr;
   }
 

@@ -390,7 +390,13 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
 
   llvm::DenseMap<Identifier, ValueDecl*> CheckTypes;
   for (unsigned i = 0, e = TU->Decls.size(); i != e; ++i) {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(TU->Decls[i])) {
+    Decl *D = TU->Decls[i];
+    if (D->isInvalid())
+      // No need to diagnose redeclarations of invalid declarations, we have
+      // already complained about them in some other way.
+      continue;
+
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
       // Check for declarations with the same name which aren't overloaded
       // vars/funcs.
       // FIXME: We don't have enough information to do this properly here,
