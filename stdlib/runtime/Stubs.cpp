@@ -96,7 +96,8 @@ unsigned long long
 print_double(char* Buffer, double X) {
   long long i = sprintf(Buffer, "%g", X);
   // Add ".0" to a float that (a) is not in scientific notation, (b) does not
-  // already have a fractional part, and (c) is not infinite.
+  // already have a fractional part, (c) is not infinite, and (d) is not a NaN
+  // value.
   if (strchr(Buffer, 'e') == nullptr && strchr(Buffer, '.') == nullptr &&
       strchr(Buffer, 'n') == nullptr) {
     Buffer[i++] = '.';
