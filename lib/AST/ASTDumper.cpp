@@ -542,7 +542,11 @@ void Decl::dump(unsigned Indent) const {
 }
 
 void TranslationUnit::dump() const {
-  PrintDecl(llvm::errs(), 0).visitTranslationUnit(this);
+  dump(llvm::errs());
+}
+
+void TranslationUnit::dump(llvm::raw_ostream &OS) const {
+  PrintDecl(OS, 0).visitTranslationUnit(this);
   llvm::errs() << '\n';
 }
 

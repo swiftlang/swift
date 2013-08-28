@@ -353,7 +353,8 @@ public:
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
   void dump() const;
-
+  void dump(raw_ostream &os) const;
+    
   /// \brief Pretty-print the entire contents of this translation unit.
   ///
   /// \param os The stream to which the contents will be printed.
