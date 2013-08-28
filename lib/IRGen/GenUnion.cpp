@@ -46,77 +46,444 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-  class UnionImplStrategy;
-  
-  /// An abstract base class for LoadableTypeInfo implementations of union types.
-  // FIXME: not always loadable or even fixed-size!
-  class LoadableUnionTypeInfoBase : public LoadableTypeInfo {
+  /// An implementation strategy for a union, which handles how the union is
+  /// laid out and how to construct and destructure values inside the union.
+  class UnionImplStrategy {
   public:
-    // FIXME: Derive spare bits from element layout.
-    LoadableUnionTypeInfoBase(llvm::StructType *T, Size S, llvm::BitVector SB,
-                      Alignment A, IsPOD_t isPOD)
-      : LoadableTypeInfo(T, S, std::move(SB), A, isPOD) {}
+    struct Element {
+      UnionElementDecl *decl;
+      const TypeInfo *ti;
+    };
+  protected:
+    unsigned NumElements;
+    std::vector<Element> ElementsWithPayload;
+    std::vector<Element> ElementsWithRecursivePayload;
+    std::vector<Element> ElementsWithNoPayload;
+    
+    const TypeInfo *TI = nullptr;
+    
+    UnionImplStrategy(unsigned NumElements,
+                std::vector<Element> &&ElementsWithPayload,
+                std::vector<Element> &&ElementsWithRecursivePayload,
+                std::vector<Element> &&ElementsWithNoPayload)
+      : NumElements(NumElements),
+        ElementsWithPayload(std::move(ElementsWithPayload)),
+        ElementsWithRecursivePayload(std::move(ElementsWithRecursivePayload)),
+        ElementsWithNoPayload(std::move(ElementsWithNoPayload))
+    {}
 
-    llvm::StructType *getStorageType() const {
-      return cast<llvm::StructType>(TypeInfo::getStorageType());
+    /// Given an incomplete StructType for the union, completes layout of the
+    /// storage type, calculates its size and alignment, and produces the
+    /// TypeInfo for the union.
+    virtual TypeInfo *doCompleteUnionTypeLayout(TypeConverter &TC,
+                                                UnionDecl *theUnion,
+                                                llvm::StructType *unionTy) = 0;
+    
+
+  public:
+    /// Construct a layout strategy appropriate to the union type.
+    static UnionImplStrategy *get(TypeConverter &TC, UnionDecl *theUnion);
+    
+    TypeInfo *completeUnionTypeLayout(TypeConverter &TC,
+                                      UnionDecl *theUnion,
+                                      llvm::StructType *unionTy) {
+      auto mutableTI = doCompleteUnionTypeLayout(TC, theUnion, unionTy);
+      TI = mutableTI;
+      return mutableTI;
     }
+    
+    const TypeInfo &getTypeInfo() const {
+      assert(TI);
+      return *TI;
+    }
+    
+    llvm::StructType *getStorageType() const {
+      return cast<llvm::StructType>(getTypeInfo().getStorageType());
+    }
+    
+    IsPOD_t isPOD(ResilienceScope scope) const {
+      return getTypeInfo().isPOD(scope);
+    }
+    
+    /// \group Indirect union operations
+    
+    /* TODO
+    /// Project the address of the data for a case. Does not check or modify
+    /// the referenced union value.
+    /// Corresponds to the SIL 'union_data_addr' instruction.
+    virtual Address projectDataForStore(IRGenFunction &IGF,
+                                        UnionElementDecl *elt,
+                                        Address unionAddr) const = 0;
+    
+    /// Overlay the tag value for a case onto a data value in memory.
+    /// Corresponds to the SIL 'inject_union_addr' instruction.
+    virtual void storeTag(IRGenFunction &IGF,
+                          UnionElementDecl *elt,
+                          Address unionAddr) const = 0;
+    
+    /// Emit a branch on the case contained by a union in memory.
+    /// Performs the branching for a SIL 'destructive_switch_union_addr'
+    /// instruction.
+    virtual void emitAddressSwitch(IRGenFunction &IGF,
+                                   Address unionAddr,
+                                   ArrayRef<std::pair<UnionElementDecl*,
+                                   llvm::BasicBlock*>> dests,
+                                   llvm::BasicBlock *defaultDest) const = 0;
+    
+    /// Clears tag bits from within the payload of a union in memory and
+    /// projects the address of the data for a case. Does not check
+    /// the referenced union value.
+    /// Performs the block argument binding for a SIL
+    /// 'destructive_switch_union_addr' instruction.
+    virtual Address destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                                  UnionElementDecl *elt,
+                                                  Address unionAddr) const = 0;
+     */
 
-    bool isIndirectArgument(ExplosionKind kind) const override {
+    /// \group Loadable union operations
+    
+    /// Emit the construction sequence for a union case into an explosion.
+    /// Corresponds to the SIL 'union' instruction.
+    virtual void emitValueInjection(IRGenFunction &IGF,
+                                    UnionElementDecl *elt,
+                                    Explosion &params,
+                                    Explosion &out) const = 0;
+    
+    /// Emit a branch on the case contained by a union explosion.
+    /// Performs the branching for a SIL 'switch_union' instruction.
+    virtual void emitValueSwitch(IRGenFunction &IGF,
+                                 Explosion &value,
+                                 ArrayRef<std::pair<UnionElementDecl*,
+                                                    llvm::BasicBlock*>> dests,
+                                 llvm::BasicBlock *defaultDest) const = 0;
+    
+    /// Project a case value out of a union explosion. This does not check that
+    /// the explosion actually contains a value of the given case.
+    /// Performs the block argument binding for a SIL 'switch_union'
+    /// instruction.
+    virtual void emitValueProject(IRGenFunction &IGF,
+                                  Explosion &inUnion,
+                                  UnionElementDecl *theCase,
+                                  Explosion &out) const = 0;
+    
+    /// \group Delegated TypeInfo operations
+    
+    virtual void getSchema(ExplosionSchema &schema) const = 0;
+    virtual void destroy(IRGenFunction &IGF, Address addr) const = 0;
+    
+    virtual bool isIndirectArgument(ExplosionKind kind) const {
       // FIXME!
       return false;
     }
-
-    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                              Address dest) const override {
+      
+    virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                                      Address dest) const {
       // FIXME!
       initialize(IGF, params, dest);
     }
-
-    /// Emit the construction sequence for a union case.
-    virtual void emitValueInjection(IRGenFunction &IGF,
-                               UnionElementDecl *elt,
-                               Explosion &params,
-                               Explosion &out) const = 0;
     
-    /// Emit a branch on the case contained in a union value.
-    virtual void emitValueSwitch(IRGenFunction &IGF,
-                            Explosion &value,
-                            ArrayRef<std::pair<UnionElementDecl*,
-                                               llvm::BasicBlock*>> dests,
-                            llvm::BasicBlock *defaultDest) const = 0;
+    /// \group Delegated LoadableTypeInfo operations
     
-    /// Project a case value out of a union value. This does not check that the
-    /// union actually contains a value of the given case.
-    virtual void emitValueProject(IRGenFunction &IGF,
-                             Explosion &inUnion,
-                             UnionElementDecl *theCase,
-                             Explosion &out) const = 0;
+    virtual unsigned getExplosionSize(ExplosionKind kind) const = 0;
+    virtual void loadAsCopy(IRGenFunction &IGF, Address addr,
+                            Explosion &e) const = 0;
+    virtual void loadAsTake(IRGenFunction &IGF, Address addr,
+                            Explosion &e) const = 0;
+    virtual void assign(IRGenFunction &IGF, Explosion &e,
+                        Address addr) const = 0;
+    virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
+                                Address src) const = 0;
+    virtual void assignWithTake(IRGenFunction &IGF, Address dest,
+                                Address src) const = 0;
+    virtual void initialize(IRGenFunction &IGF, Explosion &e,
+                            Address addr) const = 0;
+    virtual void reexplode(IRGenFunction &IGF, Explosion &src,
+                           Explosion &dest) const = 0;
+    virtual void copy(IRGenFunction &IGF, Explosion &src,
+                      Explosion &dest) const = 0;
+    virtual void consume(IRGenFunction &IGF, Explosion &src) const = 0;
+    virtual llvm::Value *packUnionPayload(IRGenFunction &IGF,
+                                          Explosion &in,
+                                          unsigned bitWidth,
+                                          unsigned offset) const = 0;
     
-    /// Given an incomplete UnionTypeInfo, completes layout of the storage type
-    /// and calculates its size and alignment.
-    virtual void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
-                                 UnionImplStrategy &strategy) = 0;
+    virtual void unpackUnionPayload(IRGenFunction &IGF,
+                                    llvm::Value *payload,
+                                    Explosion &dest,
+                                    unsigned offset) const = 0;
   };
   
-  /// Abstract base class for unions with one or cases that carry payloads.
-  class PayloadUnionTypeInfoBase : public LoadableUnionTypeInfoBase {
+  /// Implementation strategy for singleton unions, with zero or one cases.
+  class SingletonUnionImplStrategy : public UnionImplStrategy {
+    const TypeInfo *getSingleton() const {
+      return ElementsWithPayload.empty() ? nullptr : ElementsWithPayload[0].ti;
+    }
+    
+    const FixedTypeInfo *getFixedSingleton() const {
+      return cast_or_null<FixedTypeInfo>(getSingleton());
+    }
+    
+    const LoadableTypeInfo *getLoadableSingleton() const {
+      return cast_or_null<LoadableTypeInfo>(getSingleton());
+    }
+
+    static Address getSingletonAddress(IRGenFunction &IGF, Address addr) {
+      llvm::Value *singletonAddr =
+        IGF.Builder.CreateStructGEP(addr.getAddress(), 0);
+      return Address(singletonAddr, addr.getAlignment());
+    }
+    
+  public:
+    SingletonUnionImplStrategy(unsigned NumElements,
+                           std::vector<Element> &&WithPayload,
+                           std::vector<Element> &&WithRecursivePayload,
+                           std::vector<Element> &&WithNoPayload)
+      : UnionImplStrategy(NumElements,
+                          std::move(WithPayload),
+                          std::move(WithRecursivePayload),
+                          std::move(WithNoPayload))
+    {
+      assert(NumElements <= 1);
+      assert(ElementsWithPayload.size() <= 1);
+    }
+    
+    TypeInfo *doCompleteUnionTypeLayout(TypeConverter &TC,
+                                      UnionDecl *theUnion,
+                                      llvm::StructType *unionTy) override;
+
+    void emitValueSwitch(IRGenFunction &IGF,
+                         Explosion &value,
+                         ArrayRef<std::pair<UnionElementDecl*,
+                                            llvm::BasicBlock*>> dests,
+                         llvm::BasicBlock *defaultDest) const override {
+      // No dispatch necessary. Branch straight to the destination.
+      value.claimAll();
+      
+      assert(dests.size() == 1 && "switch table mismatch");
+      IGF.Builder.CreateBr(dests[0].second);
+    }
+    
+    void emitValueProject(IRGenFunction &IGF,
+                          Explosion &in,
+                          UnionElementDecl *theCase,
+                          Explosion &out) const override {
+      // The projected value is the payload.
+      if (getLoadableSingleton())
+        getLoadableSingleton()->reexplode(IGF, in, out);
+    }
+
+    void emitValueInjection(IRGenFunction &IGF,
+                            UnionElementDecl *elt,
+                            Explosion &params,
+                            Explosion &out) const override {
+      // If the element carries no data, neither does the injection.
+      // Otherwise, the result is identical.
+      if (getLoadableSingleton())
+        getLoadableSingleton()->reexplode(IGF, params, out);
+    }
+    
+    void getSchema(ExplosionSchema &schema) const {
+      if (getSingleton()) getSingleton()->getSchema(schema);
+    }
+    
+    unsigned getExplosionSize(ExplosionKind kind) const {
+      if (!getLoadableSingleton()) return 0;
+      return getLoadableSingleton()->getExplosionSize(kind);
+    }
+    
+    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      if (!getLoadableSingleton()) return;
+      getLoadableSingleton()->loadAsCopy(IGF, getSingletonAddress(IGF, addr), e);
+    }
+    
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      if (!getLoadableSingleton()) return;
+      getLoadableSingleton()->loadAsTake(IGF, getSingletonAddress(IGF, addr), e);
+    }
+    
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      if (!getLoadableSingleton()) return;
+      getLoadableSingleton()->assign(IGF, e, getSingletonAddress(IGF, addr));
+    }
+    
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+      if (!getLoadableSingleton()) return;
+      dest = getSingletonAddress(IGF, dest);
+      src = getSingletonAddress(IGF, src);
+      getLoadableSingleton()->assignWithCopy(IGF, dest, src);
+    }
+    
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+      if (!getLoadableSingleton()) return;
+      dest = getSingletonAddress(IGF, dest);
+      src = getSingletonAddress(IGF, src);
+      getLoadableSingleton()->assignWithTake(IGF, dest, src);
+    }
+    
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      if (!getLoadableSingleton()) return;
+      getLoadableSingleton()->initialize(IGF, e, getSingletonAddress(IGF, addr));
+    }
+    
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      if (getLoadableSingleton()) getLoadableSingleton()->reexplode(IGF, src, dest);
+    }
+    
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      if (getLoadableSingleton()) getLoadableSingleton()->copy(IGF, src, dest);
+    }
+    
+    void consume(IRGenFunction &IGF, Explosion &src) const {
+      if (getLoadableSingleton()) getLoadableSingleton()->consume(IGF, src);
+    }
+    
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      if (getSingleton() && !getSingleton()->isPOD(ResilienceScope::Local))
+        getSingleton()->destroy(IGF, getSingletonAddress(IGF, addr));
+    }
+    
+    llvm::Value *packUnionPayload(IRGenFunction &IGF,
+                                  Explosion &in,
+                                  unsigned bitWidth,
+                                  unsigned offset) const override {
+      if (getLoadableSingleton())
+        return getLoadableSingleton()->packUnionPayload(IGF, in, bitWidth, offset);
+      return PackUnionPayload::getEmpty(IGF.IGM, bitWidth);
+    }
+    
+    void unpackUnionPayload(IRGenFunction &IGF,
+                            llvm::Value *payload,
+                            Explosion &dest,
+                            unsigned offset) const override {
+      if (!getLoadableSingleton()) return;
+      getLoadableSingleton()->unpackUnionPayload(IGF, payload, dest, offset);
+    }
+  };
+  
+  /// Implementation strategy for no-payload unions, in other words, 'enum-like'
+  /// unions where none of the cases have data.
+  class NoPayloadUnionImplStrategy
+    : public SingleScalarTypeInfo<NoPayloadUnionImplStrategy,
+                                  UnionImplStrategy>
+  {
+    llvm::IntegerType *getDiscriminatorType() const {
+      llvm::StructType *Struct = getStorageType();
+      return cast<llvm::IntegerType>(Struct->getElementType(0));
+    }
+    
+    /// Map the given element to the appropriate value in the
+    /// discriminator type.
+    llvm::ConstantInt *getDiscriminatorIndex(UnionElementDecl *target) const {
+      // FIXME: using a linear search here is fairly ridiculous.
+      unsigned index = 0;
+      for (auto elt : target->getParentUnion()->getAllElements()) {
+        if (elt == target) break;
+        index++;
+      }
+      return llvm::ConstantInt::get(getDiscriminatorType(), index);
+    }
+    
+  public:
+    NoPayloadUnionImplStrategy(unsigned NumElements,
+                           std::vector<Element> &&WithPayload,
+                           std::vector<Element> &&WithRecursivePayload,
+                           std::vector<Element> &&WithNoPayload)
+      : SingleScalarTypeInfo(NumElements,
+                             std::move(WithPayload),
+                             std::move(WithRecursivePayload),
+                             std::move(WithNoPayload))
+    {
+      assert(ElementsWithPayload.empty());
+      assert(!ElementsWithNoPayload.empty());
+    }
+    
+    TypeInfo *doCompleteUnionTypeLayout(TypeConverter &TC,
+                                      UnionDecl *theUnion,
+                                      llvm::StructType *unionTy) override;
+
+    void emitValueSwitch(IRGenFunction &IGF,
+                         Explosion &value,
+                         ArrayRef<std::pair<UnionElementDecl*,
+                         llvm::BasicBlock*>> dests,
+                         llvm::BasicBlock *defaultDest) const override {
+      llvm::Value *discriminator = value.claimNext();
+      
+      // Create an unreachable block for the default if the original SIL
+      // instruction had none.
+      bool unreachableDefault = false;
+      if (!defaultDest) {
+        unreachableDefault = true;
+        defaultDest = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+      }
+      
+      auto *i = IGF.Builder.CreateSwitch(discriminator, defaultDest,
+                                         dests.size());
+      for (auto &dest : dests)
+        i->addCase(getDiscriminatorIndex(dest.first), dest.second);
+      
+      if (unreachableDefault) {
+        IGF.Builder.emitBlock(defaultDest);
+        IGF.Builder.CreateUnreachable();
+      }
+    }
+    
+    void emitValueProject(IRGenFunction &IGF,
+                          Explosion &in,
+                          UnionElementDecl *elt,
+                          Explosion &out) const override {
+      // All of the cases project an empty explosion.
+      in.claimAll();
+    }
+    
+    void emitValueInjection(IRGenFunction &IGF,
+                            UnionElementDecl *elt,
+                            Explosion &params,
+                            Explosion &out) const {
+      out.add(getDiscriminatorIndex(elt));
+    }
+    
+    /// \group Required for SingleScalarTypeInfo
+    
+    llvm::Type *getScalarType() const {
+      return getDiscriminatorType();
+    }
+    
+    static Address projectScalar(IRGenFunction &IGF, Address addr) {
+      return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
+    }
+
+    void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {}
+    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {}
+    
+    static constexpr IsPOD_t IsScalarPOD = IsPOD;
+  };
+  
+  /// Common base class for unions with one or more cases with data.
+  class PayloadUnionImplStrategyBase : public UnionImplStrategy {
   protected:
     // The number of extra tag bits outside of the payload required to
     // discriminate union cases.
-    unsigned ExtraTagBitCount = 0;
+    unsigned ExtraTagBitCount = ~0u;
     // The number of possible values for the extra tag bits that are used.
     // Log2(NumExtraTagValues - 1) + 1 == ExtraTagBitCount
-    unsigned NumExtraTagValues = 0;
-    
+    unsigned NumExtraTagValues = ~0u;
+
   public:
-    PayloadUnionTypeInfoBase(llvm::StructType *T, Size S, Alignment A,
-                             IsPOD_t isPOD)
-      : LoadableUnionTypeInfoBase(T, S, {}, A, isPOD)
-    {}
+    PayloadUnionImplStrategyBase(unsigned NumElements,
+                                 std::vector<Element> &&WithPayload,
+                                 std::vector<Element> &&WithRecursivePayload,
+                                 std::vector<Element> &&WithNoPayload)
+      : UnionImplStrategy(NumElements,
+                          std::move(WithPayload),
+                          std::move(WithRecursivePayload),
+                          std::move(WithNoPayload))
+    {
+      assert(ElementsWithPayload.size() >= 1);
+    }
     
     virtual Size getExtraTagBitOffset() const = 0;
-
-    void getSchema(ExplosionSchema &schema) const {
+    
+    void getSchema(ExplosionSchema &schema) const override {
       schema.add(ExplosionSchema::Element::forScalar(
                                          getStorageType()->getElementType(0)));
       if (ExtraTagBitCount > 0)
@@ -124,7 +491,7 @@ namespace {
                                          getStorageType()->getElementType(1)));
     }
     
-    unsigned getExplosionSize(ExplosionKind kind) const {
+    unsigned getExplosionSize(ExplosionKind kind) const override {
       return ExtraTagBitCount > 0 ? 2 : 1;
     }
     
@@ -136,20 +503,22 @@ namespace {
       assert(ExtraTagBitCount > 0 && "does not have extra tag bits");
       return IGF.Builder.CreateStructGEP(addr, 1, getExtraTagBitOffset());
     }
-
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e)
+    const override {
       e.add(IGF.Builder.CreateLoad(projectPayload(IGF, addr)));
       if (ExtraTagBitCount > 0)
         e.add(IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr)));
     }
     
-    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e)
+    const override {
       Explosion tmp(e.getKind());
       loadAsTake(IGF, addr, tmp);
       copy(IGF, tmp, e);
     }
     
-    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const override {
       Explosion old(e.getKind());
       if (!isPOD(ResilienceScope::Local))
         loadAsTake(IGF, addr, old);
@@ -158,60 +527,82 @@ namespace {
         consume(IGF, old);
     }
     
-    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src)
+    const override {
       Explosion srcVal(ExplosionKind::Minimal);
       loadAsCopy(IGF, src, srcVal);
       assign(IGF, srcVal, dest);
     }
     
-    void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src)
+    const override {
       Explosion srcVal(ExplosionKind::Minimal);
       loadAsTake(IGF, src, srcVal);
       assign(IGF, srcVal, dest);
     }
     
-    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr)
+    const override {
       IGF.Builder.CreateStore(e.claimNext(), projectPayload(IGF, addr));
       if (ExtraTagBitCount > 0)
         IGF.Builder.CreateStore(e.claimNext(), projectExtraTagBits(IGF, addr));
     }
     
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest)
+    const override {
       dest.add(src.claim(getExplosionSize(ExplosionKind::Minimal)));
     }
     
-    void destroy(IRGenFunction &IGF, Address addr) const {
+    void destroy(IRGenFunction &IGF, Address addr) const override {
       if (isPOD(ResilienceScope::Local))
         return;
-
+      
       Explosion val(ExplosionKind::Minimal);
       loadAsTake(IGF, addr, val);
       consume(IGF, val);
     }
+
   };
 
-  /// A UnionTypeInfo implementation which has a single case with a payload and
-  /// one or more additional no-payload cases.
-  class SinglePayloadUnionTypeInfo : public PayloadUnionTypeInfoBase {
-    UnionElementDecl *PayloadElement = nullptr;
-    // FIXME - non-fixed payloads
-    const FixedTypeInfo *PayloadTypeInfo = nullptr;
-  public:
-    /// FIXME: Spare bits from the payload not exhausted by the extra
-    /// inhabitants we used.
-    SinglePayloadUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
-                              IsPOD_t isPOD)
-      : PayloadUnionTypeInfoBase(T, S, A, isPOD) {}
-    
-    Size getExtraTagBitOffset() const override {
-      return PayloadTypeInfo->getFixedSize();
+  class SinglePayloadUnionImplStrategy : public PayloadUnionImplStrategyBase {
+    UnionElementDecl *getPayloadElement() const {
+      return ElementsWithPayload[0].decl;
     }
     
+    const TypeInfo &getPayloadTypeInfo() const {
+      return *ElementsWithPayload[0].ti;
+    }
+    const FixedTypeInfo &getFixedPayloadTypeInfo() const {
+      return cast<FixedTypeInfo>(*ElementsWithPayload[0].ti);
+    }
+    const LoadableTypeInfo &getLoadablePayloadTypeInfo() const {
+      return cast<LoadableTypeInfo>(*ElementsWithPayload[0].ti);
+    }
+    
+  public:
+    SinglePayloadUnionImplStrategy(unsigned NumElements,
+                                   std::vector<Element> &&WithPayload,
+                                   std::vector<Element> &&WithRecursivePayload,
+                                   std::vector<Element> &&WithNoPayload)
+      : PayloadUnionImplStrategyBase(NumElements,
+                                     std::move(WithPayload),
+                                     std::move(WithRecursivePayload),
+                                     std::move(WithNoPayload))
+    {
+      assert(ElementsWithPayload.size() == 1);
+    }
+    
+    Size getExtraTagBitOffset() const override {
+      return getFixedPayloadTypeInfo().getFixedSize();
+    }
+    
+    TypeInfo *doCompleteUnionTypeLayout(TypeConverter &TC,
+                                      UnionDecl *theUnion,
+                                      llvm::StructType *unionTy) override;
+
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth,
                                   unsigned offset) const override {
-      assert(isComplete());
-      
       PackUnionPayload pack(IGF, bitWidth);
       // Pack payload.
       pack.addAtOffset(src.claimNext(), offset);
@@ -219,7 +610,7 @@ namespace {
       // Pack tag bits, if any.
       if (ExtraTagBitCount > 0) {
         unsigned extraTagOffset
-          = PayloadTypeInfo->getFixedSize().getValueInBits() + offset;
+          = getFixedPayloadTypeInfo().getFixedSize().getValueInBits() + offset;
         
         pack.addAtOffset(src.claimNext(), extraTagOffset);
       }
@@ -230,8 +621,6 @@ namespace {
     void unpackUnionPayload(IRGenFunction &IGF, llvm::Value *outerPayload,
                             Explosion &dest,
                             unsigned offset) const override {
-      assert(isComplete());
-      
       UnpackUnionPayload unpack(IGF, outerPayload);
       
       // Unpack our inner payload.
@@ -241,7 +630,7 @@ namespace {
       // Unpack our extra tag bits, if any.
       if (ExtraTagBitCount > 0) {
         unsigned extraTagOffset
-          = PayloadTypeInfo->getFixedSize().getValueInBits() + offset;
+          = getFixedPayloadTypeInfo().getFixedSize().getValueInBits() + offset;
         
         dest.add(unpack.claimAtOffset(getStorageType()->getElementType(1),
                                       extraTagOffset));
@@ -249,10 +638,10 @@ namespace {
     }
     
     void emitValueSwitch(IRGenFunction &IGF,
-                    Explosion &value,
-                    ArrayRef<std::pair<UnionElementDecl*,
-                                       llvm::BasicBlock*>> dests,
-                    llvm::BasicBlock *defaultDest) const override {
+                         Explosion &value,
+                         ArrayRef<std::pair<UnionElementDecl*,
+                                  llvm::BasicBlock*>> dests,
+                         llvm::BasicBlock *defaultDest) const override {
       auto &C = IGF.IGM.getLLVMContext();
       
       // Create a map of the destination blocks for quicker lookup.
@@ -260,7 +649,7 @@ namespace {
                                                                   dests.end());
       // Create an unreachable branch for unreachable switch defaults.
       auto *unreachableBB = llvm::BasicBlock::Create(C);
-
+      
       // If there was no default branch in SIL, use the unreachable branch as
       // the default.
       if (!defaultDest)
@@ -275,9 +664,9 @@ namespace {
       };
       
       llvm::Value *payload = value.claimNext();
-      llvm::BasicBlock *payloadDest = blockForCase(PayloadElement);
+      llvm::BasicBlock *payloadDest = blockForCase(getPayloadElement());
       unsigned extraInhabitantCount
-        = PayloadTypeInfo->getFixedExtraInhabitantCount();
+        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount();
       
       // If there are extra tag bits, switch over them first.
       SmallVector<llvm::BasicBlock*, 2> tagBitBlocks;
@@ -310,9 +699,9 @@ namespace {
           IGF.Builder.emitBlock(tagBitBlocks[0]);
       }
       
-      auto elements = PayloadElement->getParentUnion()->getAllElements();
+      auto elements = getPayloadElement()->getParentUnion()->getAllElements();
       auto elti = elements.begin(), eltEnd = elements.end();
-      if (*elti == PayloadElement)
+      if (*elti == getPayloadElement())
         ++elti;
       
       // Advance the union element iterator, skipping the payload case.
@@ -320,7 +709,7 @@ namespace {
         assert(elti != eltEnd);
         auto result = *elti;
         ++elti;
-        if (elti != eltEnd && *elti == PayloadElement)
+        if (elti != eltEnd && *elti == getPayloadElement())
           ++elti;
         return result;
       };
@@ -328,12 +717,13 @@ namespace {
       // If there are no extra tag bits, or they're set to zero, then we either
       // have a payload, or an empty case represented using an extra inhabitant.
       // Check the extra inhabitant cases if we have any.
-      unsigned payloadBits = PayloadTypeInfo->getFixedSize().getValueInBits();
+      unsigned payloadBits
+        = getFixedPayloadTypeInfo().getFixedSize().getValueInBits();
       if (extraInhabitantCount > 0) {
         auto *swi = IGF.Builder.CreateSwitch(payload, payloadDest);
         for (unsigned i = 0; i < extraInhabitantCount && elti != eltEnd; ++i) {
-          auto v = PayloadTypeInfo->getFixedExtraInhabitantValue(IGF.IGM,
-                                                               payloadBits, i);
+          auto v = getFixedPayloadTypeInfo().getFixedExtraInhabitantValue(
+                                                       IGF.IGM, payloadBits, i);
           swi->addCase(v, blockForCase(nextCase()));
         }
       }
@@ -367,34 +757,33 @@ namespace {
     }
     
     void emitValueProject(IRGenFunction &IGF,
-                     Explosion &inUnion,
-                     UnionElementDecl *theCase,
-                     Explosion &out) const override {
+                          Explosion &inUnion,
+                          UnionElementDecl *theCase,
+                          Explosion &out) const override {
       // Only the payload case has anything to project. The other cases are
       // empty.
-      if (theCase != PayloadElement) {
+      if (theCase != getPayloadElement()) {
         inUnion.claimAll();
         return;
       }
-        
+      
       llvm::Value *payload = inUnion.claimNext();
       if (ExtraTagBitCount > 0)
         inUnion.claimNext();
       // FIXME non-loadable payloads
-      cast<LoadableTypeInfo>(PayloadTypeInfo)
-        ->unpackUnionPayload(IGF, payload, out, 0);
+      getLoadablePayloadTypeInfo().unpackUnionPayload(IGF, payload, out, 0);
     }
     
   private:
     // Get the index of a union element among the non-payload cases.
     unsigned getSimpleElementTagIndex(UnionElementDecl *elt) const {
-      assert(elt != PayloadElement && "is payload element");
+      assert(elt != getPayloadElement() && "is payload element");
       unsigned i = 0;
       // FIXME: linear search
       for (auto *unionElt : elt->getParentUnion()->getAllElements()) {
         if (elt == unionElt)
           return i;
-        if (unionElt != PayloadElement)
+        if (unionElt != getPayloadElement())
           ++i;
       }
       llvm_unreachable("element was not a member of union");
@@ -404,8 +793,8 @@ namespace {
                              Explosion &out, unsigned value) const {
       if (ExtraTagBitCount > 0) {
         llvm::Value *zeroTagBits
-          = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
-                                   APInt(ExtraTagBitCount, value));
+        = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
+                                 APInt(ExtraTagBitCount, value));
         out.add(zeroTagBits);
         return;
       }
@@ -414,16 +803,16 @@ namespace {
     
   public:
     void emitValueInjection(IRGenFunction &IGF,
-                       UnionElementDecl *elt,
-                       Explosion &params,
-                       Explosion &out) const {
+                            UnionElementDecl *elt,
+                            Explosion &params,
+                            Explosion &out) const {
       // The payload case gets its native representation. If there are extra
       // tag bits, set them to zero.
-      unsigned payloadSize = PayloadTypeInfo->getFixedSize().getValueInBits();
+      unsigned payloadSize
+        = getFixedPayloadTypeInfo().getFixedSize().getValueInBits();
       
-      if (elt == PayloadElement) {
-        // FIXME
-        auto &loadablePayloadTI = cast<LoadableTypeInfo>(*PayloadTypeInfo);
+      if (elt == getPayloadElement()) {
+        auto &loadablePayloadTI = getLoadablePayloadTypeInfo();
         llvm::Value *payload
           = loadablePayloadTI.packUnionPayload(IGF, params, payloadSize, 0);
         out.add(payload);
@@ -436,13 +825,12 @@ namespace {
       // by setting the tag bits.
       unsigned tagIndex = getSimpleElementTagIndex(elt);
       unsigned numExtraInhabitants
-        = PayloadTypeInfo->getFixedExtraInhabitantCount();
+        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount();
       llvm::Value *payload;
       unsigned extraTagValue;
       if (tagIndex < numExtraInhabitants) {
-        payload = PayloadTypeInfo->getFixedExtraInhabitantValue(IGF.IGM,
-                                                                payloadSize,
-                                                                tagIndex);
+        payload = getFixedPayloadTypeInfo().getFixedExtraInhabitantValue(
+                                                IGF.IGM, payloadSize, tagIndex);
         extraTagValue = 0;
       } else {
         tagIndex -= numExtraInhabitants;
@@ -460,7 +848,7 @@ namespace {
         payload = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
                                          APInt(payloadSize, payloadValue));
       }
-
+      
       out.add(payload);
       addExtraTagBitValue(IGF, out, extraTagValue);
     }
@@ -469,10 +857,10 @@ namespace {
     std::tuple<llvm::BasicBlock *, llvm::Value*, llvm::Value*>
     testUnionContainsPayload(IRGenFunction &IGF, Explosion &src) const {
       auto *endBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
-
+      
       llvm::Value *payload = src.claimNext();
       llvm::Value *extraBits = nullptr;
-
+      
       // We only need to apply the payload operation if the union contains a
       // value of the payload case.
       
@@ -492,21 +880,22 @@ namespace {
       // If we used extra inhabitants to represent empty case discriminators,
       // weed them out.
       unsigned numExtraInhabitants
-        = PayloadTypeInfo->getFixedExtraInhabitantCount();
+        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount();
       if (numExtraInhabitants > 0) {
         auto *payloadBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
         auto *swi = IGF.Builder.CreateSwitch(payload, payloadBB);
         
-        auto elements = PayloadElement->getParentUnion()->getAllElements();
+        auto elements = getPayloadElement()->getParentUnion()->getAllElements();
         unsigned inhabitant = 0;
         for (auto i = elements.begin(), end = elements.end();
              i != end && inhabitant < numExtraInhabitants;
              ++i, ++inhabitant) {
-          if (*i == PayloadElement)
+          if (*i == getPayloadElement())
             ++i;
-          auto xi = PayloadTypeInfo->getFixedExtraInhabitantValue(IGF.IGM,
-                              PayloadTypeInfo->getFixedSize().getValueInBits(),
-                              inhabitant);
+          auto xi = getFixedPayloadTypeInfo().getFixedExtraInhabitantValue(
+                      IGF.IGM,
+                      getFixedPayloadTypeInfo().getFixedSize().getValueInBits(),
+                      inhabitant);
           swi->addCase(xi, endBB);
         }
         
@@ -515,7 +904,7 @@ namespace {
       
       return {endBB, payload, extraBits};
     }
-
+    
   public:
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       if (isPOD(ResilienceScope::Local)) {
@@ -527,10 +916,10 @@ namespace {
       llvm::BasicBlock *endBB;
       llvm::Value *payload, *extraTag;
       std::tie(endBB, payload, extraTag) = testUnionContainsPayload(IGF, src);
-
+      
       Explosion payloadValue(ExplosionKind::Minimal);
       Explosion payloadCopy(ExplosionKind::Minimal);
-      auto &loadableTI = cast<LoadableTypeInfo>(*PayloadTypeInfo);
+      auto &loadableTI = getLoadablePayloadTypeInfo();
       loadableTI.unpackUnionPayload(IGF, payload, payloadValue, 0);
       loadableTI.copy(IGF, payloadValue, payloadCopy);
       payloadCopy.claimAll();
@@ -548,49 +937,50 @@ namespace {
         src.claimAll();
         return;
       }
-
+      
       // Check that we have a payload.
       llvm::BasicBlock *endBB;
       llvm::Value *payload, *extraTag;
       std::tie(endBB, payload, extraTag) = testUnionContainsPayload(IGF, src);
-
+      
       // If we did, consume it.
       Explosion payloadValue(ExplosionKind::Minimal);
-      auto &loadableTI = cast<LoadableTypeInfo>(*PayloadTypeInfo);
+      auto &loadableTI = getLoadablePayloadTypeInfo();
       loadableTI.unpackUnionPayload(IGF, payload, payloadValue, 0);
       loadableTI.consume(IGF, payloadValue);
-
+      
       IGF.Builder.CreateBr(endBB);
       IGF.Builder.emitBlock(endBB);
     }
-    
-    void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
-                         UnionImplStrategy &strategy) override;
+
   };
 
-  /// A UnionTypeInfo implementation which has multiple payloads.
-  class MultiPayloadUnionTypeInfo : public PayloadUnionTypeInfoBase {
+  class MultiPayloadUnionImplStrategy : public PayloadUnionImplStrategyBase {
     // The spare bits shared by all payloads, if any.
     // Invariant: The size of the bit
     // vector is the size of the payload in bits, rounded up to a byte boundary.
     llvm::BitVector CommonSpareBits;
-    
-    // The cases with payloads, in tag order.
-    // FIXME: non-fixed type info
-    std::vector<std::pair<UnionElementDecl*, const FixedTypeInfo*>>
-      PayloadCases;
-    
-    // The cases without payloads, in discriminator order.
-    std::vector<UnionElementDecl *> NoPayloadCases;
-    
-    // The number of tag values used for no-payload cases.
-    unsigned NumEmptyElementTags;
-  public:
-    /// FIXME: Spare bits common to aggregate elements and not used for tags.
-    MultiPayloadUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
-                           IsPOD_t isPOD)
-      : PayloadUnionTypeInfoBase(T, S, A, isPOD) {}
 
+    // The number of tag values used for no-payload cases.
+    unsigned NumEmptyElementTags = ~0u;
+
+  public:
+    MultiPayloadUnionImplStrategy(unsigned NumElements,
+                                   std::vector<Element> &&WithPayload,
+                                   std::vector<Element> &&WithRecursivePayload,
+                                   std::vector<Element> &&WithNoPayload)
+    : PayloadUnionImplStrategyBase(NumElements,
+                                   std::move(WithPayload),
+                                   std::move(WithRecursivePayload),
+                                   std::move(WithNoPayload))
+    {
+      assert(ElementsWithPayload.size() > 1);
+    }
+    
+    TypeInfo *doCompleteUnionTypeLayout(TypeConverter &TC,
+                                      UnionDecl *theUnion,
+                                      llvm::StructType *unionTy) override;
+    
     Size getExtraTagBitOffset() const override {
       return Size(CommonSpareBits.size()+7U/8U);
     }
@@ -656,7 +1046,7 @@ namespace {
     unsigned getNumCasesPerTag() const {
       unsigned numCaseBits = getNumCaseBits();
       return numCaseBits >= 32
-        ? 0x80000000 : 1 << numCaseBits;
+      ? 0x80000000 : 1 << numCaseBits;
     }
     
     /// Extract the payload-discriminating tag from a payload and optional
@@ -688,15 +1078,15 @@ namespace {
       assert(!extraTagBits);
       return tag;
     }
-
+    
   public:
     void emitValueSwitch(IRGenFunction &IGF,
-                    Explosion &value,
-                    ArrayRef<std::pair<UnionElementDecl*,
-                                       llvm::BasicBlock*>> dests,
-                    llvm::BasicBlock *defaultDest) const override {
+                         Explosion &value,
+                         ArrayRef<std::pair<UnionElementDecl*,
+                                            llvm::BasicBlock*>> dests,
+                         llvm::BasicBlock *defaultDest) const override {
       auto &C = IGF.IGM.getLLVMContext();
-
+      
       // Create a map of the destination blocks for quicker lookup.
       llvm::DenseMap<UnionElementDecl*,llvm::BasicBlock*> destMap(dests.begin(),
                                                                   dests.end());
@@ -716,24 +1106,24 @@ namespace {
         else
           return found->second;
       };
-
+      
       llvm::Value *payload = value.claimNext();
       llvm::Value *extraTagBits = nullptr;
       if (ExtraTagBitCount > 0)
         extraTagBits = value.claimNext();
-
+      
       // Extract and switch on the tag bits.
       llvm::Value *tag = extractPayloadTag(IGF, payload, extraTagBits);
       unsigned numTagBits
         = cast<llvm::IntegerType>(tag->getType())->getBitWidth();
       
       auto *tagSwitch = IGF.Builder.CreateSwitch(tag, unreachableBB,
-                                       PayloadCases.size() + NumEmptyElementTags);
+                             ElementsWithPayload.size() + NumEmptyElementTags);
       
       // Switch over the tag bits for payload cases.
       unsigned tagIndex = 0;
-      for (auto &payloadCasePair : PayloadCases) {
-        UnionElementDecl *payloadCase = payloadCasePair.first;
+      for (auto &payloadCasePair : ElementsWithPayload) {
+        UnionElementDecl *payloadCase = payloadCasePair.decl;
         tagSwitch->addCase(llvm::ConstantInt::get(C,APInt(numTagBits,tagIndex)),
                            blockForCase(payloadCase));
         ++tagIndex;
@@ -742,7 +1132,8 @@ namespace {
       // Switch over the no-payload cases.
       unsigned casesPerTag = getNumCasesPerTag();
       
-      auto elti = NoPayloadCases.begin(), eltEnd = NoPayloadCases.end();
+      auto elti = ElementsWithNoPayload.begin(),
+           eltEnd = ElementsWithNoPayload.end();
       
       for (unsigned i = 0; i < NumEmptyElementTags; ++i) {
         assert(elti != eltEnd &&
@@ -758,10 +1149,10 @@ namespace {
           auto v = interleaveSpareBits(IGF.IGM, CommonSpareBits,
                                        CommonSpareBits.size(),
                                        tagIndex, idx);
-          caseSwitch->addCase(v, blockForCase(*elti));
+          caseSwitch->addCase(v, blockForCase(elti->decl));
           ++elti;
         }
-
+        
         ++tagIndex;
       }
       
@@ -791,7 +1182,7 @@ namespace {
       
       return APInt(bits.size(), parts);
     }
-
+    
     void projectPayload(IRGenFunction &IGF,
                         llvm::Value *payload,
                         unsigned payloadTag,
@@ -817,16 +1208,15 @@ namespace {
     
   public:
     void emitValueProject(IRGenFunction &IGF,
-                     Explosion &inValue,
-                     UnionElementDecl *theCase,
-                     Explosion &out) const override {
-      auto foundPayload = std::find_if(PayloadCases.begin(), PayloadCases.end(),
-        [&](const std::pair<UnionElementDecl*, const FixedTypeInfo*> &e) {
-          return e.first == theCase;
-        });
+                          Explosion &inValue,
+                          UnionElementDecl *theCase,
+                          Explosion &out) const override {
+      auto foundPayload = std::find_if(ElementsWithPayload.begin(),
+                                       ElementsWithPayload.end(),
+             [&](const Element &e) { return e.decl == theCase; });
       
       // Non-payload cases project to an empty explosion.
-      if (foundPayload == PayloadCases.end()) {
+      if (foundPayload == ElementsWithPayload.end()) {
         inValue.claimAll();
         return;
       }
@@ -837,15 +1227,13 @@ namespace {
         inValue.claimNext();
       
       // Unpack the payload.
-      projectPayload(IGF, payload, foundPayload - PayloadCases.begin(),
-                     cast<LoadableTypeInfo>(*foundPayload->second), out);
+      projectPayload(IGF, payload, foundPayload - ElementsWithPayload.begin(),
+                     cast<LoadableTypeInfo>(*foundPayload->ti), out);
     }
     
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth,
                                   unsigned offset) const override {
-      assert(isComplete());
-      
       PackUnionPayload pack(IGF, bitWidth);
       // Pack the payload.
       pack.addAtOffset(src.claimNext(), offset);
@@ -857,10 +1245,7 @@ namespace {
     }
     
     void unpackUnionPayload(IRGenFunction &IGF, llvm::Value *outerPayload,
-                            Explosion &dest,
-                            unsigned offset) const override {
-      assert(isComplete());
-
+                            Explosion &dest, unsigned offset) const override {
       UnpackUnionPayload unpack(IGF, outerPayload);
       // Unpack the payload.
       dest.add(unpack.claimAtOffset(getStorageType()->getElementType(0),
@@ -873,21 +1258,24 @@ namespace {
     }
     
     void emitValueInjection(IRGenFunction &IGF,
-                       UnionElementDecl *elt,
-                       Explosion &params,
-                       Explosion &out) const {
+                            UnionElementDecl *elt,
+                            Explosion &params,
+                            Explosion &out) const {
       // See whether this is a payload or empty case we're emitting.
-      auto payloadI = std::find_if(PayloadCases.begin(), PayloadCases.end(),
-         [&](const std::pair<UnionElementDecl*, const FixedTypeInfo*> &p) {
-           return p.first == elt;
-         });
-      if (payloadI != PayloadCases.end()) {
-        return emitPayloadInjection(IGF, elt, *payloadI->second, params, out,
-                                    payloadI - PayloadCases.begin());
+      auto payloadI = std::find_if(ElementsWithPayload.begin(),
+                                   ElementsWithPayload.end(),
+         [&](const Element &e) { return e.decl == elt; });
+      if (payloadI != ElementsWithPayload.end()) {
+        return emitPayloadInjection(IGF, elt,
+                                    cast<FixedTypeInfo>(*payloadI->ti),
+                                    params, out,
+                                    payloadI - ElementsWithPayload.begin());
       }
-      auto emptyI = std::find(NoPayloadCases.begin(),NoPayloadCases.end(), elt);
-      assert(emptyI != NoPayloadCases.end() && "case not in union");
-      emitEmptyInjection(IGF, out, emptyI - NoPayloadCases.begin());
+      auto emptyI = std::find_if(ElementsWithNoPayload.begin(),
+                                 ElementsWithNoPayload.end(),
+         [&](const Element &e) { return e.decl == elt; });
+      assert(emptyI != ElementsWithNoPayload.end() && "case not in union");
+      emitEmptyInjection(IGF, out, emptyI - ElementsWithNoPayload.begin());
     }
     
   private:
@@ -898,14 +1286,14 @@ namespace {
       // Pack the payload.
       auto &loadablePayloadTI = cast<LoadableTypeInfo>(payloadTI); // FIXME
       llvm::Value *payload = loadablePayloadTI.packUnionPayload(IGF, params,
-                                                     CommonSpareBits.size(), 0);
+                                                                CommonSpareBits.size(), 0);
       
       // If we have spare bits, pack tag bits into them.
       unsigned numSpareBits = CommonSpareBits.count();
       if (numSpareBits > 0) {
         llvm::ConstantInt *tagMask
-          = interleaveSpareBits(IGF.IGM, CommonSpareBits,CommonSpareBits.size(),
-                                tag, 0);
+        = interleaveSpareBits(IGF.IGM, CommonSpareBits,CommonSpareBits.size(),
+                              tag, 0);
         payload = IGF.Builder.CreateOr(payload, tagMask);
       }
       
@@ -926,10 +1314,10 @@ namespace {
       unsigned numCaseBits = getNumCaseBits();
       unsigned tag, tagIndex;
       if (numCaseBits >= 32) {
-        tag = PayloadCases.size();
+        tag = ElementsWithPayload.size();
         tagIndex = index;
       } else {
-        tag = (index >> numCaseBits) + PayloadCases.size();
+        tag = (index >> numCaseBits) + ElementsWithPayload.size();
         tagIndex = index & ((1 << numCaseBits) - 1);
       }
       
@@ -943,7 +1331,7 @@ namespace {
       } else {
         // Otherwise the payload is just the index.
         payload = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
-                                       APInt(CommonSpareBits.size(), tagIndex));
+                                         APInt(CommonSpareBits.size(), tagIndex));
       }
       
       out.add(payload);
@@ -970,8 +1358,8 @@ namespace {
       
       // Handle nontrivial tags.
       unsigned tagIndex = 0;
-      for (auto &payloadCasePair : PayloadCases) {
-        auto &payloadTI = cast<LoadableTypeInfo>(*payloadCasePair.second);
+      for (auto &payloadCasePair : ElementsWithPayload) {
+        auto &payloadTI = cast<LoadableTypeInfo>(*payloadCasePair.ti);
         
         // Trivial payloads don't need any work.
         if (payloadTI.isPOD(ResilienceScope::Local)) {
@@ -1005,7 +1393,7 @@ namespace {
       
       llvm::Value *payload = src.claimNext();
       llvm::Value *extraTagBits = ExtraTagBitCount > 0
-        ? src.claimNext() : nullptr;
+      ? src.claimNext() : nullptr;
       
       forNontrivialPayloads(IGF, payload, extraTagBits,
                             [&](Explosion &value, const LoadableTypeInfo &ti) {
@@ -1024,7 +1412,7 @@ namespace {
         src.claimAll();
         return;
       }
-
+      
       llvm::Value *payload = src.claimNext();
       llvm::Value *extraTagBits = ExtraTagBitCount > 0
         ? src.claimNext() : nullptr;
@@ -1034,390 +1422,219 @@ namespace {
                               ti.consume(IGF, value);
                             });
     }
-    
-    void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
-                         UnionImplStrategy &strategy) override;
   };
+  
+  UnionImplStrategy *UnionImplStrategy::get(TypeConverter &TC,
+                                            UnionDecl *theUnion)
+  {
+    unsigned numElements = 0;
+    bool dynamic = false;
+    bool loadable = true;
+    std::vector<Element> elementsWithPayload;
+    std::vector<Element> elementsWithRecursivePayload;
+    std::vector<Element> elementsWithNoPayload;
+    
+    for (auto elt : theUnion->getAllElements()) {
+      numElements++;
+      
+      // Compute whether this gives us an apparent payload or dynamic layout.
+      Type argType = elt->getArgumentType();
+      if (argType.isNull()) {
+        elementsWithNoPayload.push_back({elt, nullptr});
+        continue;
+      }
+      auto *argTI = TC.tryGetCompleteTypeInfo(argType->getCanonicalType());
+      if (!argTI) {
+        elementsWithRecursivePayload.push_back({elt, nullptr});
+        continue;
+      }
+      if (!argTI->isFixedSize())
+        dynamic = true;
+      
+      auto loadableArgTI = dyn_cast<LoadableTypeInfo>(argTI);
+      if (!loadableArgTI)
+        loadable = false;
+      else if (loadableArgTI->getExplosionSize(ExplosionKind::Minimal) != 0)
+        elementsWithPayload.push_back({elt, argTI});
+      else
+        elementsWithNoPayload.push_back({elt, argTI});
+    }
+    
+    assert(numElements != 0);
+    
+    // FIXME non-loadable unions
+    if (!loadable) {
+      TC.IGM.unimplemented(theUnion->getLoc(), "non-loadable union layout");
+      exit(1);
+    }
+    // FIXME recursive unions
+    if (!elementsWithRecursivePayload.empty()) {
+      TC.IGM.unimplemented(theUnion->getLoc(), "recursive union layout");
+      exit(1);
+    }
+    
+    // FIXME dynamic union layout
+    if (dynamic) {
+      TC.IGM.unimplemented(theUnion->getLoc(), "dynamic union layout");
+      exit(1);
+    }
+    
+    if (numElements == 1)
+      return new SingletonUnionImplStrategy(numElements,
+                                      std::move(elementsWithPayload),
+                                      std::move(elementsWithRecursivePayload),
+                                      std::move(elementsWithNoPayload));
+    if (elementsWithPayload.size() > 1)
+      return new MultiPayloadUnionImplStrategy(numElements,
+                                      std::move(elementsWithPayload),
+                                      std::move(elementsWithRecursivePayload),
+                                      std::move(elementsWithNoPayload));
+    if (elementsWithPayload.size() == 1)
+      return new SinglePayloadUnionImplStrategy(numElements,
+                                      std::move(elementsWithPayload),
+                                      std::move(elementsWithRecursivePayload),
+                                      std::move(elementsWithNoPayload));
 
-  /// A UnionTypeInfo implementation for singleton unions.
-  class SingletonUnionTypeInfo : public LoadableUnionTypeInfoBase {
+    return new NoPayloadUnionImplStrategy(numElements,
+                                        std::move(elementsWithPayload),
+                                        std::move(elementsWithRecursivePayload),
+                                        std::move(elementsWithNoPayload));
+  }
+
+  /// An abstract base class for LoadableTypeInfo implementations of union
+  /// types.
+  class LoadableUnionTypeInfo : public LoadableTypeInfo {
   public:
-    static Address getSingletonAddress(IRGenFunction &IGF, Address addr) {
-      llvm::Value *singletonAddr =
-        IGF.Builder.CreateStructGEP(addr.getAddress(), 0);
-      return Address(singletonAddr, addr.getAlignment());
+    /// The implementation strategy used by the union.
+    UnionImplStrategy &Strategy;
+    
+    // FIXME: Derive spare bits from element layout.
+    LoadableUnionTypeInfo(UnionImplStrategy &strategy,
+                          llvm::StructType *T, Size S, llvm::BitVector SB,
+                          Alignment A, IsPOD_t isPOD)
+      : LoadableTypeInfo(T, S, std::move(SB), A, isPOD),
+        Strategy(strategy) {}
+
+    llvm::StructType *getStorageType() const {
+      return cast<llvm::StructType>(TypeInfo::getStorageType());
     }
 
-    /// The type info of the singleton member, or null if it carries no data.
-    const LoadableTypeInfo *Singleton;
-
-    SingletonUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
-                           IsPOD_t isPOD)
-      : LoadableUnionTypeInfoBase(T, S, {}, A, isPOD), Singleton(nullptr) {}
-
-    void getSchema(ExplosionSchema &schema) const {
-      assert(isComplete());
-      if (Singleton) Singleton->getSchema(schema);
+    /// \group Methods delegated to the UnionImplStrategy
+    
+    void getSchema(ExplosionSchema &s) const override {
+      return Strategy.getSchema(s);
     }
-
-    unsigned getExplosionSize(ExplosionKind kind) const {
-      assert(isComplete());
-      if (!Singleton) return 0;
-      return Singleton->getExplosionSize(kind);
+    void destroy(IRGenFunction &IGF, Address addr) const override {
+      return Strategy.destroy(IGF, addr);
     }
-
-    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      if (!Singleton) return;
-      Singleton->loadAsCopy(IGF, getSingletonAddress(IGF, addr), e);
+    bool isIndirectArgument(ExplosionKind kind) const override {
+      return Strategy.isIndirectArgument(kind);
     }
-
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      if (!Singleton) return;
-      Singleton->loadAsTake(IGF, getSingletonAddress(IGF, addr), e);
-    }
-
-    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      if (!Singleton) return;
-      Singleton->assign(IGF, e, getSingletonAddress(IGF, addr));
-    }
-
-    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
-      if (!Singleton) return;
-      dest = getSingletonAddress(IGF, dest);
-      src = getSingletonAddress(IGF, src);
-      Singleton->assignWithCopy(IGF, dest, src);
-    }
-
-    void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
-      if (!Singleton) return;
-      dest = getSingletonAddress(IGF, dest);
-      src = getSingletonAddress(IGF, src);
-      Singleton->assignWithTake(IGF, dest, src);
-    }
-
-    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      if (!Singleton) return;
-      Singleton->initialize(IGF, e, getSingletonAddress(IGF, addr));
-    }
-
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      if (Singleton) Singleton->reexplode(IGF, src, dest);
-    }
-
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      if (Singleton) Singleton->copy(IGF, src, dest);
-    }
-
-    void consume(IRGenFunction &IGF, Explosion &src) const {
-      if (Singleton) Singleton->consume(IGF, src);
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address dest) const override {
+      return Strategy.initializeFromParams(IGF, params, dest);
     }
     
-    void destroy(IRGenFunction &IGF, Address addr) const {
-      if (Singleton && !isPOD(ResilienceScope::Local))
-        Singleton->destroy(IGF, getSingletonAddress(IGF, addr));
+    unsigned getExplosionSize(ExplosionKind kind) const override {
+      return Strategy.getExplosionSize(kind);
     }
-    
+    void loadAsCopy(IRGenFunction &IGF, Address addr,
+                    Explosion &e) const override {
+      return Strategy.loadAsCopy(IGF, addr, e);
+    }
+    void loadAsTake(IRGenFunction &IGF, Address addr,
+                    Explosion &e) const override {
+      return Strategy.loadAsTake(IGF, addr, e);
+    }
+    void assign(IRGenFunction &IGF, Explosion &e,
+                Address addr) const override {
+      return Strategy.assign(IGF, e, addr);
+    }
+    void assignWithCopy(IRGenFunction &IGF, Address dest,
+                        Address src) const override {
+      return Strategy.assignWithCopy(IGF, dest, src);
+    }
+    void assignWithTake(IRGenFunction &IGF, Address dest,
+                        Address src) const override {
+      return Strategy.assignWithTake(IGF, dest, src);
+    }
+    void initialize(IRGenFunction &IGF, Explosion &e,
+                    Address addr) const override {
+      return Strategy.initialize(IGF, e, addr);
+    }
+    void reexplode(IRGenFunction &IGF, Explosion &src,
+                   Explosion &dest) const override {
+      return Strategy.reexplode(IGF, src, dest);
+    }
+    void copy(IRGenFunction &IGF, Explosion &src,
+              Explosion &dest) const override {
+      return Strategy.copy(IGF, src, dest);
+    }
+    void consume(IRGenFunction &IGF, Explosion &src) const override {
+      return Strategy.consume(IGF, src);
+    }
     llvm::Value *packUnionPayload(IRGenFunction &IGF,
                                   Explosion &in,
                                   unsigned bitWidth,
                                   unsigned offset) const override {
-      if (Singleton)
-        return Singleton->packUnionPayload(IGF, in, bitWidth, offset);
-      return PackUnionPayload::getEmpty(IGF.IGM, bitWidth);
+      return Strategy.packUnionPayload(IGF, in, bitWidth, offset);
     }
-    
     void unpackUnionPayload(IRGenFunction &IGF,
                             llvm::Value *payload,
                             Explosion &dest,
                             unsigned offset) const override {
-      if (!Singleton) return;
-      Singleton->unpackUnionPayload(IGF, payload, dest, offset);
-    }
-    
-    void emitValueSwitch(IRGenFunction &IGF,
-                    Explosion &value,
-                    ArrayRef<std::pair<UnionElementDecl*,
-                             llvm::BasicBlock*>> dests,
-                    llvm::BasicBlock *defaultDest) const override {
-      // No dispatch necessary. Branch straight to the destination.
-      value.claimAll();
-      
-      assert(dests.size() == 1 && "switch table mismatch");
-      IGF.Builder.CreateBr(dests[0].second);
-    }
-    
-    void emitValueProject(IRGenFunction &IGF,
-                     Explosion &in,
-                     UnionElementDecl *theCase,
-                     Explosion &out) const override {
-      // The projected value is the payload.
-      if (Singleton)
-        Singleton->reexplode(IGF, in, out);
-    }
-
-    void emitValueInjection(IRGenFunction &IGF,
-                       UnionElementDecl *elt,
-                       Explosion &params,
-                       Explosion &out) const {
-      // If the element carries no data, neither does the injection.
-      if (!Singleton) {
-        return;
-      }
-
-      // Otherwise, package up the result.
-      reexplode(IGF, params, out);
-    }
-    
-    void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
-                         UnionImplStrategy &) override;
-  };
-
-  /// A UnionTypeInfo implementation for unions with no payload.
-  class NoPayloadUnionTypeInfo :
-    public PODSingleScalarTypeInfo<NoPayloadUnionTypeInfo,LoadableUnionTypeInfoBase> {
-  public:
-    NoPayloadUnionTypeInfo(llvm::StructType *T, Size S, Alignment A)
-      : PODSingleScalarTypeInfo(T, S, {}, A) {}
-
-    llvm::Type *getScalarType() const {
-      assert(isComplete());
-      return getDiscriminatorType();
-    }
-
-    static Address projectScalar(IRGenFunction &IGF, Address addr) {
-      return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
-    }
-      
-    llvm::IntegerType *getDiscriminatorType() const {
-      llvm::StructType *Struct = getStorageType();
-      return cast<llvm::IntegerType>(Struct->getElementType(0));
-    }
-    
-    /// Map the given element to the appropriate value in the
-    /// discriminator type.
-    llvm::ConstantInt *getDiscriminatorIndex(UnionElementDecl *target) const {
-      // FIXME: using a linear search here is fairly ridiculous.
-      unsigned index = 0;
-      for (auto elt : target->getParentUnion()->getAllElements()) {
-        if (elt == target) break;
-        index++;
-      }
-      return llvm::ConstantInt::get(getDiscriminatorType(), index);
-    }
-    
-    void emitValueSwitch(IRGenFunction &IGF,
-                    Explosion &value,
-                    ArrayRef<std::pair<UnionElementDecl*,
-                                       llvm::BasicBlock*>> dests,
-                    llvm::BasicBlock *defaultDest) const override {
-      llvm::Value *discriminator = value.claimNext();
-      
-      // Create an unreachable block for the default if the original SIL
-      // instruction had none.
-      bool unreachableDefault = false;
-      if (!defaultDest) {
-        unreachableDefault = true;
-        defaultDest = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
-      }
-      
-      auto *i = IGF.Builder.CreateSwitch(discriminator, defaultDest,
-                                         dests.size());
-      for (auto &dest : dests)
-        i->addCase(getDiscriminatorIndex(dest.first), dest.second);
-      
-      if (unreachableDefault) {
-        IGF.Builder.emitBlock(defaultDest);
-        IGF.Builder.CreateUnreachable();
-      }
-    }
-      
-    void emitValueProject(IRGenFunction &IGF,
-                     Explosion &in,
-                     UnionElementDecl *elt,
-                     Explosion &out) const override {
-      // All of the cases project an empty explosion.
-      in.claimAll();
-    }
-
-    void emitValueInjection(IRGenFunction &IGF,
-                       UnionElementDecl *elt,
-                       Explosion &params,
-                       Explosion &out) const {
-      out.add(getDiscriminatorIndex(elt));
-    }
-    
-    void layoutUnionType(TypeConverter &TC, UnionDecl *theUnion,
-                         UnionImplStrategy &strategy) override;
-  };
-
-  /// An implementation strategy for a union.
-  class UnionImplStrategy {
-  public:
-    enum Kind {
-      /// A "union" with a single case.
-      Singleton,
-      /// An enum-like union whose cases all have empty payloads.
-      NoPayload,
-      /// A union which is enum-like except for a single case with payload.
-      SinglePayload,
-      /// A fully general union with more than one case with payload.
-      MultiPayload,
-      /// A union with dynamic layout.
-      Dynamic,
-    };
-
-  private:
-    TypeConverter &TC;
-    UnionDecl *Union;
-    unsigned NumElements;
-    Kind TheKind;
-    std::vector<UnionElementDecl *> ElementsWithPayload;
-    std::vector<UnionElementDecl *> ElementsWithRecursivePayload;
-    bool Loadable;
-
-  public:
-    explicit UnionImplStrategy(TypeConverter &TC, UnionDecl *theUnion)
-      : TC(TC), Union(theUnion)
-    {
-      NumElements = 0;
-      bool dynamic = false;
-      Loadable = true;
-
-      for (auto elt : theUnion->getAllElements()) {
-        NumElements++;
-
-        // Compute whether this gives us an apparent payload or dynamic layout.
-        Type argType = elt->getArgumentType();
-        if (argType.isNull())
-          continue;
-        auto *argTI = TC.tryGetCompleteTypeInfo(argType->getCanonicalType());
-        if (!argTI) {
-          ElementsWithRecursivePayload.push_back(elt);
-          continue;
-        }
-        if (!argTI->isFixedSize())
-          dynamic = true;
-        
-        auto loadableArgTI = dyn_cast<LoadableTypeInfo>(argTI);
-        if (!loadableArgTI)
-          Loadable = false;
-        else if (loadableArgTI->getExplosionSize(ExplosionKind::Minimal) != 0)
-          ElementsWithPayload.push_back(elt);
-      }
-
-      assert(NumElements != 0);
-      if (dynamic) {
-        TheKind = Dynamic;
-      } else if (NumElements == 1) {
-        TheKind = Singleton;
-      } else if (ElementsWithPayload.size() > 1) {
-        TheKind = MultiPayload;
-      } else if (ElementsWithPayload.size() == 1) {
-        TheKind = SinglePayload;
-      } else {
-        TheKind = NoPayload;
-      }
-    }
-
-    Kind getKind() const { return TheKind; }
-    unsigned getNumElements() const { return NumElements; }
-    unsigned getNumElementsWithPayload() const {
-      return ElementsWithPayload.size();
-    }
-    
-    UnionElementDecl *getOnlyElementWithPayload() const {
-      assert(TheKind == SinglePayload &&
-             "not a single-payload union");
-      assert(ElementsWithPayload.size() == 1 &&
-             "single-payload union has multiple payloads?!");
-      return ElementsWithPayload[0];
-    }
-    
-    ArrayRef<UnionElementDecl*> getElementsWithPayload() const {
-      return ElementsWithPayload;
-    }
-    
-    /// Create a forward declaration for the union.
-    LoadableUnionTypeInfoBase *create(llvm::StructType *convertedStruct) const {
-      // FIXME non-loadable unions
-      if (!Loadable) {
-        TC.IGM.unimplemented(Union->getLoc(), "non-loadable union layout");
-        exit(1);
-      }
-      // FIXME recursive unions
-      if (!ElementsWithRecursivePayload.empty()) {
-        TC.IGM.unimplemented(Union->getLoc(), "recursive union layout");
-        exit(1);
-      }
-      
-      switch (getKind()) {
-      case Singleton:
-        return new SingletonUnionTypeInfo(convertedStruct,
-                                          Size(0), Alignment(0), IsPOD);
-      case NoPayload:
-        return new NoPayloadUnionTypeInfo(convertedStruct,
-                                          Size(0), Alignment(0));
-      
-      case SinglePayload:
-        return new SinglePayloadUnionTypeInfo(convertedStruct,
-                                              Size(0), Alignment(0), IsPOD);
-      
-      case MultiPayload:
-        return new MultiPayloadUnionTypeInfo(convertedStruct,
-                                             Size(0), Alignment(0), IsPOD);
-
-      case Dynamic:
-        // FIXME dynamic union layout
-        TC.IGM.unimplemented(Union->getLoc(), "non-fixed union layout");
-        exit(1);
-      }
+      return Strategy.unpackUnionPayload(IGF, payload, dest, offset);
     }
   };
   
-  void SingletonUnionTypeInfo::layoutUnionType(TypeConverter &TC,
-                                               UnionDecl *theUnion,
-                                               UnionImplStrategy &) {
-    Type eltType =
-      theUnion->getAllElements().front()->getArgumentType();
+  TypeInfo *
+  SingletonUnionImplStrategy::doCompleteUnionTypeLayout(TypeConverter &TC,
+                                                   UnionDecl *theUnion,
+                                                   llvm::StructType *unionTy) {
+    Type eltType = theUnion->getAllElements().front()->getArgumentType();
     
-    llvm::Type *storageType;
     if (eltType.isNull()) {
-      storageType = TC.IGM.Int8Ty;
-      completeFixed(Size(0), Alignment(1));
-      Singleton = nullptr;
+      llvm::Type *body[] = { TC.IGM.Int8Ty };
+      unionTy->setBody(body);
+      return new LoadableUnionTypeInfo(*this, unionTy, Size(0), {},
+                                       Alignment(1), IsPOD);
     } else {
       const TypeInfo &eltTI
         = TC.getCompleteTypeInfo(eltType->getCanonicalType());
       
+      llvm::Type *body[] = { eltTI.StorageType };
+      unionTy->setBody(body);
+      
       auto &fixedEltTI = cast<FixedTypeInfo>(eltTI); // FIXME
-      storageType = eltTI.StorageType;
-      completeFixed(fixedEltTI.getFixedSize(),
-                    fixedEltTI.getFixedAlignment());
-      Singleton = cast<LoadableTypeInfo>(&eltTI); // FIXME
-      setPOD(eltTI.isPOD(ResilienceScope::Local));
+      
+      return new LoadableUnionTypeInfo(*this, unionTy,
+                                     fixedEltTI.getFixedSize(),
+                                     fixedEltTI.getSpareBits(),
+                                     fixedEltTI.getFixedAlignment(),
+                                     fixedEltTI.isPOD(ResilienceScope::Local));
     }
-    
-    llvm::Type *body[] = { storageType };
-    getStorageType()->setBody(body);
   }
   
-  void NoPayloadUnionTypeInfo::layoutUnionType(TypeConverter &TC,
-                                               UnionDecl *theUnion,
-                                               UnionImplStrategy &strategy) {
+  TypeInfo *
+  NoPayloadUnionImplStrategy::doCompleteUnionTypeLayout(TypeConverter &TC,
+                                                    UnionDecl *theUnion,
+                                                    llvm::StructType *unionTy) {
     // Since there are no payloads, we need just enough bits to hold a
     // discriminator.
-    assert(strategy.getNumElements() > 1 &&
-           "singletons should use SingletonUnionTypeInfo");
-    unsigned tagBits = llvm::Log2_32(strategy.getNumElements() - 1) + 1;
+    unsigned tagBits = llvm::Log2_32(ElementsWithNoPayload.size() - 1) + 1;
     auto tagTy = llvm::IntegerType::get(TC.IGM.getLLVMContext(), tagBits);
     // Round the physical size up to the next power of two.
     unsigned tagBytes = (tagBits + 7U)/8U;
     if (!llvm::isPowerOf2_32(tagBytes))
       tagBytes = llvm::NextPowerOf2(tagBytes);
-    completeFixed(Size(tagBytes), Alignment(tagBytes));
     
     llvm::Type *body[] = { tagTy };
-    getStorageType()->setBody(body);
+    unionTy->setBody(body);
+    
+    /// FIXME: Spare bits.
+    return new LoadableUnionTypeInfo(*this, unionTy,
+                                     Size(tagBytes), {}, Alignment(tagBytes),
+                                     IsPOD);
   }
   
   static void setTaggedUnionBody(IRGenModule &IGM,
@@ -1438,21 +1655,16 @@ namespace {
     }
   }
   
-  void SinglePayloadUnionTypeInfo::layoutUnionType(TypeConverter &TC,
-                                                   UnionDecl *theUnion,
-                                                   UnionImplStrategy &strategy){
+  TypeInfo *
+  SinglePayloadUnionImplStrategy::doCompleteUnionTypeLayout(TypeConverter &TC,
+                                                  UnionDecl *theUnion,
+                                                  llvm::StructType *unionTy) {
     // See whether the payload case's type has extra inhabitants.
     unsigned fixedExtraInhabitants = 0;
-    unsigned numTags = strategy.getNumElements() - 1;
-
-    PayloadElement = strategy.getOnlyElementWithPayload();
-    auto payloadTy = PayloadElement->getArgumentType()
-      ->getCanonicalType();
+    unsigned numTags = ElementsWithNoPayload.size();
     
-    auto &payloadTI = TC.getCompleteTypeInfo(payloadTy);
-
-    PayloadTypeInfo = cast<FixedTypeInfo>(&payloadTI); // FIXME
-    fixedExtraInhabitants = PayloadTypeInfo->getFixedExtraInhabitantCount();
+    auto &payloadTI = getFixedPayloadTypeInfo(); // FIXME non-fixed payload
+    fixedExtraInhabitants = payloadTI.getFixedExtraInhabitantCount();
     
     // Determine how many tag bits we need. Given N extra inhabitants, we
     // represent the first N tags using those inhabitants. For additional tags,
@@ -1462,45 +1674,48 @@ namespace {
     
     if (tagsWithoutInhabitants == 0) {
       ExtraTagBitCount = 0;
+      NumExtraTagValues = 0;
     // If the payload size is greater than 32 bits, the calculation would
     // overflow, but one tag bit should suffice. if you have more than 2^32
     // union discriminators you have other problems.
-    } else if (PayloadTypeInfo->getFixedSize().getValue() >= 4) {
+    } else if (payloadTI.getFixedSize().getValue() >= 4) {
       ExtraTagBitCount = 1;
       NumExtraTagValues = 2;
     } else {
       unsigned tagsPerTagBitValue =
-        1 << PayloadTypeInfo->getFixedSize().getValueInBits();
+        1 << payloadTI.getFixedSize().getValueInBits();
       NumExtraTagValues
         = (tagsWithoutInhabitants+(tagsPerTagBitValue-1))/tagsPerTagBitValue+1;
       ExtraTagBitCount = llvm::Log2_32(NumExtraTagValues-1) + 1;
     }
 
     // Create the body type.
-    setTaggedUnionBody(TC.IGM, getStorageType(),
-                       PayloadTypeInfo->getFixedSize().getValueInBits(),
+    setTaggedUnionBody(TC.IGM, unionTy,
+                       payloadTI.getFixedSize().getValueInBits(),
                        ExtraTagBitCount);
     
     // The union has the alignment of the payload. The size includes the added
     // tag bits.
-    auto sizeWithTag = PayloadTypeInfo->getFixedSize()
-      .roundUpToAlignment(PayloadTypeInfo->getFixedAlignment())
+    auto sizeWithTag = payloadTI.getFixedSize()
+      .roundUpToAlignment(payloadTI.getFixedAlignment())
       .getValue();
     sizeWithTag += (ExtraTagBitCount+7U)/8U;
     
-    setPOD(PayloadTypeInfo->isPOD(ResilienceScope::Component));
-    completeFixed(Size(sizeWithTag),
-                  PayloadTypeInfo->getFixedAlignment());
+    /// FIXME: Spare bits.
+    return new LoadableUnionTypeInfo(*this, unionTy, Size(sizeWithTag), {},
+                                   payloadTI.getFixedAlignment(),
+                                   payloadTI.isPOD(ResilienceScope::Component));
   }
   
-  void MultiPayloadUnionTypeInfo::layoutUnionType(TypeConverter &TC,
+  TypeInfo *
+  MultiPayloadUnionImplStrategy::doCompleteUnionTypeLayout(TypeConverter &TC,
                                                   UnionDecl *theUnion,
-                                                  UnionImplStrategy &strategy) {
+                                                  llvm::StructType *unionTy) {
     // We need tags for each of the payload types, which we may be able to form
     // using spare bits, plus a minimal number of tags with which we can
     // represent the empty cases.
-    unsigned numPayloadTags = strategy.getNumElementsWithPayload();
-    unsigned numEmptyElements = strategy.getNumElements() - numPayloadTags;
+    unsigned numPayloadTags = ElementsWithPayload.size();
+    unsigned numEmptyElements = ElementsWithNoPayload.size();
     
     // See if the payload types have any spare bits in common.
     // At the end of the loop CommonSpareBits.size() will be the size (in bits)
@@ -1508,25 +1723,13 @@ namespace {
     CommonSpareBits = {};
     Alignment worstAlignment(1);
     IsPOD_t isPOD = IsPOD;
-    for (auto *elt : strategy.getElementsWithPayload()) {
-      auto payloadTy = elt->getArgumentType()->getCanonicalType();
-      auto &payloadTI = TC.getCompleteTypeInfo(payloadTy);
-      auto &fixedPayloadTI = cast<FixedTypeInfo>(payloadTI); // FIXME
+    for (auto &elt : ElementsWithPayload) {
+      auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti); // FIXME
       fixedPayloadTI.applyFixedSpareBitsMask(CommonSpareBits);
       if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
         worstAlignment = fixedPayloadTI.getFixedAlignment();
       if (!fixedPayloadTI.isPOD(ResilienceScope::Component))
         isPOD = IsNotPOD;
-      PayloadCases.emplace_back(elt, &fixedPayloadTI);
-    }
-    
-    // Collect the no-payload cases.
-    // FIXME: O(n^2)
-    for (auto *elt : theUnion->getAllElements()) {
-      if (std::find(strategy.getElementsWithPayload().begin(),
-                    strategy.getElementsWithPayload().end(),
-                    elt) == strategy.getElementsWithPayload().end())
-        NoPayloadCases.push_back(elt);
     }
     
     unsigned commonSpareBitCount = CommonSpareBits.count();
@@ -1550,7 +1753,7 @@ namespace {
     
     // Create the type. We need enough bits to store the largest payload plus
     // extra tag bits we need.
-    setTaggedUnionBody(TC.IGM, getStorageType(),
+    setTaggedUnionBody(TC.IGM, unionTy,
                        CommonSpareBits.size(),
                        ExtraTagBitCount);
     
@@ -1561,9 +1764,9 @@ namespace {
       .getValue();
     sizeWithTag += (ExtraTagBitCount+7U)/8U;
     
-    setPOD(isPOD);
-    completeFixed(Size(sizeWithTag), worstAlignment);
-  }
+    return new LoadableUnionTypeInfo(*this, unionTy, Size(sizeWithTag), {},
+                                     worstAlignment, isPOD);
+  }  
 }
 
 const TypeInfo *TypeConverter::convertUnionType(UnionDecl *theUnion) {
@@ -1574,13 +1777,10 @@ const TypeInfo *TypeConverter::convertUnionType(UnionDecl *theUnion) {
   addForwardDecl(typeCacheKey, convertedStruct);
 
   // Compute the implementation strategy.
-  UnionImplStrategy strategy(*this, theUnion);
+  auto *strategy = UnionImplStrategy::get(*this, theUnion);
 
-  // Create the TI as a forward declaration and map it in the table.
-  LoadableUnionTypeInfoBase *convertedTI = strategy.create(convertedStruct);
-
-  convertedTI->layoutUnionType(*this, theUnion, strategy);
-  return convertedTI;
+  // Create the TI.
+  return strategy->completeUnionTypeLayout(*this, theUnion, convertedStruct);
 }
 
 /// emitUnionDecl - Emit all the declarations associated with this union type.
@@ -1626,7 +1826,6 @@ void IRGenModule::emitUnionDecl(UnionDecl *theUnion) {
       if (cast<VarDecl>(member)->isProperty())
         // Getter/setter will be handled separately.
         continue;
-      // FIXME: Will need an implementation here for resilience
       continue;
     case DeclKind::Func:
       emitLocalDecls(cast<FuncDecl>(member));
@@ -1740,8 +1939,8 @@ void irgen::emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
                                   llvm::BasicBlock *defaultDest) {
   assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
          && "not of a union type");
-  auto &unionTI = IGF.getTypeInfo(unionTy).as<LoadableUnionTypeInfoBase>();
-  unionTI.emitValueSwitch(IGF, unionValue, dests, defaultDest);
+  auto &unionTI = IGF.getTypeInfo(unionTy).as<LoadableUnionTypeInfo>();
+  unionTI.Strategy.emitValueSwitch(IGF, unionValue, dests, defaultDest);
 }
 
 void irgen::emitInjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
@@ -1750,8 +1949,8 @@ void irgen::emitInjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
                                     Explosion &out) {
   assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
          && "not of a union type");
-  auto &unionTI = IGF.getTypeInfo(unionTy).as<LoadableUnionTypeInfoBase>();
-  unionTI.emitValueInjection(IGF, theCase, data, out);
+  auto &unionTI = IGF.getTypeInfo(unionTy).as<LoadableUnionTypeInfo>();
+  unionTI.Strategy.emitValueInjection(IGF, theCase, data, out);
 }
 
 void irgen::emitProjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
@@ -1760,8 +1959,8 @@ void irgen::emitProjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
                                      Explosion &out) {
   assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
          && "not of a union type");
-  auto &unionTI = IGF.getTypeInfo(unionTy).as<LoadableUnionTypeInfoBase>();
-  unionTI.emitValueProject(IGF, inUnionValue, theCase, out);
+  auto &unionTI = IGF.getTypeInfo(unionTy).as<LoadableUnionTypeInfo>();
+  unionTI.Strategy.emitValueProject(IGF, inUnionValue, theCase, out);
 }
 
 /// Interleave the occupiedValue and spareValue bits, taking a bit from one

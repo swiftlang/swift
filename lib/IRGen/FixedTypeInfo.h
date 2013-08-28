@@ -128,7 +128,10 @@ public:
   llvm::ConstantInt *getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
                                                        unsigned bits,
                                                        unsigned index) const;
-    
+  
+  /// Get the spare bit mask for the type.
+  const llvm::BitVector &getSpareBits() const { return SpareBits; }
+  
   /// True if the type representation has statically "spare" unused bits.
   bool hasFixedSpareBits() const {
     return SpareBits.any();
