@@ -134,7 +134,7 @@ In its most basic form, a protocol is a collection of function signatures::
   }
 
 Document describes types that have a title() operation that accepts no arguments
-and returns a String. Note that there is implicitly a 'self' or 'self' type,
+and returns a String. Note that there is implicitly a 'self' type,
 which is the type that conforms to the protocol itself. This follows how most
 object-oriented languages describe interfaces, but deviates from Haskell type
 classes and C++ concepts, which require explicit type parameters for all of the
@@ -185,7 +185,7 @@ referred to as the binary method problem
 problem, including the solution I'm proposing below).
 
 Neither C++ concepts nor Haskell type classes have this particular problem,
-because they don't have the notion of an implicit 'self' or 'self' type. Rather,
+because they don't have the notion of an implicit 'self' type. Rather,
 they explicitly parameterize everything. In C++ concepts::
 
   concept Comparable<typename T> {
