@@ -66,7 +66,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   ParserResult<TypeRepr> ty;
   switch (Tok.getKind()) {
-  case tok::kw_This:
+  case tok::kw_Self:
   case tok::identifier:
     ty = parseTypeIdentifier();
     break;
@@ -207,7 +207,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
 ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
-  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_This)) {
+  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
         CodeCompletion->completeTypeIdentifierWithDot(nullptr);
@@ -558,7 +558,7 @@ bool Parser::canParseGenericArguments() {
 
 bool Parser::canParseType() {
   switch (Tok.getKind()) {
-  case tok::kw_This:
+  case tok::kw_Self:
   case tok::identifier:
     if (!canParseTypeIdentifier())
       return false;
@@ -617,7 +617,7 @@ bool Parser::canParseType() {
 }
 
 bool Parser::canParseTypeIdentifier() {
-  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_This)) {
+  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     return false;
   }
   
