@@ -179,7 +179,7 @@ namespace {
     virtual void destroy(IRGenFunction &IGF, Address addr) const = 0;
     
     virtual bool isIndirectArgument(ExplosionKind kind) const {
-      return TIK >= Loadable;
+      return TIK < Loadable;
     }
       
     virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
