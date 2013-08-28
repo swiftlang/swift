@@ -1518,6 +1518,11 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
+    if (CD->isInvalid()) {
+      CD->overwriteType(ErrorType::get(TC.Context));
+      return;
+    }
+
     if (!IsFirstPass) {
       if (CD->getBody())
         TC.definedFunctions.push_back(CD);

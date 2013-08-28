@@ -2323,11 +2323,10 @@ static void AddConstructorArgumentsToScope(const Pattern *pat,
 ParserResult<ConstructorDecl>
 Parser::parseDeclConstructor(bool HasContainerType) {
   SourceLoc ConstructorLoc = consumeToken(tok::kw_constructor);
-  
+
   // Reject 'constructor' functions outside of types
   if (!HasContainerType) {
     diagnose(Tok, diag::constructor_decl_wrong_scope);
-    return nullptr;
   }
 
   // attribute-list
@@ -2364,6 +2363,10 @@ Parser::parseDeclConstructor(bool HasContainerType) {
                                     ConstructorLoc, Arguments.get(), SelfDecl,
                                     GenericParams, CurDeclContext);
   SelfDecl->setDeclContext(CD);
+  if (!HasContainerType) {
+    // Tell the type checker not to touch this constructor.
+    CD->setInvalid();
+  }
   if (GenericParams) {
     for (auto Param : *GenericParams)
       Param.setDeclContext(CD);
