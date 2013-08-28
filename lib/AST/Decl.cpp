@@ -507,6 +507,17 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   LastExtension = extension;
 }
 
+void NominalTypeDecl::getImplicitProtocols(
+       SmallVectorImpl<ProtocolDecl *> &protocols) {
+  // If this is a class, it conforms to the DynamicLookup protocol.
+  if (isa<ClassDecl>(this)) {
+    if (auto dynamicLookup
+          = getASTContext().getProtocol(KnownProtocolKind::DynamicLookup)) {
+      protocols.push_back(dynamicLookup);
+    }
+  }
+}
+
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
                              DeclContext *DC,

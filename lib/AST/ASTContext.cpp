@@ -43,7 +43,6 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
   }
 }
 
-
 struct ASTContext::Implementation {
   Implementation();
   ~Implementation();

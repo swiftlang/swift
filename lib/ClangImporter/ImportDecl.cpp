@@ -1807,12 +1807,15 @@ namespace {
     // Import the given Objective-C protocol list and return a context-allocated
     // ArrayRef that can be passed to the declaration.
     MutableArrayRef<ProtocolDecl *>
-    importObjCProtocols(const clang::ObjCProtocolList &clangProtocols) {
-      if (clangProtocols.empty())
-        return { };
-
+    importObjCProtocols(Decl *decl,
+                        const clang::ObjCProtocolList &clangProtocols) {
       SmallVector<ProtocolDecl *, 4> protocols;
       llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
+      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+        nominal->getImplicitProtocols(protocols);
+        knownProtocols.insert(protocols.begin(), protocols.end());
+      }
+
       for (auto cp = clangProtocols.begin(), cpEnd = clangProtocols.end();
            cp != cpEnd; ++cp) {
         if (auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp))) {
@@ -1944,7 +1947,9 @@ namespace {
       objcClass->addExtension(result);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl->getCanonicalDecl());
-      result->setProtocols(importObjCProtocols(decl->getReferencedProtocols()));
+      result->setProtocols(importObjCProtocols(result,
+                                               decl->getReferencedProtocols()));
+      result->setCheckedInheritanceClause();
 
       // Import each of the members.
       SmallVector<Decl *, 4> members;
@@ -2026,7 +2031,9 @@ namespace {
       result->setCircularityCheck(CircularityCheck::Checked);
 
       // Import protocols this protocol conforms to.
-      result->setProtocols(importObjCProtocols(decl->getReferencedProtocols()));
+      result->setProtocols(importObjCProtocols(result,
+                                               decl->getReferencedProtocols()));
+      result->setCheckedInheritanceClause();
 
       // Note that this is an Objective-C and class protocol.
       result->getMutableAttrs().ObjC = true;
@@ -2139,7 +2146,9 @@ namespace {
       }
 
       // Import protocols this class conforms to.
-      result->setProtocols(importObjCProtocols(decl->getReferencedProtocols()));
+      result->setProtocols(importObjCProtocols(result,
+                                               decl->getReferencedProtocols()));
+      result->setCheckedInheritanceClause();
 
       // Note that this is an Objective-C class.
       result->getMutableAttrs().ObjC = true;

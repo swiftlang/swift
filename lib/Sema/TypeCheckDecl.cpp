@@ -69,6 +69,17 @@ static Type getDeclaredType(Decl *decl) {
   return cast<ExtensionDecl>(decl)->getExtendedType();
 }
 
+// Add implicit conformances to the given declaration.
+static void addImplicitConformances(
+              TypeChecker &tc, Decl *decl,
+              llvm::SmallSetVector<ProtocolDecl *, 4> &allProtocols) {
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    SmallVector<ProtocolDecl *, 2> protocols;
+    nominal->getImplicitProtocols(protocols);
+    allProtocols.insert(protocols.begin(), protocols.end());
+  }
+}
+
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine validates all of the types in the parsed inheritance clause,
@@ -100,6 +111,7 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
   SourceRange superclassRange;
   llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
   llvm::SmallDenseMap<CanType, SourceRange> inheritedTypes;
+  addImplicitConformances(tc, decl, allProtocols);
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
 
@@ -358,39 +370,22 @@ public:
 
   template<typename DeclType>
   void gatherExplicitConformances(DeclType *D, Type T) {
-    llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
-    SmallVector<ProtocolDecl *, 4> allProtocols;
-    SmallVector<ProtocolConformance *, 4> allConformances;
-    for (auto inherited : D->getInherited()) {
-      SmallVector<ProtocolDecl *, 4> protocols;
-      if (inherited.getType()->isExistentialType(protocols)) {
-        for (auto proto : protocols) {
-          if (knownProtocols.insert(proto)) {
-            ProtocolConformance *conformance = nullptr;
-            if (TC.conformsToProtocol(T, proto, &conformance,
-                                      D->getStartLoc(), D)) {
-              // For nominal types and extensions thereof, record conformance
-              // to known protocols.
-              if (auto kind = proto->getKnownProtocolKind())
-                if (isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D))
-                  TC.Context.recordConformance(kind.getValue(), D);
-            }
-            allProtocols.push_back(proto);
-            allConformances.push_back(conformance);
-          }
-        }
+    SmallVector<ProtocolConformance *, 4> conformances;
+    for (auto proto : D->getProtocols()) {
+      ProtocolConformance *conformance = nullptr;
+      // FIXME: Better location info
+      if (TC.conformsToProtocol(T, proto, &conformance,
+                                D->getStartLoc(), D)) {
+        // For nominal types and extensions thereof, record conformance
+        // to known protocols.
+        if (auto kind = proto->getKnownProtocolKind())
+          if (isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D))
+            TC.Context.recordConformance(kind.getValue(), D);
       }
+      conformances.push_back(conformance);
     }
 
-    // Set the protocols and conformances.
-    if (D->getProtocols().size() == allProtocols.size()) {
-      // Do nothing: we've already set the list of protocols.
-      assert(std::equal(D->getProtocols().begin(), D->getProtocols().end(),
-                        allProtocols.begin()) && "Protocol list changed?");
-    } else {
-      D->setProtocols(D->getASTContext().AllocateCopy(allProtocols));
-    }
-    D->setConformances(D->getASTContext().AllocateCopy(allConformances));
+    D->setConformances(D->getASTContext().AllocateCopy(conformances));
   }
 
   void checkExplicitConformance(TypeDecl *D, Type T) {

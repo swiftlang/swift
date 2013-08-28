@@ -1511,6 +1511,10 @@ public:
   /// overridden declarations been removed.
   ArrayRef<ValueDecl *> lookupDirect(Identifier name);
 
+  /// Collect the set of protocols to which this type should implicitly
+  /// conform, such as DynamicLookup (for classes).
+  void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
+
 private:
   /// Predicate used to filter FieldRange.
   static bool isPhysicalField(VarDecl *vd); // at end of file
