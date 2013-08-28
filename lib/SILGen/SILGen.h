@@ -506,7 +506,7 @@ public:
   /// The insertion point will be moved into the epilog block if it is
   /// reachable.
   ///
-  /// \param Loc The location of the top level AST node for which we are
+  /// \param TopLevelLoc The location of the top level AST node for which we are
   ///            constructing the epilog, such as a CapturingExpr.
   /// \returns Nothing if the epilog block is unreachable. Otherwise, returns
   ///          the epilog block's return value argument, or a null SILValue if
