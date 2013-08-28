@@ -1511,12 +1511,12 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     SILDeclRef dtorConstant =
       SILDeclRef(superclass, SILDeclRef::Kind::Destroyer);
     SILType baseSILTy = getLoweredLoadableType(superclassTy);
-    SILValue baseThis = B.createUpcast(dd, selfValue, baseSILTy);
-    ManagedValue dtorValue = emitMethodRef(dd, baseThis, dtorConstant,
+    SILValue baseSelf = B.createUpcast(dd, selfValue, baseSILTy);
+    ManagedValue dtorValue = emitMethodRef(dd, baseSelf, dtorConstant,
                                            /*innerSubstitutions*/ {});
     selfValue = B.createApply(dd, dtorValue.forward(*this),
                               objectPtrTy,
-                              baseThis);
+                              baseSelf);
   } else {
     selfValue = B.createRefToObjectPointer(dd, selfValue, objectPtrTy);
   }

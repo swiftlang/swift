@@ -1637,7 +1637,7 @@ public:
       DefaultForType = 0,
 
       /// The default for a [byref] 'self' parameter.
-      DefaultForByrefThis = 0,
+      DefaultForByrefSelf = 0,
 
       /// The default for a variable reference.
       DefaultForVar = Implicit,

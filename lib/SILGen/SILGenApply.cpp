@@ -166,7 +166,7 @@ private:
           = cast<ProtocolDecl>(methodName.getDecl()->getDeclContext())
               ->getSelf()->getArchetype();
         selfTy = LValueType::get(protoSelfTy,
-                                 LValueType::Qual::DefaultForByrefThis,
+                                 LValueType::Qual::DefaultForByrefSelf,
                                  protoSelfTy->getASTContext());
         isThin = false;
       }

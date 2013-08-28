@@ -1321,8 +1321,8 @@ namespace {
       initExpr = cast;
 
       // Form the assignment statement.
-      auto refThis = new (Impl.SwiftContext) DeclRefExpr(selfVar, loc);
-      auto assign = new (Impl.SwiftContext) AssignExpr(refThis, loc, initExpr);
+      auto SelfRef = new (Impl.SwiftContext) DeclRefExpr(selfVar, loc);
+      auto assign = new (Impl.SwiftContext) AssignExpr(SelfRef, loc, initExpr);
 
       // Set the body of the constructor.
       result->setBody(BraceStmt::create(Impl.SwiftContext, loc,

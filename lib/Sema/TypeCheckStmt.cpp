@@ -674,9 +674,9 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *selfDecl,
 }
 
 void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
-  if (auto allocThis = ctor->getAllocSelfExpr()) {
-    if (!typeCheckExpression(allocThis, ctor, Type(), /*discardedExpr=*/false))
-      ctor->setAllocSelfExpr(allocThis);
+  if (auto allocSelf = ctor->getAllocSelfExpr()) {
+    if (!typeCheckExpression(allocSelf, ctor, Type(), /*discardedExpr=*/false))
+      ctor->setAllocSelfExpr(allocSelf);
   }
 
   // Check the default argument definitions.

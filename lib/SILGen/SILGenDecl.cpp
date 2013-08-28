@@ -653,10 +653,10 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
 }
 
 namespace {
-  class CleanupDestructorThis : public Cleanup {
+  class CleanupDestructorSelf : public Cleanup {
     VarDecl *selfDecl;
   public:
-    CleanupDestructorThis(VarDecl *selfDecl) : selfDecl(selfDecl) {
+    CleanupDestructorSelf(VarDecl *selfDecl) : selfDecl(selfDecl) {
     }
     
     void emit(SILGenFunction &gen) override {
@@ -685,7 +685,7 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
     emitLocalVariable(selfDecl);
     SILValue selfAddr = VarLocs[selfDecl].address;
     B.createStore(DD, selfValue, selfAddr);
-    Cleanups.pushCleanup<CleanupDestructorThis>(selfDecl);
+    Cleanups.pushCleanup<CleanupDestructorSelf>(selfDecl);
   }
   return selfValue;
 }
