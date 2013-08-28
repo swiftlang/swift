@@ -402,6 +402,12 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   // This is the source line used for the function prologue.
   unsigned ScopeLine = PrologLoc.Line;
 
+  // We know that top_level_code always comes from MainFile.
+  if (!L.Filename && LinkageName == "top_level_code") {
+    File = MainFile;
+    Line = 1;
+  }
+
   AnyFunctionType* FnTy = getFunctionType(SILTy);
   auto Params = createParameterTypes(SILMod, SILTy, Fn->getFunctionType(),
                                      Scope);
