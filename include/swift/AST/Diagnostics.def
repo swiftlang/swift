@@ -301,6 +301,8 @@ ERROR(expected_lbrace_constructor,decl_parsing,none,
 // Destructor
 ERROR(destructor_decl_outside_class,decl_parsing,none,
       "'destructor' functions may only be declared within a class", ())
+ERROR(destructor_parameter_tuple,decl_parsing,none,
+      "destructors don't have parameters", ())
 ERROR(expected_lbrace_destructor,decl_parsing,none,
       "expected '{' for destructor", ())
 

@@ -2403,8 +2403,21 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
 
   // '{'
   if (!Tok.is(tok::l_brace)) {
-    diagnose(Tok, diag::expected_lbrace_destructor);
-    return nullptr;
+    if (Tok.is(tok::l_paren)) {
+      // Parse the parameter tuple for recovery.
+      SourceLoc LParenLoc = Tok.getLoc();
+      ParserResult<Pattern> Params = parsePatternTuple(/*AllowInitExpr=*/true);
+      if (Params.isParseError()) {
+        diagnose(LParenLoc, diag::destructor_parameter_tuple);
+      } else {
+        diagnose(LParenLoc, diag::destructor_parameter_tuple)
+            .fixItRemove(Params.get()->getSourceRange());
+      }
+    }
+    if (!Tok.is(tok::l_brace)) {
+      diagnose(Tok, diag::expected_lbrace_destructor);
+      return nullptr;
+    }
   }
 
   VarDecl *SelfDecl
