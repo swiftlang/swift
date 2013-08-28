@@ -867,12 +867,12 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // bits using TargetInfo.
     SizeInBits = IntegerTy->getBitWidth();
     switch (SizeInBits) {
-    case 8:   Name = "Int8";   break;
-    case 16:  Name = "Int16";  break;
-    case 32:  Name = "Int32";  break;
-    case 64:  Name = "Int64";  break;
-    case 128: Name = "Int128"; break;
-    default:  Name = "Int";
+    case   8: Name = "Builtin.Int8";   break;
+    case  16: Name = "Builtin.Int16";  break;
+    case  32: Name = "Builtin.Int32";  break;
+    case  64: Name = "Builtin.Int64";  break;
+    case 128: Name = "Builtin.Int128"; break;
+    default:  Name = "Builtin.Int";
     }
     Encoding = llvm::dwarf::DW_ATE_unsigned;
     break;
@@ -883,12 +883,12 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Assuming that the bitwidth and FloatTy->getFPKind() are identical.
     SizeInBits = FloatTy->getBitWidth();
     switch (SizeInBits) {
-    case 16:  Name = "Float16";  break;
-    case 32:  Name = "Float32";  break;
-    case 64:  Name = "Float64";  break;
-    case 80:  Name = "Float80";  break;
-    case 128: Name = "Float128"; break;
-    default:  Name = "Float";
+    case  16: Name = "Builtin.Float16";  break;
+    case  32: Name = "Builtin.Float32";  break;
+    case  64: Name = "Builtin.Float64";  break;
+    case  80: Name = "Builtin.Float80";  break;
+    case 128: Name = "Builtin.Float128"; break;
+    default:  Name = "Builtin.Float";
     }
     Encoding = llvm::dwarf::DW_ATE_float;
     break;
