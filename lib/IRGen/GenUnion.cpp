@@ -81,6 +81,8 @@ namespace {
     
 
   public:
+    virtual ~UnionImplStrategy() { }
+
     /// Construct a layout strategy appropriate to the union type.
     static UnionImplStrategy *get(TypeConverter &TC, UnionDecl *theUnion);
     
