@@ -13,6 +13,10 @@
 #ifndef SWIFT_AST_KNOWNPROTOCOLS_H
 #define SWIFT_AST_KNOWNPROTOCOLS_H
 
+namespace llvm {
+class StringRef;
+}
+
 namespace swift {
 
 /// \brief The set of known protocols.
@@ -30,6 +34,9 @@ enum : uint8_t {
   NumKnownProtocols =
 #include "swift/AST/KnownProtocols.def"
 };
+
+/// Retrieve the name of the given known protocol.
+llvm::StringRef getProtocolName(KnownProtocolKind kind);
 
 } // end namespace swift
 

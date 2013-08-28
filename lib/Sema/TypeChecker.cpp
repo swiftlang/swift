@@ -66,32 +66,13 @@ void TypeChecker::addedExternalType(Type type) {
 }
 
 ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
-  // Check whether we've already looked for and cached this protocol.
-  unsigned index = (unsigned)kind;
-  assert(index < NumKnownProtocols && "Number of known protocols is wrong");
-  if (knownProtocols[index])
-    return knownProtocols[index];
-
-  // Look for the protocol by name.
-  Identifier name;
-  switch (kind) {
-#define PROTOCOL(Id) \
-  case KnownProtocolKind::Id: \
-    name = Context.getIdentifier(#Id); \
-    break;
-#include "swift/AST/KnownProtocols.def"
+  auto protocol = Context.getProtocol(kind);
+  if (!protocol && loc.isValid()) {
+    diagnose(loc, diag::missing_protocol,
+             Context.getIdentifier(getProtocolName(kind)));
   }
 
-  UnqualifiedLookup global(name, getStdlibModule());
-  knownProtocols[index]
-    = dyn_cast_or_null<ProtocolDecl>(global.getSingleTypeResult());
-
-  // Complain if the protocol is completely missing.
-  if (!knownProtocols[index]) {
-    diagnose(loc, diag::missing_protocol, name);
-  }
-
-  return knownProtocols[index];
+  return protocol;
 }
 
 ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {

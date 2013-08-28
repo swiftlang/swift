@@ -34,6 +34,16 @@ ASTMutationListener::~ASTMutationListener() { }
 
 ModuleLoadListener::~ModuleLoadListener() {}
 
+llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
+  switch (kind) {
+#define PROTOCOL(Id) \
+  case KnownProtocolKind::Id: \
+    return #Id;
+#include "swift/AST/KnownProtocols.def"
+  }
+}
+
+
 struct ASTContext::Implementation {
   Implementation();
   ~Implementation();
@@ -50,6 +60,9 @@ struct ASTContext::Implementation {
 
   /// The declaration of swift.Optional<T>.
   NominalTypeDecl *OptionalDecl = nullptr;
+
+  /// \brief The set of known protocols, lazily populated as needed.
+  ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
   /// \brief The various module loaders that import external modules into this
   /// ASTContext.
@@ -271,6 +284,34 @@ NominalTypeDecl *ASTContext::getOptionalDecl() const {
     Impl.OptionalDecl = findSyntaxSugarImpl(*this, "Optional");
 
   return Impl.OptionalDecl;
+}
+
+ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
+  // Check whether we've already looked for and cached this protocol.
+  unsigned index = (unsigned)kind;
+  assert(index < NumKnownProtocols && "Number of known protocols is wrong");
+  if (Impl.KnownProtocols[index])
+    return Impl.KnownProtocols[index];
+
+  // Find the "swift" module.
+  auto module = LoadedModules.find("swift");
+  if (module == LoadedModules.end())
+    return nullptr;
+
+  // Look for the protocol by name.
+  Identifier name = getIdentifier(getProtocolName(kind));
+
+  // Find all of the declarations with this name in the Swift module.
+  SmallVector<ValueDecl *, 1> results;
+  module->second->lookupValue({ }, name, NLKind::UnqualifiedLookup, results);
+  for (auto result : results) {
+    if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
+      Impl.KnownProtocols[index] = protocol;
+      return protocol;
+    }
+  }
+
+  return nullptr;
 }
 
 void ASTContext::addMutationListener(ASTMutationListener &listener) {

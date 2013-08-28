@@ -122,9 +122,6 @@ public:
   std::vector<FuncExprLike> definedFunctions;
 
 private:
-  /// \brief The set of known protocols, lazily populated as needed.
-  ProtocolDecl *knownProtocols[NumKnownProtocols] = { };
-
   Type IntLiteralType;
   Type FloatLiteralType;
   Type CharacterLiteralType;

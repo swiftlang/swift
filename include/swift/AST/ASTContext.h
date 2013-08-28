@@ -290,6 +290,9 @@ public:
   /// Retrieve the declaration of swift.Optional<T>.
   NominalTypeDecl *getOptionalDecl() const;
 
+  /// Retrieve a specific, known protocol.
+  ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
+
   /// \brief Add a new mutation listener to this AST context.
   ///
   /// Mutation listeners will receive events when the AST is updated, e.g.,
