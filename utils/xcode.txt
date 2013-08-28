@@ -5,8 +5,9 @@ Xcode support for Swift is provided by the IDELanguageSupport project, found her
 This project should be checked out alongside other Xcode repository folders (Mac/, iOS/, etc.). If you want just basic support (enough to compile and run), you can follow these steps:
 
 	1. Check out the IDELanguageSupport project by itself.
-	2. Edit the "ExecPath" setting in "Swift.xcspec" to point to your built compiler.
-	3. Build the "XCLanguageSupport" target.
-	4. Place the resulting xcplugin in "~/Library/Application Support/Developer/Shared/Xcode/Plug-ins", creating that directory if necessary.
+	2. Build the "XCLanguageSupport" target.
+	3. Place the resulting xcplugin in "~/Library/Application Support/Developer/Shared/Xcode/Plug-ins", creating that directory if necessary.
+	4. Relaunch Xcode.
+	5. Set the SWIFT_EXEC and SWIFT_LIBRARY_PATH build settings to point to your built compiler and the directory containing the Swift runtime libraries.
 
 There are currently no prebuilt versions of Xcode that support Swift.

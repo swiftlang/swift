@@ -44,6 +44,18 @@
   protocol type, weak reference type, or generic parameter type. Recursive
   unions are also not yet supported.
 
+
+* Swift now supports autolinking, so importing frameworks or Swift libraries
+  should no longer require adding linker flags or modifying your project file.
+
+
+* The xcplugin in the Swift repository has been removed, as it is incompatible
+  with the work done in the IDELanguageSupport repository. The best support for
+  now is to build Xcode yourself with the IDELanguageSupport project included,
+  but for simple parity with the old xcplugin, follow the instructions in
+  utils/xcode.txt.
+
+
 2013-08-14
 ----------
 
