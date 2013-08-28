@@ -559,8 +559,8 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound) {
     return false;
 
   case '.':
-    // Prefer the '!' in "x!.y" to be a postfix op, not binary, but the '!' in
-    // "!.y" to be a prefix op, not binary.
+    // Prefer the '@' in "x@.y" to be a postfix op, not binary, but the '@' in
+    // "@.y" to be a prefix op, not binary.
     return !isLeftBound;
 
   default:
@@ -616,6 +616,13 @@ void Lexer::lexOperatorIdentifier() {
       diagnose(TokStart, diag::lex_unary_postfix_dot_is_reserved);
       // always emit 'tok::period' to avoid trickle down parse errors
       return formToken(tok::period, TokStart);
+    case '!':
+      // '!' is a normal operator except that it is treated as a postfix
+      // operator in cases where it is both left- and right-bound. To be
+      // interpreted as an infix operator, there must be space on both sides.
+      if (leftBound)
+        rightBound = false;
+      break;
     }
   } else if (CurPtr-TokStart == 2) {
     switch ((TokStart[0] << 8) | TokStart[1]) {

@@ -538,7 +538,8 @@
     operator-prefix ::= operator
     operator-postfix ::= operator
 
-    left-binder ::= [ \r\n\t\(\[\{,;]
+    left-binder  ::= [ \r\n\t\(\[\{,;:]
+    right-binder ::= [ \r\n\t\)\]\},;:]
 
     <a name="any-identifier">any-identifier</a> ::= identifier | operator
   </pre>
@@ -554,6 +555,15 @@
     not right-bound, and an <tt>operator-binary</tt> in either of the
     other two cases.
   </p>
+
+  <p>As an exception to the above rule, an operator immediately followed by a
+    dot ('.') is only considered right-bound if not already left-bound. This
+    allows <code>a@.prop</code> to be parsed as <code>(a@).prop</code> rather
+    than as <code>a @ .prop</code>. Similarly, because the '!' operator is
+    defined by the standard library to destructure
+    <a href="#type-optional">optional types</a> and is thus expected to be used
+    ubiquitously, it is also only considered right-bound if not already
+    left-bound.</p>
 
   <p>When parsing certain grammatical constructs that involve '&lt;' and
   '&gt;' (such as <a href="#type-composition">protocol composition
