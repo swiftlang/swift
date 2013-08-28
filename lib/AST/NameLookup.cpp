@@ -735,12 +735,22 @@ bool Module::lookupQualified(Type type,
 
   // Handle nominal types.
   bool wantProtocolMembers = false;
+  bool wantLookupInAllClasses = false;
   if (auto nominal = type->getAnyNominal()) {
     visited.insert(nominal);
     stack.push_back(nominal);
 
     wantProtocolMembers = (options & NL_ProtocolMembers) &&
                           !isa<ProtocolDecl>(nominal);
+
+    // If we want dynamic lookup and we're searching in the
+    // DynamicLookup protocol, note this for later.
+    if (options & NL_DynamicLookup) {
+      if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
+        if (proto->isSpecificProtocol(KnownProtocolKind::DynamicLookup))
+          wantLookupInAllClasses = true;
+      }
+    }
   }
   // Handle archetypes
   else if (auto archetypeTy = type->getAs<ArchetypeType>()) {
@@ -768,8 +778,15 @@ bool Module::lookupQualified(Type type,
     SmallVector<ProtocolDecl *, 4> protocols;
     if (compositionTy->isExistentialType(protocols)) {
       for (auto proto : protocols) {
-        if (visited.insert(proto))
+        if (visited.insert(proto)) {
           stack.push_back(proto);
+
+          // If we want dynamic lookup and this is the DynamicLookup
+          // protocol, note this for later.
+          if ((options & NL_DynamicLookup) &&
+              proto->isSpecificProtocol(KnownProtocolKind::DynamicLookup))
+            wantLookupInAllClasses = true;
+        }
       }
     }
   }
@@ -820,6 +837,33 @@ bool Module::lookupQualified(Type type,
     // Add protocols from the extensions of the current type.
     for (auto ext : current->getExtensions()) {
       addProtocols(ext->getProtocols());
+    }
+  }
+
+  // If we want to perform lookup into all classes, do so now.
+  if (wantLookupInAllClasses) {
+    // Collect all of the visible declarations.
+    SmallVector<ValueDecl *, 4> allDecls;
+    forAllVisibleModules(Module::AccessPathTy(),
+                         [&](Module::ImportedModule import) {
+      import.second->lookupClassMember(import.first, name, allDecls);
+    });
+
+    // For each declaration whose context is not something we've
+    // already visited above, add it to the list of declarations.
+    for (auto decl : allDecls) {
+      auto dc = decl->getDeclContext();
+      auto nominal = dyn_cast<NominalTypeDecl>(dc);
+      if (!nominal) {
+        auto ext = cast<ExtensionDecl>(dc);
+        nominal = ext->getExtendedType()->getAnyNominal();
+        assert(nominal && "Couldn't find nominal type?");
+      }
+
+      // If we didn't visit this nominal type above, add this
+      // declaration to the list.
+      if (!visited.count(nominal))
+        decls.push_back(decl);
     }
   }
 

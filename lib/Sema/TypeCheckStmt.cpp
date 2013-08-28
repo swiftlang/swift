@@ -784,7 +784,8 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
           if (var->isProperty())
             continue;
 
-          // If we already saw an initializer for this member, don't initialize it.
+          // If we already saw an initializer for this member, don't
+          // initialize it.
           if (!initializedMembers.insert(var))
             continue;
 

@@ -210,8 +210,8 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
-      // Figure out the actual base type, and whether we have an instance of that
-      // type or its metatype.
+      // Figure out the actual base type, and whether we have an instance of
+      // that type or its metatype.
       Type baseTy = base->getType()->getRValueType();
       bool baseIsInstance = true;
       if (auto baseMeta = baseTy->getAs<MetaTypeType>()) {
@@ -408,6 +408,20 @@ namespace {
         return solution.specialize(result, polyFn, openedType);
       }
 
+      return result;
+    }
+
+    /// \brief Build a new dynamic member reference with the given base and
+    /// member.
+    Expr *buildDynamicMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
+                                SourceLoc memberLoc, Type openedType,
+                                ConstraintLocatorBuilder locator) {
+      auto &context = cs.getASTContext();
+
+      // FIXME: Handle specializations?
+      auto result = new (context) DynamicMemberRefExpr(base, dotLoc, member,
+                                                       memberLoc);
+      result->setType(simplifyType(openedType));
       return result;
     }
 
@@ -1144,6 +1158,18 @@ namespace {
                             cs.getConstraintLocator(expr, { }));
     }
 
+    Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
+      auto selected = getOverloadChoice(
+                        cs.getConstraintLocator(expr,
+                                                ConstraintLocator::Member));
+
+      return buildDynamicMemberRef(expr->getBase(), expr->getDotLoc(),
+                                   selected.first.getDecl(),
+                                   expr->getNameLoc(),
+                                   selected.second,
+                                   cs.getConstraintLocator(expr, { }));
+    }
+
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
       // Dig out the type of the 'union', which will either be the result
       // type of this expression (for unit UnionElements) or the result of
@@ -1184,6 +1210,13 @@ namespace {
                               selected.first.getDecl(), expr->getNameLoc(),
                               selected.second,
                               cs.getConstraintLocator(expr, { }));
+
+      case OverloadChoiceKind::DeclViaDynamic:
+        return buildDynamicMemberRef(expr->getBase(), expr->getDotLoc(),
+                                     selected.first.getDecl(),
+                                     expr->getNameLoc(),
+                                     selected.second,
+                                     cs.getConstraintLocator(expr, { }));
 
       case OverloadChoiceKind::TupleIndex: {
         auto base = expr->getBase();
@@ -2769,7 +2802,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // Form a reference to the witness itself.
   auto openedType = cs.getTypeOfMemberReference(base->getType(),
                                                 witness,
-                                                /*isTypeReference=*/false);
+                                                /*isTypeReference=*/false,
+                                                /*isDynamicResult=*/false);
   auto locator = cs.getConstraintLocator(base, { });
 
   // Form the call argument.

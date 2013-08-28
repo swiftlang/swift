@@ -887,11 +887,13 @@ namespace index_block {
     BuiltinCharacterLiteralConvertible,
     BuiltinFloatLiteralConvertible,
     BuiltinIntegerLiteralConvertible,
-    BuiltinStringLiteralConvertible
+    BuiltinStringLiteralConvertible,
+    
+    DynamicLookup
   };
 
   using KnownProtocolLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // known protocol ID
+    BCFixed<5>,  // known protocol ID
     BCArray<DeclIDField> // list of conforming decls
   >;
 }

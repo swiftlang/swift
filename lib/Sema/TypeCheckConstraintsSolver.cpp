@@ -150,6 +150,7 @@ static bool overloadSetFullyBindsType(OverloadSet *ovl) {
       continue;
 
     case OverloadChoiceKind::Decl:
+    case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::TypeDecl:
     case OverloadChoiceKind::TupleIndex:
     case OverloadChoiceKind::IdentityFunction:

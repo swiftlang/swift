@@ -23,7 +23,7 @@ using namespace swift;
 
 LookupResult TypeChecker::lookupMember(Type type, Identifier name) {
   LookupResult result;
-  unsigned options = NL_QualifiedDefault;
+  unsigned options = NL_QualifiedDefault | NL_DynamicLookup;
   
   // We can't have tuple types here; they need to be handled elsewhere.
   assert(!type->is<TupleType>());
@@ -55,6 +55,9 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name) {
 
     // Fall through to look for constructors via the normal means.
     options = NL_Constructor;
+  } else if (name.str().equals("__conversion")) {
+    // Conversion lookups never permit dynamic lookup.
+    options = options & ~NL_DynamicLookup;
   }
 
   // Look for the member.

@@ -794,7 +794,8 @@ Type ConstraintSystem::openTypeOfContext(
 }
 
 Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
-                                                bool isTypeReference) {
+                                                bool isTypeReference,
+                                                bool isDynamicResult) {
   // Figure out the instance type used for the base.
   Type baseObjTy = baseTy->getRValueType();
   bool isInstance = true;
@@ -814,11 +815,13 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   Type ownerTy = openTypeOfContext(value->getDeclContext(), replacements,
                                    nullptr);
 
-  // The base type must be convertible to the owner type. For most cases,
-  // subtyping suffices. However, the owner might be a protocol and the base a
-  // type that implements that protocol, if which case we need to model this
-  // with a conversion constraint.
-  addConstraint(ConstraintKind::Conversion, baseObjTy, ownerTy);
+  if (!isDynamicResult) {
+    // The base type must be convertible to the owner type. For most cases,
+    // subtyping suffices. However, the owner might be a protocol and the base a
+    // type that implements that protocol, if which case we need to model this
+    // with a conversion constraint.
+    addConstraint(ConstraintKind::Conversion, baseObjTy, ownerTy);
+  }
 
   // Determine the type of the member.
   Type type;
@@ -1914,21 +1917,34 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
   Type refType;
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
+  case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::TypeDecl: {
     bool isTypeReference = choice.getKind() == OverloadChoiceKind::TypeDecl;
+    bool isDynamicResult
+      = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
     // Retrieve the type of a reference to the specific declaration choice.
     if (choice.getBaseType())
       refType = getTypeOfMemberReference(choice.getBaseType(),
                                          choice.getDecl(),
-                                         isTypeReference);
+                                         isTypeReference,
+                                         isDynamicResult);
     else
       refType = getTypeOfReference(choice.getDecl(),
                                    isTypeReference,
                                    choice.isSpecialized());
 
-    bool isAssignment = choice.getDecl()->getAttrs().isAssignment();
-    refType = adjustLValueForReference(refType, isAssignment,
-                                       getASTContext());
+    if (isDynamicResult) {
+      // For a declaration found via dynamic lookup, strip off the lvalue-ness
+      // (one cannot assign to such declarations) and make a reference to
+      // that declaration be optional.
+      refType = OptionalType::get(refType->getRValueType(), TC.Context);
+    } else {
+      // Otherwise, adjust the lvalue type for this reference.
+      bool isAssignment = choice.getDecl()->getAttrs().isAssignment();
+      refType = adjustLValueForReference(refType, isAssignment,
+                                         getASTContext());
+    }
+
     break;
   }
 
@@ -2182,11 +2198,16 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // then we can't solve this constraint.
   Type baseTy = simplifyType(constraint.getFirstType());
   Type baseObjTy = baseTy->getRValueType();
-  
-  if (baseObjTy->is<TypeVariableType>() ||
-      (baseObjTy->is<MetaTypeType>() && 
-       baseObjTy->castTo<MetaTypeType>()->getInstanceType()
-         ->is<TypeVariableType>()))
+
+  // Dig out the instance type.
+  bool isMetatype = false;
+  Type instanceTy = baseObjTy;
+  if (auto baseObjMeta = baseObjTy->getAs<MetaTypeType>()) {
+    instanceTy = baseObjMeta->getInstanceType();
+    isMetatype = true;
+  }
+
+  if (instanceTy->is<TypeVariableType>())
     return SolutionKind::Unsolved;
   
   // If the base type is a tuple type, look for the named or indexed member
@@ -2222,7 +2243,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // constraint to be unsolved. This effectively requires us to solve the
   // left-hand side of a dot expression before we look for members.
 
-  bool isExistential = baseObjTy->isExistentialType();
+  bool isExistential = instanceTy->isExistentialType();
   if (name.str() == "constructor") {
     // Constructors have their own approach to name lookup.
     auto ctors = TC.lookupConstructors(baseObjTy);
@@ -2270,7 +2291,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       // so we don't let errors cascade further.
       if (constructor->isInvalid())
         continue;
-
 
       // If our base is an existential type, we can't make use of any
       // constructor whose signature involves associated types.
@@ -2354,9 +2374,39 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     return SolutionKind::Error;
   }
 
+  // The set of directly accessible types, which is only used when
+  // we're performing dynamic lookup into an existential type.
+  // 
+  // FIXME: Should the lookup results encode how we found a particular
+  // declaration? For example, in a superclass, via conformance to a
+  // protocol, via dynamic lookup, etc.? That way, we wouldn't have to
+  // reconstruct this information on the fly.
+  SmallPtrSet<NominalTypeDecl *, 16> directlyAccessibleTypes;
+  if (isExistential) {
+    // Collect the set of protocols listed in the existential type.
+    SmallVector<ProtocolDecl *, 4> protocols;
+    (void)instanceTy->isExistentialType(protocols);
+
+    // Visit all of the protocols referenced in the existential type.
+    SmallVector<ProtocolDecl *, 4> stack;
+    for (auto proto : protocols) {
+      if (directlyAccessibleTypes.insert(proto))
+        stack.push_back(proto);
+    }
+
+    while (!stack.empty()) {
+      auto proto = stack.back();
+      stack.pop_back();
+
+      for (auto inherits : TC.getDirectConformsTo(proto)) {
+        if (directlyAccessibleTypes.insert(inherits))
+          stack.push_back(inherits);
+      }
+    }
+  }
+
   // Introduce a new overload set to capture the choices.
   SmallVector<OverloadChoice, 4> choices;
-  bool isMetatype = baseObjTy->is<MetaTypeType>();
   for (auto result : lookup) {
     // If the result is invalid, skip it.
     // FIXME: Note this as invalid, in case we don't find a solution,
@@ -2384,6 +2434,18 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     if (!isMetatype && !baseObjTy->is<ModuleType>() &&
         isa<FuncDecl>(result) && !result->isInstanceMember())
       continue;
+
+    // If we're looking into an existential type, check whether this
+    // result was found via dynamic lookup.
+    if (isExistential && result->getDeclContext()->isTypeContext()) {
+      auto nominal 
+        = result->getDeclContext()->getDeclaredTypeOfContext()->getAnyNominal();
+      if (nominal && !directlyAccessibleTypes.count(nominal)) {
+        // We found this declaration via dynamic lookup, record it as such.
+        choices.push_back(OverloadChoice::getDeclViaDynamic(baseTy, result));
+        continue;
+      }
+    }
 
     choices.push_back(OverloadChoice(baseTy, result, /*isSpecialized=*/false));
   }
@@ -2630,6 +2692,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
     return true;
 
   case OverloadChoiceKind::Decl:
+  case OverloadChoiceKind::DeclViaDynamic:
     return sameDecl(x.getDecl(), y.getDecl());
 
   case OverloadChoiceKind::TypeDecl:
@@ -2651,6 +2714,13 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc,
   // FIXME: This is wrong for type declarations.
   if (decl1->getKind() != decl2->getKind())
     return false;
+
+  // A declaration within a nominal type takes precedent over one in a protocol.
+  bool isProtocolDecl1 = isa<ProtocolDecl>(decl1->getDeclContext());
+  bool isProtocolDecl2 = isa<ProtocolDecl>(decl2->getDeclContext());
+  if (isProtocolDecl1 != isProtocolDecl2) {
+    return isProtocolDecl2;
+  }
 
   Type type1;
   Type type2;
@@ -2777,6 +2847,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       break;
 
     case OverloadChoiceKind::Decl:
+    case OverloadChoiceKind::DeclViaDynamic:
       // Determine whether one declaration is more specialized than the other.
       if (isDeclAsSpecializedAs(tc, choice1.getDecl(), choice2.getDecl()))
         ++score1;
@@ -4033,6 +4104,7 @@ void Solution::dump(SourceManager *sm) const {
     auto choice = ovl.second.first;
     switch (choice.getKind()) {
     case OverloadChoiceKind::Decl:
+    case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::TypeDecl:
       if (choice.getBaseType())
         out << choice.getBaseType()->getString() << ".";
@@ -4109,6 +4181,7 @@ void ConstraintSystem::dump() {
           << " choice #" << resolved->ChoiceIndex << " for ";
       switch (choice.getKind()) {
         case OverloadChoiceKind::Decl:
+        case OverloadChoiceKind::DeclViaDynamic:
         case OverloadChoiceKind::TypeDecl:
           if (choice.getBaseType())
             out << choice.getBaseType()->getString() << ".";
@@ -4147,6 +4220,7 @@ void ConstraintSystem::dump() {
         out.indent(4);
         switch (choice.getKind()) {
         case OverloadChoiceKind::Decl:
+        case OverloadChoiceKind::DeclViaDynamic:
         case OverloadChoiceKind::TypeDecl:
           if (choice.getBaseType())
             out << choice.getBaseType()->getString() << ".";

@@ -885,6 +885,12 @@ public:
     printRec(E->getBase());
     OS << ')';
   }
+  void visitDynamicMemberRefExpr(DynamicMemberRefExpr *E) {
+    printCommon(E, "dynamic_member_ref_expr")
+    << " decl=" << E->getDecl()->getName() << '\n';
+    printRec(E->getBase());
+    OS << ')';
+  }
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     printCommon(E, "unresolved_member_expr")
       << " name='" << E->getName() << "')";

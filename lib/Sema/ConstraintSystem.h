@@ -1102,6 +1102,10 @@ enum class OverloadChoiceKind : int {
   /// \brief The overload choice selects a particular declaration from a
   /// set of declarations.
   Decl,
+  /// \brief The overload choice selects a particular declaration that was
+  /// found via dynamic lookup and, therefore, might not actually be
+  /// available at runtime.
+  DeclViaDynamic,
   /// \brief The overload choice selects a particular declaration from a
   /// set of declarations and treats it as a type.
   TypeDecl,
@@ -1155,7 +1159,7 @@ public:
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
     : BaseAndSpecialized(base, false),
-      DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x02) {
+      DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x03) {
     assert(base && "Must have a base type for overload choice");
     assert(kind != OverloadChoiceKind::Decl && "wrong constructor for decl");
   }
@@ -1164,8 +1168,17 @@ public:
     : BaseAndSpecialized(base, false),
       DeclOrKind(((uintptr_t)index
                   + (uintptr_t)OverloadChoiceKind::TupleIndex) << 2
-                 | (uintptr_t)0x02) {
+                 | (uintptr_t)0x03) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
+  }
+
+  /// Retrieve an overload choice for a declaration that was found via
+  /// dynamic lookup.
+  static OverloadChoice getDeclViaDynamic(Type base, ValueDecl *value) {
+    OverloadChoice result;
+    result.BaseAndSpecialized.setPointer(base);
+    result.DeclOrKind = reinterpret_cast<uintptr_t>(value) | 0x02;
+    return result;
   }
 
   /// \brief Retrieve the base type used to refer to the declaration.
@@ -1179,7 +1192,11 @@ public:
   
   /// \brief Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {
-    if (DeclOrKind & 0x02) {
+    switch (DeclOrKind & 0x03) {
+    case 0x00: return OverloadChoiceKind::Decl;
+    case 0x01: return OverloadChoiceKind::TypeDecl;
+    case 0x02: return OverloadChoiceKind::DeclViaDynamic;
+    case 0x03: {
       uintptr_t value = DeclOrKind >> 2;
       if (value >= (uintptr_t)OverloadChoiceKind::TupleIndex)
         return OverloadChoiceKind::TupleIndex;
@@ -1187,13 +1204,14 @@ public:
       return (OverloadChoiceKind)value;
     }
 
-    return DeclOrKind & 0x01? OverloadChoiceKind::TypeDecl
-                            : OverloadChoiceKind::Decl;
+    default: llvm_unreachable("basic math has escaped me");
+    }
   }
 
   /// \brief Retrieve the declaraton that corresponds to this overload choice.
   ValueDecl *getDecl() const {
     assert((getKind() == OverloadChoiceKind::Decl ||
+            getKind() == OverloadChoiceKind::DeclViaDynamic ||
             getKind() == OverloadChoiceKind::TypeDecl) && "Not a declaration");
     return reinterpret_cast<ValueDecl *>(DeclOrKind & ~(uintptr_t)0x03);
   }
@@ -1977,8 +1995,12 @@ public:
   ///
   /// \param isTypeReference Indicates that we want to refer to the declared
   /// type of the type declaration rather than referring to it as a value.
+  ///
+  /// \param isDynamicResult Indicates that this declaration was found via
+  /// dynamic lookup.
   Type getTypeOfMemberReference(Type baseTy, ValueDecl *decl,
-                                bool isTypeReference);
+                                bool isTypeReference,
+                                bool isDynamicResult);
 
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.

@@ -370,6 +370,10 @@ namespace {
       return addMemberRefConstraints(expr, expr->getBase(), expr->getDecl());
     }
 
+    Type visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
+      return addMemberRefConstraints(expr, expr->getBase(), expr->getDecl());
+    }
+    
     Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
       auto unionLocator = CS.getConstraintLocator(
                             expr,

@@ -163,6 +163,7 @@ namespace {
     RValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
     RValue visitGenericMemberRefExpr(GenericMemberRefExpr *E, SGFContext C);
+    RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
     RValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
                                        SGFContext C);
     RValue visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E,
@@ -860,6 +861,12 @@ RValue RValueEmitter::visitGenericMemberRefExpr(GenericMemberRefExpr *E,
 
   }
   return SGF.emitLValueAsRValue(E);
+}
+
+RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
+                                                SGFContext C) {
+  E->dump();
+  llvm_unreachable("DynamicMemberRefExpr unimplemented in SILGen");
 }
 
 RValue RValueEmitter::visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,

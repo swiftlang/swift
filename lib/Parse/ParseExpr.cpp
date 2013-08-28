@@ -106,6 +106,7 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::CharacterLiteral:
   case ExprKind::DeclRef:
   case ExprKind::Dictionary:
+  case ExprKind::DynamicMemberRef:
   case ExprKind::FloatLiteral:
   case ExprKind::Func:
   case ExprKind::MemberRef:

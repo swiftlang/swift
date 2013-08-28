@@ -617,6 +617,7 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
     for (auto choice : overload.choices) {
       switch (choice.getKind()) {
       case OverloadChoiceKind::Decl:
+      case OverloadChoiceKind::DeclViaDynamic:
       case OverloadChoiceKind::TypeDecl:
         // FIXME: show deduced types, etc, etc.
         tc.diagnose(choice.getDecl(), diag::found_candidate);

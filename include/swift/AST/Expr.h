@@ -737,6 +737,62 @@ public:
   }
 };
 
+/// A reference to a member of an object that was found via dynamic lookup.
+///
+/// A member found via dynamic lookup may not actually be available at runtime.
+/// Therefore, a reference to that member always returns an optional instance.
+/// Users can then propagate the optional (via ?) or assert that the member is
+/// always available (via !). For example:
+///
+/// \code
+/// class C {
+///   func foo(i : Int) -> String { ... }
+/// };
+///
+/// var x : DynamicLookup = <some value>
+/// print(x.foo!(17)) // x.foo has type ((i : Int) -> String)?
+/// \endcode
+class DynamicMemberRefExpr : public Expr {
+  Expr *Base;
+  ValueDecl *Decl;
+  SourceLoc DotLoc;
+  SourceLoc NameLoc;
+
+public:
+  DynamicMemberRefExpr(Expr *base, SourceLoc dotLoc, ValueDecl *decl,
+                       SourceLoc nameLoc)
+    : Expr(ExprKind::DynamicMemberRef),
+      Base(base), Decl(decl), DotLoc(dotLoc), NameLoc(nameLoc) { }
+
+  /// Retrieve the base of the expression.
+  Expr *getBase() const { return Base; }
+
+  /// Replace the base of the expression.
+  void setBase(Expr *base) { Base = base; }
+
+  /// Retrieve the member to which this access refers.
+  ValueDecl *getDecl() const { return Decl; }
+
+  /// Retrieve the location of the member name.
+  SourceLoc getNameLoc() const { return NameLoc; }
+
+  /// Retrieve the location of the '.'.
+  SourceLoc getDotLoc() const { return DotLoc; }
+
+  SourceLoc getLoc() const { return NameLoc; }
+
+  SourceRange getSourceRange() const {
+    if (Base->isImplicit())
+      return SourceRange(NameLoc);
+
+    return SourceRange(Base->getStartLoc(), NameLoc);
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DynamicMemberRef;
+  }
+};
+
 /// UnresolvedMemberExpr - This represents '.foo', an unresolved reference to a
 /// member, which is to be resolved with context sensitive type information into
 /// bar.foo.  These always have unresolved type.

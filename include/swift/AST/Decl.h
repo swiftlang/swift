@@ -159,12 +159,12 @@ class alignas(8) Decl {
 
     /// If this is a compiler-known protocol, this will be a KnownProtocolKind
     /// value, plus one. Otherwise, it will be 0.
-    unsigned KnownProtocol : 4;
+    unsigned KnownProtocol : 5;
 
     /// The stage of the circularity check for this protocol.
     unsigned Circularity : 2;
   };
-  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 10 };
+  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 11 };
   static_assert(NumProtocolDeclBits <= 32, "fits in an unsigned");
 
   class ClassDeclBitFields {
@@ -1779,12 +1779,21 @@ public:
     return static_cast<KnownProtocolKind>(ProtocolDeclBits.KnownProtocol - 1);
   }
 
+  /// Check whether this protocol is of a specific, known protocol kind.
+  bool isSpecificProtocol(KnownProtocolKind kind) {
+    if (auto knownKind = getKnownProtocolKind())
+      return *knownKind == kind;
+
+    return false;
+  }
+
   /// Records that this is a compiler-known protocol.
   void setKnownProtocolKind(KnownProtocolKind kind) {
     assert((!getKnownProtocolKind() || *getKnownProtocolKind() == kind) &&
            "can't reset known protocol kind");
     ProtocolDeclBits.KnownProtocol = static_cast<unsigned>(kind) + 1;
-    assert(*getKnownProtocolKind() == kind && "not enough bits");
+    assert(getKnownProtocolKind() && *getKnownProtocolKind() == kind &&
+           "not enough bits");
   }
 
   /// Retrieve the status of circularity checking for protocol inheritance.
