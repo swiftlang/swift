@@ -547,6 +547,10 @@ public:
       for (Decl *Member : CD->getMembers())
         if (doIt(Member))
           return true;
+    } else if (ProtocolDecl *PD = dyn_cast<ProtocolDecl>(D)) {
+      for (Decl *Member : PD->getMembers())
+        if (doIt(Member))
+          return true;
     } else if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(TLCD->getBody())))
         TLCD->setBody(S);

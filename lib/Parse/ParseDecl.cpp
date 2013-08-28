@@ -2106,9 +2106,9 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
     // Add the implicit 'Self' associated type.
     Members.push_back(new (Context) AssociatedTypeDecl(
                                       CurDeclContext,
-                                      SourceLoc(),
+                                      Proto->getLoc(),
                                       Context.getIdentifier("Self"),
-                                      SourceLoc()));
+                                      Proto->getLoc()));
     Members.back()->setImplicit();
 
     SourceLoc LBraceLoc;
