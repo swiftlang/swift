@@ -154,6 +154,28 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition) {
   skipUntil(tok::eof, /*StopAtCodeComplete=*/false);
 }
 
+static void unwrapIfDiscardedClosure(Parser &P,
+                                     Parser::ExprStmtOrDecl &Result) {
+  // If we parsed a bare closure as an expression, it will be a discarded value
+  // expression and the type checker will complain.
+  //
+  // Instead, recover by unwrapping the BraceStmt that is contained inside.
+
+  if (isa<PipeClosureExpr>(P.CurDeclContext))
+    // Inside a closure expression, an expression which syntactically looks
+    // like a discarded value expression, can become the return value of the
+    // closure.  Don't attempt recovery.
+    return;
+
+  if (auto *E = Result.dyn_cast<Expr *>()) {
+    if (auto *CE = dyn_cast<PipeClosureExpr>(E)) {
+      auto *BS = CE->getBody();
+      Result = BS;
+      P.diagnose(BS->getLBraceLoc(), diag::brace_stmt_invalid);
+    }
+  }
+}
+
 ///   brace-item:
 ///     decl
 ///     expr
@@ -232,30 +254,31 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         consumeTopLevelDecl(BeginParserPosition);
         return;
       }
-      if (Status.isError()) {
+      if (Status.isError())
         NeedParseErrorRecovery = true;
-      } else {
+      unwrapIfDiscardedClosure(*this, Result);
+      if (!Result.isNull()) {
         auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
       }
     } else {
       SourceLoc StartLoc = Tok.getLoc();
-      if (parseExprOrStmt(Result).isError())
+      ParserStatus ExprOrStmtStatus = parseExprOrStmt(Result);
+      if (ExprOrStmtStatus.isError())
         NeedParseErrorRecovery = true;
-      else {
-
+      unwrapIfDiscardedClosure(*this, Result);
+      if (ExprOrStmtStatus.isSuccess() && IsTopLevel) {
         // If this is a normal library, you can't have expressions or statements
-        // outside at the top level.  Diagnose this error.
-        if (IsTopLevel) {
-          if (!NeedParseErrorRecovery)
-            diagnose(StartLoc,
-                     Result.is<Stmt*>() ? diag::illegal_top_level_stmt :
-                     diag::illegal_top_level_expr);
-        } else {
-          Entries.push_back(Result);
-        }
+        // outside at the top level.
+        diagnose(StartLoc,
+                 Result.is<Stmt*>() ? diag::illegal_top_level_stmt
+                                    : diag::illegal_top_level_expr);
+        Result = ExprStmtOrDecl();
       }
+
+      if (!Result.isNull())
+        Entries.push_back(Result);
     }
 
     if (!NeedParseErrorRecovery && !previousHadSemi && Tok.is(tok::semi)) {
@@ -267,11 +290,13 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       previousHadSemi = true;
     }
 
-    // If we had a parse error, skip to the start of the next stmt or decl.  It
-    // would be ideal to stop at the start of the next expression (e.g. "X = 4")
-    // but distinguishing the start of an expression from the middle of one is
-    // "hard".
     if (NeedParseErrorRecovery) {
+      // If we had a parse error, skip to the start of the next stmt, decl or
+      // '{'.
+      //
+      // It would be ideal to stop at the start of the next expression (e.g.
+      // "X = 4"), but distinguishing the start of an expression from the middle
+      // of one is "hard".
       skipUntilDeclStmtRBrace(tok::l_brace);
 
       // If we have to recover, pretend that we had a semicolon; it's less

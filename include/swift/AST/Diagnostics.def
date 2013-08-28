@@ -548,6 +548,8 @@ ERROR(illegal_semi_stmt,stmt_parsing,none,
       "';' statements are not allowed", ())
 ERROR(statement_same_line_without_semi,stmt_parsing,none,
       "consecutive statements on a line must be separated by ';'", ())
+ERROR(brace_stmt_invalid,stmt_parsing,none,
+      "braced block of statements is an unused closure", ())
 
 
 // Assignment statement
