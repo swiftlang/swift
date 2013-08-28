@@ -72,17 +72,6 @@ union SinglePayloadTrivial {
   case c
 }
 
-sil @destroy_single_trivial : $[thin] ([byref] SinglePayloadTrivial) -> () {
-entry(%u : $*SinglePayloadTrivial):
-  destroy_addr %u : $*SinglePayloadTrivial
-  %x = tuple ()
-  return %x : $()
-}
-// CHECK: define void @destroy_single_trivial(%O21union_value_semantics20SinglePayloadTrivial*) {
-// CHECK-NOT: swift_release
-// CHECK:   ret void
-// CHECK: }
-
 union SinglePayloadNontrivial {
   case payload(Builtin.ObjectPointer)
   case a
@@ -90,23 +79,20 @@ union SinglePayloadNontrivial {
   case c
 }
 
-sil @destroy_single_nontrivial : $[thin] ([byref] SinglePayloadNontrivial) -> () {
-entry(%u : $*SinglePayloadNontrivial):
-  destroy_addr %u : $*SinglePayloadNontrivial
-  %x = tuple ()
-  return %x : $()
-}
-// CHECK: define void @destroy_single_nontrivial(%O21union_value_semantics23SinglePayloadNontrivial*) {
+// -- SinglePayloadNontrivial destroyBuffer
+// CHECK: define linkonce_odr hidden void @_TwxxO21union_value_semantics23SinglePayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type*) {
 // CHECK: entry:
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics23SinglePayloadNontrivial* %0, i32 0, i32 0
+// CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O21union_value_semantics23SinglePayloadNontrivial*
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics23SinglePayloadNontrivial* [[ADDR]], i32 0, i32 0
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics23SinglePayloadNontrivial* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics23SinglePayloadNontrivial* [[ADDR]], i32 0, i32 1
 // CHECK:   [[TAG:%.*]] = load i1* [[TAG_ADDR]], align 8
 // CHECK:   [[HAS_PAYLOAD:%.*]] = icmp eq i1 [[TAG]], false
 // CHECK:   br i1 [[HAS_PAYLOAD]], label %[[RELEASE_PAYLOAD:[0-9]+]], label %[[DONE:[0-9]+]]
 // CHECK: ; <label>:[[RELEASE_PAYLOAD]]
-// CHECK:   [[VALUE:%.*]] = inttoptr i64 [[PAYLOAD]] to %swift.refcounted*
-// CHECK:   call void @swift_release(%swift.refcounted* [[VALUE]])
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O21union_value_semantics23SinglePayloadNontrivial* [[ADDR]] to %swift.refcounted**
+// CHECK:   [[DATA:%.*]] = load %swift.refcounted** [[DATA_ADDR]], align 8
+// CHECK:   call void @swift_release(%swift.refcounted* [[DATA]])
 // CHECK:   br label %[[DONE]]
 // CHECK: ; <label>:[[DONE]]
 // CHECK:   ret void
@@ -120,17 +106,6 @@ union MultiPayloadTrivial {
   case c
 }
 
-sil @destroy_multi_trivial : $[thin] ([byref] MultiPayloadTrivial) -> () {
-entry(%u : $*MultiPayloadTrivial):
-  destroy_addr %u : $*MultiPayloadTrivial
-  %x = tuple ()
-  return %x : $()
-}
-// CHECK: define void @destroy_multi_trivial(%O21union_value_semantics19MultiPayloadTrivial*) {
-// CHECK: entry:
-// CHECK:   ret void
-// CHECK: }
-
 union MultiPayloadNontrivial {
   case payload1(Builtin.ObjectPointer)
   case payload2(Builtin.Int64)
@@ -140,17 +115,13 @@ union MultiPayloadNontrivial {
   case c
 }
 
-sil @destroy_multi_nontrivial : $[thin] ([byref] MultiPayloadNontrivial) -> () {
-entry(%u : $*MultiPayloadNontrivial):
-  destroy_addr %u : $*MultiPayloadNontrivial
-  %x = tuple ()
-  return %x : $()
-}
-// CHECK: define void @destroy_multi_nontrivial(%O21union_value_semantics22MultiPayloadNontrivial*) {
+// -- MultiPayloadNontrivial destroyBuffer
+// CHECK: define linkonce_odr hidden void @_TwxxO21union_value_semantics22MultiPayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type*) {
 // CHECK: entry:
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics22MultiPayloadNontrivial* %0, i32 0, i32 0
+// CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O21union_value_semantics22MultiPayloadNontrivial*
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics22MultiPayloadNontrivial* [[ADDR]], i32 0, i32 0
 // CHECK:   [[PAYLOAD:%.*]] = load i128* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics22MultiPayloadNontrivial* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics22MultiPayloadNontrivial* [[ADDR]], i32 0, i32 1
 // CHECK:   [[TAG:%.*]] = load i2* [[TAG_ADDR]], align 8
 // CHECK:   switch i2 [[TAG]], label %[[END:[0-9]+]] [
 // CHECK:     i2 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
