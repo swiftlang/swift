@@ -292,7 +292,7 @@ ERROR(subscript_static,decl_parsing,none,
 
 // Constructor
 ERROR(constructor_decl_wrong_scope,decl_parsing,none,
-      "'constructor' functions may only be declared within a type", ())
+      "constructors may only be declared within a class, struct, or union", ())
 ERROR(expected_lparen_constructor,decl_parsing,none,
       "expected '(' for constructor parameters", ())
 ERROR(expected_lbrace_constructor,decl_parsing,none,

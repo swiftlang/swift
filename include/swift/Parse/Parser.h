@@ -477,7 +477,7 @@ public:
                                   bool NeedDefinition,
                                   SmallVectorImpl<Decl *> &Decls);
 
-  ParserResult<ConstructorDecl> parseDeclConstructor(bool HasContainerType);
+  ParserResult<ConstructorDecl> parseDeclConstructor(unsigned Flags);
   ParserResult<DestructorDecl> parseDeclDestructor(unsigned Flags);
   
   ParserResult<OperatorDecl> parseDeclOperator(bool AllowTopLevel);

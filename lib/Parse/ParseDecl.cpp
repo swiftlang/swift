@@ -580,7 +580,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     Status = DeclResult;
     break;
   case tok::kw_constructor:
-    DeclResult = parseDeclConstructor(Flags & PD_HasContainerType);
+    DeclResult = parseDeclConstructor(Flags);
     Status = DeclResult;
     break;
   case tok::kw_destructor:
@@ -2322,11 +2322,14 @@ static void AddConstructorArgumentsToScope(const Pattern *pat,
 
 
 ParserResult<ConstructorDecl>
-Parser::parseDeclConstructor(bool HasContainerType) {
+Parser::parseDeclConstructor(unsigned Flags) {
   SourceLoc ConstructorLoc = consumeToken(tok::kw_constructor);
 
+  const bool ConstructorsNotAllowed =
+      !(Flags & PD_HasContainerType) || (Flags & PD_InProtocol);
+
   // Reject 'constructor' functions outside of types
-  if (!HasContainerType) {
+  if (ConstructorsNotAllowed) {
     diagnose(Tok, diag::constructor_decl_wrong_scope);
   }
 
@@ -2372,7 +2375,7 @@ Parser::parseDeclConstructor(bool HasContainerType) {
                                     ConstructorLoc, Arguments.get(), SelfDecl,
                                     GenericParams, CurDeclContext);
   SelfDecl->setDeclContext(CD);
-  if (!HasContainerType) {
+  if (ConstructorsNotAllowed) {
     // Tell the type checker not to touch this constructor.
     CD->setInvalid();
   }
