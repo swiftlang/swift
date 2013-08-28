@@ -53,6 +53,7 @@ class CompilerInvocation {
 
   bool ParseStdlib = false;
   bool ParseOnly = false;
+  bool Immediate = false;
   TranslationUnit::TUKind TUKind = TranslationUnit::Main;
 
   std::string ModuleName;
@@ -216,6 +217,14 @@ public:
 
   bool isDelayedFunctionBodyParsing() const {
     return DelayedFunctionBodyParsing;
+  }
+
+  void setImmediate(bool Val) {
+    Immediate = Val;
+  }
+  
+  bool isImmediate() const {
+    return Immediate;
   }
 };
 

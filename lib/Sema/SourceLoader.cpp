@@ -20,6 +20,8 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/Parse/DelayedParsingCallbacks.h"
+#include "swift/Parse/PersistentParserState.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallString.h"
@@ -73,6 +75,17 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
   return err;
 }
 
+namespace {
+  /// Don't parse any function bodies except those that are transparent.
+  class SkipNonTransparentFunctions : public DelayedParsingCallbacks {
+    bool shouldDelayFunctionBodyParsing(Parser &parser, FuncExpr *FE,
+                                        const DeclAttributes &Attrs,
+                                        SourceRange bodyRange) override {
+      return Attrs.isTransparent();
+    }
+  };
+}
+
 
 Module *SourceLoader::loadModule(SourceLoc importLoc,
                              ArrayRef<std::pair<Identifier, SourceLoc>> path) {
@@ -109,10 +122,16 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
 
   performAutoImport(importTU);
 
-  bool Done;
-  parseIntoTranslationUnit(importTU, bufferID, &Done);
-  assert(Done && "Parser returned early?");
-  (void) Done;
+  bool done;
+  PersistentParserState persistentState;
+  SkipNonTransparentFunctions delayCallbacks;
+  parseIntoTranslationUnit(importTU, bufferID, &done, nullptr, &persistentState,
+                           SkipBodies ? &delayCallbacks : nullptr);
+  assert(done && "Parser returned early?");
+  (void)done;
+  
+  if (SkipBodies)
+    performDelayedParsing(importTU, persistentState, nullptr);
 
   // We have to do type checking on it to ensure that types are fully resolved.
   // This should eventually be eliminated by having actual fully resolved binary

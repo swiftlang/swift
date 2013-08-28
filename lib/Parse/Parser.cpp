@@ -89,15 +89,13 @@ private:
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
     TheParser.parseDeclFuncBodyDelayed(FD);
-    CodeCompletion->doneParsing();
+    if (CodeCompletion)
+      CodeCompletion->doneParsing();
   }
 };
 
 void parseDelayedDecl(TranslationUnit *TU, PersistentParserState &ParserState,
                       CodeCompletionCallbacksFactory *CodeCompletionFactory) {
-  assert(CodeCompletionFactory &&
-         "delayed parsing of decls only makes sense for code completion");
-
   if (!ParserState.hasDelayedDecl())
     return;
 
@@ -105,9 +103,13 @@ void parseDelayedDecl(TranslationUnit *TU, PersistentParserState &ParserState,
       .findBufferContainingLoc(ParserState.getDelayedDeclLoc());
   Parser TheParser(BufferID, TU, nullptr, &ParserState);
 
-  std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
+  std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
+  if (CodeCompletionFactory) {
+    CodeCompletion.reset(
       CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
-  TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
+    TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
+  }
+
   switch (ParserState.getDelayedDeclKind()) {
   case PersistentParserState::DelayedDeclKind::TopLevelCodeDecl:
     TheParser.parseTopLevelCodeDeclDelayed();
@@ -117,7 +119,9 @@ void parseDelayedDecl(TranslationUnit *TU, PersistentParserState &ParserState,
     TheParser.parseDeclDelayed();
     break;
   }
-  CodeCompletion->doneParsing();
+  
+  if (CodeCompletion)
+    CodeCompletion->doneParsing();
 }
 } // unnamed namespace
 

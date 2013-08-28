@@ -24,12 +24,14 @@ class Module;
 class SourceLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
+  bool SkipBodies;
 
-  explicit SourceLoader(ASTContext &ctx) : Ctx(ctx) {}
+  explicit SourceLoader(ASTContext &ctx, bool skipBodies)
+    : Ctx(ctx), SkipBodies(skipBodies) {}
 
 public:
-  static SourceLoader *create(ASTContext &ctx) {
-    return new SourceLoader(ctx);
+  static SourceLoader *create(ASTContext &ctx, bool skipBodies) {
+    return new SourceLoader(ctx, skipBodies);
   }
 
   SourceLoader(const SourceLoader &) = delete;

@@ -41,7 +41,8 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   // Give the context the list of search paths to use for modules.
   Context->ImportSearchPaths = Invocation.getImportSearchPaths();
-  Context->addModuleLoader(SourceLoader::create(*Context));
+  Context->addModuleLoader(SourceLoader::create(*Context,
+                                                !Invocation.isImmediate()));
   Context->addModuleLoader(SerializedModuleLoader::create(*Context));
 
   // If the user has specified an SDK, wire up the Clang module importer

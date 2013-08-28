@@ -1402,7 +1402,7 @@ Pattern *Parser::buildImplicitSelfParameter() {
   return new (Context) TypedPattern(P, TypeLoc());
 }
 
-void Parser::consumeFunctionBody(FuncExpr *FE) {
+void Parser::consumeFunctionBody(FuncExpr *FE, const DeclAttributes &Attrs) {
   auto BeginParserPosition = getParserPosition();
   SourceRange BodyRange;
   BodyRange.Start = Tok.getLoc();
@@ -1436,7 +1436,8 @@ void Parser::consumeFunctionBody(FuncExpr *FE) {
 
   BodyRange.End = PreviousLoc;
 
-  if (DelayedParseCB->shouldDelayFunctionBodyParsing(*this, FE, BodyRange)) {
+  if (DelayedParseCB->shouldDelayFunctionBodyParsing(*this, FE, Attrs,
+                                                     BodyRange)) {
     State->delayFunctionBodyParsing(FE, BodyRange,
                                     BeginParserPosition.PreviousLoc);
     FE->setBodyDelayed(BodyRange.End);
@@ -1605,7 +1606,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
           FE->setBody(Body.get());
         }
       } else {
-        consumeFunctionBody(FE);
+        consumeFunctionBody(FE, Attributes);
       }
     } else if (Attributes.AsmName.empty() && !(Flags & PD_DisallowFuncDef) &&
                !HadSignatureParseError) {

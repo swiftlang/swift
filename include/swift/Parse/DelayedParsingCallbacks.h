@@ -15,26 +15,30 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/Parser.h"
 
 namespace swift {
+  class DeclAttributes;
   class FuncExpr;
-  class Parser;
 
 /// \brief Callbacks for Parser's delayed parsing.
 class DelayedParsingCallbacks {
   virtual void anchor();
 
 public:
-  virtual ~DelayedParsingCallbacks() {}
+  virtual ~DelayedParsingCallbacks() = default;
 
+  /// Checks if a function body should be delayed or skipped altogether.
   virtual bool shouldDelayFunctionBodyParsing(Parser &TheParser,
                                               FuncExpr *FE,
+                                              const DeclAttributes &Attrs,
                                               SourceRange BodyRange) = 0;
 };
 
 class AlwaysDelayedCallbacks : public DelayedParsingCallbacks {
   bool shouldDelayFunctionBodyParsing(Parser &TheParser,
                                       FuncExpr *FE,
+                                      const DeclAttributes &Attrs,
                                       SourceRange BodyRange) override {
     return true;
   }
@@ -51,6 +55,7 @@ public:
 
   bool shouldDelayFunctionBodyParsing(Parser &TheParser,
                                       FuncExpr *FE,
+                                      const DeclAttributes &Attrs,
                                       SourceRange BodyRange) override {
     // Delay parsing if the code completion point is in the function body.
     return TheParser.SourceMgr
