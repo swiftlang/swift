@@ -1000,6 +1000,9 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)
                 /*HasTypeVariable=*/false) { }
 
 LValueType *LValueType::get(Type objectTy, Qual quals, const ASTContext &C) {
+  assert(!objectTy->is<ErrorType>() &&
+         "can not have ErrorType wrapped inside LValueType");
+
   bool hasTypeVariable = objectTy->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 

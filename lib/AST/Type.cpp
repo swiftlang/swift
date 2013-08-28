@@ -51,8 +51,6 @@ bool CanType::isActuallyCanonicalOrNull() const {
          getPointer()->isCanonical();
 }
 
-
-
 //===----------------------------------------------------------------------===//
 // Various Type Methods.
 //===----------------------------------------------------------------------===//
@@ -60,14 +58,6 @@ bool CanType::isActuallyCanonicalOrNull() const {
 /// isEqual - Return true if these two types are equal, ignoring sugar.
 bool TypeBase::isEqual(Type Other) {
   return getCanonicalType() == Other.getPointer()->getCanonicalType();
-}
-
-bool TypeBase::isError() {
-  TypeBase *T = this;
-  if (auto *LVT = T->getAs<LValueType>())
-    T = LVT->getObjectType().getPointer();
-
-  return T->is<ErrorType>();
 }
 
 /// isMaterializable - Is this type 'materializable' according to the

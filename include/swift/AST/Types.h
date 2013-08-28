@@ -169,9 +169,6 @@ public:
     return cast<T>(getDesugaredType());
   }
 
-  /// Returns true if this type contains an \c ErrorType.
-  bool isError();
-  
   /// getString - Return the name of the type as a string, for use in
   /// diagnostics only.
   std::string getString() const;

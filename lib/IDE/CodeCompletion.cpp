@@ -400,7 +400,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
     if (!typeCheckCompletionContextExpr(TU, TypecheckedExpr))
       return false;
 
-    if (TypecheckedExpr->getType()->isError())
+    if (TypecheckedExpr->getType()->is<ErrorType>())
       return false;
 
     ParsedExpr = TypecheckedExpr;
