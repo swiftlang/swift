@@ -89,7 +89,6 @@ class IRGenDebugInfo {
   const Options &Opts;
   const clang::TargetInfo &TargetInfo;
   SourceManager &SM;
-  llvm::Module &M;
   llvm::DIBuilder DBuilder;
   TypeConverter &Types;
 

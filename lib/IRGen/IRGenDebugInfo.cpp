@@ -71,7 +71,7 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
                                TypeConverter &Types,
                                SourceManager &SM,
                                llvm::Module &M)
-  : Opts(Opts), TargetInfo(TargetInfo), SM(SM), M(M), DBuilder(M), Types(Types),
+  : Opts(Opts), TargetInfo(TargetInfo), SM(SM), DBuilder(M), Types(Types),
     LastFn(nullptr), LastLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfo);
   StringRef Dir, Filename;
@@ -639,7 +639,7 @@ llvm::DIFile IRGenDebugInfo::getFile(llvm::DIDescriptor Scope) {
 
 void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              llvm::Value *Storage,
-                                             DebugTypeInfo DTI,
+                                             DebugTypeInfo Ty,
                                              StringRef Name,
                                              unsigned Tag,
                                              unsigned ArgNo) {
@@ -649,7 +649,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
     return;
 
   llvm::DIFile Unit = getFile(Scope);
-  llvm::DIType DTy = getOrCreateType(DTI, Scope);
+  llvm::DIType DTy = getOrCreateType(Ty, Scope);
 
   // If there is no debug info for this type then do not emit debug info
   // for this variable.
@@ -659,31 +659,14 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
   unsigned Line = DL.getLine();
   unsigned Flags = 0;
 
-  if (Name == "NsObj" || Name == "MyObj")
-    llvm::dbgs()<<"\n";
-
   // Create the descriptor for the variable.
-  llvm::DIVariable Descriptor;
-  switch (DTI.Ty->getCanonicalType()->getKind()) {
-  case TypeKind::Class:
-  case TypeKind::BoundGenericClass: {
-    // Classes are always passed by reference.
-    llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
-    SmallVector<llvm::Value *, 1> Addr;
-    Addr.push_back(llvm::ConstantInt::get(Int64Ty, llvm::DIBuilder::OpDeref));
-    Descriptor = DBuilder.createComplexVariable(Tag, Scope, Name.str(),
-                                                Unit, Line, DTy, Addr, ArgNo);
-    break;
-  }
-  default:
-    Descriptor = DBuilder.createLocalVariable(Tag, Scope, Name.str(),
-                                              Unit, Line, DTy,
-                                              Opts.OptLevel > 0, Flags, ArgNo);
-  }
+  llvm::DIVariable D =
+    DBuilder.createLocalVariable(Tag, Scope, Name.str(), Unit, Line, DTy,
+                                 Opts.OptLevel > 0, Flags, ArgNo);
 
   // Insert an llvm.dbg.declare into the current block.
   llvm::Instruction *Call =
-    DBuilder.insertDeclare(Storage, Descriptor, Builder.GetInsertBlock());
+    DBuilder.insertDeclare(Storage, D, Builder.GetInsertBlock());
   Call->setDebugLoc(llvm::DebugLoc::get(Line, DL.getCol(), Scope));
 }
 
