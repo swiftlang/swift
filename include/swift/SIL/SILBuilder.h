@@ -528,9 +528,9 @@ public:
   
   ProjectExistentialInst *createProjectExistential(SILLocation Loc,
                                                    SILValue Operand,
-                                                   SILType ThisTy) {
+                                                   SILType SelfTy) {
     return insert(new (F.getModule())
-                    ProjectExistentialInst(Loc, Operand, ThisTy));
+                    ProjectExistentialInst(Loc, Operand, SelfTy));
   }
   
   ProjectExistentialRefInst *createProjectExistentialRef(SILLocation Loc,

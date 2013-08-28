@@ -1509,11 +1509,11 @@ bool Serializer::writeDecl(const Decl *D) {
     // FIXME: Handle allocating constructors.
     // FIXME: Does this ever occur in Swift modules? If it's only used by the
     // importer, perhaps we don't need to worry about it here.
-    if (ctor->getAllocThisExpr())
+    if (ctor->getAllocSelfExpr())
       return false;
 
     const Decl *DC = getDeclForContext(ctor->getDeclContext());
-    auto implicitThis = ctor->getImplicitThisDecl();
+    auto implicitSelf = ctor->getImplicitSelfDecl();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1521,7 +1521,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   addTypeRef(ctor->getType()),
-                                  addDeclRef(implicitThis));
+                                  addDeclRef(implicitSelf));
 
     writeGenericParams(ctor->getGenericParams());
     writePattern(ctor->getArguments());
@@ -1539,7 +1539,7 @@ bool Serializer::writeDecl(const Decl *D) {
       return false;
 
     const Decl *DC = getDeclForContext(dtor->getDeclContext());
-    auto implicitThis = dtor->getImplicitThisDecl();
+    auto implicitSelf = dtor->getImplicitSelfDecl();
 
     unsigned abbrCode = DeclTypeAbbrCodes[DestructorLayout::Code];
     DestructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1547,7 +1547,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
                                  addTypeRef(dtor->getType()),
-                                 addDeclRef(implicitThis));
+                                 addDeclRef(implicitSelf));
     
     return true;
   }

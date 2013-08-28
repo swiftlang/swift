@@ -344,7 +344,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
   for (auto Member : Proto->getMembers()) {
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Nothing to do for 'Self'.
-      if (AssocType->isThis())
+      if (AssocType->isSelf())
         continue;
 
       // Add requirements placed directly on this associated type.

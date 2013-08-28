@@ -385,10 +385,7 @@ ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
 }
 
-/// getImplicitThisDecl - If this FuncExpr is a non-static method in an
-/// extension context, it will have a 'self' argument.  This method returns it
-/// if present, or returns null if not.
-VarDecl *FuncExpr::getImplicitThisDecl() const {
+VarDecl *FuncExpr::getImplicitSelfDecl() const {
   if (getNumParamPatterns() == 0) return nullptr;
   
   // "self" is represented as (typed_pattern (named_pattern (var_decl 'self')).
@@ -403,10 +400,10 @@ VarDecl *FuncExpr::getImplicitThisDecl() const {
 }
 
 RebindThisInConstructorExpr::RebindThisInConstructorExpr(Expr *SubExpr,
-                                                         ValueDecl *This)
+                                                         ValueDecl *Self)
   : Expr(ExprKind::RebindThisInConstructor,
-         TupleType::getEmpty(This->getASTContext())),
-    SubExpr(SubExpr), This(This)
+         TupleType::getEmpty(Self->getASTContext())),
+    SubExpr(SubExpr), Self(Self)
 {}
 
 

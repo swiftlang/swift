@@ -1417,11 +1417,11 @@ Type TypeConverter::getSubscriptPropertyType(SILDeclRef::Kind kind,
 }
 
 /// Get the type of the 'self' parameter for methods of a type.
-Type TypeConverter::getMethodThisType(Type thisType) const {
-  if (thisType->hasReferenceSemantics()) {
-    return thisType;
+Type TypeConverter::getMethodSelfType(Type selfType) const {
+  if (selfType->hasReferenceSemantics()) {
+    return selfType;
   } else {
-    return LValueType::get(thisType, LValueType::Qual::DefaultForType, Context);
+    return LValueType::get(selfType, LValueType::Qual::DefaultForType, Context);
   }
 }
 
@@ -1430,13 +1430,13 @@ Type TypeConverter::getMethodTypeInContext(Type /*nullable*/ contextType,
                                        GenericParamList *genericParams) const {
   if (!contextType)
     return methodType;
-  Type thisType = getMethodThisType(contextType);
+  Type selfType = getMethodSelfType(contextType);
   
   if (genericParams)
-    return PolymorphicFunctionType::get(thisType, methodType, genericParams,
+    return PolymorphicFunctionType::get(selfType, methodType, genericParams,
                                         Context);
 
-  return FunctionType::get(thisType, methodType, Context);
+  return FunctionType::get(selfType, methodType, Context);
 }
 
 /// Get the type of a global variable accessor function, () -> [byref] T.
@@ -1560,7 +1560,7 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
     if (contextType) {
       if (UnboundGenericType *ugt = contextType->getAs<UnboundGenericType>()) {
         // Bind the generic parameters.
-        // FIXME: see computeThisType()
+        // FIXME: see computeSelfType()
         genericParams = ugt->getDecl()->getGenericParams();
         contextType = vd->getDeclContext()->getDeclaredTypeInContext();
       }

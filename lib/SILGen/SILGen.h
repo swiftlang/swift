@@ -632,14 +632,14 @@ public:
   ManagedValue emitGetProperty(SILLocation loc,
                                SILDeclRef getter,
                                ArrayRef<Substitution> substitutions,
-                               RValue &&optionalthisValue,
+                               RValue &&optionalSelfValue,
                                RValue &&optionalSubscripts,
                                Type resultType,
                                SGFContext C);
   void emitSetProperty(SILLocation loc,
                        SILDeclRef setter,
                        ArrayRef<Substitution> substitutions,
-                       RValue &&optionalThisValue,
+                       RValue &&optionalSelfValue,
                        RValue &&optionalSubscripts,
                        RValue &&value);
 
@@ -660,7 +660,7 @@ public:
   ManagedValue emitLoadOfLValue(SILLocation loc, const LValue &src,
                                 SGFContext C);
   ManagedValue emitMethodRef(SILLocation loc,
-                             SILValue thisValue,
+                             SILValue selfValue,
                              SILDeclRef methodConstant,
                              ArrayRef<Substitution> innerSubstitutions);
   

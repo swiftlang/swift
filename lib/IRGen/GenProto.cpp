@@ -249,7 +249,7 @@ namespace {
     
     void visitAssociatedType(AssociatedTypeDecl *ty) {
       // Don't need to do anything for the implicit "Self" type.
-      if (ty->isThis())
+      if (ty->isSelf())
         return;
       
       asDerived().addAssociatedType(ty);
@@ -2254,7 +2254,7 @@ namespace {
     ArrayRef<Substitution> Substitutions;
 
     /// The first argument involves a lvalue-to-rvalue conversion.
-    bool HasAbstractedThis;
+    bool HasAbstractedSelf;
 
     /// The function involves any difference in abstraction.
     bool HasAbstraction;
@@ -2296,7 +2296,7 @@ namespace {
       // but if it is, we don't need to compute difference by abstraction.
       if (isa<LValueType>(CanType(sigFnTy->getInput())) &&
           !isa<LValueType>(CanType(implFnTy->getInput()))) {
-        HasAbstractedThis = true;
+        HasAbstractedSelf = true;
         HasAbstraction = true;
         return;
       }
@@ -2306,7 +2306,7 @@ namespace {
       // because we're emitting the witness table for the bound generic
       // type rather than the unbound.  It's definitely not the right
       // thing to do in general.
-      HasAbstractedThis = false;
+      HasAbstractedSelf = false;
       HasAbstraction =
         isa<PolymorphicFunctionType>(implFnTy) || // HACK
         differsByAbstractionAsFunction(IGM, sigFnTy, implFnTy,
@@ -2377,22 +2377,22 @@ namespace {
     };
 
     /// Bind the metatype for 'Self' in this witness.
-    void bindThisArchetype(IRGenFunction &IGF, llvm::Value *metadata) {
+    void bindSelfArchetype(IRGenFunction &IGF, llvm::Value *metadata) {
       // Set a name for the metadata value.
       metadata->setName("Self");
 
-      // Find the This archetype.
-      auto thisTy = SignatureTy;
-      thisTy = stripLabel(CanType(cast<AnyFunctionType>(thisTy)->getInput()));
-      if (auto lvalueTy = dyn_cast<LValueType>(thisTy)) {
-        thisTy = CanType(lvalueTy->getObjectType());
-      } else if (auto metaTy = dyn_cast<MetaTypeType>(thisTy)) {
-        thisTy = CanType(metaTy->getInstanceType());
+      // Find the Self archetype.
+      auto selfTy = SignatureTy;
+      selfTy = stripLabel(CanType(cast<AnyFunctionType>(selfTy)->getInput()));
+      if (auto lvalueTy = dyn_cast<LValueType>(selfTy)) {
+        selfTy = CanType(lvalueTy->getObjectType());
+      } else if (auto metaTy = dyn_cast<MetaTypeType>(selfTy)) {
+        selfTy = CanType(metaTy->getInstanceType());
       } else {
-        assert(thisTy->hasReferenceSemantics() &&
-               "non-class archetype This passed by value?");
+        assert(selfTy->hasReferenceSemantics() &&
+               "non-class archetype Self passed by value?");
       }
-      auto archetype = cast<ArchetypeType>(thisTy);
+      auto archetype = cast<ArchetypeType>(selfTy);
 
       // Set the metadata pointer.
       setMetadataRef(IGF, archetype, metadata);
@@ -2417,10 +2417,10 @@ namespace {
       Explosion sigParams = IGF.collectParameters();
 
       // For opaque archetypes, the data parameter is a metatype; bind it as
-      // the This archetype.
+      // the Self archetype.
       if (NeedsExtraMetatype) {
         llvm::Value *metatype = sigParams.takeLast();
-        bindThisArchetype(IGF, metatype);
+        bindSelfArchetype(IGF, metatype);
       }
 
       // Peel off the result address if necessary.
@@ -2467,28 +2467,28 @@ namespace {
       CanType sigInputTypeForImpl = sigInputType;
       
       // We need some special treatment for 'self'.
-      if (HasAbstractedThis) {
+      if (HasAbstractedSelf) {
         auto sigTupleType = cast<TupleType>(sigInputType);
         
-        CanType implThisType
+        CanType implSelfType
           = CanType(cast<TupleType>(implInputType)->getFields().back().getType());
-        CanType sigThisType
+        CanType sigSelfType
           = CanType(sigTupleType->getFields().back().getType());
         
-        assert(isa<ClassType>(implThisType));
-        assert(isa<LValueType>(sigThisType));
+        assert(isa<ClassType>(implSelfType));
+        assert(isa<LValueType>(sigSelfType));
 
-        CanType sigThisTypeForImpl =
-          CanType(cast<LValueType>(sigThisType)->getObjectType());
-        assert(isa<ArchetypeType>(sigThisTypeForImpl));
+        CanType sigSelfTypeForImpl =
+          CanType(cast<LValueType>(sigSelfType)->getObjectType());
+        assert(isa<ArchetypeType>(sigSelfTypeForImpl));
 
-        auto &remappedThisTI = IGF.getTypeInfo(implThisType);
+        auto &remappedSelfTI = IGF.getTypeInfo(implSelfType);
 
         // It's an l-value, so the final value is the address.  Cast to T*.
-        auto sigThisValue = sigClause.takeLast();
-        auto implPtrTy = remappedThisTI.getStorageType()->getPointerTo();
-        sigThisValue = IGF.Builder.CreateBitCast(sigThisValue, implPtrTy);
-        auto sigThis = remappedThisTI.getAddressForPointer(sigThisValue);
+        auto sigSelfValue = sigClause.takeLast();
+        auto implPtrTy = remappedSelfTI.getStorageType()->getPointerTo();
+        sigSelfValue = IGF.Builder.CreateBitCast(sigSelfValue, implPtrTy);
+        auto sigSelf = remappedSelfTI.getAddressForPointer(sigSelfValue);
 
         Explosion sigClauseForImpl(ExplosionLevel);
         sigClause.transferInto(sigClauseForImpl, sigClause.size());
@@ -2496,7 +2496,7 @@ namespace {
         // Load.  In theory this might require
         // remapping, but in practice the constraints (which we
         // assert just above) don't permit that.
-        cast<LoadableTypeInfo>(remappedThisTI).loadAsCopy(IGF, sigThis,
+        cast<LoadableTypeInfo>(remappedSelfTI).loadAsCopy(IGF, sigSelf,
                                                           sigClauseForImpl);
         sigClause = std::move(sigClauseForImpl);
         
@@ -2505,7 +2505,7 @@ namespace {
         std::copy(sigTupleType->getFields().begin(),
                   sigTupleType->getFields().end() - 1,
                   std::back_inserter(sigInputFieldsForImpl));
-        sigInputFieldsForImpl.push_back(TupleTypeElt(implThisType));
+        sigInputFieldsForImpl.push_back(TupleTypeElt(implSelfType));
         sigInputTypeForImpl = TupleType::get(sigInputFieldsForImpl,
                                              sigInputType->getASTContext())
           ->getCanonicalType();

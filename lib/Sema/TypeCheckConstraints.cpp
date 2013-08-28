@@ -675,10 +675,10 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto type = func->getType()->castTo<FunctionType>()->getResult();
 
     // Find the archetype for 'Self'. We'll be opening it.
-    auto thisArchetype
-      = proto->getThis()->getDeclaredType()->castTo<ArchetypeType>();
+    auto selfArchetype
+      = proto->getSelf()->getDeclaredType()->castTo<ArchetypeType>();
     llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
-    type = adjustLValueForReference(openType(type, { &thisArchetype, 1 },
+    type = adjustLValueForReference(openType(type, { &selfArchetype, 1 },
                                              replacements),
                                     func->getAttrs().isAssignment(),
                                     TC.Context);
@@ -688,7 +688,7 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // FIXME: We may eventually want to loosen this constraint, to allow us
     // to find operator functions both in classes and in protocols to which
     // a class conforms (if there's a default implementation).
-    addArchetypeConstraint(replacements[thisArchetype]);
+    addArchetypeConstraint(replacements[selfArchetype]);
     
     return type;
   }
@@ -841,11 +841,11 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     // For a member of an archetype, substitute the base type for the 'Self'
     // type.
     if (baseObjTy->is<ArchetypeType>()) {
-      auto thisArchetype = ownerProtoTy->getDecl()->getThis()->getDeclaredType()
+      auto selfArchetype = ownerProtoTy->getDecl()->getSelf()->getDeclaredType()
                              ->castTo<ArchetypeType>();
 
       llvm::DenseMap<ArchetypeType *, Type> mappedTypes;
-      mappedTypes[thisArchetype] = baseObjTy;
+      mappedTypes[selfArchetype] = baseObjTy;
       type = TC.transformType(type,
                [&](Type type) -> Type {
                  if (auto archetype = type->getAs<ArchetypeType>()) {

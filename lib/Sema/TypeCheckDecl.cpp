@@ -1050,36 +1050,36 @@ public:
     }
 
     // Fix the 'Self' associated type.
-    AssociatedTypeDecl *thisDecl = nullptr;
+    AssociatedTypeDecl *selfDecl = nullptr;
     for (auto Member : PD->getMembers()) {
       if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
         checkInheritanceClause(TC, AssocType);
 
-        if (AssocType->isThis()) {
-          thisDecl = AssocType;
+        if (AssocType->isSelf()) {
+          selfDecl = AssocType;
           break;
         }
       }
     }
-    assert(thisDecl && "no This decl?");
+    assert(selfDecl && "no This decl?");
 
     // Build archetypes for this protocol.
     ArchetypeBuilder builder = createArchetypeBuilder();
-    builder.addGenericParameter(thisDecl, 0);
-    builder.addImplicitConformance(thisDecl, PD);
+    builder.addGenericParameter(selfDecl, 0);
+    builder.addImplicitConformance(selfDecl, PD);
     builder.assignArchetypes();
 
     // Set the underlying type of each of the associated types to the
     // appropriate archetype.
-    ArchetypeType *thisArchetype = builder.getArchetype(thisDecl);
+    ArchetypeType *selfArchetype = builder.getArchetype(selfDecl);
     for (auto member : PD->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         TypeLoc underlyingTy;
-        if (assocType == thisDecl)
-          assocType->setArchetype(thisArchetype);
+        if (assocType == selfDecl)
+          assocType->setArchetype(selfArchetype);
         else
           assocType->setArchetype(
-            thisArchetype->getNestedType(assocType->getName()));
+            selfArchetype->getNestedType(assocType->getName()));
       }
     }
 
@@ -1185,7 +1185,7 @@ public:
     GenericParamList *genericParams = nullptr;
     GenericParamList *outerGenericParams = nullptr;
     if (FuncDecl *FD = FE->getDecl()) {
-      isInstanceFunc = (bool)FD->computeThisType(&outerGenericParams);
+      isInstanceFunc = (bool)FD->computeSelfType(&outerGenericParams);
       genericParams = FD->getGenericParams();
     }
 
@@ -1316,16 +1316,16 @@ public:
 
     // Before anything else, set up the 'self' argument correctly.
     GenericParamList *outerGenericParams = nullptr;
-    if (Type thisType = FD->computeThisType(&outerGenericParams)) {
-      FD->getImplicitThisDecl()->setType(thisType);
+    if (Type selfType = FD->computeSelfType(&outerGenericParams)) {
+      FD->getImplicitSelfDecl()->setType(selfType);
 
-      TypedPattern *thisPattern =
+      TypedPattern *selfPattern =
         cast<TypedPattern>(body->getArgParamPatterns()[0]);
-      if (thisPattern->hasType()) {
-        assert(thisPattern->getType().getPointer() == thisType.getPointer());
+      if (selfPattern->hasType()) {
+        assert(selfPattern->getType().getPointer() == selfType.getPointer());
       } else {
-        thisPattern->setType(thisType);
-        cast<NamedPattern>(thisPattern->getSubPattern())->setType(thisType);
+        selfPattern->setType(selfType);
+        cast<NamedPattern>(selfPattern->getSubPattern())->setType(selfType);
       }
     }
 
@@ -1531,9 +1531,9 @@ public:
            && "Decl parsing must prevent constructors outside of types!");
 
     GenericParamList *outerGenericParams = nullptr;
-    Type ThisTy = CD->computeThisType(&outerGenericParams);
-    TC.validateTypeSimple(ThisTy);
-    CD->getImplicitThisDecl()->setType(ThisTy);
+    Type SelfTy = CD->computeSelfType(&outerGenericParams);
+    TC.validateTypeSimple(SelfTy);
+    CD->getImplicitSelfDecl()->setType(SelfTy);
 
     Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
@@ -1574,20 +1574,20 @@ public:
       if (GenericParamList *innerGenericParams = CD->getGenericParams()) {
         innerGenericParams->setOuterParameters(outerGenericParams);
         FnTy = PolymorphicFunctionType::get(CD->getArguments()->getType(),
-                                            ThisTy, innerGenericParams,
+                                            SelfTy, innerGenericParams,
                                             TC.Context);
       } else
         FnTy = FunctionType::get(CD->getArguments()->getType(),
-                                 ThisTy, TC.Context);
-      Type ThisMetaTy = MetaTypeType::get(ThisTy, TC.Context);
+                                 SelfTy, TC.Context);
+      Type SelfMetaTy = MetaTypeType::get(SelfTy, TC.Context);
       if (outerGenericParams) {
-        AllocFnTy = PolymorphicFunctionType::get(ThisMetaTy, FnTy,
+        AllocFnTy = PolymorphicFunctionType::get(SelfMetaTy, FnTy,
                                                 outerGenericParams, TC.Context);
-        InitFnTy = PolymorphicFunctionType::get(ThisTy, FnTy,
+        InitFnTy = PolymorphicFunctionType::get(SelfTy, FnTy,
                                                 outerGenericParams, TC.Context);
       } else {
-        AllocFnTy = FunctionType::get(ThisMetaTy, FnTy, TC.Context);
-        InitFnTy = FunctionType::get(ThisTy, FnTy, TC.Context);
+        AllocFnTy = FunctionType::get(SelfMetaTy, FnTy, TC.Context);
+        InitFnTy = FunctionType::get(SelfTy, FnTy, TC.Context);
       }
       CD->setType(AllocFnTy);
       CD->setInitializerType(InitFnTy);
@@ -1610,19 +1610,19 @@ public:
            && "Decl parsing must prevent destructors outside of types!");
 
     GenericParamList *outerGenericParams = nullptr;
-    Type ThisTy = DD->computeThisType(&outerGenericParams);
-    TC.validateTypeSimple(ThisTy);
+    Type SelfTy = DD->computeSelfType(&outerGenericParams);
+    TC.validateTypeSimple(SelfTy);
     Type FnTy;
     if (outerGenericParams)
-      FnTy = PolymorphicFunctionType::get(ThisTy,
+      FnTy = PolymorphicFunctionType::get(SelfTy,
                                           TupleType::getEmpty(TC.Context),
                                           outerGenericParams, TC.Context);
     else
-      FnTy = FunctionType::get(ThisTy, TupleType::getEmpty(TC.Context),
+      FnTy = FunctionType::get(SelfTy, TupleType::getEmpty(TC.Context),
                                TC.Context);
 
     DD->setType(FnTy);
-    DD->getImplicitThisDecl()->setType(ThisTy);
+    DD->getImplicitSelfDecl()->setType(SelfTy);
 
     validateAttributes(DD);
   }
@@ -1718,14 +1718,14 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
 
   // Crate the onstructor.
   auto constructorID = context.getIdentifier("constructor");
-  VarDecl *thisDecl
+  VarDecl *selfDecl
     = new (context) VarDecl(SourceLoc(),
                             context.getIdentifier("self"),
                             Type(), structDecl);
   ConstructorDecl *ctor
     = new (context) ConstructorDecl(constructorID, structDecl->getLoc(),
-                                    nullptr, thisDecl, nullptr, structDecl);
-  thisDecl->setDeclContext(ctor);
+                                    nullptr, selfDecl, nullptr, structDecl);
+  selfDecl->setDeclContext(ctor);
   for (auto var : allArgs) {
     var->setDeclContext(ctor);
   }

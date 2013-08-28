@@ -1453,7 +1453,7 @@ class ProjectExistentialInst
   : public UnaryInstructionBase<ValueKind::ProjectExistentialInst>
 {
 public:
-  ProjectExistentialInst(SILLocation Loc, SILValue Operand, SILType ThisTy);
+  ProjectExistentialInst(SILLocation Loc, SILValue Operand, SILType SelfTy);
 };
   
 /// ProjectExistentialRefInst - Given a class existential, returns an

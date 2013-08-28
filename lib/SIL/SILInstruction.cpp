@@ -520,8 +520,8 @@ ModuleInst::ModuleInst(SILLocation Loc, SILType ModuleType)
 
 ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc,
                                                SILValue Operand,
-                                               SILType ThisTy)
-  : UnaryInstructionBase(Loc, Operand, ThisTy)
+                                               SILType SelfTy)
+  : UnaryInstructionBase(Loc, Operand, SelfTy)
 {}
 
 ProjectExistentialRefInst::ProjectExistentialRefInst(SILLocation Loc,

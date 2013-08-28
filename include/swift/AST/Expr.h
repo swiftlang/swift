@@ -373,14 +373,14 @@ public:
 /// A reference to 'super'. References to members of 'super' resolve to members
 /// of a superclass of 'self'.
 class SuperRefExpr : public Expr {
-  ValueDecl *This;
+  ValueDecl *Self;
   SourceLoc Loc;
   
 public:
-  SuperRefExpr(ValueDecl *This, SourceLoc Loc, Type SuperTy = Type())
-    : Expr(ExprKind::SuperRef, SuperTy), This(This), Loc(Loc) {}
+  SuperRefExpr(ValueDecl *Self, SourceLoc Loc, Type SuperTy = Type())
+    : Expr(ExprKind::SuperRef, SuperTy), Self(Self), Loc(Loc) {}
   
-  ValueDecl *getThis() const { return This; }
+  ValueDecl *getSelf() const { return Self; }
   
   SourceLoc getSuperLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
@@ -1795,10 +1795,10 @@ public:
     return NumPatterns;
   }
   
-  /// getImplicitThisDecl - If this FuncExpr is a non-static method in an
-  /// extension context, it will have a 'self' argument.  This method returns it
-  /// if present, or returns null if not.
-  VarDecl *getImplicitThisDecl() const;
+  /// \brief If this FuncExpr is a non-static method in an extension context,
+  /// it will have a 'self' argument.  This method returns it if present, or
+  /// returns null if not.
+  VarDecl *getImplicitSelfDecl() const;
   
   FuncDecl *getDecl() const { return TheFuncDecl; }
   void setDecl(FuncDecl *f) { TheFuncDecl = f; }
@@ -2574,14 +2574,14 @@ public:
 /// initializing 'self' in-place before the delegator's logic executes.
 class RebindThisInConstructorExpr : public Expr {
   Expr *SubExpr;
-  ValueDecl *This;
+  ValueDecl *Self;
 public:
-  RebindThisInConstructorExpr(Expr *SubExpr, ValueDecl *This);
+  RebindThisInConstructorExpr(Expr *SubExpr, ValueDecl *Self);
   
   SourceLoc getLoc() const { return SubExpr->getLoc(); }
   SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
   
-  ValueDecl *getThis() const { return This; }
+  ValueDecl *getSelf() const { return Self; }
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *Sub) { SubExpr = Sub; }
   

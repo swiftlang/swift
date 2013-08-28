@@ -819,23 +819,23 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID parentID;
     bool isImplicit, isObjC;
     TypeID signatureID;
-    DeclID implicitThisID;
+    DeclID implicitSelfID;
 
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
                                                isObjC, signatureID,
-                                               implicitThisID);
+                                               implicitSelfID);
     auto parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
       break;
 
-    auto thisDecl = cast<VarDecl>(getDecl(implicitThisID, nullptr));
+    auto selfDecl = cast<VarDecl>(getDecl(implicitSelfID, nullptr));
     auto genericParams = maybeReadGenericParams(parent);
 
     auto ctor = new (ctx) ConstructorDecl(ctx.getIdentifier("constructor"),
                                           SourceLoc(), /*args=*/nullptr,
-                                          thisDecl, genericParams, parent);
+                                          selfDecl, genericParams, parent);
     declOrOffset = ctor;
-    thisDecl->setDeclContext(ctor);
+    selfDecl->setDeclContext(ctor);
 
     Pattern *args = maybeReadPattern();
     assert(args && "missing arguments for constructor");
@@ -1320,22 +1320,22 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID parentID;
     bool isImplicit, isObjC;
     TypeID signatureID;
-    DeclID implicitThisID;
+    DeclID implicitSelfID;
 
     decls_block::DestructorLayout::readRecord(scratch, parentID, isImplicit,
                                               isObjC, signatureID,
-                                              implicitThisID);
+                                              implicitSelfID);
 
     DeclContext *parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
       break;
 
-    auto thisDecl = cast<VarDecl>(getDecl(implicitThisID, nullptr));
+    auto selfDecl = cast<VarDecl>(getDecl(implicitSelfID, nullptr));
 
     auto dtor = new (ctx) DestructorDecl(ctx.getIdentifier("destructor"),
-                                         SourceLoc(), thisDecl, parent);
+                                         SourceLoc(), selfDecl, parent);
     declOrOffset = dtor;
-    thisDecl->setDeclContext(dtor);
+    selfDecl->setDeclContext(dtor);
 
     dtor->setType(getType(signatureID));
     if (isImplicit)

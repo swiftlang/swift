@@ -654,15 +654,15 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
 
 namespace {
   class CleanupDestructorThis : public Cleanup {
-    VarDecl *thisDecl;
+    VarDecl *selfDecl;
   public:
-    CleanupDestructorThis(VarDecl *thisDecl) : thisDecl(thisDecl) {
+    CleanupDestructorThis(VarDecl *selfDecl) : selfDecl(selfDecl) {
     }
     
     void emit(SILGenFunction &gen) override {
       // 'self' is passed in at +0 (and will be deallocated when we return),
       // so don't release the value, only deallocate the variable.
-      gen.deallocateUninitializedLocalVariable(thisDecl);
+      gen.deallocateUninitializedLocalVariable(selfDecl);
     }
   };
 } // end anonymous namespace
@@ -670,24 +670,24 @@ namespace {
 SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
                                               DestructorDecl *DD) {
   // Emit the implicit 'self' argument.
-  VarDecl *thisDecl = DD ? DD->getImplicitThisDecl() : nullptr;
-  assert((!thisDecl || thisDecl->getType()->hasReferenceSemantics()) &&
+  VarDecl *selfDecl = DD ? DD->getImplicitSelfDecl() : nullptr;
+  assert((!selfDecl || selfDecl->getType()->hasReferenceSemantics()) &&
          "destructor's implicit this is a value type?!");
 
-  SILType thisType = getLoweredLoadableType(CD->getDeclaredTypeInContext());
-  assert((!thisDecl || getLoweredLoadableType(thisDecl->getType()) == thisType)
+  SILType selfType = getLoweredLoadableType(CD->getDeclaredTypeInContext());
+  assert((!selfDecl || getLoweredLoadableType(selfDecl->getType()) == selfType)
          && "decl type doesn't match destructor's implicit this type");
   
-  SILValue thisValue = new (SGM.M) SILArgument(thisType, F.begin());
+  SILValue selfValue = new (SGM.M) SILArgument(selfType, F.begin());
   
   if (DD) {
     // Make a local variable for 'self'.
-    emitLocalVariable(thisDecl);
-    SILValue thisAddr = VarLocs[thisDecl].address;
-    B.createStore(DD, thisValue, thisAddr);
-    Cleanups.pushCleanup<CleanupDestructorThis>(thisDecl);
+    emitLocalVariable(selfDecl);
+    SILValue selfAddr = VarLocs[selfDecl].address;
+    B.createStore(DD, selfValue, selfAddr);
+    Cleanups.pushCleanup<CleanupDestructorThis>(selfDecl);
   }
-  return thisValue;
+  return selfValue;
 }
 
 void SILGenFunction::prepareEpilog(Type resultType) {
@@ -1080,7 +1080,7 @@ static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
   auto ownership = OwnershipConventions::get(gen, thunk, objcTy);
   ArrayRef<SILType> inputs
     = objcInfo->getInputTypesWithoutIndirectReturnType();
-  ManagedValue thisArg = ManagedValue();
+  ManagedValue selfArg = ManagedValue();
   assert(!inputs.empty());
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILValue arg = new(gen.F.getModule()) SILArgument(inputs[i], gen.F.begin());
@@ -1094,12 +1094,12 @@ static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
 
     // Re-order 'self' to the end.
     if (i == 0) {
-      thisArg = managedArg;
+      selfArg = managedArg;
     } else {
       bridgedArgs.push_back(managedArg);
     }
   }
-  bridgedArgs.push_back(thisArg);
+  bridgedArgs.push_back(selfArg);
 
   assert(bridgedArgs.size() == objcInfo->getInputTypes().size() &&
          "objc inputs don't match number of arguments?!");
@@ -1160,19 +1160,19 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
   // If the native property is physical, load it.
   SILFunctionTypeInfo *info
     = SGM.getConstantType(getter).getFunctionTypeInfo(SGM.M);
-  SILValue indirectReturn, thisValue;
+  SILValue indirectReturn, selfValue;
   if (info->hasIndirectReturn()) {
     assert(args.size() == 2 && "wrong number of arguments for getter");
     indirectReturn = args[0];
-    thisValue = args[1];
+    selfValue = args[1];
   } else {
     assert(args.size() == 1 && "wrong number of arguments for getter");
-    thisValue = args[0];
+    selfValue = args[0];
   }
 
   auto &fieldLowering = getTypeLowering(var->getType());
 
-  SILValue addr = B.createRefElementAddr(loc, thisValue, var,
+  SILValue addr = B.createRefElementAddr(loc, selfValue, var,
                              fieldLowering.getLoweredType().getAddressType());
   if (indirectReturn) {
     assert(ownership.getReturn() == OwnershipConventions::Return::Unretained
@@ -1182,7 +1182,7 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
     // transferring ownership in aggregates.
     fieldLowering.emitSemanticLoadInto(B, loc, addr, indirectReturn,
                                        IsNotTake, IsInitialization);
-    B.createStrongRelease(loc, thisValue);
+    B.createStrongRelease(loc, selfValue);
     B.createReturn(loc, emitEmptyTuple(var));
     return;
   }
@@ -1191,7 +1191,7 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
   SILValue result = fieldLowering.emitSemanticLoad(B, loc, addr, IsNotTake);
 
   // FIXME: This should have artificial location.
-  B.createStrongRelease(loc, thisValue);
+  B.createStrongRelease(loc, selfValue);
   return emitObjCReturnValue(*this, loc, result, objcResultTy,
                              ownership);
 }
@@ -1216,16 +1216,16 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
   }
 
   assert(args.size() == 2 && "wrong number of args for setter");
-  SILValue thisValue = args[1];
+  SILValue selfValue = args[1];
   SILValue setValue = args[0];
   
   // If the native property is physical, store to it.
   auto &varTI = getTypeLowering(var->getType());
-  SILValue addr = B.createRefElementAddr(loc, thisValue, var,
+  SILValue addr = B.createRefElementAddr(loc, selfValue, var,
                                  varTI.getLoweredType().getAddressType());
   varTI.emitSemanticAssignment(B, loc, setValue, addr);
   
   // FIXME: This should have artificial location.
-  B.createStrongRelease(loc, thisValue);
+  B.createStrongRelease(loc, selfValue);
   B.createReturn(loc, emitEmptyTuple(loc));
 }

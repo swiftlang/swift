@@ -248,7 +248,7 @@ namespace {
     Type visitSuperRefExpr(SuperRefExpr *E) {
       if (!E->getType()) {
         // Resolve the super type of 'self'.
-        Type superTy = getSuperType(E->getThis(), E->getLoc(),
+        Type superTy = getSuperType(E->getSelf(), E->getLoc(),
                                     diag::super_not_in_class_method,
                                     diag::super_with_no_base_class);
         if (!superTy)
@@ -259,7 +259,7 @@ namespace {
                                   CS.getASTContext());
         
         return adjustLValueForReference(superTy,
-                                        E->getThis()->getAttrs().isAssignment(),
+                                        E->getSelf()->getAttrs().isAssignment(),
                                         CS.getASTContext());
       }
       
@@ -882,11 +882,11 @@ namespace {
       return outputTy;
     }
 
-    Type getSuperType(ValueDecl *thisDecl,
+    Type getSuperType(ValueDecl *selfDecl,
                       SourceLoc diagLoc,
                       Diag<> diag_not_in_class,
                       Diag<> diag_no_base_class) {
-      DeclContext *typeContext = thisDecl->getDeclContext()->getParent();
+      DeclContext *typeContext = selfDecl->getDeclContext()->getParent();
       assert(typeContext && "constructor without parent context?!");
       auto &tc = CS.getTypeChecker();
       const ClassType *classType
@@ -902,7 +902,7 @@ namespace {
       }
 
       Type superclassTy = classDecl->getSuperclass();
-      if (thisDecl->getType()->is<MetaTypeType>())
+      if (selfDecl->getType()->is<MetaTypeType>())
         superclassTy = MetaTypeType::get(superclassTy, CS.getASTContext());
       return superclassTy;
     }
@@ -910,7 +910,7 @@ namespace {
     Type visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *expr) {
       // The subexpression must be a supertype of 'self' type.
       CS.addConstraint(ConstraintKind::Subtype,
-                       expr->getThis()->getType(),
+                       expr->getSelf()->getType(),
                        expr->getSubExpr()->getType());
       // The result is void.
       return TupleType::getEmpty(CS.getASTContext());

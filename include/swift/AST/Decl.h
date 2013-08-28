@@ -1350,7 +1350,7 @@ public:
                      SourceLoc nameLoc);
 
   /// Determine whether this is the implicitly-created 'Self'.
-  bool isThis() const { return isImplicit(); }
+  bool isSelf() const { return isImplicit(); }
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceLoc getLoc() const { return NameLoc; }
@@ -1740,7 +1740,7 @@ public:
   }
 
   /// \brief Retrieve the associated type 'Self'.
-  AssociatedTypeDecl *getThis() const;
+  AssociatedTypeDecl *getSelf() const;
 
   /// True if this protocol can only be conformed to by class types.
   bool requiresClass() {
@@ -1934,21 +1934,21 @@ public:
   /// return that type, otherwise return Type().
   Type getExtensionType() const;
   
-  /// computeThisType - If this is a method in a type extension for some type,
-  /// compute and return the type to be used for the 'self' argument of the
-  /// type (which varies based on whether the extended type is a reference type
+  /// \brief If this is a method in a type extension for some type, compute
+  /// and return the type to be used for the 'self' argument of the type
+  /// (which varies based on whether the extended type is a reference type
   /// or not), or an empty Type() if no 'self' argument should exist.  This can
   /// only be used after name binding has resolved types.
   ///
   /// \param OuterGenericParams If non-NULL, and this function is an instance
   /// of a generic type, will be set to the generic parameter list of that
   /// generic type.
-  Type computeThisType(GenericParamList **OuterGenericParams = nullptr) const;
+  Type computeSelfType(GenericParamList **OuterGenericParams = nullptr) const;
   
-  /// getImplicitThisDecl - If this FuncDecl is a non-static method in an
-  /// extension context, it will have a 'self' argument.  This method returns it
-  /// if present, or returns null if not.
-  VarDecl *getImplicitThisDecl() const;
+  /// \brief If this FuncDecl is a non-static method in an extension context,
+  /// it will have a 'self' argument.  This method returns it if present, or
+  /// returns null if not.
+  VarDecl *getImplicitSelfDecl() const;
   
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
@@ -2216,7 +2216,7 @@ class ConstructorDecl : public ValueDecl, public DeclContext {
   SourceLoc ConstructorLoc;
   Pattern *Arguments;
   BraceStmt *Body;
-  VarDecl *ImplicitThisDecl;
+  VarDecl *ImplicitSelfDecl;
   GenericParamList *GenericParams;
   
   /// The type of the initializing constructor.
@@ -2224,16 +2224,16 @@ class ConstructorDecl : public ValueDecl, public DeclContext {
 
   /// \brief When non-null, the expression that should be used to
   /// allocate 'self'.
-  Expr *AllocThis = nullptr;
+  Expr *AllocSelf = nullptr;
   
 public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
-                  Pattern *Arguments, VarDecl *ImplicitThisDecl,
+                  Pattern *Arguments, VarDecl *ImplicitSelfDecl,
                   GenericParamList *GenericParams, DeclContext *Parent)
     : ValueDecl(DeclKind::Constructor, Parent, NameHack, Type()),
       DeclContext(DeclContextKind::ConstructorDecl, Parent),
       ConstructorLoc(ConstructorLoc), Arguments(Arguments), Body(nullptr),
-      ImplicitThisDecl(ImplicitThisDecl), GenericParams(GenericParams) {}
+      ImplicitSelfDecl(ImplicitSelfDecl), GenericParams(GenericParams) {}
   
   SourceLoc getStartLoc() const { return ConstructorLoc; }
   SourceLoc getLoc() const;
@@ -2249,8 +2249,8 @@ public:
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *b) { Body = b; }
 
-  /// computeThisType - compute and return the type of 'self'.
-  Type computeThisType(GenericParamList **OuterGenericParams = nullptr) const;
+  /// \brief Compute and return the type of 'self'.
+  Type computeSelfType(GenericParamList **OuterGenericParams = nullptr) const;
 
   /// getArgumentType - get the type of the argument tuple
   Type getArgumentType() const;
@@ -2258,8 +2258,8 @@ public:
   /// \brief Get the type of the constructed object.
   Type getResultType() const;
 
-  /// getImplicitThisDecl - This method returns the implicit 'self' decl.
-  VarDecl *getImplicitThisDecl() const { return ImplicitThisDecl; }
+  /// \brief This method returns the implicit 'self' decl.
+  VarDecl *getImplicitSelfDecl() const { return ImplicitSelfDecl; }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
   bool isGeneric() const { return GenericParams != nullptr; }
@@ -2268,12 +2268,12 @@ public:
   /// 'self', or null if 'self' should be allocated via the normal path.
   ///
   /// There is no way to describe this expression in the Swift language.
-  /// However, the \c ClangImporter synthesizes this-allocation expressions
+  /// However, the \c ClangImporter synthesizes 'self'-allocation expressions
   /// for "constructors" of Objective-C classes (which call 'alloc').
-  Expr *getAllocThisExpr() const { return AllocThis; }
+  Expr *getAllocSelfExpr() const { return AllocSelf; }
 
-  /// \brief Set the expression used to allocate self.
-  void setAllocThisExpr(Expr *expr) { AllocThis = expr; }
+  /// \brief Set the expression used to allocate 'self'.
+  void setAllocSelfExpr(Expr *E) { AllocSelf = E; }
 
   /// Given that this is an Objective-C method declaration, produce
   /// its selector in the given buffer (as UTF-8).
@@ -2306,15 +2306,15 @@ public:
 class DestructorDecl : public ValueDecl, public DeclContext {
   SourceLoc DestructorLoc;
   BraceStmt *Body;
-  VarDecl *ImplicitThisDecl;
+  VarDecl *ImplicitSelfDecl;
   
 public:
   DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
-                  VarDecl *ImplicitThisDecl, DeclContext *Parent)
+                  VarDecl *ImplicitSelfDecl, DeclContext *Parent)
     : ValueDecl(DeclKind::Destructor, Parent, NameHack, Type()),
       DeclContext(DeclContextKind::DestructorDecl, Parent),
       DestructorLoc(DestructorLoc), Body(nullptr),
-      ImplicitThisDecl(ImplicitThisDecl) {}
+      ImplicitSelfDecl(ImplicitSelfDecl) {}
   
   SourceLoc getStartLoc() const { return DestructorLoc; }
   SourceLoc getLoc() const { return DestructorLoc; }
@@ -2323,11 +2323,11 @@ public:
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *b) { Body = b; }
 
-  /// computeThisType - compute and return the type of 'self'.
-  Type computeThisType(GenericParamList **OuterGenericParams = nullptr) const;
+  /// \brief Compute and return the type of 'self'.
+  Type computeSelfType(GenericParamList **OuterGenericParams = nullptr) const;
 
-  /// getImplicitThisDecl - This method returns the implicit 'self' decl.
-  VarDecl *getImplicitThisDecl() const { return ImplicitThisDecl; }
+  /// \brief This method returns the implicit 'self' decl.
+  VarDecl *getImplicitSelfDecl() const { return ImplicitSelfDecl; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Destructor;

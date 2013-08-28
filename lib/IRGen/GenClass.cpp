@@ -444,9 +444,9 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
   if (IGM.DebugInfo)
       IGM.DebugInfo->emitArtificialFunction(IGF, deallocator);
 
-  Type thisType = theClass->getDeclaredTypeInContext();
+  Type selfType = theClass->getDeclaredTypeInContext();
   const ClassTypeInfo &info =
-    IGM.getTypeInfo(thisType).as<ClassTypeInfo>();
+    IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
   
   llvm::Value *obj = deallocator->getArgumentList().begin();
   obj = IGF.Builder.CreateBitCast(obj, info.getStorageType());
@@ -461,12 +461,12 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
 }
 
 /// Emit an allocation of a class.
-llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType thisType) {
+llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType) {
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
-  auto &classTI = IGF.IGM.getTypeInfo(thisType).as<ClassTypeInfo>();
+  auto &classTI = IGF.IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
   auto &layout = classTI.getLayout(IGF.IGM);
 
-  llvm::Value *metadata = emitClassHeapMetadataRef(IGF, thisType);
+  llvm::Value *metadata = emitClassHeapMetadataRef(IGF, selfType);
   
   llvm::Value *size = layout.emitSize(IGF);
   llvm::Value *alignMask = layout.emitAlignMask(IGF);

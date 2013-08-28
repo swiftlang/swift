@@ -1518,9 +1518,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   // "(int)->int" on FooTy into "(this: [byref] FooTy.metatype)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
   if (HasContainerType) {
-    Pattern *thisPattern = buildImplicitSelfParameter();
-    ArgParams.push_back(thisPattern);
-    BodyParams.push_back(thisPattern);
+    Pattern *SelfPattern = buildImplicitSelfParameter();
+    ArgParams.push_back(SelfPattern);
+    BodyParams.push_back(SelfPattern);
   }
 
   bool HadSignatureParseError = false;
@@ -1538,9 +1538,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
       ArgParams.clear();
       BodyParams.clear();
       if (HasContainerType) {
-        Pattern *thisPattern = buildImplicitSelfParameter();
-        ArgParams.push_back(thisPattern);
-        BodyParams.push_back(thisPattern);
+        Pattern *SelfPattern = buildImplicitSelfParameter();
+        ArgParams.push_back(SelfPattern);
+        BodyParams.push_back(SelfPattern);
       }
       auto *VoidPattern =
           TuplePattern::create(Context, Tok.getLoc(), {}, Tok.getLoc());
@@ -2028,7 +2028,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
   }
 
   if (!hasConstructor) {
-    VarDecl *ThisDecl
+    VarDecl *SelfDecl
       = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
                               Type(), CD);
     Pattern *Arguments = TuplePattern::create(Context, SourceLoc(),
@@ -2036,10 +2036,10 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
                                               SourceLoc());
     ConstructorDecl *Constructor =
         new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
-                                     SourceLoc(), Arguments, ThisDecl,
+                                     SourceLoc(), Arguments, SelfDecl,
                                      nullptr, CD);
     Constructor->setImplicit();
-    ThisDecl->setDeclContext(Constructor);
+    SelfDecl->setDeclContext(Constructor);
     MemberDecls.push_back(Constructor);
   }
 
@@ -2354,22 +2354,22 @@ Parser::parseDeclConstructor(bool HasContainerType) {
     return nullptr;
   }
 
-  VarDecl *ThisDecl
+  VarDecl *SelfDecl
     = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
                             Type(), CurDeclContext);
 
   Scope S2(this, ScopeKind::ConstructorBody);
   ConstructorDecl *CD =
       new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
-                                    ConstructorLoc, Arguments.get(), ThisDecl,
+                                    ConstructorLoc, Arguments.get(), SelfDecl,
                                     GenericParams, CurDeclContext);
-  ThisDecl->setDeclContext(CD);
+  SelfDecl->setDeclContext(CD);
   if (GenericParams) {
     for (auto Param : *GenericParams)
       Param.setDeclContext(CD);
   }
   AddConstructorArgumentsToScope(Arguments.get(), CD, *this);
-  addToScope(ThisDecl);
+  addToScope(SelfDecl);
   ContextChange CC(*this, CD);
 
   ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
@@ -2396,16 +2396,16 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
     return nullptr;
   }
 
-  VarDecl *ThisDecl
+  VarDecl *SelfDecl
     = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
                             Type(), CurDeclContext);
 
   Scope S(this, ScopeKind::DestructorBody);
   DestructorDecl *DD =
       new (Context) DestructorDecl(Context.getIdentifier("destructor"),
-                                   DestructorLoc, ThisDecl, CurDeclContext);
-  ThisDecl->setDeclContext(DD);
-  addToScope(ThisDecl);
+                                   DestructorLoc, SelfDecl, CurDeclContext);
+  SelfDecl->setDeclContext(DD);
+  addToScope(SelfDecl);
   ContextChange CC(*this, DD);
 
   ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);

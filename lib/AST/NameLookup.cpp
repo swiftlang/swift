@@ -1,4 +1,3 @@
-
 //===--- NameLookup.cpp - Swift Name Lookup Routines ----------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -313,7 +312,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       FuncDecl *FD = FE->getDecl();
       if (FD && FD->getExtensionType()) {
         ExtendedType = FD->getExtensionType();
-        BaseDecl = FD->getImplicitThisDecl();
+        BaseDecl = FD->getImplicitSelfDecl();
         if (NominalType *NT = ExtendedType->getAs<NominalType>())
           MetaBaseDecl = NT->getDecl();
         else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
@@ -363,7 +362,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         }
       }
 
-      BaseDecl = CD->getImplicitThisDecl();
+      BaseDecl = CD->getImplicitSelfDecl();
       ExtendedType = CD->getDeclContext()->getDeclaredTypeOfContext();
       if (NominalType *NT = ExtendedType->getAs<NominalType>())
         MetaBaseDecl = NT->getDecl();
@@ -384,7 +383,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         }
       }
 
-      BaseDecl = DD->getImplicitThisDecl();
+      BaseDecl = DD->getImplicitSelfDecl();
       ExtendedType = DD->getDeclContext()->getDeclaredTypeOfContext();
       if (NominalType *NT = ExtendedType->getAs<NominalType>())
         MetaBaseDecl = NT->getDecl();

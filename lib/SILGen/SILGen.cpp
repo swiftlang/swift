@@ -353,7 +353,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   SILDeclRef constant(decl);
   SILFunction *f = preEmitFunction(constant, decl);
 
-  if (decl->getImplicitThisDecl()->getType()->getClassOrBoundGenericClass()) {
+  if (decl->getImplicitSelfDecl()->getType()->getClassOrBoundGenericClass()) {
     // Class constructors have separate entry points for allocation and
     // initialization.
     SILGenFunction(*this, *f)

@@ -618,9 +618,9 @@ bool TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
 /// structure as the pattern.
 ///
 /// \param tc The type checker.
-/// \param thisDecl The 'self' declaration.
+/// \param selfDecl The 'self' declaration.
 /// \param pattern The pattern.
-static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *thisDecl,
+static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *selfDecl,
                                         Pattern *pattern) {
   switch (pattern->getKind()) {
   case PatternKind::Any:
@@ -630,21 +630,21 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *thisDecl,
 
   case PatternKind::Named:
     return new (tc.Context) UnresolvedDotExpr(
-             tc.buildRefExpr(thisDecl, SourceLoc()),
+             tc.buildRefExpr(selfDecl, SourceLoc()),
              SourceLoc(), 
              cast<NamedPattern>(pattern)->getDecl()->getName(), 
              SourceLoc());
 
   case PatternKind::Paren:
     return createPatternMemberRefExpr(
-             tc, thisDecl,
+             tc, selfDecl,
              cast<ParenPattern>(pattern)->getSubPattern());
 
   case PatternKind::Tuple: {
     auto tuple = cast<TuplePattern>(pattern);
     SmallVector<Expr *, 4> elements;
     for (auto elt : tuple->getFields()) {
-      auto sub = createPatternMemberRefExpr(tc, thisDecl, elt.getPattern());
+      auto sub = createPatternMemberRefExpr(tc, selfDecl, elt.getPattern());
       if (!sub)
         return nullptr;
 
@@ -663,7 +663,7 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *thisDecl,
   case PatternKind::Typed:
     return createPatternMemberRefExpr(
              tc,
-             thisDecl,
+             selfDecl,
              cast<TypedPattern>(pattern)->getSubPattern());
       
 #define PATTERN(Id, Parent)
@@ -674,9 +674,9 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *thisDecl,
 }
 
 void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
-  if (auto allocThis = ctor->getAllocThisExpr()) {
+  if (auto allocThis = ctor->getAllocSelfExpr()) {
     if (!typeCheckExpression(allocThis, ctor, Type(), /*discardedExpr=*/false))
-      ctor->setAllocThisExpr(allocThis);
+      ctor->setAllocSelfExpr(allocThis);
   }
 
   // Check the default argument definitions.
@@ -760,7 +760,7 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
           // pattern.
           if (Expr *dest = createPatternMemberRefExpr(
                              *this,
-                             ctor->getImplicitThisDecl(),
+                             ctor->getImplicitSelfDecl(),
                              patternBind->getPattern())) {
             initializer = new (Context) DefaultValueExpr(initializer);
             Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
@@ -800,10 +800,10 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
           }
 
           // Create the assignment.
-          auto thisDecl = ctor->getImplicitThisDecl();
+          auto selfDecl = ctor->getImplicitSelfDecl();
           Expr *dest
             = new (Context) UnresolvedDotExpr(
-                new (Context) DeclRefExpr(thisDecl, SourceLoc()),
+                new (Context) DeclRefExpr(selfDecl, SourceLoc()),
                 SourceLoc(), 
                 var->getName(),
                 SourceLoc());

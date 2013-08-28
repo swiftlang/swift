@@ -261,11 +261,11 @@ namespace {
               // archetypes, we need to substitute 'self' through.
               if (baseTy->is<ArchetypeType>()) {
                 auto protocol = containerTy->castTo<ProtocolType>()->getDecl();
-                auto thisArchetype
-                  = protocol->getThis()->getDeclaredType()
+                auto selfArchetype
+                  = protocol->getSelf()->getDeclaredType()
                       ->castTo<ArchetypeType>();
                 TypeSubstitutionMap substitutions;
-                substitutions[thisArchetype] = baseTy;
+                substitutions[selfArchetype] = baseTy;
                 resultTy = tc.substType(resultTy, substitutions);
                 if (!resultTy)
                   return nullptr;
@@ -659,11 +659,11 @@ namespace {
       // find a place to cache the type variable, rather than searching for it
       // again.
       Type baseTy;
-      auto thisArchetype
-        = proto->getThis()->getDeclaredType()->castTo<ArchetypeType>();
+      auto selfArchetype
+        = proto->getSelf()->getDeclaredType()->castTo<ArchetypeType>();
       cs.getTypeChecker().transformType(openedType, [&](Type type) -> Type {
         if (auto typeVar = dyn_cast<TypeVariableType>(type.getPointer())) {
-          if (typeVar->getImpl().getArchetype() == thisArchetype) {
+          if (typeVar->getImpl().getArchetype() == selfArchetype) {
             baseTy = solution.getFixedType(typeVar);
             return nullptr;
           }

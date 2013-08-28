@@ -1400,14 +1400,14 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   // need to be wrapped in an objc_super struct, and the '_cmd' argument needs
   // to be passed alongside it.
   if (calleeLV.kind == LoweredValue::Kind::ObjCMethod) {
-    SILValue thisValue = i->getArguments()[0];
+    SILValue selfValue = i->getArguments()[0];
     llvm::Value *selfArg;
     // Convert a metatype 'self' argument to the ObjC Class pointer.
-    if (thisValue.getType().is<MetaTypeType>()) {
-      selfArg = getObjCClassForValue(*this, thisValue);
+    if (selfValue.getType().is<MetaTypeType>()) {
+      selfArg = getObjCClassForValue(*this, selfValue);
     } else {
-      Explosion selfExplosion(getExplosionKind(thisValue));
-      getLoweredExplosion(thisValue, selfExplosion);
+      Explosion selfExplosion(getExplosionKind(selfValue));
+      getLoweredExplosion(selfValue, selfExplosion);
       selfArg = selfExplosion.claimNext();
     }
 

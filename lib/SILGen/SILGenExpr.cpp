@@ -319,7 +319,7 @@ RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
 RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
   if (E->getType()->is<LValueType>())
     return SGF.emitLValueAsRValue(E);
-  return RValue(SGF, SGF.emitReferenceToDecl(E, E->getThis(), E->getType(), 0));
+  return RValue(SGF, SGF.emitReferenceToDecl(E, E->getSelf(), E->getType(), 0));
 }
 
 RValue RValueEmitter::visitOtherConstructorDeclRefExpr(
@@ -774,7 +774,7 @@ RValue RValueEmitter::visitAddressOfExpr(AddressOfExpr *E,
 }
 
 ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
-                                           SILValue thisValue,
+                                           SILValue selfValue,
                                            SILDeclRef methodConstant,
                                            ArrayRef<Substitution> innerSubs) {
   // FIXME: Emit dynamic dispatch instruction (class_method, super_method, etc.)
@@ -805,12 +805,12 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
   auto Info = FunctionType::ExtInfo()
                 .withCallingConv(methodType.getAbstractCC())
                 .withIsThin(true);
-  Type outerMethodTy = FunctionType::get(thisValue.getType().getSwiftType(),
+  Type outerMethodTy = FunctionType::get(selfValue.getType().getSwiftType(),
                                          innerMethodTy,
                                          Info,
                                          F.getASTContext());
 
-  if (BoundGenericType *bgt = thisValue.getType().getAs<BoundGenericType>())
+  if (BoundGenericType *bgt = selfValue.getType().getAs<BoundGenericType>())
     outerSubs = bgt->getSubstitutions();
   
   if (!innerSubs.empty() || !outerSubs.empty()) {
@@ -1462,7 +1462,7 @@ void SILGenFunction::emitEpilog(SILLocation TopLevel, bool AutoGen) {
 }
 
 void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
-  SILValue thisValue = emitDestructorProlog(cd, dd);
+  SILValue selfValue = emitDestructorProlog(cd, dd);
 
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
@@ -1488,7 +1488,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
         continue;
       const TypeLowering &ti = getTypeLowering(vd->getType());
       if (!ti.isTrivial()) {
-        SILValue addr = B.createRefElementAddr(dd, thisValue, vd,
+        SILValue addr = B.createRefElementAddr(dd, selfValue, vd,
                                           ti.getLoweredType().getAddressType());
         B.createDestroyAddr(dd, addr);
       }
@@ -1503,24 +1503,24 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     // FIXME: We can't sensibly call up to ObjC dealloc methods right now
     // because they aren't really destroying destructors.
     if (superclass->hasClangNode() && superclass->isObjC()) {
-      thisValue = B.createRefToObjectPointer(dd, thisValue, objectPtrTy);
-      B.createReturn(dd, thisValue);
+      selfValue = B.createRefToObjectPointer(dd, selfValue, objectPtrTy);
+      B.createReturn(dd, selfValue);
       return;
     }
     
     SILDeclRef dtorConstant =
       SILDeclRef(superclass, SILDeclRef::Kind::Destroyer);
     SILType baseSILTy = getLoweredLoadableType(superclassTy);
-    SILValue baseThis = B.createUpcast(dd, thisValue, baseSILTy);
+    SILValue baseThis = B.createUpcast(dd, selfValue, baseSILTy);
     ManagedValue dtorValue = emitMethodRef(dd, baseThis, dtorConstant,
                                            /*innerSubstitutions*/ {});
-    thisValue = B.createApply(dd, dtorValue.forward(*this),
+    selfValue = B.createApply(dd, dtorValue.forward(*this),
                               objectPtrTy,
                               baseThis);
   } else {
-    thisValue = B.createRefToObjectPointer(dd, thisValue, objectPtrTy);
+    selfValue = B.createRefToObjectPointer(dd, selfValue, objectPtrTy);
   }
-  B.createReturn(dd, thisValue);
+  B.createReturn(dd, selfValue);
 }
 
 static void emitConstructorMetatypeArg(SILGenFunction &gen,
@@ -1568,17 +1568,16 @@ static void emitImplicitValueDefaultConstructor(SILGenFunction &gen,
                                                 ConstructorDecl *ctor) {
   emitConstructorMetatypeArg(gen, ctor);
 
-  SILType thisTy
-    = gen.getLoweredType(ctor->getImplicitThisDecl()->getType());
+  SILType selfTy = gen.getLoweredType(ctor->getImplicitSelfDecl()->getType());
   
   // FIXME: We should actually elementwise default-construct the elements.
-  if (thisTy.isAddressOnly(gen.SGM.M)) {
+  if (selfTy.isAddressOnly(gen.SGM.M)) {
     SILValue resultSlot
-      = new (gen.F.getModule()) SILArgument(thisTy, gen.F.begin());
+      = new (gen.F.getModule()) SILArgument(selfTy, gen.F.begin());
     gen.B.createInitializeVar(ctor, resultSlot, /*canDefaultConstruct*/ false);
     gen.B.createReturn(ctor, gen.emitEmptyTuple(ctor));
   } else {
-    auto alloc = gen.B.createAllocStack(ctor, thisTy);
+    auto alloc = gen.B.createAllocStack(ctor, selfTy);
     gen.B.createInitializeVar(ctor, alloc->getAddressResult(),
                               /*canDefaultConstruct*/ false);
     SILValue result = gen.B.createLoad(ctor, alloc->getAddressResult());
@@ -1590,8 +1589,7 @@ static void emitImplicitValueDefaultConstructor(SILGenFunction &gen,
 static void emitImplicitValueConstructor(SILGenFunction &gen,
                                          ConstructorDecl *ctor) {
   auto *TP = cast<TuplePattern>(ctor->getArguments());
-  SILType thisTy
-    = gen.getLoweredType(ctor->getImplicitThisDecl()->getType());
+  SILType selfTy = gen.getLoweredType(ctor->getImplicitSelfDecl()->getType());
 
   if (TP->getFields().empty()) {
     // Emit a default constructor.
@@ -1600,8 +1598,8 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
 
   // Emit the indirect return argument, if any.
   SILValue resultSlot;
-  if (thisTy.isAddressOnly(gen.SGM.M))
-    resultSlot = new (gen.F.getModule()) SILArgument(thisTy, gen.F.begin());
+  if (selfTy.isAddressOnly(gen.SGM.M))
+    resultSlot = new (gen.F.getModule()) SILArgument(selfTy, gen.F.begin());
   
   // Emit the elementwise arguments.
   SmallVector<RValue, 4> elements;
@@ -1617,7 +1615,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   // If we have an indirect return slot, initialize it in-place in the implicit
   // return slot.
   if (resultSlot) {
-    auto *decl = cast<StructDecl>(thisTy.getSwiftRValueType()
+    auto *decl = cast<StructDecl>(selfTy.getSwiftRValueType()
                                   ->getNominalOrBoundGenericNominal());
     unsigned memberIndex = 0;
     
@@ -1656,8 +1654,8 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
     eltValues.push_back(std::move(rv).forwardAsSingleValue(gen));
   }
   
-  SILValue thisValue = gen.B.createStruct(ctor, thisTy, eltValues);
-  gen.B.createReturn(ctor, thisValue);
+  SILValue selfValue = gen.B.createStruct(ctor, selfTy, eltValues);
+  gen.B.createReturn(ctor, selfValue);
   return;
 }
 
@@ -1667,27 +1665,27 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     return emitImplicitValueConstructor(*this, ctor);
   
   // Emit the prolog.
-  emitProlog(ctor->getArguments(), ctor->getImplicitThisDecl()->getType());
+  emitProlog(ctor->getArguments(), ctor->getImplicitSelfDecl()->getType());
   emitConstructorMetatypeArg(*this, ctor);
   
   // Get the 'self' decl and type.
-  VarDecl *thisDecl = ctor->getImplicitThisDecl();
-  auto &lowering = getTypeLowering(thisDecl->getType());
-  SILType thisTy = lowering.getLoweredType();
-  assert(!thisTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
-  assert(!ctor->getAllocThisExpr() && "alloc_this expr for value type?!");
+  VarDecl *selfDecl = ctor->getImplicitSelfDecl();
+  auto &lowering = getTypeLowering(selfDecl->getType());
+  SILType selfTy = lowering.getLoweredType();
+  assert(!selfTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
+  assert(!ctor->getAllocSelfExpr() && "alloc_this expr for value type?!");
 
   // Emit a local variable for 'self'.
   // FIXME: The (potentially partially initialized) variable would need to be
   // cleaned up on an error unwind.
-  emitLocalVariable(thisDecl);
+  emitLocalVariable(selfDecl);
 
-  SILValue thisLV = VarLocs[thisDecl].address;
+  SILValue selfLV = VarLocs[selfDecl].address;
   
   // Emit a default initialization of the this value.
   // Note that this initialization *cannot* be lowered to a
   // default constructor--we're already in a constructor!
-  B.createInitializeVar(ctor, thisLV, /*CanDefaultConstruct*/ false);
+  B.createInitializeVar(ctor, selfLV, /*CanDefaultConstruct*/ false);
   
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
@@ -1705,29 +1703,29 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   if (lowering.isAddressOnly()) {
     assert(IndirectReturnAddress &&
            "no indirect return for address-only ctor?!");
-    SILValue thisBox = VarLocs[thisDecl].box;
-    assert(thisBox &&
+    SILValue selfBox = VarLocs[selfDecl].box;
+    assert(selfBox &&
            "address-only non-heap this should have been allocated in-place");
     // We have to do a non-take copy because someone else may be using the box.
-    B.createCopyAddr(ctor, thisLV, IndirectReturnAddress,
+    B.createCopyAddr(ctor, selfLV, IndirectReturnAddress,
                      IsNotTake, IsInitialization);
-    B.createStrongRelease(ctor, thisBox);
+    B.createStrongRelease(ctor, selfBox);
     B.createReturn(ctor, emitEmptyTuple(ctor));
     return;
   }
 
   // Otherwise, load and return the final 'self' value.
-  SILValue thisValue = B.createLoad(ctor, thisLV);
-  SILValue thisBox = VarLocs[thisDecl].box;
-  assert(thisBox);
+  SILValue selfValue = B.createLoad(ctor, selfLV);
+  SILValue selfBox = VarLocs[selfDecl].box;
+  assert(selfBox);
 
   // We have to do a retain because someone else may be using the box.
-  lowering.emitRetain(B, ctor, thisValue);
+  lowering.emitRetain(B, ctor, selfValue);
 
   // Release the box.
-  B.createStrongRelease(ctor, thisBox);
+  B.createStrongRelease(ctor, selfBox);
 
-  B.createReturn(ctor, thisValue);
+  B.createReturn(ctor, selfValue);
 }
 
 static void emitAddressOnlyUnionConstructor(SILGenFunction &gen,
@@ -1896,24 +1894,24 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   emitConstructorMetatypeArg(*this, ctor);
 
   // Allocate the "self" value.
-  VarDecl *thisDecl = ctor->getImplicitThisDecl();
-  SILType thisTy = getLoweredType(thisDecl->getType());
-  assert(thisTy.hasReferenceSemantics() &&
+  VarDecl *selfDecl = ctor->getImplicitSelfDecl();
+  SILType selfTy = getLoweredType(selfDecl->getType());
+  assert(selfTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
-  SILValue thisValue;
-  if (ctor->getAllocThisExpr()) {
-    FullExpr allocThisScope(Cleanups);
+  SILValue selfValue;
+  if (ctor->getAllocSelfExpr()) {
+    FullExpr allocSelfScope(Cleanups);
     // If the constructor has an alloc-this expr, emit it to get "self".
-    thisValue = emitRValue(ctor->getAllocThisExpr()).forwardAsSingleValue(*this);
-    assert(thisValue.getType() == thisTy &&
+    selfValue = emitRValue(ctor->getAllocSelfExpr()).forwardAsSingleValue(*this);
+    assert(selfValue.getType() == selfTy &&
            "alloc-this expr type did not match this type?!");
   } else {
     // Otherwise, just emit an alloc_ref instruction for the default allocation
     // path.
     // FIXME: should have a cleanup in case of exception
-    thisValue = B.createAllocRef(ctor, thisTy);
+    selfValue = B.createAllocRef(ctor, selfTy);
   }
-  args.push_back(thisValue);
+  args.push_back(selfValue);
 
   // Call the initializer.
   SILDeclRef initConstant = SILDeclRef(ctor, SILDeclRef::Kind::Initializer);
@@ -1922,14 +1920,14 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   if (auto genericParams = ctor->getGenericParams())
     archetypes = genericParams->getAllArchetypes();
   auto forwardingSubs = buildForwardingSubstitutions(archetypes);
-  ManagedValue initVal = emitMethodRef(ctor, thisValue, initConstant,
+  ManagedValue initVal = emitMethodRef(ctor, selfValue, initConstant,
                                        forwardingSubs);
   
-  SILValue initedThisValue
-    = B.createApply(ctor, initVal.forward(*this), thisTy, args);
+  SILValue initedSelfValue
+    = B.createApply(ctor, initVal.forward(*this), selfTy, args);
   
   // Return the initialized 'self'.
-  B.createReturn(ctor, initedThisValue);
+  B.createReturn(ctor, initedSelfValue);
 }
 
 static void emitClassImplicitConstructorInitializer(SILGenFunction &gen,
@@ -1940,13 +1938,13 @@ static void emitClassImplicitConstructorInitializer(SILGenFunction &gen,
   assert(cast<TuplePattern>(ctor->getArguments())->getNumFields() == 0
          && "implicit class ctor has arguments?!");
 
-  VarDecl *thisDecl = ctor->getImplicitThisDecl();
-  SILType thisTy = gen.getLoweredLoadableType(thisDecl->getType());
-  SILValue thisArg = new (gen.SGM.M) SILArgument(thisTy, gen.F.begin());
-  assert(thisTy.hasReferenceSemantics() &&
+  VarDecl *selfDecl = ctor->getImplicitSelfDecl();
+  SILType selfTy = gen.getLoweredLoadableType(selfDecl->getType());
+  SILValue selfArg = new (gen.SGM.M) SILArgument(selfTy, gen.F.begin());
+  assert(selfTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
   
-  gen.B.createReturn(ctor, thisArg);
+  gen.B.createReturn(ctor, selfArg);
 }
 
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
@@ -1958,17 +1956,17 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   emitProlog(ctor->getArguments(), TupleType::getEmpty(F.getASTContext()));
   
   // Emit the 'self' argument and make an lvalue for it.
-  VarDecl *thisDecl = ctor->getImplicitThisDecl();
-  SILType thisTy = getLoweredLoadableType(thisDecl->getType());
-  SILValue thisArg = new (SGM.M) SILArgument(thisTy, F.begin());
-  assert(thisTy.hasReferenceSemantics() &&
+  VarDecl *selfDecl = ctor->getImplicitSelfDecl();
+  SILType selfTy = getLoweredLoadableType(selfDecl->getType());
+  SILValue selfArg = new (SGM.M) SILArgument(selfTy, F.begin());
+  assert(selfTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
 
   // FIXME: The (potentially partially initialized) value here would need to be
   // cleaned up on a constructor failure unwinding.
-  emitLocalVariable(thisDecl);
-  SILValue thisLV = VarLocs[thisDecl].address;
-  B.createStore(ctor, thisArg, thisLV);
+  emitLocalVariable(selfDecl);
+  SILValue selfLV = VarLocs[selfDecl].address;
+  B.createStore(ctor, selfArg, selfLV);
   
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
@@ -1982,15 +1980,15 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     return;
 
   // Load and return the final 'self'.
-  SILValue thisValue = B.createLoad(ctor, thisLV);
-  SILValue thisBox = VarLocs[thisDecl].box;
-  assert(thisBox);
+  SILValue selfValue = B.createLoad(ctor, selfLV);
+  SILValue selfBox = VarLocs[selfDecl].box;
+  assert(selfBox);
 
   // We have to do a retain because someone else may be using the box.
-  B.emitRetainValue(ctor, thisValue);
-  B.createStrongRelease(ctor, thisBox);
+  B.emitRetainValue(ctor, selfValue);
+  B.createStrongRelease(ctor, selfBox);
 
-  B.createReturn(ctor, thisValue);
+  B.createReturn(ctor, selfValue);
 }
 
 static void forwardCaptureArgs(SILGenFunction &gen,
@@ -2144,21 +2142,21 @@ RValue RValueEmitter::visitRebindThisInConstructorExpr(
                                 RebindThisInConstructorExpr *E, SGFContext C) {
   // FIXME: Use a different instruction from 'downcast'. IRGen can make
   // "rebind this" into a no-op if the called constructor is a Swift one.
-  ManagedValue newThis = visit(E->getSubExpr()).getAsSingleValue(SGF);
-  if (!newThis.getType().getSwiftRValueType()
-        ->isEqual(E->getThis()->getType())) {
-    assert(newThis.getType().isObject() &&
-           newThis.getType().hasReferenceSemantics() &&
+  ManagedValue newSelf = visit(E->getSubExpr()).getAsSingleValue(SGF);
+  if (!newSelf.getType().getSwiftRValueType()
+        ->isEqual(E->getSelf()->getType())) {
+    assert(newSelf.getType().isObject() &&
+           newSelf.getType().hasReferenceSemantics() &&
            "delegating ctor type mismatch for non-reference type?!");
-    CleanupsDepth newThisCleanup = newThis.getCleanup();
-    SILValue newThisValue = SGF.B.createDowncast(E, newThis.getValue(),
-                              SGF.getLoweredLoadableType(E->getThis()->getType()),
+    CleanupsDepth newSelfCleanup = newSelf.getCleanup();
+    SILValue newSelfValue = SGF.B.createDowncast(E, newSelf.getValue(),
+                              SGF.getLoweredLoadableType(E->getSelf()->getType()),
                               CheckedCastMode::Unconditional);
-    newThis = ManagedValue(newThisValue, newThisCleanup);
+    newSelf = ManagedValue(newSelfValue, newSelfCleanup);
   }
   
-  SILValue thisAddr = SGF.emitReferenceToDecl(E, E->getThis()).getUnmanagedValue();
-  newThis.assignInto(SGF, E, thisAddr);
+  SILValue selfAddr = SGF.emitReferenceToDecl(E, E->getSelf()).getUnmanagedValue();
+  newSelf.assignInto(SGF, E, selfAddr);
   
   return SGF.emitEmptyTupleRValue(E);
 }

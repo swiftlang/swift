@@ -303,10 +303,10 @@ namespace {
       auto name = context.getIdentifier("constructor");
 
       // Create the 'self' declaration.
-      auto thisType = structDecl->getDeclaredTypeInContext();
-      auto thisMetaType = MetaTypeType::get(thisType, context);
-      auto thisName = context.getIdentifier("self");
-      auto thisDecl = new (context) VarDecl(SourceLoc(), thisName, thisType,
+      auto selfType = structDecl->getDeclaredTypeInContext();
+      auto selfMetaType = MetaTypeType::get(selfType, context);
+      auto selfName = context.getIdentifier("self");
+      auto selfDecl = new (context) VarDecl(SourceLoc(), selfName, selfType,
                                             structDecl);
 
       // Construct the set of parameters from the list of members.
@@ -339,18 +339,18 @@ namespace {
 
       // Create the constructor
       auto constructor = new (context) ConstructorDecl(name, SourceLoc(),
-                                                       paramPattern, thisDecl,
+                                                       paramPattern, selfDecl,
                                                        nullptr, structDecl);
 
       // Set the constructor's type.
-      auto fnTy = FunctionType::get(paramTy, thisType, context);
-      auto allocFnTy = FunctionType::get(thisMetaType, fnTy, context);
-      auto initFnTy = FunctionType::get(thisType, fnTy, context);
+      auto fnTy = FunctionType::get(paramTy, selfType, context);
+      auto allocFnTy = FunctionType::get(selfMetaType, fnTy, context);
+      auto initFnTy = FunctionType::get(selfType, fnTy, context);
       constructor->setType(allocFnTy);
       constructor->setInitializerType(initFnTy);
 
       // Fix the declaration contexts.
-      thisDecl->setDeclContext(constructor);
+      selfDecl->setDeclContext(constructor);
       setVarDeclContexts(paramPatterns, constructor);
 
       // Assign all of the member variables appropriately.
@@ -362,7 +362,7 @@ namespace {
           continue;
 
         // Construct left-hand side.
-        Expr *lhs = new (context) DeclRefExpr(thisDecl, SourceLoc());
+        Expr *lhs = new (context) DeclRefExpr(selfDecl, SourceLoc());
         lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, SourceLoc());
 
         // Construct right-hand side.
@@ -922,21 +922,21 @@ namespace {
       // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
-      auto thisTy = getThisTypeForContext(dc);
+      auto selfTy = getSelfTypeForContext(dc);
       if (decl->isClassMethod())
-        thisTy = MetaTypeType::get(thisTy, Impl.SwiftContext);
-      auto thisName = Impl.SwiftContext.getIdentifier("self");
-      auto thisVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), thisName,
-                                                     thisTy,
+        selfTy = MetaTypeType::get(selfTy, Impl.SwiftContext);
+      auto selfName = Impl.SwiftContext.getIdentifier("self");
+      auto selfVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), selfName,
+                                                     selfTy,
                                                      Impl.firstClangModule);
-      Pattern *thisPat = new (Impl.SwiftContext) NamedPattern(thisVar);
-      thisPat->setType(thisVar->getType());
-      thisPat
-        = new (Impl.SwiftContext) TypedPattern(thisPat,
-                                               TypeLoc::withoutLoc(thisTy));
-      thisPat->setType(thisVar->getType());
-      argPatterns.push_back(thisPat);
-      bodyPatterns.push_back(thisPat);
+      Pattern *selfPat = new (Impl.SwiftContext) NamedPattern(selfVar);
+      selfPat->setType(selfVar->getType());
+      selfPat
+        = new (Impl.SwiftContext) TypedPattern(selfPat,
+                                               TypeLoc::withoutLoc(selfTy));
+      selfPat->setType(selfVar->getType());
+      argPatterns.push_back(selfPat);
+      bodyPatterns.push_back(selfPat);
       
       // Import the type that this method will have.
       auto type = Impl.importFunctionType(decl->getResultType(),
@@ -952,7 +952,7 @@ namespace {
       auto resultTy = type->castTo<FunctionType>()->getResult();
 
       // Add the 'self' parameter to the function type.
-      type = FunctionType::get(thisTy, type, Impl.SwiftContext);
+      type = FunctionType::get(selfTy, type, Impl.SwiftContext);
 
       // FIXME: Related result type?
 
@@ -983,8 +983,8 @@ namespace {
 
       // FIXME: We'll eventually have to deal with having multiple overrides
       // in Swift.
-      if (auto thisClassTy = thisTy->getAs<ClassType>()) {
-        if (auto superTy = thisClassTy->getDecl()->getSuperclass()) {
+      if (auto selfClassTy = selfTy->getAs<ClassType>()) {
+        if (auto superTy = selfClassTy->getDecl()->getSuperclass()) {
           auto superDecl = superTy->castTo<ClassType>()->getDecl();
           if (auto superObjCClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
                                       superDecl->getClangDecl())) {
@@ -1169,21 +1169,21 @@ namespace {
       // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
-      auto thisTy = getThisTypeForContext(dc);
-      auto thisMetaTy = MetaTypeType::get(thisTy, Impl.SwiftContext);
-      auto thisName = Impl.SwiftContext.getIdentifier("self");
-      auto thisMetaVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), thisName,
-                                                         thisMetaTy,
+      auto selfTy = getSelfTypeForContext(dc);
+      auto selfMetaTy = MetaTypeType::get(selfTy, Impl.SwiftContext);
+      auto selfName = Impl.SwiftContext.getIdentifier("self");
+      auto selfMetaVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), selfName,
+                                                         selfMetaTy,
                                                          Impl.firstClangModule);
-      Pattern *thisPat = new (Impl.SwiftContext) NamedPattern(thisMetaVar);
-      thisPat->setType(thisMetaTy);
-      thisPat
-        = new (Impl.SwiftContext) TypedPattern(thisPat,
-                                               TypeLoc::withoutLoc(thisMetaTy));
-      thisPat->setType(thisMetaTy);
+      Pattern *selfPat = new (Impl.SwiftContext) NamedPattern(selfMetaVar);
+      selfPat->setType(selfMetaTy);
+      selfPat
+        = new (Impl.SwiftContext) TypedPattern(selfPat,
+                                               TypeLoc::withoutLoc(selfMetaTy));
+      selfPat->setType(selfMetaTy);
 
-      argPatterns.push_back(thisPat);
-      bodyPatterns.push_back(thisPat);
+      argPatterns.push_back(selfPat);
+      bodyPatterns.push_back(selfPat);
 
       // Import the type that this method will have.
       auto type = Impl.importFunctionType(objcMethod->getResultType(),
@@ -1201,25 +1201,25 @@ namespace {
       // FIXME: Perhaps actually check whether the routine has a related result
       // type?
       type = FunctionType::get(type->castTo<FunctionType>()->getInput(),
-                               thisTy, Impl.SwiftContext);
+                               selfTy, Impl.SwiftContext);
 
       // Add the 'self' parameter to the function types.
-      Type allocType = FunctionType::get(thisMetaTy, type, Impl.SwiftContext);
-      Type initType = FunctionType::get(thisTy, type, Impl.SwiftContext);
+      Type allocType = FunctionType::get(selfMetaTy, type, Impl.SwiftContext);
+      Type initType = FunctionType::get(selfTy, type, Impl.SwiftContext);
 
-      VarDecl *thisVar = new (Impl.SwiftContext) VarDecl(SourceLoc(),
-                                                          thisName, thisTy, dc);
+      VarDecl *selfVar = new (Impl.SwiftContext) VarDecl(SourceLoc(),
+                                                          selfName, selfTy, dc);
 
       // Create the actual constructor.
       // FIXME: Losing body patterns here.
       auto result = new (Impl.SwiftContext) ConstructorDecl(name, loc,
                                                             argPatterns.back(),
-                                                            thisVar,
+                                                            selfVar,
                                                             /*GenericParams=*/0,
                                                             dc);
       result->setType(allocType);
       result->setInitializerType(initType);
-      thisVar->setDeclContext(result);
+      selfVar->setDeclContext(result);
       setVarDeclContexts(argPatterns, result);
       setVarDeclContexts(bodyPatterns, result);
 
@@ -1228,7 +1228,7 @@ namespace {
         // FIXME: Use the 'self' of metaclass type rather than a metatype
         // expression.
         Expr* initExpr = new (Impl.SwiftContext) MetatypeExpr(nullptr, loc,
-                                                              thisMetaTy);
+                                                              selfMetaTy);
 
         // For an 'init' method, we need to call alloc first.
         Expr *allocRef = new (Impl.SwiftContext) DeclRefExpr(alloc, loc);
@@ -1247,16 +1247,16 @@ namespace {
                                              initExpr,
                                              SourceLoc(),
                                              SourceLoc(),
-                                             TypeLoc::withoutLoc(thisTy));
+                                             TypeLoc::withoutLoc(selfTy));
         cast->setCastKind(CheckedCastKind::Downcast);
         initExpr = cast;
 
-        result->setAllocThisExpr(initExpr);
+        result->setAllocSelfExpr(initExpr);
       }
       
       // Create the body of the constructor, which will call the
       // corresponding init method.
-      Expr *initExpr = new (Impl.SwiftContext) DeclRefExpr(thisVar, loc);
+      Expr *initExpr = new (Impl.SwiftContext) DeclRefExpr(selfVar, loc);
       
       // Form a reference to the actual method.
       auto func = cast<FuncDecl>(decl);
@@ -1316,12 +1316,12 @@ namespace {
                                            initExpr,
                                            SourceLoc(),
                                            SourceLoc(),
-                                           TypeLoc::withoutLoc(thisTy));
+                                           TypeLoc::withoutLoc(selfTy));
       cast->setCastKind(CheckedCastKind::Downcast);
       initExpr = cast;
 
       // Form the assignment statement.
-      auto refThis = new (Impl.SwiftContext) DeclRefExpr(thisVar, loc);
+      auto refThis = new (Impl.SwiftContext) DeclRefExpr(selfVar, loc);
       auto assign = new (Impl.SwiftContext) AssignExpr(refThis, loc, initExpr);
 
       // Set the body of the constructor.
@@ -1351,24 +1351,24 @@ namespace {
 
     /// \brief Add the implicit 'self' pattern to the given list of patterns.
     ///
-    /// \param thisTy The type of the 'self' parameter.
+    /// \param selfTy The type of the 'self' parameter.
     ///
     /// \param args The set of arguments 
-    VarDecl *addImplicitSelfParameter(Type thisTy,
+    VarDecl *addImplicitSelfParameter(Type selfTy,
                                       SmallVectorImpl<Pattern *> &args) {
-      auto thisName = Impl.SwiftContext.getIdentifier("self");
-      auto thisVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), thisName,
-                                                     thisTy,
+      auto selfName = Impl.SwiftContext.getIdentifier("self");
+      auto selfVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), selfName,
+                                                     selfTy,
                                                      Impl.firstClangModule);
-      Pattern *thisPat = new (Impl.SwiftContext) NamedPattern(thisVar);
-      thisPat->setType(thisVar->getType());
-      thisPat = new (Impl.SwiftContext) TypedPattern(
-                                          thisPat,
-                                          TypeLoc::withoutLoc(thisTy));
-      thisPat->setType(thisVar->getType());
-      args.push_back(thisPat);
+      Pattern *selfPat = new (Impl.SwiftContext) NamedPattern(selfVar);
+      selfPat->setType(selfVar->getType());
+      selfPat = new (Impl.SwiftContext) TypedPattern(
+                                          selfPat,
+                                          TypeLoc::withoutLoc(selfTy));
+      selfPat->setType(selfVar->getType());
+      args.push_back(selfPat);
 
-      return thisVar;
+      return selfVar;
     }
 
     /// \brief Build a thunk for an Objective-C getter.
@@ -1396,7 +1396,7 @@ namespace {
       SmallVector<Pattern *, 3> getterArgs;
 
       // 'self'
-      auto thisVar = addImplicitSelfParameter(dc->getDeclaredTypeOfContext(),
+      auto selfVar = addImplicitSelfParameter(dc->getDeclaredTypeOfContext(),
                                               getterArgs);
 
       // index, for subscript operations.
@@ -1441,11 +1441,11 @@ namespace {
                                           getter->getDeclContext());
 
       // Create the body of the thunk, which calls the Objective-C getter.
-      auto thisRef = new (context) DeclRefExpr(thisVar, loc);
+      auto selfRef = new (context) DeclRefExpr(selfVar, loc);
       auto getterRef = new (context) DeclRefExpr(getter, loc);
 
       // First, bind 'self' to the method.
-      Expr *call = new (context) DotSyntaxCallExpr(getterRef, loc, thisRef);
+      Expr *call = new (context) DotSyntaxCallExpr(getterRef, loc, selfRef);
 
       // Call the method itself.
       if (indices) {
@@ -1509,7 +1509,7 @@ namespace {
       SmallVector<Pattern *, 3> setterArgs;
 
       // 'self'
-      auto thisVar = addImplicitSelfParameter(dc->getDeclaredTypeOfContext(),
+      auto selfVar = addImplicitSelfParameter(dc->getDeclaredTypeOfContext(),
                                               setterArgs);
 
       // index, for subscript operations.
@@ -1562,12 +1562,12 @@ namespace {
       // Create the body of the thunk, which calls the Objective-C setter.
       auto valueVar = getSingleVar(setterArgs.back());
 
-      auto thisRef = new (context) DeclRefExpr(thisVar, loc);
+      auto selfRef = new (context) DeclRefExpr(selfVar, loc);
       auto valueRef = new (context) DeclRefExpr(valueVar, loc);
       auto setterRef = new (context) DeclRefExpr(setter, loc);
 
       // First, bind 'self' to the method.
-      Expr *call = new (context) DotSyntaxCallExpr(setterRef, loc, thisRef);
+      Expr *call = new (context) DotSyntaxCallExpr(setterRef, loc, selfRef);
 
       // Next, call the Objective-C setter.
       Expr *callArgs;
@@ -1795,10 +1795,10 @@ namespace {
 
   public:
     /// \brief Retrieve the type of 'self' for the given context.
-    Type getThisTypeForContext(DeclContext *dc) {
+    Type getSelfTypeForContext(DeclContext *dc) {
       // For a protocol, the type is 'Self'.
       if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
-        return proto->getThis()->getDeclaredType();
+        return proto->getSelf()->getDeclaredType();
       }
 
       return dc->getDeclaredTypeOfContext();
@@ -2034,24 +2034,24 @@ namespace {
       result->setIsObjC(true);
 
       // Add the implicit 'Self' associated type.
-      auto thisId = Impl.SwiftContext.getIdentifier("Self");
-      auto thisDecl = new (Impl.SwiftContext) AssociatedTypeDecl(result,
+      auto selfId = Impl.SwiftContext.getIdentifier("Self");
+      auto selfDecl = new (Impl.SwiftContext) AssociatedTypeDecl(result,
                                                                  SourceLoc(),
-                                                                 thisId,
+                                                                 selfId,
                                                                  SourceLoc());
-      thisDecl->setImplicit();
-      auto thisArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
-                                                 nullptr, thisId,
+      selfDecl->setImplicit();
+      auto selfArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
+                                                 nullptr, selfId,
                                                  Type(result->getDeclaredType()),
                                                  Type());
-      thisDecl->setArchetype(thisArchetype);
+      selfDecl->setArchetype(selfArchetype);
       result->setMembers(Impl.SwiftContext.AllocateCopy(
-                           llvm::makeArrayRef<Decl*>(thisDecl)),
+                           llvm::makeArrayRef<Decl*>(selfDecl)),
                          SourceRange());
                          
       // Import each of the members.
       SmallVector<Decl *, 4> members;
-      members.push_back(thisDecl);
+      members.push_back(selfDecl);
       for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
            m != mEnd; ++m) {
         auto nd = dyn_cast<clang::NamedDecl>(*m);

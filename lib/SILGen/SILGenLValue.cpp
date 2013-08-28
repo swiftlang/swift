@@ -418,7 +418,7 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
 }
 
 LValue SILGenLValue::visitSuperRefExpr(SuperRefExpr *e) {
-  return emitLValueForDecl(*this, e, e->getThis(), e->getType());
+  return emitLValueForDecl(*this, e, e->getSelf(), e->getType());
 }
 
 LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {

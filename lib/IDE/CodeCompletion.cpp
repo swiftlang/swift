@@ -646,7 +646,7 @@ public:
     auto *FE = FD->getBody();
     auto Patterns = FE->getArgParamPatterns();
     unsigned FirstIndex = 0;
-    if (!IsImlicitlyCurriedInstanceMethod && FE->getImplicitThisDecl())
+    if (!IsImlicitlyCurriedInstanceMethod && FE->getImplicitSelfDecl())
       FirstIndex = 1;
     addPatternParameters(Builder, Patterns[FirstIndex]);
     Builder.addRightParen();

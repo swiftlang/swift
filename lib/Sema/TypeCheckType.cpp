@@ -114,7 +114,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
       typeDecl->getDeclContext() != fromDC) {
     if (auto fromProto = dyn_cast<ProtocolDecl>(fromDC)) {
       return substMemberTypeWithBase(typeDecl->getDeclaredType(), typeDecl,
-                                     fromProto->getThis()->getDeclaredType());
+                                     fromProto->getSelf()->getDeclaredType());
     }
   }
 
@@ -1008,10 +1008,9 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
     return T;
 
   auto Proto = ProtoType->getDecl();
-  auto ThisDecl = Proto->getThis();
+  auto SelfDecl = Proto->getSelf();
   TypeSubstitutionMap Substitutions;
-  Substitutions[ThisDecl->getArchetype()]
-    = BaseArchetype;
+  Substitutions[SelfDecl->getArchetype()] = BaseArchetype;
   return substType(T, Substitutions);
 }
 

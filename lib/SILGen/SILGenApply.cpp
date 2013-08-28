@@ -67,11 +67,11 @@ private:
     ManagedValue indirectValue;
     SILDeclRef standaloneFunction;
     struct {
-      SILValue thisValue;
+      SILValue selfValue;
       SILDeclRef methodName;
     } method;
     struct {
-      SILValue thisValue;
+      SILValue selfValue;
       SILDeclRef methodName;
       CanType origType;
     } genericMethod;
@@ -104,10 +104,10 @@ private:
 
   Callee(Kind methodKind,
          SILGenFunction &gen,
-         SILValue thisValue,
+         SILValue selfValue,
          SILDeclRef methodName,
          SILLocation l)
-    : kind(methodKind), method{thisValue, methodName},
+    : kind(methodKind), method{selfValue, methodName},
       specializedType(
                 gen.SGM.getConstantType(methodName.atUncurryLevel(0))
                   .getSwiftRValueType()),
@@ -153,25 +153,25 @@ private:
                                        SILDeclRef methodName,
                                        Type memberType) {
     // 'self' for instance methods is projected out of the existential container
-    // as an ObjCPointer or as the address of its This archetype.
+    // as an ObjCPointer or as the address of its Self archetype.
     // 'self' for existential metatypes is the metatype itself.
-    Type thisTy;
+    Type selfTy;
     bool isThin;
     if (methodName.getDecl()->isInstanceMember()) {
       if (proto.getType().isClassExistentialType()) {
-        thisTy = memberType->getASTContext().TheObjCPointerType;
+        selfTy = memberType->getASTContext().TheObjCPointerType;
         isThin = true;
       } else {
-        Type protoThisTy
+        Type protoSelfTy
           = cast<ProtocolDecl>(methodName.getDecl()->getDeclContext())
-              ->getThis()->getArchetype();
-        thisTy = LValueType::get(protoThisTy,
+              ->getSelf()->getArchetype();
+        selfTy = LValueType::get(protoSelfTy,
                                  LValueType::Qual::DefaultForByrefThis,
-                                 protoThisTy->getASTContext());
+                                 protoSelfTy->getASTContext());
         isThin = false;
       }
     } else {
-      thisTy = proto.getType().getSwiftType();
+      selfTy = proto.getType().getSwiftType();
       isThin = false;
     }
     
@@ -180,7 +180,7 @@ private:
     auto Info = FunctionType::ExtInfo()
                   .withCallingConv(gen.SGM.getConstantCC(methodName))
                   .withIsThin(isThin);
-    return FunctionType::get(thisTy,
+    return FunctionType::get(selfTy,
                              memberType,
                              Info,
                              memberType->getASTContext())
@@ -204,13 +204,13 @@ public:
   static Callee forDirect(SILGenFunction &gen, SILDeclRef c, SILLocation l) {
     return Callee(gen, c, l);
   }
-  static Callee forClassMethod(SILGenFunction &gen, SILValue thisValue,
+  static Callee forClassMethod(SILGenFunction &gen, SILValue selfValue,
                                SILDeclRef name, SILLocation l) {
-    return Callee(Kind::ClassMethod, gen, thisValue, name, l);
+    return Callee(Kind::ClassMethod, gen, selfValue, name, l);
   }
-  static Callee forSuperMethod(SILGenFunction &gen, SILValue thisValue,
+  static Callee forSuperMethod(SILGenFunction &gen, SILValue selfValue,
                                SILDeclRef name, SILLocation l) {
-    return Callee(Kind::SuperMethod, gen, thisValue, name, l);
+    return Callee(Kind::SuperMethod, gen, selfValue, name, l);
   }
   static Callee forArchetype(SILGenFunction &gen, SILValue archetypeValue,
                              SILDeclRef name, Type memberType, SILLocation l) {
@@ -330,7 +330,7 @@ public:
     case Kind::ClassMethod: {
       SILDeclRef constant = getMethodAndSetOwnership();
       SILValue classMethod = gen.B.createClassMethod(Loc,
-                                           method.thisValue,
+                                           method.selfValue,
                                            constant,
                                            gen.SGM.getConstantType(constant),
                                            /*volatile*/ constant.isObjC);
@@ -340,7 +340,7 @@ public:
     case Kind::SuperMethod: {
       SILDeclRef constant = getMethodAndSetOwnership();
       SILValue superMethod = gen.B.createSuperMethod(Loc,
-                                           method.thisValue,
+                                           method.selfValue,
                                            constant,
                                            gen.SGM.getConstantType(constant),
                                            /*volatile*/ constant.isObjC);
@@ -355,7 +355,7 @@ public:
 
       SILDeclRef constant = genericMethod.methodName.atUncurryLevel(level);
       CanType archetypeType
-        = genericMethod.thisValue.getType().getSwiftRValueType();
+        = genericMethod.selfValue.getType().getSwiftRValueType();
       if (auto metatype = dyn_cast<MetaTypeType>(archetypeType))
         archetypeType = CanType(metatype->getInstanceType());
       SILValue method = gen.B.createArchetypeMethod(Loc,
@@ -375,7 +375,7 @@ public:
       
       SILDeclRef constant = genericMethod.methodName.atUncurryLevel(level);
       SILValue method = gen.B.createProtocolMethod(Loc,
-                            genericMethod.thisValue,
+                            genericMethod.selfValue,
                             constant,
                             gen.getLoweredType(genericMethod.origType, level),
                             /*volatile*/ constant.isObjC);
@@ -566,11 +566,11 @@ public:
                                                          existential.getValue());
         proj = ManagedValue(val, existential.getCleanup());
       } else {
-        SILType protoThisTy
-          = gen.getLoweredType(proto->getThis()->getArchetype());
-        assert(protoThisTy.isAddress() && "This should be address-only");
+        SILType protoSelfTy
+          = gen.getLoweredType(proto->getSelf()->getArchetype());
+        assert(protoSelfTy.isAddress() && "Self should be address-only");
         SILValue val = gen.B.createProjectExistential(e, existential.getValue(),
-                                                      protoThisTy);
+                                                      protoSelfTy);
         proj = ManagedValue(val, ManagedValue::Unmanaged);
       }
 
@@ -1342,7 +1342,7 @@ Callee emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
   }
   
   // Get the accessor function. The type will be a polymorphic function if
-  // the This type is generic.
+  // the Self type is generic.
   // FIXME: Dynamic dispatch for class/arch/proto methods.
   Callee callee = Callee::forDirect(gen, constant, loc);
   
@@ -1363,7 +1363,7 @@ Callee emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
 ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
                                              SILDeclRef get,
                                              ArrayRef<Substitution> substitutions,
-                                             RValue &&thisValue,
+                                             RValue &&selfValue,
                                              RValue &&subscripts,
                                              Type resultType,
                                              SGFContext c) {
@@ -1376,8 +1376,8 @@ ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
                                            resultType);
   else
     propType = tc.getPropertyType(SILDeclRef::Kind::Getter, resultType);
-  if (thisValue)
-    propType = tc.getMethodTypeInContext(thisValue.getType()->getRValueType(),
+  if (selfValue)
+    propType = tc.getMethodTypeInContext(selfValue.getType()->getRValueType(),
                                          propType);
   
   Callee getter = emitSpecializedPropertyFunctionRef(*this, loc, get,
@@ -1385,9 +1385,9 @@ ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
   
   CallEmission emission(*this, std::move(getter));
   auto *propFnTy = propType->castTo<AnyFunctionType>();
-  // This ->
-  if (thisValue) {
-    emission.addCallSite(loc, std::move(thisValue), propFnTy->getResult());
+  // Self ->
+  if (selfValue) {
+    emission.addCallSite(loc, std::move(selfValue), propFnTy->getResult());
     propFnTy = propFnTy->getResult()->castTo<AnyFunctionType>();
   }
   // Index ->
@@ -1404,7 +1404,7 @@ ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
 void SILGenFunction::emitSetProperty(SILLocation loc,
                                      SILDeclRef set,
                                      ArrayRef<Substitution> substitutions,
-                                     RValue &&thisValue,
+                                     RValue &&selfValue,
                                      RValue &&subscripts,
                                      RValue &&setValue) {
   // Derive the specialized type of the accessor.
@@ -1417,8 +1417,8 @@ void SILGenFunction::emitSetProperty(SILLocation loc,
   else
     propType = tc.getPropertyType(SILDeclRef::Kind::Setter,
                                   setValue.getType());
-  if (thisValue)
-    propType = tc.getMethodTypeInContext(thisValue.getType()->getRValueType(),
+  if (selfValue)
+    propType = tc.getMethodTypeInContext(selfValue.getType()->getRValueType(),
                                          propType);
 
   Callee setter = emitSpecializedPropertyFunctionRef(*this, loc, set,
@@ -1426,9 +1426,9 @@ void SILGenFunction::emitSetProperty(SILLocation loc,
 
   CallEmission emission(*this, std::move(setter));
   auto *propFnTy = propType->castTo<AnyFunctionType>();
-  // This ->
-  if (thisValue) {
-    emission.addCallSite(loc, std::move(thisValue), propFnTy->getResult());
+  // Self ->
+  if (selfValue) {
+    emission.addCallSite(loc, std::move(selfValue), propFnTy->getResult());
     propFnTy = propFnTy->getResult()->castTo<AnyFunctionType>();
   }
   // Index ->

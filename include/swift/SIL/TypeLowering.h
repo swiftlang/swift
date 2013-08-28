@@ -316,7 +316,7 @@ public:
                                    DeclContext *parentContext);
   
   /// Returns the type of the "self" parameter to methods of a type.
-  Type getMethodThisType(Type thisType) const;
+  Type getMethodSelfType(Type selfType) const;
   
   /// Returns the type of a property accessor, () -> T for a getter,
   /// or (value:T) -> () for a setter. 'kind' must be one of the Kind constants

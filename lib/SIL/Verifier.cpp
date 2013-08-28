@@ -599,7 +599,7 @@ public:
     // generic types.
   }
   
-  CanType getMethodThisType(AnyFunctionType *ft) {
+  CanType getMethodSelfType(AnyFunctionType *ft) {
     Lowering::UncurryDirection direction
       = F.getModule().Types.getUncurryDirection(ft->getAbstractCC());
     
@@ -636,9 +636,9 @@ public:
     require(operandType.is<ArchetypeType>(),
             "operand type must be an archetype");
     
-    CanType thisType = getMethodThisType(methodType);
-    require(thisType == operandType.getSwiftType()
-            || thisType->isEqual(
+    CanType selfType = getMethodSelfType(methodType);
+    require(selfType == operandType.getSwiftType()
+            || selfType->isEqual(
                             MetaTypeType::get(operandType.getSwiftRValueType(),
                                               operandType.getASTContext())),
             "result must be method of operand type");
@@ -651,7 +651,7 @@ public:
     }
   }
   
-  bool isThisArchetype(CanType t) {
+  bool isSelfArchetype(CanType t) {
     ArchetypeType *archetype = dyn_cast<ArchetypeType>(t);
     if (!archetype)
       return false;
@@ -675,16 +675,16 @@ public:
       require(operandType.isExistentialType(),
               "instance protocol_method must apply to an existential address");
       if (operandType.isClassExistentialType()) {
-        require(getMethodThisType(methodType)->isEqual(
+        require(getMethodSelfType(methodType)->isEqual(
                                operandType.getASTContext().TheObjCPointerType),
                 "result must be a method of objc pointer");
         
       } else {
-        CanType thisType = getMethodThisType(methodType);
-        require(isa<LValueType>(thisType),
+        CanType selfType = getMethodSelfType(methodType);
+        require(isa<LValueType>(selfType),
                 "protocol_method result must take its this parameter byref");
-        CanType thisObjType = thisType->getRValueType()->getCanonicalType();
-        require(isThisArchetype(thisObjType),
+        CanType selfObjType = selfType->getRValueType()->getCanonicalType();
+        require(isSelfArchetype(selfObjType),
                 "result must be a method of opaque pointer");
       }
     } else {
@@ -695,7 +695,7 @@ public:
       require(operandType.castTo<MetaTypeType>()
                 ->getInstanceType()->isExistentialType(),
               "static protocol_method must apply to an existential metatype");
-      require(getMethodThisType(methodType) ==
+      require(getMethodSelfType(methodType) ==
                                   EMI->getOperand().getType().getSwiftType(),
               "result must be a method of the existential metatype");
     }
@@ -718,7 +718,7 @@ public:
     SILType operandType = CMI->getOperand().getType();
     require(isClassOrClassMetatype(operandType.getSwiftType()),
             "operand must be of a class type");
-    require(isClassOrClassMetatype(getMethodThisType(methodType)),
+    require(isClassOrClassMetatype(getMethodSelfType(methodType)),
             "result must be a method of a class");
   }
   
@@ -731,7 +731,7 @@ public:
     SILType operandType = CMI->getOperand().getType();
     require(isClassOrClassMetatype(operandType.getSwiftType()),
             "operand must be of a class type");
-    require(isClassOrClassMetatype(getMethodThisType(methodType)),
+    require(isClassOrClassMetatype(getMethodSelfType(methodType)),
             "result must be a method of a class");
     
     Type methodClass = CMI->getMember().getDecl()->getDeclContext()
@@ -755,8 +755,8 @@ public:
     require(PEI->getType().isAddress(),
             "project_existential result must be an address");
     
-    require(isThisArchetype(PEI->getType().getSwiftRValueType()),
-            "project_existential result must be This archetype of a protocol");
+    require(isSelfArchetype(PEI->getType().getSwiftRValueType()),
+            "project_existential result must be Self archetype of a protocol");
   }
   
   void checkProjectExistentialRefInst(ProjectExistentialRefInst *PEI) {

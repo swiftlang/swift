@@ -677,10 +677,10 @@ bool ProtocolDecl::requiresClassSlow() {
   return false;
 }
 
-AssociatedTypeDecl *ProtocolDecl::getThis() const {
+AssociatedTypeDecl *ProtocolDecl::getSelf() const {
   for (auto member : getMembers()) {
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
-      if (assocType->isThis())
+      if (assocType->isSelf())
         return assocType;
   }
   llvm_unreachable("No 'Self' associated type?");
@@ -713,8 +713,8 @@ bool VarDecl::isAnonClosureParam() const {
   return nameStr[0] == '$';
 }
 
-VarDecl *FuncDecl::getImplicitThisDecl() const {
-  return Body->getImplicitThisDecl();
+VarDecl *FuncDecl::getImplicitSelfDecl() const {
+  return Body->getImplicitSelfDecl();
 }
 
 /// getNaturalArgumentCount - Returns the "natural" number of
@@ -758,12 +758,7 @@ Type FuncDecl::getExtensionType() const {
 }
 
 
-/// computeThisType - If this is a method in a type extension for some type,
-/// compute and return the type to be used for the 'self' argument of the
-/// type (which varies based on whether the extended type is a reference type
-/// or not), or an empty Type() if no 'self' argument should exist.  This can
-/// only be used after name binding has resolved types.
-Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
+Type FuncDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
   if (OuterGenericParams)
     *OuterGenericParams = nullptr;
   
@@ -773,20 +768,20 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
   // For a protocol, the type of 'self' is the associated type 'Self', not
   // the protocol itself.
   if (auto Protocol = ContainerType->getAs<ProtocolType>()) {
-    AssociatedTypeDecl *This = 0;
+    AssociatedTypeDecl *Self = 0;
     for (auto Member : Protocol->getDecl()->getMembers()) {
-      This = dyn_cast<AssociatedTypeDecl>(Member);
-      if (!This)
+      Self = dyn_cast<AssociatedTypeDecl>(Member);
+      if (!Self)
         continue;
 
-      if (This->isThis())
+      if (Self->isSelf())
         break;
 
-      This = nullptr;
+      Self = nullptr;
     }
 
-    assert(This && "Missing 'Self' associated type in protocol");
-    ContainerType = This->getDeclaredType();
+    assert(Self && "Missing 'Self' associated type in protocol");
+    ContainerType = Self->getDeclaredType();
   }
 
   if (UnboundGenericType *UGT = ContainerType->getAs<UnboundGenericType>()) {
@@ -954,7 +949,7 @@ SourceRange ConstructorDecl::getSourceRange() const {
 }
 
 Type
-ConstructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
+ConstructorDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
   Type ContainerType = getDeclContext()->getDeclaredTypeOfContext();
 
   if (UnboundGenericType *UGT = ContainerType->getAs<UnboundGenericType>()) {
@@ -1030,7 +1025,7 @@ ConstructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
 }
 
 Type
-DestructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
+DestructorDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
   Type ContainerType = getDeclContext()->getDeclaredTypeOfContext();
 
   if (UnboundGenericType *UGT = ContainerType->getAs<UnboundGenericType>()) {

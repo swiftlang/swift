@@ -533,7 +533,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     
     // Bind the implicit 'Self' type to the type T.
     auto archetype = AssociatedType->getArchetype();
-    if (AssociatedType->isThis()) {
+    if (AssociatedType->isSelf()) {
       TypeMapping[archetype]= T;
       continue;
     }
@@ -911,13 +911,13 @@ existentialConformsToItself(TypeChecker &tc,
   }
 
   // Check whether this protocol conforms to itself.
-  auto thisDecl = proto->getThis();
-  auto thisType = proto->getThis()->getArchetype();
+  auto selfDecl = proto->getSelf();
+  auto selfType = proto->getSelf()->getArchetype();
   for (auto member : proto->getMembers()) {
     // Check for associated types.
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       // 'Self' is obviously okay.
-      if (assocType == thisDecl)
+      if (assocType == selfDecl)
         continue;
 
       // A protocol cannot conform to itself if it has an associated type.
@@ -951,7 +951,7 @@ existentialConformsToItself(TypeChecker &tc,
     if (tc.transformType(memberTy, [&](Type type) -> Type {
           // If we found our archetype, return null.
           if (auto archetype = type->getAs<ArchetypeType>()) {
-            return archetype == thisType? nullptr : type;
+            return archetype == selfType? nullptr : type;
           }
 
           return type;
@@ -1013,7 +1013,7 @@ static void suggestExplicitConformance(TypeChecker &tc,
     Decl *witnessOwner = nullptr;
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(req)) {
       // Ignore the 'Self' declaration.
-      if (assocType == proto->getThis())
+      if (assocType == proto->getSelf())
         continue;
 
       auto witnessTy = conformance->getTypeWitness(assocType).Replacement;

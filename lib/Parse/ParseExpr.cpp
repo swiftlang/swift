@@ -592,17 +592,17 @@ ParserResult<Expr> Parser::parseExprNew() {
       NewArrayExpr::create(Context, newLoc, elementTy.get(), bounds));
 }
 
-static VarDecl *getImplicitThisDeclForSuperContext(Parser &P,
+static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
                                                    DeclContext *dc,
                                                    SourceLoc loc) {
   if (ConstructorDecl *ctor = dyn_cast<ConstructorDecl>(dc)) {
-    return ctor->getImplicitThisDecl();
+    return ctor->getImplicitSelfDecl();
   } else if (DestructorDecl *dtor = dyn_cast<DestructorDecl>(dc)) {
-    return dtor->getImplicitThisDecl();
+    return dtor->getImplicitSelfDecl();
   } else if (FuncExpr *fe = dyn_cast<FuncExpr>(dc)) {
-    auto thisDecl = fe->getImplicitThisDecl();
-    if (thisDecl)
-      return thisDecl;
+    auto selfDecl = fe->getImplicitSelfDecl();
+    if (selfDecl)
+      return selfDecl;
   }
   P.diagnose(loc, diag::super_not_in_class_method);
   return nullptr;
@@ -625,11 +625,11 @@ ParserResult<Expr> Parser::parseExprSuper() {
   // Parse the 'super' reference.
   SourceLoc superLoc = consumeToken(tok::kw_super);
   
-  VarDecl *thisDecl = getImplicitThisDeclForSuperContext(*this,
+  VarDecl *selfDecl = getImplicitSelfDeclForSuperContext(*this,
                                                          CurDeclContext,
                                                          superLoc);
-  Expr *superRef = thisDecl
-    ? cast<Expr>(new (Context) SuperRefExpr(thisDecl, superLoc))
+  Expr *superRef = selfDecl
+    ? cast<Expr>(new (Context) SuperRefExpr(selfDecl, superLoc))
     : cast<Expr>(new (Context) ErrorExpr(superLoc));
   
   if (Tok.is(tok::period)) {
@@ -671,7 +671,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
 
       // The result of the called constructor is used to rebind 'self'.
       return makeParserResult(
-          new (Context) RebindThisInConstructorExpr(result, thisDecl));
+          new (Context) RebindThisInConstructorExpr(result, selfDecl));
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletion) {
         if (auto *SRE = dyn_cast<SuperRefExpr>(superRef))
@@ -688,7 +688,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
                           diag::expected_identifier_after_super_dot_expr))
         return nullptr;
       
-      if (!thisDecl)
+      if (!selfDecl)
         return makeParserErrorResult(new (Context) ErrorExpr(
             SourceRange(superLoc, nameLoc), ErrorType::get(Context)));
       

@@ -259,7 +259,7 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
       if (!LookupFromChildDeclContext) {
         // Current decl context is outside 'D', so 'Self' decl is not visible.
         if (auto AssocType = dyn_cast<AssociatedTypeDecl>(VD))
-          if (AssocType->isThis())
+          if (AssocType->isSelf())
             continue;
       }
       BaseMembers.push_back(VD);
@@ -425,7 +425,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       FuncDecl *FD = FE->getDecl();
       if (FD && FD->getExtensionType()) {
         ExtendedType = FD->getExtensionType();
-        BaseDecl = FD->getImplicitThisDecl();
+        BaseDecl = FD->getImplicitSelfDecl();
         MetaBaseDecl = ExtendedType->getAnyNominal();
         DC = DC->getParent();
 
@@ -455,7 +455,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         FindLocalVal(SM, Loc, Consumer).visit(CD->getBody());
       }
 
-      BaseDecl = CD->getImplicitThisDecl();
+      BaseDecl = CD->getImplicitSelfDecl();
       ExtendedType = CD->getDeclContext()->getDeclaredTypeOfContext();
       if (NominalType *NT = ExtendedType->getAs<NominalType>())
         MetaBaseDecl = NT->getDecl();
@@ -469,7 +469,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         FindLocalVal(SM, Loc, Consumer).visit(CD->getBody());
       }
 
-      BaseDecl = DD->getImplicitThisDecl();
+      BaseDecl = DD->getImplicitSelfDecl();
       ExtendedType = DD->getDeclContext()->getDeclaredTypeOfContext();
       if (NominalType *NT = ExtendedType->getAs<NominalType>())
         MetaBaseDecl = NT->getDecl();
