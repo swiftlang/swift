@@ -204,7 +204,7 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
         SILType argTy = gen.getLoweredLoadableType(elt->getArgumentType());
         eltValue = new (gen.F.getModule()) SILArgument(argTy, caseBB);
       } else {
-        // If the element pattern for a void oneof element has a subpattern, it
+        // If the element pattern for a void union element has a subpattern, it
         // will bind to a void value.
         if (!voidValue)
           voidValue = gen.emitEmptyTuple(SILLocation());
