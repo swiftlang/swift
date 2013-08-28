@@ -2829,6 +2829,19 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         continue;
       }
 
+      // A declaration found directly beats any declaration found via dynamic
+      // lookup.
+      if (choice1.getKind() == OverloadChoiceKind::Decl &&
+          choice2.getKind() == OverloadChoiceKind::DeclViaDynamic) {
+        ++score1;
+        continue;
+      }
+      if (choice1.getKind() == OverloadChoiceKind::Decl &&
+          choice2.getKind() == OverloadChoiceKind::DeclViaDynamic) {
+        ++score2;
+        continue;
+      }
+
       continue;
     }
 
