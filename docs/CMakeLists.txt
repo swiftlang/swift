@@ -164,7 +164,7 @@ if (DOXYGEN_FOUND)
       # Find the value
       string(REPLACE "${Name}=" "" Value ${NameAndValue})
       # Set the variable
-      if (NOT ${Name} EQUALS clang)
+      if (NOT ${Name} EQUALS swift)
 	set(EXTRA_SEARCH_MAPPINGS "${EXTRA_SEARCH_MAPPINGS} ${LLVM_BINARY_DIR}/${NameAndValue}")
       endif()
     endforeach()
