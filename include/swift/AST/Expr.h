@@ -2572,11 +2572,11 @@ public:
 /// reassigning 'self' is a supported feature, and for value type delegating
 /// constructors, where the delegatee constructor is responsible for
 /// initializing 'self' in-place before the delegator's logic executes.
-class RebindThisInConstructorExpr : public Expr {
+class RebindSelfInConstructorExpr : public Expr {
   Expr *SubExpr;
   ValueDecl *Self;
 public:
-  RebindThisInConstructorExpr(Expr *SubExpr, ValueDecl *Self);
+  RebindSelfInConstructorExpr(Expr *SubExpr, ValueDecl *Self);
   
   SourceLoc getLoc() const { return SubExpr->getLoc(); }
   SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
@@ -2586,7 +2586,7 @@ public:
   void setSubExpr(Expr *Sub) { SubExpr = Sub; }
   
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::RebindThisInConstructor;
+    return E->getKind() == ExprKind::RebindSelfInConstructor;
   }
 };
   

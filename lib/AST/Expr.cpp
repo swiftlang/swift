@@ -399,9 +399,9 @@ VarDecl *FuncExpr::getImplicitSelfDecl() const {
   return nullptr;
 }
 
-RebindThisInConstructorExpr::RebindThisInConstructorExpr(Expr *SubExpr,
+RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
                                                          ValueDecl *Self)
-  : Expr(ExprKind::RebindThisInConstructor,
+  : Expr(ExprKind::RebindSelfInConstructor,
          TupleType::getEmpty(Self->getASTContext())),
     SubExpr(SubExpr), Self(Self)
 {}

@@ -395,7 +395,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
-  Expr *visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E) {
+  Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
     Expr *Sub = doIt(E->getSubExpr());
     if (!Sub) return nullptr;
     E->setSubExpr(Sub);

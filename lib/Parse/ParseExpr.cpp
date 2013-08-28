@@ -115,7 +115,7 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::OverloadedDeclRef:
   case ExprKind::Paren:
   case ExprKind::PipeClosure:
-  case ExprKind::RebindThisInConstructor:
+  case ExprKind::RebindSelfInConstructor:
   case ExprKind::IntegerLiteral:
   case ExprKind::StringLiteral:
   case ExprKind::MagicIdentifierLiteral:
@@ -671,7 +671,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
 
       // The result of the called constructor is used to rebind 'self'.
       return makeParserResult(
-          new (Context) RebindThisInConstructorExpr(result, selfDecl));
+          new (Context) RebindSelfInConstructorExpr(result, selfDecl));
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletion) {
         if (auto *SRE = dyn_cast<SuperRefExpr>(superRef))

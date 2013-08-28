@@ -1496,7 +1496,7 @@ namespace {
                            cs.getConstraintLocator(expr, { })));
     }
 
-    Expr *visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *expr) {
+    Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
       return expr;
     }
 

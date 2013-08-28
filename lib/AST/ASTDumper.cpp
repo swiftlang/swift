@@ -1180,8 +1180,8 @@ public:
   void visitIsaExpr(IsaExpr *E) {
     printExplicitCastExpr(E, "is_subtype_expr");
   }
-  void visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E) {
-    printCommon(E, "rebind_this_in_constructor_expr") << '\n';
+  void visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
+    printCommon(E, "rebind_self_in_constructor_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }

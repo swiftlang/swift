@@ -188,7 +188,7 @@ namespace {
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
                                            SGFContext C);
     RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
-    RValue visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E,
+    RValue visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E,
                                             SGFContext C);
     RValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
     RValue visitIfExpr(IfExpr *E, SGFContext C);
@@ -2138,8 +2138,8 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr());
 }
 
-RValue RValueEmitter::visitRebindThisInConstructorExpr(
-                                RebindThisInConstructorExpr *E, SGFContext C) {
+RValue RValueEmitter::visitRebindSelfInConstructorExpr(
+                                RebindSelfInConstructorExpr *E, SGFContext C) {
   // FIXME: Use a different instruction from 'downcast'. IRGen can make
   // "rebind this" into a no-op if the called constructor is a Swift one.
   ManagedValue newSelf = visit(E->getSubExpr()).getAsSingleValue(SGF);

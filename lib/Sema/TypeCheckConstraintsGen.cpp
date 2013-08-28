@@ -907,7 +907,7 @@ namespace {
       return superclassTy;
     }
     
-    Type visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *expr) {
+    Type visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
       // The subexpression must be a supertype of 'self' type.
       CS.addConstraint(ConstraintKind::Subtype,
                        expr->getSelf()->getType(),
