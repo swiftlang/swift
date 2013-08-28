@@ -143,7 +143,7 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition) {
   consumeIf(tok::code_complete);
   // Also perform the same recovery as the main parser to capture tokens from
   // this decl that are past the code completion token.
-  skipUntilDeclStmtRBrace();
+  skipUntilDeclStmtRBrace(tok::l_brace);
   SourceLoc EndLoc = Tok.getLoc();
   State->delayDecl(PersistentParserState::DelayedDeclKind::TopLevelCodeDecl, 0,
                    CurDeclContext, { BeginLoc, EndLoc },
@@ -272,7 +272,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     // but distinguishing the start of an expression from the middle of one is
     // "hard".
     if (NeedParseErrorRecovery) {
-      skipUntilDeclStmtRBrace();
+      skipUntilDeclStmtRBrace(tok::l_brace);
 
       // If we have to recover, pretend that we had a semicolon; it's less
       // noisy that way.

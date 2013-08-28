@@ -345,8 +345,8 @@ void Parser::skipUntilDeclRBrace() {
     skipSingle();
 }
 
-void Parser::skipUntilDeclStmtRBrace(bool StopAtCodeComplete) {
-  while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
+void Parser::skipUntilDeclStmtRBrace(tok T1, bool StopAtCodeComplete) {
+  while (Tok.isNot(T1) && Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
          !isStartOfStmt(Tok) &&
          !isStartOfDecl(Tok, peekToken()) &&
          (!StopAtCodeComplete || Tok.isNot(tok::code_complete))) {

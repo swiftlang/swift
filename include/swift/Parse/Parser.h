@@ -268,8 +268,12 @@ public:
   /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
   void skipUntilDeclRBrace();
 
-  /// skipUntilDeclStmtRBrace - Skip to the next decl, statement or '}'.
-  void skipUntilDeclStmtRBrace(bool StopAtCodeComplete = true);
+  void skipUntilDeclStmtRBrace(tok T1, bool StopAtCodeComplete = true);
+
+  /// \brief Skip to the next decl, statement or '}'.
+  void skipUntilDeclStmtRBrace(bool StopAtCodeComplete = true) {
+    skipUntilDeclStmtRBrace(tok::unknown);
+  }
 
   void skipUntilDeclRBrace(tok T1, tok T2 = tok::unknown,
                            bool StopAtCodeComplete = true);
