@@ -1501,13 +1501,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
     GenericParams = maybeParseGenericParams();
   }
 
-  // We force first type of a func declaration to be a tuple for consistency.
-  //
-  if (!Tok.is(tok::l_paren)) {
-    diagnose(Tok, diag::func_decl_without_paren);
-    return nullptr;
-  }
-
   SmallVector<Pattern*, 8> ArgParams;
   SmallVector<Pattern*, 8> BodyParams;
   
@@ -1527,8 +1520,15 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   bool HadSignatureParseError = false;
   TypeRepr *FuncRetTy = nullptr;
   {
-    ParserStatus SignatureStatus =
-        parseFunctionSignature(ArgParams, BodyParams, FuncRetTy);
+    ParserStatus SignatureStatus;
+    // We force first type of a func declaration to be a tuple for consistency.
+    if (Tok.is(tok::l_paren)) {
+      SignatureStatus =
+          parseFunctionSignature(ArgParams, BodyParams, FuncRetTy);
+    } else {
+      diagnose(Tok, diag::func_decl_without_paren);
+      SignatureStatus = makeParserError();
+    }
 
     if (SignatureStatus.isError()) {
       HadSignatureParseError = true;
