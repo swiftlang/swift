@@ -26,10 +26,8 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include <mach-o/loader.h>
-#include <stdlib.h>
-#include <iostream>
+#include <stdint.h>
 #include <fstream>
-#include <unistd.h>
 
 struct apple_ast_section {
   uint32_t version;
