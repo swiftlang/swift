@@ -588,8 +588,10 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
   if (!accessPath.empty()) {
     for (auto item : *iter) {
       auto vd = cast<ValueDecl>(getDecl(item.second));
-      Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
-      if (auto nominal = ty->getAnyNominal())
+      auto dc = vd->getDeclContext();
+      while (!dc->getParent()->isModuleContext())
+        dc = dc->getParent();
+      if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
         if (nominal->getName() == accessPath.front().first)
           results.push_back(vd);
     }
@@ -614,8 +616,10 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
                                        ClassMembersByName->data_end())) {
       for (auto item : list) {
         auto vd = cast<ValueDecl>(getDecl(item.second));
-        Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
-        if (auto nominal = ty->getAnyNominal())
+        auto dc = vd->getDeclContext();
+        while (!dc->getParent()->isModuleContext())
+          dc = dc->getParent();
+        if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
           if (nominal->getName() == accessPath.front().first)
             consumer.foundDecl(vd);
       }

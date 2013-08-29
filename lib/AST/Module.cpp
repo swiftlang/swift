@@ -167,9 +167,18 @@ void TUModuleCache::populateMemberCache(const TranslationUnit &TU) {
 void TUModuleCache::addToMemberCache(ArrayRef<Decl*> decls) {
   for (Decl *D : decls) {
     auto VD = dyn_cast<ValueDecl>(D);
-    if (!VD || !VD->canBeAccessedByDynamicLookup())
+    if (!VD)
       continue;
-    ClassMembers[VD->getName()].push_back(VD);
+
+    if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
+      assert(!VD->canBeAccessedByDynamicLookup() &&
+             "inner types cannot be accessed by dynamic lookup");
+      if (isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD))
+        addToMemberCache(NTD->getMembers());
+    
+    } else if (VD->canBeAccessedByDynamicLookup()) {
+      ClassMembers[VD->getName()].push_back(VD);
+    }
   }
 }
 
