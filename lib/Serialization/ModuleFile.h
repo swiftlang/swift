@@ -50,12 +50,6 @@ enum class ModuleStatus {
   /// The module is valid.
   Valid,
 
-  /// The module contains pointers to source files, which should be loaded
-  /// instead.
-  ///
-  /// This is a bring-up hack and will eventually go away.
-  FallBackToTranslationUnit,
-
   /// The module file format is too new to be used by this version of the
   /// compiler.
   FormatTooNew,
@@ -196,8 +190,7 @@ private:
 
   /// Convenience function for module loading.
   void error(ModuleStatus issue = ModuleStatus::Malformed) {
-    assert(issue != ModuleStatus::Valid &&
-           issue != ModuleStatus::FallBackToTranslationUnit);
+    assert(issue != ModuleStatus::Valid);
     Status = issue;
   }
 
@@ -316,8 +309,7 @@ public:
 
   /// Returns paths to the source files that were used to build this module.
   ArrayRef<StringRef> getInputSourcePaths() const {
-    assert(getStatus() == ModuleStatus::Valid ||
-           getStatus() == ModuleStatus::FallBackToTranslationUnit);
+    assert(getStatus() == ModuleStatus::Valid);
     return SourcePaths;
   }
 

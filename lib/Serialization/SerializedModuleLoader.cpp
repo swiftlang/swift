@@ -79,42 +79,6 @@ static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
   return err;
 }
 
-static Module *makeTU(ASTContext &ctx, AccessPathElem moduleID,
-                      ArrayRef<StringRef> inputPaths) {
-  // FIXME: The kind of the TU should be read from the serialized file.
-  Component *comp = new (ctx.Allocate<Component>(1)) Component();
-  TranslationUnit *TU = new (ctx) TranslationUnit(moduleID.first, comp, ctx,
-                                                  TranslationUnit::Library);
-
-  TU->HasBuiltinModuleAccess = (moduleID.first.str() == "swift");
-  performAutoImport(TU);
-
-  ctx.LoadedModules[moduleID.first.str()] = TU;
-
-  std::vector<unsigned> BufferIDs;
-  for (auto &path : inputPaths) {
-    // Open the input file.
-    llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
-    if (llvm::MemoryBuffer::getFileOrSTDIN(path, InputFile))
-      return nullptr;
-
-    // Transfer ownership of the MemoryBuffer to the SourceMgr.
-    // FIXME: include location
-    BufferIDs.push_back(ctx.SourceMgr.addNewSourceBuffer(InputFile.take(),
-                                                         moduleID.second));
-  }
-
-  for (auto &BufferID : BufferIDs) {
-    bool Done;
-    do {
-      parseIntoTranslationUnit(TU, BufferID, &Done);
-    } while (!Done);
-  }
-
-  performTypeChecking(TU);
-
-  return TU;
-}
 
 Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
                                            Module::AccessPathTy path) {
@@ -156,8 +120,6 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   std::unique_ptr<ModuleFile> loadedModuleFile;
   ModuleStatus err = ModuleFile::load(std::move(inputFile), loadedModuleFile);
   switch (err) {
-  case ModuleStatus::FallBackToTranslationUnit:
-    return makeTU(Ctx, moduleID, loadedModuleFile->getInputSourcePaths());
   case ModuleStatus::Valid:
     Ctx.bumpGeneration();
     break;

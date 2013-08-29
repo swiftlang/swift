@@ -193,12 +193,6 @@ enum BlockID {
   /// This contains lists of decls known to conform to each compiler-known
   /// protocol.
   KNOWN_PROTOCOL_BLOCK_ID = 64,
-
-  /// An empty block that signals to the reader to throw away the module and
-  /// reparse the source files in the input block.
-  ///
-  /// This is a bring-up hack and will eventually go away.
-  FALL_BACK_TO_TRANSLATION_UNIT_ID = 100
 };
 
 /// The record types within the control block.

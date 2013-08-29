@@ -408,11 +408,6 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
       break;
     }
 
-    case FALL_BACK_TO_TRANSLATION_UNIT_ID:
-      // This is a bring-up hack and will eventually go away.
-      Status = ModuleStatus::FallBackToTranslationUnit;
-      break;
-
     default:
       // Unknown top-level block, possibly for use by a future version of the
       // module format.

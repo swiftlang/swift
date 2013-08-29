@@ -179,11 +179,6 @@ namespace {
     /// The last assigned IdentifierID for types from this module.
     IdentifierID LastIdentifierID = 0;
 
-    /// True if this module does not fully represent the original source file.
-    ///
-    /// This is a bring-up hack and will eventually go away.
-    bool ShouldFallBackToTranslationUnit = false;
-
     /// Returns the record code for serializing the given vector of offsets.
     ///
     /// This allows the offset-serialization code to be generic over all kinds
@@ -287,22 +282,19 @@ namespace {
     void writeMembers(ArrayRef<Decl *> members, bool isClass);
 
     /// Writes a reference to a decl in another module.
-    ///
-    /// Returns false if the decl cannot be serialized without losing
-    /// information.
-    bool writeCrossReference(const Decl *D);
+    void writeCrossReference(const Decl *D);
 
     /// Writes the given decl.
     ///
     /// Returns false if the decl cannot be serialized without losing
     /// information.
-    bool writeDecl(const Decl *D);
+    void writeDecl(const Decl *D);
 
     /// Writes the given type.
     ///
     /// Returns false if the type cannot be serialized without losing
     /// information.
-    bool writeType(Type ty);
+    void writeType(Type ty);
 
     /// Registers the abbreviation for the given decl or type layout.
     template <typename Layout>
@@ -582,8 +574,6 @@ void Serializer::writeBlockInfoBlock() {
 #define PROTOCOL(Id) RECORD(index_block, Id);
 #include "swift/AST/KnownProtocols.def"
   RECORD(index_block, FORCE_DESERIALIZATION);
-
-  BLOCK(FALL_BACK_TO_TRANSLATION_UNIT);
 
 #undef BLOCK
 #undef RECORD
@@ -1022,7 +1012,7 @@ void Serializer::writeMembers(ArrayRef<Decl*> members, bool isClass) {
   DeclContextLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
 }
 
-bool Serializer::writeCrossReference(const Decl *D) {
+void Serializer::writeCrossReference(const Decl *D) {
   using namespace decls_block;
 
   SmallVector<IdentifierID, 4> accessPath;
@@ -1076,8 +1066,6 @@ bool Serializer::writeCrossReference(const Decl *D) {
   unsigned abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
   XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
                          kind, typeID, !!extension, accessPath);
-
-  return true;
 }
 
 /// Translate from the AST associativity enum to the Serialization enum
@@ -1093,21 +1081,21 @@ static uint8_t getRawStableAssociativity(swift::Associativity assoc) {
   }
 }
 
-bool Serializer::writeDecl(const Decl *D) {
+void Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
   assert(!D->isInvalid() && "cannot create a module with an invalid decl");
   Module *M = D->getModuleContext();
-  if (M != TU)
-    return writeCrossReference(D);
+  if (M != TU) {
+    writeCrossReference(D);
+    return;
+  }
 
   assert(!D->hasClangNode() && "imported decls should use cross-references");
 
   switch (D->getKind()) {
   case DeclKind::Import:
-    // FIXME: Do imported module names appear in the DeclContext of the
-    // serialized module?
-    return true;
+    llvm_unreachable("import decls should not be serialized");
 
   case DeclKind::Extension: {
     auto extension = cast<ExtensionDecl>(D);
@@ -1131,7 +1119,7 @@ bool Serializer::writeDecl(const Decl *D) {
     }
     writeMembers(extension->getMembers(), isClassExtension);
 
-    return true;
+    break;
   }
 
   case DeclKind::PatternBinding: {
@@ -1145,12 +1133,12 @@ bool Serializer::writeDecl(const Decl *D) {
     writePattern(binding->getPattern());
     // Ignore initializer; external clients don't need to know about it.
 
-    return true;
+    break;
   }
 
   case DeclKind::TopLevelCode:
     // Top-level code is ignored; external clients don't need to know about it.
-    return true;
+    break;
 
   case DeclKind::InfixOperator: {
     auto op = cast<InfixOperatorDecl>(D);
@@ -1164,7 +1152,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                     addDeclRef(DC),
                                     associativity,
                                     op->getPrecedence());
-    return true;
+    break;
   }
       
   case DeclKind::PrefixOperator: {
@@ -1176,7 +1164,7 @@ bool Serializer::writeDecl(const Decl *D) {
     PrefixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                      addIdentifierRef(op->getName()),
                                      addDeclRef(DC));
-    return true;
+    break;
   }
     
   case DeclKind::PostfixOperator: {
@@ -1188,7 +1176,7 @@ bool Serializer::writeDecl(const Decl *D) {
     PostfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                       addIdentifierRef(op->getName()),
                                       addDeclRef(DC));
-    return true;
+    break;
   }
 
   case DeclKind::TypeAlias: {
@@ -1197,8 +1185,7 @@ bool Serializer::writeDecl(const Decl *D) {
 
     // FIXME: Handle attributes.
     // FIXME: Do typealiases have any interesting attributes? Resilience?
-    if (!typeAlias->getAttrs().empty())
-      return false;
+    assert(typeAlias->getAttrs().empty() && "typealias attrs not handled");
 
     const Decl *DC = getDeclForContext(typeAlias->getDeclContext());
 
@@ -1215,7 +1202,7 @@ bool Serializer::writeDecl(const Decl *D) {
 
     writeConformances(typeAlias->getProtocols(), typeAlias->getConformances(),
                       typeAlias);
-    return true;
+    break;
   }
 
   case DeclKind::GenericTypeParam: {
@@ -1223,9 +1210,8 @@ bool Serializer::writeDecl(const Decl *D) {
     assert(!genericParam->isImplicit() && "Implicit generic parameter?");
 
     // FIXME: Handle attributes.
-    // FIXME: Do typealiases have any interesting attributes? Resilience?
-    if (!genericParam->getAttrs().empty())
-      return false;
+    // FIXME: Do generic params have any interesting attributes?
+    assert(genericParam->getAttrs().empty() && "generic attrs not handled");
 
     const Decl *DC = getDeclForContext(genericParam->getDeclContext());
 
@@ -1241,16 +1227,16 @@ bool Serializer::writeDecl(const Decl *D) {
     writeConformances(genericParam->getProtocols(),
                       genericParam->getConformances(),
                       genericParam);
-    return true;
+    break;
   }
 
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
 
     // FIXME: Handle attributes.
-    // FIXME: Do typealiases have any interesting attributes? Resilience?
-    if (!assocType->getAttrs().empty())
-      return false;
+    // FIXME: Do associated types have any interesting attributes?
+    assert(assocType->getAttrs().empty() &&
+           "associated type attrs not handled");
 
     const Decl *DC = getDeclForContext(assocType->getDeclContext());
 
@@ -1265,15 +1251,14 @@ bool Serializer::writeDecl(const Decl *D) {
     writeConformances(assocType->getProtocols(),
                       assocType->getConformances(),
                       assocType);
-    return true;
+    break;
   }
 
   case DeclKind::Struct: {
     auto theStruct = cast<StructDecl>(D);
     
     // FIXME: Handle attributes.
-    if (!theStruct->getAttrs().empty())
-      return false;
+    assert(theStruct->getAttrs().empty() && "struct attrs not handled");
 
     const Decl *DC = getDeclForContext(theStruct->getDeclContext());
 
@@ -1287,15 +1272,14 @@ bool Serializer::writeDecl(const Decl *D) {
     writeConformances(theStruct->getProtocols(), theStruct->getConformances(),
                       theStruct);
     writeMembers(theStruct->getMembers(), false);
-    return true;
+    break;
   }
 
   case DeclKind::Union: {
     auto theUnion = cast<UnionDecl>(D);
 
     // FIXME: Handle attributes.
-    if (!theUnion->getAttrs().empty())
-      return false;
+    assert(theUnion->getAttrs().empty() && "union attrs not handled");
 
     const Decl *DC = getDeclForContext(theUnion->getDeclContext());
 
@@ -1309,7 +1293,7 @@ bool Serializer::writeDecl(const Decl *D) {
     writeConformances(theUnion->getProtocols(), theUnion->getConformances(),
                       theUnion);
     writeMembers(theUnion->getMembers(), false);
-    return true;
+    break;
   }
 
   case DeclKind::Class: {
@@ -1317,9 +1301,7 @@ bool Serializer::writeDecl(const Decl *D) {
 
     DeclAttributes remainingAttrs = theClass->getAttrs();
     remainingAttrs.ObjC = false;
-
-    if (!remainingAttrs.empty())
-      return false;
+    assert(remainingAttrs.empty() && "unhandled class attrs");
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
 
@@ -1335,7 +1317,7 @@ bool Serializer::writeDecl(const Decl *D) {
     writeConformances(theClass->getProtocols(), theClass->getConformances(),
                       theClass);
     writeMembers(theClass->getMembers(), true);
-    return true;
+    break;
   }
 
 
@@ -1346,8 +1328,7 @@ bool Serializer::writeDecl(const Decl *D) {
     remainingAttrs.ClassProtocol = false;
     remainingAttrs.ObjC = false;
 
-    if (!remainingAttrs.empty())
-      return false;
+    assert(remainingAttrs.empty() && "unhandled protocol attrs");
 
     assert(!proto->getGenericParams() && "protocols can't be generic");
     const Decl *DC = getDeclForContext(proto->getDeclContext());
@@ -1366,7 +1347,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                protocols);
 
     writeMembers(proto->getMembers(), true);
-    return true;
+    break;
   }
 
   case DeclKind::Var: {
@@ -1377,8 +1358,7 @@ bool Serializer::writeDecl(const Decl *D) {
     remainingAttrs.ObjC = false;
     remainingAttrs.IBOutlet = false;
 
-    if (!remainingAttrs.empty())
-      return false;
+    assert(remainingAttrs.empty() && "unhandled var attrs");
 
     const Decl *DC = getDeclForContext(var->getDeclContext());
     Type type = var->hasType() ? var->getType() : nullptr;
@@ -1394,8 +1374,7 @@ bool Serializer::writeDecl(const Decl *D) {
                           addDeclRef(var->getGetter()),
                           addDeclRef(var->getSetter()),
                           addDeclRef(var->getOverriddenDecl()));
-
-    return true;
+    break;
   }
 
   case DeclKind::Func: {
@@ -1414,8 +1393,7 @@ bool Serializer::writeDecl(const Decl *D) {
     remainingAttrs.ObjC = false;
     remainingAttrs.IBAction = false;
 
-    if (!remainingAttrs.empty())
-      return false;
+    assert(remainingAttrs.empty() && "unhandled func attrs");
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());
 
@@ -1446,15 +1424,14 @@ bool Serializer::writeDecl(const Decl *D) {
     if (fn->getAttrs().isConversion())
       EagerDeserializationDecls.push_back(addDeclRef(DC));
 
-    return true;
+    break;
   }
 
   case DeclKind::UnionElement: {
     auto elem = cast<UnionElementDecl>(D);
 
     // FIXME: Handle attributes.
-    if (!elem->getAttrs().empty())
-      return false;
+    assert(elem->getAttrs().empty() && "unhandled union element attrs");
 
     const Decl *DC = getDeclForContext(elem->getDeclContext());
 
@@ -1466,7 +1443,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                    addTypeRef(elem->getResultType()),
                                    addTypeRef(elem->getType()),
                                    elem->isImplicit());
-    return true;
+    break;
   }
 
   case DeclKind::Subscript: {
@@ -1474,9 +1451,7 @@ bool Serializer::writeDecl(const Decl *D) {
 
     DeclAttributes remainingAttrs = subscript->getAttrs();
     remainingAttrs.ObjC = false;
-
-    if (!remainingAttrs.empty())
-      return false;
+    assert(remainingAttrs.empty() && "unhandled subscript attrs");
 
     const Decl *DC = getDeclForContext(subscript->getDeclContext());
 
@@ -1492,8 +1467,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                 addDeclRef(subscript->getOverriddenDecl()));
 
     writePattern(subscript->getIndices());
-
-    return true;
+    break;
   }
 
 
@@ -1502,15 +1476,9 @@ bool Serializer::writeDecl(const Decl *D) {
 
     DeclAttributes remainingAttrs = ctor->getAttrs();
     remainingAttrs.ObjC = false;
+    assert(remainingAttrs.empty() && "unhandled constructor attrs");
 
-    if (!remainingAttrs.empty())
-      return false;
-
-    // FIXME: Handle allocating constructors.
-    // FIXME: Does this ever occur in Swift modules? If it's only used by the
-    // importer, perhaps we don't need to worry about it here.
-    if (ctor->getAllocSelfExpr())
-      return false;
+    assert(!ctor->getAllocSelfExpr() && "allocating constructors not handled");
 
     const Decl *DC = getDeclForContext(ctor->getDeclContext());
     auto implicitSelf = ctor->getImplicitSelfDecl();
@@ -1525,8 +1493,7 @@ bool Serializer::writeDecl(const Decl *D) {
 
     writeGenericParams(ctor->getGenericParams());
     writePattern(ctor->getArguments());
-
-    return true;
+    break;
   }
 
   case DeclKind::Destructor: {
@@ -1534,9 +1501,7 @@ bool Serializer::writeDecl(const Decl *D) {
 
     DeclAttributes remainingAttrs = dtor->getAttrs();
     remainingAttrs.ObjC = false;
-
-    if (!remainingAttrs.empty())
-      return false;
+    assert(remainingAttrs.empty() && "unhandled destructor attrs");
 
     const Decl *DC = getDeclForContext(dtor->getDeclContext());
     auto implicitSelf = dtor->getImplicitSelfDecl();
@@ -1549,7 +1514,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                  addTypeRef(dtor->getType()),
                                  addDeclRef(implicitSelf));
     
-    return true;
+    break;
   }
   }
 }
@@ -1583,7 +1548,7 @@ static uint8_t getRawStableOwnership(swift::Ownership ownership) {
   llvm_unreachable("bad ownership kind");
 }
 
-bool Serializer::writeType(Type ty) {
+void Serializer::writeType(Type ty) {
   using namespace decls_block;
 
   switch (ty.getPointer()->getKind()) {
@@ -1605,7 +1570,7 @@ bool Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     addDeclRef(typeAlias));
-    return true;
+    break;
   }
 
   case TypeKind::Paren: {
@@ -1614,7 +1579,7 @@ bool Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[ParenTypeLayout::Code];
     ParenTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addTypeRef(parenTy->getUnderlyingType()));
-    return true;
+    break;
   }
 
   case TypeKind::Tuple: {
@@ -1634,7 +1599,7 @@ bool Serializer::writeType(Type ty) {
                                      elt.isVararg());
     }
 
-    return true;
+    break;
   }
 
   case TypeKind::Struct:
@@ -1647,7 +1612,7 @@ bool Serializer::writeType(Type ty) {
     NominalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   addDeclRef(nominalTy->getDecl()),
                                   addTypeRef(nominalTy->getParent()));
-    return true;
+    break;
   }
 
   case TypeKind::MetaType: {
@@ -1656,7 +1621,7 @@ bool Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[MetaTypeTypeLayout::Code];
     MetaTypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addTypeRef(metatypeTy->getInstanceType()));
-    return true;
+    break;
   }
 
   case TypeKind::Module:
@@ -1699,7 +1664,7 @@ bool Serializer::writeType(Type ty) {
     ArchetypeNestedTypesLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            nestedTypes);
 
-    return true;
+    break;
   }
 
   case TypeKind::GenericTypeParam: {
@@ -1707,7 +1672,7 @@ bool Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
     GenericTypeParamTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            addDeclRef(genericParam->getDecl()));
-    return true;
+    break;
   }
 
   case TypeKind::AssociatedType: {
@@ -1715,7 +1680,7 @@ bool Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[AssociatedTypeTypeLayout::Code];
     AssociatedTypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addDeclRef(assocType->getDecl()));
-    return true;
+    break;
   }
 
   case TypeKind::Substituted: {
@@ -1725,7 +1690,7 @@ bool Serializer::writeType(Type ty) {
     SubstitutedTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                       addTypeRef(subTy->getOriginal()),
                                       addTypeRef(subTy->getReplacementType()));
-    return true;
+    break;
   }
 
   case TypeKind::DependentMember: {
@@ -1736,7 +1701,7 @@ bool Serializer::writeType(Type ty) {
       Out, ScratchRecord, abbrCode,
       addTypeRef(dependent->getBase()),
       addIdentifierRef(dependent->getName()));
-    return true;
+    break;
   }
 
   case TypeKind::Function: {
@@ -1751,8 +1716,7 @@ bool Serializer::writeType(Type ty) {
                                    fnTy->isThin(),
                                    fnTy->isNoReturn(),
                                    fnTy->isBlock());
-
-    return true;
+    break;
   }
 
   case TypeKind::PolymorphicFunction: {
@@ -1768,8 +1732,7 @@ bool Serializer::writeType(Type ty) {
                                               getRawStableCC(callingConvention),
                                               fnTy->isThin(),
                                               fnTy->isNoReturn());
-
-    return true;
+    break;
   }
 
   case TypeKind::Array: {
@@ -1780,7 +1743,7 @@ bool Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[ArrayTypeLayout::Code];
     ArrayTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                      addTypeRef(base), arrayTy->getSize());
-    return true;
+    break;
   }
 
   case TypeKind::ArraySlice: {
@@ -1791,7 +1754,7 @@ bool Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[ArraySliceTypeLayout::Code];
     ArraySliceTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                      addTypeRef(base));
-    return true;
+    break;
   }
 
   case TypeKind::Optional: {
@@ -1802,7 +1765,7 @@ bool Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[OptionalTypeLayout::Code];
     OptionalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addTypeRef(base));
-    return true;
+    break;
   }
 
   case TypeKind::ProtocolComposition: {
@@ -1815,8 +1778,7 @@ bool Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
     ProtocolCompositionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                               protocols);
-
-    return true;
+    break;
   }
 
   case TypeKind::LValue: {
@@ -1827,7 +1789,7 @@ bool Serializer::writeType(Type ty) {
                                  addTypeRef(lValueTy->getObjectType()),
                                  lValueTy->getQualifiers().isImplicit(),
                                  !lValueTy->getQualifiers().isSettable());
-    return true;
+    break;
   }
 
   case TypeKind::UnownedStorage:
@@ -1839,7 +1801,7 @@ bool Serializer::writeType(Type ty) {
     ReferenceStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            stableOwnership,
                                   addTypeRef(refTy->getReferentType()));
-    return true;
+    break;
   }
 
   case TypeKind::UnboundGeneric: {
@@ -1849,7 +1811,7 @@ bool Serializer::writeType(Type ty) {
     UnboundGenericTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addDeclRef(generic->getDecl()),
                                          addTypeRef(generic->getParent()));
-    return true;
+    break;
   }
 
   case TypeKind::BoundGenericClass:
@@ -1874,8 +1836,7 @@ bool Serializer::writeType(Type ty) {
                                        genericArgIDs);
 
     writeSubstitutions(substitutions);
-
-    return true;
+    break;
   }
 
   case TypeKind::TypeVariable:
@@ -1963,12 +1924,10 @@ void Serializer::writeAllDeclsAndTypes() {
     
     offsets.push_back(Out.GetCurrentBitNo());
 
-    // If we can't handle a decl or type, mark the module as incomplete.
-    // FIXME: Eventually we should assert this.
-    bool success = next.isDecl() ? writeDecl(next.getDecl())
-                                 : writeType(next.getType());
-    if (!success)
-      ShouldFallBackToTranslationUnit = true;
+    if (next.isDecl())
+      writeDecl(next.getDecl());
+    else
+      writeType(next.getType());
   }
 }
 
@@ -2115,9 +2074,6 @@ void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,
   writeHeader();
   writeInputFiles(TU, inputFiles, moduleLinkName);
   writeTranslationUnit(TU);
-
-  if (ShouldFallBackToTranslationUnit)
-    BCBlockRAII(Out, FALL_BACK_TO_TRANSLATION_UNIT_ID, 2);
 
   os.write(Buffer.data(), Buffer.size());
   os.flush();
