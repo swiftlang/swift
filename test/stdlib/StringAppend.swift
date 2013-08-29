@@ -2,14 +2,14 @@
 
 func StringAppend() {
   var str : String
-  str = "Some"
+  str = "So" + "me"
   var str2 : String
-  str2 = "text"
+  str2 = 't' + 'e' + "xt"
   var str3 : String
-  str3 = str + " " + str2
-  print(str3);
+  str3 = '¡' + str + ' ' + str2 + '!'
+  print(str3)
 }
 
 StringAppend()
 
-// CHECK: Some text
+// CHECK: ¡Some text!
