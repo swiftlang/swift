@@ -311,17 +311,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   if (Impl.KnownProtocols[index])
     return Impl.KnownProtocols[index];
 
-  // Find the "swift" module.
-  auto module = LoadedModules.find("swift");
-  if (module == LoadedModules.end())
-    return nullptr;
-
-  // Look for the protocol by name.
-  Identifier name = getIdentifier(getProtocolName(kind));
-
   // Find all of the declarations with this name in the Swift module.
   SmallVector<ValueDecl *, 1> results;
-  module->second->lookupValue({ }, name, NLKind::UnqualifiedLookup, results);
+  lookupInSwiftModule(*this, getProtocolName(kind), results);
   for (auto result : results) {
     if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
       Impl.KnownProtocols[index] = protocol;
