@@ -9,6 +9,23 @@ its current implementation state.
 
 .. contents:: Index
 
+DaveZ's Proposed Document Structure
+-----------------------------------
+
+1. High level design rationale
+
+Prose: words and thoughts like this: "deep reverence and respect for
+the lessons learned from many languages and libraries". You don't
+literally need to use the word "reverence" or "respect", but they do
+help set the tone.
+
+2. Examples and tutorials
+3. Reference manual
+4. High level comparison to NSString
+5. Side by side comparisons with NSString
+Take advantage of the back that you can reference back to sections 1,
+2, and 3 in this outline. :-)
+
 Chris' Outline of Important Points to Cover
 -------------------------------------------
 
@@ -27,6 +44,9 @@ Chris' Outline of Important Points to Cover
   - How does Bridging Work
   - Measured Performance Cost
   - You can still use NSString
+
+------------------------------------------------------------------------
+
 
 General Principles
 ------------------
