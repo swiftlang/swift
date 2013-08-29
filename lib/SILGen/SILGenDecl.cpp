@@ -15,7 +15,6 @@
 #include "OwnershipConventions.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "llvm/ADT/OwningPtr.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"

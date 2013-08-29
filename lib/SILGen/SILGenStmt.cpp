@@ -18,7 +18,6 @@
 #include "RValue.h"
 #include "swift/AST/AST.h"
 #include "swift/SIL/SILArgument.h"
-#include "llvm/ADT/OwningPtr.h"
 #include "swift/AST/Diagnostics.h"
 
 using namespace swift;
