@@ -338,9 +338,13 @@ static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
 }
 
 static CanType stripImmediateLabels(CanType type) {
-  while (auto tuple = dyn_cast<TupleType>(type))
-    if (tuple->getNumElements() == 1)
+  while (auto tuple = dyn_cast<TupleType>(type)) {
+    if (tuple->getNumElements() == 1) {
       type = tuple.getElementType(0);
+    } else {
+      break;
+    }
+  }
   return type;
 }
 
