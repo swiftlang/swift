@@ -448,6 +448,8 @@ ERROR(no_sil_stage_declared, decl_parsing, none,
 
 ERROR(expected_type,type_parsing,none,
       "expected type", ())
+ERROR(expected_type_is_keyword,pattern_parsing,none,
+      "expected type, found keyword", ())
 ERROR(expected_initializer_expr,expr_parsing,none,
       "expected initializer expression after '='", ())
 ERROR(attribute_does_not_apply_to_type,type_parsing,none,

@@ -85,8 +85,18 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     return makeParserCodeCompletionResult<TypeRepr>();
   }
   default:
-    diagnose(Tok, MessageID);
-    return nullptr;
+    // Nested switch because IDENTIFIER_KEYWORD includes tok::kw_Self, which is
+    // handled above.
+    switch (Tok.getKind()) {
+#define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
+#include "swift/Parse/Tokens.def"
+      diagnose(Tok, diag::expected_type_is_keyword);
+      consumeToken();
+      return nullptr;
+    default:
+      diagnose(Tok, MessageID);
+      return nullptr;
+    }
   }
 
   // '.metatype' and '?' still leave us with type-simple.
