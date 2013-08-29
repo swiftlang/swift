@@ -1060,7 +1060,10 @@ public:
   /// needsCapture - Check whether referring to this decl from a nested
   /// function requires capturing it.
   bool needsCapture() const;
-  
+
+  /// Retrieve the declaration that this declaration overrides, if any.
+  ValueDecl *getOverriddenDecl() const;
+
   /// isObjC - Returns true if the decl requires Objective-C interop.
   bool isObjC() const { return AttrsAndIsObjC.getInt(); }
   

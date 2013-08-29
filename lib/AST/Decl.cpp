@@ -433,6 +433,19 @@ ValueDecl::getDefaultArg(unsigned index) const {
   return { found->getDefaultArgKind(), found->getPattern()->getType() };
 }
 
+ValueDecl *ValueDecl::getOverriddenDecl() const {
+  if (auto fd = dyn_cast<FuncDecl>(this)) {
+    return fd->getOverriddenDecl();
+  }
+  if (auto vd = dyn_cast<VarDecl>(this)) {
+    return vd->getOverriddenDecl();
+  }
+  if (auto sd = dyn_cast<SubscriptDecl>(this)) {
+    return sd->getOverriddenDecl();
+  }
+  return nullptr;
+}
+
 Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this))
     return TAD->getAliasType();

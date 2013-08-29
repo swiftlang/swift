@@ -852,6 +852,12 @@ bool Module::lookupQualified(Type type,
     // For each declaration whose context is not something we've
     // already visited above, add it to the list of declarations.
     for (auto decl : allDecls) {
+      // If the declaration has an override, name lookup will also have
+      // found the overridden method. Skip this declaration, because we
+      // prefer the overridden method.
+      if (decl->getOverriddenDecl())
+        continue;
+
       auto dc = decl->getDeclContext();
       auto nominal = dyn_cast<NominalTypeDecl>(dc);
       if (!nominal) {
@@ -872,17 +878,8 @@ bool Module::lookupQualified(Type type,
     // Find all of the overridden declarations.
     llvm::SmallPtrSet<ValueDecl*, 8> overridden;
     for (auto decl : decls) {
-      // FIXME: Generalize this.
-      if (auto fd = dyn_cast<FuncDecl>(decl)) {
-        if (fd->getOverriddenDecl())
-          overridden.insert(fd->getOverriddenDecl());
-      } else if (auto vd = dyn_cast<VarDecl>(decl)) {
-        if (vd->getOverriddenDecl())
-          overridden.insert(vd->getOverriddenDecl());
-      } else if (auto sd = dyn_cast<SubscriptDecl>(decl)) {
-        if (sd->getOverriddenDecl())
-          overridden.insert(sd->getOverriddenDecl());
-      }
+      if (auto overrides = decl->getOverriddenDecl())
+        overridden.insert(overrides);
     }
 
     // If any methods were overridden, remove them from the results.

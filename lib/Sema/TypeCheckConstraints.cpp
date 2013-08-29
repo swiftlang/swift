@@ -2704,22 +2704,77 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   }
 }
 
+/// Compare two declarations to determine whether one is a witness of the other.
+static Comparison compareWitnessAndRequirement(TypeChecker &tc,
+                                               ValueDecl *decl1,
+                                               ValueDecl *decl2) {
+  // We only have a witness/requirement pair if exactly one of the declarations
+  // comes from a protocol.
+  auto proto1 = dyn_cast<ProtocolDecl>(decl1->getDeclContext());
+  auto proto2 = dyn_cast<ProtocolDecl>(decl2->getDeclContext());
+  if ((bool)proto1 == (bool)proto2)
+    return Comparison::Unordered;
+
+  // Figure out the protocol, requirement, and potential witness.
+  ProtocolDecl *proto;
+  ValueDecl *req;
+  ValueDecl *potentialWitness;
+  if (proto1) {
+    proto = proto1;
+    req = decl1;
+    potentialWitness = decl2;
+  } else {
+    proto = proto2;
+    req = decl2;
+    potentialWitness = decl1;
+  }
+
+  // Cannot compare type declarations this way.
+  // FIXME: Use the same type-substitution approach as lookupMemberType.
+  if (isa<TypeDecl>(req))
+    return Comparison::Unordered;
+
+  if (!potentialWitness->getDeclContext()->isTypeContext())
+    return Comparison::Unordered;
+
+  // Determine whether the type of the witness's context conforms to the
+  // protocol.
+  auto owningType
+    = potentialWitness->getDeclContext()->getDeclaredTypeInContext();
+  ProtocolConformance *conformance = nullptr;
+  if (!tc.conformsToProtocol(owningType, proto, &conformance))
+    return Comparison::Unordered;
+
+  // If the witness and the potential witness are not the same, there's no
+  // ordering here.
+  if (conformance->getWitness(req).Decl != potentialWitness)
+    return Comparison::Unordered;
+
+  // We have a requirement/witness match.
+  return proto1? Comparison::Worse : Comparison::Better;
+}
+
 /// \brief Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
 /// "Specialized" is essentially a form of subtyping, defined below.
 static bool isDeclAsSpecializedAs(TypeChecker &tc,
-                                  Decl *decl1, Decl *decl2) {
+                                  ValueDecl *decl1, ValueDecl *decl2) {
   // If the kinds are different, there's nothing we can do.
   // FIXME: This is wrong for type declarations.
   if (decl1->getKind() != decl2->getKind())
     return false;
 
-  // A declaration within a nominal type takes precedent over one in a protocol.
-  bool isProtocolDecl1 = isa<ProtocolDecl>(decl1->getDeclContext());
-  bool isProtocolDecl2 = isa<ProtocolDecl>(decl2->getDeclContext());
-  if (isProtocolDecl1 != isProtocolDecl2) {
-    return isProtocolDecl2;
+  // A witness is always more specialized than the requirement it satisfies.
+  switch (compareWitnessAndRequirement(tc, decl1, decl2)) {
+  case Comparison::Unordered:
+    break;
+
+  case Comparison::Better:
+    return true;
+
+  case Comparison::Worse:
+    return false;
   }
 
   Type type1;
@@ -2786,6 +2841,22 @@ Comparison TypeChecker::compareDeclarations(ValueDecl *decl1, ValueDecl *decl2){
     return Comparison::Unordered;
 
   return decl1Better? Comparison::Better : Comparison::Worse;
+}
+
+/// Determine whether we're allowed to compare the given declarations found
+/// via dynamic lookup.
+static bool canCompareDynamicDecls(ValueDecl *decl1, ValueDecl *decl2) {
+  // If the two declarations occur within the same nominal type, it's fine
+  // to compare them because either result will end up operating on the same
+  // object type.
+  auto nominal1
+    = decl1->getDeclContext()->getDeclaredTypeOfContext()->getAnyNominal();
+  auto nominal2
+    = decl2->getDeclContext()->getDeclaredTypeOfContext()->getAnyNominal();
+  if (nominal1 == nominal2)
+    return true;
+
+  return false;
 }
 
 SolutionCompareResult ConstraintSystem::compareSolutions(
@@ -2859,8 +2930,32 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::TypeDecl:
       break;
 
-    case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaDynamic:
+      // Only allow ambiguity resolution between declarations found via dynamic
+      // lookup in certain cases.
+      if (!canCompareDynamicDecls(choice1.getDecl(), choice2.getDecl())) {
+        // If one declaration is a witness for the other (which is a
+        // requirement), prefer the requirement because it is the more general
+        // answer.
+        switch (compareWitnessAndRequirement(tc, choice1.getDecl(),
+                                             choice2.getDecl())) {
+        case Comparison::Unordered:
+          break;
+
+        case Comparison::Better:
+          ++score2;
+          break;
+
+        case Comparison::Worse:
+          ++score1;
+          break;
+        }
+        break;
+      }
+
+      SWIFT_FALLTHROUGH;
+
+    case OverloadChoiceKind::Decl:
       // Determine whether one declaration is more specialized than the other.
       if (isDeclAsSpecializedAs(tc, choice1.getDecl(), choice2.getDecl()))
         ++score1;

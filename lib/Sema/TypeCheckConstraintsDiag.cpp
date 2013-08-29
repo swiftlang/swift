@@ -39,7 +39,7 @@ void Failure::dump(SourceManager *sm) {
     break;
 
   case FunctionTypesMismatch:
-    out << "function type" << getFirstType().getString() << " is not equal to "
+    out << "function type " << getFirstType().getString() << " is not equal to "
     << getSecondType().getString();
     break;
 
