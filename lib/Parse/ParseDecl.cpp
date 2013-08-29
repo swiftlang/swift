@@ -1473,6 +1473,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   // FIXME: Implicitly add immutable attribute.
   parseAttributeList(Attributes);
   
+  bool ShouldMarkDeclInvalid = false;
+
   Identifier Name;
   SourceLoc NameLoc = Tok.getLoc();
   if (!(Flags & PD_AllowTopLevel) && !(Flags & PD_DisallowFuncDef) &&
@@ -1480,8 +1482,26 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
     diagnose(Tok, diag::func_decl_nonglobal_operator);
     return nullptr;
   }
-  if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "func"))
-    return nullptr;
+  if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "func")) {
+    if (Tok.isKeyword() && peekToken().is(tok::l_paren)) {
+      // The name is a keyword, which is not allowed, but we see the beginning
+      // of the parameter tuple after that.  Recover by faking a name from the
+      // keyword.  Of course, this function will not be callable, but the
+      // diagnostics that print the function name back will include the name as
+      // spelled in the source.
+      Name = Context.getIdentifier(Tok.getText());
+      consumeToken();
+
+      // A declaration with a keyword as a name is serious error, ensure that
+      // the type checker does not try to look at this decl.  This function can
+      // not be referenced from anywhere, so this should not cause other
+      // errors.
+      ShouldMarkDeclInvalid = true;
+    } else {
+      // We are not sure that we can resynchronize.
+      return nullptr;
+    }
+  }
   
   // Parse the generic-params, if present.
   Optional<Scope> GenericsScope;
@@ -1623,8 +1643,11 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
                                         CurDeclContext);
   if (FE)
     FE->setDecl(FD);
-  if (Attributes.isValid()) FD->getMutableAttrs() = Attributes;
+  if (Attributes.isValid())
+    FD->getMutableAttrs() = Attributes;
   addToScope(FD);
+  if (ShouldMarkDeclInvalid)
+    FD->setInvalid();
   return makeParserResult(FD);
 }
 
