@@ -2659,7 +2659,6 @@ static Type stripInitializers(TypeChecker &tc, Type origType) {
 
 ///\ brief Compare two declarations for equality when they are used.
 ///
-//
 static bool sameDecl(Decl *decl1, Decl *decl2) {
   if (decl1 == decl2)
     return true;
@@ -2678,6 +2677,57 @@ static bool sameDecl(Decl *decl1, Decl *decl2) {
   return false;
 }
 
+/// Determine whether the given declarations are equivalent in the Objective-C
+/// runtime and have compatible types.
+static bool areEquivalentObjCDecls(ValueDecl *decl1, ValueDecl *decl2) {
+  if (!decl1->isObjC() || !decl2->isObjC() ||
+      decl1->getKind() != decl2->getKind())
+    return false;
+
+  Type type1, type2;
+  if (auto func1 = dyn_cast<FuncDecl>(decl1)) {
+    auto func2 = cast<FuncDecl>(decl2);
+
+    // Compare selectors
+    llvm::SmallString<32> sel1, sel2;
+    if (func1->getObjCSelector(sel1) != func2->getObjCSelector(sel2))
+      return false;
+
+    // Extract the function type.
+    type1 = func1->getType()->castTo<AnyFunctionType>()->getResult();
+    type2 = func2->getType()->castTo<AnyFunctionType>()->getResult();
+  } else if (auto con1 = dyn_cast<ConstructorDecl>(decl1)) {
+    auto con2 = cast<ConstructorDecl>(decl2);
+
+    // Compare selectors
+    llvm::SmallString<32> sel1, sel2;
+    if (con1->getObjCSelector(sel1) != con2->getObjCSelector(sel2))
+      return false;
+
+    // Extract the function type.
+    type1 = con1->getType()->castTo<AnyFunctionType>()->getResult();
+    type2 = con2->getType()->castTo<AnyFunctionType>()->getResult();
+  } else if (auto var1 = dyn_cast<VarDecl>(decl1)) {
+    auto var2 = cast<VarDecl>(decl2);
+
+    // Compare getter/setter selectors.
+    llvm::SmallString<32> sel1, sel2;
+    if (var1->getObjCGetterSelector(sel1)!=var2->getObjCGetterSelector(sel2) ||
+        var1->getObjCSetterSelector(sel1)!=var2->getObjCSetterSelector(sel2))
+      return false;
+
+    // Extract the type.
+    type1 = var1->getType();
+    type2 = var2->getType();
+  } else {
+    // FIXME: Subscript declarations.
+    return false;
+  }
+
+  // Require exact type equality, at least for now.
+  return type1->isEqual(type2);
+}
+
 /// \brief Compare two overload choices for equality.
 static bool sameOverloadChoice(const OverloadChoice &x,
                                const OverloadChoice &y) {
@@ -2691,8 +2741,16 @@ static bool sameOverloadChoice(const OverloadChoice &x,
     // FIXME: Compare base types after substitution?
     return true;
 
-  case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaDynamic:
+      // If both declarations are the same, we're done.
+    if (sameDecl(x.getDecl(), y.getDecl()))
+      return true;
+
+    // Otherwise, if both declarations are Objective-C declarations with the
+    // same underlying selector and type.
+    return areEquivalentObjCDecls(x.getDecl(), y.getDecl());
+
+  case OverloadChoiceKind::Decl:
     return sameDecl(x.getDecl(), y.getDecl());
 
   case OverloadChoiceKind::TypeDecl:
