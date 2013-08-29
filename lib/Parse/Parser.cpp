@@ -302,26 +302,22 @@ SourceLoc Parser::consumeStartingGreater() {
   return Loc;
 }
 
-void Parser::skipSingle(bool StopAtCodeComplete) {
+void Parser::skipSingle() {
   switch (Tok.getKind()) {
   case tok::l_paren:
     consumeToken();
-    skipUntil(tok::r_paren, StopAtCodeComplete);
+    skipUntil(tok::r_paren);
     consumeIf(tok::r_paren);
     break;
   case tok::l_brace:
     consumeToken();
-    skipUntil(tok::r_brace, StopAtCodeComplete);
+    skipUntil(tok::r_brace);
     consumeIf(tok::r_brace);
     break;
   case tok::l_square:
     consumeToken();
-    skipUntil(tok::r_square, StopAtCodeComplete);
+    skipUntil(tok::r_square);
     consumeIf(tok::r_square);
-    break;
-  case tok::code_complete:
-    if (!StopAtCodeComplete)
-      consumeToken();
     break;
   default:
     consumeToken();
@@ -329,18 +325,17 @@ void Parser::skipSingle(bool StopAtCodeComplete) {
   }
 }
 
-void Parser::skipUntil(tok T1, tok T2, bool StopAtCodeComplete) {
+void Parser::skipUntil(tok T1, tok T2) {
   // tok::unknown is a sentinel that means "don't skip".
   if (T1 == tok::unknown && T2 == tok::unknown) return;
   
-  while (Tok.isNot(tok::eof) && Tok.isNot(T1) && Tok.isNot(T2) &&
-         (!StopAtCodeComplete || Tok.isNot(tok::code_complete)))
-    skipSingle(StopAtCodeComplete);
+  while (Tok.isNot(tok::eof) && Tok.isNot(T1) && Tok.isNot(T2))
+    skipSingle();
 }
 
 void Parser::skipUntilAnyOperator() {
   while (Tok.isNot(tok::eof) && Tok.isNotAnyOperator())
-    skipSingle(false);
+    skipSingle();
 }
 
 void Parser::skipUntilDeclRBrace() {
@@ -349,21 +344,19 @@ void Parser::skipUntilDeclRBrace() {
     skipSingle();
 }
 
-void Parser::skipUntilDeclStmtRBrace(tok T1, bool StopAtCodeComplete) {
+void Parser::skipUntilDeclStmtRBrace(tok T1) {
   while (Tok.isNot(T1) && Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
          !isStartOfStmt(Tok) &&
-         !isStartOfDecl(Tok, peekToken()) &&
-         (!StopAtCodeComplete || Tok.isNot(tok::code_complete))) {
-    skipSingle(StopAtCodeComplete);
+         !isStartOfDecl(Tok, peekToken())) {
+    skipSingle();
   }
 }
 
-void Parser::skipUntilDeclRBrace(tok T1, tok T2, bool StopAtCodeComplete) {
+void Parser::skipUntilDeclRBrace(tok T1, tok T2) {
   while (Tok.isNot(T1) && Tok.isNot(T2) &&
          Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
-         !isStartOfDecl(Tok, peekToken()) &&
-         (!StopAtCodeComplete || Tok.isNot(tok::code_complete))) {
-    skipSingle(StopAtCodeComplete);
+         !isStartOfDecl(Tok, peekToken())) {
+    skipSingle();
   }
 }
 

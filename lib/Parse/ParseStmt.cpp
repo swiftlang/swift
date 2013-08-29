@@ -150,7 +150,7 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition) {
 
   // Skip the rest of the file to prevent the parser from constructing the AST
   // for it.  Forward references are not allowed at the top level.
-  skipUntil(tok::eof, /*StopAtCodeComplete=*/false);
+  skipUntil(tok::eof);
 }
 
 static void unwrapIfDiscardedClosure(Parser &P,

@@ -259,24 +259,23 @@ public:
   /// \brief Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token
   /// will ever occur, this skips to some likely good stopping point.
-  void skipUntil(tok T1, bool StopAtCodeComplete = true) {
-    skipUntil(T1, tok::unknown, StopAtCodeComplete);
+  void skipUntil(tok T1) {
+    skipUntil(T1, tok::unknown);
   }
-  void skipUntil(tok T1, tok T2, bool StopAtCodeComplete = true);
+  void skipUntil(tok T1, tok T2);
   void skipUntilAnyOperator();
   
   /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
   void skipUntilDeclRBrace();
 
-  void skipUntilDeclStmtRBrace(tok T1, bool StopAtCodeComplete = true);
+  void skipUntilDeclStmtRBrace(tok T1);
 
   /// \brief Skip to the next decl, statement or '}'.
-  void skipUntilDeclStmtRBrace(bool StopAtCodeComplete = true) {
+  void skipUntilDeclStmtRBrace() {
     skipUntilDeclStmtRBrace(tok::unknown);
   }
 
-  void skipUntilDeclRBrace(tok T1, tok T2 = tok::unknown,
-                           bool StopAtCodeComplete = true);
+  void skipUntilDeclRBrace(tok T1, tok T2 = tok::unknown);
 
 private:
   /// Skip a single token, but match parentheses, braces, and square brackets.
@@ -284,7 +283,7 @@ private:
   /// Note: this does \em not match angle brackets ("<" and ">")! These are
   /// matched in the source when they refer to a generic type,
   /// but not when used as comparison operators.
-  void skipSingle(bool StopAtCodeComplete = true);
+  void skipSingle();
 
 public:
   template<typename ...ArgTypes>
