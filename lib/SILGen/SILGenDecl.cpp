@@ -103,8 +103,8 @@ namespace {
     SILValue closure;
   public:
     CleanupClosureConstant(SILValue closure) : closure(closure) {}
-    void emit(SILGenFunction &gen) override {
-      gen.B.createStrongRelease(SILLocation(), closure);
+    void emit(SILGenFunction &gen, CleanupLocation l) override {
+      gen.B.createStrongRelease(l, closure);
     }
   };
 }
@@ -174,8 +174,8 @@ class DeallocStack : public Cleanup {
 public:
   DeallocStack(SILLocation loc, SILValue addr) : Loc(loc), Addr(addr) {}
 
-  void emit(SILGenFunction &gen) override {
-    gen.B.createDeallocStack(Loc, Addr);
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.createDeallocStack(l, Addr);
   }
 };
 
@@ -186,8 +186,8 @@ public:
   CleanupLocalVariable(VarDecl *var)
     : var(var) {}
   
-  void emit(SILGenFunction &gen) override {
-    gen.destroyLocalVariable(var);
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.destroyLocalVariable(l, var);
   }
 };
   
@@ -199,8 +199,8 @@ public:
   CleanupAddressOnlyArgument(SILValue addr)
     : addr(addr) {}
   
-  void emit(SILGenFunction &gen) override {
-    gen.B.createDestroyAddr(SILLocation(), addr);
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.createDestroyAddr(l, addr);
   }
 };
 
@@ -374,7 +374,7 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
   // the initialization. Otherwise, emit 'initialize_var' placeholder
   // instructions.
   if (D->getInit()) {
-    FullExpr Scope(Cleanups);
+    FullExpr Scope(Cleanups, CleanupLocation(D->getInit()));
     emitExprInto(D->getInit(), initialization.get());
   } else {
     if (!SGM.M.getASTContext().LangOpts.UseDefiniteInit)
@@ -533,8 +533,8 @@ class CleanupCaptureBox : public Cleanup {
   SILValue box;
 public:
   CleanupCaptureBox(SILValue box) : box(box) {}
-  void emit(SILGenFunction &gen) override {
-    gen.B.createStrongRelease(SILLocation(), box);
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.createStrongRelease(l, box);
   }
 };
   
@@ -542,8 +542,8 @@ class CleanupCaptureValue : public Cleanup {
   SILValue v;
 public:
   CleanupCaptureValue(SILValue v) : v(v) {}
-  void emit(SILGenFunction &gen) override {
-    gen.B.emitReleaseValue(SILLocation(), v);
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.emitReleaseValue(l, v);
   }
 };
   
@@ -658,10 +658,10 @@ namespace {
     CleanupDestructorSelf(VarDecl *selfDecl) : selfDecl(selfDecl) {
     }
     
-    void emit(SILGenFunction &gen) override {
+    void emit(SILGenFunction &gen, CleanupLocation l) override {
       // 'self' is passed in at +0 (and will be deallocated when we return),
       // so don't release the value, only deallocate the variable.
-      gen.deallocateUninitializedLocalVariable(selfDecl);
+      gen.deallocateUninitializedLocalVariable(l, selfDecl);
     }
   };
 } // end anonymous namespace
@@ -689,7 +689,7 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
   return selfValue;
 }
 
-void SILGenFunction::prepareEpilog(Type resultType) {
+void SILGenFunction::prepareEpilog(Type resultType, CleanupLocation CleanupL) {
   auto *epilogBB = new (F.getModule()) SILBasicBlock(&F);
   
   // If we have a non-null, non-void, non-address-only return type, receive the
@@ -700,7 +700,7 @@ void SILGenFunction::prepareEpilog(Type resultType) {
     if (!resultTI.isAddressOnly())
       new (F.getModule()) SILArgument(resultTI.getLoweredType(), epilogBB);
   }
-  ReturnDest = JumpDest(epilogBB, getCleanupsDepth());
+  ReturnDest = JumpDest(epilogBB, getCleanupsDepth(), CleanupL);
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
@@ -965,7 +965,7 @@ InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(VarDecl *vd) {
   return InitializationPtr(new LocalVariableInitialization(vd, *this));
 }
 
-void SILGenFunction::destroyLocalVariable(VarDecl *vd) {
+void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   assert(vd->getDeclContext()->isLocalContext() &&
          "can't emit a local var for a non-local var decl");
   assert(!vd->isProperty() &&
@@ -978,10 +978,11 @@ void SILGenFunction::destroyLocalVariable(VarDecl *vd) {
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
   assert(loc.box && "captured var should have been given a box");
-  B.createStrongRelease(vd, loc.box);
+  B.createStrongRelease(silLoc, loc.box);
 }
 
-void SILGenFunction::deallocateUninitializedLocalVariable(VarDecl *vd) {
+void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,
+                                                          VarDecl *vd) {
   assert(vd->getDeclContext()->isLocalContext() &&
          "can't emit a local var for a non-local var decl");
   assert(!vd->isProperty() &&
@@ -991,7 +992,7 @@ void SILGenFunction::deallocateUninitializedLocalVariable(VarDecl *vd) {
 
   auto &loc = VarLocs[vd];
   assert(loc.box && "captured var should have been given a box");
-  B.createDeallocBox(vd, loc.address.getType().getObjectType(), loc.box);
+  B.createDeallocBox(silLoc, loc.address.getType().getObjectType(), loc.box);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1002,7 +1003,7 @@ static SILValue emitBridgeObjCReturnValue(SILGenFunction &gen,
                                           SILLocation loc,
                                           SILValue result,
                                           SILType resultTy) {
-  Scope scope(gen.Cleanups);
+  Scope scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
   
   ManagedValue native = gen.emitManagedRValueWithCleanup(result);
   ManagedValue bridged = gen.emitNativeToBridgedValue(loc, native,
@@ -1106,7 +1107,7 @@ static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
          "swift inputs don't match number of arguments?!");
 
   // Bridge the input types.
-  Scope scope(gen.Cleanups);
+  Scope scope(gen.Cleanups, CleanupLocation::getCleanupLocation(Loc));
   for (unsigned i = 0, size = bridgedArgs.size(); i < size; ++i) {
     ManagedValue native = gen.emitBridgedToNativeValue(Loc,
                                bridgedArgs[i],

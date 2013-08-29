@@ -701,7 +701,8 @@ public:
       SILBasicBlock *caseBB = emitCaseBlock(gen, caseMap);
       
       if (caseBB != insertionBB)
-        gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB, getCleanupsDepth()},
+        gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB, getCleanupsDepth(),
+                                                    getCaseBlock()},
                                            gen.CurrentSILLoc);
       
       gen.B.moveBlockToEnd(caseBB);
@@ -735,8 +736,9 @@ public:
         // Emit the match test.
         SILValue testBool;
         {
-          FullExpr scope(gen.Cleanups);
-          testBool = gen.emitRValue(eg.pattern->getMatchExpr())
+          Expr *ME = eg.pattern->getMatchExpr();
+          FullExpr scope(gen.Cleanups, CleanupLocation(ME));
+          testBool = gen.emitRValue(ME)
             .getUnmanagedSingleValue(gen);
         }
 
@@ -754,12 +756,13 @@ public:
     if (hasGuard()) {
       SILValue guardBool;
       {
-        FullExpr scope(gen.Cleanups);
+        Expr *G = getGuard();
+        FullExpr scope(gen.Cleanups, CleanupLocation(G));
           
         // Emit the guard.
         // TODO: We should emit every guard once and share code if it covers
         // multiple patterns.
-        guardBool = gen.emitRValue(getGuard()).getUnmanagedSingleValue(gen);
+        guardBool = gen.emitRValue(G).getUnmanagedSingleValue(gen);
       }
       
       // Branch either to the row destination or the new BB.
@@ -768,7 +771,8 @@ public:
     
     // On the true block, jump to the case block, unwinding if necessary.
     gen.B.emitBlock(trueBB);
-    gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB, getCleanupsDepth()},
+    gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB, getCleanupsDepth(),
+                                       getCaseBlock()},
                                        gen.CurrentSILLoc);
     
     // Position the case block logically.
@@ -1329,7 +1333,8 @@ recur:
     SILBasicBlock *innerContBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
     
     {
-      Scope patternVarScope(gen.Cleanups);
+      Scope patternVarScope(gen.Cleanups,
+                            CleanupLocation(const_cast<Pattern*>(pat)));
       
       ClauseMatrix submatrix = clauses.emitSpecialization(gen, pat, row,
                                               bodyOccurrences,
@@ -1385,7 +1390,7 @@ public:
 };
 
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
-  Scope OuterSwitchScope(Cleanups);
+  Scope OuterSwitchScope(Cleanups, CleanupLocation(S));
   
   // Emit the subject value.
   ManagedValue subject = emitRValue(S->getSubjectExpr()).getAsSingleValue(*this);
@@ -1396,7 +1401,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
   // Create a scope to contain pattern variables.
   {
-    Scope patternVarScope(Cleanups);
+    Scope patternVarScope(Cleanups, CleanupLocation(S));
 
     // Create a continuation bb for life after the switch.
     SILBasicBlock *contBB = new (F.getModule()) SILBasicBlock(&F);
@@ -1465,5 +1470,7 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
                                       context->outerContBB);
   
   // Jump to it.
-  Cleanups.emitBranchAndCleanups(JumpDest{dest, context->outerScope}, S);
+  Cleanups.emitBranchAndCleanups(JumpDest{dest, context->outerScope,
+                                          CleanupLocation(S)},
+                                 S);
 }

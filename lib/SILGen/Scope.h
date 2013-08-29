@@ -30,6 +30,7 @@ class LLVM_LIBRARY_VISIBILITY Scope {
   CleanupManager &Cleanups;
   CleanupsDepth Depth;
   CleanupsDepth SavedInnermostScope;
+  CleanupLocation Loc;
 
   void popImpl() {
     Cleanups.Stack.checkIterator(Depth);
@@ -37,14 +38,15 @@ class LLVM_LIBRARY_VISIBILITY Scope {
     assert(Cleanups.InnermostScope == Depth && "popping scopes out of order");
 
     Cleanups.InnermostScope = SavedInnermostScope;
-    Cleanups.endScope(Depth);
+    Cleanups.endScope(Depth, Loc);
     Cleanups.Stack.checkIterator(Cleanups.InnermostScope);
   }
 
 public:
-  explicit Scope(CleanupManager &Cleanups)
+  explicit Scope(CleanupManager &Cleanups, CleanupLocation L)
     : Cleanups(Cleanups), Depth(Cleanups.getCleanupsDepth()),
-      SavedInnermostScope(Cleanups.InnermostScope) {
+      SavedInnermostScope(Cleanups.InnermostScope),
+      Loc(L) {
     assert(Depth.isValid());
     Cleanups.Stack.checkIterator(Cleanups.InnermostScope);
     Cleanups.InnermostScope = Depth;
@@ -68,7 +70,8 @@ public:
 /// that are only conditionally evaluated.
 class LLVM_LIBRARY_VISIBILITY FullExpr : private Scope {
 public:
-  explicit FullExpr(CleanupManager &Cleanups) : Scope(Cleanups) {}
+  explicit FullExpr(CleanupManager &Cleanups, CleanupLocation Loc)
+    : Scope(Cleanups, Loc) {}
   using Scope::pop;
 };
 
@@ -78,8 +81,8 @@ class LLVM_LIBRARY_VISIBILITY LexicalScope : private Scope {
 public:
   explicit LexicalScope(CleanupManager &Cleanups,
                         SILGenFunction& SGF,
-                        SILLocation Loc)
-    : Scope(Cleanups), SGF(SGF) {
+                        CleanupLocation Loc)
+    : Scope(Cleanups, Loc), SGF(SGF) {
     SILDebugScope *DS = new (SGF.SGM.M) SILDebugScope(Loc);
     SGF.enterDebugScope(DS);
   }

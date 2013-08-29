@@ -41,7 +41,7 @@ namespace {
   };
 }
 
-void CleanupManager::popAndEmitTopCleanup() {
+void CleanupManager::popAndEmitTopCleanup(CleanupLocation *l) {
   Cleanup &stackCleanup = *Stack.begin();
   
   // Copy it off the cleanups stack.
@@ -51,23 +51,25 @@ void CleanupManager::popAndEmitTopCleanup() {
   // Pop now.
   Stack.pop();
 
-  if (cleanup.isActive() && Gen.B.hasValidInsertionPoint())
-    cleanup.emit(Gen);
+  if (cleanup.isActive() && Gen.B.hasValidInsertionPoint()) {
+    assert(l && "Location should be provided for active cleanups.");
+    cleanup.emit(Gen, *l);
+  }
 }
 
-void CleanupManager::popAndEmitTopDeadCleanups(CleanupsDepth end) {
+void CleanupManager::popTopDeadCleanups(CleanupsDepth end) {
   Stack.checkIterator(end);
 
   while (Stack.stable_begin() != end && Stack.begin()->isDead()) {
     assert(!Stack.empty());
     
-    popAndEmitTopCleanup();
+    popAndEmitTopCleanup(0);
     Stack.checkIterator(end);
   }
 }
 
 /// Leave a scope, with all its cleanups.
-void CleanupManager::endScope(CleanupsDepth depth) {
+void CleanupManager::endScope(CleanupsDepth depth, CleanupLocation l) {
   Stack.checkIterator(depth);
   
   // FIXME: Thread a branch through the cleanups if there are any active
@@ -79,7 +81,7 @@ void CleanupManager::endScope(CleanupsDepth depth) {
   // Iteratively mark cleanups dead and pop them.
   // Maybe we'd get better results if we marked them all dead in one shot?
   while (Stack.stable_begin() != depth) {
-    popAndEmitTopCleanup();
+    popAndEmitTopCleanup(&l);
   }
 }
 
@@ -88,7 +90,7 @@ void CleanupManager::endScope(CleanupsDepth depth) {
 /// threading out through any cleanups we might need to run.  This does not
 /// pop the cleanup stack.
 void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
-                                           SILLocation Loc,
+                                           SILLocation BranchLoc,
                                            ArrayRef<SILValue> Args) {
   SILBuilder &B = Gen.getBuilder();
   assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
@@ -97,17 +99,18 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
   for (auto cleanup = Stack.begin();
        cleanup != end;
        ++cleanup) {
-    if (cleanup->isActive())
-      cleanup->emit(Gen);
+    if (cleanup->isActive()) {
+      cleanup->emit(Gen, Dest.getCleanupLocation());
+    }
   }
 
-  B.createBranch(Loc, Dest.getBlock(), Args);
+  B.createBranch(BranchLoc, Dest.getBlock(), Args);
 }
 
-void CleanupManager::emitCleanupsForReturn(SILLocation loc) {
+void CleanupManager::emitCleanupsForReturn(CleanupLocation Loc) {
   for (auto &cleanup : Stack)
     if (cleanup.isActive())
-      cleanup.emit(Gen);
+      cleanup.emit(Gen, Loc);
 }
 
 Cleanup &CleanupManager::initCleanup(Cleanup &cleanup,
@@ -124,7 +127,7 @@ void CleanupManager::setCleanupState(CleanupsDepth depth, CleanupState state) {
   setCleanupState(*iter, state);
   
   if (state == CleanupState::Dead && iter == Stack.begin())
-    popAndEmitTopDeadCleanups(InnermostScope);
+    popTopDeadCleanups(InnermostScope);
 }
 
 void CleanupManager::setCleanupState(Cleanup &cleanup, CleanupState state) {

@@ -317,40 +317,28 @@ private:
 ///
 /// This location wraps the statement representing the enclosing scope, for
 /// example, FuncExpr, ParenExpr. The scope's end location points to
-/// the SourceLoc that shows when the operation is performed at runtime. The
-/// location also stores the AST node that triggered the cleanup.
+/// the SourceLoc that shows when the operation is performed at runtime.
 ///
 /// Allowed on any instruction except for ReturnInst, AutoreleaseReturnInst.
-/// CleanupInlinedDestructorLocation is also represented by this.
+/// Locations of an inlined destructor should also be represented by this.
 class CleanupLocation : public SILLocation {
 public:
-  CleanupLocation(CapturingExpr *RS) : SILLocation(RS, CleanupKind) {}
+  CleanupLocation(Expr *E) : SILLocation(E, CleanupKind) {}
+  CleanupLocation(Stmt *S) : SILLocation(S, CleanupKind) {}
+  CleanupLocation(Pattern *P) : SILLocation(P, CleanupKind) {}
+  CleanupLocation(Decl *D) : SILLocation(D, CleanupKind) {}
 
-  CapturingExpr *get() {
-    return castToASTNode<CapturingExpr>();
-  }
+  /// \brief Empty CleanupLocation represents the cleanup accociated with the
+  /// top-level (FIXME: or when no location info is available).
+  CleanupLocation() {}
 
-  /// \brief Get the AST node that triggered the cleanup as a node of the
-  /// given AST type.
-  template <typename T>
-  T *getOriginAs() const { return getNodeAs<T>(ASTNodeSecondary); }
-
-  /// \brief Check if the node that triggered the cleanup is of the given
-  /// type.
-  template <typename T>
-  bool isOrigin() const { return isNode<T>(ASTNodeSecondary); }
-
-  /// \brief Returns the node that triggered the cleanup as the specified
-  /// AST node type. If the specified type is incorrect, asserts.
-  template <typename T>
-  T *castOriginTo() const { return castNodeTo<T>(ASTNodeSecondary); }
+  static CleanupLocation getCleanupLocation(SILLocation L);
 
 private:
   friend class SILLocation;
   static bool isKind(const SILLocation& L) {
     return L.getKind() == CleanupKind;
   }
-  CleanupLocation() {}
 };
 
 /// \brief Used to represent unreachable location that was auto-generated and

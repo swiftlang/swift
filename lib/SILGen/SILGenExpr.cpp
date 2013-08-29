@@ -40,8 +40,8 @@ namespace {
     CleanupRValue(const TypeLowering &lowering, SILValue value)
       : Lowering(lowering), Value(value) {}
     
-    void emit(SILGenFunction &gen) override {
-      Lowering.emitDestroyRValue(gen.B, SILLocation(), Value);
+    void emit(SILGenFunction &gen, CleanupLocation l) override {
+      Lowering.emitDestroyRValue(gen.B, l, Value);
     }
   };
   
@@ -52,8 +52,8 @@ namespace {
     CleanupMaterializedValue(const TypeLowering &lowering, SILValue address)
       : Lowering(lowering), Address(address) {}
     
-    void emit(SILGenFunction &gen) override {
-      Lowering.emitDestroyAddress(gen.B, SILLocation(), Address);
+    void emit(SILGenFunction &gen, CleanupLocation l) override {
+      Lowering.emitDestroyAddress(gen.B, l, Address);
     }
   };
   
@@ -62,8 +62,8 @@ namespace {
   public:
     CleanupMaterializedAddressOnlyValue(SILValue address) : address(address) {}
     
-    void emit(SILGenFunction &gen) override {
-      gen.B.createDestroyAddr(SILLocation(), address);
+    void emit(SILGenFunction &gen, CleanupLocation l) override {
+      gen.B.createDestroyAddr(l, address);
     }
   };
 } // end anonymous namespace
@@ -589,8 +589,8 @@ namespace {
     CleanupUsedExistentialContainer(SILValue existential)
       : existential(existential) {}
     
-    void emit(SILGenFunction &gen) override {
-      gen.B.createDeinitExistential(SILLocation(), existential);
+    void emit(SILGenFunction &gen, CleanupLocation l) override {
+      gen.B.createDeinitExistential(l, existential);
     }
   };
 }
@@ -1333,14 +1333,14 @@ RValue RValueEmitter::visitClosureExpr(ClosureExpr *e, SGFContext C) {
 void SILGenFunction::emitFunction(FuncExpr *fe) {
   Type resultTy = fe->getResultType(F.getASTContext());
   emitProlog(fe, fe->getBodyParamPatterns(), resultTy);
-  prepareEpilog(resultTy);
+  prepareEpilog(resultTy, CleanupLocation(fe));
   visit(fe->getBody());
   emitEpilog(fe);
 }
 
 void SILGenFunction::emitClosure(PipeClosureExpr *ce) {
   emitProlog(ce, ce->getParams(), ce->getResultType());
-  prepareEpilog(ce->getResultType());
+  prepareEpilog(ce->getResultType(), CleanupLocation(ce));
   visit(ce->getBody());
   emitEpilog(ce);
 }
@@ -1348,7 +1348,7 @@ void SILGenFunction::emitClosure(PipeClosureExpr *ce) {
 void SILGenFunction::emitClosure(ClosureExpr *ce) {
   Type resultTy = ce->getType()->castTo<FunctionType>()->getResult();
   emitProlog(ce, ce->getParamPatterns(), resultTy);
-  prepareEpilog(resultTy);
+  prepareEpilog(resultTy, CleanupLocation(ce));
 
   // Closure expressions implicitly return the result of their body expression.
   emitReturnExpr(ImplicitReturnLocation(ce), ce->getBody());
@@ -1438,7 +1438,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
   assert(getCleanupsDepth() == ReturnDest.getDepth() &&
          "emitting epilog in wrong scope");
   // FIXME: Use proper cleanups location.
-  Cleanups.emitCleanupsForReturn(TopLevel);
+  Cleanups.emitCleanupsForReturn(CleanupLocation::getCleanupLocation(TopLevel));
   
   return std::pair<Optional<SILValue>, Optional<SILLocation>>(returnValue,
                                                               returnLoc);
@@ -1479,7 +1479,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  prepareEpilog(Type());
+  prepareEpilog(Type(), CleanupLocation(dd));
   
   // Emit the destructor body, if any.
   if (dd)
@@ -1702,7 +1702,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
   // The epilog takes a void return because the return of 'self' is implicit.
-  prepareEpilog(Type());
+  prepareEpilog(Type(), CleanupLocation(ctor));
 
   // Emit the constructor body.
   visit(ctor->getBody());
@@ -1912,7 +1912,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
          "can't emit a value type ctor here");
   SILValue selfValue;
   if (ctor->getAllocSelfExpr()) {
-    FullExpr allocSelfScope(Cleanups);
+    FullExpr allocSelfScope(Cleanups,CleanupLocation(ctor->getAllocSelfExpr()));
     // If the constructor has an alloc-this expr, emit it to get "self".
     selfValue = emitRValue(ctor->getAllocSelfExpr()).forwardAsSingleValue(*this);
     assert(selfValue.getType() == selfTy &&
@@ -1982,7 +1982,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
-  prepareEpilog(Type());
+  prepareEpilog(Type(), CleanupLocation(ctor));
   
   // Emit the constructor body.
   visit(ctor->getBody());
@@ -2099,7 +2099,8 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   AutoGeneratedLocation Loc(value);
   emitProlog({ }, value->getType());
-  prepareEpilog(value->getType());
+  // FIXME: This is an aoto-generated location, but also a cleanup.
+  prepareEpilog(value->getType(), CleanupLocation::getCleanupLocation(Loc));
   emitReturnExpr(Loc, value);
   emitEpilog(Loc);
 }
@@ -2209,7 +2210,7 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
   cond.enterTrue(SGF.B);
   SILValue trueValue;
   {
-    FullExpr trueScope(SGF.Cleanups);
+    FullExpr trueScope(SGF.Cleanups, CleanupLocation(E->getThenExpr()));
     trueValue = visit(E->getThenExpr()).forwardAsSingleValue(SGF);
   }
   cond.exitTrue(SGF.B, trueValue);
@@ -2217,7 +2218,7 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
   cond.enterFalse(SGF.B);
   SILValue falseValue;
   {
-    FullExpr falseScope(SGF.Cleanups);
+    FullExpr falseScope(SGF.Cleanups, CleanupLocation(E->getElseExpr()));
     falseValue = visit(E->getElseExpr()).forwardAsSingleValue(SGF);
   }
   cond.exitFalse(SGF.B, falseValue);
@@ -2392,7 +2393,7 @@ static void emitAssignExprRecursive(AssignExpr *S, RValue &&Src, Expr *Dest,
 
 
 RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
-  FullExpr scope(SGF.Cleanups);
+  FullExpr scope(SGF.Cleanups, CleanupLocation(E));
 
   // Handle tuple destinations by destructuring them if present.
   emitAssignExprRecursive(E, visit(E->getSrc()), E->getDest(), SGF);

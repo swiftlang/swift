@@ -44,7 +44,7 @@ static SILValue emitConditionValue(SILGenFunction &gen, Expr *E) {
   // Sema forces conditions to have Builtin.i1 type, which guarantees this.
   SILValue V;
   {
-    FullExpr Scope(gen.Cleanups);
+    FullExpr Scope(gen.Cleanups, CleanupLocation(E));
     V = gen.emitRValue(E).forwardAsSingleValue(gen);
   }
   assert(V.getType().castTo<BuiltinIntegerType>()->getBitWidth() == 1);
@@ -85,7 +85,7 @@ Condition SILGenFunction::emitCondition(SILLocation Loc, Expr *E,
 
 void SILGenFunction::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
-  LexicalScope BraceScope(Cleanups, *this, S);
+  LexicalScope BraceScope(Cleanups, *this, CleanupLocation(S));
 
   for (auto &ESD : S->getElements()) {
     assert(B.hasValidInsertionPoint());
@@ -97,7 +97,7 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S) {
       // This will need revision if we ever add goto.
       if (!B.hasValidInsertionPoint()) return;
     } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
-      FullExpr scope(Cleanups);
+      FullExpr scope(Cleanups, CleanupLocation(E));
       emitRValue(E);
     } else
       visit(ESD.get<Decl*>());
@@ -119,24 +119,25 @@ public:
 
 } // end anonymous namespace
 
-void SILGenFunction::emitReturnExpr(SILLocation loc, Expr *ret) {
+void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
+                                    Expr *ret) {
   SILValue result;
   if (IndirectReturnAddress) {
     // Indirect return of an address-only value.
-    FullExpr scope(Cleanups);
+    FullExpr scope(Cleanups, CleanupLocation(ret));
     InitializationPtr returnInit(
                        new IndirectReturnInitialization(IndirectReturnAddress));
     emitExprInto(ret, returnInit.get());
   } else {
     // SILValue return.
-    FullExpr scope(Cleanups);
+    FullExpr scope(Cleanups, CleanupLocation(ret));
     RValue resultRValue = emitRValue(ret);
     if (!resultRValue.getType()->isVoid()) {
       result = std::move(resultRValue).forwardAsSingleValue(*this);
       result = emitGeneralizedValue(ret, result);
     }
   }
-  Cleanups.emitBranchAndCleanups(ReturnDest, loc,
+  Cleanups.emitBranchAndCleanups(ReturnDest, branchLoc,
                                  result ? result : ArrayRef<SILValue>{});
 }
 
@@ -178,8 +179,10 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
   
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
-  BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
-  ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
+  BreakDestStack.emplace_back(EndBB, getCleanupsDepth(),
+                              CleanupLocation(S->getBody()));
+  ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth(),
+                                 CleanupLocation(S->getBody()));
   
   // Evaluate the condition with the false edge leading directly
   // to the continuation block.
@@ -210,8 +213,10 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
   SILBasicBlock *CondBB = new (F.getModule()) SILBasicBlock(&F);
-  BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
-  ContinueDestStack.emplace_back(CondBB, getCleanupsDepth());
+  BreakDestStack.emplace_back(EndBB, getCleanupsDepth(),
+                              CleanupLocation(S->getBody()));
+  ContinueDestStack.emplace_back(CondBB, getCleanupsDepth(),
+                                 CleanupLocation(S->getBody()));
   
   // Emit the body, which is always evaluated the first time around.
   visit(S->getBody());
@@ -241,14 +246,14 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
 
 void SILGenFunction::visitForStmt(ForStmt *S) {
   // Enter a new scope.
-  Scope ForScope(Cleanups);
+  Scope ForScope(Cleanups, CleanupLocation(S));
   
   // Emit any local 'var' variables declared in the initializer.
   for (auto D : S->getInitializerVarDecls())
     visit(D);
   
   if (auto *Initializer = S->getInitializer().getPtrOrNull()) {
-    FullExpr Scope(Cleanups);
+    FullExpr Scope(Cleanups, CleanupLocation(Initializer));
     emitRValue(Initializer);
   }
   
@@ -263,8 +268,10 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *IncBB = new (F.getModule()) SILBasicBlock(&F);
   SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
-  BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
-  ContinueDestStack.emplace_back(IncBB, getCleanupsDepth());
+  BreakDestStack.emplace_back(EndBB, getCleanupsDepth(),
+                              CleanupLocation(S->getBody()));
+  ContinueDestStack.emplace_back(IncBB, getCleanupsDepth(),
+                                 CleanupLocation(S->getBody()));
   
   // Evaluate the condition with the false edge leading directly
   // to the continuation block.
@@ -280,7 +287,7 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
     emitOrDeleteBlock(B, IncBB);
     
     if (B.hasValidInsertionPoint() && S->getIncrement().isNonNull()) {
-      FullExpr Scope(Cleanups);
+      FullExpr Scope(Cleanups, CleanupLocation(S->getIncrement().get()));
       emitRValue(S->getIncrement().get());
     }
     
@@ -299,7 +306,7 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
 
 void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'range' variable that we'll be using for iteration.
-  Scope OuterForScope(Cleanups);
+  Scope OuterForScope(Cleanups, CleanupLocation(S));
   visitPatternBindingDecl(S->getRange());
   
   // If we ever reach an unreachable point, stop emitting statements.
@@ -312,8 +319,11 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
-  BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
-  ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
+  BreakDestStack.emplace_back(EndBB,
+                              getCleanupsDepth(),
+                              CleanupLocation(S->getBody()));
+  ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth(),
+                                 CleanupLocation(S->getBody()));
   
   Condition Cond = emitCondition(S, S->getRangeEmpty(), /*hasFalseCode=*/false,
                                  /*invertValue=*/true);
@@ -324,7 +334,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
     // The declared variable(s) for the current element are destroyed
     // at the end of each loop iteration.
     {
-      Scope InnerForScope(Cleanups);
+      Scope InnerForScope(Cleanups, CleanupLocation(S->getBody()));
       visitPatternBindingDecl(S->getElementInit());
       visit(S->getBody());
     }

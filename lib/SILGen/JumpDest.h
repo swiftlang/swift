@@ -18,6 +18,7 @@
 #define JUMPDEST_H
 
 #include "swift/Basic/DiverseStack.h"
+#include "swift/SIL/SILLocation.h"
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
@@ -35,14 +36,16 @@ typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
 class LLVM_LIBRARY_VISIBILITY JumpDest {
   SILBasicBlock *Block = nullptr;
   CleanupsDepth Depth = CleanupsDepth::invalid();
+  CleanupLocation CleanupLoc;
 public:
-  JumpDest() = default;
+  JumpDest(CleanupLocation L) : CleanupLoc(L) {}
   
-  JumpDest(SILBasicBlock *block, CleanupsDepth depth)
-    : Block(block), Depth(depth) {}
+  JumpDest(SILBasicBlock *block, CleanupsDepth depth, CleanupLocation l)
+    : Block(block), Depth(depth), CleanupLoc(l) {}
 
   SILBasicBlock *getBlock() const { return Block; }
   CleanupsDepth getDepth() const { return Depth; }
+  CleanupLocation getCleanupLocation() const { return CleanupLoc; }
 };
   
 } // end namespace Lowering

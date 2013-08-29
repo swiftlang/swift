@@ -501,7 +501,9 @@ public:
   /// \param returnType  If non-null, the epilog block will be created with an
   ///                    argument of this type to receive the return value for
   ///                    the function.
-  void prepareEpilog(Type returnType);
+  /// \param L           The SILLocation which should be accosocated with
+  ///                    cleanup instructions.
+  void prepareEpilog(Type returnType, CleanupLocation L);
   
   /// \brief Branch to and emit the epilog basic block. This will fuse
   /// the epilog to the current basic block if the epilog bb has no predecessor.
@@ -767,10 +769,10 @@ public:
   std::unique_ptr<Initialization> emitLocalVariableWithCleanup(VarDecl *D);
   
   /// Destroy and deallocate an initialized local variable.
-  void destroyLocalVariable(VarDecl *D);
+  void destroyLocalVariable(SILLocation L, VarDecl *D);
   
   /// Deallocate an uninitialized local variable.
-  void deallocateUninitializedLocalVariable(VarDecl *D);
+  void deallocateUninitializedLocalVariable(SILLocation L, VarDecl *D);
 
   /// Enter a cleanup to deallocate a stack variable.
   CleanupsDepth enterDeallocStackCleanup(SILLocation loc, SILValue address);

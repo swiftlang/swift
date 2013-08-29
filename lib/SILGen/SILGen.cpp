@@ -32,6 +32,7 @@ using namespace Lowering;
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
   : SGM(SGM), F(F), LastInsnWithoutScope(0),
     B(new (F.getModule()) SILBasicBlock(&F), &InsertedInstrs),
+    ReturnDest(CleanupLocation::getCleanupLocation(F.getLocation())),
     CurrentSILLoc(F.getLocation()), Cleanups(*this)
 {
 }
@@ -54,9 +55,10 @@ SILGenModule::SILGenModule(SILModule &M)
   SILFunction *toplevel = emitTopLevelFunction();
   // Assign a debug scope pointing into the void to the top level function.
   toplevel->setDebugScope(new (M) SILDebugScope());
+  toplevel->setLocation(SILLocation());
 
   TopLevelSGF = new SILGenFunction(*this, *toplevel);
-  TopLevelSGF->prepareEpilog(Type());
+  TopLevelSGF->prepareEpilog(Type(), CleanupLocation());
 }
 
 SILGenModule::~SILGenModule() {

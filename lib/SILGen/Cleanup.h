@@ -60,7 +60,7 @@ public:
   bool isActive() const { return state == CleanupState::Active; }
   bool isDead() const { return state == CleanupState::Dead; }
 
-  virtual void emit(SILGenFunction &Gen) = 0;
+  virtual void emit(SILGenFunction &Gen, CleanupLocation L) = 0;
 };
 
 class LLVM_LIBRARY_VISIBILITY CleanupManager {
@@ -73,13 +73,13 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   
   CleanupsDepth InnermostScope;
   
-  void popAndEmitTopCleanup();
-  void popAndEmitTopDeadCleanups(CleanupsDepth end);
+  void popAndEmitTopCleanup(CleanupLocation *l);
+  void popTopDeadCleanups(CleanupsDepth end);
   
   Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
   void setCleanupState(Cleanup &cleanup, CleanupState state);
   
-  void endScope(CleanupsDepth depth);
+  void endScope(CleanupsDepth depth, CleanupLocation l);
   
 public:
   CleanupManager(SILGenFunction &Gen)
@@ -95,15 +95,16 @@ public:
   /// threading out through any cleanups we need to run. This does not pop the
   /// cleanup stack.
   ///
-  /// \param Dest  The destination scope and block.
-  /// \param Loc   The location of the branch instruction.
-  /// \param Args  Arguments to pass to the destination block.
-  void emitBranchAndCleanups(JumpDest Dest, SILLocation Loc,
+  /// \param Dest       The destination scope and block.
+  /// \param BranchLoc  The location of the branch instruction.
+  /// \param Args       Arguments to pass to the destination block.
+  void emitBranchAndCleanups(JumpDest Dest,
+                             SILLocation BranchLoc,
                              ArrayRef<SILValue> Args = {});
   
   /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a
   /// return from the function.
-  void emitCleanupsForReturn(SILLocation loc);
+  void emitCleanupsForReturn(CleanupLocation loc);
   
   /// pushCleanup - Push a new cleanup.
   template<class T, class... A>
