@@ -36,6 +36,9 @@ static void diagnose(SILModule *M, SILLocation loc, ArgTypes... args) {
 static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
                                    bool isInitialization,
                                    SILValue IncomingVal) {
+  DEBUG(llvm::errs() << "  *** Lowering [isInit=" << isInitialization << "]: "
+            << *Inst << "\n");
+
   ++NumAssignRewritten;
 
   auto &TL = Inst->getModule()->getTypeLowering(Inst->getSrc().getType());
@@ -549,6 +552,11 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
 
   assert(!isStructOrTupleToScalarize(Inst->getType(0)));
 
+  DEBUG(llvm::errs() << "  *** Promoting load: " << *Inst << "\n");
+  DEBUG(llvm::errs() << "      To value: " << Result.getDef() << "\n");
+
+
+
   SILValue(Inst, 0).replaceAllUsesWith(Result);
   SILValue Addr = Inst->getOperand(0);
   Inst->eraseFromParent();
@@ -1008,6 +1016,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       SILBuilder B(User);
       ElementTmps.clear();
 
+      DEBUG(llvm::errs() << "  *** Scalarizing: " << *User << "\n");
+
       // Scalarize LoadInst
       if (auto *LI = dyn_cast<LoadInst>(User)) {
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
@@ -1053,6 +1063,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
 
 
 static void optimizeAllocBox(AllocBoxInst *ABI) {
+  DEBUG(llvm::errs() << "*** MemPromotion looking at: " << *ABI << "\n");
+
   // Set up the datastructure used to collect the uses of the alloc_box.  The
   // uses are bucketed up into the elements of the allocation that are being
   // used.  This matters for element-wise tuples and fragile structs.
