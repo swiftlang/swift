@@ -535,7 +535,7 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
                              DeclContext *DC,
                              MutableArrayRef<TypeLoc> Inherited)
-  : TypeDecl(DeclKind::TypeAlias, DC, Name, Inherited, Type()),
+  : TypeDecl(DeclKind::TypeAlias, DC, Name, Inherited),
     TypeAliasLoc(TypeAliasLoc), NameLoc(NameLoc),
     UnderlyingTy(UnderlyingTy)
 {

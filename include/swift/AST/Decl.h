@@ -999,8 +999,8 @@ class ValueDecl : public Decl {
   Type Ty;
 
 protected:
-  ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty)
-    : Decl(K, DC), Name(name), AttrsAndIsObjC(&EmptyAttrs, false), Ty(ty) {
+  ValueDecl(DeclKind K, DeclContext *DC, Identifier name)
+    : Decl(K, DC), Name(name), AttrsAndIsObjC(&EmptyAttrs, false) {
   }
 
 public:
@@ -1114,8 +1114,8 @@ class TypeDecl : public ValueDecl {
 
 protected:
   TypeDecl(DeclKind K, DeclContext *DC, Identifier name,
-           MutableArrayRef<TypeLoc> inherited, Type ty) :
-    ValueDecl(K, DC, name, ty), Inherited(inherited)
+           MutableArrayRef<TypeLoc> inherited) :
+    ValueDecl(K, DC, name), Inherited(inherited)
   {
     TypeDeclBits.CheckedInheritanceClause = false;
   }
@@ -1223,7 +1223,7 @@ class AbstractTypeParamDecl : public TypeDecl {
 
 protected:
   AbstractTypeParamDecl(DeclKind kind, DeclContext *dc, Identifier name)
-    : TypeDecl(kind, dc, name, { }, Type()), Archetype(nullptr) { }
+    : TypeDecl(kind, dc, name, { }), Archetype(nullptr) { }
 
 public:
   /// Return the superclass of the generic parameter.
@@ -1481,7 +1481,7 @@ public:
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   MutableArrayRef<TypeLoc> inherited,
                   GenericParamList *GenericParams) :
-    TypeDecl(K, DC, name, inherited, Type()),
+    TypeDecl(K, DC, name, inherited),
     DeclContext(DeclContextKind::NominalTypeDecl, DC),
     GenericParams(GenericParams), DeclaredTy(nullptr) {}
 
@@ -1841,8 +1841,10 @@ private:
 
 public:
   VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, DeclContext *DC)
-    : ValueDecl(DeclKind::Var, DC, Name, Ty),
-      VarLoc(VarLoc), GetSet(), OverriddenDecl(nullptr) {}
+    : ValueDecl(DeclKind::Var, DC, Name),
+      VarLoc(VarLoc), GetSet(), OverriddenDecl(nullptr) {
+    setType(Ty);
+  }
 
   SourceLoc getLoc() const { return VarLoc; }
   SourceLoc getStartLoc() const { return VarLoc; }
@@ -1906,10 +1908,11 @@ public:
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
            SourceLoc NameLoc, GenericParamList *GenericParams, Type Ty,
            FuncExpr *Body, DeclContext *DC)
-    : ValueDecl(DeclKind::Func, DC, Name, Ty), StaticLoc(StaticLoc),
+    : ValueDecl(DeclKind::Func, DC, Name), StaticLoc(StaticLoc),
       FuncLoc(FuncLoc), NameLoc(NameLoc), GenericParams(GenericParams),
       Body(Body), OverriddenDecl(nullptr), Operator(nullptr) {
     FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
+    setType(Ty);
   }
   
   bool isStatic() const {
@@ -2097,7 +2100,7 @@ public:
                    SourceLoc ArrowLoc,
                    TypeLoc ResultType,
                    DeclContext *DC)
-  : ValueDecl(DeclKind::UnionElement, DC, Name, Type()),
+  : ValueDecl(DeclKind::UnionElement, DC, Name),
     CaseLoc(CaseLoc), IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType),
     ResultArrowLoc(ArrowLoc),
     ResultType(ResultType)
@@ -2178,7 +2181,7 @@ public:
                 SourceLoc ArrowLoc, TypeLoc ElementTy,
                 SourceRange Braces, FuncDecl *Get, FuncDecl *Set,
                 DeclContext *Parent)
-    : ValueDecl(DeclKind::Subscript, Parent, NameHack, Type()),
+    : ValueDecl(DeclKind::Subscript, Parent, NameHack),
       SubscriptLoc(SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
       Braces(Braces), Get(Get), Set(Set), OverriddenDecl(nullptr) { }
@@ -2246,7 +2249,7 @@ public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
                   Pattern *Arguments, VarDecl *ImplicitSelfDecl,
                   GenericParamList *GenericParams, DeclContext *Parent)
-    : ValueDecl(DeclKind::Constructor, Parent, NameHack, Type()),
+    : ValueDecl(DeclKind::Constructor, Parent, NameHack),
       DeclContext(DeclContextKind::ConstructorDecl, Parent),
       ConstructorLoc(ConstructorLoc), Arguments(Arguments), Body(nullptr),
       ImplicitSelfDecl(ImplicitSelfDecl), GenericParams(GenericParams) {}
@@ -2327,7 +2330,7 @@ class DestructorDecl : public ValueDecl, public DeclContext {
 public:
   DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
                   VarDecl *ImplicitSelfDecl, DeclContext *Parent)
-    : ValueDecl(DeclKind::Destructor, Parent, NameHack, Type()),
+    : ValueDecl(DeclKind::Destructor, Parent, NameHack),
       DeclContext(DeclContextKind::DestructorDecl, Parent),
       DestructorLoc(DestructorLoc), Body(nullptr),
       ImplicitSelfDecl(ImplicitSelfDecl) {}
