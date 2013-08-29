@@ -46,7 +46,7 @@ struct module_header {
 
 static llvm::cl::list<std::string>
 InputNames(llvm::cl::Positional, llvm::cl::desc("compiled_swift_file1.o ..."),
-             llvm::cl::OneOrMore);
+           llvm::cl::OneOrMore);
 
 #ifndef SWIFT_MODULES_SDK
 #define SWIFT_MODULES_SDK ""
@@ -115,43 +115,44 @@ int main(int argc, char **argv) {
                 macho.read((char*)&mh, sizeof(mh));
 
                 // Path.
-                macho.seekg(base+mh.name_ofs, macho.beg);
+                macho.seekg(base + mh.name_ofs, macho.beg);
                 uint32_t nchars;
                 macho.read((char*)&nchars, sizeof(nchars));
-                assert(nchars < 2<<10);
-                char path[nchars+1];
+                assert(nchars < (2 << 10) && "path is too long");
+                char path[nchars + 1];
                 macho.read(path, nchars);
                 path[nchars] = 0;
 
                 // Bitstream.
-                macho.seekg(base+mh.bitstream_ofs, macho.beg);
+                macho.seekg(base + mh.bitstream_ofs, macho.beg);
                 char* data = new char[mh.bitstream_size];
                 macho.read(data, mh.bitstream_size);
                 auto sr = llvm::StringRef(data, mh.bitstream_size);
-                auto bitstream = (llvm::MemoryBuffer::getMemBuffer(sr, path));
+                auto bitstream = llvm::MemoryBuffer::getMemBuffer(sr, path);
 
                 // Register it.
-                std::cout<<"Loaded module "<<path<<" from "<<name<<"\n";
-                SML->registerBitstream(path, llvm::OwningPtr<llvm::MemoryBuffer>
-                                             (bitstream));
+                std::cout << "Loaded module " << path << " from " << name << "\n";
+                SML->registerBitstream(
+                    path, llvm::OwningPtr<llvm::MemoryBuffer>(bitstream));
                 modules.push_back(path);
 
                 assert(macho.good());
               }
           }
         }
-      } else macho.seekg(lc.cmdsize-sizeof(lc), macho.cur);
+      } else
+        macho.seekg(lc.cmdsize-sizeof(lc), macho.cur);
     }
   }
 
   // Attempt to import all modules we found.
   for (auto path : modules) {
-    std::cout<<"Importing "<<path<<"... ";
+    std::cout << "Importing " << path << "... ";
 
 #ifdef SWIFT_SUPPORTS_SUBMODULES
     std::vector<std::pair<swift::Identifier, swift::SourceLoc> > AccessPath;
     for (auto i = llvm::sys::path::begin(path);
-             i != llvm::sys::path::end(path);  ++i)
+         i != llvm::sys::path::end(path); ++i)
       if (!llvm::sys::path::is_separator((*i)[0]))
           AccessPath.push_back({ CI.getASTContext().getIdentifier(*i),
                                  swift::SourceLoc() });
@@ -163,10 +164,10 @@ int main(int argc, char **argv) {
 
     auto Module = SML->loadModule(swift::SourceLoc(), AccessPath);
     if (!Module) {
-      std::cerr<<"FAIL!\n";
+      std::cerr << "FAIL!\n";
       return 1;
     }
-    std::cout<<"ok!\n";
+    std::cout << "ok!\n";
   }
   return 0;
 }
