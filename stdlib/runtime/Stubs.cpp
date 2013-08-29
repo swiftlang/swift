@@ -131,10 +131,6 @@ extern "C" bool _TSb13getLogicValuefRSbFT_Bi1_(bool* b) {
   return *b;
 }
 
-extern "C" bool swift_getBool(bool b) {
-  return b;
-}
-
 static bool
 _swift_replOutputIsUTF8(void) {
   const char *lang = getenv("LANG");
