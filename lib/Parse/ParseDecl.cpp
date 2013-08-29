@@ -865,6 +865,30 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
   return makeParserResult(Status, ED);
 }
 
+static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
+                                            SourceLoc &Loc,
+                                            const Diagnostic &D) {
+  switch (P.Tok.getKind()) {
+  case tok::identifier:
+    Result = P.Context.getIdentifier(P.Tok.getText());
+    Loc = P.Tok.getLoc();
+    P.consumeToken();
+    return makeParserSuccess();
+
+  default:
+    // FIXME: try to skip IDENTIFIER_KEYWORD and resynchronize.
+    P.diagnose(P.Tok, D);
+    return makeParserError();
+  }
+}
+
+template <typename... DiagArgTypes, typename... ArgTypes>
+static ParserStatus
+parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
+                        Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+  return parseIdentifierDeclName(P, Result, L, Diagnostic(ID, Args...));
+}
+
 /// \brief Parse a typealias decl.
 ///
 /// \verbatim
@@ -877,10 +901,12 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   
   Identifier Id;
   SourceLoc IdLoc;
-  if (parseIdentifier(Id, IdLoc, diag::expected_identifier_in_decl,"typealias"))
-    return nullptr;
-
   ParserStatus Status;
+
+  Status |= parseIdentifierDeclName(
+      *this, Id, IdLoc, diag::expected_identifier_in_decl, "typealias");
+  if (Status.isError())
+    return nullptr;
 
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
@@ -1713,8 +1739,11 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
   
   Identifier UnionName;
   SourceLoc UnionNameLoc;
-  if (parseIdentifier(UnionName, UnionNameLoc,
-                      diag::expected_identifier_in_decl, "union"))
+  ParserStatus Status;
+
+  Status |= parseIdentifierDeclName(*this, UnionName, UnionNameLoc,
+                                    diag::expected_identifier_in_decl, "union");
+  if (Status.isError())
     return nullptr;
 
   // Parse the generic-params, if present.
@@ -1738,8 +1767,6 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
   if (GenericParams)
     for (auto Param : *GenericParams)
       Param.setDeclContext(UD);
-
-  ParserStatus Status;
 
   // Parse optional inheritance clause within the context of the union.
   if (Tok.is(tok::colon)) {
@@ -1907,8 +1934,12 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
 
   Identifier StructName;
   SourceLoc StructNameLoc;
-  if (parseIdentifier(StructName, StructNameLoc,
-                      diag::expected_identifier_in_decl, "struct"))
+  ParserStatus Status;
+
+  Status |=
+      parseIdentifierDeclName(*this, StructName, StructNameLoc,
+                              diag::expected_identifier_in_decl, "struct");
+  if (Status.isError())
     return nullptr;
 
   // Parse the generic-params, if present.
@@ -1934,8 +1965,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
       Param.setDeclContext(SD);
     }
   }
-
-  ParserStatus Status;
 
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
@@ -1992,8 +2021,12 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
 
   Identifier ClassName;
   SourceLoc ClassNameLoc;
-  if (parseIdentifier(ClassName, ClassNameLoc,
-                      diag::expected_identifier_in_decl, "class"))
+  ParserStatus Status;
+
+  Status |=
+      parseIdentifierDeclName(*this, ClassName, ClassNameLoc,
+                              diag::expected_identifier_in_decl, "class");
+  if (Status.isError())
     return nullptr;
 
   // Parse the generic-params, if present.
@@ -2018,8 +2051,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
       Param.setDeclContext(CD);
     }
   }
-
-  ParserStatus Status;
 
   // Parse optional inheritance clause within the context of the class.
   if (Tok.is(tok::colon)) {
@@ -2100,11 +2131,13 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
   
   SourceLoc NameLoc;
   Identifier ProtocolName;
-  if (parseIdentifier(ProtocolName, NameLoc,
-                      diag::expected_identifier_in_decl, "protocol"))
-    return nullptr;
-
   ParserStatus Status;
+
+  Status |=
+      parseIdentifierDeclName(*this, ProtocolName, NameLoc,
+                              diag::expected_identifier_in_decl, "protocol");
+  if (Status.isError())
+    return nullptr;
 
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 4> InheritedProtocols;
