@@ -54,6 +54,11 @@ NodePointer Node::child_at (Node::size_type idx) {
 
 Node::Node (Node::Kind k, std::string t) : NodeKind(k), NodeText(t), Successor(nullptr), Children(), Parent(nullptr), Predecessor(nullptr) {}
 
+Node::Node (const Node& other) : NodeKind(other.NodeKind), NodeText(other.NodeText), Successor(), Children(), Parent(), Predecessor() {
+  for (NodePointer child : other)
+    push_back_child(NodePointer(new Node(*child)));
+}
+
 Node* Node::getParent () {
   return Parent;
 }
@@ -774,27 +779,42 @@ private:
     return nullptr;
   }
 
-  bool demangleDeclarationName(NodePointer &context, NodePointer &identifier,
-                               IsProtocol isA) {
+  NodePointer demangleDeclarationName(Node::Kind identifier_type) {
     Node::Kind context_type = Node::Kind::Unknown;
+    NodePointer context;
+    NodePointer identifier;
     context = demangleContextImpl(&context_type);
     if (!context)
       return false;
     identifier = demangleIdentifier();
     if (!identifier)
       return false;
-    DemanglerPrinter printer;
-    printer << context->getText() << "." << identifier->getText();
-    NodePointer nominaltype = Node::makeNodePointer(Node::Kind::Path);
-    NodePointer copy_context = Node::makeNodePointer(context->getKind(),context->getText());
-    NodePointer copy_identifier = Node::makeNodePointer(identifier->getKind(),identifier->getText());
-    if (isA == IsProtocol::yes)
-      copy_identifier->setKind(Node::Kind::Protocol);
-    nominaltype->push_back_child(copy_context)->setNextNode(copy_identifier);
-    Substitutions.push_back({ nominaltype, isA });
-    if (context_type != Node::Kind::Unknown)
+    IsProtocol is_proto = IsProtocol::no;
+    if (identifier_type != Node::Kind::Unknown) {
+      identifier->setKind(identifier_type);
+      if (identifier_type == Node::Kind::Protocol)
+        is_proto = IsProtocol::yes;
+    }
+    else if (context_type != Node::Kind::Unknown) {
       identifier->setKind(context_type);
-    return true;
+      if (context_type == Node::Kind::Protocol)
+        is_proto = IsProtocol::yes;
+    }
+    if (context->getKind() == Node::Kind::Path) {
+      context->push_back_child(identifier);
+      NodePointer path = Node::makeNodePointer(Node::Kind::Path);
+      straightenNestedDeclContext(context, path);
+      context = path;
+    }
+    else {
+      context->setNextNode(identifier);
+      NodePointer path = Node::makeNodePointer(Node::Kind::Path);
+      path->push_back_child(context);
+      context = path;
+    }
+    NodePointer nominaltype = NodePointer(new Node(*context));
+    Substitutions.push_back({ nominaltype, is_proto });
+    return context;
   }
 
   NodePointer demangleProtocolName() {
@@ -820,16 +840,8 @@ private:
       Substitutions.push_back({ nominaltype, IsProtocol::yes });
       return nominaltype;
     }
-    NodePointer context, identifier;
-    if (demangleDeclarationName(context, identifier, IsProtocol::yes)) {
-      DemanglerPrinter printer;
-      while (context) {
-        printer << context->getText() << ".";
-        context = context->getNextNode();
-      }
-      printer << identifier->getText();
-      NodePointer result =
-          Node::makeNodePointer(Node::Kind::Protocol, printer.str());
+    NodePointer result;
+    if ((result = demangleDeclarationName(Node::Kind::Protocol))) {
       return result;
     }
     return nullptr;
@@ -843,13 +855,10 @@ private:
       return demangleSubstitutionIndex();
     if (!isStartOfNominalType(c))
       return nullptr;
-    NodePointer context, identifier;
-    if (!demangleDeclarationName(context, identifier, IsProtocol::no))
-      return nullptr;
-    NodePointer nominalType = Node::makeNodePointer(Node::Kind::Path);
-    nominalType->push_back_child(context)->setNextNode(identifier);
-    identifier->setKind(nominalTypeMarkerToNodeKind(c));
-    return nominalType;
+    NodePointer nominalType;
+    if ((nominalType = demangleDeclarationName(nominalTypeMarkerToNodeKind(c))))
+      return nominalType;
+    return nullptr;
   }
   
   NodePointer demangleContextImpl(Node::Kind *inferred_context_type = nullptr) {
@@ -1296,10 +1305,11 @@ private:
     }
     if (c == 'R') {
       NodePointer byref = Node::makeNodePointer(Node::Kind::ByRef);
-      byref->setNextNode(demangleType());
-      if (byref->getNextNode())
-        return byref;
-      return nullptr;
+      NodePointer type = demangleTypeImpl();
+      if (!type)
+        return nullptr;
+      byref->push_back_child(type);
+      return byref;
     }
     if (c == 'S') {
       return demangleSubstitutionIndex();
@@ -1345,13 +1355,7 @@ private:
       return nullptr;
     }
     if (isStartOfNominalType(c)) {
-      NodePointer context(nullptr), identifier(nullptr);
-      if (!demangleDeclarationName(context, identifier, IsProtocol::no))
-        return nullptr;
-      context->setNextNode(identifier);
-      identifier->setKind(nominalTypeMarkerToNodeKind(c));
-      NodePointer nominal_type = Node::makeNodePointer(Node::Kind::Path);
-      nominal_type->push_back_child(context);
+      NodePointer nominal_type = demangleDeclarationName(nominalTypeMarkerToNodeKind(c));
       return nominal_type;
     }
     return nullptr;
@@ -1637,7 +1641,7 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       pointer = pointer->getNextNode(); continue;
     case swift::Demangle::Node::Kind::ByRef:
       printer << "[byref] ";
-      pointer = pointer->getNextNode(); continue;
+      pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::ObjCAttribute:
       printer << "[objc] ";
       pointer = pointer->getNextNode(); continue;

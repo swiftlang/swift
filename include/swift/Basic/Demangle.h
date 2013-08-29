@@ -121,6 +121,8 @@ public:
   
   Node (Kind k, std::string t);
   
+  Node (const Node& other);
+  
   Node* getParent ();
   
   NodePointer getNextNode ();
