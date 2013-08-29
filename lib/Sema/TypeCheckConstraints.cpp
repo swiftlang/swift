@@ -2836,8 +2836,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         ++score1;
         continue;
       }
-      if (choice1.getKind() == OverloadChoiceKind::Decl &&
-          choice2.getKind() == OverloadChoiceKind::DeclViaDynamic) {
+      if (choice1.getKind() == OverloadChoiceKind::DeclViaDynamic &&
+          choice2.getKind() == OverloadChoiceKind::Decl) {
         ++score2;
         continue;
       }
