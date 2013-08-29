@@ -146,6 +146,7 @@ if [ \! "$SKIP_TEST_SWIFT" ]; then
   export SIL_OPT="$WORKSPACE/swift/build/bin/sil-opt"
   export SWIFT_IDE_TEST="$WORKSPACE/swift/build/bin/swift-ide-test"
   export SWIFT_DEMANGLE="$WORKSPACE/swift/build/bin/swift-demangle"
+  export LLDB_MODULEIMPORT_TEST="$WORKSPACE/swift/build/bin/lldb-moduleimport-test"
   echo "--- Running Swift Tests ---"
   (cd "$WORKSPACE/swift/build" &&
     "$WORKSPACE/llvm/build/bin/llvm-lit" -sv test) || exit 1
