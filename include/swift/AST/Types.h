@@ -241,6 +241,9 @@ public:
   /// \brief Check if this type is equal to the empty tuple type.
   bool isVoid();
 
+  /// \brief Check if this type is equal to Builtin.IntN.
+  bool isBuiltinIntegerType(unsigned bitWidth);
+
   /// \brief If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.
   ClassDecl *getClassOrBoundGenericClass();
@@ -2664,6 +2667,12 @@ inline bool TypeBase::isClassExistentialType() {
     return pt->requiresClass();
   if (auto pct = dyn_cast<ProtocolCompositionType>(T))
     return pct->requiresClass();
+  return false;
+}
+
+inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
+  if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))
+    return intTy->getBitWidth() == n;
   return false;
 }
 
