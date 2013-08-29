@@ -333,9 +333,11 @@ public:
   // Primitive Parsing
 
   /// \brief Consume an identifier (but not an operator) if present and return
-  /// its name in \p Result.  Otherwise, emit an error and return true.
+  /// its name in \p Result.  Otherwise, emit an error.
+  ///
+  /// \returns false on success, true on error.
   bool parseIdentifier(Identifier &Result, SourceLoc &Loc, const Diagnostic &D);
-  
+
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseIdentifier(Identifier &Result, Diag<DiagArgTypes...> ID,
                        ArgTypes... Args) {
