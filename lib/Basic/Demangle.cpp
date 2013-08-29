@@ -15,6 +15,7 @@
 //===---------------------------------------------------------------------===//
 
 #include "swift/Basic/Demangle.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -453,20 +454,18 @@ private:
         Directness d = demangleDirectness();
         if (d == Directness::Unkown)
           return failure();
-        appendNode(Node::Kind::Directness, toString(d));
-        appendNode(Node::Kind::GenericTypeMetadataPattern);
         NodePointer type = demangleType();
         if (!type)
           return failure();
-        appendNode(type);
+        appendNode(Node::Kind::Directness, toString(d));
+        appendNode(Node::Kind::GenericTypeMetadataPattern)->push_back_child(type);
         return true;
       }
       if (Mangled.nextIf('m')) {
-        appendNode(Node::Kind::Metaclass);
         NodePointer type = demangleType();
         if (!type)
           return failure();
-        appendNode(type);
+        appendNode(Node::Kind::Metaclass)->push_back_child(type);
         return true;
       }
       Directness d = demangleDirectness();
@@ -474,17 +473,14 @@ private:
       NodePointer type = demangleType();
       if (!type)
         return failure();
-      appendNode(Node::Kind::TypeMetadata);
-      appendNode(type);
+      appendNode(Node::Kind::TypeMetadata)->push_back_child(type);
       return true;
     }
     if (Mangled.nextIf('n')) {
       if (Mangled.nextIf('k') && Mangled.nextIf('_')) {
-        NodePointer entity = demangleEntity();
-        if (!entity)
+        bool entity_ok = demangleEntity(appendNode(Node::Kind::ProtocolWitness));
+        if (!entity_ok)
           return failure();
-        appendNode(Node::Kind::ProtocolWitness);
-        appendNode(entity);
         return true;
       } else
         return failure();
@@ -503,8 +499,7 @@ private:
       NodePointer type = demangleType();
       if (!type)
         return failure();
-      appendNode(Node::Kind::ValueWitnessKind, toString(w));
-      appendNode(type);
+      appendNode(Node::Kind::ValueWitnessKind, toString(w))->push_back_child(type);
       return true;
     }
     if (Mangled.nextIf('W')) {
@@ -512,70 +507,56 @@ private:
         NodePointer type = demangleType();
         if (!type)
           return failure();
-        appendNode(Node::Kind::ValueWitnessTable);
-        appendNode(type);
+        appendNode(Node::Kind::ValueWitnessTable)->push_back_child(type);
         return true;
       }
       if (Mangled.nextIf('o')) {
-        NodePointer entity = demangleEntity();
-        if (!entity)
+        bool entity_ok = demangleEntity(appendNode(Node::Kind::WitnessTableOffset));
+        if (!entity_ok)
           return failure();
-        appendNode(Node::Kind::WitnessTableOffset);
-        appendNode(entity);
         return true;
       }
       if (Mangled.nextIf('v')) {
         Directness d = demangleDirectness();
         appendNode(Node::Kind::Directness, toString(d));
-        NodePointer entity = demangleEntity();
-        if (!entity)
+        bool entity_ok = demangleEntity(appendNode(Node::Kind::FieldOffset));
+        if (!entity_ok)
           return failure();
-        appendNode(Node::Kind::FieldOffset);
-        appendNode(entity);
         return true;
       }
       if (Mangled.nextIf('P')) {
         NodePointer conformance = demangleProtocolConformance();
         if (!conformance)
           return failure();
-        appendNode(Node::makeNodePointer(Node::Kind::ProtocolWitnessTable));
-        appendNode(conformance);
+        appendNode(Node::makeNodePointer(Node::Kind::ProtocolWitnessTable))->push_back_child(conformance);
         return true;
       }
       if (Mangled.nextIf('Z')) {
         NodePointer conformance = demangleProtocolConformance();
         if (!conformance)
           return failure();
-        appendNode(Node::makeNodePointer(
-            Node::Kind::LazyProtocolWitnessTableAccessor));
-        appendNode(conformance);
+        appendNode(Node::makeNodePointer(Node::Kind::LazyProtocolWitnessTableAccessor))->push_back_child(conformance);
         return true;
       }
       if (Mangled.nextIf('z')) {
         NodePointer conformance = demangleProtocolConformance();
         if (!conformance)
           return failure();
-        appendNode(Node::makeNodePointer(
-            Node::Kind::LazyProtocolWitnessTableTemplate));
-        appendNode(conformance);
+        appendNode(Node::makeNodePointer(Node::Kind::LazyProtocolWitnessTableTemplate))->push_back_child(conformance);
         return true;
       }
       if (Mangled.nextIf('D')) {
         NodePointer conformance = demangleProtocolConformance();
         if (!conformance)
           return failure();
-        appendNode(Node::makeNodePointer(
-            Node::Kind::DependentProtocolWitnessTableGenerator));
-        appendNode(conformance);
+        appendNode(Node::makeNodePointer(Node::Kind::DependentProtocolWitnessTableGenerator))->push_back_child(conformance);
         return true;
       }
       if (Mangled.nextIf('d')) {
         NodePointer conformance = demangleProtocolConformance();
         if (!conformance)
           return failure();
-        appendNode(Node::makeNodePointer(
-            Node::Kind::DependentProtocolWitnessTableTemplate));
-        appendNode(conformance);
+        appendNode(Node::makeNodePointer(Node::Kind::DependentProtocolWitnessTableTemplate))->push_back_child(conformance);
         return true;
       }
       return failure();
@@ -585,24 +566,21 @@ private:
         NodePointer type = demangleType();
         if (!type)
           return failure();
-        appendNode(Node::Kind::BridgeToBlockFunction);
-        appendNode(type);
+        appendNode(Node::Kind::BridgeToBlockFunction)->push_back_child(type);
         return true;
       }
       return failure();
     }
     if (Mangled.nextIf('L')) {
-      NodePointer entity = demangleEntity();
-      if (!entity)
+      bool entity_ok = demangleEntity(appendNode(Node::Kind::LocalEntity));
+      if (!entity_ok)
         return failure();
-      appendNode(Node::Kind::LocalEntity);
-      appendNode(entity);
       return true;
     }
-    NodePointer entity = demangleEntity();
-    if (!entity)
+    NodePointer decl = Node::makeNodePointer(Node::Kind::Declaration);
+    appendNode(decl);
+    if (!demangleEntity(decl))
       return failure();
-    appendNode(entity);
     return true;
   }
 
@@ -699,55 +677,55 @@ private:
     if (Mangled.nextIf('s'))
       return { Node::makeNodePointer(Node::Kind::Module,"swift"), IsProtocol::no };
     if (Mangled.nextIf('a')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
                             Node::makeNodePointer(Node::Kind::Structure,"Slice"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('b')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
                                                                                             Node::makeNodePointer(Node::Kind::Structure,"Bool"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('c')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
                             Node::makeNodePointer(Node::Kind::Structure,"Char"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('d')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
                             Node::makeNodePointer(Node::Kind::Structure,"Float64"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('f')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
                             Node::makeNodePointer(Node::Kind::Structure,"Float32"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('i')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
                             Node::makeNodePointer(Node::Kind::Structure,"Int64"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('q')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
                             Node::makeNodePointer(Node::Kind::Structure,"Optional"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('S')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
                             Node::makeNodePointer(Node::Kind::Structure,"String"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('u')) {
-      NodePointer type = Node::makeNodePointer(Node::Kind::NominalType);
+      NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
                             Node::makeNodePointer(Node::Kind::Structure,"UInt64"));
       return { type, IsProtocol::no };
@@ -789,7 +767,7 @@ private:
       NodePointer identifier = demangleSubstitution();
       if (!identifier)
         return nullptr;
-      if (identifier->getKind() != Node::Kind::NominalType)
+      if (identifier->getKind() != Node::Kind::Path)
         identifier->setKind(Node::Kind::Module);
       return identifier;
     }
@@ -807,7 +785,7 @@ private:
       return false;
     DemanglerPrinter printer;
     printer << context->getText() << "." << identifier->getText();
-    NodePointer nominaltype = Node::makeNodePointer(Node::Kind::NominalType);
+    NodePointer nominaltype = Node::makeNodePointer(Node::Kind::Path);
     NodePointer copy_context = Node::makeNodePointer(context->getKind(),context->getText());
     NodePointer copy_identifier = Node::makeNodePointer(identifier->getKind(),identifier->getText());
     if (isA == IsProtocol::yes)
@@ -834,7 +812,7 @@ private:
       NodePointer identifier = demangleIdentifier();
       if (!identifier)
         return nullptr;
-      NodePointer nominaltype = Node::makeNodePointer(Node::Kind::NominalType);
+      NodePointer nominaltype = Node::makeNodePointer(Node::Kind::Path);
       NodePointer copy_context = NodePointer(new Node(*sub.first.getPtr()));
       identifier->setKind(Node::Kind::Protocol);
       NodePointer copy_identifier = Node::makeNodePointer(identifier->getKind(),identifier->getText());
@@ -868,7 +846,7 @@ private:
     NodePointer context, identifier;
     if (!demangleDeclarationName(context, identifier, IsProtocol::no))
       return nullptr;
-    NodePointer nominalType = Node::makeNodePointer(Node::Kind::NominalType);
+    NodePointer nominalType = Node::makeNodePointer(Node::Kind::Path);
     nominalType->push_back_child(context)->setNextNode(identifier);
     identifier->setKind(nominalTypeMarkerToNodeKind(c));
     return nominalType;
@@ -894,40 +872,48 @@ private:
     }
     return demangled_ctx;
   }
-
+  
+  void straightenNestedDeclContext (NodePointer src, NodePointer& dest) {
+    Node::Kind srcKind = src->getKind();
+    switch (srcKind) {
+      case swift::Demangle::Node::Kind::Class:
+      case swift::Demangle::Node::Kind::Structure:
+      case swift::Demangle::Node::Kind::Union:
+      case swift::Demangle::Node::Kind::Module:
+        dest->push_back_child(Node::makeNodePointer(srcKind,src->getText()));
+        break;
+      case swift::Demangle::Node::Kind::Path:
+        for (NodePointer child : *src) {
+          straightenNestedDeclContext(child, dest);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  
   NodePointer demangleContext(Node::Kind *inferred_context_type = nullptr) {
     if (!Mangled)
       return nullptr;
     NodePointer demangled_ctx(demangleContextImpl(inferred_context_type));
     if (!demangled_ctx)
       return nullptr;
-    NodePointer ret(Node::makeNodePointer(Node::Kind::DeclarationContext));
-    ret->push_back_child(demangled_ctx);
+    NodePointer ret(Node::makeNodePointer(Node::Kind::Path));
+    straightenNestedDeclContext(demangled_ctx, ret);
     return ret;
   }
 
-  NodePointer demangleDeclWithContext(NodePointer context) {
+  std::pair<NodePointer,NodePointer> demangleDecl() {
+    std::pair<NodePointer,NodePointer> ret;
     NodePointer identifier = demangleIdentifier();
     if (!identifier)
-      return nullptr;
-    NodePointer declIdentifier = Node::makeNodePointer(Node::Kind::DeclarationIdentifier);
-    declIdentifier->push_back_child(identifier);
-    return demangleDeclTypeWithContextAndName(context, declIdentifier);
-  }
-
-  NodePointer demangleDeclTypeWithContextAndName(NodePointer context,
-                                                 NodePointer identifier) {
+      return ret;
     NodePointer type = demangleType();
     if (!type)
-      return nullptr;
-    NodePointer decl =
-        Node::makeNodePointer(Node::Kind::Declaration);
-    NodePointer declType = Node::makeNodePointer(Node::Kind::DeclarationType);
-    declType->push_back_child(type);
-    decl->push_back_child(context);
-    decl->push_back_child(identifier);
-    decl->push_back_child(declType);
-    return decl;
+      return ret;
+    ret.first = identifier;
+    ret.second = type;
+    return ret;
   }
 
   NodePointer demangleProtocolList() {
@@ -967,86 +953,86 @@ private:
   }
 
   Node::Kind getDeclContextType (NodePointer declContext) {
-    if (declContext->getKind() != Node::Kind::DeclarationContext)
+    if (declContext->getKind() != Node::Kind::Path)
       return Node::Kind::Unknown;
-    if (declContext->front()->getKind() == Node::Kind::NominalType) {
-      for (NodePointer child : *declContext->front()) {
-        Node::Kind childKind = child->getKind();
-        switch (childKind) {
-          case Node::Kind::Class:
-          case Node::Kind::Structure:
-          case Node::Kind::Union:
-            return childKind;
-          default:
-            continue;
-        }
+    for (NodePointer child : *declContext) {
+      Node::Kind childKind = child->getKind();
+      switch (childKind) {
+        case Node::Kind::Class:
+        case Node::Kind::Structure:
+        case Node::Kind::Union:
+        case Node::Kind::Protocol:
+          return childKind;
+        default:
+          continue;
       }
     }
-    if (declContext->front()->getKind() == Node::Kind::Protocol)
-      return Node::Kind::Protocol;
-    if (declContext->front()->getKind() == Node::Kind::Module)
-      return Node::Kind::Module;
-    if (declContext->front()->getKind() == Node::Kind::FunctionType)
-      return Node::Kind::FunctionType;
     return Node::Kind::Unknown;
   }
   
-  NodePointer demangleEntity() {
+  bool demangleEntity(NodePointer decl) {
     NodePointer context = demangleContext();
     if (!context)
-      return nullptr;
+      return failure();
     Node::Kind idKind = getDeclContextType(context);
-    NodePointer decl;
     if (Mangled.nextIf('D')) {
       if (idKind == Node::Kind::Class)
-        decl = Node::makeNodePointer(Node::Kind::Deallocator);
+        context->push_back_child(Node::makeNodePointer(Node::Kind::Deallocator));
       else
-        decl = Node::makeNodePointer(Node::Kind::Destructor);
+        context->push_back_child(Node::makeNodePointer(Node::Kind::Destructor));
       decl->push_back_child(context);
-      return decl;
+      return true;
     }
     if (Mangled.nextIf('d')) {
-      decl = Node::makeNodePointer(Node::Kind::Destructor);
+      context->push_back_child(Node::makeNodePointer(Node::Kind::Destructor));
       decl->push_back_child(context);
-      return decl;
+      return true;
     }
     if (Mangled.nextIf('C')) {
       NodePointer type = demangleType();
       if (!type)
-        return nullptr;
+        return failure();
       if (idKind == Node::Kind::Class)
-        decl = Node::makeNodePointer(Node::Kind::Allocator);
+        context->push_back_child(Node::makeNodePointer(Node::Kind::Allocator));
       else
-        decl = Node::makeNodePointer(Node::Kind::Constructor);
+        context->push_back_child(Node::makeNodePointer(Node::Kind::Constructor));
       decl->push_back_child(context);
       decl->push_back_child(type);
-      return decl;
+      return true;
     }
     if (Mangled.nextIf('c')) {
       NodePointer type = demangleType();
       if (!type)
-        return nullptr;
-      decl = Node::makeNodePointer(Node::Kind::Constructor);
+        return failure();
+      context->push_back_child(Node::makeNodePointer(Node::Kind::Constructor));
       decl->push_back_child(context);
       decl->push_back_child(type);
-      return decl;
+      return true;
     }
-    NodePointer decl_with_ctx = demangleDeclWithContext(context);
-    if (!decl_with_ctx)
+    std::pair<NodePointer,NodePointer> demangledDecl = demangleDecl();
+    if (demangledDecl.first.getPtr() == nullptr || demangledDecl.second.getPtr() == nullptr)
       return nullptr;
     if (Mangled.nextIf('a')) {
-      decl = Node::makeNodePointer(Node::Kind::Addressor);
-      decl->push_back_child(decl_with_ctx);
+      context->push_back_child(demangledDecl.first);
+      context->push_back_child(Node::makeNodePointer(Node::Kind::Addressor));
+      decl->push_back_child(context);
+      decl->push_back_child(demangledDecl.second);
     } else if (Mangled.nextIf('g')) {
-      decl = Node::makeNodePointer(Node::Kind::Getter);
-      decl->push_back_child(decl_with_ctx);
+      context->push_back_child(demangledDecl.first);
+      context->push_back_child(Node::makeNodePointer(Node::Kind::Getter));
+      decl->push_back_child(context);
+      decl->push_back_child(demangledDecl.second);
     } else if (Mangled.nextIf('s')) {
-      decl = Node::makeNodePointer(Node::Kind::Setter);
-      decl->push_back_child(decl_with_ctx);
+      context->push_back_child(demangledDecl.first);
+      context->push_back_child(Node::makeNodePointer(Node::Kind::Setter));
+      decl->push_back_child(context);
+      decl->push_back_child(demangledDecl.second);
     } else {
-      decl = decl_with_ctx;
+      context->push_back_child(demangledDecl.first);
+      decl->push_back_child(context);
+      decl->push_back_child(demangledDecl.second);
     }
-    return decl;
+    return true;
   }
 
   NodePointer demangleArchetypes() {
@@ -1123,21 +1109,21 @@ private:
   }
   
   NodePointer postProcessReturnTypeNode (NodePointer out_args) {
-    Node::Kind out_args_kind = out_args->getKind();
-    if (out_args_kind == Node::Kind::Identifier ||
-        out_args_kind == Node::Kind::Class ||
-        out_args_kind == Node::Kind::Module ||
-        out_args_kind == Node::Kind::Structure ||
-        out_args_kind == Node::Kind::Union) {
-      return compactNode(out_args, Node::Kind::ReturnType);
-    } else {
-      NodePointer out_node = Node::makeNodePointer(Node::Kind::ReturnType);
-      out_node->push_back_child(out_args);
-      return out_node;
-    }
+    NodePointer out_node = Node::makeNodePointer(Node::Kind::ReturnType);
+    out_node->push_back_child(out_args);
+    return out_node;
   }
 
   NodePointer demangleType() {
+    NodePointer type = demangleTypeImpl();
+    if (!type)
+      return nullptr;
+    NodePointer nodeType = Node::makeNodePointer(Node::Kind::Type);
+    nodeType->push_back_child(type);
+    return nodeType;
+  }
+  
+  NodePointer demangleTypeImpl() {
     if (!Mangled)
       return nullptr;
     char c = Mangled.next();
@@ -1288,9 +1274,7 @@ private:
       if (!type)
         return nullptr;
       NodePointer metatype = Node::makeNodePointer(Node::Kind::MetaType);
-      NodePointer type_entry = Node::makeNodePointer(Node::Kind::TypeListEntry);
-      type_entry->push_back_child(type);
-      metatype->push_back_child(type_entry);
+      metatype->push_back_child(type);
       return metatype;
     }
     if (c == 'P') {
@@ -1366,7 +1350,7 @@ private:
         return nullptr;
       context->setNextNode(identifier);
       identifier->setKind(nominalTypeMarkerToNodeKind(c));
-      NodePointer nominal_type = Node::makeNodePointer(Node::Kind::NominalType);
+      NodePointer nominal_type = Node::makeNodePointer(Node::Kind::Path);
       nominal_type->push_back_child(context);
       return nominal_type;
     }
@@ -1485,7 +1469,7 @@ void toStringChildren (NodePointer pointer, DemanglerPrinter &printer, const cha
 
 void toStringLifeCycleEntity (NodePointer pointer, DemanglerPrinter &printer, const char* name) {
   NodePointer child = pointer->child_at(0);
-  if (child->getKind() == Node::Kind::DeclarationContext) {
+  if (child->getKind() == Node::Kind::Path) {
     toString(child, printer);
     printer << ".";
   }
@@ -1507,6 +1491,16 @@ void toStringLifeCycleEntity (NodePointer pointer, DemanglerPrinter &printer, co
   }
 }
 
+NodePointer getFirstChildOfKind (NodePointer pointer, Node::Kind kind) {
+  if (!pointer)
+    return nullptr;
+  for (NodePointer child : *pointer) {
+    if (child && child->getKind() == kind)
+      return child;
+  }
+  return nullptr;
+}
+
 void toString(NodePointer pointer, DemanglerPrinter &printer) {
   while (pointer) {
     Node::Kind kind = pointer->getKind();
@@ -1516,9 +1510,30 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     case swift::Demangle::Node::Kind::Directness:
       printer << pointer->getText() << " ";
       pointer = pointer->getNextNode(); continue;
+    case swift::Demangle::Node::Kind::LocalEntity:
+        printer << "local ";
+        SWIFT_FALLTHROUGH;
     case swift::Demangle::Node::Kind::Declaration:
-      toStringChildren(pointer, printer);
+    {
+      NodePointer path = getFirstChildOfKind(pointer, Node::Kind::Path);
+      NodePointer type = getFirstChildOfKind(pointer, Node::Kind::Type);
+      toString(path, printer);
+      if (type) {
+        printer << " : ";
+        toString(type, printer);
+      }
       break;
+    }
+    case swift::Demangle::Node::Kind::Path:
+    {
+      toStringChildren(pointer, printer, ".");
+      break;
+    }
+    case swift::Demangle::Node::Kind::Type:
+    {
+      toString(pointer->child_at(0), printer);
+      break;
+    }
     case swift::Demangle::Node::Kind::Module:
     case swift::Demangle::Node::Kind::Class:
     case swift::Demangle::Node::Kind::Structure:
@@ -1528,11 +1543,6 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     case swift::Demangle::Node::Kind::Identifier:
       printer << pointer->getText();
       break;
-    case swift::Demangle::Node::Kind::DeclarationIdentifier:
-      printer << ".";
-      toString(pointer->child_at(0), printer);
-      printer << " : ";
-      break;
     case swift::Demangle::Node::Kind::FunctionName:
       break;
     case swift::Demangle::Node::Kind::FunctionType:
@@ -1540,7 +1550,6 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       break;
     case swift::Demangle::Node::Kind::DeclarationName:
         break;
-    case swift::Demangle::Node::Kind::DeclarationContext:
     case swift::Demangle::Node::Kind::DeclarationType:
       toStringChildren(pointer, printer, ".");
       break;
@@ -1571,7 +1580,7 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
         if (pointer->size() == 0)
           need_parens = true;
         else {
-          Node::Kind child0_kind = pointer->child_at(0)->getKind();
+          Node::Kind child0_kind = pointer->child_at(0)->child_at(0)->getKind();
           if (child0_kind != Node::Kind::VariadicTuple &&
               child0_kind != Node::Kind::NonVariadicTuple)
             need_parens = true;
@@ -1632,9 +1641,6 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     case swift::Demangle::Node::Kind::ObjCAttribute:
       printer << "[objc] ";
       pointer = pointer->getNextNode(); continue;
-    case swift::Demangle::Node::Kind::LocalEntity:
-      printer << "local ";
-      pointer = pointer->getNextNode(); continue;
     case swift::Demangle::Node::Kind::BuiltinTypeName:
     case swift::Demangle::Node::Kind::BaseName:
     case swift::Demangle::Node::Kind::Number:
@@ -1660,46 +1666,67 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       pointer = pointer->getNextNode(); continue;
     case swift::Demangle::Node::Kind::DependentProtocolWitnessTableGenerator:
       printer << "dependent protocol witness table generator for ";
-      pointer = pointer->getNextNode(); continue;
+      pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::DependentProtocolWitnessTableTemplate:
       printer << "dependent protocol witness table template for ";
-      pointer = pointer->getNextNode(); continue;
+        pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::LazyProtocolWitnessTableAccessor:
       printer << "lazy protocol witness table accessor for ";
-      pointer = pointer->getNextNode(); continue;
+        pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::LazyProtocolWitnessTableTemplate:
       printer << "lazy protocol witness table template for ";
-      pointer = pointer->getNextNode(); continue;
+        pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::ProtocolWitnessTable:
       printer << "protocol witness table for ";
-      pointer = pointer->getNextNode(); continue;
+        pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::ProtocolWitness:
       printer << "protocol witness for ";
-      pointer = pointer->getNextNode(); continue;
+      {
+        NodePointer path = getFirstChildOfKind(pointer, Node::Kind::Path);
+        NodePointer type = getFirstChildOfKind(pointer, Node::Kind::Type);
+        toString(path,printer);
+        printer << " : ";
+        toString(type, printer);
+        break;
+      }
     case swift::Demangle::Node::Kind::FieldOffset:
       printer << "field offset for ";
-      pointer = pointer->getNextNode(); continue;
+      {
+        NodePointer path = getFirstChildOfKind(pointer, Node::Kind::Path);
+        NodePointer type = getFirstChildOfKind(pointer, Node::Kind::Type);
+        toString(path,printer);
+        printer << " : ";
+        toString(type, printer);
+        break;
+      }
     case swift::Demangle::Node::Kind::BridgeToBlockFunction:
       printer << "bridge-to-block function for ";
-      pointer = pointer->getNextNode(); continue;
+        pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::GenericTypeMetadataPattern:
       printer << "generic type metadata pattern for ";
-      pointer = pointer->getNextNode(); continue;
+        pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::Metaclass:
       printer << "metaclass for ";
-      pointer = pointer->getNextNode(); continue;
+        pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::TypeMetadata:
       printer << "type metadata for ";
-      pointer = pointer->getNextNode(); continue;
+        pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::ValueWitnessKind:
       printer << pointer->getText() << " value witness for ";
-      pointer = pointer->getNextNode(); continue;
+        pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::ValueWitnessTable:
       printer << "value witness table for ";
-      pointer = pointer->getNextNode(); continue;
+        pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::WitnessTableOffset:
       printer << "witness table offset for ";
-      pointer = pointer->getNextNode(); continue;
+      {
+        NodePointer path = getFirstChildOfKind(pointer, Node::Kind::Path);
+        NodePointer type = getFirstChildOfKind(pointer, Node::Kind::Type);
+        toString(path,printer);
+        printer << " : ";
+        toString(type, printer);
+        break;
+      }
     case swift::Demangle::Node::Kind::GenericTypeApplication: {
       NodePointer typelist = pointer->child_at(0);
       if (!typelist)
@@ -1714,16 +1741,6 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
           printer << ", ";
       }
       printer << ">";
-      break;
-    }
-    case swift::Demangle::Node::Kind::NominalType: {
-      NodePointer first = pointer->child_at(0);
-      while (first) {
-        printer << first->getText();
-        first = first->getNextNode();
-        if (first)
-          printer << ".";
-      }
       break;
     }
     case swift::Demangle::Node::Kind::TypeListEntry:
@@ -1767,7 +1784,7 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     }
     case swift::Demangle::Node::Kind::GenericType: {
       NodePointer atype_list = pointer->child_at(0);
-      NodePointer fct_type = pointer->child_at(1);
+      NodePointer fct_type = pointer->child_at(1)->child_at(0);
       toString(atype_list, printer);
       NodePointer args = fct_type->child_at(0);
       NodePointer ret = fct_type->child_at(1);
@@ -1776,34 +1793,28 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       break;
     }
     case swift::Demangle::Node::Kind::Addressor: {
-      NodePointer decl = pointer->child_at(0);
-      toString(decl, printer);
-      printer << " addressor";
+      printer << "addressor";
       break;
     }
     case swift::Demangle::Node::Kind::Getter: {
-      NodePointer decl = pointer->child_at(0);
-      toString(decl, printer);
-      printer << " getter";
+      printer << "getter";
       break;
     }
     case swift::Demangle::Node::Kind::Setter: {
-      NodePointer decl = pointer->child_at(0);
-      toString(decl, printer);
-      printer << " setter";
+      printer << "setter";
       break;
     }
     case swift::Demangle::Node::Kind::Allocator:
-      toStringLifeCycleEntity(pointer, printer, "__allocating_constructor");
+      printer << "__allocating_constructor";
       break;
     case swift::Demangle::Node::Kind::Constructor:
-      toStringLifeCycleEntity(pointer, printer, "constructor");
+      printer << "constructor";
       break;
     case swift::Demangle::Node::Kind::Destructor:
-      toStringLifeCycleEntity(pointer, printer, "destructor");
+      printer << "destructor";
       break;
     case swift::Demangle::Node::Kind::Deallocator:
-      toStringLifeCycleEntity(pointer, printer, "__deallocating_destructor");
+      printer << "__deallocating_destructor";
       break;
     case swift::Demangle::Node::Kind::ProtocolConformance: {
       NodePointer child0 = pointer->child_at(0);

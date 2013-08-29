@@ -102,11 +102,10 @@ public:
     TupleElementType,
     TypeListEntry,
     FunctionName,
-    NominalType,
     DeclarationName,
-    DeclarationContext,
-    DeclarationIdentifier,
-    DeclarationType
+    Path,
+    DeclarationType,
+    Type
   };
   
   size_type size ();
