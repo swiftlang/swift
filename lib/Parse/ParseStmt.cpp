@@ -201,7 +201,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
 
   SmallVector<Decl*, 8> TmpDecls;
 
-  bool previousHadSemi = true;
+  bool PreviousHadSemi = true;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof) &&
          Tok.isNot(tok::kw_sil) && Tok.isNot(tok::kw_sil_stage) &&
          !isTerminatorForBraceItemListKind(Tok, Kind, Entries)) {
@@ -210,7 +210,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
 
     // If the previous statement didn't have a semicolon and this new
     // statement doesn't start a line, complain.
-    if (!previousHadSemi && !Tok.isAtStartOfLine()) {
+    if (!PreviousHadSemi && !Tok.isAtStartOfLine()) {
       SourceLoc EndOfPreviousLoc = Lexer::getLocForEndOfToken(SourceMgr,
                                                               PreviousLoc);
       diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
@@ -223,7 +223,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       BeginParserPosition = getParserPosition();
 
     // Parse the decl, stmt, or expression.
-    previousHadSemi = false;
+    PreviousHadSemi = false;
     if (isStartOfDecl(Tok, peekToken())) {
       ParserStatus Status =
           parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
@@ -239,7 +239,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       for (Decl *D : TmpDecls)
         Entries.push_back(D);
       if (!TmpDecls.empty())
-        previousHadSemi = TmpDecls.back()->TrailingSemiLoc.isValid();
+        PreviousHadSemi = TmpDecls.back()->TrailingSemiLoc.isValid();
       TmpDecls.clear();
     } else if (IsTopLevel && allowTopLevelCode()) {
       // If this is a statement or expression at the top level of the module,
@@ -280,13 +280,13 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         Entries.push_back(Result);
     }
 
-    if (!NeedParseErrorRecovery && !previousHadSemi && Tok.is(tok::semi)) {
+    if (!NeedParseErrorRecovery && !PreviousHadSemi && Tok.is(tok::semi)) {
       if (Result.is<Expr*>()) {
         Result.get<Expr*>()->TrailingSemiLoc = consumeToken(tok::semi);
       } else {
         Result.get<Stmt*>()->TrailingSemiLoc = consumeToken(tok::semi);
       }
-      previousHadSemi = true;
+      PreviousHadSemi = true;
     }
 
     if (NeedParseErrorRecovery) {
@@ -300,7 +300,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
 
       // If we have to recover, pretend that we had a semicolon; it's less
       // noisy that way.
-      previousHadSemi = true;
+      PreviousHadSemi = true;
     }
   }
 }
