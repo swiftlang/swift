@@ -1,0 +1,234 @@
+@# -*- mode: swift -*-
+
+@# Ignore the following admonition; it applies to the resulting .swift file only
+//// Automatically Generated From FixedPoint.gyb.  Do Not Edit Directly ////
+func overflowCheck<T: RandomAccessIndex>(arg: T, overflow: Bool) -> T {
+  alwaysTrap(overflow == false)
+  return arg
+}
+@{
+#
+# Utility code for later in this template
+#
+def hexify(n):
+    """Return a legible hex representation of n, using '_' separators """
+    z = '%X' % n
+    l = len(z)
+    r = []
+    while z:
+        r.insert(0, z[-4:])
+        z = z[:-4]
+    return '0x' + '_'.join(r)
+
+# Number of bits in an Int
+intBits = 64
+
+def maskBits(n):
+    """Return an n-bit mask in hex"""
+    return hexify((1 << n) - 1)
+
+def all_ints():
+    for bits in 8,16,32,64,128:
+        for signed in False, True:
+            yield bits,signed
+
+def int_name(bits, signed):
+    return ('' if signed else 'U') + 'Int' + str(bits)
+}@
+
+@for (bits, signed) in all_ints():
+@   sign = 's' if signed else 'u'
+@   Self = int_name(bits, signed)
+@   ArrayBound = 'ArrayBound, ' if bits > 8 and bits < 128 else ''
+
+struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible, 
+                ${ArrayBound}ReplPrintable {
+  var value : Builtin.Int${bits}
+
+  static func _convertFromBuiltinIntegerLiteral(val : Builtin.Int128) -> ${Self} {
+    @assert bits <= 128, 'Teach me how to deal with numbers this large'
+    return ${Self}(${'val' if bits == 128 else ('Builtin.trunc_Int128_Int%d(val)' % bits)})
+  }
+
+  typealias IntegerLiteralType = ${Self}
+  static func convertFromIntegerLiteral(value : ${Self}) -> ${Self} {
+    return value
+  }
+@if ArrayBound:
+  func _getBuiltinArrayBoundValue() -> Builtin.Int${bits} {
+    return value
+  }
+
+  typealias ArrayBoundType = ${Self}
+  func getArrayBoundValue() -> ${Self} {
+    return self
+  }
+@else:
+
+@end 
+  func replPrint() {
+    print(${
+      'self' if bits == 64
+      else (('String' if bits > 64 else 'Int64' if signed else 'UInt64') + '(self)')})
+  }
+
+@max = maskBits((bits - 1) if signed else bits)
+  // FIXME: these should be static vars when supported
+  static func max() -> ${Self} { return ${max} }
+  static func min() -> ${Self} { return ${'-%s-1' % max if signed else '0'} }
+}
+
+extension ${Self} : RandomAccessIndex, Hashable {
+  func __equal__(rhs: ${Self}) -> Bool {
+    return _getBool(Builtin.cmp_eq_Int${bits}(value, rhs.value))
+  }
+  func __less__(rhs: ${Self}) -> Bool {
+    return _getBool(Builtin.cmp_${sign}lt_Int${bits}(value, rhs.value))
+  }
+  func succ() -> ${Self} {
+    return self + 1
+  }
+  func pred() -> ${Self} {
+    return self - 1
+  }
+  func hashValue() -> Int {
+@{
+if bits <= intBits:
+    hashValue = 'Int(self)'
+else:
+    # count of ints needed to represent this type
+    ints = (bits + intBits - 1) / intBits
+
+    # accumulate the high word
+    i = ints - 1
+    hashValue = 'Int(self >> %s)' % (i * intBits)
+
+    # accumulate middle words; these require shift + mask
+    while i > 1:
+        i = i-1
+        hashValue += ' ^ Int((self >> %d) & %s)' % (
+                      intBits * i, maskBits(intBits))
+
+    # accumulate the low word; requires only a mask
+    hashValue += ' ^ Int(self & %s)' % maskBits(intBits)
+}@
+    return ${hashValue}
+  }
+
+  typealias DistanceType = ${Self}
+  static func sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
+    var tmp = Builtin.int_${sign}sub_with_overflow_Int${bits}(lhs.value, rhs.value)
+    return (${Self}(tmp.0), _getBool(tmp.1))
+  }
+  static func add(lhs: ${Self}, rhs: DistanceType) -> (${Self}, Bool) {
+    var tmp = Builtin.int_${sign}add_with_overflow_Int${bits}(lhs.value, rhs.value)
+    return (${Self}(tmp.0), _getBool(tmp.1))
+  }
+  static func mul(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
+    var tmp = Builtin.int_${sign}mul_with_overflow_Int${bits}(lhs.value, rhs.value)
+    return (${Self}(tmp.0), _getBool(tmp.1))
+  }
+}
+
+@if signed:
+extension ${Self} : SignedNumber {
+  static func negate(rhs: ${Self}) -> (${Self}, Bool) { return ${Self}.sub(0, rhs) }
+  func isNegative() -> Bool { return self < 0 }
+}
+@end
+
+// construction from other integer types
+extension ${Self} {
+@for (src_bits, src_signed) in all_ints():
+@    That = int_name(src_bits, src_signed)
+@    if Self != That:
+  constructor(v: ${That}) {
+         @if bits == src_bits:
+    value = v.value
+         @else:
+    value = Builtin.${
+    ('trunc' if src_bits > bits 
+    else 'sext' if src_signed 
+    else 'zext')
+    }_Int${src_bits}_Int${bits}(v.value)
+         @end
+  }
+@    end
+@end
+}
+
+//===----------------------------------------------------------------------===//
+// Standard Operator Tables
+//===----------------------------------------------------------------------===//
+
+// Unary addition
+func [prefix] +(a : ${Self}) -> ${Self} { return a }
+
+// Bitwise negation
+func [prefix] ~(a: ${Self}) -> ${Self} { return a ^ ${maskBits(bits)} }
+
+// Masking Binary Operations
+func &+ (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}.add(lhs, rhs).0 }
+func &* (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}.mul(lhs, rhs).0 }
+func &- (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}.sub(lhs, rhs).0 }
+
+// Checked Binary Operations 
+func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return overflowCheck(${Self}.mul(lhs, rhs)) }
+func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return overflowCheck(${Self}.add(lhs, rhs)) }
+func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return overflowCheck(${Self}.sub(lhs, rhs)) }
+
+// Division and remainder
+func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.${sign}div_Int${bits}(lhs.value, rhs.value)) }
+func % (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.${sign}rem_Int${bits}(lhs.value, rhs.value)) }
+
+// Left Shift.
+func << (lhs : ${Self}, rhs : ${Self}) -> ${Self} {
+  return ${Self}(Builtin.shl_Int${bits}(lhs.value, rhs.value))
+}
+
+// Right Shift.
+func >>(lhs : ${Self}, rhs : ${Self}) -> ${Self} {
+  return ${Self}(Builtin.${'a' if signed else 'l'}shr_Int${bits}(lhs.value, rhs.value))
+}
+
+// Bitwise operators
+func & (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+  return ${Self}(Builtin.and_Int${bits}(lhs.value, rhs.value))
+}
+func ^ (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+  return ${Self}(Builtin.xor_Int${bits}(lhs.value, rhs.value))
+}
+func | (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+  return ${Self}(Builtin.or_Int${bits}(lhs.value, rhs.value))
+}
+
+// Compound assignments
+@if not signed:
+func [assignment] -= (lhs : [byref] ${Self}, rhs : ${Self}) {
+  lhs = lhs - rhs
+}
+@end
+func [assignment] *= (lhs : [byref] ${Self}, rhs : ${Self}) {
+  lhs = lhs * rhs
+}
+func [assignment] /= (lhs : [byref] ${Self}, rhs : ${Self}) {
+  lhs = lhs / rhs
+}
+func [assignment] %= (lhs : [byref] ${Self}, rhs : ${Self}) {
+  lhs = lhs % rhs
+}
+func [assignment] <<= (lhs : [byref] ${Self}, rhs : ${Self}) {
+  lhs = lhs << rhs
+}
+func [assignment] >>= (lhs : [byref] ${Self}, rhs : ${Self}) {
+  lhs = lhs >> rhs
+}
+func [assignment] &= (lhs : [byref] ${Self}, rhs : ${Self}) {
+  lhs = lhs & rhs
+}
+func [assignment] |= (lhs : [byref] ${Self}, rhs : ${Self}) {
+  lhs = lhs | rhs
+}
+func [assignment] ^= (lhs : [byref] ${Self}, rhs : ${Self}) {
+  lhs = lhs ^ rhs
+}
