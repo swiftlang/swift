@@ -14,10 +14,22 @@ SWIFT_LEVEL := ../..
 
 TOOLNAME = lldb-moduleimport-test
 
-LINK_COMPONENTS := support
-USEDLIBS = swiftFrontend.a swiftParse.a swiftClangImporter.a swiftSema.a swiftSerialization.a swiftAST.a swiftBasic.a
+include $(SWIFT_LEVEL)/../../Makefile.config
+
+LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitreader mcjit option
+USEDLIBS = swiftFrontend.a swiftParse.a swiftClangImporter.a swiftSIL.a swiftSema.a swiftSerialization.a swiftAST.a swiftBasic.a
 
 LLVMLibsOptions :=     \
+  -lclangDriver        \
+  -lclangEdit          \
+  -lclangFrontend      \
+  -lclangSerialization \
+  -lclangParse         \
+  -lclangSema          \
+  -lclangAnalysis      \
+  -lclangLex	       \
+  -lclangAST	       \
+  -lclangBasic         \
   $(LLVMLibsOptions)
 
 include $(SWIFT_LEVEL)/Makefile
