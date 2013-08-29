@@ -71,13 +71,11 @@ using DispatchedPatternVector
 /// Emit a conditional branch testing if a value matches one of the given
 /// pattern nodes.
 /// In the case branch for each pattern, destructure the value.
-/// On return, the insertion point is inside the true branch. The false branch
-/// is returned.
+/// On return, the insertion point is cleared.
 ///
-/// If the set of pattern nodes form a signature for the type, that is, they
-/// match every possible value of the type, this returns null. Otherwise, this
-/// returns the "default" basic block for the dispatch that will be branched to
-/// if no patterns match.
+/// \returns null if the set of pattern nodes match every possible value of the
+/// type, or else the "default" basic block for the dispatch that will be
+/// branched to if no patterns match.
 static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
                                           ArrayRef<const Pattern *> patterns,
                                           SILValue v,
@@ -129,8 +127,8 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
   case PatternKind::Isa: {
     /// Emit all the 'is' checks.
     ///
-    /// FIXME: We may at some point need to deal with heterogeneous pattern node
-    /// sets (e.g., a 't is U' pattern with a 'T(...)' pattern).
+    /// FIXME: We will at some point need to deal with heterogeneous pattern
+    /// node sets (e.g., a 't is U' pattern with a 'T(...)' pattern).
     for (const Pattern *p : patterns) {
       auto *ip = cast<IsaPattern>(p);
 
