@@ -1797,6 +1797,11 @@ public:
   /// \brief Retrieve the superclass of this type, if such a requirement exists.
   Type getSuperclass() const { return Superclass; }
 
+  /// \brief Return true if the archetype has any requirements at all.
+  bool hasRequirements() const {
+    return !getConformsTo().empty() || getSuperclass();
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_SubstitutableType &&
