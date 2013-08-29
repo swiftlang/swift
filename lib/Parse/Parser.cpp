@@ -371,9 +371,6 @@ void Parser::skipUntilDeclRBrace(tok T1, tok T2, bool StopAtCodeComplete) {
 // Primitive Parsing
 //===----------------------------------------------------------------------===//
 
-/// parseIdentifier - Consume an identifier (but not an operator) if
-/// present and return its name in Result.  Otherwise, emit an error and
-/// return true.
 bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
                              const Diagnostic &D) {
   switch (Tok.getKind()) {
