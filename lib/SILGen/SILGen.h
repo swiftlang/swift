@@ -264,6 +264,8 @@ public:
   /// The SILFunction being constructed.
   SILFunction &F;
 
+  ASTContext &getASTContext() const { return SGM.M.getASTContext(); }
+
   /// This is used to keep track of all SILInstructions inserted by \c B.
   SmallVector<SILInstruction*, 32> InsertedInstrs;
   size_t LastInsnWithoutScope;
@@ -699,6 +701,12 @@ public:
                          OwnershipConventions const &Ownership,
                          bool ForceInline = false,
                          SGFContext C = SGFContext());
+
+  ManagedValue emitApplyOfLibraryIntrinsic(SILLocation loc,
+                                           FuncDecl *fn,
+                                           ArrayRef<ManagedValue> args,
+                                           CanType resultType,
+                                           SGFContext ctx);
 
   /// \brief Emit the cast instruction appropriate to the kind of checked cast.
   ///

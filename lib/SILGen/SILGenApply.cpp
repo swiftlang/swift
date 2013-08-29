@@ -1297,6 +1297,22 @@ RValue SILGenFunction::emitApplyExpr(ApplyExpr *e, SGFContext c) {
   return RValue(*this, prepareApplyExpr(*this, e).apply(c));
 }
 
+ManagedValue
+SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
+                                            FuncDecl *fn,
+                                            ArrayRef<ManagedValue> args,
+                                            CanType resultType,
+                                            SGFContext ctx) {
+  Callee callee = Callee::forDirect(*this, SILDeclRef(fn), loc);
+
+  ManagedValue calleeValue;
+  OwnershipConventions ownership;
+  std::tie(calleeValue, ownership) = callee.getAtUncurryLevel(*this, 0);
+
+  return emitApply(loc, calleeValue, args, resultType, ownership,
+                   callee.isTransparent(), ctx);
+}
+
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
 /// (which represents the retain count), a base pointer to some elements, and a
 /// length.

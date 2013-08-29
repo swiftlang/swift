@@ -451,8 +451,8 @@ bb0(%0 : $Int64, %1 : $M):
 class B { }
 class E : B { }
 
-// CHECK: $[thin] (b : B) -> Bool
-sil @_T4null3isaFT1bCS_1B_Sb : $[thin] (b : B) -> Bool {
+// CHECK: $[thin] (b : B) -> Builtin.Int1
+sil @_T4null3isaFT1bCS_1B_Sb : $[thin] (b : B) -> Builtin.Int1 {
 bb0(%0 : $B):
   %1 = alloc_box $B                           // CHECK: alloc_box
   %2 = store %0 to %1#1 : $*B
@@ -462,7 +462,7 @@ bb0(%0 : $B):
   %6 = is_nonnull %5 : $E                     // CHECK: is_nonnull {{%.*}} : $E
   %7 = strong_release %3 : $B
   %8 = strong_release %1#0 : $Builtin.ObjectPointer
-  %9 = return %6 : $Bool
+  %9 = return %6 : $Builtin.Int1
 }
 
 sil @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $[thin] ((value : Builtin.FPIEEE64), Float64.metatype) -> Float64

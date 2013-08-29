@@ -433,8 +433,7 @@ SILValue
 SILCloner<ImplClass>::visitIsNonnullInst(IsNonnullInst* Inst) {
   return doPostProcess(Inst,
     Builder.createIsNonnull(getOpLocation(Inst->getLoc()),
-                            getOpValue(Inst->getOperand()),
-                            getOpType(Inst->getType())));
+                            getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

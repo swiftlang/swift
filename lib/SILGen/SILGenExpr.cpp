@@ -693,9 +693,14 @@ RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
                                   CheckedCastMode::Conditional,
                                   /*useCastValue*/ false);
   // Check the result.
-  SILValue is = SGF.B.createIsNonnull(E, cast,
-                                  SGF.getLoweredLoadableType(E->getType()));
-  return RValue(SGF, SGF.emitManagedRValueWithCleanup(is));
+  SILValue is = SGF.B.createIsNonnull(E, cast);
+
+  // Call the _getBool library intrinsic.
+  return RValue(SGF, SGF.emitApplyOfLibraryIntrinsic(E,
+                                  SGF.SGM.M.getASTContext().getGetBoolDecl(),
+                                  ManagedValue(is, ManagedValue::Unmanaged),
+                                  E->getType()->getCanonicalType(),
+                                  C));
 }
 
 RValue RValueEmitter::visitParenExpr(ParenExpr *E, SGFContext C) {

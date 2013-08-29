@@ -144,8 +144,7 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
                                         ip->getCastKind(),
                                         CheckedCastMode::Conditional,
                                         /*useCastValue*/ false);
-      SILValue didMatch = gen.B.createIsNonnull(SILLocation(), cast,
-                      SILType::getBuiltinIntegerType(1, gen.F.getASTContext()));
+      SILValue didMatch = gen.B.createIsNonnull(SILLocation(), cast);
       
       // On the true branch, we can use the cast value.
       // If the cast result is loadable and we cast a value address, load it.

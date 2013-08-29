@@ -394,11 +394,11 @@ public:
                   DowncastExistentialRefInst(Loc, Existential, Ty, Mode));
   }
   
-  IsNonnullInst *createIsNonnull(SILLocation Loc,
-                           SILValue Operand,
-                           SILType ResultType) {
+  IsNonnullInst *createIsNonnull(SILLocation loc,
+                                 SILValue operand) {
     return insert(new (F.getModule())
-                    IsNonnullInst(Loc, Operand, ResultType));
+                    IsNonnullInst(loc, operand,
+                      SILType::getBuiltinIntegerType(1, F.getASTContext())));
   }
 
   StructInst *createStruct(SILLocation Loc, SILType Ty,

@@ -1593,6 +1593,13 @@ namespace {
     }
     
     Expr *visitIsaExpr(IsaExpr *expr) {
+      // SIL-generation magically turns this into a Bool; make sure it can.
+      if (!cs.getASTContext().getGetBoolDecl()) {
+        cs.getTypeChecker().diagnose(expr->getLoc(),
+                                     diag::bool_intrinsics_not_found);
+        // Continue anyway.
+      }
+
       CheckedCastKind castKind = checkCheckedCastExpr(expr);
       switch (castKind) {
       // Invalid type check.

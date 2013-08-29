@@ -88,9 +88,6 @@ namespace {
     /// Construct ArchetypeType from Generic Params.
     bool handleGenericParams(GenericParamList *GenericParams);
     bool performTypeLocChecking(TypeLoc &T);
-
-    /// Look up the Bool type.
-    Type lookupBoolType(SourceLoc Loc);
   public:
 
     SILParser(Parser &P) : P(P), SILMod(*P.SIL->M), TUState(*P.SIL->S) {}
@@ -907,23 +904,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   }
   P.diagnose(OpcodeLoc, diag::expected_sil_instr_opcode);
   return true;
-}
-
-/// Use performTypeLocChecking to get the type for Bool. Another option
-/// is to use UnqualifiedLookup.
-Type SILParser::lookupBoolType(SourceLoc Loc) {
-  SmallVector<IdentTypeRepr::Component, 4> ComponentsR;
-  SmallVector<TypeRepr*, 8> GenericArgs;
-  ComponentsR.push_back(IdentTypeRepr::Component(Loc, 
-                          P.Context.getIdentifier("Bool"),
-                          GenericArgs, P.TU));
-  IdentTypeRepr *TyRepr = IdentTypeRepr::create(P.Context, ComponentsR);
-  TypeLoc Ty = TyRepr;
-  if (performTypeLocChecking(Ty)) {
-    P.diagnose(Loc, diag::bool_type_broken);
-    return Type();
-  }
-  return Ty.getType();
 }
 
 bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args) {
@@ -1806,9 +1786,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SourceLoc Loc;
     if (parseTypedValueRef(Val, Loc))
       return true;
-    auto BoolTy = SILType::getPrimitiveObjectType(
-                                    lookupBoolType(Loc)->getCanonicalType());
-    ResultVal = B.createIsNonnull(InstLoc, Val, BoolTy);
+    ResultVal = B.createIsNonnull(InstLoc, Val);
     break;
   }
   case ValueKind::IndexAddrInst: {
