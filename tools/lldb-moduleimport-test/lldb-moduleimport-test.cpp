@@ -24,6 +24,7 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
 #include <mach-o/loader.h>
 #include <stdlib.h>
 #include <iostream>
@@ -42,7 +43,6 @@ struct module_header {
  uint32_t language;
  uint32_t flags;
 };
-
 
 static llvm::cl::list<std::string>
 InputNames(llvm::cl::Positional, llvm::cl::desc("compiled_swift_file1.o ..."),
@@ -119,22 +119,22 @@ int main(int argc, char **argv) {
                 uint32_t nchars;
                 macho.read((char*)&nchars, sizeof(nchars));
                 assert(nchars < (2 << 10) && "path is too long");
-                char path[nchars + 1];
-                macho.read(path, nchars);
-                path[nchars] = 0;
+                llvm::SmallString<128> Path;
+                Path.append(nchars, 'x');
+                macho.read(Path.data(), nchars);
 
                 // Bitstream.
                 macho.seekg(base + mh.bitstream_ofs, macho.beg);
                 char* data = new char[mh.bitstream_size];
                 macho.read(data, mh.bitstream_size);
                 auto sr = llvm::StringRef(data, mh.bitstream_size);
-                auto bitstream = llvm::MemoryBuffer::getMemBuffer(sr, path);
+                auto bitstream = llvm::MemoryBuffer::getMemBuffer(sr, Path);
 
                 // Register it.
-                std::cout << "Loaded module " << path << " from " << name << "\n";
+                llvm::outs() << "Loaded module " << Path << " from " << name << "\n";
                 SML->registerBitstream(
-                    path, llvm::OwningPtr<llvm::MemoryBuffer>(bitstream));
-                modules.push_back(path);
+                    Path.c_str(), llvm::OwningPtr<llvm::MemoryBuffer>(bitstream));
+                modules.push_back(Path.c_str());
 
                 assert(macho.good());
               }
@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
 
   // Attempt to import all modules we found.
   for (auto path : modules) {
-    std::cout << "Importing " << path << "... ";
+    llvm::outs() << "Importing " << path << "... ";
 
 #ifdef SWIFT_SUPPORTS_SUBMODULES
     std::vector<std::pair<swift::Identifier, swift::SourceLoc> > AccessPath;
@@ -164,10 +164,10 @@ int main(int argc, char **argv) {
 
     auto Module = SML->loadModule(swift::SourceLoc(), AccessPath);
     if (!Module) {
-      std::cerr << "FAIL!\n";
+      llvm::errs() << "FAIL!\n";
       return 1;
     }
-    std::cout << "ok!\n";
+    llvm::outs() << "ok!\n";
   }
   return 0;
 }
