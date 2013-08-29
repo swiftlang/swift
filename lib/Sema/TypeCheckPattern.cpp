@@ -211,7 +211,8 @@ lookupUnionMemberElement(TypeChecker &TC, Type ty, Identifier name) {
     return nullptr;
   
   // Look up the case inside the union.
-  LookupResult foundElements = TC.lookupMember(ty, name);
+  LookupResult foundElements = TC.lookupMember(ty, name,
+                                               /*allowDynamicLookup=*/false);
   if (!foundElements)
     return nullptr;
   

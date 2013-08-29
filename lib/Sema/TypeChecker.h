@@ -555,9 +555,11 @@ public:
   ///
   /// \param type The type in which we will look for a member.
   /// \param name The name of the member to look for.
+  /// \param allowDynamicLookup Whether to allow dynamic lookup.
   ///
   /// \returns The result of name lookup.
-  LookupResult lookupMember(Type type, Identifier name);
+  LookupResult lookupMember(Type type, Identifier name,
+                            bool allowDynamicLookup = true);
 
   /// \brief Look up a member type within the given type.
   ///

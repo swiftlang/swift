@@ -21,9 +21,12 @@
 
 using namespace swift;
 
-LookupResult TypeChecker::lookupMember(Type type, Identifier name) {
+LookupResult TypeChecker::lookupMember(Type type, Identifier name,
+                                       bool allowDynamicLookup) {
   LookupResult result;
-  unsigned options = NL_QualifiedDefault | NL_DynamicLookup;
+  unsigned options = NL_QualifiedDefault;
+  if (allowDynamicLookup)
+    options = options | NL_DynamicLookup;
   
   // We can't have tuple types here; they need to be handled elsewhere.
   assert(!type->is<TupleType>());
@@ -142,5 +145,6 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
 
 LookupResult TypeChecker::lookupConstructors(Type type) {
   // FIXME: Use of string literal here is lame.
-  return lookupMember(type, Context.getIdentifier("constructor"));
+  return lookupMember(type, Context.getIdentifier("constructor"),
+                      /*allowDynamicLookup=*/false);
 }

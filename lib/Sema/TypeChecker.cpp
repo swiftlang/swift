@@ -229,7 +229,8 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
     auto& CurDecls = FoundDeclResult.first->second;
     if (FoundDeclResult.second) {
       for (auto BaseMember : TC.lookupMember(superclassMetaTy,
-                                             MemberVD->getName()))
+                                             MemberVD->getName(),
+                                             /*allowDynamicLookup=*/false))
         CurDecls.push_back(BaseMember);
     }
     if (!CurDecls.empty()) {
