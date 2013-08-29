@@ -105,6 +105,25 @@ entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
   return %u : $Singleton
 }
 
+// CHECK: define void @singleton_inject_indirect(i64, i64, %O5union9Singleton*) {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = getelementptr inbounds %O5union9Singleton* %2, i32 0, i32 0
+// CHECK:   [[DATA_0_ADDR:%.*]] = getelementptr inbounds { i64, i64 }* [[DATA_ADDR]], i32 0, i32 0
+// CHECK:   store i64 %0, i64* [[DATA_0_ADDR]], align 8
+// CHECK:   [[DATA_1_ADDR:%.*]] = getelementptr inbounds { i64, i64 }* [[DATA_ADDR]], i32 0, i32 1
+// CHECK:   store i64 %1, i64* [[DATA_1_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+sil @singleton_inject_indirect : $(Builtin.Int64, Builtin.Int64, [byref] Singleton) -> () {
+entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $*Singleton):
+  %t = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+  %a = union_data_addr %2 : $*Singleton, #Singleton.val!unionelt.1
+  store %t to %a : $*(Builtin.Int64, Builtin.Int64)
+  inject_union_addr %2 : $*Singleton, #Singleton.val!unionelt.1
+  %v = tuple ()
+  return %v : $()
+}
+
 
 union NoPayloads {
   case x
@@ -190,6 +209,19 @@ sil @no_payload_inject_z : $() -> NoPayloads {
 entry:
   %u = union $NoPayloads, #NoPayloads.z!unionelt
   return %u : $NoPayloads
+}
+
+// CHECK: define void @no_payload_inject_z_indirect(%O5union10NoPayloads*) {
+// CHECK: entry:
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O5union10NoPayloads* %0, i32 0, i32 0
+// CHECK:   store i2 -2, i2* [[TAG_ADDR]], align 1
+// CHECK:   ret void
+// CHECK: }
+sil @no_payload_inject_z_indirect : $([byref] NoPayloads) -> () {
+entry(%0 : $*NoPayloads):
+  inject_union_addr %0 : $*NoPayloads, #NoPayloads.z!unionelt
+  %v = tuple ()
+  return %v : $()
 }
 
 
@@ -357,6 +389,23 @@ entry(%0 : $Builtin.Int64):
   return %u : $SinglePayloadNoXI2
 }
 
+// CHECK: define void @single_payload_no_xi_inject_x_indirect(i64, %O5union18SinglePayloadNoXI2*) {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O5union18SinglePayloadNoXI2* %1 to i64*
+// CHECK:   store i64 %0, i64* [[DATA_ADDR]], align 8
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O5union18SinglePayloadNoXI2* %1, i32 0, i32 1
+// CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+sil @single_payload_no_xi_inject_x_indirect : $(Builtin.Int64, [byref] SinglePayloadNoXI2) -> () {
+entry(%0 : $Builtin.Int64, %1 : $*SinglePayloadNoXI2):
+  %a = union_data_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!unionelt.1
+  store %0 to %a : $*Builtin.Int64
+  inject_union_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!unionelt.1
+  %v = tuple ()
+  return %v : $()
+}
+
 // CHECK: define { i64, i1 } @single_payload_no_xi_inject_y() {
 // CHECK: entry:
 // CHECK:   ret { i64, i1 } { i64 0, i1 true }
@@ -365,6 +414,21 @@ sil @single_payload_no_xi_inject_y : $() -> SinglePayloadNoXI2 {
 entry:
   %u = union $SinglePayloadNoXI2, #SinglePayloadNoXI2.y!unionelt
   return %u : $SinglePayloadNoXI2
+}
+
+// CHECK: define void @single_payload_no_xi_inject_y_indirect(%O5union18SinglePayloadNoXI2*) {
+// CHECK: entry:
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union18SinglePayloadNoXI2* %0, i32 0, i32 0
+// CHECK:   store i64 0, i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O5union18SinglePayloadNoXI2* %0, i32 0, i32 1
+// CHECK:   store i1 true, i1* [[TAG_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+sil @single_payload_no_xi_inject_y_indirect : $([byref] SinglePayloadNoXI2) -> () {
+entry(%0 : $*SinglePayloadNoXI2):
+  inject_union_addr %0 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.y!unionelt
+  %v = tuple ()
+  return %v : $()
 }
 
 // CHECK: define { i64, i1 } @single_payload_no_xi_inject_z() {
@@ -580,15 +644,44 @@ entry(%0 : $Builtin.Int63):
   return %u : $SinglePayloadSpareBit
 }
 
+// CHECK: define void @single_payload_spare_bit_inject_x_indirect(i63, %O5union21SinglePayloadSpareBit*) {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O5union21SinglePayloadSpareBit* %1 to i63*
+// CHECK:   store i63 %0, i63* [[DATA_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+sil @single_payload_spare_bit_inject_x_indirect : $(Builtin.Int63, [byref] SinglePayloadSpareBit) -> () {
+entry(%0 : $Builtin.Int63, %1 : $*SinglePayloadSpareBit):
+  %a = union_data_addr %1 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!unionelt.1
+  store %0 to %a : $*Builtin.Int63
+  inject_union_addr %1 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!unionelt.1
+  %v = tuple ()
+  return %v : $()
+}
+
 // CHECK: define i64 @single_payload_spare_bit_inject_y() {
 // CHECK: entry:
-//                 0x8000_0000_0000_0000
+// --              0x8000_0000_0000_0000
 // CHECK:   ret i64 -9223372036854775808
 // CHECK: }
 sil @single_payload_spare_bit_inject_y : $() -> SinglePayloadSpareBit {
 entry:
   %u = union $SinglePayloadSpareBit, #SinglePayloadSpareBit.y!unionelt
   return %u : $SinglePayloadSpareBit
+}
+
+// CHECK: define void @single_payload_spare_bit_inject_y_indirect(%O5union21SinglePayloadSpareBit*) {
+// CHECK: entry:
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union21SinglePayloadSpareBit* %0, i32 0, i32 0
+// --                0x8000_0000_0000_0000
+// CHECK:   store i64 -9223372036854775808, i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+sil @single_payload_spare_bit_inject_y_indirect : $([byref] SinglePayloadSpareBit) -> () {
+entry(%0 : $*SinglePayloadSpareBit):
+  inject_union_addr %0 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.y!unionelt
+  %v = tuple ()
+  return %v : $()
 }
 
 // CHECK: define i64 @single_payload_spare_bit_inject_z() {
@@ -696,6 +789,23 @@ entry(%0 : $Builtin.Int64):
   return %u : $MultiPayloadNoSpareBits
 }
 
+// CHECK: define void @multi_payload_no_spare_bit_inject_x_indirect(i64, %O5union23MultiPayloadNoSpareBits*) {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O5union23MultiPayloadNoSpareBits* %1 to i64*
+// CHECK:   store i64 %0, i64* [[DATA_ADDR]], align 8
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadNoSpareBits* %1, i32 0, i32 1
+// CHECK:   store i2 0, i2* [[TAG_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+sil @multi_payload_no_spare_bit_inject_x_indirect : $(Builtin.Int64, [byref] MultiPayloadNoSpareBits) -> () {
+entry(%0 : $Builtin.Int64, %1 : $*MultiPayloadNoSpareBits):
+  %a = union_data_addr %1 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!unionelt.1
+  store %0 to %a : $*Builtin.Int64
+  inject_union_addr %1 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!unionelt.1
+  %v = tuple ()
+  return %v : $()
+}
+
 // CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_y(i32) {
 // CHECK: entry:
 // CHECK:   [[ZEXT:%.*]] = zext i32 %0 to i64
@@ -730,6 +840,21 @@ sil @multi_payload_no_spare_bit_inject_a : $() -> MultiPayloadNoSpareBits {
 entry:
   %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.a!unionelt
   return %u : $MultiPayloadNoSpareBits
+}
+
+// CHECK: define void @multi_payload_no_spare_bit_inject_a_indirect(%O5union23MultiPayloadNoSpareBits*) {
+// CHECK: entry:
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadNoSpareBits* %0, i32 0, i32 0
+// CHECK:   store i64 0, i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[DATA_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadNoSpareBits* %0, i32 0, i32 1
+// CHECK:   store i2 -1, i2* [[DATA_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+sil @multi_payload_no_spare_bit_inject_a_indirect : $([byref] MultiPayloadNoSpareBits) -> () {
+entry(%0 : $*MultiPayloadNoSpareBits):
+  inject_union_addr %0 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.a!unionelt
+  %v = tuple ()
+  return %v : $()
 }
 
 // CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_b() {
@@ -860,6 +985,28 @@ entry(%0 : $Builtin.Int62):
   return %u : $MultiPayloadOneSpareBit
 }
 
+// CHECK: define void @multi_payload_one_spare_bit_inject_x_indirect(i62, %O5union23MultiPayloadOneSpareBit*) {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O5union23MultiPayloadOneSpareBit* %1 to i62*
+// CHECK:   store i62 %0, i62* [[DATA_ADDR]], align 8
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadOneSpareBit* %1, i32 0, i32 0
+// CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
+// --                                                   0x7FFF_FFFF_FFFF_FFFF
+// CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
+// CHECK:   store i64 [[PAYLOAD_MASKED]], i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadOneSpareBit* %1, i32 0, i32 1
+// CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+sil @multi_payload_one_spare_bit_inject_x_indirect : $(Builtin.Int62, [byref] MultiPayloadOneSpareBit) -> () {
+entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadOneSpareBit):
+  %a = union_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!unionelt.1
+  store %0 to %a : $*Builtin.Int62
+  inject_union_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!unionelt.1
+  %v = tuple ()
+  return %v : $()
+}
+
 // CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_y(i63) {
 // CHECK: entry:
 // CHECK:   [[ZEXT:%.*]] = zext i63 %0 to i64
@@ -873,6 +1020,31 @@ sil @multi_payload_one_spare_bit_inject_y : $(Builtin.Int63) -> MultiPayloadOneS
 entry(%0 : $Builtin.Int63):
   %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!unionelt.1, %0 : $Builtin.Int63
   return %u : $MultiPayloadOneSpareBit
+}
+
+// CHECK: define void @multi_payload_one_spare_bit_inject_y_indirect(i63, %O5union23MultiPayloadOneSpareBit*) {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O5union23MultiPayloadOneSpareBit* %1 to i63*
+// CHECK:   store i63 %0, i63* [[DATA_ADDR]], align 8
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadOneSpareBit* %1, i32 0, i32 0
+// CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
+// --                                                   0x7FFF_FFFF_FFFF_FFFF
+// CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
+// --                                                          0x8000_0000_0000_0000
+// CHECK:   [[PAYLOAD_TAGGED:%.*]] = or i64 [[PAYLOAD_MASKED]], -9223372036854775808
+// CHECK:   store i64 [[PAYLOAD_TAGGED]], i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadOneSpareBit* %1, i32 0, i32 1
+// CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+
+sil @multi_payload_one_spare_bit_inject_y_indirect : $(Builtin.Int63, [byref] MultiPayloadOneSpareBit) -> () {
+entry(%0 : $Builtin.Int63, %1 : $*MultiPayloadOneSpareBit):
+  %a = union_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!unionelt.1
+  store %0 to %a : $*Builtin.Int63
+  inject_union_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!unionelt.1
+  %v = tuple ()
+  return %v : $()
 }
 
 // CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_z(i61) {
@@ -897,6 +1069,22 @@ sil @multi_payload_one_spare_bit_inject_a : $() -> MultiPayloadOneSpareBit {
 entry:
   %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.a!unionelt
   return %u : $MultiPayloadOneSpareBit
+}
+
+// CHECK: define void @multi_payload_one_spare_bit_inject_a_indirect(%O5union23MultiPayloadOneSpareBit*) {
+// CHECK: entry:
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadOneSpareBit* %0, i32 0, i32 0
+// --                0x8000_0000_0000_0000
+// CHECK:   store i64 -9223372036854775808, i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadOneSpareBit* %0, i32 0, i32 1
+// CHECK:   store i1 true, i1* [[TAG_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+sil @multi_payload_one_spare_bit_inject_a_indirect : $([byref] MultiPayloadOneSpareBit) -> () {
+entry(%0 : $*MultiPayloadOneSpareBit):
+  inject_union_addr %0 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.a!unionelt
+  %v = tuple ()
+  return %v : $()
 }
 
 // CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_b() {
@@ -1026,6 +1214,26 @@ entry(%0 : $Builtin.Int62):
   return %u : $MultiPayloadTwoSpareBits
 }
 
+// CHECK: define void @multi_payload_two_spare_bits_inject_x_indirect(i62, %O5union24MultiPayloadTwoSpareBits*) {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O5union24MultiPayloadTwoSpareBits* %1 to i62*
+// CHECK:   store i62 %0, i62* [[DATA_ADDR]], align 8
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union24MultiPayloadTwoSpareBits* %1, i32 0, i32 0
+// CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
+// --                                                   0x3FFF_FFFF_FFFF_FFFF
+// CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 4611686018427387903
+// CHECK:   store i64 [[PAYLOAD_MASKED]], i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+sil @multi_payload_two_spare_bits_inject_x_indirect : $(Builtin.Int62, [byref] MultiPayloadTwoSpareBits) -> () {
+entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadTwoSpareBits):
+  %a = union_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!unionelt.1
+  store %0 to %a : $*Builtin.Int62
+  inject_union_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!unionelt.1
+  %v = tuple ()
+  return %v : $()
+}
+
 // CHECK: define i64 @multi_payload_two_spare_bits_inject_y(i60) {
 // CHECK: entry:
 // CHECK:   [[ZEXT:%.*]] = zext i60 %0 to i64
@@ -1037,6 +1245,28 @@ sil @multi_payload_two_spare_bits_inject_y : $(Builtin.Int60) -> MultiPayloadTwo
 entry(%0 : $Builtin.Int60):
   %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!unionelt.1, %0 : $Builtin.Int60
   return %u : $MultiPayloadTwoSpareBits
+}
+
+// CHECK: define void @multi_payload_two_spare_bits_inject_y_indirect(i60, %O5union24MultiPayloadTwoSpareBits*) {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O5union24MultiPayloadTwoSpareBits* %1 to i60*
+// CHECK:   store i60 %0, i60* [[DATA_ADDR]], align 8
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union24MultiPayloadTwoSpareBits* %1, i32 0, i32 0
+// CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
+// --                                                   0x3FFF_FFFF_FFFF_FFFF
+// CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 4611686018427387903
+// --                                                         0x4000_0000_0000_0000
+// CHECK:   [[PAYLOAD_TAGGED:%.*]] = or i64 [[PAYLOAD_MASKED]], 4611686018427387904
+// CHECK:   store i64 [[PAYLOAD_TAGGED]], i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+sil @multi_payload_two_spare_bits_inject_y_indirect : $(Builtin.Int60, [byref] MultiPayloadTwoSpareBits) -> () {
+entry(%0 : $Builtin.Int60, %1 : $*MultiPayloadTwoSpareBits):
+  %a = union_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!unionelt.1
+  store %0 to %a : $*Builtin.Int60
+  inject_union_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!unionelt.1
+  %v = tuple ()
+  return %v : $()
 }
 
 // CHECK: define i64 @multi_payload_two_spare_bits_inject_z(i61) {
@@ -1061,6 +1291,20 @@ sil @multi_payload_two_spare_bits_inject_a : $() -> MultiPayloadTwoSpareBits {
 entry:
   %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.a!unionelt
   return %u : $MultiPayloadTwoSpareBits
+}
+
+// CHECK: define void @multi_payload_two_spare_bits_inject_a_indirect(%O5union24MultiPayloadTwoSpareBits*) {
+// CHECK: entry:
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union24MultiPayloadTwoSpareBits* %0, i32 0, i32 0
+// --                0xC000_0000_0000_0000
+// CHECK:   store i64 -4611686018427387904, i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
+sil @multi_payload_two_spare_bits_inject_a_indirect : $([byref] MultiPayloadTwoSpareBits) -> () {
+entry(%0 : $*MultiPayloadTwoSpareBits):
+  inject_union_addr %0 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.a!unionelt
+  %v = tuple ()
+  return %v : $()
 }
 
 // CHECK: define i64 @multi_payload_two_spare_bits_inject_b() {

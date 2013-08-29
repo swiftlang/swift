@@ -116,6 +116,20 @@ void emitProjectLoadableUnion(IRGenFunction &IGF,
                               UnionElementDecl *theCase,
                               Explosion &out);
 
+/// \brief Projects the address of the associated data for a case inside a
+/// union, to which a new data value can be stored.
+Address emitProjectUnionAddressForStore(IRGenFunction &IGF,
+                                        SILType unionTy,
+                                        Address unionAddr,
+                                        UnionElementDecl *theCase);
+
+/// \brief Stores the tag bits for a union case to the given address, overlaying
+/// the data (if any) stored there.
+void emitStoreUnionTagToAddress(IRGenFunction &IGF,
+                                SILType unionTy,
+                                Address unionAddr,
+                                UnionElementDecl *theCase);
+  
 /// Interleave the occupiedValue and spareValue bits, taking a bit from one
 /// or the other at each position based on the spareBits mask.
 llvm::ConstantInt *

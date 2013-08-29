@@ -1705,23 +1705,27 @@ void IRGenSILFunction::visitTupleInst(swift::TupleInst *i) {
 }
 
 void IRGenSILFunction::visitUnionInst(swift::UnionInst *i) {
-  Explosion data = [&]{
-    if (i->hasOperand())
-      return getLoweredExplosion(i->getOperand());
-    // Empty explosion if no operand.
-    return Explosion(ExplosionKind::Minimal);
-  }();
+  Explosion data = (i->hasOperand())
+    ? getLoweredExplosion(i->getOperand())
+    : Explosion(ExplosionKind::Minimal);
   Explosion out(ExplosionKind::Maximal);
   emitInjectLoadableUnion(*this, i->getType(), i->getElement(), data, out);
   setLoweredExplosion(SILValue(i, 0), out);
 }
 
 void IRGenSILFunction::visitUnionDataAddrInst(swift::UnionDataAddrInst *i) {
-  llvm_unreachable("unimplemented");
+  Address unionAddr = getLoweredAddress(i->getOperand());
+  Address dataAddr = emitProjectUnionAddressForStore(*this,
+                                                     i->getOperand().getType(),
+                                                     unionAddr,
+                                                     i->getElement());
+  setLoweredAddress(SILValue(i, 0), dataAddr);
 }
 
 void IRGenSILFunction::visitInjectUnionAddrInst(swift::InjectUnionAddrInst *i) {
-  llvm_unreachable("unimplemented");
+  Address unionAddr = getLoweredAddress(i->getOperand());
+  emitStoreUnionTagToAddress(*this, i->getOperand().getType(),
+                             unionAddr, i->getElement());
 }
 
 void IRGenSILFunction::visitBuiltinZeroInst(swift::BuiltinZeroInst *i) {

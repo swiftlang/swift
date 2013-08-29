@@ -114,7 +114,6 @@ namespace {
     
     /// \group Indirect union operations
     
-    /* TODO
     /// Project the address of the data for a case. Does not check or modify
     /// the referenced union value.
     /// Corresponds to the SIL 'union_data_addr' instruction.
@@ -128,13 +127,14 @@ namespace {
                           UnionElementDecl *elt,
                           Address unionAddr) const = 0;
     
+    /* TODO
     /// Emit a branch on the case contained by a union in memory.
     /// Performs the branching for a SIL 'destructive_switch_union_addr'
     /// instruction.
     virtual void emitAddressSwitch(IRGenFunction &IGF,
                                    Address unionAddr,
                                    ArrayRef<std::pair<UnionElementDecl*,
-                                   llvm::BasicBlock*>> dests,
+                                                      llvm::BasicBlock*>> dests,
                                    llvm::BasicBlock *defaultDest) const = 0;
     
     /// Clears tag bits from within the payload of a union in memory and
@@ -293,6 +293,18 @@ namespace {
       // Otherwise, the result is identical.
       if (getLoadableSingleton())
         getLoadableSingleton()->reexplode(IGF, params, out);
+    }
+    
+    Address projectDataForStore(IRGenFunction &IGF,
+                                UnionElementDecl *elt,
+                                Address unionAddr) const override {
+      return getSingletonAddress(IGF, unionAddr);
+    }
+    
+    void storeTag(IRGenFunction &IGF,
+                  UnionElementDecl *elt,
+                  Address unionAddr) const override {
+      // No tag, nothing to do.
     }
     
     void getSchema(ExplosionSchema &schema) const {
@@ -471,6 +483,20 @@ namespace {
       out.add(getDiscriminatorIndex(elt));
     }
     
+    Address projectDataForStore(IRGenFunction &IGF,
+                                UnionElementDecl *elt,
+                                Address unionAddr) const override {
+      llvm_unreachable("cannot project data for no-payload cases");
+    }
+    
+    void storeTag(IRGenFunction &IGF, UnionElementDecl *elt, Address unionAddr)
+    const override {
+      llvm::Value *discriminator = getDiscriminatorIndex(elt);
+      Address discriminatorAddr
+        = IGF.Builder.CreateStructGEP(unionAddr, 0, Size(0));
+      IGF.Builder.CreateStore(discriminator, discriminatorAddr);
+    }
+    
     /// \group Required for SingleScalarTypeInfo
     
     llvm::Type *getScalarType() const {
@@ -618,6 +644,12 @@ namespace {
     Address projectPayloadData(IRGenFunction &IGF, Address addr) const {
       return IGF.Builder.CreateBitCast(addr,
                          getPayloadTypeInfo().getStorageType()->getPointerTo());
+    }
+    
+    Address projectDataForStore(IRGenFunction &IGF, UnionElementDecl *elt,
+                                Address unionAddr) const override {
+      assert(elt == getPayloadElement() && "cannot project no-data case");
+      return projectPayloadData(IGF, unionAddr);
     }
     
     Size getExtraTagBitOffset() const override {
@@ -817,37 +849,14 @@ namespace {
       llvm_unreachable("element was not a member of union");
     }
     
-    void addExtraTagBitValue(IRGenFunction &IGF,
-                             Explosion &out, unsigned value) const {
-      if (ExtraTagBitCount > 0) {
-        llvm::Value *zeroTagBits
-        = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
-                                 APInt(ExtraTagBitCount, value));
-        out.add(zeroTagBits);
-        return;
-      }
-      assert(value == 0 && "setting non-zero extra tag value with no tag bits");
-    }
-    
-  public:
-    void emitValueInjection(IRGenFunction &IGF,
-                            UnionElementDecl *elt,
-                            Explosion &params,
-                            Explosion &out) const {
-      // The payload case gets its native representation. If there are extra
-      // tag bits, set them to zero.
+    // Get the payload and extra tag (if any) parts of the discriminator for
+    // a no-data case.
+    std::pair<llvm::Value *, llvm::Value *>
+    getNoPayloadCaseValue(IRGenFunction &IGF, UnionElementDecl *elt) const {
+      assert(elt != getPayloadElement());
+      
       unsigned payloadSize
         = getFixedPayloadTypeInfo().getFixedSize().getValueInBits();
-      
-      if (elt == getPayloadElement()) {
-        auto &loadablePayloadTI = getLoadablePayloadTypeInfo();
-        llvm::Value *payload
-          = loadablePayloadTI.packUnionPayload(IGF, params, payloadSize, 0);
-        out.add(payload);
-        
-        addExtraTagBitValue(IGF, out, 0);
-        return;
-      }
       
       // Non-payload cases use extra inhabitants, if any, or are discriminated
       // by setting the tag bits.
@@ -858,7 +867,7 @@ namespace {
       unsigned extraTagValue;
       if (tagIndex < numExtraInhabitants) {
         payload = getFixedPayloadTypeInfo().getFixedExtraInhabitantValue(
-                                                IGF.IGM, payloadSize, tagIndex);
+                                               IGF.IGM, payloadSize, tagIndex);
         extraTagValue = 0;
       } else {
         tagIndex -= numExtraInhabitants;
@@ -876,9 +885,48 @@ namespace {
         payload = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
                                          APInt(payloadSize, payloadValue));
       }
+
+      llvm::Value *extraTag = nullptr;
+      if (ExtraTagBitCount > 0) {
+        extraTag = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
+                                        APInt(ExtraTagBitCount, extraTagValue));
+      } else {
+        assert(extraTagValue == 0 &&
+               "non-zero extra tag value with no tag bits");
+      }
+      return {payload, extraTag};
+    }
+    
+  public:
+    void emitValueInjection(IRGenFunction &IGF,
+                            UnionElementDecl *elt,
+                            Explosion &params,
+                            Explosion &out) const {
+      // The payload case gets its native representation. If there are extra
+      // tag bits, set them to zero.
+      unsigned payloadSize
+        = getFixedPayloadTypeInfo().getFixedSize().getValueInBits();
       
+      if (elt == getPayloadElement()) {
+        auto &loadablePayloadTI = getLoadablePayloadTypeInfo();
+        llvm::Value *payload
+          = loadablePayloadTI.packUnionPayload(IGF, params, payloadSize, 0);
+        out.add(payload);
+
+        if (ExtraTagBitCount > 0)
+          out.add(getZeroExtraTagConstant(IGF.IGM));
+        return;
+      }
+      
+      // Non-payload cases use extra inhabitants, if any, or are discriminated
+      // by setting the tag bits.
+      llvm::Value *payload, *extraTag;
+      std::tie(payload, extraTag) = getNoPayloadCaseValue(IGF, elt);
       out.add(payload);
-      addExtraTagBitValue(IGF, out, extraTagValue);
+      if (ExtraTagBitCount > 0) {
+        assert(extraTag);
+        out.add(extraTag);
+      }
     }
     
   private:
@@ -1042,6 +1090,12 @@ namespace {
         IGF.Builder.CreateStore(extraTag, projectExtraTagBits(IGF, dest));
     }
     
+    llvm::ConstantInt *getZeroExtraTagConstant(IRGenModule &IGM) const {
+      assert(ExtraTagBitCount > 0 && "no extra tag bits?!");
+      return llvm::ConstantInt::get(IGM.getLLVMContext(),
+                                    APInt(ExtraTagBitCount, 0));
+    }
+    
     /// Emit an reassignment sequence from a union at one address to another.
     void emitIndirectAssign(IRGenFunction &IGF,
        Address dest, Address src,
@@ -1095,8 +1149,7 @@ namespace {
       // the zero extra tag (if any).
       (getPayloadTypeInfo().*initializeData)(IGF, destData, srcData);
       if (ExtraTagBitCount > 0) {
-        auto *zeroTag = llvm::ConstantInt::get(
-                           cast<llvm::IntegerType>(srcExtraTag->getType()), 0);
+        auto *zeroTag = getZeroExtraTagConstant(IGF.IGM);
         IGF.Builder.CreateStore(zeroTag, projectExtraTagBits(IGF, dest));
       }
       IGF.Builder.CreateBr(endBB);
@@ -1137,8 +1190,7 @@ namespace {
       // it, and set the extra tag if any to zero.
       (getPayloadTypeInfo().*initializeData)(IGF, destData, srcData);
       if (ExtraTagBitCount > 0) {
-        auto *zeroTag = llvm::ConstantInt::get(
-                           cast<llvm::IntegerType>(srcExtraTag->getType()), 0);
+        auto *zeroTag = getZeroExtraTagConstant(IGF.IGM);
         IGF.Builder.CreateStore(zeroTag, projectExtraTagBits(IGF, dest));
       }
       IGF.Builder.CreateBr(endBB);
@@ -1178,12 +1230,33 @@ namespace {
       emitIndirectInitialize(IGF, dest, src,
                              &TypeInfo::initializeWithTake);
     }
+    
+    void storeTag(IRGenFunction &IGF,
+                  UnionElementDecl *elt,
+                  Address unionAddr) const override {
+      if (elt == getPayloadElement()) {
+        // The data occupies the entire payload. If we have extra tag bits,
+        // zero them out.
+        if (ExtraTagBitCount > 0)
+          IGF.Builder.CreateStore(getZeroExtraTagConstant(IGF.IGM),
+                                  projectExtraTagBits(IGF, unionAddr));
+        return;
+      }
+      
+      // Store the discriminator for the no-payload case.
+      llvm::Value *payload, *extraTag;
+      std::tie(payload, extraTag) = getNoPayloadCaseValue(IGF, elt);
+      
+      IGF.Builder.CreateStore(payload, projectPayload(IGF, unionAddr));
+      if (ExtraTagBitCount > 0)
+        IGF.Builder.CreateStore(extraTag, projectExtraTagBits(IGF, unionAddr));
+    }
   };
 
   class MultiPayloadUnionImplStrategy : public PayloadUnionImplStrategyBase {
     // The spare bits shared by all payloads, if any.
-    // Invariant: The size of the bit
-    // vector is the size of the payload in bits, rounded up to a byte boundary.
+    // Invariant: The size of the bit vector is the size of the payload in bits,
+    // rounded up to a byte boundary.
     llvm::BitVector CommonSpareBits;
 
     // The number of tag values used for no-payload cases.
@@ -1408,7 +1481,7 @@ namespace {
       return APInt(bits.size(), parts);
     }
     
-    void projectPayload(IRGenFunction &IGF,
+    void projectPayloadValue(IRGenFunction &IGF,
                         llvm::Value *payload,
                         unsigned payloadTag,
                         const LoadableTypeInfo &payloadTI,
@@ -1452,7 +1525,8 @@ namespace {
         inValue.claimNext();
       
       // Unpack the payload.
-      projectPayload(IGF, payload, foundPayload - ElementsWithPayload.begin(),
+      projectPayloadValue(IGF, payload,
+                          foundPayload - ElementsWithPayload.begin(),
                      cast<LoadableTypeInfo>(*foundPayload->ti), out);
     }
     
@@ -1482,43 +1556,22 @@ namespace {
       }
     }
     
-    void emitValueInjection(IRGenFunction &IGF,
-                            UnionElementDecl *elt,
-                            Explosion &params,
-                            Explosion &out) const {
-      // See whether this is a payload or empty case we're emitting.
-      auto payloadI = std::find_if(ElementsWithPayload.begin(),
-                                   ElementsWithPayload.end(),
-         [&](const Element &e) { return e.decl == elt; });
-      if (payloadI != ElementsWithPayload.end()) {
-        return emitPayloadInjection(IGF, elt,
-                                    cast<FixedTypeInfo>(*payloadI->ti),
-                                    params, out,
-                                    payloadI - ElementsWithPayload.begin());
-      }
-      auto emptyI = std::find_if(ElementsWithNoPayload.begin(),
-                                 ElementsWithNoPayload.end(),
-         [&](const Element &e) { return e.decl == elt; });
-      assert(emptyI != ElementsWithNoPayload.end() && "case not in union");
-      emitEmptyInjection(IGF, out, emptyI - ElementsWithNoPayload.begin());
-    }
-    
   private:
-    void emitPayloadInjection(IRGenFunction &IGF, UnionElementDecl *elt,
+    void emitPayloadInjection(IRGenFunction &IGF,
                               const FixedTypeInfo &payloadTI,
                               Explosion &params, Explosion &out,
                               unsigned tag) const {
       // Pack the payload.
       auto &loadablePayloadTI = cast<LoadableTypeInfo>(payloadTI); // FIXME
       llvm::Value *payload = loadablePayloadTI.packUnionPayload(IGF, params,
-                                                                CommonSpareBits.size(), 0);
+                                                    CommonSpareBits.size(), 0);
       
       // If we have spare bits, pack tag bits into them.
       unsigned numSpareBits = CommonSpareBits.count();
       if (numSpareBits > 0) {
         llvm::ConstantInt *tagMask
-        = interleaveSpareBits(IGF.IGM, CommonSpareBits,CommonSpareBits.size(),
-                              tag, 0);
+          = interleaveSpareBits(IGF.IGM, CommonSpareBits,CommonSpareBits.size(),
+                                tag, 0);
         payload = IGF.Builder.CreateOr(payload, tagMask);
       }
       
@@ -1533,8 +1586,8 @@ namespace {
       }
     }
     
-    void emitEmptyInjection(IRGenFunction &IGF, Explosion &out,
-                            unsigned index) const {
+    std::pair<llvm::Value*, llvm::Value*>
+    getNoPayloadCaseValue(IRGenFunction &IGF, unsigned index) const {
       // Figure out the tag and payload for the empty case.
       unsigned numCaseBits = getNumCaseBits();
       unsigned tag, tagIndex;
@@ -1547,6 +1600,7 @@ namespace {
       }
       
       llvm::Value *payload;
+      llvm::Value *extraTag = nullptr;
       unsigned numSpareBits = CommonSpareBits.count();
       if (numSpareBits > 0) {
         // If we have spare bits, pack tag bits into them.
@@ -1559,14 +1613,23 @@ namespace {
                                          APInt(CommonSpareBits.size(), tagIndex));
       }
       
-      out.add(payload);
-      
       // If we have extra tag bits, pack the remaining tag bits into them.
       if (ExtraTagBitCount > 0) {
         tag >>= numSpareBits;
-        auto extra = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
+        extraTag = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
                                             APInt(ExtraTagBitCount, tag));
-        out.add(extra);
+      }
+      return {payload, extraTag};
+    }
+    
+    void emitNoPayloadInjection(IRGenFunction &IGF, Explosion &out,
+                                unsigned index) const {
+      llvm::Value *payload, *extraTag;
+      std::tie(payload, extraTag) = getNoPayloadCaseValue(IGF, index);
+      out.add(payload);
+      if (ExtraTagBitCount > 0) {
+        assert(extraTag);
+        out.add(extraTag);
       }
     }
     
@@ -1598,7 +1661,7 @@ namespace {
         
         IGF.Builder.emitBlock(caseBB);
         Explosion value(ExplosionKind::Minimal);
-        projectPayload(IGF, payload, tagIndex, payloadTI, value);
+        projectPayloadValue(IGF, payload, tagIndex, payloadTI, value);
         f(value, payloadTI);
         IGF.Builder.CreateBr(endBB);
         
@@ -1609,6 +1672,26 @@ namespace {
     }
     
   public:
+    void emitValueInjection(IRGenFunction &IGF,
+                            UnionElementDecl *elt,
+                            Explosion &params,
+                            Explosion &out) const {
+      // See whether this is a payload or empty case we're emitting.
+      auto payloadI = std::find_if(ElementsWithPayload.begin(),
+                                   ElementsWithPayload.end(),
+                               [&](const Element &e) { return e.decl == elt; });
+      if (payloadI != ElementsWithPayload.end())
+        return emitPayloadInjection(IGF, cast<FixedTypeInfo>(*payloadI->ti),
+                                    params, out,
+                                    payloadI - ElementsWithPayload.begin());
+
+      auto emptyI = std::find_if(ElementsWithNoPayload.begin(),
+                                 ElementsWithNoPayload.end(),
+                               [&](const Element &e) { return e.decl == elt; });
+      assert(emptyI != ElementsWithNoPayload.end() && "case not in union");
+      emitNoPayloadInjection(IGF, out, emptyI - ElementsWithNoPayload.begin());
+    }
+    
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
     const override {
       if (isPOD(ResilienceScope::Local)) {
@@ -1693,6 +1776,87 @@ namespace {
       Explosion val(ExplosionKind::Minimal);
       loadAsTake(IGF, addr, val);
       consume(IGF, val);
+    }
+    
+    Address projectDataForStore(IRGenFunction &IGF,
+                                UnionElementDecl *elt,
+                                Address unionAddr) const override {
+      auto payloadI = std::find_if(ElementsWithPayload.begin(),
+                                   ElementsWithPayload.end(),
+         [&](const Element &e) { return e.decl == elt; });
+
+      assert(payloadI != ElementsWithPayload.end() &&
+             "cannot project a no-payload case");
+      
+      // Payloads are all placed at the beginning of the value.
+      return IGF.Builder.CreateBitCast(unionAddr,
+                               payloadI->ti->getStorageType()->getPointerTo());
+    }
+    
+  private:
+    void storePayloadTag(IRGenFunction &IGF, const FixedTypeInfo &payloadTI,
+                         Address unionAddr, unsigned index) const {
+      // If the tag has spare bits, we need to mask them into the
+      // payload area.
+      unsigned numSpareBits = CommonSpareBits.count();
+      if (numSpareBits > 0) {
+        unsigned spareTagBits = numSpareBits >= 32
+          ? index : index & ((1U << numSpareBits) - 1U);
+
+        // Mask the spare bits into the payload area.
+        Address payloadAddr = projectPayload(IGF, unionAddr);
+        llvm::Value *payloadBits = IGF.Builder.CreateLoad(payloadAddr);
+        auto *spareBitMask = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
+                                      ~getAPIntFromBitVector(CommonSpareBits));
+        llvm::Value *tagBitMask
+          = interleaveSpareBits(IGF.IGM, CommonSpareBits, CommonSpareBits.size(),
+                                spareTagBits, 0);
+        payloadBits = IGF.Builder.CreateAnd(payloadBits, spareBitMask);
+        if (spareTagBits != 0)
+          payloadBits = IGF.Builder.CreateOr(payloadBits, tagBitMask);
+        IGF.Builder.CreateStore(payloadBits, payloadAddr);
+      }
+
+      // Initialize the extra tag bits, if we have them.
+      if (ExtraTagBitCount > 0) {
+        unsigned extraTagBits = index >> numSpareBits;
+        auto *extraTagValue = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
+                                        APInt(ExtraTagBitCount, extraTagBits));
+        IGF.Builder.CreateStore(extraTagValue,
+                                projectExtraTagBits(IGF, unionAddr));
+      }
+    }
+    
+    void storeNoPayloadTag(IRGenFunction &IGF, Address unionAddr,
+                           unsigned index) const {
+      // We can just primitive-store the representation for the empty case.
+      llvm::Value *payload, *extraTag;
+      std::tie(payload, extraTag) = getNoPayloadCaseValue(IGF, index);
+      IGF.Builder.CreateStore(payload, projectPayload(IGF, unionAddr));
+      if (ExtraTagBitCount > 0) {
+        assert(extraTag);
+        IGF.Builder.CreateStore(extraTag, projectExtraTagBits(IGF, unionAddr));
+      }
+    }
+    
+  public:
+    void storeTag(IRGenFunction &IGF,
+                  UnionElementDecl *elt,
+                  Address unionAddr) const override {
+      // See whether this is a payload or empty case we're emitting.
+      auto payloadI = std::find_if(ElementsWithPayload.begin(),
+                                   ElementsWithPayload.end(),
+                               [&](const Element &e) { return e.decl == elt; });
+      if (payloadI != ElementsWithPayload.end())
+        return storePayloadTag(IGF, cast<FixedTypeInfo>(*payloadI->ti),
+                               unionAddr,
+                               payloadI - ElementsWithPayload.begin());
+      
+      auto emptyI = std::find_if(ElementsWithNoPayload.begin(),
+                                 ElementsWithNoPayload.end(),
+                               [&](const Element &e) { return e.decl == elt; });
+      assert(emptyI != ElementsWithNoPayload.end() && "case not in union");
+      storeNoPayloadTag(IGF, unionAddr, emptyI - ElementsWithNoPayload.begin());
     }
   };
   
@@ -1875,6 +2039,17 @@ namespace {
       return Strategy.unpackUnionPayload(IGF, payload, dest, offset);
     }
   };
+  
+  static const UnionImplStrategy &getUnionImplStrategy(IRGenModule &IGM,
+                                                       SILType ty) {
+    assert(ty.getUnionOrBoundGenericUnion() && "not a union");
+    auto *ti = &IGM.getTypeInfo(ty);
+    if (auto *loadableTI = dyn_cast<LoadableTypeInfo>(ti))
+      return loadableTI->as<LoadableUnionTypeInfo>().Strategy;
+    if (auto *TI = dyn_cast<FixedTypeInfo>(ti))
+      return TI->as<FixedUnionTypeInfo>().Strategy;
+    llvm_unreachable("unimplemented union type info");
+  }
   
   TypeInfo *
   UnionImplStrategy::getUnionTypeInfo(llvm::StructType *T, Size S,
@@ -2244,30 +2419,40 @@ void irgen::emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
                                   ArrayRef<std::pair<UnionElementDecl *,
                                                      llvm::BasicBlock *>> dests,
                                   llvm::BasicBlock *defaultDest) {
-  assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
-         && "not of a union type");
-  auto &unionTI = IGF.getTypeInfo(unionTy).as<LoadableUnionTypeInfo>();
-  unionTI.Strategy.emitValueSwitch(IGF, unionValue, dests, defaultDest);
+  getUnionImplStrategy(IGF.IGM, unionTy)
+    .emitValueSwitch(IGF, unionValue, dests, defaultDest);
 }
 
 void irgen::emitInjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
                                     UnionElementDecl *theCase,
                                     Explosion &data,
                                     Explosion &out) {
-  assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
-         && "not of a union type");
-  auto &unionTI = IGF.getTypeInfo(unionTy).as<LoadableUnionTypeInfo>();
-  unionTI.Strategy.emitValueInjection(IGF, theCase, data, out);
+  getUnionImplStrategy(IGF.IGM, unionTy)
+    .emitValueInjection(IGF, theCase, data, out);
 }
 
 void irgen::emitProjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
                                      Explosion &inUnionValue,
                                      UnionElementDecl *theCase,
                                      Explosion &out) {
-  assert(unionTy.getSwiftRValueType()->getUnionOrBoundGenericUnion()
-         && "not of a union type");
-  auto &unionTI = IGF.getTypeInfo(unionTy).as<LoadableUnionTypeInfo>();
-  unionTI.Strategy.emitValueProject(IGF, inUnionValue, theCase, out);
+  getUnionImplStrategy(IGF.IGM, unionTy)
+    .emitValueProject(IGF, inUnionValue, theCase, out);
+}
+
+Address irgen::emitProjectUnionAddressForStore(IRGenFunction &IGF,
+                                               SILType unionTy,
+                                               Address unionAddr,
+                                               UnionElementDecl *theCase) {
+  return getUnionImplStrategy(IGF.IGM, unionTy)
+    .projectDataForStore(IGF, theCase, unionAddr);
+}
+
+void irgen::emitStoreUnionTagToAddress(IRGenFunction &IGF,
+                                       SILType unionTy,
+                                       Address unionAddr,
+                                       UnionElementDecl *theCase) {
+  getUnionImplStrategy(IGF.IGM, unionTy)
+    .storeTag(IGF, theCase, unionAddr);
 }
 
 /// Interleave the occupiedValue and spareValue bits, taking a bit from one
