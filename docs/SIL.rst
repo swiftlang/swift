@@ -2356,13 +2356,10 @@ is_nonnull
   %1 = is_nonnull %0 : $C
   %1 = is_nonnull %0 : $*T
   // %0 must be of reference type $C or of address type $*T
-  // %1 will be of type swift.Bool
+  // %1 will be of type Builtin.Int1
 
-TODO: The instruction should produce a Builtin.i1 and we should emit a
-conversion to swift.Bool when needed.
-
-Checks whether a reference type or address value is null, returning true if
-the value is not null, or false if it is null.
+Checks whether a reference type or address value is null, returning 1 if
+the value is not null, or 0 if it is null.
 
 downcast
 ````````
