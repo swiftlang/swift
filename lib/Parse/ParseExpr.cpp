@@ -486,9 +486,11 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message) {
     Tok.setKind(tok::oper_prefix);
     Operator = parseExprOperator();
 
-    assert(OperEndLoc != Tok.getLoc() && "binary operator with no spaces?");
-    diagnose(PreviousLoc, diag::expected_prefix_operator)
-      .fixItRemoveChars(OperEndLoc, Tok.getLoc());
+    if (OperEndLoc == Tok.getLoc())
+      diagnose(PreviousLoc, diag::expected_expr_after_unary_operator);
+    else
+      diagnose(PreviousLoc, diag::expected_prefix_operator)
+          .fixItRemoveChars(OperEndLoc, Tok.getLoc());
     break;
   }
   }
