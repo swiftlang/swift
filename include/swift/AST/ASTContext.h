@@ -49,6 +49,7 @@ namespace swift {
   class ClangModule;
   class Decl;
   class ExtensionDecl;
+  class FuncDecl;
   class SourceLoc;
   class Type;
   class TupleType;
@@ -289,6 +290,25 @@ public:
 
   /// Retrieve the declaration of swift.Optional<T>.
   NominalTypeDecl *getOptionalDecl() const;
+
+  /// Retrieve the declaration of swift._doesOptionalHaveValue.
+  FuncDecl *getDoesOptionalHaveValueDecl() const;
+
+  /// Retrieve the declaration of swift._getOptionalValue.
+  FuncDecl *getGetOptionalValueDecl() const;
+
+  /// Retrieve the declaration of swift._injectValueIntoOptional.
+  FuncDecl *getInjectValueIntoOptionalDecl() const;
+
+  /// Retrieve the declaration of swift._injectNothingIntoOptional.
+  FuncDecl *getInjectNothingIntoOptionalDecl() const;
+
+  /// Check whether the standary library provides all the correct
+  /// intrinsic support for Optional<T>.
+  ///
+  /// If this is true, the four methods above all promise to return
+  /// non-null.
+  bool hasOptionalIntrinsics() const;
 
   /// Retrieve a specific, known protocol.
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;

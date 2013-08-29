@@ -60,6 +60,18 @@ struct ASTContext::Implementation {
   /// The declaration of swift.Optional<T>.
   NominalTypeDecl *OptionalDecl = nullptr;
 
+  /// func _doesOptionalHaveValue<T>(v : Optional<T>) -> T
+  FuncDecl *DoesOptionalHaveValueDecl = nullptr;
+
+  /// func _getOptionalValue<T>(v : Optional<T>) -> T
+  FuncDecl *GetOptionalValueDecl = nullptr;
+
+  /// func _injectValueIntoOptional<T>(v : T) -> Optional<T>
+  FuncDecl *InjectValueIntoOptionalDecl = nullptr;
+
+  /// func _injectNothingIntoOptional<T>() -> Optional<T>
+  FuncDecl *InjectNothingIntoOptionalDecl = nullptr;
+
   /// \brief The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -243,20 +255,27 @@ Identifier ASTContext::getIdentifier(StringRef Str) const {
   return Identifier(Impl.IdentifierTable.GetOrCreateValue(Str).getKeyData());
 }
 
+static void lookupInSwiftModule(const ASTContext &ctx,
+                                StringRef name,
+                                SmallVectorImpl<ValueDecl *> &results) {
+  // Find the "swift" module.
+  auto module = ctx.LoadedModules.find("swift");
+  if (module == ctx.LoadedModules.end())
+    return;
+
+  // Find all of the declarations with this name in the Swift module.
+  auto identifier = ctx.getIdentifier(name);
+  module->second->lookupValue({ }, identifier, NLKind::UnqualifiedLookup,
+                              results);
+}
+
 /// Find the generic implementation declaration for the named syntactic-sugar
 /// type.
 static NominalTypeDecl *findSyntaxSugarImpl(const ASTContext &ctx,
                                             StringRef name) {
-  // Find the "swift" module.
-  auto module = ctx.LoadedModules.find("swift");
-  if (module == ctx.LoadedModules.end())
-    return nullptr;
-
   // Find all of the declarations with this name in the Swift module.
-  auto identifier = ctx.getIdentifier(name);
   SmallVector<ValueDecl *, 1> results;
-  module->second->lookupValue({ }, identifier, NLKind::UnqualifiedLookup,
-                              results);
+  lookupInSwiftModule(ctx, name, results);
   for (auto result : results) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
       if (auto params = nominal->getGenericParams()) {
@@ -311,6 +330,152 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   }
 
   return nullptr;
+}
+
+/// Find the implementation for the given "intrinsic" library function.
+static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
+                                      StringRef name) {
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule(ctx, name, results);
+  if (results.size() == 1)
+    return dyn_cast<FuncDecl>(results.front());
+  return nullptr;
+}
+
+static CanType stripImmediateLabels(CanType type) {
+  while (auto tuple = dyn_cast<TupleType>(type))
+    if (tuple->getNumElements() == 1)
+      type = tuple.getElementType(0);
+  return type;
+}
+
+/// Check whether the given function is generic over a single,
+/// unconstrained archetype.
+static bool isGenericIntrinsic(FuncDecl *fn, CanType &input, CanType &output,
+                               CanType &param) {
+  // The polymorphic
+  auto fnType =
+    dyn_cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
+  if (!fnType || fnType->getAllArchetypes().size() != 1)
+    return false;
+
+  auto paramType = CanArchetypeType(fnType->getAllArchetypes()[0]);
+  if (paramType->hasRequirements())
+    return false;
+
+  param = paramType;
+  input = stripImmediateLabels(fnType.getInput());
+  output = stripImmediateLabels(fnType.getResult());
+  return true;
+}
+
+/// Check whether the given type is Optional applied to the given
+/// type argument.
+static bool isOptionalType(const ASTContext &ctx, CanType type,
+                           CanType arg) {
+  if (auto boundType = dyn_cast<BoundGenericType>(type)) {
+    return (boundType->getDecl() == ctx.getOptionalDecl() &&
+            boundType->getGenericArgs().size() == 1 &&
+            CanType(boundType->getGenericArgs()[0]) == arg);
+  }
+  return false;
+}
+
+FuncDecl *ASTContext::getDoesOptionalHaveValueDecl() const {
+  if (Impl.DoesOptionalHaveValueDecl)
+    return Impl.DoesOptionalHaveValueDecl;
+
+  // Look for a generic function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_doesOptionalHaveValue");
+  if (!decl || !isGenericIntrinsic(decl, input, output, param))
+    return nullptr;
+
+  // Input must be Optional<T>.
+  if (!isOptionalType(*this, input, param))
+    return nullptr;
+
+  // Output must be Builtin.Int1.
+  auto boolOutput = dyn_cast<BuiltinIntegerType>(output);
+  if (!boolOutput || boolOutput->getBitWidth() != 1)
+    return nullptr;
+
+  Impl.DoesOptionalHaveValueDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getGetOptionalValueDecl() const {
+  if (Impl.GetOptionalValueDecl)
+    return Impl.GetOptionalValueDecl;
+
+  // Look for the function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_getOptionalValue");
+  if (!decl || !isGenericIntrinsic(decl, input, output, param))
+    return nullptr;
+
+  // Input must be Optional<T>.
+  if (!isOptionalType(*this, input, param))
+    return nullptr;
+
+  // Output must be T.
+  if (output != param)
+    return nullptr;
+
+  Impl.GetOptionalValueDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getInjectValueIntoOptionalDecl() const {
+  if (Impl.InjectValueIntoOptionalDecl)
+    return Impl.InjectValueIntoOptionalDecl;
+
+  // Look for the function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_injectValueIntoOptional");
+  if (!decl || !isGenericIntrinsic(decl, input, output, param))
+    return nullptr;
+
+  // Input must be T.
+  if (input != param)
+    return nullptr;
+
+  // Output must be Optional<T>.
+  if (!isOptionalType(*this, output, param))
+    return nullptr;
+
+  Impl.InjectValueIntoOptionalDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getInjectNothingIntoOptionalDecl() const {
+  if (Impl.InjectNothingIntoOptionalDecl)
+    return Impl.InjectNothingIntoOptionalDecl;
+
+  // Look for the function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_injectNothingIntoOptional");
+  if (!decl || !isGenericIntrinsic(decl, input, output, param))
+    return nullptr;
+
+  // Input must be ().
+  auto inputTuple = dyn_cast<TupleType>(input);
+  if (!inputTuple || inputTuple->getNumElements() != 0)
+    return nullptr;
+
+  // Output must be Optional<T>.
+  if (!isOptionalType(*this, output, param))
+    return nullptr;
+
+  Impl.InjectNothingIntoOptionalDecl = decl;
+  return decl;
+}
+
+bool ASTContext::hasOptionalIntrinsics() const {
+  return getDoesOptionalHaveValueDecl() &&
+         getGetOptionalValueDecl() &&
+         getInjectValueIntoOptionalDecl() &&
+         getInjectNothingIntoOptionalDecl();
 }
 
 void ASTContext::addMutationListener(ASTMutationListener &listener) {

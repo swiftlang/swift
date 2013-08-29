@@ -9,6 +9,8 @@
 // CHECK: [[B:%V4weak1B]] = type { { i8**, [[WEAK]] } }
 // CHECK: [[UNKNOWN:%objc_object]] = type opaque
 
+import swift
+
 class C {}
 protocol [class_protocol] P {
   func explode()

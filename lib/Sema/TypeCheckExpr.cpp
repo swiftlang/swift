@@ -340,9 +340,29 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value) {
   if (isa<LValueType>(canType)) {
     return type->castTo<LValueType>()->getObjectType();
 
-  // Ignore ownership qualification.
-  } else if (isa<ReferenceStorageType>(canType)) {
-    return type->castTo<ReferenceStorageType>()->getReferentType();
+  // Turn [weak] T into Optional<T>.
+  } else if (isa<WeakStorageType>(canType)) {
+    // On the one hand, we should probably use a better location than
+    // the declaration's.  On the other hand, all these diagnostics
+    // are "broken library" errors, so it should really never matter.
+
+    auto refTy = type->castTo<ReferenceStorageType>()->getReferentType();
+    auto optTy = getOptionalType(value->getLoc(), refTy);
+
+    // If we can't create Optional<T>, use T instead of returning null.
+    if (!optTy) return refTy;
+
+    // Check that we can do intrinsic operations on Optional<T> before
+    // returning.
+    if (!Context.hasOptionalIntrinsics()) {
+      diagnose(value->getLoc(), diag::optional_intrinsics_not_found);
+    }
+
+    return refTy; // FIXME: optTy
+
+  // Ignore [unowned] qualification.
+  } else if (isa<UnownedStorageType>(canType)) {
+    return type->castTo<UnownedStorageType>()->getReferentType();
 
   // No other transforms necessary.
   } else {
