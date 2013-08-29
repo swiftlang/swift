@@ -116,10 +116,8 @@ static Module *makeTU(ASTContext &ctx, AccessPathElem moduleID,
   return TU;
 }
 
-
 Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
                                            Module::AccessPathTy path) {
-
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -127,14 +125,31 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   auto moduleID = path[0];
 
   llvm::OwningPtr<llvm::MemoryBuffer> inputFile;
-  if (llvm::error_code err = findModule(Ctx, moduleID, inputFile)) {
-    if (err.value() != llvm::errc::no_such_file_or_directory) {
-      Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
-                         moduleID.first.str(), err.message());
+  // First see if we find it in the registered bitstreams.
+  if (!Bitstreams.empty()) {
+    // FIXME: Right now this works only with fully-qualified absolute
+    // pathnames, which is incidentally what LLDB uses. Fix this to
+    // support suffix matching and a search path.
+    llvm::SmallString<256> spath;
+    for (auto el : path)
+      llvm::sys::path::append(spath, el.first.str());
+
+    auto bs = Bitstreams.find(spath.str());
+    if (bs != Bitstreams.end())
+      inputFile.reset(bs->second.take());
+  }
+
+  // Otherwise look on disk.
+  if (!inputFile)
+    if (llvm::error_code err = findModule(Ctx, moduleID, inputFile)) {
+      if (err.value() != llvm::errc::no_such_file_or_directory) {
+        Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
+                           moduleID.first.str(), err.message());
+      }
+
+      return nullptr;
     }
 
-    return nullptr;
-  }
   assert(inputFile);
   std::string DebugModuleName = inputFile->getBufferIdentifier();
 

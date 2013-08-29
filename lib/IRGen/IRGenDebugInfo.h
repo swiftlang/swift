@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_DEBUGINFO_H
 #define SWIFT_IRGEN_DEBUGINFO_H
 
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ValueHandle.h"
 #include "llvm/DebugInfo.h"
 #include "llvm/DIBuilder.h"
@@ -107,7 +108,7 @@ class IRGenDebugInfo {
   SILBasicBlock::const_bbarg_iterator LastArg, LastEnd;
   unsigned LastArgNo;
 
-  StringRef MainFilename;
+  llvm::SmallString<256> MainFilename;
   StringRef CWDName; /// The current working directory.
   llvm::BumpPtrAllocator DebugInfoNames;
   llvm::DICompileUnit TheCU;
@@ -198,7 +199,7 @@ public:
                                      StringRef LinkageName,
                                      DebugTypeInfo DebugType,
                                      RegularLocation Loc);
-
+  /// Return the native, absolute path to the main file.
   StringRef getMainFilename() const { return MainFilename; }
 
 private:

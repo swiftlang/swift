@@ -1,4 +1,4 @@
-##===- tools/Makefile --------------------------------------*- Makefile -*-===##
+##===- tools/lldb-moduleimport-test/Makefile -----------------------*- Makefile -*-===##
 #
 # This source file is part of the Swift.org open source project
 #
@@ -10,9 +10,15 @@
 #
 ##===----------------------------------------------------------------------===##
 
-SWIFT_LEVEL := ..
-PARALLEL_DIRS := swift swift-demangle sil-opt swift-ide-test lldb-moduleimport-test
+SWIFT_LEVEL := ../..
 
-include $(SWIFT_LEVEL)/../../Makefile.config
+TOOLNAME = lldb-moduleimport-test
+
+LINK_COMPONENTS := support
+USEDLIBS = swiftFrontend.a swiftParse.a swiftClangImporter.a swiftSema.a swiftSerialization.a swiftAST.a swiftBasic.a
+
+LLVMLibsOptions :=     \
+  $(LLVMLibsOptions)
 
 include $(SWIFT_LEVEL)/Makefile
+

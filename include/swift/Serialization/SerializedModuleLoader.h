@@ -15,6 +15,8 @@
 
 #include "swift/AST/ModuleLoader.h"
 #include "llvm/ADT/OwningPtr.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include <map>
 
 namespace swift {
 class ASTContext;
@@ -25,6 +27,7 @@ class ModuleFile;
 class SerializedModuleLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
+  std::map<std::string, llvm::OwningPtr<llvm::MemoryBuffer> > Bitstreams;
 
   /// A { module, generation # } pair.
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
@@ -57,6 +60,15 @@ public:
   /// emits a diagnostic and returns NULL.
   virtual Module *
   loadModule(SourceLoc importLoc, Module::AccessPathTy path) override;
+
+  /// \brief Register a bitstream that contains the serialized module
+  /// for the given module path. This API is intended to be used by
+  /// LLDB to add swiftmodules discovered in the __apple_ast section
+  /// of a Mach-O file to the search path.
+  void registerBitstream(std::string path,
+                         llvm::OwningPtr<llvm::MemoryBuffer> &&input) {
+    Bitstreams[path].reset(input.take());
+  }
 
   /// \brief Look for declarations associated with the given name.
   ///

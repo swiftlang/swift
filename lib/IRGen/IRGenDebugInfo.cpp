@@ -75,23 +75,25 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
     LastFn(nullptr), LastLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfo);
   StringRef Dir, Filename;
-  MainFilename = Opts.MainInputFilename;
-  if (MainFilename.empty()) {
+  if (Opts.MainInputFilename.empty()) {
     Filename = "<unknown>";
     Dir = getCurrentDirname();
   } else {
     // Separate path and filename.
-    Filename = BumpAllocatedString(llvm::sys::path::filename(MainFilename),
-                                   DebugInfoNames);
-    llvm::SmallString<512> Path(MainFilename);
+    Filename =
+      BumpAllocatedString(llvm::sys::path::filename(Opts.MainInputFilename),
+                          DebugInfoNames);
+    llvm::SmallString<512> Path(Opts.MainInputFilename);
     llvm::sys::path::remove_filename(Path);
     llvm::sys::fs::make_absolute(Path);
-    Dir = BumpAllocatedString(Path, DebugInfoNames);
+    llvm::SmallString<512> NPath;
+    llvm::sys::path::native(Twine(Path), NPath);
+    Dir = BumpAllocatedString(NPath, DebugInfoNames);
   }
   // The fallback file.
-  llvm::SmallString<512> MainFileBuf(Dir);
-  llvm::sys::path::append(MainFileBuf, Filename);
-  MainFile = getOrCreateFile(MainFileBuf.c_str());
+  MainFilename = Dir;
+  llvm::sys::path::append(MainFilename, Filename);
+  MainFile = getOrCreateFile(MainFilename.data());
 
   unsigned Lang = DW_LANG_Swift;
 
