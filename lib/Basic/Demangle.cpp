@@ -785,10 +785,10 @@ private:
     NodePointer identifier;
     context = demangleContextImpl(&context_type);
     if (!context)
-      return false;
+      return nullptr;
     identifier = demangleIdentifier();
     if (!identifier)
-      return false;
+      return nullptr;
     IsProtocol is_proto = IsProtocol::no;
     if (identifier_type != Node::Kind::Unknown) {
       identifier->setKind(identifier_type);
@@ -1505,6 +1505,28 @@ NodePointer getFirstChildOfKind (NodePointer pointer, Node::Kind kind) {
   return nullptr;
 }
 
+bool typeNeedsColonForDecl (NodePointer type) {
+  if (!type)
+    return false;
+  if (type->size() == 0)
+    return false;
+  NodePointer child = type->child_at(0);
+  if (!child)
+    return false;
+  Node::Kind child_kind = child->getKind();
+  switch (child_kind) {
+    case Node::Kind::UncurriedFunctionFunctionType:
+    case Node::Kind::UncurriedFunctionType:
+    case Node::Kind::FunctionType:
+    case Node::Kind::UncurriedFunctionMetaType:
+      return false;
+    case Node::Kind::GenericType:
+      return typeNeedsColonForDecl(getFirstChildOfKind(type, Node::Kind::UncurriedFunctionType));
+    default:
+      return true;
+  }
+}
+
 void toString(NodePointer pointer, DemanglerPrinter &printer) {
   while (pointer) {
     Node::Kind kind = pointer->getKind();
@@ -1522,10 +1544,11 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       NodePointer path = getFirstChildOfKind(pointer, Node::Kind::Path);
       NodePointer type = getFirstChildOfKind(pointer, Node::Kind::Type);
       toString(path, printer);
-      if (type) {
+      if (typeNeedsColonForDecl(type))
         printer << " : ";
-        toString(type, printer);
-      }
+      else
+        printer << " ";
+      toString(type, printer);
       break;
     }
     case swift::Demangle::Node::Kind::Path:
@@ -1682,14 +1705,17 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
         pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::ProtocolWitnessTable:
       printer << "protocol witness table for ";
-        pointer = pointer->child_at(0); continue;
+      pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::ProtocolWitness:
       printer << "protocol witness for ";
       {
         NodePointer path = getFirstChildOfKind(pointer, Node::Kind::Path);
         NodePointer type = getFirstChildOfKind(pointer, Node::Kind::Type);
         toString(path,printer);
-        printer << " : ";
+        if (typeNeedsColonForDecl(type))
+          printer << " : ";
+        else
+          printer << " ";
         toString(type, printer);
         break;
       }
@@ -1699,7 +1725,10 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
         NodePointer path = getFirstChildOfKind(pointer, Node::Kind::Path);
         NodePointer type = getFirstChildOfKind(pointer, Node::Kind::Type);
         toString(path,printer);
-        printer << " : ";
+        if (typeNeedsColonForDecl(type))
+          printer << " : ";
+        else
+          printer << " ";
         toString(type, printer);
         break;
       }
@@ -1727,7 +1756,10 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
         NodePointer path = getFirstChildOfKind(pointer, Node::Kind::Path);
         NodePointer type = getFirstChildOfKind(pointer, Node::Kind::Type);
         toString(path,printer);
-        printer << " : ";
+        if (typeNeedsColonForDecl(type))
+          printer << " : ";
+        else
+          printer << " ";
         toString(type, printer);
         break;
       }
