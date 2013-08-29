@@ -3715,16 +3715,26 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   else
     return true;
 
-  // The result must be a LogicValue.
-  auto logicValueProto = getProtocol(expr->getLoc(),
-                                     KnownProtocolKind::LogicValue);
-  if (!logicValueProto) {
-    return true;
-  }
+  // If the expression has type Builtin.Int1 (or an l-value with that
+  // object type), go ahead and special-case that.  This doesn't need
+  // to be deeply principled because builtin types are not user-facing.
+  auto rvalueType = expr->getType()->getRValueType();
+  if (rvalueType->isBuiltinIntegerType(1)) {
+    cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+                     rvalueType);
 
-  cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
-                   logicValueProto->getDeclaredType(),
-                   cs.getConstraintLocator(expr, { }));
+  // Otherwise, the result must be a LogicValue.
+  } else {
+    auto logicValueProto = getProtocol(expr->getLoc(),
+                                       KnownProtocolKind::LogicValue);
+    if (!logicValueProto) {
+      return true;
+    }
+
+    cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
+                     logicValueProto->getDeclaredType(),
+                     cs.getConstraintLocator(expr, { }));
+  }
 
   if (getLangOpts().DebugConstraintSolver) {
     log << "---Initial constraints for the given expression---\n";

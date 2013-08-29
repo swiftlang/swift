@@ -2952,17 +2952,15 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   return rewriter.finishApply(apply, openedType, locator);
 }
 
-/// \brief Determine whether the given type is a Builtin i1.
-static bool isBuiltinI1(Type type) {
-  if (auto builtinIntTy = type->getAs<BuiltinIntegerType>()) {
-    return builtinIntTy->getBitWidth() == 1;
-  }
-  return false;
-}
-
 Expr *
 Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
   auto &tc = getConstraintSystem().getTypeChecker();
+
+  // Special case: already a builtin logic value.
+  if (expr->getType()->getRValueType()->isBuiltinIntegerType(1)) {
+    return tc.coerceToRValue(expr);
+  }
+
   // FIXME: Cache names.
   auto result = convertViaBuiltinProtocol(
                   *this, expr, locator,
@@ -2972,7 +2970,7 @@ Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
                   tc.Context.getIdentifier("_getBuiltinLogicValue"),
                   diag::condition_broken_proto,
                   diag::broken_bool);
-  if (result && !isBuiltinI1(result->getType())) {
+  if (result && !result->getType()->isBuiltinIntegerType(1)) {
     tc.diagnose(expr->getLoc(), diag::broken_bool);
     return nullptr;
   }
