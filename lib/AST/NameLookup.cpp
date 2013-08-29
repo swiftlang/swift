@@ -690,6 +690,42 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(Identifier name) {
   return { known->second.begin(), known->second.size() };
 }
 
+/// Determine whether the given context is generic at any level.
+static bool isGenericContext(DeclContext *dc) {
+  for (; ; dc = dc->getParent() ) {
+    switch (dc->getContextKind()) {
+    case DeclContextKind::BuiltinModule:
+    case DeclContextKind::ClangModule:
+    case DeclContextKind::SerializedModule:
+    case DeclContextKind::TranslationUnit:
+      return false;
+
+    case DeclContextKind::CapturingExpr:
+      if (auto funcExpr = dyn_cast<FuncExpr>(dc)) {
+        if (auto func = funcExpr->getDecl())
+          if (func->getGenericParams())
+            return true;
+      }
+      break;
+
+    case DeclContextKind::ConstructorDecl:
+      if (cast<ConstructorDecl>(dc)->getGenericParams())
+        return true;
+      break;
+
+    case DeclContextKind::DestructorDecl:
+    case DeclContextKind::TopLevelCodeDecl:
+      break;
+
+    case DeclContextKind::ExtensionDecl:
+    case DeclContextKind::NominalTypeDecl:
+      if (dc->getDeclaredTypeOfContext()->getAnyNominal()->getGenericParams())
+        return true;
+      break;
+    }
+  }
+}
+
 bool Module::lookupQualified(Type type,
                              Identifier name,
                              unsigned options,
@@ -865,6 +901,11 @@ bool Module::lookupQualified(Type type,
         nominal = ext->getExtendedType()->getAnyNominal();
         assert(nominal && "Couldn't find nominal type?");
       }
+
+      // Dynamic lookup cannot find non-Objective C results within
+      // a generic context.
+      if (!decl->isObjC() && isGenericContext(dc))
+        continue;
 
       // If we didn't visit this nominal type above, add this
       // declaration to the list.
