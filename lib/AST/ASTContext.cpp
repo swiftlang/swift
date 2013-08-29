@@ -72,6 +72,9 @@ struct ASTContext::Implementation {
   /// func _injectNothingIntoOptional<T>() -> Optional<T>
   FuncDecl *InjectNothingIntoOptionalDecl = nullptr;
 
+  /// func _getBool(Builtin.Int1) -> Bool
+  FuncDecl *GetBoolDecl = nullptr;
+
   /// \brief The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -341,11 +344,54 @@ static CanType stripImmediateLabels(CanType type) {
   return type;
 }
 
+/// Check whether the given function is non-generic.
+static bool isNonGenericIntrinsic(FuncDecl *fn, CanType &input,
+                                  CanType &output) {
+  auto fnType = dyn_cast<FunctionType>(fn->getType()->getCanonicalType());
+  if (!fnType)
+    return false;
+
+  input = stripImmediateLabels(fnType.getInput());
+  output = stripImmediateLabels(fnType.getResult());
+  return true;
+}
+
+/// Check whether the given type is Builtin.Int1.
+static bool isBuiltinInt1Type(CanType type) {
+  if (auto intType = dyn_cast<BuiltinIntegerType>(type))
+    return intType->getBitWidth() == 1;
+  return false;
+}
+
+FuncDecl *ASTContext::getGetBoolDecl() const {
+  if (Impl.GetBoolDecl)
+    return Impl.GetBoolDecl;
+
+  // Look for the function.
+  CanType input, output;
+  auto decl = findLibraryIntrinsic(*this, "_getBool");
+  if (!decl || !isNonGenericIntrinsic(decl, input, output))
+    return nullptr;
+
+  // Input must be Builtin.Int1
+  if (!isBuiltinInt1Type(input))
+    return nullptr;
+
+  // Output must be a global type named Bool.
+  auto nominalType = dyn_cast<NominalType>(output);
+  if (!nominalType ||
+      nominalType.getParent() ||
+      nominalType->getDecl()->getName().str() != "Bool")
+    return nullptr;
+
+  Impl.GetBoolDecl = decl;
+  return decl;
+}
+
 /// Check whether the given function is generic over a single,
 /// unconstrained archetype.
 static bool isGenericIntrinsic(FuncDecl *fn, CanType &input, CanType &output,
                                CanType &param) {
-  // The polymorphic
   auto fnType =
     dyn_cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
   if (!fnType || fnType->getAllArchetypes().size() != 1)
@@ -389,8 +435,7 @@ FuncDecl *ASTContext::getDoesOptionalHaveValueDecl() const {
     return nullptr;
 
   // Output must be Builtin.Int1.
-  auto boolOutput = dyn_cast<BuiltinIntegerType>(output);
-  if (!boolOutput || boolOutput->getBitWidth() != 1)
+  if (!isBuiltinInt1Type(output))
     return nullptr;
 
   Impl.DoesOptionalHaveValueDecl = decl;

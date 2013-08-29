@@ -310,6 +310,9 @@ public:
   /// non-null.
   bool hasOptionalIntrinsics() const;
 
+  /// Retrieve the declaration of swift._getBool.
+  FuncDecl *getGetBoolDecl() const;
+
   /// Retrieve a specific, known protocol.
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
 
