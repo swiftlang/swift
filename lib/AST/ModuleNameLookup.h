@@ -40,11 +40,21 @@ enum class ResolutionKind {
   TypesOnly
 };
 
-/// Performs a qualified lookup into the given module and, if necessary, its
+/// Performs a lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.
+///
+/// \param module The module that will contain the name.
+/// \param accessPath The import scope on \p module.
+/// \param name The name to look up.
+/// \param[out] decls Any found decls will be added to this vector.
+/// \param lookupKind Whether this lookup is qualified or unqualified.
+/// \param resolutionKind What sort of decl is expected.
+/// \param topLevel If \p module should be treated as a top-level source file,
+///        e.g. its private imports should be included in the search.
 void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                     Identifier name, SmallVectorImpl<ValueDecl *> &decls,
-                    NLKind lookupKind, ResolutionKind resolutionKind);
+                    NLKind lookupKind, ResolutionKind resolutionKind,
+                    bool topLevel);
 
 /// Performs a qualified lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.

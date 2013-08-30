@@ -500,7 +500,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   auto resolutionKind =
     IsTypeLookup ? ResolutionKind::TypesOnly : ResolutionKind::Overloadable;
   lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind);
+                 resolutionKind, /*topLevel=*/true);
 
   for (auto VD : CurModuleResults)
     Results.push_back(Result::getModuleMember(VD));
@@ -754,7 +754,8 @@ bool Module::lookupQualified(Type type,
       if (import.second != module)
         return true;
       lookupInModule(import.second, import.first, name, decls,
-                     NLKind::QualifiedLookup, ResolutionKind::Overloadable);
+                     NLKind::QualifiedLookup, ResolutionKind::Overloadable,
+                     /*topLevel=*/false);
       // If we're able to do an unscoped lookup, we see everything. No need
       // to keep going.
       return !import.first.empty();

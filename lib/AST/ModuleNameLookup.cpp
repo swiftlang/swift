@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ModuleNameLookup.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace namelookup;
@@ -133,7 +134,8 @@ template <typename OverloadSetTy, typename CallbackTy>
 static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                            SmallVectorImpl<ValueDecl *> &decls,
                            ResolutionKind resolutionKind, bool canReturnEarly,
-                           ModuleLookupCache &cache, CallbackTy callback) {
+                           ModuleLookupCache &cache, bool topLevel,
+                           CallbackTy callback) {
   ModuleLookupCache::MapTy::iterator iter;
   bool isNew;
   std::tie(iter, isNew) = cache.Map.insert({{accessPath, module}, {}});
@@ -166,7 +168,7 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
   if (!foundDecls || !canReturnEarly ||
       resolutionKind == ResolutionKind::Overloadable) {
     SmallVector<Module::ImportedModule, 8> reexports;
-    module->getImportedModules(reexports);
+    module->getImportedModules(reexports, topLevel);
 
     // Prefer scoped imports (import func swift.max) to whole-module imports.
     SmallVector<ValueDecl *, 8> unscopedValues;
@@ -190,7 +192,7 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
       auto &resultSet = next.first.empty() ? unscopedValues : scopedValues;
       lookupInModule<OverloadSetTy>(next.second, combinedAccessPath,
                                     resultSet, resolutionKind, canReturnEarly,
-                                    cache, callback);
+                                    cache, false, callback);
     }
 
     // Add the results from scoped imports.
@@ -216,16 +218,17 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                       decls.end());
 }
 
-void namelookup::lookupInModule(Module *topLevel,
+void namelookup::lookupInModule(Module *startModule,
                                 Module::AccessPathTy topAccessPath,
                                 Identifier name,
                                 SmallVectorImpl<ValueDecl *> &decls,
                                 NLKind lookupKind,
-                                ResolutionKind resolutionKind) {
+                                ResolutionKind resolutionKind,
+                                bool topLevel) {
   ModuleLookupCache cache;
-  ::lookupInModule<CanTypeSet>(topLevel, topAccessPath, decls,
+  ::lookupInModule<CanTypeSet>(startModule, topAccessPath, decls,
                                resolutionKind, /*canReturnEarly=*/true,
-                               cache,
+                               cache, topLevel,
     [=](Module *module, Module::AccessPathTy path,
         SmallVectorImpl<ValueDecl *> &localDecls) {
       module->lookupValue(path, name, lookupKind, localDecls);
@@ -256,7 +259,7 @@ void namelookup::lookupVisibleDeclsInModule(Module *topLevel,
   ModuleLookupCache cache;
   ::lookupInModule<NamedCanTypeSet>(topLevel, topAccessPath, decls,
                                     resolutionKind, /*canReturnEarly=*/false,
-                                    cache,
+                                    cache, /*topLevel=*/true,
     [=](Module *module, Module::AccessPathTy path,
         SmallVectorImpl<ValueDecl *> &localDecls) {
       VectorDeclConsumer consumer(localDecls);

@@ -462,12 +462,9 @@ Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
     return;
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    // A translation unit doesn't really re-export all of its imported modules,
-    // but for the purposes of lookup a TU is always top-level, so we want to
-    // look at regular imports as well as re-exports.
-    // FIXME: With includePrivate, this isn't really the case any more.
     for (auto importPair : TU->getImports())
-      modules.push_back(importPair.first);
+      if (includePrivate || importPair.second)
+        modules.push_back(importPair.first);
     return;
   }
 
@@ -505,7 +502,7 @@ bool Module::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
 }
 
 template<bool respectVisibility, typename Callback>
-static void forAllImportedModules(Module *current,
+static void forAllImportedModules(Module *topLevel,
                                   Optional<Module::AccessPathTy> thisPath,
                                   const Callback &fn) {
   using ImportedModule = Module::ImportedModule;
@@ -518,11 +515,14 @@ static void forAllImportedModules(Module *current,
   if (thisPath.hasValue()) {
     if (respectVisibility)
       overridingPath = thisPath.getValue();
-    queue.push_back(ImportedModule(overridingPath, current));
+    queue.push_back(ImportedModule(overridingPath, topLevel));
   } else {
-    visited.insert(ImportedModule({}, current));
-    current->getImportedModules(queue, !respectVisibility);
+    visited.insert(ImportedModule({}, topLevel));
   }
+
+  // Even if we're processing the top-level module like any other, we still want
+  // to include non-exported modules.
+  topLevel->getImportedModules(queue, true);
 
   while (!queue.empty()) {
     auto next = queue.pop_back_val();
