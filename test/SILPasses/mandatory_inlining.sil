@@ -42,8 +42,8 @@ sil @inline_test_add : $[thin] (x : Int64) -> Int64 {
   // CHECK: [[VAL15:%.*]] = function_ref @fromLiteral
   // CHECK: [[VAL16:%.*]] = metatype $Int64.metatype
   // CHECK: [[VAL17:%.*]] = integer_literal $Builtin.Int128, 20
-  // CHECK: [[VAL18:%.*]] = apply [transparent] [[VAL15]]([[VAL17]], [[VAL16]])
-  // CHECK: [[VAL19:%.*]] = apply [transparent] [[VAL13]]([[VAL14]], [[VAL18]])
+  // CHECK: [[VAL18:%.*]] = apply [[VAL15]]([[VAL17]], [[VAL16]])
+  // CHECK: [[VAL19:%.*]] = apply [[VAL13]]([[VAL14]], [[VAL18]])
   // CHECK: strong_release [[VAL11]]#0
   // CHECK: [[VAL21:%.*]] = function_ref @fromLiteral
   // CHECK: [[VAL22:%.*]] = metatype $Int64.metatype
@@ -95,8 +95,8 @@ sil @inline_twice_test_add : $[thin] (x : Int64) -> Int64 {
   // CHECK: [[VAL15:%.*]] = function_ref @fromLiteral
   // CHECK: [[VAL16:%.*]] = metatype $Int64.metatype
   // CHECK: [[VAL17:%.*]] = integer_literal $Builtin.Int128, 20
-  // CHECK: [[VAL18:%.*]] = apply [transparent] [[VAL15]]([[VAL17]], [[VAL16]])
-  // CHECK: [[VAL19:%.*]] = apply [transparent] [[VAL13]]([[VAL14]], [[VAL18]])
+  // CHECK: [[VAL18:%.*]] = apply [[VAL15]]([[VAL17]], [[VAL16]])
+  // CHECK: [[VAL19:%.*]] = apply [[VAL13]]([[VAL14]], [[VAL18]])
   // CHECK: strong_release [[VAL11]]#0
   // CHECK: [[VAL21:%.*]] = alloc_box $Int64
   // CHECK: store [[VAL19]] to [[VAL21]]#1
@@ -105,8 +105,8 @@ sil @inline_twice_test_add : $[thin] (x : Int64) -> Int64 {
   // CHECK: [[VAL25:%.*]] = function_ref @fromLiteral
   // CHECK: [[VAL26:%.*]] = metatype $Int64.metatype
   // CHECK: [[VAL27:%.*]] = integer_literal $Builtin.Int128, 20
-  // CHECK: [[VAL28:%.*]] = apply [transparent] [[VAL25]]([[VAL27]], [[VAL26]])
-  // CHECK: [[VAL29:%.*]] = apply [transparent] [[VAL23]]([[VAL24]], [[VAL28]])
+  // CHECK: [[VAL28:%.*]] = apply [[VAL25]]([[VAL27]], [[VAL26]])
+  // CHECK: [[VAL29:%.*]] = apply [[VAL23]]([[VAL24]], [[VAL28]])
   // CHECK: strong_release [[VAL21]]#0
   // CHECK: [[VAL31:%.*]] = function_ref @fromLiteral
   // CHECK: [[VAL32:%.*]] = metatype $Int64.metatype
@@ -273,10 +273,10 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
   // CHECK: [[VAL20:%.*]] = function_ref @foo
   // CHECK: [[VAL21:%.*]] = load [[VAL15]]#1
   // CHECK: [[VAL22:%.*]] = load [[VAL16]]#1
-  // CHECK: [[VAL23:%.*]] = apply [transparent] [[VAL20]]([[VAL21]], [[VAL22]])
+  // CHECK: [[VAL23:%.*]] = apply [[VAL20]]([[VAL21]], [[VAL22]])
   // CHECK: [[VAL24:%.*]] = alloc_stack $Bool
   // CHECK: store [[VAL23]] to [[VAL24]]#1
-  // CHECK: [[VAL26:%.*]] = apply [transparent] [[VAL19]]([[VAL24]]#1)
+  // CHECK: [[VAL26:%.*]] = apply [[VAL19]]([[VAL24]]#1)
   // CHECK: dealloc_stack [[VAL24]]#0
   // CHECK: condbranch [[VAL26]], [[BB1:.*]], [[BB2:.*]]
 
@@ -291,10 +291,10 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
   // CHECK: [[VAL32:%.*]] = function_ref @_TSb13getLogicValuefRSbFT_Bi1_
   // CHECK: [[VAL33:%.*]] = function_ref @bar
   // CHECK: [[VAL34:%.*]] = load [[VAL16]]#1
-  // CHECK: [[VAL35:%.*]] = apply [transparent] [[VAL33]]([[VAL34]])
+  // CHECK: [[VAL35:%.*]] = apply [[VAL33]]([[VAL34]])
   // CHECK: [[VAL36:%.*]] = alloc_stack $Bool
   // CHECK: store [[VAL35]] to [[VAL36]]#1
-  // CHECK: [[VAL38:%.*]] = apply [transparent] [[VAL32]]([[VAL36]]#1)
+  // CHECK: [[VAL38:%.*]] = apply [[VAL32]]([[VAL36]]#1)
   // CHECK: dealloc_stack [[VAL36]]#0
   // CHECK: condbranch [[VAL38]], [[BB4:.*]], [[BB5:.*]]
 
@@ -304,8 +304,8 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
   // CHECK: [[VAL43:%.*]] = function_ref @_TSf31_convertFromBuiltinFloatLiteralfMSfFT5valueBf64__Sf
   // CHECK: [[VAL44:%.*]] = metatype $Float32.metatype
   // CHECK: [[VAL45:%.*]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
-  // CHECK: [[VAL46:%.*]] = apply [transparent] [[VAL43]]([[VAL45]], [[VAL44]])
-  // CHECK: [[VAL47:%.*]] = apply [transparent] [[VAL41]]([[VAL42]], [[VAL46]])
+  // CHECK: [[VAL46:%.*]] = apply [[VAL43]]([[VAL45]], [[VAL44]])
+  // CHECK: [[VAL47:%.*]] = apply [[VAL41]]([[VAL42]], [[VAL46]])
   // CHECK: store [[VAL47]] to [[VAL16]]#1
   // CHECK: br [[BB3]]
 
@@ -391,7 +391,7 @@ bb0(%0 : $Float32):
 sil @test_partial_foo : $[thin] (Int64) -> Int64 {
 // CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Int64):
   // CHECK: [[VAL1:%.*]] = function_ref @plus
-  // CHECK: [[VAL2:%.*]] = apply [transparent] [[VAL1]]([[VAL0]], [[VAL0]])
+  // CHECK: [[VAL2:%.*]] = apply [[VAL1]]([[VAL0]], [[VAL0]])
   // CHECK: return [[VAL2]]
 
 bb0(%0 : $Int64):

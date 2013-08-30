@@ -120,7 +120,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
 
   SmallVector<SILValue, 16> Args;
   SmallVector<SILInstruction*, 16> PossiblyDeadInsts;
-  SILInliner Inliner(*F, /*MakeTransparent=*/true);
+  SILInliner Inliner(*F, /*ForTransparent=*/true);
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
     auto I = FI->begin(), E = FI->end();
     while (I != E) {

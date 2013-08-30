@@ -32,14 +32,13 @@ namespace swift {
 /// basic block, or function; subclasses that want to handle those should
 /// implement the appropriate visit functions and/or provide other entry points.
 template<typename ImplClass>
-class SILCloner : protected SILVisitor<SILCloner<ImplClass>, SILValue> {
-  friend class SILVisitor<SILCloner<ImplClass>, SILValue>;
+class SILCloner : protected SILVisitor<ImplClass, SILValue> {
+  friend class SILVisitor<ImplClass, SILValue>;
 
 public:
-  explicit SILCloner(SILFunction &F, bool MakeTransparent = false)
-    : Builder(F), MakeTransparent(MakeTransparent) {
-  }
+  explicit SILCloner(SILFunction &F) : Builder(F) { }
 
+protected:
 #define VALUE(CLASS, PARENT) \
   SILValue visit##CLASS(CLASS *I) {                                   \
     return getOpValue(I);                                             \
@@ -48,7 +47,6 @@ public:
   SILValue visit##CLASS(CLASS *I);
 #include "swift/SIL/SILNodes.def"
 
-protected:
   SILBuilder &getBuilder() { return Builder; }
 
   // Derived classes of SILCloner using the CRTP can implement the following
@@ -64,7 +62,6 @@ protected:
     return Cloned;
   }
 
-private:
   SILLocation getOpLocation(SILLocation Loc) {
     return static_cast<ImplClass*>(this)->remapLocation(Loc);
   }
@@ -92,7 +89,6 @@ private:
   }
 
   SILBuilder Builder;
-  bool MakeTransparent;
 };
 
 /// SILInstructionCloner - Concrete SILCloner subclass which can only be called
@@ -161,7 +157,7 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst* Inst) {
     Builder.createApply(getOpLocation(Inst->getLoc()),
                         getOpValue(Inst->getCallee()),
                         getOpType(Inst->getType()), Args,
-                        MakeTransparent ? true : Inst->isTransparent()));
+                        Inst->isTransparent()));
 }
 
 template<typename ImplClass>
