@@ -700,25 +700,16 @@ public:
     SILBasicBlock *caseBB = emitCaseBlock(gen, caseMap);
 
     // Create new BBs for the guard branch.
-    SILBasicBlock *trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+    SILBasicBlock *trueBB = nullptr;
     SILBasicBlock *falseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
     
     // TODO: We should emit every guard once and share code if it covers
     // multiple patterns.
     if (!exprGuards.empty()) {
-      // If we have a guard, we'll jump to it if all the expr patterns check
-      // out. Otherwise we can jump directly to the destination.
-      SILBasicBlock *guardBB = trueBB;
-      if (hasGuard())
-        guardBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
       // Test ExprPatterns from the row in an "and" chain.
-      for (unsigned i = 0, e = exprGuards.size(); i < e; ++i) {
-        const ExprPattern *ep = exprGuards[i];
-        
+      for (const ExprPattern *ep : exprGuards) {        
         // The last pattern test jumps to the guard.
-        SILBasicBlock *nextBB = guardBB;
-        if (i < e - 1)
-          nextBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+        trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
         
         // Emit the match test.
         SILValue testBool;
@@ -731,13 +722,9 @@ public:
 
         // If the test succeeds, we move on to the next test; otherwise, we
         // fail and move to the next pattern.
-        gen.B.createCondBranch(getCaseBlock(), testBool, nextBB, falseBB);
-        if (i < e - 1)
-          gen.B.emitBlock(nextBB);
+        gen.B.createCondBranch(getCaseBlock(), testBool, trueBB, falseBB);
+        gen.B.emitBlock(trueBB);
       }
-      
-      if (hasGuard())
-        gen.B.emitBlock(guardBB);
     }
     
     if (hasGuard()) {
@@ -753,11 +740,12 @@ public:
       }
       
       // Branch either to the row destination or the new BB.
+      trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
       gen.B.createCondBranch(getCaseBlock(), guardBool, trueBB, falseBB);
+      gen.B.emitBlock(trueBB);
     }
     
     // On the true block, jump to the case block, unwinding if necessary.
-    gen.B.emitBlock(trueBB);
     gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB, getCleanupsDepth(),
                                        getCaseBlock()},
                                        gen.CurrentSILLoc);
