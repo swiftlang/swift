@@ -189,12 +189,8 @@ func [transparent]  ^ (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(B
 func [transparent]  | (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.or_Int${bits}(  lhs.value, rhs.value)) }
 
 // Compound assignments
-func [assignment, transparent]  -= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  - rhs }
-func [assignment, transparent]  *= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  * rhs }
-func [assignment, transparent]  /= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  / rhs }
-func [assignment, transparent]  %= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  % rhs }
-func [assignment, transparent] <<= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs << rhs }
-func [assignment, transparent] >>= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs >> rhs }
-func [assignment, transparent]  &= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  & rhs }
-func [assignment, transparent]  |= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  | rhs }
-func [assignment, transparent]  ^= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  ^ rhs }
+@for op in '+ - * / % << >> & | ^'.split():
+func [assignment, transparent] ${op}=(lhs: [byref] ${Self}, rhs: ${Self}) {
+  lhs = lhs ${op} rhs
+}
+@end
