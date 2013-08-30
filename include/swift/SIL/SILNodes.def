@@ -189,7 +189,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     TERMINATOR(DestructiveSwitchUnionAddrInst, TermInst, MayWrite)
     VALUE_RANGE(TermInst, UnreachableInst, DestructiveSwitchUnionAddrInst)
 
-  VALUE_RANGE(SILInstruction, AllocStackInst, SwitchUnionInst)
+  VALUE_RANGE(SILInstruction, AllocStackInst, DestructiveSwitchUnionAddrInst)
 
 #undef VALUE_RANGE
 #undef ABSTRACT_VALUE
