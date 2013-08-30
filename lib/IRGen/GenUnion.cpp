@@ -112,6 +112,12 @@ namespace {
       return getTypeInfo().isPOD(scope);
     }
     
+    /// Primitive-load the union value into an explosion. This is allowed even
+    /// for address-only types for operations that need to inspect only the
+    /// binary representation of the union.
+    virtual void loadForSwitch(IRGenFunction &IGF, Address addr,
+                               Explosion &out) const = 0;
+    
     /// \group Indirect union operations
     
     /// Project the address of the data for a case. Does not check or modify
@@ -128,15 +134,6 @@ namespace {
                           Address unionAddr) const = 0;
     
     /* TODO
-    /// Emit a branch on the case contained by a union in memory.
-    /// Performs the branching for a SIL 'destructive_switch_union_addr'
-    /// instruction.
-    virtual void emitAddressSwitch(IRGenFunction &IGF,
-                                   Address unionAddr,
-                                   ArrayRef<std::pair<UnionElementDecl*,
-                                                      llvm::BasicBlock*>> dests,
-                                   llvm::BasicBlock *defaultDest) const = 0;
-    
     /// Clears tag bits from within the payload of a union in memory and
     /// projects the address of the data for a case. Does not check
     /// the referenced union value.
@@ -320,7 +317,12 @@ namespace {
       if (!getLoadableSingleton()) return;
       getLoadableSingleton()->loadAsCopy(IGF, getSingletonAddress(IGF, addr), e);
     }
-    
+
+    void loadForSwitch(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      // Switching on a singleton does not require a value.
+      return;
+    }
+
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
       if (!getLoadableSingleton()) return;
       getLoadableSingleton()->loadAsTake(IGF, getSingletonAddress(IGF, addr), e);
@@ -445,7 +447,7 @@ namespace {
     void emitValueSwitch(IRGenFunction &IGF,
                          Explosion &value,
                          ArrayRef<std::pair<UnionElementDecl*,
-                         llvm::BasicBlock*>> dests,
+                                            llvm::BasicBlock*>> dests,
                          llvm::BasicBlock *defaultDest) const override {
       llvm::Value *discriminator = value.claimNext();
       
@@ -518,6 +520,10 @@ namespace {
       IGF.Builder.CreateStore(val, dest);
     }
     
+    void loadForSwitch(IRGenFunction &IGF, Address addr, Explosion &out) const {
+      loadAsTake(IGF, addr, out);
+    }
+    
     static constexpr IsPOD_t IsScalarPOD = IsPOD;
   };
   
@@ -566,13 +572,18 @@ namespace {
       assert(ExtraTagBitCount > 0 && "does not have extra tag bits");
       return IGF.Builder.CreateStructGEP(addr, 1, getExtraTagBitOffset());
     }
-    
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e)
+
+    void loadForSwitch(IRGenFunction &IGF, Address addr, Explosion &e)
     const override {
-      assert(TIK >= Loadable);
       e.add(IGF.Builder.CreateLoad(projectPayload(IGF, addr)));
       if (ExtraTagBitCount > 0)
         e.add(IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr)));
+    }
+
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e)
+    const override {
+      assert(TIK >= Loadable);
+      loadForSwitch(IGF, addr, e);
     }
     
     void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e)
@@ -700,7 +711,7 @@ namespace {
     void emitValueSwitch(IRGenFunction &IGF,
                          Explosion &value,
                          ArrayRef<std::pair<UnionElementDecl*,
-                                  llvm::BasicBlock*>> dests,
+                                            llvm::BasicBlock*>> dests,
                          llvm::BasicBlock *defaultDest) const override {
       auto &C = IGF.IGM.getLLVMContext();
       
