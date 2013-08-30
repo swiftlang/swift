@@ -67,7 +67,7 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
   }
 @else:
 
-@end 
+@end
   func replPrint() {
     print(${
       'self' if bits == 64
@@ -149,8 +149,8 @@ extension ${Self} {
     value = v.value
          @else:
     value = Builtin.${
-    ('trunc' if src_bits > bits 
-    else 'sext' if src_signed 
+    ('trunc' if src_bits > bits
+    else 'sext' if src_signed
     else 'zext')
     }_Int${src_bits}_Int${bits}(v.value)
          @end
@@ -159,37 +159,35 @@ extension ${Self} {
 @end
 }
 
-//===----------------------------------------------------------------------===//
-// Standard Operator Tables
-//===----------------------------------------------------------------------===//
-
 // Unary plus
 func [prefix, transparent] +(rhs: ${Self}) -> ${Self} { return rhs }
 
-// Masking arithmetic operations
-func [transparent] &+ (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}.add(lhs, rhs).0 }
-func [transparent] &* (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}.mul(lhs, rhs).0 }
-func [transparent] &- (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}.sub(lhs, rhs).0 }
+// Operations with masking and non-masking versions
+@for op,method in ('+','add'), ('*','mul'), ('-','sub'):
+func [transparent] &${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+  return ${Self}.${method}(lhs, rhs).0
+}
+func [transparent] ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+  return overflowCheck(${Self}.${method}(lhs, rhs))
+}
+@end
 
-// Checked arithmetic operations
-func [transparent] * (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return overflowCheck(${Self}.mul(lhs, rhs)) }
-func [transparent] + (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return overflowCheck(${Self}.add(lhs, rhs)) }
-func [transparent] - (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return overflowCheck(${Self}.sub(lhs, rhs)) }
+// Bitwise negate
+func [prefix, transparent] ~(rhs: ${Self}) -> ${Self} {
+  return rhs ^ ${maskBits(bits)}
+}
 
-// Division and remainder
-func [transparent] / (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.${sign}div_Int${bits}(lhs.value, rhs.value)) }
-func [transparent] % (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.${sign}rem_Int${bits}(lhs.value, rhs.value)) }
-
-// Bitwise operations
-func [prefix, transparent] ~(rhs: ${Self}) -> ${Self} { return rhs ^ ${maskBits(bits)} }
-func [transparent] << (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.shl_Int${bits}( lhs.value, rhs.value)) }
-func [transparent] >> (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.${'a' if signed else 'l'}shr_Int${bits}(lhs.value, rhs.value)) }
-func [transparent]  & (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.and_Int${bits}( lhs.value, rhs.value)) }
-func [transparent]  ^ (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.xor_Int${bits}( lhs.value, rhs.value)) }
-func [transparent]  | (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.or_Int${bits}(  lhs.value, rhs.value)) }
+@for op, name in (
+@  ('/',sign+'div'), ('%',sign+'rem'),
+@  ('<<','shl'), ('>>','ashr' if signed else 'lshr'),
+@  ('&','and'), ('^','xor'), ('|','or')):
+func [transparent] ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+  return ${Self}(Builtin.${name}_Int${bits}(lhs.value, rhs.value))
+}
+@end
 
 // Compound assignments
-@for op in '+ - * / % << >> & | ^'.split():
+@for op in '+', '-', '*', '/', '%', '<<', '>>', '&', '|', '^':
 func [assignment, transparent] ${op}=(lhs: [byref] ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
