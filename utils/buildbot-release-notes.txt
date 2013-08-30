@@ -1,3 +1,32 @@
+2013-09-04
+----------
+
+* Local variable declarations without an initializer are no longer implicitly
+  constructed.  The compmiler now verifies that they are initialized on all
+  paths leading to a use of the variable.  This means that constructs like this
+  are now allowed:
+  
+    var p : SomeProtocol
+    if whatever {
+      p = foo()
+    } else {
+      p = bar()
+    }
+    
+  where before, the compiler would reject the definition of "p" saying that it
+  needed an initializer expression.
+  
+  Since all local variables must be initialized before use, simple things like
+  this are now rejected as well:
+  
+    var x : Int
+    print(x)
+
+  The fix is to initialize the value on all paths, or to explicitly default
+  initialize the value in the declaration, e.g. with "var x = 0" or with
+  "var x = Int()" (which works for any default-constructible type).
+
+
 2013-08-28
 ----------
 
