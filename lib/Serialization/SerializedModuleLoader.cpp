@@ -90,7 +90,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   llvm::OwningPtr<llvm::MemoryBuffer> inputFile;
   // First see if we find it in the registered bitstreams.
-  if (!Bitstreams.empty()) {
+  if (!MemoryBuffers.empty()) {
     // FIXME: Right now this works only with fully-qualified absolute
     // pathnames, which is incidentally what LLDB uses. Fix this to
     // support suffix matching and a search path.
@@ -98,8 +98,8 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
     for (auto el : path)
       llvm::sys::path::append(spath, el.first.str());
 
-    auto bs = Bitstreams.find(spath.str());
-    if (bs != Bitstreams.end())
+    auto bs = MemoryBuffers.find(spath.str());
+    if (bs != MemoryBuffers.end())
       inputFile.reset(bs->second.take());
   }
 

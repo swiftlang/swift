@@ -129,9 +129,10 @@ int main(int argc, char **argv) {
                 auto bitstream = llvm::MemoryBuffer::getMemBuffer(sr, Path);
 
                 // Register it.
-                llvm::outs() << "Loaded module " << Path << " from " << name << "\n";
-                SML->registerBitstream(
-                    Path.c_str(), llvm::OwningPtr<llvm::MemoryBuffer>(bitstream));
+                llvm::outs()<<"Loaded module "<<Path<<" from "<<name<<"\n";
+                SML->registerMemoryBuffer(Path.c_str(),
+                                          llvm::OwningPtr<llvm::
+                                          MemoryBuffer>(bitstream));
                 modules.push_back(Path.c_str());
 
                 assert(macho.good());
