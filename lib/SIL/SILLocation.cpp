@@ -23,6 +23,9 @@ SourceLoc SILLocation::getSourceLoc() const {
   if (ASTNode.isNull())
     return SILFileSourceLoc;
 
+  if (alwaysPointsToStart())
+    return getStartSourceLoc();
+
   // Use the end location for the CleanupKind.
   if (getKind() == CleanupKind) {
     return getEndSourceLoc();
