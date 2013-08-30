@@ -439,8 +439,6 @@ ERROR(expected_sil_stage_name, decl_parsing, none,
       "expected 'raw' or 'canonical' after 'sil_stage'", ())
 ERROR(multiple_sil_stage_decls, decl_parsing, none,
       "sil_stage declared multiple times", ())
-ERROR(no_sil_stage_declared, decl_parsing, none,
-      "no sil_stage declared for module", ())
 
 //------------------------------------------------------------------------------
 // Type parsing diagnostics
