@@ -131,6 +131,29 @@ namespace {
     void setLocalValue(ValueBase *Value, StringRef Name, SourceLoc NameLoc);
     
   public:
+    /// @{ Primitive parsing.
+
+    /// \verbatim
+    ///   sil-identifier ::= [A-Za-z_0-9]+
+    /// \endverbatim
+    bool parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
+                            const Diagnostic &D);
+
+    template<typename ...DiagArgTypes, typename ...ArgTypes>
+    bool parseSILIdentifier(Identifier &Result, Diag<DiagArgTypes...> ID,
+                            ArgTypes... Args) {
+      SourceLoc L;
+      return parseSILIdentifier(Result, L, Diagnostic(ID, Args...));
+    }
+
+    template<typename ...DiagArgTypes, typename ...ArgTypes>
+    bool parseSILIdentifier(Identifier &Result, SourceLoc &L,
+                            Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+      return parseSILIdentifier(Result, L, Diagnostic(ID, Args...));
+    }
+
+    /// @}
+
     // Parsing logic.
     bool parseSILType(SILType &Result);
     bool parseSILType(SILType &Result, SourceLoc &TypeLoc) {
@@ -165,6 +188,21 @@ namespace {
     bool isStartOfSILInstruction();
   };
 } // end anonymous namespace.
+
+bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
+                                   const Diagnostic &D) {
+  switch (P.Tok.getKind()) {
+  case tok::identifier:
+  case tok::kw_constructor:
+    Result = P.Context.getIdentifier(P.Tok.getText());
+    Loc = P.Tok.getLoc();
+    P.consumeToken();
+    return false;
+  default:
+    P.diagnose(P.Tok, D);
+    return true;
+  }
+}
 
 /// diagnoseProblems - After a function is fully parse, emit any diagnostics
 /// for errors and return true if there were any.
@@ -299,7 +337,7 @@ SILBasicBlock *SILParser::getBBForReference(Identifier Name, SourceLoc Loc) {
 ///     '@' identifier
 bool SILParser::parseGlobalName(Identifier &Name) {
   return P.parseToken(tok::sil_at_sign, diag::expected_sil_value_name) ||
-         P.parseIdentifier(Name, diag::expected_sil_value_name);
+         parseSILIdentifier(Name, diag::expected_sil_value_name);
 }
 
 /// getLocalValue - Get a reference to a local value with the specified name
@@ -452,13 +490,13 @@ static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
 }
 
 /// Parse an option attribute ('[' Expected ']')?
-static bool parseSILOptional(bool &Result, Parser &P, StringRef Expected) {
-  if (P.consumeIf(tok::l_square)) {
+static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
+  if (SP.P.consumeIf(tok::l_square)) {
     Identifier Id;
-    P.parseIdentifier(Id, diag::expected_in_attribute_list);
+    SP.parseSILIdentifier(Id, diag::expected_in_attribute_list);
     if (Id.str() != Expected)
       return true;
-    P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+    SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
     Result = true;
   }
   return false;
@@ -647,7 +685,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
   Identifier Id;
   SmallVector<Identifier, 4> FullName;
   do {
-    if (P.parseIdentifier(Id, diag::expected_sil_constant))
+    if (parseSILIdentifier(Id, diag::expected_sil_constant))
       return true;
     FullName.push_back(Id);
   } while (P.consumeIf(tok::period));
@@ -688,7 +726,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
   unsigned ParseState = 0;
   do {
     if (P.Tok.is(tok::identifier)) {
-      if (P.parseIdentifier(Id, diag::expected_sil_constant))
+      if (parseSILIdentifier(Id, diag::expected_sil_constant))
         return true;
       if (!ParseState && Id.str() == "func") {
         Kind = SILDeclRef::Kind::Func;
@@ -1095,7 +1133,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SourceLoc ToLoc;
     
     if (parseTypedValueRef(Val) ||
-        P.parseIdentifier(ToToken,ToLoc,diag::expected_tok_in_sil_instr,"to") ||
+        parseSILIdentifier(ToToken, ToLoc,
+                           diag::expected_tok_in_sil_instr, "to") ||
         parseSILType(Ty))
       return true;
     
@@ -1151,7 +1190,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   case ValueKind::LoadWeakInst: {
     bool isTake = false;
-    if (parseSILOptional(isTake, P, "take") ||
+    if (parseSILOptional(isTake, *this, "take") ||
         parseTypedValueRef(Val))
       return true;
 
@@ -1180,7 +1219,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     Identifier ToToken;
     SourceLoc ToLoc;
     if (parseTypedValueRef(Val) ||
-        P.parseIdentifier(ToToken,ToLoc,diag::expected_tok_in_sil_instr, "to")||
+        parseSILIdentifier(ToToken, ToLoc,
+                           diag::expected_tok_in_sil_instr, "to") ||
         parseSILType(Ty))
       return true;
 
@@ -1252,11 +1292,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILType Ty;
     Identifier CheckedToken, ToToken;
     SourceLoc CheckedLoc, ToLoc;
-    if (P.parseIdentifier(CheckedToken, CheckedLoc,
-                          diag::expected_tok_in_sil_instr,
-                          "conditional or unconditional") ||
+    if (parseSILIdentifier(CheckedToken, CheckedLoc,
+                           diag::expected_tok_in_sil_instr,
+                           "conditional or unconditional") ||
         parseTypedValueRef(Val) ||
-        P.parseIdentifier(ToToken,ToLoc,diag::expected_tok_in_sil_instr, "to")||
+        parseSILIdentifier(ToToken, ToLoc,
+                           diag::expected_tok_in_sil_instr, "to") ||
         parseSILType(Ty))
       return true;
 
@@ -1311,10 +1352,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILValue addrVal;
     bool isInit = false;
     if (parseValueName(from) ||
-        P.parseIdentifier(toToken, toLoc,
-                          diag::expected_tok_in_sil_instr, "to") ||
+        parseSILIdentifier(toToken, toLoc,
+                           diag::expected_tok_in_sil_instr, "to") ||
         (Opcode == ValueKind::StoreWeakInst &&
-         parseSILOptional(isInit, P, "initialization")) ||
+         parseSILOptional(isInit, *this, "initialization")) ||
         parseTypedValueRef(addrVal, addrLoc))
       return true;
 
@@ -1558,7 +1599,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::BranchInst: {
     Identifier BBName;
     SourceLoc NameLoc;
-    if (P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name))
+    if (parseSILIdentifier(BBName, NameLoc, diag::expected_sil_block_name))
       return true;
 
     SmallVector<SILValue, 6> Args;
@@ -1578,10 +1619,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SmallVector<SILValue, 6> Args, Args2;
     if (parseValueName(Cond) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
+        parseSILIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
         parseSILBBArgsAtBranch(Args) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        P.parseIdentifier(BBName2, NameLoc2, diag::expected_sil_block_name) ||
+        parseSILIdentifier(BBName2, NameLoc2,
+                           diag::expected_sil_block_name) ||
         parseSILBBArgsAtBranch(Args2))
       return true;
 
@@ -1603,7 +1645,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::ClassMethodInst:
   case ValueKind::SuperMethodInst: {
     bool IsVolatile = false;
-    if (parseSILOptional(IsVolatile, P, "volatile"))
+    if (parseSILOptional(IsVolatile, *this, "volatile"))
       return true;
     SILDeclRef Member;
     SILType MethodTy;
@@ -1634,7 +1676,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
   case ValueKind::ArchetypeMethodInst: {
     bool IsVolatile = false;
-    if (parseSILOptional(IsVolatile, P, "volatile"))
+    if (parseSILOptional(IsVolatile, *this, "volatile"))
       return true;
     SILType LookupTy;
     SILDeclRef Member;
@@ -1657,10 +1699,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILValue DestLVal;
     SourceLoc ToLoc, DestLoc;
     Identifier ToToken;
-    if (parseSILOptional(IsTake, P, "take") || parseValueName(SrcLName) ||
-        P.parseIdentifier(ToToken, ToLoc,
-                          diag::expected_tok_in_sil_instr, "to") ||
-        parseSILOptional(IsInit, P, "initialization") ||
+    if (parseSILOptional(IsTake, *this, "take") || parseValueName(SrcLName) ||
+        parseSILIdentifier(ToToken, ToLoc,
+                           diag::expected_tok_in_sil_instr, "to") ||
+        parseSILOptional(IsInit, *this, "initialization") ||
         parseTypedValueRef(DestLVal, DestLoc))
       return true;
 
@@ -1685,10 +1727,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SourceLoc SrcLoc, DestLoc, ToLoc;
     Identifier ToToken;
     bool IsTake = false;
-    if (parseSILOptional(IsTake, P, "take") ||
+    if (parseSILOptional(IsTake, *this, "take") ||
         parseTypedValueRef(Val, SrcLoc) ||
-        P.parseIdentifier(ToToken, ToLoc,
-                          diag::expected_tok_in_sil_instr, "to") ||
+        parseSILIdentifier(ToToken, ToLoc,
+                           diag::expected_tok_in_sil_instr, "to") ||
         parseTypedValueRef(DestVal, DestLoc))
       return true;
 
@@ -1702,7 +1744,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
   case ValueKind::InitializeVarInst: {
     bool NoDefault = false;
-    if (parseSILOptional(NoDefault, P, "no_default_construct") ||
+    if (parseSILOptional(NoDefault, *this, "no_default_construct") ||
         parseTypedValueRef(Val))
       return true;
     ResultVal = B.createInitializeVar(InstLoc, Val, !NoDefault);
@@ -1735,7 +1777,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         P.parseToken(tok::sil_pound, diag::expected_sil_constant) ||
-        P.parseIdentifier(ElemId, NameLoc, diag::expected_sil_constant))
+        parseSILIdentifier(ElemId, NameLoc, diag::expected_sil_constant))
       return true;
     ValueDecl *FieldV = lookupMember(P, Val.getType().getSwiftRValueType(),
                                      ElemId);
@@ -1768,7 +1810,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         P.parseToken(tok::sil_pound, diag::expected_sil_constant) ||
-        P.parseIdentifier(ElemId, NameLoc, diag::expected_sil_constant))
+        parseSILIdentifier(ElemId, NameLoc, diag::expected_sil_constant))
       return true;
     ValueDecl *FieldV = lookupMember(P, Val.getType().getSwiftRValueType(),
                                      ElemId);
@@ -1811,7 +1853,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     Identifier GlobalName;
     SILType Ty;
     if (P.parseToken(tok::sil_pound, diag::expected_sil_constant) ||
-        P.parseIdentifier(GlobalName, diag::expected_sil_constant) ||
+        parseSILIdentifier(GlobalName, diag::expected_sil_constant) ||
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
         parseSILType(Ty))
       return true;
@@ -1839,7 +1881,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       SourceLoc BBLoc;
       // Parse 'default' sil-identifier.
       if (P.consumeIf(tok::kw_default)) {
-        P.parseIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
+        parseSILIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
         DefaultBB = getBBForReference(BBName, BBLoc);
         break;
       }
@@ -1851,7 +1893,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
           return true;
         assert(ElemRef.hasDecl() && isa<UnionElementDecl>(ElemRef.getDecl()));
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":");
-        P.parseIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
+        parseSILIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
         CaseBBs.push_back( {cast<UnionElementDecl>(ElemRef.getDecl()),
                             getBBForReference(BBName, BBLoc)} );
         continue;
@@ -1878,7 +1920,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       SourceLoc BBLoc;
       // Parse 'default' sil-identifier.
       if (P.consumeIf(tok::kw_default)) {
-        P.parseIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
+        parseSILIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
         DefaultBB = getBBForReference(BBName, BBLoc);
         break;
       }
@@ -1906,7 +1948,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.consumeToken(tok::integer_literal);
 
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":");
-        P.parseIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
+        parseSILIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
         CaseBBs.push_back( {value, getBBForReference(BBName, BBLoc)} );
         continue;
       }
@@ -1952,7 +1994,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SourceLoc ModuleLoc;
     // Parse reference to a module.
     if (P.parseToken(tok::sil_pound, diag::expected_sil_constant) ||
-        P.parseIdentifier(ModuleName, ModuleLoc, diag::expected_sil_constant))
+        parseSILIdentifier(ModuleName, ModuleLoc, diag::expected_sil_constant))
       return true;
     llvm::PointerUnion<ValueDecl*, Module *> Res = lookupTopDecl(P, ModuleName);
     assert(Res.is<Module*>() && "Expect a module name in ModuleInst");
@@ -1986,7 +2028,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       Substitution Sub;
       SILType Replace;
       Identifier ArcheId;
-      if (P.parseIdentifier(ArcheId, diag::expected_sil_type) ||
+      if (parseSILIdentifier(ArcheId, diag::expected_sil_type) ||
           P.parseToken(tok::equal, diag::expected_tok_in_sil_instr, "=") ||
           parseSILType(Replace))
         return true;
@@ -2024,7 +2066,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
   bool Transparent = false;
   if ((Opcode == ValueKind::ApplyInst &&
-       parseSILOptional(Transparent, P, "transparent")) ||
+       parseSILOptional(Transparent, *this, "transparent")) ||
       parseValueName(FnName) ||
       P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
     return true;
@@ -2152,7 +2194,7 @@ bool SILParser::parseSILBasicBlock() {
   } else {
     Identifier BBName;
     SourceLoc NameLoc;
-    if (P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name))
+    if (parseSILIdentifier(BBName, NameLoc, diag::expected_sil_block_name))
       return true;
 
     BB = getBBForDefinition(BBName, NameLoc);

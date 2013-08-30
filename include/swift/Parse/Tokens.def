@@ -37,14 +37,13 @@
 #define PUNCTUATOR(name, str)
 #endif
 
-// Decl and type keywords.
+// Keywords that start decls.
 KEYWORD(class)
-IDENTIFIER_KEYWORD(constructor)
+KEYWORD(constructor)
 KEYWORD(destructor)
 KEYWORD(extension)
 KEYWORD(func)
 KEYWORD(import)
-IDENTIFIER_KEYWORD(metatype)
 KEYWORD(protocol)
 KEYWORD(static)
 KEYWORD(struct)
@@ -72,7 +71,7 @@ KEYWORD(case)
 KEYWORD(default)
 KEYWORD(where)
 
-// Expression keywords.
+// Expression and type keywords.
 KEYWORD(new)
 KEYWORD(as)
 KEYWORD(is)
@@ -81,6 +80,7 @@ IDENTIFIER_KEYWORD(self)
 IDENTIFIER_KEYWORD(Self)
 IDENTIFIER_KEYWORD(weak)
 IDENTIFIER_KEYWORD(unowned)
+IDENTIFIER_KEYWORD(metatype)
 KEYWORD(__FILE__)
 KEYWORD(__LINE__)
 KEYWORD(__COLUMN__)
