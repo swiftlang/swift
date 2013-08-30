@@ -5,8 +5,10 @@ def triple : Separate<["-"], "triple">,
 
 def import_search_path : Joined<["-"], "I">,
   HelpText<"Add a directory to the import search path">;
+def import_search_path_alias : Separate<["-"], "I">, Alias<import_search_path>;
 def framework_search_path : Joined<["-"], "F">,
   HelpText<"Add a directory to the framework search path">;
+def framework_search_path_alias : Separate<["-"], "F">, Alias<framework_search_path>;
 
 def sdk : Separate<["-"], "sdk">,
   HelpText<"Path to the SDK to build against">;
