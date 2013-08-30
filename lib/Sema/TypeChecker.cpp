@@ -381,6 +381,21 @@ static void recordKnownProtocol(Module *stdlib, StringRef name,
     proto->setKnownProtocolKind(kind);
 }
 
+static bool haveDifferentFixity(const ValueDecl *lhs, const ValueDecl *rhs) {
+  auto lhsFn = dyn_cast<FuncDecl>(lhs);
+  auto rhsFn = dyn_cast<FuncDecl>(rhs);
+  if (!lhsFn || !rhsFn)
+    return false;
+
+  assert(lhs->getName() == rhs->getName());
+  if (!lhs->getName().isOperator())
+    return false;
+
+  assert(lhs->getAttrs().isPrefix() ^ lhs->getAttrs().isPostfix());
+  assert(rhs->getAttrs().isPrefix() ^ rhs->getAttrs().isPostfix());
+  return lhs->getAttrs().isPrefix() != rhs->getAttrs().isPrefix();
+}
+
 /// performTypeChecking - Once parsing and namebinding are complete, these
 /// walks the AST to resolve types and diagnose problems therein.
 ///
@@ -538,7 +553,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       auto &PrevOv = CheckOverloads[VD->getName()];
       if (i >= StartElem) {
         for (ValueDecl *PrevD : PrevOv) {
-          if (PrevD->getType()->isEqual(VD->getType())) {
+          if (PrevD->getType()->isEqual(VD->getType()) &&
+              !haveDifferentFixity(PrevD, VD)) {
             TC.diagnose(VD->getStartLoc(), diag::invalid_redecl);
             TC.diagnose(PrevD, diag::invalid_redecl_prev,
                         VD->getName());
