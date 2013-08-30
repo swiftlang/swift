@@ -1815,8 +1815,10 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
   SourceLoc UnionNameLoc;
   ParserStatus Status;
 
-  Status |= parseIdentifierDeclName(*this, UnionName, UnionNameLoc,
-                                    diag::expected_identifier_in_decl, "union");
+  Status |=
+      parseIdentifierDeclName(*this, UnionName, UnionNameLoc, tok::colon,
+                              tok::l_brace, TokenProperty::StartsWithLess,
+                              diag::expected_identifier_in_decl, "union");
   if (Status.isError())
     return nullptr;
 
