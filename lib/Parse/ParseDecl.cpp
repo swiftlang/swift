@@ -877,9 +877,15 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
   return makeParserResult(Status, ED);
 }
 
+enum class TokenProperty {
+  None,
+  StartsWithLess,
+};
+
 static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
                                             SourceLoc &Loc, tok ResyncT1,
                                             tok ResyncT2, tok ResyncT3,
+                                            TokenProperty ResyncP1,
                                             const Diagnostic &D) {
   switch (P.Tok.getKind()) {
   case tok::identifier:
@@ -892,7 +898,9 @@ static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
     P.diagnose(P.Tok, D);
     if (P.Tok.isKeyword() &&
         (P.peekToken().is(ResyncT1) || P.peekToken().is(ResyncT2) ||
-         P.peekToken().is(ResyncT3))) {
+         P.peekToken().is(ResyncT3) ||
+         (ResyncP1 != TokenProperty::None &&
+          P.startsWithLess(P.peekToken())))) {
       llvm::SmallString<32> Name(P.Tok.getText());
       // Append an invalid character so that nothing can resolve to this name.
       Name += "#";
@@ -912,7 +920,8 @@ static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
                                             Diag<DiagArgTypes...> ID,
                                             ArgTypes... Args) {
   return parseIdentifierDeclName(P, Result, L, tok::unknown, tok::unknown,
-                                 tok::unknown, Diagnostic(ID, Args...));
+                                 tok::unknown, TokenProperty::None,
+                                 Diagnostic(ID, Args...));
 }
 
 template <typename... DiagArgTypes, typename... ArgTypes>
@@ -921,7 +930,8 @@ static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
                                             Diag<DiagArgTypes...> ID,
                                             ArgTypes... Args) {
   return parseIdentifierDeclName(P, Result, L, ResyncT1, tok::unknown,
-                                 tok::unknown, Diagnostic(ID, Args...));
+                                 tok::unknown, TokenProperty::None,
+                                 Diagnostic(ID, Args...));
 }
 
 template <typename... DiagArgTypes, typename... ArgTypes>
@@ -930,7 +940,8 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         tok ResyncT1, tok ResyncT2, Diag<DiagArgTypes...> ID,
                         ArgTypes... Args) {
   return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2,
-                                 tok::unknown, Diagnostic(ID, Args...));
+                                 tok::unknown, TokenProperty::None,
+                                 Diagnostic(ID, Args...));
 }
 
 template <typename... DiagArgTypes, typename... ArgTypes>
@@ -939,7 +950,16 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         tok ResyncT1, tok ResyncT2, tok ResyncT3,
                         Diag<DiagArgTypes...> ID, ArgTypes... Args) {
   return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, ResyncT3,
-                                 Diagnostic(ID, Args...));
+                                 TokenProperty::None, Diagnostic(ID, Args...));
+}
+
+template <typename... DiagArgTypes, typename... ArgTypes>
+static ParserStatus
+parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
+                        tok ResyncT1, tok ResyncT2, TokenProperty ResyncP1,
+                        Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+  return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, tok::unknown,
+                                 ResyncP1, Diagnostic(ID, Args...));
 }
 
 /// \brief Parse a typealias decl.
@@ -1991,7 +2011,8 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
   ParserStatus Status;
 
   Status |=
-      parseIdentifierDeclName(*this, StructName, StructNameLoc,
+      parseIdentifierDeclName(*this, StructName, StructNameLoc, tok::colon,
+                              tok::l_brace, TokenProperty::StartsWithLess,
                               diag::expected_identifier_in_decl, "struct");
   if (Status.isError())
     return nullptr;
