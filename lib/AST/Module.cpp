@@ -152,14 +152,9 @@ void TUModuleCache::doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators) {
 void TUModuleCache::populateMemberCache(const TranslationUnit &TU) {
   for (const Decl *D : TU.Decls) {
     if (const NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
-      if (isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD))
-        addToMemberCache(NTD->getMembers());
+      addToMemberCache(NTD->getMembers());
     } else if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-      Type baseTy = ED->getExtendedType();
-      assert(baseTy && "cannot use this before type-checking");
-      if (auto baseNominal = baseTy->getAnyNominal())
-        if (isa<ClassDecl>(baseNominal) || isa<ProtocolDecl>(baseNominal))
-          addToMemberCache(ED->getMembers());
+      addToMemberCache(ED->getMembers());
     }
   }
 }
@@ -173,9 +168,7 @@ void TUModuleCache::addToMemberCache(ArrayRef<Decl*> decls) {
     if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
       assert(!VD->canBeAccessedByDynamicLookup() &&
              "inner types cannot be accessed by dynamic lookup");
-      if (isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD))
-        addToMemberCache(NTD->getMembers());
-    
+      addToMemberCache(NTD->getMembers());
     } else if (VD->canBeAccessedByDynamicLookup()) {
       ClassMembers[VD->getName()].push_back(VD);
     }

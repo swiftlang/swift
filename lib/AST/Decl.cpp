@@ -140,6 +140,42 @@ Module *DeclContext::getParentModule() const {
   return const_cast<Module *>(cast<Module>(DC));
 }
 
+/// Determine whether the given context is generic at any level.
+bool DeclContext::isGenericContext() const {
+  for (const DeclContext *dc = this; ; dc = dc->getParent() ) {
+    switch (dc->getContextKind()) {
+    case DeclContextKind::BuiltinModule:
+    case DeclContextKind::ClangModule:
+    case DeclContextKind::SerializedModule:
+    case DeclContextKind::TranslationUnit:
+      return false;
+
+    case DeclContextKind::CapturingExpr:
+      if (auto funcExpr = dyn_cast<FuncExpr>(dc)) {
+        if (auto func = funcExpr->getDecl())
+          if (func->getGenericParams())
+            return true;
+      }
+      break;
+
+    case DeclContextKind::ConstructorDecl:
+      if (cast<ConstructorDecl>(dc)->getGenericParams())
+        return true;
+      break;
+
+    case DeclContextKind::DestructorDecl:
+    case DeclContextKind::TopLevelCodeDecl:
+      break;
+
+    case DeclContextKind::ExtensionDecl:
+    case DeclContextKind::NominalTypeDecl:
+      if (dc->getDeclaredTypeOfContext()->getAnyNominal()->getGenericParams())
+        return true;
+      break;
+    }
+  }
+}
+
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) {
@@ -444,6 +480,26 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
     return sd->getOverriddenDecl();
   }
   return nullptr;
+}
+
+bool ValueDecl::canBeAccessedByDynamicLookup() const {
+  if (getName().empty())
+    return false;
+
+  // Dynamic lookup can only find class and protocol members.
+  auto dc = getDeclContext();
+  if (!isa<ClassDecl>(dc) && !isa<ProtocolDecl>(dc))
+    return false;
+
+  // Dynamic lookup cannot find results within a generic context, because there
+  // is no sensible way to infer the generic arguments.
+  if (getDeclContext()->isGenericContext())
+    return false;
+
+  if (isa<FuncDecl>(this) || isa<VarDecl>(this) || isa<SubscriptDecl>(this))
+    return isInstanceMember();
+
+  return false;
 }
 
 Type TypeDecl::getDeclaredType() const {

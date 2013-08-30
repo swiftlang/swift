@@ -1072,16 +1072,7 @@ public:
   }
   
   /// Returns true if this decl can be found by id-style dynamic lookup.
-  ///
-  /// Note that this method does NOT check that this value is actually a class
-  /// member.
-  bool canBeAccessedByDynamicLookup() const {
-    if (getName().empty())
-      return false;
-    if (isa<FuncDecl>(this) || isa<VarDecl>(this) || isa<SubscriptDecl>(this))
-      return isInstanceMember();
-    return false;
-  }
+  bool canBeAccessedByDynamicLookup() const;
 
   /// Determine the default argument kind and type for the given argument index
   /// in this declaration, which must be a function or constructor.

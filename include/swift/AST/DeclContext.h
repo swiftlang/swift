@@ -150,7 +150,11 @@ public:
 
   /// Returns the module context that contains this context.
   Module *getParentModule() const;
-  
+
+  /// Determine whether this declaration context is generic, meaning that it or
+  /// any of its parents have generic parameters.
+  bool isGenericContext() const;
+
   /// getASTContext - Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.
   ASTContext &getASTContext();
