@@ -2099,7 +2099,8 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
   ParserStatus Status;
 
   Status |=
-      parseIdentifierDeclName(*this, ClassName, ClassNameLoc,
+      parseIdentifierDeclName(*this, ClassName, ClassNameLoc, tok::colon,
+                              tok::l_brace, TokenProperty::StartsWithLess,
                               diag::expected_identifier_in_decl, "class");
   if (Status.isError())
     return nullptr;
