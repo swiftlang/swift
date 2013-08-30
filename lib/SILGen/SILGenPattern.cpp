@@ -21,6 +21,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -72,6 +73,9 @@ using DispatchedPatternVector
 /// pattern nodes.
 /// In the case branch for each pattern, destructure the value.
 /// On return, the insertion point is cleared.
+/// The parts of the value used for dispatch are conceptually consumed, that is,
+/// it should be correct to destroy only the destructured values on each branch
+/// in order to completely destroy the original subject value.
 ///
 /// \returns null if the set of pattern nodes match every possible value of the
 /// type, or else the "default" basic block for the dispatch that will be
@@ -586,9 +590,9 @@ struct CaseBlock {
 /// dispatch is resolved.
 using CaseMap = llvm::MapVector<CaseStmt*, CaseBlock>;
 
-/// Emit the entry point BB for a case block, if necessary, and add it to the
+/// Create the entry point BB for a case block, if necessary, and add it to the
 /// CaseMap. Returns the entry point BB emitted for the block.
-SILBasicBlock *emitCaseBlock(SILGenFunction &gen, CaseMap &caseMap,
+SILBasicBlock *createCaseBlock(SILGenFunction &gen, CaseMap &caseMap,
                              CaseStmt *caseBlock,
                              CleanupsDepth cleanupsDepth,
                              SILBasicBlock *contBB) {
@@ -668,96 +672,13 @@ public:
     return exprGuards;
   }
   
-  /// Emit the case block corresponding to this row if necessary. Returns the
+  /// Create the case block corresponding to this row if necessary. Returns the
   /// entry point BB emitted for the block.
-  SILBasicBlock *emitCaseBlock(SILGenFunction &gen, CaseMap &caseMap) const {
-    return ::emitCaseBlock(gen, caseMap,
-                           getCaseBlock(), getCleanupsDepth(), getContBB());
+  SILBasicBlock *createCaseBlock(SILGenFunction &gen, CaseMap &caseMap) const {
+    return ::createCaseBlock(gen, caseMap,
+                             getCaseBlock(), getCleanupsDepth(), getContBB());
   }
   
-  /// Emit dispatch to the row's destination. If the row has no guard, the
-  /// branch is unconditional, and this terminates the current block and
-  /// returns true. Otherwise, it dispatches conditionally on the guard, leaves
-  /// the insertion branch on the not-taken path, and returns false.
-  bool emitDispatch(SILGenFunction &gen, CaseMap &caseMap) const {
-    // If there is no guard, branch unconditionally.
-    if (!hasGuard() && exprGuards.empty()) {
-      // If we haven't emitted a block for this case, and our insertion point
-      // BB is empty, we can hijack this BB as the case's BB.
-      SILBasicBlock *insertionBB = gen.B.getInsertionBB();
-      SILBasicBlock *caseBB = emitCaseBlock(gen, caseMap);
-      
-      if (caseBB != insertionBB)
-        gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB, getCleanupsDepth(),
-                                                    getCaseBlock()},
-                                           gen.CurrentSILLoc);
-      
-      gen.B.moveBlockToEnd(caseBB);
-      return true;
-    }
-    
-    // Emit the case body.
-    SILBasicBlock *caseBB = emitCaseBlock(gen, caseMap);
-
-    // Create new BBs for the guard branch.
-    SILBasicBlock *trueBB = nullptr;
-    SILBasicBlock *falseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
-    
-    // TODO: We should emit every guard once and share code if it covers
-    // multiple patterns.
-    if (!exprGuards.empty()) {
-      // Test ExprPatterns from the row in an "and" chain.
-      for (const ExprPattern *ep : exprGuards) {        
-        // The last pattern test jumps to the guard.
-        trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
-        
-        // Emit the match test.
-        SILValue testBool;
-        {
-          Expr *ME = ep->getMatchExpr();
-          FullExpr scope(gen.Cleanups, CleanupLocation(ME));
-          testBool = gen.emitRValue(ME)
-            .getUnmanagedSingleValue(gen);
-        }
-
-        // If the test succeeds, we move on to the next test; otherwise, we
-        // fail and move to the next pattern.
-        gen.B.createCondBranch(getCaseBlock(), testBool, trueBB, falseBB);
-        gen.B.emitBlock(trueBB);
-      }
-    }
-    
-    if (hasGuard()) {
-      SILValue guardBool;
-      {
-        Expr *G = getGuard();
-        FullExpr scope(gen.Cleanups, CleanupLocation(G));
-          
-        // Emit the guard.
-        // TODO: We should emit every guard once and share code if it covers
-        // multiple patterns.
-        guardBool = gen.emitRValue(G).getUnmanagedSingleValue(gen);
-      }
-      
-      // Branch either to the row destination or the new BB.
-      trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
-      gen.B.createCondBranch(getCaseBlock(), guardBool, trueBB, falseBB);
-      gen.B.emitBlock(trueBB);
-    }
-    
-    // On the true block, jump to the case block, unwinding if necessary.
-    gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB, getCleanupsDepth(),
-                                       getCaseBlock()},
-                                       gen.CurrentSILLoc);
-    
-    // Position the case block logically.
-    gen.B.moveBlockToEnd(caseBB);
-    
-    // Continue codegen on the false branch.
-    gen.B.emitBlock(falseBB);
-    return false;
-  }
-
   ArrayRef<const Pattern *> getColumns() const {
     return {reinterpret_cast<const Pattern * const*>(row + 1), columnCount};
   }
@@ -830,7 +751,7 @@ class ClauseMatrix {
   /// A list of ExprPatterns and the associated SILValue they test. Rows
   /// reference into slices of this vector to indicate which ExprPatterns form
   /// part of their guard.
-  std::vector<const ExprPattern*> exprGuards;
+  std::vector<const ExprPattern*> allExprGuards;
   
   // The memory layout of data is as follows:
   
@@ -914,8 +835,8 @@ public:
     }
     
     // Collect guards introduced by ExprPatterns in this row.
-    unsigned exprGuardStart = exprGuards.size();
-    exprGuards.insert(exprGuards.end(),
+    unsigned exprGuardStart = allExprGuards.size();
+    allExprGuards.insert(allExprGuards.end(),
                       parentExprGuards.begin(), parentExprGuards.end());
     for (unsigned i = 0, e = cols.size(); i < e; ++i) {
       auto *ep = getAsExprPattern(cols[i]);
@@ -923,9 +844,9 @@ public:
         continue;
       if (std::find(parentExprGuards.begin(), parentExprGuards.end(), ep)
            == parentExprGuards.end())
-        exprGuards.push_back(ep);
+        allExprGuards.push_back(ep);
     }
-    unsigned exprGuardEnd = exprGuards.size();
+    unsigned exprGuardEnd = allExprGuards.size();
     
     // Initialize the next row.
     ClauseRow::Prefix *row = getMutableRowPrefix(rowCount++);
@@ -957,7 +878,7 @@ public:
   ClauseRow operator[](unsigned row) {
     auto *prefix = getMutableRowPrefix(row);
     return {getMutableRowPrefix(row), columnCount,
-            {&exprGuards[prefix->firstExprGuard],
+            {&allExprGuards[prefix->firstExprGuard],
              prefix->lastExprGuard - prefix->firstExprGuard}};
   }
   const ClauseRow operator[](unsigned row) const {
@@ -1137,10 +1058,20 @@ public:
   ///
   /// The first skipRows rows are removed prior to the transformation.
   /// We treat ExprPatterns as wildcards with a guard.
-  void reduceToDefault(unsigned skipRows) {
+  ///
+  /// This destroys the occurrence for the dropped row, because it is no
+  /// longer needed for dispatch.
+  void reduceToDefault(SILGenFunction &gen,
+                       unsigned skipRows) {
     assert(columnCount >= 1 && "can't default a matrix with no columns");
     assert(skipRows < rowCount && "can't skip more rows than we have");
 
+    // Destroy the first occurrence.
+    SILValue droppedOccurrence = getOccurrences()[0];
+    // FIXME: Cleanup location.
+    gen.getTypeLowering(droppedOccurrence.getType())
+      .emitDestroyRValue(gen.B, gen.CurrentSILLoc, droppedOccurrence);
+    
     // Drop the first occurrence.
     memmove(getMutableOccurrences().begin(), getMutableOccurrences().begin()+1,
             sizeof(SILValue) * (columnCount - 1));
@@ -1166,7 +1097,100 @@ public:
     
     // Shrink the column count.
     --columnCount;
-  }  
+  }
+  
+  /// Emit dispatch to a row's destination. If the row has no guard, the
+  /// branch is unconditional, and this terminates the current block and
+  /// returns true. Otherwise, it dispatches conditionally on the guard, leaves
+  /// the insertion branch on the not-taken path, and returns false.
+  /// If the case is entered,
+  bool emitDispatch(SILGenFunction &gen,
+                    unsigned r,
+                    CaseMap &caseMap) const {
+    ClauseRow row = (*this)[r];
+    
+    // Create the destination case block.
+    SILBasicBlock *caseBB = row.createCaseBlock(gen, caseMap);
+
+    // Create new BBs for the guard branch.
+    SILBasicBlock *trueBB = nullptr;
+    SILBasicBlock *falseBB = nullptr;
+    auto getFalseBB = [&] {
+      if (!falseBB)
+        falseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      return falseBB;
+    };
+    
+    // TODO: We should emit every guard once and share code if it covers
+    // multiple patterns.
+    if (!row.exprGuards.empty()) {
+      // Test ExprPatterns from the row in an "and" chain.
+      for (const ExprPattern *ep : row.exprGuards) {
+        // The last pattern test jumps to the guard.
+        trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+        
+        // Emit the match test.
+        SILValue testBool;
+        {
+          Expr *ME = ep->getMatchExpr();
+          FullExpr scope(gen.Cleanups, CleanupLocation(ME));
+          testBool = gen.emitRValue(ME)
+            .getUnmanagedSingleValue(gen);
+        }
+
+        // If the test succeeds, we move on to the next test; otherwise, we
+        // fail and move to the next pattern.
+        gen.B.createCondBranch(row.getCaseBlock(), testBool,
+                               trueBB, getFalseBB());
+        gen.B.emitBlock(trueBB);
+      }
+    }
+    
+    if (row.hasGuard()) {
+      SILValue guardBool;
+      {
+        Expr *G = row.getGuard();
+        FullExpr scope(gen.Cleanups, CleanupLocation(G));
+          
+        // Emit the guard.
+        // TODO: We should emit every guard once and share code if it covers
+        // multiple patterns.
+        guardBool = gen.emitRValue(G).getUnmanagedSingleValue(gen);
+      }
+      
+      // Branch either to the row destination or the new BB.
+      trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      gen.B.createCondBranch(row.getCaseBlock(), guardBool,
+                             trueBB, getFalseBB());
+      gen.B.emitBlock(trueBB);
+    }
+    
+    // In the true block, clean up the occurrences.
+    // FIXME: We should share an occurrence cleanup block among all rows in the
+    // same matrix.
+    // FIXME: The location for the cleanup should be placed smarter.
+    for (SILValue occurrence : getOccurrences()) {
+      gen.getTypeLowering(occurrence.getType())
+        .emitDestroyRValue(gen.B, CleanupLocation(row.getCaseBlock()),
+                           occurrence);
+    }
+    
+    // Jump to the case block, unwinding if necessary.
+    gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB,
+                                                row.getCleanupsDepth(),
+                                                row.getCaseBlock()},
+                                       gen.CurrentSILLoc);
+    
+    // Position the case block logically.
+    gen.B.moveBlockToEnd(caseBB);
+    
+    // If we branched, continue codegen on the false branch.
+    if (falseBB) {
+      gen.B.emitBlock(falseBB);
+      return false;
+    }
+    return true;
+  }
 };
 
 } // end anonymous namespace
@@ -1214,7 +1238,8 @@ recur:
   }
   
   // If the first rows are all wildcards (or there are no columns), then
-  // try guards. ExprPatterns are treated as wildcards with guards.
+  // try to dispatch to them by testing their guards.
+  // ExprPatterns are treated as wildcards with guards.
   unsigned r = 0, rows = clauses.rows();
   for (; r < rows; ++r) {
     ClauseRow row = clauses[r];
@@ -1230,7 +1255,7 @@ recur:
       break;
   
     // If the row has a guard, emit it, and try the next row if it fails.
-    if (row.emitDispatch(gen, caseMap))
+    if (clauses.emitDispatch(gen, r, caseMap))
       // If the row is irrefutable, we're done.
       return;
   }
@@ -1279,7 +1304,7 @@ recur:
 
   // If we have no specializations, recur into the default matrix immediately.
   if (specialized.empty()) {
-    clauses.reduceToDefault(skipRows);
+    clauses.reduceToDefault(gen, skipRows);
     goto recur;
   }
   
@@ -1346,7 +1371,7 @@ recur:
   assert(!gen.B.hasValidInsertionPoint() && "specialization did not close bb");
   
   gen.B.emitBlock(defaultBB);
-  clauses.reduceToDefault(skipRows);
+  clauses.reduceToDefault(gen, skipRows);
   goto recur;
 }
 
@@ -1366,8 +1391,9 @@ public:
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   Scope OuterSwitchScope(Cleanups, CleanupLocation(S));
   
-  // Emit the subject value.
-  ManagedValue subject = emitRValue(S->getSubjectExpr()).getAsSingleValue(*this);
+  // Emit the subject value. Dispatching will consume it.
+  SILValue subject
+    = emitRValue(S->getSubjectExpr()).forwardAsSingleValue(*this);
   
   // Prepare a case-to-bb mapping for fallthrough to consult.
   // The bbs for reachable cases will be filled in by emitDecisionTree below.
@@ -1381,7 +1407,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     SILBasicBlock *contBB = new (F.getModule()) SILBasicBlock(&F);
     
     // Set up an initial clause matrix.
-    ClauseMatrix clauses(subject.getValue(), S->getCases().size());
+    ClauseMatrix clauses(subject, S->getCases().size());
     
     for (auto *caseBlock : S->getCases()) {
       caseMap[caseBlock] = {};
@@ -1438,7 +1464,7 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
   SwitchContext *context = SwitchStack.back();
   
   // Get the destination block.
-  SILBasicBlock *dest = emitCaseBlock(*this, context->caseMap,
+  SILBasicBlock *dest = createCaseBlock(*this, context->caseMap,
                                       S->getFallthroughDest(),
                                       context->outerScope,
                                       context->outerContBB);
