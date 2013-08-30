@@ -1145,9 +1145,32 @@ object. Retain and release operations, however,
 are never implicit in SIL and always must be explicitly performed where needed.
 Retains and releases on the value may be freely moved, and balancing
 retains and releases may deleted, so long as an owning retain count is
-maintained for the uses of the value. 
+maintained for the uses of the value.
 
-TODO: Weak and unowned references.
+All reference-counting operations are defined to work correctly on
+null references (whether strong, unowned, or weak).  A non-null
+reference must actually refer to a valid object of the indicated type
+(or a subtype).  Address operands are required to be valid and non-null.
+
+While SIL makes reference-counting operations explicit, the SIL type
+system also fully represents strength of reference.  This is useful
+for several reasons:
+
+1. Type-safety: it is impossible to erroneously emit SIL that naively
+   uses a ``[weak]`` or ``[unowned]`` reference as if it were a strong
+   reference.
+
+2. Consistency: when a reference is kept in memory, instructions like
+   ``copy_addr`` and ``destroy_addr`` implicitly carry the right
+   semantics in the type of the address, rather than needing special
+   variants or flags.
+
+3. Ease of tooling: SIL directly stores the user's intended strength
+   of reference, making it straightforward to generate instrumentation
+   that would convey this to a memory profiler.  In principle, with
+   only a modest number of additions and restrictions on SIL, it would
+   even be possible to drop all reference-counting instructions and
+   use the type information to feed a garbage collector.
 
 strong_retain
 `````````````
@@ -1201,6 +1224,34 @@ strong_retain_unowned
 
 Asserts that the strong reference count of the heap object referenced by ``%0``
 is still positive, then increases it by one.
+
+ref_to_unowned
+``````````````
+
+::
+
+  sil-instruction ::= 'ref_to_unowned' sil-operand
+
+  %1 = unowned_to_ref %0 : T
+  // $T must be a reference type
+  // %1 will have type $[unowned] T
+
+Adds the ``[unowned]`` qualifier to the type of a reference to a heap
+object.  No runtime effect.
+
+unowned_to_ref
+``````````````
+
+::
+
+  sil-instruction ::= 'unowned_to_ref' sil-operand
+
+  %1 = unowned_to_ref %0 : $[unowned] T
+  // $T must be a reference type
+  // %1 will have type $T
+
+Strips the ``[unowned]`` qualifier off the type of a reference to a
+heap object.  No runtime effect.
 
 unowned_retain
 ``````````````
