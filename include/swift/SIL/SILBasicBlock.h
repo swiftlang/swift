@@ -71,8 +71,8 @@ public:
   // SILInstruction List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
 
-  InstListType &getInsts() { return InstList; }
-  const InstListType &getInsts() const { return InstList; }
+  InstListType &getInstList() { return InstList; }
+  const InstListType &getInstList() const { return InstList; }
 
   typedef InstListType::iterator iterator;
   typedef InstListType::const_iterator const_iterator;

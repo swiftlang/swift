@@ -1419,7 +1419,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     }
 
     // Kill the branch to the now-dead epilog BB.
-    pred->getInsts().erase(predBranch);
+    pred->getInstList().erase(predBranch);
 
     // Emit the epilog into its former predecessor.
     B.setInsertionPoint(pred);

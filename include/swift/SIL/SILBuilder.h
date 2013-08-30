@@ -806,7 +806,7 @@ private:
     if (InsertedInstrs)
       InsertedInstrs->push_back(TheInst);
 
-    BB->getInsts().insert(InsertPt, TheInst);
+    BB->getInstList().insert(InsertPt, TheInst);
   }
 };
 

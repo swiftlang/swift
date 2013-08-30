@@ -87,9 +87,9 @@ SILBasicBlock *SILBasicBlock::splitBasicBlock(iterator I, bool CreateBranch,
     Parent->getBlocks().splice(Where, Parent->getBlocks(), First);
   // Move all of the specified instructions from the original basic block into
   // the new basic block.
-  New->getInsts().splice(New->end(), this->getInsts(), I, end());
+  New->getInstList().splice(New->end(), this->getInstList(), I, end());
   if (CreateBranch)
-    getInsts().insert(getInsts().end(),
+    getInstList().insert(getInstList().end(),
                       BranchInst::create(BranchLoc, New, *getParent()));
   return New;
 }

@@ -105,10 +105,10 @@ public:
     // Check that non-terminators look ok.
     if (!isa<TermInst>(I)) {
       require(!BB->empty(), "Can't be in a parent block if it is empty");
-      require(&*BB->getInsts().rbegin() != I,
+      require(&*BB->getInstList().rbegin() != I,
               "Non-terminators cannot be the last in a block");
     } else {
-      require(&*BB->getInsts().rbegin() == I,
+      require(&*BB->getInstList().rbegin() == I,
               "Terminator must be the last in block");
     }
 

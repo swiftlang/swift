@@ -108,7 +108,7 @@ const SILModule *SILInstruction::getModule() const {
 /// block, but does not delete it.
 ///
 void SILInstruction::removeFromParent() {
-  getParent()->getInsts().remove(this);
+  getParent()->getInstList().remove(this);
 }
 
 /// eraseFromParent - This method unlinks 'self' from the containing basic
@@ -116,7 +116,7 @@ void SILInstruction::removeFromParent() {
 ///
 void SILInstruction::eraseFromParent() {
   assert(use_empty() && "There are no uses of instruction being deleted.");
-  getParent()->getInsts().erase(this);
+  getParent()->getInstList().erase(this);
 }
 
 void SILInstruction::dropAllReferences() {
