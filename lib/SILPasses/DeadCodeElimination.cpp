@@ -156,7 +156,7 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB) {
   // location to signal to the DataflowDiagnostic pass that this code does
   // not correspond to user code.
   SILBuilder B(&BB);
-  B.createUnreachable(SILLocation());
+  B.createUnreachable(ArtificialUnreachableLocation());
 
   return true;
 }

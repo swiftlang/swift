@@ -124,7 +124,8 @@ namespace {
 
     /// getLocalValue - Get a reference to a local value with the specified name
     /// and type.
-    SILValue getLocalValue(UnresolvedValueName Name, SILType Type);
+    SILValue getLocalValue(UnresolvedValueName Name, SILType Type,
+                           SILLocation L);
 
     /// setLocalValue - When an instruction or block argument is defined, this
     /// method is used to register it and update our symbol table.
@@ -164,7 +165,7 @@ namespace {
     bool parseSILDeclRef(SILDeclRef &Result);
     bool parseGlobalName(Identifier &Name);
     bool parseValueName(UnresolvedValueName &Name);
-    bool parseValueRef(SILValue &Result, SILType Ty);
+    bool parseValueRef(SILValue &Result, SILType Ty, SILLocation Loc);
     bool parseTypedValueRef(SILValue &Result, SourceLoc &Loc);
     bool parseTypedValueRef(SILValue &Result) {
       SourceLoc Tmp;
@@ -342,7 +343,8 @@ bool SILParser::parseGlobalName(Identifier &Name) {
 
 /// getLocalValue - Get a reference to a local value with the specified name
 /// and type.
-SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type) {
+SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
+                                  SILLocation Loc) {
   // Check to see if this is already defined.
   ValueBase *&Entry = LocalValues[Name.Name];
 
@@ -357,7 +359,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type) {
         HadError = true;
         P.diagnose(Name.NameLoc, diag::invalid_sil_value_name_result_number);
         // Make sure to return something of the requested type.
-        return new (SILMod) GlobalAddrInst(SILLocation(), nullptr, Type);
+        return new (SILMod) GlobalAddrInst(Loc, nullptr, Type);
       }
     }
 
@@ -368,7 +370,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type) {
       P.diagnose(Name.NameLoc, diag::sil_value_use_type_mismatch, Name.Name,
                  EntryTy.getAsString());
       // Make sure to return something of the requested type.
-      return new (SILMod) GlobalAddrInst(SILLocation(), nullptr, Type);
+      return new (SILMod) GlobalAddrInst(Loc, nullptr, Type);
     }
 
     return SILValue(Entry, Name.isMRV() ? Name.ResultVal : 0);
@@ -379,7 +381,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type) {
   ForwardRefLocalValues[Name.Name] = Name.NameLoc;
 
   if (Name.ResultVal == ~0U) {
-    Entry = new (SILMod) GlobalAddrInst(SILLocation(), nullptr, Type);
+    Entry = new (SILMod) GlobalAddrInst(Loc, nullptr, Type);
     return Entry;
   }
 
@@ -390,7 +392,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type) {
 
   if (!Placeholders[Name.ResultVal])
     Placeholders[Name.ResultVal] =
-      new (SILMod) GlobalAddrInst(SILLocation(), nullptr, Type);
+      new (SILMod) GlobalAddrInst(Loc, nullptr, Type);
   return Placeholders[Name.ResultVal];
 }
 
@@ -807,10 +809,11 @@ bool SILParser::parseValueName(UnresolvedValueName &Result) {
 ///     sil-value-ref:
 ///       sil-local-name
 ///
-bool SILParser::parseValueRef(SILValue &Result, SILType Ty) {
+bool SILParser::parseValueRef(SILValue &Result, SILType Ty,
+                              SILLocation Loc) {
   UnresolvedValueName Name;
   if (parseValueName(Name)) return true;
-  Result = getLocalValue(Name, Ty);
+  Result = getLocalValue(Name, Ty, Loc);
   return false;
 }
 
@@ -829,7 +832,7 @@ bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc) {
       parseSILType(Ty))
     return true;
   
-  Result = getLocalValue(Name, Ty);
+  Result = getLocalValue(Name, Ty, SILFileLocation(Loc));
   return false;
 }
 
@@ -1194,7 +1197,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseTypedValueRef(Val))
       return true;
 
-    ResultVal = B.createLoadWeak(SILLocation(), Val, IsTake_t(isTake));
+    ResultVal = B.createLoadWeak(InstLoc, Val, IsTake_t(isTake));
     break;
   }
 
@@ -1378,7 +1381,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         return true;
       }
       auto valueTy = SILType::getPrimitiveObjectType(refType.getReferentType());
-      ResultVal = B.createStoreWeak(InstLoc, getLocalValue(from, valueTy),
+      ResultVal = B.createStoreWeak(InstLoc,
+                                    getLocalValue(from, valueTy, InstLoc),
                                     addrVal, IsInitialization_t(isInit));
       break;
     }
@@ -1386,7 +1390,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILType ValType = addrVal.getType().getObjectType();
 
     if (Opcode == ValueKind::StoreInst) {
-      ResultVal = B.createStore(InstLoc, getLocalValue(from, ValType), addrVal);
+      ResultVal = B.createStore(InstLoc,
+                                getLocalValue(from, ValType, InstLoc),
+                                addrVal);
       break;
     }
 
@@ -1395,7 +1401,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // The ValType of an assignment to [unowned] is a strong pointer.
     if (auto T = ValType.getAs<UnownedStorageType>())
       ValType = SILType::getPrimitiveObjectType(T.getReferentType());
-    ResultVal = B.createAssign(InstLoc, getLocalValue(from, ValType),addrVal);
+    ResultVal = B.createAssign(InstLoc,
+                               getLocalValue(from, ValType, InstLoc),
+                               addrVal);
     break;
   }
   case ValueKind::AllocStackInst:
@@ -1504,7 +1512,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         }
         Type EltTy = TT->getFields()[TypeElts.size()].getType();
         if (parseValueRef(Val,
-                 SILType::getPrimitiveObjectType(EltTy->getCanonicalType())))
+                 SILType::getPrimitiveObjectType(EltTy->getCanonicalType()),
+                 SILFileLocation(P.Tok.getLoc())))
           return true;
         OpList.push_back(Val);
         TypeElts.push_back(Val.getType().getSwiftRValueType());
@@ -1634,7 +1643,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     auto I1Ty =
       SILType::getBuiltinIntegerType(1, BB->getParent()->getASTContext());
-    SILValue CondVal = getLocalValue(Cond, I1Ty);
+    SILValue CondVal = getLocalValue(Cond, I1Ty, InstLoc);
     ResultVal = B.createCondBranch(InstLoc, CondVal,
                                    getBBForReference(BBName, NameLoc),
                                    Args,
@@ -1721,7 +1730,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
-    SILValue SrcLVal = getLocalValue(SrcLName, DestLVal.getType());
+    SILValue SrcLVal = getLocalValue(SrcLName, DestLVal.getType(), InstLoc);
     ResultVal = B.createCopyAddr(InstLoc, SrcLVal, DestLVal,
                                  IsTake_t(IsTake),
                                  IsInitialization_t(IsInit));
@@ -2050,7 +2059,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       Substitutions.push_back(Sub);
     } while (P.consumeIf(tok::comma));
 
-    ResultVal = B.createSpecialize(SILLocation(), Val,
+    ResultVal = B.createSpecialize(InstLoc, Val,
                                    P.Context.AllocateCopy(Substitutions),
                                    DestTy);
     break;
@@ -2110,11 +2119,11 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       return true;
     }
 
-    SILValue FnVal = getLocalValue(FnName, Ty);
+    SILValue FnVal = getLocalValue(FnName, Ty, InstLoc);
     unsigned ArgNo = 0;
     SmallVector<SILValue, 4> Args;
     for (auto &ArgName : ArgNames)
-      Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++]));
+      Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc));
 
     ResultVal = B.createApply(InstLoc, FnVal, FTI->getResultType(), Args,
                               Transparent);
@@ -2135,10 +2144,10 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     while (ArgNo != NewArgCount)
       NewArgTypes.push_back(ArgTys[ArgNo++].getSwiftType());
 
-    SILValue FnVal = getLocalValue(FnName, Ty);
+    SILValue FnVal = getLocalValue(FnName, Ty, InstLoc);
     SmallVector<SILValue, 4> Args;
     for (auto &ArgName : ArgNames)
-      Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++]));
+      Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc));
 
     Type ArgTy = TupleType::get(NewArgTypes, P.Context);
     Type ResTy = FunctionType::get(ArgTy, FTI->getResultType().getSwiftType(),
