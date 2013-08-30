@@ -93,7 +93,7 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
   // The fallback file.
   MainFilename = Dir;
   llvm::sys::path::append(MainFilename, Filename);
-  MainFile = getOrCreateFile(MainFilename.data());
+  MainFile = getOrCreateFile(MainFilename.c_str());
 
   unsigned Lang = DW_LANG_Swift;
 
