@@ -866,7 +866,8 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
 }
 
 static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
-                                            SourceLoc &Loc,
+                                            SourceLoc &Loc, tok ResyncT1,
+                                            tok ResyncT2, tok ResyncT3,
                                             const Diagnostic &D) {
   switch (P.Tok.getKind()) {
   case tok::identifier:
@@ -876,17 +877,57 @@ static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
     return makeParserSuccess();
 
   default:
-    // FIXME: try to skip IDENTIFIER_KEYWORD and resynchronize.
     P.diagnose(P.Tok, D);
+    if (P.Tok.isKeyword() &&
+        (P.peekToken().is(ResyncT1) || P.peekToken().is(ResyncT2) ||
+         P.peekToken().is(ResyncT3))) {
+      llvm::SmallString<32> Name(P.Tok.getText());
+      // Append an invalid character so that nothing can resolve to this name.
+      Name += "#";
+      Result = P.Context.getIdentifier(Name.str());
+      Loc = P.Tok.getLoc();
+      P.consumeToken();
+      // Return success because we recovered.
+      return makeParserSuccess();
+    }
     return makeParserError();
   }
 }
 
 template <typename... DiagArgTypes, typename... ArgTypes>
+static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
+                                            SourceLoc &L,
+                                            Diag<DiagArgTypes...> ID,
+                                            ArgTypes... Args) {
+  return parseIdentifierDeclName(P, Result, L, tok::unknown, tok::unknown,
+                                 tok::unknown, Diagnostic(ID, Args...));
+}
+
+template <typename... DiagArgTypes, typename... ArgTypes>
+static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
+                                            SourceLoc &L, tok ResyncT1,
+                                            Diag<DiagArgTypes...> ID,
+                                            ArgTypes... Args) {
+  return parseIdentifierDeclName(P, Result, L, ResyncT1, tok::unknown,
+                                 tok::unknown, Diagnostic(ID, Args...));
+}
+
+template <typename... DiagArgTypes, typename... ArgTypes>
 static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
+                        tok ResyncT1, tok ResyncT2, Diag<DiagArgTypes...> ID,
+                        ArgTypes... Args) {
+  return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2,
+                                 tok::unknown, Diagnostic(ID, Args...));
+}
+
+template <typename... DiagArgTypes, typename... ArgTypes>
+static ParserStatus
+parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
+                        tok ResyncT1, tok ResyncT2, tok ResyncT3,
                         Diag<DiagArgTypes...> ID, ArgTypes... Args) {
-  return parseIdentifierDeclName(P, Result, L, Diagnostic(ID, Args...));
+  return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, ResyncT3,
+                                 Diagnostic(ID, Args...));
 }
 
 /// \brief Parse a typealias decl.
@@ -903,8 +944,9 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   SourceLoc IdLoc;
   ParserStatus Status;
 
-  Status |= parseIdentifierDeclName(
-      *this, Id, IdLoc, diag::expected_identifier_in_decl, "typealias");
+  Status |=
+      parseIdentifierDeclName(*this, Id, IdLoc, tok::colon, tok::equal,
+                              diag::expected_identifier_in_decl, "typealias");
   if (Status.isError())
     return nullptr;
 
