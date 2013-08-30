@@ -153,7 +153,7 @@ General Principles
 
   method, and types conforming to ``Parseable`` have a ::
 
-    ``static func parse(s: String) -> This``
+    ``static func parse(s: String) -> Self``
 
 * ``String``\ 's interface design is primaily inspired by convention
   among “modern” programming languages such as Python, C#, Ruby, and
