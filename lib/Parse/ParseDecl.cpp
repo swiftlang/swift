@@ -348,19 +348,31 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
   }
 
   case AttrName::prefix: {
+    SourceLoc TokLoc = Tok.getLoc();
     if (Attributes.isPrefix())
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
 
     consumeToken(tok::identifier);
+
+    if (Attributes.isPostfix()) {
+      diagnose(TokLoc, diag::cannot_combine_attribute, "postfix");
+      return false;
+    }
     Attributes.ExplicitPrefix = true;
     return false;
   }
 
   case AttrName::postfix: {
+    SourceLoc TokLoc = Tok.getLoc();
     if (Attributes.isPostfix())
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
 
     consumeToken(tok::identifier);
+
+    if (Attributes.isPrefix()) {
+      diagnose(TokLoc, diag::cannot_combine_attribute, "prefix");
+      return false;
+    }
     Attributes.ExplicitPostfix = true;
     return false;
   }
