@@ -367,8 +367,6 @@ void Parser::skipUntilDeclRBrace(tok T1, tok T2) {
 bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
                              const Diagnostic &D) {
   switch (Tok.getKind()) {
-#define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
-#include "swift/Parse/Tokens.def"
   case tok::identifier:
     Result = Context.getIdentifier(Tok.getText());
     Loc = Tok.getLoc();

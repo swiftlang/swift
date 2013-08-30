@@ -366,10 +366,10 @@ ParserResult<Pattern> Parser::parsePatternAtom() {
 
   case tok::kw_super:
   case tok::kw_metatype:
+  case tok::kw_self:
+  case tok::kw_Self:
   case tok::kw_weak:
   case tok::kw_unowned:
-#define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
-#include "swift/Parse/Tokens.def"
     diagnose(Tok, diag::expected_pattern_is_keyword);
     consumeToken();
     return nullptr;

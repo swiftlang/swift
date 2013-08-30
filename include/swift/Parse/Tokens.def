@@ -20,13 +20,6 @@
 #define KEYWORD(kw)
 #endif
 
-/// IDENTIFIER_KEYWORD(kw)
-///   Expands for Swift keywords that behave grammatically like identifiers,
-///   such as 'super' and 'constructor'.
-#ifndef IDENTIFIER_KEYWORD
-#define IDENTIFIER_KEYWORD(kw) KEYWORD(kw)
-#endif
-
 /// PUNCTUATOR(name, str)
 ///   Expands for every Swift punctuator.
 ///   \param name  The symbolic name of the punctuator, such as
@@ -76,8 +69,8 @@ KEYWORD(new)
 KEYWORD(as)
 KEYWORD(is)
 KEYWORD(super)
-IDENTIFIER_KEYWORD(self)
-IDENTIFIER_KEYWORD(Self)
+KEYWORD(self)
+KEYWORD(Self)
 KEYWORD(weak)
 KEYWORD(unowned)
 KEYWORD(metatype)

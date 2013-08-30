@@ -876,6 +876,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     return nullptr;
 
   default:
+    // FIXME: offer a fixit: 'Self' -> 'self'
     diagnose(Tok, ID);
     return nullptr;
   }
