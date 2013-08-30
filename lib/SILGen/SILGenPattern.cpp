@@ -185,7 +185,11 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     
     SmallVector<std::pair<UnionElementDecl*, SILBasicBlock*>, 4> caseBBs;
     
+    bool addressOnlyUnion = v.getType().isAddress();
+    
     SILValue voidValue;
+    
+    SILBasicBlock *bb = gen.B.getInsertionBB();
     
     for (const Pattern *p : patterns) {
       auto *up = cast<UnionElementPattern>(p);
@@ -201,9 +205,16 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       SILValue eltValue;
       if (elt->hasArgumentType() &&
           !elt->getArgumentType()->isVoid()) {
-        // FIXME: Address-only unions.
-        SILType argTy = gen.getLoweredLoadableType(elt->getArgumentType());
+        auto &argLowering = gen.getTypeLowering(elt->getArgumentType());
+        SILType argTy = argLowering.getLoweredType();
+        if (addressOnlyUnion)
+          argTy = argTy.getAddressType();
         eltValue = new (gen.F.getModule()) SILArgument(argTy, caseBB);
+        // Load a loadable data value from an address-only union.
+        if (addressOnlyUnion && argLowering.isLoadable()) {
+          gen.B.setInsertionPoint(caseBB);
+          eltValue = gen.B.createLoad(SILLocation(), eltValue);
+        }
       } else {
         // If the element pattern for a void union element has a subpattern, it
         // will bind to a void value.
@@ -223,13 +234,21 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       defaultBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
     
     // Emit the switch instruction.
-    gen.B.createSwitchUnion(SILLocation(), v, defaultBB, caseBBs);
+    gen.B.setInsertionPoint(bb);
+    if (addressOnlyUnion) {
+      gen.B.createDestructiveSwitchUnionAddr(SILLocation(), v,
+                                             defaultBB, caseBBs);
+    } else {
+      gen.B.createSwitchUnion(SILLocation(), v, defaultBB, caseBBs);
+    }
     
     // Return the default BB.
     return defaultBB;
   }
       
   case PatternKind::NominalType:
+    // NB: When we support destructuring of class types, release the class
+    // instance after extracting the destructured properties.
     llvm_unreachable("not implemented");
     
   case PatternKind::Paren:
