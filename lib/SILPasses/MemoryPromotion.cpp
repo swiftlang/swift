@@ -30,6 +30,36 @@ static void diagnose(SILModule *M, SILLocation loc, ArgTypes... args) {
   M->getASTContext().Diags.diagnose(loc.getSourceLoc(), Diagnostic(args...));
 }
 
+/// If the specified basic block iterator is pointing at a ref_to_unowned
+/// instruction of the specified operand and result type, return it.  Otherwise
+/// return a null SILValue.
+static SILValue getRefToUnowned(SILBasicBlock::iterator IP, SILValue Op,
+                                SILValue OpForTy) {
+  auto *IPI = dyn_cast<RefToUnownedInst>(IP);
+  if (IPI && IPI->getOperand() == Op &&
+      IPI->getType() == OpForTy.getType().getObjectType())
+    return IPI;
+  return SILValue();
+}
+
+static SILValue getOrCreateRefToUnowned(SILBuilder &B, SILLocation Loc,
+                                        SILValue Operand, SILValue DestVal) {
+  // The producer of this value often is preceded or followed by a
+  // ref_to_unowned that we can use.  If so, reuse it to avoid inserting
+  // lots of these.
+  if (SILValue V = getRefToUnowned(B.getInsertionPoint(), Operand, DestVal))
+    return V;
+
+  if (B.getInsertionPoint() != B.getInsertionBB()->begin())
+    if (SILValue V = getRefToUnowned(--B.getInsertionPoint(), Operand, DestVal))
+      return V;
+
+  // Otherwise, just create a new one.
+  return B.createRefToUnowned(Loc, Operand,
+                              DestVal.getType().getObjectType());
+}
+
+
 /// Emit the sequence that an assign instruction lowers to once we know
 /// if it is an initialization or an assignment.  If it is an assignment,
 /// a live-in value can be provided to optimize out the reload.
@@ -41,31 +71,42 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
 
   ++NumAssignRewritten;
 
-  auto &TL = Inst->getModule()->getTypeLowering(Inst->getSrc().getType());
+  auto *M = Inst->getModule();
+  SILValue Src = Inst->getSrc();
+
+  auto &TLDest = M->getTypeLowering(Inst->getDest().getType().getObjectType());
+
+  // If this is an unowned assign, the LHS is "+1 strong", but the destination
+  // needs to be stored "+1 unowned".  Emit an unowned retain + strong release
+  // to achieve this.
+  if (Inst->isUnownedAssign()) {
+    // Convert the source value to an unowned pointer.
+    Src = getOrCreateRefToUnowned(B, Inst->getLoc(), Src, Inst->getDest());
+    TLDest.emitRetain(B, Inst->getLoc(), Src);
+
+    // Get type lowering info for the source type to release the strong pointer.
+    auto &TLS = M->getTypeLowering(Inst->getSrc().getType());
+    TLS.emitRelease(B, Inst->getLoc(), Inst->getSrc());
+  }
 
   // Otherwise, if it has trivial type, we can always just replace the
   // assignment with a store.  If it has non-trivial type and is an
   // initialization, we can also replace it with a store.
   if (isInitialization) {
-    B.createStore(Inst->getLoc(), Inst->getOperand(0), Inst->getOperand(1));
-
-    // Non-trivial values must be retained, since the box owns them.
-    TL.emitRetain(B, Inst->getLoc(), Inst->getOperand(0));
+    B.createStore(Inst->getLoc(), Src, Inst->getDest());
     Inst->eraseFromParent();
     return;
   }
 
   // Otherwise, we need to replace the assignment with the full
-  // load/store/retain/release dance.  If we have a live-in value available, we
-  // can use that instead of doing a reload.
+  // load/store/release dance.  Note that the value is already considered to be
+  // retained - we're transfering the ownership count into the destination.
   if (!IncomingVal)
-    IncomingVal = B.createLoad(Inst->getLoc(), Inst->getOperand(1));
+    IncomingVal = B.createLoad(Inst->getLoc(), Inst->getDest());
 
-  TL.emitRetain(B, Inst->getLoc(), Inst->getOperand(0));
+  B.createStore(Inst->getLoc(), Src, Inst->getDest());
 
-  B.createStore(Inst->getLoc(), Inst->getOperand(0), Inst->getOperand(1));
-
-  TL.emitRelease(B, Inst->getLoc(), IncomingVal);
+  TLDest.emitRelease(B, Inst->getLoc(), IncomingVal);
 
   Inst->eraseFromParent();
 }
@@ -261,6 +302,9 @@ static SILValue ExtractElement(SILValue Val,
   return Val;
 }
 
+
+
+
 /// If the specified instruction is a store of some value, check to see if it is
 /// storing to something that intersects the access path of a load.  If the two
 /// accesses are non-intersecting, return true.  Otherwise, attempt to compute
@@ -292,16 +336,23 @@ static bool checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
 
   SILValue StoredVal = Inst->getOperand(0);
 
-  // If we have an exact match (which is common), we are done.  Early exit.
+  SILBuilder B(Inst);
   if (LoadUnwrapLevel == 0) {
+    // Exact match (which is common).
     LoadResultVal = StoredVal;
-    return false;
+  } else {
+    LoadResultVal = ExtractElement(StoredVal,
+       ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(0, LoadUnwrapLevel),
+                                   B, Inst->getLoc());
   }
 
-  SILBuilder B(Inst);
-  LoadResultVal = ExtractElement(StoredVal,
-       ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(0, LoadUnwrapLevel),
-                                 B, Inst->getLoc());
+  // If this is an assign to an unowned pointer, the stored value needs to be
+  // converted to an unowned pointer.
+  if (auto AI = dyn_cast<AssignInst>(Inst))
+    if (AI->isUnownedAssign())
+      LoadResultVal = getOrCreateRefToUnowned(B, Inst->getLoc(),
+                                              LoadResultVal, AI->getDest());
+
   return false;
 }
 
@@ -589,7 +640,7 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
     }
   }
 
-  SILType StoredType = Inst->getOperand(0).getType();
+  SILType StoredType = Inst->getOperand(1).getType().getObjectType();
 
   // If we are lowering/expanding an "assign", we may turn it into a read/write
   // operation to release the old value.  If so, we want to determine a live-in

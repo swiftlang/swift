@@ -312,13 +312,18 @@ public:
   }
 
   void checkAssignInst(AssignInst *AI) {
+    SILValue Src = AI->getSrc(), Dest = AI->getDest();
     require(AI->getModule()->getStage() == SILStage::Raw,
             "assign instruction can only exist in raw SIL");
-    require(AI->getSrc().getType().isObject(),
-            "Can't assign from an address source");
-    require(AI->getDest().getType().isAddress(),
-            "Must store to an address dest");
-    require(AI->getDest().getType().getObjectType() == AI->getSrc().getType(),
+    require(Src.getType().isObject(), "Can't assign from an address source");
+    require(Dest.getType().isAddress(), "Must store to an address dest");
+
+    // The value must be the right type for a semantic assign.  For an unowned
+    // pointer, this is the strong type.
+    SILType DestTy = Dest.getType().getObjectType();
+    if (auto T = DestTy.getAs<UnownedStorageType>())
+      DestTy = SILType::getPrimitiveObjectType(T.getReferentType());
+    require(DestTy == Src.getType(),
             "Store operand type and dest type mismatch");
   }
 

@@ -270,21 +270,13 @@ bb0:
 
   assign %4 to %c#1 : $*SomeClass
   // CHECK-NEXT: store [[C1]]
-  // CHECK-NEXT: retain [[C1]]
-
-  strong_release %4 : $SomeClass
-  // CHECK-NEXT: release [[C1]]
 
   %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   assign %8 to %c#1 : $*SomeClass
-  // CHECK-NEXT: retain [[C2]]
   // CHECK-NEXT: store [[C2]]
   // CHECK-NEXT: release [[C1]]
-
-  strong_release %8 : $SomeClass
-  // CHECK-NEXT: release [[C2]]
 
   strong_release %c#0 : $Builtin.ObjectPointer
 
@@ -364,32 +356,24 @@ bb0:
   %3 = metatype $SomeClass.metatype
 
   %4 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
-  // CHECK: [[C1x:%[0-9]+]] = apply
-
-  %5 = ref_to_unowned %4 : $SomeClass to $[unowned] SomeClass
-  // CHECK-NEXT: [[C1:%[0-9]+]] = ref_to_unowned [[C1x]]
+  // CHECK: [[C1:%[0-9]+]] = apply
 
   // This should become an initialization.
-  assign %5 to %c#1 : $*[unowned] SomeClass
-  // CHECK-NEXT: store [[C1]] to [[BOX]]#1
-  // CHECK-NEXT: unowned_retain [[C1]]
-
-  strong_release %4 : $SomeClass
-  // CHECK-NEXT: release [[C1x]]
+  assign %4 to %c#1 : $*[unowned] SomeClass
+  // CHECK-NEXT: [[C1u:%[0-9]+]] = ref_to_unowned [[C1]]
+  // CHECK-NEXT: unowned_retain [[C1u]]
+  // CHECK-NEXT: strong_release [[C1]]
+  // CHECK-NEXT: store [[C1u]] to [[BOX]]#1
 
   %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
-  // CHECK-NEXT: [[C2x:%[0-9]+]] = apply
+  // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
-  %9 = ref_to_unowned %8 : $SomeClass to $[unowned] SomeClass
-  // CHECK-NEXT: [[C2:%[0-9]+]] = ref_to_unowned [[C2x]]
-
-  assign %9 to %c#1 : $*[unowned] SomeClass
-  // CHECK-NEXT: unowned_retain [[C2]]
-  // CHECK-NEXT: store [[C2]] to [[BOX]]#1
-  // CHECK-NEXT: unowned_release [[C1]]
-
-  strong_release %8 : $SomeClass
-  // CHECK-NEXT: release [[C2x]]
+  assign %8 to %c#1 : $*[unowned] SomeClass
+  // CHECK-NEXT: [[C2u:%[0-9]+]] = ref_to_unowned [[C2]]
+  // CHECK-NEXT: unowned_retain [[C2u]]
+  // CHECK-NEXT: strong_release [[C2]]
+  // CHECK-NEXT: store [[C2u]] to [[BOX]]#1
+  // CHECK-NEXT: unowned_release [[C1u]]
 
   strong_release %c#0 : $Builtin.ObjectPointer
 
