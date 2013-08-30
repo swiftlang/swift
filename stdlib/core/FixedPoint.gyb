@@ -163,18 +163,15 @@ extension ${Self} {
 // Standard Operator Tables
 //===----------------------------------------------------------------------===//
 
-// Unary addition
-func [prefix, transparent] +(a : ${Self}) -> ${Self} { return a }
+// Unary plus
+func [prefix, transparent] +(rhs: ${Self}) -> ${Self} { return rhs }
 
-// Bitwise negation
-func [prefix, transparent] ~(a: ${Self}) -> ${Self} { return a ^ ${maskBits(bits)} }
-
-// Masking Binary Operations
+// Masking arithmetic operations
 func [transparent] &+ (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}.add(lhs, rhs).0 }
 func [transparent] &* (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}.mul(lhs, rhs).0 }
 func [transparent] &- (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}.sub(lhs, rhs).0 }
 
-// Checked Binary Operations 
+// Checked arithmetic operations
 func [transparent] * (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return overflowCheck(${Self}.mul(lhs, rhs)) }
 func [transparent] + (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return overflowCheck(${Self}.add(lhs, rhs)) }
 func [transparent] - (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return overflowCheck(${Self}.sub(lhs, rhs)) }
@@ -183,54 +180,21 @@ func [transparent] - (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return overflowCh
 func [transparent] / (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.${sign}div_Int${bits}(lhs.value, rhs.value)) }
 func [transparent] % (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.${sign}rem_Int${bits}(lhs.value, rhs.value)) }
 
-// Left Shift.
-func [transparent] << (lhs : ${Self}, rhs : ${Self}) -> ${Self} {
-  return ${Self}(Builtin.shl_Int${bits}(lhs.value, rhs.value))
-}
-
-// Right Shift.
-func [transparent] >> (lhs : ${Self}, rhs : ${Self}) -> ${Self} {
-  return ${Self}(Builtin.${'a' if signed else 'l'}shr_Int${bits}(lhs.value, rhs.value))
-}
-
-// Bitwise operators
-func [transparent] & (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return ${Self}(Builtin.and_Int${bits}(lhs.value, rhs.value))
-}
-func [transparent] ^ (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return ${Self}(Builtin.xor_Int${bits}(lhs.value, rhs.value))
-}
-func [transparent] | (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return ${Self}(Builtin.or_Int${bits}(lhs.value, rhs.value))
-}
+// Bitwise operations
+func [prefix, transparent] ~(rhs: ${Self}) -> ${Self} { return rhs ^ ${maskBits(bits)} }
+func [transparent] << (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.shl_Int${bits}( lhs.value, rhs.value)) }
+func [transparent] >> (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.${'a' if signed else 'l'}shr_Int${bits}(lhs.value, rhs.value)) }
+func [transparent]  & (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.and_Int${bits}( lhs.value, rhs.value)) }
+func [transparent]  ^ (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.xor_Int${bits}( lhs.value, rhs.value)) }
+func [transparent]  | (lhs: ${Self}, rhs: ${Self}) -> ${Self} { return ${Self}(Builtin.or_Int${bits}(  lhs.value, rhs.value)) }
 
 // Compound assignments
-@if not signed:
-func [assignment, transparent] -= (lhs : [byref] ${Self}, rhs : ${Self}) {
-  lhs = lhs - rhs
-}
-@end
-func [assignment, transparent] *= (lhs : [byref] ${Self}, rhs : ${Self}) {
-  lhs = lhs * rhs
-}
-func [assignment, transparent] /= (lhs : [byref] ${Self}, rhs : ${Self}) {
-  lhs = lhs / rhs
-}
-func [assignment, transparent] %= (lhs : [byref] ${Self}, rhs : ${Self}) {
-  lhs = lhs % rhs
-}
-func [assignment, transparent] <<= (lhs : [byref] ${Self}, rhs : ${Self}) {
-  lhs = lhs << rhs
-}
-func [assignment, transparent] >>= (lhs : [byref] ${Self}, rhs : ${Self}) {
-  lhs = lhs >> rhs
-}
-func [assignment, transparent] &= (lhs : [byref] ${Self}, rhs : ${Self}) {
-  lhs = lhs & rhs
-}
-func [assignment, transparent] |= (lhs : [byref] ${Self}, rhs : ${Self}) {
-  lhs = lhs | rhs
-}
-func [assignment, transparent] ^= (lhs : [byref] ${Self}, rhs : ${Self}) {
-  lhs = lhs ^ rhs
-}
+func [assignment, transparent]  -= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  - rhs }
+func [assignment, transparent]  *= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  * rhs }
+func [assignment, transparent]  /= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  / rhs }
+func [assignment, transparent]  %= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  % rhs }
+func [assignment, transparent] <<= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs << rhs }
+func [assignment, transparent] >>= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs >> rhs }
+func [assignment, transparent]  &= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  & rhs }
+func [assignment, transparent]  |= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  | rhs }
+func [assignment, transparent]  ^= (lhs: [byref] ${Self}, rhs: ${Self}) { lhs = lhs  ^ rhs }
