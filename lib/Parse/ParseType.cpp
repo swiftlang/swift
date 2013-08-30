@@ -88,6 +88,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     // Nested switch because IDENTIFIER_KEYWORD includes tok::kw_Self, which is
     // handled above.
     switch (Tok.getKind()) {
+    case tok::kw_super:
+    case tok::kw_metatype:
 #define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
 #include "swift/Parse/Tokens.def"
       diagnose(Tok, diag::expected_type_is_keyword);

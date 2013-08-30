@@ -365,6 +365,7 @@ ParserResult<Pattern> Parser::parsePatternAtom() {
     return parsePatternIdentifier();
 
   case tok::kw_super:
+  case tok::kw_metatype:
 #define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
 #include "swift/Parse/Tokens.def"
     diagnose(Tok, diag::expected_pattern_is_keyword);
