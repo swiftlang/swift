@@ -901,15 +901,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool isImplicit;
     bool isClassMethod;
     bool isAssignmentOrConversion;
-    bool isObjC, isIBAction;
+    bool isObjC, isIBAction, isTransparent;
     TypeID signatureID;
     DeclID associatedDeclID;
     DeclID overriddenID;
 
     decls_block::FuncLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                         isClassMethod, isAssignmentOrConversion,
-                                        isObjC, isIBAction, signatureID,
-                                        associatedDeclID, overriddenID);
+                                        isObjC, isIBAction, isTransparent,
+                                        signatureID, associatedDeclID,
+                                        overriddenID);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -972,6 +973,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     fn->setIsObjC(isObjC);
     if (isIBAction)
       fn->getMutableAttrs().IBAction = true;
+    if (isTransparent)
+      fn->getMutableAttrs().Transparent = true;
 
     if (Decl *associated = getDecl(associatedDeclID)) {
       if (auto op = dyn_cast<OperatorDecl>(associated)) {

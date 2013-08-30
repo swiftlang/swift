@@ -566,6 +566,7 @@ namespace decls_block {
     BCFixed<1>,   // assignment? / conversion?
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // iboutlet?
+    BCFixed<1>,   // transparent?
     TypeIDField,  // type (signature)
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function

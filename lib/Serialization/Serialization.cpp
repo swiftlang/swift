@@ -1408,6 +1408,7 @@ void Serializer::writeDecl(const Decl *D) {
                              fn->getAttrs().isConversion(),
                            fn->isObjC(),
                            fn->getAttrs().isIBAction(),
+                           fn->getAttrs().isTransparent(),
                            addTypeRef(fn->getType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
