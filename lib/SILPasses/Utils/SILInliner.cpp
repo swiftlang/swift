@@ -23,45 +23,37 @@ using namespace swift;
 ///
 /// \returns true on success or false if it is unable to inline the function
 /// (for any reason).
-bool SILInliner::inlineFunction(ApplyInst *AI) {
-  assert(AI->getParent() && AI->getParent()->getParent() &&
-         AI->getParent()->getParent() == &getBuilder().getFunction() &&
+bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
+                                SILFunction *CalleeFunction,
+                                ArrayRef<SILValue> Args) {
+  SILFunction &F = getBuilder().getFunction();
+  assert(I->getParent()->getParent() && I->getParent()->getParent() == &F &&
          "Inliner called on apply instruction in wrong function?");
 
   // We do not support inlining of Objective-C methods
-  SILFunction &F = getBuilder().getFunction();
-  if (F.getAbstractCC() == AbstractCC::ObjCMethod)
+  if (CalleeFunction->getAbstractCC() == AbstractCC::ObjCMethod)
     return false;
 
-  SILValue Callee = AI->getCallee();
-  // I don't yet know how to handle anything other than direct function refs.
-  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef());
-  assert(FRI && "Callee to be inlined is not a function ref?");
-  assert(Callee.getResultNumber() == 0);
-  SILFunction *CalledFunc = FRI->getFunction();
-  assert(CalledFunc && "No callee function being referenced while inlining?");
-  assert(!CalledFunc->empty() && "No callee body while inlining?");
-  CalleeEntryBB = CalledFunc->begin();
+  CalleeEntryBB = CalleeFunction->begin();
 
   // If the caller's BB is not the last BB in the calling function, then keep
   // track of the next BB so we always insert new BBs before it; otherwise,
   // we just leave the new BBs at the end as they are by default.
-  auto IBI = llvm::next(SILFunction::iterator(AI->getParent()));
+  auto IBI = llvm::next(SILFunction::iterator(I->getParent()));
   InsertBeforeBB = IBI != F.end() ? IBI : nullptr;
 
   // Clear argument map and map ApplyInst arguments to the arguments of the
   // callee's entry block.
   ArgumentMap.clear();
-  assert(CalleeEntryBB->bbarg_size() == AI->getArguments().size() &&
+  assert(CalleeEntryBB->bbarg_size() == Args.size() &&
          "Unexpected number of arguments to entry block of function?");
   auto BAI = CalleeEntryBB->bbarg_begin();
-  for (auto OI = AI->getArguments().begin(), OE = AI->getArguments().end();
-       OI != OE; ++OI, ++BAI)
-    ArgumentMap.insert(std::make_pair(*BAI, *OI));
+  for (auto AI = Args.begin(), AE = Args.end(); AI != AE; ++AI, ++BAI)
+    ArgumentMap.insert(std::make_pair(*BAI, *AI));
 
   InstructionMap.clear();
   BBMap.clear();
-  getBuilder().setInsertionPoint(AI);
+  getBuilder().setInsertionPoint(I);
   // Recursively visit callee's BB in depth-first preorder, starting with the
   // entry block, cloning all instructions other than terminators.
   visitSILBasicBlock(CalleeEntryBB);
@@ -70,16 +62,17 @@ bool SILInliner::inlineFunction(ApplyInst *AI) {
   if (ReturnInst *RI = dyn_cast<ReturnInst>(CalleeEntryBB->getTerminator())) {
     // Replace all uses of the apply instruction with the operands of the
     // return instruction, appropriately mapped.
-    SILValue(AI).replaceAllUsesWith(remapValue(RI->getOperand()));
+    SILValue(I).replaceAllUsesWith(remapValue(RI->getOperand()));
     // And get rid of the no-longer-needed ApplyInst.
-    AI->eraseFromParent();
+    SILBasicBlock::iterator II = I++;
+    II->eraseFromParent();
   } else {
     // Otherwise, split the caller's basic block to create a return-to BB.
-    SILBasicBlock *CallerBB = AI->getParent();
+    SILBasicBlock *CallerBB = I->getParent();
     // Split the BB and do NOT create a branch between the old and new
     // BBs; we will create the appropriate terminator manually later.
     SILBasicBlock *ReturnToBB =
-      CallerBB->splitBasicBlock(AI, /*CreateBranch=*/false);
+      CallerBB->splitBasicBlock(I, /*CreateBranch=*/false);
     // Place the return-to BB after all the other mapped BBs.
     if (InsertBeforeBB)
       F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB), F.getBlocks(),
@@ -88,12 +81,13 @@ bool SILInliner::inlineFunction(ApplyInst *AI) {
       F.getBlocks().splice(F.getBlocks().end(), F.getBlocks(),
                            SILFunction::iterator(ReturnToBB));
     // Create an argument on the return-to BB representing the returned value.
-    SILValue RetArg = new (F.getModule()) SILArgument(AI->getType(),
+    SILValue RetArg = new (F.getModule()) SILArgument(I->getType(0),
                                                       ReturnToBB);
     // Replace all uses of the ApplyInst with the new argument.
-    SILValue(AI).replaceAllUsesWith(RetArg);
+    SILValue(I).replaceAllUsesWith(RetArg);
     // And get rid of the no-longer-needed ApplyInst.
-    AI->eraseFromParent();
+    SILBasicBlock::iterator II = I++;
+    II->eraseFromParent();
 
     // Now iterate over the callee BBs and fix up the terminators.
     getBuilder().setInsertionPoint(CallerBB);
@@ -101,30 +95,25 @@ bool SILInliner::inlineFunction(ApplyInst *AI) {
     // Return Inst, so it can definitely be cloned with the normal SILCloner
     // visit function.
     visit(CalleeEntryBB->getTerminator());
-    for (auto I = BBMap.begin(), E = BBMap.end(); I != E; ++I) {
-      getBuilder().setInsertionPoint(I->second);
+    for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
+      getBuilder().setInsertionPoint(BI->second);
 
       // Modify return terminators to branch to the return-to BB, rather than
       // trying to clone the ReturnInst.
-      if (ReturnInst *RI = dyn_cast<ReturnInst>(I->first->getTerminator())) {
+      if (ReturnInst *RI = dyn_cast<ReturnInst>(BI->first->getTerminator())) {
         getBuilder().createBranch(RI->getLoc(), ReturnToBB,
                                   remapValue(RI->getOperand()));
         continue;
       }
 
-      assert(!isa<AutoreleaseReturnInst>(I->first->getTerminator()) &&
+      assert(!isa<AutoreleaseReturnInst>(BI->first->getTerminator()) &&
              "Unexpected autorelease return while inlining non-Objective-C "
              "function?");
       // Otherwise use normal visitor, which clones the existing instruction
       // but remaps basic blocks and values.
-      visit(I->first->getTerminator());
+      visit(BI->first->getTerminator());
     }
   }
-
-  // If there's no longer any uses of the function ref, then we can get rid of
-  // it, too.
-  if (FRI->use_empty())
-    FRI->eraseFromParent();
 
   return true;
 }

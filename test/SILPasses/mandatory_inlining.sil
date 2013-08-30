@@ -3,18 +3,17 @@
 import Builtin
 import swift
 
-sil @_TSsoi1pFT3lhsSi3rhsSi_Si : $[thin] (lhs : Int64, rhs : Int64) -> Int64
-
-sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+sil @plus : $[thin] (lhs : Int64, rhs : Int64) -> Int64
+sil @fromLiteral : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
 
 // CHECK-LABEL: sil @test_add : $[thin] (x : Int64) -> Int64 {
 sil @test_add : $[thin] (x : Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
   store %0 to %1#1 : $*Int64
-  %3 = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si : $[thin] (lhs : Int64, rhs : Int64) -> Int64
+  %3 = function_ref @plus : $[thin] (lhs : Int64, rhs : Int64) -> Int64
   %4 = load %1#1 : $*Int64
-  %5 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %5 = function_ref @fromLiteral : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %6 = metatype $Int64.metatype
   %7 = integer_literal $Builtin.Int128, 20
   %8 = apply %5(%7, %6) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
@@ -26,47 +25,48 @@ bb0(%0 : $Int64):
 // CHECK-LABEL: sil @inline_test_add : $[thin] (x : Int64) -> Int64 {
 sil @inline_test_add : $[thin] (x : Int64) -> Int64 {
 // CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Int64):
-bb0(%0 : $Int64):
   // CHECK: [[VAL1:%.*]] = alloc_box $Int64
   // CHECK: store [[VAL0]] to [[VAL1]]#1
-  // CHECK: [[VAL3:%.*]] = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si
-  // CHECK: [[VAL4:%.*]] = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si
+  // CHECK: [[VAL3:%.*]] = function_ref @plus
+  // CHECK: [[VAL4:%.*]] = function_ref @plus
   // CHECK: [[VAL5:%.*]] = load [[VAL1]]#1
-  // CHECK: [[VAL6:%.*]] = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si
+  // CHECK: [[VAL6:%.*]] = function_ref @fromLiteral
   // CHECK: [[VAL7:%.*]] = metatype $Int64.metatype
   // CHECK: [[VAL8:%.*]] = integer_literal $Builtin.Int128, 10
   // CHECK: [[VAL9:%.*]] = apply [[VAL6]]([[VAL8]], [[VAL7]])
   // CHECK: [[VAL10:%.*]] = apply [[VAL4]]([[VAL5]], [[VAL9]])
   // CHECK: [[VAL11:%.*]] = alloc_box $Int64
   // CHECK: store [[VAL10]] to [[VAL11]]#1
-  // CHECK: [[VAL13:%.*]] = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si
+  // CHECK: [[VAL13:%.*]] = function_ref @plus
   // CHECK: [[VAL14:%.*]] = load [[VAL11]]#1
-  // CHECK: [[VAL15:%.*]] = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si
+  // CHECK: [[VAL15:%.*]] = function_ref @fromLiteral
   // CHECK: [[VAL16:%.*]] = metatype $Int64.metatype
   // CHECK: [[VAL17:%.*]] = integer_literal $Builtin.Int128, 20
-  // CHECK: [[VAL18:%.*]] = apply [[VAL15]]([[VAL17]], [[VAL16]])
-  // CHECK: [[VAL19:%.*]] = apply [[VAL13]]([[VAL14]], [[VAL18]])
+  // CHECK: [[VAL18:%.*]] = apply [transparent] [[VAL15]]([[VAL17]], [[VAL16]])
+  // CHECK: [[VAL19:%.*]] = apply [transparent] [[VAL13]]([[VAL14]], [[VAL18]])
   // CHECK: strong_release [[VAL11]]#0
-  // CHECK: [[VAL21:%.*]] = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si
+  // CHECK: [[VAL21:%.*]] = function_ref @fromLiteral
   // CHECK: [[VAL22:%.*]] = metatype $Int64.metatype
   // CHECK: [[VAL23:%.*]] = integer_literal $Builtin.Int128, 30
   // CHECK: [[VAL24:%.*]] = apply [[VAL21]]([[VAL23]], [[VAL22]])
   // CHECK: [[VAL25:%.*]] = apply [[VAL3]]([[VAL19]], [[VAL24]])
   // CHECK: strong_release [[VAL1]]#0
   // CHECK: return [[VAL25]]
+
+bb0(%0 : $Int64):
   %1 = alloc_box $Int64
   store %0 to %1#1 : $*Int64
-  %3 = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si : $[thin] (lhs : Int64, rhs : Int64) -> Int64
+  %3 = function_ref @plus : $[thin] (lhs : Int64, rhs : Int64) -> Int64
   %4 = function_ref @test_add : $[thin] (x : Int64) -> Int64
-  %5 = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si : $[thin] (lhs : Int64, rhs : Int64) -> Int64
+  %5 = function_ref @plus : $[thin] (lhs : Int64, rhs : Int64) -> Int64
   %6 = load %1#1 : $*Int64
-  %7 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %7 = function_ref @fromLiteral : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %8 = metatype $Int64.metatype
   %9 = integer_literal $Builtin.Int128, 10
   %10 = apply %7(%9, %8) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %11 = apply %5(%6, %10) : $[thin] (lhs : Int64, rhs : Int64) -> Int64
   %12 = apply [transparent] %4(%11) : $[thin] (x : Int64) -> Int64
-  %13 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %13 = function_ref @fromLiteral : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %14 = metatype $Int64.metatype
   %15 = integer_literal $Builtin.Int128, 30
   %16 = apply %13(%15, %14) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
@@ -78,59 +78,60 @@ bb0(%0 : $Int64):
 // CHECK-LABEL: sil @inline_twice_test_add : $[thin] (x : Int64) -> Int64 {
 sil @inline_twice_test_add : $[thin] (x : Int64) -> Int64 {
 // CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Int64):
-bb0(%0 : $Int64):
   // CHECK: [[VAL1:%.*]] = alloc_box $Int64
   // CHECK: store [[VAL0]] to [[VAL1]]#1
-  // CHECK: [[VAL3:%.*]] = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si
-  // CHECK: [[VAL4:%.*]] = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si
+  // CHECK: [[VAL3:%.*]] = function_ref @plus
+  // CHECK: [[VAL4:%.*]] = function_ref @plus
   // CHECK: [[VAL5:%.*]] = load [[VAL1]]#1
-  // CHECK: [[VAL6:%.*]] = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si
+  // CHECK: [[VAL6:%.*]] = function_ref @fromLiteral
   // CHECK: [[VAL7:%.*]] = metatype $Int64.metatype
   // CHECK: [[VAL8:%.*]] = integer_literal $Builtin.Int128, 10
   // CHECK: [[VAL9:%.*]] = apply [[VAL6]]([[VAL8]], [[VAL7]])
   // CHECK: [[VAL10:%.*]] = apply [[VAL4]]([[VAL5]], [[VAL9]])
   // CHECK: [[VAL11:%.*]] = alloc_box $Int64
   // CHECK: store [[VAL10]] to [[VAL11]]#1
-  // CHECK: [[VAL13:%.*]] = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si
+  // CHECK: [[VAL13:%.*]] = function_ref @plus
   // CHECK: [[VAL14:%.*]] = load [[VAL11]]#1
-  // CHECK: [[VAL15:%.*]] = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si
+  // CHECK: [[VAL15:%.*]] = function_ref @fromLiteral
   // CHECK: [[VAL16:%.*]] = metatype $Int64.metatype
   // CHECK: [[VAL17:%.*]] = integer_literal $Builtin.Int128, 20
-  // CHECK: [[VAL18:%.*]] = apply [[VAL15]]([[VAL17]], [[VAL16]])
-  // CHECK: [[VAL19:%.*]] = apply [[VAL13]]([[VAL14]], [[VAL18]])
+  // CHECK: [[VAL18:%.*]] = apply [transparent] [[VAL15]]([[VAL17]], [[VAL16]])
+  // CHECK: [[VAL19:%.*]] = apply [transparent] [[VAL13]]([[VAL14]], [[VAL18]])
   // CHECK: strong_release [[VAL11]]#0
   // CHECK: [[VAL21:%.*]] = alloc_box $Int64
   // CHECK: store [[VAL19]] to [[VAL21]]#1
-  // CHECK: [[VAL23:%.*]] = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si
+  // CHECK: [[VAL23:%.*]] = function_ref @plus
   // CHECK: [[VAL24:%.*]] = load [[VAL21]]#1
-  // CHECK: [[VAL25:%.*]] = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si
+  // CHECK: [[VAL25:%.*]] = function_ref @fromLiteral
   // CHECK: [[VAL26:%.*]] = metatype $Int64.metatype
   // CHECK: [[VAL27:%.*]] = integer_literal $Builtin.Int128, 20
-  // CHECK: [[VAL28:%.*]] = apply [[VAL25]]([[VAL27]], [[VAL26]])
-  // CHECK: [[VAL29:%.*]] = apply [[VAL23]]([[VAL24]], [[VAL28]])
+  // CHECK: [[VAL28:%.*]] = apply [transparent] [[VAL25]]([[VAL27]], [[VAL26]])
+  // CHECK: [[VAL29:%.*]] = apply [transparent] [[VAL23]]([[VAL24]], [[VAL28]])
   // CHECK: strong_release [[VAL21]]#0
-  // CHECK: [[VAL31:%.*]] = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si
+  // CHECK: [[VAL31:%.*]] = function_ref @fromLiteral
   // CHECK: [[VAL32:%.*]] = metatype $Int64.metatype
   // CHECK: [[VAL33:%.*]] = integer_literal $Builtin.Int128, 30
   // CHECK: [[VAL34:%.*]] = apply [[VAL31]]([[VAL33]], [[VAL32]])
   // CHECK: [[VAL35:%.*]] = apply [[VAL3]]([[VAL29]], [[VAL34]])
   // CHECK: strong_release [[VAL1]]#0
   // CHECK: return [[VAL35]]
+
+bb0(%0 : $Int64):
   %1 = alloc_box $Int64
   store %0 to %1#1 : $*Int64
-  %3 = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si : $[thin] (lhs : Int64, rhs : Int64) -> Int64
+  %3 = function_ref @plus : $[thin] (lhs : Int64, rhs : Int64) -> Int64
   %4 = function_ref @test_add : $[thin] (x : Int64) -> Int64
   %5 = function_ref @test_add : $[thin] (x : Int64) -> Int64
-  %6 = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si : $[thin] (lhs : Int64, rhs : Int64) -> Int64
+  %6 = function_ref @plus : $[thin] (lhs : Int64, rhs : Int64) -> Int64
   %7 = load %1#1 : $*Int64
-  %8 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %8 = function_ref @fromLiteral : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %9 = metatype $Int64.metatype
   %10 = integer_literal $Builtin.Int128, 10
   %11 = apply %8(%10, %9) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %12 = apply %6(%7, %11) : $[thin] (lhs : Int64, rhs : Int64) -> Int64
   %13 = apply [transparent] %5(%12) : $[thin] (x : Int64) -> Int64
   %14 = apply [transparent] %4(%13) : $[thin] (x : Int64) -> Int64
-  %15 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %15 = function_ref @fromLiteral : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %16 = metatype $Int64.metatype
   %17 = integer_literal $Builtin.Int128, 30
   %18 = apply %15(%17, %16) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
@@ -159,7 +160,6 @@ bb0(%0 : $*SomeProtocol):
 // CHECK-LABEL: sil @inline_test_protocol_metatype : $[thin] (p : SomeProtocol) -> SomeProtocol.metatype
 sil @inline_test_protocol_metatype : $[thin] (p : SomeProtocol) -> SomeProtocol.metatype {
 // CHECK: [[BB0:.*]]([[VAL0:%.*]] : $*SomeProtocol):
-bb0(%0 : $*SomeProtocol):
   // CHECK: [[VAL1:%.*]] = alloc_box $SomeProtocol
   // CHECK: copy_addr [take] %0 to [initialization] [[VAL1]]#1
   // CHECK: [[VAL4:%.*]] = alloc_stack $SomeProtocol
@@ -169,6 +169,8 @@ bb0(%0 : $*SomeProtocol):
   // CHECK: dealloc_stack [[VAL4]]#0
   // CHECK: strong_release [[VAL1]]#0
   // CHECK: return [[VAL6]]
+
+bb0(%0 : $*SomeProtocol):
   %1 = function_ref @test_protocol_metatype : $[thin] (p : SomeProtocol) -> SomeProtocol.metatype
   %2 = apply [transparent] %1(%0) : $[thin] (p : SomeProtocol) -> SomeProtocol.metatype
   %3 = return %2 : $SomeProtocol.metatype
@@ -248,7 +250,7 @@ bb6(%39 : $Float32):
 // CHECK-LABEL: sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32
 sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
 
-// CHECK: [[BB0:.*]](%0 : $Float32):
+// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Float32):
   // CHECK: [[VAL1:%.*]] = alloc_box $Float32
   // CHECK: store [[VAL0]] to [[VAL1]]#1
   // CHECK: [[VAL3:%.*]] = function_ref @_TSsoi1sFT3lhsSf3rhsSf_Sf
@@ -271,10 +273,10 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
   // CHECK: [[VAL20:%.*]] = function_ref @foo
   // CHECK: [[VAL21:%.*]] = load [[VAL15]]#1
   // CHECK: [[VAL22:%.*]] = load [[VAL16]]#1
-  // CHECK: [[VAL23:%.*]] = apply [[VAL20]]([[VAL21]], [[VAL22]])
+  // CHECK: [[VAL23:%.*]] = apply [transparent] [[VAL20]]([[VAL21]], [[VAL22]])
   // CHECK: [[VAL24:%.*]] = alloc_stack $Bool
   // CHECK: store [[VAL23]] to [[VAL24]]#1
-  // CHECK: [[VAL26:%.*]] = apply [[VAL19]]([[VAL24]]#1)
+  // CHECK: [[VAL26:%.*]] = apply [transparent] [[VAL19]]([[VAL24]]#1)
   // CHECK: dealloc_stack [[VAL24]]#0
   // CHECK: condbranch [[VAL26]], [[BB1:.*]], [[BB2:.*]]
 
@@ -289,10 +291,10 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
   // CHECK: [[VAL32:%.*]] = function_ref @_TSb13getLogicValuefRSbFT_Bi1_
   // CHECK: [[VAL33:%.*]] = function_ref @bar
   // CHECK: [[VAL34:%.*]] = load [[VAL16]]#1
-  // CHECK: [[VAL35:%.*]] = apply [[VAL33]]([[VAL34]])
+  // CHECK: [[VAL35:%.*]] = apply [transparent] [[VAL33]]([[VAL34]])
   // CHECK: [[VAL36:%.*]] = alloc_stack $Bool
   // CHECK: store [[VAL35]] to [[VAL36]]#1
-  // CHECK: [[VAL38:%.*]] = apply [[VAL32]]([[VAL36]]#1)
+  // CHECK: [[VAL38:%.*]] = apply [transparent] [[VAL32]]([[VAL36]]#1)
   // CHECK: dealloc_stack [[VAL36]]#0
   // CHECK: condbranch [[VAL38]], [[BB4:.*]], [[BB5:.*]]
 
@@ -302,8 +304,8 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
   // CHECK: [[VAL43:%.*]] = function_ref @_TSf31_convertFromBuiltinFloatLiteralfMSfFT5valueBf64__Sf
   // CHECK: [[VAL44:%.*]] = metatype $Float32.metatype
   // CHECK: [[VAL45:%.*]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
-  // CHECK: [[VAL46:%.*]] = apply [[VAL43]]([[VAL45]], [[VAL44]])
-  // CHECK: [[VAL47:%.*]] = apply [[VAL41]]([[VAL42]], [[VAL46]])
+  // CHECK: [[VAL46:%.*]] = apply [transparent] [[VAL43]]([[VAL45]], [[VAL44]])
+  // CHECK: [[VAL47:%.*]] = apply [transparent] [[VAL41]]([[VAL42]], [[VAL46]])
   // CHECK: store [[VAL47]] to [[VAL16]]#1
   // CHECK: br [[BB3]]
 
@@ -351,30 +353,63 @@ bb0(%0 : $Float32):
   return %21 : $Float32
 }
 
-// CHECK: @test_recursive_foo : $[thin] (x : Float32) -> Float32
+// CHECK-LABEL: @test_recursive_foo : $[thin] (x : Float32) -> Float32
 sil @test_recursive_foo : $[thin] (x : Float32) -> Float32 {
-bb0(%0 : $Float32):
   // CHECK-NOT: function_ref
   // CHECK-NOT: apply
-  // CHECK: return %0
+  // CHECK: return
+
+bb0(%0 : $Float32):
   %3 = function_ref @test_recursive_bar : $[thin] (x : Float32) -> Float32 // test.bar : (x : swift.Float32) -> swift.Float32 // user: %5
   %5 = apply [transparent] %3(%0) : $[thin] (x : Float32) -> Float32 // user: %7
   return %5 : $Float32
 }
 
-// CHECK: sil @test_recursive_bar : $[thin] (x : Float32) -> Float32
+// CHECK-LABEL: sil @test_recursive_bar : $[thin] (x : Float32) -> Float32
 sil @test_recursive_bar : $[thin] (x : Float32) -> Float32 {
-bb0(%0 : $Float32):
   // CHECK-NOT: function_ref
   // CHECK-NOT: apply
-  // CHECK: return %0
+  // CHECK: return
+
+bb0(%0 : $Float32):
   %3 = function_ref @test_recursive_baz : $[thin] (x : Float32) -> Float32 // test.baz : (x : swift.Float32) -> swift.Float32 // user: %5
   %5 = apply [transparent] %3(%0) : $[thin] (x : Float32) -> Float32 // user: %7
   return %5 : $Float32
 }
 
-// CHECK: sil @test_recursive_baz : $[thin] (x : Float32) -> Float32
+// CHECK-LABEL: sil @test_recursive_baz : $[thin] (x : Float32) -> Float32
 sil @test_recursive_baz : $[thin] (x : Float32) -> Float32 {
+  // CHECK-NOT: function_ref
+  // CHECK-NOT: apply
+  // CHECK: return
+
 bb0(%0 : $Float32):
   return %0 : $Float32
+}
+
+// CHECK-LABEL: sil @test_partial_foo : $[thin] Int64 -> Int64 {
+sil @test_partial_foo : $[thin] (Int64) -> Int64 {
+// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Int64):
+  // CHECK: [[VAL1:%.*]] = function_ref @plus
+  // CHECK: [[VAL2:%.*]] = apply [transparent] [[VAL1]]([[VAL0]], [[VAL0]])
+  // CHECK: return [[VAL2]]
+
+bb0(%0 : $Int64):
+  %3 = function_ref @test_partial_baz : $[thin] (Int64, Int64) -> Int64
+  %5 = partial_apply %3(%0) : $[thin] (Int64, Int64) -> Int64
+  %13 = apply [transparent] %5(%0) : $Int64 -> Int64
+  return %13 : $Int64
+}
+
+sil @test_partial_baz : $[thin] (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %6 = function_ref @plus : $[thin] (lhs : Int64, rhs : Int64) -> Int64 // user: %7
+  %7 = apply %6(%0, %1) : $[thin] (lhs : Int64, rhs : Int64) -> Int64 // user: %10
+  return %7 : $Int64
+}
+
+sil @test_partial_bar : $[thin] (Int64 -> Int64, Int64) -> Int64 {
+bb0(%0 : $Int64 -> Int64, %1 : $Int64):
+  %7 = apply %0(%1) : $Int64 -> Int64
+  return %7 : $Int64
 }

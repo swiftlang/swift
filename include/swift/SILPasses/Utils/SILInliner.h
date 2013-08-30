@@ -27,17 +27,30 @@ class SILInliner : private SILCloner<SILInliner> {
 public:
   friend class SILCloner<SILInliner>;
 
-  explicit SILInliner(SILFunction &F) : SILCloner<SILInliner>(F) { }
+  explicit SILInliner(SILFunction &F, bool MakeTransparent = false)
+    : SILCloner<SILInliner>(F, MakeTransparent) {
+  }
 
-  /// inlineFunction - This method inlines the callee of a given ApplyInst,
-  /// which must a FunctionRefInst, into the caller containing the ApplyInst,
-  /// which must be the same function as provided to the constructor of
-  /// SILInliner. It only performs one step of inlining: it does not recursively
-  /// inline functions called by the callee.
+  /// inlineFunction - This method inlines a callee function, assuming that it
+  /// is called with the given arguments, into the caller at a given instruction
+  /// (as specified by a basic block iterator), assuming that the instruction
+  /// corresponds semantically to an application of the function. It only
+  /// performs one step of inlining: it does not recursively inline functions
+  /// called by the callee.
   ///
   /// Returns true on success or false if it is unable to inline the function
-  /// (for any reason).
-  bool inlineFunction(ApplyInst *AI);
+  /// (for any reason). If successful, I now points to the first inlined
+  /// instruction, or the next instruction after the removed instruction in the
+  /// original function, in case the inlined function is completely trivial
+  bool inlineFunction(SILBasicBlock::iterator &I, SILFunction *CalleeFunction,
+                      ArrayRef<SILValue> Args);
+
+  bool inlineFunction(SILInstruction *AI, SILFunction *CalleeFunction,
+                      ArrayRef<SILValue> Args) {
+    assert(AI->getParent() && "Inliner called on uninserted instruction");
+    SILBasicBlock::iterator I(AI);
+    return inlineFunction(I, CalleeFunction, Args);
+  }
 
 private:
   void visitSILBasicBlock(SILBasicBlock* BB);

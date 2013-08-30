@@ -24,7 +24,7 @@ using namespace swift;
 typedef llvm::DenseSet<SILFunction*> DenseFunctionSet;
 typedef llvm::ImmutableSet<SILFunction*> ImmutableFunctionSet;
 
-STATISTIC(NumMandatoryInlineSitesInlined,
+STATISTIC(NumMandatoryInlines,
           "Number of function application sites inlined by the mandatory "
           "inlining pass");
 
@@ -33,6 +33,51 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
               U &&...args) {
   Context.Diags.diagnose(loc,
                          diag, std::forward<U>(args)...);
+}
+
+/// \brief Returns the callee SILFunction called at a call site, in the case
+/// that the call is transparent (as in, both that the call is marked
+/// with the transparent flag and that callee function is actually transparently
+/// determinable from the SIL) or nullptr otherwise. This assumes that the SIL
+/// is already in SSA form.
+///
+/// In the case that a non-null value is returned, Args contains effective
+/// argument operands for the callee function and PossiblyDeadInsts contains
+/// instructions that might be dead after inlining and removal of any dead
+/// instructions earlier in the vector.
+static SILFunction *
+getCalleeFunction(ApplyInst* AI, SmallVectorImpl<SILValue>& Args,
+                  SmallVectorImpl<SILInstruction*>& PossiblyDeadInsts) {
+  if (!AI->isTransparent())
+    return nullptr;
+
+  Args.clear();
+  PossiblyDeadInsts.clear();
+
+  for (const auto &Arg : AI->getArguments())
+    Args.push_back(Arg);
+  SILValue Callee = AI->getCallee();
+
+  while (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(Callee.getDef())) {
+    assert(Callee.getResultNumber() == 0);
+
+    for (const auto &Arg : PAI->getArguments())
+      Args.push_back(Arg);
+    Callee = PAI->getCallee();
+
+    PossiblyDeadInsts.push_back(PAI);
+  }
+
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef());
+  if (!FRI)
+    return nullptr;
+  assert(Callee.getResultNumber() == 0);
+
+  SILFunction *CalleeFunction = FRI->getFunction();
+  if (!CalleeFunction || CalleeFunction->empty())
+    return nullptr;
+  PossiblyDeadInsts.push_back(FRI);
+  return CalleeFunction;
 }
 
 /// \brief Inlines all mandatory inlined functions into the body of a function,
@@ -57,7 +102,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
   // Avoid reprocessing functions needlessly
   if (FullyInlinedSet.find(F) != FullyInlinedSet.end())
     return true;
-  
+
   // Prevent attempt to circularly inline.
   if (CurrentInliningSet.contains(F)) {
     // This cannot happen on a top-level call, so AI should be non-null.
@@ -73,53 +118,65 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
   // during this call and recursive subcalls).
   CurrentInliningSet = SetFactory.add(CurrentInliningSet, F);
 
-  SmallVector<ApplyInst*, 4> ApplySites;
-  for (auto &BB : *F) {
-    for (auto &I : BB) {
-      ApplyInst *InnerAI;
-      if ((InnerAI = dyn_cast<ApplyInst>(&I)) && InnerAI->isTransparent()) {
-        // Figure out of this is something we have the body for
-        // FIXME: once fragile SIL is serialized in modules, these can be
-        // asserts, since transparent inline functions should always have their
-        // bodies available.
-        SILValue Callee = InnerAI->getCallee();
-        FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef());
-        if (!FRI)
-          continue;
-        assert(Callee.getResultNumber() == 0);
-        SILFunction *CalledFunc = FRI->getFunction();
-        if (!CalledFunc || CalledFunc->empty())
-          continue;
-
-        // Then recursively process it first before trying to inline it.
-        if (!runOnFunctionRecursively(CalledFunc, InnerAI, FullyInlinedSet,
-                                      SetFactory, CurrentInliningSet)) {
-          // If we failed due to circular inlining, then emit some notes to
-          // trace back the failure if we have more information.
-          // FIXME: possibly it could be worth recovering and attempting other
-          // inlines within this same recursive call rather than simply
-          // propogating the failure.
-          if (AI) {
-            SILLocation L = AI->getLoc();
-            assert(L && "Must have location for transparent inline apply");
-            diagnose(F->getModule().getASTContext(), L.getStartSourceLoc(),
-                     diag::note_while_inlining);
-          }
-          return false;
-        }
-
-        ApplySites.push_back(InnerAI);
+  SmallVector<SILValue, 16> Args;
+  SmallVector<SILInstruction*, 16> PossiblyDeadInsts;
+  SILInliner Inliner(*F, /*MakeTransparent=*/true);
+  for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
+    auto I = FI->begin(), E = FI->end();
+    while (I != E) {
+      ApplyInst *InnerAI = dyn_cast<ApplyInst>(I);
+      if (!InnerAI) {
+        ++I;
+        continue;
       }
-    }
-  }
 
-  // Do the inlining separately from the inspection loop to avoid iterator
-  // invalidation issues.
-  if (!ApplySites.empty()) {
-    SILInliner Inliner(*F);
-    for (auto *InnerAI : ApplySites) {
-      Inliner.inlineFunction(InnerAI);
-      ++NumMandatoryInlineSitesInlined;
+      SILFunction *CalleeFunction = getCalleeFunction(InnerAI, Args,
+                                                      PossiblyDeadInsts);
+      if (!CalleeFunction) {
+        ++I;
+        continue;
+      }
+
+      // Then recursively process it first before trying to inline it.
+      if (!runOnFunctionRecursively(CalleeFunction, InnerAI, FullyInlinedSet,
+                                    SetFactory, CurrentInliningSet)) {
+        // If we failed due to circular inlining, then emit some notes to
+        // trace back the failure if we have more information.
+        // FIXME: possibly it could be worth recovering and attempting other
+        // inlines within this same recursive call rather than simply
+        // propogating the failure.
+        if (AI) {
+          SILLocation L = AI->getLoc();
+          assert(L && "Must have location for transparent inline apply");
+          diagnose(F->getModule().getASTContext(), L.getStartSourceLoc(),
+                   diag::note_while_inlining);
+        }
+        return false;
+      }
+
+      // Inline function at I, which also changes I to refer to the first
+      // instruction inlined in the case that it succeeds. We purposely
+      // process the inlined body after inlining, because the inlining may
+      // have exposed new inlining opportunities beyond those present in
+      // the inlined function when processed independently
+      if (!Inliner.inlineFunction(I, CalleeFunction, Args)) {
+        // If inlining failed, then I is left unchanged, so increment it
+        // before continuing rather than process the same apply instruction
+        // twice
+        ++I;
+        continue;
+      }
+
+      // Reposition iterators possibly invalidated by mutation
+      FI = SILFunction::iterator(I->getParent());
+      FE = F->end();
+      E = FI->end();
+
+      for (SILInstruction *PossiblyDeadInst : PossiblyDeadInsts)
+        if (PossiblyDeadInst->use_empty())
+          PossiblyDeadInst->eraseFromParent();
+
+      ++NumMandatoryInlines;
     }
   }
 

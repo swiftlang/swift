@@ -36,7 +36,9 @@ class SILCloner : protected SILVisitor<SILCloner<ImplClass>, SILValue> {
   friend class SILVisitor<SILCloner<ImplClass>, SILValue>;
 
 public:
-  explicit SILCloner(SILFunction &F) : Builder(F) { }
+  explicit SILCloner(SILFunction &F, bool MakeTransparent = false)
+    : Builder(F), MakeTransparent(MakeTransparent) {
+  }
 
 #define VALUE(CLASS, PARENT) \
   SILValue visit##CLASS(CLASS *I) {                                   \
@@ -90,6 +92,7 @@ private:
   }
 
   SILBuilder Builder;
+  bool MakeTransparent;
 };
 
 /// SILInstructionCloner - Concrete SILCloner subclass which can only be called
@@ -157,7 +160,8 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst* Inst) {
   return doPostProcess(Inst,
     Builder.createApply(getOpLocation(Inst->getLoc()),
                         getOpValue(Inst->getCallee()),
-                        getOpType(Inst->getType()), Args));
+                        getOpType(Inst->getType()), Args,
+                        MakeTransparent ? true : Inst->isTransparent()));
 }
 
 template<typename ImplClass>
