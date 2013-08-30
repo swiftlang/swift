@@ -51,7 +51,7 @@ enum class SILInstructionMemoryBehavior {
   ///        alloc is not considered to have side effects because its
   ///        result/users represent its effect.
   MayHaveSideEffects,
-  /// \brief The istruction may write to memory.
+  /// \brief The instruction may write to memory.
   MayWrite,
   MayWriteAndHaveSideEffects
 };
