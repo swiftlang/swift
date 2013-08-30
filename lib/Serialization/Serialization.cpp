@@ -1392,6 +1392,7 @@ void Serializer::writeDecl(const Decl *D) {
     remainingAttrs.Thin = false;
     remainingAttrs.ObjC = false;
     remainingAttrs.IBAction = false;
+    remainingAttrs.Transparent = false;
 
     assert(remainingAttrs.empty() && "unhandled func attrs");
 
