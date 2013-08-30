@@ -571,20 +571,6 @@ bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
 }
 
 namespace {
-
-/// A pair of an ExprPattern node and the SILValue it will test.
-struct ExprGuard {
-  const ExprPattern *pattern;
-  SILValue value;
-  
-  bool operator==(ExprGuard o) const {
-    return pattern == o.pattern && value == o.value;
-  }
-  
-  bool operator!=(ExprGuard o) const {
-    return pattern != o.pattern || value != o.value;
-  }
-};
   
 /// A CaseMap entry.
 struct CaseBlock {
@@ -647,10 +633,11 @@ class ClauseRow {
   
   Prefix *row;
   unsigned columnCount;
-  ArrayRef<ExprGuard> exprGuards;
+  ArrayRef<const ExprPattern*> exprGuards;
   
   // ClauseRows should only be vended by ClauseMatrix::operator[].
-  ClauseRow(Prefix *row, unsigned columnCount, ArrayRef<ExprGuard> guards)
+  ClauseRow(Prefix *row, unsigned columnCount,
+            ArrayRef<const ExprPattern*> guards)
     : row(row), columnCount(columnCount), exprGuards(guards)
   {}
   
@@ -677,7 +664,7 @@ public:
     return row->cont;
   }
   
-  ArrayRef<ExprGuard> getExprGuards() const {
+  ArrayRef<const ExprPattern*> getExprGuards() const {
     return exprGuards;
   }
   
@@ -726,7 +713,7 @@ public:
         guardBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
       // Test ExprPatterns from the row in an "and" chain.
       for (unsigned i = 0, e = exprGuards.size(); i < e; ++i) {
-        ExprGuard eg = exprGuards[i];
+        const ExprPattern *ep = exprGuards[i];
         
         // The last pattern test jumps to the guard.
         SILBasicBlock *nextBB = guardBB;
@@ -736,7 +723,7 @@ public:
         // Emit the match test.
         SILValue testBool;
         {
-          Expr *ME = eg.pattern->getMatchExpr();
+          Expr *ME = ep->getMatchExpr();
           FullExpr scope(gen.Cleanups, CleanupLocation(ME));
           testBool = gen.emitRValue(ME)
             .getUnmanagedSingleValue(gen);
@@ -855,7 +842,7 @@ class ClauseMatrix {
   /// A list of ExprPatterns and the associated SILValue they test. Rows
   /// reference into slices of this vector to indicate which ExprPatterns form
   /// part of their guard.
-  std::vector<ExprGuard> exprGuards;
+  std::vector<const ExprPattern*> exprGuards;
   
   // The memory layout of data is as follows:
   
@@ -928,7 +915,7 @@ public:
               ArrayRef<const Pattern*> cols,
               CleanupsDepth scope,
               SILBasicBlock *contBB,
-              ArrayRef<ExprGuard> parentExprGuards = {}) {
+              ArrayRef<const ExprPattern *> parentExprGuards = {}) {
     assert(cols.size() == columnCount && "new row has wrong number of columns");
 
     // Grow storage if necessary.
@@ -946,10 +933,9 @@ public:
       auto *ep = getAsExprPattern(cols[i]);
       if (!ep)
         continue;
-      ExprGuard eg{ep, getOccurrences()[i]};
-      if (std::find(parentExprGuards.begin(), parentExprGuards.end(), eg)
+      if (std::find(parentExprGuards.begin(), parentExprGuards.end(), ep)
            == parentExprGuards.end())
-        exprGuards.push_back(eg);
+        exprGuards.push_back(ep);
     }
     unsigned exprGuardEnd = exprGuards.size();
     
