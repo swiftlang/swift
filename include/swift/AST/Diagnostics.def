@@ -47,9 +47,6 @@ ERROR(invalid_diagnostic,parsing,none,
 ERROR(not_implemented,TODO,none,
       "INTERNAL ERROR: feature not implemented", ())
 
-ERROR(expected_lbrace,parsing,none,
-     "to match this opening '{'", ())
-
 NOTE(opening_brace,parsing,none,
      "to match this opening '{'", ())
 NOTE(opening_bracket,parsing,none,
@@ -85,8 +82,6 @@ ERROR(lex_unprintable_ascii_character,lexing,none,
       "unprintable ASCII character found in source file", ())
 ERROR(lex_invalid_utf8_character,lexing,none,
       "invalid UTF8-encoded character found in source file", ())
-ERROR(lex_missing_whitespace,lexing,none,
-        "missing whitespace", ())
 
 ERROR(lex_unterminated_block_comment,lexing,none,
       "unterminated '/*' comment", ())
@@ -150,16 +145,8 @@ ERROR(declaration_same_line_without_semi,decl_parsing,none,
 
 ERROR(expected_decl,decl_parsing,none,
       "expected declaration", ())
-ERROR(top_level_decl_without_type,decl_parsing,none,
-      "top-level declarations require a type specifier", ())
 ERROR(expected_identifier_in_decl,decl_parsing,none,
       "expected identifier in %0 declaration", (StringRef))
-ERROR(expected_type_or_init,decl_parsing,none,
-      "expected a type or an initializer", ())
-ERROR(non_simple_var,decl_parsing,none,
-      "complex 'var' declaration not allowed here", ())
-ERROR(precedence_overload,decl_parsing,none,
-      "infix precedence of functions in an overload set must match", ())
 ERROR(decl_redefinition,decl_parsing,none,
       "%select{declaration|definition}0 conflicts with previous value", 
       (bool))
@@ -186,12 +173,6 @@ ERROR(decl_not_static,decl_parsing,none,
       "declaration can not be 'static'", ())
 
 // Var Name
-ERROR(expected_lparen_var_name,decl_parsing,none,
-      "expected identifier or '(' in var name", ())
-ERROR(expected_rparen_var_name,decl_parsing,none,
-      "expected ')' at end of var name", ())
-ERROR(invalid_index_in_var_name_path,decl_parsing,none,
-      "%0 is an invalid index for %1", (Identifier, Type))
 ERROR(unimplemented_static_var,decl_parsing,none,
      "static variables not yet supported", ())
 
@@ -271,8 +252,6 @@ ERROR(expected_rbrace_class,decl_parsing,none,
 // Protocol
 ERROR(expected_rbrace_protocol,decl_parsing,none,
       "expected '}' in protocol", ())
-ERROR(protocol_func_def,decl_parsing,none,
-      "methods may not be defined in a protocol", ())
 
 // Subscripting
 ERROR(subscript_decl_wrong_scope,decl_parsing,none,
@@ -370,8 +349,6 @@ NOTE(sil_prior_reference,parsing,none,
 
 
 // SIL Instructions
-ERROR(expected_sil_instr_name,decl_parsing,none,
-      "expected instruction name", ())
 ERROR(expected_sil_instr_start_of_line,decl_parsing,none,
       "SIL instructions must be at the start of a line", ())
 ERROR(expected_equal_in_sil_instr,decl_parsing,none,
@@ -390,8 +367,6 @@ ERROR(sil_struct_inst_wrong_field,decl_parsing,none,
       "struct instruction requires a field name", ())
 ERROR(sil_ref_inst_wrong_field,decl_parsing,none,
       "ref_element_addr instruction requires a field name", ())
-ERROR(sil_expected_allocation_kind,decl_parsing,none,
-      "expected allocation kind (heap, pseudo, or stack)", ())
 ERROR(sil_invalid_instr_operands,decl_parsing,none,
       "invalid instruction operands", ())
 ERROR(sil_operand_not_address,decl_parsing,none,
@@ -423,17 +398,7 @@ ERROR(expected_sil_function_name, decl_parsing,none,
       "expected SIL function name", ())
 ERROR(expected_sil_rbrace, decl_parsing,none,
       "expected '}' at the end of a sil body", ())
-ERROR(expected_bracket_sil_type_attributes,expr_parsing,none,
-      "expected ']' in SIL type attribute list", ())
-ERROR(expected_identifier_sil_type_attributes,expr_parsing,none,
-      "expected identifier in SIL type attribute list", ())
-ERROR(unknown_sil_type_attribute,expr_parsing,none,
-      "unknown SIL type attribute", ())
-ERROR(malformed_sil_cc_attribute,expr_parsing,none,
-      "invalid sil_cc attribute", ())
-ERROR(malformed_sil_uncurry_attribute,expr_parsing,none,
-      "invalid sil_uncurry attribute", ())
-      
+
 // SIL Stage
 ERROR(expected_sil_stage_name, decl_parsing, none,
       "expected 'raw' or 'canonical' after 'sil_stage'", ())
@@ -458,8 +423,6 @@ ERROR(expected_identifier_in_dotted_type,expr_parsing,none,
       "expected identifier in dotted type", ())
 ERROR(expected_identifier_for_type,expr_parsing,none,
       "expected identifier for type name", ())
-ERROR(named_definition_isnt_type,expr_parsing,none,
-      "%0 does not name a type", (Identifier))
 ERROR(expected_rangle_generic_arg_list,type_parsing,none,
       "expected '>' to complete generic argument list", ())
 
@@ -473,10 +436,6 @@ ERROR(expected_lbrace_union_type,type_parsing,none,
       "expected '{' in union", ())
 ERROR(expected_rbrace_union_type,type_parsing,none,
       "expected '}' at end of union", ())
-ERROR(duplicate_union_element,type_parsing,none,
-      "duplicate definition of union case '%0'", (StringRef))
-ERROR(expected_type_union_element,type_parsing,none,
-      "expected type in parentheses after 'case' name", ())
 ERROR(expected_type_union_element_result,type_parsing,none,
       "expected type after '->' in 'case'", ())
 
@@ -505,8 +464,6 @@ ERROR(tuple_type_init,pattern_parsing,none,
 // Protocol Types
 ERROR(expected_lbrace_protocol_type,type_parsing,none,
       "expected '{' in protocol type", ())
-ERROR(expected_protocol_member,type_parsing,none,
-      "expected a function or variable declaration in protocol", ())
 ERROR(expected_langle_protocol,type_parsing,none,
       "expected '<' in protocol composition type", ())
 ERROR(expected_rangle_protocol,type_parsing,none,
@@ -532,8 +489,6 @@ ERROR(ellipsis_pattern_not_at_end,pattern_parsing,none,
       "variadic arguments '...' must come at the end of the pattern", ())
 ERROR(non_func_decl_pattern_init,pattern_parsing,none,
       "default argument is only permitted for a non-curried function parameter",())
-ERROR(missing_comma_in_pattern,pattern_parsing,none,
-      "missing comma between patterns", ())
 ERROR(var_pattern_in_var,pattern_parsing,none,
       "'var' cannot appear nested inside another 'var' pattern", ())
 
@@ -634,10 +589,6 @@ ERROR(expected_case_where_expr,stmt_parsing,none,
       "expected expression for 'where' guard of 'case'", ())
 ERROR(expected_case_colon,stmt_parsing,none,
       "expected ':' after '%0'", (StringRef))
-ERROR(expected_case_stmt,stmt_parsing,none,
-      "expected statement or expression in 'switch'", ())
-ERROR(expected_switch_case_or_default,stmt_parsing,none,
-      "expected 'case' or 'default' in 'switch'", ())
 ERROR(default_with_other_labels,stmt_parsing,none,
       "'default' cannot appear with other 'case' or 'default' labels over the same block",
       ())
@@ -667,8 +618,6 @@ ERROR(expected_prefix_operator,expr_parsing,none,
       "unary operator cannot be separated from its operand", ())
 ERROR(expected_operator_ref,expr_parsing,none,
       "expected operator name in operator reference", ())
-ERROR(expected_rparen_operator_ref,expr_parsing,none,
-      "expected closing ')' after operator name in operator reference", ())
 ERROR(invalid_postfix_operator,expr_parsing,none,
       "operator with postfix spacing cannot start a subexpression", ())
 
@@ -708,11 +657,6 @@ ERROR(super_constructor_not_in_constructor,expr_parsing,none,
 ERROR(super_constructor_must_be_called,expr_parsing,none,
       "'super.constructor' cannot be referenced without arguments", ())
 
-ERROR(expected_expr_closure,expr_parsing,none,
-      "expected expression in closure", ())
-ERROR(expected_rbrace_in_closure,expr_parsing,none,
-      "expected '}' at end of closure", ())
-
 ERROR(trailing_closure_not_postfix,expr_parsing,none,
       "trailing closure can only follow a postfix expression", ())
 NOTE(trailing_closure_full_expr_parentheses,expr_parsing,none,
@@ -720,15 +664,7 @@ NOTE(trailing_closure_full_expr_parentheses,expr_parsing,none,
 NOTE(trailing_closure_postfix_parentheses,expr_parsing,none,
      "add parentheses around last postfix expression", ())
 
-// Subscript expressions
-ERROR(expected_expr_subscript_value,expr_parsing,none,
-      "expected expression for subscript value", ())
-ERROR(expected_bracket_array_subscript,expr_parsing,none,
-      "expected ']' in subscript expression", ())
-
 // New expressions
-ERROR(array_new_init_unsupported,expr_parsing,none,
-      "no support init in new", ())
 ERROR(array_new_missing_first_bound,expr_parsing,none,
       "must specify length of array to allocate", ())
 ERROR(expected_expr_new_array_bound,expr_parsing,none,
@@ -747,8 +683,6 @@ ERROR(expected_value_in_dictionary_literal,expr_parsing,none,
       "expected value in dictionary literal", ())
 ERROR(expected_colon_in_dictionary_literal,expr_parsing,none,
       "expected ':' in dictionary literal", ())
-ERROR(expected_equal_in_tuple_expr,expr_parsing,none,
-      "expected '=' in tuple expression", ())
 ERROR(expected_rparen_expr_list,expr_parsing,none,
       "expected ')' in expression list", ())
 ERROR(expected_rsquare_expr_list,expr_parsing,none,
@@ -778,20 +712,12 @@ ERROR(string_literal_broken_proto,sema_tce,none,
       "protocol 'StringLiteralConvertible' is broken", ())
 
 // Array literal expressions
-ERROR(expected_expr_array,expr_parsing,none,
-      "expected subexpression in container literal", ())
 ERROR(expected_rsquare_array_expr,expr_parsing,none,
       "expected ']' in container literal expression", ())
-
-// Func expressions
-ERROR(expected_lbrace_func_expr,decl_parsing,none,
-      "expected '{' in func expression", ())
 
 // If expressions
 ERROR(expected_expr_after_if_question,expr_parsing,none,
       "expected expression after '?' in ternary expression", ())
-ERROR(expected_question_before_if_colon,expr_parsing,none,
-      "expected '?' before ':' in ternary expression", ())
 ERROR(expected_colon_after_if_question,expr_parsing,none,
       "expected ':' after '? ...' in ternary expression", ())
 ERROR(expected_expr_after_if_colon,expr_parsing,none,
@@ -821,19 +747,6 @@ NOTE(while_processing_literal_conversion_function,sema,none,
      "while processing argument of conversion function to inferred type %0",
       (Type))
 
-ERROR(type_not_compatible_literal,literal_parsing,none,
-      "inferred type %0 is not compatible with literal", (Type))
-ERROR(type_ambiguous_literal_conversion,literal_parsing,none,
-      "%0 has multiple '%1' methods", (Type, StringRef))
-ERROR(type_literal_conversion_not_static,literal_parsing,none,
-      "'%1' method in %0 must be a static method",
-      (Type, StringRef))
-ERROR(literal_conversion_wrong_return_type,literal_parsing,none,
-      "'%1' should return %0", (Type, StringRef))
-ERROR(type_literal_conversion_defined_wrong,literal_parsing,none,
-      "conversion method in %0 not defined in terms of standard library type",
-       (Type))
-
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
@@ -848,18 +761,10 @@ ERROR(cannot_combine_attribute,attribute_parsing,none,
 ERROR(expected_in_attribute_list,attribute_parsing,none,
       "expected ']' or ',' in attribute list", ())
 
-// infix and unary      
-ERROR(expected_precedence_value,attribute_parsing,none,
-      "expected precedence number in infix attribute", ())
-ERROR(invalid_precedence,attribute_parsing,none,
-      "precedence '%0' is not an integer between 0 and 255", (StringRef))
-
 ERROR(import_attributes,attribute_parsing,none,
       "invalid attributes specified for import", ())
 
 // byref
-ERROR(byref_attribute_expected_identifier,attribute_parsing,none,
-      "expected identifier for byref attribute", ())
 ERROR(byref_attribute_unknown_qualifier,attribute_parsing,none,
       "unknown qualifier for byref attribute", ())
 ERROR(byref_attribute_expected_rparen,attribute_parsing,none,
@@ -934,14 +839,8 @@ NOTE(while_converting_function_argument,sema,none,
 NOTE(while_converting_subscript_index,sema,none,
      "while converting subscript index to expected type %0", (Type))
 
-ERROR(invalid_anonymous_argument,sema,none,
-      "use of invalid anonymous argument, %0 is larger than"
-      " # arguments to bound function (%1)", (unsigned, unsigned))
-
 ERROR(constraint_type_check_fail,sema,none,
       "expression does not type-check", ())
-ERROR(constraint_assign_type_check_fail,sema,none,
-      "assignment does not type-check", ())
 
 //------------------------------------------------------------------------------
 // Name Binding
@@ -970,8 +869,6 @@ ERROR(invalid_redecl,sema_nb,none,"invalid redeclaration",())
 NOTE(invalid_redecl_prev,sema_nb,none,
      "%0 previously declared here", (Identifier))
 
-ERROR(no_module_or_type,sema_nb,none,
-      "no such module or type", ())
 ERROR(ambiguous_type_base,sema_nb,none,
       "%0 is ambiguous for type look up in this context", (Identifier))
 ERROR(invalid_member_type,sema_nb,none,
@@ -1030,53 +927,10 @@ ERROR(invalid_arg_count_for_operator,sema_nb,none,
 // Type Check Coercions
 //------------------------------------------------------------------------------
 
-ERROR(cannot_convert_unresolved_reference,sema_tcc,none,
-      "unresolved reference to member %0 cannot convert to %1",
-      (Identifier,Type))
-ERROR(invalid_member_in_type,sema_tcc,none,
-      "type %0 has no member named %1", (Type, Identifier))
-ERROR(call_element_not_function_type,sema_tcc,none,
-      "cannot provide an initializer for member %1 of type %0", (Type, Identifier))
-ERROR(call_element_function_type,sema_tcc,none,
-      "must provide an initializer for member %1 of type %0", (Type, Identifier))
-ERROR(not_initialized_tuple_element,sema_tcc,none,
-      "no value to initialize tuple element #%0 in expression of type %1",
-      (unsigned, Type))
-ERROR(not_initialized_named_tuple_element,sema_tcc,none,
-     "no value to initialize tuple element %0 (#%1) in expression of type %2",
-      (Identifier, unsigned, Type))
-ERROR(tuple_element_not_used,sema_tcc,none,
-      "element #%0 of tuple value not used when converting to type %1",
-      (unsigned, Type))
-ERROR(named_tuple_element_not_used,sema_tcc,none,
-      "element %0 (#%1) of tuple value not used when converting to type %2",
-      (Identifier, unsigned, Type))
-ERROR(tuple_element_type_mismatch,sema_tcc,none,
-      "element #%0 of tuple value has type %1, but expected type %2",
-      (unsigned, Type, Type))
 ERROR(tuple_conversion_not_expressible,sema_tcc,none,
       "lame: cannot express tuple conversion %0 to %1", (Type, Type))
-ERROR(invalid_conversion,sema_tcc,none,
-      "invalid conversion from type %0 to %1", (Type, Type))
-ERROR(invalid_conversion_of_lvalue,sema_tcc,none,
-      "passing %0 variable by reference as %1 variable",
-      (Type, Type))
-ERROR(invalid_conversion_to_lvalue,sema_tcc,none,
-      "passing %0 value by reference as %1 variable",
-      (Type, Type))
-ERROR(implicit_use_of_lvalue,sema_tcc,none,
-      "passing %0 variable by reference without an '&' operator", (Type))
 ERROR(load_of_explicit_lvalue,sema_tcc,none,
       "%0 variable is not being passed by reference", (Type))
-ERROR(explicit_lvalue,sema_tcc,none,
-      "'&' is only needed when passing values by reference", ())
-ERROR(inconsistent_deduction,sema_tcc,none,
-      "inconsistent deduction for type parameter %0 (%1 vs. %2)",
-      (StringRef, Type, Type))
-ERROR(funcexpr_not_function_type,sema_tcc,none,
-      "cannot convert func expression to non-function type %0", (Type))
-ERROR(funcexpr_incompatible_result,sema_tcc,none,
-      "func has declared type %0 but inferred type %1", (Type, Type))
 
 //------------------------------------------------------------------------------
 // Expression Type Checking Errors
@@ -1093,8 +947,6 @@ ERROR(invalid_tuple_element_unused,sema_tcc,none,
 ERROR(does_not_have_member,sema_tcc,none,
   "%0 does not have a member named %1",
   (Type, Identifier))
-ERROR(cannot_construct_type,sema_tcc,none,
-  "cannot construct a value of type %0", (Type))
 ERROR(downcast_to_supertype,sema_tcc,none,
       "downcast from %0 to supertype %1 is a coercion; remove the '!'", 
       (Type, Type))
@@ -1129,8 +981,6 @@ NOTE(note_init_parameter,sema_tcc,none,
 // Type Check Declarations
 //------------------------------------------------------------------------------
 
-ERROR(invalid_index_in_element_ref,sema_tcd,none,
-      "%0 is an invalid index for %1", (Identifier, Type))
 ERROR(operator_not_func,sema_tcd,none,
       "operators must be declared with 'func'", ())
 ERROR(custom_operator_addressof,sema_tcd,none,
@@ -1146,8 +996,6 @@ ERROR(invalid_infix_input,sema_tcd,none,
      ())
 ERROR(infix_not_an_operator,sema_tcd,none,
       "only operator functions may be declared with an infix attribute", ())
-ERROR(binops_infix_left,sema_tcd,none,
-      "binary operators must be declared with an infix attribute", ())
 ERROR(postfix_not_an_operator,sema_tcd,none,
       "only operator functions can be declared 'postfix'", ())
 ERROR(invalid_postfix_input,sema_tcd,none,
@@ -1337,65 +1185,9 @@ ERROR(no_MaxBuiltinIntegerType_found,sema_tce,none,
 ERROR(no_MaxBuiltinFloatType_found,sema_tce,none,
    "standard library error: MaxBuiltinFloatType is not properly defined", ())
 
-ERROR(invalid_module_member,sema_tce,none,
-      "%0 is not a member of %1 module", (Identifier, Identifier))
-
-ERROR(unary_op_without_attribute,sema_tce,none,
-      "use of unary operator without 'prefix' or 'postfix' attribute specified", ())
-ERROR(binary_op_without_attribute,sema_tce,none,
-      "use of binary operator without 'infix' attribute specified", ())
-ERROR(called_expr_indirect_metatype,sema_tce,none,
-      "called expression is an indirect reference to a metatype", ())
-ERROR(called_expr_isnt_function,sema_tce,none,
-      "called expression isn't a function", ())
-ERROR(overloading_ambiguity,sema_tce,none,
-      "overloading ambiguity found", ())
-ERROR(no_candidates_op, sema_tce, none,
-      "no candidates found for %select{binary|unary}0 operator %1",
-      (unsigned, Identifier))
-ERROR(no_candidates_binop, sema_tce, none,
-      "no matching binary operator %0 for types %1 and %2",
-      (Identifier, Type, Type))
-ERROR(no_candidates_unary, sema_tce, none,
-      "no matching unary operator %0 for type %1",
-      (Identifier, Type))
-ERROR(no_candidates,sema_tce,none, "no candidates found for call", ())
-ERROR(no_candidates_ref,sema_tce,none,
-      "no candidates found for reference to overloaded %0", (Identifier))
-ERROR(use_undeclared_identifier,sema_tce,none,
-      "use of undeclared identifier", ())
-ERROR(field_number_too_large,sema_tce,none,
-      "field number is too large for tuple", ())
-ERROR(no_valid_dot_expression,sema_tce,none,
-      "base type %0 has no member named %1", (Type, Identifier))
-
-ERROR(no_member_of_tuple,sema_tce,none,
-      "tuple type %0 has no member named %1", (Type, Identifier))
-ERROR(no_member_of_protocol,sema_tce,none,
-      "protocol %0 has no member named %1", (Type, Identifier))
 ERROR(no_member_of_module,sema_tce,none,
       "module %0 has no member named %1", (Identifier, Identifier))
-ERROR(no_member_of_metatype,sema_tce,none,
-      "metatype %0 has no member named %1", (Type, Identifier))
-ERROR(member_ref_metatype_variable,sema_tce,none,
-      "reference to member variable %0 requires base object of type %1",
-      (Identifier, Type))
-ERROR(no_convert_object_arg,sema_tca,none,
-      "cannot convert object argument %0 to type %1", (Type, Type))
-ERROR(constructor_overload_fail,sema_tce,none,
-      "%select{no matching function|ambiguous overloads}0 constructing "
-      "type %1", (bool, Type))
-ERROR(existential_member_assoc_types,sema_tca,none,
-      "cannot refer to member %0 of protocol type %1 because its type (%2) "
-      "involves associated types", (Identifier, Type, Type))
 
-ERROR(closure_not_function_type,sema_tce,none,
-      "closure inferred to have non-function type %0", (Type))
-
-ERROR(super_constructor_not_in_class_constructor,sema_tce,none,
-      "'super.constructor' cannot be called in a constructor for a non-class type", ())
-ERROR(super_constructor_with_no_base_class,sema_tce,none,
-      "'super.constructor' cannot be called in a root class constructor", ())
 ERROR(super_not_in_class_method,sema_tce,none,
       "'super' members cannot be referenced in a non-class type", ())
 ERROR(super_with_no_base_class,sema_tce,none,
@@ -1406,13 +1198,6 @@ ERROR(byref_capture,sema_tce,none,
       "cannot capture [byref] parameter %0", (Identifier))
 
 // Operators
-ERROR(binop_not_infix,sema_tce,none,
-      "binary operator has no infix attribute", ())
-ERROR(binop_mismatched_infix,sema_tce,none,
-      "binary operator has overloads with incompatible infixity", ())
-
-ERROR(binop_not_overloaded,sema_tce,none,
-      "operator is not overloaded as a binary operator", ())
 ERROR(unknown_binop,sema_tce,none,
        "operator is not a known binary operator", ())
 ERROR(non_assoc_adjacent,sema_tce,none,
@@ -1422,43 +1207,19 @@ ERROR(incompatible_assoc,sema_tce,none,
       " but incompatible associativity", ())
 ERROR(reference_non_byref,sema_tce,none,
       "reference to %0 not used to initialize a [byref] parameter", (Type))
-ERROR(no_subscript_declaration,sema_tce,none,
-      "type %0 cannot be subscripted", (Type))
-ERROR(subscript_overload_fail,sema_tce,none,
-      "%select{no matching function|ambiguous overloads}0 subscripting base %1 "
-      "with index of type %2", (bool, Type, Type))
-ERROR(existential_subscript_assoc_types,sema_tca,none,
-      "cannot subscript value of protocol type %0 because its "
-      "%select{index|value}1 type (%2) involves associated types",
-      (Type, bool, Type))
 NOTE(subscript_decl_here,sema_tca,none,
      "subscript operator declared here", ())
-ERROR(condition_convert_limit_reached,sema_tce,none,
-      "getLogicValue() for type %0 used in a conditional does not return "
-      "a bool", (Type))
 ERROR(condition_broken_proto,sema_tce,none,
       "protocol 'LogicValue' is broken", ())
 ERROR(broken_bool,sema_tce,none, "type 'Bool' is broken", ())
 
 ERROR(new_array_bound_zero,sema_tce,none,
       "array type cannot have zero length", ())
-ERROR(array_bound_convert_limit_reached,sema_tce,none,
-      "getArrayBoundValue() for type %0 used as an array size does not return "
-      "an integer type", (Type))
 ERROR(broken_array_bound_proto,sema_tce,none,
       "protocol 'ArrayBound' is broken", ())
 ERROR(broken_builtin_array_bound,sema_tce,none,
       "builtin 'ArrayBound' type is broken", ())
 
-ERROR(new_reference_not_class,sema_tce,none,
-      "new expression used with non-class type", ())
-
-ERROR(string_interpolation_overload_fail,sema_tce,none,
-      "could not interpolate strings with %0 + %1", (Type, Type))
-ERROR(string_interpolation_convert_fail,sema_tce,none,
-      "could not coerce expression %0 to string type %1", (Type, Type))
-ERROR(nonstring_interpolation_type,sema_tce,none,
-      "string interpolation coerced to non-string type %0", (Type))
 ERROR(interpolation_missing_proto,sema_tce,none,
       "string interpolation requires the protocol 'StringInterpolationConvertible' to be defined",
       ())
@@ -1513,8 +1274,6 @@ ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to the result of this expression", ())
 ERROR(assignment_lhs_not_settable,sema_tcs,none,
       "cannot assign to a property or subscript without a 'set' method", ())
-ERROR(byref_not_settable,sema_tcs,none,
-      "cannot pass by reference a property or subscript without a 'set' method", ())
 
 // ForEach Stmt
 ERROR(enumerable_protocol_broken,sema_tcs,none,
@@ -1528,10 +1287,6 @@ ERROR(continue_outside_loop,sema_tcs,none,
       "'continue' is only allowed inside a loop", ())
 
 // Switch Stmt
-ERROR(multiple_defaults_in_switch,sema_tcs,none,
-      "multiple 'default' branches in 'switch' statement", ())
-NOTE(previous_default,sema_tcs,none,
-     "previous 'default' here", ())
 ERROR(no_match_operator,sema_tcs,none,
       "no binary '~=' operator available for 'switch' statement", ())
 ERROR(fallthrough_outside_switch,sema_tcs,none,
@@ -1568,9 +1323,6 @@ ERROR(optional_intrinsics_not_found,sema_tct,none,
       "Optional<T>", ())
 ERROR(bool_intrinsics_not_found,sema_tct,none,
       "broken standard library: cannot find intrinsic operations on Bool", ())
-ERROR(tuple_default_local_ref,sema_tct,none,
-      "cannot refer to local declaration from default value of"
-      " tuple element", ())
 
 //==============================================================================
 // SIL Generation Diagnostics
