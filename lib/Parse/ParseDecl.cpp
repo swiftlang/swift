@@ -799,84 +799,6 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
   return Status;
 }
 
-/// \brief Parse an 'extension' declaration.
-///
-/// \verbatim
-///   extension:
-///    'extension' type-identifier inheritance? '{' decl* '}'
-/// \endverbatim
-ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
-  SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
-
-  // The grammar allows only type-identifier here, but we parse type-simple for
-  // recovery purposes and let the type checker reject types that can not be
-  // extended.
-  ParserResult<TypeRepr> Ty = parseTypeSimple();
-  if (Ty.hasCodeCompletion())
-    return makeParserCodeCompletionResult<ExtensionDecl>();
-  if (Ty.isNull())
-    return nullptr;
-  // Diagnose extensions for paren types in the parser because a ParenType is
-  // canonically equivalent to the wrapped type, and we are using syntactic
-  // information to differentiate between them.
-  if (auto *TTR = dyn_cast<TupleTypeRepr>(Ty.get())) {
-    if (TTR->isParenType()) {
-      diagnose(TTR->getStartLoc(), diag::paren_type_in_extension)
-        .highlight(TTR->getSourceRange());
-    }
-  }
-
-  ParserStatus Status;
-
-  // Parse optional inheritance clause.
-  SmallVector<TypeLoc, 2> Inherited;
-  if (Tok.is(tok::colon))
-    Status |= parseInheritance(Inherited);
-
-  ExtensionDecl *ED
-    = new (Context) ExtensionDecl(ExtensionLoc, Ty.get(),
-                                  Context.AllocateCopy(Inherited),
-                                  CurDeclContext);
-
-  SmallVector<Decl*, 8> MemberDecls;
-  SourceLoc LBLoc, RBLoc;
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
-    LBLoc = Tok.getLoc();
-    RBLoc = LBLoc;
-    Status.setIsParseError();
-  } else {
-    // Parse the body.
-    ContextChange CC(*this, ED);
-    Scope S(this, ScopeKind::Extension);
-
-    ParserStatus BodyStatus =
-        parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/true,
-                  diag::expected_rbrace_extension, [&]()->ParserStatus{
-      return parseDecl(MemberDecls, PD_HasContainerType | PD_DisallowVar);
-    });
-    // Don't propagate the code completion bit from members: we can not help
-    // code completion inside a member decl, and our callers can not do
-    // anything about it either.  But propagate the error bit.
-    if (BodyStatus.isError())
-      Status.setIsParseError();
-  }
-
-  if (MemberDecls.empty())
-    ED->setMembers({}, { LBLoc, RBLoc });
-  else
-    ED->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
-
-  if (!(Flags & PD_AllowTopLevel)) {
-    diagnose(ExtensionLoc, diag::decl_inner_scope);
-    Status.setIsParseError();
-
-    // Tell the type checker not to touch this extension.
-    ED->setInvalid();
-  }
-
-  return makeParserResult(Status, ED);
-}
-
 enum class TokenProperty {
   None,
   StartsWithLess,
@@ -960,6 +882,84 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         Diag<DiagArgTypes...> ID, ArgTypes... Args) {
   return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, tok::unknown,
                                  ResyncP1, Diagnostic(ID, Args...));
+}
+
+/// \brief Parse an 'extension' declaration.
+///
+/// \verbatim
+///   extension:
+///    'extension' type-identifier inheritance? '{' decl* '}'
+/// \endverbatim
+ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
+  SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
+
+  // The grammar allows only type-identifier here, but we parse type-simple for
+  // recovery purposes and let the type checker reject types that can not be
+  // extended.
+  ParserResult<TypeRepr> Ty = parseTypeSimple();
+  if (Ty.hasCodeCompletion())
+    return makeParserCodeCompletionResult<ExtensionDecl>();
+  if (Ty.isNull())
+    return nullptr;
+  // Diagnose extensions for paren types in the parser because a ParenType is
+  // canonically equivalent to the wrapped type, and we are using syntactic
+  // information to differentiate between them.
+  if (auto *TTR = dyn_cast<TupleTypeRepr>(Ty.get())) {
+    if (TTR->isParenType()) {
+      diagnose(TTR->getStartLoc(), diag::paren_type_in_extension)
+        .highlight(TTR->getSourceRange());
+    }
+  }
+
+  ParserStatus Status;
+
+  // Parse optional inheritance clause.
+  SmallVector<TypeLoc, 2> Inherited;
+  if (Tok.is(tok::colon))
+    Status |= parseInheritance(Inherited);
+
+  ExtensionDecl *ED
+    = new (Context) ExtensionDecl(ExtensionLoc, Ty.get(),
+                                  Context.AllocateCopy(Inherited),
+                                  CurDeclContext);
+
+  SmallVector<Decl*, 8> MemberDecls;
+  SourceLoc LBLoc, RBLoc;
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
+    LBLoc = Tok.getLoc();
+    RBLoc = LBLoc;
+    Status.setIsParseError();
+  } else {
+    // Parse the body.
+    ContextChange CC(*this, ED);
+    Scope S(this, ScopeKind::Extension);
+
+    ParserStatus BodyStatus =
+        parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/true,
+                  diag::expected_rbrace_extension, [&]()->ParserStatus{
+      return parseDecl(MemberDecls, PD_HasContainerType | PD_DisallowVar);
+    });
+    // Don't propagate the code completion bit from members: we can not help
+    // code completion inside a member decl, and our callers can not do
+    // anything about it either.  But propagate the error bit.
+    if (BodyStatus.isError())
+      Status.setIsParseError();
+  }
+
+  if (MemberDecls.empty())
+    ED->setMembers({}, { LBLoc, RBLoc });
+  else
+    ED->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
+
+  if (!(Flags & PD_AllowTopLevel)) {
+    diagnose(ExtensionLoc, diag::decl_inner_scope);
+    Status.setIsParseError();
+
+    // Tell the type checker not to touch this extension.
+    ED->setInvalid();
+  }
+
+  return makeParserResult(Status, ED);
 }
 
 /// \brief Parse a typealias decl.
