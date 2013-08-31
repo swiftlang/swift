@@ -214,6 +214,7 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
         if (addressOnlyUnion && argLowering.isLoadable()) {
           gen.B.setInsertionPoint(caseBB);
           eltValue = gen.B.createLoad(SILLocation(), eltValue);
+          gen.B.setInsertionPoint(bb);
         }
       } else {
         // If the element pattern for a void union element has a subpattern, it
@@ -234,7 +235,6 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       defaultBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
     
     // Emit the switch instruction.
-    gen.B.setInsertionPoint(bb);
     if (addressOnlyUnion) {
       gen.B.createDestructiveSwitchUnionAddr(SILLocation(), v,
                                              defaultBB, caseBBs);
