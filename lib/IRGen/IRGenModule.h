@@ -26,6 +26,7 @@
 #include "llvm/Support/ValueHandle.h"
 #include "llvm/IR/CallingConv.h"
 #include "IRGen.h"
+#include "SwiftTargetInfo.h"
 #include "ValueWitness.h"
 
 namespace llvm {
@@ -102,6 +103,8 @@ public:
   llvm::LLVMContext &LLVMContext;
   const llvm::DataLayout &DataLayout;
   SILModule *SILMod;
+  /// Order dependency -- TargetInfo must be initialized after Opts.
+  SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
   IRGenDebugInfo *DebugInfo;
 

@@ -64,7 +64,9 @@ IRGenModule::IRGenModule(ASTContext &Context,
                          SILModule *SILMod)
   : Context(Context), Opts(Opts), Module(Module),
     LLVMContext(Module.getContext()), DataLayout(DataLayout),
-    SILMod(SILMod), DebugInfo(0), Types(*new TypeConverter(*this)) {
+    SILMod(SILMod), TargetInfo(SwiftTargetInfo::get(*this)),
+    DebugInfo(0), Types(*new TypeConverter(*this))
+{
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
