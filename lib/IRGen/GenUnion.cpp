@@ -562,6 +562,12 @@ namespace {
     virtual Size getExtraTagBitOffset() const = 0;
     
     void getSchema(ExplosionSchema &schema) const override {
+      if (TIK < Loadable) {
+        schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
+                                                  TI->getBestKnownAlignment()));
+        return;
+      }
+      
       schema.add(ExplosionSchema::Element::forScalar(
                                          getStorageType()->getElementType(0)));
       if (ExtraTagBitCount > 0)
@@ -1946,12 +1952,14 @@ namespace {
         tik = Opaque;
       
       auto loadableArgTI = dyn_cast<LoadableTypeInfo>(argTI);
-      if (!loadableArgTI && tik > Fixed)
-        tik = Fixed;
-      else if (loadableArgTI->getExplosionSize(ExplosionKind::Minimal) != 0)
-        elementsWithPayload.push_back({elt, argTI});
-      else
+      if (loadableArgTI
+          && loadableArgTI->getExplosionSize(ExplosionKind::Minimal) == 0) {
         elementsWithNoPayload.push_back({elt, argTI});
+      } else {
+        elementsWithPayload.push_back({elt, argTI});
+        if (!loadableArgTI && tik > Fixed)
+          tik = Fixed;
+      }
     }
     
     assert(numElements != 0);
@@ -1966,6 +1974,11 @@ namespace {
       TC.IGM.unimplemented(theUnion->getLoc(), "recursive union layout");
       exit(1);
     }
+    
+    assert(numElements == elementsWithPayload.size()
+             + elementsWithRecursivePayload.size()
+             + elementsWithNoPayload.size()
+           && "not all elements accounted for");
     
     if (numElements == 1)
       return new SingletonUnionImplStrategy(tik, numElements,
