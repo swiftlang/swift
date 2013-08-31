@@ -100,6 +100,14 @@ void emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
                                                       llvm::BasicBlock*>> dests,
                                      llvm::BasicBlock *defaultDest);
 
+/// \brief Emit the dispatch branch(es) for an address-only union.
+void emitSwitchAddressOnlyUnionDispatch(IRGenFunction &IGF,
+                                        SILType unionTy,
+                                        Address unionAddr,
+                                        ArrayRef<std::pair<UnionElementDecl*,
+                                                           llvm::BasicBlock*>> dests,
+                                        llvm::BasicBlock *defaultDest);
+
 /// \brief Injects a case and its associated data, if any, into a loadable union
 /// value.
 void emitInjectLoadableUnion(IRGenFunction &IGF,
@@ -122,6 +130,15 @@ Address emitProjectUnionAddressForStore(IRGenFunction &IGF,
                                         SILType unionTy,
                                         Address unionAddr,
                                         UnionElementDecl *theCase);
+
+/// \brief Projects the address of the associated data for a case inside a
+/// union, clearing any tag bits interleaved into the data area, so that the
+/// value inside can be loaded. Does not check that the union has a value of the
+/// given case.
+Address emitDestructiveProjectUnionAddressForLoad(IRGenFunction &IGF,
+                                                  SILType unionTy,
+                                                  Address unionAddr,
+                                                  UnionElementDecl *theCase);
 
 /// \brief Stores the tag bits for a union case to the given address, overlaying
 /// the data (if any) stored there.

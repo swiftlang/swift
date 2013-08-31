@@ -92,6 +92,24 @@ dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
   return %x : $()
 }
 
+// CHECK: define void @singleton_switch_indirect(%O5union9Singleton*) {
+// CHECK: entry:
+// CHECK:   br label %[[PREDEST:[0-9]+]]
+// CHECK: ; <label>:[[PREDEST]]
+// CHECK:   [[ADDR:%.*]] = getelementptr inbounds %O5union9Singleton* %0, i32 0, i32 0
+// CHECK:   br label %[[DEST:[0-9]+]]
+// CHECK: ; <label>:[[DEST]]
+// CHECK:   phi { i64, i64 }* [ [[ADDR]], %[[PREDEST]] ]
+// CHECK:   ret void
+// CHECK: }
+sil @singleton_switch_indirect : $([byref] Singleton) -> () {
+entry(%u : $*Singleton):
+  destructive_switch_union_addr %u : $*Singleton, case #Singleton.val!unionelt.1: dest
+dest(%u2 : $*(Builtin.Int64, Builtin.Int64)):
+  %x = tuple ()
+  return %x : $()
+}
+
 // CHECK: define { i64, i64 } @singleton_inject(i64, i64) {
 // CHECK: entry:
 // CHECK:   [[A:%.*]] = insertvalue { i64, i64 } undef, i64 %0, 0
@@ -153,30 +171,49 @@ entry(%u : $NoPayloads):
   switch_union %u : $NoPayloads, case #NoPayloads.x!unionelt: x_dest, case #NoPayloads.y!unionelt: y_dest, case #NoPayloads.z!unionelt: z_dest
 
 // CHECK: ; <label>:[[X_DEST]]
-x_dest:
 // CHECK:   call void @a()
+// CHECK:   br label %[[END:[0-9]+]]
+x_dest:
   %a = function_ref @a : $[thin] () -> ()
   apply %a() : $[thin] () -> ()
-// CHECK:   br label %[[END:[0-9]+]]
   br end
 // CHECK: ; <label>:[[Y_DEST]]
-y_dest:
 // CHECK:   call void @b()
+// CHECK:   br label %[[END]]
+y_dest:
   %b = function_ref @b : $[thin] () -> ()
   apply %b() : $[thin] () -> ()
-// CHECK:   br label %[[END]]
   br end
 // CHECK: ; <label>:[[Z_DEST]]
-z_dest:
 // CHECK:   call void @c()
+// CHECK:   br label %[[END]]
+z_dest:
   %c = function_ref @c : $[thin] () -> ()
   apply %c() : $[thin] () -> ()
-// CHECK:   br label %[[END]]
   br end
 
 // CHECK: ; <label>:[[END]]
-end:
 // CHECK:   ret void
+end:
+  %x = tuple ()
+  return %x : $()
+}
+
+// CHECK: define void @no_payload_switch_indirect(%O5union10NoPayloads*) {
+sil @no_payload_switch_indirect : $[thin] ([byref] NoPayloads) -> () {
+entry(%u : $*NoPayloads):
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O5union10NoPayloads* %0, i32 0, i32 0
+// CHECK:   [[TAG:%.*]] = load i2* [[TAG_ADDR]]
+// CHECK:   switch i2 [[TAG]]
+  destructive_switch_union_addr %u : $*NoPayloads, case #NoPayloads.x!unionelt: x_dest, case #NoPayloads.y!unionelt: y_dest, case #NoPayloads.z!unionelt: z_dest
+
+x_dest:
+  br end
+y_dest:
+  br end
+z_dest:
+  br end
+end:
   %x = tuple ()
   return %x : $()
 }
@@ -633,6 +670,34 @@ end:
   return %x : $()
 }
 
+sil @single_payload_spare_bit_switch_indirect : $[thin] ([byref] SinglePayloadSpareBit) -> () {
+entry(%u : $*SinglePayloadSpareBit):
+// CHECK:  [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union21SinglePayloadSpareBit* %0, i32 0, i32 0
+// CHECK:  [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]]
+// CHECK:  switch i64 [[PAYLOAD]]
+  destructive_switch_union_addr %u : $*SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!unionelt.1: x_dest, case #SinglePayloadSpareBit.y!unionelt: y_dest, case #SinglePayloadSpareBit.z!unionelt: z_dest
+
+// CHECK: ; <label>:[[X_PREDEST:[0-9]+]]
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O5union21SinglePayloadSpareBit* %0 to i63*
+// CHECK:   br label %[[X_DEST:[0-9]+]]
+// CHECK: ; <label>:[[X_DEST]]
+// CHECK:   phi i63* [ [[DATA_ADDR]], %[[X_PREDEST]] ]
+x_dest(%u2 : $*Builtin.Int63):
+  %a = function_ref @a : $[thin] () -> ()
+  apply %a() : $[thin] () -> ()
+  br end
+
+y_dest:
+  br end
+
+z_dest:
+  br end
+
+end:
+  %x = tuple ()
+  return %x : $()
+}
+
 // CHECK: define i64 @single_payload_spare_bit_inject_x(i63) {
 // CHECK: entry:
 // CHECK:   [[A:%.*]] = zext i63 %0 to i64
@@ -770,6 +835,49 @@ b_dest:
 c_dest:
   %f = function_ref @f : $[thin] () -> ()
   apply %f() : $[thin] () -> ()
+  br end
+
+end:
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK: define void @multi_payload_no_spare_bits_switch_indirect(%O5union23MultiPayloadNoSpareBits*) {
+sil @multi_payload_no_spare_bits_switch_indirect : $([byref] MultiPayloadNoSpareBits) -> () {
+entry(%u : $*MultiPayloadNoSpareBits):
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadNoSpareBits* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadNoSpareBits* %0, i32 0, i32 1
+// CHECK:   [[TAG:%.*]] = load i2* [[TAG_ADDR]], align 8
+// CHECK:   switch i2 [[TAG]]
+// CHECK:   switch i64 [[PAYLOAD]]
+// CHECK: ; <label>:
+// CHECK:   unreachable
+  destructive_switch_union_addr %u : $*MultiPayloadNoSpareBits, case #MultiPayloadNoSpareBits.x!unionelt.1: x_dest, case #MultiPayloadNoSpareBits.y!unionelt.1: y_dest, case #MultiPayloadNoSpareBits.z!unionelt.1: z_dest, case #MultiPayloadNoSpareBits.a!unionelt: a_dest, case #MultiPayloadNoSpareBits.b!unionelt: b_dest, case #MultiPayloadNoSpareBits.c!unionelt: c_dest
+
+// CHECK: ; <label>:[[X_PREDEST:[0-9]+]]
+// CHECK:   bitcast %O5union23MultiPayloadNoSpareBits* %0 to i64*
+// CHECK: ; <label>:[[Y_PREDEST:[0-9]+]]
+// CHECK:   bitcast %O5union23MultiPayloadNoSpareBits* %0 to i32*
+// CHECK: ; <label>:[[Z_PREDEST:[0-9]+]]
+// CHECK:   bitcast %O5union23MultiPayloadNoSpareBits* %0 to i63*
+
+x_dest(%x : $*Builtin.Int64):
+  br end
+
+y_dest(%y : $*Builtin.Int32):
+  br end
+
+z_dest(%z : $*Builtin.Int63):
+  br end
+
+a_dest:
+  br end
+
+b_dest:
+  br end
+
+c_dest:
   br end
 
 end:
@@ -965,6 +1073,55 @@ b_dest:
 c_dest:
   %f = function_ref @f : $[thin] () -> ()
   apply %f() : $[thin] () -> ()
+  br end
+
+end:
+  %v = tuple ()
+  return %v : $()
+}
+
+sil @multi_payload_one_spare_bit_switch_indirect : $([byref] MultiPayloadOneSpareBit) -> () {
+entry(%u : $*MultiPayloadOneSpareBit):
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadOneSpareBit* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadOneSpareBit* %0, i32 0, i32 1
+// CHECK:   [[TAG:%.*]] = load i1* [[TAG_ADDR]], align 8
+// CHECK:   switch i2 {{%.*}}
+// CHECK:   switch i64 [[PAYLOAD]]
+// CHECK: ; <label>:
+// CHECK:   unreachable
+  destructive_switch_union_addr %u : $*MultiPayloadOneSpareBit, case #MultiPayloadOneSpareBit.x!unionelt.1: x_dest, case #MultiPayloadOneSpareBit.y!unionelt.1: y_dest, case #MultiPayloadOneSpareBit.z!unionelt.1: z_dest, case #MultiPayloadOneSpareBit.a!unionelt: a_dest, case #MultiPayloadOneSpareBit.b!unionelt: b_dest, case #MultiPayloadOneSpareBit.c!unionelt: c_dest
+
+// CHECK: ; <label>:[[X_PREDEST:[0-9]+]]
+// CHECK:   bitcast %O5union23MultiPayloadOneSpareBit* %0 to i62*
+
+// CHECK: ; <label>:[[Y_PREDEST:[0-9]+]]
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadOneSpareBit* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]]
+// --                                                   0x7FFF_FFFF_FFFF_FFFF
+// CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
+// CHECK:   store i64 [[PAYLOAD_MASKED]], i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   bitcast %O5union23MultiPayloadOneSpareBit* %0 to i63*
+
+// CHECK: ; <label>:[[Z_PREDEST:[0-9]+]]
+// CHECK:   bitcast %O5union23MultiPayloadOneSpareBit* %0 to i61*
+
+x_dest(%x : $*Builtin.Int62):
+  br end
+
+y_dest(%y : $*Builtin.Int63):
+  br end
+
+z_dest(%z : $*Builtin.Int61):
+  br end
+
+a_dest:
+  br end
+
+b_dest:
+  br end
+
+c_dest:
   br end
 
 end:

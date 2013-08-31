@@ -1593,18 +1593,25 @@ static void addIncomingExplosionToPHINodes(IRGenSILFunction &IGF,
     lbb.phis[phiIndex++]->addIncoming(argValue.claimNext(), curBB);
 }
 
+// Bind an incoming address value to a SILArgument's LLVM phi node(s).
+static void addIncomingAddressToPHINodes(IRGenSILFunction &IGF,
+                                         LoweredBB &lbb,
+                                         unsigned &phiIndex,
+                                         Address argValue) {
+  llvm::BasicBlock *curBB = IGF.Builder.GetInsertBlock();
+  lbb.phis[phiIndex++]->addIncoming(argValue.getAddress(), curBB);
+}
+
 // Add branch arguments to destination phi nodes.
 static void addIncomingSILArgumentsToPHINodes(IRGenSILFunction &IGF,
                                               LoweredBB &lbb,
                                               OperandValueArrayRef args) {
-  llvm::BasicBlock *curBB = IGF.Builder.GetInsertBlock();
-  ArrayRef<llvm::PHINode*> phis = lbb.phis;
   unsigned phiIndex = 0;
   for (SILValue arg : args) {
     const LoweredValue &lv = IGF.getLoweredValue(arg);
-    
+  
     if (lv.isAddress()) {
-      phis[phiIndex++]->addIncoming(lv.getAddress().getAddress(), curBB);
+      addIncomingAddressToPHINodes(IGF, lbb, phiIndex, lv.getAddress());
       continue;
     }
     
@@ -1613,13 +1620,10 @@ static void addIncomingSILArgumentsToPHINodes(IRGenSILFunction &IGF,
   }
 }
 
-void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *inst) {
-  Explosion value = getLoweredExplosion(inst->getOperand());
-  
-  // Map the SIL dest bbs to their LLVM bbs.
-  SmallVector<std::pair<UnionElementDecl*, llvm::BasicBlock*>, 4>
-    dests;
-  
+static llvm::BasicBlock *emitBBMapForSwitchUnion(
+        IRGenSILFunction &IGF,
+        SmallVectorImpl<std::pair<UnionElementDecl*, llvm::BasicBlock*>> &dests,
+        SwitchUnionInstBase *inst) {
   for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
     auto casePair = inst->getCase(i);
     
@@ -1630,14 +1634,24 @@ void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *inst) {
     // as a predecessor.
     if (!casePair.second->bbarg_empty())
       dests.push_back({casePair.first,
-                       llvm::BasicBlock::Create(IGM.getLLVMContext())});
+        llvm::BasicBlock::Create(IGF.IGM.getLLVMContext())});
     else
-      dests.push_back({casePair.first, getLoweredBB(casePair.second).bb});
+      dests.push_back({casePair.first, IGF.getLoweredBB(casePair.second).bb});
   }
   
   llvm::BasicBlock *defaultDest = nullptr;
   if (inst->hasDefault())
-    defaultDest = getLoweredBB(inst->getDefaultBB()).bb;
+    defaultDest = IGF.getLoweredBB(inst->getDefaultBB()).bb;
+  return defaultDest;
+}
+
+void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *inst) {
+  Explosion value = getLoweredExplosion(inst->getOperand());
+  
+  // Map the SIL dest bbs to their LLVM bbs.
+  SmallVector<std::pair<UnionElementDecl*, llvm::BasicBlock*>, 4> dests;
+  llvm::BasicBlock *defaultDest
+    = emitBBMapForSwitchUnion(*this, dests, inst);
   
   // Emit the dispatch.
   emitSwitchLoadableUnionDispatch(*this, inst->getOperand().getType(),
@@ -1668,8 +1682,36 @@ void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *inst) {
 
 void
 IRGenSILFunction::visitDestructiveSwitchUnionAddrInst(
-                                            DestructiveSwitchUnionAddrInst *i) {
-  llvm_unreachable("unimplemented");
+                                        DestructiveSwitchUnionAddrInst *inst) {
+  Address value = getLoweredAddress(inst->getOperand());
+  
+  // Map the SIL dest bbs to their LLVM bbs.
+  SmallVector<std::pair<UnionElementDecl*, llvm::BasicBlock*>, 4> dests;
+  llvm::BasicBlock *defaultDest
+    = emitBBMapForSwitchUnion(*this, dests, inst);
+  
+  // Emit the dispatch.
+  emitSwitchAddressOnlyUnionDispatch(*this, inst->getOperand().getType(),
+                                     value, dests, defaultDest);
+
+  // Bind arguments for cases that want them.
+  for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
+    auto casePair = inst->getCase(i);
+    if (!casePair.second->bbarg_empty()) {
+      auto waypointBB = dests[i].second;
+      auto &destLBB = getLoweredBB(casePair.second);
+      
+      Builder.emitBlock(waypointBB);
+
+      Address data
+        = emitDestructiveProjectUnionAddressForLoad(*this,
+                                                  inst->getOperand().getType(),
+                                                  value, casePair.first);
+      unsigned phiIndex = 0;
+      addIncomingAddressToPHINodes(*this, destLBB, phiIndex, data);
+      Builder.CreateBr(destLBB.bb);
+    }
+  }
 }
 
 void IRGenSILFunction::visitBranchInst(swift::BranchInst *i) {

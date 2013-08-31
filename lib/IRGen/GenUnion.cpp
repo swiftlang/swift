@@ -133,7 +133,6 @@ namespace {
                           UnionElementDecl *elt,
                           Address unionAddr) const = 0;
     
-    /* TODO
     /// Clears tag bits from within the payload of a union in memory and
     /// projects the address of the data for a case. Does not check
     /// the referenced union value.
@@ -142,8 +141,7 @@ namespace {
     virtual Address destructiveProjectDataForLoad(IRGenFunction &IGF,
                                                   UnionElementDecl *elt,
                                                   Address unionAddr) const = 0;
-     */
-
+    
     /// \group Loadable union operations
     
     /// Emit the construction sequence for a union case into an explosion.
@@ -298,6 +296,12 @@ namespace {
       return getSingletonAddress(IGF, unionAddr);
     }
     
+    Address destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                          UnionElementDecl *elt,
+                                          Address unionAddr) const override {
+      return getSingletonAddress(IGF, unionAddr);
+    }
+    
     void storeTag(IRGenFunction &IGF,
                   UnionElementDecl *elt,
                   Address unionAddr) const override {
@@ -315,7 +319,7 @@ namespace {
     
     void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
       if (!getLoadableSingleton()) return;
-      getLoadableSingleton()->loadAsCopy(IGF, getSingletonAddress(IGF, addr), e);
+      getLoadableSingleton()->loadAsCopy(IGF, getSingletonAddress(IGF, addr),e);
     }
 
     void loadForSwitch(IRGenFunction &IGF, Address addr, Explosion &e) const {
@@ -325,7 +329,7 @@ namespace {
 
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
       if (!getLoadableSingleton()) return;
-      getLoadableSingleton()->loadAsTake(IGF, getSingletonAddress(IGF, addr), e);
+      getLoadableSingleton()->loadAsTake(IGF, getSingletonAddress(IGF, addr),e);
     }
     
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
@@ -488,6 +492,11 @@ namespace {
     Address projectDataForStore(IRGenFunction &IGF,
                                 UnionElementDecl *elt,
                                 Address unionAddr) const override {
+      llvm_unreachable("cannot project data for no-payload cases");
+    }
+    Address destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                          UnionElementDecl *elt,
+                                          Address unionAddr) const override {
       llvm_unreachable("cannot project data for no-payload cases");
     }
     
@@ -656,9 +665,14 @@ namespace {
       return IGF.Builder.CreateBitCast(addr,
                          getPayloadTypeInfo().getStorageType()->getPointerTo());
     }
-    
     Address projectDataForStore(IRGenFunction &IGF, UnionElementDecl *elt,
                                 Address unionAddr) const override {
+      assert(elt == getPayloadElement() && "cannot project no-data case");
+      return projectPayloadData(IGF, unionAddr);
+    }
+    Address destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                          UnionElementDecl *elt,
+                                          Address unionAddr) const override {
       assert(elt == getPayloadElement() && "cannot project no-data case");
       return projectPayloadData(IGF, unionAddr);
     }
@@ -1803,7 +1817,7 @@ namespace {
       return IGF.Builder.CreateBitCast(unionAddr,
                                payloadI->ti->getStorageType()->getPointerTo());
     }
-    
+
   private:
     void storePayloadTag(IRGenFunction &IGF, const FixedTypeInfo &payloadTI,
                          Address unionAddr, unsigned index) const {
@@ -1868,6 +1882,40 @@ namespace {
                                [&](const Element &e) { return e.decl == elt; });
       assert(emptyI != ElementsWithNoPayload.end() && "case not in union");
       storeNoPayloadTag(IGF, unionAddr, emptyI - ElementsWithNoPayload.begin());
+    }
+    
+    Address destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                          UnionElementDecl *elt,
+                                          Address unionAddr) const override {
+      auto payloadI = std::find_if(ElementsWithPayload.begin(),
+                               ElementsWithPayload.end(),
+                               [&](const Element &e) { return e.decl == elt; });
+      
+      assert(payloadI != ElementsWithPayload.end() &&
+             "cannot project a no-payload case");
+      
+      unsigned index = payloadI - ElementsWithPayload.begin();
+      
+      // If the case has non-zero tag bits stored in spare bits, we need to
+      // mask them out before the data can be read.
+      unsigned numSpareBits = CommonSpareBits.count();
+      if (numSpareBits > 0) {
+        unsigned spareTagBits = numSpareBits >= 32
+          ? index : index & ((1U << numSpareBits) - 1U);
+        
+        if (spareTagBits != 0) {
+          Address payloadAddr = projectPayload(IGF, unionAddr);
+          llvm::Value *payloadBits = IGF.Builder.CreateLoad(payloadAddr);
+          auto *spareBitMask = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
+                                      ~getAPIntFromBitVector(CommonSpareBits));
+          payloadBits = IGF.Builder.CreateAnd(payloadBits, spareBitMask);
+          IGF.Builder.CreateStore(payloadBits, payloadAddr);
+        }
+      }
+      
+      // Payloads are all placed at the beginning of the value.
+      return IGF.Builder.CreateBitCast(unionAddr,
+                               payloadI->ti->getStorageType()->getPointerTo());
     }
   };
   
@@ -2434,6 +2482,18 @@ void irgen::emitSwitchLoadableUnionDispatch(IRGenFunction &IGF,
     .emitValueSwitch(IGF, unionValue, dests, defaultDest);
 }
 
+void irgen::emitSwitchAddressOnlyUnionDispatch(IRGenFunction &IGF,
+                                  SILType unionTy,
+                                  Address unionAddr,
+                                  ArrayRef<std::pair<UnionElementDecl *,
+                                                     llvm::BasicBlock *>> dests,
+                                  llvm::BasicBlock *defaultDest) {
+  auto &strategy = getUnionImplStrategy(IGF.IGM, unionTy);
+  Explosion payload(ExplosionKind::Minimal);
+  strategy.loadForSwitch(IGF, unionAddr, payload);
+  strategy.emitValueSwitch(IGF, payload, dests, defaultDest);
+}
+
 void irgen::emitInjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,
                                     UnionElementDecl *theCase,
                                     Explosion &data,
@@ -2456,6 +2516,14 @@ Address irgen::emitProjectUnionAddressForStore(IRGenFunction &IGF,
                                                UnionElementDecl *theCase) {
   return getUnionImplStrategy(IGF.IGM, unionTy)
     .projectDataForStore(IGF, theCase, unionAddr);
+}
+
+Address irgen::emitDestructiveProjectUnionAddressForLoad(IRGenFunction &IGF,
+                                                   SILType unionTy,
+                                                   Address unionAddr,
+                                                   UnionElementDecl *theCase) {
+  return getUnionImplStrategy(IGF.IGM, unionTy)
+    .destructiveProjectDataForLoad(IGF, theCase, unionAddr);
 }
 
 void irgen::emitStoreUnionTagToAddress(IRGenFunction &IGF,
