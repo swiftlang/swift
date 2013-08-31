@@ -817,7 +817,8 @@ static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
     return makeParserSuccess();
 
   default:
-    P.diagnose(P.Tok, D);
+    if (D.getID() != DiagID::invalid_diagnostic)
+      P.diagnose(P.Tok, D);
     if (P.Tok.isKeyword() &&
         (P.peekToken().is(ResyncT1) || P.peekToken().is(ResyncT2) ||
          P.peekToken().is(ResyncT3) ||
@@ -899,6 +900,19 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
   ParserResult<TypeRepr> Ty = parseTypeSimple();
   if (Ty.hasCodeCompletion())
     return makeParserCodeCompletionResult<ExtensionDecl>();
+  if (Ty.isNull() && Tok.isKeyword()) {
+    // We failed to parse the type, but we could try recovering by parsing a
+    // keyword if the lookahead token looks promising.
+    Identifier ExtensionName;
+    SourceLoc NameLoc;
+    if (parseIdentifierDeclName(*this, ExtensionName, NameLoc, tok::colon,
+                                tok::l_brace,
+                                diag::invalid_diagnostic).isError())
+      return nullptr;
+    Ty = makeParserErrorResult(
+        IdentTypeRepr::createSimple(Context, NameLoc, ExtensionName,
+                                    CurDeclContext));
+  }
   if (Ty.isNull())
     return nullptr;
   // Diagnose extensions for paren types in the parser because a ParenType is

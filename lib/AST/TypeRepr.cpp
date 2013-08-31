@@ -136,6 +136,12 @@ IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
   return new (C) IdentTypeRepr(C.AllocateCopy(Components));
 }
 
+IdentTypeRepr *IdentTypeRepr::createSimple(ASTContext &C, SourceLoc Loc,
+                                           Identifier Id, DeclContext *Ctx) {
+  IdentTypeRepr::Component IdTypeComponent(Loc, Id, {}, Ctx);
+  return create(C, llvm::makeArrayRef(IdTypeComponent));
+}
+
 static void printGenericArgs(raw_ostream &OS, ArrayRef<TypeRepr *> Args) {
   if (Args.empty())
     return;

@@ -207,6 +207,9 @@ public:
 
   static IdentTypeRepr *create(ASTContext &C, ArrayRef<Component> Components);
 
+  static IdentTypeRepr *createSimple(ASTContext &C, SourceLoc Loc,
+                                     Identifier Id, DeclContext *Ctx);
+
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Ident;
   }
