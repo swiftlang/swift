@@ -88,10 +88,15 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   case tok::kw_metatype:
   case tok::kw_self:
   case tok::kw_weak:
-  case tok::kw_unowned:
-    diagnose(Tok, diag::expected_type_is_keyword);
+  case tok::kw_unowned: {
+    // These keywords don't start a decl or a statement, and thus should be
+    // safe to skip over.
+    diagnose(Tok, MessageID);
+    ty = makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
     consumeToken();
-    return nullptr;
+    // FIXME: we could try to continue to parse.
+    return ty;
+  }
   default:
     diagnose(Tok, MessageID);
     return nullptr;
