@@ -2212,8 +2212,9 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
   ParserStatus Status;
 
   Status |=
-      parseIdentifierDeclName(*this, ProtocolName, NameLoc,
-                              diag::expected_identifier_in_decl, "protocol");
+      parseIdentifierDeclName(*this, ProtocolName, NameLoc, tok::colon,
+                              tok::l_brace, diag::expected_identifier_in_decl,
+                              "protocol");
   if (Status.isError())
     return nullptr;
 
