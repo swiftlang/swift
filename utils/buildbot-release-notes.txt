@@ -2,7 +2,7 @@
 ----------
 
 * Local variable declarations without an initializer are no longer implicitly
-  constructed.  The compmiler now verifies that they are initialized on all
+  constructed.  The compiler now verifies that they are initialized on all
   paths leading to a use of the variable.  This means that constructs like this
   are now allowed:
   
