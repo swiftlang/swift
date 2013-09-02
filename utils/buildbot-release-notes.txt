@@ -26,6 +26,9 @@
   initialize the value in the declaration, e.g. with "var x = 0" or with
   "var x = Int()" (which works for any default-constructible type).
 
+* The implementation now supports unions containing protocol types and weak
+  reference types. Generic parameters on unions are still not yet supported.
+
 
 2013-08-28
 ----------
@@ -70,8 +73,7 @@
     }
 
   Due to implementation limitations, unions cannot yet contain values of
-  protocol type, weak reference type, or generic parameter type. Recursive
-  unions are also not yet supported.
+  generic parameter type. Recursive unions are also not yet supported.
 
 
 * Swift now supports autolinking, so importing frameworks or Swift libraries
