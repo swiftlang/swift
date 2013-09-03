@@ -2874,22 +2874,6 @@ Comparison TypeChecker::compareDeclarations(ValueDecl *decl1, ValueDecl *decl2){
   return decl1Better? Comparison::Better : Comparison::Worse;
 }
 
-/// Determine whether we're allowed to compare the given declarations found
-/// via dynamic lookup.
-static bool canCompareDynamicDecls(ValueDecl *decl1, ValueDecl *decl2) {
-  // If the two declarations occur within the same nominal type, it's fine
-  // to compare them because either result will end up operating on the same
-  // object type.
-  auto nominal1
-    = decl1->getDeclContext()->getDeclaredTypeOfContext()->getAnyNominal();
-  auto nominal2
-    = decl2->getDeclContext()->getDeclaredTypeOfContext()->getAnyNominal();
-  if (nominal1 == nominal2)
-    return true;
-
-  return false;
-}
-
 SolutionCompareResult ConstraintSystem::compareSolutions(
                         ConstraintSystem &cs,
                         ArrayRef<Solution> solutions,
@@ -2962,30 +2946,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       break;
 
     case OverloadChoiceKind::DeclViaDynamic:
-      // Only allow ambiguity resolution between declarations found via dynamic
-      // lookup in certain cases.
-      if (!canCompareDynamicDecls(choice1.getDecl(), choice2.getDecl())) {
-        // If one declaration is a witness for the other (which is a
-        // requirement), prefer the requirement because it is the more general
-        // answer.
-        switch (compareWitnessAndRequirement(tc, choice1.getDecl(),
-                                             choice2.getDecl())) {
-        case Comparison::Unordered:
-          break;
-
-        case Comparison::Better:
-          ++score2;
-          break;
-
-        case Comparison::Worse:
-          ++score1;
-          break;
-        }
-        break;
-      }
-
-      SWIFT_FALLTHROUGH;
-
     case OverloadChoiceKind::Decl:
       // Determine whether one declaration is more specialized than the other.
       if (isDeclAsSpecializedAs(tc, choice1.getDecl(), choice2.getDecl()))
