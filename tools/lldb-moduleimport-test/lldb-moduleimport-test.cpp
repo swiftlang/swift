@@ -26,7 +26,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
-#include <mach-o/loader.h>
+#include "llvm/Support/MachO.h"
 #include <stdint.h>
 #include <fstream>
 
@@ -44,6 +44,7 @@ SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
 
 void anchorForGetMainExecutable() {}
 
+using namespace llvm::MachO;
 
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal();
