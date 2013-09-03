@@ -329,7 +329,12 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
       substitutions.push_back(sub.getValue());
     }
 
-    ProtocolConformanceWitness witness{second, ctx.AllocateCopy(substitutions)};
+    ConcreteDeclRef witness;
+    if (substitutions.empty())
+      witness = ConcreteDeclRef(second);
+    else
+      witness = ConcreteDeclRef(ctx, second, substitutions);
+
     witnesses.insert(std::make_pair(first, witness));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");

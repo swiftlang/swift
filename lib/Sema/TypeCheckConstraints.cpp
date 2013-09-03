@@ -2805,7 +2805,7 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc,
 
   // If the witness and the potential witness are not the same, there's no
   // ordering here.
-  if (conformance->getWitness(req).Decl != potentialWitness)
+  if (conformance->getWitness(req).getDecl() != potentialWitness)
     return Comparison::Unordered;
 
   // We have a requirement/witness match.

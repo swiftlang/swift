@@ -615,7 +615,7 @@ namespace {
              "should only consider objc conformances for extensions");
       if (protocol->isObjC())
         for (auto &mapping : conformance->getWitnesses()) {
-          ValueDecl *vd = mapping.second.Decl;
+          ValueDecl *vd = mapping.second.getDecl();
           if (vd->getDeclContext() != TheExtension)
             visit(vd);
         }

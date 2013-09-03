@@ -746,9 +746,11 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         auto &best = matches[bestIdx];
 
         // Record the match.
-        Mapping[Requirement].Decl = best.Witness;
-        Mapping[Requirement].Substitutions
-          = TC.Context.AllocateCopy(best.WitnessSubstitutions);
+        if (best.WitnessSubstitutions.empty())
+          Mapping[Requirement] = best.Witness;
+        else
+          Mapping[Requirement] = ConcreteDeclRef(TC.Context, best.Witness,
+                                                 best.WitnessSubstitutions);
 
         // If we deduced any associated types, record them now.
         if (!best.AssociatedTypeDeductions.empty()) {
@@ -1024,7 +1026,7 @@ static void suggestExplicitConformance(TypeChecker &tc,
         witnessOwner = getNominalOrExtensionDecl(nominal->getDeclContext());
       }
     } else {
-      auto witness = conformance->getWitness(valueReq).Decl;
+      auto witness = conformance->getWitness(valueReq).getDecl();
       witnessOwner = getNominalOrExtensionDecl(witness->getDeclContext());
     }
 

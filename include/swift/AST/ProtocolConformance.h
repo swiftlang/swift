@@ -16,6 +16,7 @@
 #ifndef SWIFT_AST_PROTOCOLCONFORMANCE_H
 #define SWIFT_AST_PROTOCOLCONFORMANCE_H
 
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -38,19 +39,8 @@ class Module;
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
-/// \brief Describes a declaration used to satisfy, or "witness", a protocol
-/// requirement.
-struct ProtocolConformanceWitness {
-  /// The declaration that satisfies the requirement.
-  ValueDecl *Decl;
-  
-  /// The substitutions necessary to map the declaration's type to the
-  /// requirement.
-  ArrayRef<Substitution> Substitutions;
-};
-
 /// Map from non-type requirements to the corresponding conformance witnesses.
-typedef llvm::DenseMap<ValueDecl *, ProtocolConformanceWitness> WitnessMap;
+typedef llvm::DenseMap<ValueDecl *, ConcreteDeclRef> WitnessMap;
 
 /// Map from associated type requirements to the corresponding substitution,
 /// which captures the replacement type along with any conformances it requires.
@@ -117,7 +107,7 @@ public:
   const TypeWitnessMap &getTypeWitnesses() const;
 
   /// Retrieve the non-type witness for the given requirement.
-  ProtocolConformanceWitness getWitness(ValueDecl *requirement) const {
+  ConcreteDeclRef getWitness(ValueDecl *requirement) const {
     const auto &witnesses = getWitnesses();
     auto known = witnesses.find(requirement);
     assert(known != witnesses.end());

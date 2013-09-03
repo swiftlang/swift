@@ -170,7 +170,7 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, Type type,
 
   assert(conformance && "Missing conformance information");
   // FIXME: Dropping substitutions here.
-  return cast<FuncDecl>(conformance->getWitness(requirement).Decl);
+  return cast<FuncDecl>(conformance->getWitness(requirement).getDecl());
 }
 
 /// \brief Perform the substitutions required to convert a given object type

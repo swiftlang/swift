@@ -69,6 +69,9 @@ class ConcreteDeclRef {
   llvm::PointerUnion<ValueDecl *, SpecializedDeclRef *> Data;
 
 public:
+  /// Create an empty declaration reference.
+  ConcreteDeclRef() : Data() { }
+
   /// Construct a reference to the given value.
   ConcreteDeclRef(ValueDecl *decl) : Data(decl) { }
 
@@ -87,6 +90,9 @@ public:
                   ArrayRef<Substitution> substitutions)
     : Data(SpecializedDeclRef::create(ctx, decl, substitutions)) { }
 
+  /// Determine whether this declaration reference refers to anything.
+  explicit operator bool() const { return !Data.isNull(); }
+
   /// Retrieve the declarations to which this reference refers.
   ValueDecl *getDecl() const {
     if (Data.is<ValueDecl *>())
@@ -102,8 +108,9 @@ public:
   /// For a specialized reference, return the set of substitutions applied to
   /// the declaration reference.
   ArrayRef<Substitution> getSubstitutions() const {
-    assert(isSpecialized() &&
-           "Substitutions are only available for specialized references");
+    if (!isSpecialized())
+      return { };
+    
     return Data.get<SpecializedDeclRef *>()->getSubstitutions();
   }
 

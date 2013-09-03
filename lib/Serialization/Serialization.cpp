@@ -862,9 +862,9 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned numDefaultedDefinitions = 0;
     for (auto valueMapping : conf->getWitnesses()) {
       data.push_back(addDeclRef(valueMapping.first));
-      data.push_back(addDeclRef(valueMapping.second.Decl));
+      data.push_back(addDeclRef(valueMapping.second.getDecl()));
       // The substitution records are serialized later.
-      data.push_back(valueMapping.second.Substitutions.size());
+      data.push_back(valueMapping.second.getSubstitutions().size());
       ++numValueWitnesses;
     }
     for (auto typeMapping : conf->getTypeWitnesses()) {
@@ -896,8 +896,9 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
       inheritedConformance.push_back(inheritedMapping.second);
     }
     writeConformances(inheritedProtos, inheritedConformance, associatedDecl);
-    for (auto valueMapping : conf->getWitnesses())
-      writeSubstitutions(valueMapping.second.Substitutions);
+    for (auto valueMapping : conf->getWitnesses()) {
+      writeSubstitutions(valueMapping.second.getSubstitutions());
+    }
     for (auto typeMapping : conf->getTypeWitnesses())
       writeSubstitutions(typeMapping.second);
 

@@ -2671,19 +2671,19 @@ namespace {
     void addStaticMethod(FuncDecl *iface) {
       const auto &witness = Conformance.getWitness(iface);
       
-      FuncDecl *impl = cast<FuncDecl>(witness.Decl);
+      FuncDecl *impl = cast<FuncDecl>(witness.getDecl());
       Table.push_back(getStaticMethodWitness(impl,
                                       iface->getType()->getCanonicalType(),
-                                      witness.Substitutions));
+                                      witness.getSubstitutions()));
     }
 
     void addInstanceMethod(FuncDecl *iface) {
       const auto &witness = Conformance.getWitness(iface);
 
-      FuncDecl *impl = cast<FuncDecl>(witness.Decl);
+      FuncDecl *impl = cast<FuncDecl>(witness.getDecl());
       Table.push_back(getInstanceMethodWitness(impl,
                                       iface->getType()->getCanonicalType(),
-                                      witness.Substitutions));
+                                      witness.getSubstitutions()));
     }
     
     void addAssociatedType(AssociatedTypeDecl *ty) {
