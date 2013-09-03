@@ -46,7 +46,6 @@ public:
   
   LValue visitMemberRefExpr(MemberRefExpr *e);
   LValue visitSubscriptExpr(SubscriptExpr *e);
-  LValue visitGenericSubscriptExpr(GenericSubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
   
   // Expressions that wrap lvalues
@@ -437,24 +436,6 @@ LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e)
   return visitRec(e->getRHS());
 }
 
-namespace {
-  
-template<typename ANY_SUBSCRIPT_EXPR>
-LValue emitAnySubscriptExpr(SILGenLValue &sgl,
-                            SILGenFunction &gen,
-                            ANY_SUBSCRIPT_EXPR *e,
-                            ArrayRef<Substitution> substitutions) {
-  LValue lv = sgl.visitRec(e->getBase());
-  SubscriptDecl *sd = e->getDecl();
-  lv.add<GetterSetterComponent>(sd,
-                                substitutions,
-                                e->getIndex(),
-                                e->getType()->getRValueType());
-  return ::std::move(lv);
-}
-  
-} // end anonymous namespace
-
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   LValue lv = visitRec(e->getBase());
   CanType baseTy = e->getBase()->getType()->getCanonicalType();
@@ -482,12 +463,13 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   return ::std::move(lv);
 }
 
-LValue SILGenLValue::visitGenericSubscriptExpr(GenericSubscriptExpr *e) {
-  return emitAnySubscriptExpr(*this, gen, e, e->getSubstitutions());
-}
-
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
-  return emitAnySubscriptExpr(*this, gen, e, {});
+  LValue lv = visitRec(e->getBase());
+  lv.add<GetterSetterComponent>(e->getDecl().getDecl(),
+                                e->getDecl().getSubstitutions(),
+                                e->getIndex(),
+                                e->getType()->getRValueType());
+  return ::std::move(lv);
 }
 
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {

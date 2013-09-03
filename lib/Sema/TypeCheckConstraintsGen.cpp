@@ -620,10 +620,6 @@ namespace {
       return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
     }
 
-    Type visitGenericSubscriptExpr(GenericSubscriptExpr *expr) {
-      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
-    }
-
     Type visitTupleElementExpr(TupleElementExpr *expr) {
       ASTContext &context = CS.getASTContext();
       Identifier name

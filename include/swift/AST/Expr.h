@@ -958,20 +958,23 @@ public:
   }
 };
 
-/// SubscriptExpr - Subscripting expressions like a[i] that refer to an element
-/// within a container.
+/// Subscripting expressions like a[i] that refer to an element within a
+/// container.
 ///
 /// There is no built-in subscripting in the language. Rather, a fully
 /// type-checked and well-formed subscript expression refers to a subscript
 /// declaration, which provides a getter and (optionally) a setter that will
 /// be used to perform reads/writes.
 class SubscriptExpr : public Expr {
-  SubscriptDecl *D;
+  ConcreteDeclRef TheDecl;
   Expr *Base;
   Expr *Index;
   
 public:
-  SubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D = 0);
+  SubscriptExpr(Expr *base, Expr *index,
+                ConcreteDeclRef decl = ConcreteDeclRef())
+    : Expr(ExprKind::Subscript, Type()),
+      TheDecl(decl), Base(base), Index(index) { }
   
   /// getBase - Retrieve the base of the subscript expression, i.e., the
   /// value being indexed.
@@ -983,17 +986,17 @@ public:
   Expr *getIndex() const { return Index; }
   void setIndex(Expr *E) { Index = E; }
   
-  /// hasDecl - Determine whether subscript operation has a known underlying
+  /// Determine whether subscript operation has a known underlying
   /// subscript declaration or not.
-  bool hasDecl() const { return D != 0; }
+  bool hasDecl() const { return static_cast<bool>(TheDecl); }
   
-  /// getDecl - Retrieve the subscript declaration that this subscripting
+  /// Retrieve the subscript declaration that this subscripting
   /// operation refers to. Only valid when \c hasDecl() is true.
-  SubscriptDecl *getDecl() const {
+  ConcreteDeclRef getDecl() const {
     assert(hasDecl() && "No subscript declaration known!");
-    return D;
+    return TheDecl;
   }
-  void setDecl(SubscriptDecl *D) { this->D = D; }
+  void setDecl(ConcreteDeclRef decl) { TheDecl = decl; }
 
   SourceRange getSourceRange() const {
     return SourceRange(Base->getStartLoc(), Index->getEndLoc());
@@ -1074,50 +1077,6 @@ public:
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ArchetypeSubscript;
-  }
-};
-
-/// GenericSubscriptExpr - Subscripting expressions like a[i] that refer to
-/// an element within a container, where the container is a generic type.
-class GenericSubscriptExpr : public Expr {
-  SubscriptDecl *D;
-  Expr *Base;
-  Expr *Index;
-  ArrayRef<Substitution> Substitutions;
-
-public:
-  GenericSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D);
-  
-  /// getBase - Retrieve the base of the subscript expression, i.e., the
-  /// value being indexed. This value has generic type.
-  Expr *getBase() const { return Base; }
-  void setBase(Expr *E) { Base = E; }
-  
-  /// getIndex - Retrieve the index of the subscript expression, i.e., the
-  /// "offset" into the base value.
-  Expr *getIndex() const { return Index; }
-  void setIndex(Expr *E) { Index = E; }
-  
-  /// getDecl - Retrieve the subscript declaration that this subscripting
-  /// operation refers to. 
-  SubscriptDecl *getDecl() const { return D; }
-  void setDecl(SubscriptDecl *D) { this->D = D; }
-
-  /// \brief Retrieve the set of substitutions applied to specialize the
-  /// member.
-  ///
-  /// Each substitution contains the archetype being substitued, the type it is
-  /// being replaced with, and the protocol conformance relationships.
-  ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
-
-  void setSubstitutions(ArrayRef<Substitution> S) { Substitutions = S; }
-
-  SourceRange getSourceRange() const {
-    return SourceRange(Base->getStartLoc(), Index->getEndLoc());
-  }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::GenericSubscript;
   }
 };
 

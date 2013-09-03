@@ -472,33 +472,8 @@ namespace {
         Out << "Subscript expression is missing subscript declaration";
         abort();
       }
-      
-      checkSameType(E->getDecl()->getIndices()->getType(),
-                    E->getIndex()->getType(), "subscript indices");
-      
-      LValueType *ResultLV = E->getType()->getAs<LValueType>();
-      if (!ResultLV) {
-        Out << "Subscript expression has non-lvalue type";
-        abort();
-      }
-      
-      checkSameType(E->getDecl()->getElementType(), ResultLV->getObjectType(),
-                    "subscript result type and subscript declaration");
-      
-      Type ContainerTy
-        = E->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
-      if (!ContainerTy) {
-        Out << "container of subscript is not a type\n";
-        E->dump();
-        abort();
-      }
-      
-      Type BaseTy = E->getBase()->getType();
-      if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
-        BaseTy = BaseLV->getObjectType();
-      
-      checkSameOrSubType(BaseTy, ContainerTy,
-                         "subscript base and subscript container");
+
+      // FIXME: Check base/member types through substitutions.
     }
 
     void verifyChecked(CoerceExpr *E) {

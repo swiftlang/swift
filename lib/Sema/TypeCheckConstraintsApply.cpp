@@ -683,12 +683,15 @@ namespace {
           return nullptr;
 
         // Form the generic subscript expression.
-        auto subscriptExpr = new (tc.Context) GenericSubscriptExpr(base, index,
-                                                                   subscript);
+        SmallVector<Substitution, 4> substitutionsVec;
+        tc.encodeSubstitutions(genericParams, substitutions, conformances,
+                               false, substitutionsVec);
+        auto subscriptExpr
+          = new (tc.Context) SubscriptExpr(base, index,
+                                           ConcreteDeclRef(tc.Context,
+                                                           subscript,
+                                                           substitutionsVec));
         subscriptExpr->setType(resultTy);
-        subscriptExpr->setSubstitutions(
-          tc.encodeSubstitutions(genericParams, substitutions,
-                                 conformances, false));
         return subscriptExpr;
       }
 
@@ -1395,11 +1398,6 @@ namespace {
     }
 
     Expr *visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *expr) {
-      return buildSubscript(expr->getBase(), expr->getIndex(),
-                            cs.getConstraintLocator(expr, { }));
-    }
-
-    Expr *visitGenericSubscriptExpr(GenericSubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             cs.getConstraintLocator(expr, { }));
     }

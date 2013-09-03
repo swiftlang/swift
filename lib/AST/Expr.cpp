@@ -260,14 +260,6 @@ SourceRange TupleExpr::getSourceRange() const {
   return SourceRange(Start, End);
 }
 
-SubscriptExpr::SubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
-  : Expr(ExprKind::Subscript, D? D->getElementType() : Type()),
-    D(D), Base(Base), Index(Index) {
-  assert((!D ||
-          !D->getDeclContext()->getDeclaredTypeOfContext()->isExistentialType())
-         && "use ExistentialSubscriptExpr for existential type subscript");
-}
-
 ExistentialSubscriptExpr::
 ExistentialSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
   : Expr(ExprKind::ExistentialSubscript, D? D->getElementType() : Type()),
@@ -282,14 +274,6 @@ ArchetypeSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
     D(D), Base(Base), Index(Index) {
   assert(Base->getType()->getRValueType()->is<ArchetypeType>() &&
          "use SubscriptExpr for non-archetype type subscript");
-}
-
-GenericSubscriptExpr::
-GenericSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
-  : Expr(ExprKind::GenericSubscript, D? D->getElementType() : Type()),
-    D(D), Base(Base), Index(Index) {
-  assert(Base->getType()->getRValueType()->is<BoundGenericType>() &&
-         "use SubscriptExpr for non-generic type subscript");
 }
 
 ArrayRef<Pattern *> CapturingExpr::getParamPatterns() {

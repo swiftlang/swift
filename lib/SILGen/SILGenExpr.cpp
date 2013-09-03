@@ -172,7 +172,6 @@ namespace {
     RValue visitModuleExpr(ModuleExpr *E, SGFContext C);
     RValue visitTupleElementExpr(TupleElementExpr *E, SGFContext C);
     RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
-    RValue visitGenericSubscriptExpr(GenericSubscriptExpr *E, SGFContext C);
     RValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E,
                                        SGFContext C);
     RValue visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E,
@@ -907,12 +906,6 @@ RValue RValueEmitter::visitModuleExpr(ModuleExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E,
                                          SGFContext C) {
-  return SGF.emitLValueAsRValue(E);
-}
-
-RValue RValueEmitter::visitGenericSubscriptExpr(GenericSubscriptExpr *E,
-                                                 SGFContext C)
-{
   return SGF.emitLValueAsRValue(E);
 }
 

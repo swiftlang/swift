@@ -146,7 +146,6 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::ExistentialMemberRef:
   case ExprKind::ExistentialSubscript:
   case ExprKind::FunctionConversion:
-  case ExprKind::GenericSubscript:
   case ExprKind::If:
   case ExprKind::ImplicitClosure:
   case ExprKind::Load:

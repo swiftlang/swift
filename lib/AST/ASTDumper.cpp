@@ -1028,15 +1028,6 @@ public:
     printRec(E->getIndex());
     OS << ')';
   }
-  void visitGenericSubscriptExpr(GenericSubscriptExpr *E) {
-    printCommon(E, "generic_subscript_expr");
-    OS << '\n';
-    printSubstitutions(E->getSubstitutions());
-    printRec(E->getBase());
-    OS << '\n';
-    printRec(E->getIndex());
-    OS << ')';
-  }
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     printCommon(E, "unresolved_dot_expr")
       << " field '" << E->getName().str() << "'";
