@@ -9,43 +9,84 @@ its current implementation state.
 
 .. contents:: Index
 
-DaveZ's Proposed Document Structure
------------------------------------
+High Level Design Rationale
+===========================
 
-1. High level design rationale
+Like all things Swift, our approach to strings begins with a deep
+respect for the lessons learned from many languages and libraries,
+including Objective-C and Cocoa.
 
-Prose: words and thoughts like this: "deep reverence and respect for
-the lessons learned from many languages and libraries". You don't
-literally need to use the word "reverence" or "respect", but they do
-help set the tone.
+Why a Builtin String Type?
+--------------------------
 
-2. Examples and tutorials
-3. Reference manual
-4. High level comparison to NSString
-5. Side by side comparisons with NSString
-Take advantage of the back that you can reference back to sections 1,
-2, and 3 in this outline. :-)
+``NSString`` and ``NSMutableString``\ —the string types provided by
+Cocoa—are full-featured classes with high-level functionality for
+writing fully-localized applications.  They have served Apple
+programmers well; so, why does Swift have its own string type?
 
-Chris' Outline of Important Points to Cover
--------------------------------------------
+* ObjCMessageSend
 
-* Why having a builtin String is good
+* Error Prone Mutability
+  Reference semantics don't line up with how people think about strings
 
-* The user model for Cocoa
+* 2 is too many string types.  
+  two APIs
+  duplication of effort
+  documentation
+  Complexity adds decisions for users
+  etc.
 
-  - Bridging
-  - Extensions on String
-  - Implicit Conversions
-  - API?
+* ObjC needed to innovate because C strings suck
+  O(N) length
+  no localization
+  no memory management
+  no specified encoding
 
-* How it works?
+* C strings had to stay around for performance reasons and
+  interoperability
 
-  - Runtime Implementation Detail
-  - How does Bridging Work
-  - Measured Performance Cost
-  - You can still use NSString
+Want performance of C, sane semantics of C++ strings, and high-level
+goodness of ObjC.
 
-------------------------------------------------------------------------
+How Would You Design It?
+------------------------
+
+* It'd be an independent *value* so you don't have to micromanage
+  sharing and mutation
+
+* It'd be UTF-8 because:
+
+  - UTF-8 has been the clear winner__ among Unicode encodings since at
+    least 2008; Swift should interoperate smoothly and efficiently
+    with the rest of the world's systems
+
+    __ http://www.artima.com/weblogs/viewpost.jsp?thread=230157
+
+  - UTF-8 is a fairly efficient storage format, especially for ASCII
+    but also for the most common non-ASCII code points.
+
+  - This__ posting elaborates on some other nice qualities of UTF-8:
+
+    1. All ASCII files are already UTF-8 files
+    2. ASCII bytes always represent themselves in UTF-8 files. They
+       never appear as part of other UTF-8 sequences
+    3. ASCII code points are always represented as themselves in UTF-8
+       files. They cannot be hidden inside multibyte UTF-8
+       sequences
+    4. UTF-8 is self-synchronizing
+    5. CodePoint substring search is just byte string search
+    6. Most programs that handle 8-bit files safely can handle UTF-8 safely
+    7. UTF-8 sequences sort in code point order.
+    8. UTF-8 has no “byte order.”
+
+    __ http://research.swtch.com/2010/03/utf-8-bits-bytes-and-benefits.html
+
+* It would be efficient, taking advantage of state-of-the-art
+  optimizations, including:
+
+  - Storing short strings without heap allocation
+  - Sharing allocated buffers among copies and slices
+  - In-place modification of uniquely-owned buffers
 
 
 General Principles
@@ -187,9 +228,21 @@ possible points of deviation for Swift ``String``:
 
 .. _Unicode Text Segmentation Specification: http://www.unicode.org/reports/tr29
 
+Examples and Tutorials
+======================
 
-Qualitative Comparison with ``NSString``
------------------------------------------
+**WRITEME**
+
+Reference Manual
+================
+
+**WRITEME**
+
+Comparisons with ``NSString``
+=============================
+
+High-Level Comparison with ``NSString``
+---------------------------------------
 
 API Breadth
 ~~~~~~~~~~~
