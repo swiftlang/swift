@@ -2411,11 +2411,12 @@ public:
 };
 
 /// \brief Represents an explicit type coercion of an expression to a specified
-/// type, spelled 'a as T'.
+/// type.
 ///
 /// An explicit type coercion makes implicit conversions explicit, clarifying
 /// a type. It does not perform any casting not captured by implicit
-/// conversions.
+/// conversions. Note that such coercions cannot currently be written within
+/// the language.
 class CoerceExpr : public ExplicitCastExpr {
 public:
   CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)

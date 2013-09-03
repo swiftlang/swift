@@ -295,27 +295,26 @@ ParserResult<Expr> Parser::parseExprIs() {
 
 /// parseExprAs
 ///   expr-as:
-///     'as' type
 ///     'as' '!' type
 ParserResult<Expr> Parser::parseExprAs() {
   SourceLoc asLoc = consumeToken(tok::kw_as);
   SourceLoc bangLoc;
-  
-  if (Tok.isContextualPunctuator("!")) {
-    bangLoc = consumeToken();
+
+  if (!Tok.isContextualPunctuator("!")) {
+    diagnose(Tok, diag::expected_bang_or_question_after_as);
+    return nullptr;
   }
-  
+
+  bangLoc = consumeToken();
+
   ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as);
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (type.isNull())
     return nullptr;
   
-  if (bangLoc.isValid())
-    return makeParserResult(new (Context)
-        UnconditionalCheckedCastExpr(asLoc, bangLoc, type.get()));
-  else
-    return makeParserResult(new (Context) CoerceExpr(asLoc, type.get()));
+  return makeParserResult(new (Context)
+      UnconditionalCheckedCastExpr(asLoc, bangLoc, type.get()));
 }
 
 /// parseExprSequence
