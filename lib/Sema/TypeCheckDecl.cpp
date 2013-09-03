@@ -145,6 +145,16 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
     // If this is a protocol or protocol composition type, record the
     // protocols.
     if (inheritedTy->isExistentialType()) {
+      // DynamicLookup cannot be used in a generic constraint.
+      if (auto protoTy = inheritedTy->getAs<ProtocolType>()) {
+        if (protoTy->getDecl()->isSpecificProtocol(
+                                   KnownProtocolKind::DynamicLookup)) {
+          tc.diagnose(inheritedClause[i].getSourceRange().Start,
+                      diag::dynamic_lookup_conformance);
+          continue;
+        }
+      }
+
       SmallVector<ProtocolDecl *, 4> protocols;
       inheritedTy->isExistentialType(protocols);
       allProtocols.insert(protocols.begin(), protocols.end());
@@ -582,6 +592,16 @@ public:
           Req.getConstraintLoc().setInvalidType(TC.Context);
           Req.setInvalid();
           continue;
+        }
+
+        // DynamicLookup cannot be used in a generic constraint.
+        if (auto protoTy = Req.getConstraint()->getAs<ProtocolType>()) {
+          if (protoTy->getDecl()->isSpecificProtocol(
+                                    KnownProtocolKind::DynamicLookup)) {
+            TC.diagnose(Req.getConstraintLoc().getSourceRange().Start,
+                        diag::dynamic_lookup_conformance);
+            continue;
+          }
         }
         break;
       }
