@@ -838,26 +838,6 @@ static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
 }
 
 template <typename... DiagArgTypes, typename... ArgTypes>
-static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
-                                            SourceLoc &L,
-                                            Diag<DiagArgTypes...> ID,
-                                            ArgTypes... Args) {
-  return parseIdentifierDeclName(P, Result, L, tok::unknown, tok::unknown,
-                                 tok::unknown, TokenProperty::None,
-                                 Diagnostic(ID, Args...));
-}
-
-template <typename... DiagArgTypes, typename... ArgTypes>
-static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
-                                            SourceLoc &L, tok ResyncT1,
-                                            Diag<DiagArgTypes...> ID,
-                                            ArgTypes... Args) {
-  return parseIdentifierDeclName(P, Result, L, ResyncT1, tok::unknown,
-                                 tok::unknown, TokenProperty::None,
-                                 Diagnostic(ID, Args...));
-}
-
-template <typename... DiagArgTypes, typename... ArgTypes>
 static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         tok ResyncT1, tok ResyncT2, Diag<DiagArgTypes...> ID,
