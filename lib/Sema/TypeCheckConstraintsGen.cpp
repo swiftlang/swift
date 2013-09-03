@@ -371,7 +371,8 @@ namespace {
     }
 
     Type visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
-      return addMemberRefConstraints(expr, expr->getBase(), expr->getDecl());
+      return addMemberRefConstraints(expr, expr->getBase(),
+                                     expr->getMember().getDecl());
     }
     
     Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {

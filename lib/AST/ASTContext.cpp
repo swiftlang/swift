@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTMutationListener.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/KnownProtocols.h"

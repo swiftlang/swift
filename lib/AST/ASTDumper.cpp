@@ -541,6 +541,81 @@ void Decl::dump(unsigned Indent) const {
   llvm::errs() << '\n';
 }
 
+// Print a name.
+static void printName(raw_ostream &os, Identifier name) {
+  if (name.empty())
+    os << "<anonymous>";
+  else
+    os << name.str();
+}
+
+/// Print the given declaration context (with its parents).
+static void printContext(raw_ostream &os, DeclContext *dc) {
+  if (auto parent = dc->getParent()) {
+    printContext(os, parent);
+    os << '.';
+  }
+
+  switch (dc->getContextKind()) {
+  case DeclContextKind::BuiltinModule:
+  case DeclContextKind::ClangModule:
+  case DeclContextKind::SerializedModule:
+  case DeclContextKind::TranslationUnit:
+    printName(os, cast<Module>(dc)->Name);
+    break;
+
+  case DeclContextKind::NominalTypeDecl:
+    printName(os, cast<NominalTypeDecl>(dc)->getName());
+    break;
+
+  case DeclContextKind::ExtensionDecl:
+    if (auto extendedTy = cast<ExtensionDecl>(dc)->getExtendedType()) {
+      if (auto nominal = extendedTy->getAnyNominal()) {
+        printName(os, nominal->getName());
+        break;
+      }
+    }
+    os << "extension";
+    break;
+
+  case DeclContextKind::ConstructorDecl:
+    os << "constructor";
+    break;
+
+  case DeclContextKind::DestructorDecl:
+    os << "destructor";
+    break;
+
+  case DeclContextKind::CapturingExpr:
+    os << "captured";
+    break;
+
+  case DeclContextKind::TopLevelCodeDecl:
+    os << "top-level code";
+    break;
+  }
+}
+
+void ValueDecl::dumpRef(raw_ostream &os) const {
+  // Print the context.
+  printContext(os, getDeclContext());
+  os << ".";
+
+  // Print name.
+  printName(os, getName());
+
+  // Print location.
+  auto &srcMgr = getASTContext().SourceMgr;
+  if (getLoc().isValid()) {
+    os << '@';
+    getLoc().print(os, srcMgr);
+  }
+}
+
+void LLVM_ATTRIBUTE_USED ValueDecl::dumpRef() const {
+  dumpRef(llvm::errs());
+}
+
 void TranslationUnit::dump() const {
   dump(llvm::errs());
 }
@@ -887,7 +962,9 @@ public:
   }
   void visitDynamicMemberRefExpr(DynamicMemberRefExpr *E) {
     printCommon(E, "dynamic_member_ref_expr")
-    << " decl=" << E->getDecl()->getName() << '\n';
+      << " decl=";
+    E->getMember().dump(OS);
+    OS << '\n';
     printRec(E->getBase());
     OS << ')';
   }

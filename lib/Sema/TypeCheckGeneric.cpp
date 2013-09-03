@@ -33,6 +33,17 @@ TypeChecker::encodeSubstitutions(const GenericParamList *GenericParams,
                                  const TypeSubstitutionMap &Substitutions,
                                  const ConformanceMap &Conformances,
                                  bool OnlyInnermostParams) {
+  SmallVector<Substitution, 4> Results;
+  encodeSubstitutions(GenericParams, Substitutions, Conformances,
+                      OnlyInnermostParams, Results);
+  return Context.AllocateCopy(Results);
+}
+
+void TypeChecker::encodeSubstitutions(const GenericParamList *GenericParams,
+                                      const TypeSubstitutionMap &Substitutions,
+                                      const ConformanceMap &Conformances,
+                                      bool OnlyInnermostParams,
+                                      SmallVectorImpl<Substitution> &Results) {
   // Collect all of the archetypes.
   SmallVector<ArchetypeType *, 2> allArchetypesList;
   ArrayRef<ArchetypeType *> allArchetypes = GenericParams->getAllArchetypes();
@@ -52,8 +63,7 @@ TypeChecker::encodeSubstitutions(const GenericParamList *GenericParams,
     allArchetypes = allArchetypesList;
   }
 
-  SmallVector<SpecializeExpr::Substitution, 2> storedSubstitutions;
-  storedSubstitutions.resize(allArchetypes.size());
+  Results.resize(allArchetypes.size());
   unsigned index = 0;
   for (auto archetype : allArchetypes) {
     // Figure out the key into the maps we were given.
@@ -62,16 +72,14 @@ TypeChecker::encodeSubstitutions(const GenericParamList *GenericParams,
     assert(Conformances.count(key) && "Missing conformance information");
 
     // Record this substitution.
-    storedSubstitutions[index].Archetype = archetype;
-    storedSubstitutions[index].Replacement
+    Results[index].Archetype = archetype;
+    Results[index].Replacement
       = Substitutions.find(key)->second;
-    storedSubstitutions[index].Conformance
+    Results[index].Conformance
       = Context.AllocateCopy(Conformances.find(key)->second);
 
     ++index;
   }
-
-  return Context.AllocateCopy(storedSubstitutions);
 }
 
 bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,

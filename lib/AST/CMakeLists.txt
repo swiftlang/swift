@@ -5,6 +5,7 @@ add_swift_library(swiftAST
   ASTWalker.cpp
   Attr.cpp
   Builtins.cpp
+  ConcreteDeclRef.cpp
   Decl.cpp
   DiagnosticList.cpp
   DiagnosticEngine.cpp

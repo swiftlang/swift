@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_EXPR_H
 #define SWIFT_AST_EXPR_H
 
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Substitution.h"
@@ -754,15 +755,16 @@ public:
 /// \endcode
 class DynamicMemberRefExpr : public Expr {
   Expr *Base;
-  ValueDecl *Decl;
+  ConcreteDeclRef Member;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
 
 public:
-  DynamicMemberRefExpr(Expr *base, SourceLoc dotLoc, ValueDecl *decl,
+  DynamicMemberRefExpr(Expr *base, SourceLoc dotLoc,
+                       ConcreteDeclRef member,
                        SourceLoc nameLoc)
     : Expr(ExprKind::DynamicMemberRef),
-      Base(base), Decl(decl), DotLoc(dotLoc), NameLoc(nameLoc) { }
+      Base(base), Member(member), DotLoc(dotLoc), NameLoc(nameLoc) { }
 
   /// Retrieve the base of the expression.
   Expr *getBase() const { return Base; }
@@ -771,7 +773,7 @@ public:
   void setBase(Expr *base) { Base = base; }
 
   /// Retrieve the member to which this access refers.
-  ValueDecl *getDecl() const { return Decl; }
+  ConcreteDeclRef getMember() const { return Member; }
 
   /// Retrieve the location of the member name.
   SourceLoc getNameLoc() const { return NameLoc; }

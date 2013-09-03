@@ -1440,7 +1440,23 @@ public:
   Expr *specialize(Expr *expr,
                    PolymorphicFunctionType *polyFn,
                    Type openedType) const;
-  
+
+  /// Compute the set of substitutions required to map the given polymorphic
+  /// function type to the provided "opened" type.
+  ///
+  /// \param polyFn The polymorphic function type.
+  ///
+  /// \param openedType The type to which this reference to the given
+  /// polymorphic function type was opened.
+  ///
+  /// \param substitutions Will be populated with the set of substitutions
+  /// to be applied to the polymorphic function type.
+  ///
+  /// \returns The opened type after applying the computed substitutions.
+  Type computeSubstitutions(PolymorphicFunctionType *polyFn,
+                            Type openedType,
+                            SmallVectorImpl<Substitution> &substitutions) const;
+
   /// \brief Retrieve the fixed score of this solution, which considers
   /// the number of user-defined conversions.
   int getFixedScore() const;

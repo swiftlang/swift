@@ -76,6 +76,49 @@ Expr *Solution::specialize(Expr *expr,
   return new (tc.Context) SpecializeExpr(expr, type, encodedSubs);
 }
 
+Type Solution::computeSubstitutions(
+                 PolymorphicFunctionType *polyFn,
+                 Type openedType,
+                 SmallVectorImpl<Substitution> &substitutions) const {
+  auto &tc = getConstraintSystem().getTypeChecker();
+
+  // Gather the substitutions from archetypes to concrete types, found
+  // by identifying all of the type variables in the original type
+  TypeSubstitutionMap typeSubstitutions;
+  auto type
+    = tc.transformType(openedType,
+                       [&](Type type) -> Type {
+        if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+          auto archetype = tv->getImpl().getArchetype();
+          auto simplified = getFixedType(tv);
+          typeSubstitutions[archetype] = simplified;
+
+          return SubstitutedType::get(archetype, simplified, tc.Context);
+        }
+
+        return type;
+      });
+
+  // Validate the generated type, now that we've substituted in for
+  // type variables.
+  tc.validateTypeSimple(type);
+
+  // Check that the substitutions we've produced actually work.
+  // FIXME: We'd like the type checker to ensure that this always
+  // succeeds.
+  ConformanceMap conformances;
+  if (tc.checkSubstitutions(typeSubstitutions, conformances, SourceLoc(),
+                            &typeSubstitutions))
+    return Type();
+
+  tc.encodeSubstitutions(&polyFn->getGenericParams(),
+                         typeSubstitutions, conformances,
+                         /*OnlyInnermostParams=*/true,
+                         substitutions);
+
+  return type;
+}
+
 /// \brief Find a particular named function witness for a type that conforms to
 /// the given protocol.
 ///
@@ -418,8 +461,24 @@ namespace {
                                 ConstraintLocatorBuilder locator) {
       auto &context = cs.getASTContext();
 
-      // FIXME: Handle specializations?
-      auto result = new (context) DynamicMemberRefExpr(base, dotLoc, member,
+      // If we're specializing a polymorphic function, compute the set of
+      // substitutions and form the member reference.
+      Optional<ConcreteDeclRef> memberRef;
+      if (auto func = dyn_cast<FuncDecl>(member)) {
+        auto resultTy = func->getType()->castTo<AnyFunctionType>()->getResult();
+        if (auto polyFn = resultTy->getAs<PolymorphicFunctionType>()) {
+          llvm::SmallVector<Substitution, 4> substitutions;
+          solution.computeSubstitutions(polyFn, openedType, substitutions);
+          memberRef = ConcreteDeclRef(context, member, substitutions);
+        }
+      }
+
+      // If we didn't have a specialized member reference, it's a normal
+      // reference.
+      if (!memberRef)
+        memberRef = member;
+
+      auto result = new (context) DynamicMemberRefExpr(base, dotLoc, *memberRef,
                                                        memberLoc);
       result->setType(simplifyType(openedType));
       return result;

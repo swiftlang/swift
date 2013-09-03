@@ -1086,6 +1086,12 @@ public:
   /// the type of the corresponding parameter.
   std::pair<DefaultArgumentKind, Type> getDefaultArg(unsigned index) const;
 
+  /// Dump a reference to the given declaration.
+  void dumpRef(raw_ostream &os) const;
+
+  /// Dump a reference to the given declaration.
+  void dumpRef() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_ValueDecl &&
            D->getKind() <= DeclKind::Last_ValueDecl;
