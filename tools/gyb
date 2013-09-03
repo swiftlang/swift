@@ -280,8 +280,8 @@ def splitAtLines(sourceLines):
     return unmatchedIndents
 
 def codeStartsWithDedentKeyword(sourceLines):
-    r"""Return True iff the incoming Python sourceLines begin with "else"
-    or "except".
+    r"""Return True iff the incoming Python sourceLines begin with "else",
+    "elif", "except", or "finally".
 
     Initial comments and whitespace are ignored.
 
@@ -299,7 +299,7 @@ def codeStartsWithDedentKeyword(sourceLines):
         if tokenKind != tokenize.COMMENT and tokenText.strip() != '':
             break
 
-    return tokenText in ('else', 'except')
+    return tokenText in ('else', 'elif', 'except', 'finally')
 
 class ParseContext:
     """State carried through a parse of a template"""
