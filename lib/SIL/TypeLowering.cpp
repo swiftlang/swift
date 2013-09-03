@@ -249,8 +249,8 @@ Type Lowering::getThinFunctionType(Type t, AbstractCC cc) {
     return PolymorphicFunctionType::get(pft->getInput(), pft->getResult(),
                                         &pft->getGenericParams(),
                                         pft->getExtInfo()
-                                               .withIsThin(true)
-                                               .withCallingConv(cc),
+                                          .withIsThin(true)
+                                          .withCallingConv(cc),
                                         pft->getASTContext());
 
   return t;
@@ -272,8 +272,8 @@ Type Lowering::getThickFunctionType(Type t, AbstractCC cc) {
     return PolymorphicFunctionType::get(pfTy->getInput(), pfTy->getResult(),
                                         &pfTy->getGenericParams(),
                                         pfTy->getExtInfo()
-                                                .withIsThin(false)
-                                                .withCallingConv(cc),
+                                          .withIsThin(false)
+                                          .withCallingConv(cc),
                                         pfTy->getASTContext());
 
   return t;
