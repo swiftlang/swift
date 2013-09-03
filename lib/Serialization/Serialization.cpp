@@ -1747,9 +1747,12 @@ writeKnownProtocolList(const index_block::KnownProtocolLayout &AdopterList,
   AdopterList.emit(scratch, getRawStableKnownProtocolKind(kind), adopters);
 }
 
-void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
+void Serializer::writeTranslationUnit(const TranslationUnit *TU, const SILModule *M) {
   assert(!this->TU && "already serializing a translation unit");
   this->TU = TU;
+
+  this->M = M;
+  writeSILFunctions(M);
 
   DeclTable topLevelDecls, extensionDecls, operatorDecls;
   for (auto D : TU->Decls) {
@@ -1811,6 +1814,7 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
 }
 
 void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,
+                               const SILModule *M,
                                FileBufferIDs inputFiles,
                                StringRef moduleLinkName) {
   // Write the signature through the BitstreamWriter for alignment purposes.
@@ -1819,14 +1823,15 @@ void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,
 
   writeHeader();
   writeInputFiles(TU, inputFiles, moduleLinkName);
-  writeTranslationUnit(TU);
+  writeTranslationUnit(TU, M);
 
   os.write(Buffer.data(), Buffer.size());
   os.flush();
   Buffer.clear();
 }
 
-void swift::serialize(const TranslationUnit *TU, const char *outputPath,
+void swift::serialize(const TranslationUnit *TU, const SILModule *M,
+                      const char *outputPath,
                       FileBufferIDs inputFiles, StringRef moduleLinkName) {
   std::string errorInfo;
   llvm::raw_fd_ostream out(outputPath, errorInfo,
@@ -1839,12 +1844,13 @@ void swift::serialize(const TranslationUnit *TU, const char *outputPath,
     return;
   }
 
-  serializeToStream(TU, out, inputFiles, moduleLinkName);
+  serializeToStream(TU, out, M, inputFiles, moduleLinkName);
 }
 
-void swift::serializeToStream(const TranslationUnit *TU, raw_ostream &out,
+void swift::serializeToStream(const TranslationUnit *TU,
+                              raw_ostream &out, const SILModule *M,
                               FileBufferIDs inputFiles,
                               StringRef moduleLinkName) {
   Serializer S;
-  S.writeToStream(out, TU, inputFiles, moduleLinkName);
+  S.writeToStream(out, TU, M, inputFiles, moduleLinkName);
 }

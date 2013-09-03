@@ -180,12 +180,14 @@ namespace swift {
   /// Serializes a translation unit to the given output file.
   ///
   /// This interface is still prone to change!
-  void serialize(const TranslationUnit *TU, const char *outputPath,
+  void serialize(const TranslationUnit *TU, const SILModule *M,
+                 const char *outputPath,
                  ArrayRef<unsigned> inputFileBufferIDs = {},
                  StringRef moduleLinkName = {});
 
   /// Serializes a translation unit to a stream.
   void serializeToStream(const TranslationUnit *TU, llvm::raw_ostream &out,
+                         const SILModule *M = nullptr,
                          ArrayRef<unsigned> inputFileBufferIDs = {},
                          StringRef moduleLinkName = {});
 

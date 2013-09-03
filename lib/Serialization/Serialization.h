@@ -24,6 +24,7 @@
 #include <queue>
 
 namespace swift {
+  class SILModule;
   class TranslationUnit;
 
 namespace serialization {
@@ -39,6 +40,9 @@ class Serializer {
 
   /// The TranslationUnit currently being serialized.
   const TranslationUnit *TU = nullptr;
+
+  /// The SILModule currently being serialized.
+  const SILModule *M = nullptr;
 
 public:    
   /// Stores a declaration or a type to be written to the AST file.
@@ -274,14 +278,18 @@ private:
   void writeOffsets(const index_block::OffsetsLayout &Offsets,
                     const std::vector<BitOffset> &values);
 
+  /// Serializes all transparent SIL functions in the SILModule.
+  void writeSILFunctions(const SILModule *M);
+
   /// Top-level entry point for serializing a translation unit module.
-  void writeTranslationUnit(const TranslationUnit *TU);
+  void writeTranslationUnit(const TranslationUnit *TU, const SILModule *M);
 
 public:
   Serializer() = default;
 
   /// Serialize a translation unit to the given stream.
   void writeToStream(raw_ostream &os, const TranslationUnit *TU,
+                     const SILModule *M,
                      FileBufferIDs inputFiles, StringRef moduleLinkName);
 };
 } // end namespace serialization
