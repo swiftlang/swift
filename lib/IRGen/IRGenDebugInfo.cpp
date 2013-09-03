@@ -20,6 +20,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
+#include "swift/Basic/Dwarf.h"
 #include "llvm/Config/config.h"
 #include "llvm/DebugInfo.h"
 #include "llvm/IR/Module.h"
