@@ -15,12 +15,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/Frontend.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
@@ -43,7 +43,8 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   Context->ImportSearchPaths = Invocation.getImportSearchPaths();
   Context->addModuleLoader(SourceLoader::create(*Context,
                                                 !Invocation.isImmediate()));
-  Context->addModuleLoader(SerializedModuleLoader::create(*Context));
+  SML = SerializedModuleLoader::create(*Context);
+  Context->addModuleLoader(SML);
 
   // If the user has specified an SDK, wire up the Clang module importer
   // and point it at that SDK.

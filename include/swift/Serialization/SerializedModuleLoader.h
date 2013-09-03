@@ -27,8 +27,7 @@ class ModuleFile;
 class SerializedModuleLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
-  std::map<std::string, llvm::OwningPtr<llvm::MemoryBuffer> > MemoryBuffers;
-
+  std::map<std::string, std::unique_ptr<llvm::MemoryBuffer> > MemoryBuffers;
   /// A { module, generation # } pair.
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
   std::vector<LoadedModulePair> LoadedModuleFiles;
@@ -62,13 +61,24 @@ public:
   loadModule(SourceLoc importLoc, Module::AccessPathTy path) override;
 
   /// \brief Register a memory buffer that contains the serialized
-  /// module for the given module path. This API is intended to be
+  /// module for the given access path. This API is intended to be
   /// used by LLDB to add swiftmodules discovered in the __apple_ast
   /// section of a Mach-O file to the search path.
-  void registerMemoryBuffer(std::string path,
-                            llvm::OwningPtr<llvm::MemoryBuffer> &&input) {
-    MemoryBuffers[path].reset(input.take());
+  /// FIXME: make this an actual access *path* once submodules are designed.
+  void registerMemoryBuffer(StringRef AccessPath,
+                            std::unique_ptr<llvm::MemoryBuffer> input) {
+    MemoryBuffers[AccessPath].reset(input.release());
   }
+
+  /// \brief Povided a memory buffer with an entire Mach-O __apple_ast
+  /// section, this function makes memory buffer copies of all swift
+  /// modules found in it and registers them using
+  /// registerMemoryBuffer() so they can be found by loadModule(). The
+  /// the access path of all modules found in the section is appended
+  /// to the vector foundModules.
+  /// \return true if successful.
+  bool addASTSection(std::unique_ptr<llvm::MemoryBuffer> data,
+                     SmallVectorImpl<std::string> &foundModules);
 
   /// \brief Look for declarations associated with the given name.
   ///

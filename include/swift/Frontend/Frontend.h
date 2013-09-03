@@ -40,6 +40,8 @@ namespace llvm {
 
 namespace swift {
 
+class SerializedModuleLoader;
+
 class CompilerInvocation {
   std::string TargetTriple;
   std::string ClangModuleCachePath;
@@ -237,6 +239,7 @@ class CompilerInstance {
   std::unique_ptr<SILModule> TheSILModule;
 
   TranslationUnit *TU;
+  SerializedModuleLoader *SML;
 
   void createSILModule();
 
@@ -271,6 +274,8 @@ public:
   TranslationUnit *getTU() {
     return TU;
   }
+
+  SerializedModuleLoader *getSerializedModuleLoader() const { return SML; }
 
   ArrayRef<unsigned> getInputBufferIDs() const { return BufferIDs; }
 

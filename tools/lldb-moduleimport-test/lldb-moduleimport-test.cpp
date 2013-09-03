@@ -23,24 +23,12 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include <mach-o/loader.h>
 #include <stdint.h>
 #include <fstream>
-
-struct apple_ast_section {
-  uint32_t version;
-  uint32_t nmods;
-};
-
-struct module_header {
- uint64_t bitstream_ofs;
- uint64_t bitstream_size;
- uint64_t name_ofs;
- uint32_t language;
- uint32_t flags;
-};
 
 static llvm::cl::list<std::string>
 InputNames(llvm::cl::Positional, llvm::cl::desc("compiled_swift_file1.o ..."),
@@ -56,13 +44,14 @@ SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
 
 void anchorForGetMainExecutable() {}
 
+
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal();
   llvm::PrettyStackTraceProgram ST(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
   // Create a Swift compiler.
-  std::vector<std::string> modules;
+  llvm::SmallVector<std::string, 4> modules;
   swift::CompilerInstance CI;
   swift::CompilerInvocation Invocation;
 
@@ -77,13 +66,15 @@ int main(int argc, char **argv) {
   if (CI.setup(Invocation))
     return 1;
 
-  auto SML = swift::SerializedModuleLoader::create(CI.getASTContext());
-
   // Fetch the serialized module bitstreams from the Mach-O files and
   // register them with the module loader.
   for (std::string name : InputNames) {
     // We assume Macho-O 64 bit.
     std::ifstream macho(name);
+    if (!macho.good()) {
+      llvm::outs() << "Cannot read from " << name << "\n";
+      exit(1);
+    }
     struct mach_header_64 h;
     macho.read((char*)&h, sizeof(h));
     assert(h.magic == MH_MAGIC_64);
@@ -102,42 +93,19 @@ int main(int argc, char **argv) {
           macho.read((char*)&section, sizeof(section));
           auto sectname = "__apple_ast";
           if (strncmp(section.sectname, sectname, strlen(sectname)) == 0) {
-              macho.seekg(section.offset, macho.beg);
-              size_t base = macho.tellg();
-              struct apple_ast_section apple_ast_section;
-              macho.read((char*)&apple_ast_section, sizeof(apple_ast_section));
-              assert(apple_ast_section.version == 1);
-              // AST Modules.
-              for (uint32_t k = 0; k < apple_ast_section.nmods; ++k) {
-                struct module_header mh;
-                macho.read((char*)&mh, sizeof(mh));
+            macho.seekg(section.offset, macho.beg);
+            assert(macho.good());
 
-                // Path.
-                macho.seekg(base + mh.name_ofs, macho.beg);
-                uint32_t nchars;
-                macho.read((char*)&nchars, sizeof(nchars));
-                assert(nchars < (2 << 10) && "path is too long");
-                llvm::SmallString<128> Path;
-                Path.append(nchars, 'x');
-                macho.read(Path.data(), nchars);
+            // Pass the __apple_AST section to the module loader.
+            auto data = llvm::MemoryBuffer::getNewMemBuffer(section.size, name);
+            macho.read(const_cast<char *>(data->getBufferStart()), section.size);
+            if (!CI.getSerializedModuleLoader()->addASTSection
+                 (std::unique_ptr<llvm::MemoryBuffer>(data), modules))
+              exit(1);
 
-                // Bitstream.
-                macho.seekg(base + mh.bitstream_ofs, macho.beg);
-                char* data = new char[mh.bitstream_size];
-                macho.read(data, mh.bitstream_size);
-                auto sr = llvm::StringRef(data, mh.bitstream_size);
-                auto bitstream = llvm::MemoryBuffer::getMemBuffer(sr, Path);
-
-                // Register it.
-                llvm::outs() << "Loaded module " << Path << " from " << name
-                             << "\n";
-                SML->registerMemoryBuffer(Path.c_str(),
-                                          llvm::OwningPtr<llvm::MemoryBuffer>
-                                          (bitstream));
-                modules.push_back(Path.c_str());
-
-                assert(macho.good());
-              }
+            for (auto path : modules)
+              llvm::outs() << "Loaded module " << path << " from " << name
+                           << "\n";
           }
         }
       } else
@@ -162,7 +130,7 @@ int main(int argc, char **argv) {
                            swift::SourceLoc() });
 #endif
 
-    auto Module = SML->loadModule(swift::SourceLoc(), AccessPath);
+    auto Module = CI.getASTContext().getModule(AccessPath);
     if (!Module) {
       llvm::errs() << "FAIL!\n";
       return 1;
