@@ -478,8 +478,7 @@ ERROR(unsupported_unparenthesized_array_optional,type_parsing,none,
 ERROR(expected_pattern,pattern_parsing,none,
       "expected pattern", ())
 ERROR(expected_pattern_is_keyword,pattern_parsing,none,
-      "keyword '%0' can not be used as an identifier in the pattern",
-      (StringRef))
+      "keyword '%0' cannot be used as an identifier", (StringRef))
 ERROR(expected_rparen_tuple_pattern_list,pattern_parsing,non,
       "expected ')' at end of tuple pattern", ())
 ERROR(untyped_pattern_ellipsis,pattern_parsing,none,
