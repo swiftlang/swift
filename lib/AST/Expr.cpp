@@ -104,8 +104,6 @@ bool Expr::isImplicit() const {
   
   if (const MemberRefExpr *memberRef = dyn_cast<MemberRefExpr>(this))
     return memberRef->getNameLoc().isInvalid();
-  if (auto memberRef = dyn_cast<GenericMemberRefExpr>(this))
-    return memberRef->getNameLoc().isInvalid();
   if (auto memberRef = dyn_cast<ArchetypeMemberRefExpr>(this))
     return memberRef->getNameLoc().isInvalid();
 
@@ -181,10 +179,10 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
                   getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
 }
 
-MemberRefExpr::MemberRefExpr(Expr *Base, SourceLoc DotLoc, VarDecl *Value,
-                             SourceLoc NameLoc)
-  : Expr(ExprKind::MemberRef), Base(Base),
-    Value(Value), DotLoc(DotLoc), NameLoc(NameLoc) { }
+MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
+                             ConcreteDeclRef member, SourceLoc nameLoc)
+  : Expr(ExprKind::MemberRef), Base(base),
+    Member(member), DotLoc(dotLoc), NameLoc(nameLoc) { }
 
 ExistentialMemberRefExpr::ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc,
                                                    ValueDecl *Value,
@@ -209,25 +207,6 @@ ArchetypeType *ArchetypeMemberRefExpr::getArchetype() const {
 bool ArchetypeMemberRefExpr::isBaseIgnored() const {
   if (isa<TypeDecl>(Value))
     return true;
-
-  return false;
-}
-
-GenericMemberRefExpr::GenericMemberRefExpr(Expr *Base, SourceLoc DotLoc,
-                                           ValueDecl *Value,
-                                           SourceLoc NameLoc)
-  : Expr(ExprKind::GenericMemberRef), Base(Base), Value(Value),
-    DotLoc(DotLoc), NameLoc(NameLoc) { }
-
-bool GenericMemberRefExpr::isBaseIgnored() const {
-  if (getBase()->getType()->getRValueType()->is<MetaTypeType>())
-    return true;
-
-  if (isa<TypeDecl>(Value))
-    return true;
-
-  if (auto Func = dyn_cast<FuncDecl>(Value))
-    return Func->isStatic();
 
   return false;
 }

@@ -355,7 +355,8 @@ namespace {
     }
     
     Type visitMemberRefExpr(MemberRefExpr *expr) {
-      return addMemberRefConstraints(expr, expr->getBase(), expr->getDecl());
+      return addMemberRefConstraints(expr, expr->getBase(),
+                                     expr->getMember().getDecl());
     }
     
     Type visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
@@ -363,10 +364,6 @@ namespace {
     }
 
     Type visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *expr) {
-      return addMemberRefConstraints(expr, expr->getBase(), expr->getDecl());
-    }
-
-    Type visitGenericMemberRefExpr(GenericMemberRefExpr *expr) {
       return addMemberRefConstraints(expr, expr->getBase(), expr->getDecl());
     }
 

@@ -440,12 +440,12 @@ namespace {
         abort();
       }
       
-      if (!E->getDecl()) {
+      if (!E->getMember()) {
         Out << "Member reference is missing declaration\n";
         E->dump();
         abort();
       }
-      
+
       LValueType *ResultLV = E->getType()->getAs<LValueType>();
       if (!ResultLV) {
         Out << "Member reference has non-lvalue type\n";
@@ -453,23 +453,7 @@ namespace {
         abort();
       }
 
-      checkIsTypeOfRValue(E->getDecl(), ResultLV->getObjectType(),
-                          "member reference result type and referenced member");
-      
-      Type ContainerTy
-        = E->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
-      if (!ContainerTy) {
-        Out << "container of member reference is not a type\n";
-        E->dump();
-        abort();
-      }
-      
-      Type BaseTy = E->getBase()->getType();
-      if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
-        BaseTy = BaseLV->getObjectType();
-      
-      checkSameOrSubType(BaseTy, ContainerTy,
-                         "member reference base and member container");
+      // FIXME: Check container/member types through substitutions.
     }
     
     void verifyChecked(SubscriptExpr *E) {

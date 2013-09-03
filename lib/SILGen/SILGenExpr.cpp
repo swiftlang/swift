@@ -162,7 +162,6 @@ namespace {
     RValue visitSpecializeExpr(SpecializeExpr *E, SGFContext C);
     RValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
-    RValue visitGenericMemberRefExpr(GenericMemberRefExpr *E, SGFContext C);
     RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
     RValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
                                        SGFContext C);
@@ -848,12 +847,6 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
 
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                                           SGFContext C) {
-  return SGF.emitLValueAsRValue(E);
-}
-
-RValue RValueEmitter::visitGenericMemberRefExpr(GenericMemberRefExpr *E,
-                                                SGFContext C)
-{
   if (E->getBase()->getType()->is<MetaTypeType>()) {
     // Emit the metatype for the associated type.
     assert(E->getType()->is<MetaTypeType>() &&
@@ -861,10 +854,11 @@ RValue RValueEmitter::visitGenericMemberRefExpr(GenericMemberRefExpr *E,
     visit(E->getBase());
     return RValue(SGF,
                   ManagedValue(SGF.B.createMetatype(E,
-                                SGF.getLoweredLoadableType(E->getType())),
-                        ManagedValue::Unmanaged));
-
+                                 SGF.getLoweredLoadableType(E->getType())),
+                               ManagedValue::Unmanaged));
+    
   }
+
   return SGF.emitLValueAsRValue(E);
 }
 

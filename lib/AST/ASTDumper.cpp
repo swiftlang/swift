@@ -939,7 +939,7 @@ public:
   void visitMemberRefExpr(MemberRefExpr *E) {
     printCommon(E, "member_ref_expr")
       << " decl=";
-    E->getDecl()->dumpRef(OS);
+    E->getMember().dump(OS);
     OS << '\n';
     printRec(E->getBase());
     OS << ')';
@@ -957,15 +957,6 @@ public:
       << " decl=";
     E->getDecl()->dumpRef(OS);
     OS << '\n';
-    printRec(E->getBase());
-    OS << ')';
-  }
-  void visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
-    printCommon(E, "generic_member_ref_expr")
-      << " decl=";
-    E->getDecl()->dumpRef(OS);
-    OS << '\n';
-    printSubstitutions(E->getSubstitutions());
     printRec(E->getBase());
     OS << ')';
   }

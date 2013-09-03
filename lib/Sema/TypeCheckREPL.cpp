@@ -107,7 +107,11 @@ getArgRefExpr(TypeChecker &TC,
     }
     if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(CurT)) {
       VarDecl *VD = cast<VarDecl>(BGST->getDecl()->getMembers()[i]);
-      ArgRef = new (Context) GenericMemberRefExpr(ArgRef, Loc, VD, Loc);
+      ArgRef = new (Context) MemberRefExpr(
+                               ArgRef, Loc,
+                               ConcreteDeclRef(Context, VD,
+                                               BGST->getSubstitutions()),
+                               Loc);
       continue;
     }
     TupleType *TT = cast<TupleType>(CurT);

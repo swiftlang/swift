@@ -45,7 +45,6 @@ public:
   // Nodes that make up components of lvalue paths
   
   LValue visitMemberRefExpr(MemberRefExpr *e);
-  LValue visitGenericMemberRefExpr(GenericMemberRefExpr *e);
   LValue visitSubscriptExpr(SubscriptExpr *e);
   LValue visitGenericSubscriptExpr(GenericSubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
@@ -444,9 +443,9 @@ template<typename ANY_MEMBER_REF_EXPR>
 LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
                             SILGenFunction &gen,
                             ANY_MEMBER_REF_EXPR *e,
+                            ValueDecl *decl,
                             ArrayRef<Substitution> substitutions) {
   LValue lv = sgl.visitRec(e->getBase());
-  ValueDecl *decl = e->getDecl();
   CanType baseTy = e->getBase()->getType()->getCanonicalType();
 
   // If this is a physical field, access with a fragile element reference.
@@ -488,12 +487,9 @@ LValue emitAnySubscriptExpr(SILGenLValue &sgl,
   
 } // end anonymous namespace
 
-LValue SILGenLValue::visitGenericMemberRefExpr(GenericMemberRefExpr *e) {
-  return emitAnyMemberRefExpr(*this, gen, e, e->getSubstitutions());
-}
-
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
-  return emitAnyMemberRefExpr(*this, gen, e, {});
+  return emitAnyMemberRefExpr(*this, gen, e, e->getMember().getDecl(),
+                              e->getMember().getSubstitutions());
 }
 
 LValue SILGenLValue::visitGenericSubscriptExpr(GenericSubscriptExpr *e) {

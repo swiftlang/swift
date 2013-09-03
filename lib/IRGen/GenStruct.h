@@ -18,7 +18,6 @@
 #define SWIFT_IRGEN_GENSTRUCT_H
 
 namespace swift {
-  class GenericMemberRefExpr;
   class MemberRefExpr;
   class CanType;
   class SILType;

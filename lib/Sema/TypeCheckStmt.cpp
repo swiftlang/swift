@@ -712,12 +712,10 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
       VarDecl *member = nullptr;
       auto dest = assign->getDest()->getSemanticsProvidingExpr();
       if (auto memberRef = dyn_cast<MemberRefExpr>(dest))
-        member = memberRef->getDecl();
+        member = dyn_cast<VarDecl>(memberRef->getMember().getDecl());
       else if (auto memberRef = dyn_cast<ExistentialMemberRefExpr>(dest))
         member = dyn_cast<VarDecl>(memberRef->getDecl());
       else if (auto memberRef = dyn_cast<ArchetypeMemberRefExpr>(dest))
-        member = dyn_cast<VarDecl>(memberRef->getDecl());
-      else if (auto memberRef = dyn_cast<GenericMemberRefExpr>(dest))
         member = dyn_cast<VarDecl>(memberRef->getDecl());
       else if (auto memberRef = dyn_cast<UnresolvedDotExpr>(dest)) {
         if (auto base = dyn_cast<DeclRefExpr>(

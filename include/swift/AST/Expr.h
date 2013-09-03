@@ -577,15 +577,15 @@ public:
 /// argument) to the function 'f'.
 class MemberRefExpr : public Expr {
   Expr *Base;
-  VarDecl *Value;
+  ConcreteDeclRef Member;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
   
 public:  
-  MemberRefExpr(Expr *Base, SourceLoc DotLoc, VarDecl *Value,
-                SourceLoc NameLoc);
+  MemberRefExpr(Expr *base, SourceLoc dotLoc, ConcreteDeclRef member,
+                SourceLoc nameLoc);
   Expr *getBase() const { return Base; }
-  VarDecl *getDecl() const { return Value; }
+  ConcreteDeclRef getMember() const { return Member; }
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   
@@ -690,51 +690,6 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ArchetypeMemberRef;
-  }
-};
-
-class GenericMemberRefExpr : public Expr {
-  Expr *Base;
-  ValueDecl *Value;
-  SourceLoc DotLoc;
-  SourceLoc NameLoc;
-  ArrayRef<Substitution> Substitutions;
-
-public:  
-  GenericMemberRefExpr(Expr *Base, SourceLoc DotLoc, ValueDecl *Value,
-                       SourceLoc NameLoc);
-
-  Expr *getBase() const { return Base; }
-  ValueDecl *getDecl() const { return Value; }
-  SourceLoc getNameLoc() const { return NameLoc; }
-  SourceLoc getDotLoc() const { return DotLoc; }
-
-  /// \brief Retrieve the set of substitutions applied to specialize the
-  /// member.
-  ///
-  /// Each substitution contains the archetype being substitued, the type it is
-  /// being replaced with, and the protocol conformance relationships.
-  ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
-
-  void setSubstitutions(ArrayRef<Substitution> S) { Substitutions = S; }
-  
-  void setBase(Expr *E) { Base = E; }
-
-  SourceLoc getLoc() const { return NameLoc; }
-  SourceRange getSourceRange() const {
-    if (Base->isImplicit())
-      return SourceRange(NameLoc);
-
-    return SourceRange(Base->getStartLoc(), NameLoc);
-  }
-
-  /// isBaseIgnored - Determine whether the base expression is actually
-  /// ignored, rather than being used as, e.g., the 'self' argument passed
-  /// to an instance method or the base of a variable access.
-  bool isBaseIgnored() const;
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::GenericMemberRef;
   }
 };
 

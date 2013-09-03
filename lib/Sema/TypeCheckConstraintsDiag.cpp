@@ -302,7 +302,7 @@ ResolvedLocator constraints::resolveLocatorToDecl(
     decl = dre->getDecl();
   } else if (auto mre = dyn_cast<MemberRefExpr>(anchor)) {
     // Simple case: direct reference to a declaration.
-    decl = mre->getDecl();
+    decl = mre->getMember().getDecl();
   } else if (isa<OverloadedDeclRefExpr>(anchor) ||
              isa<OverloadedMemberRefExpr>(anchor) ||
              isa<UnresolvedDeclRefExpr>(anchor) ||

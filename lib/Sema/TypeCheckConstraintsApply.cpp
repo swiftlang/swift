@@ -392,16 +392,15 @@ namespace {
         }
 
         // Build a reference to a generic member.
-        auto result = new (context) GenericMemberRefExpr(base, dotLoc, member,
-                                                         memberLoc);
-
-        // Set the (substituted) type and the set of substitutions.
-        // FIXME: Use simplifyType(openedType);
+        SmallVector<Substitution, 4> substitutionsVec;
+        tc.encodeSubstitutions(genericParams, substitutions, conformances,
+                               false, substitutionsVec);
+        auto result
+          = new (context) MemberRefExpr(base, dotLoc,
+                                        ConcreteDeclRef(context, member,
+                                                        substitutionsVec),
+                                        memberLoc);
         result->setType(substTy);
-        result->setSubstitutions(tc.encodeSubstitutions(genericParams,
-                                                        substitutions,
-                                                        conformances,
-                                                        false));
         return result;
       }
 
@@ -1188,7 +1187,8 @@ namespace {
     }
 
     Expr *visitMemberRefExpr(MemberRefExpr *expr) {
-      return buildMemberRef(expr->getBase(), expr->getDotLoc(), expr->getDecl(),
+      return buildMemberRef(expr->getBase(), expr->getDotLoc(),
+                            expr->getMember().getDecl(),
                             expr->getNameLoc(), expr->getType(),
                             cs.getConstraintLocator(expr, { }));
     }
@@ -1198,16 +1198,6 @@ namespace {
     }
 
     Expr *visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *expr) {
-      auto selected = getOverloadChoice(
-                        cs.getConstraintLocator(expr,
-                                                ConstraintLocator::Member));
-      return buildMemberRef(expr->getBase(), expr->getDotLoc(),
-                            selected.first.getDecl(), expr->getNameLoc(),
-                            selected.second,
-                            cs.getConstraintLocator(expr, { }));
-    }
-
-    Expr *visitGenericMemberRefExpr(GenericMemberRefExpr *expr) {
       auto selected = getOverloadChoice(
                         cs.getConstraintLocator(expr,
                                                 ConstraintLocator::Member));

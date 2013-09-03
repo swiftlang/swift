@@ -26,7 +26,6 @@ namespace llvm {
 namespace swift {
   class ClassDecl;
   class ExtensionDecl;
-  class GenericMemberRefExpr;
   class MemberRefExpr;
   class CanType;
   class VarDecl;
