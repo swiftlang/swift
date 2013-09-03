@@ -675,11 +675,9 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   if (Tok.isNot(tok::semi)) {
     Second = parseExpr(diag::expected_cond_for_stmt);
     Status |= Second;
-    if (Second.isNull() || Second.hasCodeCompletion())
-      return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
   }
 
-  if (Tok.isNot(tok::semi)) {
+  if (Tok.isNot(tok::semi) && Second.isNonNull()) {
     Expr *RecoveredCondition = nullptr;
     BraceStmt *RecoveredBody = nullptr;
     if (auto *CE = dyn_cast<PipeClosureExpr>(Second.get())) {
@@ -727,26 +725,28 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 
   // Consume the second semicolon.
   if (parseToken(tok::semi, Semi2Loc, diag::expected_semi_for_stmt))
-    return nullptr; // FIXME: better recovery
+    Status.setIsParseError();
 
   if (Tok.isNot(tok::l_brace)) {
     Third = parseExpr(diag::expected_expr, /*isExprBasic=*/true);
     Status |= Third;
-    if (Third.isNull() || Third.hasCodeCompletion())
-      return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
   }
 
   if (LPLocConsumed && parseMatchingToken(tok::r_paren, RPLoc,
                                           diag::expected_rparen_for_stmt,LPLoc))
-    return nullptr; // FIXME: better recovery
+    Status.setIsParseError();
 
-  if ((Body = parseBraceItemList(diag::expected_lbrace_after_for)).isNull())
-    return nullptr; // FIXME: better recovery
+  Body = parseBraceItemList(diag::expected_lbrace_after_for);
+  Status |= Body;
+  if (Body.isNull())
+    Body = makeParserErrorResult(
+        BraceStmt::create(Context, Tok.getLoc(), {}, Tok.getLoc()));
 
   return makeParserResult(
+      Status,
       new (Context) ForStmt(ForLoc, First.getPtrOrNull(), FirstDeclsContext,
-                            Semi1Loc, Second.getPtrOrNull(),
-                            Semi2Loc, Third.getPtrOrNull(), Body.get()));
+                            Semi1Loc, Second.getPtrOrNull(), Semi2Loc,
+                            Third.getPtrOrNull(), Body.get()));
 }
 
 /// 
