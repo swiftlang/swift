@@ -13,6 +13,7 @@
 #ifndef SWIFT_SERIALIZATION_MODULELOADER_H
 #define SWIFT_SERIALIZATION_MODULELOADER_H
 
+#include "swift/Basic/Dwarf.h"
 #include "swift/AST/ModuleLoader.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -69,16 +70,6 @@ public:
                             std::unique_ptr<llvm::MemoryBuffer> input) {
     MemoryBuffers[AccessPath].reset(input.release());
   }
-
-  /// \brief Povided a memory buffer with an entire Mach-O __apple_ast
-  /// section, this function makes memory buffer copies of all swift
-  /// modules found in it and registers them using
-  /// registerMemoryBuffer() so they can be found by loadModule(). The
-  /// the access path of all modules found in the section is appended
-  /// to the vector foundModules.
-  /// \return true if successful.
-  bool addASTSection(std::unique_ptr<llvm::MemoryBuffer> data,
-                     SmallVectorImpl<std::string> &foundModules);
 
   /// \brief Look for declarations associated with the given name.
   ///

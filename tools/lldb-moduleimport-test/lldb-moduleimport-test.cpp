@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/Frontend.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -100,8 +100,9 @@ int main(int argc, char **argv) {
             // Pass the __apple_AST section to the module loader.
             auto data = llvm::MemoryBuffer::getNewMemBuffer(section.size, name);
             macho.read(const_cast<char *>(data->getBufferStart()), section.size);
-            if (!CI.getSerializedModuleLoader()->addASTSection
-                 (std::unique_ptr<llvm::MemoryBuffer>(data), modules))
+            if (!parseASTSection(CI.getSerializedModuleLoader(),
+                                 std::unique_ptr<llvm::MemoryBuffer>(data),
+                                 modules))
               exit(1);
 
             for (auto path : modules)
