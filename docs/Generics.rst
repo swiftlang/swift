@@ -185,7 +185,7 @@ referred to as the binary method problem
 problem, including the solution I'm proposing below).
 
 Neither C++ concepts nor Haskell type classes have this particular problem,
-because they don't have the notion of an implicit 'self' type. Rather,
+because they don't have the notion of an implicit 'Self' type. Rather,
 they explicitly parameterize everything. In C++ concepts::
 
   concept Comparable<typename T> {
@@ -368,7 +368,7 @@ extensions, e.g.,::
   extension String : Collection {
     typealias Element = char
     func forEach(callback : (value : Element) -> void) { /* use existing String routines to enumerate characters */ }
-    func add(value : Element) { this += value /* append character */ }
+    func add(value : Element) { self += value /* append character */ }
   }
 
 Once an extension is defined, the extension now conforms to the Collection
@@ -407,7 +407,7 @@ provide default implementations::
   
   protocol Numeric {
     func +(lhs : Self, rhs : Self) -> Self
-    func -(lhs : this, rhs : Self) -> Self { return lhs + -rhs }
+    func -(lhs : Self, rhs : Self) -> Self { return lhs + -rhs }
     func +(x : Self) -> Self { return x }
     func -(x : Self) -> Self
   }
