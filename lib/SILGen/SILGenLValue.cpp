@@ -439,38 +439,6 @@ LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e)
 
 namespace {
   
-template<typename ANY_MEMBER_REF_EXPR>
-LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
-                            SILGenFunction &gen,
-                            ANY_MEMBER_REF_EXPR *e,
-                            ValueDecl *decl,
-                            ArrayRef<Substitution> substitutions) {
-  LValue lv = sgl.visitRec(e->getBase());
-  CanType baseTy = e->getBase()->getType()->getCanonicalType();
-
-  // If this is a physical field, access with a fragile element reference.
-  if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
-    if (!var->isProperty()) {
-      // Find the substituted storage type.
-      SILType varStorageType =
-        gen.SGM.Types.getSubstitutedStorageType(var, e->getType());
-      if (!isa<LValueType>(baseTy)) {
-        assert(baseTy.hasReferenceSemantics());
-        lv.add<RefElementComponent>(var, varStorageType);
-      } else {
-        lv.add<StructElementComponent>(var, varStorageType);
-      }
-      return ::std::move(lv);
-    }
-  }
-  
-  // Otherwise, use the property accessors.
-  lv.add<GetterSetterComponent>(decl,
-                                substitutions,
-                                e->getType()->getRValueType());
-  return ::std::move(lv);
-}
-  
 template<typename ANY_SUBSCRIPT_EXPR>
 LValue emitAnySubscriptExpr(SILGenLValue &sgl,
                             SILGenFunction &gen,
@@ -488,8 +456,30 @@ LValue emitAnySubscriptExpr(SILGenLValue &sgl,
 } // end anonymous namespace
 
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
-  return emitAnyMemberRefExpr(*this, gen, e, e->getMember().getDecl(),
-                              e->getMember().getSubstitutions());
+  LValue lv = visitRec(e->getBase());
+  CanType baseTy = e->getBase()->getType()->getCanonicalType();
+
+  // If this is a physical field, access with a fragile element reference.
+  if (VarDecl *var = dyn_cast<VarDecl>(e->getMember().getDecl())) {
+    if (!var->isProperty()) {
+      // Find the substituted storage type.
+      SILType varStorageType =
+        gen.SGM.Types.getSubstitutedStorageType(var, e->getType());
+      if (!isa<LValueType>(baseTy)) {
+        assert(baseTy.hasReferenceSemantics());
+        lv.add<RefElementComponent>(var, varStorageType);
+      } else {
+        lv.add<StructElementComponent>(var, varStorageType);
+      }
+      return ::std::move(lv);
+    }
+  }
+
+  // Otherwise, use the property accessors.
+  lv.add<GetterSetterComponent>(e->getMember().getDecl(),
+                                e->getMember().getSubstitutions(),
+                                e->getType()->getRValueType());
+  return ::std::move(lv);
 }
 
 LValue SILGenLValue::visitGenericSubscriptExpr(GenericSubscriptExpr *e) {
