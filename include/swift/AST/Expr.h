@@ -996,7 +996,6 @@ public:
     assert(hasDecl() && "No subscript declaration known!");
     return TheDecl;
   }
-  void setDecl(ConcreteDeclRef decl) { TheDecl = decl; }
 
   SourceRange getSourceRange() const {
     return SourceRange(Base->getStartLoc(), Index->getEndLoc());
@@ -1035,7 +1034,6 @@ public:
   /// getDecl - Retrieve the subscript declaration that this subscripting
   /// operation refers to. 
   SubscriptDecl *getDecl() const { return D; }
-  void setDecl(SubscriptDecl *D) { this->D = D; }
 
   SourceRange getSourceRange() const {
     return SourceRange(Base->getStartLoc(), Index->getEndLoc());
@@ -1069,7 +1067,6 @@ public:
   /// getDecl - Retrieve the subscript declaration that this subscripting
   /// operation refers to. 
   SubscriptDecl *getDecl() const { return D; }
-  void setDecl(SubscriptDecl *D) { this->D = D; }
 
   SourceRange getSourceRange() const {
     return SourceRange(Base->getStartLoc(), Index->getEndLoc());
