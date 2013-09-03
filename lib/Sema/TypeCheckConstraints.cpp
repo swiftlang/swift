@@ -2376,33 +2376,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   // The set of directly accessible types, which is only used when
   // we're performing dynamic lookup into an existential type.
-  // 
-  // FIXME: Should the lookup results encode how we found a particular
-  // declaration? For example, in a superclass, via conformance to a
-  // protocol, via dynamic lookup, etc.? That way, we wouldn't have to
-  // reconstruct this information on the fly.
-  SmallPtrSet<NominalTypeDecl *, 16> directlyAccessibleTypes;
-  if (isExistential) {
-    // Collect the set of protocols listed in the existential type.
-    SmallVector<ProtocolDecl *, 4> protocols;
-    (void)instanceTy->isExistentialType(protocols);
-
-    // Visit all of the protocols referenced in the existential type.
-    SmallVector<ProtocolDecl *, 4> stack;
-    for (auto proto : protocols) {
-      if (directlyAccessibleTypes.insert(proto))
-        stack.push_back(proto);
-    }
-
-    while (!stack.empty()) {
-      auto proto = stack.back();
-      stack.pop_back();
-
-      for (auto inherits : TC.getDirectConformsTo(proto)) {
-        if (directlyAccessibleTypes.insert(inherits))
-          stack.push_back(inherits);
-      }
-    }
+  bool isDynamicLookup = false;
+  if (auto protoTy = instanceTy->getAs<ProtocolType>()) {
+    isDynamicLookup = protoTy->getDecl()->isSpecificProtocol(
+                                            KnownProtocolKind::DynamicLookup);
   }
 
   // Introduce a new overload set to capture the choices.
@@ -2437,14 +2414,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.
-    if (isExistential && result->getDeclContext()->isTypeContext()) {
-      auto nominal 
-        = result->getDeclContext()->getDeclaredTypeOfContext()->getAnyNominal();
-      if (nominal && !directlyAccessibleTypes.count(nominal)) {
-        // We found this declaration via dynamic lookup, record it as such.
-        choices.push_back(OverloadChoice::getDeclViaDynamic(baseTy, result));
-        continue;
-      }
+    if (isDynamicLookup && result->getDeclContext()->isTypeContext()) {
+      // We found this declaration via dynamic lookup, record it as such.
+      choices.push_back(OverloadChoice::getDeclViaDynamic(baseTy, result));
+      continue;
     }
 
     choices.push_back(OverloadChoice(baseTy, result, /*isSpecialized=*/false));
