@@ -411,8 +411,6 @@ ERROR(multiple_sil_stage_decls, decl_parsing, none,
 
 ERROR(expected_type,type_parsing,none,
       "expected type", ())
-ERROR(expected_type_is_keyword,pattern_parsing,none,
-      "expected type, found keyword", ())
 ERROR(expected_initializer_expr,expr_parsing,none,
       "expected initializer expression after '='", ())
 ERROR(attribute_does_not_apply_to_type,type_parsing,none,
@@ -480,7 +478,8 @@ ERROR(unsupported_unparenthesized_array_optional,type_parsing,none,
 ERROR(expected_pattern,pattern_parsing,none,
       "expected pattern", ())
 ERROR(expected_pattern_is_keyword,pattern_parsing,none,
-      "expected pattern is a keyword", ())
+      "keyword '%0' can not be used as an identifier in the pattern",
+      (StringRef))
 ERROR(expected_rparen_tuple_pattern_list,pattern_parsing,non,
       "expected ')' at end of tuple pattern", ())
 ERROR(untyped_pattern_ellipsis,pattern_parsing,none,

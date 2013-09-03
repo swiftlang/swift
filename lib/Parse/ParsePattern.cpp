@@ -370,7 +370,7 @@ ParserResult<Pattern> Parser::parsePatternAtom() {
   case tok::kw_Self:
   case tok::kw_weak:
   case tok::kw_unowned:
-    diagnose(Tok, diag::expected_pattern_is_keyword);
+    diagnose(Tok, diag::expected_pattern_is_keyword, Tok.getText());
     consumeToken();
     return nullptr;
 
