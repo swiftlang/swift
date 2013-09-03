@@ -732,8 +732,20 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
       if (!ty->isExistentialType()) {
         diagnose(tyR->getStartLoc(), diag::protocol_composition_not_protocol,
                  ty);
-        return ErrorType::get(Context);
+        continue;
       }
+
+      // The special DynamicLookup protocol can't be part of a protocol
+      // composition.
+      if (auto protoTy = ty->getAs<ProtocolType>()){
+        if (protoTy->getDecl()->isSpecificProtocol(
+              KnownProtocolKind::DynamicLookup)) {
+          diagnose(tyR->getStartLoc(),
+                   diag::protocol_composition_dynamic_lookup);
+          continue;
+        }
+      }
+
       ProtocolTypes.push_back(ty);
     }
     return ProtocolCompositionType::get(Context, ProtocolTypes);
