@@ -83,6 +83,42 @@ extern "C" HeapObject* swift_bufferAllocate(
 
 extern "C" int64_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
 
+/// A do-nothing destructor for POD metadata.
+static void destroyPOD(HeapObject*) {}
+
+/// Heap metadata for POD allocations.
+static const FullMetadata<HeapMetadata> PODHeapMetadata{
+  HeapMetadataHeader{{destroyPOD}, {nullptr}},
+  HeapMetadata{{MetadataKind::HeapLocalVariable}}
+};
+
+namespace {
+  /// Header for a POD allocation created by swift_allocPOD.
+  struct PODBox : HeapObject {
+    /// The size of the complete allocation.
+    size_t allocatedSize;
+    
+    /// Returns the offset in bytes from the address of the header of a POD
+    /// allocation with the given size and alignment.
+    static size_t getValueOffset(size_t size, size_t alignMask) {
+      return llvm::RoundUpToAlignment(sizeof(PODBox), alignMask+1);
+    }
+  };
+}
+
+BoxPair
+swift::swift_allocPOD(size_t dataSize, size_t dataAlignmentMask) {
+  // Allocate the heap object.
+  size_t valueOffset = PODBox::getValueOffset(dataSize, dataAlignmentMask);
+  size_t size = valueOffset + dataSize;
+  auto *obj = swift_allocObject(&PODHeapMetadata, size, dataAlignmentMask);
+  // Initialize the header for the box.
+  static_cast<PODBox*>(obj)->allocatedSize = size;
+  // Get the address of the value inside.
+  auto *data = reinterpret_cast<char*>(obj) + valueOffset;
+  return {obj, reinterpret_cast<OpaqueValue*>(data)};
+}
+
 namespace {
   /// Header for a generic box created by swift_allocBox in the worst case.
   struct GenericBox : HeapObject {
@@ -155,8 +191,14 @@ static const FullMetadata<HeapMetadata> GenericBoxHeapMetadata{
 
 BoxPair
 swift::swift_allocBox(Metadata const *type) {
-  // FIXME: We could use more efficient prefab heap metadata for PODs and other
-  // special cases.
+  // NB: Special cases here need to also be checked for and handled in
+  // swift_deallocBox.
+  
+  // If the contained type is POD, perform a POD allocation.
+  auto *vw = type->getValueWitnesses();
+  if (vw->isPOD()) {
+    return swift_allocPOD(vw->getSize(), vw->getAlignmentMask());
+  }
 
   // Allocate the box.
   HeapObject *obj = swift_allocObject(&GenericBoxHeapMetadata,
@@ -173,11 +215,22 @@ swift::swift_allocBox(Metadata const *type) {
 }
 
 void swift::swift_deallocBox(HeapObject *box, Metadata const *type) {
-  // FIXME: When we implement special cases for swift_allocBox, we need to
-  // check for them here.
-  
-  // Use the generic box size to deallocate the object.
-  swift_deallocObject(box, GenericBox::getAllocatedSize(type));
+  // NB: Special cases here need to also be checked for and handled in
+  // swift_allocBox.
+
+  // First, we need to recover what the allocation size was.
+  size_t allocatedSize;
+  auto *vw = type->getValueWitnesses();
+  if (vw->isPOD()) {
+    // If the contained type is POD, use the POD allocation size.
+    allocatedSize = static_cast<PODBox*>(box)->allocatedSize;
+  } else {
+    // Use the generic box size to deallocate the object.
+    allocatedSize = GenericBox::getAllocatedSize(type);
+  }
+
+  // Deallocate the box.
+  swift_deallocObject(box, allocatedSize);
 }
 
 // Forward-declare this, but define it after swift_release.
