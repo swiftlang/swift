@@ -233,6 +233,10 @@ void swift::swift_deallocBox(HeapObject *box, Metadata const *type) {
   swift_deallocObject(box, allocatedSize);
 }
 
+void swift::swift_deallocPOD(HeapObject *obj) {
+  swift_deallocObject(obj, static_cast<PODBox*>(obj)->allocatedSize);
+}
+
 // Forward-declare this, but define it after swift_release.
 extern "C" LLVM_LIBRARY_VISIBILITY
 void _swift_release_slow(HeapObject *object)

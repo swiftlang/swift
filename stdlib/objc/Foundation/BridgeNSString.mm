@@ -96,13 +96,36 @@ static const Class stringClasses[] = {
   objc_lookUpClass("__NSCFString"),
 };
 
+/// Helper function to grow the allocated heap object for
+/// swift_NSStringToString in the case where the initial allocation is
+/// insufficient.
+static BoxPair _swift_NSStringToString_realloc(BoxPair oldBox,
+                                               size_t oldBufSize,
+                                               size_t newBufSize) {
+  // Allocate the new box.
+  BoxPair newBox = swift_allocPOD(newBufSize, alignof(void*) - 1);
+
+  // Copy the data from the old box.
+  memcpy(newBox.value, oldBox.value, oldBufSize);
+  
+  // Deallocate the old box. We know the box is POD and hasn't escaped, so we
+  // can use the swift_deallocPOD fast path.
+  swift_deallocPOD(oldBox.heapObject);
+  
+  return newBox;
+}
+
+/// Convert an NSString to a Swift String in the worst case, where we have to
+/// use -[NSString getBytes:...:] to reencode the string value.
 __attribute__((noinline,used))
 static void
 _swift_NSStringToString_slow(NSString *nsstring, SwiftString *string) {
   size_t len = [nsstring length];
   size_t bufSize = len * 2 + 1;
-  // XXX FIXME -- leaks the malloc. Should do a Swift heap allocation.
-  char *buf = static_cast<char *>(malloc(bufSize));
+  
+  // Allocate a POD heap object to hold the data.
+  BoxPair box = swift_allocPOD(bufSize, alignof(void*) - 1);
+  char *buf = reinterpret_cast<char *>(box.value);
   char *p = buf;
 
   NSRange rangeToEncode = NSMakeRange(0, len);
@@ -130,17 +153,19 @@ _swift_NSStringToString_slow(NSString *nsstring, SwiftString *string) {
         break;
       
       // Otherwise, grow the buffer and try again.
-      bufSize += pSize;
-      buf = static_cast<char*>(realloc(buf, bufSize));
+      size_t newBufSize = bufSize + pSize;
+      box = _swift_NSStringToString_realloc(box, bufSize, newBufSize);
+      bufSize = newBufSize;
+      buf = reinterpret_cast<char *>(box.value);
     }
   }
   
-  // getBytes: doesn't add a null terminator.
+  // getBytes:...: doesn't add a null terminator.
   *p = '\0';
 
   string->base  = buf;
   string->len   = p - buf;
-  string->owner = nullptr;
+  string->owner = box.heapObject;
 }
 
 void

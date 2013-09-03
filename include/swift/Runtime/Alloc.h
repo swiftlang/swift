@@ -87,6 +87,10 @@ struct BoxPair {
 ///          by the dataAlignmentMask and point to dataSize bytes of memory.
 extern "C" BoxPair swift_allocPOD(size_t dataSize, size_t dataAlignmentMask);
 
+/// Deallocates a heap object known to have been allocated by swift_allocPOD and
+/// to have no remaining owners.
+extern "C" void swift_deallocPOD(HeapObject *obj);
+  
 /// Allocates a heap object that can contain a value of the given type.
 /// Returns a Box structure containing a HeapObject* pointer to the
 /// allocated object, and a pointer to the value inside the heap object.
