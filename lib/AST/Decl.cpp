@@ -486,6 +486,10 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (getName().empty())
     return false;
 
+  // Dynamic lookup can only find [objc] members.
+  if (!isObjC())
+    return false;
+
   // Dynamic lookup can only find class and protocol members.
   auto dc = getDeclContext();
   if (!isa<ClassDecl>(dc) && !isa<ProtocolDecl>(dc))
