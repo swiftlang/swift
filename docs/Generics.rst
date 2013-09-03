@@ -165,7 +165,7 @@ of protocols::
 Any type that conforms to PersistentDocument also conforms to VersionedDocument,
 Document, and Serializable, which gives us substitutability.
 
-This Types
+Self Types
 ----------
 
 Protocols thus far do not give us an easy way to express simple binary
@@ -225,17 +225,17 @@ isEqual is well-typed. However, if we have objects of different types T and U,
 we cannot compare those objects with isEqual even if both T and U are
 Comparable.
 
-This types are not without their costs, particularly in the case where This is
+Self types are not without their costs, particularly in the case where Self is
 used as a parameter type of a class method that will be subclassed. Here, the
 parameter type ends up being (implicitly) covariant, which tightens up
 type-checking but may also force us into more dynamic type checks. We can
-explore this separately; within protocols, type-checking for This is more
+explore this separately; within protocols, type-checking for Self is more
 direct.
 
 Associated Types
 ----------------
 
-In addition to This, a protocol's operations often need to refer to types that
+In addition to Self, a protocol's operations often need to refer to types that
 are related to the type of 'Self', such as a type of data stored in a
 collection, or the node and edge types of a graph. For example, this would allow
 us to cleanly describe a protocol for collections::
@@ -275,7 +275,7 @@ Conforming to a Protocol
 
 Thus far, we have not actually shown how a type can meet the requirements of a
 protocol. The most syntactically lightweight approach is to allow implicit
-conformance.This is essentially duck typing, where a type is assumed to conform
+conformance. This is essentially duck typing, where a type is assumed to conform
 to a protocol if it meets the syntactic requirements of the protocol. For
 example, given::
 
@@ -448,7 +448,7 @@ protocol. Thus, a variable can be declared with type "Serializable", e.g.,::
   x.serialize() // okay: serialize() is part of the Serializable protocol
 
 Naturally, such polymorphism is dynamic, and will require boxing of value types
-to implement. We can now see how This types interact with subtype
+to implement. We can now see how Self types interact with subtype
 polymorphism. For example, say we have two values of type Comparable, and we try
 to compare them::
 
@@ -608,7 +608,7 @@ conform to the Enumerator protocol), by adding a conformance clause (: Enumerato
 to the associated type definition. We also use a separate requires clause to
 require that the type of values produced by querying the enumerator is the same as
 the type of values stored in the container. This is important, for example, for
-use with the Comparable protocol (and any protocol using This types), because it
+use with the Comparable protocol (and any protocol using Self types), because it
 maintains type identity within the generic function or type.
 
 Constraint Inference
