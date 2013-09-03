@@ -1909,22 +1909,23 @@ ParserResult<UnionElementDecl> Parser::parseDeclUnionElement(unsigned Flags) {
   
   Identifier Name;
   SourceLoc NameLoc;
-  // For recovery, see if the user typed something resembling a switch "case"
-  // label.
-  if (!Tok.is(tok::identifier)) {
-    ParserResult<Pattern> pattern = parseMatchingPattern();
-    if (pattern.isNull())
+
+  const bool NameIsNotIdentifier = Tok.isNot(tok::identifier);
+  if (parseIdentifierDeclName(*this, Name, NameLoc, tok::l_paren,
+                              tok::kw_case, tok::colon,
+                              diag::invalid_diagnostic).isError()) {
+    // For recovery, see if the user typed something resembling a switch "case"
+    // label.
+    parseMatchingPattern();
+  }
+  if (NameIsNotIdentifier) {
+    if (consumeIf(tok::colon)) {
+      diagnose(CaseLoc, diag::case_outside_of_switch, "case");
       return nullptr;
-    diagnose(CaseLoc, diag::case_outside_of_switch, "case");
-    skipUntil(tok::colon);
-    consumeIf(tok::colon);
-    return nullptr;
+    }
+    diagnose(CaseLoc, diag::expected_identifier_in_decl, "union case");
   }
 
-  if (parseIdentifier(Name, NameLoc,
-                      diag::expected_identifier_in_decl, "union case"))
-    return nullptr;
-  
   // See if there's a following argument type.
   ParserResult<TypeRepr> ArgType;
   if (Tok.isFollowingLParen()) {
