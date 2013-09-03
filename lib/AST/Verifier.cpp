@@ -476,15 +476,6 @@ namespace {
       // FIXME: Check base/member types through substitutions.
     }
 
-    void verifyChecked(CoerceExpr *E) {
-      Type Ty = E->getCastTypeLoc().getType();
-      if (!Ty->isEqual(E->getType()) ||
-          !Ty->isEqual(E->getSubExpr()->getType())) {
-        Out << "CoerceExpr types don't match\n";
-        abort();
-      }
-    }
-    
     void verifyChecked(UnconditionalCheckedCastExpr *E) {
       Type Ty = E->getCastTypeLoc().getType();
       if (!Ty->isEqual(E->getType())) {

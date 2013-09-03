@@ -2625,8 +2625,6 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
    }
 
   case ConstantConvertKind::Coerce:
-    expr = new (context) CoerceExpr(expr, SourceLoc(),
-                                    TypeLoc::withoutLoc(type));
     break;
 
   case ConstantConvertKind::Downcast: {

@@ -1603,14 +1603,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    Expr *visitCoerceExpr(CoerceExpr *expr) {
-      expr->setType(simplifyType(expr->getType()));
-      Expr *subExpr = coerceToType(expr->getSubExpr(), expr->getType(),
-                                   cs.getConstraintLocator(expr, { }));
-      expr->setSubExpr(subExpr);
-      return expr;
-    }
-    
     /// Type-check a checked cast expression.
     CheckedCastKind checkCheckedCastExpr(CheckedCastExpr *expr) {
       auto &tc = cs.getTypeChecker();
@@ -1697,12 +1689,14 @@ namespace {
             .highlight(expr->getCastTypeLoc().getSourceRange())
             .fixItRemove(SourceRange(expr->getBangLoc()));
         }
-        
-        Expr *coerce = new (cs.getASTContext()) CoerceExpr(expr->getSubExpr(),
-                                                        expr->getLoc(),
-                                                        expr->getCastTypeLoc());
-        coerce->setType(expr->getType());
-        return coerce;
+
+        // If the types are equivalent, we don't need the 'as!' at all.
+        if (expr->getType()->isEqual(expr->getSubExpr()->getType()))
+          return expr->getSubExpr();
+
+        // Just perform the coercion directly.
+        return coerceToType(expr->getSubExpr(), toType,
+                            cs.getConstraintLocator(expr, { }));
       }
 
       // Valid casts.

@@ -1249,9 +1249,6 @@ public:
     OS << ')';
   }
 
-  void visitCoerceExpr(CoerceExpr *E) {
-    printExplicitCastExpr(E, "coerce_expr");
-  }
   void visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *E) {
     printExplicitCastExpr(E, "unconditional_checked_cast_expr");
   }

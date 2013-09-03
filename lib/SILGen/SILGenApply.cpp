@@ -609,10 +609,6 @@ public:
     visit(e->getSubExpr());
   }
   
-  void visitCoerceExpr(CoerceExpr *e) {
-    visit(e->getSubExpr());
-  }
-  
   void applySuper(ApplyExpr *apply) {
     // Load the 'super' argument.
     Expr *arg = apply->getArg();

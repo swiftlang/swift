@@ -942,15 +942,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
     
-    Type visitCoerceExpr(CoerceExpr *expr) {
-      // FIXME: Could split the system here.
-      Type ty = expr->getCastTypeLoc().getType();
-      CS.addConstraint(ConstraintKind::Conversion,
-                       expr->getSubExpr()->getType(), ty,
-                       CS.getConstraintLocator(expr, { }));
-      return ty;
-    }
-
     Type visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *expr) {
       // FIXME: Open this type.
       return expr->getCastTypeLoc().getType();

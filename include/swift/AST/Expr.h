@@ -2410,28 +2410,6 @@ public:
   }
 };
 
-/// \brief Represents an explicit type coercion of an expression to a specified
-/// type.
-///
-/// An explicit type coercion makes implicit conversions explicit, clarifying
-/// a type. It does not perform any casting not captured by implicit
-/// conversions. Note that such coercions cannot currently be written within
-/// the language.
-class CoerceExpr : public ExplicitCastExpr {
-public:
-  CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
-    : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type,
-                       type.getType()) { }
-  
-  CoerceExpr(SourceLoc asLoc, TypeLoc type)
-    : CoerceExpr(nullptr, asLoc, type)
-  {}
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::Coerce;
-  }
-};
-  
 /// Discriminates the different kinds of checked cast supported.
 enum class CheckedCastKind {
   /// The kind has not been determined yet.

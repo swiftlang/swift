@@ -152,7 +152,6 @@ namespace {
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                        SGFContext C);
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
-    RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
     RValue visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *E,
                                              SGFContext C);
     RValue visitIsaExpr(IsaExpr *E, SGFContext C);
@@ -574,10 +573,6 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   if (E->getType()->isClassExistentialType())
     return emitClassBoundErasure(SGF, E);
   return emitAddressOnlyErasure(SGF, E, C);
-}
-
-RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
-  return visit(E->getSubExpr(), C);
 }
 
 namespace {

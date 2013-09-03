@@ -90,7 +90,6 @@ static bool isExprPostfix(Expr *expr) {
   switch (expr->getKind()) {
   // Not postfix expressions.
   case ExprKind::AddressOf:
-  case ExprKind::Coerce:
   case ExprKind::PostfixUnary:
   case ExprKind::PrefixUnary:
   case ExprKind::Sequence:
