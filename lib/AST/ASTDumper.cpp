@@ -881,8 +881,9 @@ public:
 
   void visitDeclRefExpr(DeclRefExpr *E) {
     printCommon(E, "declref_expr")
-      << " decl=" << E->getDecl()->getName()
-      << " specialized=" << (E->isSpecialized()? "yes" : "no") << ")";
+      << " decl=";
+    E->getDecl()->dumpRef(OS);
+    OS << " specialized=" << (E->isSpecialized()? "yes" : "no") << ")";
   }
   void visitSuperRefExpr(SuperRefExpr *E) {
     printCommon(E, "super_ref_expr") << ')';
@@ -903,7 +904,7 @@ public:
     for (ValueDecl *D : E->getDecls()) {
       OS << '\n';
       OS.indent(Indent);
-      OS << "  type=" << D->getType();
+      D->dumpRef(OS);
     }
     OS << ')';
   }
@@ -915,7 +916,7 @@ public:
     for (ValueDecl *D : E->getDecls()) {
       OS << '\n';
       OS.indent(Indent);
-      OS << "  type=" << D->getType();
+      D->dumpRef(OS);
     }
     OS << ')';
   }
@@ -937,25 +938,33 @@ public:
 
   void visitMemberRefExpr(MemberRefExpr *E) {
     printCommon(E, "member_ref_expr")
-      << " decl=" << E->getDecl()->getName() << '\n';
+      << " decl=";
+    E->getDecl()->dumpRef(OS);
+    OS << '\n';
     printRec(E->getBase());
     OS << ')';
   }
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
     printCommon(E, "existential_member_ref_expr")
-    << " decl=" << E->getDecl()->getName() << '\n';
+      << " decl=";
+    E->getDecl()->dumpRef(OS);
+    OS << '\n';
     printRec(E->getBase());
     OS << ')';
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
     printCommon(E, "archetype_member_ref_expr")
-      << " decl=" << E->getDecl()->getName() << '\n';
+      << " decl=";
+    E->getDecl()->dumpRef(OS);
+    OS << '\n';
     printRec(E->getBase());
     OS << ')';
   }
   void visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
     printCommon(E, "generic_member_ref_expr")
-      << " decl=" << E->getDecl()->getName() << '\n';
+      << " decl=";
+    E->getDecl()->dumpRef(OS);
+    OS << '\n';
     printSubstitutions(E->getSubstitutions());
     printRec(E->getBase());
     OS << ')';
