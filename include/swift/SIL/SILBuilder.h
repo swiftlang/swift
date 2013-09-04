@@ -106,12 +106,18 @@ public:
   // CFG Manipulation
   //===--------------------------------------------------------------------===//
 
+  /// moveBlockToEnd - Move a block to a new position in its function.
+  void moveBlockTo(SILBasicBlock *BB, SILFunction::iterator IP) {
+    SILFunction *F = BB->getParent();
+    auto &Blocks = F->getBlocks();
+    Blocks.splice(IP, Blocks, BB);
+  }
+
   /// moveBlockToEnd - Reorder a block to the end of its containing function.
   void moveBlockToEnd(SILBasicBlock *BB) {
-    SILFunction *F = BB->getParent();
-    if (&F->getBlocks().back() != BB)
-      F->getBlocks().splice(F->end(), F->getBlocks(), BB);
+    moveBlockTo(BB, BB->getParent()->end());
   }
+
 
   /// emitBlock - Each basic block is individually new'd then emitted with
   /// this function.  Since each block is implicitly added to the Function's
@@ -127,17 +133,28 @@ public:
   /// This function also sets the insertion point of the builder to be the newly
   /// emitted block.
   void emitBlock(SILBasicBlock *BB, SILLocation BranchLoc = SILLocation()) {
+    SILFunction::iterator IP;
+
     // If this is a fall through into BB, emit the fall through branch.
     if (hasValidInsertionPoint()) {
+      // Move the new block after the current one.
+      IP = getInsertionBB();
+      ++IP;
+
+      // Emit the branch.
       assert(BB->bbarg_empty() && "cannot fall through to bb with args");
       createBranch(BranchLoc, BB);
+    } else {
+      // If we don't have an insertion point, insert the block at the end of the
+      // function
+      IP = BB->getParent()->end();
     }
     
     // Start inserting into that block.
     setInsertionPoint(BB);
     
-    // Move block to the end of the list.
-    moveBlockToEnd(BB);
+    // Move block to its new spot.
+    moveBlockTo(BB, IP);
   }
 
   //===--------------------------------------------------------------------===//

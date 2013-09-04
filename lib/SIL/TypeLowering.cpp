@@ -756,7 +756,7 @@ namespace {
     void ifNonTrivialElement(SILBuilder &B, SILLocation loc,
                              SILValue value,
                              SimpleOperationTy operation) const {
-      SmallVector<std::pair<UnionElementDecl*, SILBasicBlock*>, 4> nonTrivialBBs;
+      SmallVector<std::pair<UnionElementDecl*,SILBasicBlock*>, 4> nonTrivialBBs;
       
       auto &M = B.getFunction().getModule();
       
