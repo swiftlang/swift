@@ -1388,13 +1388,17 @@ llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
   }
 
-  case DeclKind::Union:
-  case DeclKind::Struct:
-    // FIXME: should unions really be using the struct logic? (no)
+  case DeclKind::Struct: {
     int index =
       FindStructArgumentIndex(IGF.IGM, cast<StructDecl>(decl), targetArchetype)
         .getTargetIndex();
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
+  }
+
+  case DeclKind::Union:
+    // FIXME
+    IGF.unimplemented(decl->getLoc(), "union type parameter metadata lookup");
+    exit(1);
   }
   llvm_unreachable("bad decl kind!");
 }

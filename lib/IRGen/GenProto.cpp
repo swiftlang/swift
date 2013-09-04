@@ -1302,7 +1302,7 @@ namespace {
 
   /// An implementation of DynamicPackingPHIMapping for a single LLVM value.
   template <> class DynamicPackingPHIMapping<llvm::Value*> {
-    llvm::PHINode *PHI;
+    llvm::PHINode *PHI = nullptr;
   public:
     void collect(IRGenFunction &IGF, const TypeInfo &type, llvm::Value *value) {
       // Add the result to the phi, creating it (unparented) if necessary.
@@ -1612,11 +1612,17 @@ static Address getArgAsBuffer(IRGenFunction &IGF,
   return Address(arg, getFixedBufferAlignment(IGF.IGM));
 }
 
+/// Get the next argument and use it as the 'self' type metadata.
+static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
+                                          llvm::Function::arg_iterator &it,
+                                          CanType abstractType);
+
 /// Build a specific value-witness function.
 static void buildValueWitnessFunction(IRGenModule &IGM,
                                       llvm::Function *fn,
                                       ValueWitness index,
                                       FixedPacking packing,
+                                      CanType abstractType,
                                       CanType concreteType,
                                       const TypeInfo &type) {
   assert(isValueWitnessFunction(index));
@@ -1629,6 +1635,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   switch (index) {
   case ValueWitness::AllocateBuffer: {
     Address buffer = getArgAsBuffer(IGF, argv, "buffer");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     Address result = emitAllocateBuffer(IGF, type, packing, buffer);
     result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
@@ -1638,6 +1645,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::AssignWithCopy: {
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     type.assignWithCopy(IGF, dest, src);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
@@ -1647,6 +1655,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::AssignWithTake: {
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     type.assignWithTake(IGF, dest, src);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
@@ -1655,6 +1664,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
   case ValueWitness::DeallocateBuffer: {
     Address buffer = getArgAsBuffer(IGF, argv, "buffer");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     emitDeallocateBuffer(IGF, type, packing, buffer);
     IGF.Builder.CreateRetVoid();
     return;
@@ -1662,6 +1672,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
   case ValueWitness::Destroy: {
     Address object = getArgAs(IGF, argv, type, "object");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     type.destroy(IGF, object);
     IGF.Builder.CreateRetVoid();
     return;
@@ -1669,6 +1680,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
   case ValueWitness::DestroyBuffer: {
     Address buffer = getArgAsBuffer(IGF, argv, "buffer");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     emitDestroyBuffer(IGF, type, packing, buffer);
     IGF.Builder.CreateRetVoid();
     return;
@@ -1677,6 +1689,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::InitializeBufferWithCopyOfBuffer: {
     Address dest = getArgAsBuffer(IGF, argv, "dest");
     Address src = getArgAsBuffer(IGF, argv, "src");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
     Address result =
       emitInitializeBufferWithCopyOfBuffer(IGF, type, packing, dest, src);
     result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
@@ -1687,6 +1701,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::InitializeBufferWithCopy: {
     Address dest = getArgAsBuffer(IGF, argv, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
     Address result =
       emitInitializeBufferWithCopy(IGF, type, packing, dest, src);
     result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
@@ -1697,6 +1713,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::InitializeBufferWithTake: {
     Address dest = getArgAsBuffer(IGF, argv, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
     Address result =
       emitInitializeBufferWithTake(IGF, type, packing, dest, src);
     result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
@@ -1707,6 +1725,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::InitializeWithCopy: {
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
     emitInitializeWithCopy(IGF, type, dest, src);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
@@ -1716,6 +1736,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::InitializeWithTake: {
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
     emitInitializeWithTake(IGF, type, dest, src);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
@@ -1724,6 +1746,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
   case ValueWitness::ProjectBuffer: {
     Address buffer = getArgAsBuffer(IGF, argv, "buffer");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
     Address result = emitProjectBuffer(IGF, type, packing, buffer);
     result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
@@ -1735,6 +1759,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     assert(concreteType->isExistentialType() &&
            "non-existentials should have a known typeof witness");
     Address obj = getArgAs(IGF, argv, type, "obj");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
     if (concreteType->isClassExistentialType()) {
       auto &concreteTI = type.as<ClassExistentialTypeInfo>();
       auto instance = concreteTI.loadValue(IGF, obj);
@@ -2226,9 +2252,8 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   llvm::Function *fn =
     IGM.getAddrOfValueWitness(abstractType, index);
   if (fn->empty())
-    buildValueWitnessFunction(IGM, fn, index, packing,
-                              concreteType,
-                              concreteTI);
+    buildValueWitnessFunction(IGM, fn, index, packing, abstractType,
+                              concreteType, concreteTI);
   return asOpaquePtr(IGM, fn);
 }
 
@@ -3051,6 +3076,7 @@ namespace {
     /// The generic argument index.
     unsigned Index;
   };
+  typedef std::pair<ArchetypeType*, ProtocolDecl*> FulfillmentKey;
 
   /// A class for computing how to pass arguments to a polymorphic
   /// function.  The subclasses of this are the places which need to
@@ -3065,9 +3091,9 @@ namespace {
       /// pointer.
       ClassPointer,
       
-      /// The polymorphic arguments are derived from a class metadata
+      /// The polymorphic arguments are derived from a type metadata
       /// pointer.
-      ClassMetadata,
+      Metadata,
 
       /// The polymorphic arguments are passed from generic type
       /// metadata for the origin type.
@@ -3079,7 +3105,6 @@ namespace {
     SourceKind TheSourceKind;
     SmallVector<NominalTypeDecl*, 4> TypesForDepths;
 
-    typedef std::pair<ArchetypeType*, ProtocolDecl*> FulfillmentKey;
     llvm::DenseMap<FulfillmentKey, Fulfillment> Fulfillments;
 
   public:
@@ -3116,11 +3141,11 @@ namespace {
       } else if (auto metatypeTy = dyn_cast<MetaTypeType>(argTy)) {
         CanType objTy = CanType(metatypeTy->getInstanceType());
         if (auto nomTy = dyn_cast<ClassType>(objTy)) {
-          source = SourceKind::ClassMetadata;
+          source = SourceKind::Metadata;
           considerNominalType(nomTy, 0);
         } else if (auto boundTy = dyn_cast<BoundGenericType>(objTy)) {
           if (isa<ClassDecl>(boundTy->getDecl())) {
-            source = SourceKind::ClassMetadata;
+            source = SourceKind::Metadata;
             considerBoundGenericType(boundTy, 0);
           }
         }
@@ -3131,7 +3156,21 @@ namespace {
 
       TheSourceKind = source;
     }
-
+    
+    /// Extract archetype metadata for a value witness function of the given
+    /// type.
+    PolymorphicConvention(UnboundGenericType *bgType)
+      : FnType(PolymorphicFunctionType::get(
+                                  bgType->getDecl()->getDeclaredTypeInContext(),
+                                  TupleType::getEmpty(bgType->getASTContext()),
+                                  bgType->getDecl()->getGenericParamsOfContext(),
+                                  bgType->getASTContext()))
+    {
+      TheSourceKind = SourceKind::Metadata;
+      considerBoundGenericType(
+                             FnType->getInput()->castTo<BoundGenericType>(), 0);
+    }
+    
     SourceKind getSourceKind() const { return TheSourceKind; }
 
   private:
@@ -3234,8 +3273,17 @@ namespace {
       : PolymorphicConvention(fnType), IGF(IGF) {}
 
     void emit(Explosion &in);
+    
+    /// Emit polymorphic parameters for a generic value witness.
+    EmitPolymorphicParameters(IRGenFunction &IGF, UnboundGenericType *ugt)
+      : PolymorphicConvention(ugt), IGF(IGF) {}
+    
+    void emitForGenericValueWitness(llvm::Value *selfMeta);
 
   private:
+    // Emit metadata bindings after the source, if any, has been bound.
+    void emitWithSourceBound(Explosion &in);
+    
     CanType getArgType() const {
       return stripLabel(CanType(cast<AnyFunctionType>(FnType)->getInput()));
     }
@@ -3246,7 +3294,7 @@ namespace {
       case SourceKind::None:
         return nullptr;
 
-      case SourceKind::ClassMetadata:
+      case SourceKind::Metadata:
         return in.getLastClaimed();
           
       case SourceKind::ClassPointer:
@@ -3287,6 +3335,23 @@ void EmitPolymorphicParameters::emit(Explosion &in) {
   // Compute the first source metadata.
   MetadataForDepths.push_back(emitSourceForParameters(in));
 
+  emitWithSourceBound(in);
+}
+
+/// Emit a polymorphic parameters clause for a generic value witness, binding
+/// all the metadata necessary.
+void
+EmitPolymorphicParameters::emitForGenericValueWitness(llvm::Value *selfMeta) {
+  // We get the source metadata verbatim from the value witness signature.
+  MetadataForDepths.push_back(selfMeta);
+
+  // All our archetypes should be satisfiable from the source.
+  Explosion empty(ExplosionKind::Minimal);
+  emitWithSourceBound(empty);
+}
+
+void
+EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
   for (auto archetype : FnType->getAllArchetypes()) {
     // Derive the appropriate metadata reference.
     llvm::Value *metadata;
@@ -3328,7 +3393,7 @@ void EmitPolymorphicParameters::emit(Explosion &in) {
     }
 
     IGF.bindArchetype(archetype, metadata, wtables);
-  }  
+  }
 }
 
 /// Perform all the bindings necessary to emit the given declaration.
@@ -3338,6 +3403,24 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
   EmitPolymorphicParameters(IGF, type).emit(in);
 }
 
+/// Perform the bindings necessary to emit a generic value witness.
+static void emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
+                                                        UnboundGenericType *ugt,
+                                                        llvm::Value *selfMeta) {
+  EmitPolymorphicParameters(IGF, ugt).emitForGenericValueWitness(selfMeta);
+}
+
+/// Get the next argument and use it as the 'self' type metadata.
+static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
+                                          llvm::Function::arg_iterator &it,
+                                          CanType abstractType) {
+  llvm::Value *arg = getArg(it, "Self");
+  assert(arg->getType() == IGF.IGM.TypeMetadataPtrTy &&
+         "Self argument is not a type?!");
+  if (auto ugt = dyn_cast<UnboundGenericType>(abstractType)) {
+    emitPolymorphicParametersForGenericValueWitness(IGF, ugt, arg);
+  }
+}
 
 namespace {
   /// A CRTP class for finding the archetypes we need to bind in order
@@ -3505,7 +3588,7 @@ namespace {
       switch (getSourceKind()) {
       case SourceKind::None: return;
       case SourceKind::ClassPointer: return;
-      case SourceKind::ClassMetadata: return;
+      case SourceKind::Metadata: return;
       case SourceKind::GenericLValueMetadata: {
         CanType argTy = stripLabel(substInputType);
         CanType objTy = CanType(cast<LValueType>(argTy)->getObjectType());
@@ -3618,7 +3701,7 @@ namespace {
       switch (getSourceKind()) {
       case SourceKind::None: return;
       case SourceKind::ClassPointer: return; // already accounted for
-      case SourceKind::ClassMetadata: return; // already accounted for
+      case SourceKind::Metadata: return; // already accounted for
       case SourceKind::GenericLValueMetadata:
         return out.push_back(IGM.TypeMetadataPtrTy);
       }
