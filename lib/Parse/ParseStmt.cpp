@@ -168,6 +168,10 @@ static void unwrapIfDiscardedClosure(Parser &P,
 
   if (auto *E = Result.dyn_cast<Expr *>()) {
     if (auto *CE = dyn_cast<PipeClosureExpr>(E)) {
+      if (!CE->hasAnonymousClosureVars())
+        // Parameters are explicitly specified, and could be used in the body,
+        // don't attempt recovery.
+        return;
       auto *BS = CE->getBody();
       Result = BS;
       P.diagnose(BS->getLBraceLoc(), diag::brace_stmt_invalid);
