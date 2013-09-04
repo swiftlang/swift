@@ -59,6 +59,15 @@ public:
   bool hasValidInsertionPoint() const { return BB != nullptr; }
   SILBasicBlock *getInsertionBB() { return BB; }
   SILBasicBlock::iterator getInsertionPoint() { return InsertPt; }
+
+  /// insertingAtEndOfBlock - Return true if the insertion point is at the end
+  /// of the current basic block.  False if we're inserting before an existing
+  /// instruction.
+  bool insertingAtEndOfBlock() const {
+    assert(hasValidInsertionPoint() &&
+           "Must have insertion point to ask about it");
+    return InsertPt == BB->end();
+  }
   
   /// clearInsertionPoint - Clear the insertion point: created instructions will
   /// not be inserted into a block.
@@ -119,43 +128,21 @@ public:
   }
 
 
-  /// emitBlock - Each basic block is individually new'd then emitted with
-  /// this function.  Since each block is implicitly added to the Function's
-  /// list of blocks when created, the construction order is not particularly
-  /// useful.
-  ///
-  /// Instead, we want blocks to end up in the order that they are *emitted*.
-  /// The cheapest way to ensure this is to just move each block to the end of
-  /// the block list when emitted: as later blocks are emitted, they'll be moved
-  /// after this, giving us a block list order that matches emission order when
-  /// the function is done.
-  ///
-  /// This function also sets the insertion point of the builder to be the newly
-  /// emitted block.
-  void emitBlock(SILBasicBlock *BB, SILLocation BranchLoc = SILLocation()) {
-    SILFunction::iterator IP;
+  /// emitBlock - Move the specified block to the current insertion point (which
+  /// is the end of the function if there is no insertion point) and reset the
+  /// insertion point to point to the first instruction in the emitted block.
+  void emitBlock(SILBasicBlock *BB, SILLocation BranchLoc = SILLocation());
 
-    // If this is a fall through into BB, emit the fall through branch.
-    if (hasValidInsertionPoint()) {
-      // Move the new block after the current one.
-      IP = getInsertionBB();
-      ++IP;
 
-      // Emit the branch.
-      assert(BB->bbarg_empty() && "cannot fall through to bb with args");
-      createBranch(BranchLoc, BB);
-    } else {
-      // If we don't have an insertion point, insert the block at the end of the
-      // function
-      IP = BB->getParent()->end();
-    }
-    
-    // Start inserting into that block.
-    setInsertionPoint(BB);
-    
-    // Move block to its new spot.
-    moveBlockTo(BB, IP);
-  }
+  /// splitBlockForFallthrough - Prepare for the insertion of a terminator.  If
+  /// the builder's insertion point is at the end of the current block (as when
+  /// SILGen is creating the initial code for a function), just create and
+  /// return a new basic block that will be later used for the continue point.
+  ///
+  /// If the insertion point is valid (i.e., pointing to an existing
+  /// instruction) then split the block at that instruction and return the
+  /// continuation block.
+  SILBasicBlock *splitBlockForFallthrough();
 
   //===--------------------------------------------------------------------===//
   // SILInstruction Creation Methods

@@ -759,15 +759,20 @@ namespace {
       SmallVector<std::pair<UnionElementDecl*,SILBasicBlock*>, 4> nonTrivialBBs;
       
       auto &M = B.getFunction().getModule();
-      
+
+      // Create all the blocks up front, so we can set up our switch_union.
       for (auto &elt : getNonTrivialElements()) {
         auto bb = new (M) SILBasicBlock(&B.getFunction());
         auto argTy = elt.getLowering().getLoweredType();
         new (M) SILArgument(argTy, bb);
         nonTrivialBBs.push_back({elt.getElement(), bb});
       }
-      
-      auto doneBB = new (M) SILBasicBlock(&B.getFunction());
+
+      // If we are appending to the end of a block being constructed, then we
+      // create a new basic block to continue cons'ing up code.  If we're
+      // emitting this operation into the middle of existing code, we split the
+      // block.
+      SILBasicBlock *doneBB = B.splitBlockForFallthrough();
       B.createSwitchUnion(loc, value, doneBB, nonTrivialBBs);
       
       for (size_t i = 0; i < nonTrivialBBs.size(); ++i) {
