@@ -1183,9 +1183,13 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
 
 
 /// Returns the address of a value-witness function.
-llvm::Function *IRGenModule::getAddrOfValueWitness(CanType concreteType,
+llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
                                                    ValueWitness index) {
-  LinkEntity entity = LinkEntity::forValueWitness(concreteType, index);
+  // We shouldn't emit value witness symbols for generic type instances.
+  assert(!isa<BoundGenericType>(abstractType) &&
+         "emitting value witness for generic type instance?!");
+  
+  LinkEntity entity = LinkEntity::forValueWitness(abstractType, index);
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return entry;

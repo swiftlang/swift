@@ -1855,44 +1855,6 @@ namespace {
     }
   };
   
-  // FIXME.  This is a *horrendous* hack, but:  just apply the generic
-  // type at the empty-tuple type a bunch. When the witnesses really
-  // need stuff from the type, we should lay out the VWT within the pattern,
-  // probably, and have the pattern fill function expect that.
-  static Type buildFakeBoundType(IRGenModule &IGM, NominalTypeDecl *target) {
-    auto generics = target->getGenericParams();
-    if (!generics) return target->getDeclaredType();
-    
-    Type parent;
-    auto DC = target->getDeclContext();
-    switch (DC->getContextKind()) {
-      case DeclContextKind::TranslationUnit:
-      case DeclContextKind::BuiltinModule:
-      case DeclContextKind::SerializedModule:
-      case DeclContextKind::ClangModule:
-      case DeclContextKind::CapturingExpr:
-      case DeclContextKind::TopLevelCodeDecl:
-      case DeclContextKind::ConstructorDecl:
-      case DeclContextKind::DestructorDecl:
-        parent = Type();
-        break;
-        
-      case DeclContextKind::ExtensionDecl:
-        parent = Type(); // FIXME?
-        break;
-        
-      case DeclContextKind::NominalTypeDecl:
-        parent = buildFakeBoundType(IGM, cast<NominalTypeDecl>(DC));
-        break;
-    }
-    
-    SmallVector<Type, 8> args;
-    args.append(generics->getAllArchetypes().size(),
-                TupleType::getEmpty(IGM.Context));
-    
-    return BoundGenericType::get(target, parent, args);
-  }
-
   /// A builder for metadata templates.
   class GenericStructMetadataBuilder :
     public GenericMetadataBuilderBase<GenericStructMetadataBuilder,
@@ -1906,8 +1868,9 @@ namespace {
       : super(IGM, structGenerics, theStruct) {}
 
     void addValueWitnessTable() {
-      CanType fakeType = buildFakeBoundType(IGM, Target)->getCanonicalType();
-      Fields.push_back(emitValueWitnessTable(IGM, fakeType));
+      CanType unboundType
+        = Target->getDeclaredTypeOfContext()->getCanonicalType();
+      Fields.push_back(emitValueWitnessTable(IGM, unboundType));
     }
   };
 }
@@ -2031,8 +1994,9 @@ public:
     : GenericMetadataBuilderBase(IGM, unionGenerics, theUnion) {}
   
   void addValueWitnessTable() {
-    CanType fakeType = buildFakeBoundType(IGM, Target)->getCanonicalType();
-    Fields.push_back(emitValueWitnessTable(IGM, fakeType));
+    CanType unboundType
+      = Target->getDeclaredTypeOfContext()->getCanonicalType();
+    Fields.push_back(emitValueWitnessTable(IGM, unboundType));
   }
 };
   

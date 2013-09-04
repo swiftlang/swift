@@ -2088,6 +2088,7 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
 static llvm::Constant *getValueWitness(IRGenModule &IGM,
                                        ValueWitness index,
                                        FixedPacking packing,
+                                       CanType abstractType,
                                        CanType concreteType,
                                        const TypeInfo &concreteTI) {
   // Try to use a standard function.
@@ -2223,7 +2224,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
 
  standard:
   llvm::Function *fn =
-    IGM.getAddrOfValueWitness(concreteType, index);
+    IGM.getAddrOfValueWitness(abstractType, index);
   if (fn->empty())
     buildValueWitnessFunction(IGM, fn, index, packing,
                               concreteType,
@@ -2754,11 +2755,12 @@ namespace {
 
 /// Collect the value witnesses for a particular type.
 static void addValueWitnesses(IRGenModule &IGM, FixedPacking packing,
+                              CanType abstractType,
                               CanType concreteType, const TypeInfo &concreteTI,
                               SmallVectorImpl<llvm::Constant*> &table) {
   for (unsigned i = 0; i != NumRequiredValueWitnesses; ++i) {
     table.push_back(getValueWitness(IGM, ValueWitness(i),
-                                    packing, concreteType,
+                                    packing, abstractType, concreteType,
                                     concreteTI));
   }
 }
@@ -2795,17 +2797,28 @@ static llvm::Constant *buildWitnessTable(IRGenModule &IGM,
 /// Emit a value-witness table for the given type, which is assumed to
 /// be non-dependent.
 llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
-                                             CanType concreteType) {
+                                             CanType abstractType) {
+  // We shouldn't emit global value witness tables for generic type instances.
+  assert(!isa<BoundGenericType>(abstractType) &&
+         "emitting VWT for generic instance");
+  
+  // Instantiate generic types on their context archetypes.
+  CanType concreteType = abstractType;
+  if (auto ugt = dyn_cast<UnboundGenericType>(abstractType)) {
+    concreteType = ugt->getDecl()->getDeclaredTypeInContext()->getCanonicalType();
+  }
+  
   auto &concreteTI = IGM.getTypeInfo(concreteType);
   FixedPacking packing = computePacking(IGM, concreteTI);
 
   SmallVector<llvm::Constant*, NumRequiredValueWitnesses> witnesses;
-  addValueWitnesses(IGM, packing, concreteType, concreteTI, witnesses);
+  addValueWitnesses(IGM, packing, abstractType,
+                    concreteType, concreteTI, witnesses);
 
   auto tableTy = llvm::ArrayType::get(IGM.Int8PtrTy, witnesses.size());
   auto table = llvm::ConstantArray::get(tableTy, witnesses);
 
-  auto addr = IGM.getAddrOfValueWitnessTable(concreteType, table->getType());
+  auto addr = IGM.getAddrOfValueWitnessTable(abstractType, table->getType());
   auto global = cast<llvm::GlobalVariable>(addr);
   global->setConstant(true);
   global->setInitializer(table);

@@ -89,6 +89,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::ValueWitness:
     buffer << "_Tw";
     buffer << mangleValueWitness(getValueWitness());
+   
     mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
     return;
 
