@@ -9,15 +9,158 @@ its current implementation state.
 
 .. contents:: Index
 
-High Level Design Rationale
-===========================
+High Level Design
+=================
 
 Like all things Swift, our approach to strings begins with a deep
 respect for the lessons learned from many languages and libraries,
 including Objective-C and Cocoa.
 
-Why a Builtin String Type?
---------------------------
+General Principles
+------------------
+
+.. sidebar:: Rationales
+
+   ``String`` is *mutable* because in-place modification is a
+   convenient and efficient approach to many common string-processing
+   problems.
+
+   ``String`` is a *value type* because unintended sharing of mutable
+   reference types is a source of bugs and “nuisance best practices”
+   such as defensive copying.
+
+   ``String`` is *Unicode-aware* so that straightforward code
+   written without specific attention to Unicode will not be badly
+   broken in the presence of non-ASCII characters.
+
+   ``String`` is *locale-agnostic* for two reasons: first, it does not
+   carry a locale because common binary string operations such as
+   comparison and concatenation are not well-defined for heterogeneous
+   locales.  Second, it does not respond to global locale so that
+   casual sorting and hashing are not invalidated by changes in global
+   system state. [#re_sort]_
+
+   ``String`` has *no direct support for encoding conversion* because
+   the functionality is neatly separable from other ``String``
+   operations and would add interface complexity with little benefit
+   to most programs.  Any future support for encodings can go in a
+   separate module with its own interfaces, e.g.,
+   ``utf16.encode(someString)``, thereby avoiding bloating the
+   ``String`` interface.
+
+   ``String`` is *not indexable with* ``Int`` because |Character|_\ s
+   consume an arbitrary number of bytes, so they can't be randomly
+   addressed with reasonable efficiency.
+
+   .. _extending:
+
+   ``String`` is *extended with restraint* by the library because
+   ``String`` is a “vocabulary type” to and from which most other
+   types are convertible.  Making these conversions members of
+   ``String`` could quickly lead to an extremely broad ``String``
+   interface with slow code completion.
+
+* ``String`` is a **mutable value type**, just like ``Int``: each copy
+  of a ``String`` is logically distinct from the original, and a
+  ``String``’s value can be altered.
+
+* ``String`` is **Unicode-aware**.  This means, for example, that
+  ``String``\ s containing semantically equivalent, but distinct,
+  sequences of code points will be treated as equal::
+
+    var x = "\u006E\u0303"   // Decomposed "ñ"
+    var y = "\u00F1"         // Composed "ñ"
+    assert(x == y)           // OK, passes
+
+.. _locale-agnostic:
+
+* ``String`` is **Locale-agnostic**.  It stores no locale information,
+  and for any pair of strings ``s1`` and ``s2``, “``s1 == s2``” yields
+  the same result regardless of the global locale. [#agnostic]_
+
+* ``String`` **is a sequence** of |Character|_\ s.
+
+.. |EGC_bold| replace:: **extended grapheme cluster**
+.. |Character| replace:: ``Character``
+.. _Character:
+
+* A ``Character`` is a **Unicode** |EGC_bold|__\ —as
+  defined by some Unicode segmentation algorithm—not a byte, code
+  unit, or code point. [#char]_
+  
+  __ http://www.unicode.org/glossary/#extended_grapheme_cluster
+
+* The |Character|_\ s that make up a ``String`` are determined by
+  Unicode's `default segmentation`__ algorithm
+
+  __ http://www.unicode.org/reports/tr29/#Default_Grapheme_Cluster_Table
+
+* ``String`` implements the ``Indexable`` and ``Sliceable`` protocols
+  using a type conforming to ``BidirectionalIndex``.  ``String``
+  cannot be indexed or sliced with ``Int`` indices.
+
+* The **code points** stored in a string ``s`` can be read via
+  ``s.codePoints`` [#code_points]_
+
+* ``String``\ 's storage is **UTF-8 encoded**.  The bytes stored in a
+  string ``s`` can be read via ``s.bytes``.  ``String`` does not
+  provide access to or conversions from other encodings.
+
+* The standard library does not extend ``String`` for each type with
+  which it needs to interoperate.  Instead, for example, types
+  conforming to ``Printable`` have a ::
+
+    func toString() -> String
+
+  method, and types conforming to ``Parseable`` have a ::
+
+    static func parse(s: String) -> Self
+
+  method.
+
+Deviations from Unicode
+-----------------------
+
+Unicode is a pretty good standard.  Any deviation from what Unicode
+specifies requires careful justification.  So far, we have found two
+possible points of deviation for Swift ``String``:
+
+1. The `Unicode Text Segmentation Specification`_ says, “`do not
+   break between CR and LF`__.”  However, breaking between CR and LF
+   may necessary if we wish ``String`` to “behave normally” for users
+   of pure ASCII.  This point is still open for discussion.
+
+   __ http://www.unicode.org/reports/tr29/#GB2
+
+2. The `Unicode Text Segmentation Specification`_ says,
+   “`do not break between regional indicator symbols`__.”  However, it also
+   says “(Sequences of more than two RI characters should be separated
+   by other characters, such as U+200B ZWSP).”  Although the
+   parenthesized note probably has less official weight than the other
+   admonition, breaking pairs of RI characters seems like the right
+   thing for us to do given that Cocoa already forms strings with
+   several adjacent pairs of RI characters, and the Unicode spec *can*
+   be read as outlawing such strings anyway.
+
+   __ http://www.unicode.org/reports/tr29/#GB8
+
+.. _Unicode Text Segmentation Specification: http://www.unicode.org/reports/tr29
+
+Examples and Tutorials
+======================
+
+**WRITEME**
+
+Reference Manual
+================
+
+**WRITEME**
+
+Rationales
+==========
+
+Why a Built-In String Type?
+---------------------------
 
 ``NSString`` and ``NSMutableString``\ —the string types provided by
 Cocoa—are full-featured classes with high-level functionality for
@@ -47,6 +190,15 @@ programmers well; so, why does Swift have its own string type?
 
 Want performance of C, sane semantics of C++ strings, and high-level
 goodness of ObjC.
+
+   The design of ``NSString`` is *very* different from the string
+   designs of most modern programming languages, which all tend to be
+   very similar to one another.  Although existing ``NSString`` users
+   are a critical constituency today, current trends indicate that
+   most of our *future* target audience will not be ``NSString``
+   users. Absent compelling justification, it's important to make the
+   Swift programming environment as familiar as possible for them.
+
 
 How Would You Design It?
 ------------------------
@@ -88,155 +240,6 @@ How Would You Design It?
   - Sharing allocated buffers among copies and slices
   - In-place modification of uniquely-owned buffers
 
-
-General Principles
-------------------
-
-.. sidebar:: Rationale
-
-   Making ``String`` a value type eliminates the need for defensive
-   copying and a separate mutable string type.
-
-   Unicode-awareness ensures that straightforward code written without
-   attention to Unicode will not be badly broken in the presence of
-   non-ASCII characters.  
-
-   Locale-unawareness ensures that casual sorting or hashing of
-   ``String``\ s is remains valid across changes in global system
-   state.  Collections that automatically re-sort based on locale
-   changes are firmly out-of-scope for Swift and in-scope for Cocoa.
-
-   Encoding conversion is a neatly separable problem from other
-   ``String`` issues, and—at least initially—we intend to refer users
-   to Cocoa for that functionality.  When and if Swift itself acquires
-   encoding support, it can go in a separate module with its own
-   interfaces, e.g., ``utf16.encode(someString)``, thereby avoiding
-   bloating the ``String`` interface.
-
-   Strings are not indexable with ``Int`` because |Character|_\ s
-   consume an arbitrary number of bytes, so they can't be randomly
-   addressed with reasonable efficiency.
-
-   .. _extending:
-
-   The library uses restraint in extending ``String`` because
-   ``String`` is a “vocabulary type” to and from which most other
-   types are convertible.  Making these conversions members of
-   ``String`` would quickly lead to an intolerably broad ``String``
-   interface with intolerably slow code completion.
-
-   The design of ``NSString`` is *very* different from the string
-   designs of most modern programming languages, which all tend to be
-   very similar to one another.  Although existing ``NSString`` users
-   are a critical constituency today, current trends indicate that
-   most of our *future* target audience will not be ``NSString``
-   users. Absent compelling justification, it's important to make the
-   Swift programming environment as familiar as possible for them.
-
-* ``String`` is a mutable **value type**, just like ``Int``: each copy
-  of a ``String`` is logically distinct from the original, and a
-  ``String``’s value can be altered.
-
-* ``String``\ 's primary interface is **Unicode-aware**.  For
-  example::
-
-    var x = "\u006E\u0303"   // Decomposed "ñ"
-    var y = "\u00F1"         // Composed "ñ"
-    assert(x == y)           // OK, passes
-
-.. _locale-unaware:
-
-* ``String``\ 's primary interface is **Locale-unaware**.  For any
-  pair of strings ``s1`` and ``s2``, “``s1 == s2``” yields the same
-  result regardless of the global locale. [#unaware]_
-
-* The type currently called ``Char`` in Swift represents a Unicode
-  code point.  This document refers to it as ``CodePoint``, in
-  anticipation of renaming.
-
-.. |Character| replace:: ``Character``
-.. _Character:
-
-* A new type called ``Character`` represents a Unicode `extended
-  grapheme cluster`__ as defined by some Unicode segmentation
-  algorithm.
-
-  __ http://www.unicode.org/glossary/#extended_grapheme_cluster
-
-* ``String`` elements are |Character|_\ s as defined by Unicode's
-  `default segmentation`__ algorithm, rather than code units (as in
-  Cocoa) or code points. [#elements]_ Secondary interfaces are
-  provided for those who need to manipulate a ``String``\ 's
-  ``CodePoint``\ s or its bytes.  For example::
-
-    s                         // locale-independent Characters
-    s.bytes                   // UInt8s (utf-8)
-    s.codePoints              // CodePoints
-
-  __ http://www.unicode.org/reports/tr29/#Default_Grapheme_Cluster_Table
-
-* No ``String`` interfaces deal directly with encoding.
-
-* ``String`` implements generic ``Indexable`` and ``Sliceable``
-  protocols using a type conforming to ``BidirectionalIndex``, rather
-  than ``Int``, as indices.
-
-* When the user writes a string literal, she specifies a particular
-  sequence of code points.  We guarantee that those code points are
-  stored without change in the resulting ``String``.  The user
-  can explicitly request normalization. [#normalizationbit]_
-
-* The standard library does not extend ``String`` for each type with
-  which it needs to interoperate.  Instead, types conforming to
-  ``Printable`` have a ::
-
-    func toString() -> String
-
-  method, and types conforming to ``Parseable`` have a ::
-
-    ``static func parse(s: String) -> Self``
-
-* ``String``\ 's interface design is primaily inspired by convention
-  among “modern” programming languages such as Python, C#, Ruby, and
-  Go.
-
-Deviations from Unicode
------------------------
-
-Unicode is a pretty good standard.  Any deviation from what Unicode
-specifies requires careful justification.  So far, we have found two
-possible points of deviation for Swift ``String``:
-
-1. The `Unicode Text Segmentation Specification`_ says, “`do not
-   break between CR and LF`__.”  However, breaking between CR and LF
-   may necessary if we wish ``String`` to “behave normally” for users
-   of pure ASCII.  This point is still open for discussion.
-
-   __ http://www.unicode.org/reports/tr29/#GB2
-
-2. The `Unicode Text Segmentation Specification`_ says,
-   “`do not break between regional indicator symbols`__.”  However, it also
-   says “(Sequences of more than two RI characters should be separated
-   by other characters, such as U+200B ZWSP).”  Although the
-   parenthesized note probably has less official weight than the other
-   admonition, breaking pairs of RI characters seems like the right
-   thing for us to do given that Cocoa already forms strings with
-   several adjacent pairs of RI characters, and the Unicode spec *can*
-   be read as outlawing such strings anyway.
-
-   __ http://www.unicode.org/reports/tr29/#GB8
-
-.. _Unicode Text Segmentation Specification: http://www.unicode.org/reports/tr29
-
-Examples and Tutorials
-======================
-
-**WRITEME**
-
-Reference Manual
-================
-
-**WRITEME**
 
 Comparisons with ``NSString``
 =============================
@@ -1339,20 +1342,33 @@ Already deprecated in Cocoa.
 
 --------------
 
-.. [#unaware] Unicode specifies default (“un-tailored”)
+.. [#agnostic] Unicode specifies default (“un-tailored”)
    locale-independent collation_ and segmentation_ algorithms that
    make reasonable sense in most contexts.  Using these algorithms
    allows strings to be naturally compared and combined, generating
    the expected results when the content is ASCII
+
+.. [#re_sort] Collections that automatically re-sort based on locale
+   changes are out of scope for the core Swift language
+
+.. [#char] The type currently called ``Char`` in Swift represents a
+   Unicode code point.  This document refers to it as ``CodePoint``,
+   in anticipation of renaming.
+
 
 .. _segmentation: http://www.unicode.org/reports/tr29/#GB1
 
 .. _collation: http://www.unicode.org/reports/tr10/
 
 
-.. [#normalizationbit] We can use a bit to remember whether a given
-   string buffer has been normalized.
+.. [#code_points] When the user writes a string literal, she
+   specifies a particular sequence of code points.  We guarantee that
+   those code points are stored without change in the resulting
+   ``String``.  The user can explicitly request normalization, and
+   Swift can use a bit to remember whether a given string buffer has
+   been normalized, thus speeding up comparison operations.
 
-.. [#elements] Since ``String`` is locale-unaware_, its elements are
+.. [#elements] Since ``String`` is locale-agnostic_, its elements are
    determined using Unicode's default, “un-tailored” segmentation_
    algorithm.
+
