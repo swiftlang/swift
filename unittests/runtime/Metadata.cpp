@@ -21,27 +21,26 @@ char Global2 = 0;
 char Global3 = 0;
 
 /// The general structure of a generic metadata.
-template <unsigned NumFillOps, unsigned NumFields>
+template <unsigned NumFields>
 struct GenericMetadataTest {
   GenericMetadata Header;
-  GenericMetadata::FillOp FillOps[NumFillOps];
   void *Fields[NumFields];
 };
 
-GenericMetadataTest<2,3> MetadataTest1 = {
+GenericMetadataTest<3> MetadataTest1 = {
   // Header
   {
-    1, // num arguments
-    2, // num fill ops
+    // fill function
+    [](void *metadata, const void *args) {
+      auto metadataWords = reinterpret_cast<const void**>(metadata);
+      auto argsWords = reinterpret_cast<const void* const*>(args);
+      metadataWords[0] = argsWords[0];
+      metadataWords[2] = argsWords[0];
+    },
     3 * sizeof(void*), // metadata size
+    1, // num arguments
     0, // address point
     {} // private data
-  },
-
-  // Fill ops
-  { 
-    { 0, 0 },
-    { 0, 2 }
   },
 
   // Fields
