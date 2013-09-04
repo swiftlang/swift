@@ -368,7 +368,12 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
                      : TU->Ctx.SourceMgr.getCodeCompletionLoc();
       // FIXME: constructors and destructors.
       // FIXME: closures.
-      if (auto *FE = dyn_cast<FuncExpr>(CurDeclContext))
+      // For now, just find the nearest outer FuncExpr.
+      DeclContext *DCToTypeCheck = CurDeclContext;
+      while (!DCToTypeCheck->isModuleContext() &&
+             !isa<FuncExpr>(DCToTypeCheck))
+        DCToTypeCheck = DCToTypeCheck->getParent();
+      if (auto *FE = dyn_cast<FuncExpr>(DCToTypeCheck))
         return typeCheckFunctionBodyUntil(TU, CurDeclContext, FE,
                                           EndTypeCheckLoc);
       return false;

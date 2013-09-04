@@ -670,7 +670,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 
   // Consume the first semicolon.
   if (parseToken(tok::semi, Semi1Loc, diag::expected_semi_for_stmt))
-    return nullptr; // FIXME: better recovery
+    Status.setIsParseError();
 
   if (Tok.isNot(tok::semi)) {
     Second = parseExpr(diag::expected_cond_for_stmt);
