@@ -81,6 +81,10 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   }
 
   Module->setTargetTriple(Opts.Triple);
+  // Set the dwarf version to 3, which is what the Xcode 5.0 tool chain
+  // understands.  FIXME: Increase this to 4 once we have a build
+  // train that includes the ToT version of ld64.
+  Module->addModuleFlag(llvm::Module::Warning, "Dwarf Version", 3);
 
   std::string Error;
   const Target *Target =
