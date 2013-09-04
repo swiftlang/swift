@@ -392,6 +392,14 @@ public:
             OS << ":auto_gen";
 
         }
+        if (M && L.isNull()) {
+          if (!printedSlashes) {
+            OS.PadToColumn(50);
+            OS << "//";
+          }
+          OS << " <no loc>";
+        }
+
       }
     }
     
@@ -990,8 +998,8 @@ void SILBasicBlock::print(raw_ostream &OS) const {
 }
 
 /// Pretty-print the SILFunction to errs.
-void SILFunction::dump() const {
-  print(llvm::errs());
+void SILFunction::dump(bool Verbose) const {
+  print(llvm::errs(), Verbose);
 }
 
 /// Pretty-print the SILFunction to the designated stream.
