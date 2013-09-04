@@ -126,6 +126,8 @@ public:
   
   virtual void getDisplayDecls(const Module *module,
                                SmallVectorImpl<Decl*> &results) override;
+
+  StringRef getModuleFilename(const Module *Module) override;
 };
 
 } // end namespace swift

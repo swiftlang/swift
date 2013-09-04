@@ -149,6 +149,11 @@ public:
   /// of the module.
   virtual void getDisplayDecls(const Module *module,
                                SmallVectorImpl<Decl*> &results) { }
+
+  /// \brief Get the path for the file that a module came from.
+  virtual StringRef getModuleFilename(const Module *Module) {
+    return StringRef();
+  }
 };
 
 }

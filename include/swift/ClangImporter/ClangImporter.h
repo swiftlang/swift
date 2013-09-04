@@ -166,6 +166,8 @@ public:
 
   virtual void getDisplayDecls(const Module *module,
                                SmallVectorImpl<Decl*> &results) override;
+
+  StringRef getModuleFilename(const Module *Module) override;
   
   clang::TargetInfo &getTargetInfo() const;
 };

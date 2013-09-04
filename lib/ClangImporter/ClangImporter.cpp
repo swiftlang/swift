@@ -716,6 +716,11 @@ void ClangImporter::getDisplayDecls(const Module *module,
   }
 }
 
+StringRef ClangImporter::getModuleFilename(const Module *Module) {
+  auto Underlying = cast<ClangModule>(Module)->clangModule;
+  return Underlying->getASTFile()->getName();
+}
+
 clang::TargetInfo &ClangImporter::getTargetInfo() const {
   return Impl.Instance->getTarget();
 }

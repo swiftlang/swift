@@ -21,11 +21,13 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/PrintOptions.h"
+#include "swift/Basic/SourceManager.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -492,6 +494,21 @@ bool Module::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
     return lElem.first == rElem.first;
   });
   return iters.first == lhs.end();
+}
+
+StringRef Module::getModuleFilename() const {
+  if (isa<BuiltinModule>(this))
+    return StringRef();
+
+  if (auto TU = dyn_cast<TranslationUnit>(this)) {
+    if (TU->getImportBufferID() == -1)
+      return StringRef();
+    return Ctx.SourceMgr->getMemoryBuffer(
+                                TU->getImportBufferID())->getBufferIdentifier();
+  }
+
+  ModuleLoader &Owner = cast<LoadedModule>(this)->getOwner();
+  return Owner.getModuleFilename(this);
 }
 
 template<bool respectVisibility, typename Callback>

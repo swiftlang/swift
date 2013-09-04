@@ -270,6 +270,10 @@ public:
   /// Source locations are ignored here.
   static bool isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs);
 
+  /// \brief Get the path for the file that this module came from, or an empty
+  /// string if this is not applicable.
+  StringRef getModuleFilename() const;
+
   static bool classof(const DeclContext *DC) {
     return DC->isModuleContext();
   }
@@ -298,6 +302,10 @@ private:
 
   /// The list of libraries specified as link-time dependencies at compile time.
   ArrayRef<LinkLibrary> LinkLibraries;
+
+  /// \brief The buffer ID for the file that was imported as this TU, or -1
+  /// if this TU is not an imported TU.
+  int ImportBufferID = -1;
 
 public:
   /// Kind - This is the sort of file the translation unit was parsed for, which
@@ -355,6 +363,14 @@ public:
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
+
+  /// \brief The buffer ID for the file that was imported as this TU, or -1
+  /// if this is not an imported TU.
+  int getImportBufferID() const { return ImportBufferID; }
+  void setImportBufferID(unsigned BufID) {
+    assert(ImportBufferID == -1 && "Already set!");
+    ImportBufferID = BufID;
+  }
 
   void dump() const;
   void dump(raw_ostream &os) const;

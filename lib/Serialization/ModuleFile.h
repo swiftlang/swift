@@ -367,6 +367,11 @@ public:
   ///
   /// This includes all decls that should be displayed to clients of the module.
   void getDisplayDecls(SmallVectorImpl<Decl*> &results);
+
+  StringRef getModuleFilename() const {
+    // FIXME: This seems fragile, maybe store the filename separately ?
+    return InputFile->getBufferIdentifier();
+  }
 };
 
 class SerializedModule : public LoadedModule {

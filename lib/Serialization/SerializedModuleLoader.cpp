@@ -295,3 +295,8 @@ void SerializedModuleLoader::getDisplayDecls(const Module *module,
     return;
   moduleFile->getDisplayDecls(results);
 }
+
+StringRef SerializedModuleLoader::getModuleFilename(const Module *Module) {
+  ModuleFile *Mod = cast<SerializedModule>(Module)->File;
+  return Mod->getModuleFilename();
+}

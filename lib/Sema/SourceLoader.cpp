@@ -119,6 +119,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   auto *importTU = new (Ctx) TranslationUnit(moduleID.first, comp, Ctx,
                                              TranslationUnit::Library);
   Ctx.LoadedModules[moduleID.first.str()] = importTU;
+  importTU->setImportBufferID(bufferID);
 
   performAutoImport(importTU);
 
