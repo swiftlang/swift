@@ -81,6 +81,7 @@ private:
   // specializedType.
   CanType specializedType;
   SILLocation specializeLoc;
+  bool transparent;
 
   // The pointer back to the AST node that produced the callee.
   SILLocation Loc;
@@ -88,10 +89,11 @@ private:
   static SpecializedEmitter getSpecializedEmitterForSILBuiltin(SILDeclRef c,
                                                                SILModule &M);
 
-  Callee(ManagedValue indirectValue)
+  Callee(ManagedValue indirectValue, bool transparent)
     : kind(Kind::IndirectValue),
       indirectValue(indirectValue),
-      specializedType(indirectValue.getType().getSwiftRValueType())
+      specializedType(indirectValue.getType().getSwiftRValueType()),
+      transparent(transparent)
   {}
 
   Callee(SILGenFunction &gen, SILDeclRef standaloneFunction, SILLocation l)
@@ -99,8 +101,11 @@ private:
       specializedType(
                 gen.SGM.getConstantType(standaloneFunction.atUncurryLevel(0))
                   .getSwiftRValueType()),
+      transparent(standaloneFunction.hasDecl() &&
+                  standaloneFunction.getDecl()->getAttrs().isTransparent()),
       Loc(l)
-  {}
+  {
+  }
 
   Callee(Kind methodKind,
          SILGenFunction &gen,
@@ -111,6 +116,7 @@ private:
       specializedType(
                 gen.SGM.getConstantType(methodName.atUncurryLevel(0))
                   .getSwiftRValueType()),
+      transparent(false),
       Loc(l)
   {
     assert(kind >= Kind::VirtualMethod_First &&
@@ -144,6 +150,7 @@ private:
                           memberType->getASTContext())
                       ->getCanonicalType()},
     specializedType(genericMethod.origType),
+    transparent(false),
     Loc(l)
   {
   }
@@ -194,12 +201,13 @@ private:
       genericMethod{proto, methodName,
                     getProtocolMethodType(gen, proto, methodName, memberType)},
       specializedType(genericMethod.origType),
+      transparent(false),
       Loc(l)
   {}
 
 public:
-  static Callee forIndirect(ManagedValue indirectValue) {
-    return Callee(indirectValue);
+  static Callee forIndirect(ManagedValue indirectValue, bool transparent) {
+    return Callee(indirectValue, transparent);
   }
   static Callee forDirect(SILGenFunction &gen, SILDeclRef c, SILLocation l) {
     return Callee(gen, c, l);
@@ -268,14 +276,7 @@ public:
                      e->getType()->getCanonicalType(), callDepth);
   }
 
-  bool isTransparent() const {
-    if (kind == Kind::StandaloneFunction && standaloneFunction.hasDecl()) {
-      ValueDecl *VD = standaloneFunction.getDecl();
-      if (VD->getAttrs().isTransparent())
-        return true;
-    }
-    return false;
-  }
+  bool isTransparent() const { return transparent; }
   
   unsigned getNaturalUncurryLevel() const {
     switch (kind) {
@@ -477,7 +478,21 @@ public:
   /// Fall back to an unknown, indirect callee.
   void visitExpr(Expr *e) {
     ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen);
-    setCallee(Callee::forIndirect(fn));
+    setCallee(Callee::forIndirect(fn, false));
+  }
+
+  void visitLoadExpr(LoadExpr *e) {
+    bool transparent = false;
+    if (DeclRefExpr *d = dyn_cast<DeclRefExpr>(e->getSubExpr())) {
+      // This marks all calls to auto closure typed variables as transparent.
+      // As of writing, local variable auto closures are currently allowed by
+      // the parser, but the plan is that they will be disallowed, so this will
+      // actually only apply to auto closure parameters, which is what we want
+      auto *t = d->getDecl()->getType()->castTo<AnyFunctionType>();
+      transparent = t->getExtInfo().isAutoClosure();
+    }
+    ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen);
+    setCallee(Callee::forIndirect(fn, transparent));
   }
   
   /// Add a call site to the curry.
@@ -534,7 +549,7 @@ public:
     // Obtain a reference for a local closure.
     if (gen.LocalConstants.count(constant)) {
       ManagedValue localFn = gen.emitReferenceToDecl(e, e->getDecl());
-      setCallee(Callee::forIndirect(localFn));
+      setCallee(Callee::forIndirect(localFn, false));
 
     // Otherwise, stash the SILDeclRef.
     } else {
@@ -1350,7 +1365,7 @@ Callee emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
   // FIXME: Can local properties ever be generic?
   if (gen.LocalConstants.count(constant)) {
     SILValue v = gen.LocalConstants[constant];
-    return Callee::forIndirect(gen.emitManagedRetain(loc, v));
+    return Callee::forIndirect(gen.emitManagedRetain(loc, v), false);
   }
   
   // Get the accessor function. The type will be a polymorphic function if
