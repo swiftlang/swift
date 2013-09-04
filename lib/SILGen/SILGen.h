@@ -601,7 +601,8 @@ public:
   ManagedValue emitArrayInjectionCall(ManagedValue ObjectPtr,
                                       SILValue BasePtr,
                                       SILValue Length,
-                                      Expr *ArrayInjectionFunction);
+                                      Expr *ArrayInjectionFunction,
+                                      SILLocation Loc);
                         
   /// Emit the empty tuple value by emitting
   SILValue emitEmptyTuple(SILLocation loc);

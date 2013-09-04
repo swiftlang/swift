@@ -99,9 +99,12 @@ public:
   ///
   /// \param buf - If new Initializations need to be created, their ownership
   /// is given to this vector.
+  /// \param Loc The location with which the single initialization should be
+  ///        associated.
   ArrayRef<InitializationPtr>
   getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
-                                SmallVectorImpl<InitializationPtr> &buf);
+                                SmallVectorImpl<InitializationPtr> &buf,
+                                SILLocation Loc);
   
   /// Perform post-initialization bookkeeping for this initialization.
   virtual void finishInitialization(SILGenFunction &gen) {}

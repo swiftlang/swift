@@ -705,7 +705,7 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
                                 Type baseTy,
                                 ArrayRef<ManagedValue> elements,
                                 Expr *VarargsInjectionFn) {
-  SILValue numEltsVal = gen.B.createIntegerLiteral(SILLocation(),
+  SILValue numEltsVal = gen.B.createIntegerLiteral(loc,
                       SILType::getBuiltinIntegerType(64, gen.F.getASTContext()),
                       elements.size());
   AllocArrayInst *allocArray = gen.B.createAllocArray(loc,
@@ -729,7 +729,7 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
   }
 
   return gen.emitArrayInjectionCall(objectPtr, basePtr,
-                                    numEltsVal, VarargsInjectionFn);
+                                    numEltsVal, VarargsInjectionFn, loc);
 }
 
 RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
@@ -739,7 +739,8 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
   if (Initialization *I = C.getEmitInto()) {
     SmallVector<InitializationPtr, 4> subInitializationBuf;
     auto subInitializations =
-      I->getSubInitializationsForTuple(SGF, type, subInitializationBuf);
+      I->getSubInitializationsForTuple(SGF, type, subInitializationBuf,
+                                       RegularLocation(E));
     assert(subInitializations.size() == E->getElements().size() &&
            "initialization for tuple has wrong number of elements");
     for (unsigned i = 0, size = subInitializations.size(); i < size; ++i) {
@@ -1012,7 +1013,8 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
   // Decompose the initialization.
   SmallVector<InitializationPtr, 4> subInitializationBuf;
   auto subInitializations = I->getSubInitializationsForTuple(gen, tupleType,
-                                                          subInitializationBuf);
+                                                          subInitializationBuf,
+                                                          RegularLocation(E));
   assert(subInitializations.size() == outerFields.size() &&
          "initialization size does not match tuple size?!");
   
@@ -1158,7 +1160,7 @@ RValue RValueEmitter::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
   // Finally, build and return a Slice instance using the object
   // header/base/count.
   return RValue(SGF, SGF.emitArrayInjectionCall(ObjectPtr, BasePtr, NumElements,
-                                                E->getInjectionFunction()));
+                                                E->getInjectionFunction(), E));
 }
 
 SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {

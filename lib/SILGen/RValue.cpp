@@ -240,7 +240,7 @@ public:
   void visitTupleType(CanTupleType t, Initialization *I) {
     // Break up the aggregate initialization.
     SmallVector<InitializationPtr, 4> subInitBuf;
-    auto subInits = I->getSubInitializationsForTuple(gen, t, subInitBuf);
+    auto subInits = I->getSubInitializationsForTuple(gen, t, subInitBuf, loc);
     
     assert(subInits.size() == t->getNumElements() &&
            "initialization does not match tuple?!");

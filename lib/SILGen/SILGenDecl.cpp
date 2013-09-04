@@ -64,7 +64,8 @@ namespace {
 
 ArrayRef<InitializationPtr>
 Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
-                                      SmallVectorImpl<InitializationPtr> &buf) {
+                                      SmallVectorImpl<InitializationPtr> &buf,
+                                      SILLocation Loc) {
   auto tupleTy = cast<TupleType>(type);
   switch (kind) {
   case Kind::Tuple:
@@ -83,7 +84,7 @@ Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
     for (unsigned i = 0, size = tupleTy->getNumElements(); i < size; ++i) {
       auto fieldType = tupleTy.getElementType(i);
       SILType fieldTy = gen.getLoweredType(fieldType).getAddressType();
-      SILValue fieldAddr = gen.B.createTupleElementAddr(SILLocation(),
+      SILValue fieldAddr = gen.B.createTupleElementAddr(Loc,
                                                         baseAddr, i,
                                                         fieldTy);
                           
@@ -488,15 +489,14 @@ struct ArgumentInitVisitor :
         break;
       }
 
-      return initB.createTuple(SILLocation(), gen.getLoweredType(P->getType()),
-                               {});
+      return initB.createTuple(P, gen.getLoweredType(P->getType()), {});
     }
     
     // Destructure the initialization into per-element Initializations.
     SmallVector<InitializationPtr, 2> buf;
     ArrayRef<InitializationPtr> subInits =
       I->getSubInitializationsForTuple(gen, P->getType()->getCanonicalType(),
-                                       buf);
+                                       buf, RegularLocation(P));
 
     assert(P->getFields().size() == subInits.size() &&
            "TupleInitialization size does not match tuple pattern size!");

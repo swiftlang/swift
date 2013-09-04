@@ -1330,10 +1330,11 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
 ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
                                             SILValue BasePtr,
                                             SILValue Length,
-                                            Expr *ArrayInjectionFunction) {
+                                            Expr *ArrayInjectionFunction,
+                                            SILLocation Loc) {
   // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
   if (BasePtr.getType() != SILType::getRawPointerType(F.getASTContext()))
-    BasePtr = B.createAddressToPointer(SILLocation(),
+    BasePtr = B.createAddressToPointer(Loc,
                               BasePtr,
                               SILType::getRawPointerType(F.getASTContext()));
 
@@ -1350,7 +1351,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
   InjectionArgs.addElement(RValue(*this,
                                 ManagedValue(Length, ManagedValue::Unmanaged)));
   
-  emission.addCallSite(SILLocation(), std::move(InjectionArgs),
+  emission.addCallSite(Loc, std::move(InjectionArgs),
                        injectionFnTy->getResult());
   return emission.apply();
 }
