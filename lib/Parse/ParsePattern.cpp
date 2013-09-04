@@ -198,8 +198,10 @@ parseSelectorFunctionArguments(Parser &P,
     rp = firstTuple->getRParenLoc();
     if (firstTuple->getNumFields() != 1) {
       P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
-    } else {
-      TuplePatternElt const &firstElt = firstTuple->getFields()[0];
+    }
+    
+    if (firstTuple->getNumFields() >= 1) {
+      const TuplePatternElt &firstElt = firstTuple->getFields()[0];
       bodyElts.push_back(firstElt);
       argElts.push_back(TuplePatternElt(
           getFirstSelectorPattern(P.Context,
@@ -207,10 +209,23 @@ parseSelectorFunctionArguments(Parser &P,
                                   firstTuple->getLoc()),
         firstElt.getInit(),
         firstElt.getDefaultArgKind()));
+    } else {
+      // Recover by creating a '(_: ())' pattern.
+      TuplePatternElt firstElt(
+          new (P.Context) TypedPattern(
+              new (P.Context) AnyPattern(firstTuple->getLParenLoc()),
+              TupleTypeRepr::create(P.Context, {},
+                                    firstTuple->getSourceRange(),
+                                    SourceLoc())));
+      bodyElts.push_back(firstElt);
+      argElts.push_back(firstElt);
     }
   } else
     llvm_unreachable("unexpected function argument pattern!");
-  
+
+  assert(argElts.size() > 0);
+  assert(bodyElts.size() > 0);
+
   // Parse additional selectors as long as we can.
   llvm::StringMap<VarDecl*> selectorNames;
 
@@ -218,15 +233,17 @@ parseSelectorFunctionArguments(Parser &P,
   for (;;) {
     if (P.isStartOfBindingName(P.Tok)) {
       Status |= parseSelectorArgument(P, argElts, bodyElts, selectorNames, rp);
-    } else if (P.Tok.is(tok::l_paren)) {
+      continue;
+    }
+    if (P.Tok.is(tok::l_paren)) {
       P.diagnose(P.Tok, diag::func_selector_with_curry);
-      // FIXME: better recovery: just parse a tuple.
+      // FIXME: better recovery: just parse a tuple instead of skipping tokens.
       P.skipUntilDeclRBrace(tok::l_brace);
-      return makeParserError();
-    } else
-      break;
+      Status.setIsParseError();
+    }
+    break;
   }
-  
+
   argPat.push_back(TuplePattern::create(P.Context, lp, argElts, rp));
   bodyPat.push_back(TuplePattern::create(P.Context, lp, bodyElts, rp));
   return Status;
@@ -237,11 +254,15 @@ Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
                                SmallVectorImpl<Pattern *> &BodyPatterns) {
   // Parse the first function argument clause.
   ParserResult<Pattern> FirstPattern = parsePatternTuple(/*AllowInitExpr=*/true);
-  if (FirstPattern.isNull() || FirstPattern.hasCodeCompletion())
-    // FIXME: improve recovery: we should not stop if isNull().
-    // But if we saw code completion token, there is no point in continuing.
-    return FirstPattern;
+  if (FirstPattern.isNull()) {
+    // Recover by creating a '()' pattern.
+    auto EmptyTuplePattern =
+        TuplePattern::create(Context, Tok.getLoc(), {}, Tok.getLoc());
+    ArgPatterns.push_back(EmptyTuplePattern);
+    BodyPatterns.push_back(EmptyTuplePattern);
+  }
 
+  // FIXME: more strict check would be to look for l_paren as well.
   if (isStartOfBindingName(Tok)) {
     // This looks like a selector-style argument.  Try to convert the first
     // argument pattern into a single argument type and parse subsequent
@@ -268,7 +289,20 @@ ParserStatus
 Parser::parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
                                SmallVectorImpl<Pattern *> &bodyPatterns,
                                TypeRepr *&retType) {
-  ParserStatus Status = parseFunctionArguments(argPatterns, bodyPatterns);
+  ParserStatus Status;
+  // We force first type of a func declaration to be a tuple for consistency.
+  if (Tok.is(tok::l_paren))
+    Status = parseFunctionArguments(argPatterns, bodyPatterns);
+  else {
+    diagnose(Tok, diag::func_decl_without_paren);
+    Status = makeParserError();
+
+    // Recover by creating a '() -> ?' signature.
+    auto *EmptyTuplePattern =
+        TuplePattern::create(Context, Tok.getLoc(), {}, Tok.getLoc());
+    argPatterns.push_back(EmptyTuplePattern);
+    bodyPatterns.push_back(EmptyTuplePattern);
+  }
 
   // If there's a trailing arrow, parse the rest as the result type.
   if (consumeIf(tok::arrow)) {

@@ -1619,35 +1619,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   bool HadSignatureParseError = false;
   TypeRepr *FuncRetTy = nullptr;
   {
-    ParserStatus SignatureStatus;
-    // We force first type of a func declaration to be a tuple for consistency.
-    if (Tok.is(tok::l_paren)) {
-      SignatureStatus =
-          parseFunctionSignature(ArgParams, BodyParams, FuncRetTy);
-    } else {
-      diagnose(Tok, diag::func_decl_without_paren);
-      SignatureStatus = makeParserError();
-    }
+    ParserStatus SignatureStatus =
+        parseFunctionSignature(ArgParams, BodyParams, FuncRetTy);
 
-    if (SignatureStatus.isError()) {
-      HadSignatureParseError = true;
-      // Try to recover.  Create a function signature with as much information
-      // as possible.
-      //
-      // FIXME: right now creates a '() -> ()' signature.
-      ArgParams.clear();
-      BodyParams.clear();
-      if (HasContainerType) {
-        Pattern *SelfPattern = buildImplicitSelfParameter();
-        ArgParams.push_back(SelfPattern);
-        BodyParams.push_back(SelfPattern);
-      }
-      auto *VoidPattern =
-          TuplePattern::create(Context, Tok.getLoc(), {}, Tok.getLoc());
-      ArgParams.push_back(VoidPattern);
-      BodyParams.push_back(VoidPattern);
-      // FuncRetTy is always initialized by parseFunctionSignature().
-    }
+    HadSignatureParseError = SignatureStatus.isError();
 
     if (SignatureStatus.hasCodeCompletion()) {
       if (!CodeCompletion)
