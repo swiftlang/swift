@@ -174,7 +174,7 @@ public:
 
 private:
   Size PtrSize;
-  llvm::Type *FixedBufferTy;           /// [N x i8], where N == 3 * sizeof(void*)
+  llvm::Type *FixedBufferTy;          /// [N x i8], where N == 3 * sizeof(void*)
 
   llvm::Type *ValueWitnessTys[MaxNumValueWitnesses];
   

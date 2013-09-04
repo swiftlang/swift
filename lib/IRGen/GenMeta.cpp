@@ -760,28 +760,6 @@ namespace {
       };
       return makeArray(IGM.Int8PtrTy, privateData);
     }
-
-    llvm::Constant *getFillOpsInit() {
-      // Construct the type of individual operations.
-      llvm::Type *opMemberTys[] = { IGM.Int32Ty, IGM.Int32Ty };
-      auto fillOpTy =
-        llvm::StructType::get(IGM.getLLVMContext(), opMemberTys, false);
-
-      // Build the array of fill-ops.
-      SmallVector<llvm::Constant*, 4> fillOps(FillOps.size());
-      for (size_t i = 0, e = FillOps.size(); i != e; ++i) {
-        fillOps[i] = getFillOpInit(FillOps[i], fillOpTy);
-      }
-      return makeArray(fillOpTy, fillOps);
-    }
-
-    llvm::Constant *getFillOpInit(const FillOp &op, llvm::StructType *opTy) {
-      llvm::Constant *members[] = {
-        llvm::ConstantInt::get(IGM.Int32Ty, op.FromIndex),
-        llvm::ConstantInt::get(IGM.Int32Ty, op.ToIndex)
-      };
-      return llvm::ConstantStruct::get(opTy, members);
-    }
   };
 }
 
