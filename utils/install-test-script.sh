@@ -64,8 +64,7 @@ fi
 
 if ! /usr/bin/swift -repl 2>"$TMPDIR/test_repl_2_err_$$" >"$TMPDIR/test_repl_2_$$" <<REPL
 import Foundation
-var s : NSString = "Hello world"
-println(s)
+{(s : NSString) in println(s)}("Hello world")
 REPL
 then
   echo "swift failed in REPL with SDK!"
