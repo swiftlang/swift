@@ -104,7 +104,7 @@ WritebackScope::~WritebackScope() {
   WritebackStack.begin() + savedDepth;
   while (i-- > deepest) {
     ManagedValue mv = i->temp.claim(*gen, i->loc);
-    i->component->set(*gen, i->loc, RValue(*gen, mv), i->base);
+    i->component->set(*gen, i->loc, RValue(*gen, mv, i->loc), i->base);
   }
   
   gen->WritebackStack.erase(deepest, gen->WritebackStack.end());
@@ -140,7 +140,7 @@ LValue SILGenFunction::emitLValue(Expr *e) {
 
 RValue SILGenFunction::emitLValueAsRValue(Expr *e) {
   LValue lv = emitLValue(e);
-  return RValue(*this, emitAddressOfLValue(e, lv));
+  return RValue(*this, emitAddressOfLValue(e, lv), e);
 }
 
 void PathComponent::_anchor() {}
@@ -285,9 +285,11 @@ namespace {
       if (base) {
         if (base.getType().hasReferenceSemantics()) {
           gen.B.createStrongRetain(loc, base);
-          result.base = RValue(gen, gen.emitManagedRValueWithCleanup(base));
+          result.base = RValue(gen,
+                               gen.emitManagedRValueWithCleanup(base), loc);
         } else {
-          result.base = RValue(gen, ManagedValue(base, ManagedValue::LValue));
+          result.base = RValue(gen,
+                               ManagedValue(base, ManagedValue::LValue), loc);
         }
       }
       
@@ -376,7 +378,7 @@ LValue SILGenLValue::visitRec(Expr *e) {
   if (e->getType()->hasReferenceSemantics()) {
     // Any reference type expression can form the root of a logical lvalue.
     LValue lv;
-    lv.add<RefComponent>(gen.emitRValue(e).getAsSingleValue(gen));
+    lv.add<RefComponent>(gen.emitRValue(e).getAsSingleValue(gen, e));
     return ::std::move(lv);
   } else {
     return visit(e);
@@ -424,7 +426,8 @@ LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
 
   // Evaluate the value, then use it to initialize a new temporary and return
   // the temp's address.
-  ManagedValue v = gen.emitRValue(e->getSubExpr()).getAsSingleValue(gen);
+  ManagedValue v = gen.emitRValue(e->getSubExpr()).getAsSingleValue(gen,
+                                                              e->getSubExpr());
   SILValue addr = gen.emitMaterialize(e, v).address;
   lv.add<AddressComponent>(addr);
   return ::std::move(lv);

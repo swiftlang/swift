@@ -98,15 +98,15 @@ public:
   
   /// Store a copy of this value with independent ownership into the given
   /// uninitialized address.
-  void copyInto(SILGenFunction &gen, SILValue dest) {
+  void copyInto(SILGenFunction &gen, SILValue dest, SILLocation L) {
     auto &lowering = gen.getTypeLowering(getType());
     if (lowering.isAddressOnly()) {
-      gen.B.createCopyAddr(SILLocation(), getValue(), dest,
+      gen.B.createCopyAddr(L, getValue(), dest,
                            IsNotTake, IsInitialization);
       return;
     }
-    lowering.emitRetain(gen.B, SILLocation(), getValue());
-    gen.B.createStore(SILLocation(), getValue(), dest);
+    lowering.emitRetain(gen.B, L, getValue());
+    gen.B.createStore(L, getValue(), dest);
   }
   
   bool hasCleanup() const { return cleanup.isValid(); }
@@ -213,7 +213,7 @@ public:
   
   /// Create a RValue from a single value. If the value is of tuple type, it
   /// will be exploded.
-  RValue(SILGenFunction &gen, ManagedValue v);
+  RValue(SILGenFunction &gen, ManagedValue v, SILLocation l);
 
   /// Construct an RValue from a pre-exploded set of
   /// ManagedValues. Used to implement the extractElement* methods.
@@ -245,17 +245,17 @@ public:
   
   /// Add a ManagedValue element to the rvalue, exploding tuples if necessary.
   /// The rvalue must not yet be complete.
-  void addElement(SILGenFunction &gen, ManagedValue element) &;
+  void addElement(SILGenFunction &gen, ManagedValue element, SILLocation l) &;
   
   /// Forward an rvalue into a single value, imploding tuples if necessary.
-  SILValue forwardAsSingleValue(SILGenFunction &gen) &&;
+  SILValue forwardAsSingleValue(SILGenFunction &gen, SILLocation l) &&;
 
   /// Get the rvalue as a single value, imploding tuples if necessary.
-  ManagedValue getAsSingleValue(SILGenFunction &gen) &&;
+  ManagedValue getAsSingleValue(SILGenFunction &gen, SILLocation l) &&;
   
   /// Get the rvalue as a single unmanaged value, imploding tuples if necessary.
   /// The values must not require any cleanups.
-  SILValue getUnmanagedSingleValue(SILGenFunction &gen) const &;
+  SILValue getUnmanagedSingleValue(SILGenFunction &gen, SILLocation l) const &;
   
   /// Peek at the single scalar value backing this rvalue without consuming it.
   /// The rvalue must not be of a tuple type.

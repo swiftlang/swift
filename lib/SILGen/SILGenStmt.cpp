@@ -45,7 +45,7 @@ static SILValue emitConditionValue(SILGenFunction &gen, Expr *E) {
   SILValue V;
   {
     FullExpr Scope(gen.Cleanups, CleanupLocation(E));
-    V = gen.emitRValue(E).forwardAsSingleValue(gen);
+    V = gen.emitRValue(E).forwardAsSingleValue(gen, E);
   }
   assert(V.getType().castTo<BuiltinIntegerType>()->getBitWidth() == 1);
 
@@ -133,7 +133,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     FullExpr scope(Cleanups, CleanupLocation(ret));
     RValue resultRValue = emitRValue(ret);
     if (!resultRValue.getType()->isVoid()) {
-      result = std::move(resultRValue).forwardAsSingleValue(*this);
+      result = std::move(resultRValue).forwardAsSingleValue(*this, ret);
       result = emitGeneralizedValue(ret, result);
     }
   }
@@ -465,7 +465,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
     SILValue finalDestAddr
       = component.asPhysical().offset(*this, loc, destAddr);
     
-    std::move(src).getAsSingleValue(*this)
+    std::move(src).getAsSingleValue(*this, loc)
       .assignInto(*this, loc, finalDestAddr);
   } else {
     component.asLogical().set(*this, loc, std::move(src), destAddr);

@@ -99,6 +99,7 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     // Tuples are irrefutable; destructure without branching.
     assert(patterns.size() == 1 && "pattern orthogonal to tuple?!");
     auto *tp = cast<TuplePattern>(patterns[0]);
+    RegularLocation Loc(const_cast<TuplePattern*>(tp));
 
     std::vector<SILValue> destructured;
 
@@ -107,18 +108,17 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     if (tupleSILTy.isAddressOnly(gen.F.getModule())) {
       for (unsigned i = 0, e = tupleTy->getFields().size(); i < e; ++i) {
         SILType fieldTy = gen.getLoweredType(tupleTy->getElementType(i));
-        SILValue member = gen.B.createTupleElementAddr(SILLocation(),
+        SILValue member = gen.B.createTupleElementAddr(Loc,
                                              v, i, fieldTy.getAddressType());
         if (!fieldTy.isAddressOnly(gen.F.getModule()))
-          member = gen.B.createLoad(SILLocation(), member);
+          member = gen.B.createLoad(Loc, member);
         destructured.push_back(member);
       }
     } else {
       for (unsigned i = 0, e = tupleTy->getFields().size(); i < e; ++i) {
         auto fieldType = tupleTy->getElementType(i);
         SILType fieldTy = gen.getLoweredLoadableType(fieldType);
-        SILValue member = gen.B.createTupleExtract(SILLocation(),
-                                                   v, i, fieldTy);
+        SILValue member = gen.B.createTupleExtract(Loc, v, i, fieldTy);
         destructured.push_back(member);
       }
     }
@@ -135,31 +135,32 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     /// node sets (e.g., a 't is U' pattern with a 'T(...)' pattern).
     for (const Pattern *p : patterns) {
       auto *ip = cast<IsaPattern>(p);
+      RegularLocation Loc(const_cast<IsaPattern*>(ip));
 
       std::vector<SILValue> destructured;
       
       // Perform a conditional cast and branch on whether it succeeded.
-      SILValue cast = gen.emitCheckedCast(SILLocation(),
+      SILValue cast = gen.emitCheckedCast(Loc,
                                         ManagedValue(v, ManagedValue::Unmanaged),
                                         ip->getType(),
                                         ip->getCastTypeLoc().getType(),
                                         ip->getCastKind(),
                                         CheckedCastMode::Conditional,
                                         /*useCastValue*/ false);
-      SILValue didMatch = gen.B.createIsNonnull(SILLocation(), cast);
+      SILValue didMatch = gen.B.createIsNonnull(Loc, cast);
       
       // On the true branch, we can use the cast value.
       // If the cast result is loadable and we cast a value address, load it.
       if (cast.getType().isAddress()
           && !cast.getType().isAddressOnly(gen.F.getModule()))
-        cast = gen.B.createLoad(SILLocation(), cast);
+        cast = gen.B.createLoad(Loc, cast);
       destructured.push_back(cast);
       
       // Emit the branch.
       SILBasicBlock *trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
       SILBasicBlock *falseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
       
-      gen.B.createCondBranch(SILLocation(), didMatch,
+      gen.B.createCondBranch(Loc, didMatch,
                              trueBB, falseBB);
       
       // Code matching the pattern goes into the "true" block.
@@ -193,6 +194,8 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     
     for (const Pattern *p : patterns) {
       auto *up = cast<UnionElementPattern>(p);
+      RegularLocation Loc(const_cast<UnionElementPattern*>(up));
+
       UnionElementDecl *elt = up->getElementDecl();
       
       assert(unmatchedCases.count(elt)
@@ -213,14 +216,14 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
         // Load a loadable data value from an address-only union.
         if (addressOnlyUnion && argLowering.isLoadable()) {
           gen.B.setInsertionPoint(caseBB);
-          eltValue = gen.B.createLoad(SILLocation(), eltValue);
+          eltValue = gen.B.createLoad(Loc, eltValue);
           gen.B.setInsertionPoint(bb);
         }
       } else {
         // If the element pattern for a void union element has a subpattern, it
         // will bind to a void value.
         if (!voidValue)
-          voidValue = gen.emitEmptyTuple(SILLocation());
+          voidValue = gen.emitEmptyTuple(Loc);
         eltValue = voidValue;
       }
       
@@ -988,7 +991,8 @@ public:
                          rowDepth, rowCont,
                          row.getExprGuards());
     }
-    
+    RegularLocation loc(const_cast<Pattern *>(specializer));
+
     // Emit variable bindings from the newly specialized rows.
     for (unsigned i = 0; i < specializedWidth; ++i)
       specialized.emitVarsInColumn(gen, i);
@@ -1016,7 +1020,7 @@ public:
     // block.
     VarDecl *emittedVar = nullptr;
     
-    auto emitVar = [&](VarDecl *vd) {
+    auto emitVar = [&](VarDecl *vd, SILLocation loc) {
       // If we already emitted a variable from another row, alias that variable.
       if (emittedVar) {
         gen.VarLocs[vd] = gen.VarLocs[emittedVar];
@@ -1025,7 +1029,8 @@ public:
       
       // Create and initialize the variable.
       InitializationPtr init = gen.emitLocalVariableWithCleanup(vd);
-      ManagedValue(v, ManagedValue::Unmanaged).copyInto(gen,init->getAddress());
+      ManagedValue(v, ManagedValue::Unmanaged).copyInto(gen, init->getAddress(),
+                                                        loc);
       init->finishInitialization(gen);
       emittedVar = vd;
     };
@@ -1046,13 +1051,15 @@ public:
           
       case PatternKind::Named:
         // Bind the named variable.
-        emitVar(cast<NamedPattern>(p)->getDecl());
+        emitVar(cast<NamedPattern>(p)->getDecl(),
+                RegularLocation(const_cast<Pattern*>(p)));
         break;
           
       case PatternKind::Expr:
         // Bind the ExprPattern's implicit match var.
         // TODO: It'd be nice not to need the temp var for expr patterns.
-        emitVar(cast<ExprPattern>(p)->getMatchVar());
+        emitVar(cast<ExprPattern>(p)->getMatchVar(),
+                RegularLocation(const_cast<Pattern*>(p)));
         break;
 
       case PatternKind::Paren:
@@ -1154,7 +1161,7 @@ public:
           Expr *ME = ep->getMatchExpr();
           FullExpr scope(gen.Cleanups, CleanupLocation(ME));
           testBool = gen.emitRValue(ME)
-            .getUnmanagedSingleValue(gen);
+            .getUnmanagedSingleValue(gen, ME);
         }
 
         // If the test succeeds, we move on to the next test; otherwise, we
@@ -1174,7 +1181,7 @@ public:
         // Emit the guard.
         // TODO: We should emit every guard once and share code if it covers
         // multiple patterns.
-        guardBool = gen.emitRValue(G).getUnmanagedSingleValue(gen);
+        guardBool = gen.emitRValue(G).getUnmanagedSingleValue(gen, G);
       }
       
       // Branch either to the row destination or the new BB.
@@ -1412,7 +1419,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   
   // Emit the subject value. Dispatching will consume it.
   SILValue subject
-    = emitRValue(S->getSubjectExpr()).forwardAsSingleValue(*this);
+    = emitRValue(S->getSubjectExpr()).forwardAsSingleValue(*this,
+                                                           S->getSubjectExpr());
   
   // Prepare a case-to-bb mapping for fallthrough to consult.
   // The bbs for reachable cases will be filled in by emitDecisionTree below.

@@ -111,7 +111,7 @@ public:
 
   /// Perform a default initialization of this buffer or buffers, then
   /// invoke finishInitialization().
-  virtual void defaultInitialize(SILGenFunction &gen) = 0;
+  virtual void defaultInitialize(SILGenFunction &gen, SILLocation L) = 0;
   
 private:
   Initialization(const Initialization &) = delete;
@@ -131,9 +131,9 @@ public:
     return {};
   }
   
-  void defaultInitialize(SILGenFunction &gen) override {
+  void defaultInitialize(SILGenFunction &gen, SILLocation L) override {
     SILValue address = getAddress();
-    gen.B.createInitializeVar(SILLocation(), address,
+    gen.B.createInitializeVar(L, address,
                               /*CanDefaultConstruct*/ true);
     finishInitialization(gen);
   }

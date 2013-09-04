@@ -477,7 +477,7 @@ public:
 
   /// Fall back to an unknown, indirect callee.
   void visitExpr(Expr *e) {
-    ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen);
+    ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen, e);
     setCallee(Callee::forIndirect(fn, false));
   }
 
@@ -491,7 +491,7 @@ public:
       auto *t = d->getDecl()->getType()->castTo<AnyFunctionType>();
       transparent = t->getExtInfo().isAutoClosure();
     }
-    ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen);
+    ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen, e);
     setCallee(Callee::forIndirect(fn, transparent));
   }
   
@@ -565,7 +565,8 @@ public:
     visit(e->getRHS());
   }
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
-    ManagedValue existential = gen.emitRValue(e->getBase()).getAsSingleValue(gen);
+    ManagedValue existential =
+      gen.emitRValue(e->getBase()).getAsSingleValue(gen, e->getBase());
     
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "existential properties not yet supported");
@@ -589,11 +590,11 @@ public:
         proj = ManagedValue(val, ManagedValue::Unmanaged);
       }
 
-      setSelfParam(RValue(gen, proj), e);
+      setSelfParam(RValue(gen, proj, e), e);
     } else {
       assert(existential.getType().is<MetaTypeType>() &&
              "non-existential-metatype for existential static method?!");
-      setSelfParam(RValue(gen, existential), e);
+      setSelfParam(RValue(gen, existential, e), e);
     }
 
     // Method calls through ObjC protocols require ObjC dispatch.
@@ -627,7 +628,7 @@ public:
   void applySuper(ApplyExpr *apply) {
     // Load the 'super' argument.
     Expr *arg = apply->getArg();
-    ManagedValue super = gen.emitRValue(arg).getAsSingleValue(gen);
+    ManagedValue super = gen.emitRValue(arg).getAsSingleValue(gen, arg);
     if (super.isLValue()) {
       auto superValue = gen.B.createLoad(arg, super.getValue());
       super = gen.emitManagedRetain(arg, superValue);
@@ -650,11 +651,12 @@ public:
 
     // Upcast 'self' parameter to the super type.
     SILType superTy
-      = gen.getLoweredLoadableType(apply->getArg()->getType()->getRValueType());
-    SILValue superUpcast = gen.B.createUpcast(apply->getArg(), super.getValue(),
+      = gen.getLoweredLoadableType(arg->getType()->getRValueType());
+    SILValue superUpcast = gen.B.createUpcast(arg, super.getValue(),
                                               superTy);
     
-    setSelfParam(RValue(gen, ManagedValue(superUpcast, super.getCleanup())),
+    setSelfParam(RValue(gen,
+                        ManagedValue(superUpcast, super.getCleanup()), apply),
                  apply);
     
     SILValue superMethod;
@@ -1071,7 +1073,7 @@ namespace {
     // Build the value to be assigned, reconstructing tuples if needed.
     ManagedValue src = RValue(args.slice(0, args.size() - 1),
                               assignType.getSwiftRValueType())
-      .getAsSingleValue(gen);
+      .getAsSingleValue(gen, loc);
     
     if (isInitialization)
       src.forwardInto(gen, loc, addr);
@@ -1305,7 +1307,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
 }
 
 RValue SILGenFunction::emitApplyExpr(ApplyExpr *e, SGFContext c) {
-  return RValue(*this, prepareApplyExpr(*this, e).apply(c));
+  return RValue(*this, prepareApplyExpr(*this, e).apply(c), e);
 }
 
 ManagedValue
@@ -1346,10 +1348,12 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
   CanType injectionArgsTy = injectionFnTy->getInput()->getCanonicalType();
   RValue InjectionArgs(injectionArgsTy);
   InjectionArgs.addElement(RValue(*this,
-                                ManagedValue(BasePtr, ManagedValue::Unmanaged)));
-  InjectionArgs.addElement(RValue(*this, ObjectPtr));
+                                ManagedValue(BasePtr, ManagedValue::Unmanaged),
+                                Loc));
+  InjectionArgs.addElement(RValue(*this, ObjectPtr, Loc));
   InjectionArgs.addElement(RValue(*this,
-                                ManagedValue(Length, ManagedValue::Unmanaged)));
+                                ManagedValue(Length, ManagedValue::Unmanaged),
+                                Loc));
   
   emission.addCallSite(Loc, std::move(InjectionArgs),
                        injectionFnTy->getResult());
