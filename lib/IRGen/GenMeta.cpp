@@ -39,6 +39,7 @@
 #include "IRGenDebugInfo.h"
 #include "ScalarTypeInfo.h"
 #include "StructMetadataLayout.h"
+#include "UnionMetadataLayout.h"
 
 #include "GenMeta.h"
 
@@ -1358,6 +1359,25 @@ namespace {
       NextIndex++;
     }
   };
+
+  /// A class for finding a type argument in a union metadata object.
+  class FindUnionArgumentIndex :
+      public MetadataSearcher<UnionMetadataScanner<FindStructArgumentIndex>> {
+    typedef MetadataSearcher super;
+    
+    ArchetypeType *TargetArchetype;
+    
+  public:
+    FindUnionArgumentIndex(IRGenModule &IGM, UnionDecl *decl,
+                            ArchetypeType *targetArchetype)
+    : super(IGM, decl), TargetArchetype(targetArchetype) {}
+    
+    void addGenericArgument(ArchetypeType *argument) {
+      if (argument == TargetArchetype)
+        setTargetIndex();
+      NextIndex++;
+    }
+  };
 }
 
 /// Given a reference to nominal type metadata of the given type,
@@ -1395,10 +1415,12 @@ llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
   }
 
-  case DeclKind::Union:
-    // FIXME
-    IGF.unimplemented(decl->getLoc(), "union type parameter metadata lookup");
-    exit(1);
+  case DeclKind::Union: {
+    int index =
+      FindUnionArgumentIndex(IGF.IGM, cast<UnionDecl>(decl), targetArchetype)
+        .getTargetIndex();
+    return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
+  }
   }
   llvm_unreachable("bad decl kind!");
 }
@@ -1913,36 +1935,18 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 namespace {
 
 template<class Impl>
-class UnionMetadataBuilderBase : public MetadataLayout<Impl> {
-  using super = MetadataLayout<Impl>;
+class UnionMetadataBuilderBase : public UnionMetadataLayout<Impl> {
+  using super = UnionMetadataLayout<Impl>;
 
 protected:
   using super::IGM;
-  UnionDecl *const Target;
   SmallVector<llvm::Constant *, 8> Fields;
 
   unsigned getNextIndex() const { return Fields.size(); }
 
 public:
   UnionMetadataBuilderBase(IRGenModule &IGM, UnionDecl *theUnion)
-    : super(IGM), Target(theUnion) {}
-  
-  void layout() {
-    // Metadata header.
-    super::layout();
-    
-    // UnionMetadata header.
-    addNominalTypeDescriptor();
-    addParentMetadataRef();
-    
-    // If changing this layout, you must update the magic number in
-    // emitParentMetadataRef.
-    
-    // Instantiation-specific.
-    if (auto generics = Target->getGenericParamsOfContext()) {
-      this->addGenericFields(*generics);
-    }
-  }
+    : super(IGM, theUnion) {}
   
   void addMetadataFlags() {
     Fields.push_back(getMetadataKind(IGM, MetadataKind::Union));
