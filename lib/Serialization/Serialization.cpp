@@ -584,12 +584,6 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
 
   if (associatedDecl) {
     if (auto protoKind = protocol->getKnownProtocolKind()) {
-      const NominalTypeDecl *nominal;
-      if (auto extension = dyn_cast<ExtensionDecl>(associatedDecl))
-        nominal = extension->getExtendedType()->getAnyNominal();
-      else
-        nominal = dyn_cast<NominalTypeDecl>(associatedDecl);
-
       auto index = static_cast<unsigned>(protoKind.getValue());
       KnownProtocolAdopters[index].push_back(addDeclRef(associatedDecl));
     }
