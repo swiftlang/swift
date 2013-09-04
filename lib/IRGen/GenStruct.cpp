@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Optional.h"
+#include "swift/IRGen/Options.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 
@@ -301,7 +302,8 @@ const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
     if (VarDecl *VD = dyn_cast<VarDecl>(D))
       if (!VD->isProperty()) {
         // FIXME: Type-parameter-dependent field layout isn't implemented yet.
-        if (!IGM.getTypeInfo(VD->getType()).isFixedSize()) {
+        if (!IGM.Opts.EnableDynamicValueTypeLayout &&
+            !IGM.getTypeInfo(VD->getType()).isFixedSize()) {
           IGM.unimplemented(VD->getLoc(), "dynamic field layout in structs");
           exit(1);
         }

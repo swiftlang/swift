@@ -65,9 +65,13 @@ public:
 
   /// \brief Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
+  
+  /// \brief Whether we allow dynamic value type layout.
+  unsigned EnableDynamicValueTypeLayout : 1;
 
   Options() : OutputKind(OutputKind::LLVMAssembly), Verify(true), OptLevel(0),
-              DebugInfo(false), UseJIT(false) {}
+              DebugInfo(false), UseJIT(false),
+              EnableDynamicValueTypeLayout(false) {}
 };
 
 } // end namespace irgen
