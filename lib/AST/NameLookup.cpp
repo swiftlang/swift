@@ -266,8 +266,10 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitCaseStmt(CaseStmt *S) {
     if (!IntersectsRange(S->getSourceRange()))
       return;
-    
-    // TODO: Check patterns in pattern-matching case.
+    for (auto Label : S->getCaseLabels()) {
+      for (auto P : Label->getPatterns())
+        checkPattern(P);
+    }
     visit(S->getBody());
   }
 };
