@@ -67,7 +67,15 @@ namespace {
     void printGenericParams(GenericParamList *params);
     void printMembers(ArrayRef<Decl *> members, bool needComma = false);
     void printNominalDeclName(NominalTypeDecl *decl);
-    void printInherited(ArrayRef<TypeLoc> inherited);
+    void printInherited(ArrayRef<TypeLoc> inherited,
+                        ArrayRef<ProtocolDecl *> protos,
+                        Type superclass = {});
+
+    template <typename DeclWithSuperclass>
+    void printInheritedWithSuperclass(DeclWithSuperclass *decl);
+    
+    void printInherited(const TypeDecl *decl);
+    void printInherited(const ExtensionDecl *decl);
     void printBraceStmtElements(BraceStmt *stmt);
 
     /// Print the argument/body patterns in selector style, if possible.
@@ -297,7 +305,7 @@ void PrintAST::printGenericParams(GenericParamList *params) {
 
     auto typeParam = gp.getAsTypeParam();
     OS << typeParam->getName().str();
-    printInherited(typeParam->getInherited());
+    printInheritedWithSuperclass(typeParam);
   }
   OS << ">";
 }
@@ -328,22 +336,47 @@ void PrintAST::printNominalDeclName(NominalTypeDecl *decl) {
   }
 }
 
-void PrintAST::printInherited(ArrayRef<TypeLoc> inherited) {
-  if (inherited.empty())
+void PrintAST::printInherited(ArrayRef<TypeLoc> inherited,
+                              ArrayRef<ProtocolDecl *> protos,
+                              Type superclass) {
+  if (inherited.empty() && protos.empty() && superclass.isNull())
     return;
 
   OS << " : ";
-  bool first = true;
-  for (auto tl : inherited) {
-    if (first) {
-      first = false;
-    } else {
+  
+  if (inherited.empty()) {
+    if (superclass) {
+      superclass.print(OS);
       OS << ", ";
     }
-
-    tl.getType().print(OS);
+    
+    interleave(protos, [&](const ProtocolDecl *proto) {
+      proto->getDeclaredType()->print(OS);
+    }, [&]() {
+      OS << ", ";
+    });
+  } else {
+    interleave(inherited, [&](TypeLoc TL) {
+      TL.getType()->print(OS);
+    }, [&]() {
+      OS << ", ";
+    });
   }
 }
+
+template <typename DeclWithSuperclass>
+void PrintAST::printInheritedWithSuperclass(DeclWithSuperclass *decl) {
+  printInherited(decl->getInherited(), decl->getProtocols(),
+                 decl->getSuperclass());
+}
+
+void PrintAST::printInherited(const TypeDecl *decl) {
+  printInherited(decl->getInherited(), decl->getProtocols());
+}
+void PrintAST::printInherited(const ExtensionDecl *decl) {
+  printInherited(decl->getInherited(), decl->getProtocols());
+}
+
 
 void PrintAST::visitImportDecl(ImportDecl *decl) {
   OS << "import ";
@@ -388,7 +421,7 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
   OS << "extension ";
   recordDeclLoc(decl);
   decl->getExtendedType().print(OS);
-  printInherited(decl->getInherited());
+  printInherited(decl);
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
   }
@@ -412,7 +445,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
   OS << decl->getName().str();
-  printInherited(decl->getInherited());
+  printInherited(decl);
   if (Options.TypeDefinitions && decl->hasUnderlyingType()) {
     OS << " = ";
     decl->getUnderlyingType().print(OS);
@@ -422,7 +455,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
   recordDeclLoc(decl);
   OS << decl->getName().str();
-  printInherited(decl->getInherited());
+  printInheritedWithSuperclass(decl);
 }
 
 void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
@@ -430,7 +463,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
   OS << decl->getName().str();
-  printInherited(decl->getInherited());
+  printInheritedWithSuperclass(decl);
 }
 
 void PrintAST::visitUnionDecl(UnionDecl *decl) {
@@ -438,7 +471,7 @@ void PrintAST::visitUnionDecl(UnionDecl *decl) {
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
   printNominalDeclName(decl);
-  printInherited(decl->getInherited());
+  printInherited(decl);
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
   }
@@ -449,7 +482,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
   printNominalDeclName(decl);
-  printInherited(decl->getInherited());
+  printInherited(decl);
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
   }
@@ -460,7 +493,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
   printNominalDeclName(decl);
-  printInherited(decl->getInherited());
+  printInheritedWithSuperclass(decl);
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
   }
@@ -471,7 +504,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
   printNominalDeclName(decl);
-  printInherited(decl->getInherited());
+  printInherited(decl);
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
   }
