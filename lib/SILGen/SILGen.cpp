@@ -234,8 +234,15 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant) {
   
   SILType constantType = getConstantType(constant);
   SILLinkage linkage = getConstantLinkage(constant);
+
+  IsTransparent_t IsTrans = IsNotTransparent;
+  if (constant.hasDecl()) {
+    ValueDecl *VD = constant.getDecl();
+    if (VD->getAttrs().isTransparent())
+      IsTrans = IsTransparent;
+  }
   
-  SILFunction *F = new (M) SILFunction(M, linkage, "", constantType);
+  SILFunction *F = new (M) SILFunction(M, linkage, "", constantType, IsTrans);
   mangleConstant(constant, F);
   emittedFunctions[constant] = F;
 

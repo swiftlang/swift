@@ -56,7 +56,7 @@ void Serializer::writeSILFunctions(const SILModule *M) {
   // Go through all SILFunctions in M, and if it is transparent,
   // write out the SILFunction.
   for (const SILFunction &F : *M) {
-    // TODO: check whether it is transparent.
-    SILSer.writeSILFunction(F);
+    if (F.isTransparent())
+      SILSer.writeSILFunction(F);
   }
 }

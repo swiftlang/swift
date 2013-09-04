@@ -34,6 +34,8 @@ enum class SILLinkage : unsigned char {
   Internal,
 };
   
+enum IsTransparent_t { IsNotTransparent, IsTransparent };
+
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
@@ -66,10 +68,14 @@ private:
 
   /// The source location and scope of the function.
   SILDebugScope *DebugScope;
+
+  /// The function's transparent attribute.
+  unsigned Transparent : 1; // FIXME: pack this somewhere
 public:
 
   SILFunction(SILModule &Module, SILLinkage Linkage,
-              StringRef MangledName, SILType LoweredType);
+              StringRef MangledName, SILType LoweredType,
+              IsTransparent_t isTrans = IsNotTransparent);
   
   ~SILFunction();
 
@@ -113,6 +119,10 @@ public:
   /// Get the source location of the function.
   SILDebugScope *getDebugScope() const { return DebugScope; }
   
+  /// Get this function's transparent attribute.
+  IsTransparent_t isTransparent() const { return IsTransparent_t(Transparent); }
+  void setIsTransparent(IsTransparent_t I) { Transparent = (bool)I; }
+
   //===--------------------------------------------------------------------===//
   // Block List Access
   //===--------------------------------------------------------------------===//
