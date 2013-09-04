@@ -29,6 +29,9 @@
 * The implementation now supports unions containing protocol types and weak
   reference types. Generic parameters on unions are still not yet supported.
 
+* The type annotation syntax, 'x as T', has been removed from the language.
+  The checked cast operations 'x as! T' and 'x is T' still remain.
+
 
 2013-08-28
 ----------
