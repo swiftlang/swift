@@ -145,6 +145,10 @@ public:
   virtual void getLinkLibraries(const Module *module,
                                 Module::LinkLibraryCallback callback) { }
   
+  /// \brief Get all top-level decls of the module.
+  virtual void getTopLevelDecls(const Module *Module,
+                                SmallVectorImpl<Decl*> &Results) { }
+
   /// \brief Look for all top-level decls that should be displayed to a client
   /// of the module.
   virtual void getDisplayDecls(const Module *module,

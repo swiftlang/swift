@@ -164,6 +164,9 @@ public:
   virtual void getLinkLibraries(const Module *module,
                                 Module::LinkLibraryCallback callback) override;
 
+  virtual void getTopLevelDecls(const Module *Module,
+                                SmallVectorImpl<Decl*> &Results) override;
+
   virtual void getDisplayDecls(const Module *module,
                                SmallVectorImpl<Decl*> &results) override;
 

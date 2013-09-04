@@ -288,6 +288,14 @@ SerializedModuleLoader::getLinkLibraries(const Module *module,
   moduleFile->getLinkLibraries(callback);
 }
 
+void SerializedModuleLoader::getTopLevelDecls(const Module *Module,
+                                              SmallVectorImpl<Decl*> &Results) {
+  ModuleFile *ModuleFile = cast<SerializedModule>(Module)->File;
+  if (!ModuleFile)
+    return;
+  ModuleFile->getTopLevelDecls(Results);
+}
+
 void SerializedModuleLoader::getDisplayDecls(const Module *module,
                                              SmallVectorImpl<Decl*> &results) {
   ModuleFile *moduleFile = cast<SerializedModule>(module)->File;

@@ -698,8 +698,8 @@ void ClangImporter::getLinkLibraries(const Module *module,
   }
 }
 
-void ClangImporter::getDisplayDecls(const Module *module,
-                                    SmallVectorImpl<Decl*> &results) {
+void ClangImporter::getTopLevelDecls(const Module *module,
+                                     SmallVectorImpl<Decl*> &results) {
   clang::ASTContext &clangCtx = Impl.Instance->getASTContext();
   const clang::TranslationUnitDecl *clangTU = clangCtx.getTranslationUnitDecl();
   
@@ -714,6 +714,11 @@ void ClangImporter::getDisplayDecls(const Module *module,
     if (auto imported = Impl.importDecl(named))
       results.push_back(imported);
   }
+}
+
+void ClangImporter::getDisplayDecls(const Module *module,
+                                    SmallVectorImpl<Decl*> &results) {
+  return getTopLevelDecls(module, results);
 }
 
 StringRef ClangImporter::getModuleFilename(const Module *Module) {

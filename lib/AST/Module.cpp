@@ -348,6 +348,20 @@ void Module::lookupClassMember(AccessPathTy accessPath,
   return owner.lookupClassMember(this, accessPath, name, results);
 }
 
+void Module::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) {
+  if (isa<BuiltinModule>(this)) {
+    return;
+  }
+
+  if (auto TU = dyn_cast<TranslationUnit>(this)) {
+    Results.append(TU->Decls.begin(), TU->Decls.end());
+    return;
+  }
+
+  ModuleLoader &Owner = cast<LoadedModule>(this)->getOwner();
+  return Owner.getTopLevelDecls(this, Results);
+}
+
 void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) {
   if (isa<BuiltinModule>(this)) {
     // FIXME: The Builtin module isn't usually visible, but it would be nice

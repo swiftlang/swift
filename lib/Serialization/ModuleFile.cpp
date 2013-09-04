@@ -639,10 +639,7 @@ void ModuleFile::getLinkLibraries(Module::LinkLibraryCallback callback) const {
     callback(lib);
 }
 
-void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
-  if (ShadowedModule)
-    ShadowedModule->getDisplayDecls(results);
-  
+void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
   if (OperatorDecls) {
     for (auto entry : make_range(OperatorDecls->data_begin(),
                                  OperatorDecls->data_end())) {
@@ -666,4 +663,11 @@ void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
         results.push_back(getDecl(item.second));
     }
   }
+}
+
+void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
+  if (ShadowedModule)
+    ShadowedModule->getDisplayDecls(results);
+
+  getTopLevelDecls(results);
 }
