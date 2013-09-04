@@ -163,7 +163,7 @@ static const T *adjustAddressPoint(const T *raw, uint32_t offset) {
 static const Metadata *
 instantiateGenericMetadata(GenericMetadata *pattern,
                            const void *arguments) {
-  size_t numGenericArguments = pattern->NumArguments;
+  size_t numGenericArguments = pattern->NumKeyArguments;
   void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
 
   // Allocate the new entry.
@@ -175,12 +175,9 @@ instantiateGenericMetadata(GenericMetadata *pattern,
   auto fullMetadata = entry->getData<Metadata>(numGenericArguments);
   memcpy(fullMetadata, pattern->getMetadataTemplate(), pattern->MetadataSize);
 
-  // Fill in the missing spaces from the arguments.
-  void **metadataAsArray = reinterpret_cast<void**>(fullMetadata);
-  for (auto i = pattern->fill_ops_begin(),
-            e = pattern->fill_ops_end(); i != e; ++i) {
-    metadataAsArray[i->ToIndex] = argumentsAsArray[i->FromIndex];
-  }
+  // Fill in the missing spaces from the arguments using the pattern's fill
+  // function.
+  pattern->FillFunction(fullMetadata, arguments);
 
   // The metadata is now valid.
 
@@ -409,7 +406,7 @@ const Metadata *
 swift::swift_getGenericMetadata(GenericMetadata *pattern,
                                 const void *arguments) {
   auto genericArgs = (const void * const *) arguments;
-  size_t numGenericArgs = pattern->NumArguments;
+  size_t numGenericArgs = pattern->NumKeyArguments;
 
 #if SWIFT_DEBUG_RUNTIME
   printf("swift_getGenericMetadata(%p):\n", pattern);

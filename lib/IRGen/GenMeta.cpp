@@ -36,6 +36,7 @@
 #include "GenPoly.h"
 #include "GenProto.h"
 #include "IRGenModule.h"
+#include "IRGenDebugInfo.h"
 #include "ScalarTypeInfo.h"
 #include "StructMetadataLayout.h"
 
@@ -623,10 +624,10 @@ namespace {
 
     SmallVector<FillOp, 8> FillOps;
 
-    enum { TemplateHeaderFieldCount = 6 };
+    enum { TemplateHeaderFieldCount = 5 };
 
   protected:
-    using super::IGM;
+    IRGenModule &IGM = super::IGM;
     using super::Fields;
 
     template <class... T>
@@ -635,6 +636,49 @@ namespace {
                                T &&...args)
       : super(IGM, std::forward<T>(args)...), ClassGenerics(generics) {}
 
+    /// Emit the fill function for the template.
+    llvm::Function *emitFillFunction() {
+      // void (*FillFunction)(void*, const void*)
+      llvm::Type *argTys[] = {IGM.Int8PtrTy, IGM.Int8PtrTy};
+      auto ty = llvm::FunctionType::get(IGM.VoidTy, argTys, /*isVarArg*/ false);
+      llvm::Function *f = llvm::Function::Create(ty,
+                                           llvm::GlobalValue::InternalLinkage,
+                                           "fill_generic_metadata",
+                                           &IGM.Module);
+      
+      IRGenFunction IGF(IGM, ExplosionKind::Minimal, f);
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, f);
+      
+      // Execute the fill ops. Cast the parameters to word pointers because the
+      // fill indexes are word-indexed.
+      Explosion params = IGF.collectParameters();
+      llvm::Value *fullMeta = params.claimNext();
+      llvm::Value *args = params.claimNext();
+      
+      Address fullMetaWords(IGF.Builder.CreateBitCast(fullMeta,
+                                                   IGM.SizeTy->getPointerTo()),
+                            Alignment(IGM.getPointerAlignment()));
+      Address argWords(IGF.Builder.CreateBitCast(args,
+                                                 IGM.SizeTy->getPointerTo()),
+                       Alignment(IGM.getPointerAlignment()));
+      
+      for (auto &fillOp : FillOps) {
+        auto dest = IGF.Builder.CreateConstArrayGEP(fullMetaWords,
+                                                    fillOp.ToIndex,
+                                                    IGM.getPointerSize());
+        auto src = IGF.Builder.CreateConstArrayGEP(argWords,
+                                                   fillOp.FromIndex,
+                                                   IGM.getPointerSize());
+        IGF.Builder.CreateStore(IGF.Builder.CreateLoad(src), dest);
+      }
+      
+      // The metadata is now complete.
+      IGF.Builder.CreateRetVoid();
+      
+      return f;
+    }
+    
   public:
     void layout() {
       // Leave room for the header.
@@ -644,34 +688,33 @@ namespace {
       super::layout();
 
       // Fill in the header:
+      unsigned Field = 0;
 
-      //   uint32_t NumArguments;
-
-      // TODO: ultimately, this should be the number of actual template
-      // arguments, not the number of value witness tables required.
-      Fields[0] = llvm::ConstantInt::get(IGM.Int32Ty, NumGenericWitnesses);
-
-      //   uint32_t NumFillOps;
-      Fields[1] = llvm::ConstantInt::get(IGM.Int32Ty, FillOps.size());
-
+      //   void (*FillFunction)(void *, const void*);
+      Fields[Field++] = emitFillFunction();
+      
       //   uint32_t MetadataSize;
       // We compute this assuming that every entry in the metadata table
       // is a pointer in size.
       Size size = this->getNextIndex() * IGM.getPointerSize();
-      Fields[2] = llvm::ConstantInt::get(IGM.Int32Ty, size.getValue());
+      Fields[Field++] = llvm::ConstantInt::get(IGM.Int32Ty, size.getValue());
+      
+      //   uint16_t NumArguments;
+      // TODO: ultimately, this should be the number of actual template
+      // arguments, not the number of value witness tables required.
+      Fields[Field++]
+        = llvm::ConstantInt::get(IGM.Int16Ty, NumGenericWitnesses);
 
-      //   uint32_t AddressPoint;
+      //   uint16_t AddressPoint;
       assert(AddressPoint != 0 && "address point not noted!");
       Size addressPoint = AddressPoint * IGM.getPointerSize();
-      Fields[3] = llvm::ConstantInt::get(IGM.Int32Ty, addressPoint.getValue());
+      Fields[Field++]
+        = llvm::ConstantInt::get(IGM.Int16Ty, addressPoint.getValue());
 
       //   void *PrivateData[8];
-      Fields[4] = getPrivateDataInit();
+      Fields[Field++] = getPrivateDataInit();
 
-      //   struct SwiftGenericHeapMetadataFillOp FillOps[NumArguments];
-      Fields[5] = getFillOpsInit();
-
-      assert(TemplateHeaderFieldCount == 6);
+      assert(TemplateHeaderFieldCount == Field);
     }
 
     /// Write down the index of the address point.
@@ -1835,10 +1878,9 @@ namespace {
   };
   
   // FIXME.  This is a *horrendous* hack, but:  just apply the generic
-  // type at the empty-tuple type a bunch.  I don't have a theory right
-  // now for how this should actually work when the witnesses really
-  // need stuff from the type.  Laying out the VWT within the pattern,
-  // probably, and then making the value witnesses expect that.
+  // type at the empty-tuple type a bunch. When the witnesses really
+  // need stuff from the type, we should lay out the VWT within the pattern,
+  // probably, and have the pattern fill function expect that.
   static Type buildFakeBoundType(IRGenModule &IGM, NominalTypeDecl *target) {
     auto generics = target->getGenericParams();
     if (!generics) return target->getDeclaredType();

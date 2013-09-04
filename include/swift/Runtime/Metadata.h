@@ -734,8 +734,8 @@ extern "C" const FullMetadata<TupleTypeMetadata> _TMdT_;
 /// Dictionary<T,U> like so:
 ///   extern GenericMetadata Dictionary_metadata_header;
 ///   void *arguments[] = { typeid(T), typeid(U) };
-///   void *metadata = swift_fetchGenericMetadata(&Dictionary_metadata_header,
-///                                               &arguments);
+///   void *metadata = swift_getGenericMetadata(&Dictionary_metadata_header,
+///                                             &arguments);
 ///   void *object = swift_allocObject(metadata);
 ///
 /// Note that the metadata header is *not* const data; it includes 8
@@ -744,53 +744,32 @@ extern "C" const FullMetadata<TupleTypeMetadata> _TMdT_;
 /// Both the metadata header and the arguments buffer are guaranteed
 /// to be pointer-aligned.
 struct GenericMetadata {
-  /// The number of generic arguments that we need to unique on,
-  /// in words.  The first 'NumArguments * sizeof(void*)' bytes of
-  /// the arguments buffer are the key.
-  uint32_t NumArguments;
-
-  /// The number of fill operations following this header.
-  /// See the 
-  uint32_t NumFillOps;
-
+  /// The fill function. Receives a pointer to the instantiated metadata and
+  /// the argument pointer passed to swift_getGenericMetadata.
+  void (*FillFunction)(void *metadata, const void *arguments);
+  
   /// The size of the template in bytes.
   uint32_t MetadataSize;
 
+  /// The number of generic arguments that we need to unique on,
+  /// in words.  The first 'NumArguments * sizeof(void*)' bytes of
+  /// the arguments buffer are the key. There may be additional private-contract
+  /// data used by FillFunction not used for uniquing.
+  uint16_t NumKeyArguments;
+
   /// The offset of the address point in the template in bytes.
-  uint32_t AddressPoint;
+  uint16_t AddressPoint;
 
   /// Data that the runtime can use for its own purposes.  It is guaranteed
   /// to be zero-filled by the compiler.
   void *PrivateData[8];
 
   // Here there is a variably-sized field:
-  // GenericMetadataFillOp FillOps[NumArguments];
-
-  // Here there is a variably-sized field:
-  // char MetadataTemplate[MetadataSize];
-
-  /// A heap-metadata fill operation is an instruction to copy a
-  /// pointer's worth of data from the arguments into a particular
-  /// position in the allocated metadata.
-  ///
-  /// 'ToIndex' is expressed relative to the start of the full
-  /// metadata, not relative to the address point.
-  struct FillOp {
-    uint32_t FromIndex;
-    int32_t ToIndex;
-  };
-
-  typedef const FillOp *fill_ops_const_iterator;
-  fill_ops_const_iterator fill_ops_begin() const {
-    return reinterpret_cast<const FillOp *>(this + 1);
-  }
-  fill_ops_const_iterator fill_ops_end() const {
-    return fill_ops_begin() + NumFillOps;
-  }
+  // char alignas(void*) MetadataTemplate[MetadataSize];
 
   /// Return the starting address of the metadata template data.
   const void *getMetadataTemplate() const {
-    return fill_ops_end();
+    return reinterpret_cast<const void *>(this + 1);
   }
 };
 
