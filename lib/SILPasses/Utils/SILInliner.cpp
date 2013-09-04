@@ -29,6 +29,7 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
   SILFunction &F = getBuilder().getFunction();
   assert(I->getParent()->getParent() && I->getParent()->getParent() == &F &&
          "Inliner called on apply instruction in wrong function?");
+  assert(I != I->getParent()->end() && "Inliner called on a terminator?");
 
   // We do not support inlining of Objective-C methods
   if (CalleeFunction->getAbstractCC() == AbstractCC::ObjCMethod)
@@ -53,7 +54,8 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
 
   InstructionMap.clear();
   BBMap.clear();
-  getBuilder().setInsertionPoint(I);
+  SILBasicBlock::iterator InsertPoint = llvm::next(I);
+  getBuilder().setInsertionPoint(InsertPoint);
   // Recursively visit callee's BB in depth-first preorder, starting with the
   // entry block, cloning all instructions other than terminators.
   visitSILBasicBlock(CalleeEntryBB);
@@ -72,7 +74,7 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
     // Split the BB and do NOT create a branch between the old and new
     // BBs; we will create the appropriate terminator manually later.
     SILBasicBlock *ReturnToBB =
-      CallerBB->splitBasicBlock(I, /*CreateBranch=*/false);
+      CallerBB->splitBasicBlock(InsertPoint, /*CreateBranch=*/false);
     // Place the return-to BB after all the other mapped BBs.
     if (InsertBeforeBB)
       F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB), F.getBlocks(),

@@ -58,14 +58,60 @@ getCalleeFunction(ApplyInst* AI, SmallVectorImpl<SILValue>& Args,
     Args.push_back(Arg);
   SILValue Callee = AI->getCallee();
 
-  while (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(Callee.getDef())) {
+  if (LoadInst *LI = dyn_cast<LoadInst>(Callee.getDef())) {
+    assert(Callee.getResultNumber() == 0);
+    // Conservatively only see through alloc_box; we assume this pass is run
+    // immediately after SILGen
+    AllocBoxInst *ABI = dyn_cast<AllocBoxInst>(LI->getOperand().getDef());
+    if (!ABI)
+      return nullptr;
+    assert(LI->getOperand().getResultNumber() == 1);
+
+    // Scan forward from the alloc box to find the first store, which
+    // (conservatively) must be in the same basic block as the alloc box
+    StoreInst *SI = nullptr;
+    for (auto I = SILBasicBlock::iterator(ABI), E = I->getParent()->end();
+         I != E; ++I) {
+      // If we find the load instruction first, then the load is loading from
+      // a non-initialized alloc; this shouldn't really happen but I'm not
+      // making any assumptions
+      if (static_cast<SILInstruction*>(I) == LI)
+        return nullptr;
+      if ((SI = dyn_cast<StoreInst>(I))) {
+        // We found a store that we know dominates the load; now ensure there
+        // are no other uses of the alloc box other than loads, retains, and
+        // releases
+        for (auto UI = ABI->use_begin(), UE = ABI->use_end(); UI != UE;
+             ++UI)
+          if (UI.getUser() != SI && !isa<LoadInst>(UI.getUser()) &&
+              !isa<StrongRetainInst>(UI.getUser()) &&
+              !isa<StrongReleaseInst>(UI.getUser()))
+            return nullptr;
+        // We can conservatively see through the store
+        break;
+      }
+    }
+    if (!SI)
+      return nullptr;
+    Callee = SI->getSrc();
+  }
+
+  // We are allowed to see through exactly one "partial apply" instruction or
+  // one "thin to thick function" instructions, since those are the patterns
+  // generated when using auto closures
+  if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(Callee.getDef())) {
     assert(Callee.getResultNumber() == 0);
 
     for (const auto &Arg : PAI->getArguments())
       Args.push_back(Arg);
-    Callee = PAI->getCallee();
 
+    Callee = PAI->getCallee();
     PossiblyDeadInsts.push_back(PAI);
+  } else if (ThinToThickFunctionInst *TTTFI =
+               dyn_cast<ThinToThickFunctionInst>(Callee.getDef())) {
+    assert(Callee.getResultNumber() == 0);
+    Callee = TTTFI->getOperand();
+    PossiblyDeadInsts.push_back(TTTFI);
   }
 
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef());
@@ -120,7 +166,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
 
   SmallVector<SILValue, 16> Args;
   SmallVector<SILInstruction*, 16> PossiblyDeadInsts;
-  SILInliner Inliner(*F, /*ForTransparent=*/true);
+  SILInliner Inliner(*F);
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
     auto I = FI->begin(), E = FI->end();
     while (I != E) {

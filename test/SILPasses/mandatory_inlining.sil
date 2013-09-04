@@ -395,9 +395,10 @@ sil @test_partial_foo : $[thin] (Int64) -> Int64 {
   // CHECK: return [[VAL2]]
 
 bb0(%0 : $Int64):
+  %2 = function_ref @test_partial_bar : $[thin] (Int64 -> Int64, Int64) -> Int64
   %3 = function_ref @test_partial_baz : $[thin] (Int64, Int64) -> Int64
   %5 = partial_apply %3(%0) : $[thin] (Int64, Int64) -> Int64
-  %13 = apply [transparent] %5(%0) : $Int64 -> Int64
+  %13 = apply [transparent] %2(%5, %0) : $[thin] (Int64 -> Int64, Int64) -> Int64
   return %13 : $Int64
 }
 
@@ -410,6 +411,6 @@ bb0(%0 : $Int64, %1 : $Int64):
 
 sil @test_partial_bar : $[thin] (Int64 -> Int64, Int64) -> Int64 {
 bb0(%0 : $Int64 -> Int64, %1 : $Int64):
-  %7 = apply %0(%1) : $Int64 -> Int64
+  %7 = apply [transparent] %0(%1) : $Int64 -> Int64
   return %7 : $Int64
 }

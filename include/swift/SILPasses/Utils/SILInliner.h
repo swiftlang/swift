@@ -31,8 +31,8 @@ public:
   friend class SILVisitor<SILInliner, SILValue>;
   friend class SILCloner<SILInliner>;
 
-  explicit SILInliner(SILFunction &F, bool ForTransparent = false)
-    : SILCloner<SILInliner>(F), ForTransparent(ForTransparent) {
+  explicit SILInliner(SILFunction &F)
+    : SILCloner<SILInliner>(F) {
   }
 
   /// inlineFunction - This method inlines a callee function, assuming that it
@@ -58,27 +58,6 @@ public:
 
 private:
   void visitSILBasicBlock(SILBasicBlock* BB);
-
-  SILValue visitApplyInst(ApplyInst* Inst) {
-    auto Args = getOpValueArray<8>(Inst->getArguments());
-    SILArgument *CalleeArg;
-
-    // When inlining a [transparent] apply, we have a pretty special case rule
-    // that says that any apply of an argument to the function being inlined
-    // gets the [transparent] flag. This it to handle the case of an
-    // [auto_closure] argument to a [transparent] function and is admittedly
-    // contrived.
-    bool MakeTransparent = Inst->isTransparent() ||
-      (ForTransparent &&
-       (CalleeArg = dyn_cast<SILArgument>(Inst->getCallee())) &&
-       CalleeArg->getParent() == CalleeEntryBB);
-
-    return doPostProcess(Inst,
-      Builder.createApply(getOpLocation(Inst->getLoc()),
-                          getOpValue(Inst->getCallee()),
-                          getOpType(Inst->getType()), Args,
-                          MakeTransparent));
-  }
 
   SILValue remapValue(SILValue Value) {
     if (SILArgument* A = dyn_cast<SILArgument>(Value.getDef())) {
@@ -108,8 +87,6 @@ private:
     InstructionMap.insert(std::make_pair(Orig, Cloned));
     return Cloned;
   }
-
-  bool ForTransparent;
 
   SILBasicBlock* CalleeEntryBB;
   SILBasicBlock* InsertBeforeBB;
