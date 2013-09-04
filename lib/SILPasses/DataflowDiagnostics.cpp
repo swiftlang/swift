@@ -113,9 +113,9 @@ static void diagnoseReturn(const SILInstruction *I, ASTContext &Context) {
       if (T->isNoReturn()) {
         SILLocation L = TI->getLoc();
         if (L.is<ReturnLocation>())
-          diagnose(Context, L.getStartSourceLoc(), diag::return_from_noreturn);
+          diagnose(Context, L.getSourceLoc(), diag::return_from_noreturn);
         if (L.is<ImplicitReturnLocation>())
-          diagnose(Context, L.getEndSourceLoc(), diag::return_from_noreturn);
+          diagnose(Context, L.getSourceLoc(), diag::return_from_noreturn);
       }
     }
   }

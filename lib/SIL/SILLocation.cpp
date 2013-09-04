@@ -31,6 +31,16 @@ SourceLoc SILLocation::getSourceLoc() const {
     return getEndSourceLoc();
   }
 
+  // Use the end location for the ImplicitReturnKind.
+  if (getKind() == ImplicitReturnKind) {
+    return getEndSourceLoc();
+  }
+
+  // Use the start location for the ReturnKind.
+  if (getKind() == ReturnKind) {
+    return getStartSourceLoc();
+  }
+
   if (auto decl = ASTNode.dyn_cast<Decl*>())
     return decl->getLoc();
   if (auto expr = ASTNode.dyn_cast<Expr*>())
