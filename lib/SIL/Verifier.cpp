@@ -49,17 +49,20 @@ public:
   }
   void checkValueBase(ValueBase *V) {}
 };
+} // end anonymous namespace
+
+namespace {
 
 /// The SIL verifier walks over a SIL function / basic block / instruction,
 /// checking and enforcing its invariants.
 class SILVerifier : public SILVerifierBase<SILVerifier> {
   const SILFunction &F;
   const SILInstruction *CurInstruction = nullptr;
-  DominanceInfo Dominance;
+  DominanceInfo *Dominance;
+
+  SILVerifier(const SILVerifier&) = delete;
+  void operator=(const SILVerifier&) = delete;
 public:
-  SILVerifier(SILFunction const &F)
-    : F(F), Dominance(const_cast<SILFunction*>(&F)) {}
-  
   void _require(bool condition, const Twine &complaint) {
     if (condition) return;
 
@@ -72,7 +75,7 @@ public:
       CurInstruction->getParent()->print(llvm::dbgs());
     }
 
-    assert(0 && "triggering standard assertion failure routine");
+    abort();
   }
 #define require(condition, complaint) \
   _require(condition, complaint ": " #condition)
@@ -93,6 +96,22 @@ public:
     require(value.getType().isObject(), valueDescription + " must be an object");
     require(value.getType().hasReferenceSemantics(),
             valueDescription + " must have reference semantics");
+  }
+
+  SILVerifier(const SILFunction &F) : F(F) {
+    // Check to make sure that all blocks are well formed.  If not, the
+    // SILVerifier object will explode trying to compute dominance info.
+    for (auto &BB : F) {
+      require(!BB.empty(), "Basic blocks cannot be empty");
+      require(isa<TermInst>(BB.getInstList().back()),
+              "Basic blocks must end with a terminator instruction");
+    }
+
+    Dominance = new DominanceInfo(const_cast<SILFunction*>(&F));
+  }
+
+  ~SILVerifier() {
+    delete Dominance;
   }
 
   void visitSILInstruction(SILInstruction *I) {
@@ -138,7 +157,7 @@ public:
                 "instruction uses value of unparented instruction");
         require(valueI->getParent()->getParent() == &F,
                 "instruction uses value of instruction from another function");
-        require(Dominance.properlyDominates(valueI, I),
+        require(Dominance->properlyDominates(valueI, I),
                 "instruction doesn't dominate its operand");
       }
 
