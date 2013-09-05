@@ -505,11 +505,25 @@ public:
   // Type Parsing
   
   ParserResult<TypeRepr> parseType();
-  ParserResult<TypeRepr> parseType(Diag<> ID);
+  ParserResult<TypeRepr> parseType(Diag<> MessageID);
+
+  /// \brief Parse any type, but diagnose all types except type-identifier.
+  ///
+  /// In some places the grammar allows type-identifier, but when it is not
+  /// ambiguous, we want to parse any type for recovery purposes.
+  ///
+  /// \param MessageID a generic diagnostic for a syntax error in the type
+  /// \param NonIdentifierTypeMessageID a diagnostic for a non-identifier type
+  ///
+  /// \returns null, IdentTypeRepr or ErrorTypeRepr.
+  ParserResult<TypeRepr>
+  parseTypeIdentifierWithRecovery(Diag<> MessageID,
+                                  Diag<TypeLoc> NonIdentifierTypeMessageID);
+
   ParserResult<TypeRepr> parseTypeAnnotation();
   ParserResult<TypeRepr> parseTypeAnnotation(Diag<> ID);
   ParserResult<TypeRepr> parseTypeSimple();
-  ParserResult<TypeRepr> parseTypeSimple(Diag<> ID);
+  ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID);
   bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);

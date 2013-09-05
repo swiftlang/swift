@@ -177,6 +177,24 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
   return ty;
 }
 
+ParserResult<TypeRepr> Parser::parseTypeIdentifierWithRecovery(
+    Diag<> MessageID, Diag<TypeLoc> NonIdentifierTypeMessageID) {
+  ParserResult<TypeRepr> Ty = parseType(MessageID);
+
+  if (!Ty.isParseError() && !isa<IdentTypeRepr>(Ty.get())) {
+    diagnose(Ty.get()->getStartLoc(), NonIdentifierTypeMessageID, Ty.get())
+        .highlight(Ty.get()->getSourceRange());
+    Ty.setIsParseError();
+    Ty = makeParserResult(
+        Ty, new (Context) ErrorTypeRepr(Ty.get()->getSourceRange()));
+  }
+
+  assert(Ty.isNull() ||
+         isa<IdentTypeRepr>(Ty.get()) ||
+         isa<ErrorTypeRepr>(Ty.get()));
+  return Ty;
+}
+
 bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                                    SourceLoc &LAngleLoc,
                                    SourceLoc &RAngleLoc) {

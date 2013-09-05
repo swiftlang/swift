@@ -874,10 +874,8 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
 ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
-  // The grammar allows only type-identifier here, but we parse type-simple for
-  // recovery purposes and let the type checker reject types that can not be
-  // extended.
-  ParserResult<TypeRepr> Ty = parseTypeSimple();
+  ParserResult<TypeRepr> Ty = parseTypeIdentifierWithRecovery(
+      diag::expected_type, diag::expected_ident_type_in_extension);
   if (Ty.hasCodeCompletion())
     return makeParserCodeCompletionResult<ExtensionDecl>();
   if (Ty.isNull() && Tok.isKeyword()) {
@@ -895,15 +893,6 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
   }
   if (Ty.isNull())
     return nullptr;
-  // Diagnose extensions for paren types in the parser because a ParenType is
-  // canonically equivalent to the wrapped type, and we are using syntactic
-  // information to differentiate between them.
-  if (auto *TTR = dyn_cast<TupleTypeRepr>(Ty.get())) {
-    if (TTR->isParenType()) {
-      diagnose(TTR->getStartLoc(), diag::paren_type_in_extension)
-        .highlight(TTR->getSourceRange());
-    }
-  }
 
   ParserStatus Status;
 
