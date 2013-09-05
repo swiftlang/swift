@@ -268,6 +268,11 @@ BEGIN_FUNC _swift_weakRelease
   ret
 END_FUNC
 
+// __x86_64__
+#elif defined(SWIFT_HAVE_FAST_ENTRY_POINTS)
+
+#error fast entry points promised but not implemented on this architecture
+
 #endif
 
 .subsections_via_symbols

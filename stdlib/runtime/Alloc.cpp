@@ -28,23 +28,17 @@
 
 using namespace swift;
 
-extern "C" HeapObject *swift_tryRetain(HeapObject *object);
+namespace swift {
+  extern "C" HeapObject *swift_tryRetain(HeapObject *object);
+};
 
 struct AllocCacheEntry {
   struct AllocCacheEntry *next;
 };
 
-// XXX FIXME -- we need to clean this up when the project isn't a secret.
-// There are only 256 slots, and the latter half is basically unused. We can
-// go lower than 128, but we eventually begin to stomp on other frameworks.
-//#ifdef __LP64__
-//#define ALLOC_CACHE_BUCKETS 56
-//#else
-#define ALLOC_CACHE_BUCKETS 64
-//#endif
 static __attribute__((address_space(256)))
 struct TSD {
-  uintptr_t junk[128];
+  uintptr_t reserved[ALLOC_CACHE_RESERVED];  // see note in FastEntryPoints.h
   AllocCacheEntry *cache[ALLOC_CACHE_BUCKETS];
   AllocCacheEntry *rawCache[ALLOC_CACHE_BUCKETS];
 } *tsd = 0;
@@ -247,8 +241,10 @@ swift::swift_retain_noresult(HeapObject *object) {
   swift_retain(object);
 }
 
-// On x86-64 these are implemented in FastEntryPoints.s.
-#ifndef __x86_64__
+
+// These are implemented in FastEntryPoints.s on some platforms.
+#ifndef SWIFT_HAVE_FAST_ENTRY_POINTS
+
 HeapObject *swift::swift_retain(HeapObject *object) {
   return _swift_retain(object);
 }
@@ -258,6 +254,43 @@ void swift::swift_release(HeapObject *object) {
     _swift_release_slow(object);
   }
 }
+
+void swift::swift_weakRetain(HeapObject *object) {
+  if (!object) return;
+
+  // FIXME: not thread-safe
+  // FIXME: should check carry bit
+  if ((object->weakRefCount += WRC_INTERVAL) < WRC_INTERVAL) {
+    assert(0 && "weak retain count overflow");
+  }
+}
+
+void swift::swift_weakRelease(HeapObject *object) {
+  if (!object) return;
+
+  // FIXME: not thread-safe
+  uint32_t newCount = (object->weakRefCount -= WRC_INTERVAL);
+  if (newCount >= (uint32_t)~WRC_INTERVAL) {
+    assert(0 && "weak retain count underflow");
+  }
+  if (newCount == 0) {
+    swift_slowRawDealloc(object, 0);
+  }
+}
+
+HeapObject *swift::swift_tryRetain(HeapObject *object) {
+  if (!object) return nullptr;
+
+  // FIXME: not thread-safe
+  uint32_t newCount = (object->refCount += RC_INTERVAL);
+  assert(newCount >= RC_INTERVAL  &&  "retain count overflow");
+  if (newCount & RC_DEALLOCATING_BIT) {
+    object->refCount -= RC_INTERVAL;
+    return nullptr;
+  }
+  return object;
+}
+
 #endif
 
 void swift::swift_retainUnowned(HeapObject *object) {
@@ -349,8 +382,9 @@ void *swift::swift_slowAlloc(size_t bytes, uint64_t flags) {
   return r;
 }
 
-// On x86-64 these are implemented in FastEntryPoints.s.
-#ifndef __x86_64__
+// These are implemented in FastEntryPoints.s on some platforms.
+#ifndef SWIFT_HAVE_FAST_ENTRY_POINTS
+
 void *swift::swift_alloc(AllocIndex idx) {
   AllocCacheEntry *r = tsd->cache[idx];
   if (r) {
@@ -400,6 +434,8 @@ void swift::swift_rawDealloc(void *ptr, AllocIndex idx) {
   cur->next = prev;
   tsd->rawCache[idx] = cur;
 }
+
+// !SWIFT_HAVE_FAST_ENTRY_POINTS
 #endif
 
 void swift::swift_slowDealloc(void *ptr, size_t bytes) {
