@@ -1240,7 +1240,7 @@ private:
       return block;
     }
     if (c == 'f') {
-      NodePointer in_args = demangleType();
+      NodePointer in_args = demangleTypeImpl();
       if (!in_args)
         return nullptr;
       NodePointer out_args = demangleType();
@@ -1248,10 +1248,7 @@ private:
         return nullptr;
       NodePointer block =
           Node::makeNodePointer(Node::Kind::UncurriedFunctionType);
-      NodePointer in_node =
-          Node::makeNodePointer(Node::Kind::UncurriedFunctionMetaType);
-      block->push_back_child(in_node);
-      in_node->push_back_child(in_args);
+      block->push_back_child(in_args);
       block->push_back_child(postProcessReturnTypeNode(out_args));
       return block;
     }
@@ -1515,10 +1512,8 @@ bool typeNeedsColonForDecl (NodePointer type) {
     return false;
   Node::Kind child_kind = child->getKind();
   switch (child_kind) {
-    case Node::Kind::UncurriedFunctionFunctionType:
     case Node::Kind::UncurriedFunctionType:
     case Node::Kind::FunctionType:
-    case Node::Kind::UncurriedFunctionMetaType:
       return false;
     case Node::Kind::GenericType:
       return typeNeedsColonForDecl(getFirstChildOfKind(type, Node::Kind::UncurriedFunctionType));
@@ -1584,9 +1579,9 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       NodePointer metatype = pointer->child_at(0);
       if (!metatype)
         break;
-      DemanglerPrinter sub_printer;
-      toString(metatype, sub_printer);
-      printer << sub_printer.str();
+      printer << "(";
+      toString(metatype, printer);
+      printer << ")";
       NodePointer real_func = pointer->child_at(1);
       if (!real_func)
         break;
@@ -1594,11 +1589,6 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       toStringChildren(real_func, printer);
       break;
     }
-    case swift::Demangle::Node::Kind::UncurriedFunctionMetaType:
-      printer << "(";
-      toStringChildren(pointer, printer);
-      printer << ")";
-      break;
     case swift::Demangle::Node::Kind::ArgumentTuple: {
       bool need_parens = false;
       if (pointer->size() > 1)
@@ -1822,10 +1812,7 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       NodePointer atype_list = pointer->child_at(0);
       NodePointer fct_type = pointer->child_at(1)->child_at(0);
       toString(atype_list, printer);
-      NodePointer args = fct_type->child_at(0);
-      NodePointer ret = fct_type->child_at(1);
-      toString(args, printer);
-      toString(ret, printer);
+      toString(fct_type, printer);
       break;
     }
     case swift::Demangle::Node::Kind::Addressor: {
@@ -1867,7 +1854,6 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     }
     case swift::Demangle::Node::Kind::Substitution:
     case swift::Demangle::Node::Kind::TypeName:
-    case swift::Demangle::Node::Kind::UncurriedFunctionFunctionType:
     case swift::Demangle::Node::Kind::TypeList:
     case swift::Demangle::Node::Kind::ArchetypeAndProtocol: {
       NodePointer child0 = pointer->child_at(0);

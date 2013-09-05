@@ -58,8 +58,6 @@ public:
     BuiltinTypeName,
     FunctionType,
     UncurriedFunctionType,
-    UncurriedFunctionMetaType,
-    UncurriedFunctionFunctionType,
     ObjCBlock,
     GenericTypeApplication,
     TypeList,
