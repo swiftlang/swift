@@ -62,26 +62,26 @@ getCalleeFunction(ApplyInst* AI, SmallVectorImpl<SILValue>& Args,
     assert(Callee.getResultNumber() == 0);
     // Conservatively only see through alloc_box; we assume this pass is run
     // immediately after SILGen
-    SILInstruction *AI = dyn_cast<SILInstruction>(LI->getOperand().getDef());
-    if (!AI || !(isa<AllocBoxInst>(AI) || isa<AllocStackInst>(AI)))
+    SILInstruction *ABSI = dyn_cast<SILInstruction>(LI->getOperand().getDef());
+    if (!ABSI || !(isa<AllocBoxInst>(ABSI) || isa<AllocStackInst>(ABSI)))
       return nullptr;
     assert(LI->getOperand().getResultNumber() == 1);
 
     // Scan forward from the alloc box to find the first store, which
     // (conservatively) must be in the same basic block as the alloc box
     StoreInst *SI = nullptr;
-    for (auto I = SILBasicBlock::iterator(AI), E = I->getParent()->end();
+    for (auto I = SILBasicBlock::iterator(ABSI), E = I->getParent()->end();
          I != E; ++I) {
       // If we find the load instruction first, then the load is loading from
       // a non-initialized alloc; this shouldn't really happen but I'm not
       // making any assumptions
       if (static_cast<SILInstruction*>(I) == LI)
         return nullptr;
-      if ((SI = dyn_cast<StoreInst>(I)) && SI->getDest().getDef() == AI) {
+      if ((SI = dyn_cast<StoreInst>(I)) && SI->getDest().getDef() == ABSI) {
         // We found a store that we know dominates the load; now ensure there
         // are no other uses of the alloc other than loads, retains, releases
         // and dealloc stacks
-        for (auto UI = AI->use_begin(), UE = AI->use_end(); UI != UE;
+        for (auto UI = ABSI->use_begin(), UE = ABSI->use_end(); UI != UE;
              ++UI)
           if (UI.getUser() != SI && !isa<LoadInst>(UI.getUser()) &&
               !isa<StrongRetainInst>(UI.getUser()) &&
