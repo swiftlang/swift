@@ -1156,19 +1156,12 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       SmallVector<ExprStmtOrDecl, 16> Entries;
       parseBraceItems(Entries, false /*NotTopLevel*/,
                       BraceItemListKind::Property);
-      NullablePtr<BraceStmt> Body = BraceStmt::create(Context, ColonLoc,
-                                                      Entries, Tok.getLoc());
+      BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
+                                          Entries, Tok.getLoc());
 
-      if (Body.isNull()) {
-        GetLoc = SourceLoc();
-        skipUntilDeclRBrace();
-        Invalid = true;
-        break;
-      }
-      
-      GetFn->setBody(Body.get());
+      GetFn->setBody(Body);
 
-      LastValidLoc = Body.get()->getRBraceLoc();
+      LastValidLoc = Body->getRBraceLoc();
       
       Get = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), GetLoc,
                                    Identifier(), GetLoc, /*generic=*/nullptr,
@@ -1268,18 +1261,12 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     SmallVector<ExprStmtOrDecl, 16> Entries;
     parseBraceItems(Entries, false /*NotTopLevel*/,
                     BraceItemListKind::Property);
-    NullablePtr<BraceStmt> Body = BraceStmt::create(Context, ColonLoc,
-                                                    Entries, Tok.getLoc());
+    BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
+                                        Entries, Tok.getLoc());
 
-    if (Body.isNull()) {
-      skipUntilDeclRBrace();
-      Invalid = true;
-      break;
-    }
-    
-    SetFn->setBody(Body.get());
+    SetFn->setBody(Body);
 
-    LastValidLoc = Body.get()->getRBraceLoc();
+    LastValidLoc = Body->getRBraceLoc();
     
     Set = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), SetLoc,
                                  Identifier(), SetLoc, /*generic=*/nullptr,
