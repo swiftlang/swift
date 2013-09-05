@@ -179,5 +179,35 @@ sil @dealloc_box : $[thin] <T> () -> () {
 }
 
 
+union SomeUnion {
+  case x(Int)
+  case y(SomeClass)
+}
+
+
+
+sil @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $[thin] (SomeClass, SomeUnion.metatype) -> SomeUnion 
+sil @_TC1t9SomeClassCfMS0_FT_S0_ : $[thin] ((), SomeClass.metatype) -> SomeClass 
+
+// CHECK-LABEL: sil @union_test
+sil @union_test : $[thin] () -> () {
+bb0:
+  %1 = alloc_box $SomeUnion
+  %2 = function_ref @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $[thin] (SomeClass, SomeUnion.metatype) -> SomeUnion // user: %7
+  %3 = metatype $SomeUnion.metatype
+  %4 = function_ref @_TC1t9SomeClassCfMS0_FT_S0_ : $[thin] ((), SomeClass.metatype) -> SomeClass // user: %6
+  %5 = metatype $SomeClass.metatype
+  %6 = apply %4(%5) : $[thin] ((), SomeClass.metatype) -> SomeClass
+  %7 = apply %2(%6, %3) : $[thin] (SomeClass, SomeUnion.metatype) -> SomeUnion
+  store %7 to %1#1 : $*SomeUnion
+  strong_release %1#0 : $Builtin.ObjectPointer
+  %10 = tuple ()
+  return %10 : $()
+  
+// CHECK: dealloc_stack %0#0 : $*[local_storage] SomeUnion
+// CHECK-NEXT:  %14 = tuple ()
+// CHECK-NEXT:  return %14 : $()
+}
+
 
 

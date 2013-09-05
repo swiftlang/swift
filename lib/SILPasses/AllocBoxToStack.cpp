@@ -236,6 +236,9 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
     if (!lowering.isTrivial() && !isa<DeallocBoxInst>(LastRelease))
       lowering.emitDestroyAddress(B2, ABI->getLoc(), ASI->getAddressResult());
 
+    // Reset the insertion point in case the destroy address expanded to
+    // multiple blocks.
+    B2.setInsertionPoint(LastRelease);
     B2.createDeallocStack(LastRelease->getLoc(), ASI->getContainerResult());
   }
   
