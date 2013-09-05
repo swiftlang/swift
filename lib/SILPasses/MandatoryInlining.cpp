@@ -62,30 +62,31 @@ getCalleeFunction(ApplyInst* AI, SmallVectorImpl<SILValue>& Args,
     assert(Callee.getResultNumber() == 0);
     // Conservatively only see through alloc_box; we assume this pass is run
     // immediately after SILGen
-    AllocBoxInst *ABI = dyn_cast<AllocBoxInst>(LI->getOperand().getDef());
-    if (!ABI)
+    SILInstruction *AI = dyn_cast<SILInstruction>(LI->getOperand().getDef());
+    if (!AI || !(isa<AllocBoxInst>(AI) || isa<AllocStackInst>(AI)))
       return nullptr;
     assert(LI->getOperand().getResultNumber() == 1);
 
     // Scan forward from the alloc box to find the first store, which
     // (conservatively) must be in the same basic block as the alloc box
     StoreInst *SI = nullptr;
-    for (auto I = SILBasicBlock::iterator(ABI), E = I->getParent()->end();
+    for (auto I = SILBasicBlock::iterator(AI), E = I->getParent()->end();
          I != E; ++I) {
       // If we find the load instruction first, then the load is loading from
       // a non-initialized alloc; this shouldn't really happen but I'm not
       // making any assumptions
       if (static_cast<SILInstruction*>(I) == LI)
         return nullptr;
-      if ((SI = dyn_cast<StoreInst>(I))) {
+      if ((SI = dyn_cast<StoreInst>(I)) && SI->getDest().getDef() == AI) {
         // We found a store that we know dominates the load; now ensure there
-        // are no other uses of the alloc box other than loads, retains, and
-        // releases
-        for (auto UI = ABI->use_begin(), UE = ABI->use_end(); UI != UE;
+        // are no other uses of the alloc other than loads, retains, releases
+        // and dealloc stacks
+        for (auto UI = AI->use_begin(), UE = AI->use_end(); UI != UE;
              ++UI)
           if (UI.getUser() != SI && !isa<LoadInst>(UI.getUser()) &&
               !isa<StrongRetainInst>(UI.getUser()) &&
-              !isa<StrongReleaseInst>(UI.getUser()))
+              !isa<StrongReleaseInst>(UI.getUser()) &&
+              !isa<DeallocStackInst>(UI.getUser()))
             return nullptr;
         // We can conservatively see through the store
         break;
