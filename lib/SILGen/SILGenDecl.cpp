@@ -408,9 +408,9 @@ struct ArgumentInitVisitor :
 {
   SILGenFunction &gen;
   SILFunction &f;
-  SILBuilder initB;
+  SILBuilder &initB;
   ArgumentInitVisitor(SILGenFunction &gen, SILFunction &f)
-    : gen(gen), f(f), initB(f.begin()) {}
+    : gen(gen), f(f), initB(gen.B) {}
 
   SILValue makeArgument(Type ty, SILBasicBlock *parent, SILLocation l) {
     assert(ty && "no type?!");
@@ -433,8 +433,8 @@ struct ArgumentInitVisitor :
       break;
 
     case Initialization::Kind::SingleBuffer:
-      gen.getTypeLowering(ty).emitSemanticInitialize(initB, loc, arg,
-                                                     I->getAddress());
+      gen.emitSemanticInitialize(loc, arg, I->getAddress(),
+                                 gen.getTypeLowering(ty));
       break;
 
     case Initialization::Kind::Ignored:
@@ -1236,7 +1236,8 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
   auto &varTI = getTypeLowering(var->getType());
   SILValue addr = B.createRefElementAddr(loc, selfValue, var,
                                  varTI.getLoweredType().getAddressType());
-  varTI.emitSemanticAssignment(B, loc, setValue, addr);
+  emitSemanticAssignment(loc, setValue, addr, varTI,
+                         /*can be definitive init*/ false);
   
   // FIXME: This should have artificial location.
   B.createStrongRelease(loc, selfValue);

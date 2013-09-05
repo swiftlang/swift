@@ -448,18 +448,16 @@ void ManagedValue::forwardInto(SILGenFunction &gen, SILLocation loc,
                                SILValue address) {
   if (hasCleanup())
     forwardCleanup(gen);
-  auto &lowering = gen.getTypeLowering(address.getType().getSwiftRValueType());
-  lowering.emitSemanticInitialize(gen.B, loc, getValue(), address);
+  auto &addrTL = gen.getTypeLowering(address.getType());
+  gen.emitSemanticInitialize(loc, getValue(), address, addrTL);
 }
 
 void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
                               SILValue address) {
   if (hasCleanup())
     forwardCleanup(gen);
-  auto &lowering = gen.getTypeLowering(address.getType().getSwiftRValueType());
 
-  if (gen.SGM.M.getASTContext().LangOpts.UseDefiniteInit)
-    lowering.emitSemanticUnknownAssignment(gen.B, loc, getValue(), address);
-  else
-    lowering.emitSemanticAssignment(gen.B, loc, getValue(), address);
+  auto &addrTL = gen.getTypeLowering(address.getType());
+  gen.emitSemanticAssignment(loc, getValue(), address, addrTL,
+                         gen.SGM.M.getASTContext().LangOpts.UseDefiniteInit);
 }

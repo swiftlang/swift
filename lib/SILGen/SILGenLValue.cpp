@@ -563,6 +563,33 @@ void SILGenFunction::emitSemanticLoadInto(SILLocation loc,
   srcTL.emitSemanticLoadInto(B, loc, src, dest, isTake, isInit);
 }
 
+/// Store an r-value into the given address as an initialization.
+void SILGenFunction::emitSemanticInitialize(SILLocation loc,
+                                            SILValue rvalue,
+                                            SILValue dest,
+                                            const TypeLowering &destTL) {
+  assert(rvalue.getType() == destTL.getSemanticType() ||
+         rvalue.getType().is<AnyFunctionType>()); // <- generalization
+  assert(destTL.getLoweredType().getAddressType() == dest.getType());
+  return destTL.emitSemanticInitialize(B, loc, rvalue, dest);
+}
+
+/// Store an r-value into the given address as an assignment.
+void SILGenFunction::emitSemanticAssignment(SILLocation loc,
+                                            SILValue rvalue,
+                                            SILValue dest,
+                                            const TypeLowering &destTL,
+                                            bool canBeDefinitiveInit) {
+  assert(rvalue.getType() == destTL.getSemanticType() ||
+         rvalue.getType().is<AnyFunctionType>()); // <- generalization
+  assert(destTL.getLoweredType().getAddressType() == dest.getType());
+  if (canBeDefinitiveInit) {
+    destTL.emitSemanticUnknownAssignment(B, loc, rvalue, dest);
+  } else {
+    destTL.emitSemanticAssignment(B, loc, rvalue, dest);
+  }
+}
+
 /// Produce a physical address that corresponds to the given l-value
 /// component.
 static SILValue drillIntoComponent(SILGenFunction &SGF,
