@@ -120,10 +120,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
       LangOpts.DebugConstraintSolver = true;
       break;
 
-    case OPT_enable_definite_init:
-      LangOpts.UseDefiniteInit = true;
-      break;
-
     case OPT_link_library:
       addLinkLibrary(InputArg->getValue(), LibraryKind::Library);
       break;

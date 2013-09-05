@@ -833,8 +833,7 @@ public:
       Expr *initializer = nullptr;
       if (isPatternProperty(PBD->getPattern())) {
         // Properties don't have initializers.
-      } else if (TC.Context.LangOpts.UseDefiniteInit &&
-                 !isa<TopLevelCodeDecl>(PBD->getDeclContext())) {
+      } else if (!isa<TopLevelCodeDecl>(PBD->getDeclContext())) {
         // If we are using the new definite initialization rules, we don't
         // default initialize local variables, only globals.
       } else if (!TC.isDefaultInitializable(ty, &initializer)) {

@@ -32,10 +32,6 @@ namespace swift {
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
-    
-    /// \brief Enable the memory promotion pass and perform definite
-    /// initialization analysis.
-    bool UseDefiniteInit = false;
   };
 }
 

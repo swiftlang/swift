@@ -48,9 +48,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   auto &Ctx = Module.getASTContext();
   performSILMandatoryInlining(&Module);
 
-  if (Ctx.LangOpts.UseDefiniteInit)
-    performSILMemoryPromotion(&Module);
-
+  performSILMemoryPromotion(&Module);
   performSILAllocBoxToStackPromotion(&Module);
   performSILStackToSSAPromotion(&Module);
 

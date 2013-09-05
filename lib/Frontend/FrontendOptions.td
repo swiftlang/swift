@@ -26,5 +26,3 @@ def link_library : Joined<["-"], "l">,
 // LangOptions
 def debug_constraints : Flag<["-"], "debug-constraints">,
   HelpText<"Debug the constraint-based type checker">;
-def enable_definite_init : Flag<["-"], "enable-definite-init">,
-  HelpText<"Enable the 'new' model for definite initialization">;
