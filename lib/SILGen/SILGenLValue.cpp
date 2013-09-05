@@ -535,8 +535,93 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc,
   return emitManagedRValueWithCleanup(loadedV, rvalueTL);
 }
 
-/// Load a r-value out of the given address, given that the type is
-/// loadable.
+static void emitUnloweredStoreOfCopy(SILBuilder &B, SILLocation loc,
+                                     SILValue value, SILValue addr,
+                                     IsInitialization_t isInit) {
+  if (isInit) {
+    B.createStore(loc, value, addr);
+  } else {
+    B.createAssign(loc, value, addr);
+  }
+}
+
+static bool hasDifferentTypeOfRValue(const TypeLowering &srcTL) {
+  return srcTL.getLoweredType().is<ReferenceStorageType>();
+}
+
+/// Given that the type-of-rvalue differs from the type-of-storage,
+/// and given that the type-of-rvalue is loadable, produce a +1 scalar
+/// of the type-of-rvalue.
+static SILValue emitLoadOfScalarRValue(SILGenFunction &gen,
+                                       SILLocation loc,
+                                       SILType storageType,
+                                       SILValue src,
+                                       IsTake_t isTake) {
+  // For [weak] types, we need to create an Optional<T>.
+  if (storageType.is<WeakStorageType>()) {
+    // TODO: actually make an Optional<T>
+    return gen.B.createLoadWeak(loc, src, isTake);
+  }
+
+  // For [unowned] types, we need to strip the unowned box.
+  if (auto unownedType = storageType.getAs<UnownedStorageType>()) {
+    auto unownedValue = gen.B.createLoad(loc, src);
+    gen.B.createStrongRetainUnowned(loc, unownedValue);
+    if (isTake) gen.B.createUnownedRelease(loc, unownedValue);
+    return gen.B.createUnownedToRef(loc, unownedValue,
+              SILType::getPrimitiveObjectType(unownedType.getReferentType()));
+  }
+
+  llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
+}
+
+/// Given that the type-of-rvalue differs from the type-of-storage,
+/// store a +1 value (possibly not a scalar) of the type-of-rvalue
+/// into the given address.
+static void emitStoreOfScalarRValue(SILGenFunction &gen,
+                                    SILLocation loc,
+                                    SILValue value,
+                                    SILValue dest,
+                                    IsInitialization_t isInit) {
+  auto storageType = dest.getType();
+
+  // Function values might need to be generalized.  This is actually
+  // pretty broken; the general expression emitter has a
+  // responsibility to emit functions with the right type.
+  if (storageType.is<AnyFunctionType>()) {
+    value = gen.B.emitGeneralizedValue(loc, value);
+    emitUnloweredStoreOfCopy(gen.B, loc, value, dest, isInit);
+    return;
+  }
+
+  // For [weak] types, we need to break down an Optional<T> and then
+  // emit the storeWeak ourselves.
+  if (storageType.is<WeakStorageType>()) {
+    // TODO: actually expect an Optional<T>
+    gen.B.createStoreWeak(loc, value, dest, isInit);
+
+    // store_weak doesn't take ownership of the input, so cancel it out.
+    gen.B.createStrongRelease(loc, value);
+
+    return;
+  }
+
+  // For [unowned] types, we need to enter the unowned box by turning
+  // the strong retain into an unowned retain.
+  if (storageType.is<UnownedStorageType>()) {
+    auto unownedValue =
+      gen.B.createRefToUnowned(loc, value, storageType.getObjectType());
+    gen.B.createUnownedRetain(loc, unownedValue);
+    emitUnloweredStoreOfCopy(gen.B, loc, unownedValue, dest, isInit);
+    gen.B.createStrongRelease(loc, value);
+    return;
+  }
+
+  llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
+}
+
+/// Load a value of the type-of-rvalue out of the given address as a
+/// scalar.  The type-of-rvalue must be loadable.
 SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
                                           SILValue src,
                                           const TypeLowering &srcTL,
@@ -544,12 +629,19 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
                                           IsTake_t isTake) {
   assert(srcTL.getLoweredType().getAddressType() == src.getType());
   assert(rvalueTL.isLoadable());
-  assert(srcTL.getSemanticType() == rvalueTL.getLoweredType());
-  return srcTL.emitSemanticLoad(B, loc, src, isTake);
+
+  // Easy case: the types match.
+  if (srcTL.getLoweredType() == rvalueTL.getLoweredType()) {
+    assert(!hasDifferentTypeOfRValue(srcTL));
+    return srcTL.emitLoadOfCopy(B, loc, src, isTake);
+  }
+
+  return emitLoadOfScalarRValue(*this, loc, srcTL.getLoweredType(),
+                                src, isTake);
 }
 
-/// Load a r-value out of the given address, given that the type is
-/// loadable.
+/// Load a value of the type-of-reference out of the given address
+/// and into the destination address.
 void SILGenFunction::emitSemanticLoadInto(SILLocation loc,
                                           SILValue src,
                                           const TypeLowering &srcTL,
@@ -559,35 +651,39 @@ void SILGenFunction::emitSemanticLoadInto(SILLocation loc,
                                           IsInitialization_t isInit) {
   assert(srcTL.getLoweredType().getAddressType() == src.getType());
   assert(destTL.getLoweredType().getAddressType() == dest.getType());
-  assert(srcTL.getSemanticType() == destTL.getLoweredType());
-  srcTL.emitSemanticLoadInto(B, loc, src, dest, isTake, isInit);
+
+  // Easy case: the types match.
+  if (srcTL.getLoweredType() == destTL.getLoweredType()) {
+    assert(!hasDifferentTypeOfRValue(srcTL));
+    return srcTL.emitCopyInto(B, loc, src, dest, isTake, isInit);
+  }
+
+  auto rvalue =
+    emitLoadOfScalarRValue(*this, loc, srcTL.getLoweredType(), src, isTake);
+  emitUnloweredStoreOfCopy(B, loc, rvalue, dest, isInit);
 }
 
 /// Store an r-value into the given address as an initialization.
-void SILGenFunction::emitSemanticInitialize(SILLocation loc,
-                                            SILValue rvalue,
-                                            SILValue dest,
-                                            const TypeLowering &destTL) {
-  assert(rvalue.getType() == destTL.getSemanticType() ||
-         rvalue.getType().is<AnyFunctionType>()); // <- generalization
+void SILGenFunction::emitSemanticStore(SILLocation loc,
+                                       SILValue rvalue,
+                                       SILValue dest,
+                                       const TypeLowering &destTL,
+                                       IsInitialization_t isInit) {
   assert(destTL.getLoweredType().getAddressType() == dest.getType());
-  return destTL.emitSemanticInitialize(B, loc, rvalue, dest);
-}
 
-/// Store an r-value into the given address as an assignment.
-void SILGenFunction::emitSemanticAssignment(SILLocation loc,
-                                            SILValue rvalue,
-                                            SILValue dest,
-                                            const TypeLowering &destTL,
-                                            bool canBeDefinitiveInit) {
-  assert(rvalue.getType() == destTL.getSemanticType() ||
-         rvalue.getType().is<AnyFunctionType>()); // <- generalization
-  assert(destTL.getLoweredType().getAddressType() == dest.getType());
-  if (canBeDefinitiveInit) {
-    destTL.emitSemanticUnknownAssignment(B, loc, rvalue, dest);
-  } else {
-    destTL.emitSemanticAssignment(B, loc, rvalue, dest);
+  // Easy case: the types match.
+  if (rvalue.getType() == destTL.getLoweredType()) {
+    assert(!hasDifferentTypeOfRValue(destTL));
+    assert(destTL.isAddressOnly() == rvalue.getType().isAddress());
+    if (rvalue.getType().isAddress()) {
+      destTL.emitCopyInto(B, loc, rvalue, dest, IsTake, isInit);
+    } else {
+      emitUnloweredStoreOfCopy(B, loc, rvalue, dest, isInit);
+    }
+    return;
   }
+
+  emitStoreOfScalarRValue(*this, loc, rvalue, dest, isInit);
 }
 
 /// Produce a physical address that corresponds to the given l-value

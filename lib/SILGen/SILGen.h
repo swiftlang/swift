@@ -667,14 +667,9 @@ public:
                             const TypeLowering &rvalueLowering,
                             IsTake_t isTake);
 
-  void emitSemanticInitialize(SILLocation loc, SILValue value,
-                              SILValue dest,
-                              const TypeLowering &destTL);
-
-  void emitSemanticAssignment(SILLocation loc, SILValue value,
-                              SILValue dest,
-                              const TypeLowering &destTL,
-                              bool canBeDefinitiveInit);
+  void emitSemanticStore(SILLocation loc, SILValue value,
+                         SILValue dest, const TypeLowering &destTL,
+                         IsInitialization_t isInit);
   
   ManagedValue emitLoad(SILLocation loc, SILValue addr,
                         const TypeLowering &rvalueTL,

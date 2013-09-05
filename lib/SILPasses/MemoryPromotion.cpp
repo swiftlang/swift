@@ -30,36 +30,6 @@ static void diagnose(SILModule *M, SILLocation loc, ArgTypes... args) {
   M->getASTContext().Diags.diagnose(loc.getSourceLoc(), Diagnostic(args...));
 }
 
-/// If the specified basic block iterator is pointing at a ref_to_unowned
-/// instruction of the specified operand and result type, return it.  Otherwise
-/// return a null SILValue.
-static SILValue getRefToUnowned(SILBasicBlock::iterator IP, SILValue Op,
-                                SILValue OpForTy) {
-  auto *IPI = dyn_cast<RefToUnownedInst>(IP);
-  if (IPI && IPI->getOperand() == Op &&
-      IPI->getType() == OpForTy.getType().getObjectType())
-    return IPI;
-  return SILValue();
-}
-
-static SILValue getOrCreateRefToUnowned(SILBuilder &B, SILLocation Loc,
-                                        SILValue Operand, SILValue DestVal) {
-  // The producer of this value often is preceded or followed by a
-  // ref_to_unowned that we can use.  If so, reuse it to avoid inserting
-  // lots of these.
-  if (SILValue V = getRefToUnowned(B.getInsertionPoint(), Operand, DestVal))
-    return V;
-
-  if (B.getInsertionPoint() != B.getInsertionBB()->begin())
-    if (SILValue V = getRefToUnowned(--B.getInsertionPoint(), Operand, DestVal))
-      return V;
-
-  // Otherwise, just create a new one.
-  return B.createRefToUnowned(Loc, Operand,
-                              DestVal.getType().getObjectType());
-}
-
-
 /// Emit the sequence that an assign instruction lowers to once we know
 /// if it is an initialization or an assignment.  If it is an assignment,
 /// a live-in value can be provided to optimize out the reload.
@@ -74,39 +44,31 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
   auto *M = Inst->getModule();
   SILValue Src = Inst->getSrc();
 
-  auto &TLDest = M->getTypeLowering(Inst->getDest().getType().getObjectType());
+  auto &destTL = M->getTypeLowering(Inst->getDest().getType());
 
-  // If this is an unowned assign, the LHS is "+1 strong", but the destination
-  // needs to be stored "+1 unowned".  Emit an unowned retain + strong release
-  // to achieve this.
-  if (Inst->isUnownedAssign()) {
-    // Convert the source value to an unowned pointer.
-    Src = getOrCreateRefToUnowned(B, Inst->getLoc(), Src, Inst->getDest());
-    TLDest.emitRetain(B, Inst->getLoc(), Src);
-
-    // Get type lowering info for the source type to release the strong pointer.
-    auto &TLS = M->getTypeLowering(Inst->getSrc().getType());
-    TLS.emitRelease(B, Inst->getLoc(), Inst->getSrc());
-  }
+  // If this is an initialization, or the storage type is trivial, we
+  // can just replace the assignment with a store.
 
   // Otherwise, if it has trivial type, we can always just replace the
   // assignment with a store.  If it has non-trivial type and is an
   // initialization, we can also replace it with a store.
-  if (isInitialization) {
+  if (isInitialization || destTL.isTrivial()) {
     B.createStore(Inst->getLoc(), Src, Inst->getDest());
     Inst->eraseFromParent();
     return;
   }
 
   // Otherwise, we need to replace the assignment with the full
-  // load/store/release dance.  Note that the value is already considered to be
-  // retained - we're transfering the ownership count into the destination.
+  // load/store/release dance.  Note that the new value is already
+  // considered to be retained (by the semantics of the storage type),
+  // and we're transfering that ownership count into the destination.
+
+  // This is basically destTL.emitStoreOfCopy, except that if we have
+  // a known incoming value, we can avoid the load.
   if (!IncomingVal)
     IncomingVal = B.createLoad(Inst->getLoc(), Inst->getDest());
-
   B.createStore(Inst->getLoc(), Src, Inst->getDest());
-
-  TLDest.emitRelease(B, Inst->getLoc(), IncomingVal);
+  destTL.emitRelease(B, Inst->getLoc(), IncomingVal);
 
   Inst->eraseFromParent();
 }
@@ -345,13 +307,6 @@ static bool checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
        ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(0, LoadUnwrapLevel),
                                    B, Inst->getLoc());
   }
-
-  // If this is an assign to an unowned pointer, the stored value needs to be
-  // converted to an unowned pointer.
-  if (auto AI = dyn_cast<AssignInst>(Inst))
-    if (AI->isUnownedAssign())
-      LoadResultVal = getOrCreateRefToUnowned(B, Inst->getLoc(),
-                                              LoadResultVal, AI->getDest());
 
   return false;
 }

@@ -433,8 +433,8 @@ struct ArgumentInitVisitor :
       break;
 
     case Initialization::Kind::SingleBuffer:
-      gen.emitSemanticInitialize(loc, arg, I->getAddress(),
-                                 gen.getTypeLowering(ty));
+      gen.emitSemanticStore(loc, arg, I->getAddress(),
+                            gen.getTypeLowering(ty), IsInitialization);
       break;
 
     case Initialization::Kind::Ignored:
@@ -1236,8 +1236,7 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
   auto &varTI = getTypeLowering(var->getType());
   SILValue addr = B.createRefElementAddr(loc, selfValue, var,
                                  varTI.getLoweredType().getAddressType());
-  emitSemanticAssignment(loc, setValue, addr, varTI,
-                         /*can be definitive init*/ false);
+  emitSemanticStore(loc, setValue, addr, varTI, IsNotInitialization);
   
   // FIXME: This should have artificial location.
   B.createStrongRelease(loc, selfValue);

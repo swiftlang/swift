@@ -140,47 +140,44 @@ public:
   /// Return the lowering for the semantic type.
   inline const TypeLowering &getSemanticTypeLowering(TypeConverter &TC) const;
 
-  /// Given a +1 value of the semantic type which we are claiming
-  /// ownership of, put it into the given address with either
-  /// initialization or assignment semantics.
-  virtual void emitSemanticInitialize(SILBuilder &B,
-                                      SILLocation loc,
-                                      SILValue value,
-                                      SILValue addr) const = 0;
-  virtual void emitSemanticAssignment(SILBuilder &B,
-                                      SILLocation loc,
-                                      SILValue value,
-                                      SILValue addr) const = 0;
-  /// Emit an assignment where we don't know whether the destination is being
-  /// initialized or assigned.  This should only be used by SILGen.
-  virtual void emitSemanticUnknownAssignment(SILBuilder &B,
-                                             SILLocation loc,
-                                             SILValue value,
-                                             SILValue addr) const = 0;
+  /// Produce a exact copy of the value in the given address as a
+  /// scalar.  The caller is responsible for destroying this value,
+  /// e.g. by releasing it.
+  ///
+  /// This type must be loadable.
+  virtual SILValue emitLoadOfCopy(SILBuilder &B,
+                                  SILLocation loc,
+                                  SILValue addr,
+                                  IsTake_t isTake) const = 0;
+
+  /// Store an exact copy of the given value in the destination
+  /// address, taking ownership of it.
+  ///
+  /// This type must be loadable.
+  ///
+  /// Note that, for an assignment, this produces lowered code: that
+  /// is, for non-POD types, an explicit load and release.  Therefore,
+  /// it is generally not correct to call this during SIL-gen.
+  virtual void emitStoreOfCopy(SILBuilder &B,
+                               SILLocation loc,
+                               SILValue value,
+                               SILValue addr,
+                               IsInitialization_t isInit) const = 0;
+
+  /// Put an exact copy of the value in the source address in the
+  /// destination address.
+  virtual void emitCopyInto(SILBuilder &B,
+                            SILLocation loc,
+                            SILValue src,
+                            SILValue dest,
+                            IsTake_t isTake,
+                            IsInitialization_t isInit) const = 0;
 
   /// Given an address, emit operations to destroy it.
   ///
   /// This produces canonicalized SIL.
   virtual void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                                   SILValue value) const = 0;
-
-  /// Produce a +1 semantic value loaded from the given address.  This
-  /// type must be loadable.
-  ///
-  /// For [unowned] types, the result will be of the referent type.
-  virtual SILValue emitSemanticLoad(SILBuilder &B,
-                                    SILLocation loc,
-                                    SILValue addr,
-                                    IsTake_t isTake) const = 0;
-
-  /// Copy a semantic value from the given address into the given
-  /// uninitialized result.  The type need not be loadable.
-  virtual void emitSemanticLoadInto(SILBuilder &B,
-                                    SILLocation loc,
-                                    SILValue src,
-                                    SILValue dest,
-                                    IsTake_t isTake,
-                                    IsInitialization_t isInit) const = 0;
 
   /// Given a +1 r-value which are are claiming ownership of, destroy it.
   ///

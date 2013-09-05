@@ -449,7 +449,7 @@ void ManagedValue::forwardInto(SILGenFunction &gen, SILLocation loc,
   if (hasCleanup())
     forwardCleanup(gen);
   auto &addrTL = gen.getTypeLowering(address.getType());
-  gen.emitSemanticInitialize(loc, getValue(), address, addrTL);
+  gen.emitSemanticStore(loc, getValue(), address, addrTL, IsInitialization);
 }
 
 void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
@@ -458,6 +458,6 @@ void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
     forwardCleanup(gen);
 
   auto &addrTL = gen.getTypeLowering(address.getType());
-  gen.emitSemanticAssignment(loc, getValue(), address, addrTL,
-                         gen.SGM.M.getASTContext().LangOpts.UseDefiniteInit);
+  gen.emitSemanticStore(loc, getValue(), address, addrTL,
+                        IsNotInitialization);
 }

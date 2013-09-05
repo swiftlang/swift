@@ -317,13 +317,7 @@ public:
             "assign instruction can only exist in raw SIL");
     require(Src.getType().isObject(), "Can't assign from an address source");
     require(Dest.getType().isAddress(), "Must store to an address dest");
-
-    // The value must be the right type for a semantic assign.  For an unowned
-    // pointer, this is the strong type.
-    SILType DestTy = Dest.getType().getObjectType();
-    if (auto T = DestTy.getAs<UnownedStorageType>())
-      DestTy = SILType::getPrimitiveObjectType(T.getReferentType());
-    require(DestTy == Src.getType(),
+    require(Dest.getType().getObjectType() == Src.getType(),
             "Store operand type and dest type mismatch");
   }
 

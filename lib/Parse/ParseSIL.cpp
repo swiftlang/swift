@@ -1397,10 +1397,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     assert(Opcode == ValueKind::AssignInst);
-
-    // The ValType of an assignment to [unowned] is a strong pointer.
-    if (auto T = ValType.getAs<UnownedStorageType>())
-      ValType = SILType::getPrimitiveObjectType(T.getReferentType());
     ResultVal = B.createAssign(InstLoc,
                                getLocalValue(from, ValType, InstLoc),
                                addrVal);

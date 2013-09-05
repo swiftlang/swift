@@ -359,21 +359,27 @@ bb0:
   // CHECK: [[C1:%[0-9]+]] = apply
 
   // This should become an initialization.
-  assign %4 to %c#1 : $*[unowned] SomeClass
+  %5 = ref_to_unowned %4 : $SomeClass to $[unowned] SomeClass
+  unowned_retain %5 : $[unowned] SomeClass
+  assign %5 to %c#1 : $*[unowned] SomeClass
+  strong_release %4 : $SomeClass
   // CHECK-NEXT: [[C1u:%[0-9]+]] = ref_to_unowned [[C1]]
   // CHECK-NEXT: unowned_retain [[C1u]]
-  // CHECK-NEXT: strong_release [[C1]]
   // CHECK-NEXT: store [[C1u]] to [[BOX]]#1
+  // CHECK-NEXT: strong_release [[C1]]
 
   %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
-  assign %8 to %c#1 : $*[unowned] SomeClass
+  %9 = ref_to_unowned %8 : $SomeClass to $[unowned] SomeClass
+  unowned_retain %9 : $[unowned] SomeClass
+  assign %9 to %c#1 : $*[unowned] SomeClass
+  strong_release %8 : $SomeClass
   // CHECK-NEXT: [[C2u:%[0-9]+]] = ref_to_unowned [[C2]]
   // CHECK-NEXT: unowned_retain [[C2u]]
-  // CHECK-NEXT: strong_release [[C2]]
   // CHECK-NEXT: store [[C2u]] to [[BOX]]#1
   // CHECK-NEXT: unowned_release [[C1u]]
+  // CHECK-NEXT: strong_release [[C2]]
 
   strong_release %c#0 : $Builtin.ObjectPointer
 
@@ -399,13 +405,24 @@ bb0(%0 : $*ContainsObjectPointer):
   return %x : $()
 }
 
+// CHECK-LABEL: sil @non_box_assign_trivial
+// CHECK-NOT: load
+// CHECK: store
+// CHECK: return
+sil @non_box_assign_trivial : $[thin] (lhs : [byref] Bool, rhs : Bool) -> () {
+bb0(%0 : $*Bool, %1 : $Bool):
+  assign %1 to %0 : $*Bool
+  %9 = tuple ()
+  return %9 : $()
+}
+
 // CHECK-LABEL: sil @non_box_assign
 // CHECK: load
 // CHECK: store
 // CHECK: return
-sil @non_box_assign : $[thin] (lhs : [byref] Bool, rhs : Bool) -> () {
-bb0(%0 : $*Bool, %1 : $Bool):
-  assign %1 to %0 : $*Bool
+sil @non_box_assign : $[thin] (lhs : [byref] SomeClass, rhs : SomeClass) -> () {
+bb0(%0 : $*SomeClass, %1 : $SomeClass):
+  assign %1 to %0 : $*SomeClass
   %9 = tuple ()
   return %9 : $()
 }
