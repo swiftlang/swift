@@ -968,12 +968,12 @@ assign
 
 Represents an abstract assignment of the value ``%0`` to memory at address
 ``%1`` without specifying whether it is an initialization or a normal store.
-The type of %1 is ``*T`` and the type of ``%0 is the semantic type for ``T``,
-which must be of a loadable type. This will overwrite the memory at ``%1``.
-The semantic type for ``T`` is the same as ``T`` except in the case of unowned
-pointers (in which case, the semantic type is a strong pointer).  The 
-``assign`` instruction is always semantically a "take" operation, taking
-ownership of a +1 retain count of its left side.
+The type of %1 is ``*T`` and the type of ``%0`` is the semantic type for ``T``,
+which must be of a loadable type. This will overwrite the memory at ``%1``.  The
+semantic type for ``T`` is the same as ``T`` except in the case of unowned
+pointers (in which case, the semantic type is a strong pointer).  The ``assign``
+instruction is always semantically a "take" operation, taking ownership of a +1
+retain count of its left side.
 
 The ``assign`` instruction is only valid in Raw SIL, it is produced by SILGen
 (which doesn't know what assignment is an initialization) and rewritten by the
