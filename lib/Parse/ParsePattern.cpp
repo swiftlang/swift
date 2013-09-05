@@ -305,7 +305,14 @@ Parser::parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
   }
 
   // If there's a trailing arrow, parse the rest as the result type.
-  if (consumeIf(tok::arrow)) {
+  if (Tok.is(tok::arrow) || Tok.is(tok::colon)) {
+    if (!consumeIf(tok::arrow)) {
+      // FixIt ':' to '->'.
+      diagnose(Tok, diag::func_decl_expected_arrow)
+          .fixItReplace(SourceRange(Tok.getLoc()), "->");
+      consumeToken(tok::colon);
+    }
+
     ParserResult<TypeRepr> ResultType = parseType();
     if (ResultType.hasCodeCompletion())
       return ResultType;
