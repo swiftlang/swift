@@ -898,14 +898,14 @@ namespace {
       Callee::SpecializedEmitter specializedEmitter
         = callee.getSpecializedEmitter(uncurryLevel, gen.SGM.M);
 
-      ManagedValue calleeValue;
+      ManagedValue mv;
       OwnershipConventions ownership;
       bool transparent;
       auto cc = AbstractCC::Freestanding;
       if (!specializedEmitter) {
-        std::tie(calleeValue, ownership, transparent)
+        std::tie(mv, ownership, transparent)
           = callee.getAtUncurryLevel(gen, uncurryLevel);
-        cc = calleeValue.getType().getAbstractCC();
+        cc = mv.getType().getAbstractCC();
       }
       
       // Collect the arguments to the uncurried call.
@@ -948,9 +948,9 @@ namespace {
                                     uncurriedArgs,
                                     uncurriedContext);
       else
-        result = gen.emitApply(uncurriedLoc, calleeValue, uncurriedArgs,
-                               uncurriedResultTy, ownership,
-                               transparent, uncurriedContext);
+        result = gen.emitApply(uncurriedLoc, mv, uncurriedArgs,
+                               uncurriedResultTy, ownership, transparent,
+                               uncurriedContext);
       
       // End the initial writeback scope, if any.
       initialWritebackScope.reset();
@@ -1320,14 +1320,12 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                             SGFContext ctx) {
   Callee callee = Callee::forDirect(*this, SILDeclRef(fn), loc);
 
-  ManagedValue calleeValue;
+  ManagedValue mv;
   OwnershipConventions ownership;
   bool transparent;
-  std::tie(calleeValue, ownership, transparent) =
-    callee.getAtUncurryLevel(*this, 0);
+  std::tie(mv, ownership, transparent) = callee.getAtUncurryLevel(*this, 0);
 
-  return emitApply(loc, calleeValue, args, resultType, ownership, transparent,
-                   ctx);
+  return emitApply(loc, mv, args, resultType, ownership, transparent, ctx);
 }
 
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
