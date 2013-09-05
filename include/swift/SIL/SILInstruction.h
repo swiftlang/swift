@@ -52,8 +52,7 @@ enum class SILInstructionMemoryBehavior {
   ///        result/users represent its effect.
   MayHaveSideEffects,
   /// \brief The instruction may write to memory.
-  MayWrite,
-  MayWriteAndHaveSideEffects
+  MayWrite
 };
 
 enum IsTake_t { IsNotTake, IsTake };

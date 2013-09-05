@@ -140,7 +140,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Protocol and Protocol Composition Types
   INST(InitExistentialInst, SILInstruction, MayWrite)
   INST(UpcastExistentialInst, SILInstruction, MayWrite)
-  INST(DeinitExistentialInst, SILInstruction, MayWriteAndHaveSideEffects)
+  INST(DeinitExistentialInst, SILInstruction, MayHaveSideEffects)
   INST(ProjectExistentialInst, SILInstruction, None)
   INST(InitExistentialRefInst, SILInstruction, None)
   INST(UpcastExistentialRefInst, SILInstruction, None)
