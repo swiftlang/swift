@@ -952,7 +952,7 @@ store
   // $T must be a loadable type
 
 Stores the value ``%0`` to memory at address ``%1``.  The type of %1 is ``*T``
-and the type of ``%0 is ``T``, which must be of a loadable type. This will
+and the type of ``%0 is ``T``, which must be a loadable type. This will
 overwrite the memory at ``%1``. If ``%1`` already references a value that
 requires ``release`` or other cleanup, that value must be loaded before being
 stored over and cleaned up.
@@ -968,20 +968,20 @@ assign
 
 Represents an abstract assignment of the value ``%0`` to memory at address
 ``%1`` without specifying whether it is an initialization or a normal store.
-The type of %1 is ``*T`` and the type of ``%0`` is the semantic type for ``T``,
-which must be of a loadable type. This will overwrite the memory at ``%1``.  The
-semantic type for ``T`` is the same as ``T`` except in the case of unowned
-pointers (in which case, the semantic type is a strong pointer).  The ``assign``
-instruction is always semantically a "take" operation, taking ownership of a +1
-retain count of its left side.
+The type of %1 is ``*T`` and the type of ``%0`` is ``T``, which must be a
+loadable type. This will overwrite the memory at ``%1`` and destroy the value
+currently held there.
 
-The ``assign`` instruction is only valid in Raw SIL, it is produced by SILGen
-(which doesn't know what assignment is an initialization) and rewritten by the
-definitive initialization pass into an initialization or store sequence.
-Further, ``assign`` instructions may only access memory allocated by an
-``alloc_box`` instruction, or through a pointer derived from and ``alloc_box``
-through a sequence of ``struct_element_addr`` and/or ``tuple_element_addr``
-instructions.
+The purpose of the ``assign`` instruction is to simplify the
+definitive initialization analysis on loadable variables by removing
+what would otherwise appear to be a load and use of the current value.
+It is produced by SILGen, which cannot know which assignments are
+meant to be initializations.  If it is deemed to be an initialization,
+it can be replaced with a ``store``; otherwise, it must be replaced
+with a sequence that also correctly destroys the current value.
+
+This instruction is only valid in Raw SIL and is rewritten as appropriate
+by the definitive initialization pass.
 
 initialize_var
 ``````````````
