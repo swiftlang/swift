@@ -173,7 +173,10 @@ void FunctionTypeRepr::printImpl(llvm::raw_ostream &OS) const {
 }
 
 void ArrayTypeRepr::printImpl(llvm::raw_ostream &OS) const {
-  OS << Base << '[' << Size << ']';
+  OS << Base << '[';
+  if (Size)
+    Size->getExpr()->print(OS);
+  OS << ']';
 }
 
 void OptionalTypeRepr::printImpl(llvm::raw_ostream &OS) const {
