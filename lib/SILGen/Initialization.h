@@ -109,10 +109,6 @@ public:
   /// Perform post-initialization bookkeeping for this initialization.
   virtual void finishInitialization(SILGenFunction &gen) {}
 
-  /// Perform a default initialization of this buffer or buffers, then
-  /// invoke finishInitialization().
-  virtual void defaultInitialize(SILGenFunction &gen, SILLocation L) = 0;
-  
 private:
   Initialization(const Initialization &) = delete;
   Initialization(Initialization &&) = delete;
@@ -129,13 +125,6 @@ public:
   
   ArrayRef<InitializationPtr> getSubInitializations() override {
     return {};
-  }
-  
-  void defaultInitialize(SILGenFunction &gen, SILLocation L) override {
-    SILValue address = getAddress();
-    gen.B.createInitializeVar(L, address,
-                              /*CanDefaultConstruct*/ true);
-    finishInitialization(gen);
   }
 };
 

@@ -42,8 +42,6 @@ namespace {
     ArrayRef<InitializationPtr> getSubInitializations() override {
       return {};
     }
-    
-    void defaultInitialize(SILGenFunction &gen, SILLocation L) override {}
   };
   
 
@@ -157,11 +155,6 @@ public:
     return subInitializations;
   }
   
-  void defaultInitialize(SILGenFunction &gen, SILLocation L) override {
-    for (auto &sub : subInitializations)
-      sub->defaultInitialize(gen, L);
-  }
-
   void finishInitialization(SILGenFunction &gen) override {
     for (auto &sub : subInitializations)
       sub->finishInitialization(gen);
@@ -284,8 +277,6 @@ public:
            "binding a variable to a non-address argument?!");
     gen.VarLocs[vd] = {SILValue(), address};
   }
-
-  void defaultInitialize(SILGenFunction &gen, SILLocation L) override {}
 };
   
 /// InitializationForPattern - A visitor for traversing a pattern, generating
