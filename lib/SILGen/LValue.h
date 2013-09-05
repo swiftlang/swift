@@ -123,7 +123,7 @@ protected:
 public:
   /// Clone the path component onto the heap.
   virtual std::unique_ptr<LogicalPathComponent>
-  clone(SILGenFunction &gen) const = 0;
+  clone(SILGenFunction &gen, SILLocation l) const = 0;
   
   /// True if the property is settable.
   virtual bool isSettable() const = 0;

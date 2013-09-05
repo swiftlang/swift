@@ -181,7 +181,7 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
   if (loweredType.isAddressOnly(gen.F.getModule())) {
     assert(KIND != ImplodeKind::Unmanaged &&
            "address-only values are always managed!");
-    SILValue buffer = gen.emitTemporaryAllocation(SILLocation(), loweredType);
+    SILValue buffer = gen.emitTemporaryAllocation(l, loweredType);
     ImplodeAddressOnlyTuple(values, gen).visit(tupleType, buffer, l);
     return buffer;
   }
@@ -432,7 +432,7 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   makeUsed();
 }
 
-RValue::RValue(const RValue &copied, SILGenFunction &gen)
+RValue::RValue(const RValue &copied, SILGenFunction &gen, SILLocation l)
   : type(copied.type),
     elementsToBeAdded(copied.elementsToBeAdded)
 {
@@ -440,7 +440,7 @@ RValue::RValue(const RValue &copied, SILGenFunction &gen)
          && "can't copy incomplete rvalue");
   values.reserve(copied.values.size());
   for (ManagedValue value : copied.values) {
-    values.push_back(value.copy(gen));
+    values.push_back(value.copy(gen, l));
   }
 }
 

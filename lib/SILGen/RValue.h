@@ -77,7 +77,7 @@ public:
   }
   
   /// Emit a copy of this value with independent ownership.
-  ManagedValue copy(SILGenFunction &gen) {
+  ManagedValue copy(SILGenFunction &gen, SILLocation l) {
     if (!cleanup.isValid()) {
       assert(gen.getTypeLowering(getType()).isTrivial());
       return *this;
@@ -87,12 +87,12 @@ public:
     assert(!lowering.isTrivial() && "trivial value has cleanup?");
 
     if (lowering.isAddressOnly()) {
-      SILValue buf = gen.emitTemporaryAllocation(SILLocation(), getType());
-      gen.B.createCopyAddr(SILLocation(), getValue(), buf,
+      SILValue buf = gen.emitTemporaryAllocation(l, getType());
+      gen.B.createCopyAddr(l, getValue(), buf,
                            IsNotTake, IsInitialization);
       return gen.emitManagedRValueWithCleanup(buf, lowering);
     }
-    lowering.emitRetain(gen.B, SILLocation(), getValue());
+    lowering.emitRetain(gen.B, l, getValue());
     return gen.emitManagedRValueWithCleanup(getValue(), lowering);
   }
   
@@ -184,7 +184,7 @@ class RValue {
   }
   
   /// Private constructor used by copy().
-  RValue(const RValue &copied, SILGenFunction &gen);
+  RValue(const RValue &copied, SILGenFunction &gen, SILLocation l);
   
 public:
   /// Creates an invalid RValue object, in a "used" state.
@@ -289,8 +289,8 @@ public:
   CanType getType() const & { return type; }
   
   /// Emit an equivalent value with independent ownership.
-  RValue copy(SILGenFunction &gen) const & {
-    return RValue(*this, gen);
+  RValue copy(SILGenFunction &gen, SILLocation l) const & {
+    return RValue(*this, gen, l);
   }
 };
 

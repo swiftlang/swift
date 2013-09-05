@@ -72,7 +72,7 @@ SILGenFunction::pushWritebackIfInScope(SILLocation loc,
                                        SILValue base,
                                        Materialize temp) {
   if (InWritebackScope) {
-    WritebackStack.emplace_back(loc, component.clone(*this), base, temp);
+    WritebackStack.emplace_back(loc, component.clone(*this, loc), base, temp);
   }
 }
 
@@ -296,7 +296,7 @@ namespace {
       if (subscriptExpr) {
         if (!origSubscripts)
           origSubscripts = gen.emitRValue(subscriptExpr);
-        result.subscripts = origSubscripts.copy(gen);
+        result.subscripts = origSubscripts.copy(gen, loc);
       }
       
       return result;
@@ -325,12 +325,13 @@ namespace {
     }
     
     GetterSetterComponent(const GetterSetterComponent &copied,
-                          SILGenFunction &gen)
+                          SILGenFunction &gen,
+                          SILLocation loc)
       : getter(copied.getter),
         setter(copied.setter),
         substitutions(copied.substitutions),
         subscriptExpr(copied.subscriptExpr),
-        origSubscripts(copied.origSubscripts.copy(gen)),
+        origSubscripts(copied.origSubscripts.copy(gen, loc)),
         substType(copied.substType)
     {
     }
@@ -367,8 +368,8 @@ namespace {
     }
     
     std::unique_ptr<LogicalPathComponent>
-    clone(SILGenFunction &gen) const override {
-      LogicalPathComponent *clone = new GetterSetterComponent(*this, gen);
+    clone(SILGenFunction &gen, SILLocation loc) const override {
+      LogicalPathComponent *clone = new GetterSetterComponent(*this, gen, loc);
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
   };
