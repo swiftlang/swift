@@ -1011,8 +1011,6 @@ ERROR(conversion_not_instance_method,sema_tcd,none,
       (Identifier))
 ERROR(transparent_not_function,sema_tcd,none,
       "'transparent' attribute can only be applied to functions", ())
-ERROR(transparent_curry_not_supported,sema_tcd,none,
-      "'transparent' attribute not supported for curried functions", ())
 ERROR(transparent_generic_not_supported,sema_tcd,none,
       "'transparent' attribute not supported for generic functions", ())
 ERROR(conversion_params,sema_tcd,none,

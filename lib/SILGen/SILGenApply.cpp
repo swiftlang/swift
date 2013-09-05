@@ -81,7 +81,7 @@ private:
   // specializedType.
   CanType specializedType;
   SILLocation specializeLoc;
-  bool transparent;
+  bool isTransparent;
 
   // The pointer back to the AST node that produced the callee.
   SILLocation Loc;
@@ -89,11 +89,11 @@ private:
   static SpecializedEmitter getSpecializedEmitterForSILBuiltin(SILDeclRef c,
                                                                SILModule &M);
 
-  Callee(ManagedValue indirectValue, bool transparent)
+  Callee(ManagedValue indirectValue, bool isTransparent)
     : kind(Kind::IndirectValue),
       indirectValue(indirectValue),
       specializedType(indirectValue.getType().getSwiftRValueType()),
-      transparent(transparent)
+      isTransparent(isTransparent)
   {}
 
   Callee(SILGenFunction &gen, SILDeclRef standaloneFunction, SILLocation l)
@@ -101,8 +101,8 @@ private:
       specializedType(
                 gen.SGM.getConstantType(standaloneFunction.atUncurryLevel(0))
                   .getSwiftRValueType()),
-      transparent(standaloneFunction.hasDecl() &&
-                  standaloneFunction.getDecl()->getAttrs().isTransparent()),
+      isTransparent(standaloneFunction.hasDecl() &&
+                    standaloneFunction.getDecl()->getAttrs().isTransparent()),
       Loc(l)
   {
   }
@@ -116,7 +116,7 @@ private:
       specializedType(
                 gen.SGM.getConstantType(methodName.atUncurryLevel(0))
                   .getSwiftRValueType()),
-      transparent(false),
+      isTransparent(false),
       Loc(l)
   {
     assert(kind >= Kind::VirtualMethod_First &&
@@ -150,7 +150,7 @@ private:
                           memberType->getASTContext())
                       ->getCanonicalType()},
     specializedType(genericMethod.origType),
-    transparent(false),
+    isTransparent(false),
     Loc(l)
   {
   }
@@ -201,13 +201,13 @@ private:
       genericMethod{proto, methodName,
                     getProtocolMethodType(gen, proto, methodName, memberType)},
       specializedType(genericMethod.origType),
-      transparent(false),
+      isTransparent(false),
       Loc(l)
   {}
 
 public:
-  static Callee forIndirect(ManagedValue indirectValue, bool transparent) {
-    return Callee(indirectValue, transparent);
+  static Callee forIndirect(ManagedValue indirectValue, bool isTransparent) {
+    return Callee(indirectValue, isTransparent);
   }
   static Callee forDirect(SILGenFunction &gen, SILDeclRef c, SILLocation l) {
     return Callee(gen, c, l);
@@ -276,8 +276,6 @@ public:
                      e->getType()->getCanonicalType(), callDepth);
   }
 
-  bool isTransparent() const { return transparent; }
-  
   unsigned getNaturalUncurryLevel() const {
     switch (kind) {
     case Kind::IndirectValue:
@@ -294,10 +292,11 @@ public:
     }
   }
   
-  std::pair<ManagedValue, OwnershipConventions>
+  std::tuple<ManagedValue, OwnershipConventions, bool>
   getAtUncurryLevel(SILGenFunction &gen, unsigned level) const {
     ManagedValue mv;
     OwnershipConventions ownership;
+    bool transparent = isTransparent;
 
     /// Get the SILDeclRef for a method at an uncurry level, and store its
     /// ownership conventions into the 'ownership' local variable.
@@ -321,6 +320,8 @@ public:
     case Kind::StandaloneFunction: {
       assert(level <= standaloneFunction.uncurryLevel
              && "uncurrying past natural uncurry level of standalone function");
+      if (level < standaloneFunction.uncurryLevel)
+        transparent = false;
       SILDeclRef constant = standaloneFunction.atUncurryLevel(level);
       SILValue ref = gen.emitGlobalFunctionRef(Loc, constant);
       mv = ManagedValue(ref, ManagedValue::Unmanaged);
@@ -403,7 +404,7 @@ public:
       ownership = OwnershipConventions::getDefault(gen, specializedUncurriedType);
     }
     
-    return {mv, ownership};
+    return {mv, ownership, transparent};
   }
   
   ArrayRef<Substitution> getSubstitutions() const {
@@ -482,17 +483,17 @@ public:
   }
 
   void visitLoadExpr(LoadExpr *e) {
-    bool transparent = false;
+    bool isTransparent = false;
     if (DeclRefExpr *d = dyn_cast<DeclRefExpr>(e->getSubExpr())) {
       // This marks all calls to auto closure typed variables as transparent.
       // As of writing, local variable auto closures are currently allowed by
       // the parser, but the plan is that they will be disallowed, so this will
       // actually only apply to auto closure parameters, which is what we want
       auto *t = d->getDecl()->getType()->castTo<AnyFunctionType>();
-      transparent = t->getExtInfo().isAutoClosure();
+      isTransparent = t->getExtInfo().isAutoClosure();
     }
     ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen, e);
-    setCallee(Callee::forIndirect(fn, transparent));
+    setCallee(Callee::forIndirect(fn, isTransparent));
   }
   
   /// Add a call site to the curry.
@@ -899,9 +900,10 @@ namespace {
 
       ManagedValue calleeValue;
       OwnershipConventions ownership;
+      bool transparent;
       auto cc = AbstractCC::Freestanding;
       if (!specializedEmitter) {
-        std::tie(calleeValue, ownership)
+        std::tie(calleeValue, ownership, transparent)
           = callee.getAtUncurryLevel(gen, uncurryLevel);
         cc = calleeValue.getType().getAbstractCC();
       }
@@ -948,7 +950,7 @@ namespace {
       else
         result = gen.emitApply(uncurriedLoc, calleeValue, uncurriedArgs,
                                uncurriedResultTy, ownership,
-                               callee.isTransparent(), uncurriedContext);
+                               transparent, uncurriedContext);
       
       // End the initial writeback scope, if any.
       initialWritebackScope.reset();
@@ -1320,10 +1322,12 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
 
   ManagedValue calleeValue;
   OwnershipConventions ownership;
-  std::tie(calleeValue, ownership) = callee.getAtUncurryLevel(*this, 0);
+  bool transparent;
+  std::tie(calleeValue, ownership, transparent) =
+    callee.getAtUncurryLevel(*this, 0);
 
-  return emitApply(loc, calleeValue, args, resultType, ownership,
-                   callee.isTransparent(), ctx);
+  return emitApply(loc, calleeValue, args, resultType, ownership, transparent,
+                   ctx);
 }
 
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer

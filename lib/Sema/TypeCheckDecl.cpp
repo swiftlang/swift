@@ -2299,12 +2299,8 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     if (!FD) {
       TC.diagnose(VD->getStartLoc(), diag::transparent_not_function);
       VD->getMutableAttrs().Transparent = false;
-    } else if (FD->getBody()->getNumParamPatterns() > 1) {
-      // We don't yet support transparent of curried functions.
-      TC.diagnose(VD->getStartLoc(), diag::transparent_curry_not_supported);
-      VD->getMutableAttrs().Transparent = false;
     } else if (FD->getGenericParams()) {
-      // We don't yet support transparent of generic functions.
+      // We don't yet support transparent on generic functions.
       TC.diagnose(VD->getStartLoc(), diag::transparent_generic_not_supported);
       VD->getMutableAttrs().Transparent = false;
     }
