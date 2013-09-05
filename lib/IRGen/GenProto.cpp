@@ -2819,14 +2819,19 @@ static llvm::Constant *buildWitnessTable(IRGenModule &IGM,
   return llvm::ConstantExpr::getInBoundsGetElementPtr(var, indices);
 }
 
-/// Emit a value-witness table for the given type, which is assumed to
-/// be non-dependent.
-llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
-                                             CanType abstractType) {
-  // We shouldn't emit global value witness tables for generic type instances.
-  assert(!isa<BoundGenericType>(abstractType) &&
-         "emitting VWT for generic instance");
+/// True if a type has a generic-parameter-dependent value witness table.
+/// Currently, This is true if the size and/or alignment of the type is
+/// dependent on its generic parameters.
+bool irgen::hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty) {
+  if (auto ugt = dyn_cast<UnboundGenericType>(ty))
+    ty = ugt->getDecl()->getDeclaredTypeInContext()->getCanonicalType();
   
+  return !IGM.getTypeInfo(ty).isFixedSize();
+}
+
+static void addValueWitnessesForAbstractType(IRGenModule &IGM,
+                                 CanType abstractType,
+                                 SmallVectorImpl<llvm::Constant*> &witnesses) {
   // Instantiate generic types on their context archetypes.
   CanType concreteType = abstractType;
   if (auto ugt = dyn_cast<UnboundGenericType>(abstractType)) {
@@ -2835,10 +2840,25 @@ llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
   
   auto &concreteTI = IGM.getTypeInfo(concreteType);
   FixedPacking packing = computePacking(IGM, concreteTI);
-
-  SmallVector<llvm::Constant*, NumRequiredValueWitnesses> witnesses;
+  
   addValueWitnesses(IGM, packing, abstractType,
                     concreteType, concreteTI, witnesses);
+}
+
+/// Emit a value-witness table for the given type, which is assumed to
+/// be non-dependent.
+llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
+                                             CanType abstractType) {
+  // We shouldn't emit global value witness tables for generic type instances.
+  assert(!isa<BoundGenericType>(abstractType) &&
+         "emitting VWT for generic instance");
+  
+  // We shouldn't emit global value witness tables for non-fixed-layout types.
+  assert(!hasDependentValueWitnessTable(IGM, abstractType) &&
+         "emitting global VWT for dynamic-layout type");
+  
+  SmallVector<llvm::Constant*, NumRequiredValueWitnesses> witnesses;
+  addValueWitnessesForAbstractType(IGM, abstractType, witnesses);
 
   auto tableTy = llvm::ArrayType::get(IGM.Int8PtrTy, witnesses.size());
   auto table = llvm::ConstantArray::get(tableTy, witnesses);
@@ -2849,6 +2869,22 @@ llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
   global->setInitializer(table);
 
   return llvm::ConstantExpr::getBitCast(global, IGM.WitnessTablePtrTy);
+}
+
+/// Emit the elements of a dependent value witness table template into a
+/// vector.
+void irgen::emitDependentValueWitnessTablePattern(IRGenModule &IGM,
+                                    CanType abstractType,
+                                    SmallVectorImpl<llvm::Constant*> &fields) {
+  // We shouldn't emit global value witness tables for generic type instances.
+  assert(!isa<BoundGenericType>(abstractType) &&
+         "emitting VWT for generic instance");
+  
+  // We shouldn't emit global value witness tables for fixed-layout types.
+  assert(hasDependentValueWitnessTable(IGM, abstractType) &&
+         "emitting VWT pattern for fixed-layout type");
+
+  addValueWitnessesForAbstractType(IGM, abstractType, fields);
 }
 
 /// Do a memoized witness-table layout for a protocol.

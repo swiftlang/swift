@@ -25,7 +25,7 @@ namespace irgen {
 
 class IRGenModule;
 
-/// A CRTP class for laying out class metadata.  Note that this does
+/// A CRTP class for laying out type metadata.  Note that this does
 /// *not* handle the metadata template stuff.
 template <class Impl> class MetadataLayout {
 protected:

@@ -630,6 +630,16 @@ namespace {
   protected:
     IRGenModule &IGM = super::IGM;
     using super::Fields;
+    using super::asImpl;
+    
+    /// Set to true if the value witness table for the generic type is dependent
+    /// on its generic parameters. If true, the value witness will be
+    /// tail-emplaced inside the metadata pattern and initialized by the fill
+    /// function.
+    bool HasDependentVWT = false;
+    
+    /// The index of the tail-allocated dependent VWT, if any.
+    unsigned DependentVWTPoint = 0;
 
     template <class... T>
     GenericMetadataBuilderBase(IRGenModule &IGM, 
@@ -674,6 +684,28 @@ namespace {
         IGF.Builder.CreateStore(IGF.Builder.CreateLoad(src), dest);
       }
       
+      // Initialize the instantiated dependent value witness table, if we have
+      // one.
+      if (HasDependentVWT) {
+        assert(AddressPoint >= 1 && "did not set valid address point!");
+        assert(DependentVWTPoint != 0 && "did not set dependent VWT point!");
+        
+        // Fill in the pointer from the metadata to the VWT. The VWT pointer
+        // always immediately precedes the address point.
+        auto vwtAddr = IGF.Builder.CreateConstArrayGEP(fullMetaWords,
+                                                       DependentVWTPoint,
+                                                       IGM.getPointerSize());
+        auto vwtAddrVal = IGF.Builder.CreatePtrToInt(vwtAddr.getAddress(),
+                                                     IGM.SizeTy);
+        auto vwtRefAddr = IGF.Builder.CreateConstArrayGEP(fullMetaWords,
+                                                          AddressPoint - 1,
+                                                          IGM.getPointerSize());
+        IGF.Builder.CreateStore(vwtAddrVal, vwtRefAddr);
+        
+        // TODO: Calculate and store the size, alignment, flags, and stride for
+        // the instance.
+      }
+      
       // The metadata is now complete.
       IGF.Builder.CreateRetVoid();
       
@@ -687,6 +719,13 @@ namespace {
 
       // Lay out the template data.
       super::layout();
+      
+      // If we have a dependent value witness table, emit its template.
+      if (HasDependentVWT) {
+        // Note the dependent VWT offset.
+        DependentVWTPoint = getNextIndex();
+        asImpl().addDependentValueWitnessTablePattern();
+      }
 
       // Fill in the header:
       unsigned Field = 0;
@@ -702,7 +741,7 @@ namespace {
       
       //   uint16_t NumArguments;
       // TODO: ultimately, this should be the number of actual template
-      // arguments, not the number of value witness tables required.
+      // arguments, not the number of witness tables required.
       Fields[Field++]
         = llvm::ConstantInt::get(IGM.Int16Ty, NumGenericWitnesses);
 
@@ -979,6 +1018,10 @@ namespace {
                                 const StructLayout &layout,
                                 const GenericParamList &classGenerics)
       : super(IGM, classGenerics, theClass, layout) {}
+                        
+    void addDependentValueWitnessTablePattern() {
+      llvm_unreachable("classes should never have dependent vwtables");
+    }
   };
 }
 
@@ -1881,22 +1924,45 @@ namespace {
     }
   };
   
+  /// Emit a value witness table for a fixed-layout generic type, or a null
+  /// placeholder if the value witness table is dependent on generic parameters.
+  /// Returns true if the value witness table is dependent.
+  static bool addValueWitnessTableSlotForGenericValueType(
+                                     IRGenModule &IGM, NominalTypeDecl *decl,
+                                     SmallVectorImpl<llvm::Constant*> &Fields) {
+    CanType unboundType
+      = decl->getDeclaredTypeOfContext()->getCanonicalType();
+    
+    bool dependent = hasDependentValueWitnessTable(IGM, unboundType);
+    
+    if (dependent)
+      Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+    else
+      Fields.push_back(emitValueWitnessTable(IGM, unboundType));
+    
+    return dependent;
+  }
+  
   /// A builder for metadata templates.
   class GenericStructMetadataBuilder :
     public GenericMetadataBuilderBase<GenericStructMetadataBuilder,
                       StructMetadataBuilderBase<GenericStructMetadataBuilder>> {
 
     typedef GenericMetadataBuilderBase super;
-
+                        
   public:
     GenericStructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct,
                                 const GenericParamList &structGenerics)
       : super(IGM, structGenerics, theStruct) {}
 
     void addValueWitnessTable() {
-      CanType unboundType
-        = Target->getDeclaredTypeOfContext()->getCanonicalType();
-      Fields.push_back(emitValueWitnessTable(IGM, unboundType));
+      HasDependentVWT
+        = addValueWitnessTableSlotForGenericValueType(IGM, Target, Fields);
+    }
+                        
+    void addDependentValueWitnessTablePattern() {
+      emitDependentValueWitnessTablePattern(IGM,
+                Target->getDeclaredTypeOfContext()->getCanonicalType(), Fields);
     }
   };
 }
@@ -2002,9 +2068,13 @@ public:
     : GenericMetadataBuilderBase(IGM, unionGenerics, theUnion) {}
   
   void addValueWitnessTable() {
-    CanType unboundType
-      = Target->getDeclaredTypeOfContext()->getCanonicalType();
-    Fields.push_back(emitValueWitnessTable(IGM, unboundType));
+    HasDependentVWT
+      = addValueWitnessTableSlotForGenericValueType(IGM, Target, Fields);
+  }
+  
+  void addDependentValueWitnessTablePattern() {
+    emitDependentValueWitnessTablePattern(IGM,
+                Target->getDeclaredTypeOfContext()->getCanonicalType(), Fields);
   }
 };
   
