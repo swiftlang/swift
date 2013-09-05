@@ -29,10 +29,25 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
+enum class DiagnosticOptions {
+  /// No options.
+  none,
+
+  /// The location of this diagnostic points to the beginning of the first
+  /// token that the parser considers invalid.  If this token is located at the
+  /// beginning of the line, then the location is adjusted to point to the end
+  /// of the previous token.
+  ///
+  /// This behaviour improves experience for "expected token X" diagnostics.
+  PointsToFirstBadToken
+};
+
 struct StoredDiagnosticInfo {
   /// \brief The kind of diagnostic we're dealing with.
   DiagnosticKind Kind;
-  
+
+  DiagnosticOptions Options;
+
   // FIXME: Category
   
   /// \brief Text associated with the diagnostic
@@ -41,13 +56,13 @@ struct StoredDiagnosticInfo {
 
 static StoredDiagnosticInfo StoredDiagnosticInfos[] = {
 #define ERROR(ID,Category,Options,Text,Signature) \
-  { DiagnosticKind::Error, Text },
+  { DiagnosticKind::Error, DiagnosticOptions::Options, Text },
 #define WARNING(ID,Category,Options,Text,Signature) \
-  { DiagnosticKind::Warning, Text },
+  { DiagnosticKind::Warning, DiagnosticOptions::Options, Text },
 #define NOTE(ID,Category,Options,Text,Signature) \
-  { DiagnosticKind::Note, Text },
+  { DiagnosticKind::Note, DiagnosticOptions::Options, Text },
 #include "swift/AST/Diagnostics.def"
-  { DiagnosticKind::Error, "<not a diagnostic>" }
+  { DiagnosticKind::Error, DiagnosticOptions::none, "<not a diagnostic>" }
 };
 
 static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
@@ -104,7 +119,11 @@ void InFlightDiagnostic::flush() {
     Engine->flushActiveDiagnostic();
 }
 
-
+bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
+  const StoredDiagnosticInfo &StoredInfo =
+      StoredDiagnosticInfos[(unsigned) ID];
+  return StoredInfo.Options == DiagnosticOptions::PointsToFirstBadToken;
+}
 
 /// \brief Skip forward to one of the given delimiters.
 ///
@@ -276,7 +295,7 @@ static void formatDiagnosticText(StringRef InText,
     formatDiagnosticArgument(Modifier, ModifierArguments, Args, ArgIndex, Out);
   }
 }
-                             
+
 void DiagnosticEngine::flushActiveDiagnostic() {
   assert(ActiveDiagnostic && "No active diagnostic to flush");
   const StoredDiagnosticInfo &StoredInfo

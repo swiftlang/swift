@@ -286,13 +286,27 @@ private:
   void skipSingle();
 
 public:
-  template<typename ...ArgTypes>
-  InFlightDiagnostic diagnose(SourceLoc Loc, ArgTypes... Args) {
-    return Diags.diagnose(Loc, Diagnostic(Args...));
+  InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
+    if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
+        Loc == Tok.getLoc() && Tok.isAtStartOfLine())
+      Loc = Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
+    return Diags.diagnose(Loc, Diag);
   }
-  template<typename ...ArgTypes>
-  InFlightDiagnostic diagnose(Token Tok, ArgTypes... Args) {
-    return Diags.diagnose(Tok.getLoc(), Diagnostic(Args...));
+
+  InFlightDiagnostic diagnose(Token Tok, Diagnostic Diag) {
+    return diagnose(Tok.getLoc(), Diag);
+  }
+
+  template<typename ...DiagArgTypes, typename ...ArgTypes>
+  InFlightDiagnostic diagnose(SourceLoc Loc, Diag<DiagArgTypes...> DiagID,
+                              ArgTypes... Args) {
+    return diagnose(Loc, Diagnostic(DiagID, Args...));
+  }
+
+  template<typename ...DiagArgTypes, typename ...ArgTypes>
+  InFlightDiagnostic diagnose(Token Tok, Diag<DiagArgTypes...> DiagID,
+                              ArgTypes... Args) {
+    return diagnose(Tok.getLoc(), Diagnostic(DiagID, Args...));
   }
   
   void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New);

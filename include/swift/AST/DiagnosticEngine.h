@@ -473,7 +473,11 @@ namespace swift {
       ActiveDiagnostic = Diagnostic(id, std::move(args)...);
       return InFlightDiagnostic(*this);
     }
-       
+
+    /// \returns true if diagnostic is marked with PointsToFirstBadToken
+    /// option.
+    bool isDiagnosticPointsToFirstBadToken(DiagID ID) const;
+
   private:
     /// \brief Flush the active diagnostic.
     void flushActiveDiagnostic();
