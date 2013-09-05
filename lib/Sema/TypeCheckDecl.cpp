@@ -336,6 +336,7 @@ static void checkCircularity(TypeChecker &tc, T *decl,
 
     // Set this declaration as invalid, then break the cycle somehow.
     decl->setInvalid();
+    decl->overwriteType(ErrorType::get(tc.Context));
     breakInheritanceCycle(decl);
     break;
   }
@@ -779,9 +780,7 @@ public:
     // Handle vars.
     case PatternKind::Named: {
       VarDecl *var = cast<NamedPattern>(pattern)->getDecl();
-      if (!var->hasType()) {
-        var->setType(ErrorType::get(TC.Context));
-      }
+      var->overwriteType(ErrorType::get(TC.Context));
       var->setInvalid();
       return;
     }
@@ -920,6 +919,7 @@ public:
     if (!IsSecondPass) {
       if (TC.validateType(TAD->getUnderlyingTypeLoc())) {
         TAD->setInvalid();
+        TAD->overwriteType(ErrorType::get(TC.Context));
         TAD->getUnderlyingTypeLoc().setType(ErrorType::get(TC.Context));
       }
 
@@ -1480,8 +1480,11 @@ public:
     if (ED->isInvalid()) {
       // Mark children as invalid.
       // FIXME: This is awful.
-      for (auto member : ED->getMembers())
+      for (auto member : ED->getMembers()) {
         member->setInvalid();
+        if (ValueDecl *VD = dyn_cast<ValueDecl>(member))
+          VD->overwriteType(ErrorType::get(TC.Context));
+      }
       return;
     }
 

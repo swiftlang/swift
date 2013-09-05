@@ -148,6 +148,9 @@ namespace {
       // We always verify source ranges.
       checkSourceRanges(node);
 
+      // Check that nodes marked invalid have the correct type.
+      checkErrors(node);
+
       // Always verify the node as a parsed node.
       verifyParsed(node);
 
@@ -1045,6 +1048,24 @@ namespace {
 
     void checkBoundGenericTypes(ValueDecl *D) {
       checkBoundGenericTypes(D->getType());
+    }
+
+    void checkErrors(Expr *E) {}
+    void checkErrors(Stmt *S) {}
+    void checkErrors(Decl *D) {}
+    void checkErrors(ValueDecl *D) {
+      if (!D->hasType())
+        return;
+      if (D->isInvalid() && !D->getType()->is<ErrorType>()) {
+        Out << "Invalid decl has non-error type!\n";
+        D->dump();
+        abort();
+      }
+      if (D->getType()->is<ErrorType>() && !D->isInvalid()) {
+        Out << "Valid decl has error type!\n";
+        D->dump();
+        abort();
+      }
     }
   };
 }
