@@ -1293,7 +1293,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   
   // Apply 'self' if provided.
   if (apply.selfParam)
-    emission.addCallSite(SILLocation(), std::move(apply.selfParam),
+    emission.addCallSite(RegularLocation(e), std::move(apply.selfParam),
                          apply.SelfApplyExpr->getType());
 
   // Apply arguments from call sites, innermost to outermost.

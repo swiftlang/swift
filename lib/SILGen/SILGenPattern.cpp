@@ -83,7 +83,8 @@ using DispatchedPatternVector
 static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
                                           ArrayRef<const Pattern *> patterns,
                                           SILValue v,
-                                          DispatchedPatternVector &dispatches) {
+                                          DispatchedPatternVector &dispatches,
+                                          SwitchStmt *stmt) {
   assert(!patterns.empty() && "no patterns to dispatch on?!");
   
   PatternKind kind = patterns[0]->getSemanticsProvidingPattern()->getKind();
@@ -239,10 +240,10 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     
     // Emit the switch instruction.
     if (addressOnlyUnion) {
-      gen.B.createDestructiveSwitchUnionAddr(SILLocation(), v,
+      gen.B.createDestructiveSwitchUnionAddr(stmt, v,
                                              defaultBB, caseBBs);
     } else {
-      gen.B.createSwitchUnion(SILLocation(), v, defaultBB, caseBBs);
+      gen.B.createSwitchUnion(stmt, v, defaultBB, caseBBs);
     }
     
     // Return the default BB.
@@ -1339,7 +1340,7 @@ recur:
 
   SILBasicBlock *defaultBB
     = emitDispatchAndDestructure(gen, specialized, clauses.getOccurrences()[0],
-                                 dispatches);
+                                 dispatches, stmt);
   assert(dispatches.size() == specialized.size() &&
          "dispatch table doesn't match pattern set");
   
@@ -1385,7 +1386,7 @@ recur:
     }
     // Chain the inner continuation to the outer.
     if (gen.B.hasValidInsertionPoint())
-      gen.B.createBranch(SILLocation(), contBB);
+      gen.B.createBranch(stmt, contBB);
   }
 
   // If the dispatch was exhaustive, then emitDispatchAndDestructure returns
@@ -1396,7 +1397,7 @@ recur:
   // Otherwise, recur into the default matrix.
   assert(!gen.B.hasValidInsertionPoint() && "specialization did not close bb");
   
-  gen.B.emitBlock(defaultBB);
+  gen.B.emitBlock(defaultBB, stmt);
   clauses.reduceToDefault(gen, skipRows);
   goto recur;
 }
