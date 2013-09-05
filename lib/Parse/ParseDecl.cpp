@@ -1095,8 +1095,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                          TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
                          SourceLoc &LastValidLoc) {
   bool Invalid = false;
-  Get = 0;
-  Set = 0;
+  Get = nullptr;
+  Set = nullptr;
   
   while (Tok.isNot(tok::r_brace)) {
     if (Tok.is(tok::eof)) {
@@ -1112,7 +1112,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
         diagnose(Get->getLoc(), diag::previous_getset, false);
         
         // Forget the previous version.
-        Get = 0;
+        Get = nullptr;
       }
       
       SourceLoc GetLoc = Tok.getLoc(), ColonLoc = Tok.getLoc();
@@ -1178,7 +1178,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       diagnose(Set->getLoc(), diag::previous_getset, true);
 
       // Forget the previous setter.
-      Set = 0;
+      Set = nullptr;
     }
     
     SourceLoc SetLoc = consumeToken();
@@ -1288,7 +1288,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
     
   // The grammar syntactically requires a simple identifier for the variable
   // name. Complain if that isn't what we got.
-  VarDecl *PrimaryVar = 0;
+  VarDecl *PrimaryVar = nullptr;
   {
     Pattern *PrimaryPattern = &pattern;
     if (TypedPattern *Typed = dyn_cast<TypedPattern>(PrimaryPattern))
@@ -1315,8 +1315,8 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
   SourceLoc LBLoc = consumeToken(tok::l_brace);
     
   // Parse getter and setter.
-  FuncDecl *Get = 0;
-  FuncDecl *Set = 0;
+  FuncDecl *Get = nullptr;
+  FuncDecl *Set = nullptr;
   SourceLoc LastValidLoc = LBLoc;
   if (parseGetSet(HasContainerType, /*Indices=*/0, TyLoc, Get, Set, LastValidLoc))
     Invalid = true;
@@ -1633,7 +1633,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
   // duplication.
-  FuncExpr *FE = 0;
+  FuncExpr *FE = nullptr;
   {
     Scope S(this, ScopeKind::FunctionBody);
     
@@ -2298,8 +2298,8 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
   SourceLoc LBLoc = consumeToken();
   
   // Parse getter and setter.
-  FuncDecl *Get = 0;
-  FuncDecl *Set = 0;
+  FuncDecl *Get = nullptr;
+  FuncDecl *Set = nullptr;
   SourceLoc LastValidLoc = LBLoc;
   if (parseGetSet(HasContainerType, Indices.get(), ElementTy.get(),
                   Get, Set, LastValidLoc))
