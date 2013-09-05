@@ -69,4 +69,4 @@ Unit/lit.site.cfg: FORCE
 clean::
 	@ find . -name Output | xargs rm -fr
 
-.PHONY: all report clean
+.PHONY: all clean

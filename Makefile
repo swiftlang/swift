@@ -86,9 +86,6 @@ wc::
 test::
 	@ $(MAKE) -C test
 
-report::
-	@ $(MAKE) -C test report
-
 clean::
 	@ $(MAKE) -C test clean
 
@@ -104,6 +101,6 @@ cscope.files:
 	                    -or -name '*.td' \
 	                    -or -name '*.h' > cscope.files
 
-.PHONY: test report clean cscope.files
+.PHONY: test clean cscope.files
 
 endif
