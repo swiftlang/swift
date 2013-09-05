@@ -203,6 +203,7 @@ bool SILInstruction::mayHaveSideEffects() const {
   SILInstructionMemoryBehavior B = getMemoryBehavior();
 
   return B == SILInstructionMemoryBehavior::MayWrite ||
+    B == SILInstructionMemoryBehavior::MayReadWrite ||
     B == SILInstructionMemoryBehavior::MayHaveSideEffects;
 }
 

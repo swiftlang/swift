@@ -46,13 +46,17 @@ class VarDecl;
 
 enum class SILInstructionMemoryBehavior {
   None,
+  /// The instruction may read memory.
+  MayRead,
+  /// \brief The instruction may write to memory.
+  MayWrite,
+  /// The instruction may read or write memory.
+  MayReadWrite,
   /// \brief The instruction may have side effects not captured solely by its
   ///        users. Specifically, it can return, release memory, or store. Note,
   ///        alloc is not considered to have side effects because its
   ///        result/users represent its effect.
   MayHaveSideEffects,
-  /// \brief The instruction may write to memory.
-  MayWrite
 };
 
 enum IsTake_t { IsNotTake, IsTake };
@@ -131,6 +135,22 @@ public:
   /// calls and deallocation instructions are considered to have side effects
   /// that are not visible by merely examining their uses.
   bool mayHaveSideEffects() const;
+
+  /// Returns true if the instruction may write to memory.
+  bool mayWrite() const {
+    const SILInstructionMemoryBehavior B = getMemoryBehavior();
+    return B == SILInstructionMemoryBehavior::MayWrite ||
+      B == SILInstructionMemoryBehavior::MayReadWrite ||
+      B == SILInstructionMemoryBehavior::MayHaveSideEffects;
+  }
+
+  /// Returns true if the instruction may read from memory.
+  bool mayRead() const {
+    const SILInstructionMemoryBehavior B = getMemoryBehavior();
+    return B == SILInstructionMemoryBehavior::MayRead ||
+      B == SILInstructionMemoryBehavior::MayReadWrite ||
+      B == SILInstructionMemoryBehavior::MayHaveSideEffects;
+  }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_SILInstruction &&
