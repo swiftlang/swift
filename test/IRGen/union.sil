@@ -1486,6 +1486,29 @@ entry:
   return %u : $MultiPayloadTwoSpareBits
 }
 
+// -- test for a switch_union bug for multi-payload, no-empty-case unions
+//    uncovered by Chris
+union OnlyPayloads {
+  case x(Builtin.Int64)
+  case y(Builtin.Int32)
+  case z(Builtin.Int16)
+}
+
+sil @only_payloads_switch : $(OnlyPayloads) -> () {
+entry(%0 : $OnlyPayloads):
+  switch_union %0 : $OnlyPayloads, case #OnlyPayloads.x!unionelt.1: x_dest, case #OnlyPayloads.y!unionelt.1: y_dest, case #OnlyPayloads.z!unionelt.1: z_dest
+
+x_dest:
+  br end
+y_dest:
+  br end
+z_dest:
+  br end
+
+end:
+  %v = tuple ()
+  return %v : $()
+}
 
 // Force the storage types to all be generated.
 typealias AllTestUnions = (

@@ -2432,14 +2432,19 @@ namespace {
     unsigned commonSpareBitCount = CommonSpareBits.count();
     unsigned usedBitCount = CommonSpareBits.size() - commonSpareBitCount;
     
-    // We can store tags for the empty elements using the inhabited bits with
-    // their own tag(s).
-    if (usedBitCount >= 32) {
-      NumEmptyElementTags = 1;
+    // Determine how many tags we need to accommodate the empty cases, if any.
+    if (ElementsWithNoPayload.empty()) {
+      NumEmptyElementTags = 0;
     } else {
-      unsigned emptyElementsPerTag = 1 << usedBitCount;
-      NumEmptyElementTags
-        = (numEmptyElements + (emptyElementsPerTag-1))/emptyElementsPerTag;
+      // We can store tags for the empty elements using the inhabited bits with
+      // their own tag(s).
+      if (usedBitCount >= 32) {
+        NumEmptyElementTags = 1;
+      } else {
+        unsigned emptyElementsPerTag = 1 << usedBitCount;
+        NumEmptyElementTags
+          = (numEmptyElements + (emptyElementsPerTag-1))/emptyElementsPerTag;
+      }
     }
     
     unsigned numTags = numPayloadTags + NumEmptyElementTags;
