@@ -84,14 +84,18 @@ WritebackScope::WritebackScope(SILGenFunction &gen)
 }
 
 ManagedValue Materialize::claim(SILGenFunction &gen, SILLocation loc) {
-  if (address.getType().isAddressOnly(gen.SGM.M)) {
+  auto &addressTL = gen.getTypeLowering(address.getType());
+  if (addressTL.isAddressOnly()) {
     // We can use the temporary as an address-only rvalue directly.
     return ManagedValue(address, valueCleanup);
   }
 
+  // A materialized temporary is always its own type-of-rvalue because
+  // we did a semantic load to produce it in the first place.
+
   if (valueCleanup.isValid())
     gen.Cleanups.setCleanupState(valueCleanup, CleanupState::Dead);
-  return gen.emitLoad(loc, address, SGFContext(), IsTake);
+  return gen.emitLoad(loc, address, addressTL, SGFContext(), IsTake);
 }
 
 WritebackScope::~WritebackScope() {
@@ -151,28 +155,27 @@ namespace {
   class AddressComponent : public PhysicalPathComponent {
     SILValue address;
   public:
-    AddressComponent(SILValue address) : address(address) {
+    AddressComponent(SILValue address, SILType typeOfRValue)
+      : PhysicalPathComponent(typeOfRValue), address(address) {
       assert(address.getType().isAddress() &&
              "var component value must be an address");
     }
     
     SILValue offset(SILGenFunction &gen, SILLocation loc,
-                 SILValue base) const override {
+                    SILValue base) const override {
       assert(!base && "var component must be root of lvalue path");
       return address;
-    }
-    
-    Type getObjectType() const override {
-      return address.getType().getSwiftRValueType();
     }
   };
   
   class RefElementComponent : public PhysicalPathComponent {
-    VarDecl *field;
-    SILType type;
+    VarDecl *Field;
+    SILType SubstFieldType;
   public:
-    RefElementComponent(VarDecl *field, SILType type)
-      : field(field), type(type) {}
+    RefElementComponent(VarDecl *field, SILType substFieldType,
+                        SILType typeOfRValue)
+      : PhysicalPathComponent(typeOfRValue),
+        Field(field), SubstFieldType(substFieldType) {}
     
     SILValue offset(SILGenFunction &gen, SILLocation loc, SILValue base)
       const override
@@ -181,44 +184,15 @@ namespace {
              "base for ref element component must be an object");
       assert(base.getType().hasReferenceSemantics() &&
              "base for ref element component must be a reference type");
-      return gen.B.createRefElementAddr(loc, base, field, type);
-    }
-    
-    Type getObjectType() const override {
-      return type.getSwiftRValueType();
+      return gen.B.createRefElementAddr(loc, base, Field, SubstFieldType);
     }
   };
   
   class TupleElementComponent : public PhysicalPathComponent {
-    unsigned elementIndex;
-    SILType type;
+    unsigned ElementIndex;
   public:
-    TupleElementComponent(unsigned elementIndex, SILType type)
-      : elementIndex(elementIndex), type(type) {}
-    
-    SILValue offset(SILGenFunction &gen, SILLocation loc,
-                 SILValue base) const override {
-      assert(base && "invalid value for element base");
-      SILType baseType = base.getType();
-      (void)baseType;
-      assert(baseType.isAddress() &&
-             "base for element component must be an address");
-      assert(!baseType.hasReferenceSemantics() &&
-             "can't get element from address of ref type");
-      return gen.B.createTupleElementAddr(loc, base, elementIndex, type);
-    }
-    
-    Type getObjectType() const override {
-      return type.getSwiftRValueType();
-    }
-  };
-  
-  class StructElementComponent : public PhysicalPathComponent {
-    VarDecl *field;
-    SILType type;
-  public:
-    StructElementComponent(VarDecl *field, SILType type)
-      : field(field), type(type) {}
+    TupleElementComponent(unsigned elementIndex, SILType typeOfRValue)
+      : PhysicalPathComponent(typeOfRValue), ElementIndex(elementIndex) {}
     
     SILValue offset(SILGenFunction &gen, SILLocation loc,
                     SILValue base) const override {
@@ -229,30 +203,46 @@ namespace {
              "base for element component must be an address");
       assert(!baseType.hasReferenceSemantics() &&
              "can't get element from address of ref type");
-      return gen.B.createStructElementAddr(loc, base, field, type);
+      return gen.B.createTupleElementAddr(loc, base, ElementIndex,
+                                          getTypeOfRValue().getAddressType());
     }
+  };
+  
+  class StructElementComponent : public PhysicalPathComponent {
+    VarDecl *Field;
+    SILType SubstFieldType;
+  public:
+    StructElementComponent(VarDecl *field, SILType substFieldType,
+                           SILType typeOfRValue)
+      : PhysicalPathComponent(typeOfRValue),
+        Field(field), SubstFieldType(substFieldType) {}
     
-    Type getObjectType() const override {
-      return type.getSwiftRValueType();
+    SILValue offset(SILGenFunction &gen, SILLocation loc,
+                    SILValue base) const override {
+      assert(base && "invalid value for element base");
+      SILType baseType = base.getType();
+      (void)baseType;
+      assert(baseType.isAddress() &&
+             "base for element component must be an address");
+      assert(!baseType.hasReferenceSemantics() &&
+             "can't get element from address of ref type");
+      return gen.B.createStructElementAddr(loc, base, Field, SubstFieldType);
     }
   };
 
   class RefComponent : public PhysicalPathComponent {
     SILValue value;
   public:
-    RefComponent(ManagedValue value) : value(value.getValue()) {
+    RefComponent(ManagedValue value) :
+      PhysicalPathComponent(value.getValue().getType()), value(value.getValue()) {
       assert(value.getType().hasReferenceSemantics() &&
              "ref component must be of reference type");
     }
     
     SILValue offset(SILGenFunction &gen, SILLocation loc,
-                 SILValue base) const override {
+                    SILValue base) const override {
       assert(!base && "ref component must be root of lvalue path");
       return value;
-    }
-
-    Type getObjectType() const override {
-      return value.getType().getSwiftRValueType();
     }
   };
   
@@ -305,29 +295,31 @@ namespace {
   public:
     GetterSetterComponent(ValueDecl *decl,
                           ArrayRef<Substitution> substitutions,
-                          Type substType)
-      : GetterSetterComponent(decl, substitutions, nullptr, substType)
+                          SILType typeOfRValue)
+      : GetterSetterComponent(decl, substitutions, nullptr, typeOfRValue)
     {
     }
 
     GetterSetterComponent(ValueDecl *decl,
                           ArrayRef<Substitution> substitutions,
                           Expr *subscriptExpr,
-                          Type substType)
-      : getter(SILDeclRef(decl, SILDeclRef::Kind::Getter)),
+                          SILType typeOfRValue)
+      : LogicalPathComponent(typeOfRValue),
+        getter(SILDeclRef(decl, SILDeclRef::Kind::Getter)),
         setter(decl->isSettable()
                  ? SILDeclRef(decl, SILDeclRef::Kind::Setter)
                  : SILDeclRef()),
         substitutions(substitutions.begin(), substitutions.end()),
         subscriptExpr(subscriptExpr),
-        substType(substType)
+        substType(typeOfRValue.getSwiftRValueType())
     {
     }
     
     GetterSetterComponent(const GetterSetterComponent &copied,
                           SILGenFunction &gen,
                           SILLocation loc)
-      : getter(copied.getter),
+      : LogicalPathComponent(copied.getTypeOfRValue()),
+        getter(copied.getter),
         setter(copied.setter),
         substitutions(copied.substitutions),
         subscriptExpr(copied.subscriptExpr),
@@ -363,10 +355,6 @@ namespace {
                                  substType, c);
     }
     
-    Type getObjectType() const override {
-      return substType;
-    }
-    
     std::unique_ptr<LogicalPathComponent>
     clone(SILGenFunction &gen, SILLocation loc) const override {
       LogicalPathComponent *clone = new GetterSetterComponent(*this, gen, loc);
@@ -391,26 +379,33 @@ LValue SILGenLValue::visitExpr(Expr *e) {
   llvm_unreachable("unimplemented lvalue expr");
 }
 
+static SILType getSubstTypeOfRValue(SILGenFunction &gen, Type lvalue) {
+  auto objType = cast<LValueType>(lvalue->getCanonicalType()).getObjectType();
+  return gen.getLoweredType(objType);
+}
+
 static LValue emitLValueForDecl(SILGenLValue &sgl,
                                 SILLocation loc, ValueDecl *decl,
-                                Type ty) {
-  LValue lv;
+                                Type substTypeOfReference) {
+  auto substTypeOfRValue = getSubstTypeOfRValue(sgl.gen, substTypeOfReference);
   
+  LValue lv;
+
   // If it's a property, push a reference to the getter and setter.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     if (var->isProperty()) {
       lv.add<GetterSetterComponent>(var,
                                     ArrayRef<Substitution>{},
-                                    ty->getRValueType());
+                                    substTypeOfRValue);
       return ::std::move(lv);
     }
   }
-  
+
   // If it's a physical value, push its address.
   SILValue address = sgl.gen.emitReferenceToDecl(loc, decl).getUnmanagedValue();
   assert(address.getType().isAddress() &&
          "physical lvalue decl ref must evaluate to an address");
-  lv.add<AddressComponent>(address);
+  lv.add<AddressComponent>(address, substTypeOfRValue);
   return ::std::move(lv);
 }
 
@@ -419,7 +414,12 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
 }
 
 LValue SILGenLValue::visitSuperRefExpr(SuperRefExpr *e) {
-  return emitLValueForDecl(*this, e, e->getSelf(), e->getType());
+  // The type of reference here is a lie, but it works out given the
+  // syntactic constraint on 'super'.
+  return emitLValueForDecl(*this, e, e->getSelf(),
+                           LValueType::get(e->getSelf()->getType(),
+                                           LValueType::Qual::DefaultForVar,
+                                           gen.getASTContext()));
 }
 
 LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
@@ -430,7 +430,7 @@ LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
   ManagedValue v = gen.emitRValue(e->getSubExpr()).getAsSingleValue(gen,
                                                               e->getSubExpr());
   SILValue addr = gen.emitMaterialize(e, v).address;
-  lv.add<AddressComponent>(addr);
+  lv.add<AddressComponent>(addr, getSubstTypeOfRValue(gen, e->getType()));
   return ::std::move(lv);
 }
 
@@ -444,6 +444,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   LValue lv = visitRec(e->getBase());
   CanType baseTy = e->getBase()->getType()->getCanonicalType();
 
+  auto substTypeOfRValue = getSubstTypeOfRValue(gen, e->getType());
+
   // If this is a physical field, access with a fragile element reference.
   if (VarDecl *var = dyn_cast<VarDecl>(e->getMember().getDecl())) {
     if (!var->isProperty()) {
@@ -452,9 +454,9 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
         gen.SGM.Types.getSubstitutedStorageType(var, e->getType());
       if (!isa<LValueType>(baseTy)) {
         assert(baseTy.hasReferenceSemantics());
-        lv.add<RefElementComponent>(var, varStorageType);
+        lv.add<RefElementComponent>(var, varStorageType, substTypeOfRValue);
       } else {
-        lv.add<StructElementComponent>(var, varStorageType);
+        lv.add<StructElementComponent>(var, varStorageType, substTypeOfRValue);
       }
       return ::std::move(lv);
     }
@@ -463,23 +465,25 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   // Otherwise, use the property accessors.
   lv.add<GetterSetterComponent>(e->getMember().getDecl(),
                                 e->getMember().getSubstitutions(),
-                                e->getType()->getRValueType());
+                                substTypeOfRValue);
   return ::std::move(lv);
 }
 
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
+  auto substTypeOfRValue = getSubstTypeOfRValue(gen, e->getType());
+
   LValue lv = visitRec(e->getBase());
   lv.add<GetterSetterComponent>(e->getDecl().getDecl(),
                                 e->getDecl().getSubstitutions(),
                                 e->getIndex(),
-                                e->getType()->getRValueType());
+                                substTypeOfRValue);
   return ::std::move(lv);
 }
 
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   LValue lv = visitRec(e->getBase());
   lv.add<TupleElementComponent>(e->getFieldNumber(),
-                                gen.getLoweredType(e->getType()));
+                                getSubstTypeOfRValue(gen, e->getType()));
   return ::std::move(lv);
 }
 

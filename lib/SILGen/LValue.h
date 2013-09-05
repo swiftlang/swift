@@ -46,6 +46,8 @@ class LogicalPathComponent;
 ///     still qualify for physical access if we are in a privileged
 ///     component.
 class PathComponent {
+  SILType TypeOfRValue;
+
   friend class LValue;
   unsigned AllocatedSize : 31;
   const unsigned IsPhysical : 1;
@@ -60,8 +62,8 @@ class PathComponent {
   PathComponent &operator=(const PathComponent &) = delete;
 
 protected:
-  PathComponent(bool isPhysical)
-    : IsPhysical(isPhysical) {}
+  PathComponent(SILType typeOfRValue, bool isPhysical)
+    : TypeOfRValue(typeOfRValue), IsPhysical(isPhysical) {}
 
   virtual ~PathComponent() {}
 
@@ -83,8 +85,9 @@ public:
   LogicalPathComponent &asLogical();
   const LogicalPathComponent &asLogical() const;
   
-  /// Returns the type of the value addressed by the component.
-  virtual Type getObjectType() const = 0;
+  /// Returns the logical type-as-rvalue of the value addressed by the
+  /// component.
+  SILType getTypeOfRValue() const { return TypeOfRValue; }
 };
 
 /// An abstract class for "physical" path components, i.e. path
@@ -94,12 +97,13 @@ class PhysicalPathComponent : public PathComponent {
   virtual void _anchor();
 
 protected:
-  PhysicalPathComponent() : PathComponent(true) {}
+  PhysicalPathComponent(SILType typeOfRValue)
+    : PathComponent(typeOfRValue, true) {}
 
 public:
   virtual SILValue offset(SILGenFunction &gen,
-                       SILLocation loc,
-                       SILValue base) const = 0;
+                          SILLocation loc,
+                          SILValue base) const = 0;
 };
 
 inline PhysicalPathComponent &PathComponent::asPhysical() {
@@ -118,7 +122,8 @@ class LogicalPathComponent : public PathComponent {
   virtual void _anchor();
 
 protected:
-  LogicalPathComponent() : PathComponent(false) {}
+  LogicalPathComponent(SILType typeOfRValue)
+    : PathComponent(typeOfRValue, false) {}
 
 public:
   /// Clone the path component onto the heap.
@@ -156,7 +161,10 @@ inline const LogicalPathComponent &PathComponent::asLogical() const {
 /// of the type.
 class LValue {
   DiverseList<PathComponent, 128> Path;
-  Type ObjectType;
+
+  /// Iterating to the end of the l-value is expensive, so we cache it
+  /// here.
+  SILType TypeOfRValue;
 
 public:
   LValue() = default;
@@ -179,7 +187,7 @@ public:
     T &component = Path.add<T>(std::forward<A>(args)...);
     component.AllocatedSize = sizeof(T);
     assert(component.allocated_size() == sizeof(T));
-    ObjectType = component.getObjectType();
+    TypeOfRValue = component.getTypeOfRValue();
     return component;
   }
 
@@ -188,7 +196,7 @@ public:
     T &component = Path.addWithExtra<T>(extraSize, std::forward<A>(args)...);
     component.AllocatedSize = sizeof(T) + extraSize;
     assert(component.allocated_size() == sizeof(T) + extraSize);
-    ObjectType = component.getObjectType();
+    TypeOfRValue = component.getTypeOfRValue();
     return component;
   }
 
@@ -200,8 +208,10 @@ public:
   const_iterator begin() const { return Path.begin(); }
   const_iterator end() const { return Path.end(); }
   
-  /// Returns the type of the value addressed by the LValue.
-  Type getObjectType() const { return ObjectType; }
+  /// Returns the type-of-rvalue of the logical object referenced by
+  /// this l-value.  Note that this may differ significantly from the
+  /// type of l-value.
+  SILType getTypeOfRValue() const { return TypeOfRValue; }
 };
   
 /// RAII object to enable writebacks for logical lvalues evaluated within the

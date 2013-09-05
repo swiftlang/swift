@@ -655,9 +655,21 @@ public:
   ManagedValue emitManagedRValueWithCleanup(SILValue v);
   ManagedValue emitManagedRValueWithCleanup(SILValue v,
                                             const TypeLowering &lowering);
+
+  void emitSemanticLoadInto(SILLocation loc, SILValue src,
+                            const TypeLowering &srcLowering,
+                            SILValue dest,
+                            const TypeLowering &destLowering,
+                            IsTake_t isTake, IsInitialization_t isInit);
+
+  SILValue emitSemanticLoad(SILLocation loc, SILValue src,
+                            const TypeLowering &srcLowering,
+                            const TypeLowering &rvalueLowering,
+                            IsTake_t isTake);
   
-  ManagedValue emitLoad(SILLocation loc, SILValue addr, SGFContext C,
-                        IsTake_t isTake);
+  ManagedValue emitLoad(SILLocation loc, SILValue addr,
+                        const TypeLowering &rvalueTL,
+                        SGFContext C, IsTake_t isTake);
   
   void emitAssignToLValue(SILLocation loc, RValue &&src,
                           LValue const &dest);

@@ -352,22 +352,61 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
   return RValue(SGF, ManagedValue(string, ManagedValue::Unmanaged), E);
 }
 
+/// Load an r-value out of the given address.
+///
+/// \param rvalueTL - the type lowering for the type-of-rvalue
+///   of the address
 ManagedValue SILGenFunction::emitLoad(SILLocation loc,
                                       SILValue addr,
+                                      const TypeLowering &rvalueTL,
                                       SGFContext C,
                                       IsTake_t isTake) {
-  auto &addrTL = getTypeLowering(addr.getType());
-  auto &semanticTL = addrTL.getSemanticTypeLowering(SGM.Types);
-  if (semanticTL.isAddressOnly()) {
+  // Get the lowering for the address type.  We can avoid a re-lookup
+  // in the very common case of this being equivalent to the r-value
+  // type.
+  auto &addrTL =
+    (addr.getType() == rvalueTL.getLoweredType().getAddressType()
+       ? rvalueTL : getTypeLowering(addr.getType()));
+
+  if (rvalueTL.isAddressOnly()) {
     // Copy the address-only value.
-    SILValue copy = getBufferForExprResult(loc, semanticTL.getLoweredType(), C);
-    addrTL.emitSemanticLoadInto(B, loc, addr, copy, isTake, IsInitialization);
-    return emitManagedRValueWithCleanup(copy, semanticTL);
+    SILValue copy = getBufferForExprResult(loc, rvalueTL.getLoweredType(), C);
+    emitSemanticLoadInto(loc, addr, addrTL, copy, rvalueTL,
+                         isTake, IsInitialization);
+    return emitManagedRValueWithCleanup(copy, rvalueTL);
   }
   
   // Load the loadable value, and retain it if we aren't taking it.
-  SILValue loadedV = addrTL.emitSemanticLoad(B, loc, addr, isTake);
-  return emitManagedRValueWithCleanup(loadedV, semanticTL);
+  SILValue loadedV = emitSemanticLoad(loc, addr, addrTL, rvalueTL, isTake);
+  return emitManagedRValueWithCleanup(loadedV, rvalueTL);
+}
+
+/// Load a r-value out of the given address, given that the type is
+/// loadable.
+SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
+                                          SILValue src,
+                                          const TypeLowering &srcTL,
+                                          const TypeLowering &rvalueTL,
+                                          IsTake_t isTake) {
+  assert(srcTL.getLoweredType().getAddressType() == src.getType());
+  assert(rvalueTL.isLoadable());
+  assert(srcTL.getSemanticType() == rvalueTL.getLoweredType());
+  return srcTL.emitSemanticLoad(B, loc, src, isTake);
+}
+
+/// Load a r-value out of the given address, given that the type is
+/// loadable.
+void SILGenFunction::emitSemanticLoadInto(SILLocation loc,
+                                          SILValue src,
+                                          const TypeLowering &srcTL,
+                                          SILValue dest,
+                                          const TypeLowering &destTL,
+                                          IsTake_t isTake,
+                                          IsInitialization_t isInit) {
+  assert(srcTL.getLoweredType().getAddressType() == src.getType());
+  assert(destTL.getLoweredType().getAddressType() == dest.getType());
+  assert(srcTL.getSemanticType() == destTL.getLoweredType());
+  srcTL.emitSemanticLoadInto(B, loc, src, dest, isTake, isInit);
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {

@@ -431,7 +431,8 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
   // If the last component is physical, just drill down and load from it.
   if (component.isPhysical()) {
     addr = component.asPhysical().offset(*this, loc, addr);
-    return emitLoad(loc, addr, C, IsNotTake);
+    return emitLoad(loc, addr, getTypeLowering(src.getTypeOfRValue()),
+                    C, IsNotTake);
   }
 
   // If the last component is logical, just emit a get.

@@ -999,13 +999,17 @@ namespace {
     assert(substitutions.size() == 1 && "load should have single substitution");
     assert(args.size() == 1 && "load should have a single argument");
     
-    // The substitution gives the type of the load.
-    SILType loadedType = gen.getLoweredType(substitutions[0].Replacement);
+    // The substitution gives the type of the load.  This is always a
+    // first-class type; there is no way to e.g. produce a [weak] load
+    // with this builtin.
+    auto &rvalueTL = gen.getTypeLowering(substitutions[0].Replacement);
+    SILType loadedType = rvalueTL.getLoweredType();
+
     // Convert the pointer argument to a SIL address.
     SILValue addr = gen.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
                                                  loadedType.getAddressType());
     // Perform the load.
-    return gen.emitLoad(loc, addr, C, isTake);
+    return gen.emitLoad(loc, addr, rvalueTL, C, isTake);
   }
 
   static ManagedValue emitBuiltinLoad(SILGenFunction &gen,

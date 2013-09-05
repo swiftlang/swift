@@ -1176,9 +1176,13 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
     selfValue = args[0];
   }
 
-  auto &fieldLowering = getTypeLowering(var->getType());
+  auto fieldType = var->getType()->getCanonicalType();
+  auto &fieldLowering = getTypeLowering(fieldType);
+  auto &resultLowering =
+    (fieldType == swiftResultTy.getSwiftRValueType()
+       ? fieldLowering : getTypeLowering(swiftResultTy));
 
-  SILValue addr = B.createRefElementAddr(loc, selfValue, var,
+  SILValue fieldAddr = B.createRefElementAddr(loc, selfValue, var,
                              fieldLowering.getLoweredType().getAddressType());
   if (indirectReturn) {
     assert(ownership.getReturn() == OwnershipConventions::Return::Unretained
@@ -1186,15 +1190,17 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
     // This is basically returning +1, but there's no obvious
     // alternative, and there really isn't an ObjC convention for
     // transferring ownership in aggregates.
-    fieldLowering.emitSemanticLoadInto(B, loc, addr, indirectReturn,
-                                       IsNotTake, IsInitialization);
+    emitSemanticLoadInto(loc, fieldAddr, fieldLowering,
+                         indirectReturn, resultLowering,
+                         IsNotTake, IsInitialization);
     B.createStrongRelease(loc, selfValue);
-    B.createReturn(loc, emitEmptyTuple(var));
+    B.createReturn(loc, emitEmptyTuple(loc));
     return;
   }
 
   // Bridge the result.
-  SILValue result = fieldLowering.emitSemanticLoad(B, loc, addr, IsNotTake);
+  SILValue result = emitSemanticLoad(loc, fieldAddr, fieldLowering,
+                                     resultLowering, IsNotTake);
 
   // FIXME: This should have artificial location.
   B.createStrongRelease(loc, selfValue);
