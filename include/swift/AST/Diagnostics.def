@@ -215,7 +215,7 @@ ERROR(expected_rbrace_extension,type_parsing,none,
 ERROR(expected_equal_in_typealias,decl_parsing,none,
       "expected '=' in typealias declaration", ())
 ERROR(expected_type_in_typealias,decl_parsing,none,
-      "expected type in var declaration", ())
+      "expected type in typealias declaration", ())
 ERROR(associated_type_def,decl_parsing,none,
       "typealias %0 in protocol cannot have a definition", (Identifier))
 
