@@ -39,7 +39,7 @@ bool parseASTSection(SerializedModuleLoader* SML,
 
   if (MemoryBuffer->getBufferSize() < sizeof(struct apple_ast_hdr)
                                     + sizeof(struct module_header)) {
-    llvm::dbgs() << "__apple_ast section is too small.\n";
+    llvm::dbgs() << "__ast section is too small.\n";
     return false;
   }
 
@@ -47,7 +47,7 @@ bool parseASTSection(SerializedModuleLoader* SML,
   const char *data = MemoryBuffer->getBufferStart();
   auto apple_ast_hdr = reinterpret_cast<const struct apple_ast_hdr *>(data);
   if (apple_ast_hdr->version != 1) {
-    llvm::dbgs() << "Unsupported __apple_ast section version.\n";
+    llvm::dbgs() << "Unsupported __ast section version.\n";
     return false;
   }
 

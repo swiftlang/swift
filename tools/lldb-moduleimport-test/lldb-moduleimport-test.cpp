@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
         for (uint32_t j = 0; j < sc.nsects; ++j) {
           struct section_64 section;
           macho.read((char*)&section, sizeof(section));
-          auto sectname = "__apple_ast";
+          auto sectname = "__ast";
           if (strncmp(section.sectname, sectname, strlen(sectname)) == 0) {
             macho.seekg(section.offset, macho.beg);
             assert(macho.good());
