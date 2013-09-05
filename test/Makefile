@@ -34,6 +34,11 @@ all:: lit.site.cfg Unit/lit.site.cfg
 	@ $(PYTHON) $(LLVM_SRC_ROOT)/utils/lit/lit.py \
 	  $(LIT_ARGS) $(TESTARGS) $(TESTDIRS)
 
+test-perf: ../benchmark/lit.site.cfg
+	@ echo '--- Running swift performance tests ---'
+	@ $(PYTHON) $(LLVM_SRC_ROOT)/utils/lit/lit.py \
+	  $(LIT_ARGS) $(TESTARGS) ../benchmark
+
 FORCE:
 
 lit.site.cfg: FORCE
@@ -64,6 +69,17 @@ Unit/lit.site.cfg: FORCE
 	@$(ECHOPATH) s=@SHLIBDIR@=$(SharedLibDir)=g >> unit.tmp
 	@$(ECHOPATH) s=@SHLIBPATH_VAR@=$(SHLIBPATH_VAR)=g >> unit.tmp
 	@sed -f unit.tmp $(PROJ_SRC_DIR)/Unit/lit.site.cfg.in > $@
+	@-rm -f unit.tmp
+
+../benchmark/lit.site.cfg: FORCE
+	@echo "Making Swift '../benchmark/lit.site.cfg' file..."
+	@$(MKDIR) $(dir $@)
+	@$(ECHOPATH) s=@LLVM_TOOLS_DIR@=$(ToolDir)=g >> unit.tmp
+	@$(ECHOPATH) s=@LLVM_LIBS_DIR@=$(LibDir)=g >> unit.tmp
+	@$(ECHOPATH) s=@SWIFT_SOURCE_DIR@=$(PROJ_SRC_DIR)/..=g >> unit.tmp
+	@$(ECHOPATH) s=@SWIFT_BINARY_DIR@=$(PROJ_OBJ_DIR)/..=g >> unit.tmp
+	@$(ECHOPATH) s=@CC_UNDER_TEST@=$(CC)=g >> unit.tmp
+	@sed -f unit.tmp $(PROJ_SRC_DIR)/../benchmark/lit.site.cfg.in > $@
 	@-rm -f unit.tmp
 
 clean::

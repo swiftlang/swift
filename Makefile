@@ -86,6 +86,9 @@ wc::
 test::
 	@ $(MAKE) -C test
 
+test-perf::
+	@ $(MAKE) -C test test-perf
+
 clean::
 	@ $(MAKE) -C test clean
 
