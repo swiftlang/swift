@@ -30,13 +30,14 @@ using namespace Lowering;
 /// emitOrDeleteBlock - If there are branches to the specified basic block,
 /// emit it per emitBlock.  If there aren't, then just delete the block - it
 /// turns out to have not been needed.
-static void emitOrDeleteBlock(SILBuilder &B, SILBasicBlock *BB) {
+static void emitOrDeleteBlock(SILBuilder &B, SILBasicBlock *BB,
+                              SILLocation BranchLoc) {
   if (BB->pred_empty()) {
     // If the block is unused, we don't need it; just delete it.
     BB->eraseFromParent();
   } else {
     // Otherwise, continue emitting code in BB.
-    B.emitBlock(BB);
+    B.emitBlock(BB, BranchLoc);
   }
 }
 
@@ -175,7 +176,7 @@ void SILGenFunction::visitIfStmt(IfStmt *S) {
 void SILGenFunction::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
   SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
-  B.emitBlock(LoopBB);
+  B.emitBlock(LoopBB, S);
   
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
@@ -192,15 +193,19 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
   if (Cond.hasTrue()) {
     Cond.enterTrue(B);
     visit(S->getBody());
-    if (B.hasValidInsertionPoint())
-      B.createBranch(S, LoopBB);
+    if (B.hasValidInsertionPoint()) {
+      // Accosiate the loop body's closing brace with this branch.
+      RegularLocation L(S->getBody());
+      L.pointToEnd();
+      B.createBranch(L, LoopBB);
+    }
     Cond.exitTrue(B);
   }
   
   // Complete the conditional execution.
   Cond.complete(B);
   
-  emitOrDeleteBlock(B, EndBB);
+  emitOrDeleteBlock(B, EndBB, S);
   BreakDestStack.pop_back();
   ContinueDestStack.pop_back();
 }
@@ -208,7 +213,7 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
 void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
   SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
-  B.emitBlock(LoopBB);
+  B.emitBlock(LoopBB, S);
   
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
@@ -223,7 +228,7 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
 
   // Let's not differ from C99 6.8.5.2: "The evaluation of the controlling
   // expression takes place after each execution of the loop body."
-  emitOrDeleteBlock(B, CondBB);
+  emitOrDeleteBlock(B, CondBB, S);
 
   if (B.hasValidInsertionPoint()) {
     // Evaluate the condition with the false edge leading directly
@@ -231,15 +236,16 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
     Condition Cond = emitCondition(S, S->getCond(), /*hasFalseCode*/ false);
     
     Cond.enterTrue(B);
-    if (B.hasValidInsertionPoint())
-      B.createBranch(S, LoopBB);
+    if (B.hasValidInsertionPoint()) {
+      B.createBranch(S->getCond(), LoopBB);
+    }
     
     Cond.exitTrue(B);
     // Complete the conditional execution.
     Cond.complete(B);
   }
   
-  emitOrDeleteBlock(B, EndBB);
+  emitOrDeleteBlock(B, EndBB, S);
   BreakDestStack.pop_back();
   ContinueDestStack.pop_back();
 }
@@ -263,7 +269,7 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   
   // Create a new basic block and jump into it.
   SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
-  B.emitBlock(LoopBB);
+  B.emitBlock(LoopBB, S);
   
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *IncBB = new (F.getModule()) SILBasicBlock(&F);
@@ -284,22 +290,26 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
     Cond.enterTrue(B);
     visit(S->getBody());
     
-    emitOrDeleteBlock(B, IncBB);
+    emitOrDeleteBlock(B, IncBB, S);
     
     if (B.hasValidInsertionPoint() && S->getIncrement().isNonNull()) {
       FullExpr Scope(Cleanups, CleanupLocation(S->getIncrement().get()));
       emitRValue(S->getIncrement().get());
     }
     
-    if (B.hasValidInsertionPoint())
-      B.createBranch(S, LoopBB);
+    if (B.hasValidInsertionPoint()) {
+      // Accosiate the loop body's closing brace with this branch.
+      RegularLocation L(S->getBody());
+      L.pointToEnd();
+      B.createBranch(L, LoopBB);
+    }
     Cond.exitTrue(B);
   }
   
   // Complete the conditional execution.
   Cond.complete(B);
   
-  emitOrDeleteBlock(B, EndBB);
+  emitOrDeleteBlock(B, EndBB, S);
   BreakDestStack.pop_back();
   ContinueDestStack.pop_back();
 }
@@ -315,7 +325,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   
   // Create a new basic block and jump into it.
   SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
-  B.emitBlock(LoopBB);
+  B.emitBlock(LoopBB, S);
   
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
@@ -340,15 +350,19 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
     }
     
     // Loop back to the header.
-    if (B.hasValidInsertionPoint())
-      B.createBranch(S, LoopBB);
+    if (B.hasValidInsertionPoint()) {
+      // Accosiate the loop body's closing brace with this branch.
+      RegularLocation L(S->getBody());
+      L.pointToEnd();
+      B.createBranch(L, LoopBB);
+    }
     Cond.exitTrue(B);
   }
   
   // Complete the conditional execution.
   Cond.complete(B);
   
-  emitOrDeleteBlock(B, EndBB);
+  emitOrDeleteBlock(B, EndBB, S);
   BreakDestStack.pop_back();
   ContinueDestStack.pop_back();
 }

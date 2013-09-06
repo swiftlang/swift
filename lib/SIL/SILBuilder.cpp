@@ -37,6 +37,7 @@ void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
 
     // Emit the branch.
     assert(BB->bbarg_empty() && "cannot fall through to bb with args");
+    assert(!BranchLoc.isNull());
     createBranch(BranchLoc, BB);
   } else {
     // If we don't have an insertion point, insert the block at the end of the
