@@ -1591,6 +1591,9 @@ likewise not be implicitly retained or released. ``%0`` must be an object of a
 concrete function type; generic functions must have all of their generic
 parameters bound with a ``specialize`` instruction before they can be applied.
 
+NB: If the callee value is of a thick function type, ``apply`` currently
+consumes the callee value at +1 strong retain count.
+
 TODO: should have normal/unwind branch targets, like LLVM ``invoke``.
 
 partial_apply
