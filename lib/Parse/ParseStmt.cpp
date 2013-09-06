@@ -426,8 +426,9 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
 
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
-  // followed by a '}', ';', or statement keyword.
-  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi) && !isStartOfStmt(Tok)) {
+  // followed by a '}', ';', statement or decl start keyword sequence.
+  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi) &&
+      !isStartOfStmt(Tok) && !isStartOfDecl(Tok, peekToken())) {
     ParserResult<Expr> Result = parseExpr(diag::expected_expr_return);
     return makeParserResult(
         Result, new (Context) ReturnStmt(ReturnLoc, Result.getPtrOrNull()));
