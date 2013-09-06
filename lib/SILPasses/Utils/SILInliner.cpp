@@ -73,8 +73,7 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
     SILBasicBlock *CallerBB = I->getParent();
     // Split the BB and do NOT create a branch between the old and new
     // BBs; we will create the appropriate terminator manually later.
-    SILBasicBlock *ReturnToBB =
-      CallerBB->splitBasicBlock(InsertPoint, /*CreateBranch=*/false);
+    SILBasicBlock *ReturnToBB = CallerBB->splitBasicBlock(InsertPoint);
     // Place the return-to BB after all the other mapped BBs.
     if (InsertBeforeBB)
       F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB), F.getBlocks(),

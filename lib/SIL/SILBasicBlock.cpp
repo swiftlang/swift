@@ -73,13 +73,12 @@ void SILBasicBlock::eraseFromParent() {
   getParent()->getBlocks().erase(this);
 }
 
-/// splitBasicBlock - This splits a basic block into two at the specified
-/// instruction.  Note that all instructions BEFORE the specified iterator stay
-/// as part of the original basic block. If CreateBranch is true, an
-/// unconditional branch is added from the old basic block to the new basic
-/// block, otherwise the old basic block is left without a terminator.
-SILBasicBlock *SILBasicBlock::splitBasicBlock(iterator I, bool CreateBranch,
-                                              SILLocation BranchLoc) {
+/// \brief Splits a basic block into two at the specified instruction.
+///
+/// Note that all the instructions BEFORE the specified iterator
+/// stay as part of the original basic block. The old basic block is left
+/// without a terminator.
+SILBasicBlock *SILBasicBlock::splitBasicBlock(iterator I) {
   SILBasicBlock *New = new (Parent->getModule()) SILBasicBlock(Parent);
   SILFunction::iterator Where = llvm::next(SILFunction::iterator(this));
   SILFunction::iterator First = SILFunction::iterator(New);
@@ -88,8 +87,16 @@ SILBasicBlock *SILBasicBlock::splitBasicBlock(iterator I, bool CreateBranch,
   // Move all of the specified instructions from the original basic block into
   // the new basic block.
   New->getInstList().splice(New->end(), this->getInstList(), I, end());
-  if (CreateBranch)
-    getInstList().insert(getInstList().end(),
-                      BranchInst::create(BranchLoc, New, *getParent()));
+  return New;
+}
+
+/// \brief Splits a basic block into two at the specified instruction and
+/// inserts an unconditional branch from the old basic block to the new basic
+/// block.
+SILBasicBlock *SILBasicBlock::splitBasicBlockAndBranch(iterator I,
+                                                       SILLocation BranchLoc) {
+  SILBasicBlock *New = splitBasicBlock(I);
+  getInstList().insert(getInstList().end(),
+                       BranchInst::create(BranchLoc, New, *getParent()));
   return New;
 }

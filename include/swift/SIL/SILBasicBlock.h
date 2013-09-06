@@ -92,13 +92,19 @@ public:
     return const_cast<SILBasicBlock*>(this)->getTerminator();
   }
 
-  /// splitBasicBlock - This splits a basic block into two at the specified
-  /// instruction.  Note that all instructions BEFORE the specified iterator
-  /// stay as part of the original basic block. If CreateBranch is true, an
-  /// unconditional branch is added from the old basic block to the new basic
-  /// block, otherwise the old basic block is left without a terminator.
-  SILBasicBlock *splitBasicBlock(iterator I, bool CreateBranch = true,
-                                 SILLocation BranchLoc = SILLocation());
+  /// \brief Splits a basic block into two at the specified instruction.
+  ///
+  /// Note that all the instructions BEFORE the specified iterator
+  /// stay as part of the original basic block. The old basic block is left
+  /// without a terminator.
+  SILBasicBlock *splitBasicBlock(iterator I);
+
+  /// \brief Splits a basic block into two at the specified instruction and
+  /// inserts an unconditional branch from the old basic block to the new basic
+  /// block.
+  ///
+  /// \sa splitBasicBlock
+  SILBasicBlock *splitBasicBlockAndBranch(iterator I, SILLocation BranchLoc);
 
   //===--------------------------------------------------------------------===//
   // SILBasicBlock Argument List Inspection and Manipulation

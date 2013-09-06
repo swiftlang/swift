@@ -65,7 +65,7 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
     return new (*F.getParent()) SILBasicBlock(&F);
 
   // Otherwise we need to split the current block at the insertion point.
-  auto *NewBB = BB->splitBasicBlock(InsertPt, false);
+  auto *NewBB = BB->splitBasicBlock(InsertPt);
   InsertPt = BB->end();
   return NewBB;
 }
