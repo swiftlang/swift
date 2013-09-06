@@ -1773,10 +1773,27 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     }
     return;
   }
-      
+  
+  case ValueWitness::StoreExtraInhabitant: {
+    Address dest = getArgAs(IGF, argv, type, "dest");
+    llvm::Value *index = getArg(argv, "index");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+    
+    type.storeExtraInhabitant(IGF, index, dest);
+    IGF.Builder.CreateRetVoid();
+    return;
+  }
+
+  case ValueWitness::GetExtraInhabitantIndex: {
+    Address src = getArgAs(IGF, argv, type, "src");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+    
+    llvm::Value *idx = type.getExtraInhabitantIndex(IGF, src);
+    IGF.Builder.CreateRet(idx);
+    return;
+  }
+
   // TODO
-  case ValueWitness::StoreExtraInhabitant:
-  case ValueWitness::GetExtraInhabitantIndex:
   case ValueWitness::GetUnionTag:
   case ValueWitness::InplaceProjectUnionData: {
     IGF.Builder.CreateUnreachable();
@@ -2222,6 +2239,10 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
              packing == FixedPacking::Allocate);
       if (packing != FixedPacking::OffsetZero)
         flags |= ValueWitnessFlags::IsNonInline;
+      
+      if (fixedTI->getFixedExtraInhabitantCount() > 0)
+        flags |= ValueWitnessFlags::Union_HasExtraInhabitants;
+      
       auto value = IGM.getSize(Size(flags));
       return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
     }
@@ -2238,10 +2259,31 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   }
   
-  /// TODO:
   case ValueWitness::StoreExtraInhabitant:
-  case ValueWitness::GetExtraInhabitantIndex:
-  case ValueWitness::ExtraInhabitantFlags:
+  case ValueWitness::GetExtraInhabitantIndex: {
+    assert(concreteTI.mayHaveExtraInhabitants());
+    
+    goto standard;
+  }
+    
+  case ValueWitness::ExtraInhabitantFlags: {
+    assert(concreteTI.mayHaveExtraInhabitants());
+    
+    // If we locally know that the type has fixed layout, we can emit
+    // meaningful flags for it.
+    if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI)) {
+      uint64_t numExtraInhabitants = fixedTI->getFixedExtraInhabitantCount();
+      assert(numExtraInhabitants <= ExtraInhabitantFlags::NumExtraInhabitantsMask);
+      auto value = IGM.getSize(Size(numExtraInhabitants));
+      return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
+    }
+    
+    // Otherwise, just fill in null here if the type can't be statically
+    // queried for extra inhabitants.
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  }
+  
+  /// TODO:
   case ValueWitness::GetUnionTag:
   case ValueWitness::InplaceProjectUnionData:
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
@@ -2788,13 +2830,21 @@ static void addValueWitnesses(IRGenModule &IGM, FixedPacking packing,
                                     packing, abstractType, concreteType,
                                     concreteTI));
   }
+  if (concreteTI.mayHaveExtraInhabitants()) {
+    for (auto i = unsigned(ValueWitness::First_ExtraInhabitantValueWitness);
+         i <= unsigned(ValueWitness::Last_ExtraInhabitantValueWitness);
+         ++i) {
+      table.push_back(getValueWitness(IGM, ValueWitness(i), packing,
+                                      abstractType, concreteType, concreteTI));
+    }
+  }
 }
 
 /// Construct a global variable to hold a witness table.
 ///
 /// \param protocol - optional; null if this is the trivial
 ///   witness table
- /// \return a value of type IGM.WitnessTablePtrTy
+/// \return a value of type IGM.WitnessTablePtrTy
 static llvm::Constant *buildWitnessTable(IRGenModule &IGM,
                                          CanType concreteType,
                                          ProtocolDecl *protocol,
@@ -2832,7 +2882,7 @@ bool irgen::hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty) {
 static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                  CanType abstractType,
                                  SmallVectorImpl<llvm::Constant*> &witnesses) {
-  // Instantiate generic types on their context archetypes.
+  // Instantiate unbound generic types on their context archetypes.
   CanType concreteType = abstractType;
   if (auto ugt = dyn_cast<UnboundGenericType>(abstractType)) {
     concreteType = ugt->getDecl()->getDeclaredTypeInContext()->getCanonicalType();
@@ -2857,7 +2907,7 @@ llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
   assert(!hasDependentValueWitnessTable(IGM, abstractType) &&
          "emitting global VWT for dynamic-layout type");
   
-  SmallVector<llvm::Constant*, NumRequiredValueWitnesses> witnesses;
+  SmallVector<llvm::Constant*, MaxNumValueWitnesses> witnesses;
   addValueWitnessesForAbstractType(IGM, abstractType, witnesses);
 
   auto tableTy = llvm::ArrayType::get(IGM.Int8PtrTy, witnesses.size());

@@ -55,7 +55,23 @@ import Builtin
 //      case c:     0  1  0  0  0  0  1  1
 // CHECK: %O5union24MultiPayloadTwoSpareBits = type { i64 }
 
-
+// -- No-payload unions have spare bits, and therefore extra inhabitants, in
+//    their value witness table.
+// CHECK: @_TWVO5union10NoPayloads = constant [19 x i8*] [
+// -- ...
+// -- size
+// CHECK:   i8* inttoptr (i64 1 to i8*),
+// -- flags                 0x4_0000 - alignment 1, has extra inhabitants
+// CHECK:   i8* inttoptr (i64 262144 to i8*),
+// -- stride
+// CHECK:   i8* inttoptr (i64 1 to i8*),
+// -- storeExtraInhabitant
+// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO5union10NoPayloads to i8*),
+// -- getExtraInhabitantIndex
+// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO5union10NoPayloads to i8*),
+// -- num extra inhabitants (256 - 4 valid states)
+// CHECK:   i8* inttoptr (i64 252 to i8*)
+// CHECK: ] 
 union Singleton {
   case val(Builtin.Int64, Builtin.Int64)
 }
