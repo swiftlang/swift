@@ -272,16 +272,19 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
         Status.setIsParseError();
       break;
     }
-    SourceLoc LAngle, RAngle;
-    SmallVector<TypeRepr*, 8> GenericArgs;
-    if (startsWithLess(Tok)) {
-      if (parseGenericArguments(GenericArgs, LAngle, RAngle))
-        return nullptr;
-    }
-    EndLoc = Loc;
 
-    ComponentsR.push_back(IdentTypeRepr::Component(
-        Loc, Name, Context.AllocateCopy(GenericArgs), CurDeclContext));
+    if (Loc.isValid()) {
+      SourceLoc LAngle, RAngle;
+      SmallVector<TypeRepr*, 8> GenericArgs;
+      if (startsWithLess(Tok)) {
+        if (parseGenericArguments(GenericArgs, LAngle, RAngle))
+          return nullptr;
+      }
+      EndLoc = Loc;
+
+      ComponentsR.push_back(IdentTypeRepr::Component(
+          Loc, Name, Context.AllocateCopy(GenericArgs), CurDeclContext));
+    }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
     // unless <anything> is 'metatype'.

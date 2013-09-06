@@ -429,7 +429,7 @@ ERROR(attribute_does_not_apply_to_type,type_parsing,none,
       "attribute does not apply to type", ())
 
 // Named types
-ERROR(expected_identifier_in_dotted_type,expr_parsing,none,
+ERROR(expected_identifier_in_dotted_type,expr_parsing,PointsToFirstBadToken,
       "expected identifier in dotted type", ())
 ERROR(expected_identifier_for_type,expr_parsing,PointsToFirstBadToken,
       "expected identifier for type name", ())
