@@ -701,9 +701,22 @@ namespace {
                                                           AddressPoint - 1,
                                                           IGM.getPointerSize());
         IGF.Builder.CreateStore(vwtAddrVal, vwtRefAddr);
+
+        // The metadata should be initialized enough now that we can bind
+        // archetypes for the 'this' type from it.
+        auto addressPointAddr = IGF.Builder.CreateConstArrayGEP(fullMetaWords,
+                                                          AddressPoint,
+                                                          IGM.getPointerSize());
+        llvm::Value *metadataValue
+          = IGF.Builder.CreateBitCast(addressPointAddr.getAddress(),
+                                      IGF.IGM.TypeMetadataPtrTy);
         
-        // TODO: Calculate and store the size, alignment, flags, and stride for
-        // the instance.
+        llvm::Value *vwtableValue
+          = IGF.Builder.CreateBitCast(vwtAddr.getAddress(),
+                                      IGF.IGM.WitnessTablePtrTy);
+        
+        asImpl().emitInitializeValueWitnessTable(IGF,
+                                                 metadataValue, vwtableValue);
       }
       
       // The metadata is now complete.
@@ -1020,6 +1033,12 @@ namespace {
       : super(IGM, classGenerics, theClass, layout) {}
                         
     void addDependentValueWitnessTablePattern() {
+      llvm_unreachable("classes should never have dependent vwtables");
+    }
+
+    void emitInitializeValueWitnessTable(IRGenFunction &IGF,
+                                         llvm::Value *metadata,
+                                         llvm::Value *vwtable) {
       llvm_unreachable("classes should never have dependent vwtables");
     }
   };
@@ -1964,6 +1983,14 @@ namespace {
       emitDependentValueWitnessTablePattern(IGM,
                 Target->getDeclaredTypeOfContext()->getCanonicalType(), Fields);
     }
+                        
+    void emitInitializeValueWitnessTable(IRGenFunction &IGF,
+                                         llvm::Value *metadata,
+                                         llvm::Value *vwtable) {
+      emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
+      IGM.getTypeInfo(Target->getDeclaredTypeInContext())
+        .initializeValueWitnessTable(IGF, metadata, vwtable);
+    }
   };
 }
 
@@ -2075,6 +2102,14 @@ public:
   void addDependentValueWitnessTablePattern() {
     emitDependentValueWitnessTablePattern(IGM,
                 Target->getDeclaredTypeOfContext()->getCanonicalType(), Fields);
+  }
+  
+  void emitInitializeValueWitnessTable(IRGenFunction &IGF,
+                                       llvm::Value *metadata,
+                                       llvm::Value *vwtable) {
+    emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
+    IGM.getTypeInfo(Target->getDeclaredTypeInContext())
+      .initializeValueWitnessTable(IGF, metadata, vwtable);
   }
 };
   

@@ -174,8 +174,8 @@ namespace {
   /// Type implementation for non-fixed-size tuples.
   class NonFixedTupleTypeInfo :
       public TupleTypeInfoBase<NonFixedTupleTypeInfo,
-                               WitnessSizedTypeInfo<NonFixedTupleTypeInfo> > {
-
+                               WitnessSizedTypeInfo<NonFixedTupleTypeInfo>>
+  {
     CanType TheType;
   public:
     NonFixedTupleTypeInfo(unsigned numFields, llvm::Type *T, CanType type,
@@ -193,6 +193,14 @@ namespace {
     llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const {
       auto metadata = getMetadataRef(IGF);
       return IGF.emitValueWitnessTableRefForMetadata(metadata);
+    }
+
+    void initializeValueWitnessTable(IRGenFunction &IGF,
+                                     llvm::Value *metadata,
+                                     llvm::Value *vwtable) const override {
+      // Tuple value witness tables are instantiated by the runtime along with
+      // their metadata. We should never try to initialize one in the compiler.
+      llvm_unreachable("initializing value witness table for tuple?!");
     }
   };
 

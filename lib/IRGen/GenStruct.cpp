@@ -160,6 +160,12 @@ namespace {
       auto metadata = getMetadataRef(IGF);
       return IGF.emitValueWitnessTableRefForMetadata(metadata);
     }
+                                    
+    void initializeValueWitnessTable(IRGenFunction &IGF,
+                                     llvm::Value *metadata,
+                                     llvm::Value *vwtable) const override {
+      // FIXME
+    }
   };
 
   class StructTypeBuilder :

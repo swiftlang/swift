@@ -104,6 +104,15 @@ public:
     return { size, align };
   }
 
+  std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
+  getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF) const override {
+    auto wtable = asImpl().getValueWitnessTable(IGF);
+    auto size = emitLoadOfSize(IGF, wtable);
+    auto align = emitLoadOfAlignmentMask(IGF, wtable);
+    auto stride = emitLoadOfStride(IGF, wtable);
+    return { size, align, stride };
+  }
+
   llvm::Value *getSize(IRGenFunction &IGF) const override {
     auto wtable = asImpl().getValueWitnessTable(IGF);
     return emitLoadOfSize(IGF, wtable);

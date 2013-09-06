@@ -1130,6 +1130,14 @@ namespace {
     llvm::Constant *getStaticSize(IRGenModule &IGM) const { return nullptr; }
     llvm::Constant *getStaticAlignment(IRGenModule &IGM) const { return nullptr; }
     llvm::Constant *getStaticStride(IRGenModule &IGM) const { return nullptr; }
+    
+    void initializeValueWitnessTable(IRGenFunction &IGF,
+                                     llvm::Value *metadata,
+                                     llvm::Value *vwtable) const override {
+      // Archetypes always refer to an existing type. A witness table should
+      // never be independently initialized for one.
+      llvm_unreachable("initializing value witness table for archetype?!");
+    }
   };
   
   /// Ways in which an object can fit into a fixed-size buffer.
@@ -3245,12 +3253,12 @@ namespace {
     
     /// Extract archetype metadata for a value witness function of the given
     /// type.
-    PolymorphicConvention(UnboundGenericType *bgType)
+    PolymorphicConvention(NominalTypeDecl *ntd)
       : FnType(PolymorphicFunctionType::get(
-                                  bgType->getDecl()->getDeclaredTypeInContext(),
-                                  TupleType::getEmpty(bgType->getASTContext()),
-                                  bgType->getDecl()->getGenericParamsOfContext(),
-                                  bgType->getASTContext()))
+                                  ntd->getDeclaredTypeInContext(),
+                                  TupleType::getEmpty(ntd->getASTContext()),
+                                  ntd->getGenericParamsOfContext(),
+                                  ntd->getASTContext()))
     {
       TheSourceKind = SourceKind::Metadata;
       considerBoundGenericType(
@@ -3361,8 +3369,8 @@ namespace {
     void emit(Explosion &in);
     
     /// Emit polymorphic parameters for a generic value witness.
-    EmitPolymorphicParameters(IRGenFunction &IGF, UnboundGenericType *ugt)
-      : PolymorphicConvention(ugt), IGF(IGF) {}
+    EmitPolymorphicParameters(IRGenFunction &IGF, NominalTypeDecl *ntd)
+      : PolymorphicConvention(ntd), IGF(IGF) {}
     
     void emitForGenericValueWitness(llvm::Value *selfMeta);
 
@@ -3489,11 +3497,11 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
   EmitPolymorphicParameters(IGF, type).emit(in);
 }
 
-/// Perform the bindings necessary to emit a generic value witness.
-static void emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
-                                                        UnboundGenericType *ugt,
+/// Perform the metadata bindings necessary to emit a generic value witness.
+void irgen::emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
+                                                        NominalTypeDecl *ntd,
                                                         llvm::Value *selfMeta) {
-  EmitPolymorphicParameters(IGF, ugt).emitForGenericValueWitness(selfMeta);
+  EmitPolymorphicParameters(IGF, ntd).emitForGenericValueWitness(selfMeta);
 }
 
 /// Get the next argument and use it as the 'self' type metadata.
@@ -3504,7 +3512,7 @@ static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
   assert(arg->getType() == IGF.IGM.TypeMetadataPtrTy &&
          "Self argument is not a type?!");
   if (auto ugt = dyn_cast<UnboundGenericType>(abstractType)) {
-    emitPolymorphicParametersForGenericValueWitness(IGF, ugt, arg);
+    emitPolymorphicParametersForGenericValueWitness(IGF, ugt->getDecl(), arg);
   }
 }
 

@@ -162,6 +162,8 @@ public:
   /// Return the size and alignment of this type.
   virtual std::pair<llvm::Value*,llvm::Value*>
     getSizeAndAlignmentMask(IRGenFunction &IGF) const = 0;
+  virtual std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
+    getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF) const = 0;
   virtual llvm::Value *getSize(IRGenFunction &IGF) const = 0;
   virtual llvm::Value *getAlignmentMask(IRGenFunction &IGF) const = 0;
   virtual llvm::Value *getStride(IRGenFunction &IGF) const = 0;
@@ -247,6 +249,12 @@ public:
   virtual void storeExtraInhabitant(IRGenFunction &IGF,
                                     llvm::Value *index,
                                     Address dest) const = 0;
+  
+  /// Initialize a freshly instantiated value witness table. Should be a no-op
+  /// for fixed-size types.
+  virtual void initializeValueWitnessTable(IRGenFunction &IGF,
+                                           llvm::Value *metadata,
+                                           llvm::Value *vwtable) const = 0;
 };
 
 } // end namespace irgen

@@ -131,6 +131,11 @@ namespace irgen {
   void emitPolymorphicParameters(IRGenFunction &IGF,
                                  PolymorphicFunctionType *type,
                                  Explosion &args);
+  
+  /// Perform the metadata bindings necessary to emit a generic value witness.
+  void emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
+                                                       NominalTypeDecl *ntd,
+                                                       llvm::Value *selfMeta);
 
   /// When calling a polymorphic call, pass the arguments for the
   /// generics clause.

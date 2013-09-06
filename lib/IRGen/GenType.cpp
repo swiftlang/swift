@@ -109,8 +109,13 @@ static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
 /// Return the size and alignment of this type.
 std::pair<llvm::Value*,llvm::Value*>
 FixedTypeInfo::getSizeAndAlignmentMask(IRGenFunction &IGF) const {
-  return std::make_pair(FixedTypeInfo::getSize(IGF),
-                        FixedTypeInfo::getAlignmentMask(IGF));
+  return {FixedTypeInfo::getSize(IGF), FixedTypeInfo::getAlignmentMask(IGF)};
+}
+std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
+FixedTypeInfo::getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF) const {
+  return {FixedTypeInfo::getSize(IGF),
+          FixedTypeInfo::getAlignmentMask(IGF),
+          FixedTypeInfo::getStride(IGF)};
 }
 
 llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF) const {

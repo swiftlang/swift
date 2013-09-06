@@ -59,6 +59,11 @@ import Builtin
 //    the element type.
 // CHECK: %O5union16DynamicSingleton = type {}
 
+// -- Dynamic singleton metadata template carries a value witness table pattern
+//    we fill in on instantiation.
+// CHECK: @_TMPdO5union16DynamicSingleton = global { {{.*}}* } {
+// CHECK:   void (i8*, i8*)* [[DYNAMIC_SINGLETON_FILL:@fill_generic_metadata[0-9]*]]
+
 // -- No-payload unions have spare bits, and therefore extra inhabitants, in
 //    their value witness table.
 // CHECK: @_TWVO5union10NoPayloads = constant [19 x i8*] [
@@ -1576,3 +1581,31 @@ entry:
   %z = tuple ()
   return %z : $()
 }
+
+// -- Fill function for dynamic singleton. The value witness table flags just
+//    get copied over from the element.
+// CHECK: define internal void [[DYNAMIC_SINGLETON_FILL]](i8*, i8*) {
+// CHECK:   [[FULL_ADDR:%.*]] = bitcast i8* %0 to i64*
+// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i64* [[FULL_ADDR]], i32 5
+// CHECK:   [[METADATA_ADDR:%.*]] = getelementptr inbounds i64* [[FULL_ADDR]], i32 1
+// CHECK:   [[METADATA:%.*]] = bitcast i64* [[METADATA_ADDR]] to %swift.type*
+// CHECK:   [[VWT:%.*]] = bitcast i64* [[VWT_ADDR]] to i8**
+// CHECK:   [[METADATA_PARAMS:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
+// CHECK:   [[METADATA_PARAM_ADDR:%.*]] = getelementptr inbounds %swift.type** [[METADATA_PARAMS]], i64 3
+// CHECK:   [[T:%.*]] = load %swift.type** [[METADATA_PARAM_ADDR]], align 8
+// CHECK:   [[T_VWTS:%.*]] = bitcast %swift.type* [[T]] to i8***
+// CHECK:   [[T_VWT_ADDR:%.*]] = getelementptr inbounds i8*** [[T_VWTS]], i64 -1
+// CHECK:   [[T_VWT:%.*]] = load i8*** [[T_VWT_ADDR]], align 8
+// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8** [[VWT]], i32 13
+// CHECK:   [[T_SIZE_ADDR:%.*]] = getelementptr inbounds i8** [[T_VWT]], i32 13
+// CHECK:   [[T_SIZE:%.*]] = load i8** [[T_SIZE_ADDR]], align 8
+// CHECK:   store i8* [[T_SIZE]], i8** [[SIZE_ADDR]], align 8
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8** [[VWT]], i32 14
+// CHECK:   [[T_FLAGS_ADDR:%.*]] = getelementptr inbounds i8** [[T_VWT]], i32 14
+// CHECK:   [[T_FLAGS:%.*]] = load i8** [[T_FLAGS_ADDR]], align 8
+// CHECK:   store i8* [[T_FLAGS]], i8** [[FLAGS_ADDR]], align 8
+// CHECK:   [[STRIDE_ADDR:%.*]] = getelementptr inbounds i8** [[VWT]], i32 15
+// CHECK:   [[T_STRIDE_ADDR:%.*]] = getelementptr inbounds i8** [[T_VWT]], i32 15
+// CHECK:   [[T_STRIDE:%.*]] = load i8** [[T_STRIDE_ADDR]], align 8
+// CHECK:   store i8* [[T_STRIDE]], i8** [[STRIDE_ADDR]], align 8
+

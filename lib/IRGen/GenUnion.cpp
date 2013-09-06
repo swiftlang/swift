@@ -57,7 +57,7 @@ public:
   };
   
   enum TypeInfoKind {
-    Opaque,   ///< The union has an opaque TypeInfo.
+    Opaque,   ///< The union has a NonFixedTypeInfo.
     Fixed,    ///< The union has a FixedTypeInfo.
     Loadable, ///< The union has a LoadableTypeInfo.
   };
@@ -202,6 +202,10 @@ public:
                                   Address src) const = 0;
   virtual void initializeWithTake(IRGenFunction &IGF, Address dest,
                                   Address src) const = 0;
+  
+  virtual void initializeValueWitnessTable(IRGenFunction &IGF,
+                                           llvm::Value *metadata,
+                                           llvm::Value *vwtable) const = 0;
   
   /// \group Delegated LoadableTypeInfo operations
   
@@ -416,6 +420,41 @@ namespace {
       if (!getLoadableSingleton()) return;
       getLoadableSingleton()->unpackUnionPayload(IGF, payload, dest, offset);
     }
+    
+    void initializeValueWitnessTable(IRGenFunction &IGF,
+                                     llvm::Value *metadata,
+                                     llvm::Value *vwtable) const override {
+      // Fixed-size unions don't need dynamic witness table initialization.
+      if (TIK >= Fixed) return;
+
+      assert(!ElementsWithPayload.empty() &&
+             "empty singleton union should not be dynamic!");
+
+      // Get the value witness table for the element.
+      CanType eltTy
+       = ElementsWithPayload[0].decl->getArgumentType()->getCanonicalType();
+      llvm::Value *eltMetadata = IGF.emitTypeMetadataRef(eltTy);
+      llvm::Value *eltVWT
+        = IGF.emitValueWitnessTableRefForMetadata(eltMetadata);
+      
+      Address vwtAddr(vwtable, IGF.IGM.getPointerAlignment());
+      Address eltVWTAddr(eltVWT, IGF.IGM.getPointerAlignment());
+      
+      auto copyWitnessFromElt = [&](ValueWitness witness) {
+        Address dest = IGF.Builder.CreateConstArrayGEP(vwtAddr,
+                                   unsigned(witness), IGF.IGM.getPointerSize());
+        Address src = IGF.Builder.CreateConstArrayGEP(eltVWTAddr,
+                                   unsigned(witness), IGF.IGM.getPointerSize());
+        IGF.Builder.CreateStore(IGF.Builder.CreateLoad(src), dest);
+      };
+
+      copyWitnessFromElt(ValueWitness::Size);
+      copyWitnessFromElt(ValueWitness::Flags);
+      copyWitnessFromElt(ValueWitness::Stride);
+      
+      // FIXME: We should also carry over the extra inhabitant flags if the
+      // element type has extra inhabitants.
+    }
   };
   
   /// Implementation strategy for no-payload unions, in other words, 'enum-like'
@@ -518,6 +557,13 @@ namespace {
       Address discriminatorAddr
         = IGF.Builder.CreateStructGEP(unionAddr, 0, Size(0));
       IGF.Builder.CreateStore(discriminator, discriminatorAddr);
+    }
+    
+    void initializeValueWitnessTable(IRGenFunction &IGF,
+                                     llvm::Value *metadata,
+                                     llvm::Value *vwtable) const override {
+      // No-payload unions are always fixed-size so never need dynamic value
+      // witness table initialization.
     }
     
     /// \group Required for SingleScalarTypeInfo
@@ -677,6 +723,12 @@ namespace {
       if (ExtraTagBitCount > 0)
         extraTag = IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr));
       return {payload, extraTag};
+    }
+    
+    void initializeValueWitnessTable(IRGenFunction &IGF,
+                                     llvm::Value *metadata,
+                                     llvm::Value *vwtable) const override {
+      // FIXME
     }
   };
 
@@ -2137,6 +2189,11 @@ namespace {
     void assignWithTake(IRGenFunction &IGF, Address dest,
                         Address src) const override {
       return Strategy.assignWithTake(IGF, dest, src);
+    }
+    virtual void initializeValueWitnessTable(IRGenFunction &IGF,
+                                         llvm::Value *metadata,
+                                         llvm::Value *vwtable) const override {
+      return Strategy.initializeValueWitnessTable(IGF, metadata, vwtable);
     }
   };
   

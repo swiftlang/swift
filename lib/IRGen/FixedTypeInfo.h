@@ -73,6 +73,8 @@ public:
 
   std::pair<llvm::Value*, llvm::Value*>
   getSizeAndAlignmentMask(IRGenFunction &IGF) const override;
+  std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
+  getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF) const override;
   llvm::Value *getSize(IRGenFunction &IGF) const override;
   llvm::Value *getAlignmentMask(IRGenFunction &IGF) const override;
   llvm::Value *getStride(IRGenFunction &IGF) const override;
@@ -186,6 +188,11 @@ public:
   ///
   /// and end up with a spare bits mask for the entire union.
   void applyFixedSpareBitsMask(llvm::BitVector &bits) const;
+  
+  /// Fixed-size types never need dynamic value witness table instantiation.
+  void initializeValueWitnessTable(IRGenFunction &IGF,
+                                   llvm::Value *metadata,
+                                   llvm::Value *vwtable) const override {}
   
   static bool classof(const FixedTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isFixedSize(); }
