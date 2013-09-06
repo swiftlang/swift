@@ -30,7 +30,7 @@ public:
   SILLocation Loc;
   SILDebugScope* Parent;
 
-  SILDebugScope(SILLocation Loc = SILLocation(),
+  SILDebugScope(SILLocation Loc,
                 SILDebugScope* Parent = nullptr)
     :Loc(Loc), Parent(Parent)
   {}

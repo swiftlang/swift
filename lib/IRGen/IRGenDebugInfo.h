@@ -109,7 +109,7 @@ public:
   /// Update the IRBuilder's current debug location to the location
   /// Loc and the lexical scope DS.
   void setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
-                     SILLocation Loc = SILLocation());
+                     SILLocation Loc);
 
   /// Push the current debug location onto a stack.
   void pushLoc() {

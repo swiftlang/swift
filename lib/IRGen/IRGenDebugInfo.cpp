@@ -553,9 +553,10 @@ void IRGenDebugInfo::emitFunction(SILFunction *SILFn, llvm::Function *Fn) {
 void IRGenDebugInfo::emitArtificialFunction(SILModule &SILMod,
                                               IRBuilder &Builder,
                                               llvm::Function *Fn) {
-  SILDebugScope *Scope = new (SILMod) SILDebugScope();
+  RegularLocation ALoc = RegularLocation::getArtificialLocation();
+  SILDebugScope *Scope = new (SILMod) SILDebugScope(ALoc);
   emitFunction(SILMod, Scope, Fn, AbstractCC::Freestanding, SILType());
-  setCurrentLoc(Builder, Scope, RegularLocation::getArtificialLocation());
+  setCurrentLoc(Builder, Scope, ALoc);
 }
 
 /// Return the position of Arg in Fn's signature, counting from 1.

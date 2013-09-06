@@ -994,7 +994,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         IGM.DebugInfo->setCurrentLoc(Builder, DS, I.getLoc());
       else {
         assert( CurSILFn->getDebugScope() && "function without a debug scope");
-        IGM.DebugInfo->setCurrentLoc(Builder, CurSILFn->getDebugScope());
+        IGM.DebugInfo->setCurrentLoc(Builder, CurSILFn->getDebugScope(),
+                                     SILLocation());
       }
     }
     visit(&I);

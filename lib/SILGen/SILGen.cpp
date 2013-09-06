@@ -56,7 +56,7 @@ SILGenModule::SILGenModule(SILModule &M)
 
   RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();
   // Assign a debug scope pointing into the void to the top level function.
-  toplevel->setDebugScope(new (M) SILDebugScope());
+  toplevel->setDebugScope(new (M) SILDebugScope(TopLevelLoc));
   toplevel->setLocation(TopLevelLoc);
 
   TopLevelSGF = new SILGenFunction(*this, *toplevel);
