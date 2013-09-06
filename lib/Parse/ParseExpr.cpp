@@ -712,7 +712,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult(superRef);
   }
-  diagnose(superLoc, diag::expected_dot_or_subscript_after_super);
+  diagnose(Tok, diag::expected_dot_or_subscript_after_super);
   return nullptr;
 }
 

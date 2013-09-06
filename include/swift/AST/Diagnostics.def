@@ -653,9 +653,10 @@ ERROR(expected_identifier_after_dot_expr,expr_parsing,none,
 ERROR(expected_field_spec_name_tuple_expr,expr_parsing,none,
       "expected field specifier name in tuple expression", ())
 
-ERROR(expected_identifier_after_super_dot_expr,expr_parsing,none,
+ERROR(expected_identifier_after_super_dot_expr,expr_parsing,
+      PointsToFirstBadToken,
       "expected identifier or 'constructor' after super '.' expression", ())
-ERROR(expected_dot_or_subscript_after_super,expr_parsing,none,
+ERROR(expected_dot_or_subscript_after_super,expr_parsing,PointsToFirstBadToken,
       "expected '.' or '[' after 'super'", ())
 ERROR(super_constructor_not_in_constructor,expr_parsing,none,
       "'super.constructor' cannot be called outside of a constructor", ())
