@@ -552,9 +552,11 @@ ERROR(expected_expr_do_while,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'do-while' condition", ())
 
 // C-Style For Stmt
+ERROR(expected_init_for_stmt,stmt_parsing,PointsToFirstBadToken,
+      "expected initialization in a 'for' statement", ())
 ERROR(missing_init_for_stmt,stmt_parsing,none,
       "missing initialization in a 'for' statement", ())
-ERROR(expected_semi_for_stmt,stmt_parsing,none,
+ERROR(expected_semi_for_stmt,stmt_parsing,PointsToFirstBadToken,
       "expected ';' in 'for' statement", ())
 ERROR(expected_cond_for_stmt,stmt_parsing,none,
       "expected condition in 'for' statement", ())

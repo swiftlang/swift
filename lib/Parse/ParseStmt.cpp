@@ -641,7 +641,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
       return VarDeclStatus; // FIXME: better recovery
   } else if (Tok.isNot(tok::semi)) {
     HaveFirst = true;
-    First = parseExpr(diag::expected_expr);
+    First = parseExpr(diag::expected_init_for_stmt);
     Status |= First;
     if (First.isNull() || First.hasCodeCompletion())
       return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
