@@ -438,7 +438,7 @@ ERROR(expected_rangle_generic_arg_list,type_parsing,PointsToFirstBadToken,
 
 
 // Function types
-ERROR(expected_type_function_result,type_parsing,none,
+ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
       "expected type for function result", ())
 
 // Union Types

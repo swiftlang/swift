@@ -313,7 +313,8 @@ Parser::parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
       consumeToken(tok::colon);
     }
 
-    ParserResult<TypeRepr> ResultType = parseType();
+    ParserResult<TypeRepr> ResultType =
+        parseType(diag::expected_type_function_result);
     if (ResultType.hasCodeCompletion())
       return ResultType;
     retType = ResultType.getPtrOrNull();
