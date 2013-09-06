@@ -106,7 +106,7 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     }
     
     // Skip until we hit the '>'.
-    skipUntilAnyOperator();
+    skipUntilGreaterInTypeList();
     if (startsWithGreater(Tok))
       RAngleLoc = consumeStartingGreater();
     else

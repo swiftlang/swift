@@ -206,7 +206,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
     ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
     if (Ty.isNull() || Ty.hasCodeCompletion()) {
       // Skip until we hit the '>'.
-      skipUntilAnyOperator();
+      skipUntilGreaterInTypeList();
       if (startsWithGreater(Tok))
         consumeStartingGreater();
       return true;
@@ -221,7 +221,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
     diagnose(LAngleLoc, diag::opening_angle);
 
     // Skip until we hit the '>'.
-    skipUntilAnyOperator();
+    skipUntilGreaterInTypeList();
     if (startsWithGreater(Tok))
       RAngleLoc = consumeStartingGreater();
     return true;
@@ -377,7 +377,7 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
     }
 
     // Skip until we hit the '>'.
-    skipUntilAnyOperator();
+    skipUntilGreaterInTypeList();
     if (startsWithGreater(Tok))
       EndLoc = consumeStartingGreater();    
   } else {

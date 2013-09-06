@@ -338,6 +338,33 @@ void Parser::skipUntilAnyOperator() {
     skipSingle();
 }
 
+void Parser::skipUntilGreaterInTypeList() {
+  while (true) {
+    switch (Tok.getKind()) {
+    case tok::eof:
+    case tok::l_brace:
+    case tok::r_brace:
+      return;
+
+#define KEYWORD(X) case tok::kw_##X:
+#include "swift/Parse/Tokens.def"
+    // 'Self' can appear in types, skip it.
+    if (Tok.is(tok::kw_Self))
+      break;
+    if (isStartOfStmt(Tok) || isStartOfDecl(Tok, peekToken()))
+      return;
+    break;
+
+    default:
+      if (Tok.isAnyOperator() && startsWithGreater(Tok))
+        return;
+      // Skip '[' ']' '(' ')', because they can appear in types.
+      break;
+    }
+    skipSingle();
+  }
+}
+
 void Parser::skipUntilDeclRBrace() {
   while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
          !isStartOfDecl(Tok, peekToken()))
