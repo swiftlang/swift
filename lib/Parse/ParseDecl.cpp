@@ -1782,7 +1782,7 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
 
   SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_union_type)) {
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_union)) {
     LBLoc = Tok.getLoc();
     RBLoc = LBLoc;
     Status.setIsParseError();
@@ -1790,7 +1790,7 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
     ContextChange CC(*this, UD);
     Scope S(this, ScopeKind::ClassBody);
     if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
-                                diag::expected_rbrace_union_type,
+                                diag::expected_rbrace_union,
                                 PD_HasContainerType | PD_AllowUnionElement |
                                 PD_DisallowVar))
       Status.setIsParseError();
@@ -2178,8 +2178,7 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
 
     SourceLoc LBraceLoc;
     SourceLoc RBraceLoc;
-    if (parseToken(tok::l_brace, LBraceLoc,
-                   diag::expected_lbrace_protocol_type)) {
+    if (parseToken(tok::l_brace, LBraceLoc, diag::expected_lbrace_protocol)) {
       LBraceLoc = Tok.getLoc();
       RBraceLoc = LBraceLoc;
       Status.setIsParseError();

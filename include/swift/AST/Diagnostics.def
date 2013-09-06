@@ -208,10 +208,12 @@ ERROR(decl_expected_module_name,decl_parsing,none,
       "expected module name in import declaration", ())
 
 // Extension
-ERROR(expected_ident_type_in_extension,decl_parsing,none,
-      "non-nominal type %0 cannot be extended", (TypeLoc))
+ERROR(expected_lbrace_extension,decl_parsing,PointsToFirstBadToken,
+      "expected '{' in extension", ())
 ERROR(expected_rbrace_extension,decl_parsing,none,
       "expected '}' at end of extension", ())
+ERROR(expected_ident_type_in_extension,decl_parsing,none,
+      "non-nominal type %0 cannot be extended", (TypeLoc))
 
 // TypeAlias
 ERROR(expected_equal_in_typealias,decl_parsing,PointsToFirstBadToken,
@@ -240,20 +242,26 @@ ERROR(func_decl_expected_arrow,decl_parsing,none,
       "expected '->' after function parameter tuple", ())
 
 // Union
+ERROR(expected_lbrace_union,decl_parsing,PointsToFirstBadToken,
+      "expected '{' in union", ())
+ERROR(expected_rbrace_union,decl_parsing,none,
+      "expected '}' at end of union", ())
 
 // Struct
-ERROR(expected_lbrace_struct,decl_parsing,none,
+ERROR(expected_lbrace_struct,decl_parsing,PointsToFirstBadToken,
       "expected '{' in struct", ())
 ERROR(expected_rbrace_struct,decl_parsing,none,
       "expected '}' in struct", ())
 
 // Class
-ERROR(expected_lbrace_class,decl_parsing,none,
+ERROR(expected_lbrace_class,decl_parsing,PointsToFirstBadToken,
       "expected '{' in class", ())
 ERROR(expected_rbrace_class,decl_parsing,none,
       "expected '}' in class", ())
 
 // Protocol
+ERROR(expected_lbrace_protocol,decl_parsing,PointsToFirstBadToken,
+      "expected '{' in protocol type", ())
 ERROR(expected_rbrace_protocol,decl_parsing,none,
       "expected '}' in protocol", ())
 
@@ -434,10 +442,6 @@ ERROR(expected_type_function_result,type_parsing,none,
       "expected type for function result", ())
 
 // Union Types
-ERROR(expected_lbrace_union_type,type_parsing,none,
-      "expected '{' in union", ())
-ERROR(expected_rbrace_union_type,type_parsing,none,
-      "expected '}' at end of union", ())
 ERROR(expected_type_union_element_result,type_parsing,none,
       "expected type after '->' in 'case'", ())
 
@@ -464,8 +468,6 @@ ERROR(tuple_type_init,pattern_parsing,none,
       "default argument not permitted in a tuple type", ())
 
 // Protocol Types
-ERROR(expected_lbrace_protocol_type,type_parsing,none,
-      "expected '{' in protocol type", ())
 ERROR(expected_langle_protocol,type_parsing,none,
       "expected '<' in protocol composition type", ())
 ERROR(expected_rangle_protocol,type_parsing,none,
@@ -1036,8 +1038,6 @@ ERROR(invalid_decl_attribute,sema_tcd,none,
       "attribute '%0' cannot be applied to declaration", (StringRef))
 
 // Extensions
-ERROR(expected_lbrace_extension,type_parsing,none,
-      "expected '{' in extension", ())
 ERROR(non_nominal_extension,sema_tcd,none,
       "%select{non-nominal type|protocol}0 %1 cannot be extended", (bool, Type))
 
