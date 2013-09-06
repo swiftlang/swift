@@ -626,7 +626,7 @@ ERROR(expected_operator_ref,expr_parsing,none,
 ERROR(invalid_postfix_operator,expr_parsing,none,
       "operator with postfix spacing cannot start a subexpression", ())
 
-ERROR(expected_field_name,expr_parsing,none,
+ERROR(expected_field_name,expr_parsing,PointsToFirstBadToken,
       "expected field name following '.'", ())
 ERROR(expected_dollar_numeric,expr_parsing,none,
       "expected numeric value following '$'", ())
