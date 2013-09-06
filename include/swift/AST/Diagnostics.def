@@ -274,7 +274,7 @@ ERROR(expected_arrow_subscript,decl_parsing,PointsToFirstBadToken,
       "expected '->' for subscript element type", ())
 ERROR(expected_type_subscript,type_parsing,PointsToFirstBadToken,
       "expected subscripting element type", ())
-ERROR(expected_lbrace_subscript,decl_parsing,none,
+ERROR(expected_lbrace_subscript,decl_parsing,PointsToFirstBadToken,
       "expected '{' for subscripting", ())
 ERROR(subscript_without_get,decl_parsing,none,
       "subscripting must have a getter", ())
