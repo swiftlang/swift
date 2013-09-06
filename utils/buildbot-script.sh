@@ -14,6 +14,7 @@
 # SKIP_BUILD_SOURCEKIT -- set to skip building SourceKit
 # SKIP_TEST_SWIFT -- set to skip testing Swift
 # SKIP_PACKAGE_SWIFT -- set to skip packaging Swift
+# SKIP_TEST_SOURCEKIT -- set to skip testing SourceKit
 # SKIP_PACKAGE_SOURCEKIT -- set to skip packaging SourceKit
 
 # The -release flag enables a release build, which will additionally build
@@ -255,6 +256,15 @@ EOM
     echo "No package file built!"
     exit 1
   fi
+fi
+
+# Run the SourceKit tests.
+if [ \! "$SKIP_TEST_SOURCEKIT" ]; then
+  export SWIFT="$WORKSPACE/swift/build/bin/swift"
+  export SOURCEKITD_TEST="$WORKSPACE/SourceKit/build/bin/sourcekitd-test"
+  echo "--- Running SourceKit Tests ---"
+  (cd "$WORKSPACE/SourceKit/build" &&
+    "$WORKSPACE/llvm/build/bin/llvm-lit" -sv test) || exit 1
 fi
 
 if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SOURCEKIT" ]; then
