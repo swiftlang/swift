@@ -522,7 +522,7 @@ ERROR(expected_rbrace_in_brace_stmt,stmt_parsing,none,
       "expected '}' at end of brace statement", ())
 
 // Return Statement
-ERROR(expected_expr_return,stmt_parsing,none,
+ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'return' statement", ())
 
 // If Statement
