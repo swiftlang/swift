@@ -998,7 +998,8 @@ ParserStatus Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
     SourceLoc colonLoc = Tok.getLoc();
     if (!Tok.is(tok::colon))
       diagnose(Tok, diag::expected_case_colon, "default");
-    colonLoc = consumeToken();
+    else
+      consumeToken(tok::colon);
     
     // Create an implicit AnyPattern to represent the default match.
     auto any = new (Context) AnyPattern(defaultLoc);

@@ -590,9 +590,9 @@ ERROR(case_after_default,stmt_parsing,none,
       ())
 
 // Case Stmt
-ERROR(expected_case_where_expr,stmt_parsing,none,
+ERROR(expected_case_where_expr,stmt_parsing,PointsToFirstBadToken,
       "expected expression for 'where' guard of 'case'", ())
-ERROR(expected_case_colon,stmt_parsing,none,
+ERROR(expected_case_colon,stmt_parsing,PointsToFirstBadToken,
       "expected ':' after '%0'", (StringRef))
 ERROR(default_with_other_labels,stmt_parsing,none,
       "'default' cannot appear with other 'case' or 'default' labels over the same block",
