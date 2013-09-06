@@ -368,7 +368,6 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
   // Cast the messenger to the right type.
   messenger = llvm::ConstantExpr::getBitCast(messenger, fnTy->getPointerTo());
 
-  // FIXME: ObjC method constants should get SILGen-ed with a [sil_cc=c] type.
   CallEmission emission(IGF,
                         Callee::forKnownFunction(origType,
                                                  substResultType,
