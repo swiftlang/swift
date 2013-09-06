@@ -574,9 +574,9 @@ ERROR(expected_foreach_lbrace,stmt_parsing,none,
       "expected '{' to start the body of for-each loop", ())
 
 // Switch Stmt
-ERROR(expected_switch_expr,stmt_parsing,none,
+ERROR(expected_switch_expr,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'switch' statement", ())
-ERROR(expected_lbrace_after_switch,stmt_parsing,none,
+ERROR(expected_lbrace_after_switch,stmt_parsing,PointsToFirstBadToken,
       "expected '{' after 'switch' subject expression", ())
 ERROR(expected_rbrace_switch,stmt_parsing,none,
       "expected '}' at end of 'switch' statement", ())
