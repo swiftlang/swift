@@ -468,7 +468,7 @@ ERROR(tuple_type_init,pattern_parsing,none,
       "default argument not permitted in a tuple type", ())
 
 // Protocol Types
-ERROR(expected_langle_protocol,type_parsing,none,
+ERROR(expected_langle_protocol,type_parsing,PointsToFirstBadToken,
       "expected '<' in protocol composition type", ())
 ERROR(expected_rangle_protocol,type_parsing,PointsToFirstBadToken,
       "expected '>' to complete protocol composition type", ())
