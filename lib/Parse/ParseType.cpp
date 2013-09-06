@@ -512,8 +512,11 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   ParserResult<Expr> sizeEx = parseExpr(diag::expected_expr_array_type);
   if (sizeEx.hasCodeCompletion())
     return makeParserCodeCompletionStatus();
-  if (sizeEx.isNull())
+  if (sizeEx.isNull()) {
+    consumeIf(tok::r_square);
+    // FIXME: better recovery.
     return nullptr;
+  }
 
   SourceLoc rsquareLoc;
   if (parseMatchingToken(tok::r_square, rsquareLoc,

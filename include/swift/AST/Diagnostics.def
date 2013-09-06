@@ -445,8 +445,8 @@ ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
 ERROR(expected_type_union_element_result,type_parsing,PointsToFirstBadToken,
       "expected type after '->' in 'case'", ())
 
-// Array Types      
-ERROR(expected_expr_array_type,expr_parsing,none,
+// Array Types
+ERROR(expected_expr_array_type,expr_parsing,PointsToFirstBadToken,
       "expected expression for size of array type", ())
 ERROR(non_constant_array,type_parsing,none,
       "array has non-constant size", ())
