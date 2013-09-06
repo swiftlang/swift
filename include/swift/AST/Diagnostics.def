@@ -423,7 +423,7 @@ ERROR(multiple_sil_stage_decls, decl_parsing, none,
 
 ERROR(expected_type,type_parsing,PointsToFirstBadToken,
       "expected type", ())
-ERROR(expected_initializer_expr,expr_parsing,none,
+ERROR(expected_initializer_expr,expr_parsing,PointsToFirstBadToken,
       "expected initializer expression after '='", ())
 ERROR(attribute_does_not_apply_to_type,type_parsing,none,
       "attribute does not apply to type", ())
