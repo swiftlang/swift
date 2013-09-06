@@ -421,7 +421,7 @@ ERROR(multiple_sil_stage_decls, decl_parsing, none,
 // Type parsing diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(expected_type,type_parsing,none,
+ERROR(expected_type,type_parsing,PointsToFirstBadToken,
       "expected type", ())
 ERROR(expected_initializer_expr,expr_parsing,none,
       "expected initializer expression after '='", ())
