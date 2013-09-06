@@ -2325,13 +2325,19 @@ namespace {
     unsigned tagBytes = (tagBits + 7U)/8U;
     if (!llvm::isPowerOf2_32(tagBytes))
       tagBytes = llvm::NextPowerOf2(tagBytes);
+    Size tagSize(tagBytes);
     
     llvm::Type *body[] = { tagTy };
     unionTy->setBody(body);
     
-    /// FIXME: Spare bits.
-    return getUnionTypeInfo(unionTy, Size(tagBytes), {}, Alignment(tagBytes),
-                            IsPOD);
+    // Unused tag bits in the physical size can be used as spare bits.
+    // TODO: We can use all values greater than the largest discriminator as
+    // extra inhabitants, not just those made available by spare bits.
+    llvm::BitVector spareBits(tagBits, false);
+    spareBits.resize(tagSize.getValueInBits(), true);
+    
+    return getUnionTypeInfo(unionTy, tagSize, std::move(spareBits),
+                            Alignment(tagBytes), IsPOD);
   }
   
   static void setTaggedUnionBody(IRGenModule &IGM,
