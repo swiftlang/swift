@@ -442,7 +442,7 @@ ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
       "expected type for function result", ())
 
 // Union Types
-ERROR(expected_type_union_element_result,type_parsing,none,
+ERROR(expected_type_union_element_result,type_parsing,PointsToFirstBadToken,
       "expected type after '->' in 'case'", ())
 
 // Array Types      
