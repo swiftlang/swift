@@ -301,7 +301,6 @@ const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
   for (Decl *D : D->getMembers())
     if (VarDecl *VD = dyn_cast<VarDecl>(D))
       if (!VD->isProperty()) {
-        // FIXME: Type-parameter-dependent field layout isn't implemented yet.
         if (!IGM.Opts.EnableDynamicValueTypeLayout &&
             !IGM.getTypeInfo(VD->getType()).isFixedSize()) {
           IGM.unimplemented(VD->getLoc(), "dynamic field layout in structs");
@@ -314,8 +313,7 @@ const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
   auto ty = IGM.createNominalType(D);
 
   // Register a forward declaration before we look at any of the child types.
-  auto typesMapKey = D->getDeclaredType().getPointer();
-  addForwardDecl(typesMapKey, ty);
+  addForwardDecl(type.getPointer(), ty);
 
   // Build the type.
   StructTypeBuilder builder(IGM, ty, type);

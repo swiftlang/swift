@@ -47,188 +47,190 @@
 using namespace swift;
 using namespace irgen;
 
-namespace {
-  /// An implementation strategy for a union, which handles how the union is
-  /// laid out and how to construct and destructure values inside the union.
-  class UnionImplStrategy {
-  public:
-    struct Element {
-      UnionElementDecl *decl;
-      const TypeInfo *ti;
-    };
-    
-    enum TypeInfoKind {
-      Opaque,   ///< The union has an opaque TypeInfo.
-      Fixed,    ///< The union has a FixedTypeInfo.
-      Loadable, ///< The union has a LoadableTypeInfo.
-    };
-    
-  protected:
-    std::vector<Element> ElementsWithPayload;
-    std::vector<Element> ElementsWithRecursivePayload;
-    std::vector<Element> ElementsWithNoPayload;
-    const TypeInfo *TI = nullptr;
-    TypeInfoKind TIK;
-    unsigned NumElements;
-    
-    UnionImplStrategy(TypeInfoKind tik,
-                unsigned NumElements,
-                std::vector<Element> &&ElementsWithPayload,
-                std::vector<Element> &&ElementsWithRecursivePayload,
-                std::vector<Element> &&ElementsWithNoPayload)
-      : ElementsWithPayload(std::move(ElementsWithPayload)),
-        ElementsWithRecursivePayload(std::move(ElementsWithRecursivePayload)),
-        ElementsWithNoPayload(std::move(ElementsWithNoPayload)),
-        TIK(tik),
-        NumElements(NumElements)
-    {}
-    
-    /// Save the TypeInfo created for the union.
-    TypeInfo * registerUnionTypeInfo(TypeInfo *mutableTI) {
-      TI = mutableTI;
-      return mutableTI;
-    }
-    
-    /// Constructs a TypeInfo for a union of the best possible kind for its
-    /// layout, FixedUnionTypeInfo or LoadableUnionTypeInfo.
-    TypeInfo *getFixedUnionTypeInfo(llvm::StructType *T, Size S, llvm::BitVector SB,
-                               Alignment A, IsPOD_t isPOD);
-
-  public:
-    virtual ~UnionImplStrategy() { }
-
-    /// Construct a layout strategy appropriate to the union type.
-    static UnionImplStrategy *get(TypeConverter &TC, UnionDecl *theUnion);
-    
-    /// Given an incomplete StructType for the union, completes layout of the
-    /// storage type, calculates its size and alignment, and produces the
-    /// TypeInfo for the union.
-    virtual TypeInfo *completeUnionTypeLayout(TypeConverter &TC,
-                                              UnionDecl *theUnion,
-                                              llvm::StructType *unionTy) = 0;
-    
-    const TypeInfo &getTypeInfo() const {
-      assert(TI);
-      return *TI;
-    }
-    
-    llvm::StructType *getStorageType() const {
-      return cast<llvm::StructType>(getTypeInfo().getStorageType());
-    }
-    
-    IsPOD_t isPOD(ResilienceScope scope) const {
-      return getTypeInfo().isPOD(scope);
-    }
-    
-    /// Primitive-load the union value into an explosion. This is allowed even
-    /// for address-only types for operations that need to inspect only the
-    /// binary representation of the union.
-    virtual void loadForSwitch(IRGenFunction &IGF, Address addr,
-                               Explosion &out) const = 0;
-    
-    /// \group Indirect union operations
-    
-    /// Project the address of the data for a case. Does not check or modify
-    /// the referenced union value.
-    /// Corresponds to the SIL 'union_data_addr' instruction.
-    virtual Address projectDataForStore(IRGenFunction &IGF,
-                                        UnionElementDecl *elt,
-                                        Address unionAddr) const = 0;
-    
-    /// Overlay the tag value for a case onto a data value in memory.
-    /// Corresponds to the SIL 'inject_union_addr' instruction.
-    virtual void storeTag(IRGenFunction &IGF,
-                          UnionElementDecl *elt,
-                          Address unionAddr) const = 0;
-    
-    /// Clears tag bits from within the payload of a union in memory and
-    /// projects the address of the data for a case. Does not check
-    /// the referenced union value.
-    /// Performs the block argument binding for a SIL
-    /// 'destructive_switch_union_addr' instruction.
-    virtual Address destructiveProjectDataForLoad(IRGenFunction &IGF,
-                                                  UnionElementDecl *elt,
-                                                  Address unionAddr) const = 0;
-    
-    /// \group Loadable union operations
-    
-    /// Emit the construction sequence for a union case into an explosion.
-    /// Corresponds to the SIL 'union' instruction.
-    virtual void emitValueInjection(IRGenFunction &IGF,
-                                    UnionElementDecl *elt,
-                                    Explosion &params,
-                                    Explosion &out) const = 0;
-    
-    /// Emit a branch on the case contained by a union explosion.
-    /// Performs the branching for a SIL 'switch_union' instruction.
-    virtual void emitValueSwitch(IRGenFunction &IGF,
-                                 Explosion &value,
-                                 ArrayRef<std::pair<UnionElementDecl*,
-                                                    llvm::BasicBlock*>> dests,
-                                 llvm::BasicBlock *defaultDest) const = 0;
-    
-    /// Project a case value out of a union explosion. This does not check that
-    /// the explosion actually contains a value of the given case.
-    /// Performs the block argument binding for a SIL 'switch_union'
-    /// instruction.
-    virtual void emitValueProject(IRGenFunction &IGF,
-                                  Explosion &inUnion,
-                                  UnionElementDecl *theCase,
-                                  Explosion &out) const = 0;
-    
-    /// \group Delegated TypeInfo operations
-    
-    virtual void getSchema(ExplosionSchema &schema) const = 0;
-    virtual void destroy(IRGenFunction &IGF, Address addr) const = 0;
-    
-    virtual bool isIndirectArgument(ExplosionKind kind) const {
-      return TIK < Loadable;
-    }
-      
-    virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                                      Address dest) const {
-      if (TIK >= Loadable)
-        return initialize(IGF, params, dest);
-      Address src = TI->getAddressForPointer(params.claimNext());
-      TI->initializeWithTake(IGF, dest, src);
-    }
-
-    virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
-                                Address src) const = 0;
-    virtual void assignWithTake(IRGenFunction &IGF, Address dest,
-                                Address src) const = 0;
-    virtual void initializeWithCopy(IRGenFunction &IGF, Address dest,
-                                    Address src) const = 0;
-    virtual void initializeWithTake(IRGenFunction &IGF, Address dest,
-                                    Address src) const = 0;
-
-    /// \group Delegated LoadableTypeInfo operations
-    
-    virtual unsigned getExplosionSize(ExplosionKind kind) const = 0;
-    virtual void loadAsCopy(IRGenFunction &IGF, Address addr,
-                            Explosion &e) const = 0;
-    virtual void loadAsTake(IRGenFunction &IGF, Address addr,
-                            Explosion &e) const = 0;
-    virtual void assign(IRGenFunction &IGF, Explosion &e,
-                        Address addr) const = 0;
-    virtual void initialize(IRGenFunction &IGF, Explosion &e,
-                            Address addr) const = 0;
-    virtual void reexplode(IRGenFunction &IGF, Explosion &src,
-                           Explosion &dest) const = 0;
-    virtual void copy(IRGenFunction &IGF, Explosion &src,
-                      Explosion &dest) const = 0;
-    virtual void consume(IRGenFunction &IGF, Explosion &src) const = 0;
-    virtual llvm::Value *packUnionPayload(IRGenFunction &IGF,
-                                          Explosion &in,
-                                          unsigned bitWidth,
-                                          unsigned offset) const = 0;
-    
-    virtual void unpackUnionPayload(IRGenFunction &IGF,
-                                    llvm::Value *payload,
-                                    Explosion &dest,
-                                    unsigned offset) const = 0;
+/// An implementation strategy for a union, which handles how the union is
+/// laid out and how to construct and destructure values inside the union.
+class irgen::UnionImplStrategy {
+public:
+  struct Element {
+    UnionElementDecl *decl;
+    const TypeInfo *ti;
   };
   
+  enum TypeInfoKind {
+    Opaque,   ///< The union has an opaque TypeInfo.
+    Fixed,    ///< The union has a FixedTypeInfo.
+    Loadable, ///< The union has a LoadableTypeInfo.
+  };
+  
+protected:
+  std::vector<Element> ElementsWithPayload;
+  std::vector<Element> ElementsWithRecursivePayload;
+  std::vector<Element> ElementsWithNoPayload;
+  const TypeInfo *TI = nullptr;
+  TypeInfoKind TIK;
+  unsigned NumElements;
+  
+  UnionImplStrategy(TypeInfoKind tik,
+                    unsigned NumElements,
+                    std::vector<Element> &&ElementsWithPayload,
+                    std::vector<Element> &&ElementsWithRecursivePayload,
+                    std::vector<Element> &&ElementsWithNoPayload)
+  : ElementsWithPayload(std::move(ElementsWithPayload)),
+  ElementsWithRecursivePayload(std::move(ElementsWithRecursivePayload)),
+  ElementsWithNoPayload(std::move(ElementsWithNoPayload)),
+  TIK(tik),
+  NumElements(NumElements)
+  {}
+  
+  /// Save the TypeInfo created for the union.
+  TypeInfo * registerUnionTypeInfo(TypeInfo *mutableTI) {
+    TI = mutableTI;
+    return mutableTI;
+  }
+  
+  /// Constructs a TypeInfo for a union of the best possible kind for its
+  /// layout, FixedUnionTypeInfo or LoadableUnionTypeInfo.
+  TypeInfo *getFixedUnionTypeInfo(llvm::StructType *T, Size S, llvm::BitVector SB,
+                                  Alignment A, IsPOD_t isPOD);
+  
+public:
+  virtual ~UnionImplStrategy() { }
+  
+  /// Construct a layout strategy appropriate to the union type.
+  static UnionImplStrategy *get(TypeConverter &TC,
+                                UnionDecl *theUnion);
+  
+  /// Given an incomplete StructType for the union, completes layout of the
+  /// storage type, calculates its size and alignment, and produces the
+  /// TypeInfo for the union.
+  virtual TypeInfo *completeUnionTypeLayout(TypeConverter &TC,
+                                            CanType type,
+                                            UnionDecl *theUnion,
+                                            llvm::StructType *unionTy) = 0;
+  
+  const TypeInfo &getTypeInfo() const {
+    assert(TI);
+    return *TI;
+  }
+  
+  llvm::StructType *getStorageType() const {
+    return cast<llvm::StructType>(getTypeInfo().getStorageType());
+  }
+  
+  IsPOD_t isPOD(ResilienceScope scope) const {
+    return getTypeInfo().isPOD(scope);
+  }
+  
+  /// Primitive-load the union value into an explosion. This is allowed even
+  /// for address-only types for operations that need to inspect only the
+  /// binary representation of the union.
+  virtual void loadForSwitch(IRGenFunction &IGF, Address addr,
+                             Explosion &out) const = 0;
+  
+  /// \group Indirect union operations
+  
+  /// Project the address of the data for a case. Does not check or modify
+  /// the referenced union value.
+  /// Corresponds to the SIL 'union_data_addr' instruction.
+  virtual Address projectDataForStore(IRGenFunction &IGF,
+                                      UnionElementDecl *elt,
+                                      Address unionAddr) const = 0;
+  
+  /// Overlay the tag value for a case onto a data value in memory.
+  /// Corresponds to the SIL 'inject_union_addr' instruction.
+  virtual void storeTag(IRGenFunction &IGF,
+                        UnionElementDecl *elt,
+                        Address unionAddr) const = 0;
+  
+  /// Clears tag bits from within the payload of a union in memory and
+  /// projects the address of the data for a case. Does not check
+  /// the referenced union value.
+  /// Performs the block argument binding for a SIL
+  /// 'destructive_switch_union_addr' instruction.
+  virtual Address destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                                UnionElementDecl *elt,
+                                                Address unionAddr) const = 0;
+  
+  /// \group Loadable union operations
+  
+  /// Emit the construction sequence for a union case into an explosion.
+  /// Corresponds to the SIL 'union' instruction.
+  virtual void emitValueInjection(IRGenFunction &IGF,
+                                  UnionElementDecl *elt,
+                                  Explosion &params,
+                                  Explosion &out) const = 0;
+  
+  /// Emit a branch on the case contained by a union explosion.
+  /// Performs the branching for a SIL 'switch_union' instruction.
+  virtual void emitValueSwitch(IRGenFunction &IGF,
+                               Explosion &value,
+                               ArrayRef<std::pair<UnionElementDecl*,
+                               llvm::BasicBlock*>> dests,
+                               llvm::BasicBlock *defaultDest) const = 0;
+  
+  /// Project a case value out of a union explosion. This does not check that
+  /// the explosion actually contains a value of the given case.
+  /// Performs the block argument binding for a SIL 'switch_union'
+  /// instruction.
+  virtual void emitValueProject(IRGenFunction &IGF,
+                                Explosion &inUnion,
+                                UnionElementDecl *theCase,
+                                Explosion &out) const = 0;
+  
+  /// \group Delegated TypeInfo operations
+  
+  virtual void getSchema(ExplosionSchema &schema) const = 0;
+  virtual void destroy(IRGenFunction &IGF, Address addr) const = 0;
+  
+  virtual bool isIndirectArgument(ExplosionKind kind) const {
+    return TIK < Loadable;
+  }
+  
+  virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                                    Address dest) const {
+    if (TIK >= Loadable)
+      return initialize(IGF, params, dest);
+    Address src = TI->getAddressForPointer(params.claimNext());
+    TI->initializeWithTake(IGF, dest, src);
+  }
+  
+  virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
+                              Address src) const = 0;
+  virtual void assignWithTake(IRGenFunction &IGF, Address dest,
+                              Address src) const = 0;
+  virtual void initializeWithCopy(IRGenFunction &IGF, Address dest,
+                                  Address src) const = 0;
+  virtual void initializeWithTake(IRGenFunction &IGF, Address dest,
+                                  Address src) const = 0;
+  
+  /// \group Delegated LoadableTypeInfo operations
+  
+  virtual unsigned getExplosionSize(ExplosionKind kind) const = 0;
+  virtual void loadAsCopy(IRGenFunction &IGF, Address addr,
+                          Explosion &e) const = 0;
+  virtual void loadAsTake(IRGenFunction &IGF, Address addr,
+                          Explosion &e) const = 0;
+  virtual void assign(IRGenFunction &IGF, Explosion &e,
+                      Address addr) const = 0;
+  virtual void initialize(IRGenFunction &IGF, Explosion &e,
+                          Address addr) const = 0;
+  virtual void reexplode(IRGenFunction &IGF, Explosion &src,
+                         Explosion &dest) const = 0;
+  virtual void copy(IRGenFunction &IGF, Explosion &src,
+                    Explosion &dest) const = 0;
+  virtual void consume(IRGenFunction &IGF, Explosion &src) const = 0;
+  virtual llvm::Value *packUnionPayload(IRGenFunction &IGF,
+                                        Explosion &in,
+                                        unsigned bitWidth,
+                                        unsigned offset) const = 0;
+  
+  virtual void unpackUnionPayload(IRGenFunction &IGF,
+                                  llvm::Value *payload,
+                                  Explosion &dest,
+                                  unsigned offset) const = 0;
+};
+
+namespace {
   /// Implementation strategy for singleton unions, with zero or one cases.
   class SingletonUnionImplStrategy final : public UnionImplStrategy {
     const TypeInfo *getSingleton() const {
@@ -263,6 +265,7 @@ namespace {
     }
     
     TypeInfo *completeUnionTypeLayout(TypeConverter &TC,
+                                      CanType type,
                                       UnionDecl *theUnion,
                                       llvm::StructType *unionTy) override;
 
@@ -453,6 +456,7 @@ namespace {
     }
     
     TypeInfo *completeUnionTypeLayout(TypeConverter &TC,
+                                      CanType type,
                                       UnionDecl *theUnion,
                                       llvm::StructType *unionTy) override;
 
@@ -731,6 +735,7 @@ namespace {
     }
     
     TypeInfo *completeUnionTypeLayout(TypeConverter &TC,
+                                      CanType type,
                                       UnionDecl *theUnion,
                                       llvm::StructType *unionTy) override;
 
@@ -1319,6 +1324,7 @@ namespace {
     }
     
     TypeInfo *completeUnionTypeLayout(TypeConverter &TC,
+                                      CanType type,
                                       UnionDecl *theUnion,
                                       llvm::StructType *unionTy) override;
     
@@ -2008,83 +2014,85 @@ namespace {
                                payloadI->ti->getStorageType()->getPointerTo());
     }
   };
-  
-  UnionImplStrategy *UnionImplStrategy::get(TypeConverter &TC,
-                                            UnionDecl *theUnion)
-  {
-    unsigned numElements = 0;
-    TypeInfoKind tik = Loadable;
-    std::vector<Element> elementsWithPayload;
-    std::vector<Element> elementsWithRecursivePayload;
-    std::vector<Element> elementsWithNoPayload;
-    
-    for (auto elt : theUnion->getAllElements()) {
-      numElements++;
-      
-      // Compute whether this gives us an apparent payload or dynamic layout.
-      Type argType = elt->getArgumentType();
-      if (argType.isNull()) {
-        elementsWithNoPayload.push_back({elt, nullptr});
-        continue;
-      }
-      auto *argTI = TC.tryGetCompleteTypeInfo(argType->getCanonicalType());
-      if (!argTI) {
-        elementsWithRecursivePayload.push_back({elt, nullptr});
-        continue;
-      }
-      if (!argTI->isFixedSize())
-        tik = Opaque;
-      
-      auto loadableArgTI = dyn_cast<LoadableTypeInfo>(argTI);
-      if (loadableArgTI
-          && loadableArgTI->getExplosionSize(ExplosionKind::Minimal) == 0) {
-        elementsWithNoPayload.push_back({elt, argTI});
-      } else {
-        elementsWithPayload.push_back({elt, argTI});
-        if (!loadableArgTI && tik > Fixed)
-          tik = Fixed;
-      }
-    }
-    
-    assert(numElements != 0);
-    
-    if (!TC.IGM.Opts.EnableDynamicValueTypeLayout && tik < Fixed) {
-      TC.IGM.unimplemented(theUnion->getLoc(), "non-fixed union layout");
-      exit(1);
-    }
-    // FIXME recursive unions
-    if (!elementsWithRecursivePayload.empty()) {
-      TC.IGM.unimplemented(theUnion->getLoc(), "recursive union layout");
-      exit(1);
-    }
-    
-    assert(numElements == elementsWithPayload.size()
-             + elementsWithRecursivePayload.size()
-             + elementsWithNoPayload.size()
-           && "not all elements accounted for");
-    
-    if (numElements == 1)
-      return new SingletonUnionImplStrategy(tik, numElements,
-                                      std::move(elementsWithPayload),
-                                      std::move(elementsWithRecursivePayload),
-                                      std::move(elementsWithNoPayload));
-    if (elementsWithPayload.size() > 1)
-      return new MultiPayloadUnionImplStrategy(tik, numElements,
-                                      std::move(elementsWithPayload),
-                                      std::move(elementsWithRecursivePayload),
-                                      std::move(elementsWithNoPayload));
-    if (elementsWithPayload.size() == 1)
-      return new SinglePayloadUnionImplStrategy(tik, numElements,
-                                      std::move(elementsWithPayload),
-                                      std::move(elementsWithRecursivePayload),
-                                      std::move(elementsWithNoPayload));
+} // end anonymous namespace
 
-    return new NoPayloadUnionImplStrategy(tik, numElements,
-                                        std::move(elementsWithPayload),
-                                        std::move(elementsWithRecursivePayload),
-                                        std::move(elementsWithNoPayload));
+UnionImplStrategy *UnionImplStrategy::get(TypeConverter &TC,
+                                          UnionDecl *theUnion)
+{
+  unsigned numElements = 0;
+  TypeInfoKind tik = Loadable;
+  std::vector<Element> elementsWithPayload;
+  std::vector<Element> elementsWithRecursivePayload;
+  std::vector<Element> elementsWithNoPayload;
+  
+  for (auto elt : theUnion->getAllElements()) {
+    numElements++;
+    
+    // Compute whether this gives us an apparent payload or dynamic layout.
+    Type argType = elt->getArgumentType();
+    if (argType.isNull()) {
+      elementsWithNoPayload.push_back({elt, nullptr});
+      continue;
+    }
+    auto *argTI = TC.tryGetCompleteTypeInfo(argType->getCanonicalType());
+    if (!argTI) {
+      elementsWithRecursivePayload.push_back({elt, nullptr});
+      continue;
+    }
+    if (!argTI->isFixedSize())
+      tik = Opaque;
+    
+    auto loadableArgTI = dyn_cast<LoadableTypeInfo>(argTI);
+    if (loadableArgTI
+        && loadableArgTI->getExplosionSize(ExplosionKind::Minimal) == 0) {
+      elementsWithNoPayload.push_back({elt, argTI});
+    } else {
+      elementsWithPayload.push_back({elt, argTI});
+      if (!loadableArgTI && tik > Fixed)
+        tik = Fixed;
+    }
   }
   
+  assert(numElements != 0);
+  
+  if (!TC.IGM.Opts.EnableDynamicValueTypeLayout && tik < Fixed) {
+    TC.IGM.unimplemented(theUnion->getLoc(), "non-fixed union layout");
+    exit(1);
+  }
+  // FIXME recursive unions
+  if (!elementsWithRecursivePayload.empty()) {
+    TC.IGM.unimplemented(theUnion->getLoc(), "recursive union layout");
+    exit(1);
+  }
+  
+  assert(numElements == elementsWithPayload.size()
+           + elementsWithRecursivePayload.size()
+           + elementsWithNoPayload.size()
+         && "not all elements accounted for");
+  
+  if (numElements == 1)
+    return new SingletonUnionImplStrategy(tik, numElements,
+                                    std::move(elementsWithPayload),
+                                    std::move(elementsWithRecursivePayload),
+                                    std::move(elementsWithNoPayload));
+  if (elementsWithPayload.size() > 1)
+    return new MultiPayloadUnionImplStrategy(tik, numElements,
+                                    std::move(elementsWithPayload),
+                                    std::move(elementsWithRecursivePayload),
+                                    std::move(elementsWithNoPayload));
+  if (elementsWithPayload.size() == 1)
+    return new SinglePayloadUnionImplStrategy(tik, numElements,
+                                    std::move(elementsWithPayload),
+                                    std::move(elementsWithRecursivePayload),
+                                    std::move(elementsWithNoPayload));
+
+  return new NoPayloadUnionImplStrategy(tik, numElements,
+                                      std::move(elementsWithPayload),
+                                      std::move(elementsWithRecursivePayload),
+                                      std::move(elementsWithNoPayload));
+}
+
+namespace {
   /// Common base template for union type infos.
   template<typename BaseTypeInfo>
   class UnionTypeInfoBase : public BaseTypeInfo {
@@ -2227,28 +2235,31 @@ namespace {
       return TI->as<FixedUnionTypeInfo>().Strategy;
     llvm_unreachable("unimplemented union type info");
   }
-  
-  TypeInfo *
-  UnionImplStrategy::getFixedUnionTypeInfo(llvm::StructType *T, Size S,
-                                      llvm::BitVector SB,
-                                      Alignment A, IsPOD_t isPOD) {
-    TypeInfo *mutableTI;
-    switch (TIK) {
-    case Opaque:
-      llvm_unreachable("not valid");
-    case Fixed:
-      mutableTI = new FixedUnionTypeInfo(*this, T, S, SB, A, isPOD);
-      break;
-    case Loadable:
-      mutableTI = new LoadableUnionTypeInfo(*this, T, S, SB, A, isPOD);
-      break;
-    }
-    TI = mutableTI;
-    return mutableTI;
+} // end anonymous namespace
+
+TypeInfo *
+UnionImplStrategy::getFixedUnionTypeInfo(llvm::StructType *T, Size S,
+                                    llvm::BitVector SB,
+                                    Alignment A, IsPOD_t isPOD) {
+  TypeInfo *mutableTI;
+  switch (TIK) {
+  case Opaque:
+    llvm_unreachable("not valid");
+  case Fixed:
+    mutableTI = new FixedUnionTypeInfo(*this, T, S, SB, A, isPOD);
+    break;
+  case Loadable:
+    mutableTI = new LoadableUnionTypeInfo(*this, T, S, SB, A, isPOD);
+    break;
   }
-  
+  TI = mutableTI;
+  return mutableTI;
+}
+
+namespace {
   TypeInfo *
   SingletonUnionImplStrategy::completeUnionTypeLayout(TypeConverter &TC,
+                                                   CanType type,
                                                    UnionDecl *theUnion,
                                                    llvm::StructType *unionTy) {
     Type eltType = theUnion->getAllElements().front()->getArgumentType();
@@ -2273,8 +2284,7 @@ namespace {
       
       if (TIK <= Opaque) {
         return registerUnionTypeInfo(new NonFixedUnionTypeInfo(*this, unionTy,
-                                         theUnion->getDeclaredTypeInContext()
-                                           ->getCanonicalType(),
+                                         type,
                                          eltTI.getBestKnownAlignment(),
                                          eltTI.isPOD(ResilienceScope::Local)));
       } else {
@@ -2290,6 +2300,7 @@ namespace {
   
   TypeInfo *
   NoPayloadUnionImplStrategy::completeUnionTypeLayout(TypeConverter &TC,
+                                                    CanType type,
                                                     UnionDecl *theUnion,
                                                     llvm::StructType *unionTy) {
     // Since there are no payloads, we need just enough bits to hold a
@@ -2336,6 +2347,7 @@ namespace {
   
   TypeInfo *
   SinglePayloadUnionImplStrategy::completeUnionTypeLayout(TypeConverter &TC,
+                                                  CanType type,
                                                   UnionDecl *theUnion,
                                                   llvm::StructType *unionTy) {
     // See whether the payload case's type has extra inhabitants.
@@ -2388,6 +2400,7 @@ namespace {
   
   TypeInfo *
   MultiPayloadUnionImplStrategy::completeUnionTypeLayout(TypeConverter &TC,
+                                                  CanType type,
                                                   UnionDecl *theUnion,
                                                   llvm::StructType *unionTy) {
     // We need tags for each of the payload types, which we may be able to form
@@ -2453,18 +2466,25 @@ namespace {
   }
 }
 
-const TypeInfo *TypeConverter::convertUnionType(UnionDecl *theUnion) {
+const TypeInfo *TypeConverter::convertUnionType(CanType type,
+                                                UnionDecl *theUnion) {
   llvm::StructType *convertedStruct = IGM.createNominalType(theUnion);
 
   // Create a forward declaration for that type.
-  auto typeCacheKey = theUnion->getDeclaredType().getPointer();
-  addForwardDecl(typeCacheKey, convertedStruct);
+  addForwardDecl(type.getPointer(), convertedStruct);
 
-  // Compute the implementation strategy.
-  auto *strategy = UnionImplStrategy::get(*this, theUnion);
+  // Determine the implementation strategy, checking if we've visited this
+  // union before.
+  UnionImplStrategy *strategy;
+  auto found = Unions.find(theUnion);
+  if (found != Unions.end())
+    strategy = found->second;
+  else
+    strategy = UnionImplStrategy::get(*this, theUnion);
 
   // Create the TI.
-  return strategy->completeUnionTypeLayout(*this, theUnion, convertedStruct);
+  return strategy->completeUnionTypeLayout(*this, type,
+                                           theUnion, convertedStruct);
 }
 
 /// emitUnionDecl - Emit all the declarations associated with this union type.

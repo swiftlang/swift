@@ -721,7 +721,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
     case DeclKind::Class:
       return convertClassType(cast<ClassDecl>(decl));
     case DeclKind::Union:
-      return convertUnionType(cast<UnionDecl>(decl));
+      return convertUnionType(type, cast<UnionDecl>(decl));
     case DeclKind::Struct:
       return convertStructType(type, cast<StructDecl>(decl));
     }
@@ -761,13 +761,13 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   }
 
   case DeclKind::Union: {
-    auto result = convertUnionType(cast<UnionDecl>(decl));
+    auto result = convertUnionType(CanType(key), cast<UnionDecl>(decl));
     overwriteForwardDecl(Types.Cache, key, result);
     return result;
   }
 
   case DeclKind::Struct: {
-    auto result = convertStructType(type, cast<StructDecl>(decl));
+    auto result = convertStructType(CanType(key), cast<StructDecl>(decl));
     overwriteForwardDecl(Types.Cache, key, result);
     return result;
   }

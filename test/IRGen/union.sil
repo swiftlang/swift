@@ -1560,11 +1560,19 @@ typealias AllConcreteTestUnions = (
 
 var x : AllConcreteTestUnions
 
+// Verify that we can instantiate generic union instances of dynamic size.
+var a : DynamicSingleton<()>
+var b : DynamicSingleton<NoPayloads>
+
 sil @top_level_code : $() -> () {
 entry:
   // Force the global variables to materialize.
   %x = global_addr #x : $*AllConcreteTestUnions
   initialize_var %x : $*AllConcreteTestUnions
+  %a = global_addr #a : $*DynamicSingleton<()>
+  initialize_var %a : $*DynamicSingleton<()>
+  %b = global_addr #b : $*DynamicSingleton<NoPayloads>
+  initialize_var %b : $*DynamicSingleton<NoPayloads>
   %z = tuple ()
   return %z : $()
 }

@@ -42,6 +42,7 @@ namespace swift {
   class TupleType;
   class TypeBase;
   class Type;
+  class UnionDecl;
   class UnownedStorageType;
   class WeakStorageType;
 
@@ -51,6 +52,7 @@ namespace irgen {
   class ProtocolInfo;
   class Size;
   class TypeInfo;
+  class UnionImplStrategy; // defined in GenUnion.cpp
   class UnownedTypeInfo;
   class WeakTypeInfo;
 
@@ -76,8 +78,8 @@ private:
   TypeCacheEntry convertType(CanType T);
   TypeCacheEntry convertAnyNominalType(CanType T, NominalTypeDecl *D);
   const TypeInfo *convertTupleType(TupleType *T);
-  const TypeInfo *convertUnionType(UnionDecl *D);
   const TypeInfo *convertClassType(ClassDecl *D);
+  const TypeInfo *convertUnionType(CanType type, UnionDecl *D);
   const TypeInfo *convertStructType(CanType type, StructDecl *D);
   const TypeInfo *convertFunctionType(AnyFunctionType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
@@ -117,6 +119,7 @@ private:
     friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
   };
   Types_t Types;
+  llvm::DenseMap<UnionDecl *, UnionImplStrategy *> Unions;
 };
   
 } // end namespace irgen
