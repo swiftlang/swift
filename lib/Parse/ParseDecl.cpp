@@ -1660,7 +1660,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
       }
     } else if (Attributes.AsmName.empty() && !(Flags & PD_DisallowFuncDef) &&
                !HadSignatureParseError) {
-      diagnose(NameLoc, diag::func_decl_without_brace);
+      diagnose(Tok.getLoc(), diag::func_decl_without_brace);
     }
   }
 
