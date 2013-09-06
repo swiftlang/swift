@@ -53,16 +53,20 @@ SILGenModule::SILGenModule(SILModule &M)
   : M(M), Types(M.Types), TopLevelSGF(nullptr) {
   
   SILFunction *toplevel = emitTopLevelFunction();
+
+  RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();
   // Assign a debug scope pointing into the void to the top level function.
   toplevel->setDebugScope(new (M) SILDebugScope());
-  toplevel->setLocation(SILLocation());
+  toplevel->setLocation(TopLevelLoc);
 
   TopLevelSGF = new SILGenFunction(*this, *toplevel);
-  TopLevelSGF->prepareEpilog(Type(), CleanupLocation());
+  TopLevelSGF->prepareEpilog(Type(),
+                             CleanupLocation::getModuleCleanupLocation());
 }
 
 SILGenModule::~SILGenModule() {
-  TopLevelSGF->emitEpilog(SILLocation(), /* AutoGen */ true);
+  TopLevelSGF->emitEpilog(RegularLocation::getModuleLocation(),
+                          /* AutoGen */ true);
   SILFunction *toplevel = &TopLevelSGF->getFunction();
   delete TopLevelSGF;
   DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
