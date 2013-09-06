@@ -47,13 +47,13 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
                 ${ArrayBound}ReplPrintable {
   var value : Builtin.Int${bits}
 
-  static func _convertFromBuiltinIntegerLiteral(val : Builtin.Int128) -> ${Self} {
+  static func [transparent] _convertFromBuiltinIntegerLiteral(val : Builtin.Int128) -> ${Self} {
     @assert bits <= 128, 'Teach me how to deal with numbers this large'
     return ${Self}(${'val' if bits == 128 else ('Builtin.trunc_Int128_Int%d(val)' % bits)})
   }
 
   typealias IntegerLiteralType = ${Self}
-  static func convertFromIntegerLiteral(value : ${Self}) -> ${Self} {
+  static func [transparent] convertFromIntegerLiteral(value : ${Self}) -> ${Self} {
     return value
   }
 @if ArrayBound:
