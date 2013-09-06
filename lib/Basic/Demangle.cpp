@@ -978,6 +978,17 @@ private:
     }
     return Node::Kind::Unknown;
   }
+    
+  Node::Kind getTypeKind (NodePointer type) {
+    if (type->getKind() != Node::Kind::Type)
+      return Node::Kind::Unknown;
+    if (type->size() == 0)
+      return Node::Kind::Unknown;
+    NodePointer child = type->child_at(0);
+    if (child->getKind() == Node::Kind::Path)
+      return getDeclContextType(child);
+    return child->getKind();
+  }
   
   bool demangleEntity(NodePointer decl) {
     NodePointer context = demangleContext();
@@ -1254,24 +1265,33 @@ private:
     }
     if (c == 'G') {
       NodePointer type_list = Node::makeNodePointer(Node::Kind::TypeList);
-      NodePointer type = demangleType();
-      if (!type)
+      NodePointer unboundType = demangleType();
+      if (!unboundType)
         return nullptr;
-      NodePointer type_list_entry =
-          Node::makeNodePointer(Node::Kind::TypeListEntry);
-      type_list_entry->push_back_child(type);
-      type_list->push_back_child(type_list_entry);
       while (Mangled.peek() != '_') {
-        type = demangleType();
+        NodePointer type = demangleType();
         if (!type)
           return nullptr;
-        type_list_entry = Node::makeNodePointer(Node::Kind::TypeListEntry);
-        type_list_entry->push_back_child(type);
-        type_list->push_back_child(type_list_entry);
+        type_list->push_back_child(type);
       }
       Mangled.next();
+      Node::Kind bound_type_kind = Node::Kind::Unknown;
+      switch (getTypeKind(unboundType)) {
+        case Node::Kind::Class:
+          bound_type_kind = Node::Kind::BoundGenericClass;
+          break;
+        case Node::Kind::Structure:
+          bound_type_kind = Node::Kind::BoundGenericStructure;
+          break;
+        case Node::Kind::Union:
+          bound_type_kind = Node::Kind::BoundGenericUnion;
+          break;
+        default:
+          assert(false && "trying to make a generic type application for a non class|struct|union");
+      }
       NodePointer type_application =
-          Node::makeNodePointer(Node::Kind::GenericTypeApplication);
+          Node::makeNodePointer(bound_type_kind);
+      type_application->push_back_child(unboundType);
       type_application->push_back_child(type_list);
       return type_application;
     }
@@ -1753,25 +1773,23 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
         toString(type, printer);
         break;
       }
-    case swift::Demangle::Node::Kind::GenericTypeApplication: {
-      NodePointer typelist = pointer->child_at(0);
+    case swift::Demangle::Node::Kind::BoundGenericClass:
+    case swift::Demangle::Node::Kind::BoundGenericStructure:
+    case swift::Demangle::Node::Kind::BoundGenericUnion: {
+      if (pointer->size() < 2)
+        break;
+      NodePointer typelist = pointer->child_at(1);
       if (!typelist)
         break;
-      NodePointer type0 = typelist->child_at(0);
+      NodePointer type0 = pointer->child_at(0);
+      if (!type0)
+        break;
       toString(type0, printer);
       printer << "<";
-      Node::size_type count = typelist->size();
-      for (Node::size_type i = 1; i < count;) {
-        toString(typelist->child_at(i), printer);
-        if (++i < count)
-          printer << ", ";
-      }
+      toStringChildren(typelist, printer, ", ");
       printer << ">";
       break;
     }
-    case swift::Demangle::Node::Kind::TypeListEntry:
-      toStringChildren(pointer, printer);
-      break;
     case swift::Demangle::Node::Kind::ObjCBlock: {
       printer << "[objc_block] ";
       NodePointer tuple = pointer->child_at(0);
