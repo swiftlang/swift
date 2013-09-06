@@ -482,7 +482,7 @@ public:
   llvm::GlobalVariable *createVariable(IRGenModule &IGM,
                                   llvm::Type *objectType,
                                   DebugTypeInfo DebugType=DebugTypeInfo(),
-                                  RegularLocation DebugLoc = RegularLocation(),
+                                  SILLocation DebugLoc = SILLocation(),
                                   StringRef DebugName = StringRef());
 };
 

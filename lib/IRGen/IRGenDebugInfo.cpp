@@ -555,7 +555,7 @@ void IRGenDebugInfo::emitArtificialFunction(SILModule &SILMod,
                                               llvm::Function *Fn) {
   SILDebugScope *Scope = new (SILMod) SILDebugScope();
   emitFunction(SILMod, Scope, Fn, AbstractCC::Freestanding, SILType());
-  setCurrentLoc(Builder, Scope);
+  setCurrentLoc(Builder, Scope, RegularLocation::getArtificialLocation());
 }
 
 /// Return the position of Arg in Fn's signature, counting from 1.
@@ -677,7 +677,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                                    StringRef Name,
                                                    StringRef LinkageName,
                                                    DebugTypeInfo DebugType,
-                                                   RegularLocation Loc) {
+                                                   SILLocation Loc) {
   Location L = getStartLoc(SM, Loc);
   llvm::DIFile Unit = getOrCreateFile(L.Filename);
 

@@ -265,7 +265,7 @@ public:
     ManagedValue mv = isa<LValueType>(t)
       ? ManagedValue(arg, ManagedValue::LValue)
       : gen.emitManagedRValueWithCleanup(arg);
-    return RValue(gen, mv, RegularLocation(/* AutoGen */ true));
+    return RValue(gen, mv, RegularLocation::getArtificialLocation());
   }
   
   RValue visitTupleType(CanTupleType t) {

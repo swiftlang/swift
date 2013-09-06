@@ -175,7 +175,7 @@ public:
                                      StringRef Name,
                                      StringRef LinkageName,
                                      DebugTypeInfo DebugType,
-                                     RegularLocation Loc);
+                                     SILLocation Loc);
   /// Return the native, absolute path to the main file.
   StringRef getMainFilename() const { return MainFilename; }
 
