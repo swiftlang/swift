@@ -544,15 +544,14 @@ ERROR(expected_lbrace_after_while,stmt_parsing,PointsToFirstBadToken,
       "expected '{' after 'while' condition", ())
 
 // Do/While Statement
-ERROR(expected_lbrace_after_do,stmt_parsing,none,
+ERROR(expected_lbrace_after_do,stmt_parsing,PointsToFirstBadToken,
       "expected '{' after 'do'", ())
-ERROR(expected_while_in_dowhile,stmt_parsing,none,
+ERROR(expected_while_in_dowhile,stmt_parsing,PointsToFirstBadToken,
       "expected 'while' in 'do-while' loop", ())
-ERROR(expected_expr_do_while,stmt_parsing,none,
+ERROR(expected_expr_do_while,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'do-while' condition", ())
 
 // C-Style For Stmt
-
 ERROR(missing_init_for_stmt,stmt_parsing,none,
       "missing initialization in a 'for' statement", ())
 ERROR(expected_semi_for_stmt,stmt_parsing,none,
