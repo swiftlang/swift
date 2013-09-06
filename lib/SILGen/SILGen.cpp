@@ -308,7 +308,7 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   PrettyStackTraceExpr stackTrace(M.getASTContext(), "emitting SIL for", fe);
   
   SILDeclRef constant(decl);
-  SILFunction *f = preEmitFunction(constant, fe);
+  SILFunction *f = preEmitFunction(constant, fe, fe);
   SILGenFunction(*this, *f).emitFunction(fe);
   postEmitFunction(constant, f);
 
@@ -345,7 +345,7 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
 void SILGenModule::emitCurryThunk(SILDeclRef entryPoint,
                                   SILDeclRef nextEntryPoint,
                                   FuncExpr *fe) {
-  SILFunction *f = preEmitFunction(entryPoint, fe);
+  SILFunction *f = preEmitFunction(entryPoint, fe, fe);
   SILGenFunction(*this, *f)
     .emitCurryThunk(fe, entryPoint, nextEntryPoint);
   postEmitFunction(entryPoint, f);
@@ -360,7 +360,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   emitDefaultArgGenerators(decl, decl->getArguments());
 
   SILDeclRef constant(decl);
-  SILFunction *f = preEmitFunction(constant, decl);
+  SILFunction *f = preEmitFunction(constant, decl, decl);
 
   if (decl->getImplicitSelfDecl()->getType()->getClassOrBoundGenericClass()) {
     // Class constructors have separate entry points for allocation and
@@ -370,7 +370,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
     postEmitFunction(constant, f);
     
     SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
-    SILFunction *initF = preEmitFunction(initConstant, decl);
+    SILFunction *initF = preEmitFunction(initConstant, decl, decl);
     SILGenFunction(*this, *initF)
       .emitClassConstructorInitializer(decl);
     postEmitFunction(initConstant, initF);
@@ -384,21 +384,21 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
 void SILGenModule::emitUnionConstructor(UnionElementDecl *decl) {
   SILDeclRef constant(decl);
-  SILFunction *f = preEmitFunction(constant, decl);
+  SILFunction *f = preEmitFunction(constant, decl, decl);
   SILGenFunction(*this, *f).emitUnionConstructor(decl);
   postEmitFunction(constant, f);
 }
 
 void SILGenModule::emitClosure(PipeClosureExpr *ce) {
   SILDeclRef constant(ce);
-  SILFunction *f = preEmitFunction(constant, ce);
+  SILFunction *f = preEmitFunction(constant, ce, ce);
   SILGenFunction(*this, *f).emitClosure(ce);
   postEmitFunction(constant, f);
 }
 
 void SILGenModule::emitClosure(ClosureExpr *ce) {
   SILDeclRef constant(ce);
-  SILFunction *f = preEmitFunction(constant, ce);
+  SILFunction *f = preEmitFunction(constant, ce, ce);
   SILGenFunction(*this, *f).emitClosure(ce);
   postEmitFunction(constant, f);
 }
@@ -407,13 +407,13 @@ void SILGenModule::emitDestructor(ClassDecl *cd,
                                   DestructorDecl /*nullable*/ *dd) {
   // Emit the destroying destructor.
   SILDeclRef destroyer(cd, SILDeclRef::Kind::Destroyer);
-  SILFunction *f = preEmitFunction(destroyer, dd);
+  SILFunction *f = preEmitFunction(destroyer, dd, dd);
   SILGenFunction(*this, *f).emitDestructor(cd, dd);
   postEmitFunction(destroyer, f);
 }
 
 void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {
-  SILFunction *f = preEmitFunction(constant, arg);
+  SILFunction *f = preEmitFunction(constant, arg, arg);
   SILGenFunction(*this, *f)
     .emitGeneratorFunction(constant, arg);
   postEmitFunction(constant, f);
@@ -448,7 +448,7 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
   if (hasFunction(thunk))
     return;
   // TODO: why we have getBody here?
-  SILFunction *f = preEmitFunction(thunk, method->getBody());
+  SILFunction *f = preEmitFunction(thunk, method->getBody(), method->getBody());
   SILGenFunction(*this, *f).emitObjCMethodThunk(thunk);
   postEmitFunction(thunk, f);
 }
