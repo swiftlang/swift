@@ -1,4 +1,4 @@
-// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm | FileCheck %s
+// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm -enable-dynamic-value-type-layout | FileCheck %s
 
 import Builtin
 
@@ -55,6 +55,10 @@ import Builtin
 //      case c:     0  1  0  0  0  0  1  1
 // CHECK: %O5union24MultiPayloadTwoSpareBits = type { i64 }
 
+// -- Dynamic singleton. The type layout is opaque; we dynamically bitcast to
+//    the element type.
+// CHECK: %O5union16DynamicSingleton = type {}
+
 // -- No-payload unions have spare bits, and therefore extra inhabitants, in
 //    their value witness table.
 // CHECK: @_TWVO5union10NoPayloads = constant [19 x i8*] [
@@ -72,9 +76,25 @@ import Builtin
 // -- num extra inhabitants (256 - 4 valid states)
 // CHECK:   i8* inttoptr (i64 252 to i8*)
 // CHECK: ] 
+
 union Singleton {
   case val(Builtin.Int64, Builtin.Int64)
 }
+
+union DynamicSingleton<T> {
+  case val(T)
+}
+/*
+union DynamicSingleton2<T> {
+  case val(Int, T)
+}
+union DynamicSingleton3<T> {
+  case val(T, Int)
+}
+union DynamicSingleton4<T> {
+  case val(T, T)
+}
+*/
 
 // CHECK: define void @singleton_switch(i64, i64) {
 sil @singleton_switch : $(Singleton) -> () {
@@ -112,7 +132,7 @@ dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
 // CHECK: entry:
 // CHECK:   br label %[[PREDEST:[0-9]+]]
 // CHECK: ; <label>:[[PREDEST]]
-// CHECK:   [[ADDR:%.*]] = getelementptr inbounds %O5union9Singleton* %0, i32 0, i32 0
+// CHECK:   [[ADDR:%.*]] = bitcast %O5union9Singleton* %0 to { i64, i64 }*
 // CHECK:   br label %[[DEST:[0-9]+]]
 // CHECK: ; <label>:[[DEST]]
 // CHECK:   phi { i64, i64 }* [ [[ADDR]], %[[PREDEST]] ]
@@ -141,7 +161,7 @@ entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
 
 // CHECK: define void @singleton_inject_indirect(i64, i64, %O5union9Singleton*) {
 // CHECK: entry:
-// CHECK:   [[DATA_ADDR:%.*]] = getelementptr inbounds %O5union9Singleton* %2, i32 0, i32 0
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O5union9Singleton* %2 to { i64, i64 }*
 // CHECK:   [[DATA_0_ADDR:%.*]] = getelementptr inbounds { i64, i64 }* [[DATA_ADDR]], i32 0, i32 0
 // CHECK:   store i64 %0, i64* [[DATA_0_ADDR]], align 8
 // CHECK:   [[DATA_1_ADDR:%.*]] = getelementptr inbounds { i64, i64 }* [[DATA_ADDR]], i32 0, i32 1
@@ -1527,7 +1547,7 @@ end:
 }
 
 // Force the storage types to all be generated.
-typealias AllTestUnions = (
+typealias AllConcreteTestUnions = (
   Singleton,
   NoPayloads,
   NoPayloads2,
@@ -1538,13 +1558,13 @@ typealias AllTestUnions = (
   MultiPayloadOneSpareBit,
   MultiPayloadTwoSpareBits)
 
-var x : AllTestUnions
+var x : AllConcreteTestUnions
 
 sil @top_level_code : $() -> () {
 entry:
   // Force the global variables to materialize.
-  %x = global_addr #x : $*AllTestUnions
-  initialize_var %x : $*AllTestUnions
+  %x = global_addr #x : $*AllConcreteTestUnions
+  initialize_var %x : $*AllConcreteTestUnions
   %z = tuple ()
   return %z : $()
 }

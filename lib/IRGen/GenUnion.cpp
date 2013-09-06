@@ -29,17 +29,19 @@
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Optional.h"
+#include "swift/IRGen/Options.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 
+#include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
+#include "NonFixedTypeInfo.h"
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "GenUnion.h"
 #include "IRGenDebugInfo.h"
-#include "IRGenModule.h"
 #include "ScalarTypeInfo.h"
 
 using namespace swift;
@@ -81,9 +83,15 @@ namespace {
         NumElements(NumElements)
     {}
     
+    /// Save the TypeInfo created for the union.
+    TypeInfo * registerUnionTypeInfo(TypeInfo *mutableTI) {
+      TI = mutableTI;
+      return mutableTI;
+    }
+    
     /// Constructs a TypeInfo for a union of the best possible kind for its
     /// layout, FixedUnionTypeInfo or LoadableUnionTypeInfo.
-    TypeInfo *getUnionTypeInfo(llvm::StructType *T, Size S, llvm::BitVector SB,
+    TypeInfo *getFixedUnionTypeInfo(llvm::StructType *T, Size S, llvm::BitVector SB,
                                Alignment A, IsPOD_t isPOD);
 
   public:
@@ -235,10 +243,9 @@ namespace {
       return cast_or_null<LoadableTypeInfo>(getSingleton());
     }
 
-    static Address getSingletonAddress(IRGenFunction &IGF, Address addr) {
-      llvm::Value *singletonAddr =
-        IGF.Builder.CreateStructGEP(addr.getAddress(), 0);
-      return Address(singletonAddr, addr.getAlignment());
+    Address getSingletonAddress(IRGenFunction &IGF, Address addr) const {
+      return IGF.Builder.CreateBitCast(addr,
+                             getSingleton()->getStorageType()->getPointerTo());
     }
     
   public:
@@ -394,7 +401,8 @@ namespace {
                                   unsigned bitWidth,
                                   unsigned offset) const override {
       if (getLoadableSingleton())
-        return getLoadableSingleton()->packUnionPayload(IGF, in, bitWidth, offset);
+        return getLoadableSingleton()->packUnionPayload(IGF, in,
+                                                        bitWidth, offset);
       return PackUnionPayload::getEmpty(IGF.IGM, bitWidth);
     }
     
@@ -1302,10 +1310,10 @@ namespace {
                                   std::vector<Element> &&WithPayload,
                                   std::vector<Element> &&WithRecursivePayload,
                                   std::vector<Element> &&WithNoPayload)
-    : PayloadUnionImplStrategyBase(tik, NumElements,
-                                   std::move(WithPayload),
-                                   std::move(WithRecursivePayload),
-                                   std::move(WithNoPayload))
+      : PayloadUnionImplStrategyBase(tik, NumElements,
+                                     std::move(WithPayload),
+                                     std::move(WithRecursivePayload),
+                                     std::move(WithNoPayload))
     {
       assert(ElementsWithPayload.size() > 1);
     }
@@ -2040,8 +2048,7 @@ namespace {
     
     assert(numElements != 0);
     
-    // FIXME dynamic union layout
-    if (tik < Fixed) {
+    if (!TC.IGM.Opts.EnableDynamicValueTypeLayout && tik < Fixed) {
       TC.IGM.unimplemented(theUnion->getLoc(), "non-fixed union layout");
       exit(1);
     }
@@ -2188,6 +2195,28 @@ namespace {
     }
   };
   
+  /// TypeInfo for dynamically-sized union types.
+  class NonFixedUnionTypeInfo
+    : public UnionTypeInfoBase<WitnessSizedTypeInfo<NonFixedUnionTypeInfo>>
+  {
+    CanType UnionType;
+  public:
+    NonFixedUnionTypeInfo(UnionImplStrategy &strategy,
+                          llvm::Type *irTy, CanType unionTy,
+                          Alignment align, IsPOD_t pod)
+      : UnionTypeInfoBase(strategy, irTy, align, pod), UnionType(unionTy) {}
+    
+    llvm::Value *getMetadataRef(IRGenFunction &IGF) const {
+      return IGF.emitTypeMetadataRef(UnionType);
+    }
+    
+    llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const {
+      auto metadata = getMetadataRef(IGF);
+      return IGF.emitValueWitnessTableRefForMetadata(metadata);
+    }
+
+  };
+  
   static const UnionImplStrategy &getUnionImplStrategy(IRGenModule &IGM,
                                                        SILType ty) {
     assert(ty.getUnionOrBoundGenericUnion() && "not a union");
@@ -2200,13 +2229,13 @@ namespace {
   }
   
   TypeInfo *
-  UnionImplStrategy::getUnionTypeInfo(llvm::StructType *T, Size S,
+  UnionImplStrategy::getFixedUnionTypeInfo(llvm::StructType *T, Size S,
                                       llvm::BitVector SB,
                                       Alignment A, IsPOD_t isPOD) {
     TypeInfo *mutableTI;
     switch (TIK) {
     case Opaque:
-      llvm_unreachable("not implemented");
+      llvm_unreachable("not valid");
     case Fixed:
       mutableTI = new FixedUnionTypeInfo(*this, T, S, SB, A, isPOD);
       break;
@@ -2225,24 +2254,37 @@ namespace {
     Type eltType = theUnion->getAllElements().front()->getArgumentType();
     
     if (eltType.isNull()) {
-      llvm::Type *body[] = { TC.IGM.Int8Ty };
-      unionTy->setBody(body);
-      return new LoadableUnionTypeInfo(*this, unionTy, Size(0), {},
-                                       Alignment(1), IsPOD);
+      unionTy->setBody(ArrayRef<llvm::Type*>{});
+      return registerUnionTypeInfo(new LoadableUnionTypeInfo(*this, unionTy,
+                                                             Size(0), {},
+                                                             Alignment(1),
+                                                             IsPOD));
     } else {
       const TypeInfo &eltTI
         = TC.getCompleteTypeInfo(eltType->getCanonicalType());
+
+      // Use the singleton element's storage type if fixed-size.
+      if (eltTI.isFixedSize()) {
+        llvm::Type *body[] = { eltTI.StorageType };
+        unionTy->setBody(body);
+      } else {
+        unionTy->setBody(ArrayRef<llvm::Type*>{});
+      }
       
-      llvm::Type *body[] = { eltTI.StorageType };
-      unionTy->setBody(body);
-      
-      auto &fixedEltTI = cast<FixedTypeInfo>(eltTI); // FIXME
-      
-      return getUnionTypeInfo(unionTy,
-                              fixedEltTI.getFixedSize(),
-                              fixedEltTI.getSpareBits(),
-                              fixedEltTI.getFixedAlignment(),
-                              fixedEltTI.isPOD(ResilienceScope::Local));
+      if (TIK <= Opaque) {
+        return registerUnionTypeInfo(new NonFixedUnionTypeInfo(*this, unionTy,
+                                         theUnion->getDeclaredTypeInContext()
+                                           ->getCanonicalType(),
+                                         eltTI.getBestKnownAlignment(),
+                                         eltTI.isPOD(ResilienceScope::Local)));
+      } else {
+        auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
+        return getFixedUnionTypeInfo(unionTy,
+                                fixedEltTI.getFixedSize(),
+                                fixedEltTI.getSpareBits(),
+                                fixedEltTI.getFixedAlignment(),
+                                fixedEltTI.isPOD(ResilienceScope::Local));
+      }
     }
   }
   
@@ -2269,8 +2311,9 @@ namespace {
     llvm::BitVector spareBits(tagBits, false);
     spareBits.resize(tagSize.getValueInBits(), true);
     
-    return getUnionTypeInfo(unionTy, tagSize, std::move(spareBits),
-                            Alignment(tagBytes), IsPOD);
+    return registerUnionTypeInfo(new LoadableUnionTypeInfo(*this,
+                                     unionTy, tagSize, std::move(spareBits),
+                                     Alignment(tagBytes), IsPOD));
   }
   
   static void setTaggedUnionBody(IRGenModule &IGM,
@@ -2338,7 +2381,7 @@ namespace {
     sizeWithTag += (ExtraTagBitCount+7U)/8U;
     
     /// FIXME: Spare bits.
-    return getUnionTypeInfo(unionTy, Size(sizeWithTag), {},
+    return getFixedUnionTypeInfo(unionTy, Size(sizeWithTag), {},
                             payloadTI.getFixedAlignment(),
                             payloadTI.isPOD(ResilienceScope::Component));
   }
@@ -2405,7 +2448,7 @@ namespace {
       .getValue();
     sizeWithTag += (ExtraTagBitCount+7U)/8U;
     
-    return getUnionTypeInfo(unionTy, Size(sizeWithTag), {},
+    return getFixedUnionTypeInfo(unionTy, Size(sizeWithTag), {},
                             worstAlignment, isPOD);
   }
 }
