@@ -286,7 +286,7 @@ ERROR(constructor_decl_wrong_scope,decl_parsing,none,
       "constructors may only be declared within a class, struct, or union", ())
 ERROR(expected_lparen_constructor,decl_parsing,none,
       "expected '(' for constructor parameters", ())
-ERROR(expected_lbrace_constructor,decl_parsing,none,
+ERROR(expected_lbrace_constructor,decl_parsing,PointsToFirstBadToken,
       "expected '{' for constructor", ())
 
 // Destructor
@@ -294,7 +294,7 @@ ERROR(destructor_decl_outside_class,decl_parsing,none,
       "'destructor' functions may only be declared within a class", ())
 ERROR(destructor_parameter_tuple,decl_parsing,none,
       "destructors don't have parameters", ())
-ERROR(expected_lbrace_destructor,decl_parsing,none,
+ERROR(expected_lbrace_destructor,decl_parsing,PointsToFirstBadToken,
       "expected '{' for destructor", ())
 
 // Operator
