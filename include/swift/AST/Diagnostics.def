@@ -433,7 +433,7 @@ ERROR(expected_identifier_in_dotted_type,expr_parsing,PointsToFirstBadToken,
       "expected identifier in dotted type", ())
 ERROR(expected_identifier_for_type,expr_parsing,PointsToFirstBadToken,
       "expected identifier for type name", ())
-ERROR(expected_rangle_generic_arg_list,type_parsing,none,
+ERROR(expected_rangle_generic_arg_list,type_parsing,PointsToFirstBadToken,
       "expected '>' to complete generic argument list", ())
 
 
@@ -470,7 +470,7 @@ ERROR(tuple_type_init,pattern_parsing,none,
 // Protocol Types
 ERROR(expected_langle_protocol,type_parsing,none,
       "expected '<' in protocol composition type", ())
-ERROR(expected_rangle_protocol,type_parsing,none,
+ERROR(expected_rangle_protocol,type_parsing,PointsToFirstBadToken,
       "expected '>' to complete protocol composition type", ())
 
 // Optional Types
@@ -814,9 +814,9 @@ ERROR(invalid_ownership_opaque_type,attribute_parsing,none,
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------
-ERROR(expected_rangle_generics_param,parsing,none,
+ERROR(expected_rangle_generics_param,parsing,PointsToFirstBadToken,
       "expected '>' to complete generic parameter list", ())
-ERROR(expected_generics_parameter_name,parsing,none,
+ERROR(expected_generics_parameter_name,parsing,PointsToFirstBadToken,
       "expected an identifier to name generic parameter", ())
 ERROR(expected_generics_type_restriction,parsing,none,
       "expected a type name or protocol composition restricting %0",
