@@ -200,6 +200,119 @@ FixedTypeInfo::getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
   return interleaveSpareBits(IGM, SpareBits, bits, spareIndex, occupiedIndex);
 }
 
+llvm::Value *
+FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
+                                               Address src) const {
+  assert(!SpareBits.empty() && "no spare bits");
+  
+  auto &C = IGF.IGM.getLLVMContext();
+  
+  // Load the value.
+  auto payloadTy = llvm::IntegerType::get(C, StorageSize.getValueInBits());
+  src = IGF.Builder.CreateBitCast(src, payloadTy->getPointerTo());
+  auto val = IGF.Builder.CreateLoad(src);
+  
+  // If the spare bits are all zero, then we have a valid value and not an
+  // extra inhabitant.
+  auto spareBitsMask
+    = llvm::ConstantInt::get(C, getAPIntFromBitVector(SpareBits));
+  auto valSpareBits = IGF.Builder.CreateAnd(val, spareBitsMask);
+  auto isValid = IGF.Builder.CreateICmpEQ(valSpareBits,
+                                          llvm::ConstantInt::get(payloadTy, 0));
+  
+  auto *origBB = IGF.Builder.GetInsertBlock();
+  auto *endBB = llvm::BasicBlock::Create(C);
+  auto *spareBB = llvm::BasicBlock::Create(C);
+  IGF.Builder.CreateCondBr(isValid, endBB, spareBB);
+
+  IGF.Builder.emitBlock(spareBB);
+  
+  // Gather the occupied bits.
+  auto OccupiedBits = SpareBits;
+  OccupiedBits.flip();
+  llvm::Value *idx = emitGatherSpareBits(IGF, OccupiedBits, val, 0, 31);
+  
+  // See if spare bits fit into the 31 bits of the index.
+  unsigned numSpareBits = SpareBits.count();
+  unsigned numOccupiedBits = StorageSize.getValueInBits() - numSpareBits;
+  if (numOccupiedBits < 31) {
+    // Gather the spare bits.
+    llvm::Value *spareIdx
+      = emitGatherSpareBits(IGF, SpareBits, val, numOccupiedBits, 31);
+    // Unbias by subtracting one.
+    spareIdx = IGF.Builder.CreateSub(spareIdx,
+            llvm::ConstantInt::get(spareIdx->getType(), 1 << numOccupiedBits));
+    idx = IGF.Builder.CreateOr(idx, spareIdx);
+  }
+  idx = IGF.Builder.CreateZExt(idx, IGF.IGM.Int32Ty);
+  
+  IGF.Builder.CreateBr(endBB);
+  IGF.Builder.emitBlock(endBB);
+  
+  // If we had a valid value, return -1. Otherwise, return the index.
+  auto phi = IGF.Builder.CreatePHI(IGF.IGM.Int32Ty, 2);
+  phi->addIncoming(llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1), origBB);
+  phi->addIncoming(idx, spareBB);;
+  
+  return phi;
+}
+
+void
+FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
+                                            llvm::Value *index,
+                                            Address dest) const {
+  assert(!SpareBits.empty() && "no spare bits");
+  
+  auto &C = IGF.IGM.getLLVMContext();
+
+  auto payloadTy = llvm::IntegerType::get(C, StorageSize.getValueInBits());
+
+  unsigned numSpareBits = SpareBits.count();
+  unsigned numOccupiedBits = StorageSize.getValueInBits() - numSpareBits;
+  llvm::Value *spareBitValue;
+  llvm::Value *occupiedBitValue;
+  
+  // The spare bit value is biased by one because all zero spare bits
+  // represents a valid value of the type.
+  auto spareBitBias = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                             1U << numOccupiedBits);
+  
+  // Factor the spare and occupied bit values from the index.
+  if (numOccupiedBits >= 31) {
+    occupiedBitValue = index;
+    spareBitValue = spareBitBias;
+  } else {
+    auto occupiedBitMask = APInt::getAllOnesValue(numOccupiedBits);
+    occupiedBitMask = occupiedBitMask.zext(32);
+    auto occupiedBitMaskValue = llvm::ConstantInt::get(C, occupiedBitMask);
+    occupiedBitValue = IGF.Builder.CreateAnd(index, occupiedBitMaskValue);
+    
+    auto spareBitMask = ~occupiedBitMask;
+    auto spareBitMaskValue = llvm::ConstantInt::get(C, spareBitMask);
+    spareBitValue = IGF.Builder.CreateAnd(index, spareBitMaskValue);
+    // The spare bit value is biased by one because all zero spare bits
+    // represents a valid value of the type.
+    spareBitValue = IGF.Builder.CreateAdd(spareBitValue, spareBitBias);
+  }
+  
+  // Scatter the occupied bits.
+  auto OccupiedBits = SpareBits;
+  OccupiedBits.flip();
+  llvm::Value *occupied = emitScatterSpareBits(IGF, OccupiedBits,
+                                               occupiedBitValue, 0);
+  
+  // Scatter the spare bits.
+  llvm::Value *spare = emitScatterSpareBits(IGF, SpareBits, spareBitValue,
+                                            numOccupiedBits);
+  
+  // Combine the values and store to the destination.
+  llvm::Value *inhabitant = IGF.Builder.CreateOr(occupied, spare);
+  
+  dest = IGF.Builder.CreateBitCast(dest, payloadTy->getPointerTo());
+  IGF.Builder.CreateStore(inhabitant, dest);
+}
+
+
 namespace {
   /// A TypeInfo implementation for empty types.
   struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, LoadableTypeInfo> {

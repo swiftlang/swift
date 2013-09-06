@@ -181,7 +181,7 @@ public:
   /// Is this type passed indirectly as an argument at the given
   /// explosion level?
   virtual bool isIndirectArgument(Mangle::ExplosionKind level) const = 0;
-
+  
   /// Add the information for exploding values of this type to the
   /// given schema.
   virtual void getSchema(ExplosionSchema &schema) const = 0;
@@ -232,6 +232,21 @@ public:
   ///
   /// \return false by default
   virtual bool isSingleRetainablePointer(ResilienceScope scope) const;
+
+  /// Does this type statically have extra inhabitants, or may it dynamically
+  /// have extra inhabitants based on type arguments?
+  virtual bool mayHaveExtraInhabitants() const = 0;
+  
+  /// Map an extra inhabitant representation in memory to a unique 31-bit
+  /// identifier, and map a valid representation of the type to -1.
+  virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                               Address src) const = 0;
+  
+  /// Store the extra inhabitant representation indexed by a 31-bit identifier
+  /// to memory.
+  virtual void storeExtraInhabitant(IRGenFunction &IGF,
+                                    llvm::Value *index,
+                                    Address dest) const = 0;
 };
 
 } // end namespace irgen

@@ -19,6 +19,7 @@
 #ifndef SWIFT_IRGEN_FIXEDTYPEINFO_H
 #define SWIFT_IRGEN_FIXEDTYPEINFO_H
 
+#include "Address.h"
 #include "TypeInfo.h"
 #include "llvm/ADT/BitVector.h"
 
@@ -114,6 +115,12 @@ public:
   /// bits.
   unsigned getSpareBitExtraInhabitantCount() const;
 
+  /// We can statically determine the presence of extra inhabitants for fixed
+  /// types.
+  bool mayHaveExtraInhabitants() const override {
+    return getFixedExtraInhabitantCount() > 0;
+  }
+
   /// Create a constant of the given bit width holding one of the extra
   /// inhabitants of the type.
   /// The index must be less than the value returned by
@@ -128,6 +135,31 @@ public:
   llvm::ConstantInt *getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
                                                        unsigned bits,
                                                        unsigned index) const;
+  
+  /// Map an extra inhabitant representation in memory to a unique 31-bit
+  /// identifier, and map a valid representation of the type to -1.
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                       Address src) const override {
+    return getSpareBitExtraInhabitantIndex(IGF, src);
+  }
+  
+  /// Map an extra inhabitant representation derived from spare bits to an
+  /// index.
+  llvm::Value *getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
+                                               Address src) const;
+  
+  /// Store the extra inhabitant representation indexed by a 31-bit identifier
+  /// to memory.
+  void storeExtraInhabitant(IRGenFunction &IGF,
+                            llvm::Value *index,
+                            Address dest) const override {
+    storeSpareBitExtraInhabitant(IGF, index, dest);
+  }
+  
+  /// Store the indexed spare-bit-derived extra inhabitant to memory.
+  void storeSpareBitExtraInhabitant(IRGenFunction &IGF,
+                                    llvm::Value *index,
+                                    Address dest) const;
   
   /// Get the spare bit mask for the type.
   const llvm::BitVector &getSpareBits() const { return SpareBits; }

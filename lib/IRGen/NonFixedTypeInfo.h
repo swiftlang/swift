@@ -118,7 +118,19 @@ public:
     auto wtable = asImpl().getValueWitnessTable(IGF);
     return emitLoadOfStride(IGF, wtable);
   }
-  
+
+  /// FIXME: Dynamic extra inhabitant lookup.
+  bool mayHaveExtraInhabitants() const override { return false; }
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                       Address src) const override {
+    llvm_unreachable("dynamic extra inhabitants not supported");
+  }
+  void storeExtraInhabitant(IRGenFunction &IGF,
+                            llvm::Value *index,
+                            Address dest) const override {
+    llvm_unreachable("dynamic extra inhabitants not supported");
+  }
+
   llvm::Constant *getStaticSize(IRGenModule &IGM) const override {
     return nullptr;
   }

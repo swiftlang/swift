@@ -409,7 +409,7 @@ namespace {
   
   /// Implementation strategy for no-payload unions, in other words, 'enum-like'
   /// unions where none of the cases have data.
-  class NoPayloadUnionImplStrategy
+  class NoPayloadUnionImplStrategy final
     : public SingleScalarTypeInfo<NoPayloadUnionImplStrategy,
                                   UnionImplStrategy>
   {
@@ -1319,57 +1319,6 @@ namespace {
     }
     
   private:
-    /// Gather spare bits into the low bits of a smaller integer value.
-    llvm::Value *gatherSpareBits(IRGenFunction &IGF,
-                                 llvm::Value *spareBits,
-                                 unsigned resultBitWidth) const {
-      auto destTy
-        = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), resultBitWidth);
-      unsigned usedBits = 0;
-      llvm::Value *result = nullptr;
-      
-      for (int i = CommonSpareBits.find_first(); i != -1;
-           i = CommonSpareBits.find_next(i)) {
-        assert(i >= 0);
-        unsigned u = i;
-        assert(u >= usedBits && "used more bits than we've processed?!");
-        
-        // Shift the bits into place.
-        llvm::Value *newBits;
-        if (u > 0)
-          newBits = IGF.Builder.CreateLShr(spareBits, u - usedBits);
-        else
-          newBits = spareBits;
-        newBits = IGF.Builder.CreateTrunc(newBits, destTy);
-        
-        // See how many consecutive bits we have.
-        unsigned numBits = 1;
-        ++u;
-        for (unsigned e = CommonSpareBits.size();
-             u < e && CommonSpareBits[u]; ++u)
-          ++numBits;
-        
-        // Mask out the selected bits.
-        auto val = APInt::getAllOnesValue(numBits);
-        if (numBits < resultBitWidth)
-          val = val.zext(resultBitWidth);
-        val = val.shl(usedBits);
-        auto *mask = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), val);
-        newBits = IGF.Builder.CreateAnd(newBits, mask);
-        
-        // Accumulate the result.
-        if (result)
-          result = IGF.Builder.CreateOr(result, newBits);
-        else
-          result = newBits;
-        
-        usedBits += numBits;
-        i = u;
-      }
-      
-      return result;
-    }
-    
     /// The number of empty cases representable by each tag value.
     /// Equal to the size of the payload minus the spare bits used for tags.
     unsigned getNumCaseBits() const {
@@ -1379,7 +1328,7 @@ namespace {
     unsigned getNumCasesPerTag() const {
       unsigned numCaseBits = getNumCaseBits();
       return numCaseBits >= 32
-      ? 0x80000000 : 1 << numCaseBits;
+        ? 0x80000000 : 1 << numCaseBits;
     }
     
     /// Extract the payload-discriminating tag from a payload and optional
@@ -1393,7 +1342,7 @@ namespace {
       
       // Get the tag bits from spare bits, if any.
       if (numSpareBits > 0) {
-        tag = gatherSpareBits(IGF, payload, numTagBits);
+        tag = emitGatherSpareBits(IGF, CommonSpareBits, payload, 0, numTagBits);
       }
       
       // Get the extra tag bits, if any.
@@ -1500,22 +1449,6 @@ namespace {
     }
     
   private:
-    static APInt getAPIntFromBitVector(const llvm::BitVector &bits) {
-      SmallVector<llvm::integerPart, 2> parts;
-      
-      for (unsigned i = 0; i < bits.size();) {
-        llvm::integerPart part = 0UL;
-        for (llvm::integerPart bit = 1; bit != 0 && i < bits.size();
-             ++i, bit <<= 1) {
-          if (bits[i])
-            part |= bit;
-        }
-        parts.push_back(part);
-      }
-      
-      return APInt(bits.size(), parts);
-    }
-    
     void projectPayloadValue(IRGenFunction &IGF,
                         llvm::Value *payload,
                         unsigned payloadTag,
@@ -2701,6 +2634,133 @@ void irgen::emitStoreUnionTagToAddress(IRGenFunction &IGF,
     .storeTag(IGF, theCase, unionAddr);
 }
 
+APInt irgen::getAPIntFromBitVector(const llvm::BitVector &bits) {
+  SmallVector<llvm::integerPart, 2> parts;
+  
+  for (unsigned i = 0; i < bits.size();) {
+    llvm::integerPart part = 0UL;
+    for (llvm::integerPart bit = 1; bit != 0 && i < bits.size();
+         ++i, bit <<= 1) {
+      if (bits[i])
+        part |= bit;
+    }
+    parts.push_back(part);
+  }
+  
+  return APInt(bits.size(), parts);
+}
+
+/// Gather spare bits into the low bits of a smaller integer value.
+llvm::Value *irgen::emitGatherSpareBits(IRGenFunction &IGF,
+                                        const llvm::BitVector &spareBitMask,
+                                        llvm::Value *spareBits,
+                                        unsigned resultLowBit,
+                                        unsigned resultBitWidth) {
+  auto destTy
+    = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), resultBitWidth);
+  unsigned usedBits = resultLowBit;
+  llvm::Value *result = nullptr;
+  
+  for (int i = spareBitMask.find_first(); i != -1;
+       i = spareBitMask.find_next(i)) {
+    assert(i >= 0);
+    unsigned u = i;
+    assert(u >= (usedBits - resultLowBit) &&
+           "used more bits than we've processed?!");
+    
+    // Shift the bits into place.
+    llvm::Value *newBits;
+    if (u > usedBits)
+      newBits = IGF.Builder.CreateLShr(spareBits, u - usedBits);
+    else if (u < usedBits)
+      newBits = IGF.Builder.CreateShl(spareBits, usedBits - u);
+    else
+      newBits = spareBits;
+    newBits = IGF.Builder.CreateZExtOrTrunc(newBits, destTy);
+    
+    // See how many consecutive bits we have.
+    unsigned numBits = 1;
+    ++u;
+    for (unsigned e = spareBitMask.size(); u < e && spareBitMask[u]; ++u)
+      ++numBits;
+    
+    // Mask out the selected bits.
+    auto val = APInt::getAllOnesValue(numBits);
+    if (numBits < resultBitWidth)
+      val = val.zext(resultBitWidth);
+    val = val.shl(usedBits);
+    auto *mask = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), val);
+    newBits = IGF.Builder.CreateAnd(newBits, mask);
+    
+    // Accumulate the result.
+    if (result)
+      result = IGF.Builder.CreateOr(result, newBits);
+    else
+      result = newBits;
+    
+    usedBits += numBits;
+    i = u;
+  }
+  
+  return result;
+}
+
+/// Scatter spare bits from the low bits of an integer value.
+llvm::Value *irgen::emitScatterSpareBits(IRGenFunction &IGF,
+                                         const llvm::BitVector &spareBitMask,
+                                         llvm::Value *packedBits,
+                                         unsigned packedLowBit) {
+  auto destTy
+    = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), spareBitMask.size());
+  llvm::Value *result = nullptr;
+  unsigned usedBits = packedLowBit;
+  
+  // Expand the packed bits to the destination type.
+  packedBits = IGF.Builder.CreateZExtOrTrunc(packedBits, destTy);
+  
+  for (int i = spareBitMask.find_first(); i != -1;
+       i = spareBitMask.find_next(i)) {
+    assert(i >= 0);
+    unsigned u = i, startBit = u;
+    assert(u >= usedBits - packedLowBit
+           && "used more bits than we've processed?!");
+    
+    // Shift the selected bits into place.
+    llvm::Value *newBits;
+    if (u > usedBits)
+      newBits = IGF.Builder.CreateShl(packedBits, u - usedBits);
+    else if (u < usedBits)
+      newBits = IGF.Builder.CreateLShr(packedBits, usedBits - u);
+    else
+      newBits = packedBits;
+    
+    // See how many consecutive bits we have.
+    unsigned numBits = 1;
+    ++u;
+    for (unsigned e = spareBitMask.size(); u < e && spareBitMask[u]; ++u)
+      ++numBits;
+    
+    // Mask out the selected bits.
+    auto val = APInt::getAllOnesValue(numBits);
+    if (numBits < spareBitMask.size())
+      val = val.zext(spareBitMask.size());
+    val = val.shl(startBit);
+    auto mask = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), val);
+    newBits = IGF.Builder.CreateAnd(newBits, mask);
+    
+    // Accumulate the result.
+    if (result)
+      result = IGF.Builder.CreateOr(result, newBits);
+    else
+      result = newBits;
+    
+    usedBits += numBits;
+    i = u;
+  }
+  
+  return result;
+}
+
 /// Interleave the occupiedValue and spareValue bits, taking a bit from one
 /// or the other at each position based on the spareBits mask.
 llvm::ConstantInt *
@@ -2725,11 +2785,11 @@ irgen::interleaveSpareBits(IRGenModule &IGM, const llvm::BitVector &spareBits,
        ++i, advanceValueBit()) {
     if (spareBits[i]) {
       if (spareValue & 1)
-      valueParts.back() |= valueBit;
+        valueParts.back() |= valueBit;
       spareValue >>= 1;
     } else {
       if (occupiedValue & 1)
-      valueParts.back() |= valueBit;
+        valueParts.back() |= valueBit;
       occupiedValue >>= 1;
     }
   }

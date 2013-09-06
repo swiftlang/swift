@@ -147,11 +147,26 @@ void emitStoreUnionTagToAddress(IRGenFunction &IGF,
                                 Address unionAddr,
                                 UnionElementDecl *theCase);
   
+/// Convert a BitVector to an APInt.
+APInt getAPIntFromBitVector(const llvm::BitVector &bits);
+  
 /// Interleave the occupiedValue and spareValue bits, taking a bit from one
 /// or the other at each position based on the spareBits mask.
 llvm::ConstantInt *
 interleaveSpareBits(IRGenModule &IGM, const llvm::BitVector &spareBits,
                     unsigned bits, unsigned spareValue, unsigned occupiedValue);
+
+/// Gather spare bits into the low bits of a smaller integer value.
+llvm::Value *emitGatherSpareBits(IRGenFunction &IGF,
+                                 const llvm::BitVector &spareBitMask,
+                                 llvm::Value *spareBits,
+                                 unsigned resultLowBit,
+                                 unsigned resultBitWidth);
+/// Scatter spare bits from the low bits of a smaller integer value.
+llvm::Value *emitScatterSpareBits(IRGenFunction &IGF,
+                                  const llvm::BitVector &spareBitMask,
+                                  llvm::Value *packedBits,
+                                  unsigned packedLowBit);
 
 }
 }
