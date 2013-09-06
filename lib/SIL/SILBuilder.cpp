@@ -23,27 +23,41 @@ BranchInst *SILBuilder::createBranch(SILLocation Loc,
   return createBranch(Loc, TargetBlock, ArgsCopy);
 }
 
-/// emitBlock - Move the specified block to the current insertion point (which
+/// \brief Move the specified block to the end of the function and reset the
+/// insertion point to point to the first instruction in the emitted block.
+///
+/// Assumes that no insertion point is currently active.
+void SILBuilder::emitBlock(SILBasicBlock *BB) {
+  assert(!hasValidInsertionPoint());
+
+  // We don't have an insertion point, insert the block at the end of the
+  // function.
+  SILFunction::iterator IP = BB->getParent()->end();
+
+  // Start inserting into that block.
+  setInsertionPoint(BB);
+
+  // Move block to its new spot.
+  moveBlockTo(BB, IP);
+}
+
+/// \brief Move the specified block to the current insertion point (which
 /// is the end of the function if there is no insertion point) and reset the
 /// insertion point to point to the first instruction in the emitted block.
 void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
-  SILFunction::iterator IP;
-
-  // If this is a fall through into BB, emit the fall through branch.
-  if (hasValidInsertionPoint()) {
-    // Move the new block after the current one.
-    IP = getInsertionBB();
-    ++IP;
-
-    // Emit the branch.
-    assert(BB->bbarg_empty() && "cannot fall through to bb with args");
-    assert(!BranchLoc.isNull());
-    createBranch(BranchLoc, BB);
-  } else {
-    // If we don't have an insertion point, insert the block at the end of the
-    // function
-    IP = BB->getParent()->end();
+  if (!hasValidInsertionPoint()) {
+    return emitBlock(BB);
   }
+
+  // Fall though from the currently active block into the given block.
+  assert(BB->bbarg_empty() && "cannot fall through to bb with args");
+
+  // Move the new block after the current one.
+  SILFunction::iterator IP = getInsertionBB();
+  ++IP;
+
+  // This is a fall through into BB, emit the fall through branch.
+  createBranch(BranchLoc, BB);
 
   // Start inserting into that block.
   setInsertionPoint(BB);

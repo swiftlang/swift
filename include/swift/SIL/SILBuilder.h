@@ -127,12 +127,16 @@ public:
     moveBlockTo(BB, BB->getParent()->end());
   }
 
+  /// \brief Move the specified block to the end of the function and reset the
+  /// insertion point to point to the first instruction in the emitted block.
+  ///
+  /// Assumes that no insertion point is currently active.
+  void emitBlock(SILBasicBlock *BB);
 
-  /// emitBlock - Move the specified block to the current insertion point (which
+  /// \brief Move the specified block to the current insertion point (which
   /// is the end of the function if there is no insertion point) and reset the
   /// insertion point to point to the first instruction in the emitted block.
-  void emitBlock(SILBasicBlock *BB, SILLocation BranchLoc = SILLocation());
-
+  void emitBlock(SILBasicBlock *BB, SILLocation BranchLoc);
 
   /// splitBlockForFallthrough - Prepare for the insertion of a terminator.  If
   /// the builder's insertion point is at the end of the current block (as when
