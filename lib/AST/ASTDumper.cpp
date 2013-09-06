@@ -384,7 +384,6 @@ namespace {
     void visitFuncDecl(FuncDecl *FD) {
       printCommon(FD, "func_decl", FuncColor);
       if (FD->isGetterOrSetter()) {
-
         if (FD->getGetterDecl()) {
           OS << " getter";
         } else {
@@ -396,7 +395,16 @@ namespace {
           OS << "_for=" << vd->getName();
         }
       }
+      auto Captures = FD->getCaptures();
+      if (!Captures.empty()) {
+        OS << " captures=(";
+        OS << Captures[0]->getName();
+        for (auto capture : Captures.slice(1))
+          OS << ", " << capture->getName();
+        OS << ')';
+      }
       OS << '\n';
+
       printRec(FD->getBody());
       OS << ')';
     }
