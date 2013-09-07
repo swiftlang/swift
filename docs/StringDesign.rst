@@ -1342,6 +1342,14 @@ Already deprecated in Cocoa.
 
 --------------
 
+Why YAGNI
+---------
+
+* Retroactive Modeling
+* Derivation
+* ...
+
+
 .. [#agnostic] Unicode specifies default (“un-tailored”)
    locale-independent collation_ and segmentation_ algorithms that
    make reasonable sense in most contexts.  Using these algorithms
