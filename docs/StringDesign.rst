@@ -1,5 +1,85 @@
 .. @raise litre.TestsAreMissing
 
+.. raw:: html
+
+    <style> 
+    .repl, .emph, .look {color:rgb(47,175,187)}
+    .emph {font-weight:bold}
+
+    span.look, span.look1 {
+      position: relative;
+      border-bottom: .2em dotted rgb(255,165,165);
+    }
+
+    span.aside { font-family: sans-serif; white-space: normal; }
+
+    span.look + span.aside, span.look1 + span.aside { display: none; }
+
+    span.look:hover, span.look1:hover {
+      background-color:greenyellow;
+    }
+
+    span.look:hover {
+      color:rgb(23,87,94);
+    }
+
+    /* Main speech bubble*/
+    span.look:hover + span.aside, span.look1:hover + span.aside{
+      display: inline-block;
+      position: relative; 
+      margin-top: -1000em;
+      margin-bottom: -1000em;
+      margin-right: -1000em;
+      padding: 0.3em 1em 0.3em 1em;
+      /*text-align: justify;*/
+      max-width: 40em;
+      width: auto;
+      left: 2em;
+      background: gray;
+      -moz-border-radius:10px;
+      -webkit-border-radius:10px;
+      border-radius:10px;    
+      color: #fff;
+      z-index: 1;
+    }
+
+    /* Little triangle on the left */
+    span.look:hover + span.aside:after, span.look1:hover + span.aside:after {
+      content: "";
+      position: absolute;
+      bottom: 0.3em;
+      left: -1.5em;
+      border-style: solid;
+      border-width: 0.6em 2em 0.6em 0;
+      border-color: transparent gray;
+      display: inline;
+      width: 0;
+      z-index: 2;
+    }
+
+    a:link {color:blue}
+    h1 a:link {color:#0c3762} 
+    h2 a:link {color:#0c3762} 
+    h3 a:link {color:#0c3762} 
+    h4 a:link {color:#0c3762} 
+    h5 a:link {color:#0c3762} 
+    h1 a:visited {color:#0c3762} 
+    h2 a:visited {color:#0c3762} 
+    h3 a:visited {color:#0c3762} 
+    h4 a:visited {color:#0c3762} 
+    h5 a:visited {color:#0c3762} 
+    </style>
+
+.. role:: repl
+.. default-role:: repl
+
+.. |swift| replace:: :repl:`(swift)`
+
+.. role:: look
+.. role:: look1
+.. role:: aside
+.. role:: emph
+
 ===================
 Swift String Design
 ===================
@@ -7,8 +87,9 @@ Swift String Design
 Note:: This document represents the intended design of ``String``, not
 its current implementation state.
 
-.. contents:: Index
-
+.. contents:: 
+   :depth: 3
+              
 High Level Design
 =================
 
@@ -16,49 +97,144 @@ Like all things Swift, our approach to strings begins with a deep
 respect for the lessons learned from many languages and libraries,
 including Objective-C and Cocoa.
 
-General Principles
-------------------
+Overview By Example
+-------------------
 
-.. sidebar:: Rationales
 
-   ``String`` is *mutable* because in-place modification is a
-   convenient and efficient approach to many common string-processing
-   problems.
+Swift has a single **first-class** string type called ``String``:
 
-   ``String`` is a *value type* because unintended sharing of mutable
-   reference types is a source of bugs and “nuisance best practices”
-   such as defensive copying.
+.. parsed-literal::
 
-   ``String`` is *Unicode-aware* so that straightforward code
-   written without specific attention to Unicode will not be badly
-   broken in the presence of non-ASCII characters.
+  |swift| var s = "Yo"
+  `// s:` :emph:`String` `= "Yo"`
 
-   ``String`` is *locale-agnostic* for two reasons: first, it does not
-   carry a locale because common binary string operations such as
-   comparison and concatenation are not well-defined for heterogeneous
-   locales.  Second, it does not respond to global locale so that
-   casual sorting and hashing are not invalidated by changes in global
-   system state. [#re_sort]_
+Strings are **mutable**:
 
-   ``String`` has *no direct support for encoding conversion* because
-   the functionality is neatly separable from other ``String``
-   operations and would add interface complexity with little benefit
-   to most programs.  Any future support for encodings can go in a
-   separate module with its own interfaces, e.g.,
-   ``utf16.encode(someString)``, thereby avoiding bloating the
-   ``String`` interface.
+.. sidebar:: Why Mention It?
 
-   ``String`` is *not indexable with* ``Int`` because |Character|_\ s
-   consume an arbitrary number of bytes, so they can't be randomly
-   addressed with reasonable efficiency.
+   The ability to change a string's value might not be worth noting
+   except that *some languages make all strings immutable*, as a way
+   of working around problems that Swift has defined away—by making
+   strings pure values (see below).
+            
+.. parsed-literal::
+  |swift| extension String {
+            func addEcho() { 
+              self += self
+            }
+          }
+  |swift| :look1:`s.addEcho()`\ :aside:`s is modified in place`
+  |swift| s
+  `// s: String =` :emph:`"YoYo"`
 
-   .. _extending:
+Strings are **value types**
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   ``String`` is *extended with restraint* by the library because
-   ``String`` is a “vocabulary type” to and from which most other
-   types are convertible.  Making these conversions members of
-   ``String`` could quickly lead to an extremely broad ``String``
-   interface with slow code completion.
+Distinct string variables have independent values: when you pass
+someone a string they get a copy of the value, and when someone
+passes you a string *you own it*.  Nobody can change a string value
+“behind your back.”
+
+.. parsed-literal::
+  |swift| class Cave {
+            // Utter something in the cave
+            func say(msg: String) -> String {
+              :look1:`msg.addEcho()`\ :aside:`Modifying a parameter is safe because it is a copy of the argument`
+              self.lastSound = msg
+              :look1:`return self.lastSound`\ :aside:`Returning a stored value is safe because the caller gets a copy`
+            }
+
+            var lastSound: String   // a Cave remembers the last sound made
+          }
+  |swift| var c = Cave()
+  `// c: Cave = <Cave instance>`
+  |swift| s = "Hey"
+  |swift| var t = c.say(s)
+  `t: String = "HeyHey"`
+  |swift| s
+  `s: String =` :look:`"Hey"`\ :aside:`s is unaffected by c.say(s)`
+  |swift| t.addEcho()
+  |swift| [s, c.lastSound, t]
+  `// r0: String[] =` :look:`["Hey", "HeyHey", "HeyHeyHeyHey"]`\ :aside:`c.lastSound is unaffected by changes to t`
+
+Strings are **unicode-aware**
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Swift applies Unicode algorithms wherever possible.  For example,
+distinct sequences of code points are treated as equal if they
+represent the same character:
+
+.. parsed-literal::
+  |swift| var n1 = "\\u006E\\u0303"
+  `// n1 : String =` **"ñ"**
+  |swift| var n2 = "\\u00F1"
+  `// n2 : String =` **"ñ"**
+  |swift| n1 == n2
+  `// r0 : Bool =` **true**
+
+Note that individual code points are still observable by explicit request:
+
+.. parsed-literal::
+  |swift| n1.codePoints == n2.codePoints
+  `// r0 : Bool =` **false**
+
+Strings are **locale-agnostic**:
+
+Strings neither carry their own locale information, nor provide
+behaviors that depend on a global locale setting.  Thus, for any pair
+of strings ``s1`` and ``s2``, “``s1 == s2``” yields the same result
+regardless of system state.  Strings *do* provide a suitable
+foundation on which to build locale-aware interfaces.  [#locales]_ 
+
+Strings are **indexable** and **sliceable**:
+
+.. parsed-literal::
+   |swift| var s = "Strings are awesome"
+   `// s : String = "Strings are awesome"`
+   |swift| var r = s.find("awe")\ :look1:`!`\ :aside:`s.find() returns .None when the argument isn't found.  Since we know "awe" is in s, force-unwrap the result`
+   `// r : Range<StringIndex> =` *<…are ⦙awe⦙some>*
+   |swift| s[r.start]
+   `// r0 = Character("a")`
+   |swift| s[r.end]
+   `// r1 = Character("s")`
+   |swift| s[r.start...r.end]
+   `// r2 : String = "awe"`
+   |swift| s[\ :look1:`r.start...`\ ]\ :aside:`postfix slice operator means “through the end”`
+   `// r3 : Character = "awesome"`
+   |swift| s[\ :look1:`...r.start`\ ]\ :aside:`prefix slice operator means “from the beginning”`
+   `// r4 : Character = "Strings are "`
+   |swift| :look1:`s[r]`\ :aside:`indexing with a range is the same as slicing`
+   `// r5 : String = "awe"`
+   |swift| s[r] = "hand"
+   |swift| s
+   `// s : String = "Strings are` :look:`handsome`\ :aside:`slice replacement can resize the string`\ `"` 
+
+Slicing a string is very efficient
+
+Strings are **encoded as UTF-8**:
+
+.. sidebar:: Encoding Conversion
+
+   Conversion to and from other encodings is out-of-scope for
+   ``String`` itself, but could be provided, e.g., by an ``Encoding``
+   module.
+
+.. parsed-literal::
+   |swift| for x in "bump"\ **.bytes** {
+            println(x)
+          }
+   98
+   117
+   109
+   112
+
+.. _extending:
+
+``String`` is *extended with restraint* by the library because
+``String`` is a “vocabulary type” to and from which most other
+types are convertible.  Making these conversions members of
+``String`` could quickly lead to an extremely broad ``String``
+interface with slow code completion.
 
 * ``String`` is a **mutable value type**, just like ``Int``: each copy
   of a ``String`` is logically distinct from the original, and a
@@ -1349,12 +1525,14 @@ Why YAGNI
 * Derivation
 * ...
 
-
 .. [#agnostic] Unicode specifies default (“un-tailored”)
    locale-independent collation_ and segmentation_ algorithms that
    make reasonable sense in most contexts.  Using these algorithms
    allows strings to be naturally compared and combined, generating
    the expected results when the content is ASCII
+
+.. [#locales] We have some specific ideas, but details are still TBD
+              and wide open for discussion.
 
 .. [#re_sort] Collections that automatically re-sort based on locale
    changes are out of scope for the core Swift language
