@@ -21,8 +21,7 @@
 
 namespace swift {
 
-bool parseASTSection(SerializedModuleLoader* SML,
-                     const std::unique_ptr<llvm::MemoryBuffer> &MemoryBuffer,
+bool parseASTSection(SerializedModuleLoader* SML, StringRef Buf,
                      SmallVectorImpl<std::string> &foundModules) {
   struct apple_ast_hdr {
     uint32_t version;
@@ -37,14 +36,14 @@ bool parseASTSection(SerializedModuleLoader* SML,
    uint32_t flags;
   };
 
-  if (MemoryBuffer->getBufferSize() < sizeof(struct apple_ast_hdr)
-                                    + sizeof(struct module_header)) {
+  size_t size = Buf.size();
+  const char *data = Buf.data();
+
+  if (size < sizeof(struct apple_ast_hdr) + sizeof(struct module_header)) {
     llvm::dbgs() << "__ast section is too small.\n";
     return false;
   }
 
-  size_t size = MemoryBuffer->getBufferSize();
-  const char *data = MemoryBuffer->getBufferStart();
   auto apple_ast_hdr = reinterpret_cast<const struct apple_ast_hdr *>(data);
   if (apple_ast_hdr->version != 1) {
     llvm::dbgs() << "Unsupported __ast section version.\n";
@@ -66,11 +65,12 @@ bool parseASTSection(SerializedModuleLoader* SML,
     assert(nchars < (2 << 10) && "path failed sanity check");
     llvm::StringRef AccessPath(data+mh->name_ofs+sizeof(nchars), nchars);
 
-    // loadModule() wants to take ownership of the input memory buffer.
-    // Copy the bitstream into a new memory buffer.
+    // loadModule() wants to take ownership of the input memory
+    // buffer, but we don't let it own the memory, since it's just a
+    // window into Buf.
     if (mh->bitstream_ofs + mh->bitstream_size > size) return false;
     auto mem = llvm::StringRef(data+mh->bitstream_ofs, mh->bitstream_size);
-    auto bitstream = llvm::MemoryBuffer::getMemBufferCopy(mem, AccessPath);
+    auto bitstream = llvm::MemoryBuffer::getMemBuffer(mem, AccessPath);
 
     // Register the memory buffer.
     SML->registerMemoryBuffer(AccessPath,

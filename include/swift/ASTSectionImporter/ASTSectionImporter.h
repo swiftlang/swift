@@ -33,8 +33,7 @@ namespace swift {
   /// the access path of all modules found in the section is appended
   /// to the vector foundModules.
   /// \return true if successful.
-  bool parseASTSection(SerializedModuleLoader* SML,
-                       const std::unique_ptr<llvm::MemoryBuffer> &data,
+  bool parseASTSection(SerializedModuleLoader* SML, StringRef Data,
                        SmallVectorImpl<std::string> &foundModules);
 
 

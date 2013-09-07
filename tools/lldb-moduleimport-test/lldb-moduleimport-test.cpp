@@ -94,16 +94,20 @@ int main(int argc, char **argv) {
           macho.read((char*)&section, sizeof(section));
           auto sectname = "__ast";
           if (strncmp(section.sectname, sectname, strlen(sectname)) == 0) {
+            // Pass the __ast section to the module loader.
             macho.seekg(section.offset, macho.beg);
             assert(macho.good());
 
-            // Pass the __apple_AST section to the module loader.
-            auto data = llvm::MemoryBuffer::getNewMemBuffer(section.size, name);
-            macho.read(const_cast<char *>(data->getBufferStart()), section.size);
+            // We can delete this memory only after the
+            // SerializedModuleLoader has performed its duty.
+            auto data = new char[section.size];
+            macho.read(data, section.size);
+
             if (!parseASTSection(CI.getSerializedModuleLoader(),
-                                 std::unique_ptr<llvm::MemoryBuffer>(data),
-                                 modules))
+                                 llvm::StringRef(data, section.size),
+                                 modules)) {
               exit(1);
+            }
 
             for (auto path : modules)
               llvm::outs() << "Loaded module " << path << " from " << name
