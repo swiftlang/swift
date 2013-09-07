@@ -1245,8 +1245,6 @@ public:
     return D->getKind() >= DeclKind::First_AbstractTypeParamDecl &&
            D->getKind() <= DeclKind::Last_AbstractTypeParamDecl;
   }
-  static bool classof(const AbstractTypeParamDecl *D) { return true; }
-  static bool classof(const GenericTypeParamDecl *D) { return true; }
 };
 
 /// A declaration of a generic type parameter.
