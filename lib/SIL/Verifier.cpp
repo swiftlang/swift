@@ -1264,10 +1264,13 @@ public:
                 "arguments");
 
         if (dest->getBBArgs().size() == 1) {
+          /* FIXME: To verify the destination argument type we need to apply
+             generic substitutions.
           Type eltArgTy = elt->getArgumentType();
           CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
           require(eltArgTy->isEqual(bbArgTy),
                   "switch_union destination bbarg must match case arg type");
+           */
           require(!dest->getBBArgs()[0]->getType().isAddress(),
                   "switch_union destination bbarg type must not be an address");
         }
@@ -1323,11 +1326,14 @@ public:
                 "destructive_switch_union_addr destination for case w/ args "
                 "must take an argument");
         
+        /* FIXME: To verify the dest argument type, we need to apply generic
+           substitutions.
         Type eltArgTy = elt->getArgumentType();
         CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
         require(eltArgTy->isEqual(bbArgTy),
                 "destructive_switch_union_addr destination bbarg must match "
                 "case arg type");
+         */
         require(dest->getBBArgs()[0]->getType().isAddress(),
                 "destructive_switch_union_addr destination bbarg type must "
                 "be an address");
