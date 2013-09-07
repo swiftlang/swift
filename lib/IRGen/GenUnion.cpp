@@ -323,7 +323,14 @@ namespace {
     }
     
     void getSchema(ExplosionSchema &schema) const {
-      if (getSingleton()) getSingleton()->getSchema(schema);
+      if (!getSingleton()) return;
+      // If the payload is loadable, forward its explosion schema.
+      if (TIK >= Loadable)
+        return getSingleton()->getSchema(schema);
+      // Otherwise, use an indirect aggregate schema with our storage
+      // type.
+      schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
+                                      getSingleton()->getBestKnownAlignment()));
     }
     
     unsigned getExplosionSize(ExplosionKind kind) const {
@@ -2288,9 +2295,9 @@ namespace {
     auto *ti = &IGM.getTypeInfo(ty);
     if (auto *loadableTI = dyn_cast<LoadableTypeInfo>(ti))
       return loadableTI->as<LoadableUnionTypeInfo>().Strategy;
-    if (auto *TI = dyn_cast<FixedTypeInfo>(ti))
-      return TI->as<FixedUnionTypeInfo>().Strategy;
-    llvm_unreachable("unimplemented union type info");
+    if (auto *fti = dyn_cast<FixedTypeInfo>(ti))
+      return fti->as<FixedUnionTypeInfo>().Strategy;
+    return ti->as<NonFixedUnionTypeInfo>().Strategy;
   }
 } // end anonymous namespace
 
