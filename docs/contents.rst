@@ -9,20 +9,13 @@ Contents
 .. toctree::
    :maxdepth: 1
 
-   2c - Expressions
-   3 - Simple User Defined Datatypes i.e. enum, union, and struct
-   ProgramStructureAndCompilationModel
-   5 - Memory and Ownership Model
-   6 - Memory and Concurrency Model
    DesignDecisions
-   Error Handling
    Generics
    Pattern Matching
    Resilience
    LogicalObjects
    Namespace Level Vars and Top Level Code
    SIL
-   TypeState
    TypeChecker
 
 
