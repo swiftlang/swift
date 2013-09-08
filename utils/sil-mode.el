@@ -24,7 +24,8 @@
    `(,(regexp-opt '("if" "in" "else" "for" "do" "while" "return" "break"
                     "continue" "switch" "case")
                   'words) . font-lock-keyword-face)   
-
+   ;; SIL Stage
+   '("sil_stage" . font-lock-keyword-face)
    ;; SIL Function
    `(,(regexp-opt '("sil" "internal" "clang_thunk")
                   'words) . font-lock-keyword-face)
@@ -40,7 +41,7 @@
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Accessing Memory.
    `(,(regexp-opt '("load" "store" "assign" "initialize_var" "copy_addr"
-		    "destroy_addr" "index_addr" "index_raw_pointer")
+		    "destroy_addr" "index_addr" "index_raw_pointer" "to")
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Reference Counting.
    `(,(regexp-opt '("strong_retain" "strong_retain_autoreleased" "strong_release"
