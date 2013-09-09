@@ -7,6 +7,7 @@ add_swift_library(swiftAST
   Builtins.cpp
   ConcreteDeclRef.cpp
   Decl.cpp
+  DeclContext.cpp
   DiagnosticList.cpp
   DiagnosticEngine.cpp
   Expr.cpp
