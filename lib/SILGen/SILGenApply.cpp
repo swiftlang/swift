@@ -82,7 +82,7 @@ private:
   // There is an initialization order dependency between genericMethod and
   // specializedType.
   CanType specializedType;
-  SILLocation specializeLoc;
+  Optional<SILLocation> specializeLoc;
   bool isTransparent;
 
   // The pointer back to the AST node that produced the callee.
@@ -91,11 +91,13 @@ private:
   static SpecializedEmitter getSpecializedEmitterForSILBuiltin(SILDeclRef c,
                                                                SILModule &M);
 
-  Callee(ManagedValue indirectValue, bool isTransparent)
+  Callee(ManagedValue indirectValue, bool isTransparent, SILLocation L)
     : kind(Kind::IndirectValue),
       indirectValue(indirectValue),
       specializedType(indirectValue.getType().getSwiftRValueType()),
-      isTransparent(isTransparent)
+      specializeLoc(),
+      isTransparent(isTransparent),
+      Loc(L)
   {}
 
   Callee(SILGenFunction &gen, SILDeclRef standaloneFunction, SILLocation l)
@@ -103,6 +105,7 @@ private:
       specializedType(
                 gen.SGM.getConstantType(standaloneFunction.atUncurryLevel(0))
                   .getSwiftRValueType()),
+      specializeLoc(),
       isTransparent(standaloneFunction.hasDecl() &&
                     standaloneFunction.getDecl()->getAttrs().isTransparent()),
       Loc(l)
@@ -118,6 +121,7 @@ private:
       specializedType(
                 gen.SGM.getConstantType(methodName.atUncurryLevel(0))
                   .getSwiftRValueType()),
+      specializeLoc(),
       isTransparent(false),
       Loc(l)
   {
@@ -234,8 +238,9 @@ private:
   {}
 
 public:
-  static Callee forIndirect(ManagedValue indirectValue, bool isTransparent) {
-    return Callee(indirectValue, isTransparent);
+  static Callee forIndirect(ManagedValue indirectValue, bool isTransparent,
+                            SILLocation l) {
+    return Callee(indirectValue, isTransparent, l);
   }
   static Callee forDirect(SILGenFunction &gen, SILDeclRef c, SILLocation l) {
     return Callee(gen, c, l);
@@ -441,7 +446,8 @@ public:
         = gen.getLoweredLoadableType(specializedType, level);
       
       CleanupsDepth cleanup = mv.getCleanup();
-      SILValue spec = gen.B.createSpecialize(specializeLoc, mv.getValue(),
+      SILValue spec = gen.B.createSpecialize(specializeLoc.getValue(),
+                                             mv.getValue(),
                                              substitutions,
                                              specializedUncurriedType);
       mv = ManagedValue(spec, cleanup);
@@ -528,7 +534,7 @@ public:
   /// Fall back to an unknown, indirect callee.
   void visitExpr(Expr *e) {
     ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen, e);
-    setCallee(Callee::forIndirect(fn, false));
+    setCallee(Callee::forIndirect(fn, false, e));
   }
 
   void visitLoadExpr(LoadExpr *e) {
@@ -542,7 +548,7 @@ public:
       isTransparent = t->getExtInfo().isAutoClosure();
     }
     ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen, e);
-    setCallee(Callee::forIndirect(fn, isTransparent));
+    setCallee(Callee::forIndirect(fn, isTransparent, e));
   }
   
   /// Add a call site to the curry.
@@ -605,7 +611,7 @@ public:
     // Obtain a reference for a local closure.
     if (gen.LocalConstants.count(constant)) {
       ManagedValue localFn = gen.emitReferenceToDecl(e, e->getDecl());
-      setCallee(Callee::forIndirect(localFn, false));
+      setCallee(Callee::forIndirect(localFn, false, e));
 
     // Otherwise, stash the SILDeclRef.
     } else {
@@ -1049,7 +1055,7 @@ namespace {
       
       // Collect the arguments to the uncurried call.
       SmallVector<SmallVector<ManagedValue, 4>, 2> args;
-      SILLocation uncurriedLoc;
+      Optional<SILLocation> uncurriedLoc;
       CanType uncurriedResultTy;
       for (auto &site : uncurriedSites) {
         uncurriedLoc = site.loc;
@@ -1057,7 +1063,9 @@ namespace {
         args.push_back({});
         std::move(site).emit(gen, args.back());
       }
-      
+
+      assert(uncurriedLoc);
+
       // Uncurry the arguments in calling convention order.
       SmallVector<ManagedValue, 4> uncurriedArgs;
       UncurryDirection direction = gen.SGM.Types.getUncurryDirection(cc);
@@ -1082,12 +1090,12 @@ namespace {
 
       if (specializedEmitter)
         result = specializedEmitter(gen,
-                                    uncurriedLoc,
+                                    uncurriedLoc.getValue(),
                                     callee.getSubstitutions(),
                                     uncurriedArgs,
                                     uncurriedContext);
       else
-        result = gen.emitApply(uncurriedLoc, mv, uncurriedArgs,
+        result = gen.emitApply(uncurriedLoc.getValue(), mv, uncurriedArgs,
                                uncurriedResultTy, ownership, transparent,
                                uncurriedContext);
       
@@ -1515,7 +1523,7 @@ Callee emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
   // FIXME: Can local properties ever be generic?
   if (gen.LocalConstants.count(constant)) {
     SILValue v = gen.LocalConstants[constant];
-    return Callee::forIndirect(gen.emitManagedRetain(loc, v), false);
+    return Callee::forIndirect(gen.emitManagedRetain(loc, v), false, loc);
   }
   
   // Get the accessor function. The type will be a polymorphic function if

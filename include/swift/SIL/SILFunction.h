@@ -64,7 +64,8 @@ private:
   BlockListType BlockList;
 
   /// The SIL location of the function, which provides a link back to the AST.
-  SILLocation Location;
+  /// The function only gets a location after it's been emitted.
+  Optional<SILLocation> Location;
 
   /// The source location and scope of the function.
   SILDebugScope *DebugScope;
@@ -75,8 +76,9 @@ public:
 
   SILFunction(SILModule &Module, SILLinkage Linkage,
               StringRef MangledName, SILType LoweredType,
+              Optional<SILLocation> Loc = Nothing,
               IsTransparent_t isTrans = IsNotTransparent);
-  
+
   ~SILFunction();
 
   SILModule *getParent() { return ModuleAndLinkage.getPointer(); }
@@ -111,7 +113,10 @@ public:
   void setLocation(SILLocation L) { Location = L; }
 
   /// Get the source location of the function.
-  SILLocation getLocation() const { return Location; }
+  SILLocation getLocation() const {
+    assert(Location.hasValue());
+    return Location.getValue();
+  }
 
   /// Initialize the debug scope of the function.
   void setDebugScope(SILDebugScope *DS) { DebugScope = DS; }

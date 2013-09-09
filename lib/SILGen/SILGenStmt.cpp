@@ -143,15 +143,15 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
 }
 
 void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
-  ReturnLoc = ReturnLocation(S);
   CurrentSILLoc = S;
+  ReturnLocation Loc(S);
 
   SILValue ArgV;
   if (!S->hasResult())
     // Void return.
-    Cleanups.emitBranchAndCleanups(ReturnDest, ReturnLoc);
+    Cleanups.emitBranchAndCleanups(ReturnDest, Loc);
   else
-    emitReturnExpr(ReturnLoc, S->getResult());
+    emitReturnExpr(Loc, S->getResult());
 }
 
 void SILGenFunction::visitIfStmt(IfStmt *S) {

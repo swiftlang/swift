@@ -58,7 +58,7 @@ public:
   /// Mapping from SILDeclRefs to emitted SILFunctions.
   llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
   
-  SILFunction *emitTopLevelFunction();
+  SILFunction *emitTopLevelFunction(SILLocation Loc);
   
   size_t anonymousFunctionCounter = 0;
   
@@ -286,16 +286,10 @@ public:
 
   /// The cleanup depth and epilog BB for "return" instructions.
   JumpDest ReturnDest;
-  /// True if a non-void return is required in this function.
+
+  /// \brief True if a non-void return is required in this function.
   bool NeedsReturn;
   
-  /// \brief Location information for the return instruction.
-  ///
-  /// FIXME: Currently this is only ever the location of the function body, or
-  /// of the first ReturnStmt in the function body. We probably want richer
-  /// return location information.
-  SILLocation ReturnLoc;
-
   /// \brief The SIL location corresponding to the AST node being processed.
   SILLocation CurrentSILLoc;
 

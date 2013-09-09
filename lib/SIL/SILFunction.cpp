@@ -16,9 +16,13 @@ using namespace swift;
 
 SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          StringRef Name, SILType LoweredType,
+                         Optional<SILLocation> Loc,
                          IsTransparent_t isTrans)
-  : ModuleAndLinkage(&Module, Linkage), Name(Name),
-    LoweredType(LoweredType), DebugScope(nullptr),
+  : ModuleAndLinkage(&Module, Linkage),
+    Name(Name),
+    LoweredType(LoweredType),
+    Location(Loc),
+    DebugScope(nullptr),
     Transparent(isTrans) {
   Module.functions.push_back(this);
 }

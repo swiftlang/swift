@@ -133,19 +133,18 @@ protected:
   ///  to the end of the AST node.
   bool alwaysPointsToEnd() const { return KindData & (1 << PointsToEndBit); }
 
-private:
-  friend class ImplicitReturnLocation;
-  void setKind(LocationKind K) { KindData |= (K & BaseMask); }
-
-public:
-  // FIXME: These should become protected constructors. We should not allow
-  // creation of a generic SILLocation.
-  SILLocation() : KindData(NoneKind) {}
+  // SILLocation constructors.
   SILLocation(LocationKind K) : KindData(K) {}
   SILLocation(Stmt *S, LocationKind K) : ASTNode(S), KindData(K) {}
   SILLocation(Expr *E, LocationKind K) : ASTNode(E), KindData(K) {}
   SILLocation(Decl *D, LocationKind K) : ASTNode(D), KindData(K) {}
   SILLocation(Pattern *P, LocationKind K) : ASTNode(P), KindData(K) {}
+
+private:
+  friend class ImplicitReturnLocation;
+  void setKind(LocationKind K) { KindData |= (K & BaseMask); }
+
+public:
 
   /// When an ASTNode gets implicitely converted into a SILLocation we
   /// construct a RegularLocation. Since RegularLocations represent the majority
@@ -155,6 +154,10 @@ public:
   SILLocation(Decl *D) : ASTNode(D), KindData(RegularKind) {}
   SILLocation(Pattern *P) : ASTNode(P), KindData(RegularKind) {}
 
+  /// \brief Check if the location wraps an AST node or a valid SIL file
+  /// location.
+  ///
+  /// Artificial locations and the top-level module locations will be null.
   bool isNull() const {
     return ASTNode.isNull() && SILFileSourceLoc.isInvalid();
   }
@@ -310,7 +313,6 @@ private:
   static bool isKind(const SILLocation& L) {
     return L.getKind() == ReturnKind;
   }
-  ReturnLocation() {}
 };
 
 /// \brief Used on the instruction that was generated to represent an implicit
@@ -370,7 +372,6 @@ private:
   static bool isKind(const SILLocation& L) {
     return L.getKind() == InlinedKind;
   }
-  InlinedLocation() {}
 };
 
 /// \brief Used on the instruction performing auto-generated cleanup such as

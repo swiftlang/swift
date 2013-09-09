@@ -1398,9 +1398,8 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
 
     // If we are optimizing, we should use the return location from the single,
     // previously processed, return statement if any.
-    if (ReturnLoc) {
+    if (predBranch->getLoc().is<ReturnLocation>()) {
       returnLoc = predBranch->getLoc();
-      assert(ReturnLoc == *returnLoc);
     } else {
       returnLoc = ImplicitReturnFromTopLevel;
     }

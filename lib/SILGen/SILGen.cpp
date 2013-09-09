@@ -51,13 +51,12 @@ SILGenFunction::~SILGenFunction() {
 
 SILGenModule::SILGenModule(SILModule &M)
   : M(M), Types(M.Types), TopLevelSGF(nullptr) {
-  
-  SILFunction *toplevel = emitTopLevelFunction();
 
   RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();
+  SILFunction *toplevel = emitTopLevelFunction(TopLevelLoc);
+
   // Assign a debug scope pointing into the void to the top level function.
   toplevel->setDebugScope(new (M) SILDebugScope(TopLevelLoc));
-  toplevel->setLocation(TopLevelLoc);
 
   TopLevelSGF = new SILGenFunction(*this, *toplevel);
   TopLevelSGF->prepareEpilog(Type(),
@@ -196,13 +195,13 @@ SILDeclRef SILGenModule::getObjCBoolToBoolFn() {
                        getBoolTy(*this));
 }
 
-SILFunction *SILGenModule::emitTopLevelFunction() {
+SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();
   Type topLevelType = FunctionType::get(TupleType::getEmpty(C),
                                         TupleType::getEmpty(C), C);
   SILType loweredType = getLoweredType(topLevelType);
   return new (M) SILFunction(M, SILLinkage::Internal,
-                             "top_level_code", loweredType);
+                             "top_level_code", loweredType, Loc);
 }
 
 SILType SILGenModule::getConstantType(SILDeclRef constant) {
@@ -246,7 +245,8 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant) {
       IsTrans = IsTransparent;
   }
   
-  SILFunction *F = new (M) SILFunction(M, linkage, "", constantType, IsTrans);
+  SILFunction *F = new (M) SILFunction(M, linkage, "",
+                                       constantType, Nothing, IsTrans);
   mangleConstant(constant, F);
   emittedFunctions[constant] = F;
 

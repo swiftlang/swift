@@ -244,7 +244,8 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name, SILType Ty,
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
                  Ty.getAsString(), Fn->getLoweredType().getAsString());
       P.diagnose(It->second.second, diag::sil_prior_reference);
-      Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty);
+      Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty,
+                                    SILFileLocation(Loc));
     }
     
     assert(Fn->isExternalDeclaration() && "Forward defns cannot have bodies!");
@@ -256,11 +257,13 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name, SILType Ty,
   // defined already.
   if (SILMod.lookup(Name.str()) != nullptr) {
     P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
-    return new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty);
+    return new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty,
+                                    SILFileLocation(Loc));
   }
 
   // Otherwise, this definition is the first use of this name.
-  return new (SILMod) SILFunction(SILMod, SILLinkage::Internal, Name.str(), Ty);
+  return new (SILMod) SILFunction(SILMod, SILLinkage::Internal, Name.str(), Ty,
+                                  SILFileLocation(Loc));
 }
 
 
@@ -276,7 +279,8 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name, SILType Ty,
     if (FnRef->getLoweredType() != Ty) {
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
                  Ty.getAsString(), FnRef->getLoweredType().getAsString());
-      FnRef = new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty);
+      FnRef = new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty,
+                                       SILFileLocation(Loc));
     }
     return FnRef;
   }
@@ -284,7 +288,7 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name, SILType Ty,
   // If we didn't find a function, create a new one - it must be a forward
   // reference.
   auto Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal,
-                                     Name.str(), Ty);
+                                     Name.str(), Ty, SILFileLocation(Loc));
   TUState.ForwardRefFns[Name] = { Fn, Loc };
   TUState.Diags = &P.Diags;
   return Fn;
