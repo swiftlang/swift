@@ -75,10 +75,14 @@ raw SIL. We do not want the diagnostics produced by the compiler to change as
 the compiler evolves, so these passes are intended to be simple and
 predictable.
 
+- **Mandatory inlining** inlines calls to "transparent" functions.
 - **Memory promotion** is implemented as two optimization phases, the first
   of which performs capture analysis to promote ``alloc_box`` instructions to
   ``alloc_stack``, and the second of which promotes non-address-exposed ``alloc_stack``
   instructions to SSA registers.
+- **Constant propagation** folds constant expressions and propagates the constant values. 
+  If an arithmetic overflow occurs during the constant expression computation, a diagnostic 
+  is issued.
 - **Return analysis** verifies that each function returns a value on every
   code path and doesn't "fall of the end" of its definition, which is an error.
   It also issues an error when a ``noreturn`` function returns.
@@ -88,9 +92,7 @@ If all diagnostic passes succeed, the final result is the
 
 TODO:
 
-- Always inline
-- Constant folding/guaranteed simplifications (including constant overflow
-  warnings)
+- Generic specialization
 - Basic ARC optimization for acceptable performance at -O0.
 
 General Optimization Passes
