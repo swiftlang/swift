@@ -479,7 +479,27 @@ namespace {
 
       // FIXME: Check container/member types through substitutions.
     }
-    
+
+    void verifyChecked(DynamicMemberRefExpr *E) {
+      // The base type must be DynamicLookup.
+      auto baseTy = E->getBase()->getType();
+      auto baseProtoTy = baseTy->getAs<ProtocolType>();
+      if (!baseProtoTy ||
+          !baseProtoTy->getDecl()->isSpecificProtocol(
+             KnownProtocolKind::DynamicLookup)) {
+        Out << "Dynamic member reference has non-DynamicLookup base\n";
+        E->dump();
+        abort();
+      }
+
+      // The member must be [objc].
+      if (!E->getMember().getDecl()->isObjC()) {
+        Out << "Dynamic member reference to non-[objc] member\n";
+        E->dump();
+        abort();
+      }
+    }
+
     void verifyChecked(SubscriptExpr *E) {
       if (HadError)
         return;

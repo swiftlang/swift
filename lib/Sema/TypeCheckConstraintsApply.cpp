@@ -477,6 +477,10 @@ namespace {
       if (!memberRef)
         memberRef = member;
 
+      // The base must always be an rvalue.
+      base = cs.getTypeChecker().coerceToRValue(base);
+      if (!base) return nullptr;
+
       auto result = new (context) DynamicMemberRefExpr(base, dotLoc, *memberRef,
                                                        memberLoc);
       result->setType(simplifyType(openedType));
