@@ -41,7 +41,7 @@ namespace llvm {
     static swift::DeclContext *getFromVoidPointer(void *P) {
       return (swift::DeclContext*)P;
     }
-    enum { NumLowBitsAvailable = 4 };
+    enum { NumLowBitsAvailable = 3 };
   };
 }
 
@@ -50,7 +50,7 @@ namespace swift {
 // The indentation of the members of this enum describe the inheritance
 // hierarchy.  Commented out members are abstract classes.  This formation
 // allows for range checks in classof.
-  enum class DeclContextKind : uint8_t {
+enum class DeclContextKind : uint8_t {
   Module,
   CapturingExpr,
   NominalTypeDecl,
@@ -72,10 +72,13 @@ namespace swift {
 /// in general, so if an AST node class multiply inherits from DeclContext
 /// and another base class, it must 'using DeclContext::operator new;' in order
 /// to use an allocator with the correct alignment.
-class alignas(16) DeclContext {
-  // alignas(16) because we use four tag bits on DeclContext.
+class alignas(8) DeclContext {
+  // alignas(8) because we use three tag bits on DeclContext.
   
-  enum { KindBits = 4 };
+  enum {
+    KindBits = llvm::PointerLikeTypeTraits<swift::DeclContext*>::
+    NumLowBitsAvailable
+  };
   static_assert(unsigned(DeclContextKind::Last_DeclContextKind) < 1U<<KindBits,
                 "Not enough KindBits for DeclContextKind");
   
