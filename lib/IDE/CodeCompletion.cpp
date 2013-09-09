@@ -648,7 +648,7 @@ public:
       Builder.addLeadingDot();
     Builder.addTextChunk(Name);
     Builder.addLeftParen();
-    auto *FE = FD->getBody();
+    auto *FE = FD->getFuncExpr();
     auto Patterns = FE->getArgParamPatterns();
     unsigned FirstIndex = 0;
     if (!IsImlicitlyCurriedInstanceMethod && FE->getImplicitSelfDecl())
@@ -1071,7 +1071,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     return;
 
   if (auto *FD = dyn_cast_or_null<FuncDecl>(DelayedParsedDecl))
-    CurDeclContext = FD->getBody();
+    CurDeclContext = FD->getFuncExpr();
 
   if (ParsedExpr && !typecheckParsedExpr())
     return;

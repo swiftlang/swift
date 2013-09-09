@@ -615,7 +615,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         continue;
       }
       if (auto func = dyn_cast<FuncDecl>(decl)) {
-        FuncExpr *FE = func->getBody();
+        FuncExpr *FE = func->getFuncExpr();
         PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);
         TC.typeCheckFunctionBody(FE);
         continue;

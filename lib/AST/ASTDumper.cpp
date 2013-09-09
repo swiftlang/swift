@@ -405,7 +405,7 @@ namespace {
       }
       OS << '\n';
 
-      printRec(FD->getBody());
+      printRec(FD->getFuncExpr());
       OS << ')';
     }
 

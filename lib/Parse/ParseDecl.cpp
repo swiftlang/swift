@@ -1680,7 +1680,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
 }
 
 bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
-  auto FE = FD->getBody();
+  auto FE = FD->getFuncExpr();
   assert(!FE->getBody() && "function should not have a parsed body");
   assert(FE->getBodyKind() == FuncExpr::BodyKind::Unparsed &&
          "function body should be delayed");

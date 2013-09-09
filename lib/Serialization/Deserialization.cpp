@@ -592,7 +592,7 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
   if (auto DD = dyn_cast<DestructorDecl>(D))
     return DD;
   if (auto FD = dyn_cast<FuncDecl>(D))
-    return FD->getBody();
+    return FD->getFuncExpr();
 
   llvm_unreachable("unknown DeclContext kind");
 }
@@ -956,7 +956,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                  TypeLoc::withoutLoc(signature->getResult()),
                                  DC);
     body->setType(signature);
-    fn->setBody(body);
+    fn->setFuncExpr(body);
 
     if (genericParams)
       for (auto &genericParam : *fn->getGenericParams())

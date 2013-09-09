@@ -629,7 +629,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     } else {
       OS << "set";
 
-      auto bodyParams = decl->getBody()->getBodyParamPatterns();
+      auto bodyParams = decl->getFuncExpr()->getBodyParamPatterns();
       auto valueParam = bodyParams.back()->getSemanticsProvidingPattern();
       if (auto named = dyn_cast<NamedPattern>(valueParam)) {
         OS << "(" << named->getBoundName().str() << ")";
@@ -637,11 +637,11 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       OS << ": ";
     }
 
-    if (!Options.FunctionDefinitions || !decl->getBody()->getBody()) {
+    if (!Options.FunctionDefinitions || !decl->getFuncExpr()->getBody()) {
       return;
     }
     
-    printBraceStmtElements(decl->getBody()->getBody());
+    printBraceStmtElements(decl->getFuncExpr()->getBody());
   } else {
     if (decl->isStatic() && !decl->isOperator())
       OS << "static ";
@@ -657,10 +657,10 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     }
 
     if (!printSelectorStyleArgs(decl,
-                                decl->getBody()->getArgParamPatterns(),
-                                decl->getBody()->getBodyParamPatterns())) {
+                                decl->getFuncExpr()->getArgParamPatterns(),
+                                decl->getFuncExpr()->getBodyParamPatterns())) {
       bool first = true;
-      for (auto pattern : decl->getBody()->getArgParamPatterns()) {
+      for (auto pattern : decl->getFuncExpr()->getArgParamPatterns()) {
         if (first) {
           first = false;
 
@@ -674,18 +674,18 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     }
 
     auto &context = decl->getASTContext();
-    Type resultTy = decl->getBody()->getResultType(context);
+    Type resultTy = decl->getFuncExpr()->getResultType(context);
     if (resultTy && !resultTy->isEqual(TupleType::getEmpty(context))) {
       OS << " -> ";
       resultTy->print(OS);
     }
     
-    if (!Options.FunctionDefinitions || !decl->getBody()->getBody()) {
+    if (!Options.FunctionDefinitions || !decl->getFuncExpr()->getBody()) {
       return;
     }
     
     OS << " ";
-    visit(decl->getBody()->getBody());
+    visit(decl->getFuncExpr()->getBody());
   }
 }
 

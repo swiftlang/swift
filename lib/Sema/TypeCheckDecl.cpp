@@ -1168,7 +1168,7 @@ public:
   }
 
   void semaFuncExpr(FuncDecl *FD, bool consumeAttributes) {
-    FuncExpr *FE = FD->getBody();
+    FuncExpr *FE = FD->getFuncExpr();
 
     if (FE->getType())
       return;
@@ -1316,7 +1316,7 @@ public:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (!IsFirstPass) {
-      if (auto body = FD->getBody())
+      if (auto body = FD->getFuncExpr())
         if (body->getBody())
           TC.definedFunctions.push_back(body);
     }
@@ -1328,7 +1328,7 @@ public:
     if (FD->isOperator())
       bindFuncDeclToOperator(FD);
 
-    FuncExpr *body = FD->getBody();
+    FuncExpr *body = FD->getFuncExpr();
 
     // Before anything else, set up the 'self' argument correctly.
     GenericParamList *outerGenericParams = nullptr;

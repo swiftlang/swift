@@ -509,12 +509,12 @@ public:
           return true;
       }
     } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-      FuncExpr *Body = FD->getBody();
+      FuncExpr *Body = FD->getFuncExpr();
 #ifndef NDEBUG
       PrettyStackTraceDecl debugStack("walking into body of", FD);
 #endif
       if (FuncExpr *E2 = cast_or_null<FuncExpr>(doIt(Body)))
-        FD->setBody(E2);
+        FD->setFuncExpr(E2);
       else
         return true;
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {

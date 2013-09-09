@@ -1894,7 +1894,7 @@ class FuncDecl : public ValueDecl {
   SourceLoc FuncLoc;    // Location of the 'func' token.
   SourceLoc NameLoc;
   GenericParamList *GenericParams;
-  FuncExpr *Body;
+  FuncExpr *TheFuncExprBody;
   llvm::PointerIntPair<Decl *, 1, bool> GetOrSetDecl;
   FuncDecl *OverriddenDecl;
   OperatorDecl *Operator;
@@ -1902,10 +1902,11 @@ class FuncDecl : public ValueDecl {
 public:
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
            SourceLoc NameLoc, GenericParamList *GenericParams, Type Ty,
-           FuncExpr *Body, DeclContext *DC)
+           FuncExpr *TheFuncExprBody, DeclContext *DC)
     : ValueDecl(DeclKind::Func, DC, Name), StaticLoc(StaticLoc),
       FuncLoc(FuncLoc), NameLoc(NameLoc), GenericParams(GenericParams),
-      Body(Body), OverriddenDecl(nullptr), Operator(nullptr) {
+      TheFuncExprBody(TheFuncExprBody), OverriddenDecl(nullptr),
+      Operator(nullptr) {
     FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
     setType(Ty);
   }
@@ -1917,9 +1918,9 @@ public:
     FuncDeclBits.Static = Static;
   }
 
-  FuncExpr *getBody() { return Body; }
-  const FuncExpr *getBody() const { return Body; }
-  void setBody(FuncExpr *NewBody) { Body = NewBody; }
+  FuncExpr *getFuncExpr() { return TheFuncExprBody; }
+  const FuncExpr *getFuncExpr() const { return TheFuncExprBody; }
+  void setFuncExpr(FuncExpr *NewBody) { TheFuncExprBody = NewBody; }
   
   /// getCaptures - Return the list of declarations captured by the function.
   /// This includes global variables, so it is all variables referenced.

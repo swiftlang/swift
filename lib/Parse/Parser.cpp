@@ -62,7 +62,7 @@ public:
 
   virtual bool walkToDeclPre(Decl *D) {
     if (auto FD = dyn_cast<FuncDecl>(D)) {
-      if (auto FE = FD->getBody()) {
+      if (auto FE = FD->getFuncExpr()) {
         if (FE->getBodyKind() != FuncExpr::BodyKind::Unparsed)
           return false;
         parseFunctionBody(FD);
@@ -74,7 +74,7 @@ public:
 
 private:
   void parseFunctionBody(FuncDecl *FD) {
-    auto FE = FD->getBody();
+    auto FE = FD->getFuncExpr();
     assert(FE);
     assert(FE->getBodyKind() == FuncExpr::BodyKind::Unparsed);
 

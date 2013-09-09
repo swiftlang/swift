@@ -130,7 +130,7 @@ static unsigned getNumCurries(AnyFunctionType *type) {
 /// in the function body.
 unsigned irgen::getDeclNaturalUncurryLevel(ValueDecl *val) {
   if (FuncDecl *func = dyn_cast<FuncDecl>(val)) {
-    return func->getBody()->getNaturalArgumentCount() - 1;
+    return func->getFuncExpr()->getNaturalArgumentCount() - 1;
   }
   if (isa<ConstructorDecl>(val) || isa<UnionElementDecl>(val)) {
     return 1;
@@ -2052,8 +2052,8 @@ void IRGenModule::emitLocalDecls(BraceStmt *body) {
 }
 
 void IRGenModule::emitLocalDecls(FuncDecl *fd) {
-  if (fd->getBody() && fd->getBody()->getBody())
-    emitLocalDecls(fd->getBody()->getBody());
+  if (fd->getFuncExpr() && fd->getFuncExpr()->getBody())
+    emitLocalDecls(fd->getFuncExpr()->getBody());
 }
 
 void IRGenModule::emitLocalDecls(ConstructorDecl *cd) {

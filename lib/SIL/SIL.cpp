@@ -39,8 +39,8 @@ static unsigned getFuncNaturalUncurryLevel(CapturingExpr *func) {
 }
 
 static unsigned getFuncNaturalUncurryLevel(FuncDecl *fd) {
-  if (fd->getBody())
-    return getFuncNaturalUncurryLevel(fd->getBody());
+  if (fd->getFuncExpr())
+    return getFuncNaturalUncurryLevel(fd->getFuncExpr());
   // Assume func decls without bodies (e.g., builtins) have uncurry level zero.
   return 0;
 }

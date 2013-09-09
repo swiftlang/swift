@@ -258,7 +258,7 @@ bool SILGenModule::hasFunction(SILDeclRef constant) {
 }
 
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
-  emitFunction(fd, fd->getBody());
+  emitFunction(fd, fd->getFuncExpr());
 }
 
 template<typename T>
@@ -451,8 +451,9 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
   // Don't emit the thunk if it already exists.
   if (hasFunction(thunk))
     return;
-  // TODO: why we have getBody here?
-  SILFunction *f = preEmitFunction(thunk, method->getBody(), method->getBody());
+  // TODO: why we have getFuncExpr here?
+  SILFunction *f = preEmitFunction(thunk, method->getFuncExpr(),
+                                   method->getFuncExpr());
   SILGenFunction(*this, *f).emitObjCMethodThunk(thunk);
   postEmitFunction(thunk, f);
 }

@@ -1156,9 +1156,9 @@ void Serializer::writeDecl(const Decl *D) {
 
     // Write both argument and body parameters. This is important for proper
     // error messages with selector-style declarations.
-    for (auto pattern : fn->getBody()->getArgParamPatterns())
+    for (auto pattern : fn->getFuncExpr()->getArgParamPatterns())
       writePattern(pattern);
-    for (auto pattern : fn->getBody()->getBodyParamPatterns())
+    for (auto pattern : fn->getFuncExpr()->getBodyParamPatterns())
       writePattern(pattern);
 
     if (fn->getAttrs().isConversion())

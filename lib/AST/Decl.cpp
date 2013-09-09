@@ -184,7 +184,7 @@ bool ValueDecl::isDefinition() const {
     llvm_unreachable("non-value decls shouldn't get here");
       
   case DeclKind::Func:
-    return cast<FuncDecl>(this)->getBody() != 0;
+    return cast<FuncDecl>(this)->getFuncExpr() != 0;
 
   case DeclKind::Var:
   case DeclKind::Union:
@@ -266,7 +266,7 @@ std::pair<DefaultArgumentKind, Type>
 ValueDecl::getDefaultArg(unsigned index) const {
   ArrayRef<const Pattern *> patterns;
   if (auto func = dyn_cast<FuncDecl>(this)) {
-    patterns = func->getBody()->getArgParamPatterns();
+    patterns = func->getFuncExpr()->getArgParamPatterns();
 
     // Skip the 'self' parameter; it is not counted.
     if (func->getDeclContext()->isTypeContext())
@@ -640,31 +640,31 @@ bool VarDecl::isAnonClosureParam() const {
 }
 
 VarDecl *FuncDecl::getImplicitSelfDecl() const {
-  return Body->getImplicitSelfDecl();
+  return TheFuncExprBody->getImplicitSelfDecl();
 }
 
 /// getNaturalArgumentCount - Returns the "natural" number of
 /// argument clauses taken by this function.
 unsigned FuncDecl::getNaturalArgumentCount() const {
-  return getBody()->getNaturalArgumentCount();
+  return TheFuncExprBody->getNaturalArgumentCount();
 }
 
 ArrayRef<ValueDecl*> FuncDecl::getCaptures() const {
-  if (Body)
-    return Body->getCaptures();
+  if (TheFuncExprBody)
+    return TheFuncExprBody->getCaptures();
   else
     return {};
 }
 
 std::vector<ValueDecl*> FuncDecl::getLocalCaptures() const {
-  if (Body)
-    return Body->getLocalCaptures();
+  if (TheFuncExprBody)
+    return TheFuncExprBody->getLocalCaptures();
   return std::vector<ValueDecl*>();
 }
 
 bool FuncDecl::hasLocalCaptures() const {
-  if (Body)
-    return Body->hasLocalCaptures();
+  if (TheFuncExprBody)
+    return TheFuncExprBody->hasLocalCaptures();
 
   return false;
 }
@@ -755,8 +755,8 @@ bool FuncDecl::isUnaryOperator() const {
   
   unsigned opArgIndex = isa<ProtocolDecl>(getDeclContext()) ? 1 : 0;
   
-  auto *argTuple
-    = dyn_cast<TuplePattern>(getBody()->getArgParamPatterns()[opArgIndex]);
+  auto *argTuple = dyn_cast<TuplePattern>(
+      TheFuncExprBody -> getArgParamPatterns()[opArgIndex]);
   if (!argTuple)
     return true;
 
@@ -769,8 +769,8 @@ bool FuncDecl::isBinaryOperator() const {
   
   unsigned opArgIndex = isa<ProtocolDecl>(getDeclContext()) ? 1 : 0;
   
-  auto *argTuple
-    = dyn_cast<TuplePattern>(getBody()->getArgParamPatterns()[opArgIndex]);
+  auto *argTuple = dyn_cast<TuplePattern>(
+      TheFuncExprBody -> getArgParamPatterns()[opArgIndex]);
   if (!argTuple)
     return false;
   
@@ -812,7 +812,7 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
   out << getName().str();
 
   // We should always have exactly two levels of argument pattern.
-  auto argPatterns = getBody()->getArgParamPatterns();
+  auto argPatterns = TheFuncExprBody->getArgParamPatterns();
   assert(argPatterns.size() == 2);
   const Pattern *pattern = argPatterns[1];
   auto tuple = dyn_cast<TuplePattern>(pattern);
@@ -848,7 +848,7 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
 }
 
 SourceRange FuncDecl::getSourceRange() const {
-  return Body->getSourceRange();
+  return TheFuncExprBody->getSourceRange();
 }
 
 SourceRange UnionElementDecl::getSourceRange() const {

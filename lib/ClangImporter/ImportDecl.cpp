@@ -1489,7 +1489,7 @@ namespace {
       auto &context = Impl.SwiftContext;
       auto loc = setter->getLoc();
       auto tuple = cast<TuplePattern>(
-                     setter->getBody()->getBodyParamPatterns()[1]);
+                     setter->getFuncExpr()->getBodyParamPatterns()[1]);
 
       // Objective-C subscript setters are imported with a function type
       // such as:
@@ -1694,7 +1694,7 @@ namespace {
       // Find the getter indices and make sure they match.
       {
         auto tuple = dyn_cast<TuplePattern>(
-                       getter->getBody()->getArgParamPatterns()[1]);
+                       getter->getFuncExpr()->getArgParamPatterns()[1]);
         if (tuple && tuple->getFields().size() != 1)
           return nullptr;
 
@@ -1706,7 +1706,7 @@ namespace {
       Pattern *setterIndices = nullptr;
       if (setter) {
         auto tuple = dyn_cast<TuplePattern>(
-                       setter->getBody()->getBodyParamPatterns()[1]);
+                       setter->getFuncExpr()->getBodyParamPatterns()[1]);
         if (!tuple)
           return nullptr;
 
@@ -1730,7 +1730,7 @@ namespace {
 
       // Build the subscript declaration.
       auto argPatterns
-        = getterThunk->getBody()->getArgParamPatterns()[1]->clone(context);
+        = getterThunk->getFuncExpr()->getArgParamPatterns()[1]->clone(context);
       auto name = context.getIdentifier("__subscript");
       auto subscript
         = new (context) SubscriptDecl(name, decl->getLoc(), argPatterns,
