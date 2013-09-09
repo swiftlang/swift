@@ -741,8 +741,10 @@ public:
       if (dc && dc->getDeclaredTypeInContext()) {
         ClassDecl *classContext = dc->getDeclaredTypeInContext()
           ->getClassOrBoundGenericClass();
+        ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(dc);
         VD->setIsObjC(VD->getAttrs().isObjC()
-                      || (classContext && classContext->isObjC()));
+                      || (classContext && classContext->isObjC())
+                      || (protocolContext && protocolContext->isObjC()));
       }
 
       return;
@@ -1409,9 +1411,10 @@ public:
     if (dc && dc->getDeclaredTypeInContext()) {
       ClassDecl *classContext = dc->getDeclaredTypeInContext()
         ->getClassOrBoundGenericClass();
-
+      ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(dc);
       bool isObjC = FD->getAttrs().isObjC()
-        || (classContext && classContext->isObjC());
+        || (classContext && classContext->isObjC())
+        || (protocolContext && protocolContext->isObjC());
       if (!isObjC && FD->isGetterOrSetter()) {
         // If the property decl is an instance property, its accessors will
         // be instance methods and the above condition will mark them ObjC.
