@@ -44,22 +44,26 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
   while (true) {
     ValueDecl *D = nullptr;
     switch (DC->getContextKind()) {
-    // All the builtin declarations are inherently fragile.
-    case DeclContextKind::BuiltinModule:
-      return Resilience::InherentlyFragile;
+    case DeclContextKind::Module:
+      switch (cast<Module>(DC)->getKind()) {
+      case ModuleKind::BuiltinModule:
+        // All the builtin declarations are inherently fragile.
+        return Resilience::InherentlyFragile;
 
-    // Anything from a Clang module is inherently fragile.
-    case DeclContextKind::ClangModule:
-      return Resilience::InherentlyFragile;
+      case ModuleKind::ClangModule:
+        // Anything from a Clang module is inherently fragile.
+        return Resilience::InherentlyFragile;
 
-    // Global declarations are resilient according to whether the module
-    // is resilient in this translation unit.
-    case DeclContextKind::TranslationUnit:
-    case DeclContextKind::SerializedModule:
-      if (explicitResilience != invalidResilience)
-        return explicitResilience;
-      return C->isResilient(cast<Module>(DC))
-                  ? Resilience::Resilient : Resilience::Fragile;
+      // Global declarations are resilient according to whether the module
+      // is resilient in this translation unit.
+      case ModuleKind::TranslationUnit:
+      case ModuleKind::SerializedModule:
+        if (explicitResilience != invalidResilience)
+          return explicitResilience;
+        return C->isResilient(cast<Module>(DC))
+                    ? Resilience::Resilient : Resilience::Fragile;
+      }
+      assert(0 && "All cases should be covered");
 
     // Local declarations are always inherently fragile.
     case DeclContextKind::CapturingExpr:

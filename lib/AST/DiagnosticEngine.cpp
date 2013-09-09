@@ -344,10 +344,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
 
           while (!dc->isModuleContext()) {
             switch (dc->getContextKind()) {
-            case DeclContextKind::BuiltinModule:
-            case DeclContextKind::ClangModule:
-            case DeclContextKind::SerializedModule:
-            case DeclContextKind::TranslationUnit:
+            case DeclContextKind::Module:
             case DeclContextKind::TopLevelCodeDecl:
               llvm_unreachable("Not in a module context!");
               break;

@@ -92,15 +92,11 @@ namespace llvm {
 
 static const Decl *getDeclForContext(const DeclContext *DC) {
   switch (DC->getContextKind()) {
-  case DeclContextKind::TranslationUnit:
-    // Use a null decl to represent the translation unit.
-    // FIXME: multiple TUs within a module?
-    return nullptr;
-  case DeclContextKind::BuiltinModule:
-    llvm_unreachable("builtins should be handled explicitly");
-  case DeclContextKind::SerializedModule:
-  case DeclContextKind::ClangModule:
-    llvm_unreachable("shouldn't serialize decls from an imported module");
+  case DeclContextKind::Module:
+      // Use a null decl to represent the translation unit.
+    if (isa<TranslationUnit>(DC))
+      return nullptr; // FIXME: multiple TUs within a module?
+    llvm_unreachable("builtins & serialized modules should be handled");
   case DeclContextKind::TopLevelCodeDecl:
     llvm_unreachable("shouldn't serialize the main module");
   case DeclContextKind::CapturingExpr: {

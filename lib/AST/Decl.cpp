@@ -675,10 +675,7 @@ bool FuncDecl::hasLocalCaptures() const {
 Type FuncDecl::getExtensionType() const {
   DeclContext *DC = getDeclContext();
   switch (DC->getContextKind()) {
-  case DeclContextKind::TranslationUnit:
-  case DeclContextKind::BuiltinModule:
-  case DeclContextKind::SerializedModule:
-  case DeclContextKind::ClangModule:
+  case DeclContextKind::Module:
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::ConstructorDecl:

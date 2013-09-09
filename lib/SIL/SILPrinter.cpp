@@ -114,12 +114,9 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   if (!Context)
     return;
   switch (Context->getContextKind()) {
-  case DeclContextKind::BuiltinModule:
-    Buffer << cast<BuiltinModule>(Context)->Name << ".";
-    return;
-  case DeclContextKind::ClangModule:
-  case DeclContextKind::TranslationUnit:
-  case DeclContextKind::SerializedModule:
+  case DeclContextKind::Module:
+    if (auto BM = dyn_cast<BuiltinModule>(Context))
+      Buffer << BM->Name << ".";
     return;
 
   case DeclContextKind::CapturingExpr:

@@ -50,15 +50,8 @@ namespace swift {
 // The indentation of the members of this enum describe the inheritance
 // hierarchy.  Commented out members are abstract classes.  This formation
 // allows for range checks in classof.
-enum class DeclContextKind {
-  First_Module,
-    TranslationUnit = First_Module,
-    BuiltinModule,
-    First_LoadedModule,
-      SerializedModule = First_LoadedModule,
-      ClangModule,
-    Last_LoadedModule = ClangModule,
-  Last_Module = Last_LoadedModule,
+  enum class DeclContextKind : uint8_t {
+  Module,
   CapturingExpr,
   NominalTypeDecl,
   ExtensionDecl,
@@ -83,15 +76,14 @@ class alignas(16) DeclContext {
   // alignas(16) because we use four tag bits on DeclContext.
   
   enum { KindBits = 4 };
-  static_assert(unsigned(DeclContextKind::Last_DeclContextKind) < 1U << KindBits,
+  static_assert(unsigned(DeclContextKind::Last_DeclContextKind) < 1U<<KindBits,
                 "Not enough KindBits for DeclContextKind");
   
   llvm::PointerIntPair<DeclContext*, KindBits, DeclContextKind> ParentAndKind;
   
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
-    : ParentAndKind(Parent, Kind)
-  {
+    : ParentAndKind(Parent, Kind) {
     assert((Parent != 0 || isModuleContext()) &&
            "DeclContext must have a parent unless it is a module!");
   }
@@ -113,8 +105,7 @@ public:
   
   /// isModuleContext - Return true if this is a subclass of Module.
   bool isModuleContext() const {
-    return getContextKind() >= DeclContextKind::First_Module &&
-           getContextKind() <= DeclContextKind::Last_Module;
+    return getContextKind() == DeclContextKind::Module;
   }
 
   /// isTypeContext - Return true if this is a type context, e.g., a union,

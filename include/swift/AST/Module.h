@@ -132,10 +132,11 @@ public:
   } ASTStage;
 
 protected:
-  Module(DeclContextKind KindX, ModuleKind Kind, Identifier Name, Component *C, ASTContext &Ctx)
-  : DeclContext(KindX, nullptr), Kind(Kind), LookupCachePimpl(0),
+  Module(ModuleKind Kind, Identifier Name, Component *C, ASTContext &Ctx)
+  : DeclContext(DeclContextKind::Module, nullptr),
+    Kind(Kind), LookupCachePimpl(0),
     Comp(C), Ctx(Ctx), Name(Name), ASTStage(Parsing) {
-    assert(Comp != nullptr || KindX == DeclContextKind::BuiltinModule);
+    assert(Comp != nullptr || Kind == ModuleKind::BuiltinModule);
   }
 
 public:
@@ -293,7 +294,7 @@ public:
   StringRef getModuleFilename() const;
 
   static bool classof(const DeclContext *DC) {
-    return DC->isModuleContext();
+    return DC->getContextKind() == DeclContextKind::Module;
   }
 
 private:
@@ -358,8 +359,7 @@ public:
   llvm::StringMap<PrefixOperatorDecl*> PrefixOperators;
 
   TranslationUnit(Identifier Name, Component *Comp, ASTContext &C, TUKind Kind)
-    : Module(DeclContextKind::TranslationUnit,
-             ModuleKind::TranslationUnit, Name, Comp, C), Kind(Kind) {
+    : Module(ModuleKind::TranslationUnit, Name, Comp, C), Kind(Kind) {
   }
   
   ArrayRef<std::pair<ImportedModule, bool>> getImports() const {
@@ -406,11 +406,12 @@ public:
   /// \param options Options controlling the printing process.
   void print(raw_ostream &os, const PrintOptions &options);
 
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::TranslationUnit;
-  }
   static bool classof(const Module *M) {
     return M->getKind() == ModuleKind::TranslationUnit;
+  }
+
+  static bool classof(const DeclContext *DC) {
+    return isa<Module>(DC) && classof(cast<Module>(DC));
   }
 };
 
@@ -420,18 +421,16 @@ public:
 class BuiltinModule : public Module {
 public:
   BuiltinModule(Identifier Name, ASTContext &Ctx)
-    : Module(DeclContextKind::BuiltinModule,
-             ModuleKind::BuiltinModule, Name, nullptr, Ctx) {
+    : Module(ModuleKind::BuiltinModule, Name, nullptr, Ctx) {
     // The Builtin module is always well formed.
     ASTStage = TypeChecked;
   }
 
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::BuiltinModule;
-  }
-
   static bool classof(const Module *M) {
     return M->getKind() == ModuleKind::BuiltinModule;
+  }
+  static bool classof(const DeclContext *DC) {
+    return isa<Module>(DC) && classof(cast<Module>(DC));
   }
 };
 
@@ -443,11 +442,10 @@ class LoadedModule : public Module {
 protected:
   friend class Module;
 
-  LoadedModule(DeclContextKind kindX,
-               ModuleKind Kind, Identifier name,
+  LoadedModule(ModuleKind Kind, Identifier name,
                std::string DebugModuleName, Component *comp,
                ASTContext &ctx, ModuleLoader &owner)
-    : Module(kindX, Kind, name, comp, ctx),
+    : Module(Kind, name, comp, ctx),
       DebugModuleName(DebugModuleName) {
     // Loaded modules are always well-formed.
     ASTStage = TypeChecked;
@@ -476,14 +474,12 @@ public:
                   "Must specify prefix, postfix, or infix operator decl");
   }
 
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() >= DeclContextKind::First_LoadedModule &&
-           DC->getContextKind() <= DeclContextKind::Last_LoadedModule;
-  }
-
   static bool classof(const Module *M) {
     return M->getKind() == ModuleKind::SerializedModule ||
            M->getKind() == ModuleKind::ClangModule;
+  }
+  static bool classof(const DeclContext *DC) {
+    return isa<Module>(DC) && classof(cast<Module>(DC));
   }
 
   /// \brief Get the debug name for the module.

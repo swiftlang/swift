@@ -187,13 +187,10 @@ void Mangler::mangleContextOf(ValueDecl *decl) {
 
 void Mangler::mangleDeclContext(DeclContext *ctx) {
   switch (ctx->getContextKind()) {
-  case DeclContextKind::BuiltinModule:
-    llvm_unreachable("mangling member of builtin module!");
-
-  case DeclContextKind::ClangModule:
-  case DeclContextKind::TranslationUnit:
-  case DeclContextKind::SerializedModule: {
+  case DeclContextKind::Module: {
     Module *module = cast<Module>(ctx);
+
+    assert(!isa<BuiltinModule>(module) && "mangling member of builtin module!");
 
     // Try the special 'swift' substitution.
     // context ::= 'Ss'

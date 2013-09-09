@@ -54,12 +54,12 @@ public:
   /// If this module is itself a top-level module, returns this module's name.
   StringRef getTopLevelModuleName() const;
 
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::ClangModule;
-  }
-
   static bool classof(const Module *M) {
     return M->getKind() == ModuleKind::ClangModule;
+  }
+
+  static bool classof(const DeclContext *DC) {
+    return isa<Module>(DC) && classof(cast<Module>(DC));
   }
 };
 

@@ -565,10 +565,7 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
   }
 
   switch (dc->getContextKind()) {
-  case DeclContextKind::BuiltinModule:
-  case DeclContextKind::ClangModule:
-  case DeclContextKind::SerializedModule:
-  case DeclContextKind::TranslationUnit:
+  case DeclContextKind::Module:
     printName(os, cast<Module>(dc)->Name);
     break;
 

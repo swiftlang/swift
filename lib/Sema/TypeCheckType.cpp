@@ -62,11 +62,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
     if (nominal->getGenericParams() && !isSpecialized) {
       for (DeclContext *dc = fromDC; dc; dc = dc->getParent()) {
         switch (dc->getContextKind()) {
-        case DeclContextKind::BuiltinModule:
-        case DeclContextKind::ClangModule:
-        case DeclContextKind::SerializedModule:
+        case DeclContextKind::Module:
         case DeclContextKind::TopLevelCodeDecl:
-        case DeclContextKind::TranslationUnit:
           break;
 
         case DeclContextKind::NominalTypeDecl:

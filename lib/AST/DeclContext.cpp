@@ -32,12 +32,9 @@ ASTContext &DeclContext::getASTContext() {
 
 Type DeclContext::getDeclaredTypeOfContext() const {
   switch (getContextKind()) {
-  case DeclContextKind::BuiltinModule:
+  case DeclContextKind::Module:
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::TranslationUnit:
-  case DeclContextKind::SerializedModule:
-  case DeclContextKind::ClangModule:
   case DeclContextKind::ConstructorDecl:
   case DeclContextKind::DestructorDecl:
     return Type();
@@ -54,12 +51,9 @@ Type DeclContext::getDeclaredTypeOfContext() const {
 
 Type DeclContext::getDeclaredTypeInContext() {
   switch (getContextKind()) {
-    case DeclContextKind::BuiltinModule:
+    case DeclContextKind::Module:
     case DeclContextKind::CapturingExpr:
     case DeclContextKind::TopLevelCodeDecl:
-    case DeclContextKind::TranslationUnit:
-    case DeclContextKind::SerializedModule:
-    case DeclContextKind::ClangModule:
     case DeclContextKind::ConstructorDecl:
     case DeclContextKind::DestructorDecl:
       return Type();
@@ -74,11 +68,8 @@ Type DeclContext::getDeclaredTypeInContext() {
 
 GenericParamList *DeclContext::getGenericParamsOfContext() const {
   switch (getContextKind()) {
-    case DeclContextKind::BuiltinModule:
+    case DeclContextKind::Module:
     case DeclContextKind::TopLevelCodeDecl:
-    case DeclContextKind::TranslationUnit:
-    case DeclContextKind::SerializedModule:
-    case DeclContextKind::ClangModule:
       return nullptr;
 
     case DeclContextKind::CapturingExpr: {
@@ -143,10 +134,7 @@ Module *DeclContext::getParentModule() const {
 bool DeclContext::isGenericContext() const {
   for (const DeclContext *dc = this; ; dc = dc->getParent() ) {
     switch (dc->getContextKind()) {
-    case DeclContextKind::BuiltinModule:
-    case DeclContextKind::ClangModule:
-    case DeclContextKind::SerializedModule:
-    case DeclContextKind::TranslationUnit:
+    case DeclContextKind::Module:
       return false;
 
     case DeclContextKind::CapturingExpr:
@@ -185,10 +173,7 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
 
   const char *Kind;
   switch (getContextKind()) {
-  case DeclContextKind::TranslationUnit:  Kind = "TranslationUnit"; break;
-  case DeclContextKind::BuiltinModule:    Kind = "BuiltinModule"; break;
-  case DeclContextKind::SerializedModule: Kind = "SerializedModule"; break;
-  case DeclContextKind::ClangModule:      Kind = "ClangModule"; break;
+  case DeclContextKind::Module:           Kind = "Module"; break;
   case DeclContextKind::CapturingExpr:    Kind = "CapturingExpr"; break;
   case DeclContextKind::NominalTypeDecl:  Kind = "NominalTypeDecl"; break;
   case DeclContextKind::ExtensionDecl:    Kind = "ExtensionDecl"; break;

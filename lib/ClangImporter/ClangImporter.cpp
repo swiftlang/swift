@@ -737,12 +737,8 @@ clang::TargetInfo &ClangImporter::getTargetInfo() const {
 ClangModule::ClangModule(ASTContext &ctx, std::string DebugModuleName,
                          ModuleLoader &owner, Component *comp,
                          clang::Module *clangModule)
-  : LoadedModule(DeclContextKind::ClangModule, ModuleKind::ClangModule,
-                 ctx.getIdentifier(clangModule->Name),
-                 DebugModuleName,
-                 comp, ctx, owner),
-    clangModule(clangModule)
-{
+  : LoadedModule(ModuleKind::ClangModule, ctx.getIdentifier(clangModule->Name),
+                 DebugModuleName, comp, ctx, owner), clangModule(clangModule) {
   // Clang modules are always well-formed.
   ASTStage = TypeChecked;
 }
