@@ -206,6 +206,7 @@ namespace {
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
   public:
     ConstraintSystem &cs;
+    DeclContext *dc;
     const Solution &solution;
 
   private:
@@ -763,7 +764,7 @@ namespace {
 
   public:
     ExprRewriter(ConstraintSystem &cs, const Solution &solution)
-      : cs(cs), solution(solution) { }
+      : cs(cs), dc(cs.DC), solution(solution) { }
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
@@ -1044,7 +1045,7 @@ namespace {
     Type getTypeOfDeclReference(ValueDecl *decl, bool isSpecialized) {
       if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
         // Resolve the reference to this type declaration in our current context.
-        auto type = cs.getTypeChecker().resolveTypeInContext(typeDecl, cs.DC,
+        auto type = cs.getTypeChecker().resolveTypeInContext(typeDecl, dc,
                                                              isSpecialized);
         if (!type)
           return nullptr;
@@ -1349,7 +1350,7 @@ namespace {
                                                            tc.Context));
       auto name = tc.Context.getIdentifier("convertFromArrayLiteral");
       auto arg = expr->getSubExpr();
-      Expr *result = tc.callWitness(typeRef, cs.DC, arrayProto, conformance,
+      Expr *result = tc.callWitness(typeRef, dc, arrayProto, conformance,
                                     name, arg, diag::array_protocol_broken);
       if (!result)
         return nullptr;
@@ -1386,7 +1387,7 @@ namespace {
                                                            tc.Context));
       auto name = tc.Context.getIdentifier("convertFromDictionaryLiteral");
       auto arg = expr->getSubExpr();
-      Expr *result = tc.callWitness(typeRef, cs.DC, dictionaryProto,
+      Expr *result = tc.callWitness(typeRef, dc, dictionaryProto,
                                     conformance, name, arg,
                                     diag::dictionary_protocol_broken);
       if (!result)
@@ -1455,46 +1456,16 @@ namespace {
       // Coerce the FuncExpr's pattern, in case we resolved something.
       Type input = expr->getType()->castTo<FunctionType>()->getInput();
       auto &tc = cs.getTypeChecker();
-      if (tc.coerceToType(expr->getArgParamPatterns()[0], cs.DC, input))
+      if (tc.coerceToType(expr->getArgParamPatterns()[0], dc, input))
         return nullptr;
-      if (tc.coerceToType(expr->getBodyParamPatterns()[0], cs.DC, input))
+      if (tc.coerceToType(expr->getBodyParamPatterns()[0], dc, input))
         return nullptr;
 
       return expr;
     }
 
     Expr *visitPipeClosureExpr(PipeClosureExpr *expr) {
-      simplifyExprType(expr);
-
-      // Coerce the pattern, in case we resolved something.
-      auto fnType = expr->getType()->castTo<FunctionType>();
-      auto &tc = cs.getTypeChecker();
-
-      // If this is a single-expression closure, convert the expression
-      // in the body to the result type of the closure.
-      if (expr->hasSingleExpressionBody()) {
-        Expr *body = coerceToType(expr->getSingleExpressionBody(),
-                                  fnType->getResult(),
-                                  cs.getConstraintLocator(
-                                    expr,
-                                    ConstraintLocator::ClosureResult));
-        if (!body)
-          return nullptr;
-
-        expr->setSingleExpressionBody(body);
-
-        // Compute the capture list, now that we have analyzed the expression.
-        tc.computeCaptures(expr);
-
-        return expr;
-      }
-
-      // For other closures, type-check the body.
-      tc.typeCheckClosureBody(expr);
-
-      // Compute the capture list, now that we have type-checked the body.
-      tc.computeCaptures(expr);
-      return expr;
+      llvm_unreachable("Handled by the walker directly");
     }
 
     Expr *visitImplicitClosureExpr(ImplicitClosureExpr *expr) {
@@ -1540,7 +1511,7 @@ namespace {
       expr->setType(resultType);
 
       // Find the appropriate injection function.
-      Expr* injectionFn = tc.buildArrayInjectionFnRef(cs.DC, sliceType,
+      Expr* injectionFn = tc.buildArrayInjectionFnRef(dc, sliceType,
                             expr->getBounds()[0].Value->getType(),
                             expr->getNewLoc());
       if (!injectionFn)
@@ -1616,7 +1587,7 @@ namespace {
 
       // Type-check the subexpression in isolation.
       Expr *sub = expr->getSubExpr();
-      if (tc.typeCheckExpression(sub, cs.DC, Type(), /*discardedExpr=*/false)) {
+      if (tc.typeCheckExpression(sub, dc, Type(), /*discardedExpr=*/false)) {
         return CheckedCastKind::Unresolved;
       }
       sub = tc.coerceToRValue(sub);
@@ -1632,7 +1603,7 @@ namespace {
                               sub->getSourceRange(),
                               expr->getCastTypeLoc().getSourceRange(),
                               [&](Type commonTy) -> bool {
-                                return tc.convertToType(sub, commonTy, cs.DC);
+                                return tc.convertToType(sub, commonTy, dc);
                               });
     }
     
@@ -1888,7 +1859,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       toSugarFields.push_back(toElt);
 
       // Create a caller-side default argument, if we need one.
-      if (auto defArg = getCallerDefaultArg(tc, cs.DC, expr->getLoc(),
+      if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
                                             defaultArgsOwner, i)) {
         callerDefaultArgs.push_back(defArg);
         sources[i] = TupleShuffleExpr::CallerDefaultInitialize;
@@ -2008,7 +1979,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       = cast<ArraySliceType>(
           toTuple->getFields().back().getType().getPointer());
     Type boundType = BuiltinIntegerType::get(64, tc.Context);
-    injectionFn = tc.buildArrayInjectionFnRef(cs.DC,
+    injectionFn = tc.buildArrayInjectionFnRef(dc,
                                               sliceType, boundType,
                                               expr->getStartLoc());
     if (!injectionFn)
@@ -2070,7 +2041,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
     ArraySliceType *sliceType
       = cast<ArraySliceType>(lastField.getType().getPointer());
     Type boundType = BuiltinIntegerType::get(64, tc.Context);
-    injectionFn = tc.buildArrayInjectionFnRef(cs.DC,
+    injectionFn = tc.buildArrayInjectionFnRef(dc,
                                               sliceType, boundType,
                                               expr->getStartLoc());
     if (!injectionFn)
@@ -2160,7 +2131,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
     }
 
     // Create a caller-side default argument, if we need one.
-    if (auto defArg = getCallerDefaultArg(tc, cs.DC, expr->getLoc(),
+    if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
                                           defaultArgsOwner, i)) {
       // Record the caller-side default argument expression.
       // FIXME: Do we need to record what this was synthesized from?
@@ -2292,7 +2263,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       expr = coerceToType(expr, toFunc->getResult(),
                           locator.withPathElement(ConstraintLocator::Load));
 
-      auto ice = new (tc.Context) ImplicitClosureExpr(expr, cs.DC, toType);
+      auto ice = new (tc.Context) ImplicitClosureExpr(expr, dc, toType);
       Pattern *pattern = TuplePattern::create(tc.Context, expr->getLoc(),
                                               ArrayRef<TuplePatternElt>(),
                                               expr->getLoc());
@@ -2530,7 +2501,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     Expr *base = new (tc.Context) MetatypeExpr(nullptr, literal->getLoc(),
                                                MetaTypeType::get(type,
                                                                  tc.Context));
-    Expr *result = tc.callWitness(base, cs.DC,
+    Expr *result = tc.callWitness(base, dc,
                                   builtinProtocol, builtinConformance,
                                   builtinLiteralFuncName,
                                   literal,
@@ -2573,7 +2544,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   Expr *base = new (tc.Context) MetatypeExpr(nullptr, literal->getLoc(),
                                              MetaTypeType::get(type,
                                                                tc.Context));
-  literal = tc.callWitness(base, cs.DC,
+  literal = tc.callWitness(base, dc,
                            protocol, conformance, literalFuncName,
                            literal, brokenProtocolDiag);
   if (literal)
@@ -2787,17 +2758,42 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         return { false, expr };
       }
 
-      // For closures, update the parameter types before we recurse.
+      // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
         Rewriter.simplifyExprType(expr);
         auto &cs = Rewriter.getConstraintSystem();
         auto &tc = cs.getTypeChecker();
-        auto fnType = closure->getType()->castTo<FunctionType>();
-        if (tc.coerceToType(closure->getParams(), cs.DC, fnType->getInput()))
-          return { false, nullptr };
-        return { true, expr };
-      }
 
+        // Coerce the pattern, in case we resolved something.
+        auto fnType = closure->getType()->castTo<FunctionType>();
+        if (tc.coerceToType(closure->getParams(), closure, fnType->getInput()))
+          return { false, nullptr };
+
+        // If this is a single-expression closure, convert the expression
+        // in the body to the result type of the closure.
+        if (closure->hasSingleExpressionBody()) {
+          // Enter the context of the closure when type-checking the body.
+          llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
+          Expr *body = closure->getSingleExpressionBody()->walk(*this);
+          if (body)
+            body = Rewriter.coerceToType(body,
+                                         fnType->getResult(),
+                                         cs.getConstraintLocator(
+                                           closure,
+                                           ConstraintLocator::ClosureResult));
+          if (!body)
+            return { false, nullptr} ;
+
+          closure->setSingleExpressionBody(body);
+        } else {
+          // For other closures, type-check the body.
+          tc.typeCheckClosureBody(closure);
+        }
+
+        // Compute the capture list, now that we have type-checked the body.
+        tc.computeCaptures(closure);
+        return { false, closure };
+      }
 
       return { true, expr };
     }
