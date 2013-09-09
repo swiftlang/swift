@@ -1559,6 +1559,37 @@ It is undefined behavior if the ``protocol_method`` function value is invoked
 with a "self" argument not derived from the same existential container as the
 method itself.
 
+dynamic_method
+```````````````
+::
+
+  sil-instruction ::= 'dynamic_method' sil-method-attributes?
+                      sil-operand ',' sil-decl-ref ':' sil-type
+
+  %1 = dynamic_method %0 : $P, #X.method!1 : $[thin] U -> V
+  // %0 must be of a protocol or protocol composition type $P,
+  // where $P contains the swift.DynamicLookup protocol
+  // #X.method!1 must be a reference to an [objc] method of any class
+  // or protocol type
+  //
+  // The "self" argument of the method type $[thin] U -> V must be 
+  //   Builtin.ObjCPointer
+
+Looks up the implementation of an Objective-C method with the same
+selector as the named method for the dynamic type of the
+value inside an existential container. The "self" operand of the result
+function value is represented using an opaque type, the value for which must
+be projected out as a value of type ``Builtin.ObjCPointer``.
+
+It is undefined behavior if the dynamic type of the operand does not
+have an implementation for the Objective-C method with the selector to
+which the ``dynamic_method`` instruction refers, or if that
+implementation has parameter or result types that are incompatible
+with the method referenced by ``dynamic_method``. Therefore,
+this instruction should only be used in cases where its result will be
+immediately consumed by an operation that performs the selector check
+itself (e.g., an ``apply`` that lowers to ``objc_msgSend``).
+
 Function Application
 ~~~~~~~~~~~~~~~~~~~~
 

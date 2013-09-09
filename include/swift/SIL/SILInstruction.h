@@ -1468,7 +1468,20 @@ public:
                      SILType Ty, bool Volatile = false)
     : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
-  
+
+/// Given the address of a value of DynamicLookup protocol type and a method
+/// constant referring to some Objective-C method, performs dynamic method
+/// lookup to extract the implementation of that method. This method lookup
+/// can fail at run-time
+class DynamicMethodInst
+  : public UnaryInstructionBase<ValueKind::DynamicMethodInst, MethodInst>
+{
+public:
+  DynamicMethodInst(SILLocation Loc, SILValue Operand, SILDeclRef Member,
+                    SILType Ty, bool Volatile = false)
+    : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
+};
+
 /// ProjectExistentialInst - Given the address of an existential, returns a
 /// RawPointer pointing to the value inside the existential.
 class ProjectExistentialInst

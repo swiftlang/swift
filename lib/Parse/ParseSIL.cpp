@@ -879,6 +879,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("downcast_archetype_addr", ValueKind::DowncastArchetypeAddrInst)
     .Case("downcast_archetype_ref", ValueKind::DowncastArchetypeRefInst)
     .Case("downcast_existential_ref", ValueKind::DowncastExistentialRefInst)
+    .Case("dynamic_method", ValueKind::DynamicMethodInst)
     .Case("float_literal", ValueKind::FloatLiteralInst)
     .Case("global_addr", ValueKind::GlobalAddrInst)
     .Case("index_addr", ValueKind::IndexAddrInst)
@@ -1653,7 +1654,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     
   case ValueKind::ProtocolMethodInst:
   case ValueKind::ClassMethodInst:
-  case ValueKind::SuperMethodInst: {
+  case ValueKind::SuperMethodInst:
+  case ValueKind::DynamicMethodInst: {
     bool IsVolatile = false;
     if (parseSILOptional(IsVolatile, *this, "volatile"))
       return true;
@@ -1680,6 +1682,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     case ValueKind::SuperMethodInst:
       ResultVal = B.createSuperMethod(InstLoc, Val, Member, MethodTy,
                                       IsVolatile);
+      break;
+    case ValueKind::DynamicMethodInst:
+      ResultVal = B.createDynamicMethod(InstLoc, Val, Member, MethodTy,
+                                       IsVolatile);
       break;
     }
     break;

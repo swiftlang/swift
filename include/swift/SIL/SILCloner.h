@@ -690,6 +690,17 @@ SILCloner<ImplClass>::visitProtocolMethodInst(ProtocolMethodInst* Inst) {
 
 template<typename ImplClass>
 SILValue
+SILCloner<ImplClass>::visitDynamicMethodInst(DynamicMethodInst* Inst) {
+  return doPostProcess(Inst,
+    Builder.createDynamicMethod(getOpLocation(Inst->getLoc()),
+                                getOpValue(Inst->getOperand()),
+                                Inst->getMember(),
+                                getOpType(Inst->getType()),
+                                Inst->isVolatile()));
+}
+
+template<typename ImplClass>
+SILValue
 SILCloner<ImplClass>::visitProjectExistentialInst(ProjectExistentialInst* Inst) {
   return doPostProcess(Inst,
     Builder.createProjectExistential(getOpLocation(Inst->getLoc()),

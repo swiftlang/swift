@@ -718,7 +718,20 @@ public:
               "result must be a method of the existential metatype");
     }
   }
-  
+
+  void checkDynamicMethodInst(DynamicMethodInst *EMI) {
+    AnyFunctionType *methodType = EMI->getType(0).getAs<AnyFunctionType>();
+    require(methodType,
+            "result method must be a function type");
+    SILType operandType = EMI->getOperand().getType();
+
+    require(EMI->getMember().getDecl()->isObjC(), "method must be [objc]");
+    require(EMI->getMember().getDecl()->isInstanceMember(),
+            "method must be an instance method");
+    require(operandType.getSwiftType()->is<BuiltinObjCPointerType>(),
+            "operand must have Builtin.ObjCPointer type");
+  }
+
   static bool isClassOrClassMetatype(Type t) {
     if (auto *meta = t->getAs<MetaTypeType>()) {
       return bool(meta->getInstanceType()->getClassOrBoundGenericClass());

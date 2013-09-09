@@ -774,6 +774,10 @@ public:
     printMethodInst(AMI, AMI->getOperand(), "protocol_method");
     OS << " : " << AMI->getType();
   }
+  void visitDynamicMethodInst(DynamicMethodInst *DMI) {
+    printMethodInst(DMI, DMI->getOperand(), "dynamic_method");
+    OS << " : " << DMI->getType();
+  }
   void visitProjectExistentialInst(ProjectExistentialInst *PI) {
     OS << "project_existential " << getIDAndType(PI->getOperand())
       << " to " << PI->getType();

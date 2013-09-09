@@ -110,7 +110,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(SuperMethodInst, MethodInst, None)
     INST(ArchetypeMethodInst, MethodInst, None)
     INST(ProtocolMethodInst, MethodInst, None)
-    VALUE_RANGE(MethodInst, ClassMethodInst, ProtocolMethodInst)
+    INST(DynamicMethodInst, MethodInst, None)
+    VALUE_RANGE(MethodInst, ClassMethodInst, DynamicMethodInst)
 
   // Function Application
   INST(ApplyInst, SILInstruction, MayHaveSideEffects)

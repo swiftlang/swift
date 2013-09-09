@@ -534,7 +534,8 @@ public:
   void visitSuperMethodInst(SuperMethodInst *i);
   void visitArchetypeMethodInst(ArchetypeMethodInst *i);
   void visitProtocolMethodInst(ProtocolMethodInst *i);
-  
+  void visitDynamicMethodInst(DynamicMethodInst *i);
+
   void visitProjectExistentialInst(ProjectExistentialInst *i);
   void visitProjectExistentialRefInst(ProjectExistentialRefInst *i);
   void visitInitExistentialInst(InitExistentialInst *i);
@@ -2378,6 +2379,12 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
   }
   
   setLoweredExplosion(SILValue(i, 0), lowered);
+}
+
+void IRGenSILFunction::visitDynamicMethodInst(DynamicMethodInst *i) {
+  assert(i->getMember().isObjC && "dynamic_method requires [objc] method");
+  setLoweredObjCMethod(SILValue(i, 0), i->getMember());
+  return;
 }
 
 void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {

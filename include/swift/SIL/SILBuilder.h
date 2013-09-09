@@ -533,7 +533,17 @@ public:
                     ProtocolMethodInst(Loc, Operand, Member, MethodTy,
                                        Volatile));
   }
-  
+
+  DynamicMethodInst *createDynamicMethod(SILLocation Loc,
+                                         SILValue Operand,
+                                         SILDeclRef Member,
+                                         SILType MethodTy,
+                                         bool Volatile = false) {
+    return insert(new (F.getModule())
+                  DynamicMethodInst(Loc, Operand, Member, MethodTy,
+                                    Volatile));
+  }
+
   ProjectExistentialInst *createProjectExistential(SILLocation Loc,
                                                    SILValue Operand,
                                                    SILType SelfTy) {

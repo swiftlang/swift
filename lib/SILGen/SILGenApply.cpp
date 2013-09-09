@@ -48,7 +48,9 @@ public:
       ArchetypeMethod = GenericMethod_First,
       /// A method call using protocol dispatch.
       ProtocolMethod,
-    GenericMethod_Last = ProtocolMethod
+      /// A method call using dynamic lookup.
+      DynamicMethod,
+    GenericMethod_Last = DynamicMethod
   };
 
   const Kind kind;
@@ -126,6 +128,7 @@ private:
   
   static const enum class ForArchetype_t {} ForArchetype{};
   static const enum class ForProtocol_t {} ForProtocol{};
+  static const enum class ForDynamic_t {} ForDynamic{};
 
   static ArchetypeType *getArchetypeType(SILType t) {
     if (auto metatype = t.getAs<MetaTypeType>())
@@ -194,12 +197,37 @@ private:
       ->getCanonicalType();
   }
 
+  static CanType getDynamicMethodType(SILGenFunction &gen,
+                                       SILValue proto,
+                                       SILDeclRef methodName,
+                                       Type memberType) {
+    auto &ctx = memberType->getASTContext();
+    Type selfTy = ctx.TheObjCPointerType;
+    auto info = FunctionType::ExtInfo()
+                  .withCallingConv(gen.SGM.getConstantCC(methodName))
+                  .withIsThin(true);
+
+    return FunctionType::get(selfTy, memberType, info, ctx)
+             ->getCanonicalType();
+  }
+
   Callee(ForProtocol_t,
          SILGenFunction &gen,
          SILValue proto, SILDeclRef methodName, Type memberType, SILLocation l)
     : kind(Kind::ProtocolMethod),
       genericMethod{proto, methodName,
                     getProtocolMethodType(gen, proto, methodName, memberType)},
+      specializedType(genericMethod.origType),
+      isTransparent(false),
+      Loc(l)
+  {}
+
+  Callee(ForDynamic_t,
+         SILGenFunction &gen,
+         SILValue proto, SILDeclRef methodName, Type memberType, SILLocation l)
+    : kind(Kind::DynamicMethod),
+      genericMethod{proto, methodName,
+                    getDynamicMethodType(gen, proto, methodName, memberType)},
       specializedType(genericMethod.origType),
       isTransparent(false),
       Loc(l)
@@ -228,7 +256,10 @@ public:
                             SILDeclRef name, Type memberType, SILLocation l) {
     return Callee(ForProtocol, gen, proto, name, memberType, l);
   }
-
+  static Callee forDynamic(SILGenFunction &gen, SILValue proto,
+                           SILDeclRef name, Type memberType, SILLocation l) {
+    return Callee(ForDynamic, gen, proto, name, memberType, l);
+  }
   Callee(Callee &&) = default;
   Callee &operator=(Callee &&) = default;
 
@@ -288,6 +319,7 @@ public:
     case Kind::SuperMethod:
     case Kind::ArchetypeMethod:
     case Kind::ProtocolMethod:
+    case Kind::DynamicMethod:
       return method.methodName.uncurryLevel;
     }
   }
@@ -385,6 +417,22 @@ public:
       ownership = OwnershipConventions::get(gen, constant, method.getType());
       break;
     }
+    case Kind::DynamicMethod: {
+      assert(level >= 1
+             && "currying 'self' of dynamic method dispatch not yet supported");
+      assert(level <= method.methodName.uncurryLevel
+             && "uncurrying past natural uncurry level of method");
+
+      SILDeclRef constant = genericMethod.methodName.atUncurryLevel(level);
+      SILValue method = gen.B.createDynamicMethod(Loc,
+                          genericMethod.selfValue,
+                          constant,
+                          gen.getLoweredType(genericMethod.origType, level),
+                          /*volatile*/ constant.isObjC);
+      mv = ManagedValue(method, ManagedValue::Unmanaged);
+      ownership = OwnershipConventions::get(gen, constant, method.getType());
+      break;
+    }
     }
     
     // If the callee needs to be specialized, do so.
@@ -432,6 +480,7 @@ public:
     case Kind::SuperMethod:
     case Kind::ArchetypeMethod:
     case Kind::ProtocolMethod:
+    case Kind::DynamicMethod:
       return nullptr;
     }
   }
@@ -498,6 +547,12 @@ public:
   
   /// Add a call site to the curry.
   void visitApplyExpr(ApplyExpr *e) {
+    // If this application is a dynamic member reference that is forced to
+    // succeed with the '!' operator, emit it as a direct invocation of the
+    // method we found.
+    if (emitForcedDynamicMemberRef(e))
+      return;
+
     if (e->isSuper()) {
       applySuper(e);
     } else {
@@ -673,6 +728,90 @@ public:
   Callee getCallee() {
     assert(callee && "did not find callee?!");
     return *std::move(callee);
+  }
+
+  /// Ignore parentheses and implicit conversions.
+  static Expr *ignoreParensAndImpConversions(Expr *expr) {
+    while (true) {
+      if (auto ice = dyn_cast<ImplicitConversionExpr>(expr)) {
+        expr = ice->getSubExpr();
+        continue;
+      }
+
+      auto valueProviding = expr->getValueProvidingExpr();
+      if (valueProviding != expr) {
+        expr = valueProviding;
+        continue;
+      }
+
+      return expr;
+    }
+  }
+
+  /// If this application forces a dynamic member reference with !, emit
+  /// a direct reference to the member.
+  bool emitForcedDynamicMemberRef(ApplyExpr *apply) {
+    // Check whether the argument is a dynamic member reference.
+    auto arg = ignoreParensAndImpConversions(apply->getArg());
+    auto dynamicMemberRef = dyn_cast<DynamicMemberRefExpr>(arg);
+    if (!dynamicMemberRef)
+      return false;
+
+    // objc_msgSend() already contains the dynamic method lookup check, which
+    // allows us to avoid emitting a specific test for the dynamic method.
+    // Bail out early if we aren't using Objective-C dispatch.
+    if (!gen.SGM.requiresObjCDispatch(dynamicMemberRef->getMember().getDecl()))
+      return false;
+
+    // Check whether the function we're calling is the postfix '!'.
+    auto fn = ignoreParensAndImpConversions(apply->getFn());
+    auto fnRef = dyn_cast<DeclRefExpr>(fn);
+    if (!fnRef)
+      return false;
+
+    auto fnDecl = dyn_cast<FuncDecl>(fnRef->getDecl());
+    if (!fnDecl)
+      return nullptr;
+
+    // We want the postfix '!' operator.
+    if (!fnDecl->isOperator() || !fnDecl->getName().str().equals("!") ||
+        !fnDecl->getAttrs().isPostfix())
+      return false;
+
+    // Must be defined in the 'swift' module.
+    auto fnDeclOwner = dyn_cast<Module>(fnDecl->getDeclContext());
+    if (!fnDeclOwner || !fnDeclOwner->Name.str().equals("swift")) {
+      return false;
+    }
+
+    // We found it. Emit the base.
+    ManagedValue existential =
+      gen.emitRValue(dynamicMemberRef->getBase())
+        .getAsSingleValue(gen, dynamicMemberRef->getBase());
+
+    auto *fd = dyn_cast<FuncDecl>(dynamicMemberRef->getMember().getDecl());
+    assert(fd && "dynamic property references not yet supported");
+    assert(fd->isObjC() && "Dynamic member references require [objc]");
+    assert(fd->isInstanceMember() && "Non-instance dynamic member reference");
+
+    // Determine the type of the method we referenced, by replacing the
+    // class type of the 'Self' parameter with Builtin.ObjCPointer.
+    SILDeclRef member(fd, SILDeclRef::ConstructAtNaturalUncurryLevel,
+                      /*isObjC=*/true);
+
+    auto methodTy = apply->getType();
+
+    // Attach the existential cleanup to the projection so that it gets consumed
+    // (or not) when the call is applied to it (or isn't).
+    SILValue val = gen.B.createProjectExistentialRef(dynamicMemberRef,
+                                                     existential.getValue());
+    ManagedValue proj(val, existential.getCleanup());
+    setSelfParam(RValue(gen, proj, dynamicMemberRef), dynamicMemberRef);
+
+    setCallee(Callee::forDynamic(gen, val, member, methodTy, apply));
+
+    // FIXME: Add substitutions if the dynamic member reference has them.
+    return true;
   }
 };
 
