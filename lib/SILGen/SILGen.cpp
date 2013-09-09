@@ -327,8 +327,8 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   if (fd && fd->isGetterOrSetter())
     return;
   
-  // FIXME: Thunks for instance methods.
-  if (fd && fd->isInstanceMember())
+  // FIXME: Thunks for dynamically-dispatched instance methods.
+  if (fd && fd->isInstanceMember() && !isa<StructDecl>(fd->getDeclContext()))
     return;
   
   // FIXME: Curry thunks for generic functions don't work right yet, so skip
