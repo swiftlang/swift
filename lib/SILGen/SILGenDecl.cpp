@@ -121,7 +121,7 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   
   // If there are captures, build the local closure value for the function and
   // store it as a local constant.
-  if (!fd->getCaptures().empty()) {
+  if (fd->hasLocalCaptures()) {
     SILValue closure = emitClosureForCapturingExpr(fd, SILDeclRef(fd),
                                                    getForwardingSubstitutions(),
                                                    fd->getBody())
@@ -600,9 +600,8 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
 
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
-  for (auto capture : ce->getCaptures()) {
+  for (auto capture : ce->getLocalCaptures())
     emitCaptureArguments(*this, capture);
-  }
 }
 
 void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,

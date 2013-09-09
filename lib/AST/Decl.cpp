@@ -656,6 +656,20 @@ ArrayRef<ValueDecl*> FuncDecl::getCaptures() const {
     return {};
 }
 
+std::vector<ValueDecl*> FuncDecl::getLocalCaptures() const {
+  if (Body)
+    return Body->getLocalCaptures();
+  return std::vector<ValueDecl*>();
+}
+
+bool FuncDecl::hasLocalCaptures() const {
+  if (Body)
+    return Body->hasLocalCaptures();
+
+  return false;
+}
+
+
 /// getExtensionType - If this is a method in a type extension for some type,
 /// return that type, otherwise return Type().
 Type FuncDecl::getExtensionType() const {

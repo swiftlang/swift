@@ -33,7 +33,7 @@ static unsigned getFuncNaturalUncurryLevel(CapturingExpr *func) {
   unsigned level = func->getParamPatterns().size() - 1;
   // Functions with captures have an extra uncurry level for the capture
   // context.
-  if (!func->getCaptures().empty())
+  if (func->hasLocalCaptures())
     level += 1;
   return level;
 }

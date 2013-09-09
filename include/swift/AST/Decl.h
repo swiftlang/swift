@@ -1921,10 +1921,19 @@ public:
   const FuncExpr *getBody() const { return Body; }
   void setBody(FuncExpr *NewBody) { Body = NewBody; }
   
-  /// getCaptures - If this is a local function declaration with captured
-  /// local variables from its context, returns a list of the captured
-  /// declarations.
+  /// getCaptures - Return the list of declarations captured by the function.
+  /// This includes global variables, so it is all variables referenced.
   ArrayRef<ValueDecl*> getCaptures() const;
+
+  /// getLocalCaptures - Return a filtered list of the captures for this
+  /// function, filtering out global variables.  This list returns the list that
+  /// actually needs to be closed over.
+  std::vector<ValueDecl*> getLocalCaptures() const;
+
+  /// hasLocalCaptures - Return true if getLocalCaptures() will return a
+  /// non-empty list.
+  bool hasLocalCaptures() const;
+
 
   /// getNaturalArgumentCount - Returns the "natural" number of
   /// argument clauses taken by this function.  This value is always

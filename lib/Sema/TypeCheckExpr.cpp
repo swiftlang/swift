@@ -501,33 +501,7 @@ namespace {
     CapturingExpr *curExpr;
 
   public:
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-        if (DRE->getDecl()->getDeclContext()->isLocalContext() &&
-            DRE->getDecl()->getDeclContext() != curExpr) {
-          // A [byref] parameter cannot be captured.
-          // FIXME: As a temporary hack, ignore 'self', which is an implicit
-          // [byref] parameter for instance methods of structs.
-          if (DRE->getDecl()->getType()->is<LValueType>() && !
-              DRE->getDecl()->getName().str().equals("self")) {
-            tc.diagnose(DRE->getLoc(), diag::byref_capture,
-                        DRE->getDecl()->getName());
-          }
-          captures.insert(DRE->getDecl());
-        }
-        return { false, E };
-      }
-      if (CapturingExpr *SubCE = dyn_cast<CapturingExpr>(E)) {
-        for (auto D : SubCE->getCaptures())
-          if (D->getDeclContext() != curExpr)
-            captures.insert(D);
-        return { false, E };
-      }
-      return { true, E };
-    }
-
-    FindCapturedVars(TypeChecker &tc,
-                     llvm::SetVector<ValueDecl*> &captures,
+    FindCapturedVars(TypeChecker &tc, llvm::SetVector<ValueDecl*> &captures,
                      CapturingExpr *curExpr)
       : tc(tc), captures(captures), curExpr(curExpr) {}
 
@@ -537,6 +511,49 @@ namespace {
     void doWalk(Stmt *S) {
       S->walk(*this);
     }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
+        return walkToDeclRefExpr(DRE);
+
+      // Don't recurse into child closures, they should already have a capture
+      // list computed, we just propagate it (filtering out stuff that they
+      // capture from us).
+      if (CapturingExpr *SubCE = dyn_cast<CapturingExpr>(E)) {
+        for (auto D : SubCE->getCaptures())
+          if (D->getDeclContext() != curExpr)
+            captures.insert(D);
+        return { false, E };
+      }
+      return { true, E };
+    }
+
+    std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
+      auto *D = DRE->getDecl();
+
+      // Decl references that are within the Capture are local references, ones
+      // from parent context are captures.
+      if (!curExpr->isChildContextOf(D->getDeclContext()))
+        return { false, DRE };
+
+      // Only capture var decls at global scope.  Other things can be captured
+      // if they are local.
+      if (!isa<VarDecl>(D) &&
+          !DRE->getDecl()->getDeclContext()->isLocalContext())
+        return { false, DRE };
+
+
+      // A [byref] parameter cannot be captured.
+      // FIXME: As a temporary hack, ignore 'self', which is an implicit
+      // [byref] parameter for instance methods of structs.
+      if (D->getType()->is<LValueType>() &&
+          !D->getName().str().equals("self"))
+        tc.diagnose(DRE->getLoc(), diag::byref_capture, D->getName());
+
+      captures.insert(D);
+      return { false, DRE };
+    }
+
   };
 }
 

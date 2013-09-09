@@ -285,9 +285,9 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
            "property accessors should go through ");
     
     // For local decls, use the address we allocated.
-    if (VarLocs.count(decl)) {
+    if (VarLocs.count(decl))
       return ManagedValue(VarLocs[decl].address, ManagedValue::LValue);
-    }
+
     // If this is a global variable, invoke its accessor function to get its
     // address.
     return emitGlobalVariable(*this, loc, var);
@@ -300,8 +300,8 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   // If the referenced decl is a local func with context, then the SILDeclRef
   // uncurry level is one deeper (for the context vars).
   if (auto *fd = dyn_cast<FuncDecl>(decl)) {
-    if (!fd->getCaptures().empty()
-        && uncurryLevel != SILDeclRef::ConstructAtNaturalUncurryLevel)
+    if (fd->hasLocalCaptures() &&
+        uncurryLevel != SILDeclRef::ConstructAtNaturalUncurryLevel)
       ++uncurryLevel;
   }
 
@@ -1196,8 +1196,8 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
                                              CapturingExpr *body) {
   // FIXME: Stash the capture args somewhere and curry them on demand rather
   // than here.
-  assert(((constant.uncurryLevel == 1 && !body->getCaptures().empty())
-          || (constant.uncurryLevel == 0 && body->getCaptures().empty()))
+  assert(((constant.uncurryLevel == 1 && body->hasLocalCaptures())
+          || (constant.uncurryLevel == 0 && !body->hasLocalCaptures()))
          && "curried local functions not yet supported");
   
   SILValue functionRef = emitGlobalFunctionRef(loc, constant);
@@ -1223,62 +1223,61 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
                                      getLoweredLoadableType(specialized));
   }
 
-  auto captures = body->getCaptures();
-  if (!captures.empty()) {    
-    SmallVector<SILValue, 4> capturedArgs;
-    for (ValueDecl *capture : captures) {
-      switch (getDeclCaptureKind(capture)) {
-        case CaptureKind::Box: {
-          // LValues are captured as both the box owning the value and the
-          // address of the value.
-          assert(VarLocs.count(capture) &&
-                 "no location for captured var!");
-          
-          VarLoc const &vl = VarLocs[capture];
-          assert(vl.box && "no box for captured var!");
-          assert(vl.address && "no address for captured var!");
-          B.createStrongRetain(loc, vl.box);
-          capturedArgs.push_back(vl.box);
-          capturedArgs.push_back(vl.address);
-          break;
-        }
-        case CaptureKind::Byref: {
-          // Byrefs are captured by address only.
-          assert(VarLocs.count(capture) &&
-                 "no location for captured byref!");
-          capturedArgs.push_back(VarLocs[capture].address);
-          break;
-        }
-        case CaptureKind::Constant: {
-          // SILValue is a constant such as a local func. Pass on the reference.
-          ManagedValue v = emitReferenceToDecl(loc, capture);
-          capturedArgs.push_back(v.forward(*this));
-          break;
-        }
-        case CaptureKind::GetterSetter: {
-          // Pass the setter and getter closure references on.
-          ManagedValue v = emitFunctionRef(loc, SILDeclRef(capture,
-                                                   SILDeclRef::Kind::Setter));
-          capturedArgs.push_back(v.forward(*this));
-          SWIFT_FALLTHROUGH;
-        }
-        case CaptureKind::Getter: {
-          // Pass the getter closure reference on.
-          ManagedValue v = emitFunctionRef(loc, SILDeclRef(capture,
-                                                   SILDeclRef::Kind::Getter));
-          capturedArgs.push_back(v.forward(*this));
-          break;
-        }
+  if (!body->hasLocalCaptures())
+    return ManagedValue(functionRef, ManagedValue::Unmanaged);
+
+  auto captures = body->getLocalCaptures();
+  SmallVector<SILValue, 4> capturedArgs;
+  for (ValueDecl *capture : captures) {
+    switch (getDeclCaptureKind(capture)) {
+      case CaptureKind::Box: {
+        // LValues are captured as both the box owning the value and the
+        // address of the value.
+        assert(VarLocs.count(capture) &&
+               "no location for captured var!");
+        
+        VarLoc const &vl = VarLocs[capture];
+        assert(vl.box && "no box for captured var!");
+        assert(vl.address && "no address for captured var!");
+        B.createStrongRetain(loc, vl.box);
+        capturedArgs.push_back(vl.box);
+        capturedArgs.push_back(vl.address);
+        break;
+      }
+      case CaptureKind::Byref: {
+        // Byrefs are captured by address only.
+        assert(VarLocs.count(capture) &&
+               "no location for captured byref!");
+        capturedArgs.push_back(VarLocs[capture].address);
+        break;
+      }
+      case CaptureKind::Constant: {
+        // SILValue is a constant such as a local func. Pass on the reference.
+        ManagedValue v = emitReferenceToDecl(loc, capture);
+        capturedArgs.push_back(v.forward(*this));
+        break;
+      }
+      case CaptureKind::GetterSetter: {
+        // Pass the setter and getter closure references on.
+        ManagedValue v = emitFunctionRef(loc, SILDeclRef(capture,
+                                                 SILDeclRef::Kind::Setter));
+        capturedArgs.push_back(v.forward(*this));
+        SWIFT_FALLTHROUGH;
+      }
+      case CaptureKind::Getter: {
+        // Pass the getter closure reference on.
+        ManagedValue v = emitFunctionRef(loc, SILDeclRef(capture,
+                                                 SILDeclRef::Kind::Getter));
+        capturedArgs.push_back(v.forward(*this));
+        break;
       }
     }
-    
-    SILType closureTy = getLoweredLoadableType(body->getType());
-    return emitManagedRValueWithCleanup(
-                    B.createPartialApply(loc, functionRef, capturedArgs,
-                                         closureTy));
-  } else {
-    return ManagedValue(functionRef, ManagedValue::Unmanaged);
   }
+  
+  SILType closureTy = getLoweredLoadableType(body->getType());
+  return emitManagedRValueWithCleanup(
+                  B.createPartialApply(loc, functionRef, capturedArgs,
+                                       closureTy));
 }
 
 RValue RValueEmitter::visitFuncExpr(FuncExpr *e, SGFContext C) {
@@ -2052,13 +2051,13 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
   unsigned paramCount = from.uncurryLevel + 1;
   
   /// Forward implicit closure context arguments.
-  bool hasCaptures = !fe->getCaptures().empty();
+  bool hasCaptures = fe->hasLocalCaptures();
   if (hasCaptures)
     --paramCount;
   
   auto forwardCaptures = [&] {
     if (hasCaptures)
-      for (auto capture : fe->getCaptures())
+      for (auto capture : fe->getLocalCaptures())
         forwardCaptureArgs(*this, curriedArgs, capture);
   };
 

@@ -1611,8 +1611,18 @@ public:
     CapturingExprBits.IsNotCaptured = false;
   }
 
-  ArrayRef<ValueDecl*> getCaptures() { return Captures; }
+  ArrayRef<ValueDecl*> getCaptures() const { return Captures; }
   void setCaptures(ArrayRef<ValueDecl*> C) { Captures = C; }
+
+  /// getLocalCaptures - Return a filtered list of the captures for this
+  /// function, filtering out global variables.  This list returns the list that
+  /// actually needs to be closed over.
+  std::vector<ValueDecl*> getLocalCaptures() const;
+
+  /// hasLocalCaptures - Return true if getLocalCaptures() will return a
+  /// non-empty list.
+  bool hasLocalCaptures() const;
+
 
   bool isNotCaptured() { return CapturingExprBits.IsNotCaptured; }
   void setIsNotCaptured(bool v) { CapturingExprBits.IsNotCaptured = v; }

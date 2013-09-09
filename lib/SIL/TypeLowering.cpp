@@ -1365,13 +1365,13 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
   case SILDeclRef::Kind::Func:
     if (CapturingExpr *e = c.loc.dyn_cast<CapturingExpr*>()) {
       auto *funcTy = e->getType()->castTo<AnyFunctionType>();
-      return getFunctionTypeWithCaptures(funcTy, e->getCaptures(),
+      return getFunctionTypeWithCaptures(funcTy, e->getLocalCaptures(),
                                          e->getParent());
     } else {
       FuncDecl *func = cast<FuncDecl>(vd);
       auto *funcTy = func->getType()->castTo<AnyFunctionType>();
       return getFunctionTypeWithCaptures(funcTy,
-                                         func->getCaptures(),
+                                         func->getLocalCaptures(),
                                          func->getDeclContext());
     }
 
@@ -1408,7 +1408,7 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
           : var->getSetter();
         auto *propTy = propertyMethodType->castTo<AnyFunctionType>();
         return getFunctionTypeWithCaptures(propTy,
-                                           property->getCaptures(),
+                                           property->getLocalCaptures(),
                                            var->getDeclContext());
       }
     }
