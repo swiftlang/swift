@@ -594,6 +594,7 @@ public:
   void visitSwitchIntInst(SwitchIntInst *i);
   void visitSwitchUnionInst(SwitchUnionInst *i);
   void visitDestructiveSwitchUnionAddrInst(DestructiveSwitchUnionAddrInst *i);
+  void visitDynamicMethodBranchInst(DynamicMethodBranchInst *i);
 };
 
 }
@@ -1713,6 +1714,10 @@ IRGenSILFunction::visitDestructiveSwitchUnionAddrInst(
       Builder.CreateBr(destLBB.bb);
     }
   }
+}
+
+void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
+  llvm_unreachable("unsupported IRgen of DynamicMethodBranchInst");
 }
 
 void IRGenSILFunction::visitBranchInst(swift::BranchInst *i) {

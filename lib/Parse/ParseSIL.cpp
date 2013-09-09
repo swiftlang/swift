@@ -884,6 +884,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("downcast_archetype_ref", ValueKind::DowncastArchetypeRefInst)
     .Case("downcast_existential_ref", ValueKind::DowncastExistentialRefInst)
     .Case("dynamic_method", ValueKind::DynamicMethodInst)
+    .Case("dynamic_method_br", ValueKind::DynamicMethodBranchInst)
     .Case("float_literal", ValueKind::FloatLiteralInst)
     .Case("global_addr", ValueKind::GlobalAddrInst)
     .Case("index_addr", ValueKind::IndexAddrInst)
@@ -2068,6 +2069,26 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createSpecialize(InstLoc, Val,
                                    P.Context.AllocateCopy(Substitutions),
                                    DestTy);
+    break;
+  }
+  case ValueKind::DynamicMethodBranchInst: {
+    SILDeclRef Member;
+    Identifier BBName, BBName2;
+    SourceLoc NameLoc, NameLoc2;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILDeclRef(Member) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILIdentifier(BBName2, NameLoc2,
+                           diag::expected_sil_block_name))
+      return true;
+
+    ResultVal = B.createDynamicMethodBranch(InstLoc, Val, Member,
+                                            getBBForReference(BBName, NameLoc),
+                                            getBBForReference(BBName2,
+                                                              NameLoc2));
     break;
   }
   }

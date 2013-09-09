@@ -1404,7 +1404,19 @@ public:
                       }),
             "false branch argument types do not match arguments for dest bb");
   }
-  
+
+  void checkDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
+    SILType operandType = DMBI->getOperand().getType();
+
+    require(DMBI->getMember().getDecl()->isObjC(), "method must be [objc]");
+    require(DMBI->getMember().getDecl()->isInstanceMember(),
+            "method must be an instance method");
+    require(operandType.getSwiftType()->is<BuiltinObjCPointerType>(),
+            "operand must have Builtin.ObjCPointer type");
+
+    // FIXME: Check branch arguments.
+  }
+
   void verifyEntryPointArguments(SILBasicBlock *entry) {
     SILType ty = F.getLoweredType();
     SILFunctionTypeInfo *ti = ty.getFunctionTypeInfo(F.getModule());

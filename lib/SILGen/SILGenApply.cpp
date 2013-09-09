@@ -13,6 +13,7 @@
 #include "LValue.h"
 #include "OwnershipConventions.h"
 #include "RValue.h"
+#include "Scope.h"
 #include "SILGen.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
@@ -20,12 +21,28 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/SILArgument.h"
 
 using namespace swift;
 using namespace Lowering;
 
+/// Retrieve the type to use for a method found via dynamic lookup.
+static CanType getDynamicMethodType(SILGenFunction &gen,
+                                    SILValue proto,
+                                    SILDeclRef methodName,
+                                    Type memberType) {
+  auto &ctx = memberType->getASTContext();
+  Type selfTy = ctx.TheObjCPointerType;
+  auto info = FunctionType::ExtInfo()
+                .withCallingConv(gen.SGM.getConstantCC(methodName))
+                .withIsThin(true);
+
+  return FunctionType::get(selfTy, memberType, info, ctx)
+           ->getCanonicalType();
+}
+
 namespace {
-  
+
 /// Abstractly represents a callee, and knows how to emit the entry point
 /// reference for a callee at any valid uncurry level.
 class Callee {
@@ -199,20 +216,6 @@ private:
                              Info,
                              memberType->getASTContext())
       ->getCanonicalType();
-  }
-
-  static CanType getDynamicMethodType(SILGenFunction &gen,
-                                       SILValue proto,
-                                       SILDeclRef methodName,
-                                       Type memberType) {
-    auto &ctx = memberType->getASTContext();
-    Type selfTy = ctx.TheObjCPointerType;
-    auto info = FunctionType::ExtInfo()
-                  .withCallingConv(gen.SGM.getConstantCC(methodName))
-                  .withIsThin(true);
-
-    return FunctionType::get(selfTy, memberType, info, ctx)
-             ->getCanonicalType();
   }
 
   Callee(ForProtocol_t,
@@ -1626,3 +1629,82 @@ void SILGenFunction::emitSetProperty(SILLocation loc,
   // ()
   emission.apply();
 }
+
+RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
+                                                SGFContext c) {
+  // Emit the operand.
+  ManagedValue existential = emitRValue(e->getBase(), c)
+                               .getAsSingleValue(*this, e->getBase());
+
+  SILValue operand = B.createProjectExistentialRef(e, existential.getValue());
+
+  // Create the has-member block.
+  SILBasicBlock *hasMemberBB = new (F.getModule()) SILBasicBlock(&F);
+
+  // Create the no-member block.
+  SILBasicBlock *noMemberBB = new (F.getModule()) SILBasicBlock(&F);
+
+  // Create the continuation block.
+  SILBasicBlock *contBB = new (F.getModule()) SILBasicBlock(&F);
+
+  // The continuation block
+  auto loweredOptTy = getLoweredType(e->getType());
+  SILValue optMethodArg = new (F.getModule()) SILArgument(loweredOptTy, contBB);
+
+  // Create the branch.
+  B.createDynamicMethodBranch(e, operand, SILDeclRef(e->getMember().getDecl()),
+                              hasMemberBB, noMemberBB);
+
+  // Create the has-member branch.
+  {
+    B.emitBlock(hasMemberBB);
+
+    FullExpr hasMemberScope(Cleanups, CleanupLocation(e->getCreateSome()));
+
+    // The argument to the has-member block is the uncurried method.
+    SILDeclRef member(e->getMember().getDecl(),
+                      SILDeclRef::ConstructAtNaturalUncurryLevel,
+                      /*isObjC=*/true);
+
+    auto methodTy =
+      e->getType()->castTo<BoundGenericType>()->getGenericArgs()[0];
+
+    auto dynamicMethodTy = getDynamicMethodType(*this, operand, member,
+                                                methodTy);
+    auto loweredMethodTy = getLoweredType(dynamicMethodTy, 1);
+    SILValue memberArg = new (F.getModule()) SILArgument(loweredMethodTy,
+                                                         hasMemberBB);
+
+    // Apply the operand to the argument.
+    SILValue appliedMethod = B.createPartialApply(e, memberArg, operand,
+                                                  getLoweredType(methodTy));
+
+    // Package up the applied method in .Some().
+    OpaqueValueRAII opaqueValue(*this, e->getOpaqueFn(), appliedMethod);
+
+    // Branch to the continuation block.
+    B.createBranch(e, contBB,
+                   emitRValue(e->getCreateSome()).forwardAsSingleValue(*this,
+                                                                       e));
+  }
+
+  // Create the no-member branch.
+  {
+    B.emitBlock(noMemberBB);
+
+    FullExpr noMemberScope(Cleanups, CleanupLocation(e->getCreateNone()));
+
+    // Branch to the continuation block.
+    B.createBranch(e, contBB,
+                   emitRValue(e->getCreateNone()).forwardAsSingleValue(*this,
+                                                                       e));
+  }
+
+  // Emit the continuation block.
+  B.emitBlock(contBB);
+
+  // Package up the result.
+  ManagedValue result(optMethodArg, existential.getCleanup());
+  return RValue(*this, result, e);
+}
+

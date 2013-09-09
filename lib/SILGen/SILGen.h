@@ -342,7 +342,33 @@ public:
   /// emitted. This map is then queried to produce the value for a DeclRefExpr
   /// to a local constant.
   llvm::DenseMap<SILDeclRef, SILValue> LocalConstants;
-  
+
+  /// Mapping from active opaque value expressions to their values.
+  llvm::DenseMap<OpaqueValueExpr *, SILValue> OpaqueValues;
+
+  /// RAII object that introduces a temporary binding for an opaque value.
+  class OpaqueValueRAII {
+    SILGenFunction &Self;
+    OpaqueValueExpr *OpaqueValue;
+
+    OpaqueValueRAII(const OpaqueValueRAII &) = delete;
+    OpaqueValueRAII &operator=(const OpaqueValueRAII &) = delete;
+
+  public:
+    OpaqueValueRAII(SILGenFunction &self, OpaqueValueExpr *opaqueValue,
+                    SILValue value)
+      : Self(self), OpaqueValue(opaqueValue)
+    {
+      assert(Self.OpaqueValues.count(OpaqueValue) == 0 &&
+             "Opaque value already has a binding");
+      Self.OpaqueValues[OpaqueValue] = value;
+    }
+
+    ~OpaqueValueRAII() {
+      Self.OpaqueValues.erase(OpaqueValue);
+    }
+  };
+
   /// True if 'return' without an operand or falling off the end of the current
   /// function is valid.
   bool allowsVoidReturn() const {
@@ -717,6 +743,9 @@ public:
                                            ArrayRef<ManagedValue> args,
                                            CanType resultType,
                                            SGFContext ctx);
+
+  /// Emit a dynamic member reference.
+  RValue emitDynamicMemberRefExpr(DynamicMemberRefExpr *e, SGFContext c);
 
   /// \brief Emit the cast instruction appropriate to the kind of checked cast.
   ///

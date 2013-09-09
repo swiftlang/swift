@@ -2207,6 +2207,54 @@ public:
   }
 };
 
+/// Branch on the existence of an Objective-C method in the dynamic type of
+/// an object.
+///
+/// If the method exists, branches to the first BB, providing it with the
+/// method reference; otherwise, branches to the second BB.
+class DynamicMethodBranchInst : public TermInst {
+  SILDeclRef Member;
+
+  SILSuccessor DestBBs[2];
+
+  // The operand.
+  FixedOperandList<1> Operands;
+
+  DynamicMethodBranchInst(SILLocation Loc, SILValue Operand, SILDeclRef Member,
+                          SILBasicBlock *HasMethodBB,
+                          SILBasicBlock *NoMethodBB);
+
+public:
+  /// Construct a DynamicMethodBranchInst that will branch to \c HasMethodBB or
+  /// \c NoMethodBB based on the ability of the object operand to respond to
+  /// a message with the same selector as the member.
+  static DynamicMethodBranchInst *create(SILLocation Loc, SILValue Operand,
+                                         SILDeclRef Member,
+                                         SILBasicBlock *HasMethodBB,
+                                         SILBasicBlock *NoMethodBB,
+                                         SILFunction &F);
+
+  SILValue getOperand() const { return Operands[0].get(); }
+
+  SILDeclRef getMember() const { return Member; }
+
+  SuccessorListTy getSuccessors() {
+    return DestBBs;
+  }
+
+  SILBasicBlock *getHasMethodBB() { return DestBBs[0]; }
+  const SILBasicBlock *getHasMethodBB() const { return DestBBs[0]; }
+  SILBasicBlock *getNoMethodBB() { return DestBBs[1]; }
+  const SILBasicBlock *getNoMethodBB() const { return DestBBs[1]; }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::DynamicMethodBranchInst;
+  }
+};
+
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//

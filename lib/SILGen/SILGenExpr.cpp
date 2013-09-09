@@ -853,8 +853,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
 
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
                                                 SGFContext C) {
-  E->dump();
-  llvm_unreachable("DynamicMemberRefExpr unimplemented in SILGen");
+  return SGF.emitDynamicMemberRefExpr(E, C);
 }
 
 RValue RValueEmitter::visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
@@ -2428,8 +2427,10 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
-  E->dump();
-  llvm_unreachable("OpaqueValueExpr unimplemented in SILGen");
+  assert(SGF.OpaqueValues.count(E) && "Didn't bind OpaqueValueExpr");
+  // FIXME: Can we optimize away this copy when there is only a single
+  // utterance of the OpaqueValueExpr? That should be the common case.
+  return RValue(SGF, SGF.emitManagedRValueWithCleanup(SGF.OpaqueValues[E]), E);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

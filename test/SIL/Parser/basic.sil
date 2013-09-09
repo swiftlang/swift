@@ -957,3 +957,28 @@ bb0(%0 : $Float32):
   %2 = partial_apply %1(%0) : $[thin] (Int64, Float32) -> ()
   %3 = return %2 : $Int64 -> ()
 }
+
+class X {
+  func [objc] f() { }
+}
+
+// CHECK-LABEL: sil @test_dynamic_lookup_br : $[thin] (obj : DynamicLookup) -> ()
+sil @test_dynamic_lookup_br : $[thin] (obj : DynamicLookup) -> () {
+bb0(%0 : $DynamicLookup):
+  %1 = alloc_box $DynamicLookup
+  store %0 to %1#1 : $*DynamicLookup
+  %3 = alloc_box $Optional<() -> ()>
+  %4 = load %1#1 : $*DynamicLookup
+  strong_retain %4 : $DynamicLookup
+  %6 = project_existential_ref %4 : $DynamicLookup
+  dynamic_method_br %6 : $Builtin.ObjCPointer, #X.f!1, bb1, bb2
+bb1:
+  br bb3
+
+bb2:                                              
+  br bb3
+
+bb3:
+  %28 = tuple ()
+  return %28 : $()
+}

@@ -737,3 +737,28 @@ DestructiveSwitchUnionAddrInst::create(SILLocation Loc, SILValue Operand,
   return createSwitchUnion<DestructiveSwitchUnionAddrInst>
     (Loc, Operand, DefaultBB, CaseBBs, F);
 }
+
+DynamicMethodBranchInst::DynamicMethodBranchInst(SILLocation Loc,
+                                                 SILValue Operand,
+                                                 SILDeclRef Member,
+                                                 SILBasicBlock *HasMethodBB,
+                                                 SILBasicBlock *NoMethodBB)
+  : TermInst(ValueKind::DynamicMethodBranchInst, Loc),
+    Member(Member),
+    DestBBs{{this, HasMethodBB}, {this, NoMethodBB}},
+    Operands(this, Operand)
+{
+}
+
+DynamicMethodBranchInst *DynamicMethodBranchInst::create(
+                                                    SILLocation Loc,
+                                                    SILValue Operand,
+                                                    SILDeclRef Member,
+                                                    SILBasicBlock *HasMethodBB,
+                                                    SILBasicBlock *NoMethodBB,
+                                                    SILFunction &F) {
+  void *Buffer = F.getModule().allocate(sizeof(DynamicMethodBranchInst),
+                                        alignof(DynamicMethodBranchInst));
+  return ::new (Buffer) DynamicMethodBranchInst(Loc, Operand, Member,
+                                                HasMethodBB, NoMethodBB);
+}

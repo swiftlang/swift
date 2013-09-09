@@ -956,7 +956,19 @@ SILCloner<ImplClass>::visitDestructiveSwitchUnionAddrInst(
                                              getOpValue(Inst->getOperand()),
                                              DefaultBB, CaseBBs));
 }
-  
+
+template<typename ImplClass>
+SILValue
+SILCloner<ImplClass>::visitDynamicMethodBranchInst(
+                        DynamicMethodBranchInst* Inst) {
+  return doPostProcess(Inst,
+    Builder.createDynamicMethodBranch(getOpLocation(Inst->getLoc()),
+                                      getOpValue(Inst->getOperand()),
+                                      Inst->getMember(),
+                                      getOpBasicBlock(Inst->getHasMethodBB()),
+                                      getOpBasicBlock(Inst->getNoMethodBB())));
+}
+
 } // end namespace swift
 
 #endif

@@ -771,6 +771,16 @@ public:
                                                      CaseBBs, F));
   }
 
+  DynamicMethodBranchInst *
+  createDynamicMethodBranch(SILLocation Loc, SILValue Operand,
+                            SILDeclRef Member,
+                            SILBasicBlock *HasMethodBB,
+                            SILBasicBlock *NoMethodBB) {
+    return insertTerminator(
+             DynamicMethodBranchInst::create(Loc, Operand, Member, HasMethodBB,
+                                             NoMethodBB, F));
+  }
+
   //===--------------------------------------------------------------------===//
   // Memory management helpers
   //===--------------------------------------------------------------------===//

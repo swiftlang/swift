@@ -906,6 +906,12 @@ public:
     OS << "destructive_switch_union_addr ";
     printSwitchUnionInst(SOI);
   }
+  void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
+    OS << "dynamic_method_br " << getIDAndType(DMBI->getOperand()) << ", ";
+    DMBI->getMember().print(OS);
+    OS << ", " << getID(DMBI->getHasMethodBB()) << ", "
+       << getID(DMBI->getNoMethodBB());
+  }
 
   void printBranchArgs(OperandValueArrayRef args) {
     if (args.empty()) return;
