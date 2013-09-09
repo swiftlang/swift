@@ -696,7 +696,7 @@ bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
   if (method->isGetterOrSetter())
     return false;
     
-  // We don't export generic methods or subclasses to IRGen yet.
+  // We don't export generic methods or subclasses to Objective-C yet.
   if (method->getType()->is<PolymorphicFunctionType>()
       || method->getType()->castTo<AnyFunctionType>()
           ->getResult()->is<PolymorphicFunctionType>()
@@ -786,7 +786,9 @@ public:
   }
   void visitFuncDecl(FuncDecl *fd) {
     SGM.emitFunction(fd, fd->getBody());
-    if (SGM.requiresObjCMethodEntryPoint(fd))
+    // FIXME: Default implementations in protocols.
+    if (SGM.requiresObjCMethodEntryPoint(fd) &&
+        !isa<ProtocolDecl>(fd->getDeclContext()))
       SGM.emitObjCMethodThunk(fd);
   }
   void visitConstructorDecl(ConstructorDecl *cd) {
@@ -807,7 +809,9 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *) {}
   
   void visitVarDecl(VarDecl *vd) {
-    if (SGM.requiresObjCPropertyEntryPoints(vd))
+    // FIXME: Default implementations in protocols.
+    if (SGM.requiresObjCPropertyEntryPoints(vd) &&
+        !isa<ProtocolDecl>(vd->getDeclContext()))
       SGM.emitObjCPropertyMethodThunks(vd);
   }
 };
