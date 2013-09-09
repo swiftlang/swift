@@ -109,7 +109,7 @@ public:
   /// Update the IRBuilder's current debug location to the location
   /// Loc and the lexical scope DS.
   void setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
-                     SILLocation Loc);
+                     Optional<SILLocation> Loc = Nothing);
 
   /// Push the current debug location onto a stack.
   void pushLoc() {
@@ -175,7 +175,7 @@ public:
                                      StringRef Name,
                                      StringRef LinkageName,
                                      DebugTypeInfo DebugType,
-                                     SILLocation Loc);
+                                     Optional<SILLocation> Loc);
   /// Return the native, absolute path to the main file.
   StringRef getMainFilename() const { return MainFilename; }
 

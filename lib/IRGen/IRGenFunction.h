@@ -93,7 +93,7 @@ public:
                 Mangle::ExplosionKind explosion,
                 llvm::Function *fn,
                 SILDebugScope* DbgScope = nullptr,
-                SILLocation DbgLoc = SILLocation());
+                Optional<SILLocation> DbgLoc = Nothing);
   ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);

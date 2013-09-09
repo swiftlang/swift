@@ -32,7 +32,7 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
                              ExplosionKind explosionLevel,
                              llvm::Function *Fn,
                              SILDebugScope *DbgScope,
-                             SILLocation DbgLoc)
+                             Optional<SILLocation> DbgLoc)
   : IGM(IGM), Builder(IGM.getLLVMContext()),
     CurFn(Fn), CurExplosionLevel(explosionLevel),
     ContextPtr(nullptr) {

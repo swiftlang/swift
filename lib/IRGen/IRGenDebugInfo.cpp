@@ -163,7 +163,11 @@ Location getStartLoc(SourceManager &SM, WithLoc *S) {
 }
 
 /// getStartLoc - extract the start location from a SILLocation.
-static Location getStartLoc(SourceManager &SM, SILLocation Loc) {
+static Location getStartLoc(SourceManager &SM, Optional<SILLocation> OptLoc) {
+  if (!OptLoc)
+    return {};
+
+  SILLocation Loc = OptLoc.getValue();
   if (Expr* E = Loc.getAsASTNode<Expr>()) return getStartLoc(SM, E);
   if (Stmt* S = Loc.getAsASTNode<Stmt>()) return getStartLoc(SM, S);
   if (Decl* D = Loc.getAsASTNode<Decl>()) return getStartLoc(SM, D);
@@ -177,7 +181,12 @@ static Location getStartLoc(SourceManager &SM, SILLocation Loc) {
 /// NOTE: Depending on how we decide to resolve
 /// rdar://problem/14627460, we may want to use the regular
 /// getStartLoc instead and rather use the column info.
-static Location getStartLocForLinetable(SourceManager &SM, SILLocation Loc) {
+static Location getStartLocForLinetable(SourceManager &SM,
+                                        Optional<SILLocation> OptLoc) {
+  if (!OptLoc)
+    return {};
+
+  SILLocation Loc = OptLoc.getValue();
   if (Expr* E = Loc.getAsASTNode<Expr>()) {
     // Implicit closures should not show up in the line table. Note
     // that the closure function still has a valid DW_AT_decl_line.
@@ -205,7 +214,7 @@ static bool isPipeClosure(SILDebugScope *DS) {
 
 void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
                                    SILDebugScope *DS,
-                                   SILLocation Loc) {
+                                   Optional<SILLocation> Loc) {
   Location L = getStartLocForLinetable(SM, Loc);
 
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
@@ -678,7 +687,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                                    StringRef Name,
                                                    StringRef LinkageName,
                                                    DebugTypeInfo DebugType,
-                                                   SILLocation Loc) {
+                                                   Optional<SILLocation> Loc) {
   Location L = getStartLoc(SM, Loc);
   llvm::DIFile Unit = getOrCreateFile(L.Filename);
 
