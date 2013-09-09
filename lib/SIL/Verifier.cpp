@@ -966,8 +966,9 @@ public:
               opFTy->isBlock() == resFTy->isBlock(),
               "convert_cc operand and result type must differ only "
               " in calling convention");
+      // FIXME: Non-virtual CC thunks can be thin, as can ABI-compatible thunks.
       require(!resFTy->isThin(),
-              "convert_cc result must be thin");
+              "convert_cc result must be thick");
       require(opFTy->isThin(),
               "convert_cc operand must be thin");
     } else if (auto opPTy = dyn_cast<PolymorphicFunctionType>(
@@ -979,8 +980,9 @@ public:
               opPTy->getResult()->isEqual(resPTy->getResult()),
               "convert_cc operand and result type must differ only "
               " in calling convention");
+      // FIXME: Non-virtual CC thunks can be thin, as can ABI-compatible thunks.
       require(!resPTy->isThin(),
-              "convert_cc result must be thin");
+              "convert_cc result must be thick");
       require(opPTy->isThin(),
               "convert_cc operand must be thin");
     } else {
