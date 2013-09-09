@@ -737,7 +737,7 @@ clang::TargetInfo &ClangImporter::getTargetInfo() const {
 ClangModule::ClangModule(ASTContext &ctx, std::string DebugModuleName,
                          ModuleLoader &owner, Component *comp,
                          clang::Module *clangModule)
-  : LoadedModule(DeclContextKind::ClangModule,
+  : LoadedModule(DeclContextKind::ClangModule, ModuleKind::ClangModule,
                  ctx.getIdentifier(clangModule->Name),
                  DebugModuleName,
                  comp, ctx, owner),

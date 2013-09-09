@@ -57,6 +57,10 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::ClangModule;
   }
+
+  static bool classof(const Module *M) {
+    return M->getKind() == ModuleKind::ClangModule;
+  }
 };
 
 }

@@ -61,6 +61,13 @@ namespace swift {
     QualifiedLookup
   };
 
+  enum class ModuleKind {
+    TranslationUnit,
+    BuiltinModule,
+    SerializedModule,
+    ClangModule
+  };
+
 /// Constants used to customize name lookup.
 enum NameLookupOptions {
   /// Visit supertypes (such as superclasses or inherited protocols)
@@ -98,6 +105,7 @@ enum NameLookupOptions {
 /// Module - A unit of modularity.  The current translation unit is a
 /// module, as is an imported module.
 class Module : public DeclContext {
+  ModuleKind Kind;
 protected:
   mutable void *LookupCachePimpl;
   Component *Comp;
@@ -124,15 +132,17 @@ public:
   } ASTStage;
 
 protected:
-  Module(DeclContextKind Kind, Identifier Name, Component *C, ASTContext &Ctx)
-  : DeclContext(Kind, nullptr), LookupCachePimpl(0),
+  Module(DeclContextKind KindX, ModuleKind Kind, Identifier Name, Component *C, ASTContext &Ctx)
+  : DeclContext(KindX, nullptr), Kind(Kind), LookupCachePimpl(0),
     Comp(C), Ctx(Ctx), Name(Name), ASTStage(Parsing) {
-    assert(Comp != nullptr || Kind == DeclContextKind::BuiltinModule);
+    assert(Comp != nullptr || KindX == DeclContextKind::BuiltinModule);
   }
 
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
   typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
+
+  ModuleKind getKind() const { return Kind; }
 
   Component *getComponent() const {
     assert(Comp && "fetching component for the builtin module");
@@ -348,7 +358,8 @@ public:
   llvm::StringMap<PrefixOperatorDecl*> PrefixOperators;
 
   TranslationUnit(Identifier Name, Component *Comp, ASTContext &C, TUKind Kind)
-    : Module(DeclContextKind::TranslationUnit, Name, Comp, C), Kind(Kind) {
+    : Module(DeclContextKind::TranslationUnit,
+             ModuleKind::TranslationUnit, Name, Comp, C), Kind(Kind) {
   }
   
   ArrayRef<std::pair<ImportedModule, bool>> getImports() const {
@@ -398,6 +409,9 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::TranslationUnit;
   }
+  static bool classof(const Module *M) {
+    return M->getKind() == ModuleKind::TranslationUnit;
+  }
 };
 
   
@@ -406,13 +420,18 @@ public:
 class BuiltinModule : public Module {
 public:
   BuiltinModule(Identifier Name, ASTContext &Ctx)
-    : Module(DeclContextKind::BuiltinModule, Name, nullptr, Ctx) {
+    : Module(DeclContextKind::BuiltinModule,
+             ModuleKind::BuiltinModule, Name, nullptr, Ctx) {
     // The Builtin module is always well formed.
     ASTStage = TypeChecked;
   }
 
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::BuiltinModule;
+  }
+
+  static bool classof(const Module *M) {
+    return M->getKind() == ModuleKind::BuiltinModule;
   }
 };
 
@@ -424,10 +443,11 @@ class LoadedModule : public Module {
 protected:
   friend class Module;
 
-  LoadedModule(DeclContextKind kind, Identifier name,
+  LoadedModule(DeclContextKind kindX,
+               ModuleKind Kind, Identifier name,
                std::string DebugModuleName, Component *comp,
                ASTContext &ctx, ModuleLoader &owner)
-    : Module(kind, name, comp, ctx),
+    : Module(kindX, Kind, name, comp, ctx),
       DebugModuleName(DebugModuleName) {
     // Loaded modules are always well-formed.
     ASTStage = TypeChecked;
@@ -459,6 +479,11 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() >= DeclContextKind::First_LoadedModule &&
            DC->getContextKind() <= DeclContextKind::Last_LoadedModule;
+  }
+
+  static bool classof(const Module *M) {
+    return M->getKind() == ModuleKind::SerializedModule ||
+           M->getKind() == ModuleKind::ClangModule;
   }
 
   /// \brief Get the debug name for the module.

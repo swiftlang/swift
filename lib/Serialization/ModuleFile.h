@@ -386,12 +386,17 @@ public:
   SerializedModule(ASTContext &ctx, SerializedModuleLoader &owner,
                    Identifier name, std::string DebugModuleName,
                    Component *comp, ModuleFile *file)
-    : LoadedModule(DeclContextKind::SerializedModule, name, DebugModuleName,
+    : LoadedModule(DeclContextKind::SerializedModule,
+                   ModuleKind::SerializedModule, name, DebugModuleName,
                    comp, ctx, owner),
       File(file) {}
 
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::SerializedModule;
+  }
+
+  static bool classof(const Module *M) {
+    return M->getKind() == ModuleKind::SerializedModule;
   }
 };
 
