@@ -2046,6 +2046,22 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   }
 }
 
+// Reduce a PolymorphicFunctionType to a concrete FunctionType as if in a
+// context with forwarding substitutions. For example, given <T> (T) -> Int,
+// returns the concrete function type (T) -> Int (in a context with T bound).
+static SILType getFunctionTypeWithForwardedSubstitutions(SILGenFunction &gen,
+                                                         SILType ty) {
+  if (auto pft = ty.getAs<PolymorphicFunctionType>()) {
+    auto ft = FunctionType::get(pft->getInput(),
+                                pft->getResult(),
+                                pft->getExtInfo(),
+                                pft->getASTContext());
+    return gen.getLoweredLoadableType(ft);
+  }
+  
+  return ty;
+}
+
 void SILGenFunction::emitCurryThunk(FuncExpr *fe,
                                     SILDeclRef from, SILDeclRef to) {
   SmallVector<SILValue, 8> curriedArgs;
@@ -2057,7 +2073,7 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
   if (hasCaptures)
     --paramCount;
   
-  auto forwardCaptures = [&] {
+  auto forwardCaptures = [&]{
     if (hasCaptures)
       for (auto capture : fe->getLocalCaptures())
         forwardCaptureArgs(*this, curriedArgs, capture);
@@ -2082,12 +2098,19 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
     break;
   }
   
-  // FIXME: Forward archetypes and specialize if the function is generic.
-  
-  // Partially apply the next uncurry level and return the result closure.
-  auto toFn = B.createFunctionRef(fe, SGM.getFunction(to));
+  SILValue toFn = B.createFunctionRef(fe, SGM.getFunction(to));
   SILType resultTy
     = SGM.getConstantType(from).getFunctionTypeInfo(SGM.M)->getResultType();
+
+  // Forward archetypes and specialize if the function is generic.
+  if (auto pft = toFn.getType().getAs<PolymorphicFunctionType>()) {
+    auto subs
+      = buildForwardingSubstitutions(pft->getAllArchetypes());
+    toFn = B.createSpecialize(fe, toFn, subs,
+              getFunctionTypeWithForwardedSubstitutions(*this, toFn.getType()));
+  }
+  
+  // Partially apply the next uncurry level and return the result closure.
   auto toClosure = B.createPartialApply(fe, toFn, curriedArgs, resultTy);
   B.createReturn(fe, toClosure);
 }

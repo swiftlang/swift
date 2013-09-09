@@ -331,9 +331,11 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   if (fd && fd->isInstanceMember() && !isa<StructDecl>(fd->getDeclContext()))
     return;
   
-  // FIXME: Curry thunks for generic functions don't work right yet, so skip
-  // emitting thunks for generic functions for now.
-  if (f->getLoweredType().is<PolymorphicFunctionType>())
+  // FIXME: Curry thunks for generic methods don't work right yet, so skip
+  // emitting thunks for them
+  if (fe->getType()->is<AnyFunctionType>()
+      && fe->getType()->castTo<AnyFunctionType>()->getResult()
+           ->is<PolymorphicFunctionType>())
     return;
   
   // Generate the curry thunks.
