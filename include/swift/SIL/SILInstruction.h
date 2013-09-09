@@ -1383,16 +1383,16 @@ public:
   VarDecl *getField() const { return Field; }
 };
   
-/// DynamicMethodInst - Abstract base for instructions that implement dynamic
+/// MethodInst - Abstract base for instructions that implement dynamic
 /// method lookup.
-class DynamicMethodInst : public SILInstruction {
+class MethodInst : public SILInstruction {
   SILDeclRef Member;
   bool Volatile;
 public:
-  DynamicMethodInst(ValueKind Kind,
-                    SILLocation Loc, SILType Ty,
-                    SILDeclRef Member,
-                    bool Volatile = false)
+  MethodInst(ValueKind Kind,
+             SILLocation Loc, SILType Ty,
+             SILDeclRef Member,
+             bool Volatile = false)
     : SILInstruction(Kind, Loc, Ty), Member(Member), Volatile(Volatile) {}
 
   /// getType() is ok since this is known to only have one type.
@@ -1404,8 +1404,8 @@ public:
   bool isVolatile() const { return Volatile; }
   
   static bool classof(const ValueBase *V) {
-    return V->getKind() >= ValueKind::First_DynamicMethodInst &&
-      V->getKind() <= ValueKind::Last_DynamicMethodInst;
+    return V->getKind() >= ValueKind::First_MethodInst &&
+      V->getKind() <= ValueKind::Last_MethodInst;
   }
 };
 
@@ -1413,7 +1413,7 @@ public:
 /// constant, extracts the implementation of that method for the dynamic
 /// instance type of the class.
 class ClassMethodInst
-  : public UnaryInstructionBase<ValueKind::ClassMethodInst, DynamicMethodInst>
+  : public UnaryInstructionBase<ValueKind::ClassMethodInst, MethodInst>
 {
 public:
   ClassMethodInst(SILLocation Loc, SILValue Operand, SILDeclRef Member,
@@ -1425,7 +1425,7 @@ public:
 /// constant, extracts the implementation of that method for the superclass of
 /// the static type of the class.
 class SuperMethodInst
-  : public UnaryInstructionBase<ValueKind::SuperMethodInst, DynamicMethodInst>
+  : public UnaryInstructionBase<ValueKind::SuperMethodInst, MethodInst>
 {
 public:
   SuperMethodInst(SILLocation Loc, SILValue Operand, SILDeclRef Member,
@@ -1435,13 +1435,12 @@ public:
 
 /// ArchetypeMethodInst - Given the address of an archetype value and a method
 /// constant, extracts the implementation of that method for the archetype.
-class ArchetypeMethodInst : public DynamicMethodInst {
+class ArchetypeMethodInst : public MethodInst {
   SILType LookupType;
 public:
   ArchetypeMethodInst(SILLocation Loc, SILType LookupType, SILDeclRef Member,
                       SILType Ty, bool Volatile = false)
-    : DynamicMethodInst(ValueKind::ArchetypeMethodInst, Loc, Ty, Member,
-                        Volatile),
+    : MethodInst(ValueKind::ArchetypeMethodInst, Loc, Ty, Member, Volatile),
       LookupType(LookupType)
   {}
   
@@ -1462,7 +1461,7 @@ public:
 /// using a ProjectExistentialInst.
 class ProtocolMethodInst
   : public UnaryInstructionBase<ValueKind::ProtocolMethodInst,
-                                DynamicMethodInst>
+                                MethodInst>
 {
 public:
   ProtocolMethodInst(SILLocation Loc, SILValue Operand, SILDeclRef Member,

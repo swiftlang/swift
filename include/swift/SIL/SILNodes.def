@@ -105,12 +105,12 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(ModuleInst, SILInstruction, None)
 
   // Dynamic Dispatch
-  ABSTRACT_VALUE(DynamicMethodInst, SILInstruction)
-    INST(ClassMethodInst, DynamicMethodInst, None)
-    INST(SuperMethodInst, DynamicMethodInst, None)
-    INST(ArchetypeMethodInst, DynamicMethodInst, None)
-    INST(ProtocolMethodInst, DynamicMethodInst, None)
-    VALUE_RANGE(DynamicMethodInst, ClassMethodInst, ProtocolMethodInst)
+  ABSTRACT_VALUE(MethodInst, SILInstruction)
+    INST(ClassMethodInst, MethodInst, None)
+    INST(SuperMethodInst, MethodInst, None)
+    INST(ArchetypeMethodInst, MethodInst, None)
+    INST(ProtocolMethodInst, MethodInst, None)
+    VALUE_RANGE(MethodInst, ClassMethodInst, ProtocolMethodInst)
 
   // Function Application
   INST(ApplyInst, SILInstruction, MayHaveSideEffects)

@@ -744,9 +744,7 @@ public:
     OS << "builtin_zero " << ZI->getType();
   }
 
-  void printDynamicMethodInst(DynamicMethodInst *I,
-                              SILValue Operand,
-                              StringRef Name) {
+  void printMethodInst(MethodInst *I, SILValue Operand, StringRef Name) {
     OS << Name << " ";
     if (I->isVolatile())
       OS << "[volatile] ";
@@ -756,11 +754,11 @@ public:
   }
   
   void visitClassMethodInst(ClassMethodInst *AMI) {
-    printDynamicMethodInst(AMI, AMI->getOperand(), "class_method");
+    printMethodInst(AMI, AMI->getOperand(), "class_method");
     OS << " : " << AMI->getType();
   }
   void visitSuperMethodInst(SuperMethodInst *AMI) {
-    printDynamicMethodInst(AMI, AMI->getOperand(), "super_method");
+    printMethodInst(AMI, AMI->getOperand(), "super_method");
     OS << " : " << AMI->getType();
   }
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
@@ -773,7 +771,7 @@ public:
     OS << " : " << AMI->getType(0);
   }
   void visitProtocolMethodInst(ProtocolMethodInst *AMI) {
-    printDynamicMethodInst(AMI, AMI->getOperand(), "protocol_method");
+    printMethodInst(AMI, AMI->getOperand(), "protocol_method");
     OS << " : " << AMI->getType();
   }
   void visitProjectExistentialInst(ProjectExistentialInst *PI) {
