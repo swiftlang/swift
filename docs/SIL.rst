@@ -726,6 +726,33 @@ The types of the SIL entry points are as follows::
   sil @curried_2 : $((z:C), (y:B), (x:A)) -> (w:D) -> Int { ... }
   sil @curried_3 : $((w:D), (z:C), (y:B), (x:A)) -> Int { ... }
 
+Byref Arguments
+```````````````
+
+``[byref]`` arguments are passed into the entry point by address. The callee
+does not take ownership of the referenced memory. The referenced memory must
+be initialized upon function entry and exit. If the ``[byref]`` argument
+refers to a fragile physical variable, then the argument is the address of that
+variable. If the ``[byref]`` argument refers to a logical property, then the
+argument is the address of a caller-owner writeback buffer. it is the caller's
+responsibility to initialize the buffer by storing the result of the property
+getter prior to calling the function and to write back to the property
+on return by loading from the buffer and invoking the setter with the final
+value. This Swift function::
+
+  func byref(x:[byref] Int) {
+    x = 1
+  }
+
+gets lowered to SIL as::
+
+  sil @byref : $([byref] Int) -> () {
+  entry(%x : $*Int):
+    %1 = integer_literal 1 : $Int
+    store %1 to %x
+    return
+  }
+
 Swift Method Calling Convention [cc(method)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
