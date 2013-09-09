@@ -2133,15 +2133,15 @@ public:
   }
 };
 
-/// SubscriptDecl - Declares a subscripting operator for a type.
+/// \brief Declares a subscripting operator for a type.
 ///
 /// A subscript declaration is defined as a get/set pair that produces a
 /// specific type. For example:
 ///
 /// \code
 /// subscript (i : Int) -> String {
-///   get { /* return ith String */ }
-///   set { /* set ith string to value */ }
+///   get: /* return ith String */
+///   set: /* set ith string to value */
 /// }
 /// \endcode
 ///
@@ -2149,12 +2149,14 @@ public:
 /// expression a[i], where a is of the subscriptable type and i is the type
 /// of the index. A subscript can have multiple indices:
 ///
+/// \code
 /// struct Matrix {
 ///   subscript (i : Int, j : Int) -> Double {
-///     get { /* return element at position (i, j) */ }
-///     set { /* set element at position (i, j) */ }
+///     get: /* return element at position (i, j) */
+///     set: /* set element at position (i, j) */
 ///   }
 /// }
+/// \endcode
 ///
 /// A given type can have multiple subscript declarations, so long as the
 /// signatures (indices and element type) are distinct.
