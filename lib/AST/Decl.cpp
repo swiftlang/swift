@@ -176,6 +176,56 @@ bool DeclContext::isGenericContext() const {
   }
 }
 
+void DeclContext::dumpContext() const {
+  printContext(llvm::outs());
+}
+unsigned DeclContext::printContext(raw_ostream &OS) const {
+  unsigned Depth = 0;
+  if (auto *P = getParent())
+    Depth = P->printContext(OS);
+
+  const char *Kind;
+  switch (getContextKind()) {
+  case DeclContextKind::TranslationUnit:  Kind = "TranslationUnit"; break;
+  case DeclContextKind::BuiltinModule:    Kind = "BuiltinModule"; break;
+  case DeclContextKind::SerializedModule: Kind = "SerializedModule"; break;
+  case DeclContextKind::ClangModule:      Kind = "ClangModule"; break;
+  case DeclContextKind::CapturingExpr:    Kind = "CapturingExpr"; break;
+  case DeclContextKind::NominalTypeDecl:  Kind = "NominalTypeDecl"; break;
+  case DeclContextKind::ExtensionDecl:    Kind = "ExtensionDecl"; break;
+  case DeclContextKind::TopLevelCodeDecl: Kind = "TopLevelCodeDecl"; break;
+  case DeclContextKind::ConstructorDecl:  Kind = "ConstructorDecl"; break;
+  case DeclContextKind::DestructorDecl:   Kind = "DestructorDecl"; break;
+  }
+  OS.indent(Depth*2) << "0x" << (void*)this << " " << Kind;
+
+  if (getContextKind() == DeclContextKind::CapturingExpr) {
+    auto *CE = (CapturingExpr*)this;
+    if (auto *FE = dyn_cast<FuncExpr>(CE)) {
+      OS << " FuncExpr=";
+      if (auto *FED = FE->getDecl())
+        OS << FED->getName();
+      else
+        OS << "<NULL FuncDecl>";
+    } else if (isa<PipeClosureExpr>(CE))
+      OS << " PipeClosureExpr";
+    else if (isa<ImplicitClosureExpr>(CE))
+      OS << " ImplicitClosureExpr";
+    else
+      OS << " <unknown CapturingExpr>";
+    OS << ": " << CE->getType().getString();
+  }
+
+
+  if (getContextKind() == DeclContextKind::NominalTypeDecl)
+    OS << " decl=" << ((ValueDecl*)this)->getName();
+
+  OS << "\n";
+  return Depth+1;
+}
+
+
+
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) {
@@ -815,6 +865,7 @@ ArrayRef<ValueDecl*> FuncDecl::getCaptures() const {
   else
     return {};
 }
+
 
 /// getExtensionType - If this is a method in a type extension for some type,
 /// return that type, otherwise return Type().

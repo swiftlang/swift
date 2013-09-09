@@ -31,6 +31,7 @@ namespace swift {
 }
 
 namespace llvm {
+  class raw_ostream;
   template<>
   class PointerLikeTypeTraits<swift::DeclContext*> {
   public:
@@ -148,6 +149,17 @@ public:
     return ParentAndKind.getPointer();
   }
 
+  /// Return true if this is a child of the specified other decl context.
+  bool isChildContextOf(DeclContext *Other) const {
+    if (this == Other) return false;
+
+    for (const DeclContext *CurContext = this; CurContext;
+         CurContext = CurContext->getParent())
+      if (CurContext == Other)
+        return true;
+    return false;
+  }
+
   /// Returns the module context that contains this context.
   Module *getParentModule() const;
 
@@ -161,6 +173,9 @@ public:
   const ASTContext &getASTContext() const {
     return const_cast<DeclContext *>(this)->getASTContext();
   }
+
+  void dumpContext() const;
+  unsigned printContext(llvm::raw_ostream &OS) const;
   
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,
