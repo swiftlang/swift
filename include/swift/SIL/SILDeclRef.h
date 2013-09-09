@@ -181,8 +181,9 @@ struct SILDeclRef {
   // Returns the SILDeclRef for an entity at a shallower uncurry level.
   SILDeclRef atUncurryLevel(unsigned level) const {
     assert(level <= uncurryLevel && "can't safely go to deeper uncurry level");
+    bool willBeCurried = isCurried || level < uncurryLevel;
     return SILDeclRef(loc.getOpaqueValue(), kind, level,
-                      /*isCurried*/ true, isObjC,
+                      willBeCurried, isObjC,
                       defaultArgIndex);
   }
   
