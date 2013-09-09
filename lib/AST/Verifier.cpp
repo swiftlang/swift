@@ -34,6 +34,9 @@ namespace {
     /// \brief The stack of functions we're visiting.
     SmallVector<FuncExprLike, 4> Functions;
 
+    /// \brief The set of opaque value expressions active at this point.
+    llvm::SmallPtrSet<OpaqueValueExpr *, 4> OpaqueValues;
+
   public:
     Verifier(TranslationUnit *TU) : TU(TU), Ctx(TU->Ctx), Out(llvm::errs()),
                                     HadError(TU->Ctx.hadError()) {}
@@ -205,6 +208,11 @@ namespace {
       return shouldVerify(cast<Expr>(closure));
     }
 
+    bool shouldVerify(DynamicMemberRefExpr *dynamicMember) {
+      OpaqueValues.insert(dynamicMember->getOpaqueFn());
+      return shouldVerify(cast<Expr>(dynamicMember));
+    }
+
     bool shouldVerify(ConstructorDecl *cd) {
       Functions.push_back(cd);
       return shouldVerify(cast<Decl>(cd));
@@ -223,6 +231,12 @@ namespace {
       assert(Functions.back().get<PipeClosureExpr*>() == closure);
       Functions.pop_back();
     }
+
+    void cleanup(DynamicMemberRefExpr *dynamicMember) {
+      assert(OpaqueValues.count(dynamicMember->getOpaqueFn()));
+      OpaqueValues.erase(dynamicMember->getOpaqueFn());
+    }
+
     void cleanup(ConstructorDecl *cd) {
       assert(Functions.back().get<ConstructorDecl*>() == cd);
       Functions.pop_back();
@@ -689,6 +703,13 @@ namespace {
         return;
       if (!expr->getType()->is<LValueType>()) {
         Out << "Type of SuperRefExpr should be an LValueType";
+        abort();
+      }
+    }
+
+    void verifyChecked(OpaqueValueExpr *expr) {
+      if (!OpaqueValues.count(expr)) {
+        Out << "OpaqueValueExpr not introduced at this point in AST\n";
         abort();
       }
     }

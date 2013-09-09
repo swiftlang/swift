@@ -193,6 +193,8 @@ namespace {
     RValue visitZeroValueExpr(ZeroValueExpr *E, SGFContext C);
     RValue visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C);
     RValue visitAssignExpr(AssignExpr *E, SGFContext C);
+
+    RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
   };
 }
 
@@ -2401,6 +2403,11 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   emitAssignExprRecursive(E, visit(E->getSrc()), E->getDest(), SGF);
   
   return SGF.emitEmptyTupleRValue(E);
+}
+
+RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
+  E->dump();
+  llvm_unreachable("OpaqueValueExpr unimplemented in SILGen");
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

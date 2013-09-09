@@ -43,6 +43,7 @@ namespace swift {
   class BraceStmt;
   class ASTWalker;
   class VarDecl;
+  class OpaqueValueExpr;
   class ProtocolConformance;
   class FuncDecl;
   class ConstructorDecl;
@@ -710,6 +711,10 @@ public:
 /// \endcode
 class DynamicMemberRefExpr : public Expr {
   Expr *Base;
+  OpaqueValueExpr *OpaqueFnValue;
+  Expr *CreateSome;
+  Expr *CreateNone;
+
   ConcreteDeclRef Member;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
@@ -717,9 +722,14 @@ class DynamicMemberRefExpr : public Expr {
 public:
   DynamicMemberRefExpr(Expr *base, SourceLoc dotLoc,
                        ConcreteDeclRef member,
-                       SourceLoc nameLoc)
+                       SourceLoc nameLoc,
+                       OpaqueValueExpr *opaqueValue,
+                       Expr *createSome,
+                       Expr *createNone)
     : Expr(ExprKind::DynamicMemberRef),
-      Base(base), Member(member), DotLoc(dotLoc), NameLoc(nameLoc) { }
+      Base(base), OpaqueFnValue(opaqueValue), CreateSome(createSome),
+      CreateNone(createNone), Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
+    }
 
   /// Retrieve the base of the expression.
   Expr *getBase() const { return Base; }
@@ -737,6 +747,26 @@ public:
   SourceLoc getDotLoc() const { return DotLoc; }
 
   SourceLoc getLoc() const { return NameLoc; }
+
+  /// Retrieve the opaque value used to represent the function \c fn passed
+  /// to \c .Some(fn) when the dynamic member is found.
+  OpaqueValueExpr *getOpaqueFn() const { return OpaqueFnValue; }
+
+  /// Retrieve the expression used to create the Optional<> result when a
+  /// dynamic member was found.
+  Expr *getCreateSome() const { return CreateSome; }
+
+  void setCreateSome(Expr *createSome) {
+    CreateSome = createSome;
+  }
+
+  /// Expression used to create the empty optional result when the dynamic
+  /// member was not found.
+  Expr *getCreateNone() const { return CreateNone; }
+
+  void setCreateNone(Expr *createNone) {
+    CreateNone = createNone;
+  }
 
   SourceRange getSourceRange() const {
     if (Base->isImplicit())
@@ -2146,9 +2176,13 @@ public:
   }
 };
 
-/// OpaqueValueExpr - An expression referring to an opaque object of a
-/// fixed type. It is used internally to perform type-checking when we require
-/// an expression but do not want to form a complete expression.
+/// An expression referring to an opaque object of a fixed type.
+///
+/// Opaque value expressions occur when a particular value within the AST
+/// needs to be re-used without being re-evaluated or for a value that is
+/// a placeholder. OpaqueValueExpr nodes are introduced by some other AST
+/// node (say, a \c DynamicMemberRefExpr) and can only be used within the
+/// subexpressions of that AST node.
 class OpaqueValueExpr : public Expr {
   SourceLoc Loc;
   

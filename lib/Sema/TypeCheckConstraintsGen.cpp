@@ -823,7 +823,7 @@ namespace {
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return expr->getType();
     }
 
     Type visitZeroValueExpr(ZeroValueExpr *expr) {

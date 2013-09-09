@@ -459,6 +459,7 @@ namespace {
     Expr *buildDynamicMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
                                 SourceLoc memberLoc, Type openedType,
                                 ConstraintLocatorBuilder locator) {
+      auto &tc = cs.getTypeChecker();
       auto &context = cs.getASTContext();
 
       // If we're specializing a polymorphic function, compute the set of
@@ -482,9 +483,44 @@ namespace {
       base = cs.getTypeChecker().coerceToRValue(base);
       if (!base) return nullptr;
 
+      auto type = simplifyType(openedType);
+      auto fnType = type->castTo<BoundGenericType>()->getGenericArgs()[0];
+
+      // Create the .Some(fn) helper expression.
+      // FIXME: This is currently swift.Some(fn).
+      auto opaqueFn = new (context) OpaqueValueExpr(dotLoc, fnType);
+      auto swiftRef = new (context) UnresolvedDeclRefExpr(
+                                      context.getIdentifier("swift"),
+                                      DeclRefKind::Ordinary,
+                                      dotLoc);
+      auto someRef = new (context) UnresolvedDotExpr(
+                                     swiftRef,
+                                     dotLoc,
+                                     context.getIdentifier("Some"),
+                                     memberLoc);
+      Expr *someCall = new (context) CallExpr(someRef, opaqueFn);
+      if (tc.typeCheckExpression(someCall, dc, type, /*discardedExpr=*/false))
+        return nullptr;
+
+      // Create the .None helper expression.
+      // FIXME: THis is currently swift.None
+      swiftRef = new (context) UnresolvedDeclRefExpr(
+                                 context.getIdentifier("swift"),
+                                 DeclRefKind::Ordinary,
+                                 dotLoc);
+      Expr *noneRef = new (context) UnresolvedDotExpr(
+                                      swiftRef,
+                                      dotLoc,
+                                      context.getIdentifier("None"),
+                                      memberLoc);
+      if (tc.typeCheckExpression(noneRef, dc, type, /*discardedExpr=*/false))
+        return nullptr;
+
+
       auto result = new (context) DynamicMemberRefExpr(base, dotLoc, *memberRef,
-                                                       memberLoc);
-      result->setType(simplifyType(openedType));
+                                                       memberLoc, opaqueFn,
+                                                       someCall, noneRef);
+      result->setType(type);
       return result;
     }
 
@@ -1534,7 +1570,7 @@ namespace {
     }
 
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return expr;
     }
 
     Expr *visitZeroValueExpr(ZeroValueExpr *expr) {

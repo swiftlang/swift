@@ -974,6 +974,10 @@ public:
     E->getMember().dump(OS);
     OS << '\n';
     printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getCreateSome());
+    OS << '\n';
+    printRec(E->getCreateNone());
     OS << ')';
   }
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
@@ -1205,7 +1209,7 @@ public:
   }
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E) {
-    printCommon(E, "opaque_value_expr") << ')';
+    printCommon(E, "opaque_value_expr") << " @ " << (void*)E << ')';
   }
 
   void visitZeroValueExpr(ZeroValueExpr *E) {

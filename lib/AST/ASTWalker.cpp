@@ -153,6 +153,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       E->setBase(Base);
       return E;
     }
+
+    if (Expr *createSome = doIt(E->getCreateSome())) {
+      E->setCreateSome(createSome);
+      return E;
+    }
+
+    if (Expr *createNone = doIt(E->getCreateNone())) {
+      E->setCreateNone(createNone);
+      return E;
+    }
+
     return nullptr;
   }
 
