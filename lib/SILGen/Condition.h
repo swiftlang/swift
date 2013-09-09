@@ -48,11 +48,7 @@ public:
             SILBasicBlock *ContBB,
             SILLocation L)
     : TrueBB(TrueBB), FalseBB(FalseBB), ContBB(ContBB), Loc(L)
-  {
-    assert(L.isASTNode<IfStmt>() || L.isASTNode<ForEachStmt>() ||
-           L.isASTNode<ForStmt>() || L.isASTNode<IfExpr>() ||
-           L.isASTNode<WhileStmt>() || L.isASTNode<DoWhileStmt>());
-  }
+  {}
   
   bool hasTrue() const { return TrueBB; }
   bool hasFalse() const { return FalseBB; }

@@ -2226,7 +2226,7 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
   // FIXME: We could avoid imploding and reexploding tuples here.
   // FIXME: "emit into" optimization
   
-  Condition cond = SGF.emitCondition(E, E->getCondExpr(),
+  Condition cond = SGF.emitCondition(E->getCondExpr(),
                                      /*hasFalse*/ true,
                                      /*invertCondition*/ false,
                                      SGF.getLoweredType(E->getType()));

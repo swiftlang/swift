@@ -53,9 +53,9 @@ static SILValue emitConditionValue(SILGenFunction &gen, Expr *E) {
   return V;
 }
 
-Condition SILGenFunction::emitCondition(SILLocation Loc, Expr *E,
-                                bool hasFalseCode, bool invertValue,
-                                ArrayRef<SILType> contArgs) {
+Condition SILGenFunction::emitCondition(Expr *E,
+                                        bool hasFalseCode, bool invertValue,
+                                        ArrayRef<SILType> contArgs) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
   
@@ -75,7 +75,7 @@ Condition SILGenFunction::emitCondition(SILLocation Loc, Expr *E,
     FalseBB = nullptr;
     FalseDestBB = ContBB;
   }
-  
+  RegularLocation Loc(E);
   if (invertValue)
     B.createCondBranch(Loc, V, FalseDestBB, TrueBB);
   else
@@ -155,7 +155,7 @@ void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
 }
 
 void SILGenFunction::visitIfStmt(IfStmt *S) {
-  Condition Cond = emitCondition(S, S->getCond(), S->getElseStmt() != nullptr);
+  Condition Cond = emitCondition(S->getCond(), S->getElseStmt() != nullptr);
   
   if (Cond.hasTrue()) {
     Cond.enterTrue(B);
@@ -187,7 +187,7 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
   
   // Evaluate the condition with the false edge leading directly
   // to the continuation block.
-  Condition Cond = emitCondition(S, S->getCond(), /*hasFalseCode*/ false);
+  Condition Cond = emitCondition(S->getCond(), /*hasFalseCode*/ false);
   
   // If there's a true edge, emit the body in it.
   if (Cond.hasTrue()) {
@@ -233,7 +233,7 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   if (B.hasValidInsertionPoint()) {
     // Evaluate the condition with the false edge leading directly
     // to the continuation block.
-    Condition Cond = emitCondition(S, S->getCond(), /*hasFalseCode*/ false);
+    Condition Cond = emitCondition(S->getCond(), /*hasFalseCode*/ false);
     
     Cond.enterTrue(B);
     if (B.hasValidInsertionPoint()) {
@@ -282,8 +282,8 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   // Evaluate the condition with the false edge leading directly
   // to the continuation block.
   Condition Cond = S->getCond().isNonNull() ?
-  emitCondition(S, S->getCond().get(), /*hasFalseCode*/ false) :
-  Condition(LoopBB, 0, 0, S); // Infinite loop.
+    emitCondition(S->getCond().get(), /*hasFalseCode*/ false) :
+    Condition(LoopBB, 0, 0, S); // Infinite loop.
   
   // If there's a true edge, emit the body in it.
   if (Cond.hasTrue()) {
@@ -335,7 +335,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth(),
                                  CleanupLocation(S->getBody()));
   
-  Condition Cond = emitCondition(S, S->getRangeEmpty(), /*hasFalseCode=*/false,
+  Condition Cond = emitCondition(S->getRangeEmpty(), /*hasFalseCode=*/false,
                                  /*invertValue=*/true);
   if (Cond.hasTrue()) {
     Cond.enterTrue(B);

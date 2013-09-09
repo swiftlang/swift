@@ -462,8 +462,6 @@ public:
   
   /// emitCondition - Emit a boolean expression as a control-flow condition.
   ///
-  /// \param Loc - The statement being lowered, for source information on
-  ///        the branch.
   /// \param E - The expression to be evaluated as a condition.
   /// \param hasFalseCode - true if the false branch doesn't just lead
   ///        to the fallthrough.
@@ -472,7 +470,7 @@ public:
   /// \param contArgs - the types of the arguments to the continuation BB.
   ///        Matching argument values must be passed to exitTrue and exitFalse
   ///        of the resulting Condition object.
-  Condition emitCondition(SILLocation Loc, Expr *E,
+  Condition emitCondition(Expr *E,
                           bool hasFalseCode = true, bool invertValue = false,
                           ArrayRef<SILType> contArgs = {});
   
