@@ -87,6 +87,8 @@ struct SILDeclRef {
   Kind kind : 4;
   /// The uncurry level of this SILDeclRef.
   unsigned uncurryLevel : 16;
+  /// True if the SILDeclRef is a curry thunk.
+  unsigned isCurried : 1;
   /// True if this references an ObjC-visible method.
   unsigned isObjC : 1;
   /// The default argument index for a default argument getter.
@@ -97,8 +99,9 @@ struct SILDeclRef {
   enum : unsigned { ConstructAtNaturalUncurryLevel = ~0U };
   
   /// Produces a null SILDeclRef.
-  SILDeclRef() : loc(), kind(Kind::Func), uncurryLevel(0), isObjC(0),
-                  defaultArgIndex(0) {}
+  SILDeclRef() : loc(), kind(Kind::Func), uncurryLevel(0),
+                 isCurried(0), isObjC(0),
+                 defaultArgIndex(0) {}
   
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(ValueDecl *decl, Kind kind,
@@ -178,14 +181,15 @@ struct SILDeclRef {
   // Returns the SILDeclRef for an entity at a shallower uncurry level.
   SILDeclRef atUncurryLevel(unsigned level) const {
     assert(level <= uncurryLevel && "can't safely go to deeper uncurry level");
-    return SILDeclRef(loc.getOpaqueValue(), kind, level, isObjC,
-                       defaultArgIndex);
+    return SILDeclRef(loc.getOpaqueValue(), kind, level,
+                      /*isCurried*/ true, isObjC,
+                      defaultArgIndex);
   }
   
   // Returns the ObjC (or native) entry point corresponding to the same
   // constant.
   SILDeclRef asObjC(bool objc = true) const {
-    return SILDeclRef(loc.getOpaqueValue(), kind, uncurryLevel, objc,
+    return SILDeclRef(loc.getOpaqueValue(), kind, uncurryLevel, isCurried, objc,
                        defaultArgIndex);
   }
   
@@ -193,10 +197,12 @@ struct SILDeclRef {
   explicit SILDeclRef(void *opaqueLoc,
                        Kind kind,
                        unsigned uncurryLevel,
+                       bool isCurried,
                        bool isObjC,
                        unsigned defaultArgIndex)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)),
-      kind(kind), uncurryLevel(uncurryLevel), isObjC(isObjC),
+      kind(kind), uncurryLevel(uncurryLevel),
+      isCurried(isCurried), isObjC(isObjC),
       defaultArgIndex(defaultArgIndex)
   {}
 };
@@ -219,10 +225,12 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
   using UnsignedInfo = DenseMapInfo<unsigned>;
 
   static SILDeclRef getEmptyKey() {
-    return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func, 0, false, 0);
+    return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func, 0,
+                      false, false, 0);
   }
   static SILDeclRef getTombstoneKey() {
-    return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func, 0, false, 0);
+    return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func, 0,
+                      false, false, 0);
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());

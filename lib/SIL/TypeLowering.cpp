@@ -1168,6 +1168,10 @@ static bool isClassOrProtocolMethod(ValueDecl *vd) {
 }
 
 static AbstractCC getAbstractCC(SILDeclRef c) {
+  // Currying thunks always have freestanding CC.
+  if (c.isCurried)
+    return AbstractCC::Freestanding;
+  
   // If this is an ObjC thunk, it always has ObjC calling convention.
   if (c.isObjC)
     return c.hasDecl() && isClassOrProtocolMethod(c.getDecl())

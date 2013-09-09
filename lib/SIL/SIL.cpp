@@ -27,7 +27,7 @@ void SILValue::replaceAllUsesWith(SILValue V) {
     (**use_begin()).set(V);
 }
 
-static unsigned getNaturalUncurryLevel(CapturingExpr *func) {
+static unsigned getFuncNaturalUncurryLevel(CapturingExpr *func) {
   assert(func && "no function body?!");
   assert(func->getParamPatterns().size() >= 1 && "no arguments for func?!");
   unsigned level = func->getParamPatterns().size() - 1;
@@ -38,9 +38,9 @@ static unsigned getNaturalUncurryLevel(CapturingExpr *func) {
   return level;
 }
 
-static unsigned getNaturalUncurryLevel(FuncDecl *fd) {
+static unsigned getFuncNaturalUncurryLevel(FuncDecl *fd) {
   if (fd->getBody())
-    return getNaturalUncurryLevel(fd->getBody());
+    return getFuncNaturalUncurryLevel(fd->getBody());
   // Assume func decls without bodies (e.g., builtins) have uncurry level zero.
   return 0;
 }
@@ -59,7 +59,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
            "cannot create a Func SILDeclRef for a property accessor");
     assert(kind == Kind::Func &&
            "can only create a Func SILDeclRef for a func decl");
-    naturalUncurryLevel = getNaturalUncurryLevel(func);
+    naturalUncurryLevel = getFuncNaturalUncurryLevel(func);
   } else if (isa<ConstructorDecl>(vd)) {
     assert((kind == Kind::Allocator || kind == Kind::Initializer)
            && "can only create Allocator or Initializer SILDeclRef for ctor");
@@ -95,9 +95,9 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
       // Local properties may have captures that affect the natural uncurry
       // level.
       else if (kind == Kind::Getter && var->getGetter())
-        naturalUncurryLevel = getNaturalUncurryLevel(var->getGetter());
+        naturalUncurryLevel = getFuncNaturalUncurryLevel(var->getGetter());
       else if (kind == Kind::Setter && var->getSetter())
-        naturalUncurryLevel = getNaturalUncurryLevel(var->getSetter());
+        naturalUncurryLevel = getFuncNaturalUncurryLevel(var->getSetter());
       // A property accessor for a non-instance variable without getters and
       // setters must be a resilient property, so it can't have context.
       else
@@ -121,6 +121,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
   uncurryLevel = atUncurryLevel == ConstructAtNaturalUncurryLevel
     ? naturalUncurryLevel
     : atUncurryLevel;
+  isCurried = uncurryLevel != naturalUncurryLevel;
 }
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
@@ -149,7 +150,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
         loc = fd;
         kind = Kind::Func;
       }
-      naturalUncurryLevel = getNaturalUncurryLevel(fd);
+      naturalUncurryLevel = getFuncNaturalUncurryLevel(fd);
     }
     // Map DestructorDecls to Destroyer SILDeclRefs of the ClassDecl.
     else if (DestructorDecl *dd = dyn_cast<DestructorDecl>(vd)) {
@@ -183,7 +184,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
     kind = Kind::Func;
     assert(expr->getParamPatterns().size() >= 1
            && "no param patterns for function?!");
-    naturalUncurryLevel = getNaturalUncurryLevel(expr);
+    naturalUncurryLevel = getFuncNaturalUncurryLevel(expr);
   }
   
   // Set the uncurry level.
@@ -193,12 +194,13 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
   uncurryLevel = atUncurryLevel == ConstructAtNaturalUncurryLevel
     ? naturalUncurryLevel
     : atUncurryLevel;
-    
+  
+  isCurried = uncurryLevel != naturalUncurryLevel;  
   isObjC = asObjC;
 }
 
 SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
-                                                unsigned defaultArgIndex) {
+                                              unsigned defaultArgIndex) {
   SILDeclRef result;
   result.loc = loc;
   result.kind = Kind::DefaultArgGenerator;
