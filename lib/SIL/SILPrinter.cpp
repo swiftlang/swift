@@ -120,10 +120,14 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     return;
 
   case DeclContextKind::CapturingExpr:
+    // FIXME
+    Buffer << "<anonymous function>";
+    return;
+      
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::ConstructorDecl:
   case DeclContextKind::DestructorDecl:
-    llvm_unreachable("unhandled context type in SILPrint!");
+    llvm_unreachable("unhandled context kind in SILPrint!");
 
   case DeclContextKind::ExtensionDecl: {
     Type Ty = cast<ExtensionDecl>(Context)->getExtendedType();
@@ -131,7 +135,7 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     const NominalTypeDecl *ExtNominal = 0;
     switch (Base->getKind()) {
       default:
-        llvm_unreachable("unhandled context type in SILPrint!");
+        llvm_unreachable("unhandled context kind in SILPrint!");
       case TypeKind::Union:
         ExtNominal = cast<UnionType>(Base)->getDecl();
         break;
