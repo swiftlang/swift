@@ -6,6 +6,10 @@
     .repl, .emph, .look {color:rgb(47,175,187)}
     .emph {font-weight:bold}
 
+    pre.literal-block {
+      overflow: hidden;
+    }
+
     span.look, span.look1 {
       position: relative;
       border-bottom: .2em dotted rgb(255,165,165);
@@ -26,14 +30,14 @@
     /* Main speech bubble*/
     span.look:hover + span.aside, span.look1:hover + span.aside{
       display: inline-block;
-      position: relative; 
+      position: relative;
       margin-top: -1000em;
       margin-bottom: -1000em;
       margin-right: -1000em;
       padding: 0.3em 1em 0.3em 1em;
       /*text-align: justify;*/
-      max-width: 40em;
-      width: auto;
+      max-width: 70%;
+      /*width: 50%;*/
       left: 2em;
       background: gray;
       -moz-border-radius:10px;
@@ -73,7 +77,7 @@
 .. role:: repl
 .. default-role:: repl
 
-.. |swift| replace:: :repl:`(swift)`
+.. |swift| replace:: (swift)
 
 .. role:: look
 .. role:: look1
@@ -84,8 +88,14 @@
 Swift String Design
 ===================
 
-Note:: This document represents the intended design of ``String``, not
-its current implementation state.
+.. Admonition:: About This Document 
+
+   1. It contains interactive HTML commentary that does not currently
+      appear in printed output.  Hover your mouse over elements with a
+      dotted pink underline to view the hidden commentary.
+
+   2. It represents the intended design of Swift strings, not their
+      current implementation state.
 
 .. contents:: 
    :depth: 3
@@ -100,15 +110,19 @@ including Objective-C and Cocoa.
 Overview By Example
 -------------------
 
+In this section, we'll walk through some basic examples of Swift
+string usage while discovering its essential properties.
 
-Swift has a single **first-class** string type called ``String``:
+``String`` is a **First-Class** Type
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. parsed-literal::
 
   |swift| var s = "Yo"
   `// s:` :emph:`String` `= "Yo"`
 
-Strings are **mutable**:
+Strings are **Mutable**
+~~~~~~~~~~~~~~~~~~~~~~~
 
 .. sidebar:: Why Mention It?
 
@@ -127,7 +141,7 @@ Strings are **mutable**:
   |swift| s
   `// s: String =` :emph:`"YoYo"`
 
-Strings are **value types**
+Strings are **Value Types**
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Distinct string variables have independent values: when you pass
@@ -139,9 +153,9 @@ passes you a string *you own it*.  Nobody can change a string value
   |swift| class Cave {
             // Utter something in the cave
             func say(msg: String) -> String {
-              :look1:`msg.addEcho()`\ :aside:`Modifying a parameter is safe because it is a copy of the argument`
+              :look1:`msg.addEcho()`\ :aside:`Modifying a parameter is safe because the callee sees a copy of the argument`
               self.lastSound = msg
-              :look1:`return self.lastSound`\ :aside:`Returning a stored value is safe because the caller gets a copy`
+              :look1:`return self.lastSound`\ :aside:`Returning a stored value is safe because the caller sees a copy of the value`
             }
 
             var lastSound: String   // a Cave remembers the last sound made
@@ -149,16 +163,44 @@ passes you a string *you own it*.  Nobody can change a string value
   |swift| var c = Cave()
   `// c: Cave = <Cave instance>`
   |swift| s = "Hey"
-  |swift| var t = c.say(s)
+  |swift| var t = :look1:`c.say(s)`\ :aside:`this call can't change s…`
   `t: String = "HeyHey"`
   |swift| s
-  `s: String =` :look:`"Hey"`\ :aside:`s is unaffected by c.say(s)`
-  |swift| t.addEcho()
+  `s: String =` :look:`"Hey"`\ :aside:`…and it doesn't.`
+  |swift| :look1:`t.addEcho()`\ :aside:`this call can't change c.lastSound…`
   |swift| [s, c.lastSound, t]
-  `// r0: String[] =` :look:`["Hey", "HeyHey", "HeyHeyHeyHey"]`\ :aside:`c.lastSound is unaffected by changes to t`
+  `// r0: String[] = ["Hey",` :look:`"HeyHey"`\ :aside:`…and it doesn't.`\ `, "HeyHeyHeyHey"]`
 
-Strings are **unicode-aware**
+Strings are **Unicode-Aware**
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. sidebar:: Deviations from Unicode
+
+
+   Any deviation from what Unicode
+   specifies requires careful justification.  So far, we have found two
+   possible points of deviation for Swift ``String``:
+
+   1. The `Unicode Text Segmentation Specification`_ says, “`do not
+      break between CR and LF`__.”  However, breaking between CR and LF
+      may necessary if we wish ``String`` to “behave normally” for users
+      of pure ASCII.  This point is still open for discussion.
+
+      __ http://www.unicode.org/reports/tr29/#GB2
+
+   2. The `Unicode Text Segmentation Specification`_ says,
+      “`do not break between regional indicator symbols`__.”  However, it also
+      says “(Sequences of more than two RI characters should be separated
+      by other characters, such as U+200B ZWSP).”  Although the
+      parenthesized note probably has less official weight than the other
+      admonition, breaking pairs of RI characters seems like the right
+      thing for us to do given that Cocoa already forms strings with
+      several adjacent pairs of RI characters, and the Unicode spec *can*
+      be read as outlawing such strings anyway.
+
+      __ http://www.unicode.org/reports/tr29/#GB8
+
+.. _Unicode Text Segmentation Specification: http://www.unicode.org/reports/tr29
 
 Swift applies Unicode algorithms wherever possible.  For example,
 distinct sequences of code points are treated as equal if they
@@ -178,40 +220,96 @@ Note that individual code points are still observable by explicit request:
   |swift| n1.codePoints == n2.codePoints
   `// r0 : Bool =` **false**
 
-Strings are **locale-agnostic**:
+.. _locale-agnostic:
+
+Strings are **Locale-Agnostic**
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Strings neither carry their own locale information, nor provide
 behaviors that depend on a global locale setting.  Thus, for any pair
 of strings ``s1`` and ``s2``, “``s1 == s2``” yields the same result
 regardless of system state.  Strings *do* provide a suitable
-foundation on which to build locale-aware interfaces.  [#locales]_ 
+foundation on which to build locale-aware interfaces.\ [#locales]_ 
 
-Strings are **indexable** and **sliceable**:
+Strings are **Indexable**
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. parsed-literal::
    |swift| var s = "Strings are awesome"
    `// s : String = "Strings are awesome"`
-   |swift| var r = s.find("awe")\ :look1:`!`\ :aside:`s.find() returns .None when the argument isn't found.  Since we know "awe" is in s, force-unwrap the result`
-   `// r : Range<StringIndex> =` *<…are ⦙awe⦙some>*
+   |swift| var r = s.find("awe")\ :look1:`!`\ :aside:`s.find() returns “.None” when the substring isn't found.  Since we know "awe" is present in s, we use “!” to force-unwrap the result`
+   `// r : Range<StringIndex> = <"…are a̲w̲e̲some">`
    |swift| s[r.start]
-   `// r0 = Character("a")`
-   |swift| s[r.end]
-   `// r1 = Character("s")`
+   `// r0 =` :look:`Character("a")`\ :aside:`String elements have type Character (see below)`
+
+.. |Character| replace:: ``Character``
+.. _Character:
+
+``Character``, the element type of ``String``, represents a
+**Unicode** `extended grapheme cluster`__ (not a byte, code unit, or code point).\ [#char]_ The
+``Character``\ s that make up a Swift string are determined by
+Unicode's `default segmentation`__ algorithm
+
+__ http://www.unicode.org/glossary/#extended_grapheme_cluster
+
+__ http://www.unicode.org/reports/tr29/#Default_Grapheme_Cluster_Table
+
+Strings are **Sliceable**
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. parsed-literal::
    |swift| s[r.start...r.end]
    `// r2 : String = "awe"`
    |swift| s[\ :look1:`r.start...`\ ]\ :aside:`postfix slice operator means “through the end”`
-   `// r3 : Character = "awesome"`
+   `// r3 : String = "awesome"`
    |swift| s[\ :look1:`...r.start`\ ]\ :aside:`prefix slice operator means “from the beginning”`
-   `// r4 : Character = "Strings are "`
+   `// r4 : String = "Strings are "`
    |swift| :look1:`s[r]`\ :aside:`indexing with a range is the same as slicing`
    `// r5 : String = "awe"`
    |swift| s[r] = "hand"
    |swift| s
    `// s : String = "Strings are` :look:`handsome`\ :aside:`slice replacement can resize the string`\ `"` 
 
-Slicing a string is very efficient
+.. Admonition:: String Indices
 
-Strings are **encoded as UTF-8**:
+          ``String`` implements the ``Indexable`` and ``Sliceable``
+          protocols, but strings **cannot be indexed or sliced by
+          integers**.  Instead, its ``IndexType`` is a library type
+          conforming to the ``BidirectionalIndex`` protocol.
+
+          This might seem surprising at first, but code that indexes
+          strings with arbitrary integers is seldom Unicode-correct in
+          the first place, and Swift provides alternative interfaces
+          that encourage Unicode-correct code.  For example, instead
+          of ``s[0] == 'S'`` you'd write ``s.startsWith("S")``.
+
+
+.. _extending:
+
+Strings are **Extended with Restraint**
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. sidebar:: Rationale
+
+   ``String`` is a “vocabulary type” with which most other types
+   interact.  Making these interactions members of ``String`` could
+   quickly lead to an extremely broad ``String`` interface with
+   intolerably slow code completion.
+
+Users are of course free to extend ``String`` at will.  The standard
+library, however, is designed so that users are never *forced* to
+extend ``String``.  Instead, string interactions with other types are
+generally surfaced as extensions to those other types.  For example,
+
+.. parsed-literal::
+
+    **extension X** : Printable, Parseable {
+      func format() -> String { ... }
+      static func parse(input: String) -> X { ... }
+    }
+
+Strings are **Encoded as UTF-8**
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. sidebar:: Encoding Conversion
 
@@ -228,99 +326,6 @@ Strings are **encoded as UTF-8**:
    109
    112
 
-.. _extending:
-
-``String`` is *extended with restraint* by the library because
-``String`` is a “vocabulary type” to and from which most other
-types are convertible.  Making these conversions members of
-``String`` could quickly lead to an extremely broad ``String``
-interface with slow code completion.
-
-* ``String`` is a **mutable value type**, just like ``Int``: each copy
-  of a ``String`` is logically distinct from the original, and a
-  ``String``’s value can be altered.
-
-* ``String`` is **Unicode-aware**.  This means, for example, that
-  ``String``\ s containing semantically equivalent, but distinct,
-  sequences of code points will be treated as equal::
-
-    var x = "\u006E\u0303"   // Decomposed "ñ"
-    var y = "\u00F1"         // Composed "ñ"
-    assert(x == y)           // OK, passes
-
-.. _locale-agnostic:
-
-* ``String`` is **Locale-agnostic**.  It stores no locale information,
-  and for any pair of strings ``s1`` and ``s2``, “``s1 == s2``” yields
-  the same result regardless of the global locale. [#agnostic]_
-
-* ``String`` **is a sequence** of |Character|_\ s.
-
-.. |EGC_bold| replace:: **extended grapheme cluster**
-.. |Character| replace:: ``Character``
-.. _Character:
-
-* A ``Character`` is a **Unicode** |EGC_bold|__\ —as
-  defined by some Unicode segmentation algorithm—not a byte, code
-  unit, or code point. [#char]_
-  
-  __ http://www.unicode.org/glossary/#extended_grapheme_cluster
-
-* The |Character|_\ s that make up a ``String`` are determined by
-  Unicode's `default segmentation`__ algorithm
-
-  __ http://www.unicode.org/reports/tr29/#Default_Grapheme_Cluster_Table
-
-* ``String`` implements the ``Indexable`` and ``Sliceable`` protocols
-  using a type conforming to ``BidirectionalIndex``.  ``String``
-  cannot be indexed or sliced with ``Int`` indices.
-
-* The **code points** stored in a string ``s`` can be read via
-  ``s.codePoints`` [#code_points]_
-
-* ``String``\ 's storage is **UTF-8 encoded**.  The bytes stored in a
-  string ``s`` can be read via ``s.bytes``.  ``String`` does not
-  provide access to or conversions from other encodings.
-
-* The standard library does not extend ``String`` for each type with
-  which it needs to interoperate.  Instead, for example, types
-  conforming to ``Printable`` have a ::
-
-    func toString() -> String
-
-  method, and types conforming to ``Parseable`` have a ::
-
-    static func parse(s: String) -> Self
-
-  method.
-
-Deviations from Unicode
------------------------
-
-Unicode is a pretty good standard.  Any deviation from what Unicode
-specifies requires careful justification.  So far, we have found two
-possible points of deviation for Swift ``String``:
-
-1. The `Unicode Text Segmentation Specification`_ says, “`do not
-   break between CR and LF`__.”  However, breaking between CR and LF
-   may necessary if we wish ``String`` to “behave normally” for users
-   of pure ASCII.  This point is still open for discussion.
-
-   __ http://www.unicode.org/reports/tr29/#GB2
-
-2. The `Unicode Text Segmentation Specification`_ says,
-   “`do not break between regional indicator symbols`__.”  However, it also
-   says “(Sequences of more than two RI characters should be separated
-   by other characters, such as U+200B ZWSP).”  Although the
-   parenthesized note probably has less official weight than the other
-   admonition, breaking pairs of RI characters seems like the right
-   thing for us to do given that Cocoa already forms strings with
-   several adjacent pairs of RI characters, and the Unicode spec *can*
-   be read as outlawing such strings anyway.
-
-   __ http://www.unicode.org/reports/tr29/#GB8
-
-.. _Unicode Text Segmentation Specification: http://www.unicode.org/reports/tr29
 
 Examples and Tutorials
 ======================
@@ -1531,8 +1536,9 @@ Why YAGNI
    allows strings to be naturally compared and combined, generating
    the expected results when the content is ASCII
 
-.. [#locales] We have some specific ideas, but details are still TBD
-              and wide open for discussion.
+.. [#locales] We have some specific ideas for locale-sensitive
+              interfaces, but details are still TBD and wide open for
+              discussion.
 
 .. [#re_sort] Collections that automatically re-sort based on locale
    changes are out of scope for the core Swift language
