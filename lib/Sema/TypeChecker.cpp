@@ -22,6 +22,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "llvm/ADT/DenseMap.h"
@@ -643,6 +644,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // Verify that we've checked types correctly.
   TU->ASTStage = TranslationUnit::TypeChecked;
   verify(TU);
+
+  // Verify modules imported by Clang importer.
+  if (auto ClangLoader = TC.Context.getClangModuleLoader())
+    ClangLoader->verifyAllModules();
 }
 
 bool swift::performTypeLocChecking(TranslationUnit *TU, TypeLoc &T,

@@ -171,7 +171,9 @@ public:
                                SmallVectorImpl<Decl*> &results) override;
 
   StringRef getModuleFilename(const Module *Module) override;
-  
+
+  void verifyAllModules() override;
+
   clang::TargetInfo &getTargetInfo() const;
 };
 

@@ -158,6 +158,9 @@ public:
   virtual StringRef getModuleFilename(const Module *Module) {
     return StringRef();
   }
+
+  /// \brief Verify all modules loaded by this loader.
+  virtual void verifyAllModules() { }
 };
 
 }

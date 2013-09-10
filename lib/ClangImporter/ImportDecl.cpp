@@ -798,6 +798,7 @@ namespace {
                                                      /*GenericParams=*/0,
                                                      type, funcExpr,
                                                      dc);
+      funcExpr->setDecl(result);
       setVarDeclContexts(argPatterns, funcExpr);
       setVarDeclContexts(bodyPatterns, funcExpr);
       return result;
@@ -967,6 +968,7 @@ namespace {
                                                      name, nameLoc,
                                                      /*GenericParams=*/0,
                                                      type, funcExpr, dc);
+      funcExpr->setDecl(result);
 
       setVarDeclContexts(argPatterns, funcExpr);
       setVarDeclContexts(bodyPatterns, funcExpr);
@@ -1439,6 +1441,7 @@ namespace {
                                           Identifier(), SourceLoc(), nullptr,
                                           getterType, funcExpr,
                                           getter->getDeclContext());
+      funcExpr->setDecl(thunk);
 
       // Create the body of the thunk, which calls the Objective-C getter.
       auto selfRef = new (context) DeclRefExpr(selfVar, loc);
@@ -1558,6 +1561,7 @@ namespace {
       auto thunk = new (context) FuncDecl(SourceLoc(), setter->getLoc(),
                                           Identifier(), SourceLoc(), nullptr,
                                           setterType, funcExpr, dc);
+      funcExpr->setDecl(thunk);
 
       // Create the body of the thunk, which calls the Objective-C setter.
       auto valueVar = getSingleVar(setterArgs.back());
@@ -2531,6 +2535,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   auto func = new (context) FuncDecl(SourceLoc(), SourceLoc(),
                                      Identifier(), SourceLoc(), nullptr,
                                      getterType, funcExpr, dc);
+  funcExpr->setDecl(func);
 
   // Create the integer literal value.
   // FIXME: Handle other kinds of values.

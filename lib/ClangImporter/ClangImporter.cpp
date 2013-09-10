@@ -16,6 +16,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "ImporterImpl.h"
+#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Decl.h"
@@ -728,6 +729,13 @@ StringRef ClangImporter::getModuleFilename(const Module *Module) {
 
 clang::TargetInfo &ClangImporter::getTargetInfo() const {
   return Impl.Instance->getTarget();
+}
+
+void ClangImporter::verifyAllModules() {
+  for (auto &I : Impl.ImportedDecls) {
+    if (Decl *D = I.second)
+      verify(D);
+  }
 }
 
 //===----------------------------------------------------------------------===//

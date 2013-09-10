@@ -26,10 +26,10 @@ namespace {
   enum ShouldHalt { Continue, Halt };
 
   class Verifier : public ASTWalker {
-    TranslationUnit *TU;
+    Module *M;
     ASTContext &Ctx;
     llvm::raw_ostream &Out;
-    bool HadError;
+    const bool HadError;
 
     /// \brief The stack of functions we're visiting.
     SmallVector<FuncExprLike, 4> Functions;
@@ -38,8 +38,8 @@ namespace {
     llvm::DenseMap<OpaqueValueExpr *, unsigned> OpaqueValues;
 
   public:
-    Verifier(TranslationUnit *TU) : TU(TU), Ctx(TU->Ctx), Out(llvm::errs()),
-                                    HadError(TU->Ctx.hadError()) {}
+    Verifier(Module *M)
+        : M(M), Ctx(M->Ctx), Out(llvm::errs()), HadError(M->Ctx.hadError()) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       switch (E->getKind()) {
@@ -49,7 +49,7 @@ namespace {
         DISPATCH(ID);
 #define UNCHECKED_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert((TU->ASTStage < TranslationUnit::TypeChecked || HadError) && \
+        assert((M->ASTStage < TranslationUnit::TypeChecked || HadError) && \
                #ID "in wrong phase");\
         DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
@@ -66,7 +66,7 @@ namespace {
         DISPATCH(ID);
 #define UNCHECKED_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert((TU->ASTStage < TranslationUnit::TypeChecked || HadError) && \
+        assert((M->ASTStage < TranslationUnit::TypeChecked || HadError) && \
                #ID "in wrong phase");\
         DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
@@ -148,8 +148,9 @@ namespace {
 
     /// Helper template for dispatching post-visitation.
     template <class T> T dispatchVisitPost(T node) {
-      // We always verify source ranges.
-      checkSourceRanges(node);
+      // Verify source ranges if the AST node was parsed from source.
+      if (isa<TranslationUnit>(M))
+        checkSourceRanges(node);
 
       // Check that nodes marked invalid have the correct type.
       checkErrors(node);
@@ -158,11 +159,11 @@ namespace {
       verifyParsed(node);
 
       // If we've bound names already, verify as a bound node.
-      if (TU->ASTStage >= TranslationUnit::NameBound)
+      if (M->ASTStage >= TranslationUnit::NameBound)
         verifyBound(node);
 
       // If we've checked types already, do some extra verification.
-      if (TU->ASTStage >= TranslationUnit::TypeChecked) {
+      if (M->ASTStage >= TranslationUnit::TypeChecked) {
         verifyChecked(node);
         if (!HadError)
           checkBoundGenericTypes(node);
@@ -321,6 +322,13 @@ namespace {
         Out << "mismatched qualifiers";
         E->print(Out);
         Out << "\n";
+        abort();
+      }
+    }
+
+    void verifyParsed(FuncExpr *E) {
+      if (!E->getDecl()) {
+        Out << "FuncExpr should have a Decl\n";
         abort();
       }
     }
@@ -1160,8 +1168,14 @@ namespace {
   };
 }
 
-void swift::verify(TranslationUnit *TUnit) {
-  Verifier verifier(TUnit);
-  for (Decl *D : TUnit->Decls)
+void swift::verify(TranslationUnit *TU) {
+  Verifier verifier(TU);
+  for (Decl *D : TU->Decls)
     D->walk(verifier);
 }
+
+void swift::verify(Decl *D) {
+  Verifier V(D->getDeclContext()->getParentModule());
+  D->walk(V);
+}
+

@@ -694,9 +694,13 @@ getNamedSwiftTypeSpecialization(Module *module, StringRef name,
     if (auto nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
       if (auto params = nominalDecl->getGenericParams()) {
         if (params->size() == args.size()) {
-          Type implTy = BoundGenericType::get(nominalDecl, Type(), args);
+          auto *BGT = BoundGenericType::get(nominalDecl, Type(), args);
           // FIXME: How do we ensure that this type gets validated?
-          return implTy;
+          // Instead of going through the type checker, we do this hack to
+          // create substitutions.
+          SwiftContext.createTrivialSubstitutions(
+              BGT->getCanonicalType()->castTo<BoundGenericType>());
+          return BGT;
         }
       }
     }

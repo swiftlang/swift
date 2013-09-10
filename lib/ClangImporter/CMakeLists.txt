@@ -31,4 +31,5 @@ target_link_libraries(swiftClangImporter
   LLVMBitReader
   LLVMMC
   LLVMMCParser
-  LLVMOption)
+  LLVMOption
+  LLVMTransformUtils)

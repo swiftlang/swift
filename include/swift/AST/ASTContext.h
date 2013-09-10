@@ -462,6 +462,10 @@ public:
   InheritedProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
+  /// \brief Create trivial substitutions for the given bound generic type.
+  Optional<ArrayRef<Substitution>>
+  createTrivialSubstitutions(BoundGenericType *BGT) const;
+
 private:
   friend class Decl;
   ClangNode getClangNode(Decl *decl);

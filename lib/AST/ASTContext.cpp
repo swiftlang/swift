@@ -552,6 +552,22 @@ bool ASTContext::hadError() const {
 }
 
 Optional<ArrayRef<Substitution>>
+ASTContext::createTrivialSubstitutions(BoundGenericType *BGT) const {
+  assert(BGT->isCanonical() && "Requesting non-canonical substitutions");
+  ArrayRef<GenericParam> Params =
+      BGT->getDecl()->getGenericParams()->getParams();
+  assert(Params.size() == 1);
+  auto Param = Params[0];
+  assert(Param.getAsTypeParam()->getArchetype() && "Not type-checked yet");
+  Substitution Subst;
+  Subst.Archetype = Param.getAsTypeParam()->getArchetype();
+  Subst.Replacement = BGT->getGenericArgs()[0];
+  auto Substitutions = AllocateCopy(llvm::makeArrayRef(Subst));
+  Impl.BoundGenericSubstitutions.insert(std::make_pair(BGT, Substitutions));
+  return Substitutions;
+}
+
+Optional<ArrayRef<Substitution>>
 ASTContext::getSubstitutions(BoundGenericType* bound) const {
   assert(bound->isCanonical() && "Requesting non-canonical substitutions");
   auto known = Impl.BoundGenericSubstitutions.find(bound);
@@ -560,16 +576,8 @@ ASTContext::getSubstitutions(BoundGenericType* bound) const {
 
   // We can trivially create substitutions for Slice and Optional.
   if (bound->getDecl() == getSliceDecl() ||
-      bound->getDecl() == getOptionalDecl()) {
-    auto param = bound->getDecl()->getGenericParams()->getParams()[0];
-    assert(param.getAsTypeParam()->getArchetype() && "Not type-checked yet");
-    Substitution substitution;
-    substitution.Archetype = param.getAsTypeParam()->getArchetype();
-    substitution.Replacement = bound->getGenericArgs()[0];
-    auto substitutions = AllocateCopy(llvm::makeArrayRef(substitution));
-    Impl.BoundGenericSubstitutions.insert(std::make_pair(bound, substitutions));
-    return substitutions;
-  }
+      bound->getDecl() == getOptionalDecl())
+    return createTrivialSubstitutions(bound);
 
   return Nothing;
 }

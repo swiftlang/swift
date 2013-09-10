@@ -66,7 +66,8 @@ namespace swift {
   /// verify - Check that the translation unit is well formed (i.e. following
   /// the invariants of the AST, not that the code written by the user makes
   /// sense), aborting and spewing errors if not.
-  void verify(TranslationUnit *TUnit);
+  void verify(TranslationUnit *TU);
+  void verify(Decl *D);
 
   /// \brief Parse a single buffer into the given taranslation unit.  If the
   /// translation unit is the main module, stop parsing after the next

@@ -956,6 +956,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                  TypeLoc::withoutLoc(signature->getResult()),
                                  DC);
     body->setType(signature);
+    body->setDecl(fn);
     fn->setFuncExpr(body);
 
     if (genericParams)
