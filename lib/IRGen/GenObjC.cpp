@@ -403,22 +403,7 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
   assert(args.size() == 1);
   
   // Add the selector value.
-  auto selectorRef = IGF.IGM.getAddrOfObjCSelectorRef(selector.str());
-  llvm::Value *selectorV;
-  if (IGF.IGM.Opts.UseJIT) {
-    // When generating JIT'd code, we need to call sel_registerName() to force
-    // the runtime to unique the selector.
-    selectorV = IGF.Builder.CreateLoad(Address(selectorRef,
-                                               IGF.IGM.getPointerAlignment()));
-    selectorV = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
-                                       selectorV);
-  } else {
-    // When generating statically-compiled code, just build a reference to
-    // the selector.
-    selectorV = IGF.Builder.CreateLoad(Address(selectorRef,
-                                               IGF.IGM.getPointerAlignment()));
-  }
-  args.add(selectorV);
+  args.add(IGF.emitObjCSelectorRefLoad(selector.str()));
 }
 
 /// Create the LLVM function declaration for a thunk that acts like

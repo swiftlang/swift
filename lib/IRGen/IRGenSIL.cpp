@@ -1727,8 +1727,7 @@ void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
 
   // Emit the swift_objcRespondsToSelector() call.
   llvm::Value *object = getLoweredExplosion(i->getOperand()).claimNext();
-  llvm::Constant *sel = IGM.getAddrOfObjCSelectorRef("respondsToSelector:");
-  llvm::Value *loadSel = Builder.CreateLoad(Address(sel, IGM.getPointerAlignment()));
+  llvm::Value *loadSel = emitObjCSelectorRefLoad("respondsToSelector:");
   llvm::CallInst *call = Builder.CreateCall2(IGM.getObjCRespondsToSelectorFn(),
                                              object, loadSel);
   call->setDoesNotThrow();

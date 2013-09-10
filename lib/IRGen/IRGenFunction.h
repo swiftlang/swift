@@ -152,7 +152,10 @@ public:
   llvm::Value *emitTypeMetadataRef(CanType type);
   llvm::Value *emitTypeMetadataRef(SILType type);
   llvm::Value *emitValueWitnessTableRefForMetadata(llvm::Value *metadata);
-  
+
+  /// Emit a load of a reference to the given Objective-C selector.
+  llvm::Value *emitObjCSelectorRefLoad(StringRef selector);
+
 private:
   llvm::Instruction *AllocaIP;
 

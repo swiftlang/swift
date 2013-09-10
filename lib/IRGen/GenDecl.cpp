@@ -74,11 +74,7 @@ static llvm::Function *emitObjCClassInitializer(IRGenModule &IGM,
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(initIGF, initFn);
 
-  llvm::Constant *loadSelRef = IGM.getAddrOfObjCSelectorRef("load");
-  llvm::Value *loadSel =
-    initIGF.Builder.CreateLoad(Address(loadSelRef,
-                                       initIGF.IGM.getPointerAlignment()));
-  loadSel = initIGF.Builder.CreateCall(IGM.getObjCSelRegisterNameFn(), loadSel);
+  llvm::Value *loadSel = initIGF.emitObjCSelectorRefLoad("load");
 
   llvm::Type *msgSendParams[] = {
     IGM.ObjCPtrTy,
