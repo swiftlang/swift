@@ -117,6 +117,9 @@ public:
   void visitSILInstruction(SILInstruction *I) {
     CurInstruction = I;
     checkSILInstruction(I);
+
+    // Check the SILLLocation attached to the instruction.
+    checkInstructionsSILLocation(I);
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -165,6 +168,35 @@ public:
               "instruction's operand's owner isn't the instruction");
       require(isInValueUses(&operand), "operand value isn't used by operand");
     }
+  }
+
+  void checkInstructionsSILLocation(SILInstruction *I) {
+    SILLocation L = I->getLoc();
+    SILLocation::LocationKind LocKind = L.getKind();
+    ValueKind InstKind = I->getKind();
+
+    // Regular locations and SIL file locations are allowed on all instructions.
+    if (LocKind == SILLocation::RegularKind ||
+        LocKind == SILLocation::SILFileKind)
+      return;
+
+    if (LocKind == SILLocation::CleanupKind ||
+        LocKind == SILLocation::InlinedKind)
+      require(InstKind != ValueKind::ReturnInst ||
+              InstKind != ValueKind::AutoreleaseReturnInst,
+        "cleanup and inlined locations are not allowed on return instructions");
+
+    if (LocKind == SILLocation::ReturnKind ||
+        LocKind == SILLocation::ImplicitReturnKind)
+      require(InstKind == ValueKind::BranchInst ||
+              InstKind == ValueKind::ReturnInst ||
+              InstKind == ValueKind::AutoreleaseReturnInst ||
+              InstKind == ValueKind::UnreachableInst,
+        "return locations are only allowed on branch and return instructions");
+
+    if (LocKind == SILLocation::ArtificialUnreachableKind)
+      require(InstKind == ValueKind::UnreachableInst,
+        "artificial locations are only allowed on Unreachable instructions");
   }
 
   /// Check that this operand appears in the use-chain of the value it uses.
