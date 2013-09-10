@@ -227,7 +227,8 @@ public:
   /// Create an RValue by emitting destructured arguments into a basic block.
   static RValue emitBBArguments(CanType type,
                                 SILGenFunction &gen,
-                                SILBasicBlock *parent);
+                                SILBasicBlock *parent,
+                                SILLocation L);
   
   /// True if the rvalue has been completely initialized by adding all its
   /// elements.

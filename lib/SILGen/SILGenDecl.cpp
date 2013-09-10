@@ -400,7 +400,7 @@ struct ArgumentInitVisitor :
   SILValue makeArgument(Type ty, SILBasicBlock *parent, SILLocation l) {
     assert(ty && "no type?!");
     return RValue::emitBBArguments(ty->getCanonicalType(),
-                                   gen, parent).forwardAsSingleValue(gen, l);
+                                   gen, parent, l).forwardAsSingleValue(gen, l);
   }
   
   void storeArgumentInto(Type ty, SILValue arg, SILLocation loc,

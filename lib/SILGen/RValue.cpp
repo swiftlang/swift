@@ -256,16 +256,18 @@ class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
 public:
   SILGenFunction &gen;
   SILBasicBlock *parent;
+  SILLocation loc;
   
-  EmitBBArguments(SILGenFunction &gen, SILBasicBlock *parent)
-    : gen(gen), parent(parent) {}
+  EmitBBArguments(SILGenFunction &gen, SILBasicBlock *parent,
+                  SILLocation l)
+    : gen(gen), parent(parent), loc(l) {}
   
   RValue visitType(CanType t) {
     SILValue arg = new (gen.SGM.M) SILArgument(gen.getLoweredType(t), parent);
     ManagedValue mv = isa<LValueType>(t)
       ? ManagedValue(arg, ManagedValue::LValue)
       : gen.emitManagedRValueWithCleanup(arg);
-    return RValue(gen, mv, RegularLocation::getArtificialLocation());
+    return RValue(gen, mv, loc);
   }
   
   RValue visitTupleType(CanTupleType t) {
@@ -297,8 +299,9 @@ RValue::RValue(CanType type)
 
 RValue RValue::emitBBArguments(CanType type,
                                SILGenFunction &gen,
-                               SILBasicBlock *parent) {
-  return EmitBBArguments(gen, parent).visit(type);
+                               SILBasicBlock *parent,
+                               SILLocation l) {
+  return EmitBBArguments(gen, parent, l).visit(type);
 }
 
 void RValue::addElement(RValue &&element) & {
