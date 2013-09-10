@@ -100,21 +100,21 @@ Swift String Design
 .. contents:: 
    :depth: 3
               
-High Level Design
-=================
+Introduction
+============
 
 Like all things Swift, our approach to strings begins with a deep
 respect for the lessons learned from many languages and libraries,
 including Objective-C and Cocoa.
 
 Overview By Example
--------------------
+===================
 
 In this section, we'll walk through some basic examples of Swift
 string usage while discovering its essential properties.
 
 ``String`` is a **First-Class** Type
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------------
 
 .. parsed-literal::
 
@@ -122,7 +122,7 @@ string usage while discovering its essential properties.
   `// s:` :emph:`String` `= "Yo"`
 
 Strings are **Mutable**
-~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------
 
 .. sidebar:: Why Mention It?
 
@@ -142,7 +142,7 @@ Strings are **Mutable**
   `// s: String =` :emph:`"YoYo"`
 
 Strings are **Value Types**
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------
 
 Distinct string variables have independent values: when you pass
 someone a string they get a copy of the value, and when someone
@@ -172,7 +172,7 @@ passes you a string *you own it*.  Nobody can change a string value
   `// r0: String[] = ["Hey",` :look:`"HeyHey"`\ :aside:`…and it doesn't.`\ `, "HeyHeyHeyHey"]`
 
 Strings are **Unicode-Aware**
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------
 
 .. sidebar:: Deviations from Unicode
 
@@ -223,7 +223,7 @@ Note that individual code points are still observable by explicit request:
 .. _locale-agnostic:
 
 Strings are **Locale-Agnostic**
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------
 
 Strings neither carry their own locale information, nor provide
 behaviors that depend on a global locale setting.  Thus, for any pair
@@ -232,7 +232,20 @@ regardless of system state.  Strings *do* provide a suitable
 foundation on which to build locale-aware interfaces.\ [#locales]_ 
 
 Strings are **Indexable**
-~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------
+
+.. Admonition:: String Indices
+
+          ``String`` implements the ``Indexable`` protocol, but
+          **cannot be indexed by integers**.  Instead,
+          ``String.IndexType`` is a library type conforming to the
+          ``BidirectionalIndex`` protocol.
+
+          This might seem surprising at first, but code that indexes
+          strings with arbitrary integers is seldom Unicode-correct in
+          the first place, and Swift provides alternative interfaces
+          that encourage Unicode-correct code.  For example, instead
+          of ``s[0] == 'S'`` you'd write ``s.startsWith("S")``.
 
 .. parsed-literal::
    |swift| var s = "Strings are awesome"
@@ -240,22 +253,33 @@ Strings are **Indexable**
    |swift| var r = s.find("awe")\ :look1:`!`\ :aside:`s.find() returns “.None” when the substring isn't found.  Since we know "awe" is present in s, we use “!” to force-unwrap the result`
    `// r : Range<StringIndex> = <"…are a̲w̲e̲some">`
    |swift| s[r.start]
-   `// r0 =` :look:`Character("a")`\ :aside:`String elements have type Character (see below)`
+   `// r0 : Character =` :look:`Character("a")`\ :aside:`String elements have type Character (see below)`
 
 .. |Character| replace:: ``Character``
 .. _Character:
 
+Strings are Composed of ``Character``\ s
+----------------------------------------
+
 ``Character``, the element type of ``String``, represents a
 **Unicode** `extended grapheme cluster`__ (not a byte, code unit, or code point).\ [#char]_ The
 ``Character``\ s that make up a Swift string are determined by
-Unicode's `default segmentation`__ algorithm
+Unicode's `default segmentation`__ algorithm.
 
 __ http://www.unicode.org/glossary/#extended_grapheme_cluster
 
 __ http://www.unicode.org/reports/tr29/#Default_Grapheme_Cluster_Table
 
+Access to lower-level elements is still possible by explicit request:
+
+.. parsed-literal::
+   |swift| s.codePoints[s.codePoints.start]
+   `// r1 : CodePoint = CodePoint(83) /* S */`
+   |swift| s.bytes[s.bytes.start]
+   `// r2 : UInt8 = UInt8(83)`
+
 Strings are **Sliceable**
-~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------
 
 .. parsed-literal::
    |swift| s[r.start...r.end]
@@ -270,24 +294,10 @@ Strings are **Sliceable**
    |swift| s
    `// s : String = "Strings are` :look:`handsome`\ :aside:`slice replacement can resize the string`\ `"` 
 
-.. Admonition:: String Indices
-
-          ``String`` implements the ``Indexable`` and ``Sliceable``
-          protocols, but strings **cannot be indexed or sliced by
-          integers**.  Instead, its ``IndexType`` is a library type
-          conforming to the ``BidirectionalIndex`` protocol.
-
-          This might seem surprising at first, but code that indexes
-          strings with arbitrary integers is seldom Unicode-correct in
-          the first place, and Swift provides alternative interfaces
-          that encourage Unicode-correct code.  For example, instead
-          of ``s[0] == 'S'`` you'd write ``s.startsWith("S")``.
-
-
 .. _extending:
 
 Strings are **Extended with Restraint**
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------------------
 
 .. sidebar:: Rationale
 
@@ -309,7 +319,7 @@ generally surfaced as extensions to those other types.  For example,
     }
 
 Strings are **Encoded as UTF-8**
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------------------
 
 .. sidebar:: Encoding Conversion
 
