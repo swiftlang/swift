@@ -58,6 +58,8 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   // Generate diagnostics.
   emitSILDataflowDiagnostics(&Module);
 
+  Module.setStage(SILStage::Canonical);
+
   // If errors were produced during SIL analysis, return true.
   return Ctx.hadError();
 }
