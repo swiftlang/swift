@@ -527,12 +527,12 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   TC->typeCheckPattern(ParamPat,
                        Arg->getDeclContext(),
                        /*allowUnknownTypes*/false);
-  FuncExpr *FE = FuncExpr::create(C, Loc, ParamPat, ParamPat, TypeLoc(), &TC->TU);
+  PipeClosureExpr *CE =
+      new (C) PipeClosureExpr(ParamPat, SourceLoc(), TypeLoc(), &TC->TU);
   Type FuncTy = FunctionType::get(ParamPat->getType(), TupleType::getEmpty(C),
                                   C);
-  FE->setType(FuncTy);
-  FE->setBodyResultType(TupleType::getEmpty(C));
-  Arg->setDeclContext(FE);
+  CE->setType(FuncTy);
+  Arg->setDeclContext(CE);
   
   // Convert the pattern to a string we can print.
   llvm::SmallString<16> PrefixString;
@@ -553,15 +553,15 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   
   SmallVector<unsigned, 4> MemberIndexes;
   PrintReplExpr(*TC, Arg, E->getType(), T, Loc, EndLoc, MemberIndexes,
-                BodyContent, PrintDecls, FE);
+                BodyContent, PrintDecls, CE);
   PrintLiteralString("\n", *TC, Loc, PrintDecls, BodyContent);
   
   // Typecheck the function.
   BraceStmt *Body = BraceStmt::create(C, Loc, BodyContent, EndLoc);
-  FE->setBody(Body);
-  TC->typeCheckFunctionBody(FE);
+  CE->setBody(Body, false);
+  TC->typeCheckClosureBody(CE);
   
-  Expr *TheCall = new (C) CallExpr(FE, E);
+  Expr *TheCall = new (C) CallExpr(CE, E);
   if (TC->typeCheckExpressionShallow(TheCall, Arg->getDeclContext()))
     return ;
   
