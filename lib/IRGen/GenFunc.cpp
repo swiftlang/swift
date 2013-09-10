@@ -1701,7 +1701,8 @@ void IRGenFunction::emitScalarReturn(Explosion &result) {
 
 /// Emit the forwarding stub function for a partial application.
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
-                                       llvm::Function *fnPtr,
+                                       llvm::Function *staticFnPtr,
+                                       llvm::Type *fnTy,
                                        ExplosionKind explosionLevel,
                                        SILType outType,
                                        HeapLayout const &layout) {
@@ -1733,7 +1734,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   // FIXME: support
   NonFixedOffsets offsets = Nothing;
-
+  
   // If there's a data pointer required, grab it (it's always the
   // last parameter) and load out the extra, previously-curried
   // parameters.
@@ -1770,9 +1771,25 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     subIGF.emitRelease(rawData);
   }
   
+  // If we didn't receive a static function, dig the function pointer
+  // out of the context.
+  llvm::Value *fnPtr;
+  if (staticFnPtr) {
+    assert(staticFnPtr->getType() == fnTy && "static function type mismatch?!");
+    fnPtr = staticFnPtr;
+  } else {
+    // The dynamic function pointer is packed "last" into the context.
+    fnPtr = params.takeLast();
+    // It comes out of the context as an i8*. Cast to the function type.
+    fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
+  }
+
   llvm::CallInst *call = subIGF.Builder.CreateCall(fnPtr, params.claimAll());
-  call->setAttributes(fnPtr->getAttributes());
-  call->setCallingConv(fnPtr->getCallingConv());
+  // FIXME: Default Swift attributes for indirect calls?
+  if (staticFnPtr) {
+    call->setAttributes(staticFnPtr->getAttributes());
+    call->setCallingConv(staticFnPtr->getCallingConv());
+  }
   call->setTailCall();
 
   // Deallocate everything we allocated above.
@@ -1792,7 +1809,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 /// Emit a partial application thunk for a function pointer applied to a partial
 /// set of argument values.
 void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
-                                           llvm::Function *fnPtr,
+                                           llvm::Value *fnPtr,
+                                           llvm::Value *fnContext,
                                            Explosion &args,
                                            ArrayRef<SILType> argTypes,
                                            ArrayRef<Substitution> subs,
@@ -1807,11 +1825,18 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     argTypeInfos.push_back(&IGF.getTypeInfo(argType.getSwiftType()));
   }
   
-  // Collect the polymorphic arguments.
-  Explosion polymorphicArgs(IGF.CurExplosionLevel);
+  // Include the context pointer, if any, in the function arguments.
+  if (fnContext) {
+    args.add(fnContext);
+    argTypeInfos.push_back(
+                 &IGF.IGM.getTypeInfo(IGF.IGM.Context.TheObjectPointerType));
+  }
   
+  // Collect the polymorphic arguments.
   if (PolymorphicFunctionType *pft = origType.getAs<PolymorphicFunctionType>()) {
     assert(!subs.empty() && "no substitutions for polymorphic argument?!");
+    Explosion polymorphicArgs(IGF.CurExplosionLevel);
+
     emitPolymorphicArguments(IGF, pft,
                          CanType(substType.castTo<FunctionType>()->getInput()),
                          subs,
@@ -1831,6 +1856,16 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     args.add(polymorphicArgs.claimAll());
   } else {
     assert(subs.empty() && "substitutions for non-polymorphic function?!");
+  }
+
+  // If the function pointer is dynamic, include it in the context.
+  auto staticFn = dyn_cast<llvm::Function>(fnPtr);
+  if (!staticFn) {
+    llvm::Value *fnRawPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
+    args.add(fnRawPtr);
+    argTypeInfos.push_back(
+                       &IGF.IGM.getTypeInfo(IGF.IGM.Context.TheRawPointerType));
+    
   }
 
   // Store the context arguments on the heap.
@@ -1855,8 +1890,15 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   assert(args.empty() && "unused args in partial application?!");
   
   // Create the forwarding stub.
+  llvm::AttributeSet attrs;
+  auto fnPtrTy = IGF.IGM.getFunctionType(origType, args.getKind(),
+                                         fnContext ? ExtraData::Retainable
+                                                   : ExtraData::None, attrs)
+    ->getPointerTo();
+
   llvm::Function *forwarder = emitPartialApplicationForwarder(IGF.IGM,
-                                                              fnPtr,
+                                                              staticFn,
+                                                              fnPtrTy,
                                                               args.getKind(),
                                                               outType,
                                                               layout);

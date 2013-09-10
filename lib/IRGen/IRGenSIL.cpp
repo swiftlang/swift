@@ -1445,7 +1445,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   setLoweredExplosion(SILValue(i, 0), result);
 }
 
-static std::tuple<llvm::Function*, SILType, ArrayRef<Substitution>>
+static std::tuple<llvm::Value*, llvm::Value*, SILType, ArrayRef<Substitution>>
 getPartialApplicationFunction(IRGenSILFunction &IGF,
                               SILValue v) {
   LoweredValue &lv = IGF.getLoweredValue(v);
@@ -1466,6 +1466,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
       break;
     }
     return {lv.getStaticFunction().getFunction(),
+            nullptr,
             v.getType(),
             ArrayRef<Substitution>{}};
   case LoweredValue::Kind::SpecializedValue: {
@@ -1474,13 +1475,21 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     auto res = getPartialApplicationFunction(IGF, unspecialized);
     return {std::get<0>(res),
             std::get<1>(res),
+            std::get<2>(res),
             specialized.getSubstitutions()};
   }
   case LoweredValue::Kind::Explosion:
   case LoweredValue::Kind::ObjCMethod:
   case LoweredValue::Kind::MetatypeValue:
-  case LoweredValue::Kind::BuiltinValue:
-    llvm_unreachable("partial application not yet supported");
+  case LoweredValue::Kind::BuiltinValue: {
+    Explosion ex = lv.getExplosion(IGF);
+    llvm::Value *fn = ex.claimNext();
+    llvm::Value *context = nullptr;
+    if (!v.getType().castTo<AnyFunctionType>()->isThin())
+      context = ex.claimNext();
+    
+    return {fn, context, v.getType(), ArrayRef<Substitution>{}};
+  }
   }
 }
 
@@ -1491,20 +1500,16 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   // FIXME: We'll need to be able to close over runtime function values
   // too, by including the function pointer and context data into the new
   // closure context.
-  llvm::Function *calleeFn = nullptr;
+  llvm::Value *calleeFn = nullptr;
+  llvm::Value *innerContext = nullptr;
   SILType origCalleeTy;
   ArrayRef<Substitution> substitutions;
 
-  std::tie(calleeFn, origCalleeTy, substitutions)
+  std::tie(calleeFn, innerContext, origCalleeTy, substitutions)
     = getPartialApplicationFunction(*this, i->getCallee());
   
   // Apply the closure up to the next-to-last uncurry level to gather the
   // context arguments.
-
-  // FIXME: We need to close over fat function values to be able to curry
-  // specialized 
-  assert(i->getCallee().getType().castTo<FunctionType>()->isThin() &&
-         "can't closure a function that already has context");
   
   Explosion llArgs(ExplosionKind::Maximal);
   SmallVector<SILType, 8> argTypes;
@@ -1517,7 +1522,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   
   // Create the thunk and function value.
   Explosion function(ExplosionKind::Maximal);
-  emitFunctionPartialApplication(*this, calleeFn, llArgs,
+  emitFunctionPartialApplication(*this, calleeFn, innerContext, llArgs,
                                  argTypes, substitutions,
                                  origCalleeTy, i->getCallee().getType(),
                                  i->getType(), function);

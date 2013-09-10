@@ -1,0 +1,42 @@
+// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm | FileCheck %s
+
+import Builtin
+
+sil @top_level_code : $() -> () {
+entry:
+  %v = tuple()
+  return %v : $()
+}
+
+// CHECK-LABEL: define { i8*, %swift.refcounted* } @dynamic_partial_apply(i8*, %swift.refcounted*, i64) {
+// CHECK: entry:
+// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata* @metadata, i32 0, i32 2), i64 40, i64 7)
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* [[OBJ]] to [[DATA_TYPE:{ %swift.refcounted, i64, %swift.refcounted\*, i8\* }]]*
+// CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
+// CHECK:   store i64 %2, i64* [[X_ADDR]], align 8
+// CHECK:   [[CONTEXT_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 2
+// CHECK:   store %swift.refcounted* %1, %swift.refcounted** [[CONTEXT_ADDR]], align 8
+// CHECK:   [[FN_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 3
+// CHECK:   store i8* %0, i8** [[FN_ADDR]], align 8
+// CHECK:   %8 = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* [[PARTIAL_APPLY_STUB:@partial_apply[0-9]*]] to i8*), %swift.refcounted* undef }, %swift.refcounted* %3, 1
+// CHECK:   ret { i8*, %swift.refcounted* } %8
+// CHECK: }
+
+// CHECK: define internal void [[PARTIAL_APPLY_STUB]](%swift.refcounted*) {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* %0 to [[DATA_TYPE]]
+// CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* %1, i32 0, i32 1
+// CHECK:   [[X:%.*]] = load i64* [[X_ADDR]], align 8
+// CHECK:   [[CONTEXT_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 2
+// CHECK:   [[CONTEXT:%.*]] = load %swift.refcounted** [[CONTEXT_ADDR]], align 8
+// CHECK:   [[FN_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 3
+// CHECK:   [[FN_PTR:%.*]] = load i8** [[FN_ADDR]], align 8
+// CHECK:   [[FN:%.*]] = bitcast i8* [[FN_PTR]] to void (i64, %swift.refcounted*)*
+// CHECK:   tail call void [[FN]](i64 [[X]], %swift.refcounted* [[CONTEXT]])
+// CHECK:   ret void
+// CHECK: }
+sil @dynamic_partial_apply : $((Builtin.Int64) -> (), Builtin.Int64) -> () -> () {
+entry(%f : $(Builtin.Int64) -> (), %x : $Builtin.Int64):
+  %p = partial_apply %f(%x) : $(Builtin.Int64) -> ()
+  return %p : $() -> ()
+}
