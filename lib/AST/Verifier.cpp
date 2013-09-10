@@ -164,9 +164,11 @@ namespace {
 
       // If we've checked types already, do some extra verification.
       if (M->ASTStage >= TranslationUnit::TypeChecked) {
-        verifyChecked(node);
-        if (!HadError)
+        verifyCheckedAlways(node);
+        if (!HadError) {
+          verifyChecked(node);
           checkBoundGenericTypes(node);
+        }
       }
 
       // Clean up anything that we've placed into a stack to check.
@@ -193,9 +195,22 @@ namespace {
     void verifyBound(Expr *E) {}
     void verifyBound(Stmt *S) {}
     void verifyBound(Decl *D) {}
+
+    /// @{
+    /// These verification functions are always run on type checked ASTs
+    /// (even if there were errors).
+    void verifyCheckedAlways(Expr *E) {}
+    void verifyCheckedAlways(Stmt *S) {}
+    void verifyCheckedAlways(Decl *D) {}
+    /// @}
+
+    /// @{
+    /// These verification functions are run on type checked ASTs if there were
+    /// no errors.
     void verifyChecked(Expr *E) {}
     void verifyChecked(Stmt *S) {}
     void verifyChecked(Decl *D) {}
+    /// @}
 
     // Specialized verifiers.
 
@@ -248,8 +263,6 @@ namespace {
     }
 
     void verifyChecked(ReturnStmt *S) {
-      if (HadError)
-        return;
       auto func = Functions.back();
       Type resultType;
       if (FuncExpr *fe = func.dyn_cast<FuncExpr*>()) {
@@ -272,15 +285,11 @@ namespace {
     }
 
     void verifyChecked(IfStmt *S) {
-      if (HadError)
-        return;
       checkSameType(S->getCond()->getType(), BuiltinIntegerType::get(1, Ctx),
                     "if condition type");
     }
 
     void verifyChecked(WhileStmt *S) {
-      if (HadError)
-        return;
       checkSameType(S->getCond()->getType(), BuiltinIntegerType::get(1, Ctx),
                     "while condition type");
     }
@@ -298,15 +307,11 @@ namespace {
     }
 
     void verifyChecked(AssignExpr *S) {
-      if (HadError)
-        return;
       Type lhsTy = checkAssignDest(S->getDest());
       checkSameType(lhsTy, S->getSrc()->getType(), "assignment operands");
     }
 
     void verifyChecked(AddressOfExpr *E) {
-      if (HadError)
-        return;
       LValueType::Qual resultQuals;
       Type resultObj = checkLValue(E->getType(), resultQuals,
                                    "result of AddressOfExpr");
@@ -334,8 +339,6 @@ namespace {
     }
 
     void verifyChecked(RequalifyExpr *E) {
-      if (HadError)
-        return;
       LValueType::Qual dstQuals, srcQuals;
       Type dstObj = checkLValue(E->getType(), dstQuals,
                                 "result of RequalifyExpr");
@@ -365,8 +368,6 @@ namespace {
     }
 
     void verifyChecked(MetatypeConversionExpr *E) {
-      if (HadError)
-        return;
       auto destTy = checkMetatypeType(E->getType(),
                                       "result of MetatypeConversionExpr");
       auto srcTy = checkMetatypeType(E->getSubExpr()->getType(),
@@ -383,16 +384,12 @@ namespace {
     }
 
     void verifyChecked(MaterializeExpr *E) {
-      if (HadError)
-        return;
       Type obj = checkLValue(E->getType(), "result of MaterializeExpr");
       checkSameType(obj, E->getSubExpr()->getType(),
                     "result and operand of MaterializeExpr");
     }
 
     void verifyChecked(TupleElementExpr *E) {
-      if (HadError)
-        return;
       Type resultType = E->getType();
       Type baseType = E->getBase()->getType();
       checkSameLValueness(baseType, resultType,
@@ -418,8 +415,6 @@ namespace {
     }
 
     void verifyChecked(ApplyExpr *E) {
-      if (HadError)
-        return;
       FunctionType *FT = E->getFn()->getType()->getAs<FunctionType>();
       if (!FT) {
         Out << "callee of apply expression does not have function type:";
@@ -471,8 +466,6 @@ namespace {
     }
 
     void verifyChecked(MemberRefExpr *E) {
-      if (HadError)
-        return;
       if (!E->getBase()->getType()->is<LValueType>() &&
           !E->getBase()->getType()->hasReferenceSemantics()) {
         Out << "Member reference base type is not an lvalue:\n";
@@ -523,8 +516,6 @@ namespace {
     }
 
     void verifyChecked(SubscriptExpr *E) {
-      if (HadError)
-        return;
       if (!E->getBase()->getType()->is<LValueType>() &&
           !E->getBase()->getType()->hasReferenceSemantics()) {
         Out << "Subscript base type is not an lvalue";
@@ -545,8 +536,6 @@ namespace {
     }
 
     void verifyChecked(UnconditionalCheckedCastExpr *E) {
-      if (HadError)
-        return;
       Type Ty = E->getCastTypeLoc().getType();
       if (!Ty->isEqual(E->getType())) {
         Out << "UnconditionalCheckedCast types don't match\n";
@@ -559,8 +548,6 @@ namespace {
     }
     
     void verifyChecked(CheckedCastExpr *E) {
-      if (HadError)
-        return;
       if (!E->isResolved()) {
         Out << "CheckedCast kind not resolved\n";
         abort();
@@ -568,8 +555,6 @@ namespace {
     }
 
     void verifyChecked(SpecializeExpr *E) {
-      if (HadError)
-        return;
       if (!E->getType()->is<FunctionType>()) {
         Out << "SpecializeExpr must have FunctionType result\n";
         abort();
@@ -606,8 +591,6 @@ namespace {
     }
 
     void verifyChecked(TupleShuffleExpr *E) {
-      if (HadError)
-        return;
       TupleType *TT = E->getType()->getAs<TupleType>();
       TupleType *SubTT = E->getSubExpr()->getType()->getAs<TupleType>();
       if (!TT || !SubTT) {
@@ -652,8 +635,6 @@ namespace {
     }
 
     void verifyChecked(MetatypeExpr *E) {
-      if (HadError)
-        return;
       auto metatype = E->getType()->getAs<MetaTypeType>();
       if (!metatype) {
         Out << "MetatypeExpr must have metatype type\n";
@@ -678,8 +659,6 @@ namespace {
     }
 
     void verifyChecked(NewArrayExpr *E) {
-      if (HadError)
-        return;
       if (!E->hasElementType()) {
         Out << "NewArrayExpr is missing its element type";
         abort();
@@ -692,8 +671,6 @@ namespace {
     }
 
     void verifyChecked(IfExpr *expr) {
-      if (HadError)
-        return;
       auto condTy
         = expr->getCondExpr()->getType()->getAs<BuiltinIntegerType>();
       if (!condTy || condTy->getBitWidth() != 1) {
@@ -707,8 +684,6 @@ namespace {
     }
     
     void verifyChecked(SuperRefExpr *expr) {
-      if (HadError)
-        return;
       if (!expr->getType()->is<LValueType>()) {
         Out << "Type of SuperRefExpr should be an LValueType";
         abort();
@@ -731,8 +706,6 @@ namespace {
     }
 
     void verifyChecked(VarDecl *var) {
-      if (HadError)
-        return;
       // The fact that this is *directly* be a reference storage type
       // cuts the code down quite a bit in getTypeOfReference.
       if (var->getAttrs().hasOwnership() !=
