@@ -88,14 +88,16 @@
 Swift String Design
 ===================
 
-.. Admonition:: About This Document 
+.. Admonition:: This Document
+   :class: note
+                
+   * contains interactive HTML commentary that does not
+     currently appear in printed output.  Hover your mouse over
+     elements with a dotted pink underline to view the hidden
+     commentary.
 
-   1. It contains interactive HTML commentary that does not currently
-      appear in printed output.  Hover your mouse over elements with a
-      dotted pink underline to view the hidden commentary.
-
-   2. It represents the intended design of Swift strings, not their
-      current implementation state.
+   * represents the intended design of Swift strings, not their
+     current implementation state.
 
 .. contents:: 
    :depth: 3
@@ -164,9 +166,9 @@ passes you a string *you own it*.  Nobody can change a string value
   `// c: Cave = <Cave instance>`
   |swift| s = "Hey"
   |swift| var t = :look1:`c.say(s)`\ :aside:`this call can't change s…`
-  `t: String = "HeyHey"`
+  `// t: String = "HeyHey"`
   |swift| s
-  `s: String =` :look:`"Hey"`\ :aside:`…and it doesn't.`
+  `// s: String =` :look:`"Hey"`\ :aside:`…and it doesn't.`
   |swift| :look1:`t.addEcho()`\ :aside:`this call can't change c.lastSound…`
   |swift| [s, c.lastSound, t]
   `// r0: String[] = ["Hey",` :look:`"HeyHey"`\ :aside:`…and it doesn't.`\ `, "HeyHeyHeyHey"]`
@@ -319,7 +321,7 @@ generally surfaced as extensions to those other types.  For example,
     }
 
 Strings are **Encoded as UTF-8**
--------------------------------------------
+--------------------------------
 
 .. sidebar:: Encoding Conversion
 
@@ -336,11 +338,6 @@ Strings are **Encoded as UTF-8**
    109
    112
 
-
-Examples and Tutorials
-======================
-
-**WRITEME**
 
 Reference Manual
 ================
