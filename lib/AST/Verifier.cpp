@@ -35,7 +35,7 @@ namespace {
     SmallVector<FuncExprLike, 4> Functions;
 
     /// \brief The set of opaque value expressions active at this point.
-    llvm::SmallPtrSet<OpaqueValueExpr *, 4> OpaqueValues;
+    llvm::DenseMap<OpaqueValueExpr *, unsigned> OpaqueValues;
 
   public:
     Verifier(TranslationUnit *TU) : TU(TU), Ctx(TU->Ctx), Out(llvm::errs()),
@@ -209,7 +209,7 @@ namespace {
     }
 
     bool shouldVerify(DynamicMemberRefExpr *dynamicMember) {
-      OpaqueValues.insert(dynamicMember->getOpaqueFn());
+      OpaqueValues.insert({dynamicMember->getOpaqueFn(), 0});
       return shouldVerify(cast<Expr>(dynamicMember));
     }
 
@@ -710,6 +710,14 @@ namespace {
     void verifyChecked(OpaqueValueExpr *expr) {
       if (!OpaqueValues.count(expr)) {
         Out << "OpaqueValueExpr not introduced at this point in AST\n";
+        abort();
+      }
+
+      ++OpaqueValues[expr];
+
+      // Make sure "uniquely-referenced" actually is.
+      if (expr->isUniquelyReferenced() && OpaqueValues[expr] > 1) {
+        Out << "Multiple references to unique OpaqueValueExpr\n";
         abort();
       }
     }

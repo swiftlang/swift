@@ -2185,11 +2185,21 @@ public:
 /// subexpressions of that AST node.
 class OpaqueValueExpr : public Expr {
   SourceLoc Loc;
-  
+  bool UniquelyReferenced = false;
+
 public:
   explicit OpaqueValueExpr(SourceLoc Loc, Type Ty)
     : Expr(ExprKind::OpaqueValue, Ty), Loc(Loc) { }
-  
+
+  /// Determine whether this opaque value is referenced at only one point in
+  /// the AST.
+  ///
+  /// Opaque values referenced at only one place in the AST can be referenced
+  /// more efficiently, be eliminating extra retain/release traffic.
+  bool isUniquelyReferenced() const { return UniquelyReferenced; }
+
+  void setUniquelyReferenced(bool uniqueRef) { UniquelyReferenced = uniqueRef; }
+
   SourceRange getSourceRange() const { return Loc; }
   
   static bool classof(const Expr *E) {

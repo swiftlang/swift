@@ -1206,7 +1206,10 @@ public:
   }
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E) {
-    printCommon(E, "opaque_value_expr") << " @ " << (void*)E << ')';
+    printCommon(E, "opaque_value_expr") << " @ " << (void*)E;
+    if (E->isUniquelyReferenced())
+      OS << " unique";
+    OS << ")";
   }
 
   void visitZeroValueExpr(ZeroValueExpr *E) {

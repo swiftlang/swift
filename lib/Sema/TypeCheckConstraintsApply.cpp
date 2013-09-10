@@ -489,6 +489,7 @@ namespace {
       // Create the .Some(fn) helper expression.
       // FIXME: This is currently swift.Some(fn).
       auto opaqueFn = new (context) OpaqueValueExpr(dotLoc, fnType);
+      opaqueFn->setUniquelyReferenced(true);
       auto swiftRef = new (context) UnresolvedDeclRefExpr(
                                       context.getIdentifier("swift"),
                                       DeclRefKind::Ordinary,

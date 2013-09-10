@@ -69,19 +69,22 @@ namespace {
 } // end anonymous namespace
 
 SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
-  // Destroy the value.
-  SILValue value = Self.OpaqueValues[OpaqueValue];
-  auto &lowering = Self.getTypeLowering(value.getType().getSwiftRValueType());
-  if (lowering.isTrivial()) {
-    // Nothing to do.
-  } else if (lowering.isAddressOnly()) {
-    lowering.emitDestroyAddress(Self.B, OpaqueValue, value);
-  } else {
-    lowering.emitDestroyRValue(Self.B, OpaqueValue, value);
+  // Destroy the value, unless it was both uniquely referenced and consumed.
+  auto entry = Self.OpaqueValues.find(OpaqueValue);
+  if (!OpaqueValue->isUniquelyReferenced() || !entry->second.second) {
+    SILValue &value = entry->second.first;
+    auto &lowering = Self.getTypeLowering(value.getType().getSwiftRValueType());
+    if (lowering.isTrivial()) {
+      // Nothing to do.
+    } else if (lowering.isAddressOnly()) {
+      lowering.emitDestroyAddress(Self.B, OpaqueValue, value);
+    } else {
+      lowering.emitDestroyRValue(Self.B, OpaqueValue, value);
+    }
   }
 
   // Remove the opaque value.
-  Self.OpaqueValues.erase(OpaqueValue);
+  Self.OpaqueValues.erase(entry);
 }
 
 ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
@@ -2444,9 +2447,20 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
   assert(SGF.OpaqueValues.count(E) && "Didn't bind OpaqueValueExpr");
-  // FIXME: Can we optimize away this copy when there is only a single
-  // utterance of the OpaqueValueExpr? That should be the common case.
-  return RValue(SGF, SGF.emitManagedRetain(E, SGF.OpaqueValues[E]), E);
+
+  auto &entry = SGF.OpaqueValues[E];
+
+  // If the opaque value is uniquely referenced, we can just return the
+  // value with a cleanup. There is no need to retain it separately.
+  if (E->isUniquelyReferenced()) {
+    assert(!entry.second &&"Uniquely-referenced opaque value already consumed");
+    entry.second = true;
+    return RValue(SGF, SGF.emitManagedRValueWithCleanup(entry.first), E);
+  }
+
+  // Retain the value.
+  entry.second = true;
+  return RValue(SGF, SGF.emitManagedRetain(E, entry.first), E);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
