@@ -1722,7 +1722,19 @@ IRGenSILFunction::visitDestructiveSwitchUnionAddrInst(
 }
 
 void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
-  llvm_unreachable("unsupported IRgen of DynamicMethodBranchInst");
+  LoweredBB &hasMethodBB = getLoweredBB(i->getHasMethodBB());
+  LoweredBB &noMethodBB = getLoweredBB(i->getNoMethodBB());
+
+  // Emit the swift_objcRespondsToSelector() call.
+  llvm::Value *object = getLoweredExplosion(i->getOperand()).claimNext();
+  llvm::Constant *sel = IGM.getAddrOfObjCSelectorRef("respondsToSelector:");
+  llvm::Value *loadSel = Builder.CreateLoad(Address(sel, IGM.getPointerAlignment()));
+  llvm::CallInst *call = Builder.CreateCall2(IGM.getObjCRespondsToSelectorFn(),
+                                             object, loadSel);
+  call->setDoesNotThrow();
+
+  // Create the branch.
+  Builder.CreateCondBr(call, hasMethodBB.bb, noMethodBB.bb);
 }
 
 void IRGenSILFunction::visitBranchInst(swift::BranchInst *i) {
