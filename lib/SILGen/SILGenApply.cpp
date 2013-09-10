@@ -1679,13 +1679,17 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     SILValue appliedMethod = B.createPartialApply(e, memberArg, operand,
                                                   getLoweredType(methodTy));
 
-    // Package up the applied method in .Some().
-    OpaqueValueRAII opaqueValue(*this, e->getOpaqueFn(), appliedMethod);
+    SILValue optResult;
+
+    {
+      // Package up the applied method in .Some().
+      OpaqueValueRAII opaqueValue(*this, e->getOpaqueFn(), appliedMethod);
+
+      optResult = emitRValue(e->getCreateSome()).forwardAsSingleValue(*this, e);
+    }
 
     // Branch to the continuation block.
-    B.createBranch(e, contBB,
-                   emitRValue(e->getCreateSome()).forwardAsSingleValue(*this,
-                                                                       e));
+    B.createBranch(e, contBB, optResult);
   }
 
   // Create the no-member branch.
@@ -1704,7 +1708,6 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   B.emitBlock(contBB);
 
   // Package up the result.
-  ManagedValue result(optMethodArg, existential.getCleanup());
-  return RValue(*this, result, e);
+  return RValue(*this, emitManagedRValueWithCleanup(optMethodArg), e);
 }
 

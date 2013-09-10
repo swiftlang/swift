@@ -68,6 +68,22 @@ namespace {
   };
 } // end anonymous namespace
 
+SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
+  // Destroy the value.
+  SILValue value = Self.OpaqueValues[OpaqueValue];
+  auto &lowering = Self.getTypeLowering(value.getType().getSwiftRValueType());
+  if (lowering.isTrivial()) {
+    // Nothing to do.
+  } else if (lowering.isAddressOnly()) {
+    lowering.emitDestroyAddress(Self.B, OpaqueValue, value);
+  } else {
+    lowering.emitDestroyRValue(Self.B, OpaqueValue, value);
+  }
+
+  // Remove the opaque value.
+  Self.OpaqueValues.erase(OpaqueValue);
+}
+
 ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
                                                SILValue v) {
   auto &lowering = getTypeLowering(v.getType().getSwiftRValueType());
@@ -2430,7 +2446,7 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
   assert(SGF.OpaqueValues.count(E) && "Didn't bind OpaqueValueExpr");
   // FIXME: Can we optimize away this copy when there is only a single
   // utterance of the OpaqueValueExpr? That should be the common case.
-  return RValue(SGF, SGF.emitManagedRValueWithCleanup(SGF.OpaqueValues[E]), E);
+  return RValue(SGF, SGF.emitManagedRetain(E, SGF.OpaqueValues[E]), E);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

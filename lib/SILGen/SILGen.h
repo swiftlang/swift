@@ -364,9 +364,7 @@ public:
       Self.OpaqueValues[OpaqueValue] = value;
     }
 
-    ~OpaqueValueRAII() {
-      Self.OpaqueValues.erase(OpaqueValue);
-    }
+    ~OpaqueValueRAII();
   };
 
   /// True if 'return' without an operand or falling off the end of the current
