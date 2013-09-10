@@ -807,7 +807,7 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
     // FIXME: This assumes that 'innerSubs' is an identity mapping, which is
     // true for generic allocating constructors calling initializers but not in
     // general.
-    
+  
     PolymorphicFunctionType *innerPFT
       = innerMethodTy->castTo<PolymorphicFunctionType>();
     innerMethodTy = FunctionType::get(innerPFT->getInput(),
@@ -2079,6 +2079,36 @@ static SILType getFunctionTypeWithForwardedSubstitutions(SILGenFunction &gen,
   return ty;
 }
 
+static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
+                                       SILLocation loc,
+                                       SILDeclRef next,
+                                       ArrayRef<SILValue> curriedArgs,
+                                       UncurryDirection direction) {
+  // For the fully-uncurried reference to a class method, emit the dynamic
+  // dispatch.
+  // FIXME: We should always emit dynamic dispatch at uncurry level 1,
+  // to support overriding a curried method with a non-curried,
+  // function-returning method.
+  if (!next.isCurried
+      && next.kind == SILDeclRef::Kind::Func
+      && next.hasDecl() && isa<ClassDecl>(next.getDecl()->getDeclContext())) {
+    SILValue thisArg;
+    switch (direction) {
+    case UncurryDirection::LeftToRight:
+      thisArg = curriedArgs.front();
+      break;
+    case UncurryDirection::RightToLeft:
+      thisArg = curriedArgs.back();
+      break;
+    }
+    
+    return gen.B.createClassMethod(loc, thisArg, next,
+                                   gen.SGM.getConstantType(next));
+  }
+  
+  return gen.B.createFunctionRef(loc, gen.SGM.getFunction(next));
+}
+
 void SILGenFunction::emitCurryThunk(FuncExpr *fe,
                                     SILDeclRef from, SILDeclRef to) {
   SmallVector<SILValue, 8> curriedArgs;
@@ -2115,7 +2145,7 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
     break;
   }
   
-  SILValue toFn = B.createFunctionRef(fe, SGM.getFunction(to));
+  SILValue toFn = getNextUncurryLevelRef(*this, fe, to, curriedArgs, direction);
   SILType resultTy
     = SGM.getConstantType(from).getFunctionTypeInfo(SGM.M)->getResultType();
 

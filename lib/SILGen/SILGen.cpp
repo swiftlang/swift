@@ -328,8 +328,8 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   if (fd && fd->isGetterOrSetter())
     return;
   
-  // FIXME: Thunks for dynamically-dispatched instance methods.
-  if (fd && fd->isInstanceMember() && !isa<StructDecl>(fd->getDeclContext()))
+  // FIXME: Thunks for instance methods of generics.
+  if (fd && fd->isInstanceMember() && isa<ProtocolDecl>(fd->getDeclContext()))
     return;
   
   // FIXME: Curry thunks for generic methods don't work right yet, so skip
@@ -337,6 +337,10 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   if (fe->getType()->is<AnyFunctionType>()
       && fe->getType()->castTo<AnyFunctionType>()->getResult()
            ->is<PolymorphicFunctionType>())
+    return;
+  
+  // FIXME: Curry thunks for [objc] methods don't work right yet either.
+  if (constant.isObjC)
     return;
   
   // Generate the curry thunks.

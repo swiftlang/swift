@@ -338,18 +338,6 @@ public:
     OwnershipConventions ownership;
     bool transparent = isTransparent;
 
-    /// Get the SILDeclRef for a method at an uncurry level, and store its
-    /// ownership conventions into the 'ownership' local variable.
-    auto getMethodAndSetOwnership = [&]() -> SILDeclRef {
-      assert(level >= 1
-             && "currying 'self' of dynamic method dispatch not yet supported");
-      assert(level <= method.methodName.uncurryLevel
-             && "uncurrying past natural uncurry level of method");
-      SILDeclRef c = method.methodName.atUncurryLevel(level);
-      ownership = OwnershipConventions::get(gen, c, gen.SGM.getConstantType(c));
-      return c;
-    };
-
     switch (kind) {
     case Kind::IndirectValue:
       assert(level == 0 && "can't curry indirect function");
@@ -368,30 +356,48 @@ public:
       ownership = OwnershipConventions::get(gen, constant, ref.getType());
       break;
     }
-
     case Kind::ClassMethod: {
-      SILDeclRef constant = getMethodAndSetOwnership();
-      SILValue classMethod = gen.B.createClassMethod(Loc,
-                                           method.selfValue,
-                                           constant,
-                                           gen.SGM.getConstantType(constant),
-                                           /*volatile*/ constant.isObjC);
-      mv = ManagedValue(classMethod, ManagedValue::Unmanaged);
+      assert(level <= method.methodName.uncurryLevel
+             && "uncurrying past natural uncurry level of method");
+      SILDeclRef c = method.methodName.atUncurryLevel(level);
+      ownership = OwnershipConventions::get(gen, c, gen.SGM.getConstantType(c));
+      
+      // If the call is curried, emit a direct call to the curry thunk.
+      if (level < method.methodName.uncurryLevel) {
+        SILValue ref = gen.emitGlobalFunctionRef(Loc, c);
+        mv = ManagedValue(ref, ManagedValue::Unmanaged);
+        break;
+      }
+      
+      // Otherwise, do the dynamic dispatch inline.
+      SILValue methodVal = gen.B.createClassMethod(Loc,
+                                                   method.selfValue,
+                                                   c, gen.SGM.getConstantType(c),
+                                                   /*volatile*/ c.isObjC);
+      
+      mv = ManagedValue(methodVal, ManagedValue::Unmanaged);
       break;
     }
     case Kind::SuperMethod: {
-      SILDeclRef constant = getMethodAndSetOwnership();
-      SILValue superMethod = gen.B.createSuperMethod(Loc,
-                                           method.selfValue,
-                                           constant,
-                                           gen.SGM.getConstantType(constant),
-                                           /*volatile*/ constant.isObjC);
-      mv = ManagedValue(superMethod, ManagedValue::Unmanaged);
+      assert(level <= method.methodName.uncurryLevel
+             && "uncurrying past natural uncurry level of method");
+      assert(level >= 1
+             && "currying 'self' of super method dispatch not yet supported");
+
+      SILDeclRef c = method.methodName.atUncurryLevel(level);
+      ownership = OwnershipConventions::get(gen, c, gen.SGM.getConstantType(c));
+      
+      SILValue methodVal = gen.B.createSuperMethod(Loc,
+                                                   method.selfValue,
+                                                   c, gen.SGM.getConstantType(c),
+                                                   /*volatile*/ c.isObjC);
+      
+      mv = ManagedValue(methodVal, ManagedValue::Unmanaged);
       break;
     }
     case Kind::ArchetypeMethod: {
       assert(level >= 1
-             && "currying 'self' of dynamic method dispatch not yet supported");
+             && "currying 'self' of generic method dispatch not yet supported");
       assert(level <= method.methodName.uncurryLevel
              && "uncurrying past natural uncurry level of method");
 
@@ -411,7 +417,7 @@ public:
     }
     case Kind::ProtocolMethod: {
       assert(level >= 1
-             && "currying 'self' of dynamic method dispatch not yet supported");
+             && "currying 'self' of generic method dispatch not yet supported");
       assert(level <= method.methodName.uncurryLevel
              && "uncurrying past natural uncurry level of method");
       
