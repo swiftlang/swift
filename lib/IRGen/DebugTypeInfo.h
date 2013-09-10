@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_DEBUGTYPEINFO_H
 
 #include "swift/AST/Types.h"
+#include "swift/AST/Decl.h"
 
 namespace llvm {
   class Type;
@@ -35,20 +36,34 @@ namespace swift {
     /// decide on what type of debug info we want to emit for types.
     class DebugTypeInfo {
     public:
-      Type Ty;
+      /// Every Decl also has a type, but is otherwise preferred.
+      PointerUnion<ValueDecl*, TypeBase*> DeclOrType;
+      //DeclContext *DeclContext;
       uint64_t SizeInBytes;
       uint64_t AlignInBytes;
 
       DebugTypeInfo()
-        : Ty(),  SizeInBytes(0), AlignInBytes(0) {
+        : SizeInBytes(0), AlignInBytes(0) {
       }
       DebugTypeInfo(Type Ty, uint64_t Size, uint64_t Align);
       DebugTypeInfo(Type Ty, Size Size, Alignment Align);
       DebugTypeInfo(Type Ty, const TypeInfo &Info);
-      DebugTypeInfo(const ValueDecl &Decl, const TypeInfo &Info);
-      DebugTypeInfo(const ValueDecl &Decl, Size Size, Alignment Align);
-      inline TypeBase* getHash() const { return Ty.getPointer(); }
+      DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info);
+      DebugTypeInfo(ValueDecl *Decl, Size Size, Alignment Align);
+      inline TypeBase* getHash() const { return getType(); } //Ty.getPointer(); }
+      inline TypeBase* getType() const {
+        if (DeclOrType.isNull())
+          return nullptr;
 
+        auto Ty = DeclOrType.dyn_cast<TypeBase*>();
+        if (Ty) return Ty;
+
+        return DeclOrType.get<ValueDecl*>()->getType().getPointer();
+      }
+      inline ValueDecl* getDecl() const {
+        return DeclOrType.dyn_cast<ValueDecl*>();
+      }
+      inline bool isNull() const { return DeclOrType.isNull(); }
       bool operator==(DebugTypeInfo T) const;
       bool operator!=(DebugTypeInfo T) const;
 
@@ -64,17 +79,18 @@ namespace llvm {
       return swift::irgen::DebugTypeInfo();
     }
     static swift::irgen::DebugTypeInfo getTombstoneKey() {
-      return swift::irgen::DebugTypeInfo(llvm::DenseMapInfo<swift::Type>
+      return swift::irgen::DebugTypeInfo(llvm::DenseMapInfo<swift::TypeBase*>
                                          ::getTombstoneKey(), 0, 0);
     }
     static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
-      return DenseMapInfo<swift::CanType>::getHashValue(Val.Ty);
+      return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());
     }
     static bool isEqual(swift::irgen::DebugTypeInfo LHS,
                         swift::irgen::DebugTypeInfo RHS) {
       return LHS == RHS;
     }
   };
+
 }
 
 #endif

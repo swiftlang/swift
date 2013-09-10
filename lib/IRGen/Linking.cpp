@@ -100,6 +100,11 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     return;
 
   //   global ::= 't' type                       // value witness
+  case Kind::DebuggerDeclTypeMangling:
+    buffer << "_Tt";
+    mangler.mangleDeclType(getDecl(), ExplosionKind::Minimal, 0);
+    return;
+
   case Kind::DebuggerTypeMangling:
     buffer << "_Tt";
     SWIFT_FALLTHROUGH;

@@ -315,6 +315,7 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   SILFunction *f = preEmitFunction(constant, fe, fe);
   SILGenFunction(*this, *f).emitFunction(fe);
   postEmitFunction(constant, f);
+  f->setDeclContext(fe);
 
   // If the function is a standalone function and is curried, emit the thunks
   // for the intermediate curry levels.

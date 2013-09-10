@@ -602,6 +602,7 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
   case Kind::FieldOffset:
+  case Kind::DebuggerDeclTypeMangling:
     return isLocalLinkageDecl(getDecl());
   
   case Kind::DirectProtocolWitnessTable:
@@ -861,7 +862,7 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
 
   // Okay, we need to rebuild it.
   LinkInfo link = LinkInfo::get(*this, entity);
-  DebugTypeInfo DbgTy(var->getType(), type);
+  DebugTypeInfo DbgTy(var, type);
   auto addr = link.createVariable(*this, type.StorageType,
                                   DbgTy, var, var->getName().str());
   // Ask the type to give us an Address.
@@ -1023,7 +1024,7 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
 llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass) {
   assert(ObjCInterop && "getting address of ObjC class in no-interop mode");
   LinkEntity entity = LinkEntity::forObjCClass(theClass);
-  DebugTypeInfo DbgTy(*theClass, getPointerSize(), getPointerAlignment());
+  DebugTypeInfo DbgTy(theClass, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     TypeMetadataStructTy, TypeMetadataStructTy,
                                     TypeMetadataPtrTy, DbgTy);
@@ -1035,7 +1036,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass) {
 llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass) {
   assert(ObjCInterop && "getting address of ObjC metaclass in no-interop mode");
   LinkEntity entity = LinkEntity::forObjCMetaclass(theClass);
-  DebugTypeInfo DbgTy(*theClass, getPointerSize(), getPointerAlignment());
+  DebugTypeInfo DbgTy(theClass, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     ObjCClassStructTy, ObjCClassStructTy,
                                     ObjCClassPtrTy, DbgTy);
@@ -1047,7 +1048,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass) {
 llvm::Constant *IRGenModule::getAddrOfSwiftMetaclassStub(ClassDecl *theClass) {
   assert(ObjCInterop && "getting address of metaclass stub in no-interop mode");
   LinkEntity entity = LinkEntity::forSwiftMetaclassStub(theClass);
-  DebugTypeInfo DbgTy(*theClass, getPointerSize(), getPointerAlignment());
+  DebugTypeInfo DbgTy(theClass, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     ObjCClassStructTy, ObjCClassStructTy,
                                     ObjCClassPtrTy, DbgTy);
@@ -1135,7 +1136,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                                              isPattern);
 
   auto DbgTy = ObjCClass 
-    ? DebugTypeInfo(*ObjCClass, getPointerSize(), getPointerAlignment())
+    ? DebugTypeInfo(ObjCClass, getPointerSize(), getPointerAlignment())
     : DebugTypeInfo(MetaTypeType::get(concreteType, Context), 0, 0);
 
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,

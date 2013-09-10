@@ -130,7 +130,7 @@ public:
   /// \param CC The calling convention of the function.
   /// \param Ty The signature of the function.
   void emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
-                    AbstractCC CC, SILType Ty);
+                    AbstractCC CC, SILType Ty, DeclContext *DeclCtx = nullptr);
 
   /// Emit debug info for a given SIL function.
   void emitFunction(SILFunction *SILFn, llvm::Function *Fn);
@@ -188,12 +188,12 @@ private:
   llvm::DIFile getOrCreateFile(const char *Filename);
   StringRef getName(const FuncDecl& FD);
   StringRef getName(SILLocation L);
-  StringRef getMangledName(CanType CanTy);
-  StringRef getMangledName(StringRef MangledName);
+  template<typename TypeOrDecl> StringRef getMangledName(TypeOrDecl TD);
   llvm::DIArray createParameterTypes(SILModule &SILMod,
                                      SILType SILTy,
                                      llvm::FunctionType *IRTy,
-                                     llvm::DIDescriptor Scope);
+                                     llvm::DIDescriptor Scope,
+                                     DeclContext *DeclCtx);
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags);
   unsigned getArgNo(SILFunction *Fn, SILArgument *Arg);
@@ -214,7 +214,7 @@ private:
                                          unsigned Flags,
                                          llvm::DIType DerivedFrom,
                                          unsigned RuntimeLang);
-  llvm::DIDerivedType createMemberType(CanType CTy,
+  llvm::DIDerivedType createMemberType(DebugTypeInfo DTI,
                                        unsigned &OffsetInBits,
                                        llvm::DIDescriptor Scope,
                                        llvm::DIFile File,

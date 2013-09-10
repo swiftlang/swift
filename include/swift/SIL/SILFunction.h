@@ -67,6 +67,9 @@ private:
   /// The function only gets a location after it's been emitted.
   Optional<SILLocation> Location;
 
+  /// The declcontext of this function.
+  DeclContext *DeclCtx;
+
   /// The source location and scope of the function.
   SILDebugScope *DebugScope;
 
@@ -108,6 +111,10 @@ public:
   /// Get this function's linkage attribute.
   SILLinkage getLinkage() const { return ModuleAndLinkage.getInt(); }
   void setLinkage(SILLinkage L) { ModuleAndLinkage.setInt(L); }
+
+  /// Get the Decl`Context of this function. (Debug info only).
+  DeclContext *getDeclContext() const { return DeclCtx; }
+  void setDeclContext(DeclContext *DC) { DeclCtx = DC; }
 
   /// Initialize the source location of the function.
   void setLocation(SILLocation L) { Location = L; }

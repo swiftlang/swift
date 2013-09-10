@@ -23,15 +23,16 @@ using namespace swift;
 using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, uint64_t Size, uint64_t Align)
-  : Ty(Ty), SizeInBytes(Size), AlignInBytes(Align) {
+  : DeclOrType(Ty.getPointer()), SizeInBytes(Size), AlignInBytes(Align) {
 }
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, Size Size, Alignment Align)
-  : Ty(Ty), SizeInBytes(Size.getValue()), AlignInBytes(Align.getValue()) {
+  : DeclOrType(Ty.getPointer()),
+    SizeInBytes(Size.getValue()), AlignInBytes(Align.getValue()) {
 }
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
-  : Ty(Ty) {
+  : DeclOrType(Ty.getPointer()) {
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     SizeInBytes = FixTy.getFixedSize().getValue();
@@ -39,8 +40,8 @@ DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
   }
 }
 
-DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, const TypeInfo &Info)
-  : Ty(Decl.getType()) {
+DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
+  : DeclOrType(Decl) {
   // Same as above.
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
@@ -49,8 +50,8 @@ DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, const TypeInfo &Info)
   }
 }
 
-DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, Size Size, Alignment Align)
-  : Ty(Decl.getType()),
+DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size Size, Alignment Align)
+  : DeclOrType(Decl),
     SizeInBytes(Size.getValue()),
     AlignInBytes(Align.getValue()) {
 }
@@ -74,7 +75,7 @@ static bool typesEqual(Type A, Type B) {
 }
 
 bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
-  return typesEqual(Ty, T.Ty)
+  return typesEqual(getType(), T.getType())
     && SizeInBytes == T.SizeInBytes
     && AlignInBytes == T.AlignInBytes;
 }

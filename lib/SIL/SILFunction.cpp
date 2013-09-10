@@ -22,6 +22,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     Name(Name),
     LoweredType(LoweredType),
     Location(Loc),
+    DeclCtx(nullptr),
     DebugScope(nullptr),
     Transparent(isTrans) {
   Module.functions.push_back(this);

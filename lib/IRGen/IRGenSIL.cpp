@@ -1981,7 +1981,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   if (IGM.DebugInfo && Decl)
     IGM.DebugInfo->emitStackVariableDeclaration(Builder,
                                                 addr.getAddressPointer(),
-                                                DebugTypeInfo(*Decl, type),
+                                                DebugTypeInfo(Decl, type),
                                                 Decl->getName().str(),
                                                 i);
 
