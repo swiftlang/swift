@@ -189,6 +189,19 @@ namespace {
         return Impl.getNamedSwiftType(Impl.getSwiftModule(), "COpaquePointer");
       }
 
+      // Special case for NSZone*, which has its own Swift wrapper.
+      if (auto pointee = type->getPointeeType()->getAs<clang::TypedefType>()) {
+        const clang::RecordType *pointeeStruct = pointee->getAsStructureType();
+        if (pointeeStruct &&
+            !pointeeStruct->getDecl()->isCompleteDefinition() &&
+            pointee->getDecl()->getName() == "NSZone") {
+          Module *Foundation = Impl.getNamedModule("Foundation");
+          Type wrapperTy = Impl.getNamedSwiftType(Foundation, "NSZone");
+          if (wrapperTy)
+            return wrapperTy;
+        }
+      }
+
       // All other C pointers to concrete types map to UnsafePointer<T>.
       auto pointeeType = Impl.importType(type->getPointeeType(),
                                          ImportTypeKind::Normal);

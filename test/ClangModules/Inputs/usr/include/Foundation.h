@@ -28,3 +28,7 @@ NSString *NSStringToNSString(NSString *str);
 @end
 
 BOOL BOOLtoBOOL(BOOL b);
+
+typedef struct _NSZone NSZone;
+
+void *allocate(NSZone *zone);
