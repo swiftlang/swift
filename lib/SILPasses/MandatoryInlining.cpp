@@ -35,11 +35,12 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                          diag, std::forward<U>(args)...);
 }
 
-/// \brief Fixup reference counts after inlining a thick function call. Note
-/// that this function makes assumptions about the release/retain convention of
-/// thick function applications: namely, that an apply of a thick function
-/// consumes the callee and that the function implementing the closure releases
-/// its context arguments.
+/// \brief Fixup reference counts after inlining a function call (which is a
+/// no-op unless the function is a thick function). Note that this function
+/// makes assumptions about the release/retain convention of thick function
+/// applications: namely, that an apply of a thick function consumes the callee
+/// and that the function implementing the closure consumes its capture
+/// arguments.
 static void
 fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator &I, SILLocation Loc,
                      SILValue CalleeValue, bool IsThick,
