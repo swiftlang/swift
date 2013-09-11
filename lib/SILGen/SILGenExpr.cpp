@@ -237,6 +237,30 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
                                       SGM.getConstantType(constant));
   }
   
+  // If the constant is a curry thunk we haven't emitted yet, emit it.
+  if (constant.isCurried && !SGM.hasFunction(constant)) {
+    // Non-functions can't be referenced uncurried.
+    FuncDecl *fd = cast<FuncDecl>(constant.getDecl());
+    
+    // Getters and setters can't be referenced uncurried.
+    assert(!fd->isGetterOrSetter());
+    
+    // FIXME: Thunks for instance methods of generics.
+    assert(!(fd->isInstanceMember() && isa<ProtocolDecl>(fd->getDeclContext()))
+           && "currying generic method not yet supported");
+
+    // FIXME: Curry thunks for generic methods don't work right yet, so skip
+    // emitting thunks for them
+    assert(!(fd->getFuncExpr()->getType()->is<AnyFunctionType>() &&
+             fd->getFuncExpr()->getType()->castTo<AnyFunctionType>()->getResult()
+               ->is<PolymorphicFunctionType>()));
+    
+    SGM.emitCurryThunk(constant,
+                       SILDeclRef(fd, SILDeclRef::Kind::Func,
+                       constant.uncurryLevel + 1),
+                       fd);
+  }
+  
   return B.createFunctionRef(loc, SGM.getFunction(constant));
 }
 
@@ -2105,7 +2129,7 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
                                    gen.SGM.getConstantType(next));
   }
   
-  return gen.B.createFunctionRef(loc, gen.SGM.getFunction(next));
+  return gen.emitGlobalFunctionRef(loc, next);
 }
 
 void SILGenFunction::emitCurryThunk(FuncDecl *fd,

@@ -221,6 +221,9 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
     dc = dc->getParent();
   }
   
+  if (constant.isCurried)
+    return SILLinkage::Thunk;
+  
   if(isa<ClangModule>(dc) &&
      (isa<ConstructorDecl>(d) ||
       isa<SubscriptDecl>(d) ||
@@ -322,40 +325,6 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   SILFunction *f = preEmitFunction(constant, fe, fe);
   SILGenFunction(*this, *f).emitFunction(fe);
   postEmitFunction(constant, f);
-
-  // If the function is a standalone function and is curried, emit the thunks
-  // for the intermediate curry levels.
-  // FIXME: It might make more sense to do this lazily and emit curry thunks
-  // with internal linkage.
-  
-  // Getters and setters can't be referenced uncurried, so skip thunking them.
-  assert(fd == dyn_cast_or_null<FuncDecl>(decl.dyn_cast<ValueDecl*>()));
-  if (fd && fd->isGetterOrSetter())
-    return;
-  
-  // FIXME: Thunks for instance methods of generics.
-  if (fd && fd->isInstanceMember() && isa<ProtocolDecl>(fd->getDeclContext()))
-    return;
-  
-  // FIXME: Curry thunks for generic methods don't work right yet, so skip
-  // emitting thunks for them
-  if (fd->getFuncExpr()->getType()->is<AnyFunctionType>() &&
-      fd->getFuncExpr()->getType()->castTo<AnyFunctionType>()->getResult()
-          ->is<PolymorphicFunctionType>())
-    return;
-  
-  // FIXME: Curry thunks for [objc] methods don't work right yet either.
-  if (constant.isObjC)
-    return;
-  
-  // Generate the curry thunks.
-  unsigned level = constant.uncurryLevel;
-  while (level-- > 0) {
-    SILDeclRef curryConstant = constant.atUncurryLevel(level);
-    
-    emitCurryThunk(curryConstant, constant, fd);
-    constant = curryConstant;
-  }
 }
 
 void SILGenModule::emitCurryThunk(SILDeclRef entryPoint,
