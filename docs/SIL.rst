@@ -797,18 +797,18 @@ Applying an ``[objc_block]`` value does not consume the block.
 Method Currying
 ```````````````
 
-The "self" argument of an Objective-C method is uncurried to the *first*
-argument of the uncurried type, opposite to the native Swift convention::
+In SIL, the "self" argument of an Objective-C method is uncurried to the last
+argument of the uncurried type, just like a native Swift method.
 
   class [objc] NSString {
     func stringByPaddingToLength(Int) withString(NSString) startingAtIndex(Int)
   }
 
   sil @NSString_stringByPaddingToLength_withString_startingAtIndex \
-    : $(NSString, (Int, NSString, Int))
+    : $((Int, NSString, Int), NSString)
 
-The ``_cmd`` selector argument to Objective-C methods is abstracted away in
-SIL.
+That ``self`` is passed as the first argument at the IR level is abstracted
+away in SIL, as is the existence of the ``_cmd`` selector argument.
 
 Instruction Set
 ---------------
