@@ -2108,46 +2108,42 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
   return gen.B.createFunctionRef(loc, gen.SGM.getFunction(next));
 }
 
-void SILGenFunction::emitCurryThunk(FuncExpr *fe,
+void SILGenFunction::emitCurryThunk(FuncDecl *fd,
                                     SILDeclRef from, SILDeclRef to) {
   SmallVector<SILValue, 8> curriedArgs;
   
   unsigned paramCount = from.uncurryLevel + 1;
   
-  /// Forward implicit closure context arguments.
-  bool hasCaptures = fe->hasLocalCaptures();
+  // Forward implicit closure context arguments.
+  bool hasCaptures = fd->getFuncExpr()->hasLocalCaptures();
   if (hasCaptures)
     --paramCount;
-  
-  auto forwardCaptures = [&]{
-    if (hasCaptures)
-      for (auto capture : fe->getLocalCaptures())
-        forwardCaptureArgs(*this, curriedArgs, capture);
-  };
 
   // Forward the curried formal arguments.
-  auto forwardedPatterns =
-      fe->getDecl()->getBodyParamPatterns().slice(0, paramCount);
+  auto forwardedPatterns = fd->getBodyParamPatterns().slice(0, paramCount);
   ArgumentForwardVisitor forwarder(*this, curriedArgs);
   for (auto *paramPattern : reversed(forwardedPatterns))
     forwarder.visit(paramPattern);
-  forwardCaptures();
-  
-  SILValue toFn = getNextUncurryLevelRef(*this, fe, to, curriedArgs);
+
+  // Forward captures.
+  if (hasCaptures)
+    for (auto capture : fd->getFuncExpr()->getLocalCaptures())
+      forwardCaptureArgs(*this, curriedArgs, capture);
+
+  SILValue toFn = getNextUncurryLevelRef(*this, fd, to, curriedArgs);
   SILType resultTy
     = SGM.getConstantType(from).getFunctionTypeInfo(SGM.M)->getResultType();
 
   // Forward archetypes and specialize if the function is generic.
   if (auto pft = toFn.getType().getAs<PolymorphicFunctionType>()) {
-    auto subs
-      = buildForwardingSubstitutions(pft->getAllArchetypes());
-    toFn = B.createSpecialize(fe, toFn, subs,
+    auto subs = buildForwardingSubstitutions(pft->getAllArchetypes());
+    toFn = B.createSpecialize(fd, toFn, subs,
               getFunctionTypeWithForwardedSubstitutions(*this, toFn.getType()));
   }
   
   // Partially apply the next uncurry level and return the result closure.
-  auto toClosure = B.createPartialApply(fe, toFn, curriedArgs, resultTy);
-  B.createReturn(fe, toClosure);
+  auto toClosure = B.createPartialApply(fd, toFn, curriedArgs, resultTy);
+  B.createReturn(fd, toClosure);
 }
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {

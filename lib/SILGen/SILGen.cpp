@@ -303,16 +303,17 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 }
 
 void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
+  FuncDecl *fd = fe->getDecl();
   // Emit any default argument generators.
   {
-    auto patterns = fe->getDecl()->getArgParamPatterns();
-    if (fe->getDecl() && fe->getDecl()->getDeclContext()->isTypeContext())
+    auto patterns = fd->getArgParamPatterns();
+    if (fd->getDeclContext()->isTypeContext())
       patterns = patterns.slice(1);
     emitDefaultArgGenerators(decl, patterns);
   }
 
   // Ignore prototypes.
-  if (!fe->getDecl()->getBody())
+  if (!fd->getBody())
     return;
 
   PrettyStackTraceExpr stackTrace(M.getASTContext(), "emitting SIL for", fe);
@@ -328,8 +329,7 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   // with internal linkage.
   
   // Getters and setters can't be referenced uncurried, so skip thunking them.
-  ValueDecl *vd = decl.dyn_cast<ValueDecl*>();
-  FuncDecl *fd = dyn_cast_or_null<FuncDecl>(vd);
+  assert(fd == dyn_cast_or_null<FuncDecl>(decl.dyn_cast<ValueDecl*>()));
   if (fd && fd->isGetterOrSetter())
     return;
   
@@ -339,9 +339,9 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   
   // FIXME: Curry thunks for generic methods don't work right yet, so skip
   // emitting thunks for them
-  if (fe->getType()->is<AnyFunctionType>()
-      && fe->getType()->castTo<AnyFunctionType>()->getResult()
-           ->is<PolymorphicFunctionType>())
+  if (fd->getFuncExpr()->getType()->is<AnyFunctionType>() &&
+      fd->getFuncExpr()->getType()->castTo<AnyFunctionType>()->getResult()
+          ->is<PolymorphicFunctionType>())
     return;
   
   // FIXME: Curry thunks for [objc] methods don't work right yet either.
@@ -353,17 +353,17 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   while (level-- > 0) {
     SILDeclRef curryConstant = constant.atUncurryLevel(level);
     
-    emitCurryThunk(curryConstant, constant, fe);
+    emitCurryThunk(curryConstant, constant, fd);
     constant = curryConstant;
   }
 }
 
 void SILGenModule::emitCurryThunk(SILDeclRef entryPoint,
                                   SILDeclRef nextEntryPoint,
-                                  FuncExpr *fe) {
-  SILFunction *f = preEmitFunction(entryPoint, fe, fe);
+                                  FuncDecl *fd) {
+  SILFunction *f = preEmitFunction(entryPoint, fd, fd);
   SILGenFunction(*this, *f)
-    .emitCurryThunk(fe, entryPoint, nextEntryPoint);
+    .emitCurryThunk(fd, entryPoint, nextEntryPoint);
   postEmitFunction(entryPoint, f);
 }
 

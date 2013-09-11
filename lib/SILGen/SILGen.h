@@ -145,7 +145,7 @@ public:
   /// function.
   void emitCurryThunk(SILDeclRef entryPoint,
                       SILDeclRef nextEntryPoint,
-                      FuncExpr *fe);
+                      FuncDecl *fd);
   
   template<typename T>
   SILFunction *preEmitFunction(SILDeclRef constant, T *astNode, SILLocation L);
@@ -472,7 +472,7 @@ public:
   void emitClassConstructorInitializer(ConstructorDecl *ctor);
   /// Generates code for a curry thunk from one uncurry level
   /// of a function to another.
-  void emitCurryThunk(FuncExpr *fe, SILDeclRef fromLevel, SILDeclRef toLevel);
+  void emitCurryThunk(FuncDecl *fd, SILDeclRef fromLevel, SILDeclRef toLevel);
 
   // Generate a nullary function that returns the given value.
   void emitGeneratorFunction(SILDeclRef function, Expr *value);
