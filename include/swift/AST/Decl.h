@@ -1940,9 +1940,13 @@ protected:
   /// this pointer is computed already.
   mutable llvm::PointerIntPair<VarDecl *, 1, bool> ImplicitSelfDeclAndIsCached;
 
+  GenericParamList *GenericParams;
+
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, Identifier Name,
-                       VarDecl *ImplicitSelfDecl)
-      : ValueDecl(Kind, Parent, Name), Body(nullptr) {
+                       VarDecl *ImplicitSelfDecl,
+                       GenericParamList *GenericParams)
+      : ValueDecl(Kind, Parent, Name), Body(nullptr),
+        GenericParams(GenericParams) {
     if (ImplicitSelfDecl)
       ImplicitSelfDeclAndIsCached.setPointerAndInt(ImplicitSelfDecl, true);
     else
@@ -2011,6 +2015,14 @@ public:
     return getImplicitSelfDeclSlow();
   }
 
+  /// \brief Retrieve the set of parameters to a generic function, or null if
+  /// this function is not generic.
+  GenericParamList *getGenericParams() const { return GenericParams; }
+
+  /// \brief Determine whether this is a generic function, which can only be
+  /// used when each of the archetypes is bound to a particular concrete type.
+  bool isGeneric() const { return GenericParams != nullptr; }
+
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractFunctionDecl &&
            D->getKind() <= DeclKind::Last_AbstractFunctionDecl;
@@ -2027,7 +2039,6 @@ class FuncDecl : public AbstractFunctionDecl {
   SourceLoc FuncLoc;    // Location of the 'func' token.
   SourceLoc NameLoc;
 
-  GenericParamList *GenericParams;
   FuncExpr *TheFuncExprBody;
   llvm::PointerIntPair<Decl *, 1, bool> GetOrSetDecl;
   FuncDecl *OverriddenDecl;
@@ -2037,9 +2048,9 @@ class FuncDecl : public AbstractFunctionDecl {
            SourceLoc NameLoc, unsigned NumParamPatterns,
            GenericParamList *GenericParams, Type Ty,
            FuncExpr *TheFuncExprBody, DeclContext *DC)
-    : AbstractFunctionDecl(DeclKind::Func, DC, Name, nullptr),
+    : AbstractFunctionDecl(DeclKind::Func, DC, Name, nullptr, GenericParams),
       StaticLoc(StaticLoc),
-      FuncLoc(FuncLoc), NameLoc(NameLoc), GenericParams(GenericParams),
+      FuncLoc(FuncLoc), NameLoc(NameLoc),
       TheFuncExprBody(TheFuncExprBody), OverriddenDecl(nullptr),
       Operator(nullptr) {
     FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
@@ -2192,15 +2203,6 @@ public:
   }
   SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const;
-
-  /// getGenericParams - Retrieve the set of parameters to a generic function,
-  /// or null if this function is not generic.
-  GenericParamList *getGenericParams() const { return GenericParams; }
-
-  /// isGeneric - Determine whether this is a generic function, which can only
-  /// be used when each of the archetypes is bound to a particular concrete
-  /// type.
-  bool isGeneric() const { return GenericParams != nullptr; }
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation, in other words, the name of the function is an operator,
@@ -2451,7 +2453,6 @@ public:
 class ConstructorDecl : public AbstractFunctionDecl, public DeclContext {
   SourceLoc ConstructorLoc;
   Pattern *Arguments;
-  GenericParamList *GenericParams;
   
   /// The type of the initializing constructor.
   Type InitializerType = Type();
@@ -2465,10 +2466,9 @@ public:
                   Pattern *Arguments, VarDecl *ImplicitSelfDecl,
                   GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Constructor, Parent, NameHack,
-                           ImplicitSelfDecl),
+                           ImplicitSelfDecl, GenericParams),
       DeclContext(DeclContextKind::ConstructorDecl, Parent),
-      ConstructorLoc(ConstructorLoc), Arguments(Arguments),
-      GenericParams(GenericParams) {
+      ConstructorLoc(ConstructorLoc), Arguments(Arguments) {
     assert(ImplicitSelfDecl && "constructors should have a non-null self");
   }
 
@@ -2491,9 +2491,6 @@ public:
 
   /// \brief Get the type of the constructed object.
   Type getResultType() const;
-
-  GenericParamList *getGenericParams() const { return GenericParams; }
-  bool isGeneric() const { return GenericParams != nullptr; }
 
   /// \brief Retrieve the expression that should be evaluated to allocate
   /// 'self', or null if 'self' should be allocated via the normal path.
@@ -2541,7 +2538,7 @@ public:
   DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
                   VarDecl *ImplicitSelfDecl, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Destructor, Parent, NameHack,
-                           ImplicitSelfDecl),
+                           ImplicitSelfDecl, nullptr),
       DeclContext(DeclContextKind::DestructorDecl, Parent),
       DestructorLoc(DestructorLoc) {
     assert(ImplicitSelfDecl && "destructors should have a non-null self");

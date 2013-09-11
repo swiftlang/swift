@@ -734,6 +734,13 @@ namespace {
       }
     }
 
+    void verifyParsed(DestructorDecl *DD) {
+      if (DD->isGeneric()) {
+        Out << "DestructorDecl can not be generic";
+        abort();
+      }
+    }
+
     /// Look through a possible l-value type, returning true if it was
     /// an l-value.
     bool lookThroughLValue(Type &type, LValueType::Qual &qs) {
