@@ -186,8 +186,8 @@ private:
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);
   StringRef getCurrentDirname();
   llvm::DIFile getOrCreateFile(const char *Filename);
-llvm::DIType getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI,
-                                      llvm::DIDescriptor Scope);
+  llvm::DIType getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI,
+                                        llvm::DIDescriptor Scope);
   StringRef getName(const FuncDecl& FD);
   StringRef getName(SILLocation L);
   StringRef getMangledName(DebugTypeInfo DTI);

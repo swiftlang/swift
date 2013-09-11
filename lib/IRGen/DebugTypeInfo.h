@@ -55,8 +55,8 @@ namespace swift {
         if (DeclOrType.isNull())
           return nullptr;
 
-        auto Ty = DeclOrType.dyn_cast<TypeBase*>();
-        if (Ty) return Ty;
+        if (auto Ty = DeclOrType.dyn_cast<TypeBase*>())
+          return Ty;
 
         return DeclOrType.get<ValueDecl*>()->getType().getPointer();
       }

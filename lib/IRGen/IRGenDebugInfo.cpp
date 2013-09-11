@@ -881,7 +881,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   unsigned Encoding = 0;
   unsigned Flags = 0;
 
-  TypeBase* BaseTy = DbgTy.getHash();
+  TypeBase* BaseTy = DbgTy.getType();
   if (!BaseTy) {
     DEBUG(llvm::dbgs() << "Type without TypeBase: "; DbgTy.getType()->dump();
           llvm::dbgs() << "\n");
@@ -1010,8 +1010,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     if (auto Decl = ClassTy->getDecl()) {
       Location L = getStartLoc(SM, Decl);
       Name = getMangledName(DbgTy);
-      //Name = getMangledName(DebugTypeInfo(Decl, (Size)DbgTy.SizeInBytes,
-      //                                    (Alignment)DbgTy.AlignInBytes));
       auto Attrs = Decl->getAttrs();
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
       return createStructType(DbgTy, Decl, Name, Scope,
