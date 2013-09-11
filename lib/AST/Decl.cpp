@@ -734,27 +734,8 @@ bool FuncDecl::hasLocalCaptures() const {
 /// getExtensionType - If this is a method in a type extension for some type,
 /// return that type, otherwise return Type().
 Type FuncDecl::getExtensionType() const {
-  DeclContext *DC = getDeclContext();
-  switch (DC->getContextKind()) {
-  case DeclContextKind::Module:
-  case DeclContextKind::CapturingExpr:
-  case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::ConstructorDecl:
-  case DeclContextKind::DestructorDecl:
-    return Type();
-
-  case DeclContextKind::NominalTypeDecl:
-    return cast<NominalTypeDecl>(DC)->getDeclaredType();
-  case DeclContextKind::ExtensionDecl: {
-    auto ext = cast<ExtensionDecl>(DC);
-    if (ext->isInvalid())
-      return ErrorType::get(getASTContext());
-    return ext->getExtendedType();
-  }
-  }
-  llvm_unreachable("bad context kind");
+  return getDeclContext()->getDeclaredTypeInContext();
 }
-
 
 Type FuncDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
   if (OuterGenericParams)
