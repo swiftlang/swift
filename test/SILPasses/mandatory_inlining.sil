@@ -178,14 +178,14 @@ bb0(%0 : $*SomeProtocol):
 
 sil internal @top_level_code : $() -> () {
 bb0:
-  %0 = tuple ()                                   // user: %1
+  %0 = tuple ()
   return %0 : $()
 }
 
-sil @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
-sil @_TSsoi1pFT3lhsSf3rhsSf_Sf : $[thin] (lhs : Float32, rhs : Float32) -> Float32
-sil @_TSf31_convertFromBuiltinFloatLiteralfMSfFT5valueBf64__Sf : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
-sil @_TSsoi1sFT3lhsSf3rhsSf_Sf : $[thin] (lhs : Float32, rhs : Float32) -> Float32
+sil @get_logic_value : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+sil @add_floats : $[thin] (lhs : Float32, rhs : Float32) -> Float32
+sil @convertFromBuiltinFloatLiteral : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
+sil @sub_floats : $[thin] (lhs : Float32, rhs : Float32) -> Float32
 
 sil @foo : $[thin] (x : Float32, y : Float32) -> Bool
 sil @bar : $[thin] (x : Float32) -> Bool
@@ -197,7 +197,7 @@ bb0(%0 : $Float32, %1 : $Float32):
   %3 = alloc_box $Float32
   store %0 to %2#1 : $*Float32
   store %1 to %3#1 : $*Float32
-  %6 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  %6 = function_ref @get_logic_value : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
   %7 = function_ref @foo : $[thin] (x : Float32, y : Float32) -> Bool
   %8 = load %2#1 : $*Float32
   %9 = load %3#1 : $*Float32
@@ -216,7 +216,7 @@ bb2:
   br bb3
 
 bb3:
-  %19 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  %19 = function_ref @get_logic_value : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
   %20 = function_ref @bar : $[thin] (x : Float32) -> Bool
   %21 = load %3#1 : $*Float32
   %22 = apply %20(%21) : $[thin] (x : Float32) -> Bool
@@ -227,9 +227,9 @@ bb3:
   condbranch %25, bb4, bb5
 
 bb4:
-  %28 = function_ref @_TSsoi1pFT3lhsSf3rhsSf_Sf : $[thin] (lhs : Float32, rhs : Float32) -> Float32
+  %28 = function_ref @add_floats : $[thin] (lhs : Float32, rhs : Float32) -> Float32
   %29 = load %3#1 : $*Float32
-  %30 = function_ref @_TSf31_convertFromBuiltinFloatLiteralfMSfFT5valueBf64__Sf : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
+  %30 = function_ref @convertFromBuiltinFloatLiteral : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
   %31 = metatype $Float32.metatype
   %32 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
   %33 = apply %30(%32, %31) : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
@@ -253,15 +253,15 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
 // CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Float32):
   // CHECK: [[VAL1:%.*]] = alloc_box $Float32
   // CHECK: store [[VAL0]] to [[VAL1]]#1
-  // CHECK: [[VAL3:%.*]] = function_ref @_TSsoi1sFT3lhsSf3rhsSf_Sf
-  // CHECK: [[VAL4:%.*]] = function_ref @_TSsoi1pFT3lhsSf3rhsSf_Sf
+  // CHECK: [[VAL3:%.*]] = function_ref @sub_floats
+  // CHECK: [[VAL4:%.*]] = function_ref @add_floats
   // CHECK: [[VAL5:%.*]] = load [[VAL1]]#1
-  // CHECK: [[VAL6:%.*]] = function_ref @_TSf31_convertFromBuiltinFloatLiteralfMSfFT5valueBf64__Sf
+  // CHECK: [[VAL6:%.*]] = function_ref @convertFromBuiltinFloatLiteral
   // CHECK: [[VAL7:%.*]] = metatype $Float32.metatype
   // CHECK: [[VAL8:%.*]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
   // CHECK: [[VAL9:%.*]] = apply [[VAL6]]([[VAL8]], [[VAL7]])
   // CHECK: [[VAL10:%.*]] = apply [[VAL4]]([[VAL5]], [[VAL9]])
-  // CHECK: [[VAL11:%.*]] = function_ref @_TSf31_convertFromBuiltinFloatLiteralfMSfFT5valueBf64__Sf
+  // CHECK: [[VAL11:%.*]] = function_ref @convertFromBuiltinFloatLiteral
   // CHECK: [[VAL12:%.*]] = metatype $Float32.metatype
   // CHECK: [[VAL13:%.*]] = float_literal $Builtin.FPIEEE64, 0x4000000000000000
   // CHECK: [[VAL14:%.*]] = apply [[VAL11]]([[VAL13]], [[VAL12]])
@@ -269,7 +269,7 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
   // CHECK: [[VAL16:%.*]] = alloc_box $Float32
   // CHECK: store [[VAL10]] to [[VAL15]]#1
   // CHECK: store [[VAL14]] to [[VAL16]]#1
-  // CHECK: [[VAL19:%.*]] = function_ref @_TSb13getLogicValuefRSbFT_Bi1_
+  // CHECK: [[VAL19:%.*]] = function_ref @get_logic_value
   // CHECK: [[VAL20:%.*]] = function_ref @foo
   // CHECK: [[VAL21:%.*]] = load [[VAL15]]#1
   // CHECK: [[VAL22:%.*]] = load [[VAL16]]#1
@@ -288,7 +288,7 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
   // CHECK: br [[BB3:.*]]
 
 // CHECK: [[BB3]]:
-  // CHECK: [[VAL32:%.*]] = function_ref @_TSb13getLogicValuefRSbFT_Bi1_
+  // CHECK: [[VAL32:%.*]] = function_ref @get_logic_value
   // CHECK: [[VAL33:%.*]] = function_ref @bar
   // CHECK: [[VAL34:%.*]] = load [[VAL16]]#1
   // CHECK: [[VAL35:%.*]] = apply [[VAL33]]([[VAL34]])
@@ -299,9 +299,9 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
   // CHECK: condbranch [[VAL38]], [[BB4:.*]], [[BB5:.*]]
 
 // CHECK: [[BB4]]:
-  // CHECK: [[VAL41:%.*]] = function_ref @_TSsoi1pFT3lhsSf3rhsSf_Sf
+  // CHECK: [[VAL41:%.*]] = function_ref @add_floats
   // CHECK: [[VAL42:%.*]] = load [[VAL16]]#1
-  // CHECK: [[VAL43:%.*]] = function_ref @_TSf31_convertFromBuiltinFloatLiteralfMSfFT5valueBf64__Sf
+  // CHECK: [[VAL43:%.*]] = function_ref @convertFromBuiltinFloatLiteral
   // CHECK: [[VAL44:%.*]] = metatype $Float32.metatype
   // CHECK: [[VAL45:%.*]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
   // CHECK: [[VAL46:%.*]] = apply [[VAL43]]([[VAL45]], [[VAL44]])
@@ -319,7 +319,7 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
   // CHECK: br [[BB7:.*]]([[VAL52]]
 
 // CHECK: [[BB7]]([[VAL56:%.*]] : $Float32):
-  // CHECK: [[VAL57:%.*]] = function_ref @_TSf31_convertFromBuiltinFloatLiteralfMSfFT5valueBf64__Sf
+  // CHECK: [[VAL57:%.*]] = function_ref @convertFromBuiltinFloatLiteral
   // CHECK: [[VAL58:%.*]] = metatype $Float32.metatype
   // CHECK: [[VAL59:%.*]] = float_literal $Builtin.FPIEEE64, 0x4008000000000000
   // CHECK: [[VAL60:%.*]] = apply [[VAL57]]([[VAL59]], [[VAL58]])
@@ -330,21 +330,21 @@ sil @inline_test_control_flow : $[thin] (x : Float32) -> Float32 {
 bb0(%0 : $Float32):
   %1 = alloc_box $Float32
   store %0 to %1#1 : $*Float32
-  %3 = function_ref @_TSsoi1sFT3lhsSf3rhsSf_Sf : $[thin] (lhs : Float32, rhs : Float32) -> Float32
+  %3 = function_ref @sub_floats : $[thin] (lhs : Float32, rhs : Float32) -> Float32
   %4 = function_ref @test_control_flow : $[thin] (x : Float32, y : Float32) -> Float32
-  %5 = function_ref @_TSsoi1pFT3lhsSf3rhsSf_Sf : $[thin] (lhs : Float32, rhs : Float32) -> Float32
+  %5 = function_ref @add_floats : $[thin] (lhs : Float32, rhs : Float32) -> Float32
   %6 = load %1#1 : $*Float32
-  %7 = function_ref @_TSf31_convertFromBuiltinFloatLiteralfMSfFT5valueBf64__Sf : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
+  %7 = function_ref @convertFromBuiltinFloatLiteral : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
   %8 = metatype $Float32.metatype
   %9 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
   %10 = apply %7(%9, %8) : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
   %11 = apply %5(%6, %10) : $[thin] (lhs : Float32, rhs : Float32) -> Float32
-  %12 = function_ref @_TSf31_convertFromBuiltinFloatLiteralfMSfFT5valueBf64__Sf : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
+  %12 = function_ref @convertFromBuiltinFloatLiteral : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
   %13 = metatype $Float32.metatype
   %14 = float_literal $Builtin.FPIEEE64, 0x4000000000000000
   %15 = apply %12(%14, %13) : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
   %16 = apply [transparent] %4(%11, %15) : $[thin] (x : Float32, y : Float32) -> Float32
-  %17 = function_ref @_TSf31_convertFromBuiltinFloatLiteralfMSfFT5valueBf64__Sf : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
+  %17 = function_ref @convertFromBuiltinFloatLiteral : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
   %18 = metatype $Float32.metatype
   %19 = float_literal $Builtin.FPIEEE64, 0x4008000000000000
   %20 = apply %17(%19, %18) : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
@@ -360,8 +360,8 @@ sil @test_recursive_foo : $[thin] (x : Float32) -> Float32 {
   // CHECK: return
 
 bb0(%0 : $Float32):
-  %3 = function_ref @test_recursive_bar : $[thin] (x : Float32) -> Float32 // test.bar : (x : swift.Float32) -> swift.Float32 // user: %5
-  %5 = apply [transparent] %3(%0) : $[thin] (x : Float32) -> Float32 // user: %7
+  %3 = function_ref @test_recursive_bar : $[thin] (x : Float32) -> Float32
+  %5 = apply [transparent] %3(%0) : $[thin] (x : Float32) -> Float32
   return %5 : $Float32
 }
 
@@ -372,8 +372,8 @@ sil @test_recursive_bar : $[thin] (x : Float32) -> Float32 {
   // CHECK: return
 
 bb0(%0 : $Float32):
-  %3 = function_ref @test_recursive_baz : $[thin] (x : Float32) -> Float32 // test.baz : (x : swift.Float32) -> swift.Float32 // user: %5
-  %5 = apply [transparent] %3(%0) : $[thin] (x : Float32) -> Float32 // user: %7
+  %3 = function_ref @test_recursive_baz : $[thin] (x : Float32) -> Float32
+  %5 = apply [transparent] %3(%0) : $[thin] (x : Float32) -> Float32
   return %5 : $Float32
 }
 
@@ -404,8 +404,8 @@ bb0(%0 : $Int64):
 
 sil @test_partial_baz : $[thin] (Int64, Int64) -> Int64 {
 bb0(%0 : $Int64, %1 : $Int64):
-  %6 = function_ref @plus : $[thin] (lhs : Int64, rhs : Int64) -> Int64 // user: %7
-  %7 = apply %6(%0, %1) : $[thin] (lhs : Int64, rhs : Int64) -> Int64 // user: %10
+  %6 = function_ref @plus : $[thin] (lhs : Int64, rhs : Int64) -> Int64
+  %7 = apply %6(%0, %1) : $[thin] (lhs : Int64, rhs : Int64) -> Int64
   return %7 : $Int64
 }
 
