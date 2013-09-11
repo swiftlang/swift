@@ -264,7 +264,7 @@ private:
   ///                  completed).
   Decl *getDecl(serialization::DeclID DID,
                 Optional<DeclContext *> ForcedContext = {},
-                Optional<std::function<void(Decl*)>> DidRecord = {});
+                std::function<void(Decl*)> DidRecord = nullptr);
 
   /// Returns the type with the given ID, deserializing it if needed.
   Type getType(serialization::TypeID TID);

@@ -639,7 +639,7 @@ static Optional<swift::Associativity> getActualAssociativity(uint8_t assoc) {
 }
 
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
-                          Optional<std::function<void(Decl*)>> DidRecord) {
+                          std::function<void(Decl*)> DidRecord) {
   if (DID == 0)
     return nullptr;
 
@@ -648,7 +648,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
   if (declOrOffset.isComplete()) {
     if (DidRecord)
-      (*DidRecord)(declOrOffset);
+      DidRecord(declOrOffset);
     return declOrOffset;
   }
 
@@ -794,8 +794,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                           SourceLoc(), { }, genericParams, DC);
     declOrOffset = theStruct;
     if (DidRecord) {
-      (*DidRecord)(theStruct);
-      DidRecord.reset();
+      DidRecord(theStruct);
+      DidRecord = nullptr;
     }
 
     if (isImplicit)
@@ -1039,8 +1039,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     proto->computeType();
 
     if (DidRecord) {
-      (*DidRecord)(proto);
-      DidRecord.reset();
+      DidRecord(proto);
+      DidRecord = nullptr;
     }
 
 
@@ -1136,8 +1136,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         SourceLoc(), { }, genericParams, DC);
     declOrOffset = theClass;
     if (DidRecord) {
-      (*DidRecord)(theClass);
-      DidRecord.reset();
+      DidRecord(theClass);
+      DidRecord = nullptr;
     }
 
     if (isImplicit)
@@ -1188,8 +1188,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     declOrOffset = theUnion;
     if (DidRecord) {
-      (*DidRecord)(theUnion);
-      DidRecord.reset();
+      DidRecord(theUnion);
+      DidRecord = nullptr;
     }
 
     if (isImplicit)
@@ -1516,7 +1516,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   }
 
   if (DidRecord)
-    (*DidRecord)(declOrOffset);
+    DidRecord(declOrOffset);
   return declOrOffset;
 }
 
