@@ -127,10 +127,6 @@ extern "C" void _TSs5printFT3valSd_T_(double l) {
   printf("%s", Buffer);
 }
 
-extern "C" bool _TSb13getLogicValuefRSbFT_Bi1_(bool* b) {
-  return *b;
-}
-
 static bool
 _swift_replOutputIsUTF8(void) {
   const char *lang = getenv("LANG");
