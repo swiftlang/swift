@@ -36,6 +36,10 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
 
   CalleeEntryBB = CalleeFunction->begin();
 
+  // Compute the SILLocation which should be used by all the inlined
+  // instructions.
+  Loc = InlinedLocation::getInlinedLocation(I->getLoc());
+
   // If the caller's BB is not the last BB in the calling function, then keep
   // track of the next BB so we always insert new BBs before it; otherwise,
   // we just leave the new BBs at the end as they are by default.
@@ -101,7 +105,7 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
       // Modify return terminators to branch to the return-to BB, rather than
       // trying to clone the ReturnInst.
       if (ReturnInst *RI = dyn_cast<ReturnInst>(BI->first->getTerminator())) {
-        getBuilder().createBranch(RI->getLoc(), ReturnToBB,
+        getBuilder().createBranch(Loc.getValue(), ReturnToBB,
                                   remapValue(RI->getOperand()));
         continue;
       }

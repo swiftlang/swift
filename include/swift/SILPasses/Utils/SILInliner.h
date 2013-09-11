@@ -88,11 +88,25 @@ private:
     return Cloned;
   }
 
+  SILLocation remapLocation(SILLocation InLoc) {
+    // Inlined location wraps the call site that is being inlined, regardless
+    // of the input location.
+    assert(Loc.hasValue());
+    return Loc.getValue();
+  }
+
   SILBasicBlock* CalleeEntryBB;
   SILBasicBlock* InsertBeforeBB;
   llvm::DenseMap<SILArgument*, SILValue> ArgumentMap;
   llvm::DenseMap<SILInstruction*, SILInstruction*> InstructionMap;
   llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;
+
+  /// \brief The location representing the inlined instructions.
+  ///
+  /// This location wrapps the call site AST node that is being inlined.
+  /// Alternatively, it can be the SIL file location of the call site (in case
+  /// of SIL-to-SIL transformations).
+  Optional<SILLocation> Loc;
 };
 
 } // end namespace swift

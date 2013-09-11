@@ -140,10 +140,12 @@ protected:
   SILLocation(Decl *D, LocationKind K) : ASTNode(D), KindData(K) {}
   SILLocation(Pattern *P, LocationKind K) : ASTNode(P), KindData(K) {}
 
+  // This constructor is used to support getAs operation.
+  SILLocation() {}
+
 private:
   friend class ImplicitReturnLocation;
   void setKind(LocationKind K) { KindData |= (K & BaseMask); }
-
 public:
 
   /// When an ASTNode gets implicitely converted into a SILLocation we
@@ -313,6 +315,7 @@ private:
   static bool isKind(const SILLocation& L) {
     return L.getKind() == ReturnKind;
   }
+  ReturnLocation() : SILLocation(ReturnKind) {}
 };
 
 /// \brief Used on the instruction that was generated to represent an implicit
@@ -351,6 +354,7 @@ private:
   static bool isKind(const SILLocation& L) {
     return L.getKind() == ImplicitReturnKind;
   }
+  ImplicitReturnLocation() : SILLocation(ImplicitReturnKind) {}
 };
 
 /// \brief Marks instructions that correspond to inlined function body and
@@ -361,17 +365,29 @@ private:
 /// Allowed on any instruction except for ReturnInst, AutoreleaseReturnInst.
 class InlinedLocation : public SILLocation {
 public:
-  InlinedLocation(ApplyExpr *RS) : SILLocation(RS, InlinedKind) {}
+  InlinedLocation(Expr *CallSite) : SILLocation(CallSite, InlinedKind) {}
 
-  ApplyExpr *get() {
-    return castToASTNode<ApplyExpr>();
+  /// Constructs an inlined location when the call site is represented by a
+  /// SILFile location.
+  InlinedLocation(SourceLoc L) : SILLocation(InlinedKind) {
+    SILFileSourceLoc = L;
   }
+
+  /// \brief If this location represents a SIL file location, returns the source
+  /// location.
+  SourceLoc getFileLocation() {
+    assert(ASTNode.isNull());
+    return SILFileSourceLoc;
+  }
+
+  static InlinedLocation getInlinedLocation(SILLocation L);
 
 private:
   friend class SILLocation;
   static bool isKind(const SILLocation& L) {
     return L.getKind() == InlinedKind;
   }
+  InlinedLocation() : SILLocation(InlinedKind) {}
 };
 
 /// \brief Used on the instruction performing auto-generated cleanup such as
@@ -384,9 +400,6 @@ private:
 /// Allowed on any instruction except for ReturnInst, AutoreleaseReturnInst.
 /// Locations of an inlined destructor should also be represented by this.
 class CleanupLocation : public SILLocation {
-private:
-  CleanupLocation() : SILLocation(CleanupKind) {}
-
 public:
   CleanupLocation(Expr *E) : SILLocation(E, CleanupKind) {}
   CleanupLocation(Stmt *S) : SILLocation(S, CleanupKind) {}
@@ -407,6 +420,7 @@ private:
   static bool isKind(const SILLocation& L) {
     return L.getKind() == CleanupKind;
   }
+  CleanupLocation() : SILLocation(CleanupKind) {}
 };
 
 /// \brief Used to represent unreachable location that was auto-generated and
@@ -436,11 +450,16 @@ public:
     SILFileSourceLoc = L;
   }
 
+  SourceLoc getFileLocation() {
+    return SILFileSourceLoc;
+  }
+
 private:
   friend class SILLocation;
   static bool isKind(const SILLocation& L) {
     return L.getKind() == SILFileKind;
   }
+  SILFileLocation() : SILLocation(SILFileKind) {}
 };
 
 } // end swift namespace

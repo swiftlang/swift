@@ -94,6 +94,19 @@ void SILLocation::print(raw_ostream &OS, const SourceManager &SM) const {
   getSourceLoc().print(OS, SM);
 }
 
+InlinedLocation InlinedLocation::getInlinedLocation(SILLocation L) {
+  if (Expr *E = L.getAsASTNode<Expr>())
+    return InlinedLocation(E);
+  if (Optional<SILFileLocation> FileLoc = L.getAs<SILFileLocation>())
+    return InlinedLocation(FileLoc.getValue().getFileLocation());
+  // Otherwise, it can be an inlined location wrapping a file location.
+  if (Optional<InlinedLocation> InlinedLoc = L.getAs<InlinedLocation>()) {
+    return InlinedLocation(InlinedLoc.getValue().getFileLocation());
+  }
+
+  llvm_unreachable("Cannot construct Inlined loc from the given location.");
+}
+
 CleanupLocation CleanupLocation::getCleanupLocation(SILLocation L) {
   if (Expr *E = L.getAsASTNode<Expr>())
     return CleanupLocation(E);
