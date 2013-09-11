@@ -37,7 +37,11 @@ DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     SizeInBytes = FixTy.getFixedSize().getValue();
     AlignInBytes = FixTy.getBestKnownAlignment().getValue();
+  } else {
+    SizeInBytes = 0;
+    AlignInBytes = Info.getBestKnownAlignment().getValue();
   }
+  assert(AlignInBytes != 0);
 }
 
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
@@ -47,13 +51,18 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     SizeInBytes = FixTy.getFixedSize().getValue();
     AlignInBytes = FixTy.getBestKnownAlignment().getValue();
+  } else {
+    SizeInBytes = 0;
+    AlignInBytes = Info.getBestKnownAlignment().getValue();
   }
+  assert(AlignInBytes != 0);
 }
 
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size Size, Alignment Align)
   : DeclOrType(Decl),
     SizeInBytes(Size.getValue()),
     AlignInBytes(Align.getValue()) {
+  assert(AlignInBytes != 0);
 }
 
 static bool typesEqual(Type A, Type B) {

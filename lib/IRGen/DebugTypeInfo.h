@@ -42,7 +42,7 @@ namespace swift {
       uint64_t AlignInBytes;
 
       DebugTypeInfo()
-        : SizeInBytes(0), AlignInBytes(0) {
+        : SizeInBytes(0), AlignInBytes(1) {
       }
       DebugTypeInfo(Type Ty, uint64_t Size, uint64_t Align);
       DebugTypeInfo(Type Ty, Size Size, Alignment Align);
