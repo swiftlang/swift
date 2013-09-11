@@ -13,6 +13,7 @@
 #include "swift/Subsystems.h"
 #include "ModuleFormat.h"
 #include "Serialization.h"
+#include "SILFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/KnownProtocols.h"
@@ -308,6 +309,13 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(index_block, OPERATORS);
   RECORD(index_block, EXTENSIONS);
   RECORD(index_block, CLASS_MEMBERS);
+
+  BLOCK(SIL_BLOCK);
+  RECORD(sil_block, SIL_FUNCTION);
+  RECORD(sil_block, SIL_BASIC_BLOCK);
+  RECORD(sil_block, SIL_ONE_VALUE_ONE_OPERAND);
+  RECORD(sil_block, SIL_ONE_TYPE);
+  RECORD(sil_block, SIL_ONE_OPERAND);
 
   BLOCK(KNOWN_PROTOCOL_BLOCK);
 #define PROTOCOL(Id) RECORD(index_block, Id);

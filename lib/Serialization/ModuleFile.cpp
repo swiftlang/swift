@@ -408,6 +408,13 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
       break;
     }
 
+    // FIXME: for now, skip the SIL block.
+    case SIL_BLOCK_ID: {
+      if (cursor.SkipBlock())
+        return error();
+      break;
+    }
+
     default:
       // Unknown top-level block, possibly for use by a future version of the
       // module format.

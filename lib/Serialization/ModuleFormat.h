@@ -188,6 +188,11 @@ enum BlockID {
   /// \sa index_block
   INDEX_BLOCK_ID,
 
+  /// The block for SIL functions.
+  ///
+  /// \sa sil_block
+  SIL_BLOCK_ID,
+
   /// The known protocol block, which is a sub-block of the index block.
   ///
   /// This contains lists of decls known to conform to each compiler-known

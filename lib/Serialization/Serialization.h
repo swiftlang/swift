@@ -157,13 +157,6 @@ private:
   /// \returns The ID for the given Decl in this module.
   DeclID addDeclRef(const Decl *D);
 
-  /// Records the use of the given Type.
-  ///
-  /// The Type will be scheduled for serialization if necessary.
-  ///
-  /// \returns The ID for the given Type in this module.
-  TypeID addTypeRef(Type ty);
-
   /// Records the use of the given Identifier.
   ///
   /// The Identifier will be scheduled for serialization if necessary.
@@ -291,6 +284,13 @@ public:
   void writeToStream(raw_ostream &os, const TranslationUnit *TU,
                      const SILModule *M,
                      FileBufferIDs inputFiles, StringRef moduleLinkName);
+
+  /// Records the use of the given Type.
+  ///
+  /// The Type will be scheduled for serialization if necessary.
+  ///
+  /// \returns The ID for the given Type in this module.
+  TypeID addTypeRef(Type ty);
 };
 } // end namespace serialization
 } // end namespace swift
