@@ -24,13 +24,11 @@ using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, uint64_t Size, uint64_t Align)
   : DeclOrType(Ty.getPointer()), SizeInBytes(Size), AlignInBytes(Align) {
-  assert(AlignInBytes != 0);
 }
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, Size Size, Alignment Align)
   : DeclOrType(Ty.getPointer()),
     SizeInBytes(Size.getValue()), AlignInBytes(Align.getValue()) {
-  assert(AlignInBytes != 0);
 }
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
@@ -40,7 +38,6 @@ DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
     SizeInBytes = FixTy.getFixedSize().getValue();
     AlignInBytes = FixTy.getBestKnownAlignment().getValue();
   }
-  assert(AlignInBytes != 0);
 }
 
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
@@ -51,14 +48,12 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
     SizeInBytes = FixTy.getFixedSize().getValue();
     AlignInBytes = FixTy.getBestKnownAlignment().getValue();
   }
-  assert(AlignInBytes != 0);
 }
 
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size Size, Alignment Align)
   : DeclOrType(Decl),
     SizeInBytes(Size.getValue()),
     AlignInBytes(Align.getValue()) {
-  assert(AlignInBytes != 0);
 }
 
 static bool typesEqual(Type A, Type B) {
