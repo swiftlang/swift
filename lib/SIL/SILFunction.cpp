@@ -46,8 +46,7 @@ void SILFunction::setDeclContext(Decl *D) {
 }
 
 void SILFunction::setDeclContext(Expr *E) {
-  if (!E) return;
-  DeclCtx = dyn_cast<CapturingExpr>(E);
+  DeclCtx = dyn_cast_or_null<CapturingExpr>(E);
 }
 
 ASTContext &SILFunction::getASTContext() const {
