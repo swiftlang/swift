@@ -38,7 +38,6 @@ namespace swift {
     public:
       /// Every Decl also has a type, but is otherwise preferred.
       PointerUnion<ValueDecl*, TypeBase*> DeclOrType;
-      //DeclContext *DeclContext;
       uint64_t SizeInBytes;
       uint64_t AlignInBytes;
 
@@ -50,7 +49,7 @@ namespace swift {
       DebugTypeInfo(Type Ty, const TypeInfo &Info);
       DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info);
       DebugTypeInfo(ValueDecl *Decl, Size Size, Alignment Align);
-      inline TypeBase* getHash() const { return getType(); } //Ty.getPointer(); }
+      inline TypeBase* getHash() const { return getType(); }
       inline TypeBase* getType() const {
         if (DeclOrType.isNull())
           return nullptr;
