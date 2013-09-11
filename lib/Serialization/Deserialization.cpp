@@ -907,7 +907,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool isClassMethod;
     bool isAssignmentOrConversion;
     bool isObjC, isIBAction, isTransparent;
-    unsigned NumParamPatterns;
+    unsigned numParamPatterns;
     TypeID signatureID;
     DeclID associatedDeclID;
     DeclID overriddenID;
@@ -915,7 +915,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     decls_block::FuncLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                         isClassMethod, isAssignmentOrConversion,
                                         isObjC, isIBAction, isTransparent,
-                                        NumParamPatterns, signatureID,
+                                        numParamPatterns, signatureID,
                                         associatedDeclID, overriddenID);
 
     auto DC = getDeclContext(contextID);
@@ -929,7 +929,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto fn = FuncDecl::create(
         ctx, SourceLoc(), SourceLoc(), getIdentifier(nameID), SourceLoc(),
-        genericParams, /*type=*/nullptr, NumParamPatterns,
+        genericParams, /*type=*/nullptr, numParamPatterns,
         /*TheFuncExprBody=*/nullptr, DC);
     declOrOffset = fn;
 
@@ -944,13 +944,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       patternBuf.push_back(pattern);
 
     assert(!patternBuf.empty());
-    size_t patternCount = patternBuf.size() / 2;
-    assert(patternCount * 2 == patternBuf.size() &&
-           "two sets of patterns don't  match up");
+    assert((patternBuf.size() == numParamPatterns ||
+            patternBuf.size() == numParamPatterns * 2) &&
+           "incorrect number of parameters");
 
     ArrayRef<Pattern *> patterns(patternBuf);
-    ArrayRef<Pattern *> argPatterns = patterns.slice(0, patternCount);
-    ArrayRef<Pattern *> bodyPatterns = patterns.slice(patternCount);
+    ArrayRef<Pattern *> argPatterns = patterns.slice(0, numParamPatterns);
+    ArrayRef<Pattern *> bodyPatterns = patterns.slice(numParamPatterns);
+    if (bodyPatterns.empty())
+      bodyPatterns = argPatterns;
     fn->setParamPatterns(argPatterns, bodyPatterns);
 
     auto body = FuncExpr::create(ctx, SourceLoc(),
