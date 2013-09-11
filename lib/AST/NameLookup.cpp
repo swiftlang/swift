@@ -298,11 +298,11 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       // for us, but it can't do the right thing inside local types.
       // FIXME: when we can parse and typecheck the function body partially for
       // code completion, FE->getBody() check can be removed.
-      if (Loc.isValid() && FE->getBody()) {
+      if (Loc.isValid() && FE->getDecl()->getBody()) {
         FindLocalVal localVal(SM, Loc, Name);
-        localVal.visit(FE->getBody());
+        localVal.visit(FE->getDecl()->getBody());
         if (!localVal.MatchingValue) {
-          for (Pattern *P : FE->getBodyParamPatterns())
+          for (Pattern *P : FE->getDecl()->getBodyParamPatterns())
             localVal.checkPattern(P);
         }
         if (localVal.MatchingValue) {

@@ -19,7 +19,7 @@
 
 namespace swift {
   class DeclAttributes;
-  class FuncExpr;
+  class FuncDecl;
 
 /// \brief Callbacks for Parser's delayed parsing.
 class DelayedParsingCallbacks {
@@ -30,14 +30,14 @@ public:
 
   /// Checks if a function body should be delayed or skipped altogether.
   virtual bool shouldDelayFunctionBodyParsing(Parser &TheParser,
-                                              FuncExpr *FE,
+                                              FuncDecl *FD,
                                               const DeclAttributes &Attrs,
                                               SourceRange BodyRange) = 0;
 };
 
 class AlwaysDelayedCallbacks : public DelayedParsingCallbacks {
   bool shouldDelayFunctionBodyParsing(Parser &TheParser,
-                                      FuncExpr *FE,
+                                      FuncDecl *FD,
                                       const DeclAttributes &Attrs,
                                       SourceRange BodyRange) override {
     return true;
@@ -54,7 +54,7 @@ public:
   }
 
   bool shouldDelayFunctionBodyParsing(Parser &TheParser,
-                                      FuncExpr *FE,
+                                      FuncDecl *FD,
                                       const DeclAttributes &Attrs,
                                       SourceRange BodyRange) override {
     // Delay parsing if the code completion point is in the function body.

@@ -136,10 +136,21 @@ getBuiltinFunction(ASTContext &Context, Identifier Id,
   else
     FnType = FunctionType::get(ArgType, ResType, Info, Context);
 
-  return new (Context)
-      FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(),
-               /*GenericParams=*/nullptr, FnType,
-               /*TheFuncExprBody=*/nullptr, Context.TheBuiltinModule);
+  SmallVector<TuplePatternElt, 4> ArgPatternElts;
+  for (auto &ArgTupleElt : ArgTypes) {
+    ArgPatternElts.push_back(TuplePatternElt(
+        new (Context) TypedPattern(
+            new (Context) AnyPattern(SourceLoc()),
+            TypeLoc::withoutLoc(ArgTupleElt.getType()))));
+  }
+
+  Pattern *ArgPattern = TuplePattern::createSimple(
+      Context, SourceLoc(), ArgPatternElts, SourceLoc());
+
+  return FuncDecl::create(Context, SourceLoc(), SourceLoc(), Id, SourceLoc(),
+                          /*GenericParams=*/nullptr, FnType, ArgPattern,
+                          ArgPattern, /*TheFuncExprBody=*/nullptr,
+                          Context.TheBuiltinModule);
 }
 
 /// Build a getelementptr operation declaration.

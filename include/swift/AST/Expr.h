@@ -81,10 +81,8 @@ class alignas(8) Expr {
   class FuncExprBitfields {
     friend class FuncExpr;
     unsigned : NumCapturingExprBits;
-
-    unsigned BodyKind : 2;
   };
-  enum { NumFuncExprBits = NumCapturingExprBits + 2 };
+  enum { NumFuncExprBits = NumCapturingExprBits + 0 };
   static_assert(NumFuncExprBits <= 32, "fits in an unsigned");
 
 protected:
@@ -1677,21 +1675,6 @@ public:
 /// have named arguments.
 ///    e.g.  func(a : int) -> int { return a+1 }
 class FuncExpr : public CapturingExpr {
-  SourceLoc FuncLoc;
-  unsigned NumPatterns;
-
-  // If a function has a body at all, we have either a parsed body AST node or
-  // we have saved the end location of the unparsed body.
-  union {
-    /// This union member is active if getBodyKind() == BodyKind::Parsed.
-    BraceStmt *Body;
-
-    /// End location of the function body when the body is delayed or skipped.
-    /// This union member is active if getBodyKind() is BodyKind::Unparsed or
-    /// BodyKind::Skipped.
-    SourceLoc BodyEndLoc;
-  };
-
   FuncDecl *TheFuncDecl;
 
   TypeLoc FnRetType;
@@ -1701,158 +1684,19 @@ class FuncExpr : public CapturingExpr {
   /// \sa getBodyResultType()
   Type BodyResultType;
 
-  Pattern **getParamsBuffer() {
-    return reinterpret_cast<Pattern**>(this+1);
-  }
-  Pattern * const *getParamsBuffer() const {
-    return reinterpret_cast<Pattern*const*>(this+1);
-  }
-
-public:
-  enum class BodyKind {
-    /// The function did not have a body in the source code file.
-    None,
-
-    /// Function body is delayed, to be parsed later.
-    Unparsed,
-
-    /// Function body is parsed and available as an AST subtree.
-    Parsed,
-
-    /// Function body is not available, although it was written in the source.
-    Skipped
-  };
-
-  BodyKind getBodyKind() const {
-    return BodyKind(FuncExprBits.BodyKind);
-  }
-
-private:
-  void setBodyKind(BodyKind K) {
-    FuncExprBits.BodyKind = unsigned(K);
-  }
-
-  FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, TypeLoc FnRetType,
-           DeclContext *Parent)
+  FuncExpr(SourceLoc FuncLoc, TypeLoc FnRetType, DeclContext *Parent)
     : CapturingExpr(ExprKind::Func, Type(), Parent),
-      FuncLoc(FuncLoc), NumPatterns(NumPatterns),
-      TheFuncDecl(nullptr), FnRetType(FnRetType) {
-    setBodyKind(BodyKind::None);
-  }
+      TheFuncDecl(nullptr), FnRetType(FnRetType) {}
 
 public:
   static FuncExpr *create(ASTContext &Context, SourceLoc FuncLoc,
-                          ArrayRef<Pattern*> ArgParams,
-                          ArrayRef<Pattern*> BodyParams,
-                          TypeLoc FnRetType,
-                          DeclContext *Parent);
+                          TypeLoc FnRetType, DeclContext *Parent);
 
-  SourceRange getSourceRange() const;
   SourceLoc getLoc() const;
-  
-  size_t getNumParamPatterns() const { return NumPatterns; }
+  SourceRange getSourceRange() const;
 
-  /// getArgParamPatterns - Returns the argument pattern(s) for the function
-  /// definition that determine the function type.
-  /// - For a definition of the form `func foo(a:A, b:B)`, this will
-  ///   be a one-element array containing the argument pattern `(a:A, b:B)`.
-  /// - For a curried definition such as `func foo(a:A)(b:B)`, this will
-  ///   be a multiple-element array containing a pattern for each level
-  ///   of currying, in this case two patterns `(a:A)` and `(b:B)`.
-  /// - For a selector-style definition such as `func foo(a:A) bar(b:B)`,
-  ///   this will be a one-element array containing the argument pattern
-  ///   of the keyword arguments, in this case `(_:A, bar:B)`. For selector-
-  ///   style definitions, this is different from `getBodyParamPatterns`,
-  ///   which would return the declared parameter names `(a:A, b:B)`.
-  ///
-  /// If the function expression refers to a method definition, there will
-  /// be an additional first argument pattern for the `this` parameter.
-  MutableArrayRef<Pattern*> getArgParamPatterns() {
-    return MutableArrayRef<Pattern*>(getParamsBuffer(), NumPatterns);
-  }
-  ArrayRef<const Pattern*> getArgParamPatterns() const {
-    return ArrayRef<const Pattern*>(getParamsBuffer(), NumPatterns);
-  }
-
-  /// getBodyParamPatterns - Returns the parameter pattern(s) for the function
-  /// definition that determine the parameter names bound in the function body.
-  /// Typically, this is the same as `getArgParamPatterns`, unless the function
-  /// was defined with selector-style syntax such as `func foo(a:A) bar(b:B)`.
-  /// For a selector-style definition, `getArgParamPatterns` will return the
-  /// pattern that describes the keyword argument names, in this case
-  /// `(_:A, bar:B)`, whereas `getBodyParamPatterns` will return a pattern
-  /// referencing the declared parameter names in the function body's scope,
-  /// in this case `(a:A, b:B)`.
-  ///
-  /// In all cases `getArgParamPatterns().size()` should equal
-  /// `getBodyParamPatterns().size()`, and the corresponding elements of each
-  /// tuple type should have equivalent types.
-  
-  MutableArrayRef<Pattern*> getBodyParamPatterns() {
-    return MutableArrayRef<Pattern*>(getParamsBuffer() + NumPatterns,
-                                     NumPatterns);
-  }
-  ArrayRef<const Pattern*> getBodyParamPatterns() const {
-    return ArrayRef<const Pattern*>(getParamsBuffer() + NumPatterns,
-                                    NumPatterns);
-  }
-
-  /// getNaturalArgumentCount - Returns the "natural" number of
-  /// argument clauses taken by this function.  See the comment on
-  /// FuncDecl.
-  unsigned getNaturalArgumentCount() const {
-    return NumPatterns;
-  }
-  
-  /// \brief If this FuncExpr is a non-static method in an extension context,
-  /// it will have a 'self' argument.  This method returns it if present, or
-  /// returns null if not.
-  VarDecl *getImplicitSelfDecl() const;
-  
   FuncDecl *getDecl() const { return TheFuncDecl; }
   void setDecl(FuncDecl *f) { TheFuncDecl = f; }
-
-  /// Returns the location of the 'func' keyword.
-  SourceLoc getFuncLoc() const { return FuncLoc; }
-
-  /// Returns true if the function has a body written in the source file.
-  ///
-  /// Note that a true return value does not imply that the body was actually
-  /// parsed.
-  bool hasBody() const {
-    return getBodyKind() != BodyKind::None;
-  }
-
-  BraceStmt *getBody() const {
-    if (getBodyKind() == BodyKind::Parsed)
-      return Body;
-    return nullptr;
-  }
-  void setBody(BraceStmt *S) {
-    assert(getBodyKind() != BodyKind::Skipped &&
-           "can not set a body if it was skipped");
-    assert(S && "assigning a null body");
-    assert(getBodyKind() == BodyKind::None ||
-           getBodyKind() == BodyKind::Unparsed ||
-           Body == S);
-    Body = S;
-    setBodyKind(BodyKind::Parsed);
-  }
-
-  /// \brief Note that the body was skipped for this function.  Function body
-  /// can not be attached after this call.
-  void setBodySkipped(SourceLoc EndLoc) {
-    assert(getBodyKind() == BodyKind::None);
-    BodyEndLoc = EndLoc;
-    setBodyKind(BodyKind::Skipped);
-  }
-
-  /// \brief Note that parsing for the body was delayed.
-  void setBodyDelayed(SourceLoc EndLoc) {
-    assert(getBodyKind() == BodyKind::None);
-    BodyEndLoc = EndLoc;
-    setBodyKind(BodyKind::Unparsed);
-  }
 
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
 

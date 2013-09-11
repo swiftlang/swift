@@ -1493,9 +1493,11 @@ namespace {
       // Coerce the FuncExpr's pattern, in case we resolved something.
       Type input = expr->getType()->castTo<FunctionType>()->getInput();
       auto &tc = cs.getTypeChecker();
-      if (tc.coerceToType(expr->getArgParamPatterns()[0], dc, input))
+      if (tc.coerceToType(expr->getDecl()->getArgParamPatterns()[0], dc,
+                          input))
         return nullptr;
-      if (tc.coerceToType(expr->getBodyParamPatterns()[0], dc, input))
+      if (tc.coerceToType(expr->getDecl()->getBodyParamPatterns()[0], dc,
+                          input))
         return nullptr;
 
       return expr;

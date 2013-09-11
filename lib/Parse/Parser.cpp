@@ -62,11 +62,9 @@ public:
 
   virtual bool walkToDeclPre(Decl *D) {
     if (auto FD = dyn_cast<FuncDecl>(D)) {
-      if (auto FE = FD->getFuncExpr()) {
-        if (FE->getBodyKind() != FuncExpr::BodyKind::Unparsed)
-          return false;
-        parseFunctionBody(FD);
-      }
+      if (FD->getBodyKind() != FuncDecl::BodyKind::Unparsed)
+        return false;
+      parseFunctionBody(FD);
       return true;
     }
     return true;
@@ -74,9 +72,7 @@ public:
 
 private:
   void parseFunctionBody(FuncDecl *FD) {
-    auto FE = FD->getFuncExpr();
-    assert(FE);
-    assert(FE->getBodyKind() == FuncExpr::BodyKind::Unparsed);
+    assert(FD->getBodyKind() == FuncDecl::BodyKind::Unparsed);
 
     unsigned BufferID =
         TU->Ctx.SourceMgr.findBufferContainingLoc(FD->getLoc());

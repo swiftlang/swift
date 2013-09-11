@@ -78,7 +78,7 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
 namespace {
   /// Don't parse any function bodies except those that are transparent.
   class SkipNonTransparentFunctions : public DelayedParsingCallbacks {
-    bool shouldDelayFunctionBodyParsing(Parser &parser, FuncExpr *FE,
+    bool shouldDelayFunctionBodyParsing(Parser &parser, FuncDecl *FD,
                                         const DeclAttributes &Attrs,
                                         SourceRange bodyRange) override {
       return Attrs.isTransparent();

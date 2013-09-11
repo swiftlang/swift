@@ -405,6 +405,16 @@ namespace {
       }
       OS << '\n';
 
+      for (auto P : FD->getArgParamPatterns()) {
+        OS << '\n';
+        printRec(P);
+      }
+
+      if (auto Body = FD->getBody()) {
+        OS << '\n';
+        printRec(Body);
+      }
+
       printRec(FD->getFuncExpr());
       OS << ')';
     }
@@ -1153,14 +1163,6 @@ public:
 
   void visitFuncExpr(FuncExpr *E) {
     printCapturing(E, "func_expr");
-    for (auto patt : E->getArgParamPatterns()) {
-      OS << '\n';
-      printRec(patt);
-    }
-    if (E->getBody()) {
-      OS << '\n';
-      printRec(E->getBody());
-    }
     OS << ')';
   }
   void visitPipeClosureExpr(PipeClosureExpr *expr) {

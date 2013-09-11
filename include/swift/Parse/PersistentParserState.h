@@ -23,7 +23,7 @@
 
 namespace swift {
   class Decl;
-  class FuncExpr;
+  class FuncDecl;
   class TopLevelCodeDecl;
 
 /// \brief Parser state persistent across multiple parses.
@@ -83,7 +83,7 @@ public:
 
 private:
   ScopeInfo ScopeInfo;
-  typedef llvm::DenseMap<FuncExpr *, std::unique_ptr<FunctionBodyState>>
+  typedef llvm::DenseMap<FuncDecl *, std::unique_ptr<FunctionBodyState>>
       DelayedBodiesTy;
   DelayedBodiesTy DelayedBodies;
 
@@ -95,9 +95,9 @@ private:
 public:
   swift::ScopeInfo &getScopeInfo() { return ScopeInfo; }
 
-  void delayFunctionBodyParsing(FuncExpr *FE, SourceRange BodyRange,
+  void delayFunctionBodyParsing(FuncDecl *FD, SourceRange BodyRange,
                                 SourceLoc PreviousLoc);
-  std::unique_ptr<FunctionBodyState> takeBodyState(FuncExpr *FE);
+  std::unique_ptr<FunctionBodyState> takeBodyState(FuncDecl *FD);
 
   void delayDecl(DelayedDeclKind Kind, unsigned Flags,
                  DeclContext *ParentContext,

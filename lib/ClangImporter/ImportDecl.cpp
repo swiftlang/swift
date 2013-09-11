@@ -788,16 +788,13 @@ namespace {
 
       // FIXME: Poor location info.
       auto funcExpr = FuncExpr::create(Impl.SwiftContext, loc,
-                                       argPatterns, bodyPatterns,
                                        TypeLoc::withoutLoc(resultTy), dc);
       funcExpr->setType(type);
       funcExpr->setBodyResultType(resultTy);
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
-      auto result = new (Impl.SwiftContext) FuncDecl(SourceLoc(), loc,
-                                                     name, nameLoc,
-                                                     /*GenericParams=*/0,
-                                                     type, funcExpr,
-                                                     dc);
+      auto result = FuncDecl::create(
+          Impl.SwiftContext, SourceLoc(), loc, name, nameLoc,
+          /*GenericParams=*/0, type, argPatterns, bodyPatterns, funcExpr, dc);
       funcExpr->setDecl(result);
       setVarDeclContexts(argPatterns, funcExpr);
       setVarDeclContexts(bodyPatterns, funcExpr);
@@ -960,14 +957,12 @@ namespace {
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto funcExpr = FuncExpr::create(Impl.SwiftContext, loc,
-                                       argPatterns, bodyPatterns,
                                        TypeLoc::withoutLoc(resultTy), dc);
       funcExpr->setType(type);
       funcExpr->setBodyResultType(resultTy);
-      auto result = new (Impl.SwiftContext) FuncDecl(SourceLoc(), loc,
-                                                     name, nameLoc,
-                                                     /*GenericParams=*/0,
-                                                     type, funcExpr, dc);
+      auto result = FuncDecl::create(
+          Impl.SwiftContext, SourceLoc(), loc, name, nameLoc,
+          /*GenericParams=*/0, type, argPatterns, bodyPatterns, funcExpr, dc);
       funcExpr->setDecl(result);
 
       setVarDeclContexts(argPatterns, funcExpr);
@@ -1428,8 +1423,6 @@ namespace {
 
       // Create the getter body.
       auto funcExpr = FuncExpr::create(context, getter->getLoc(),
-                                       getterArgs,
-                                       getterArgs,
                                        TypeLoc::withoutLoc(elementTy),
                                        getter->getDeclContext());
       funcExpr->setType(getterType);
@@ -1437,10 +1430,10 @@ namespace {
       setVarDeclContexts(getterArgs, funcExpr);
 
       // Create the getter thunk.
-      auto thunk = new (context) FuncDecl(SourceLoc(), getter->getLoc(),
-                                          Identifier(), SourceLoc(), nullptr,
-                                          getterType, funcExpr,
-                                          getter->getDeclContext());
+      auto thunk = FuncDecl::create(context, SourceLoc(), getter->getLoc(),
+                                    Identifier(), SourceLoc(), nullptr,
+                                    getterType, getterArgs, getterArgs,
+                                    funcExpr, getter->getDeclContext());
       funcExpr->setDecl(thunk);
 
       // Create the body of the thunk, which calls the Objective-C getter.
@@ -1467,9 +1460,8 @@ namespace {
       auto ret = new (context) ReturnStmt(loc, call);
 
       // Finally, set the body.
-      funcExpr->setBody(BraceStmt::create(context, loc,
-                                          BraceStmt::ExprStmtOrDecl(ret),
-                                          loc));
+      thunk->setBody(BraceStmt::create(context, loc,
+                                       BraceStmt::ExprStmtOrDecl(ret), loc));
 
       // Register this thunk as an external definition.
       Impl.SwiftContext.addedExternalDecl(thunk);
@@ -1491,8 +1483,7 @@ namespace {
                                Pattern *indices) {
       auto &context = Impl.SwiftContext;
       auto loc = setter->getLoc();
-      auto tuple = cast<TuplePattern>(
-                     setter->getFuncExpr()->getBodyParamPatterns()[1]);
+      auto tuple = cast<TuplePattern>(setter->getBodyParamPatterns()[1]);
 
       // Objective-C subscript setters are imported with a function type
       // such as:
@@ -1549,8 +1540,6 @@ namespace {
 
       // Create the setter body.
       auto funcExpr = FuncExpr::create(context, setter->getLoc(),
-                                       setterArgs,
-                                       setterArgs,
                               TypeLoc::withoutLoc(TupleType::getEmpty(context)),
                                        setter->getDeclContext());
       funcExpr->setType(setterType);
@@ -1558,9 +1547,9 @@ namespace {
       setVarDeclContexts(setterArgs, funcExpr);
 
       // Create the setter thunk.
-      auto thunk = new (context) FuncDecl(SourceLoc(), setter->getLoc(),
-                                          Identifier(), SourceLoc(), nullptr,
-                                          setterType, funcExpr, dc);
+      auto thunk = FuncDecl::create(
+          context, SourceLoc(), setter->getLoc(), Identifier(), SourceLoc(),
+          nullptr, setterType, setterArgs, setterArgs, funcExpr, dc);
       funcExpr->setDecl(thunk);
 
       // Create the body of the thunk, which calls the Objective-C setter.
@@ -1593,9 +1582,8 @@ namespace {
       call = new (context) CallExpr(call, callArgs);
 
       // Finally, set the body.
-      funcExpr->setBody(BraceStmt::create(context, loc,
-                                          BraceStmt::ExprStmtOrDecl(call),
-                                          loc));
+      thunk->setBody(BraceStmt::create(context, loc,
+                                       BraceStmt::ExprStmtOrDecl(call), loc));
 
       // Register this thunk as an external definition.
       Impl.SwiftContext.addedExternalDecl(thunk);
@@ -1697,8 +1685,8 @@ namespace {
 
       // Find the getter indices and make sure they match.
       {
-        auto tuple = dyn_cast<TuplePattern>(
-                       getter->getFuncExpr()->getArgParamPatterns()[1]);
+        auto tuple =
+            dyn_cast<TuplePattern>(getter -> getArgParamPatterns()[1]);
         if (tuple && tuple->getFields().size() != 1)
           return nullptr;
 
@@ -1709,8 +1697,7 @@ namespace {
       FuncDecl *setterThunk = nullptr;
       Pattern *setterIndices = nullptr;
       if (setter) {
-        auto tuple = dyn_cast<TuplePattern>(
-                       setter->getFuncExpr()->getBodyParamPatterns()[1]);
+        auto tuple = dyn_cast<TuplePattern>(setter->getBodyParamPatterns()[1]);
         if (!tuple)
           return nullptr;
 
@@ -1733,8 +1720,8 @@ namespace {
         setterThunk = buildSetterThunk(setter, dc, setterIndices);
 
       // Build the subscript declaration.
-      auto argPatterns
-        = getterThunk->getFuncExpr()->getArgParamPatterns()[1]->clone(context);
+      auto argPatterns =
+          getterThunk->getArgParamPatterns()[1]->clone(context);
       auto name = context.getIdentifier("__subscript");
       auto subscript
         = new (context) SubscriptDecl(name, decl->getLoc(), argPatterns,
@@ -2523,18 +2510,15 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   // Create the getter body.
   auto funcExpr = FuncExpr::create(context, SourceLoc(),
-                                   getterArgs,
-                                   getterArgs,
-                                   TypeLoc::withoutLoc(type),
-                                   dc);
+                                   TypeLoc::withoutLoc(type), dc);
   funcExpr->setType(getterType);
   funcExpr->setBodyResultType(type);
   setVarDeclContexts(getterArgs, funcExpr);
 
   // Create the getter function declaration.
-  auto func = new (context) FuncDecl(SourceLoc(), SourceLoc(),
-                                     Identifier(), SourceLoc(), nullptr,
-                                     getterType, funcExpr, dc);
+  auto func = FuncDecl::create(context, SourceLoc(), SourceLoc(), Identifier(),
+                               SourceLoc(), nullptr, getterType, getterArgs,
+                               getterArgs, funcExpr, dc);
   funcExpr->setDecl(func);
 
   // Create the integer literal value.
@@ -2647,9 +2631,9 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   auto ret = new (context) ReturnStmt(SourceLoc(), expr);
 
   // Finally, set the body.
-  funcExpr->setBody(BraceStmt::create(context, SourceLoc(),
-                                      BraceStmt::ExprStmtOrDecl(ret),
-                                      SourceLoc()));
+  func->setBody(BraceStmt::create(context, SourceLoc(),
+                                  BraceStmt::ExprStmtOrDecl(ret),
+                                  SourceLoc()));
 
   // Write the function up as the getter.
   func->makeGetter(var);

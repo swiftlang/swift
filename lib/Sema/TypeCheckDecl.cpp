@@ -1167,7 +1167,7 @@ public:
     return Info;
   }
 
-  void semaFuncExpr(FuncDecl *FD, bool consumeAttributes) {
+  void semaFuncDecl(FuncDecl *FD, bool consumeAttributes) {
     FuncExpr *FE = FD->getFuncExpr();
 
     if (FE->getType())
@@ -1180,8 +1180,10 @@ public:
       }
     }
 
-    badType = badType || semaFuncParamPatterns(FE, FE->getArgParamPatterns());
-    badType = badType || semaFuncParamPatterns(FE, FE->getBodyParamPatterns());
+    badType =
+        badType || semaFuncParamPatterns(FE, FD->getArgParamPatterns());
+    badType =
+        badType || semaFuncParamPatterns(FE, FD->getBodyParamPatterns());
 
     if (badType) {
       FE->setType(ErrorType::get(TC.Context));
@@ -1196,7 +1198,7 @@ public:
     auto bodyResultType = funcTy;
 
     // FIXME: it would be nice to have comments explaining what this is all about.
-    auto patterns = FE->getArgParamPatterns();
+    auto patterns = FE->getDecl()->getArgParamPatterns();
     bool isInstanceFunc = false;
     GenericParamList *genericParams = nullptr;
     GenericParamList *outerGenericParams = nullptr;
@@ -1315,11 +1317,8 @@ public:
   }
 
   void visitFuncDecl(FuncDecl *FD) {
-    if (!IsFirstPass) {
-      if (auto body = FD->getFuncExpr())
-        if (body->getBody())
-          TC.definedFunctions.push_back(body);
-    }
+    if (!IsFirstPass && FD->getBody())
+      TC.definedFunctions.push_back(FD->getFuncExpr());
 
     if (IsSecondPass)
       return;
@@ -1336,7 +1335,7 @@ public:
       FD->getImplicitSelfDecl()->setType(selfType);
 
       TypedPattern *selfPattern =
-        cast<TypedPattern>(body->getArgParamPatterns()[0]);
+          cast<TypedPattern>(FD->getArgParamPatterns()[0]);
       if (selfPattern->hasType()) {
         assert(selfPattern->getType().getPointer() == selfType.getPointer());
       } else {
@@ -1352,12 +1351,12 @@ public:
       checkGenericParamList(*builder, gp);
     }
 
-    semaFuncExpr(FD, /*consumeAttributes=*/!builder);
+    semaFuncDecl(FD, /*consumeAttributes=*/!builder);
 
     // If we have generic parameters, create archetypes now.
     if (builder) {
       // Infer requirements from the parameters of the function.
-      for (auto pattern : body->getArgParamPatterns()) {
+      for (auto pattern : FD->getArgParamPatterns()) {
         builder->inferRequirements(pattern);
       }
 
@@ -1376,7 +1375,7 @@ public:
       }
 
       // Revert the argument patterns.
-      ArrayRef<Pattern *> argPatterns = body->getArgParamPatterns();
+      ArrayRef<Pattern *> argPatterns = FD->getArgParamPatterns();
       if (FD->getDeclContext()->isTypeContext())
         argPatterns = argPatterns.slice(1);
       for (auto argPattern : argPatterns) {
@@ -1384,7 +1383,7 @@ public:
       }
 
       // Revert the body patterns.
-      ArrayRef<Pattern *> bodyPatterns = body->getBodyParamPatterns();
+      ArrayRef<Pattern *> bodyPatterns = FD->getBodyParamPatterns();
       if (FD->getDeclContext()->isTypeContext())
         bodyPatterns = bodyPatterns.slice(1);
       for (auto bodyPattern : bodyPatterns) {
@@ -1395,7 +1394,7 @@ public:
       body->revertType();
 
       // Type check the parameters and return type again, now with archetypes.
-      semaFuncExpr(FD, /*consumeAttributes=*/true);
+      semaFuncDecl(FD, /*consumeAttributes=*/true);
 
       // The second type check should have created a non-dependent type.
       assert(!body->getType()->isDependentType());

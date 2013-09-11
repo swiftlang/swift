@@ -84,12 +84,14 @@ ABSTRACT_DECL(Value, Decl)
       DECL_RANGE(NominalType, Union, Protocol)
     DECL_RANGE(Type, TypeAlias, Protocol)
   VALUE_DECL(Var, ValueDecl)
-  VALUE_DECL(Func, ValueDecl)
+  ABSTRACT_DECL(AbstractFunction, ValueDecl)
+    VALUE_DECL(Constructor, AbstractFunctionDecl)
+    VALUE_DECL(Destructor, AbstractFunctionDecl)
+    VALUE_DECL(Func, ValueDecl)
+    DECL_RANGE(AbstractFunction, Constructor, Func)
   VALUE_DECL(UnionElement, ValueDecl)
   VALUE_DECL(Subscript, ValueDecl)
-  VALUE_DECL(Constructor, ValueDecl)
-  VALUE_DECL(Destructor, ValueDecl)
-  DECL_RANGE(Value, TypeAlias, Destructor)
+  DECL_RANGE(Value, TypeAlias, Subscript)
 
 #undef NOMINAL_TYPE_DECL
 #undef VALUE_DECL

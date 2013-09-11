@@ -129,8 +129,8 @@ static unsigned getNumCurries(AnyFunctionType *type) {
 /// is the number of additional parameter clauses that are uncurried
 /// in the function body.
 unsigned irgen::getDeclNaturalUncurryLevel(ValueDecl *val) {
-  if (FuncDecl *func = dyn_cast<FuncDecl>(val)) {
-    return func->getFuncExpr()->getNaturalArgumentCount() - 1;
+  if (FuncDecl *FD = dyn_cast<FuncDecl>(val)) {
+    return FD->getNaturalArgumentCount() - 1;
   }
   if (isa<ConstructorDecl>(val) || isa<UnionElementDecl>(val)) {
     return 1;
@@ -2075,7 +2075,7 @@ struct EmitLocalDecls : public ASTWalker {
   
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto *FE = dyn_cast<FuncExpr>(E)) {
-      IGM.emitLocalDecls(FE->getBody());
+      IGM.emitLocalDecls(FE->getDecl()->getBody());
       return { false, E };
     }
     if (auto *CE = dyn_cast<PipeClosureExpr>(E)) {
@@ -2094,8 +2094,8 @@ void IRGenModule::emitLocalDecls(BraceStmt *body) {
 }
 
 void IRGenModule::emitLocalDecls(FuncDecl *fd) {
-  if (fd->getFuncExpr() && fd->getFuncExpr()->getBody())
-    emitLocalDecls(fd->getFuncExpr()->getBody());
+  if (fd->getBody())
+    emitLocalDecls(fd->getBody());
 }
 
 void IRGenModule::emitLocalDecls(ConstructorDecl *cd) {

@@ -488,7 +488,7 @@ public:
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
   
   Pattern *buildImplicitSelfParameter();
-  void consumeFunctionBody(FuncExpr *FE, const DeclAttributes &Attrs);
+  void consumeFunctionBody(FuncDecl *FD, const DeclAttributes &Attrs);
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc, unsigned Flags);
   bool parseDeclFuncBodyDelayed(FuncDecl *FD);
   ParserResult<ProtocolDecl> parseDeclProtocol(unsigned Flags);

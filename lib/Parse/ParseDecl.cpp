@@ -1137,8 +1137,12 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Scope S(this, ScopeKind::FunctionBody);
 
       // Start the function.
-      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, ElementTy, Params,Params);
-      
+      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, ElementTy, Params, Params);
+      Get = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), GetLoc,
+                             Identifier(), GetLoc, /*GenericParams=*/nullptr,
+                             Type(), Params, Params, GetFn, CurDeclContext);
+      GetFn->setDecl(Get);
+
       // Establish the new context.
       ContextChange CC(*this, GetFn);
 
@@ -1147,15 +1151,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                       BraceItemListKind::Property);
       BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
                                           Entries, Tok.getLoc());
-
-      GetFn->setBody(Body);
+      Get->setBody(Body);
 
       LastValidLoc = Body->getRBraceLoc();
-      
-      Get = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), GetLoc,
-                                   Identifier(), GetLoc, /*generic=*/nullptr,
-                                   Type(), GetFn, CurDeclContext);
-      GetFn->setDecl(Get);
       continue;
     }
 
@@ -1242,7 +1240,11 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     FuncExpr *SetFn = actOnFuncExprStart(SetLoc,
                                          TypeLoc::withoutLoc(SetterRetTy),
                                          Params, Params);
-    
+    Set = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), SetLoc,
+                           Identifier(), SetLoc, /*generic=*/nullptr, Type(),
+                           Params, Params, SetFn, CurDeclContext);
+    SetFn->setDecl(Set);
+
     // Establish the new context.
     ContextChange CC(*this, SetFn);
     
@@ -1252,15 +1254,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                     BraceItemListKind::Property);
     BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
                                         Entries, Tok.getLoc());
-
-    SetFn->setBody(Body);
+    Set->setBody(Body);
 
     LastValidLoc = Body->getRBraceLoc();
-    
-    Set = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), SetLoc,
-                                 Identifier(), SetLoc, /*generic=*/nullptr,
-                                 Type(), SetFn, CurDeclContext);
-    SetFn->setDecl(Set);
   }
   
   return Invalid;
@@ -1472,7 +1468,7 @@ Pattern *Parser::buildImplicitSelfParameter() {
   return new (Context) TypedPattern(P, TypeLoc());
 }
 
-void Parser::consumeFunctionBody(FuncExpr *FE, const DeclAttributes &Attrs) {
+void Parser::consumeFunctionBody(FuncDecl *FD, const DeclAttributes &Attrs) {
   auto BeginParserPosition = getParserPosition();
   SourceRange BodyRange;
   BodyRange.Start = Tok.getLoc();
@@ -1506,13 +1502,13 @@ void Parser::consumeFunctionBody(FuncExpr *FE, const DeclAttributes &Attrs) {
 
   BodyRange.End = PreviousLoc;
 
-  if (DelayedParseCB->shouldDelayFunctionBodyParsing(*this, FE, Attrs,
+  if (DelayedParseCB->shouldDelayFunctionBodyParsing(*this, FD, Attrs,
                                                      BodyRange)) {
-    State->delayFunctionBodyParsing(FE, BodyRange,
+    State->delayFunctionBodyParsing(FD, BodyRange,
                                     BeginParserPosition.PreviousLoc);
-    FE->setBodyDelayed(BodyRange.End);
+    FD->setBodyDelayed(BodyRange.End);
   } else {
-    FE->setBodySkipped(BodyRange.End);
+    FD->setBodySkipped(BodyRange.End);
   }
 }
 
@@ -1608,11 +1604,11 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
       // Create function AST nodes.
       FuncExpr *FE =
           actOnFuncExprStart(FuncLoc, FuncRetTy, ArgParams, BodyParams);
-      FuncDecl *FD = new (Context) FuncDecl(StaticLoc, FuncLoc, Name, NameLoc,
-                                            GenericParams, Type(), FE,
-                                            CurDeclContext);
+      FuncDecl *FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name,
+                                      NameLoc, GenericParams, Type(), ArgParams,
+                                      BodyParams, FE, CurDeclContext);
       FE->setDecl(FD);
-      FE->setBodySkipped(Tok.getLoc());
+      FD->setBodySkipped(Tok.getLoc());
 
       // Pass the function signature to code completion.
       CodeCompletion->setDelayedParsedDecl(FD);
@@ -1622,11 +1618,18 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
   // duplication.
-  FuncExpr *FE = nullptr;
+  FuncDecl *FD;
   {
     Scope S(this, ScopeKind::FunctionBody);
-    
-    FE = actOnFuncExprStart(FuncLoc, FuncRetTy, ArgParams, BodyParams);
+
+    FuncExpr *FE = actOnFuncExprStart(FuncLoc, FuncRetTy,
+                                      ArgParams, BodyParams);
+
+    // Create the decl for the func and add it to the parent scope.
+    FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name, NameLoc,
+                          GenericParams, Type(), ArgParams, BodyParams,
+                          FE, CurDeclContext);
+    FE->setDecl(FD);
 
     // Now that we have a context, update the generic parameters with that
     // context.
@@ -1653,10 +1656,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
         if (Body.isNull()) {
           // FIXME: Should do some sort of error recovery here?
         } else {
-          FE->setBody(Body.get());
+          FD->setBody(Body.get());
         }
       } else {
-        consumeFunctionBody(FE, Attributes);
+        consumeFunctionBody(FD, Attributes);
       }
     } else if (Attributes.AsmName.empty() && !(Flags & PD_DisallowFuncDef) &&
                !HadSignatureParseError) {
@@ -1667,12 +1670,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   // Exit the scope introduced for the generic parameters.
   GenericsScope.reset();
 
-  // Create the decl for the func and add it to the parent scope.
-  FuncDecl *FD = new (Context) FuncDecl(StaticLoc, FuncLoc, Name, NameLoc,
-                                        GenericParams, Type(), FE,
-                                        CurDeclContext);
-  if (FE)
-    FE->setDecl(FD);
   if (Attributes.isValid())
     FD->getMutableAttrs() = Attributes;
   addToScope(FD);
@@ -1680,16 +1677,15 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
 }
 
 bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
-  auto FE = FD->getFuncExpr();
-  assert(!FE->getBody() && "function should not have a parsed body");
-  assert(FE->getBodyKind() == FuncExpr::BodyKind::Unparsed &&
+  assert(!FD->getBody() && "function should not have a parsed body");
+  assert(FD->getBodyKind() == FuncDecl::BodyKind::Unparsed &&
          "function body should be delayed");
 
-  auto FunctionParserState = State->takeBodyState(FE);
+  auto FunctionParserState = State->takeBodyState(FD);
   assert(FunctionParserState.get() && "should have a valid state");
 
   auto BeginParserPosition = getParserPosition(FunctionParserState->BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(FE->getEndLoc());
+  auto EndLexerState = L->getStateForEndOfTokenLoc(FD->getEndLoc());
 
   // ParserPositionRAII needs a primed parser to restore to.
   if (Tok.is(tok::NUM_TOKENS))
@@ -1709,7 +1705,7 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
 
   // Re-enter the lexical scope.
   Scope S(this, FunctionParserState->takeScope());
-  ContextChange CC(*this, FE);
+  ContextChange CC(*this, FD->getFuncExpr());
 
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::func_decl_without_brace);
@@ -1717,7 +1713,7 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
     // FIXME: Should do some sort of error recovery here?
     return true;
   } else {
-    FE->setBody(Body.get());
+    FD->setBody(Body.get());
   }
 
   return false;

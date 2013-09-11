@@ -20,21 +20,21 @@
 
 using namespace swift;
 
-void PersistentParserState::delayFunctionBodyParsing(FuncExpr *FE,
+void PersistentParserState::delayFunctionBodyParsing(FuncDecl *FD,
                                                      SourceRange BodyRange,
                                                      SourceLoc PreviousLoc) {
   std::unique_ptr<FunctionBodyState> State;
   State.reset(new FunctionBodyState(BodyRange, PreviousLoc,
                                     ScopeInfo.saveCurrentScope()));
-  assert(DelayedBodies.find(FE) == DelayedBodies.end() &&
+  assert(DelayedBodies.find(FD) == DelayedBodies.end() &&
          "Already recorded state for this body");
-  DelayedBodies[FE] = std::move(State);
+  DelayedBodies[FD] = std::move(State);
 }
 
 std::unique_ptr<PersistentParserState::FunctionBodyState>
-PersistentParserState::takeBodyState(FuncExpr *FE) {
-  assert(FE->getBodyKind() == FuncExpr::BodyKind::Unparsed);
-  DelayedBodiesTy::iterator I = DelayedBodies.find(FE);
+PersistentParserState::takeBodyState(FuncDecl *FD) {
+  assert(FD->getBodyKind() == FuncDecl::BodyKind::Unparsed);
+  DelayedBodiesTy::iterator I = DelayedBodies.find(FD);
   assert(I != DelayedBodies.end() && "State should be saved");
   std::unique_ptr<FunctionBodyState> State = std::move(I->second);
   DelayedBodies.erase(I);

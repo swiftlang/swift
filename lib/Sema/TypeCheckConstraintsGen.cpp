@@ -708,7 +708,7 @@ namespace {
       // computing the type of each pattern (which may involve fresh type
       // variables where parameter types where no provided) and building the
       // eventual function type.
-      auto patterns = expr->getArgParamPatterns();
+      auto patterns = expr->getDecl()->getArgParamPatterns();
       ConstraintLocatorBuilder locator(CS.getConstraintLocator(expr, { }));
       for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
         Type paramTy = getTypeForPattern(patterns[e - i - 1], expr,

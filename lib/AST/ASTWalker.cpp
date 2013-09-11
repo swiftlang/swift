@@ -300,22 +300,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitFuncExpr(FuncExpr *E) {
-    for (auto &patt : E->getArgParamPatterns()) {
-      if (Pattern *P = doIt(patt))
-        patt = P;
-      else
-        return nullptr;
-    }
     if (E->getBodyResultTypeLoc().getTypeRepr())
       if (doIt(E->getBodyResultTypeLoc().getTypeRepr()))
         return nullptr;
-    if (!E->getBody())
-      return E;
-    if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(E->getBody()))) {
-      E->setBody(S);
-      return E;
-    }
-    return nullptr;
+    return E;
   }
 
   Expr *visitPipeClosureExpr(PipeClosureExpr *expr) {
@@ -509,7 +497,7 @@ public:
       if (Pattern *Pat = doIt(PBD->getPattern()))
         PBD->setPattern(Pat);
       else
-        return nullptr;
+        return true;
       if (Expr *Init = PBD->getInit()) {
 #ifndef NDEBUG
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
@@ -520,14 +508,26 @@ public:
           return true;
       }
     } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-      FuncExpr *Body = FD->getFuncExpr();
 #ifndef NDEBUG
       PrettyStackTraceDecl debugStack("walking into body of", FD);
 #endif
-      if (FuncExpr *E2 = cast_or_null<FuncExpr>(doIt(Body)))
+      for (auto &P : FD->getArgParamPatterns()) {
+        if (Pattern *NewPattern = doIt(P))
+          P = NewPattern;
+        else
+          return true;
+      }
+      if (FuncExpr *E2 = cast_or_null<FuncExpr>(doIt(FD->getFuncExpr())))
         FD->setFuncExpr(E2);
       else
         return true;
+
+      if (FD->getBody()) {
+        if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(FD->getBody())))
+          FD->setBody(S);
+        else
+          return true;
+      }
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
       for (Decl *M : ED->getMembers()) {
         if (doIt(M))

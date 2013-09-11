@@ -31,8 +31,11 @@ namespace {
     llvm::raw_ostream &Out;
     const bool HadError;
 
+    using FunctionLike = llvm::PointerUnion4<
+        ConstructorDecl *, DestructorDecl *, FuncDecl *, PipeClosureExpr *>;
+
     /// \brief The stack of functions we're visiting.
-    SmallVector<FuncExprLike, 4> Functions;
+    SmallVector<FunctionLike, 4> Functions;
 
     /// \brief The set of opaque value expressions active at this point.
     llvm::DenseMap<OpaqueValueExpr *, unsigned> OpaqueValues;
@@ -214,11 +217,6 @@ namespace {
 
     // Specialized verifiers.
 
-    bool shouldVerify(FuncExpr *func) {
-      Functions.push_back(func);
-      return shouldVerify(cast<Expr>(func));
-    }
-
     bool shouldVerify(PipeClosureExpr *closure) {
       Functions.push_back(closure);
       return shouldVerify(cast<Expr>(closure));
@@ -229,20 +227,21 @@ namespace {
       return shouldVerify(cast<Expr>(dynamicMember));
     }
 
-    bool shouldVerify(ConstructorDecl *cd) {
-      Functions.push_back(cd);
-      return shouldVerify(cast<Decl>(cd));
+    bool shouldVerify(ConstructorDecl *CD) {
+      Functions.push_back(CD);
+      return shouldVerify(cast<Decl>(CD));
     }
-    
-    bool shouldVerify(DestructorDecl *dd) {
-      Functions.push_back(dd);
-      return shouldVerify(cast<Decl>(dd));
+
+    bool shouldVerify(DestructorDecl *DD) {
+      Functions.push_back(DD);
+      return shouldVerify(cast<Decl>(DD));
     }
-    
-    void cleanup(FuncExpr *func) {
-      assert(Functions.back().get<FuncExpr*>() == func);
-      Functions.pop_back();
+
+    bool shouldVerify(FuncDecl *FD) {
+      Functions.push_back(FD);
+      return shouldVerify(cast<Decl>(FD));
     }
+
     void cleanup(PipeClosureExpr *closure) {
       assert(Functions.back().get<PipeClosureExpr*>() == closure);
       Functions.pop_back();
@@ -253,20 +252,26 @@ namespace {
       OpaqueValues.erase(dynamicMember->getOpaqueFn());
     }
 
-    void cleanup(ConstructorDecl *cd) {
-      assert(Functions.back().get<ConstructorDecl*>() == cd);
+    void cleanup(ConstructorDecl *CD) {
+      assert(Functions.back().get<ConstructorDecl *>() == CD);
       Functions.pop_back();
     }
-    void cleanup(DestructorDecl *cd) {
-      assert(Functions.back().get<DestructorDecl*>() == cd);
+
+    void cleanup(DestructorDecl *DD) {
+      assert(Functions.back().get<DestructorDecl *>() == DD);
+      Functions.pop_back();
+    }
+
+    void cleanup(FuncDecl *FD) {
+      assert(Functions.back().get<FuncDecl *>() == FD);
       Functions.pop_back();
     }
 
     void verifyChecked(ReturnStmt *S) {
       auto func = Functions.back();
       Type resultType;
-      if (FuncExpr *fe = func.dyn_cast<FuncExpr*>()) {
-        resultType = fe->getResultType(Ctx);
+      if (FuncDecl *FD = func.dyn_cast<FuncDecl *>()) {
+        resultType = FD->getFuncExpr()->getResultType(Ctx);
       } else if (auto closure = func.dyn_cast<PipeClosureExpr *>()) {
         resultType = closure->getResultType();
       } else {
@@ -913,18 +918,6 @@ namespace {
       return true;
     }
 
-    void checkSourceRanges(FuncExpr *FE) {
-      for (auto P : FE->getArgParamPatterns()) {
-        if (!P->isImplicit() && !isGoodSourceRange(P->getSourceRange())) {
-          Out << "bad source range for arg param pattern: ";
-          P->print(Out);
-          Out << "\n";
-          abort();
-        }
-      }
-      checkSourceRanges(cast<Expr>(FE));
-    }
-
     void checkSourceRanges(Expr *E) {
       if (!E->getSourceRange().isValid()) {
         // We don't care about source ranges on implicitly-generated
@@ -973,7 +966,19 @@ namespace {
       checkSourceRanges(D->getSourceRange(), Parent,
                         [&]{ D->print(Out); });
     }
-    
+
+    void checkSourceRanges(FuncDecl *FD) {
+      for (auto P : FD->getArgParamPatterns()) {
+        if (!P->isImplicit() && !isGoodSourceRange(P->getSourceRange())) {
+          Out << "bad source range for arg param pattern: ";
+          P->print(Out);
+          Out << "\n";
+          abort();
+        }
+      }
+      checkSourceRanges(cast<Decl>(FD));
+    }
+
     /// \brief Verify that the given source ranges is contained within the
     /// parent's source range.
     void checkSourceRanges(SourceRange Current,

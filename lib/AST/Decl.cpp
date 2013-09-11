@@ -266,7 +266,7 @@ std::pair<DefaultArgumentKind, Type>
 ValueDecl::getDefaultArg(unsigned index) const {
   ArrayRef<const Pattern *> patterns;
   if (auto func = dyn_cast<FuncDecl>(this)) {
-    patterns = func->getFuncExpr()->getArgParamPatterns();
+    patterns = func->getArgParamPatterns();
 
     // Skip the 'self' parameter; it is not counted.
     if (func->getDeclContext()->isTypeContext())
@@ -639,14 +639,68 @@ bool VarDecl::isAnonClosureParam() const {
   return nameStr[0] == '$';
 }
 
-VarDecl *FuncDecl::getImplicitSelfDecl() const {
-  return TheFuncExprBody->getImplicitSelfDecl();
+VarDecl *AbstractFunctionDecl::getImplicitSelfDeclSlow() const {
+  if (auto FD = dyn_cast<FuncDecl>(this)) {
+    VarDecl *SelfDecl = FD->getImplicitSelfDeclImpl();
+    ImplicitSelfDeclAndIsCached.setPointerAndInt(SelfDecl, true);
+    return SelfDecl;
+  }
+  ImplicitSelfDeclAndIsCached.setPointerAndInt(nullptr, true);
+  return nullptr;
 }
 
-/// getNaturalArgumentCount - Returns the "natural" number of
-/// argument clauses taken by this function.
-unsigned FuncDecl::getNaturalArgumentCount() const {
-  return TheFuncExprBody->getNaturalArgumentCount();
+VarDecl *FuncDecl::getImplicitSelfDeclImpl() const {
+  if (getNumParamPatterns() == 0) return nullptr;
+
+  // "self" is represented as (typed_pattern (named_pattern (var_decl 'self')).
+  auto TP = dyn_cast<TypedPattern>(getArgParamPatterns()[0]);
+  if (TP == 0) return nullptr;
+
+  // The decl should be named 'self' and have no location information.
+  auto NP = dyn_cast<NamedPattern>(TP->getSubPattern());
+  if (NP && NP->getBoundName().str() == "self" && !NP->getLoc().isValid())
+    return NP->getDecl();
+  return nullptr;
+}
+
+FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
+                           SourceLoc FuncLoc, Identifier Name,
+                           SourceLoc NameLoc, GenericParamList *GenericParams,
+                           Type Ty, unsigned NumParamPatterns,
+                           FuncExpr *TheFuncExprBody, DeclContext *DC) {
+  assert(NumParamPatterns > 0);
+  void *Mem = Context.Allocate(
+      sizeof(FuncDecl) + 2 * NumParamPatterns * sizeof(Pattern *),
+      alignof(FuncDecl));
+  return ::new (Mem)
+      FuncDecl(StaticLoc, FuncLoc, Name, NameLoc, NumParamPatterns,
+               GenericParams, Ty, TheFuncExprBody, DC);
+}
+
+FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
+                           SourceLoc FuncLoc, Identifier Name,
+                           SourceLoc NameLoc, GenericParamList *GenericParams,
+                           Type Ty, ArrayRef<Pattern *> ArgParams,
+                           ArrayRef<Pattern *> BodyParams,
+                           FuncExpr *TheFuncExprBody, DeclContext *DC) {
+  assert(ArgParams.size() == BodyParams.size());
+  const unsigned NumParamPatterns = ArgParams.size();
+  auto *FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name, NameLoc,
+                              GenericParams, Ty, NumParamPatterns,
+                              TheFuncExprBody, DC);
+  FD->setParamPatterns(ArgParams, BodyParams);
+  return FD;
+}
+
+void FuncDecl::setParamPatterns(ArrayRef<Pattern *> ArgParams,
+                                ArrayRef<Pattern *> BodyParams) {
+  assert(ArgParams.size() == BodyParams.size());
+  assert(getNumParamPatterns() == ArgParams.size());
+  const unsigned NumParamPatterns = ArgParams.size();
+  for (unsigned i = 0; i != NumParamPatterns; ++i)
+    getParamsBuffer()[i] = ArgParams[i];
+  for (unsigned i = 0; i != NumParamPatterns; ++i)
+    getParamsBuffer()[i + NumParamPatterns] = BodyParams[i];
 }
 
 ArrayRef<ValueDecl*> FuncDecl::getCaptures() const {
@@ -752,8 +806,7 @@ bool FuncDecl::isUnaryOperator() const {
   
   unsigned opArgIndex = isa<ProtocolDecl>(getDeclContext()) ? 1 : 0;
   
-  auto *argTuple = dyn_cast<TuplePattern>(
-      TheFuncExprBody -> getArgParamPatterns()[opArgIndex]);
+  auto *argTuple = dyn_cast<TuplePattern>(getArgParamPatterns()[opArgIndex]);
   if (!argTuple)
     return true;
 
@@ -766,8 +819,7 @@ bool FuncDecl::isBinaryOperator() const {
   
   unsigned opArgIndex = isa<ProtocolDecl>(getDeclContext()) ? 1 : 0;
   
-  auto *argTuple = dyn_cast<TuplePattern>(
-      TheFuncExprBody -> getArgParamPatterns()[opArgIndex]);
+  auto *argTuple = dyn_cast<TuplePattern>(getArgParamPatterns()[opArgIndex]);
   if (!argTuple)
     return false;
   
@@ -809,7 +861,7 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
   out << getName().str();
 
   // We should always have exactly two levels of argument pattern.
-  auto argPatterns = TheFuncExprBody->getArgParamPatterns();
+  auto argPatterns = getArgParamPatterns();
   assert(argPatterns.size() == 2);
   const Pattern *pattern = argPatterns[1];
   auto tuple = dyn_cast<TuplePattern>(pattern);
@@ -845,7 +897,16 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
 }
 
 SourceRange FuncDecl::getSourceRange() const {
-  return TheFuncExprBody->getSourceRange();
+  if (getBodyKind() == BodyKind::Unparsed ||
+      getBodyKind() == BodyKind::Skipped)
+    return { FuncLoc, BodyEndLoc };
+  if (auto *B = getBody())
+    return { FuncLoc, B->getEndLoc() };
+  if (TheFuncExprBody->getBodyResultTypeLoc().hasLocation())
+    return { FuncLoc,
+             TheFuncExprBody->getBodyResultTypeLoc().getSourceRange().End };
+  const Pattern *LastPat = getArgParamPatterns().back();
+  return { FuncLoc, LastPat->getEndLoc() };
 }
 
 SourceRange UnionElementDecl::getSourceRange() const {

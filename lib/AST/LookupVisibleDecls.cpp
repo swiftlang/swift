@@ -413,15 +413,15 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
     if (auto FE = dyn_cast<FuncExpr>(DC)) {
-      for (auto *P : FE->getArgParamPatterns())
+      for (auto *P : FE->getDecl()->getArgParamPatterns())
         FindLocalVal(SM, Loc, Consumer).checkPattern(P);
 
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       // FIXME: when we can parse and typecheck the function body partially for
       // code completion, FE->getBody() check can be removed.
-      if (Loc.isValid() && FE->getBody()) {
-        FindLocalVal(SM, Loc, Consumer).visit(FE->getBody());
+      if (Loc.isValid() && FE->getDecl()->getBody()) {
+        FindLocalVal(SM, Loc, Consumer).visit(FE->getDecl()->getBody());
       }
 
       FuncDecl *FD = FE->getDecl();

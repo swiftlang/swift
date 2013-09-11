@@ -300,14 +300,15 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   // Emit any default argument generators.
   {
-    auto patterns = fe->getArgParamPatterns();
+    auto patterns = fe->getDecl()->getArgParamPatterns();
     if (fe->getDecl() && fe->getDecl()->getDeclContext()->isTypeContext())
       patterns = patterns.slice(1);
     emitDefaultArgGenerators(decl, patterns);
   }
 
   // Ignore prototypes.
-  if (fe->getBody() == nullptr) return;
+  if (!fe->getDecl()->getBody())
+    return;
 
   PrettyStackTraceExpr stackTrace(M.getASTContext(), "emitting SIL for", fe);
   

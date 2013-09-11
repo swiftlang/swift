@@ -590,22 +590,24 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
 // named function or an anonymous func expression.
 bool TypeChecker::typeCheckFunctionBodyUntil(FuncExpr *FE,
                                              SourceLoc EndTypeCheckLoc) {
-  if (FE->getDecl() && FE->getDecl()->isInvalid())
+  FuncDecl *FD = FE->getDecl();
+
+  if (FD->isInvalid())
     return true;
 
   // Check the default argument definitions.
-  for (auto pattern : FE->getBodyParamPatterns()) {
+  for (auto pattern : FD->getBodyParamPatterns()) {
     checkDefaultArguments(*this, pattern, FE->getParent());
   }
 
-  BraceStmt *BS = FE->getBody();
+  BraceStmt *BS = FD->getBody();
   assert(BS && "Should have a body");
 
   StmtChecker SC(*this, FE);
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
   bool HadError = SC.typeCheckStmt(BS);
 
-  FE->setBody(BS);
+  FD->setBody(BS);
   return HadError;
 }
 

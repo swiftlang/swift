@@ -907,6 +907,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool isClassMethod;
     bool isAssignmentOrConversion;
     bool isObjC, isIBAction, isTransparent;
+    unsigned NumParamPatterns;
     TypeID signatureID;
     DeclID associatedDeclID;
     DeclID overriddenID;
@@ -914,8 +915,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     decls_block::FuncLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                         isClassMethod, isAssignmentOrConversion,
                                         isObjC, isIBAction, isTransparent,
-                                        signatureID, associatedDeclID,
-                                        overriddenID);
+                                        NumParamPatterns, signatureID,
+                                        associatedDeclID, overriddenID);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -926,10 +927,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     // DeclContext for now.
     GenericParamList *genericParams = maybeReadGenericParams(DC);
 
-    auto fn = new (ctx) FuncDecl(SourceLoc(), SourceLoc(),
-                                 getIdentifier(nameID), SourceLoc(),
-                                 genericParams, /*type=*/nullptr,
-                                 /*body=*/nullptr, DC);
+    auto fn = FuncDecl::create(
+        ctx, SourceLoc(), SourceLoc(), getIdentifier(nameID), SourceLoc(),
+        genericParams, /*type=*/nullptr, NumParamPatterns,
+        /*TheFuncExprBody=*/nullptr, DC);
     declOrOffset = fn;
 
     // This must be set after recording the constructor in the map.
@@ -950,9 +951,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     ArrayRef<Pattern *> patterns(patternBuf);
     ArrayRef<Pattern *> argPatterns = patterns.slice(0, patternCount);
     ArrayRef<Pattern *> bodyPatterns = patterns.slice(patternCount);
+    fn->setParamPatterns(argPatterns, bodyPatterns);
 
     auto body = FuncExpr::create(ctx, SourceLoc(),
-                                 argPatterns, bodyPatterns,
                                  TypeLoc::withoutLoc(signature->getResult()),
                                  DC);
     body->setType(signature);

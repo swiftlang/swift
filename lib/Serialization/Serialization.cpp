@@ -1143,6 +1143,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isObjC(),
                            fn->getAttrs().isIBAction(),
                            fn->getAttrs().isTransparent(),
+                           fn->getArgParamPatterns().size(),
                            addTypeRef(fn->getType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
@@ -1152,9 +1153,9 @@ void Serializer::writeDecl(const Decl *D) {
 
     // Write both argument and body parameters. This is important for proper
     // error messages with selector-style declarations.
-    for (auto pattern : fn->getFuncExpr()->getArgParamPatterns())
+    for (auto pattern : fn->getArgParamPatterns())
       writePattern(pattern);
-    for (auto pattern : fn->getFuncExpr()->getBodyParamPatterns())
+    for (auto pattern : fn->getBodyParamPatterns())
       writePattern(pattern);
 
     if (fn->getAttrs().isConversion())

@@ -114,14 +114,27 @@ class alignas(8) Decl {
   enum { NumValueDeclBits = NumDeclBits };
   static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
+  class AbstractFunctionDeclBitfields {
+    friend class AbstractFunctionDecl;
+    unsigned : NumValueDeclBits;
+
+    /// \see AbstractFunctionDecl::BodyKind
+    unsigned BodyKind : 2;
+  };
+  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 2 };
+  static_assert(NumAbstractFunctionDeclBits <= 32, "fits in an unsigned");
+
   class FuncDeclBitFields {
     friend class FuncDecl;
-    unsigned : NumValueDeclBits;
+    unsigned : NumAbstractFunctionDeclBits;
 
     /// \brief Whether this function is a 'static' method.
     unsigned Static : 1;
+
+    /// \brief Number of parameter patterns (tuples).
+    unsigned NumParamPatterns : 16;
   };
-  enum { NumFuncDeclBits = NumValueDeclBits + 1 };
+  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 17 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
   class TypeDeclBitFields {
@@ -213,6 +226,7 @@ protected:
   union {
     DeclBitfields DeclBits;
     ValueDeclBitfields ValueDeclBits;
+    AbstractFunctionDeclBitfields AbstractFunctionDeclBits;
     FuncDeclBitFields FuncDeclBits;
     TypeDeclBitFields TypeDeclBits;
     ProtocolDeclBitFields ProtocolDeclBits;
@@ -1886,37 +1900,232 @@ public:
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
 };
 
+/// \brief Base class for function-like declarations.
+class AbstractFunctionDecl : public ValueDecl {
+  friend class FuncExpr;
+
+public:
+  enum class BodyKind {
+    /// The function did not have a body in the source code file.
+    None,
+
+    /// Function body is delayed, to be parsed later.
+    Unparsed,
+
+    /// Function body is parsed and available as an AST subtree.
+    Parsed,
+
+    /// Function body is not available, although it was written in the source.
+    Skipped
+  };
+
+  BodyKind getBodyKind() const {
+    return BodyKind(AbstractFunctionDeclBits.BodyKind);
+  }
+
+protected:
+  // If a function has a body at all, we have either a parsed body AST node or
+  // we have saved the end location of the unparsed body.
+  union {
+    /// This union member is active if getBodyKind() == BodyKind::Parsed.
+    BraceStmt *Body;
+
+    /// End location of the function body when the body is delayed or skipped.
+    /// This union member is active if getBodyKind() is BodyKind::Unparsed or
+    /// BodyKind::Skipped.
+    SourceLoc BodyEndLoc;
+  };
+
+  /// Pointer to the implicit 'self' decl and a bit that is set to true when
+  /// this pointer is computed already.
+  mutable llvm::PointerIntPair<VarDecl *, 1, bool> ImplicitSelfDeclAndIsCached;
+
+  AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, Identifier Name,
+                       VarDecl *ImplicitSelfDecl)
+      : ValueDecl(Kind, Parent, Name), Body(nullptr) {
+    if (ImplicitSelfDecl)
+      ImplicitSelfDeclAndIsCached.setPointerAndInt(ImplicitSelfDecl, true);
+    else
+      ImplicitSelfDeclAndIsCached.setPointerAndInt(nullptr, false);
+    setBodyKind(BodyKind::None);
+  }
+
+  VarDecl *getImplicitSelfDeclSlow() const;
+
+  Pattern **getParamsBuffer();
+
+  Pattern *const *getParamsBuffer() const {
+    Pattern **Buffer =
+        const_cast<AbstractFunctionDecl *>(this)->getParamsBuffer();
+    return reinterpret_cast<Pattern *const *>(Buffer);
+  }
+
+  void setBodyKind(BodyKind K) {
+    AbstractFunctionDeclBits.BodyKind = unsigned(K);
+  }
+
+public:
+  /// Returns true if the function has a body written in the source file.
+  ///
+  /// Note that a true return value does not imply that the body was actually
+  /// parsed.
+  bool hasBody() const {
+    return getBodyKind() != BodyKind::None;
+  }
+
+  BraceStmt *getBody() const {
+    if (getBodyKind() == BodyKind::Parsed)
+      return Body;
+    return nullptr;
+  }
+  void setBody(BraceStmt *S) {
+    assert(getBodyKind() != BodyKind::Skipped &&
+           "can not set a body if it was skipped");
+
+    Body = S;
+    setBodyKind(BodyKind::Parsed);
+  }
+
+  /// \brief Note that the body was skipped for this function.  Function body
+  /// can not be attached after this call.
+  void setBodySkipped(SourceLoc EndLoc) {
+    assert(getBodyKind() == BodyKind::None);
+    BodyEndLoc = EndLoc;
+    setBodyKind(BodyKind::Skipped);
+  }
+
+  /// \brief Note that parsing for the body was delayed.
+  void setBodyDelayed(SourceLoc EndLoc) {
+    assert(getBodyKind() == BodyKind::None);
+    BodyEndLoc = EndLoc;
+    setBodyKind(BodyKind::Unparsed);
+  }
+
+  /// \brief This method returns the implicit 'self' decl.
+  ///
+  /// Note that some functions don't have an implicit 'self' decl, for example,
+  /// free functions.  In this case nullptr is returned.
+  VarDecl *getImplicitSelfDecl() const {
+    if (ImplicitSelfDeclAndIsCached.getInt())
+      return ImplicitSelfDeclAndIsCached.getPointer();
+    return getImplicitSelfDeclSlow();
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() >= DeclKind::First_AbstractFunctionDecl &&
+           D->getKind() <= DeclKind::Last_AbstractFunctionDecl;
+  }
+};
+
 class OperatorDecl;
 
 /// FuncDecl - 'func' declaration.
-class FuncDecl : public ValueDecl {
+class FuncDecl : public AbstractFunctionDecl {
+  friend class AbstractFunctionDecl;
+
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
   SourceLoc NameLoc;
+
   GenericParamList *GenericParams;
   FuncExpr *TheFuncExprBody;
   llvm::PointerIntPair<Decl *, 1, bool> GetOrSetDecl;
   FuncDecl *OverriddenDecl;
   OperatorDecl *Operator;
 
-public:
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
-           SourceLoc NameLoc, GenericParamList *GenericParams, Type Ty,
+           SourceLoc NameLoc, unsigned NumParamPatterns,
+           GenericParamList *GenericParams, Type Ty,
            FuncExpr *TheFuncExprBody, DeclContext *DC)
-    : ValueDecl(DeclKind::Func, DC, Name), StaticLoc(StaticLoc),
+    : AbstractFunctionDecl(DeclKind::Func, DC, Name, nullptr),
+      StaticLoc(StaticLoc),
       FuncLoc(FuncLoc), NameLoc(NameLoc), GenericParams(GenericParams),
       TheFuncExprBody(TheFuncExprBody), OverriddenDecl(nullptr),
       Operator(nullptr) {
     FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
+    assert(NumParamPatterns > 0);
+    FuncDeclBits.NumParamPatterns = NumParamPatterns;
     setType(Ty);
   }
-  
+
+  VarDecl *getImplicitSelfDeclImpl() const;
+
+  unsigned getNumParamPatterns() const { return FuncDeclBits.NumParamPatterns; }
+
+public:
+  static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
+                          SourceLoc FuncLoc, Identifier Name, SourceLoc NameLoc,
+                          GenericParamList *GenericParams, Type Ty,
+                          unsigned NumParamPatterns,
+                          FuncExpr *TheFuncExprBody, DeclContext *DC);
+
+  static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
+                          SourceLoc FuncLoc, Identifier Name, SourceLoc NameLoc,
+                          GenericParamList *GenericParams, Type Ty,
+                          ArrayRef<Pattern *> ArgParams,
+                          ArrayRef<Pattern *> BodyParams,
+                          FuncExpr *TheFuncExprBody, DeclContext *DC);
+
   bool isStatic() const {
     return FuncDeclBits.Static;
   }
   void setStatic(bool Static = true) {
     FuncDeclBits.Static = Static;
   }
+
+  /// \brief Returns the argument pattern(s) for the function definition
+  /// that determine the function type.
+  //
+  /// - For a definition of the form `func foo(a:A, b:B)`, this will
+  ///   be a one-element array containing the argument pattern `(a:A, b:B)`.
+  /// - For a curried definition such as `func foo(a:A)(b:B)`, this will
+  ///   be a multiple-element array containing a pattern for each level
+  ///   of currying, in this case two patterns `(a:A)` and `(b:B)`.
+  /// - For a selector-style definition such as `func foo(a:A) bar(b:B)`,
+  ///   this will be a one-element array containing the argument pattern
+  ///   of the keyword arguments, in this case `(_:A, bar:B)`. For selector-
+  ///   style definitions, this is different from `getBodyParamPatterns`,
+  ///   which would return the declared parameter names `(a:A, b:B)`.
+  ///
+  /// If the function expression refers to a method definition, there will
+  /// be an additional first argument pattern for the `this` parameter.
+  MutableArrayRef<Pattern *> getArgParamPatterns() {
+    return MutableArrayRef<Pattern *>(getParamsBuffer(),
+                                      getNumParamPatterns());
+  }
+  ArrayRef<const Pattern *> getArgParamPatterns() const {
+    return ArrayRef<const Pattern *>(getParamsBuffer(), getNumParamPatterns());
+  }
+
+  /// \brief Returns the parameter pattern(s) for the function definition that
+  /// determine the parameter names bound in the function body.
+  ///
+  /// Typically, this is the same as \c getArgParamPatterns, unless the
+  /// function was defined with selector-style syntax such as:
+  /// \code
+  ///   func foo(a:A) bar(b:B) {}
+  /// \endcode
+  ///
+  /// For a selector-style definition, \c getArgParamPatterns will return the
+  /// pattern that describes the keyword argument names, in this case
+  /// `(_:A, bar:B)`, whereas \c getBodyParamPatterns will return a pattern
+  /// referencing the declared parameter names in the function body's scope,
+  /// in this case `(a:A, b:B)`.
+  ///
+  /// In all cases `getArgParamPatterns().size()` should equal
+  /// `getBodyParamPatterns().size()`, and the corresponding elements of each
+  /// tuple type should have equivalent types.
+  MutableArrayRef<Pattern *> getBodyParamPatterns() {
+    return MutableArrayRef<Pattern *>(getParamsBuffer() + getNumParamPatterns(),
+                                      getNumParamPatterns());
+  }
+  ArrayRef<const Pattern *> getBodyParamPatterns() const {
+    return ArrayRef<const Pattern *>(getParamsBuffer() + getNumParamPatterns(),
+                                     getNumParamPatterns());
+  }
+
+  void setParamPatterns(ArrayRef<Pattern *> ArgParams,
+                        ArrayRef<Pattern *> BodyParams);
 
   FuncExpr *getFuncExpr() { return TheFuncExprBody; }
   const FuncExpr *getFuncExpr() const { return TheFuncExprBody; }
@@ -1935,24 +2144,30 @@ public:
   /// non-empty list.
   bool hasLocalCaptures() const;
 
-
-  /// getNaturalArgumentCount - Returns the "natural" number of
-  /// argument clauses taken by this function.  This value is always
-  /// at least one, and it may be more if the function is implicitly
-  /// or explicitly curried.
+  /// \brief Returns the "natural" number of argument clauses taken by this
+  /// function.  This value is always at least one, and it may be more if the
+  /// function is implicitly or explicitly curried.
   ///
   /// For example, this function:
+  /// \code
   ///   func negate(x : Int) -> Int { return -x }
+  /// \endcode
   /// has a natural argument count of 1 if it is freestanding.  If it is
   /// a method, it has a natural argument count of 2, as does this
   /// curried function:
+  /// \code
   ///   func add(x : Int)(y : Int) -> Int { return x + y }
+  /// \endcode
   ///
   /// This value never exceeds the number of chained function types
   /// in the function's type, but it can be less for functions which
   /// return a value of function type:
+  /// \code
   ///   func const(x : Int) -> () -> Int { return { x } } // NAC==1
-  unsigned getNaturalArgumentCount() const;
+  /// \endcode
+  unsigned getNaturalArgumentCount() const {
+    return getNumParamPatterns();
+  }
   
   /// getExtensionType - If this is a method in a type extension for some type,
   /// return that type, otherwise return Type().
@@ -1968,12 +2183,7 @@ public:
   /// of a generic type, will be set to the generic parameter list of that
   /// generic type.
   Type computeSelfType(GenericParamList **OuterGenericParams = nullptr) const;
-  
-  /// \brief If this FuncDecl is a non-static method in an extension context,
-  /// it will have a 'self' argument.  This method returns it if present, or
-  /// returns null if not.
-  VarDecl *getImplicitSelfDecl() const;
-  
+
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
 
@@ -2238,11 +2448,9 @@ public:
 ///   }
 /// }
 /// \endcode
-class ConstructorDecl : public ValueDecl, public DeclContext {
+class ConstructorDecl : public AbstractFunctionDecl, public DeclContext {
   SourceLoc ConstructorLoc;
   Pattern *Arguments;
-  BraceStmt *Body;
-  VarDecl *ImplicitSelfDecl;
   GenericParamList *GenericParams;
   
   /// The type of the initializing constructor.
@@ -2256,11 +2464,14 @@ public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
                   Pattern *Arguments, VarDecl *ImplicitSelfDecl,
                   GenericParamList *GenericParams, DeclContext *Parent)
-    : ValueDecl(DeclKind::Constructor, Parent, NameHack),
+    : AbstractFunctionDecl(DeclKind::Constructor, Parent, NameHack,
+                           ImplicitSelfDecl),
       DeclContext(DeclContextKind::ConstructorDecl, Parent),
-      ConstructorLoc(ConstructorLoc), Arguments(Arguments), Body(nullptr),
-      ImplicitSelfDecl(ImplicitSelfDecl), GenericParams(GenericParams) {}
-  
+      ConstructorLoc(ConstructorLoc), Arguments(Arguments),
+      GenericParams(GenericParams) {
+    assert(ImplicitSelfDecl && "constructors should have a non-null self");
+  }
+
   SourceLoc getStartLoc() const { return ConstructorLoc; }
   SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
@@ -2272,9 +2483,6 @@ public:
     Arguments = args;
   }
 
-  BraceStmt *getBody() const { return Body; }
-  void setBody(BraceStmt *b) { Body = b; }
-
   /// \brief Compute and return the type of 'self'.
   Type computeSelfType(GenericParamList **OuterGenericParams = nullptr) const;
 
@@ -2283,9 +2491,6 @@ public:
 
   /// \brief Get the type of the constructed object.
   Type getResultType() const;
-
-  /// \brief This method returns the implicit 'self' decl.
-  VarDecl *getImplicitSelfDecl() const { return ImplicitSelfDecl; }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
   bool isGeneric() const { return GenericParams != nullptr; }
@@ -2329,31 +2534,25 @@ public:
 ///   }
 /// }
 /// \endcode
-class DestructorDecl : public ValueDecl, public DeclContext {
+class DestructorDecl : public AbstractFunctionDecl, public DeclContext {
   SourceLoc DestructorLoc;
-  BraceStmt *Body;
-  VarDecl *ImplicitSelfDecl;
-  
+
 public:
   DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
                   VarDecl *ImplicitSelfDecl, DeclContext *Parent)
-    : ValueDecl(DeclKind::Destructor, Parent, NameHack),
+    : AbstractFunctionDecl(DeclKind::Destructor, Parent, NameHack,
+                           ImplicitSelfDecl),
       DeclContext(DeclContextKind::DestructorDecl, Parent),
-      DestructorLoc(DestructorLoc), Body(nullptr),
-      ImplicitSelfDecl(ImplicitSelfDecl) {}
+      DestructorLoc(DestructorLoc) {
+    assert(ImplicitSelfDecl && "destructors should have a non-null self");
+  }
   
   SourceLoc getStartLoc() const { return DestructorLoc; }
   SourceLoc getLoc() const { return DestructorLoc; }
   SourceRange getSourceRange() const;
 
-  BraceStmt *getBody() const { return Body; }
-  void setBody(BraceStmt *b) { Body = b; }
-
   /// \brief Compute and return the type of 'self'.
   Type computeSelfType(GenericParamList **OuterGenericParams = nullptr) const;
-
-  /// \brief This method returns the implicit 'self' decl.
-  VarDecl *getImplicitSelfDecl() const { return ImplicitSelfDecl; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Destructor;
@@ -2546,7 +2745,7 @@ public:
     return D->getKind() == DeclKind::PostfixOperator;
   }
 };
-  
+
 inline void GenericParam::setDeclContext(DeclContext *DC) {
   TypeParam->setDeclContext(DC);
 }
@@ -2563,7 +2762,23 @@ inline bool ValueDecl::isSettable() const {
 inline bool NominalTypeDecl::isPhysicalField(VarDecl *vd) {
   return !vd->isProperty();
 }
-  
+
+inline Pattern **AbstractFunctionDecl::getParamsBuffer() {
+  switch (getKind()) {
+  case DeclKind::Constructor:
+    return reinterpret_cast<Pattern **>(cast<ConstructorDecl>(this) + 1);
+
+  case DeclKind::Destructor:
+    return reinterpret_cast<Pattern **>(cast<DestructorDecl>(this) + 1);
+
+  case DeclKind::Func:
+    return reinterpret_cast<Pattern **>(cast<FuncDecl>(this) + 1);
+
+  default:
+    llvm_unreachable("unhandled derived decl kind");
+  }
+}
+
 // FIXME: Fix up the AST representation of ConstructorDecls and DestructorDecls
 // to use real FuncExpr bodies.
 

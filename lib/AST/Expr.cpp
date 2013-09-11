@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/AST/Decl.h" // FIXME: Bad dependency
 #include "swift/AST/AST.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
@@ -278,7 +279,7 @@ ArchetypeSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
 
 ArrayRef<Pattern *> CapturingExpr::getParamPatterns() {
   if (auto *func = dyn_cast<FuncExpr>(this))
-    return func->getArgParamPatterns();
+    return func->getDecl()->getArgParamPatterns();
   if (auto *closure = dyn_cast<PipeClosureExpr>(this))
     return closure->getParams();
   if (auto *closure = dyn_cast<ClosureExpr>(this))
@@ -291,23 +292,9 @@ ArrayRef<const Pattern *> CapturingExpr::getParamPatterns() const {
   return ArrayRef<const Pattern *>(patterns.data(), patterns.size());
 }
 
-
-FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
-                           ArrayRef<Pattern*> argParams,
-                           ArrayRef<Pattern*> bodyParams,
-                           TypeLoc fnRetType,
-                           DeclContext *parent) {
-  assert(argParams.size() == bodyParams.size());
-  unsigned nParams = argParams.size();
-  assert(nParams > 0);
-  void *buf = C.Allocate(sizeof(FuncExpr) + 2 * nParams * sizeof(Pattern*),
-                         alignof(FuncExpr));
-  FuncExpr *fn = ::new (buf) FuncExpr(funcLoc, nParams, fnRetType, parent);
-  for (unsigned i = 0; i != nParams; ++i)
-    fn->getParamsBuffer()[i] = argParams[i];
-  for (unsigned i = 0; i != nParams; ++i)
-    fn->getParamsBuffer()[i+nParams] = bodyParams[i];
-  return fn;
+FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc FuncLoc,
+                           TypeLoc FnRetType, DeclContext *Parent) {
+  return new (C) FuncExpr(FuncLoc, FnRetType, Parent);
 }
 
 SourceLoc FuncExpr::getLoc() const {
@@ -315,14 +302,7 @@ SourceLoc FuncExpr::getLoc() const {
 }
 
 SourceRange FuncExpr::getSourceRange() const {
-  if (getBodyKind() == BodyKind::Unparsed || getBodyKind() == BodyKind::Skipped)
-    return { FuncLoc, BodyEndLoc };
-  if (auto *B = getBody())
-    return { FuncLoc, B->getEndLoc() };
-  if (FnRetType.hasLocation())
-    return { FuncLoc, FnRetType.getSourceRange().End };
-  const Pattern *LastPat = getArgParamPatterns().back();
-  return { FuncLoc, LastPat->getEndLoc() };
+  return getDecl()->getSourceRange();
 }
 
 Type FuncExpr::getResultType(ASTContext &Ctx) const {
@@ -330,7 +310,7 @@ Type FuncExpr::getResultType(ASTContext &Ctx) const {
   if (!resultTy || resultTy->is<ErrorType>())
     return resultTy;
 
-  for (unsigned i = 0, e = getNumParamPatterns(); i != e; ++i)
+  for (unsigned i = 0, e = getDecl()->getNaturalArgumentCount(); i != e; ++i)
     resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
 
   if (!resultTy)
@@ -351,21 +331,6 @@ static ValueDecl *getCalledValue(Expr *E) {
 ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
 }
-
-VarDecl *FuncExpr::getImplicitSelfDecl() const {
-  if (getNumParamPatterns() == 0) return nullptr;
-  
-  // "self" is represented as (typed_pattern (named_pattern (var_decl 'self')).
-  auto TP = dyn_cast<TypedPattern>(getArgParamPatterns()[0]);
-  if (TP == 0) return nullptr;
-  
-  // The decl should be named 'self' and have no location information.
-  auto NP = dyn_cast<NamedPattern>(TP->getSubPattern());
-  if (NP && NP->getBoundName().str() == "self" && !NP->getLoc().isValid())
-    return NP->getDecl();
-  return nullptr;
-}
-
 
 bool CapturingExpr::hasLocalCaptures() const {
   for (auto VD : getCaptures())

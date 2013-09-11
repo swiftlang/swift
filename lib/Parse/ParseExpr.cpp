@@ -599,7 +599,7 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
   } else if (DestructorDecl *dtor = dyn_cast<DestructorDecl>(dc)) {
     return dtor->getImplicitSelfDecl();
   } else if (FuncExpr *fe = dyn_cast<FuncExpr>(dc)) {
-    auto selfDecl = fe->getImplicitSelfDecl();
+    auto selfDecl = fe->getDecl()->getImplicitSelfDecl();
     if (selfDecl)
       return selfDecl;
   }
@@ -1760,15 +1760,14 @@ static void AddFuncArgumentsToScope(const Pattern *pat, CapturingExpr *CE,
   llvm_unreachable("bad pattern kind!");
 }
 
-FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, TypeLoc FuncRetTy, 
-                                     ArrayRef<Pattern*> ArgParams,
-                                     ArrayRef<Pattern*> BodyParams) {
-  FuncExpr *FE = FuncExpr::create(Context, FuncLoc,
-                                  ArgParams, BodyParams, FuncRetTy,
+FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, TypeLoc FuncRetTy,
+                                     ArrayRef<Pattern *> ArgParams,
+                                     ArrayRef<Pattern *> BodyParams) {
+  FuncExpr *FE = FuncExpr::create(Context, FuncLoc, FuncRetTy,
                                   CurDeclContext);
 
   for (Pattern *P : BodyParams)
     AddFuncArgumentsToScope(P, FE, *this);
-  
+
   return FE;
 }

@@ -649,9 +649,9 @@ public:
     Builder.addTextChunk(Name);
     Builder.addLeftParen();
     auto *FE = FD->getFuncExpr();
-    auto Patterns = FE->getArgParamPatterns();
+    auto Patterns = FD->getArgParamPatterns();
     unsigned FirstIndex = 0;
-    if (!IsImlicitlyCurriedInstanceMethod && FE->getImplicitSelfDecl())
+    if (!IsImlicitlyCurriedInstanceMethod && FD->getImplicitSelfDecl())
       FirstIndex = 1;
     addPatternParameters(Builder, Patterns[FirstIndex]);
     Builder.addRightParen();

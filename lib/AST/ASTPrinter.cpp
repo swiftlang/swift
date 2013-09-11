@@ -629,7 +629,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     } else {
       OS << "set";
 
-      auto bodyParams = decl->getFuncExpr()->getBodyParamPatterns();
+      auto bodyParams = decl->getBodyParamPatterns();
       auto valueParam = bodyParams.back()->getSemanticsProvidingPattern();
       if (auto named = dyn_cast<NamedPattern>(valueParam)) {
         OS << "(" << named->getBoundName().str() << ")";
@@ -637,11 +637,11 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       OS << ": ";
     }
 
-    if (!Options.FunctionDefinitions || !decl->getFuncExpr()->getBody()) {
+    if (!Options.FunctionDefinitions || !decl->getBody()) {
       return;
     }
     
-    printBraceStmtElements(decl->getFuncExpr()->getBody());
+    printBraceStmtElements(decl->getBody());
   } else {
     if (decl->isStatic() && !decl->isOperator())
       OS << "static ";
@@ -657,10 +657,10 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     }
 
     if (!printSelectorStyleArgs(decl,
-                                decl->getFuncExpr()->getArgParamPatterns(),
-                                decl->getFuncExpr()->getBodyParamPatterns())) {
+                                decl->getArgParamPatterns(),
+                                decl->getBodyParamPatterns())) {
       bool first = true;
-      for (auto pattern : decl->getFuncExpr()->getArgParamPatterns()) {
+      for (auto pattern : decl->getArgParamPatterns()) {
         if (first) {
           first = false;
 
@@ -680,12 +680,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       resultTy->print(OS);
     }
     
-    if (!Options.FunctionDefinitions || !decl->getFuncExpr()->getBody()) {
+    if (!Options.FunctionDefinitions || !decl->getBody()) {
       return;
     }
     
     OS << " ";
-    visit(decl->getFuncExpr()->getBody());
+    visit(decl->getBody());
   }
 }
 

@@ -1337,9 +1337,9 @@ RValue RValueEmitter::visitClosureExpr(ClosureExpr *e, SGFContext C) {
 
 void SILGenFunction::emitFunction(FuncExpr *fe) {
   Type resultTy = fe->getResultType(F.getASTContext());
-  emitProlog(fe, fe->getBodyParamPatterns(), resultTy);
+  emitProlog(fe, fe->getDecl()->getBodyParamPatterns(), resultTy);
   prepareEpilog(resultTy, CleanupLocation(fe));
-  visit(fe->getBody());
+  visit(fe->getDecl()->getBody());
   emitEpilog(fe);
 }
 
@@ -2134,7 +2134,8 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
   };
 
   // Forward the curried formal arguments.
-  auto forwardedPatterns = fe->getBodyParamPatterns().slice(0, paramCount);
+  auto forwardedPatterns =
+      fe->getDecl()->getBodyParamPatterns().slice(0, paramCount);
   ArgumentForwardVisitor forwarder(*this, curriedArgs);
   UncurryDirection direction
     = SGM.Types.getUncurryDirection(F.getAbstractCC());
