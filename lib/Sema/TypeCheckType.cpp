@@ -960,53 +960,7 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {
-  Type superclassTy;
-  Type specializedTy;
-  if (auto classTy = type->getAs<ClassType>()) {
-    superclassTy = classTy->getDecl()->getSuperclass();
-    if (auto parentTy = classTy->getParent()) {
-      if (parentTy->isSpecialized())
-        specializedTy = parentTy;
-    }
-  } else if (auto boundTy = type->getAs<BoundGenericType>()) {
-    if (auto classDecl = dyn_cast<ClassDecl>(boundTy->getDecl())) {
-      superclassTy = classDecl->getSuperclass();
-      specializedTy = type;
-    }
-  } else if (auto archetypeTy = type->getAs<ArchetypeType>()) {
-    superclassTy = archetypeTy->getSuperclass();
-  } else {
-    // No other types have superclasses.
-    return nullptr;
-  }
-
-  if (!specializedTy || !superclassTy)
-    return superclassTy;
-
-  // If the type is specialized, we need to gather all of the substitutions.
-  // We've already dealt with the top level, but continue gathering
-  // specializations from the parent types.
-  TypeSubstitutionMap substitutions;
-  while (specializedTy) {
-    if (auto nominalTy = specializedTy->getAs<NominalType>()) {
-      specializedTy = nominalTy->getParent();
-      continue;
-    }
-
-    // Introduce substitutions for each of the generic parameters/arguments.
-    auto boundTy = specializedTy->castTo<BoundGenericType>();
-    auto gp = boundTy->getDecl()->getGenericParams()->getParams();
-    for (unsigned i = 0, n = boundTy->getGenericArgs().size(); i != n; ++i) {
-      auto archetype
-        = gp[i].getAsTypeParam()->getArchetype();
-      substitutions[archetype] = boundTy->getGenericArgs()[i];
-    }
-
-    specializedTy = boundTy->getParent();
-  }
-
-  // Perform substitutions into the base type.
-  return substType(superclassTy, substitutions);
+  return type->getSuperclass(Context, this);
 }
 
 Type TypeChecker::resolveMemberType(Type type, Identifier name) {

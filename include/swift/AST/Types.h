@@ -257,6 +257,15 @@ public:
   /// with a class type.
   bool mayHaveSuperclass();
 
+  /// \brief Retrieve the superclass of this type.
+  ///
+  /// \param ctx The ASTContext in which the type occurs.
+  /// \param resolver The resolver for lazy type checking.
+  ///
+  /// \returns The superclass of this type, or a null type if it has no
+  /// superclass.
+  Type getSuperclass(ASTContext &ctx, LazyResolver *resolver);
+
   /// \brief If this is a nominal type or a bound generic nominal type,
   /// returns the (possibly generic) nominal type declaration.
   NominalTypeDecl *getNominalOrBoundGenericNominal();
