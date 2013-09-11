@@ -74,6 +74,10 @@ VerifyMode("verify",
                           "{error|warning|note} annotations"));
 
 
+static llvm::cl::opt<bool>
+EmitVerboseSIL("emit-verbose-sil",
+               llvm::cl::desc("Emit locations during sil emission."));
+
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -158,7 +162,7 @@ int main(int argc, char **argv) {
                  << ErrorInfo << '\n';
     return 1;
   }
-  CI.getSILModule()->print(OS);
+  CI.getSILModule()->print(OS, EmitVerboseSIL);
 
   // Print statistics.
   if (PrintStats)
