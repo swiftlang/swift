@@ -79,8 +79,7 @@ public:
 protected:
   /// \brief Primary AST location.
   ASTNodeTy ASTNode;
-  /// \brief Secondary AST location.
-  ASTNodeTy ASTNodeSecondary;
+
   // If coming from a .sil file, this is the location in the .sil file.
   // FIXME: We should be able to reuse the ASTNodes memory to store this. We
   // could just store Value.getPointer() in the pointer union.
@@ -245,7 +244,6 @@ public:
   inline bool operator==(const SILLocation& R) const {
     return KindData == R.KindData &&
       ASTNode.getOpaqueValue() == R.ASTNode.getOpaqueValue() &&
-      ASTNodeSecondary.getOpaqueValue() == R.ASTNodeSecondary.getOpaqueValue()&&
       SILFileSourceLoc == R.SILFileSourceLoc;
   }
 };
