@@ -50,7 +50,17 @@ namespace irgen {
                                           Explosion &emission,
                                           SILDeclRef method,
                                           llvm::Value *self,
-                                          SILType searchType);
+                                          SILType superSearchType);
+
+  /// Emit a partial application of an Objective-C method to its 'self'
+  /// argument.
+  void emitObjCPartialApplication(IRGenFunction &IGF,
+                                  SILDeclRef method,
+                                  SILType origType,
+                                  SILType partialAppliedType,
+                                  llvm::Value *self,
+                                  SILType selfType,
+                                  Explosion &out);
 
   /// Reclaim an autoreleased return value.
   llvm::Value *emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,

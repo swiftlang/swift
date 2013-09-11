@@ -1489,10 +1489,9 @@ If a dynamic dispatch instruction references an Objective-C method
 (indicated by the ``objc`` language marker on a method reference, as in
 ``#NSObject.description!1.objc``), then the instruction
 represents an ``objc_msgSend`` invocation. ``objc_msgSend`` invocations can
-only be used as the callee of an ``apply`` instruction. They cannot be stored,
-used as ``apply`` or ``partial_apply`` arguments, or as the callee of a
-``partial_apply``. ``objc_msgSend`` invocations additionally must always be
-``volatile``.
+only be used as the callee of an ``apply`` instruction or ``partial_apply``
+instruction. They cannot be stored or used as ``apply`` or ``partial_apply``
+arguments.  ``objc_msgSend`` invocations must always be ``volatile``.
 
 class_method
 ````````````

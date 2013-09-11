@@ -33,6 +33,7 @@
 #include "FunctionRef.h"
 #include "GenClass.h"
 #include "GenFunc.h"
+#include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
@@ -40,6 +41,7 @@
 #include "IRGenModule.h"
 #include "Linking.h"
 #include "ScalarTypeInfo.h"
+#include "StructLayout.h"
 
 #include "GenObjC.h"
 
@@ -404,6 +406,112 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
   
   // Add the selector value.
   args.add(IGF.emitObjCSelectorRefLoad(selector.str()));
+}
+
+static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
+                                                     SILDeclRef method,
+                                                     SILType origMethodType,
+                                                     SILType resultType,
+                                                     const HeapLayout &layout,
+                                                     const TypeInfo &selfTI) {
+  llvm::AttributeSet attrs;
+  llvm::FunctionType *fwdTy = IGM.getFunctionType(AbstractCC::Freestanding,
+                                                  resultType.getSwiftRValueType(),
+                                                  ExplosionKind::Minimal,
+                                                  /*curryLevel=*/ 0,
+                                                  ExtraData::Retainable,
+                                                  attrs);
+  // FIXME: Give the thunk a real name.
+  // FIXME: Maybe cache the thunk by function and closure types?
+  llvm::Function *fwd =
+    llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
+                           "partial_apply", &IGM.Module);
+  fwd->setAttributes(attrs);
+  
+  IRGenFunction subIGF(IGM, ExplosionKind::Minimal, fwd);
+  
+  // Recover 'self' from the context.
+  Explosion params = subIGF.collectParameters();
+  llvm::Value *context = params.takeLast();
+  Address dataAddr = layout.emitCastTo(subIGF, context);
+  auto &fieldLayout = layout.getElements()[0];
+  Address selfAddr = fieldLayout.project(subIGF, dataAddr, Nothing);
+  Explosion selfParams(ExplosionKind::Minimal);
+  // FIXME: Copying the value leaks if 'self' is unconsumed, but not copying it
+  // overreleases if 'self' is consumed and the forwarder is invoked multiple
+  // times.
+  cast<LoadableTypeInfo>(selfTI).loadAsCopy(subIGF, selfAddr, selfParams);
+  llvm::Value *self = selfParams.claimNext();
+  
+  // Save off the forwarded indirect return address if we have one.
+  llvm::Value *indirectReturn = nullptr;
+  SILType appliedResultTy
+    = origMethodType.getFunctionTypeInfo(*IGM.SILMod)->getSemanticResultType();
+  auto &appliedResultTI = IGM.getTypeInfo(appliedResultTy);
+  if (appliedResultTI.getSchema(ExplosionKind::Minimal)
+        .requiresIndirectResult()) {
+    indirectReturn = params.claimNext();
+  }
+
+  // Prepare the call to the underlying method.
+  CallEmission emission
+    = prepareObjCMethodRootCall(subIGF, method, origMethodType, appliedResultTy,
+       ArrayRef<Substitution>{}, ExplosionKind::Minimal, /*isSuper*/ false);
+  
+  Explosion args(params.getKind());
+  addObjCMethodCallImplicitArguments(subIGF, args, method, self, SILType());
+  args.add(params.claimAll());
+  emission.addArg(args);
+  
+  // Emit the call and produce the return value.
+  if (indirectReturn) {
+    emission.emitToMemory(appliedResultTI.getAddressForPointer(indirectReturn),
+                          appliedResultTI);
+    subIGF.Builder.CreateRetVoid();
+  } else {
+    Explosion result(ExplosionKind::Minimal);
+    emission.emitToExplosion(result);
+    subIGF.emitScalarReturn(result);
+  }
+  
+  return fwd;
+}
+
+void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
+                                       SILDeclRef method,
+                                       SILType origMethodType,
+                                       SILType resultType,
+                                       llvm::Value *self,
+                                       SILType selfType,
+                                       Explosion &out) {
+  // Create a heap object to contain the self argument.
+  // TODO: If function context arguments were given objc retain counts,
+  // we wouldn't need to create a separate heap object here.
+  auto *selfTypeInfo = &IGF.getTypeInfo(selfType);
+  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, selfTypeInfo);
+  llvm::Value *data = IGF.emitUnmanagedAlloc(layout, "closure");
+  // FIXME: non-fixed offsets
+  NonFixedOffsets offsets = Nothing;
+  Address dataAddr = layout.emitCastTo(IGF, data);
+  auto &fieldLayout = layout.getElements()[0];
+  Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
+  Explosion selfParams(ExplosionKind::Minimal);
+  selfParams.add(self);
+  fieldLayout.getType().initializeFromParams(IGF, selfParams, fieldAddr);
+
+  // Create the forwarding stub.
+  llvm::Function *forwarder = emitObjCPartialApplicationForwarder(IGF.IGM,
+                                                                method,
+                                                                origMethodType,
+                                                                resultType,
+                                                                layout,
+                                                                *selfTypeInfo);
+  llvm::Value *forwarderValue = IGF.Builder.CreateBitCast(forwarder,
+                                                          IGF.IGM.Int8PtrTy);
+  
+  // Emit the result explosion.
+  out.add(forwarderValue);
+  out.add(data);
 }
 
 /// Create the LLVM function declaration for a thunk that acts like

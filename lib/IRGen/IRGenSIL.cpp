@@ -1455,6 +1455,8 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
   switch (lv.kind) {
   case LoweredValue::Kind::Address:
     llvm_unreachable("can't partially apply an address");
+  case LoweredValue::Kind::ObjCMethod:
+    llvm_unreachable("objc method partial application shouldn't get here");
 
   case LoweredValue::Kind::StaticFunction:
     switch (lv.getStaticFunction().getAbstractCC()) {
@@ -1481,7 +1483,6 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
             specialized.getSubstitutions()};
   }
   case LoweredValue::Kind::Explosion:
-  case LoweredValue::Kind::ObjCMethod:
   case LoweredValue::Kind::MetatypeValue:
   case LoweredValue::Kind::BuiltinValue: {
     Explosion ex = lv.getExplosion(IGF);
@@ -1498,18 +1499,6 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
 void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   SILValue v(i, 0);
 
-  // Get the static function value.
-  // FIXME: We'll need to be able to close over runtime function values
-  // too, by including the function pointer and context data into the new
-  // closure context.
-  llvm::Value *calleeFn = nullptr;
-  llvm::Value *innerContext = nullptr;
-  SILType origCalleeTy;
-  ArrayRef<Substitution> substitutions;
-
-  std::tie(calleeFn, innerContext, origCalleeTy, substitutions)
-    = getPartialApplicationFunction(*this, i->getCallee());
-  
   // Apply the closure up to the next-to-last uncurry level to gather the
   // context arguments.
   
@@ -1521,6 +1510,40 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
     // the object type's TypeInfo.
     argTypes.push_back(arg.getType());
   }
+  
+  auto &lv = getLoweredValue(i->getCallee());
+  if (lv.kind == LoweredValue::Kind::ObjCMethod) {
+    // Objective-C partial applications require a different path. There's no
+    // actual function pointer to capture, and we semantically can't cache
+    // dispatch, so we need to perform the message send in the partial
+    // application thunk.
+    auto &objcMethod = lv.getObjCMethod();
+    assert(i->getArguments().size() == 1 &&
+           "only partial application of objc method to self implemented");
+    assert(llArgs.size() == 1 &&
+           "objc partial_apply argument is not a single retainable pointer?!");
+    llvm::Value *selfVal = llArgs.claimNext();
+    
+    Explosion function(ExplosionKind::Maximal);
+    emitObjCPartialApplication(*this,
+                               objcMethod.getMethod(),
+                               i->getCallee().getType(),
+                               i->getType(),
+                               selfVal,
+                               i->getArguments()[0].getType(),
+                               function);
+    setLoweredExplosion(SILValue(i, 0), function);
+    return;
+  }
+  
+  // Get the function value.
+  llvm::Value *calleeFn = nullptr;
+  llvm::Value *innerContext = nullptr;
+  SILType origCalleeTy;
+  ArrayRef<Substitution> substitutions;
+  
+  std::tie(calleeFn, innerContext, origCalleeTy, substitutions)
+    = getPartialApplicationFunction(*this, i->getCallee());
   
   // Create the thunk and function value.
   Explosion function(ExplosionKind::Maximal);
