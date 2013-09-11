@@ -139,15 +139,14 @@ static OwnershipConventions::Return getReturnKind(const clang::Decl *clangDecl,
 
 template<typename PARAM_RANGE>
 static void getConsumedArgs(PARAM_RANGE params,
-                            size_t paramIndex,
                             llvm::SmallBitVector &consumedArgs) {
   // FIXME: This assumes a 1:1 correspondence of SIL arguments to ObjC
   // arguments, which won't be true if we ever map tuples to foreign types.
-  size_t argIndex = 1;
+  unsigned paramIndex = 0;
   for (const clang::ParmVarDecl *param : params) {
     if (param->hasAttr<clang::NSConsumedAttr>())
-      consumedArgs.set(argIndex);
-    ++argIndex;
+      consumedArgs.set(paramIndex);
+    ++paramIndex;
   }
 }
 
@@ -167,18 +166,18 @@ OwnershipConventions::getForClangDecl(const clang::Decl *clangDecl,
     
     // Check if the method consumes self.
     if (method->hasAttr<clang::NSConsumesSelfAttr>())
-      consumedArgs.set(0);
+      consumedArgs.set(consumedArgs.size() - 1);
     
     // Check if the method consumes other arguments.
     getConsumedArgs(make_range(method->param_begin(), method->param_end()),
-                    1, consumedArgs);
+                    consumedArgs);
   } else if (auto *func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
     // Determine the return kind.
     returnKind = getReturnKind(clangDecl, func->getResultType());
     
     // Check if the method consumes any arguments.
     getConsumedArgs(make_range(func->param_begin(), func->param_end()),
-                    0, consumedArgs);
+                    consumedArgs);
   }
   
   return {
@@ -203,7 +202,7 @@ OwnershipConventions::getForObjCSelectorFamily(SelectorFamily family,
   switch (family) {
       // Init consumes self and returns a retained value.
     case SelectorFamily::Init:
-      consumedArgs.set(0);
+      consumedArgs.set(consumedArgs.size() - 1);
       SWIFT_FALLTHROUGH;
       
       // These families all return a retained value.

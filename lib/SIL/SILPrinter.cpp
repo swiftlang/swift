@@ -448,7 +448,8 @@ public:
 
   void visitSILArgument(SILArgument *A) {
     // This should really only happen during debugging.
-    OS << "argument of " << getID(A->getParent());
+    OS << "argument of " << getID(A->getParent()) << " : ";
+    A->getType().print(OS);
   }
   
   void visitAllocStackInst(AllocStackInst *AVI) {

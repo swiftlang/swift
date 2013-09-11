@@ -607,12 +607,13 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
     break;
 
   case AbstractCC::ObjCMethod: {
-    // ObjC methods take an implicit _cmd argument after the self argument.
+    // ObjC methods take their 'self' argument first, followed by an implicit
+    // _cmd argument.
     CanTupleType inputTuple = cast<TupleType>(inputTy);
     assert(inputTuple->getNumElements() == 2 && "invalid objc method type");
-    decomposeTopLevelArg(inputTuple.getElementType(0));
-    argTypes.push_back(IGM.Int8PtrTy);
     decomposeTopLevelArg(inputTuple.getElementType(1));
+    argTypes.push_back(IGM.Int8PtrTy);
+    decomposeTopLevelArg(inputTuple.getElementType(0));
     break;
   }
   }
@@ -1479,8 +1480,9 @@ void CallEmission::addArg(Explosion &arg) {
     break;
   }
   case AbstractCC::ObjCMethod: {
-    // The method will be uncurried to (Self, (Args...)). The _cmd argument
-    // goes in between.
+    // The method will be uncurried to ((Args...), Self). The self arg gets
+    // lowered to the first argument, and the implicit _cmd argument
+    // goes in between it and the rest of the args.
     Explosion externalized(arg.getKind());
     // self
     externalized.add(arg.claimNext());
@@ -1491,7 +1493,7 @@ void CallEmission::addArg(Explosion &arg) {
       cast<TupleType>(cast<AnyFunctionType>(CurOrigType).getInput());
     assert(inputTuple->getNumElements() == 2 && "invalid objc method type");
     externalizeArguments(externalized, arg, newByvals,
-                         inputTuple.getElementType(1));
+                         inputTuple.getElementType(0));
     arg = std::move(externalized);
     break;
   }

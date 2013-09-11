@@ -65,18 +65,6 @@ static CanType getKnownType(Optional<CanType> &cacheSlot,
   }
 #include "swift/SIL/BridgedTypes.def"
 
-UncurryDirection TypeConverter::getUncurryDirection(AbstractCC cc) {
-  switch (cc) {
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
-    return UncurryDirection::LeftToRight;
-
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-    return UncurryDirection::RightToLeft;
-  }
-}
-
 /// Bridge the elements of an input tuple type.
 static CanType getBridgedInputType(TypeConverter &tc,
                                    AbstractCC cc,
@@ -198,7 +186,7 @@ CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
     break;
   case AbstractCC::ObjCMethod:
     // The "self" parameter should not get bridged.
-    for (auto &input : make_range(inputs.begin()+1, inputs.end()))
+    for (auto &input : make_range(inputs.begin() + 1, inputs.end()))
       input = input.getWithType(
                 getBridgedInputType(*this, outerCC, CanType(input.getType())));
     resultType = getBridgedResultType(*this, outerCC, resultType);
@@ -206,13 +194,7 @@ CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
   }
   
   // Put the inputs in the order expected by the calling convention.
-  switch (getUncurryDirection(outerCC)) {
-  case UncurryDirection::LeftToRight:
-    break;
-  case UncurryDirection::RightToLeft:
-    std::reverse(inputs.begin(), inputs.end());
-    break;
-  }
+  std::reverse(inputs.begin(), inputs.end());
   
   // Create the new function type.
   const ASTContext &C = t->getASTContext();

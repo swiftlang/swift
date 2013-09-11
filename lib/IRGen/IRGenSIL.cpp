@@ -835,7 +835,7 @@ static void emitEntryPointArgumentsObjCMethodCC(IRGenSILFunction &IGF,
   
   // Map the self argument. This should always be an ObjC pointer type so
   // should never need to be loaded from a byval.
-  SILArgument *selfArg = args[0];
+  SILArgument *selfArg = args.back();
   auto &selfType = IGF.getTypeInfo(selfArg->getType());
   Explosion self(IGF.CurExplosionLevel);
   cast<LoadableTypeInfo>(selfType).reexplode(IGF, params, self);
@@ -845,7 +845,8 @@ static void emitEntryPointArgumentsObjCMethodCC(IRGenSILFunction &IGF,
   params.claimNext();
   
   // Map the rest of the arguments as in the C calling convention.
-  emitEntryPointArgumentsCOrObjC(IGF, entry, params, args.slice(1));
+  emitEntryPointArgumentsCOrObjC(IGF, entry, params,
+                                 args.slice(0, args.size() - 1));
 }
 
 /// Emit entry point arguments for a SILFunction with the C calling
@@ -1398,11 +1399,12 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     indirectReturn = i->getIndirectReturn(*IGM.SILMod);
   }
   
-  // ObjC message sends need special handling for the 'self' argument. It may
-  // need to be wrapped in an objc_super struct, and the '_cmd' argument needs
-  // to be passed alongside it.
+  // ObjC message sends need special handling for the 'self' argument, which in
+  // SIL gets curried to the end of the argument list but in IR is passed as the
+  // first argument. It additionally may need to be wrapped in an objc_super
+  // struct, and the '_cmd' argument needs to be passed alongside it.
   if (calleeLV.kind == LoweredValue::Kind::ObjCMethod) {
-    SILValue selfValue = i->getArguments()[0];
+    SILValue selfValue = i->getArguments().back();
     llvm::Value *selfArg;
     // Convert a metatype 'self' argument to the ObjC Class pointer.
     if (selfValue.getType().is<MetaTypeType>()) {
@@ -1418,7 +1420,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
                                  selfArg,
                                  calleeLV.getObjCMethod().getSuperSearchType());
     
-    args = args.slice(1);
+    args = args.slice(0, args.size() - 1);
   }
 
   for (SILValue arg : args)

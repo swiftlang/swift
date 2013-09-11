@@ -625,17 +625,8 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
   };
   
   // Emit the argument variables in calling convention order.
-  UncurryDirection direction = SGM.Types.getUncurryDirection(F.getAbstractCC());
-  switch (direction) {
-  case UncurryDirection::LeftToRight:
-    for (Pattern *p : paramPatterns)
-      emitPattern(p);
-    break;
-  case UncurryDirection::RightToLeft:
-    for (Pattern *p : reversed(paramPatterns))
-      emitPattern(p);
-    break;
-  }
+  for (Pattern *p : reversed(paramPatterns))
+    emitPattern(p);
 }
 
 namespace {
@@ -1043,8 +1034,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
   return arg;
 }
 
-/// Reorder arguments from ObjC method order (self-first) to Swift method order
-/// (self-last), and bridge argument types.
+/// Bridge argument types and adjust retain count conventions for an ObjC thunk.
 static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
                                              SILDeclRef thunk,
                                              SmallVectorImpl<SILValue> &args) {
@@ -1072,7 +1062,6 @@ static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
   auto ownership = OwnershipConventions::get(gen, thunk, objcTy);
   ArrayRef<SILType> inputs
     = objcInfo->getInputTypesWithoutIndirectReturnType();
-  ManagedValue selfArg = ManagedValue();
   assert(!inputs.empty());
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILValue arg = new(gen.F.getModule()) SILArgument(inputs[i], gen.F.begin());
@@ -1084,14 +1073,8 @@ static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
 
     auto managedArg = gen.emitManagedRValueWithCleanup(arg);
 
-    // Re-order 'self' to the end.
-    if (i == 0) {
-      selfArg = managedArg;
-    } else {
-      bridgedArgs.push_back(managedArg);
-    }
+    bridgedArgs.push_back(managedArg);
   }
-  bridgedArgs.push_back(selfArg);
 
   assert(bridgedArgs.size() == objcInfo->getInputTypes().size() &&
          "objc inputs don't match number of arguments?!");

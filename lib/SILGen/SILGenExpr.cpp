@@ -2089,8 +2089,7 @@ static SILType getFunctionTypeWithForwardedSubstitutions(SILGenFunction &gen,
 static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
                                        SILLocation loc,
                                        SILDeclRef next,
-                                       ArrayRef<SILValue> curriedArgs,
-                                       UncurryDirection direction) {
+                                       ArrayRef<SILValue> curriedArgs) {
   // For the fully-uncurried reference to a class method, emit the dynamic
   // dispatch.
   // FIXME: We should always emit dynamic dispatch at uncurry level 1,
@@ -2100,14 +2099,7 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
       && next.kind == SILDeclRef::Kind::Func
       && next.hasDecl() && isa<ClassDecl>(next.getDecl()->getDeclContext())) {
     SILValue thisArg;
-    switch (direction) {
-    case UncurryDirection::LeftToRight:
-      thisArg = curriedArgs.front();
-      break;
-    case UncurryDirection::RightToLeft:
-      thisArg = curriedArgs.back();
-      break;
-    }
+    thisArg = curriedArgs.back();
     
     return gen.B.createClassMethod(loc, thisArg, next,
                                    gen.SGM.getConstantType(next));
@@ -2137,23 +2129,11 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
   auto forwardedPatterns =
       fe->getDecl()->getBodyParamPatterns().slice(0, paramCount);
   ArgumentForwardVisitor forwarder(*this, curriedArgs);
-  UncurryDirection direction
-    = SGM.Types.getUncurryDirection(F.getAbstractCC());
-  switch (direction) {
-  case UncurryDirection::LeftToRight:
-    forwardCaptures();
-    for (auto *paramPattern : forwardedPatterns)
-      forwarder.visit(paramPattern);
-    break;
-
-  case UncurryDirection::RightToLeft:
-    for (auto *paramPattern : reversed(forwardedPatterns))
-      forwarder.visit(paramPattern);
-    forwardCaptures();
-    break;
-  }
+  for (auto *paramPattern : reversed(forwardedPatterns))
+    forwarder.visit(paramPattern);
+  forwardCaptures();
   
-  SILValue toFn = getNextUncurryLevelRef(*this, fe, to, curriedArgs, direction);
+  SILValue toFn = getNextUncurryLevelRef(*this, fe, to, curriedArgs);
   SILType resultTy
     = SGM.getConstantType(from).getFunctionTypeInfo(SGM.M)->getResultType();
 

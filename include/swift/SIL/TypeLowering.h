@@ -217,12 +217,6 @@ protected:
   void operator delete(void*) {}
 };
   
-/// Argument order of uncurried functions.
-enum class UncurryDirection {
-  LeftToRight,
-  RightToLeft
-};
-
 /// TypeConverter - helper class for creating and managing TypeLowerings.
 class TypeConverter {
   friend class TypeLowering;
@@ -339,9 +333,6 @@ public:
   /// Convert a nested function type into an uncurried representation.
   CanAnyFunctionType getUncurriedFunctionType(CanAnyFunctionType t,
                                               unsigned uncurryLevel);
-  
-  /// Get the uncurried argument order for a calling convention.
-  static UncurryDirection getUncurryDirection(AbstractCC cc);
   
   /// Map an AST-level type to the corresponding foreign representation type we
   /// implicitly convert to for a given calling convention.

@@ -650,19 +650,10 @@ public:
   }
   
   CanType getMethodSelfType(AnyFunctionType *ft) {
-    Lowering::UncurryDirection direction
-      = F.getModule().Types.getUncurryDirection(ft->getAbstractCC());
-    
     auto *inputTuple = ft->getInput()->getAs<TupleType>();
     if (!inputTuple)
-      return ft->getInput()->getCanonicalType();
-    
-    switch (direction) {
-    case Lowering::UncurryDirection::LeftToRight:
-      return inputTuple->getFields()[0].getType()->getCanonicalType();
-    case Lowering::UncurryDirection::RightToLeft:
-      return inputTuple->getFields().back().getType()->getCanonicalType();
-    }
+      return ft->getInput()->getCanonicalType();    
+    return inputTuple->getFields().back().getType()->getCanonicalType();
   }
   
   void checkArchetypeMethodInst(ArchetypeMethodInst *AMI) {

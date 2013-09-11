@@ -1077,17 +1077,8 @@ namespace {
 
       // Uncurry the arguments in calling convention order.
       SmallVector<ManagedValue, 4> uncurriedArgs;
-      UncurryDirection direction = gen.SGM.Types.getUncurryDirection(cc);
-      switch (direction) {
-      case UncurryDirection::LeftToRight:
-        for (auto &argSet : args)
-          uncurriedArgs.append(argSet.begin(), argSet.end());
-        break;
-      case UncurryDirection::RightToLeft:
-        for (auto &argSet : reversed(args))
-          uncurriedArgs.append(argSet.begin(), argSet.end());
-        break;
-      }
+      for (auto &argSet : reversed(args))
+        uncurriedArgs.append(argSet.begin(), argSet.end());
       args = {};
       
       // We use the context emit-into initialization only for the outermost
