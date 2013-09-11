@@ -42,9 +42,9 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 /// and that the function implementing the closure consumes its capture
 /// arguments.
 static void
-fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator &I, SILLocation Loc,
+fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator I, SILLocation Loc,
                      SILValue CalleeValue, bool IsThick,
-                     SmallVectorImpl<SILValue>& ContextArgs) {
+                     SmallVectorImpl<SILValue>& CaptureArgs) {
   if (!IsThick)
     return;
 
@@ -63,16 +63,16 @@ fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator &I, SILLocation Loc,
       B.createStrongReleaseInst(Loc, CalleeValue);
     // Important: we move the insertion point before this new release, just in
     // case this inserted release would have caused the deallocation of the
-    // closure and its contained context arguments
+    // closure and its contained capture arguments
     B.setInsertionPoint(InsertedRelease);
   }
 
-  // Add a retain of each non-address type context argument, because it will be
+  // Add a retain of each non-address type capture argument, because it will be
   // consumed by the closure body
   SILModule &M = B.getFunction().getModule();
-  for (auto &ContextArg : ContextArgs) {
-    if (!ContextArg.getType().isAddress())
-      M.getTypeLowering(ContextArg.getType()).emitRetain(B, Loc, ContextArg);
+  for (auto &CaptureArg : CaptureArgs) {
+    if (!CaptureArg.getType().isAddress())
+      M.getTypeLowering(CaptureArg.getType()).emitRetain(B, Loc, CaptureArg);
   }
 }
 
@@ -88,14 +88,14 @@ fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator &I, SILLocation Loc,
 /// instructions earlier in the vector.
 static SILFunction *
 getCalleeFunction(ApplyInst* AI, bool &IsThick,
-                  SmallVectorImpl<SILValue>& ContextArgs,
+                  SmallVectorImpl<SILValue>& CaptureArgs,
                   SmallVectorImpl<SILValue>& FullArgs,
                   SmallVectorImpl<SILInstruction*>& PossiblyDeadInsts) {
   if (!AI->isTransparent())
     return nullptr;
 
   IsThick = false;
-  ContextArgs.clear();
+  CaptureArgs.clear();
   FullArgs.clear();
   PossiblyDeadInsts.clear();
 
@@ -149,7 +149,7 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
     assert(Callee.getResultNumber() == 0);
 
     for (const auto &Arg : PAI->getArguments()) {
-      ContextArgs.push_back(Arg);
+      CaptureArgs.push_back(Arg);
       FullArgs.push_back(Arg);
     }
 
@@ -216,7 +216,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
   // during this call and recursive subcalls).
   CurrentInliningSet = SetFactory.add(CurrentInliningSet, F);
 
-  SmallVector<SILValue, 16> ContextArgs;
+  SmallVector<SILValue, 16> CaptureArgs;
   SmallVector<SILValue, 32> FullArgs;
   SmallVector<SILInstruction*, 16> PossiblyDeadInsts;
   SILInliner Inliner(*F);
@@ -234,7 +234,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       SILValue CalleeValue = InnerAI->getCallee();
       bool IsThick;
       SILFunction *CalleeFunction = getCalleeFunction(InnerAI, IsThick,
-                                                      ContextArgs, FullArgs,
+                                                      CaptureArgs, FullArgs,
                                                       PossiblyDeadInsts);
       if (!CalleeFunction) {
         ++I;
@@ -271,7 +271,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         continue;
       }
 
-      fixupReferenceCounts(Builder, I, Loc, CalleeValue, IsThick, ContextArgs);
+      fixupReferenceCounts(Builder, I, Loc, CalleeValue, IsThick, CaptureArgs);
 
       // Reposition iterators possibly invalidated by mutation
       FI = SILFunction::iterator(I->getParent());
