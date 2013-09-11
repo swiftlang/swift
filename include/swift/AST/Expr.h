@@ -1748,7 +1748,7 @@ public:
                           DeclContext *Parent);
 
   SourceRange getSourceRange() const;
-  SourceLoc getLoc() const { return FuncLoc; }
+  SourceLoc getLoc() const;
   
   size_t getNumParamPatterns() const { return NumPatterns; }
 

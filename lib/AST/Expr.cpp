@@ -310,6 +310,10 @@ FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
   return fn;
 }
 
+SourceLoc FuncExpr::getLoc() const {
+  return getDecl()->getLoc();
+}
+
 SourceRange FuncExpr::getSourceRange() const {
   if (getBodyKind() == BodyKind::Unparsed || getBodyKind() == BodyKind::Skipped)
     return { FuncLoc, BodyEndLoc };
