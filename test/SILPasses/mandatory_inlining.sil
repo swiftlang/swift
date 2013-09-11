@@ -414,3 +414,81 @@ bb0(%0 : $Int64 -> Int64, %1 : $Int64):
   %7 = apply [transparent] %0(%1) : $Int64 -> Int64
   return %7 : $Int64
 }
+
+sil @true_getter : $[thin] () -> Bool
+
+sil @short_circuit_or : $[thin] (lhs : Bool, rhs : () -> Bool) -> Bool {
+bb0(%0 : $Bool, %1 : $() -> Bool):
+  %2 = alloc_box $Bool
+  %3 = alloc_box $() -> Bool
+  store %0 to %2#1 : $*Bool
+  store %1 to %3#1 : $*() -> Bool
+  %6 = function_ref @get_logic_value : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  %7 = apply %6(%2#1) : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  condbranch %7, bb1, bb2
+
+bb1:
+
+  %9 = function_ref @true_getter : $[thin] () -> Bool
+  %10 = apply %9() : $[thin] () -> Bool
+  br bb3(%10 : $Bool)
+
+bb2:
+  %12 = load %3#1 : $*() -> Bool
+  strong_retain %12 : $() -> Bool
+  %14 = apply [transparent] %12() : $() -> Bool
+  br bb3(%14 : $Bool)
+
+bb3(%16 : $Bool):
+  strong_release %3#0 : $Builtin.ObjectPointer
+  strong_release %2#0 : $Builtin.ObjectPointer
+  return %16 : $Bool
+}
+
+sil internal @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Bool)) -> Bool {
+bb0(%0 : $Builtin.ObjectPointer, %1 : $*Bool):
+  %2 = tuple ()
+  %3 = load %1 : $*Bool
+  strong_release %0 : $Builtin.ObjectPointer
+  return %3 : $Bool
+}
+
+sil @test_short_circuit : $[thin] (x : Bool, y : Bool) -> Bool {
+
+// CHECK-LABEL: sil @test_short_circuit : $[thin] (x : Bool, y : Bool) -> Bool {
+
+  // CHECK: condbranch {{%.*}}, [[BB1:.*]], [[BB3:.*]]
+
+// CHECK: bb1:
+  // CHECK: br [[BB2:.*]](
+
+// CHECK: [[BB2]](
+  // CHECK: br [[BB4:.*]](
+
+// CHECK: [[BB3]]:
+  // CHECK: {{%.*}} = load [[VAL11:%.*]]#1
+  // CHECK: strong_retain [[VAL3:.*]]#0
+  // CHECK: {{%.*}} = tuple ()
+  // CHECK: {{%.*}} = load [[VAL3]]#1
+  // CHECK: strong_release [[VAL3]]#0
+  // CHECK: br [[BB2]](
+
+// CHECK: [[BB4]](
+  // CHECK: strong_release [[VAL3]]#0
+  // CHECK: return {{.*}}
+
+bb0(%0 : $Bool, %1 : $Bool):
+  %2 = alloc_box $Bool
+  %3 = alloc_box $Bool
+  store %0 to %2#1 : $*Bool
+  store %1 to %3#1 : $*Bool
+  %6 = function_ref @short_circuit_or : $[thin] (lhs : Bool, rhs : () -> Bool) -> Bool
+  %7 = load %2#1 : $*Bool
+  %8 = function_ref @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Bool)) -> Bool
+  strong_retain %3#0 : $Builtin.ObjectPointer
+  %10 = partial_apply %8(%3#0, %3#1) : $[thin] ((), (Builtin.ObjectPointer, [byref] Bool)) -> Bool
+  %11 = apply [transparent] %6(%7, %10) : $[thin] (lhs : Bool, rhs : () -> Bool) -> Bool
+  strong_release %3#0 : $Builtin.ObjectPointer
+  strong_release %2#0 : $Builtin.ObjectPointer
+  return %11 : $Bool
+}

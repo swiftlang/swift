@@ -35,27 +35,71 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                          diag, std::forward<U>(args)...);
 }
 
+/// \brief Fixup reference counts after inlining a thick function call. Note
+/// that this function makes assumptions about the release/retain convention of
+/// thick function applications: namely, that an apply of a thick function
+/// consumes the callee and that the function implementing the closure releases
+/// its context arguments.
+static void
+fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator &I, SILLocation Loc,
+                     SILValue CalleeValue, bool IsThick,
+                     SmallVectorImpl<SILValue>& ContextArgs) {
+  if (!IsThick)
+    return;
+
+  // Either release the callee (which the apply would have done) or remove a
+  // retain that happens to be the immediately preceding instruction
+  SILBasicBlock::iterator Prev = I;
+  StrongRetainInst *RetainToErase;
+  if (I != I->getParent()->begin() &&
+      (RetainToErase = dyn_cast<StrongRetainInst>(--Prev)) &&
+      RetainToErase->getOperand() == CalleeValue) {
+    RetainToErase->eraseFromParent();
+    B.setInsertionPoint(I);
+  } else {
+    B.setInsertionPoint(I);
+    StrongReleaseInst *InsertedRelease =
+      B.createStrongReleaseInst(Loc, CalleeValue);
+    // Important: we move the insertion point before this new release, just in
+    // case this inserted release would have caused the deallocation of the
+    // closure and its contained context arguments
+    B.setInsertionPoint(InsertedRelease);
+  }
+
+  // Add a retain of each non-address type context argument, because it will be
+  // consumed by the closure body
+  SILModule &M = B.getFunction().getModule();
+  for (auto &ContextArg : ContextArgs) {
+    if (!ContextArg.getType().isAddress())
+      M.getTypeLowering(ContextArg.getType()).emitRetain(B, Loc, ContextArg);
+  }
+}
+
 /// \brief Returns the callee SILFunction called at a call site, in the case
 /// that the call is transparent (as in, both that the call is marked
 /// with the transparent flag and that callee function is actually transparently
 /// determinable from the SIL) or nullptr otherwise. This assumes that the SIL
 /// is already in SSA form.
 ///
-/// In the case that a non-null value is returned, Args contains effective
+/// In the case that a non-null value is returned, FullArgs contains effective
 /// argument operands for the callee function and PossiblyDeadInsts contains
 /// instructions that might be dead after inlining and removal of any dead
 /// instructions earlier in the vector.
 static SILFunction *
-getCalleeFunction(ApplyInst* AI, SmallVectorImpl<SILValue>& Args,
+getCalleeFunction(ApplyInst* AI, bool &IsThick,
+                  SmallVectorImpl<SILValue>& ContextArgs,
+                  SmallVectorImpl<SILValue>& FullArgs,
                   SmallVectorImpl<SILInstruction*>& PossiblyDeadInsts) {
   if (!AI->isTransparent())
     return nullptr;
 
-  Args.clear();
+  IsThick = false;
+  ContextArgs.clear();
+  FullArgs.clear();
   PossiblyDeadInsts.clear();
 
   for (const auto &Arg : AI->getArguments())
-    Args.push_back(Arg);
+    FullArgs.push_back(Arg);
   SILValue Callee = AI->getCallee();
 
   if (LoadInst *LI = dyn_cast<LoadInst>(Callee.getDef())) {
@@ -103,15 +147,19 @@ getCalleeFunction(ApplyInst* AI, SmallVectorImpl<SILValue>& Args,
   if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(Callee.getDef())) {
     assert(Callee.getResultNumber() == 0);
 
-    for (const auto &Arg : PAI->getArguments())
-      Args.push_back(Arg);
+    for (const auto &Arg : PAI->getArguments()) {
+      ContextArgs.push_back(Arg);
+      FullArgs.push_back(Arg);
+    }
 
     Callee = PAI->getCallee();
+    IsThick = true;
     PossiblyDeadInsts.push_back(PAI);
   } else if (ThinToThickFunctionInst *TTTFI =
                dyn_cast<ThinToThickFunctionInst>(Callee.getDef())) {
     assert(Callee.getResultNumber() == 0);
     Callee = TTTFI->getOperand();
+    IsThick = true;
     PossiblyDeadInsts.push_back(TTTFI);
   }
 
@@ -121,7 +169,9 @@ getCalleeFunction(ApplyInst* AI, SmallVectorImpl<SILValue>& Args,
   assert(Callee.getResultNumber() == 0);
 
   SILFunction *CalleeFunction = FRI->getFunction();
-  if (!CalleeFunction || CalleeFunction->empty())
+  if (!CalleeFunction || CalleeFunction->empty() ||
+      (CalleeFunction->getAbstractCC() != AbstractCC::Freestanding &&
+       CalleeFunction->getAbstractCC() != AbstractCC::Method))
     return nullptr;
   PossiblyDeadInsts.push_back(FRI);
   return CalleeFunction;
@@ -165,9 +215,11 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
   // during this call and recursive subcalls).
   CurrentInliningSet = SetFactory.add(CurrentInliningSet, F);
 
-  SmallVector<SILValue, 16> Args;
+  SmallVector<SILValue, 16> ContextArgs;
+  SmallVector<SILValue, 32> FullArgs;
   SmallVector<SILInstruction*, 16> PossiblyDeadInsts;
   SILInliner Inliner(*F);
+  SILBuilder Builder(*F);
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
     auto I = FI->begin(), E = FI->end();
     while (I != E) {
@@ -177,7 +229,11 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         continue;
       }
 
-      SILFunction *CalleeFunction = getCalleeFunction(InnerAI, Args,
+      SILLocation Loc = InnerAI->getLoc();
+      SILValue CalleeValue = InnerAI->getCallee();
+      bool IsThick;
+      SILFunction *CalleeFunction = getCalleeFunction(InnerAI, IsThick,
+                                                      ContextArgs, FullArgs,
                                                       PossiblyDeadInsts);
       if (!CalleeFunction) {
         ++I;
@@ -206,13 +262,15 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       // process the inlined body after inlining, because the inlining may
       // have exposed new inlining opportunities beyond those present in
       // the inlined function when processed independently
-      if (!Inliner.inlineFunction(I, CalleeFunction, Args)) {
+      if (!Inliner.inlineFunction(I, CalleeFunction, FullArgs)) {
         // If inlining failed, then I is left unchanged, so increment it
         // before continuing rather than process the same apply instruction
         // twice
         ++I;
         continue;
       }
+
+      fixupReferenceCounts(Builder, I, Loc, CalleeValue, IsThick, ContextArgs);
 
       // Reposition iterators possibly invalidated by mutation
       FI = SILFunction::iterator(I->getParent());
