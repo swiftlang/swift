@@ -478,15 +478,15 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
 ///   sil-linkage:
 ///     /*empty*/           // defaults to external linkage.
 ///     'internal'
-///     'clang_thunk'
+///     'thunk'
 static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
   if (P.Tok.isNot(tok::identifier)) {
     Result = SILLinkage::External;
   } else if (P.Tok.getText() == "internal") {
     Result = SILLinkage::Internal;
     P.consumeToken(tok::identifier);
-  } else if (P.Tok.getText() == "clang_thunk") {
-    Result = SILLinkage::ClangThunk;
+  } else if (P.Tok.getText() == "thunk") {
+    Result = SILLinkage::Thunk;
     P.consumeToken(tok::identifier);
   } else {
     P.diagnose(P.Tok, diag::expected_sil_linkage_or_function);

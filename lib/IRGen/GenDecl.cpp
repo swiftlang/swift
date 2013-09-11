@@ -623,11 +623,11 @@ bool LinkEntity::isLocalLinkage() const {
   llvm_unreachable("bad link entity kind");
 }
 
-bool LinkEntity::isClangThunk() const {
+bool LinkEntity::isThunk() const {
   // Constructors, subscripts, properties, and type metadata synthesized in the
   // mapping to Clang modules are local.
   if (getKind() == Kind::SILFunction)
-    return getSILFunction()->getLinkage() == SILLinkage::ClangThunk;
+    return getSILFunction()->getLinkage() == SILLinkage::Thunk;
 
   if (isDeclKind(getKind())) {
     ValueDecl *D = static_cast<ValueDecl *>(Pointer);
@@ -660,7 +660,7 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
     // The linkage for a value witness is linkonce_odr.
     result.Linkage = llvm::GlobalValue::LinkOnceODRLinkage;
     result.Visibility = llvm::GlobalValue::HiddenVisibility;
-  } else if (entity.isClangThunk()) {
+  } else if (entity.isThunk()) {
     // Clang thunks are linkonce_odr and hidden.
     result.Linkage = llvm::GlobalValue::LinkOnceODRLinkage;
     result.Visibility = llvm::GlobalValue::HiddenVisibility;

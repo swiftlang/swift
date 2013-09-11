@@ -27,7 +27,7 @@
    ;; SIL Stage
    '("sil_stage" . font-lock-keyword-face)
    ;; SIL Function
-   `(,(regexp-opt '("sil" "internal" "clang_thunk")
+   `(,(regexp-opt '("sil" "internal" "thunk")
                   'words) . font-lock-keyword-face)
    ;; SIL Declaration
    `(,(regexp-opt '("getter" "setter" "allocator" "initializer" "unionelt"

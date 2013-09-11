@@ -221,11 +221,11 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
     dc = dc->getParent();
   }
   
-  if (isa<ClangModule>(dc) &&
-      (isa<ConstructorDecl>(d) ||
-       isa<SubscriptDecl>(d) ||
-       (isa<VarDecl>(d) && cast<VarDecl>(d)->isProperty())))
-    return SILLinkage::ClangThunk;
+  if(isa<ClangModule>(dc) &&
+     (isa<ConstructorDecl>(d) ||
+      isa<SubscriptDecl>(d) ||
+      (isa<VarDecl>(d) && cast<VarDecl>(d)->isProperty())))
+    return SILLinkage::Thunk;
   
   return SILLinkage::External;
 }

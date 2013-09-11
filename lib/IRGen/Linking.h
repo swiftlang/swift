@@ -395,7 +395,7 @@ public:
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
   bool isLocalLinkage() const;
-  bool isClangThunk() const;
+  bool isThunk() const;
 
   ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));

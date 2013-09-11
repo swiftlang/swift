@@ -354,7 +354,7 @@ Functions
   sil-function-name ::= '@' [A-Za-z_0-9]+
 
   sil-linkage ::= 'internal'
-  sil-linkage ::= 'clang_thunk'
+  sil-linkage ::= 'thunk'
 
 SIL functions are defined with the ``sil`` keyword. SIL function names
 are introduced with the ``@`` sigil and named by an alphanumeric
@@ -372,7 +372,7 @@ given LLVM ``external`` linkage.
   to its module. Internal functions may be freely transformed by
   optimizations that might otherwise break code in other modules. Internal
   functions are given ``private`` linkage in LLVM IR.
-- The ``clang_thunk`` specifier indicates that the function was generated as
+- The ``thunk`` specifier indicates that the function was generated as
   an adapter thunk to interface with a C or Objective-C declaration imported
   from Clang. These thunks are generated lazily and given ``linkonce_odr``
   linkage in LLVM IR.

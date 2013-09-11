@@ -8,8 +8,8 @@ import Foundation
 
 // Linkage types.
 
-// CHECK-LABEL: sil clang_thunk @clang_thunk : $() -> ()
-sil clang_thunk @clang_thunk : $() -> ()
+// CHECK-LABEL: sil thunk @clang_thunk : $() -> ()
+sil thunk @clang_thunk : $() -> ()
 
 // CHECK-LABEL: sil internal @internal_fn : $() -> ()
 sil internal @internal_fn : $() -> () {

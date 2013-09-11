@@ -1025,8 +1025,8 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   case SILLinkage::Internal:
     OS << "internal ";
     break;
-  case SILLinkage::ClangThunk:
-    OS << "clang_thunk ";
+  case SILLinkage::Thunk:
+    OS << "thunk ";
     break;
   case SILLinkage::External:
     break;

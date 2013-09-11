@@ -30,7 +30,7 @@ class TranslationUnit;
 /// Linkage attribute for a SIL function.
 enum class SILLinkage : unsigned char {
   External,
-  ClangThunk,
+  Thunk,
   Internal,
 };
   
