@@ -373,8 +373,9 @@ given LLVM ``external`` linkage.
   optimizations that might otherwise break code in other modules. Internal
   functions are given ``private`` linkage in LLVM IR.
 - The ``thunk`` specifier indicates that the function was generated as
-  an adapter thunk to interface with a C or Objective-C declaration imported
-  from Clang. These thunks are generated lazily and given ``linkonce_odr``
+  an adapter thunk, for example, to provide a Swift-calling-convention interface
+  to a C or Objective-C function, or to partially apply a curried function or
+  method. These thunks are generated lazily and given ``hidden linkonce_odr``
   linkage in LLVM IR.
 
 Basic Blocks
