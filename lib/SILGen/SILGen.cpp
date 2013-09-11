@@ -239,14 +239,17 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant) {
   SILLinkage linkage = getConstantLinkage(constant);
 
   IsTransparent_t IsTrans = IsNotTransparent;
+  ValueDecl *VD = nullptr;
   if (constant.hasDecl()) {
-    ValueDecl *VD = constant.getDecl();
+    VD = constant.getDecl();
     if (VD->getAttrs().isTransparent())
       IsTrans = IsTransparent;
   }
   
   SILFunction *F = new (M) SILFunction(M, linkage, "",
                                        constantType, Nothing, IsTrans);
+  F->setDeclContext(VD);
+
   mangleConstant(constant, F);
   emittedFunctions[constant] = F;
 
@@ -275,6 +278,8 @@ SILFunction *SILGenModule::preEmitFunction(SILDeclRef constant, T *astNode,
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(astNode)));
 
   f->setLocation(Loc);
+
+  f->setDeclContext(astNode);
 
   DEBUG(llvm::dbgs() << "lowering ";
         f->printName(llvm::dbgs());
@@ -316,7 +321,6 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   SILFunction *f = preEmitFunction(constant, fe, fe);
   SILGenFunction(*this, *f).emitFunction(fe);
   postEmitFunction(constant, f);
-  f->setDeclContext(fe);
 
   // If the function is a standalone function and is curried, emit the thunks
   // for the intermediate curry levels.

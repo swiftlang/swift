@@ -112,9 +112,10 @@ public:
   SILLinkage getLinkage() const { return ModuleAndLinkage.getInt(); }
   void setLinkage(SILLinkage L) { ModuleAndLinkage.setInt(L); }
 
-  /// Get the Decl`Context of this function. (Debug info only).
+  /// Get the DeclContext of this function. (Debug info only).
   DeclContext *getDeclContext() const { return DeclCtx; }
-  void setDeclContext(DeclContext *DC) { DeclCtx = DC; }
+  void setDeclContext(Decl *D);
+  void setDeclContext(Expr *E);
 
   /// Initialize the source location of the function.
   void setLocation(SILLocation L) { Location = L; }

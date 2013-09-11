@@ -31,6 +31,25 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
 SILFunction::~SILFunction() {
 }
 
+void SILFunction::setDeclContext(Decl *D) {
+  if (!D) return;
+  switch (D->getKind()) {
+  case DeclKind::Func:        DeclCtx = cast<FuncDecl>(D)->getFuncExpr(); break;
+  // These three dual-inherit from DeclContext.
+  case DeclKind::Constructor: DeclCtx = cast<ConstructorDecl>(D); break;
+  case DeclKind::Extension:   DeclCtx = cast<ExtensionDecl>(D);   break;
+  case DeclKind::Destructor:  DeclCtx = cast<DestructorDecl>(D);  break;
+  default:
+    DeclCtx = D->getDeclContext();
+  }
+  assert(DeclCtx);
+}
+
+void SILFunction::setDeclContext(Expr *E) {
+  if (!E) return;
+  DeclCtx = dyn_cast<CapturingExpr>(E);
+}
+
 ASTContext &SILFunction::getASTContext() const {
   return getModule().getASTContext();
 }
