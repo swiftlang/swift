@@ -916,73 +916,9 @@ Type TypeChecker::transformType(Type type,
   return type.transform(Context, fn);
 }
 
-Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions,
+Type TypeChecker::substType(Type type, TypeSubstitutionMap &Substitutions,
                             bool IgnoreMissing) {
-  return transformType(origType,
-                       [&](Type type) -> Type {
-    auto substOrig = type->getAs<SubstitutableType>();
-    if (!substOrig)
-      return type;
-
-    TypeSubstitutionMap::const_iterator Known = Substitutions.find(substOrig);
-    if (Known != Substitutions.end() && Known->second)
-      return SubstitutedType::get(substOrig, Known->second, Context);
-
-    auto parent = substOrig->getParent();
-    if (!parent)
-      return type;
-
-    // Substitute into the parent type.
-    Type SubstParent = substType(parent, Substitutions);
-    if (!SubstParent)
-      return Type();
-
-    // If the parent didn't change, we won't change.
-    if (SubstParent.getPointer() == parent)
-      return type;
-
-    // If the parent is an archetype, extract the child archetype with the
-    // given name.
-    if (auto ArchetypeParent = SubstParent->getAs<ArchetypeType>()) {
-      return ArchetypeParent->getNestedType(substOrig->getName());
-    }
-
-    // Retrieve the type with the given name.
-
-    // Tuples don't have member types.
-    // FIXME: Feels like a hack.
-    if (SubstParent->is<TupleType>()) {
-      assert(IgnoreMissing && "Expect member type within tuple type");
-      return type;
-    }
-
-    // If we have an archetype for which we know the associated type,
-    // look in the witness table.
-    if (auto archetype = substOrig->getAs<ArchetypeType>()) {
-      if (auto assocType = archetype->getAssocType()) {
-        ProtocolConformance *conformance = nullptr;
-        auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
-        bool conforms = conformsToProtocol(SubstParent, proto, &conformance);
-        if (!conforms && IgnoreMissing)
-          return type;
-
-        assert(conforms && "Type does not conform");
-        assert(conformance && "Missing conformance information");
-
-        // FIXME: Introduce substituted type node here?
-        return conformance->getTypeWitness(assocType).Replacement;
-      }
-    }
-
-    // FIXME: Shouldn't we be using protocol-conformance information here?
-    LookupTypeResult MemberTypes
-      = lookupMemberType(SubstParent, substOrig->getName());
-    if (!MemberTypes && IgnoreMissing)
-      return type;
-
-    // FIXME: Detect ambiguities here?
-    return MemberTypes.back().second;
-  });
+  return type.subst(Context, Substitutions, IgnoreMissing, this);
 }
 
 Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
@@ -1071,4 +1007,14 @@ Type TypeChecker::getSuperClassOf(Type type) {
 
   // Perform substitutions into the base type.
   return substType(superclassTy, substitutions);
+}
+
+Type TypeChecker::resolveMemberType(Type type, Identifier name) {
+  LookupTypeResult memberTypes = lookupMemberType(type, name);
+  if (!memberTypes)
+    return Type();
+
+
+  // FIXME: Detect ambiguities here?
+  return memberTypes.back().second;
 }

@@ -17,13 +17,22 @@
 #ifndef SWIFT_TYPE_H
 #define SWIFT_TYPE_H
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "swift/Basic/LLVM.h"
 #include <string>
 
 namespace swift {
-  class ASTContext;
-  class TypeBase;
+
+class ASTContext;
+class LazyResolver;
+class TypeBase;
+class Type;
+class SubstitutableType;
+
+/// \brief Type substitution mapping from substitutable types to their
+/// replacements.
+typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
 /// Type - This is a simple value object that contains a pointer to a type
 /// class.  This is potentially sugared.  We use this throughout the codebase
@@ -72,6 +81,24 @@ public:
   /// \returns the result of transforming the type.
   template<typename F>
   Type transform(const ASTContext &ctx, const F &fn) const;
+
+  /// Replace references to substitutable types with new, concrete types and
+  /// return the substituted result.
+  ///
+  /// \param ctx The ASTContext in which the substitution occurs.
+  ///
+  /// \param substitutions The mapping from substitutable types to their
+  /// replacements.
+  ///
+  /// \param ignoreMissing Whether we should ignore missing substitutions
+  /// (keeping the original type) rather than returning an error.
+  ///
+  /// \param resolver A lazy resolver used to find member types, form
+  /// protocol conformances, etc.
+  ///
+  /// \returns the substituted type, or a null type if an error occurred.
+  Type subst(const ASTContext &ctx, TypeSubstitutionMap &substitutions,
+             bool ignoreMissing, LazyResolver *resolver);
 
   void dump() const;
   void print(raw_ostream &OS) const;

@@ -21,6 +21,7 @@
 #include "swift/AST/ASTMutationListener.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/KnownProtocols.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/SetVector.h"
 #include <functional>
@@ -108,7 +109,7 @@ enum class Comparison {
   Worse
 };
 
-class TypeChecker : public ASTMutationListener {
+class TypeChecker : public ASTMutationListener, public LazyResolver {
 public:
   TranslationUnit &TU;
   ASTContext &Context;
@@ -697,6 +698,15 @@ public:
 
   /// @}
 
+  /// \name Lazy resolution.
+  ///
+  /// Routines that perform lazy resolution as required for AST operations.
+  /// @{
+  virtual ProtocolConformance *resolveConformance(Type type,
+                                                  ProtocolDecl *protocol);
+  virtual Type resolveMemberType(Type type, Identifier name);
+
+  /// @}
 };
 
 } // end namespace swift

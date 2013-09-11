@@ -1554,4 +1554,13 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   return true;
 }
 
+ProtocolConformance *TypeChecker::resolveConformance(Type type,
+                                                     ProtocolDecl *protocol) {
+  ProtocolConformance *conformance = nullptr;
+  bool conforms = conformsToProtocol(type, protocol, &conformance);
+  if (!conforms)
+    return nullptr;
+
+  return conformance;
+}
 

@@ -17,6 +17,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1152,6 +1153,75 @@ ArrayRef<ArchetypeType *> PolymorphicFunctionType::getAllArchetypes() const {
   return Params->getAllArchetypes();
 }
 
+Type Type::subst(const ASTContext &ctx, TypeSubstitutionMap &substitutions,
+                 bool ignoreMissing, LazyResolver *resolver) {
+  assert(resolver && "FIXME: We currently require a resolver");
+  return transform(ctx, [&](Type type) -> Type {
+    // We only substitute for substitutable types.
+    auto substOrig = type->getAs<SubstitutableType>();
+    if (!substOrig)
+      return type;
+
+    // If we have a substitution for this type, use it.
+    auto known = substitutions.find(substOrig);
+    if (known != substitutions.end() && known->second)
+      return SubstitutedType::get(substOrig, known->second, ctx);
+
+    // If we don't have a substitution for this type and it doesn't have a
+    // parent, then we're not substituting it.
+    auto parent = substOrig->getParent();
+    if (!parent)
+      return type;
+
+    // Substitute into the parent type.
+    Type substParent = Type(parent).subst(ctx, substitutions, ignoreMissing,
+                                          resolver);
+    if (!substParent)
+      return Type();
+
+    // If the parent didn't change, we won't change.
+    if (substParent.getPointer() == parent)
+      return type;
+
+    // If the parent is an archetype, extract the child archetype with the
+    // given name.
+    if (auto archetypeParent = substParent->getAs<ArchetypeType>()) {
+      return archetypeParent->getNestedType(substOrig->getName());
+    }
+
+    // Retrieve the type with the given name.
+
+    // Tuples don't have member types.
+    if (substParent->is<TupleType>()) {
+      return ignoreMissing? type : Type();
+    }
+
+    // If we have an archetype for which we know the associated type,
+    // look in the witness table.
+    if (auto archetype = substOrig->getAs<ArchetypeType>()) {
+      if (auto assocType = archetype->getAssocType()) {
+        auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
+        ProtocolConformance *conformance
+          = resolver->resolveConformance(substParent, proto);
+        if (!conformance) {
+          return ignoreMissing? type : Type();
+        }
+
+        // FIXME: Introduce substituted type node here?
+        return conformance->getTypeWitness(assocType).Replacement;
+      }
+    }
+
+    // FIXME: This is a fallback. We want the above, conformance-based
+    // result to be the only viable path.
+    if (Type memberType = resolver->resolveMemberType(substParent,
+                                                      substOrig->getName())) {
+      return memberType;
+    }
+
+    return ignoreMissing? type : Type();
+  });
+}
 
 //===----------------------------------------------------------------------===//
 //  Type Printing

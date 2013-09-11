@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/KnownProtocols.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ModuleLoadListener.h"
 #include "swift/Basic/SourceManager.h"
@@ -33,7 +34,9 @@ using namespace swift;
 
 ASTMutationListener::~ASTMutationListener() { }
 
-ModuleLoadListener::~ModuleLoadListener() {}
+ModuleLoadListener::~ModuleLoadListener() { }
+
+LazyResolver::~LazyResolver() { }
 
 llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
   switch (kind) {
