@@ -1133,7 +1133,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   auto DbgTy = ObjCClass 
     ? DebugTypeInfo(ObjCClass, getPointerSize(), getPointerAlignment())
-    : DebugTypeInfo(MetaTypeType::get(concreteType, Context), 0, 0);
+    : DebugTypeInfo(MetaTypeType::get(concreteType, Context), 0, 1);
 
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     storageType, defaultVarTy,

@@ -22,26 +22,28 @@
 using namespace swift;
 using namespace irgen;
 
-DebugTypeInfo::DebugTypeInfo(Type Ty, uint64_t Size, uint64_t Align)
-  : DeclOrType(Ty.getPointer()), SizeInBytes(Size), AlignInBytes(Align) {
+DebugTypeInfo::DebugTypeInfo(Type Ty, uint64_t SizeInBytes, uint32_t AlignInBytes)
+  : DeclOrType(Ty.getPointer()), size(SizeInBytes), align(AlignInBytes) {
+  assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(Type Ty, Size Size, Alignment Align)
+DebugTypeInfo::DebugTypeInfo(Type Ty, Size size, Alignment align)
   : DeclOrType(Ty.getPointer()),
-    SizeInBytes(Size.getValue()), AlignInBytes(Align.getValue()) {
+    size(size), align(align) {
+  assert(align.getValue() != 0);
 }
 
 DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
   : DeclOrType(Ty.getPointer()) {
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
-    SizeInBytes = FixTy.getFixedSize().getValue();
-    AlignInBytes = FixTy.getBestKnownAlignment().getValue();
+    size = FixTy.getFixedSize();
+    align = FixTy.getBestKnownAlignment();
   } else {
-    SizeInBytes = 0;
-    AlignInBytes = Info.getBestKnownAlignment().getValue();
+    size = Size(0);
+    align = Info.getBestKnownAlignment();
   }
-  assert(AlignInBytes != 0);
+  assert(align.getValue() != 0);
 }
 
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
@@ -49,20 +51,20 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
   // Same as above.
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
-    SizeInBytes = FixTy.getFixedSize().getValue();
-    AlignInBytes = FixTy.getBestKnownAlignment().getValue();
+    size = FixTy.getFixedSize();
+    align = FixTy.getBestKnownAlignment();
   } else {
-    SizeInBytes = 0;
-    AlignInBytes = Info.getBestKnownAlignment().getValue();
+    size = Size(0);
+    align = Info.getBestKnownAlignment();
   }
-  assert(AlignInBytes != 0);
+  assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size Size, Alignment Align)
+DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align)
   : DeclOrType(Decl),
-    SizeInBytes(Size.getValue()),
-    AlignInBytes(Align.getValue()) {
-  assert(AlignInBytes != 0);
+    size(size),
+    align(align) {
+  assert(align.getValue() != 0);
 }
 
 static bool typesEqual(Type A, Type B) {
@@ -85,8 +87,8 @@ static bool typesEqual(Type A, Type B) {
 
 bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
   return typesEqual(getType(), T.getType())
-    && SizeInBytes == T.SizeInBytes
-    && AlignInBytes == T.AlignInBytes;
+    && size == T.size
+    && align == T.align;
 }
 
 bool DebugTypeInfo::operator!=(DebugTypeInfo T) const {

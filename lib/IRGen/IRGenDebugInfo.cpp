@@ -729,11 +729,12 @@ llvm::DIDerivedType IRGenDebugInfo::createMemberType(DebugTypeInfo DTI,
   unsigned SizeOfByte = TargetInfo.getCharWidth();
   auto Ty = getOrCreateType(DTI, Scope);
   auto DTy = DBuilder.createMemberType(Scope, StringRef(), File, 0,
-                                       SizeOfByte*DTI.SizeInBytes,
-                                       SizeOfByte*DTI.AlignInBytes,
+                                       SizeOfByte*DTI.size.getValue(),
+                                       SizeOfByte*DTI.align.getValue(),
                                        OffsetInBits, Flags, Ty);
   OffsetInBits += Ty.getSizeInBits();
-  OffsetInBits = llvm::RoundUpToAlignment(OffsetInBits, SizeOfByte*DTI.AlignInBytes);
+  OffsetInBits = llvm::RoundUpToAlignment(OffsetInBits,
+                                          SizeOfByte*DTI.align.getValue());
   return DTy;
 }
 
@@ -801,7 +802,7 @@ IRGenDebugInfo::createStructType(DebugTypeInfo DbgTy,
 /// Return an array with the DITypes for each of a union's elements.
 llvm::DIArray IRGenDebugInfo::
 getUnionElements(UnionDecl *D, llvm::DIDescriptor Scope, llvm::DIFile File,
-                 unsigned SizeInBytes, unsigned AlignInBytes, unsigned Flags) {
+                 Size SizeInBytes, Alignment AlignInBytes, unsigned Flags) {
   SmallVector<llvm::Value *, 16> Elements;
   for (auto Decl : D->getAllElements()) {
     auto CanTy = Decl->getType()->getCanonicalType();
@@ -819,11 +820,11 @@ IRGenDebugInfo::createUnionType(DebugTypeInfo DbgTy,
                                 StringRef Name,
                                 llvm::DIDescriptor Scope,
                                 llvm::DIFile File, unsigned Line,
-                                unsigned SizeInBytes, unsigned AlignInBytes,
+                                Size SizeInBytes, Alignment AlignInBytes,
                                 unsigned Flags) {
   unsigned SizeOfByte = TargetInfo.getCharWidth();
-  uint64_t SizeInBits = SizeInBytes * SizeOfByte;
-  uint64_t AlignInBits = AlignInBytes * SizeOfByte;
+  unsigned SizeInBits = (unsigned)SizeInBytes * SizeOfByte;
+  unsigned AlignInBits = (unsigned)AlignInBytes * SizeOfByte;
   auto FwdDecl = DBuilder.createForwardDecl
     (llvm::dwarf::DW_TAG_union_type,
      Name, Scope, File, Line, dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
@@ -832,8 +833,9 @@ IRGenDebugInfo::createUnionType(DebugTypeInfo DbgTy,
 
   auto DTy = DBuilder.createUnionType(Scope, Name, File, Line,
                                       SizeInBits, AlignInBits, Flags,
-                                      getUnionElements(Decl, Scope, File, Flags,
-                                                       SizeInBits, AlignInBits),
+                                      getUnionElements(Decl, Scope, File,
+                                                       SizeInBytes, AlignInBytes,
+                                                       Flags),
                                       dwarf::DW_LANG_Swift);
   FwdDecl->replaceAllUsesWith(DTy);
   return DTy;
@@ -846,10 +848,10 @@ llvm::DIType IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
 {
   if (auto Decl = DbgTy.getDecl()) {
     VarDecl VD(SourceLoc(), Identifier::getEmptyKey(), Ty, Decl->getDeclContext());
-    DebugTypeInfo DTI(&VD, (Size)DbgTy.SizeInBytes, (Alignment)DbgTy.AlignInBytes);
+    DebugTypeInfo DTI(&VD, DbgTy.size, DbgTy.align);
     return getOrCreateType(DTI, Scope);
   }
-  DebugTypeInfo DTI(Ty, DbgTy.SizeInBytes, DbgTy.AlignInBytes);
+  DebugTypeInfo DTI(Ty, DbgTy.size, DbgTy.align);
   return getOrCreateType(DTI, Scope);
 }
 
@@ -876,8 +878,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // emitting the storage size of the struct, but it may be necessary
   // to emit the (target!) size of the underlying basic type.
   unsigned SizeOfByte = TargetInfo.getCharWidth();
-  uint64_t SizeInBits = DbgTy.SizeInBytes * SizeOfByte;
-  uint64_t AlignInBits = DbgTy.AlignInBytes * SizeOfByte;
+  uint64_t SizeInBits = DbgTy.size.getValue() * SizeOfByte;
+  uint64_t AlignInBits = DbgTy.align.getValue() * SizeOfByte;
   unsigned Encoding = 0;
   unsigned Flags = 0;
 
@@ -1075,7 +1077,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       Location L = getStartLoc(SM, Decl);
       return createUnionType(DbgTy, Decl, Name, Scope,
                              getOrCreateFile(L.Filename), L.Line,
-                             DbgTy.SizeInBytes, DbgTy.AlignInBytes, Flags);
+                             DbgTy.size, DbgTy.align, Flags);
     }
     DEBUG(llvm::dbgs() << "Union type without Decl: ";
           DbgTy.getType()->dump(); llvm::dbgs() << "\n");
@@ -1093,7 +1095,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       auto AliasedTy = Decl->hasUnderlyingType()
         ? Decl->getUnderlyingType()
         : NameAliasTy->getDesugaredType();
-      auto DTI =DebugTypeInfo(AliasedTy, DbgTy.SizeInBytes, DbgTy.AlignInBytes);
+      auto DTI = DebugTypeInfo(AliasedTy, DbgTy.size, DbgTy.align);
       return DBuilder.createTypedef(getOrCreateType(DTI, Scope), Name,
                                     getOrCreateFile(L.Filename), L.Line, Scope);
     }

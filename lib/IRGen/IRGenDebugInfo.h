@@ -223,12 +223,12 @@ private:
                                        unsigned Flags);
   llvm::DIArray getUnionElements(UnionDecl *D, llvm::DIDescriptor Scope,
                                  llvm::DIFile File,
-                                 unsigned SizeInBytes, unsigned AlignInBytes,
+                                 Size SizeInBytes, Alignment AlignInBytes,
                                  unsigned Flags);
   llvm::DICompositeType
   createUnionType(DebugTypeInfo DbgTy, UnionDecl *Decl, StringRef Name,
                   llvm::DIDescriptor Scope, llvm::DIFile File, unsigned Line,
-                  unsigned SizeInBytes, unsigned AlignInBytes, unsigned Flags);
+                  Size SizeInBytes, Alignment AlignInBytes, unsigned Flags);
 };
 
 } // irgen

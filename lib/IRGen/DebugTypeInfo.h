@@ -20,6 +20,7 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "IRGen.h"
 
 namespace llvm {
   class Type;
@@ -27,8 +28,6 @@ namespace llvm {
 
 namespace swift {
   namespace irgen {
-    class Alignment;
-    class Size;
     class TypeInfo;
 
     /// This data structure holds all the debug info we want to emit
@@ -38,14 +37,14 @@ namespace swift {
     public:
       /// Every Decl also has a type, but is otherwise preferred.
       PointerUnion<ValueDecl*, TypeBase*> DeclOrType;
-      uint64_t SizeInBytes;
-      uint64_t AlignInBytes;
+      Size size;
+      Alignment align;
 
       DebugTypeInfo()
-        : SizeInBytes(0), AlignInBytes(1) {
+        : size(0), align(1) {
       }
-      DebugTypeInfo(Type Ty, uint64_t Size, uint64_t Align);
-      DebugTypeInfo(Type Ty, Size Size, Alignment Align);
+      DebugTypeInfo(Type Ty, uint64_t SizeInBytes, uint32_t AlignInBytes);
+      DebugTypeInfo(Type Ty, Size size, Alignment align);
       DebugTypeInfo(Type Ty, const TypeInfo &Info);
       DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info);
       DebugTypeInfo(ValueDecl *Decl, Size Size, Alignment Align);
