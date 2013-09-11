@@ -734,11 +734,45 @@ namespace {
       }
     }
 
+    void verifyParsed(AbstractFunctionDecl *AFD) {
+      if (AFD->getArgParamPatterns().size() !=
+          AFD->getBodyParamPatterns().size()) {
+        Out << "number of arg and body parameter patterns should be equal";
+        abort();
+      }
+    }
+
+    void verifyParsed(ConstructorDecl *CD) {
+      if (CD->getArgParamPatterns().size() != 1 ||
+          CD->getBodyParamPatterns().size() != 1) {
+        Out << "ConstructorDecl should have exactly one parameter pattern";
+        abort();
+      }
+      return verifyParsed(cast<AbstractFunctionDecl>(CD));
+    }
+
     void verifyParsed(DestructorDecl *DD) {
       if (DD->isGeneric()) {
         Out << "DestructorDecl can not be generic";
         abort();
       }
+      if (!DD->getArgParamPatterns().empty() ||
+          !DD->getBodyParamPatterns().empty()) {
+        Out << "DestructorDecl should not have parameter patterns";
+        abort();
+      }
+      return verifyParsed(cast<AbstractFunctionDecl>(DD));
+    }
+
+    void verifyParsed(FuncDecl *FD) {
+      unsigned MinParamPatterns = FD->getImplicitSelfDecl() ? 2 : 1;
+      if (FD->getArgParamPatterns().size() < MinParamPatterns ||
+          FD->getBodyParamPatterns().size() < MinParamPatterns) {
+        Out << "should have at least " << MinParamPatterns
+            << " parameter patterns";
+        abort();
+      }
+      return verifyParsed(cast<AbstractFunctionDecl>(FD));
     }
 
     /// Look through a possible l-value type, returning true if it was

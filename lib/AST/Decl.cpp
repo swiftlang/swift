@@ -650,11 +650,14 @@ VarDecl *AbstractFunctionDecl::getImplicitSelfDeclSlow() const {
 }
 
 VarDecl *FuncDecl::getImplicitSelfDeclImpl() const {
-  if (getNumParamPatterns() == 0) return nullptr;
+  ArrayRef<const Pattern *> ArgParamPatterns = getArgParamPatterns();
+  if (ArgParamPatterns.empty())
+    return nullptr;
 
   // "self" is represented as (typed_pattern (named_pattern (var_decl 'self')).
-  auto TP = dyn_cast<TypedPattern>(getArgParamPatterns()[0]);
-  if (TP == 0) return nullptr;
+  auto TP = dyn_cast<TypedPattern>(ArgParamPatterns[0]);
+  if (!TP)
+    return nullptr;
 
   // The decl should be named 'self' and have no location information.
   auto NP = dyn_cast<NamedPattern>(TP->getSubPattern());
@@ -694,13 +697,17 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
 
 void FuncDecl::setParamPatterns(ArrayRef<Pattern *> ArgParams,
                                 ArrayRef<Pattern *> BodyParams) {
+  MutableArrayRef<Pattern *> ArgParamsRef = getArgParamPatterns();
+  MutableArrayRef<Pattern *> BodyParamsRef = getBodyParamPatterns();
+  const unsigned NumParamPatterns = ArgParamsRef.size();
+
   assert(ArgParams.size() == BodyParams.size());
-  assert(getNumParamPatterns() == ArgParams.size());
-  const unsigned NumParamPatterns = ArgParams.size();
+  assert(NumParamPatterns == ArgParams.size());
+
   for (unsigned i = 0; i != NumParamPatterns; ++i)
-    getParamsBuffer()[i] = ArgParams[i];
+    ArgParamsRef[i] = ArgParams[i];
   for (unsigned i = 0; i != NumParamPatterns; ++i)
-    getParamsBuffer()[i + NumParamPatterns] = BodyParams[i];
+    BodyParamsRef[i] = BodyParams[i];
 }
 
 ArrayRef<ValueDecl*> FuncDecl::getCaptures() const {
