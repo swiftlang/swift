@@ -907,6 +907,7 @@ SourceRange FuncDecl::getSourceRange() const {
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
     return { FuncLoc, BodyEndLoc };
+
   if (auto *B = getBody())
     return { FuncLoc, B->getEndLoc() };
   if (TheFuncExprBody->getBodyResultTypeLoc().hasLocation())
@@ -939,6 +940,10 @@ SourceLoc ConstructorDecl::getLoc() const {
 }
 
 SourceRange ConstructorDecl::getSourceRange() const {
+  if (getBodyKind() == BodyKind::Unparsed ||
+      getBodyKind() == BodyKind::Skipped)
+    return { ConstructorLoc, BodyEndLoc };
+
   if (!Body || !Body->getEndLoc().isValid()) {
     const DeclContext *DC = getDeclContext();
     switch (DC->getContextKind()) {
@@ -1049,5 +1054,9 @@ DestructorDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
 }
 
 SourceRange DestructorDecl::getSourceRange() const {
+  if (getBodyKind() == BodyKind::Unparsed ||
+      getBodyKind() == BodyKind::Skipped)
+    return { DestructorLoc, BodyEndLoc };
+
   return { DestructorLoc, Body->getEndLoc() };
 }
