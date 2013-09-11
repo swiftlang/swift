@@ -59,7 +59,7 @@ enum class OverloadedBuiltinKind : unsigned char {
   /// floating-point types.
   FloatOrVector,
 
-  /// The builtin is has custom processing.
+  /// The builtin has custom processing.
   Special
 };
 
