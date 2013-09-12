@@ -39,12 +39,9 @@ namespace {
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
   TypeChecker &TC;
-  
-  // FIXME: ConstructorDecls and DestructorDecls ought to represent their bodies
-  // as normal FuncExprs.
-  
-  /// TheFunc - This is the current FuncExpr, ConstructorDecl, or DestructorDecl
-  /// being checked.  This is null for top level code.
+
+  /// \brief This is the current function or closure being checked.
+  /// This is null for top level code.
   FuncExprLike TheFunc;
   
   /// DC - This is the current DeclContext.
@@ -92,22 +89,24 @@ public:
     }
   };
 
-  StmtChecker(TypeChecker &TC, FuncExpr *TheFunc)
-    : TC(TC), TheFunc(TheFunc), DC(TheFunc),
-      LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
+  StmtChecker(TypeChecker &TC, AbstractFunctionDecl *AFD)
+    : TC(TC), TheFunc(AFD),
+      LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) {
+    if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
+      DC = CD;
+      return;
+    }
+    if (auto *DD = dyn_cast<DestructorDecl>(AFD)) {
+      DC = DD;
+      return;
+    }
+    DC = cast<FuncDecl>(AFD)->getFuncExpr();
+  }
 
   StmtChecker(TypeChecker &TC, PipeClosureExpr *TheClosure)
     : TC(TC), TheFunc(TheClosure), DC(TheClosure),
       LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
 
-  StmtChecker(TypeChecker &TC, ConstructorDecl *TheCtor)
-    : TC(TC), TheFunc(TheCtor), DC(TheCtor),
-      LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
-  
-  StmtChecker(TypeChecker &TC, DestructorDecl *TheDtor)
-    : TC(TC), TheFunc(TheDtor), DC(TheDtor),
-      LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
-  
   StmtChecker(TypeChecker &TC, DeclContext *DC)
     : TC(TC), TheFunc(), DC(DC),
       LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
@@ -131,12 +130,14 @@ public:
   Stmt *visitBraceStmt(BraceStmt *BS);
   
   Type returnTypeOfFunc() {
-    if (auto fe = TheFunc.dyn_cast<FuncExpr*>()) {
-      return fe->getBodyResultType();
-    } else if (auto closure = TheFunc.dyn_cast<PipeClosureExpr *>()) {
+    if (auto AFD = TheFunc.dyn_cast<AbstractFunctionDecl *>()) {
+      if (auto *FD = dyn_cast<FuncDecl>(AFD))
+        return FD->getFuncExpr()->getBodyResultType();
+    }
+    if (auto closure = TheFunc.dyn_cast<PipeClosureExpr *>()) {
       return closure->getResultType();
-    } else
-      return TupleType::getEmpty(TC.Context);
+    }
+    return TupleType::getEmpty(TC.Context);
   }
   
   Stmt *visitReturnStmt(ReturnStmt *RS) {
@@ -603,7 +604,7 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncExpr *FE,
   BraceStmt *BS = FD->getBody();
   assert(BS && "Should have a body");
 
-  StmtChecker SC(*this, FE);
+  StmtChecker SC(*this, FD);
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
   bool HadError = SC.typeCheckStmt(BS);
 
@@ -688,7 +689,8 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
 
   if (body) {
     // Type-check the body.
-    StmtChecker(*this, ctor).typeCheckStmt(body);
+    StmtChecker(*this, static_cast<AbstractFunctionDecl *>(ctor))
+        .typeCheckStmt(body);
 
     // Figure out which members already have initializers. We don't
     // default-initialize those members.
@@ -838,7 +840,8 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
 
 void TypeChecker::typeCheckDestructorBody(DestructorDecl *DD) {
   Stmt *Body = DD->getBody();
-  StmtChecker(*this, DD).typeCheckStmt(Body);
+  StmtChecker(*this, static_cast<AbstractFunctionDecl *>(DD))
+      .typeCheckStmt(Body);
 }
 
 void TypeChecker::typeCheckClosureBody(PipeClosureExpr *closure) {

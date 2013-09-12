@@ -117,10 +117,10 @@ public:
 
   /// \brief The list of implicitly-defined functions created by the
   /// type checker.
-  std::vector<FuncExprLike> implicitlyDefinedFunctions;
+  std::vector<AbstractFunctionDecl *> implicitlyDefinedFunctions;
 
   /// \brief The list of function definitions we've encountered.
-  std::vector<FuncExprLike> definedFunctions;
+  std::vector<AbstractFunctionDecl *> definedFunctions;
 
 private:
   Type IntLiteralType;

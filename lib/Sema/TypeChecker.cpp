@@ -575,31 +575,28 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     unsigned previousFuncExpr = currentFuncExpr;
     for (unsigned n = FuncExprs.size(); currentFuncExpr != n;
          ++currentFuncExpr) {
-      auto func = FuncExprs[currentFuncExpr];
+      auto *AFD = FuncExprs[currentFuncExpr];
 
-      if (ConstructorDecl *CD = func.dyn_cast<ConstructorDecl*>()) {
+      if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
         TC.typeCheckConstructorBody(CD);
         continue;
       }
-      if (DestructorDecl *DD = func.dyn_cast<DestructorDecl*>()) {
+      if (auto *DD = dyn_cast<DestructorDecl>(AFD)) {
         TC.typeCheckDestructorBody(DD);
         continue;
       }
-      FuncExpr *FE = func.get<FuncExpr*>();
-      PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);
+      auto *FD = cast<FuncDecl>(AFD);
+      PrettyStackTraceDecl StackEntry("type-checking", FD);
 
-      TC.typeCheckFunctionBody(FE);
+      TC.typeCheckFunctionBody(FD->getFuncExpr());
     }
 
     // Compute captures for the function expressions we visited, in the
     // opposite order of type checking. i.e., the nested FuncExprs will be
     // visited before the outer FuncExprs.
     for (unsigned i = currentFuncExpr; i > previousFuncExpr; --i) {
-      auto func = FuncExprs[i-1].dyn_cast<FuncExpr *>();
-      if (!func)
-        continue;
-
-      TC.computeCaptures(func);
+      if (auto *FD = dyn_cast<FuncDecl>(FuncExprs[i-1]))
+        TC.computeCaptures(FD->getFuncExpr());
     }
 
     for (unsigned n = TC.Context.ExternalDefinitions.size();

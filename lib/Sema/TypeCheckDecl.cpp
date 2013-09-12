@@ -1318,7 +1318,7 @@ public:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (!IsFirstPass && FD->getBody())
-      TC.definedFunctions.push_back(FD->getFuncExpr());
+      TC.definedFunctions.push_back(FD);
 
     if (IsSecondPass)
       return;
