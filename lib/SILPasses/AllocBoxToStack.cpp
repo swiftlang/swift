@@ -115,7 +115,7 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
     for (auto MBBI = --LastRelease->getParent()->end(); ; --MBBI) {
       auto *RI = dyn_cast<StrongReleaseInst>(MBBI);
       if (RI == nullptr ||
-          RI->getOperand() != SILValue(ABI, 1)) {
+          RI->getOperand() != SILValue(ABI, 0)) {
         assert(MBBI != LastRelease->getParent()->begin() &&
                "Didn't find any release in this block?");
         continue;
