@@ -255,10 +255,15 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
              fd->getFuncExpr()->getType()->castTo<AnyFunctionType>()->getResult()
                ->is<PolymorphicFunctionType>()));
     
-    SGM.emitCurryThunk(constant,
-                       SILDeclRef(fd, SILDeclRef::Kind::Func,
-                       constant.uncurryLevel + 1),
-                       fd);
+    // Reference the next uncurrying level of the function.
+    SILDeclRef next = SILDeclRef(fd, SILDeclRef::Kind::Func,
+                                 constant.uncurryLevel + 1);
+    // If the function is fully uncurried and natively ObjC, reference its ObjC
+    // entry point.
+    if (!next.isCurried && fd->hasClangNode())
+      next = next.asObjC();
+    
+    SGM.emitCurryThunk(constant, next, fd);
   }
   
   return B.createFunctionRef(loc, SGM.getFunction(constant));
