@@ -1209,7 +1209,6 @@ ArrayRef<ArchetypeType *> PolymorphicFunctionType::getAllArchetypes() const {
 
 Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
                  bool ignoreMissing, LazyResolver *resolver) const {
-  assert(resolver && "FIXME: We currently require a resolver");
   return transform(module->getASTContext(), [&](Type type) -> Type {
     // We only substitute for substitutable types.
     auto substOrig = type->getAs<SubstitutableType>();
@@ -1272,9 +1271,11 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
 
     // FIXME: This is a fallback. We want the above, conformance-based
     // result to be the only viable path.
-    if (Type memberType = resolver->resolveMemberType(substParent,
-                                                      substOrig->getName())) {
-      return memberType;
+    if (resolver) {
+      if (Type memberType = resolver->resolveMemberType(substParent,
+                                                        substOrig->getName())) {
+        return memberType;
+      }
     }
 
     return ignoreMissing? type : Type();

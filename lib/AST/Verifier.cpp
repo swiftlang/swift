@@ -388,6 +388,27 @@ namespace {
       checkTrivialSubtype(srcTy, destTy, "MetatypeConversionExpr");
     }
 
+    void verifyChecked(DerivedToBaseExpr *E) {
+      auto destTy = E->getType();
+      auto srcTy = E->getSubExpr()->getType();
+      if (destTy->isEqual(srcTy)) {
+        Out << "trivial DerivedToBaseExpr:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      if (!destTy->getClassOrBoundGenericClass() ||
+          !srcTy->getClassOrBoundGenericClass()) {
+        Out << "DerivedToBaseExpr does not involve class types:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      checkTrivialSubtype(srcTy, destTy, "DerivedToBaseExpr");
+    }
+
     void verifyChecked(MaterializeExpr *E) {
       Type obj = checkLValue(E->getType(), "result of MaterializeExpr");
       checkSameType(obj, E->getSubExpr()->getType(),
@@ -890,7 +911,6 @@ namespace {
         goto fail;
       }
 
-      // FIXME: don't just check the hierarchy.
       {
         ClassDecl *srcClass = srcTy->getClassOrBoundGenericClass();
         ClassDecl *destClass = destTy->getClassOrBoundGenericClass();
@@ -905,11 +925,11 @@ namespace {
           abort();
         }
 
-        assert(srcClass != destClass);
-        while (srcClass->hasSuperclass()) {
-          srcClass = srcClass->getSuperclass()->getClassOrBoundGenericClass();
-          assert(srcClass);
-          if (srcClass == destClass) return;
+        for (Type srcSuperTy = srcTy->getSuperclass(nullptr);
+             srcSuperTy;
+             srcSuperTy = srcSuperTy->getSuperclass(nullptr)) {
+          if (srcSuperTy->isEqual(destTy))
+            return;
         }
 
         Out << "subtype conversion in " << what << " is not to super class: ";

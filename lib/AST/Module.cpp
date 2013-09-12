@@ -375,7 +375,8 @@ static ArrayRef<Substitution> gatherSubstitutions(ASTContext &ctx, Type type,
     if (auto boundGeneric = type->getAs<BoundGenericType>()) {
       // FIXME: This feels like a hack. We should be able to compute the
       // substitutions ourselves for this.
-      resolver->resolveUnvalidatedType(type);
+      if (resolver)
+        resolver->resolveUnvalidatedType(type);
       if (boundGeneric->hasTypeVariable() && !boundGeneric->hasSubstitutions()){
         // If we have a type variable, introduce fake substitutions.
         // FIXME: This feels a little awkward, and shouldn't go into
