@@ -123,8 +123,10 @@ private:
                 gen.SGM.getConstantType(standaloneFunction.atUncurryLevel(0))
                   .getSwiftRValueType()),
       specializeLoc(),
-      isTransparent(standaloneFunction.hasDecl() &&
-                    standaloneFunction.getDecl()->getAttrs().isTransparent()),
+      isTransparent((standaloneFunction.hasDecl() &&
+                     standaloneFunction.getDecl()->getAttrs().isTransparent())||
+                     standaloneFunction.isUnionElement() ||
+                     standaloneFunction.isDefaultArgGenerator()),
       Loc(l)
   {
   }

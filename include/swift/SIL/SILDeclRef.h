@@ -159,7 +159,12 @@ struct SILDeclRef {
   bool isGlobal() const {
     return kind == Kind::GlobalAccessor;
   }
-  
+  /// True if the SILDeclRef references the generator for a default argument of
+  /// a function.
+  bool isDefaultArgGenerator() const {
+    return kind == Kind::DefaultArgGenerator;
+  }
+
   bool operator==(SILDeclRef rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
       && kind == rhs.kind
