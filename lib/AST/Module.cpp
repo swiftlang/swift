@@ -486,6 +486,8 @@ specializeTypeWitnesses(ASTContext &ctx,
 static std::tuple<NominalTypeDecl *, Decl *, ProtocolConformance *>
 findExplicitConformance(Module *module, NominalTypeDecl *nominal,
                         ProtocolDecl *protocol, LazyResolver *resolver) {
+  // FIXME: Introduce a cache/lazy lookup structure to make this more efficient?
+
   // Walk the nominal type, its extensions, superclasses, and so on.
   llvm::SmallPtrSet<ProtocolDecl *, 4> visitedProtocols;
   SmallVector<std::tuple<NominalTypeDecl *, NominalTypeDecl *, Decl *>,4> stack;

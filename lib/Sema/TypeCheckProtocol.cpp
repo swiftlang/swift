@@ -495,7 +495,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   for (auto InheritedProto : Proto->getProtocols()) {
     ProtocolConformance *InheritedConformance = nullptr;
     if (TC.conformsToProtocol(T, InheritedProto, &InheritedConformance,
-                              ComplainLoc))
+                              ComplainLoc, ExplicitConformance))
       InheritedMapping[InheritedProto] = InheritedConformance;
     else {
       // Recursive call already diagnosed this problem, but tack on a note
