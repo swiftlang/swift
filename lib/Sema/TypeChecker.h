@@ -290,8 +290,8 @@ public:
   Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
   void typeCheckIgnoredExpr(Expr *E);
-  bool typeCheckFunctionBodyUntil(FuncExpr *FE, SourceLoc EndTypeCheckLoc);
-  bool typeCheckFunctionBody(FuncExpr *FE);
+  bool typeCheckFunctionBodyUntil(FuncDecl *FD, SourceLoc EndTypeCheckLoc);
+  bool typeCheckFunctionBody(FuncDecl *FD);
   void typeCheckConstructorBody(ConstructorDecl *CD);
   void typeCheckDestructorBody(DestructorDecl *DD);
   void typeCheckClosureBody(PipeClosureExpr *closure);

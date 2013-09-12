@@ -588,7 +588,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       auto *FD = cast<FuncDecl>(AFD);
       PrettyStackTraceDecl StackEntry("type-checking", FD);
 
-      TC.typeCheckFunctionBody(FD->getFuncExpr());
+      TC.typeCheckFunctionBody(FD);
     }
 
     // Compute captures for the function expressions we visited, in the
@@ -614,7 +614,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       }
       if (auto func = dyn_cast<FuncDecl>(decl)) {
         PrettyStackTraceDecl StackEntry("type-checking", func);
-        TC.typeCheckFunctionBody(func->getFuncExpr());
+        TC.typeCheckFunctionBody(func);
         continue;
       }
        if (isa<StructDecl>(decl) || isa<ProtocolDecl>(decl)) {
@@ -680,12 +680,12 @@ bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
 }
 
 bool swift::typeCheckFunctionBodyUntil(TranslationUnit *TU, DeclContext *DC,
-                                       FuncExpr *FE,
+                                       FuncDecl *FD,
                                        SourceLoc EndTypeCheckLoc) {
   // Set up a diagnostics engine that swallows diagnostics.
   DiagnosticEngine Diags(TU->Ctx.SourceMgr);
 
   TypeChecker TC(*TU, Diags);
-  return !TC.typeCheckFunctionBodyUntil(FE, EndTypeCheckLoc);
+  return !TC.typeCheckFunctionBodyUntil(FD, EndTypeCheckLoc);
 }
 
