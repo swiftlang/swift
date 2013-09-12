@@ -100,14 +100,15 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
     llvm_unreachable("builtins & serialized modules should be handled");
   case DeclContextKind::TopLevelCodeDecl:
     llvm_unreachable("shouldn't serialize the main module");
-  case DeclContextKind::CapturingExpr: {
-    // FIXME: What about default functions?
-    assert(isa<FuncExpr>(DC) &&
-           "shouldn't serialize decls from anonymous closures");
+  case DeclContextKind::FuncExpr: {
     auto FD = cast<FuncExpr>(DC)->getDecl();
     assert(FD && "shouldn't serialize decls from anonymous closures");
     return FD;
   }
+  case DeclContextKind::PipeClosureExpr:
+  case DeclContextKind::ClosureExpr:
+    // FIXME: What about default functions?
+    llvm_unreachable("shouldn't serialize decls from anonymous closures");
   case DeclContextKind::NominalTypeDecl:
     return cast<NominalTypeDecl>(DC);
   case DeclContextKind::ExtensionDecl:

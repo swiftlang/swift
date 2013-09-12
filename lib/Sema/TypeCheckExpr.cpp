@@ -498,12 +498,19 @@ namespace {
   class FindCapturedVars : public ASTWalker {
     TypeChecker &tc;
     llvm::SetVector<ValueDecl*> &captures;
-    CapturingExpr *curExpr;
+    DeclContext *CurExprAsDC;
 
   public:
     FindCapturedVars(TypeChecker &tc, llvm::SetVector<ValueDecl*> &captures,
                      CapturingExpr *curExpr)
-      : tc(tc), captures(captures), curExpr(curExpr) {}
+        : tc(tc), captures(captures) {
+      if (auto *FE = dyn_cast<FuncExpr>(curExpr))
+        CurExprAsDC = FE;
+      else if (auto *CE = dyn_cast<PipeClosureExpr>(curExpr))
+        CurExprAsDC = CE;
+      else
+        CurExprAsDC = cast<ClosureExpr>(curExpr);
+    }
 
     void doWalk(Expr *E) {
       E->walk(*this);
@@ -521,7 +528,7 @@ namespace {
       // capture from us).
       if (CapturingExpr *SubCE = dyn_cast<CapturingExpr>(E)) {
         for (auto D : SubCE->getCaptures())
-          if (D->getDeclContext() != curExpr)
+          if (D->getDeclContext() != CurExprAsDC)
             captures.insert(D);
         return { false, E };
       }
@@ -533,7 +540,7 @@ namespace {
 
       // Decl references that are within the Capture are local references, ones
       // from parent context are captures.
-      if (!curExpr->isChildContextOf(D->getDeclContext()))
+      if (!CurExprAsDC->isChildContextOf(D->getDeclContext()))
         return { false, DRE };
 
       // Only capture var decls at global scope.  Other things can be captured

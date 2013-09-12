@@ -32,7 +32,8 @@ SILFunction::~SILFunction() {
 }
 
 void SILFunction::setDeclContext(Decl *D) {
-  if (!D) return;
+  if (!D)
+    return;
   switch (D->getKind()) {
   case DeclKind::Func:        DeclCtx = cast<FuncDecl>(D)->getFuncExpr(); break;
   // These three dual-inherit from DeclContext.
@@ -46,7 +47,27 @@ void SILFunction::setDeclContext(Decl *D) {
 }
 
 void SILFunction::setDeclContext(Expr *E) {
-  DeclCtx = dyn_cast_or_null<CapturingExpr>(E);
+  if (!E) {
+    DeclCtx = nullptr;
+    return;
+  }
+
+  switch (E->getKind()) {
+  case ExprKind::Func:
+    DeclCtx = dyn_cast<FuncExpr>(E);
+    return;
+
+  case ExprKind::PipeClosure:
+    DeclCtx = dyn_cast<PipeClosureExpr>(E);
+    return;
+
+  case ExprKind::ImplicitClosure:
+    DeclCtx = dyn_cast<ClosureExpr>(E);
+    return;
+
+  default:
+    DeclCtx = nullptr;
+  }
 }
 
 ASTContext &SILFunction::getASTContext() const {

@@ -1105,7 +1105,7 @@ Expr *Parser::parseExprIdentifier() {
 }
 
 // Note: defined below.
-static void AddFuncArgumentsToScope(const Pattern *pat, CapturingExpr *CE,
+static void AddFuncArgumentsToScope(const Pattern *pat, DeclContext *DC,
                                     Parser &P);
 
 bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
@@ -1725,13 +1725,13 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
 /// is known to be a FunctionType on the outer level) creating and adding named
 /// arguments to the current scope.  This causes redefinition errors to be
 /// emitted.
-static void AddFuncArgumentsToScope(const Pattern *pat, CapturingExpr *CE,
+static void AddFuncArgumentsToScope(const Pattern *pat, DeclContext *DC,
                                     Parser &P) {
   switch (pat->getKind()) {
   case PatternKind::Named: {
     // Reparent the decl and add it to the scope.
     VarDecl *var = cast<NamedPattern>(pat)->getDecl();
-    var->setDeclContext(CE);
+    var->setDeclContext(DC);
     P.addToScope(var);
     return;
   }
@@ -1740,16 +1740,16 @@ static void AddFuncArgumentsToScope(const Pattern *pat, CapturingExpr *CE,
     return;
 
   case PatternKind::Paren:
-    AddFuncArgumentsToScope(cast<ParenPattern>(pat)->getSubPattern(), CE, P);
+    AddFuncArgumentsToScope(cast<ParenPattern>(pat)->getSubPattern(), DC, P);
     return;
 
   case PatternKind::Typed:
-    AddFuncArgumentsToScope(cast<TypedPattern>(pat)->getSubPattern(), CE, P);
+    AddFuncArgumentsToScope(cast<TypedPattern>(pat)->getSubPattern(), DC, P);
     return;
 
   case PatternKind::Tuple:
     for (const TuplePatternElt &field : cast<TuplePattern>(pat)->getFields())
-      AddFuncArgumentsToScope(field.getPattern(), CE, P);
+      AddFuncArgumentsToScope(field.getPattern(), DC, P);
     return;
 #define PATTERN(Id, Parent)
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:

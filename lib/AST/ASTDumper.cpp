@@ -601,8 +601,16 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     os << "destructor";
     break;
 
-  case DeclContextKind::CapturingExpr:
-    os << "captured";
+  case DeclContextKind::FuncExpr:
+    os << "func expr";
+    break;
+
+  case DeclContextKind::PipeClosureExpr:
+    os << "pipe closure";
+    break;
+
+  case DeclContextKind::ClosureExpr:
+    os << "closure";
     break;
 
   case DeclContextKind::TopLevelCodeDecl:

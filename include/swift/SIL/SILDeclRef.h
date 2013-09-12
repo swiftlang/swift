@@ -29,7 +29,8 @@ namespace llvm {
 
 namespace swift {
   class ValueDecl;
-  class CapturingExpr;
+  class PipeClosureExpr;
+  class ClosureExpr;
   class ASTContext;
   class ClassDecl;
 
@@ -43,7 +44,8 @@ namespace swift {
 /// the allocating and initializing entry points of a constructor, the getter
 /// and setter for a property, etc.
 struct SILDeclRef {
-  typedef llvm::PointerUnion<ValueDecl*, CapturingExpr*> Loc;
+  typedef llvm::PointerUnion3<ValueDecl *, PipeClosureExpr *,
+                              ClosureExpr *> Loc;
   
   /// Represents the "kind" of the SILDeclRef. For some Swift decls there
   /// are multiple SIL entry points, and the kind is used to distinguish them.
@@ -133,12 +135,22 @@ struct SILDeclRef {
 
   bool isNull() const { return loc.isNull(); }
   
-  bool hasDecl() const { return loc.is<ValueDecl*>(); }
-  bool hasExpr() const { return loc.is<CapturingExpr*>(); }
-  
-  ValueDecl *getDecl() const { return loc.get<ValueDecl*>(); }
-  CapturingExpr *getExpr() const { return loc.get<CapturingExpr*>(); }
-  
+  bool hasDecl() const { return loc.is<ValueDecl *>(); }
+  bool hasPipeClosureExpr() const {
+    return loc.is<PipeClosureExpr *>();
+  }
+  bool hasClosureExpr() const {
+    return loc.is<ClosureExpr *>();
+  }
+
+  ValueDecl *getDecl() const { return loc.get<ValueDecl *>(); }
+  PipeClosureExpr *getPipeClosureExpr() const {
+    return loc.dyn_cast<PipeClosureExpr *>();
+  }
+  ClosureExpr *getClosureExpr() const {
+    return loc.dyn_cast<ClosureExpr *>();
+  }
+
   /// True if the SILDeclRef references a function.
   bool isFunc() const {
     return kind == Kind::Func;

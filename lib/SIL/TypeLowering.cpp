@@ -1349,21 +1349,27 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
 }
 
 Type TypeConverter::makeConstantType(SILDeclRef c) {
-  ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>();
+  ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
 
   switch (c.kind) {
-  case SILDeclRef::Kind::Func:
-    if (CapturingExpr *e = c.loc.dyn_cast<CapturingExpr*>()) {
-      auto *funcTy = e->getType()->castTo<AnyFunctionType>();
-      return getFunctionTypeWithCaptures(funcTy, e->getLocalCaptures(),
-                                         e->getParent());
-    } else {
-      FuncDecl *func = cast<FuncDecl>(vd);
-      auto *funcTy = func->getType()->castTo<AnyFunctionType>();
-      return getFunctionTypeWithCaptures(funcTy,
-                                         func->getLocalCaptures(),
-                                         func->getDeclContext());
+  case SILDeclRef::Kind::Func: {
+    if (auto *CE = c.loc.dyn_cast<PipeClosureExpr *>()) {
+      auto *FuncTy = CE->getType()->castTo<AnyFunctionType>();
+      return getFunctionTypeWithCaptures(FuncTy, CE->getLocalCaptures(),
+                                         CE->getParent());
     }
+    if (auto *CE = c.loc.dyn_cast<ClosureExpr *>()) {
+      auto *FuncTy = CE->getType()->castTo<AnyFunctionType>();
+      return getFunctionTypeWithCaptures(FuncTy, CE->getLocalCaptures(),
+                                         CE->getParent());
+    }
+
+    FuncDecl *func = cast<FuncDecl>(vd);
+    auto *funcTy = func->getType()->castTo<AnyFunctionType>();
+    return getFunctionTypeWithCaptures(funcTy,
+                                       func->getLocalCaptures(),
+                                       func->getDeclContext());
+  }
 
   case SILDeclRef::Kind::Getter:
   case SILDeclRef::Kind::Setter: {

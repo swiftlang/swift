@@ -41,7 +41,7 @@ namespace llvm {
     static swift::DeclContext *getFromVoidPointer(void *P) {
       return (swift::DeclContext*)P;
     }
-    enum { NumLowBitsAvailable = 3 };
+    enum { NumLowBitsAvailable = 4 };
   };
 }
 
@@ -52,7 +52,9 @@ namespace swift {
 // allows for range checks in classof.
 enum class DeclContextKind : uint8_t {
   Module,
-  CapturingExpr,
+  FuncExpr,
+  PipeClosureExpr,
+  ClosureExpr,
   NominalTypeDecl,
   ExtensionDecl,
   TopLevelCodeDecl,
@@ -72,12 +74,12 @@ enum class DeclContextKind : uint8_t {
 /// in general, so if an AST node class multiply inherits from DeclContext
 /// and another base class, it must 'using DeclContext::operator new;' in order
 /// to use an allocator with the correct alignment.
-class alignas(8) DeclContext {
-  // alignas(8) because we use three tag bits on DeclContext.
+class alignas(16) DeclContext {
+  // alignas(16) because we use four tag bits on DeclContext.
   
   enum {
-    KindBits = llvm::PointerLikeTypeTraits<swift::DeclContext*>::
-    NumLowBitsAvailable
+    KindBits =
+        llvm::PointerLikeTypeTraits<swift::DeclContext*>::NumLowBitsAvailable
   };
   static_assert(unsigned(DeclContextKind::Last_DeclContextKind) < 1U<<KindBits,
                 "Not enough KindBits for DeclContextKind");
@@ -100,7 +102,9 @@ public:
   /// code block.  A context that appears in such a scope, like a
   /// local type declaration, does not itself become a local context.
   bool isLocalContext() const {
-    return getContextKind() == DeclContextKind::CapturingExpr ||
+    return getContextKind() == DeclContextKind::FuncExpr ||
+           getContextKind() == DeclContextKind::PipeClosureExpr ||
+           getContextKind() == DeclContextKind::ClosureExpr ||
            getContextKind() == DeclContextKind::TopLevelCodeDecl ||
            getContextKind() == DeclContextKind::ConstructorDecl ||
            getContextKind() == DeclContextKind::DestructorDecl;

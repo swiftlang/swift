@@ -119,7 +119,9 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
       Buffer << BM->Name << ".";
     return;
 
-  case DeclContextKind::CapturingExpr:
+  case DeclContextKind::FuncExpr:
+  case DeclContextKind::PipeClosureExpr:
+  case DeclContextKind::ClosureExpr:
     // FIXME
     Buffer << "<anonymous function>";
     return;

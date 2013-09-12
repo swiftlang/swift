@@ -178,15 +178,21 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
     else {
       llvm_unreachable("invalid loc decl for SILDeclRef!");
     }
-  } else {
-    auto *expr = baseLoc.get<CapturingExpr*>();
-    loc = expr;
+  } else if (auto *PCE = baseLoc.dyn_cast<PipeClosureExpr *>()) {
+    loc = PCE;
     kind = Kind::Func;
-    assert(expr->getParamPatterns().size() >= 1
-           && "no param patterns for function?!");
-    naturalUncurryLevel = getFuncNaturalUncurryLevel(expr);
+    assert(PCE->getParamPatterns().size() >= 1 &&
+           "no param patterns for function?!");
+    naturalUncurryLevel = getFuncNaturalUncurryLevel(PCE);
+  } else {
+    auto *CE = baseLoc.dyn_cast<ClosureExpr *>();
+    loc = CE;
+    kind = Kind::Func;
+    assert(CE->getParamPatterns().size() >= 1 &&
+           "no param patterns for function?!");
+    naturalUncurryLevel = getFuncNaturalUncurryLevel(CE);
   }
-  
+
   // Set the uncurry level.
   assert((atUncurryLevel == ConstructAtNaturalUncurryLevel
           || atUncurryLevel <= naturalUncurryLevel)

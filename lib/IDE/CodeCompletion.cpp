@@ -362,7 +362,9 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   /// \returns true on success, false on failure.
   bool typecheckContext() {
     // Type check the function that contains the expression.
-    if (CurDeclContext->getContextKind() == DeclContextKind::CapturingExpr) {
+    if (CurDeclContext->getContextKind() == DeclContextKind::FuncExpr ||
+        CurDeclContext->getContextKind() == DeclContextKind::PipeClosureExpr ||
+        CurDeclContext->getContextKind() == DeclContextKind::ClosureExpr) {
       SourceLoc EndTypeCheckLoc =
           ParsedExpr ? ParsedExpr->getStartLoc()
                      : TU->Ctx.SourceMgr.getCodeCompletionLoc();

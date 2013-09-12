@@ -225,18 +225,19 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
   }
 
-  case DeclContextKind::CapturingExpr:
+  case DeclContextKind::FuncExpr: {
+    auto *FD = cast<FuncExpr>(ctx)->getDecl();
     // FIXME: We need a real solution here for local types.
-    if (FuncExpr *FE = dyn_cast<FuncExpr>(ctx)) {
-      if (FE->getDecl()) {
-        if (FE->getDecl()->isGetterOrSetter()) {
-          mangleGetterOrSetterContext(FE->getDecl());
-          return;
-        }
-        mangleDeclName(FE->getDecl(), IncludeType::Yes);
-        return;
-      }
+    if (FD->isGetterOrSetter()) {
+      mangleGetterOrSetterContext(FD);
+      return;
     }
+    mangleDeclName(FD, IncludeType::Yes);
+    return;
+  }
+
+  case DeclContextKind::PipeClosureExpr:
+  case DeclContextKind::ClosureExpr:
     llvm_unreachable("unnamed closure mangling not yet implemented");
 
   case DeclContextKind::ConstructorDecl:

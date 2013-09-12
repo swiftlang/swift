@@ -1628,13 +1628,13 @@ public:
 
 /// CapturingExpr - a FuncExpr or a ClosureExpr; always returns something
 /// of function type, and can capture variables from an enclosing scope.
-class CapturingExpr : public Expr, public DeclContext {
+class CapturingExpr : public Expr {
   ArrayRef<ValueDecl*> Captures;
 
 public:
-  CapturingExpr(ExprKind Kind, Type FnType, DeclContext *Parent)
-    : Expr(Kind, FnType), DeclContext(DeclContextKind::CapturingExpr, Parent) {
-  }
+  CapturingExpr(ExprKind Kind, Type FnType)
+      : Expr(Kind, FnType)
+  {}
 
   ArrayRef<ValueDecl*> getCaptures() const { return Captures; }
   void setCaptures(ArrayRef<ValueDecl*> C) { Captures = C; }
@@ -1657,22 +1657,19 @@ public:
     return E->getKind() >= ExprKind::First_CapturingExpr &&
            E->getKind() <= ExprKind::Last_CapturingExpr;
   }
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::CapturingExpr;
-  }
-  
-  using DeclContext::operator new;
 };
 
 /// FuncExpr - An explicit unnamed func definition, which can optionally
 /// have named arguments.
 ///    e.g.  func(a : int) -> int { return a+1 }
-class FuncExpr : public CapturingExpr {
+class FuncExpr : public CapturingExpr, public DeclContext {
   FuncDecl *TheFuncDecl;
 
   FuncExpr(DeclContext *Parent)
-    : CapturingExpr(ExprKind::Func, Type(), Parent),
-      TheFuncDecl(nullptr) {}
+    : CapturingExpr(ExprKind::Func, Type()),
+      DeclContext(DeclContextKind::FuncExpr, Parent),
+      TheFuncDecl(nullptr)
+  {}
 
 public:
   static FuncExpr *create(ASTContext &Context, DeclContext *Parent);
@@ -1684,16 +1681,19 @@ public:
   void setDecl(FuncDecl *f) { TheFuncDecl = f; }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Func; }
-  static bool classof(const DeclContext *DC) {
-    return isa<CapturingExpr>(DC) && classof(cast<CapturingExpr>(DC));
-  }
   static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
+
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::FuncExpr;
+  }
+
+  using DeclContext::operator new;
 };
 
 /// An explicit unnamed func definition, which can optionally
 /// have named arguments.
 ///    e.g.  func(a : int) -> int { return a+1 }
-class PipeClosureExpr : public CapturingExpr {
+class PipeClosureExpr : public CapturingExpr, public DeclContext {
   /// \brief The set of parameters, along with a bit indicating when these
   /// parameters were synthesized from anonymous closure variables.
   llvm::PointerIntPair<Pattern *, 1, bool> params;
@@ -1712,7 +1712,8 @@ class PipeClosureExpr : public CapturingExpr {
 public:
   PipeClosureExpr(Pattern *params, SourceLoc arrowLoc,
                   TypeLoc explicitResultType, DeclContext *parent)
-    : CapturingExpr(ExprKind::PipeClosure, Type(), parent),
+    : CapturingExpr(ExprKind::PipeClosure, Type()),
+      DeclContext(DeclContextKind::PipeClosureExpr, parent),
       params(params, false), arrowLoc(arrowLoc),
       explicitResultType(explicitResultType), body(nullptr) { }
 
@@ -1795,12 +1796,14 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::PipeClosure;
   }
-  static bool classof(const DeclContext *DC) {
-    return isa<CapturingExpr>(DC) && classof(cast<CapturingExpr>(DC));
-  }
   static bool classof(const CapturingExpr *E) {
     return classof(cast<Expr>(E));
   }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::PipeClosureExpr;
+  }
+
+  using DeclContext::operator new;
 };
 
 /// ClosureExpr - An expression which is implicitly created by using an
@@ -1809,14 +1812,16 @@ public:
 /// formed.  Once type checking has completed, ClosureExpr's are known to have
 /// FunctionType.
 ///
-class ClosureExpr : public CapturingExpr {
+class ClosureExpr : public CapturingExpr, public DeclContext {
   Expr *Body;
   Pattern *Pat;
 
 public:
   ClosureExpr(ExprKind Kind, Expr *Body, DeclContext *Parent,
               Type ResultTy = Type())
-    : CapturingExpr(Kind, ResultTy, Parent), Body(Body), Pat(0) {}
+    : CapturingExpr(Kind, ResultTy),
+      DeclContext(DeclContextKind::ClosureExpr, Parent),
+      Body(Body), Pat(nullptr) {}
 
   Expr *getBody() const { return Body; }
   void setBody(Expr *e) { Body = e; }
@@ -1836,10 +1841,13 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ImplicitClosure;
   }
-  static bool classof(const DeclContext *DC) {
-    return isa<CapturingExpr>(DC) && classof(cast<CapturingExpr>(DC));
-  }
   static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
+
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::ClosureExpr;
+  }
+
+  using DeclContext::operator new;
 };
 
 /// ImplicitClosureExpr - This is a closure of the contained subexpression that
@@ -1865,12 +1873,11 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ImplicitClosure;
   }
-  static bool classof(const DeclContext *DC) {
-    return isa<CapturingExpr>(DC) && classof(cast<CapturingExpr>(DC));
-  }
   static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
+  static bool classof(const DeclContext *DC) {
+    return ClosureExpr::classof(DC);
+  }
 };
-
 
 /// NewArrayExpr - The allocation of an array.  Allocates and constructs
 /// the array, then injects that into the corresponding slice type.

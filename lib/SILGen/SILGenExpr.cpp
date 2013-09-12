@@ -1336,7 +1336,7 @@ RValue RValueEmitter::visitFuncExpr(FuncExpr *e, SGFContext C) {
 
   // Generate the closure (if any) for the function reference.
   return RValue(SGF,
-                SGF.emitClosureForCapturingExpr(e, SILDeclRef(e),
+                SGF.emitClosureForCapturingExpr(e, SILDeclRef(e->getDecl()),
                                               SGF.getForwardingSubstitutions(),
                                               e),
                 e);
