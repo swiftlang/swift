@@ -3471,11 +3471,7 @@ static Expr *cleanupIllFormedExpression(ASTContext &context,
       : context(context), cs(cs) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // For FuncExprs, we just want to type-check the patterns as written,
-      // but not walk into the body. The body will by type-checked separately.
-      if (isa<FuncExpr>(expr)) {
-        return { false, walkToExprPost(expr) };
-      }
+      assert(!isa<FuncExpr>(expr));
 
       // For closures, type-check the patterns and result type as written,
       // but do not walk into the body. That will be type-checked after
