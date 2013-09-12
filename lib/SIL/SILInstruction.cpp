@@ -453,6 +453,23 @@ AssignInst::AssignInst(SILLocation Loc, SILValue Src, SILValue Dest)
     Operands(this, Src, Dest) {
 }
 
+MarkFunctionEscapeInst *
+MarkFunctionEscapeInst::create(SILLocation Loc,
+                               ArrayRef<SILValue> Elements, SILFunction &F) {
+  void *Buffer = F.getModule().allocate(sizeof(MarkFunctionEscapeInst) +
+                              decltype(Operands)::getExtraSize(Elements.size()),
+                                        alignof(MarkFunctionEscapeInst));
+  return ::new(Buffer) MarkFunctionEscapeInst(Loc, Elements);
+}
+
+MarkFunctionEscapeInst::MarkFunctionEscapeInst(SILLocation Loc,
+                                               ArrayRef<SILValue> Elems)
+  : SILInstruction(ValueKind::MarkFunctionEscapeInst, Loc),
+    Operands(this, Elems) {
+}
+
+
+
 StoreWeakInst::StoreWeakInst(SILLocation loc, SILValue value, SILValue dest,
                              IsInitialization_t isInit)
   : SILInstruction(ValueKind::StoreWeakInst, loc),
@@ -487,8 +504,8 @@ SpecializeInst::SpecializeInst(SILLocation Loc, SILValue Operand,
          Substitutions.size() * sizeof(Substitution));
 }
 
-StructInst *StructInst::createImpl(SILLocation Loc, SILType Ty,
-                                 ArrayRef<SILValue> Elements, SILFunction &F) {
+StructInst *StructInst::create(SILLocation Loc, SILType Ty,
+                               ArrayRef<SILValue> Elements, SILFunction &F) {
   void *Buffer = F.getModule().allocate(sizeof(StructInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
                             alignof(StructInst));
@@ -499,8 +516,8 @@ StructInst::StructInst(SILLocation Loc, SILType Ty, ArrayRef<SILValue> Elems)
   : SILInstruction(ValueKind::StructInst, Loc, Ty), Operands(this, Elems) {
 }
 
-TupleInst *TupleInst::createImpl(SILLocation Loc, SILType Ty,
-                                 ArrayRef<SILValue> Elements, SILFunction &F) {
+TupleInst *TupleInst::create(SILLocation Loc, SILType Ty,
+                             ArrayRef<SILValue> Elements, SILFunction &F) {
   void *Buffer = F.getModule().allocate(sizeof(TupleInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
                             alignof(TupleInst));

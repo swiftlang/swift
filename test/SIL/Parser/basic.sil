@@ -982,3 +982,17 @@ bb3:
   %28 = tuple ()
   return %28 : $()
 }
+
+// CHECK-LABEL: sil @test_mark_fn_escape
+sil @test_mark_fn_escape : $() -> () {
+  %b = alloc_box $Int64
+  %c = alloc_box $Int64
+
+  // CHECK: mark_function_escape {{.*}}#1 : $*Int64
+  mark_function_escape %b#1 : $*Int64
+  // CHECK: mark_function_escape {{.*}}#1 : $*Int64, {{.*}}#1 : $*Int64
+  mark_function_escape %b#1 : $*Int64, %c#1 : $*Int64
+
+  %28 = tuple ()
+  return %28 : $()
+}

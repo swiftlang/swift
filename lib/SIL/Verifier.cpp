@@ -379,6 +379,12 @@ public:
     require(Src.getType().isAddress(), "Must store to an address dest");
     require(Src.getType() == MU->getType(0),"operand and result type mismatch");
   }
+  void checkMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
+    require(MFE->getModule()->getStage() == SILStage::Raw,
+            "mark_function_escape instruction can only exist in raw SIL");
+    for (auto Elt : MFE->getElements())
+      require(Elt.getType().isAddress(), "MFE must refer to variable addrs");
+  }
 
   void checkCopyAddrInst(CopyAddrInst *SI) {
     require(SI->getSrc().getType().isAddress(),

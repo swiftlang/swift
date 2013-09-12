@@ -255,6 +255,16 @@ SILCloner<ImplClass>::visitMarkUninitializedInst(MarkUninitializedInst* Inst) {
 
 template<typename ImplClass>
 SILValue
+SILCloner<ImplClass>::visitMarkFunctionEscapeInst(MarkFunctionEscapeInst* Inst){
+  auto Elements = getOpValueArray<8>(Inst->getElements());
+  return doPostProcess(Inst,
+               Builder.createMarkFunctionEscape(getOpLocation(Inst->getLoc()),
+                                                Elements));
+}
+
+
+template<typename ImplClass>
+SILValue
 SILCloner<ImplClass>::visitLoadWeakInst(LoadWeakInst* Inst) {
   return doPostProcess(Inst,
     Builder.createLoadWeak(getOpLocation(Inst->getLoc()),

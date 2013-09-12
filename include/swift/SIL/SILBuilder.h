@@ -244,6 +244,11 @@ public:
     return insert(new (F.getModule()) MarkUninitializedInst(loc, src));
   }
 
+  MarkFunctionEscapeInst *createMarkFunctionEscape(SILLocation loc,
+                                                   ArrayRef<SILValue> vars){
+    return insert(MarkFunctionEscapeInst::create(loc, vars, F));
+  }
+
   LoadWeakInst *createLoadWeak(SILLocation loc, SILValue src, IsTake_t isTake) {
     return insert(new (F.getModule()) LoadWeakInst(loc, src, isTake));
   }

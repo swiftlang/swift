@@ -47,8 +47,8 @@ namespace swift {
 SILParserState::SILParserState(SILModule *M) : M(M) {
   S = M ? new SILParserTUState() : nullptr;
 }
+
 SILParserState::~SILParserState() {
-  
   delete S;
 }
 
@@ -899,6 +899,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("load", ValueKind::LoadInst)
     .Case("load_weak", ValueKind::LoadWeakInst)
     .Case("mark_uninitialized", ValueKind::MarkUninitializedInst)
+    .Case("mark_function_escape", ValueKind::MarkFunctionEscapeInst)
     .Case("metatype", ValueKind::MetatypeInst)
     .Case("module", ValueKind::ModuleInst)
     .Case("object_pointer_to_ref", ValueKind::ObjectPointerToRefInst)
@@ -1356,6 +1357,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createMarkUninitialized(InstLoc, Val);
     break;
+  case ValueKind::MarkFunctionEscapeInst: {
+    SmallVector<SILValue, 4> OpList;
+    do {
+      if (parseTypedValueRef(Val)) return true;
+      OpList.push_back(Val);
+    } while (P.consumeIf(tok::comma));
+
+    ResultVal = B.createMarkFunctionEscape(InstLoc, OpList);
+    break;
+  }
 
   case ValueKind::AssignInst:
   case ValueKind::StoreInst:

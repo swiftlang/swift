@@ -537,6 +537,14 @@ public:
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
     OS << "mark_uninitialized " << getIDAndType(MU->getOperand());
   }
+  void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
+    OS << "mark_function_escape ";
+    interleave(MFE->getElements(),
+               [&](SILValue Var) {
+                 OS << getIDAndType(Var);
+               },
+               [&] { OS << ", "; });
+  }
   void visitLoadWeakInst(LoadWeakInst *LI) {
     OS << "load_weak " << getIDAndType(LI->getOperand());
   }

@@ -1034,6 +1034,24 @@ which are not represented as box allocations.
 It is produced by SILGen, and is only valid in Raw SIL.  It is rewritten as
 appropriate by the definitive initialization pass.
 
+mark_function_escape
+````````````````````
+::
+
+  sil-instruction ::= 'mark_function_escape' sil-operand (',' sil-operand)
+
+  %2 = mark_function_escape %1 : $*T
+
+Indicates that a function definition closes over a symbolic memory location.
+This instruction is variadic, and all of its operands must be addresses.
+
+The purpose of the ``mark_function_escape`` instruction is to enable
+definitive initialization analysis for global variables and instance variables,
+which are not represented as box allocations.
+
+It is produced by SILGen, and is only valid in Raw SIL.  It is rewritten as
+appropriate by the definitive initialization pass.
+
 initialize_var
 ``````````````
 ::

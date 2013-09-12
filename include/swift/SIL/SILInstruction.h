@@ -649,8 +649,7 @@ public:
 
 /// MarkUninitializedInst - Indicates that a memory location is uninitialized at
 /// this point and needs to be initialized by the end of the function and before
-/// any escape point for this instruction.  This is only valid in
-/// Raw SIL.
+/// any escape point for this instruction.  This is only valid in Raw SIL.
 class MarkUninitializedInst
   : public UnaryInstructionBase<ValueKind::MarkUninitializedInst> {
 public:
@@ -658,7 +657,40 @@ public:
   MarkUninitializedInst(SILLocation Loc, SILValue Address)
     : UnaryInstructionBase(Loc, Address, Address.getType()) {
   }
-  
+};
+
+/// MarkFunctionEscape - Represents the escape point of set of variables due to
+/// a function definition which uses the variables.  This is only valid in Raw
+/// SIL.
+class MarkFunctionEscapeInst : public SILInstruction {
+  TailAllocatedOperandList<0> Operands;
+
+  /// Private constructor.  Because this is variadic, object creation goes
+  /// through 'create()'.
+  MarkFunctionEscapeInst(SILLocation Loc, ArrayRef<SILValue> Elements);
+
+public:
+  /// The elements referenced by this instruction.
+  MutableArrayRef<Operand> getElementOperands() {
+    return Operands.getDynamicAsArray();
+  }
+
+  /// The elements referenced by this instruction.
+  OperandValueArrayRef getElements() const {
+    return Operands.getDynamicValuesAsArray();
+  }
+
+  /// Construct a MarkFunctionEscapeInst.
+  static MarkFunctionEscapeInst *create(SILLocation Loc,
+                                        ArrayRef<SILValue> Elements,
+                                        SILFunction &F);
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::MarkFunctionEscapeInst;
+  }
 };
 
 
@@ -992,7 +1024,8 @@ public:
 /// ArchetypeRefToSuperInst - Given a class archetype value with a base
 /// class constraint, returns a reference to the superclass instance.
 class ArchetypeRefToSuperInst
-  : public UnaryInstructionBase<ValueKind::ArchetypeRefToSuperInst, ConversionInst>
+  : public UnaryInstructionBase<ValueKind::ArchetypeRefToSuperInst,
+                                ConversionInst>
 {
 public:
   ArchetypeRefToSuperInst(SILLocation Loc, SILValue Operand, SILType Ty)
@@ -1049,9 +1082,9 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
 };
 
-/// Given the address of an opaque archetype value, dynamically checks the concrete
-/// type represented by the archetype and casts the address to the destination type if
-/// successful or crashes if not.
+/// Given the address of an opaque archetype value, dynamically checks the
+/// concrete type represented by the archetype and casts the address to the
+/// destination type if successful or crashes if not.
 class DowncastArchetypeAddrInst
   : public UnaryInstructionBase<ValueKind::DowncastArchetypeAddrInst,
                                 CheckedConversionInst>
@@ -1076,8 +1109,8 @@ public:
 };
   
 /// Given the address of an opaque existential container, dynamically checks the
-/// concrete type contained in the existential and projects and casts the address of
-/// the contained value if successful or crashes if not.
+/// concrete type contained in the existential and projects and casts the
+/// address of the contained value if successful or crashes if not.
 class ProjectDowncastExistentialAddrInst
   : public UnaryInstructionBase<ValueKind::ProjectDowncastExistentialAddrInst,
                                 CheckedConversionInst>
@@ -1090,8 +1123,8 @@ public:
 };
   
 /// Given a value of class archetype type, dynamically checks the concrete
-/// type contained in the existential and casts the value to the destination type if
-/// successful or crashes if not.
+/// type contained in the existential and casts the value to the destination
+/// type if successful or crashes if not.
 class DowncastExistentialRefInst
   : public UnaryInstructionBase<ValueKind::DowncastExistentialRefInst,
                                 CheckedConversionInst>
@@ -1109,8 +1142,6 @@ class StructInst : public SILInstruction {
   /// Private constructor.  Because of the storage requirements of
   /// StructInst, object creation goes through 'create()'.
   StructInst(SILLocation Loc, SILType Ty, ArrayRef<SILValue> Elements);
-  static StructInst *createImpl(SILLocation Loc, SILType Ty,
-                                ArrayRef<SILValue> Elements, SILFunction &F);
 
 public:
   /// The elements referenced by this StructInst.
@@ -1125,9 +1156,7 @@ public:
 
   /// Construct a StructInst.
   static StructInst *create(SILLocation Loc, SILType Ty,
-                            ArrayRef<SILValue> Elements, SILFunction &F) {
-    return createImpl(Loc, Ty, Elements, F);
-  }
+                            ArrayRef<SILValue> Elements, SILFunction &F);
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
@@ -1147,8 +1176,6 @@ class TupleInst : public SILInstruction {
   /// Private constructor.  Because of the storage requirements of
   /// TupleInst, object creation goes through 'create()'.
   TupleInst(SILLocation Loc, SILType Ty, ArrayRef<SILValue> Elements);
-  static TupleInst *createImpl(SILLocation Loc, SILType Ty,
-                               ArrayRef<SILValue> Elements, SILFunction &F);
 
 public:
   /// The elements referenced by this TupleInst.
@@ -1163,9 +1190,7 @@ public:
 
   /// Construct a TupleInst.
   static TupleInst *create(SILLocation Loc, SILType Ty,
-                           ArrayRef<SILValue> Elements, SILFunction &F) {
-    return createImpl(Loc, Ty, Elements, F);
-  }
+                           ArrayRef<SILValue> Elements, SILFunction &F);
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
@@ -1187,9 +1212,7 @@ class UnionInst : public SILInstruction {
 public:
   UnionInst(SILLocation Loc, SILValue Operand, UnionElementDecl *Element,
             SILType ResultTy)
-    : SILInstruction(ValueKind::UnionInst, Loc, ResultTy),
-      Element(Element)
-  {
+    : SILInstruction(ValueKind::UnionInst, Loc, ResultTy), Element(Element) {
     if (Operand) {
       OptionalOperand.emplace(this, Operand);
     }
