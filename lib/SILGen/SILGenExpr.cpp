@@ -1331,7 +1331,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
 
 RValue RValueEmitter::visitFuncExpr(FuncExpr *e, SGFContext C) {
   // Generate the local function body.
-  SGF.SGM.emitFunction(e, e);
+  SGF.SGM.emitFunction(e, e->getDecl());
 
   // Generate the closure (if any) for the function reference.
   return RValue(SGF,
@@ -1364,12 +1364,12 @@ RValue RValueEmitter::visitClosureExpr(ClosureExpr *e, SGFContext C) {
                 e);
 }
 
-void SILGenFunction::emitFunction(FuncExpr *fe) {
-  Type resultTy = fe->getResultType(F.getASTContext());
-  emitProlog(fe, fe->getDecl()->getBodyParamPatterns(), resultTy);
-  prepareEpilog(resultTy, CleanupLocation(fe));
-  visit(fe->getDecl()->getBody());
-  emitEpilog(fe);
+void SILGenFunction::emitFunction(FuncDecl *fd) {
+  Type resultTy = fd->getFuncExpr()->getResultType(F.getASTContext());
+  emitProlog(fd->getFuncExpr(), fd->getBodyParamPatterns(), resultTy);
+  prepareEpilog(resultTy, CleanupLocation(fd));
+  visit(fd->getBody());
+  emitEpilog(fd);
 }
 
 void SILGenFunction::emitClosure(PipeClosureExpr *ce) {

@@ -36,14 +36,13 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
 
   Type ResTy;
 
-  // Should be an Expr as it's the parent of the basic block.
-  if (const FuncExpr *FExpr = FLoc.getAsASTNode<FuncExpr>()) {
-    ResTy = FExpr->getResultType(Context);
+  if (auto *FD = FLoc.getAsASTNode<FuncDecl>()) {
+    ResTy = FD->getFuncExpr()->getResultType(Context);
     if (ResTy->isVoid())
       return;
 
     if (AnyFunctionType *T =
-          FExpr->getType()->castTo<AnyFunctionType>()) {
+          FD->getFuncExpr()->getType()->castTo<AnyFunctionType>()) {
       if (T->isNoReturn())
         return;
     }
@@ -84,7 +83,7 @@ static void diagnoseUnreachable(const SILInstruction *I,
     // The most common case of getting an unreachable instruction is a
     // missing return statement. In this case, we know that the instruction
     // location will be the enclosing function.
-    if (L.isASTNode<FuncExpr>()) {
+    if (L.isASTNode<AbstractFunctionDecl>()) {
       diagnoseMissingReturn(UI, Context);
       return;
     }
@@ -106,8 +105,9 @@ static void diagnoseReturn(const SILInstruction *I, ASTContext &Context) {
   const SILFunction *F = BB->getParent();
   SILLocation FLoc = F->getLocation();
 
-  if (const FuncExpr *FExpr = FLoc.getAsASTNode<FuncExpr>()) {
-    if (AnyFunctionType *T = FExpr->getType()->castTo<AnyFunctionType>()) {
+  if (auto *FD = FLoc.getAsASTNode<FuncDecl>()) {
+    if (AnyFunctionType *T =
+            FD->getFuncExpr()->getType()->castTo<AnyFunctionType>()) {
 
       // Warn if we reach a return inside a noreturn function.
       if (T->isNoReturn()) {

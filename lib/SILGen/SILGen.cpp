@@ -264,7 +264,7 @@ bool SILGenModule::hasFunction(SILDeclRef constant) {
 }
 
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
-  emitFunction(fd, fd->getFuncExpr());
+  emitFunction(fd, fd);
 }
 
 template<typename T>
@@ -305,8 +305,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   F->verify();
 }
 
-void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
-  FuncDecl *fd = fe->getDecl();
+void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncDecl *fd) {
   // Emit any default argument generators.
   {
     auto patterns = fd->getArgParamPatterns();
@@ -319,11 +318,11 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   if (!fd->getBody())
     return;
 
-  PrettyStackTraceExpr stackTrace(M.getASTContext(), "emitting SIL for", fe);
-  
+  PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
+
   SILDeclRef constant(decl);
-  SILFunction *f = preEmitFunction(constant, fe, fe);
-  SILGenFunction(*this, *f).emitFunction(fe);
+  SILFunction *f = preEmitFunction(constant, fd, fd);
+  SILGenFunction(*this, *f).emitFunction(fd);
   postEmitFunction(constant, f);
 }
 

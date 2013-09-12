@@ -117,7 +117,7 @@ ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
 
 void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   // Generate the local function body.
-  SGM.emitFunction(fd, fd->getFuncExpr());
+  SGM.emitFunction(fd, fd);
   
   // If there are captures, build the local closure value for the function and
   // store it as a local constant.
@@ -775,7 +775,7 @@ public:
     SILGenType(SGM, ntd).emitType();
   }
   void visitFuncDecl(FuncDecl *fd) {
-    SGM.emitFunction(fd, fd->getFuncExpr());
+    SGM.emitFunction(fd, fd);
     // FIXME: Default implementations in protocols.
     if (SGM.requiresObjCMethodEntryPoint(fd) &&
         !isa<ProtocolDecl>(fd->getDeclContext()))
@@ -818,7 +818,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   switch (d->getKind()) {
   case DeclKind::Func: {
     auto *fd = cast<FuncDecl>(d);
-    emitFunction(fd, fd->getFuncExpr());
+    emitFunction(fd, fd);
     break;
   }
   case DeclKind::Constructor: {
@@ -897,7 +897,7 @@ public:
     SILGenType(SGM, ntd).emitType();
   }
   void visitFuncDecl(FuncDecl *fd) {
-    SGM.emitFunction(fd, fd->getFuncExpr());
+    SGM.emitFunction(fd, fd);
     if (SGM.requiresObjCMethodEntryPoint(fd))
       SGM.emitObjCMethodThunk(fd);
   }

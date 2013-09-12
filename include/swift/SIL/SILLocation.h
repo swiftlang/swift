@@ -319,26 +319,29 @@ private:
 /// \brief Used on the instruction that was generated to represent an implicit
 /// return from a function.
 ///
-/// This location wraps the CapturingExpr node.
-///
 /// Allowed on an BranchInst, ReturnInst, AutoreleaseReturnInst.
 class ImplicitReturnLocation : public SILLocation {
 public:
 
   ImplicitReturnLocation(CapturingExpr *E)
-    : SILLocation(E, ImplicitReturnKind) {}
+    : SILLocation(E, ImplicitReturnKind) {
+    assert(!isASTNode<FuncExpr>());
+  }
 
-  ImplicitReturnLocation(ConstructorDecl *CD)
-    : SILLocation(CD, ImplicitReturnKind) {}
-
-  ImplicitReturnLocation(DestructorDecl *DD)
-  : SILLocation(DD, ImplicitReturnKind) {}
+  ImplicitReturnLocation(AbstractFunctionDecl *AFD)
+    : SILLocation(AFD, ImplicitReturnKind) {}
 
   /// \brief Construct from a RegularLocation; preserve all special bits.
   ///
   /// Note, this can construct an implicit return for an arbitrary expression
   /// (specifically, in case of auto-generated bodies).
   static SILLocation getImplicitReturnLoc(SILLocation L) {
+    // FIXME: Location points to ClassDecl in the case we have an implicit
+    // destructor.
+    assert((L.isASTNode<Expr>() && !L.isASTNode<FuncExpr>()) ||
+           L.isASTNode<AbstractFunctionDecl>() ||
+           L.isASTNode<ClassDecl>() ||
+           (L.isNull() && L.isInTopLevel()));
     L.setKind(ImplicitReturnKind);
     return L;
   }
