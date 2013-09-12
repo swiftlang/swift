@@ -889,6 +889,7 @@ private:
       case swift::Demangle::Node::Kind::Structure:
       case swift::Demangle::Node::Kind::Union:
       case swift::Demangle::Node::Kind::Module:
+      case swift::Demangle::Node::Kind::Protocol:
         dest->push_back_child(Node::makeNodePointer(srcKind,src->getText()));
         break;
       case swift::Demangle::Node::Kind::Path:
