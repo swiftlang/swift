@@ -264,7 +264,7 @@ bool SILGenModule::hasFunction(SILDeclRef constant) {
 }
 
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
-  emitFunction(fd, fd);
+  emitFunction(fd);
 }
 
 template<typename T>
@@ -305,7 +305,9 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   F->verify();
 }
 
-void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncDecl *fd) {
+void SILGenModule::emitFunction(FuncDecl *fd) {
+  SILDeclRef::Loc decl = fd;
+
   // Emit any default argument generators.
   {
     auto patterns = fd->getArgParamPatterns();

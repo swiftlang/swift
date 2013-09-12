@@ -115,7 +115,7 @@ public:
   /// SILFunction to the current SILModule under the name SILDeclRef(decl). For
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
-  void emitFunction(SILDeclRef::Loc decl, FuncDecl *fd);
+  void emitFunction(FuncDecl *fd);
   /// \brief Generates code for the given closure expression and adds the 
   /// SILFunction to the current SILModule under the nane SILDeclRef(ce).
   void emitClosure(PipeClosureExpr *ce);

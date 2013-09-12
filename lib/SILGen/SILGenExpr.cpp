@@ -1331,7 +1331,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
 
 RValue RValueEmitter::visitFuncExpr(FuncExpr *e, SGFContext C) {
   // Generate the local function body.
-  SGF.SGM.emitFunction(e, e->getDecl());
+  SGF.SGM.emitFunction(e->getDecl());
 
   // Generate the closure (if any) for the function reference.
   return RValue(SGF,
