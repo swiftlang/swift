@@ -72,10 +72,8 @@ class alignas(8) Expr {
   class CapturingExprBitfields {
     friend class CapturingExpr;
     unsigned : NumExprBits;
-
-    unsigned IsNotCaptured : 1;
   };
-  enum { NumCapturingExprBits = NumExprBits + 1 };
+  enum { NumCapturingExprBits = NumExprBits + 0 };
   static_assert(NumCapturingExprBits <= 32, "fits in an unsigned");
 
   class FuncExprBitfields {
@@ -1636,7 +1634,6 @@ class CapturingExpr : public Expr, public DeclContext {
 public:
   CapturingExpr(ExprKind Kind, Type FnType, DeclContext *Parent)
     : Expr(Kind, FnType), DeclContext(DeclContextKind::CapturingExpr, Parent) {
-    CapturingExprBits.IsNotCaptured = false;
   }
 
   ArrayRef<ValueDecl*> getCaptures() const { return Captures; }
@@ -1651,10 +1648,6 @@ public:
   /// non-empty list.
   bool hasLocalCaptures() const;
 
-
-  bool isNotCaptured() { return CapturingExprBits.IsNotCaptured; }
-  void setIsNotCaptured(bool v) { CapturingExprBits.IsNotCaptured = v; }
-  
   /// Returns the parameter patterns of the function, using
   /// FuncExpr::getArgParamPatterns or ClosureExpr::getParamPatterns.
   ArrayRef<Pattern *> getParamPatterns();
