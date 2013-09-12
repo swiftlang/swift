@@ -134,6 +134,8 @@ cleanupCalleeValue(SILBuilder &B, SILBasicBlock::iterator &I,
 
     assert(ABI->use_empty());
     eraseInstruction(ABI);
+    if (!CalleeValue.isValid())
+      return;
   }
 
   if (PartialApplyInst *PAI =
