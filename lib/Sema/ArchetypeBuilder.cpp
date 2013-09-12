@@ -138,17 +138,20 @@ public:
 
   /// \brief Retrieve (or build) the archetype corresponding to the potential
   /// archetype.
-  ArchetypeType *getArchetype(TranslationUnit &tu) {
+  ArchetypeType *getArchetype(AssociatedTypeDecl * /*nullable*/ rootAssocTy,
+                              TranslationUnit &tu) {
     // Retrieve the archetype from the representation of this set.
     if (Representative != this)
-      return getRepresentative()->getArchetype(tu);
+      return getRepresentative()->getArchetype(rootAssocTy, tu);
 
-    AssociatedTypeDecl *assocType = nullptr;
+    AssociatedTypeDecl *assocType = rootAssocTy;
     if (!Archetype) {
       // Allocate a new archetype.
       ArchetypeType *ParentArchetype = nullptr;
       if (Parent) {
-        ParentArchetype = Parent->getArchetype(tu);
+        assert(!rootAssocTy &&
+               "root associated type given for non-root archetype");
+        ParentArchetype = Parent->getArchetype(nullptr, tu);
 
         if (!ParentArchetype)
           return nullptr;
@@ -188,7 +191,7 @@ public:
       SmallVector<std::pair<Identifier, ArchetypeType *>, 4> FlatNestedTypes;
       for (auto Nested : NestedTypes) {
         FlatNestedTypes.push_back({ Nested.first,
-                                    Nested.second->getArchetype(tu) });
+                                    Nested.second->getArchetype(nullptr, tu) });
       }
       Archetype->setNestedTypes(tu.getASTContext(), FlatNestedTypes);
     }
@@ -595,7 +598,8 @@ void ArchetypeBuilder::assignArchetypes() {
   // Compute the archetypes for each of the potential archetypes (i.e., the
   // generic parameters).
   for (const auto& PA : Impl->PotentialArchetypes) {
-    auto Archetype = PA.second->getArchetype(TU);
+    auto Archetype
+      = PA.second->getArchetype(dyn_cast<AssociatedTypeDecl>(PA.first), TU);
     Impl->PrimaryArchetypeMap[PA.first] = Archetype;
   }
 }

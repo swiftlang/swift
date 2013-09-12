@@ -1086,7 +1086,7 @@ public:
         }
       }
     }
-    assert(selfDecl && "no This decl?");
+    assert(selfDecl && "no Self decl?");
 
     // Build archetypes for this protocol.
     ArchetypeBuilder builder = createArchetypeBuilder();

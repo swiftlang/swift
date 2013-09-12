@@ -2037,7 +2037,7 @@ namespace {
                                                                  SourceLoc());
       selfDecl->setImplicit();
       auto selfArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
-                                                 nullptr, selfId,
+                                                 selfDecl, selfId,
                                                  Type(result->getDeclaredType()),
                                                  Type());
       selfDecl->setArchetype(selfArchetype);
