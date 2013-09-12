@@ -335,8 +335,9 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
            "property accessors should go through ");
     
     // For local decls, use the address we allocated.
-    if (VarLocs.count(decl))
-      return ManagedValue(VarLocs[decl].address, ManagedValue::LValue);
+    auto It = VarLocs.find(decl);
+    if (It != VarLocs.end())
+      return ManagedValue(It->second.address, ManagedValue::LValue);
 
     // If this is a global variable, invoke its accessor function to get its
     // address.
