@@ -433,9 +433,7 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
   // Don't emit the thunk if it already exists.
   if (hasFunction(thunk))
     return;
-  // TODO: why we have getFuncExpr here?
-  SILFunction *f = preEmitFunction(thunk, method->getFuncExpr(),
-                                   method->getFuncExpr());
+  SILFunction *f = preEmitFunction(thunk, method, method);
   SILGenFunction(*this, *f).emitObjCMethodThunk(thunk);
   postEmitFunction(thunk, f);
 }
