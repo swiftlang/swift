@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -912,11 +913,13 @@ bool TypeBase::isDependentType() {
   });
 }
 
-Type TypeBase::getSuperclass(ASTContext &ctx, LazyResolver *resolver) {
+Type TypeBase::getSuperclass(LazyResolver *resolver) {
   Type superclassTy;
   Type specializedTy;
+  Module *module = nullptr;
   if (auto classTy = getAs<ClassType>()) {
     superclassTy = classTy->getDecl()->getSuperclass();
+    module = classTy->getDecl()->getModuleContext();
     if (auto parentTy = classTy->getParent()) {
       if (parentTy->isSpecialized())
         specializedTy = parentTy;
@@ -924,10 +927,11 @@ Type TypeBase::getSuperclass(ASTContext &ctx, LazyResolver *resolver) {
   } else if (auto boundTy = getAs<BoundGenericType>()) {
     if (auto classDecl = dyn_cast<ClassDecl>(boundTy->getDecl())) {
       superclassTy = classDecl->getSuperclass();
+      module = classDecl->getModuleContext();
       specializedTy = this;
     }
   } else if (auto substitutableTy = getAs<SubstitutableType>()) {
-    superclassTy = substitutableTy->getSuperclass();
+    return substitutableTy->getSuperclass();
   } else {
     // No other types have superclasses.
     return nullptr;
@@ -958,7 +962,7 @@ Type TypeBase::getSuperclass(ASTContext &ctx, LazyResolver *resolver) {
   }
 
   // Perform substitutions into the base type.
-  return superclassTy.subst(ctx, substitutions, /*ignoreMissing=*/false,
+  return superclassTy.subst(module, substitutions, /*ignoreMissing=*/false,
                             resolver);
 }
 
@@ -1203,10 +1207,10 @@ ArrayRef<ArchetypeType *> PolymorphicFunctionType::getAllArchetypes() const {
   return Params->getAllArchetypes();
 }
 
-Type Type::subst(const ASTContext &ctx, TypeSubstitutionMap &substitutions,
-                 bool ignoreMissing, LazyResolver *resolver) {
+Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
+                 bool ignoreMissing, LazyResolver *resolver) const {
   assert(resolver && "FIXME: We currently require a resolver");
-  return transform(ctx, [&](Type type) -> Type {
+  return transform(module->getASTContext(), [&](Type type) -> Type {
     // We only substitute for substitutable types.
     auto substOrig = type->getAs<SubstitutableType>();
     if (!substOrig)
@@ -1215,7 +1219,8 @@ Type Type::subst(const ASTContext &ctx, TypeSubstitutionMap &substitutions,
     // If we have a substitution for this type, use it.
     auto known = substitutions.find(substOrig);
     if (known != substitutions.end() && known->second)
-      return SubstitutedType::get(substOrig, known->second, ctx);
+      return SubstitutedType::get(substOrig, known->second,
+                                  module->getASTContext());
 
     // If we don't have a substitution for this type and it doesn't have a
     // parent, then we're not substituting it.
@@ -1224,7 +1229,7 @@ Type Type::subst(const ASTContext &ctx, TypeSubstitutionMap &substitutions,
       return type;
 
     // Substitute into the parent type.
-    Type substParent = Type(parent).subst(ctx, substitutions, ignoreMissing,
+    Type substParent = Type(parent).subst(module, substitutions, ignoreMissing,
                                           resolver);
     if (!substParent)
       return Type();
@@ -1251,14 +1256,17 @@ Type Type::subst(const ASTContext &ctx, TypeSubstitutionMap &substitutions,
     if (auto archetype = substOrig->getAs<ArchetypeType>()) {
       if (auto assocType = archetype->getAssocType()) {
         auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
-        ProtocolConformance *conformance
-          = resolver->resolveConformance(substParent, proto);
-        if (!conformance) {
-          return ignoreMissing? type : Type();
-        }
-
         // FIXME: Introduce substituted type node here?
-        return conformance->getTypeWitness(assocType).Replacement;
+        auto conformance = module->lookupConformance(substParent, proto,
+                                                     resolver);
+        switch (conformance.getInt()) {
+        case ConformanceKind::DoesNotConform:
+        case ConformanceKind::UncheckedConforms:
+          return ignoreMissing? type : Type();
+
+        case ConformanceKind::Conforms:
+          return conformance.getPointer()->getTypeWitness(assocType).Replacement;
+        }
       }
     }
 

@@ -17,9 +17,13 @@
 #ifndef SWIFT_AST_LAZYRESOLVER_H
 #define SWIFT_AST_LAZYRESOLVER_H
 
+#include "swift/Basic/Optional.h"
+
 namespace swift {
 
+class ExtensionDecl;
 class Identifier;
+class NominalTypeDecl;
 class ProtocolConformance;
 class ProtocolDecl;
 class Type;
@@ -30,17 +34,20 @@ class LazyResolver {
 public:
   virtual ~LazyResolver();
 
-  /// Resolve the conformance of the given type to the given protocol.
+  /// Resolve the conformance of the given nominal type to the given protocol.
   ///
-  /// \param type A type that should conform to the given protocol.
+  /// \param type The nominal type that conforms to the given protocol.
+  ////
   /// \param protocol The protocol to which the type conforms.
   ///
-  /// \returns the protocol conformance, or nullptr if no such conformance can
-  /// be computed.
+  /// \param ext If the conforms occurs via an extension, the extension
+  /// declaration.
   ///
-  /// FIXME: Eventually, this routine should only handle
-  virtual ProtocolConformance *resolveConformance(Type type,
-                                                  ProtocolDecl *protocol) = 0;
+  /// \returns the protocol conformance, or null if the type does not conform
+  /// to the protocol.
+  virtual ProtocolConformance *resolveConformance(NominalTypeDecl *type,
+                                                  ProtocolDecl *protocol,
+                                                  ExtensionDecl *ext) = 0;
 
   /// Resolve a member type.
   ///
@@ -50,6 +57,13 @@ public:
   /// \returns the member type, or an empty type if no such type could be
   /// found.
   virtual Type resolveMemberType(Type type, Identifier name) = 0;
+
+  /// Validate the given type.
+  ///
+  /// FIXME: This is completely awful, because it's built on the complete
+  /// awfulness of TypeChecker::validateTypeSimple(). It should become
+  /// unnecessary.
+  virtual void resolveUnvalidatedType(Type type) = 0;
 };
 
 }

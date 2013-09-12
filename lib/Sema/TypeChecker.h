@@ -702,11 +702,11 @@ public:
   ///
   /// Routines that perform lazy resolution as required for AST operations.
   /// @{
-  virtual ProtocolConformance *resolveConformance(Type type,
-                                                  ProtocolDecl *protocol);
+  virtual ProtocolConformance *resolveConformance(NominalTypeDecl *type,
+                                                  ProtocolDecl *protocol,
+                                                  ExtensionDecl *ext);
   virtual Type resolveMemberType(Type type, Identifier name);
-
-  /// @}
+  virtual void resolveUnvalidatedType(Type type);
 };
 
 } // end namespace swift

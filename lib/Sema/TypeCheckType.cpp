@@ -918,7 +918,7 @@ Type TypeChecker::transformType(Type type,
 
 Type TypeChecker::substType(Type type, TypeSubstitutionMap &Substitutions,
                             bool IgnoreMissing) {
-  return type.subst(Context, Substitutions, IgnoreMissing, this);
+  return type.subst(&TU, Substitutions, IgnoreMissing, this);
 }
 
 Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
@@ -960,7 +960,7 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {
-  return type->getSuperclass(Context, this);
+  return type->getSuperclass(this);
 }
 
 Type TypeChecker::resolveMemberType(Type type, Identifier name) {
@@ -972,3 +972,8 @@ Type TypeChecker::resolveMemberType(Type type, Identifier name) {
   // FIXME: Detect ambiguities here?
   return memberTypes.back().second;
 }
+
+void TypeChecker::resolveUnvalidatedType(Type type) {
+  validateTypeSimple(type);
+}
+

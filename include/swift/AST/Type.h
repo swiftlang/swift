@@ -26,6 +26,7 @@ namespace swift {
 
 class ASTContext;
 class LazyResolver;
+class Module;
 class TypeBase;
 class Type;
 class SubstitutableType;
@@ -85,7 +86,7 @@ public:
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
   ///
-  /// \param ctx The ASTContext in which the substitution occurs.
+  /// \param module The module in which the substitution occurs.
   ///
   /// \param substitutions The mapping from substitutable types to their
   /// replacements.
@@ -97,8 +98,8 @@ public:
   /// protocol conformances, etc.
   ///
   /// \returns the substituted type, or a null type if an error occurred.
-  Type subst(const ASTContext &ctx, TypeSubstitutionMap &substitutions,
-             bool ignoreMissing, LazyResolver *resolver);
+  Type subst(Module *module, TypeSubstitutionMap &substitutions,
+             bool ignoreMissing, LazyResolver *resolver) const;
 
   void dump() const;
   void print(raw_ostream &OS) const;

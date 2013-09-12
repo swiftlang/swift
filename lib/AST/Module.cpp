@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
@@ -360,6 +361,311 @@ void Module::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) {
 
   ModuleLoader &Owner = cast<LoadedModule>(this)->getOwner();
   return Owner.getTopLevelDecls(this, Results);
+}
+
+/// Gather the set of substitutions required to map from the generic form of
+/// the given type to the specialized form.
+static ArrayRef<Substitution> gatherSubstitutions(ASTContext &ctx, Type type,
+                                                  LazyResolver *resolver) {
+  assert(type->isSpecialized() && "Type is not specialized");
+  SmallVector<ArrayRef<Substitution>, 2> allSubstitutions;
+
+  while (type) {
+    // Record the substitutions in a bound generic type.
+    if (auto boundGeneric = type->getAs<BoundGenericType>()) {
+      // FIXME: This feels like a hack. We should be able to compute the
+      // substitutions ourselves for this.
+      resolver->resolveUnvalidatedType(type);
+      if (boundGeneric->hasTypeVariable() && !boundGeneric->hasSubstitutions()){
+        // If we have a type variable, introduce fake substitutions.
+        // FIXME: This feels a little awkward, and shouldn't go into
+        // permanent storage.
+        SmallVector<Substitution, 4> substitutions;
+        unsigned index = 0;
+        for (auto gp : *boundGeneric->getDecl()->getGenericParams()) {
+          Substitution sub;
+          sub.Archetype = gp.getAsTypeParam()->getArchetype();
+          sub.Replacement = boundGeneric->getGenericArgs()[index++];
+          assert(!sub.Replacement->isDependentType() && "Can't be dependent");
+          SmallVector<ProtocolConformance *, 4> conformances;
+          conformances.assign(sub.Archetype->getConformsTo().size(), nullptr);
+          sub.Conformance
+            = ctx.AllocateCopy(conformances, AllocationArena::ConstraintSolver);
+          substitutions.push_back(sub);
+        }
+        allSubstitutions.push_back(
+          ctx.AllocateCopy(substitutions, AllocationArena::ConstraintSolver));
+        boundGeneric->setSubstitutions(allSubstitutions.back());
+      } else {
+        allSubstitutions.push_back(boundGeneric->getSubstitutions());
+      }
+      type = boundGeneric->getParent();
+      continue;
+    }
+
+    // Skip to the parent of a nominal type.
+    if (auto nominal = type->getAs<NominalType>()) {
+      type = nominal->getParent();
+      continue;
+    }
+
+    llvm_unreachable("Not a nominal or bound generic type");
+  }
+  assert(!allSubstitutions.empty() && "No substitutions?");
+
+  // If there is only one list of substitutions, return it. There's no
+  // need to copy it.
+  if (allSubstitutions.size() == 1)
+    return allSubstitutions.front();
+
+  SmallVector<Substitution, 4> flatSubstitutions;
+  for (auto substitutions : allSubstitutions)
+    flatSubstitutions.append(substitutions.begin(), substitutions.end());
+  return ctx.AllocateCopy(flatSubstitutions);
+}
+
+/// Given a type witness map and a set of substitutions, produce the specialized
+/// type witness map by applying the substitutions to each type witness.
+static TypeWitnessMap
+specializeTypeWitnesses(ASTContext &ctx,
+                        Module *module,
+                        const TypeWitnessMap &witnesses,
+                        ArrayRef<Substitution> substitutions,
+                        LazyResolver *resolver) {
+  // Compute the substitution map, which is needed for substType().
+  TypeSubstitutionMap substitutionMap;
+  for (const auto &substitution : substitutions) {
+    substitutionMap[substitution.Archetype] = substitution.Replacement;
+  }
+
+  // Substitute into each of the type witnesses.
+  TypeWitnessMap result;
+  for (const auto &genericWitness : witnesses) {
+    // Substitute into the type witness to produce the type witness for
+    // the specialized type.
+    auto specializedType
+      = genericWitness.second.Replacement.subst(module, substitutionMap,
+                                                /*ignoreMissing=*/false,
+                                                resolver);
+
+    // If the type witness was unchanged, just copy it directly.
+    if (specializedType.getPointer() ==
+          genericWitness.second.Replacement.getPointer()) {
+      result.insert(genericWitness);
+      continue;
+    }
+
+    // Gather the conformances for the type witness. These should never fail.
+    SmallVector<ProtocolConformance *, 4> conformances;
+    auto archetype = genericWitness.second.Archetype;
+    for (auto proto : archetype->getConformsTo()) {
+      auto conforms = module->lookupConformance(specializedType, proto,
+                                                resolver);
+      switch (conforms.getInt()) {
+      case ConformanceKind::Conforms:
+        conformances.push_back(conforms.getPointer());
+        break;
+
+      case ConformanceKind::DoesNotConform:
+      case ConformanceKind::UncheckedConforms:
+        // FIXME: Signal errors in a more sane way.
+        return TypeWitnessMap();
+      }
+    }
+
+    result[genericWitness.first]
+      = Substitution{archetype, specializedType,
+                     ctx.AllocateCopy(conformances)};
+  }
+
+  return result;
+}
+
+LookupConformanceResult Module::lookupConformance(Type type,
+                                                  ProtocolDecl *protocol,
+                                                  LazyResolver *resolver) {
+  ASTContext &ctx = getASTContext();
+
+  // Check whether we have already cached an answer to this query.
+  ASTContext::ConformsToMap::key_type key(type->getCanonicalType(), protocol);
+  auto known = ctx.ConformsTo.find(key);
+  if (known != ctx.ConformsTo.end()) {
+    // If we conform, return the conformance.
+    if (known->second.getInt()) {
+      return { known->second.getPointer(), ConformanceKind::Conforms };
+    }
+
+    // We don't conform.
+    return { nullptr, ConformanceKind::DoesNotConform };
+  }
+
+  auto nominal = type->getAnyNominal();
+
+  // If we don't have a nominal type, there are no conformances.
+  // FIXME: We may have implicit conformances for some cases. Handle those
+  // here.
+  if (!nominal) {
+    return { nullptr, ConformanceKind::DoesNotConform };
+  }
+
+  // Walk the nominal type, its extensions, superclasses, and so on.
+  llvm::SmallPtrSet<ProtocolDecl *, 4> visitedProtocols;
+  SmallVector<std::tuple<NominalTypeDecl *, NominalTypeDecl *, Decl *>,4> stack;
+  NominalTypeDecl *owningNominal = nullptr;
+  Decl *declaresConformance = nullptr;
+  ProtocolConformance *nominalConformance = nullptr;
+
+  // Local function that checks for our protocol in the given array of
+  // protocols.
+  auto isProtocolInList
+    = [&](NominalTypeDecl *currentNominal,
+          Decl *currentOwner,
+          ArrayRef<ProtocolDecl *> protocols,
+          ArrayRef<ProtocolConformance *> conformances) -> bool {
+        for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
+          auto testProto = protocols[i];
+          if (testProto == protocol) {
+            owningNominal = currentNominal;
+            declaresConformance = currentOwner;
+            if (i < conformances.size())
+              nominalConformance = conformances[i];
+            return true;
+          }
+
+          if (visitedProtocols.insert(testProto))
+            stack.push_back({testProto, currentNominal, currentOwner});
+        }
+
+        return false;
+      };
+
+  // Walk the stack of types to find a conformance.
+  stack.push_back({nominal, nominal, nominal});
+  while (!stack.empty()) {
+    NominalTypeDecl *current;
+    NominalTypeDecl *currentNominal;
+    Decl *currentOwner;
+    std::tie(current, currentNominal, currentOwner) = stack.back();
+    stack.pop_back();
+
+    // Visit the superclass of a class.
+    if (auto classDecl = dyn_cast<ClassDecl>(current)) {
+      if (auto superclassTy = classDecl->getSuperclass()) {
+        auto nominal = superclassTy->getAnyNominal();
+        stack.push_back({nominal, nominal, nominal});
+      }
+    }
+
+    // Visit the protocols this type conforms to directly.
+    if (isProtocolInList(currentNominal, currentOwner,
+                         current->getProtocols(),
+                         current->getConformances()))
+      break;
+
+    // Visit the extensions of this type.
+    for (auto ext : current->getExtensions()) {
+      if (isProtocolInList(currentNominal, ext, ext->getProtocols(),
+                           ext->getConformances()))
+        break;
+    }
+  }
+
+  // If we didn't find the protocol, we don't conform. Cache the negative result
+  // and return.
+  if (!owningNominal) {
+    ctx.ConformsTo[key] = ConformanceEntry(nullptr, false);
+    return { nullptr, ConformanceKind::DoesNotConform };
+  }
+
+  // If we found the protocol but we don't have a conformance, it's because
+  // we haven't type-checked the conformance yet.
+  if (!nominalConformance) {
+    // When there is no resolver, we simply can't check this.
+    if (!resolver)
+      return { nullptr, ConformanceKind::UncheckedConforms };
+
+    // Try to resolve the conformance.
+    nominalConformance = resolver->resolveConformance(
+                           owningNominal,
+                           protocol,
+                           dyn_cast<ExtensionDecl>(declaresConformance));
+
+    // If we failed to resolve the conformance, then the type doesn't
+    // actually conform. Cache the negative result and return.
+    if (!nominalConformance) {
+      ctx.ConformsTo[key] = ConformanceEntry(nullptr, false);
+      return { nullptr, ConformanceKind::DoesNotConform };
+    }
+  }
+
+  // If the nominal type in which we found the conformance is not the same
+  // as the type we asked for, it's an inherited type.
+  if (owningNominal != nominal) {
+    // Find the superclass type
+    Type superclassTy = type->getSuperclass(resolver);
+    while (superclassTy->getAnyNominal() != owningNominal)
+      superclassTy = superclassTy->getSuperclass(resolver);
+
+    // Compute the conformance for the inherited type.
+    auto inheritedConformance = lookupConformance(superclassTy, protocol,
+                                                  resolver);
+    switch (inheritedConformance.getInt()) {
+    case ConformanceKind::DoesNotConform:
+      llvm_unreachable("We already found the inherited conformance");
+
+    case ConformanceKind::UncheckedConforms:
+      return inheritedConformance;
+
+    case ConformanceKind::Conforms:
+      // Create inherited conformance below.
+      break;
+    }
+
+    // Create the inherited conformance entry.
+    auto result
+      = ctx.getInheritedConformance(type, inheritedConformance.getPointer());
+    ctx.ConformsTo[key] = ConformanceEntry(result, true);
+    return { result, ConformanceKind::Conforms };
+  }
+
+  // If the type is specialized, find the conformance for the generic type.
+  if (type->isSpecialized()) {
+    // Figure out the type that's explicitly conforming to this protocol.
+    Type explicitConformanceType;
+    if (auto nominal = dyn_cast<NominalTypeDecl>(declaresConformance)) {
+      explicitConformanceType = nominal->getDeclaredTypeInContext();
+    } else {
+      explicitConformanceType = cast<ExtensionDecl>(declaresConformance)
+        ->getDeclaredTypeInContext();
+    }
+
+    // If the explicit conformance is associated with a type that is different
+    // from the type we're checking, retrieve generic conformance.
+    if (!explicitConformanceType->isEqual(type)) {
+      // Gather the substitutions we need to map the generic conformance to
+      // the specialized conformance.
+      auto substitutions = gatherSubstitutions(ctx, type, resolver);
+
+      // The type witnesses for the specialized conformance.
+      TypeWitnessMap typeWitnesses
+        = specializeTypeWitnesses(ctx, this,
+                                  nominalConformance->getTypeWitnesses(),
+                                  substitutions,
+                                  resolver);
+
+      // Create the specialized conformance entry.
+      ctx.ConformsTo[key] = ConformanceEntry(nullptr, false);
+      auto result = ctx.getSpecializedConformance(type, nominalConformance,
+                                                  substitutions,
+                                                  std::move(typeWitnesses));
+      ctx.ConformsTo[key] = ConformanceEntry(result, true);
+      return { result, ConformanceKind::Conforms };
+    }
+  }
+
+  // Record and return the simple conformance.
+  ctx.ConformsTo[key] = ConformanceEntry(nominalConformance, true);
+  return { nominalConformance, ConformanceKind::Conforms };
 }
 
 void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) {

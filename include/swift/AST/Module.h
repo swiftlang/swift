@@ -44,10 +44,13 @@ namespace swift {
   class LookupCache;
   class ModuleLoader;
   class NameAliasType;
+  class NominalTypeDecl;
   class UnionElementDecl;
   class OperatorDecl;
   class PostfixOperatorDecl;
   class PrefixOperatorDecl;
+  class ProtocolConformance;
+  class ProtocolDecl;
   struct PrintOptions;
   class TupleType;
   class Type;
@@ -101,6 +104,22 @@ enum NameLookupOptions {
   /// The default set of options used for constructor lookup.
   NL_Constructor = NL_RemoveNonVisible
 };
+
+/// Describes the result of looking for the conformance of a given type
+/// to a specific protocol.
+enum class ConformanceKind {
+  /// The type does not conform to the protocol.
+  DoesNotConform,
+  /// The type conforms to the protocol, with the given conformance.
+  Conforms,
+  /// The type is specified to conform to the protocol, but that conformance
+  /// has not yet been checked.
+  UncheckedConforms
+};
+
+/// The result of looking for a specific conformance.
+typedef llvm::PointerIntPair<ProtocolConformance *, 2, ConformanceKind>
+  LookupConformanceResult;
 
 /// Module - A unit of modularity.  The current translation unit is a
 /// module, as is an imported module.
@@ -224,6 +243,29 @@ public:
   void lookupClassMember(AccessPathTy accessPath,
                          Identifier name,
                          SmallVectorImpl<ValueDecl*> &results) const;
+
+  /// Look for the conformance of the given type to the given protocol.
+  ///
+  /// This routine determines whether the given \c type conforms to the given
+  /// \c protocol. It only looks for explicit conformances (which are
+  /// required by the language), and will return a \c ProtocolConformance*
+  /// describing the conformance.
+  ///
+  /// During type-checking, it is possible that this routine will find an
+  /// explicit declaration of conformance that has not yet been type-checked,
+  /// in which case it will return note the presence of an unchecked
+  /// conformance.
+  ///
+  /// \param type The type for which we are computing conformance.
+  ///
+  /// \param protocol The protocol to which we are computing conformance.
+  ///
+  /// \param resolver The lazy resolver.
+  ///
+  /// \returns The result of the conformance search, with a conformance
+  /// structure when possible.
+  LookupConformanceResult
+  lookupConformance(Type type, ProtocolDecl *protocol, LazyResolver *resolver);
 
   /// Looks up which modules are re-exported by this module.
   void getImportedModules(SmallVectorImpl<ImportedModule> &modules,

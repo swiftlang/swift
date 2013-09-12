@@ -1098,68 +1098,6 @@ static void suggestExplicitConformance(TypeChecker &tc,
   // itself?
 }
 
-/// Gather the set of substitutions required to map from the generic form of
-/// the given type to the specialized form.
-ArrayRef<Substitution> gatherSubstitutions(TypeChecker &tc, Type type) {
-  assert(type->isSpecialized() && "Type is not specialized");
-  SmallVector<ArrayRef<Substitution>, 2> allSubstitutions;
-
-  while (type) {
-    // Record the substitutions in a bound generic type.
-    if (auto boundGeneric = type->getAs<BoundGenericType>()) {
-      // FIXME: This feels like a hack. We should be able to compute the
-      // substitutions ourselves for this.
-      tc.validateTypeSimple(type);
-      if (boundGeneric->hasTypeVariable() && !boundGeneric->hasSubstitutions()){
-        // If we have a type variable, introduce fake substitutions.
-        // FIXME: This feels a little awkward, and shouldn't go into
-        // permanent storage.
-        SmallVector<Substitution, 4> substitutions;
-        unsigned index = 0;
-        for (auto gp : *boundGeneric->getDecl()->getGenericParams()) {
-          Substitution sub;
-          sub.Archetype = gp.getAsTypeParam()->getArchetype();
-          sub.Replacement = boundGeneric->getGenericArgs()[index++];
-          assert(!sub.Replacement->isDependentType() && "Can't be dependent");
-          SmallVector<ProtocolConformance *, 4> conformances;
-          conformances.assign(sub.Archetype->getConformsTo().size(), nullptr);
-          sub.Conformance
-            = tc.Context.AllocateCopy(conformances,
-                                      AllocationArena::ConstraintSolver);
-          substitutions.push_back(sub);
-        }
-        allSubstitutions.push_back(
-          tc.Context.AllocateCopy(substitutions,
-                                  AllocationArena::ConstraintSolver));
-        boundGeneric->setSubstitutions(allSubstitutions.back());
-      } else {
-        allSubstitutions.push_back(boundGeneric->getSubstitutions());
-      }
-      type = boundGeneric->getParent();
-      continue;
-    }
-
-    // Skip to the parent of a nominal type.
-    if (auto nominal = type->getAs<NominalType>()) {
-      type = nominal->getParent();
-      continue;
-    }
-
-    llvm_unreachable("Not a nominal or bound generic type");
-  }
-  assert(!allSubstitutions.empty() && "No substitutions?");
-
-  // If there is only one list of substitutions, return it. There's no
-  // need to copy it.
-  if (allSubstitutions.size() == 1)
-    return allSubstitutions.front();
-
-  SmallVector<Substitution, 4> flatSubstitutions;
-  for (auto substitutions : allSubstitutions)
-    flatSubstitutions.append(substitutions.begin(), substitutions.end());
-  return tc.Context.AllocateCopy(flatSubstitutions);
-}
-
 /// Check whether the given archetype conforms to the protocol.
 static bool archetypeConformsToProtocol(TypeChecker &tc, Type type,
                                         ArchetypeType *archetype,
@@ -1208,54 +1146,6 @@ static bool existentialConformsToProtocol(TypeChecker &tc, Type type,
              protocol->getDeclaredType());
   }
   return false;
-}
-
-/// Given a type witness map and a set of substitutions, produce the specialized
-/// type witness map by applying the substitutions to each type witness.
-static TypeWitnessMap
-specializeTypeWitnesses(TypeChecker &tc,
-                        const TypeWitnessMap &witnesses,
-                        ArrayRef<Substitution> substitutions) {
-  // Compute the substitution map, which is needed for substType().
-  TypeSubstitutionMap substitutionMap;
-  for (const auto &substitution : substitutions) {
-    substitutionMap[substitution.Archetype] = substitution.Replacement;
-  }
-
-  // Substitute into each of the type witnesses.
-  TypeWitnessMap result;
-  for (const auto &genericWitness : witnesses) {
-    // Substitute into the type witness to produce the type witness for
-    // the specialized type.
-    auto specializedType
-      = tc.substType(genericWitness.second.Replacement, substitutionMap);
-
-    // If the type witness was unchanged, just copy it directly.
-    if (specializedType.getPointer() ==
-        genericWitness.second.Replacement.getPointer()) {
-      result.insert(genericWitness);
-      continue;
-    }
-
-    // Gather the conformances for the type witness. These should never fail.
-    SmallVector<ProtocolConformance *, 4> conformances;
-    auto archetype = genericWitness.second.Archetype;
-    for (auto proto : archetype->getConformsTo()) {
-      ProtocolConformance *conformance = nullptr;
-      bool conforms = tc.conformsToProtocol(specializedType, proto,
-                                            &conformance);
-      assert(conforms && "Conformance specialization should not fail");
-      (void)conforms;
-
-      conformances.push_back(conformance);
-    }
-
-    result[genericWitness.first]
-      = Substitution{archetype, specializedType,
-                     tc.Context.AllocateCopy(conformances) };
-  }
-
-  return result;
 }
 
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
@@ -1331,210 +1221,58 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       return false;
     }
 
-    // Walk the nominal type, its extensions, superclasses, and so on.
-    llvm::SmallPtrSet<ProtocolDecl *, 4> visitedProtocols;
-    SmallVector<std::tuple<NominalTypeDecl *, NominalTypeDecl *, Decl *>, 4>
-      stack;
-    NominalTypeDecl *owningNominal = nullptr;
-    ProtocolConformance *nominalConformance = nullptr;
+    auto lookupResult = TU.lookupConformance(T, Proto, this);
+    switch (lookupResult.getInt()) {
+    case ConformanceKind::Conforms:
+      Context.ConformsTo[Key] = ConformanceEntry(lookupResult.getPointer(),
+                                                 true);
 
-    // Local function that checks for our protocol in the given array of
-    // protocols.
-    auto isProtocolInList
-      = [&](NominalTypeDecl *currentNominal,
-            Decl *currentOwner,
-            ArrayRef<ProtocolDecl *> protocols,
-            ArrayRef<ProtocolConformance *> conformances) -> bool {
-      for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
-        auto testProto = protocols[i];
-        if (testProto == Proto) {
-          owningNominal = currentNominal;
-          ExplicitConformance = currentOwner;
-          if (i < conformances.size())
-            nominalConformance = conformances[i];
-          return true;
-        }
-
-        if (visitedProtocols.insert(testProto))
-          stack.push_back({testProto, currentNominal, currentOwner});
-      }
-
-      return false;
-    };
-
-    // Walk the stack of types.
-    stack.push_back({nominal, nominal, nominal});
-    while (!stack.empty()) {
-      NominalTypeDecl *current;
-      NominalTypeDecl *currentNominal;
-      Decl *currentOwner;
-      std::tie(current, currentNominal, currentOwner) = stack.back();
-      stack.pop_back();
-
-      // Visit the superclass of a class.
-      if (auto classDecl = dyn_cast<ClassDecl>(current)) {
-        if (auto superclassTy = classDecl->getSuperclass()) {
-          auto nominal = superclassTy->getAnyNominal();
-          stack.push_back({nominal, nominal, nominal});
-        }
-      }
-
-      // Visit the protocols this type conforms to directly.
-      if (isProtocolInList(currentNominal, currentOwner,
-                           getDirectConformsTo(current),
-                           current->getConformances()))
-        break;
-
-      // Visit the extensions of this type.
-      for (auto ext : current->getExtensions()) {
-        if (isProtocolInList(currentNominal, ext, getDirectConformsTo(ext),
-                             ext->getConformances()))
-          break;
-      }
-    }
-
-    // If we did not find explicit conformance, we're done.
-    if (!ExplicitConformance) {
-      // If the type has a type variable, there's nothing to record. Just
-      // report failure.
-      if (T->hasTypeVariable()) {
-        return false;
-      }
-
-      // Cache the failure
-      Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
-
-      // Check whether the type *implicitly* conforms to the protocol.
-      if (auto *result = checkConformsToProtocol(*this, T, Proto, nullptr,
-                                                 SourceLoc())) {
-        // Success! Record the conformance in the cache.
-        Context.ConformsTo[Key].setPointer(result);
-
-        if (Conformance)
-          *Conformance = result;
-
-        // If we can't complain about this, just return now.
-        if (ComplainLoc.isInvalid()) {
-          return false;
-        }
-
-        // Suggest the addition of the explicit conformance.
-        suggestExplicitConformance(*this, ComplainLoc, T, result);
-        return true;
-      }
-
-      if (ComplainLoc.isValid()) {
-        diagnose(ComplainLoc, diag::type_does_not_conform,
-                 T, Proto->getDeclaredType());
-      }
-
-      return false;
-    }
-
-    // We found explicit conformance.
-    assert(!isa<ProtocolDecl>(ExplicitConformance) &&
-           "Cannot get a protocol here");
-
-    // If we don't need to compute the conformance, we're done.
-    if (!Conformance) {
+      if (Conformance)
+        *Conformance = lookupResult.getPointer();
       return true;
+
+    case ConformanceKind::DoesNotConform:
+      // Handled below.
+      break;
+
+    case ConformanceKind::UncheckedConforms:
+      llvm_unreachable("Can't get here!");
     }
 
-    // Compute the actual conformance below.
+    // If the type has a type variable, there's nothing to record. Just
+    // report failure.
+    if (T->hasTypeVariable()) {
+      return false;
+    }
 
-    // If the nominal type in which we found the conformance is not the same
-    // as the type we asked for, it's an inherited type.
-    if (owningNominal != nominal) {
-      // Find the superclass type
-      ProtocolConformance *inheritedConformance = nominalConformance;
-      if (!inheritedConformance) {
-        Type superclassTy = getSuperClassOf(T);
-        while (superclassTy->getAnyNominal() != owningNominal)
-          superclassTy = getSuperClassOf(superclassTy);
+    // Cache the failure
+    Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
 
-        // Compute the conformance for the inherited type.
-        bool conforms = conformsToProtocol(superclassTy, Proto,
-                                           &inheritedConformance);
-        assert(conforms && "Superclass does not conform but should?");
-        (void)conforms;
-        assert(inheritedConformance &&
-               "We should have found an inherited conformance");
-      }
-
-      // Create the inherited conformance entry.
-      auto result = Context.getInheritedConformance(T, inheritedConformance);
-      Context.ConformsTo[Key] = ConformanceEntry(result, true);
+    // Check whether the type *implicitly* conforms to the protocol.
+    if (auto *result = checkConformsToProtocol(*this, T, Proto, nullptr,
+                                               SourceLoc())) {
+      // Success! Record the conformance in the cache.
+      Context.ConformsTo[Key].setPointer(result);
 
       if (Conformance)
         *Conformance = result;
+
+      // If we can't complain about this, just return now.
+      if (ComplainLoc.isInvalid()) {
+        return false;
+      }
+
+      // Suggest the addition of the explicit conformance.
+      suggestExplicitConformance(*this, ComplainLoc, T, result);
       return true;
     }
 
-    // If the type is specialized, find the conformance for the generic type.
-    if (T->isSpecialized()) {
-      // Look through the metatype.
-      // FIXME: This is a hack to work around bugs in the solver.
-      auto instanceT = T;
-      if (auto metaT = T->getAs<MetaTypeType>()) {
-        instanceT = metaT->getInstanceType();
-      }
-
-      // Figure out the type that's explicitly conforming to this protocol.
-      Type explicitConformanceType;
-      if (auto nominal = dyn_cast<NominalTypeDecl>(ExplicitConformance)) {
-        explicitConformanceType = nominal->getDeclaredTypeInContext();
-      } else {
-        explicitConformanceType = cast<ExtensionDecl>(ExplicitConformance)
-                                    ->getDeclaredTypeInContext();
-      }
-
-      // If the explicit conformance is associated with a type that is different
-      // from the type we're checking, retrieve generic conformance.
-      if (!explicitConformanceType->isEqual(instanceT)) {
-        // Retrieve the generic conformance.
-        ProtocolConformance *genericConformance = nominalConformance;
-        if (!genericConformance) {
-          if (!conformsToProtocol(explicitConformanceType, Proto,
-                                  &genericConformance, ComplainLoc)) {
-            // If generic conformance fails, we're done.
-            return false;
-          }
-          assert(genericConformance && "Missing generic conformance?");
-        }
-
-        // Gather the substitutions we need to map the generic conformance to
-        // the specialized conformance.
-        auto substitutions = gatherSubstitutions(*this, instanceT);
-
-        // The type witnesses for the specialized conformance.
-        TypeWitnessMap typeWitnesses
-          = specializeTypeWitnesses(*this,
-                                    genericConformance->getTypeWitnesses(),
-                                    substitutions);
-
-        // Create the specialized conformance entry.
-        Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
-        auto result
-          = Context.getSpecializedConformance(T, genericConformance,
-                                              substitutions,
-                                              std::move(typeWitnesses));
-        Context.ConformsTo[Key] = ConformanceEntry(result, true);
-
-        if (Conformance)
-          *Conformance = result;
-        return true;
-      }
+    if (ComplainLoc.isValid()) {
+      diagnose(ComplainLoc, diag::type_does_not_conform,
+               T, Proto->getDeclaredType());
     }
 
-    // If we already found the conformance, we're done.
-    if (nominalConformance) {
-      *Conformance = nominalConformance;
-      Context.ConformsTo[Key] = ConformanceEntry(nominalConformance, true);
-      return true;
-    }
-
-    // Fall through to check conformance in the implicit case.
-    // FIXME: This should be factored out better.
+    return false;
   }
 
   // Assume that the type does not conform to this protocol while checking
@@ -1554,13 +1292,15 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   return true;
 }
 
-ProtocolConformance *TypeChecker::resolveConformance(Type type,
-                                                     ProtocolDecl *protocol) {
+ProtocolConformance *TypeChecker::resolveConformance(NominalTypeDecl *type,
+                                                     ProtocolDecl *protocol,
+                                                     ExtensionDecl *ext) {
+  Decl *explicitConformance = ext? (Decl *)ext : (Decl *)type;
   ProtocolConformance *conformance = nullptr;
-  bool conforms = conformsToProtocol(type, protocol, &conformance);
-  if (!conforms)
-    return nullptr;
-
-  return conformance;
+  bool conforms = conformsToProtocol(type->getDeclaredTypeInContext(), protocol,
+                                     &conformance,
+                                     explicitConformance->getLoc(),
+                                     explicitConformance);
+  return conforms? conformance : nullptr;
 }
 
