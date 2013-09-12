@@ -24,8 +24,6 @@
 using namespace swift;
 using namespace Lowering;
 
-#include "llvm/Support/raw_ostream.h"
-
 void Initialization::_anchor() {}
 
 namespace {
@@ -325,6 +323,7 @@ struct InitializationForPattern
     if (!vd->getDeclContext()->isLocalContext()) {
       SILValue addr = Gen.B.createGlobalAddr(vd, vd,
                           Gen.getLoweredType(vd->getType()).getAddressType());
+      Gen.VarLocs[vd] = {SILValue(), addr};
       return InitializationPtr(new GlobalInitialization(addr));
     }
 
