@@ -251,8 +251,8 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
 
     // FIXME: Curry thunks for generic methods don't work right yet, so skip
     // emitting thunks for them
-    assert(!(fd->getFuncExpr()->getType()->is<AnyFunctionType>() &&
-             fd->getFuncExpr()->getType()->castTo<AnyFunctionType>()->getResult()
+    assert(!(fd->getType()->is<AnyFunctionType>() &&
+             fd->getType()->castTo<AnyFunctionType>()->getResult()
                ->is<PolymorphicFunctionType>()));
     
     // Reference the next uncurrying level of the function.

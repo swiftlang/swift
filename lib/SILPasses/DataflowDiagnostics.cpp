@@ -41,8 +41,7 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
     if (ResTy->isVoid())
       return;
 
-    if (AnyFunctionType *T =
-          FD->getFuncExpr()->getType()->castTo<AnyFunctionType>()) {
+    if (AnyFunctionType *T = FD->getType()->castTo<AnyFunctionType>()) {
       if (T->isNoReturn())
         return;
     }
@@ -106,8 +105,7 @@ static void diagnoseReturn(const SILInstruction *I, ASTContext &Context) {
   SILLocation FLoc = F->getLocation();
 
   if (auto *FD = FLoc.getAsASTNode<FuncDecl>()) {
-    if (AnyFunctionType *T =
-            FD->getFuncExpr()->getType()->castTo<AnyFunctionType>()) {
+    if (AnyFunctionType *T = FD->getType()->castTo<AnyFunctionType>()) {
 
       // Warn if we reach a return inside a noreturn function.
       if (T->isNoReturn()) {
