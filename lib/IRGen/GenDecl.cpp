@@ -325,7 +325,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     // Add this as a global initializer.
     (void) new llvm::GlobalVariable(Module,
                                     globalInits->getType(),
-                                    /*is constant*/ true,
+                                    /*is constant*/ false,
                                     llvm::GlobalValue::AppendingLinkage,
                                     globalInits,
                                     "llvm.global_ctors");
