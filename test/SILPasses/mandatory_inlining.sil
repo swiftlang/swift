@@ -466,7 +466,6 @@ sil @test_short_circuit : $[thin] (x : Bool, y : Bool) -> Bool {
   // CHECK: br [[BB4:.*]](
 
 // CHECK: [[BB3]]:
-  // CHECK: {{%.*}} = load [[VAL11:%.*]]#1
   // CHECK: strong_retain [[VAL3:.*]]#0
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[VAL3]]#1
