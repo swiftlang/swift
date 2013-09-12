@@ -1762,6 +1762,29 @@ void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
                                              object, loadSel);
   call->setDoesNotThrow();
 
+  // FIXME: Assume (probably safely) that the hasMethodBB has only us as a
+  // predecessor, and cannibalize its bb argument so we can represent is as an
+  // ObjCMethod lowered value. This is hella gross but saves us having to
+  // implement ObjCMethod-to-Explosion lowering and creating a thunk we don't
+  // want.
+  assert(std::next(i->getHasMethodBB()->pred_begin())
+           == i->getHasMethodBB()->pred_end()
+         && "lowering dynamic_method_br with multiple preds for destination "
+            "not implemented");
+  // Kill the existing lowered value for the bb arg and its phi nodes.
+  SILValue methodArg = i->getHasMethodBB()->bbarg_begin()[0];
+  Explosion formerLLArg = getLoweredExplosion(methodArg);
+  for (llvm::Value *val : formerLLArg.claimAll()) {
+    auto phi = cast<llvm::PHINode>(val);
+    assert(phi->getNumIncomingValues() == 0 && "phi already used");
+    phi->removeFromParent();
+    delete phi;
+  }
+  LoweredValues.erase(methodArg);
+  
+  // Replace the lowered value with an ObjCMethod lowering.
+  setLoweredObjCMethod(methodArg, i->getMember());
+  
   // Create the branch.
   Builder.CreateCondBr(call, hasMethodBB.bb, noMethodBB.bb);
 }
