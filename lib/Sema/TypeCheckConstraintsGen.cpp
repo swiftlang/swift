@@ -690,34 +690,7 @@ namespace {
     }
 
     Type visitFuncExpr(FuncExpr *expr) {
-      // Func expressions always have function type. In cases where a parameter
-      // or return type is omitted, a fresh type variable is used to stand in
-      // for that parameter or return type, allowing it to be inferred from
-      // context.
-      auto funcTy = expr->getDecl()->getBodyResultTypeLoc().getType();
-      if (!funcTy) {
-        // If no return type was specified, create a fresh type
-        // variable for it.
-        funcTy = CS.createTypeVariable(
-                   CS.getConstraintLocator(expr,
-                                           ConstraintLocator::ClosureResult),
-                   /*canBindToLValue=*/false);
-      }
-
-      // Walk through the patterns in the func expression, backwards,
-      // computing the type of each pattern (which may involve fresh type
-      // variables where parameter types where no provided) and building the
-      // eventual function type.
-      auto patterns = expr->getDecl()->getArgParamPatterns();
-      ConstraintLocatorBuilder locator(CS.getConstraintLocator(expr, { }));
-      for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
-        Type paramTy = getTypeForPattern(patterns[e - i - 1], expr,
-                                         locator.withPathElement(
-                                           LocatorPathElt::getTupleElement(i)));
-        funcTy = FunctionType::get(paramTy, funcTy, CS.getASTContext());
-      }
-
-      return funcTy;
+      llvm_unreachable("should not see FuncExpr in expressions");
     }
 
     Type visitPipeClosureExpr(PipeClosureExpr *expr) {
@@ -1045,14 +1018,7 @@ namespace {
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
     virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // For function expressions, we visit the closure first to assign a type
-      // with appropriate type variables. We don't walk into the bodies.
-      // Don't walk into the bodies of function expressions.
-      if (auto func = dyn_cast<FuncExpr>(expr)) {
-        auto type = CG.visitFuncExpr(func);
-        func->setType(type);
-        return { false, func };
-      }
+      assert(!isa<FuncExpr>(expr));
 
       // For closures containing only a single expression, the body participates
       // in type checking.
