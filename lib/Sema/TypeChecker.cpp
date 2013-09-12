@@ -407,7 +407,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   performNameBinding(TU, StartElem);
   
   TypeChecker TC(*TU);
-  auto &FuncExprs = TC.definedFunctions;
+  auto &DefinedFunctions = TC.definedFunctions;
 
   // Resolve extensions. This has to occur first during type checking,
   // because the extensions need to be wired into the AST for name lookup
@@ -528,9 +528,9 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
   // Define any pending implicitly declarations.
   TC.definePendingImplicitDecls();
-  FuncExprs.insert(FuncExprs.end(),
-                   TC.implicitlyDefinedFunctions.begin(),
-                   TC.implicitlyDefinedFunctions.end());
+  DefinedFunctions.insert(DefinedFunctions.end(),
+                          TC.implicitlyDefinedFunctions.begin(),
+                          TC.implicitlyDefinedFunctions.end());
   TC.implicitlyDefinedFunctions.clear();
 
   // If we're in REPL mode, inject temporary result variables and other stuff
@@ -566,16 +566,16 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
-  unsigned currentFuncExpr = 0;
+  unsigned currentFunctionIdx = 0;
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
   do {
-    // Type check the body of each of the FuncExpr in turn.  Note that outside
-    // FuncExprs must be visited before nested FuncExprs for type-checking to
+    // Type check the body of each of the function in turn.  Note that outside
+    // functions must be visited before nested functions for type-checking to
     // work correctly.
-    unsigned previousFuncExpr = currentFuncExpr;
-    for (unsigned n = FuncExprs.size(); currentFuncExpr != n;
-         ++currentFuncExpr) {
-      auto *AFD = FuncExprs[currentFuncExpr];
+    unsigned previousFunctionIdx = currentFunctionIdx;
+    for (unsigned n = DefinedFunctions.size(); currentFunctionIdx != n;
+         ++currentFunctionIdx) {
+      auto *AFD = DefinedFunctions[currentFunctionIdx];
 
       if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
         TC.typeCheckConstructorBody(CD);
@@ -592,10 +592,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
 
     // Compute captures for the function expressions we visited, in the
-    // opposite order of type checking. i.e., the nested FuncExprs will be
-    // visited before the outer FuncExprs.
-    for (unsigned i = currentFuncExpr; i > previousFuncExpr; --i) {
-      if (auto *FD = dyn_cast<FuncDecl>(FuncExprs[i-1]))
+    // opposite order of type checking. i.e., the nested DefinedFunctions will be
+    // visited before the outer DefinedFunctions.
+    for (unsigned i = currentFunctionIdx; i > previousFunctionIdx; --i) {
+      if (auto *FD = dyn_cast<FuncDecl>(DefinedFunctions[i-1]))
         TC.computeCaptures(FD->getFuncExpr());
     }
 
@@ -613,9 +613,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         continue;
       }
       if (auto func = dyn_cast<FuncDecl>(decl)) {
-        FuncExpr *FE = func->getFuncExpr();
-        PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);
-        TC.typeCheckFunctionBody(FE);
+        PrettyStackTraceDecl StackEntry("type-checking", func);
+        TC.typeCheckFunctionBody(func->getFuncExpr());
         continue;
       }
        if (isa<StructDecl>(decl) || isa<ProtocolDecl>(decl)) {
@@ -628,11 +627,11 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
     // Define any pending implicit declarations.
     TC.definePendingImplicitDecls();
-    FuncExprs.insert(FuncExprs.end(),
+    DefinedFunctions.insert(DefinedFunctions.end(),
                      TC.implicitlyDefinedFunctions.begin(),
                      TC.implicitlyDefinedFunctions.end());
     TC.implicitlyDefinedFunctions.clear();
-  } while (currentFuncExpr < FuncExprs.size() ||
+  } while (currentFunctionIdx < DefinedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size());
 
   // FIXME: Horrible hack. Store this somewhere more sane.
