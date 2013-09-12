@@ -1179,7 +1179,7 @@ public:
   void semaFuncDecl(FuncDecl *FD, bool consumeAttributes) {
     FuncExpr *FE = FD->getFuncExpr();
 
-    if (FE->getType())
+    if (FD->hasType())
       return;
 
     bool badType = false;
@@ -1196,6 +1196,7 @@ public:
 
     if (badType) {
       FE->setType(ErrorType::get(TC.Context));
+      FD->setType(ErrorType::get(TC.Context));
       FD->setInvalid();
       return;
     }
@@ -1236,6 +1237,7 @@ public:
 
     }
     FE->setType(funcTy);
+    FD->setType(funcTy);
     FD->setBodyResultType(bodyResultType);
   }
 
@@ -1402,10 +1404,8 @@ public:
       semaFuncDecl(FD, /*consumeAttributes=*/true);
 
       // The second type check should have created a non-dependent type.
-      assert(!body->getType()->isDependentType());
+      assert(!FD->getType()->isDependentType());
     }
-
-    FD->setType(body->getType());
 
     validateAttributes(FD);
 
