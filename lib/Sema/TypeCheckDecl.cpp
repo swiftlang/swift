@@ -25,6 +25,12 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
+// FIXME: This is gross but temporary.
+#include "llvm/Support/CommandLine.h"
+llvm::cl::opt<bool> TLDefiniteInit("enable-top-level-definite-init",
+                                   llvm::cl::Hidden);
+
+
 /// \brief Describes the kind of implicit constructor that will be
 /// generated.
 enum class ImplicitConstructorKind {
@@ -834,20 +840,23 @@ public:
       Expr *initializer = nullptr;
       if (isPatternProperty(PBD->getPattern())) {
         // Properties don't have initializers.
-      } else if (!isa<TopLevelCodeDecl>(PBD->getDeclContext())) {
+      } else if (!isa<TopLevelCodeDecl>(PBD->getDeclContext()) ||
+                 TLDefiniteInit) {
         // If we are using the new definite initialization rules, we don't
         // default initialize local variables, only globals.
-      } else if (!TC.isDefaultInitializable(ty, &initializer)) {
-        // FIXME: Better diagnostics here.
-        TC.diagnose(PBD, diag::decl_no_default_init, ty);
       } else {
-        if (TC.typeCheckExpression(initializer, PBD->getDeclContext(), ty,
-                                   /*discardedExpr=*/false)) {
-          TC.diagnose(PBD, diag::while_converting_var_init, ty);
-          return;
+        if (!TC.isDefaultInitializable(ty, &initializer)) {
+          // FIXME: Better diagnostics here.
+          TC.diagnose(PBD, diag::decl_no_default_init, ty);
+        } else {
+          if (TC.typeCheckExpression(initializer, PBD->getDeclContext(), ty,
+                                     /*discardedExpr=*/false)) {
+            TC.diagnose(PBD, diag::while_converting_var_init, ty);
+            return;
+          }
+          
+          PBD->setInit(initializer);
         }
-
-        PBD->setInit(initializer);
       }
     } else if (PBD->getInit() && !IsFirstPass) {
       Type DestTy;

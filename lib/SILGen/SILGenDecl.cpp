@@ -26,6 +26,12 @@ using namespace Lowering;
 
 void Initialization::_anchor() {}
 
+
+// FIXME: This is gross but temporary.
+#include "llvm/Support/CommandLine.h"
+extern llvm::cl::opt<bool> TLDefiniteInit;
+
+
 namespace {
   /// A "null" initialization that indicates that any value being initialized
   /// into this initialization should be discarded. This represents AnyPatterns
@@ -226,7 +232,8 @@ public:
   }
   
   void finishInitialization(SILGenFunction &gen) override {
-    assert(!didFinish && "called BoxInit::finishInitialization twice!");
+    assert(!didFinish &&
+           "called LocalVariableInitialization::finishInitialization twice!");
     // FIXME: deactivate the deallocating cleanup and activate the
     // destroying one.
     didFinish = true;
@@ -246,7 +253,7 @@ public:
     return address;
   }
   
-  void finishInitialization(SILGenFunction &) override {
+  void finishInitialization(SILGenFunction &gen) override {
     // Globals don't need to be cleaned up.
   }
 };
@@ -285,8 +292,7 @@ struct InitializationForPattern
 {
   SILGenFunction &Gen;
   enum ArgumentOrVar_t { Argument, Var } ArgumentOrVar;
-  InitializationForPattern(SILGenFunction &Gen,
-                           ArgumentOrVar_t ArgumentOrVar)
+  InitializationForPattern(SILGenFunction &Gen, ArgumentOrVar_t ArgumentOrVar)
     : Gen(Gen), ArgumentOrVar(ArgumentOrVar) {}
   
   // Paren & Typed patterns are noops, just look through them.
@@ -323,6 +329,11 @@ struct InitializationForPattern
     if (!vd->getDeclContext()->isLocalContext()) {
       SILValue addr = Gen.B.createGlobalAddr(vd, vd,
                           Gen.getLoweredType(vd->getType()).getAddressType());
+      
+      // In a top level context, all global variables must be initialized.
+      if (TLDefiniteInit)
+        addr = Gen.B.createMarkUninitialized(vd, addr);
+      
       Gen.VarLocs[vd] = {SILValue(), addr};
       return InitializationPtr(new GlobalInitialization(addr));
     }
