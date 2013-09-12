@@ -132,6 +132,7 @@ cleanupCalleeValue(SILBuilder &B, SILBasicBlock::iterator &I,
       eraseInstruction(SRI);
     }
 
+    assert(ABI->use_empty());
     eraseInstruction(ABI);
   }
 
