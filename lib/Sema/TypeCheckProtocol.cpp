@@ -1304,3 +1304,10 @@ ProtocolConformance *TypeChecker::resolveConformance(NominalTypeDecl *type,
   return conforms? conformance : nullptr;
 }
 
+void TypeChecker::resolveExistentialConformsToItself(ProtocolDecl *proto) {
+  llvm::SmallPtrSet<ProtocolDecl *, 4> checking;
+  existentialConformsToItself(*this, proto->getDeclaredType(), proto,
+                              SourceLoc(), checking);
+}
+
+

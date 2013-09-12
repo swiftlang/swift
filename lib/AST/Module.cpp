@@ -363,9 +363,98 @@ void Module::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) {
   return Owner.getTopLevelDecls(this, Results);
 }
 
+ArrayRef<Substitution> BoundGenericType::getSubstitutions(
+                                           Module *module,
+                                           LazyResolver *resolver) {
+  // If we already have a cached copy of the substitutions, return them.
+  auto *canon = getCanonicalType()->castTo<BoundGenericType>();
+  const ASTContext &ctx = canon->getASTContext();
+  if (auto known = ctx.getSubstitutions(canon))
+    return *known;
+
+  // Compute the set of substitutions.
+  llvm::SmallPtrSet<ArchetypeType *, 8> knownArchetypes;
+  SmallVector<ArchetypeType *, 8> archetypeStack;
+  TypeSubstitutionMap substitutions;
+  auto genericParams = canon->getDecl()->getGenericParams();
+  unsigned index = 0;
+  for (Type arg : canon->getGenericArgs()) {
+    auto gp = genericParams->getParams()[index++];
+    auto archetype = gp.getAsTypeParam()->getArchetype();
+    substitutions[archetype] = arg;
+  }
+
+  // Collect all of the archetypes.
+  SmallVector<ArchetypeType *, 2> allArchetypesList;
+  ArrayRef<ArchetypeType *> allArchetypes = genericParams->getAllArchetypes();
+  if (genericParams->getOuterParameters()) {
+    SmallVector<const GenericParamList *, 2> allGenericParams;
+    unsigned numArchetypes = 0;
+    for (; genericParams; genericParams = genericParams->getOuterParameters()) {
+      allGenericParams.push_back(genericParams);
+      numArchetypes += genericParams->getAllArchetypes().size();
+    }
+    allArchetypesList.reserve(numArchetypes);
+    for (auto gp = allGenericParams.rbegin(), gpEnd = allGenericParams.rend();
+         gp != gpEnd; ++gp) {
+      allArchetypesList.append((*gp)->getAllArchetypes().begin(),
+                               (*gp)->getAllArchetypes().end());
+    }
+    allArchetypes = allArchetypesList;
+  }
+
+  // For each of the archetypes, compute the substitution.
+  bool hasTypeVariables = canon->hasTypeVariable();
+  SmallVector<Substitution, 4> resultSubstitutions;
+  resultSubstitutions.resize(allArchetypes.size());
+  index = 0;
+  for (auto archetype : allArchetypes) {
+    // Substitute into the type.
+    auto type = Type(archetype).subst(module, substitutions,
+                                      /*ignoreMissing=*/hasTypeVariables,
+                                      resolver);
+    assert(type && "Unable to perform type substitution");
+
+    SmallVector<ProtocolConformance *, 4> conformances;
+    if (type->hasTypeVariable()) {
+      // If the type involves a type variable, just fill in null conformances.
+      // FIXME: It seems like we should record these as requirements (?).
+      conformances.assign(archetype->getConformsTo().size(), nullptr);
+    } else {
+      // Find the conformances.
+      for (auto proto : archetype->getConformsTo()) {
+        auto conforms = module->lookupConformance(type, proto, resolver);
+        switch (conforms.getInt()) {
+        case ConformanceKind::Conforms:
+          conformances.push_back(conforms.getPointer());
+          break;
+
+        case ConformanceKind::DoesNotConform:
+        case ConformanceKind::UncheckedConforms:
+          llvm_unreachable("Couldn't find conformance");
+        }
+      }
+    }
+
+    // Record this substitution.
+    resultSubstitutions[index].Archetype = archetype;
+    resultSubstitutions[index].Replacement = type;
+    resultSubstitutions[index].Conformance = ctx.AllocateCopy(conformances);
+    ++index;
+  }
+
+  // Copy and record the substitutions.
+  auto permanentSubs = ctx.AllocateCopy(resultSubstitutions,
+                                        hasTypeVariables
+                                          ? AllocationArena::ConstraintSolver
+                                          : AllocationArena::Permanent);
+  ctx.setSubstitutions(canon, permanentSubs);
+  return permanentSubs;
+}
+
 /// Gather the set of substitutions required to map from the generic form of
 /// the given type to the specialized form.
-static ArrayRef<Substitution> gatherSubstitutions(ASTContext &ctx, Type type,
+static ArrayRef<Substitution> gatherSubstitutions(Module *module, Type type,
                                                   LazyResolver *resolver) {
   assert(type->isSpecialized() && "Type is not specialized");
   SmallVector<ArrayRef<Substitution>, 2> allSubstitutions;
@@ -373,33 +462,8 @@ static ArrayRef<Substitution> gatherSubstitutions(ASTContext &ctx, Type type,
   while (type) {
     // Record the substitutions in a bound generic type.
     if (auto boundGeneric = type->getAs<BoundGenericType>()) {
-      // FIXME: This feels like a hack. We should be able to compute the
-      // substitutions ourselves for this.
-      if (resolver)
-        resolver->resolveUnvalidatedType(type);
-      if (boundGeneric->hasTypeVariable() && !boundGeneric->hasSubstitutions()){
-        // If we have a type variable, introduce fake substitutions.
-        // FIXME: This feels a little awkward, and shouldn't go into
-        // permanent storage.
-        SmallVector<Substitution, 4> substitutions;
-        unsigned index = 0;
-        for (auto gp : *boundGeneric->getDecl()->getGenericParams()) {
-          Substitution sub;
-          sub.Archetype = gp.getAsTypeParam()->getArchetype();
-          sub.Replacement = boundGeneric->getGenericArgs()[index++];
-          assert(!sub.Replacement->isDependentType() && "Can't be dependent");
-          SmallVector<ProtocolConformance *, 4> conformances;
-          conformances.assign(sub.Archetype->getConformsTo().size(), nullptr);
-          sub.Conformance
-            = ctx.AllocateCopy(conformances, AllocationArena::ConstraintSolver);
-          substitutions.push_back(sub);
-        }
-        allSubstitutions.push_back(
-          ctx.AllocateCopy(substitutions, AllocationArena::ConstraintSolver));
-        boundGeneric->setSubstitutions(allSubstitutions.back());
-      } else {
-        allSubstitutions.push_back(boundGeneric->getSubstitutions());
-      }
+      allSubstitutions.push_back(boundGeneric->getSubstitutions(module,
+                                                                resolver));
       type = boundGeneric->getParent();
       continue;
     }
@@ -422,6 +486,7 @@ static ArrayRef<Substitution> gatherSubstitutions(ASTContext &ctx, Type type,
   SmallVector<Substitution, 4> flatSubstitutions;
   for (auto substitutions : allSubstitutions)
     flatSubstitutions.append(substitutions.begin(), substitutions.end());
+  auto &ctx = module->getASTContext();
   return ctx.AllocateCopy(flatSubstitutions);
 }
 
@@ -579,6 +644,49 @@ LookupConformanceResult Module::lookupConformance(Type type,
                                                   LazyResolver *resolver) {
   ASTContext &ctx = getASTContext();
 
+  // An archetype conforms to a protocol if the protocol is listed in the
+  // archetype's list of conformances.
+  if (auto archetype = type->getAs<ArchetypeType>()) {
+    for (auto ap : archetype->getConformsTo()) {
+      if (ap == protocol || ap->inheritsFrom(protocol))
+        return { nullptr, ConformanceKind::Conforms };
+    }
+
+    return { nullptr, ConformanceKind::DoesNotConform };
+  }
+
+  // An archetype conforms to a protocol if the protocol is listed in the
+  // existential's list of conformances and the existential conforms to
+  // itself.
+  if (type->isExistentialType()) {
+    // If the protocol doesn't conform to itself, there's no point in looking
+    // further.
+    auto known = protocol->existentialConformsToSelf();
+    if (!known && resolver) {
+      resolver->resolveExistentialConformsToItself(protocol);
+      known = protocol->existentialConformsToSelf();
+    }
+
+    // If we know that protocol doesn't conform to itself, we're done.
+    if (known && !*known)
+      return { nullptr, ConformanceKind::DoesNotConform };
+
+    // Look for this protocol within the existential's list of conformances.
+    SmallVector<ProtocolDecl *, 4> protocols;
+    type->isExistentialType(protocols);
+    for (auto ap : protocols) {
+      if (ap == protocol || ap->inheritsFrom(protocol)) {
+        return { nullptr,
+                 known? ConformanceKind::Conforms
+                      : ConformanceKind::UncheckedConforms };
+      }
+    }
+
+    // We didn't find our protocol in the existential's list; it doesn't
+    // conform.
+    return { nullptr, ConformanceKind::DoesNotConform };
+  }
+
   // Check whether we have already cached an answer to this query.
   ASTContext::ConformsToMap::key_type key(type->getCanonicalType(), protocol);
   auto known = ctx.ConformsTo.find(key);
@@ -667,7 +775,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
     if (!explicitConformanceType->isEqual(type)) {
       // Gather the substitutions we need to map the generic conformance to
       // the specialized conformance.
-      auto substitutions = gatherSubstitutions(ctx, type, resolver);
+      auto substitutions = gatherSubstitutions(this, type, resolver);
 
       // The type witnesses for the specialized conformance.
       TypeWitnessMap typeWitnesses

@@ -973,7 +973,3 @@ Type TypeChecker::resolveMemberType(Type type, Identifier name) {
   return memberTypes.back().second;
 }
 
-void TypeChecker::resolveUnvalidatedType(Type type) {
-  validateTypeSimple(type);
-}
-

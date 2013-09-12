@@ -862,6 +862,11 @@ public:
   /// generic type from the underlying generic type.
   ArrayRef<Substitution> getSubstitutions();
 
+  /// \brief Retrieve the set of substitutions used to produce this bound
+  /// generic type from the underlying generic type.
+  ArrayRef<Substitution> getSubstitutions(Module *module,
+                                          LazyResolver *resolver);
+
   /// \brief Set the substitution information for this bound generic type.
   ///
   /// \param Subs The set of substitutions, which must point into

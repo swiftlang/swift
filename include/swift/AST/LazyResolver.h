@@ -49,6 +49,9 @@ public:
                                                   ProtocolDecl *protocol,
                                                   ExtensionDecl *ext) = 0;
 
+  /// Resolve the "existential conforms to itself" bit for the given protocol.
+  virtual void resolveExistentialConformsToItself(ProtocolDecl *proto) = 0;
+
   /// Resolve a member type.
   ///
   /// \param type The type in which we will search for the member type.
@@ -57,13 +60,6 @@ public:
   /// \returns the member type, or an empty type if no such type could be
   /// found.
   virtual Type resolveMemberType(Type type, Identifier name) = 0;
-
-  /// Validate the given type.
-  ///
-  /// FIXME: This is completely awful, because it's built on the complete
-  /// awfulness of TypeChecker::validateTypeSimple(). It should become
-  /// unnecessary.
-  virtual void resolveUnvalidatedType(Type type) = 0;
 };
 
 }

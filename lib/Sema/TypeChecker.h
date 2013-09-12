@@ -705,8 +705,8 @@ public:
   virtual ProtocolConformance *resolveConformance(NominalTypeDecl *type,
                                                   ProtocolDecl *protocol,
                                                   ExtensionDecl *ext);
+  virtual void resolveExistentialConformsToItself(ProtocolDecl *proto);
   virtual Type resolveMemberType(Type type, Identifier name);
-  virtual void resolveUnvalidatedType(Type type);
 };
 
 } // end namespace swift
