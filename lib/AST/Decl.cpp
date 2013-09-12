@@ -814,7 +814,7 @@ Type FuncDecl::getResultType(ASTContext &Ctx) const {
 
 void FuncDecl::revertType() {
   BodyResultType = Type();
-  overwriteType(Type());
+  setType(Type());
   getFuncExpr()->setType(Type());
 }
 
