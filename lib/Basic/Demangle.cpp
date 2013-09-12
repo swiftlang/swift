@@ -1307,6 +1307,26 @@ private:
       return demangleProtocolList();
     }
     if (c == 'Q') {
+      if (Mangled.nextIf('P')) {
+        NodePointer proto = demangleProtocolName();
+        if (!proto) return nullptr;
+        NodePointer name = demangleIdentifier();
+        if (!name) return nullptr;
+        NodePointer assocType
+          = Node::makeNodePointer(Node::Kind::AssociatedTypeRef);
+        assocType->push_back_child(proto);
+        assocType->push_back_child(name);
+        Substitutions.push_back({ assocType, IsProtocol::no });
+        return assocType;
+      }
+      if (Mangled.nextIf('Q')) {
+        NodePointer proto = demangleProtocolName();
+        if (!proto) return nullptr;
+        NodePointer selfType = Node::makeNodePointer(Node::Kind::SelfTypeRef);
+        selfType->push_back_child(proto);
+        Substitutions.push_back({ selfType, IsProtocol::no });
+        return selfType;
+      }
       if (Mangled.nextIf('d')) {
         size_t depth, index;
         if (!demangleIndex(depth))
@@ -1807,6 +1827,14 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     case swift::Demangle::Node::Kind::Protocol:
     case swift::Demangle::Node::Kind::ArchetypeRef:
       printer << pointer->getText();
+      break;
+    case swift::Demangle::Node::Kind::AssociatedTypeRef:
+      toString(pointer->child_at(0), printer);
+      printer << '.' << pointer->child_at(1)->getText();
+      break;
+    case swift::Demangle::Node::Kind::SelfTypeRef:
+      toString(pointer->child_at(0), printer);
+      printer << ".Self";
       break;
     case swift::Demangle::Node::Kind::ProtocolList: {
       if (pointer->size() == 1) {

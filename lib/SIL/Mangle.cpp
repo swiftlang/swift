@@ -576,6 +576,32 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
   }
 
   case TypeKind::Archetype: {
+    auto archetype = cast<ArchetypeType>(type);
+    
+    // type ::= associated-type
+    if (!archetype->getParent())
+      if (auto assocType = archetype->getAssocType()) {
+        // associated-type ::= substitution
+        if (tryMangleSubstitution(archetype.getPointer()))
+          return;
+        
+        addSubstitution(archetype.getPointer());
+        
+        // associated-type ::= QQ <protocol>
+        if (assocType->isSelf()) {
+          Buffer << "QQ";
+          mangleProtocolName(assocType->getProtocol());
+
+          return;
+        }
+        
+        // associated-type ::= QP <protocol> <identifier>
+        Buffer << "QP";
+        mangleProtocolName(assocType->getProtocol());
+        mangleIdentifier(archetype->getName());
+        return;
+      }
+    
     // <type> ::= Q <index>             # archetype with depth=0, index=N
     // <type> ::= Qd <index> <index>    # archetype with depth=M+1, index=N
 
@@ -583,7 +609,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     // fail for local declarations --- that might be okay; it means we
     // probably need to insert contexts for all the enclosing contexts.
     // And of course, linkage is not critical for such things.
-    auto it = Archetypes.find(cast<ArchetypeType>(type));
+    auto it = Archetypes.find(archetype);
     assert(it != Archetypes.end());
     auto &info = it->second;
     assert(ArchetypesDepth >= info.Depth);

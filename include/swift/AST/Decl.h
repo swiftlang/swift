@@ -1370,6 +1370,11 @@ public:
 
   /// Determine whether this is the implicitly-created 'Self'.
   bool isSelf() const { return isImplicit(); }
+  
+  /// Get the protocol in which this associated type is declared.
+  ProtocolDecl *getProtocol() const {
+    return cast<ProtocolDecl>(getDeclContext());
+  }
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceLoc getLoc() const { return NameLoc; }

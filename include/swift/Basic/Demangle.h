@@ -90,6 +90,8 @@ public:
     NonVariadicTuple,
     TupleElement,
     ProtocolList,
+    AssociatedTypeRef,
+    SelfTypeRef,
     ArchetypeRef,
     ArchetypeAndProtocol,
     ArchetypeList,

@@ -247,6 +247,7 @@ types where the metadata itself has unknown layout.)
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= 'Bv' natural type                 // Builtin.Vec<n>x<type>
   type ::= nominal-type
+  type ::= associated-type
   type ::= 'b' type type                     // objc block function type
   type ::= 'F' type type                     // function type
   type ::= 'f' type type                     // uncurried function type
@@ -267,6 +268,9 @@ types where the metadata itself has unknown layout.)
   nominal-type-kind ::= 'C'                  // class
   nominal-type-kind ::= 'O'                  // union
   nominal-type-kind ::= 'V'                  // struct
+  associated-type ::= substitution
+  associated-type ::= 'QP' protocol identifier // protocol associated type
+  associated-type ::= 'QQ' protocol            // protocol Self type
   protocol-context ::= 'P' protocol
   tuple-element ::= identifier? type
 
