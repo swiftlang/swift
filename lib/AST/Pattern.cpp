@@ -47,6 +47,12 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
   }
 }
 
+StringRef Pattern::getKindName(PatternKind K) {
+  switch (K) {
+#define PATTERN(Id, Parent) case PatternKind::Id: return #Id;
+#include "swift/AST/PatternNodes.def"
+  }
+}
 
 // Metaprogram to verify that every concrete class implements
 // a 'static bool classof(const Pattern*)'.

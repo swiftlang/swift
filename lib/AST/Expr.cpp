@@ -35,8 +35,8 @@ void *Expr::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
-StringRef Expr::getKindName(ExprKind kind) {
-  switch (kind) {
+StringRef Expr::getKindName(ExprKind K) {
+  switch (K) {
 #define EXPR(Id, Parent) case ExprKind::Id: return #Id;
 #include "swift/AST/ExprNodes.def"
   }

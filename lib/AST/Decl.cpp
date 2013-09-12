@@ -34,6 +34,13 @@ void *Module::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+StringRef Decl::getKindName(DeclKind K) {
+  switch (K) {
+#define DECL(Id, Parent) case DeclKind::Id: return #Id;
+#include "swift/AST/DeclNodes.def"
+  }
+}
+
 Module *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }

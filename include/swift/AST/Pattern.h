@@ -75,6 +75,13 @@ private:
 public:
   PatternKind getKind() const { return PatternKind(PatternBits.Kind); }
 
+  /// \brief Retrieve the name of the given pattern kind.
+  ///
+  /// This name should only be used for debugging dumps and other
+  /// developer aids, and should never be part of a diagnostic or exposed
+  /// to the user of the compiler in any way.
+  static StringRef getKindName(PatternKind K);
+
   bool isImplicit() const { return PatternBits.isImplicit; }
   void setImplicit() { PatternBits.isImplicit = true; }
 

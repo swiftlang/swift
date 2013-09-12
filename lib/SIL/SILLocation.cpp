@@ -86,8 +86,18 @@ SourceLoc SILLocation::getEndSourceLoc() const {
 }
 
 void SILLocation::dump(const SourceManager &SM) const {
+  if (auto D = ASTNode.dyn_cast<Decl *>())
+    llvm::errs() << Decl::getKindName(D->getKind()) << "Decl @ ";
+  if (auto E = ASTNode.dyn_cast<Expr *>())
+    llvm::errs() << Expr::getKindName(E->getKind()) << "Expr @ ";
+  if (auto S = ASTNode.dyn_cast<Stmt *>())
+    llvm::errs() << Stmt::getKindName(S->getKind()) << "Stmt @ ";
+  if (auto P = ASTNode.dyn_cast<Pattern *>())
+    llvm::errs() << Pattern::getKindName(P->getKind()) << "Pattern @ ";
+
   print(llvm::errs(), SM);
 }
+
 void SILLocation::print(raw_ostream &OS, const SourceManager &SM) const {
   if (isNull())
     OS << "<no loc>";

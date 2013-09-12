@@ -255,6 +255,13 @@ protected:
 public:
   DeclKind getKind() const { return DeclKind(DeclBits.Kind); }
 
+  /// \brief Retrieve the name of the given declaration kind.
+  ///
+  /// This name should only be used for debugging dumps and other
+  /// developer aids, and should never be part of a diagnostic or exposed
+  /// to the user of the compiler in any way.
+  static StringRef getKindName(DeclKind K);
+
   DeclContext *getDeclContext() const { return Context; }
   void setDeclContext(DeclContext *DC) { Context = DC; }
 

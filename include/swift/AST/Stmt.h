@@ -50,6 +50,13 @@ public:
 
   StmtKind getKind() const { return Kind; }
 
+  /// \brief Retrieve the name of the given statement kind.
+  ///
+  /// This name should only be used for debugging dumps and other
+  /// developer aids, and should never be part of a diagnostic or exposed
+  /// to the user of the compiler in any way.
+  static StringRef getKindName(StmtKind kind);
+
   /// \brief Return the location of the start of the statement.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
   

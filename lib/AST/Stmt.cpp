@@ -31,6 +31,13 @@ void *Stmt::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+StringRef Stmt::getKindName(StmtKind K) {
+  switch (K) {
+#define STMT(Id, Parent) case StmtKind::Id: return #Id;
+#include "swift/AST/StmtNodes.def"
+  }
+}
+
 // Helper functions to verify statically whether the getSourceRange()
 // function has been overridden.
 typedef const char (&TwoChars)[2];
