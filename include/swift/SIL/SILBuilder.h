@@ -240,6 +240,10 @@ public:
     return insert(new (F.getModule()) AssignInst(Loc, Src, DestLValue));
   }
 
+  MarkUninitializedInst *createMarkUninitialized(SILLocation loc, SILValue src){
+    return insert(new (F.getModule()) MarkUninitializedInst(loc, src));
+  }
+
   LoadWeakInst *createLoadWeak(SILLocation loc, SILValue src, IsTake_t isTake) {
     return insert(new (F.getModule()) LoadWeakInst(loc, src, isTake));
   }

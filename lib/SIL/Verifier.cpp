@@ -93,7 +93,7 @@ public:
   _requireObjectType<type>(value, valueDescription, #type)
 
   void requireReferenceValue(SILValue value, const Twine &valueDescription) {
-    require(value.getType().isObject(), valueDescription + " must be an object");
+    require(value.getType().isObject(), valueDescription +" must be an object");
     require(value.getType().hasReferenceSemantics(),
             valueDescription + " must have reference semantics");
   }
@@ -370,6 +370,14 @@ public:
     require(Dest.getType().isAddress(), "Must store to an address dest");
     require(Dest.getType().getObjectType() == Src.getType(),
             "Store operand type and dest type mismatch");
+  }
+
+  void checkMarkUninitializedInst(MarkUninitializedInst *MU) {
+    SILValue Src = MU->getOperand();
+    require(MU->getModule()->getStage() == SILStage::Raw,
+            "mark_uninitialized instruction can only exist in raw SIL");
+    require(Src.getType().isAddress(), "Must store to an address dest");
+    require(Src.getType() == MU->getType(0),"operand and result type mismatch");
   }
 
   void checkCopyAddrInst(CopyAddrInst *SI) {

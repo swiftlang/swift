@@ -898,6 +898,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("function_ref", ValueKind::FunctionRefInst)
     .Case("load", ValueKind::LoadInst)
     .Case("load_weak", ValueKind::LoadWeakInst)
+    .Case("mark_uninitialized", ValueKind::MarkUninitializedInst)
     .Case("metatype", ValueKind::MetatypeInst)
     .Case("module", ValueKind::ModuleInst)
     .Case("object_pointer_to_ref", ValueKind::ObjectPointerToRefInst)
@@ -1206,7 +1207,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createLoadWeak(InstLoc, Val, IsTake_t(isTake));
     break;
   }
-
+      
     // Conversion instructions.
   case ValueKind::RefToObjectPointerInst:
   case ValueKind::UpcastInst:
@@ -1350,6 +1351,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     break;
   }
+
+  case ValueKind::MarkUninitializedInst:
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createMarkUninitialized(InstLoc, Val);
+    break;
 
   case ValueKind::AssignInst:
   case ValueKind::StoreInst:

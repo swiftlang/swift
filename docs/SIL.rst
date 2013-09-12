@@ -1013,6 +1013,27 @@ with a sequence that also correctly destroys the current value.
 This instruction is only valid in Raw SIL and is rewritten as appropriate
 by the definitive initialization pass.
 
+mark_uninitialized
+``````````````````
+::
+
+  sil-instruction ::= 'mark_uninitialized' sil-operand
+
+  %2 = mark_uninitialized %1 : $*T
+  // $T must be an address
+
+Indicates that a symbolic memory location is uninitialized, and must be
+explicitly initialized before it escapes or before the current function returns.
+This instruction returns its operands, and all accesses within the function must
+be performed against the return value of the mark_uninitialized instruction.
+
+The purpose of the ``mark_uninitialized`` instruction is to enable
+definitive initialization analysis for global variables and instance variables,
+which are not represented as box allocations.
+
+It is produced by SILGen, and is only valid in Raw SIL.  It is rewritten as
+appropriate by the definitive initialization pass.
+
 initialize_var
 ``````````````
 ::

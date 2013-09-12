@@ -647,6 +647,20 @@ public:
   }
 };
 
+/// MarkUninitializedInst - Indicates that a memory location is uninitialized at
+/// this point and needs to be initialized by the end of the function and before
+/// any escape point for this instruction.  This is only valid in
+/// Raw SIL.
+class MarkUninitializedInst
+  : public UnaryInstructionBase<ValueKind::MarkUninitializedInst> {
+public:
+  
+  MarkUninitializedInst(SILLocation Loc, SILValue Address)
+    : UnaryInstructionBase(Loc, Address, Address.getType()) {
+  }
+  
+};
+
 
 /// Represents a load from a [weak] memory location.
 class LoadWeakInst

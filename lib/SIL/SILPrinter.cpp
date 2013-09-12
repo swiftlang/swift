@@ -534,6 +534,9 @@ public:
     OS << "assign " << getID(AI->getSrc()) << " to "
        << getIDAndType(AI->getDest());
   }
+  void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
+    OS << "mark_uninitialized " << getIDAndType(MU->getOperand());
+  }
   void visitLoadWeakInst(LoadWeakInst *LI) {
     OS << "load_weak " << getIDAndType(LI->getOperand());
   }

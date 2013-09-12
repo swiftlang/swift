@@ -247,6 +247,14 @@ SILCloner<ImplClass>::visitAssignInst(AssignInst* Inst) {
 
 template<typename ImplClass>
 SILValue
+SILCloner<ImplClass>::visitMarkUninitializedInst(MarkUninitializedInst* Inst) {
+  return doPostProcess(Inst,
+             Builder.createMarkUninitialized(getOpLocation(Inst->getLoc()),
+                                             getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+SILValue
 SILCloner<ImplClass>::visitLoadWeakInst(LoadWeakInst* Inst) {
   return doPostProcess(Inst,
     Builder.createLoadWeak(getOpLocation(Inst->getLoc()),

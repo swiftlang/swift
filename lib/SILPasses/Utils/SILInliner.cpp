@@ -10,9 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/STLExtras.h"
 #include "swift/SILPasses/Utils/SILInliner.h"
-
+#include "llvm/ADT/STLExtras.h"
 using namespace swift;
 
 /// \brief Inlines the callee of a given ApplyInst (which must be the value of a

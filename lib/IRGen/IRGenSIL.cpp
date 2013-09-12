@@ -510,7 +510,12 @@ public:
 
   void visitLoadInst(LoadInst *i);
   void visitStoreInst(StoreInst *i);
-  void visitAssignInst(AssignInst *i);
+  void visitAssignInst(AssignInst *i) {
+    llvm_unreachable("assign is not valid in canonical SIL");
+  }
+  void visitMarkUninitializedInst(MarkUninitializedInst *i) {
+    llvm_unreachable("mark_uninitialized is not valid in canonical SIL");
+  }
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitStructInst(StructInst *i);
@@ -1908,10 +1913,6 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   Address dest = getLoweredAddress(i->getDest());
   auto &type = getTypeInfo(i->getSrc().getType().getObjectType());
   cast<LoadableTypeInfo>(type).initialize(*this, source, dest);
-}
-
-void IRGenSILFunction::visitAssignInst(AssignInst *i) {
-  llvm_unreachable("assign is not valid in canonical SIL");
 }
 
 
