@@ -481,33 +481,11 @@ specializeTypeWitnesses(ASTContext &ctx,
   return result;
 }
 
-LookupConformanceResult Module::lookupConformance(Type type,
-                                                  ProtocolDecl *protocol,
-                                                  LazyResolver *resolver) {
-  ASTContext &ctx = getASTContext();
-
-  // Check whether we have already cached an answer to this query.
-  ASTContext::ConformsToMap::key_type key(type->getCanonicalType(), protocol);
-  auto known = ctx.ConformsTo.find(key);
-  if (known != ctx.ConformsTo.end()) {
-    // If we conform, return the conformance.
-    if (known->second.getInt()) {
-      return { known->second.getPointer(), ConformanceKind::Conforms };
-    }
-
-    // We don't conform.
-    return { nullptr, ConformanceKind::DoesNotConform };
-  }
-
-  auto nominal = type->getAnyNominal();
-
-  // If we don't have a nominal type, there are no conformances.
-  // FIXME: We may have implicit conformances for some cases. Handle those
-  // here.
-  if (!nominal) {
-    return { nullptr, ConformanceKind::DoesNotConform };
-  }
-
+/// Retrieve the explicit conformance of the given nominal type declaration
+/// to the given protocol.
+static std::tuple<NominalTypeDecl *, Decl *, ProtocolConformance *>
+findExplicitConformance(Module *module, NominalTypeDecl *nominal,
+                        ProtocolDecl *protocol, LazyResolver *resolver) {
   // Walk the nominal type, its extensions, superclasses, and so on.
   llvm::SmallPtrSet<ProtocolDecl *, 4> visitedProtocols;
   SmallVector<std::tuple<NominalTypeDecl *, NominalTypeDecl *, Decl *>,4> stack;
@@ -522,22 +500,22 @@ LookupConformanceResult Module::lookupConformance(Type type,
           Decl *currentOwner,
           ArrayRef<ProtocolDecl *> protocols,
           ArrayRef<ProtocolConformance *> conformances) -> bool {
-        for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
-          auto testProto = protocols[i];
-          if (testProto == protocol) {
-            owningNominal = currentNominal;
-            declaresConformance = currentOwner;
-            if (i < conformances.size())
-              nominalConformance = conformances[i];
-            return true;
-          }
-
-          if (visitedProtocols.insert(testProto))
-            stack.push_back({testProto, currentNominal, currentOwner});
+      for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
+        auto testProto = protocols[i];
+        if (testProto == protocol) {
+          owningNominal = currentNominal;
+          declaresConformance = currentOwner;
+          if (i < conformances.size())
+            nominalConformance = conformances[i];
+          return true;
         }
 
-        return false;
-      };
+        if (visitedProtocols.insert(testProto))
+          stack.push_back({testProto, currentNominal, currentOwner});
+      }
+
+      return false;
+    };
 
   // Walk the stack of types to find a conformance.
   stack.push_back({nominal, nominal, nominal});
@@ -573,29 +551,71 @@ LookupConformanceResult Module::lookupConformance(Type type,
   // If we didn't find the protocol, we don't conform. Cache the negative result
   // and return.
   if (!owningNominal) {
-    ctx.ConformsTo[key] = ConformanceEntry(nullptr, false);
-    return { nullptr, ConformanceKind::DoesNotConform };
+    return { nullptr, nullptr, nullptr };
   }
 
-  // If we found the protocol but we don't have a conformance, it's because
-  // we haven't type-checked the conformance yet.
-  if (!nominalConformance) {
-    // When there is no resolver, we simply can't check this.
-    if (!resolver)
-      return { nullptr, ConformanceKind::UncheckedConforms };
-
-    // Try to resolve the conformance.
+  // If we don't have a nominal conformance, but we do have a resolver, try
+  // to resolve the nominal conformance now.
+  if (!nominalConformance && resolver) {
     nominalConformance = resolver->resolveConformance(
                            owningNominal,
                            protocol,
                            dyn_cast<ExtensionDecl>(declaresConformance));
+  }
 
-    // If we failed to resolve the conformance, then the type doesn't
-    // actually conform. Cache the negative result and return.
-    if (!nominalConformance) {
-      ctx.ConformsTo[key] = ConformanceEntry(nullptr, false);
-      return { nullptr, ConformanceKind::DoesNotConform };
+  // If we have a nominal conformance, we're done.
+  if (nominalConformance) {
+    return { owningNominal, declaresConformance, nominalConformance };
+  }
+
+  return { nullptr, nullptr, nullptr };
+}
+
+LookupConformanceResult Module::lookupConformance(Type type,
+                                                  ProtocolDecl *protocol,
+                                                  LazyResolver *resolver) {
+  ASTContext &ctx = getASTContext();
+
+  // Check whether we have already cached an answer to this query.
+  ASTContext::ConformsToMap::key_type key(type->getCanonicalType(), protocol);
+  auto known = ctx.ConformsTo.find(key);
+  if (known != ctx.ConformsTo.end()) {
+    // If we conform, return the conformance.
+    if (known->second.getInt()) {
+      return { known->second.getPointer(), ConformanceKind::Conforms };
     }
+
+    // We don't conform.
+    return { nullptr, ConformanceKind::DoesNotConform };
+  }
+
+  auto nominal = type->getAnyNominal();
+
+  // If we don't have a nominal type, there are no conformances.
+  // FIXME: We may have implicit conformances for some cases. Handle those
+  // here.
+  if (!nominal) {
+    return { nullptr, ConformanceKind::DoesNotConform };
+  }
+
+  // Find the explicit conformance.
+  NominalTypeDecl *owningNominal = nullptr;
+  Decl *declaresConformance = nullptr;
+  ProtocolConformance *nominalConformance = nullptr;
+  std::tie(owningNominal, declaresConformance, nominalConformance)
+    = findExplicitConformance(this, nominal, protocol, resolver);
+
+  // If we didn't find an owning nominal, we don't conform. Cache the negative
+  // result and return.
+  if (!owningNominal) {
+    ctx.ConformsTo[key] = ConformanceEntry(nullptr, false);
+    return { nullptr, ConformanceKind::DoesNotConform };
+  }
+
+  // If we found an owning nominal but didn't have a conformance, this is
+  // an unchecked conformance.
+  if (!nominalConformance) {
+    return { nullptr, ConformanceKind::UncheckedConforms };
   }
 
   // If the nominal type in which we found the conformance is not the same
