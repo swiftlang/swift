@@ -648,7 +648,6 @@ public:
       Builder.addLeadingDot();
     Builder.addTextChunk(Name);
     Builder.addLeftParen();
-    auto *FE = FD->getFuncExpr();
     auto Patterns = FD->getArgParamPatterns();
     unsigned FirstIndex = 0;
     if (!IsImlicitlyCurriedInstanceMethod && FD->getImplicitSelfDecl())
@@ -678,7 +677,7 @@ public:
       }
       TypeStr += ") -> ";
     }
-    Type ResultType = FE->getResultType(SwiftContext);
+    Type ResultType = FD->getResultType(SwiftContext);
     if (ResultType->isVoid())
       TypeStr += "Void";
     else

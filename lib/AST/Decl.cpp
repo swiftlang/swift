@@ -673,11 +673,13 @@ VarDecl *FuncDecl::getImplicitSelfDeclImpl() const {
   return nullptr;
 }
 
-FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
-                           SourceLoc FuncLoc, Identifier Name,
-                           SourceLoc NameLoc, GenericParamList *GenericParams,
-                           Type Ty, unsigned NumParamPatterns,
-                           FuncExpr *TheFuncExprBody, DeclContext *DC) {
+FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
+                                       SourceLoc StaticLoc, SourceLoc FuncLoc,
+                                       Identifier Name, SourceLoc NameLoc,
+                                       GenericParamList *GenericParams,
+                                       Type Ty, unsigned NumParamPatterns,
+                                       FuncExpr *TheFuncExprBody,
+                                       DeclContext *DC) {
   assert(NumParamPatterns > 0);
   void *Mem = Context.Allocate(
       sizeof(FuncDecl) + 2 * NumParamPatterns * sizeof(Pattern *),
@@ -692,18 +694,20 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            SourceLoc NameLoc, GenericParamList *GenericParams,
                            Type Ty, ArrayRef<Pattern *> ArgParams,
                            ArrayRef<Pattern *> BodyParams,
-                           FuncExpr *TheFuncExprBody, DeclContext *DC) {
+                           FuncExpr *TheFuncExprBody, TypeLoc FnRetType,
+                           DeclContext *DC) {
   assert(ArgParams.size() == BodyParams.size());
   const unsigned NumParamPatterns = ArgParams.size();
-  auto *FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name, NameLoc,
-                              GenericParams, Ty, NumParamPatterns,
-                              TheFuncExprBody, DC);
-  FD->setParamPatterns(ArgParams, BodyParams);
+  auto *FD = FuncDecl::createDeserialized(
+      Context, StaticLoc, FuncLoc, Name, NameLoc, GenericParams, Ty,
+      NumParamPatterns, TheFuncExprBody, DC);
+  FD->setDeserializedSignature(ArgParams, BodyParams, FnRetType);
   return FD;
 }
 
-void FuncDecl::setParamPatterns(ArrayRef<Pattern *> ArgParams,
-                                ArrayRef<Pattern *> BodyParams) {
+void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
+                                        ArrayRef<Pattern *> BodyParams,
+                                        TypeLoc FnRetType) {
   MutableArrayRef<Pattern *> ArgParamsRef = getArgParamPatterns();
   MutableArrayRef<Pattern *> BodyParamsRef = getBodyParamPatterns();
   const unsigned NumParamPatterns = ArgParamsRef.size();
@@ -715,6 +719,8 @@ void FuncDecl::setParamPatterns(ArrayRef<Pattern *> ArgParams,
     ArgParamsRef[i] = ArgParams[i];
   for (unsigned i = 0; i != NumParamPatterns; ++i)
     BodyParamsRef[i] = BodyParams[i];
+
+  this->FnRetType = FnRetType;
 }
 
 ArrayRef<ValueDecl*> FuncDecl::getCaptures() const {
@@ -737,9 +743,6 @@ bool FuncDecl::hasLocalCaptures() const {
   return false;
 }
 
-
-/// getExtensionType - If this is a method in a type extension for some type,
-/// return that type, otherwise return Type().
 Type FuncDecl::getExtensionType() const {
   return getDeclContext()->getDeclaredTypeInContext();
 }
@@ -793,6 +796,26 @@ Type FuncDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
   return LValueType::get(ContainerType,
                          LValueType::Qual::DefaultForByrefSelf,
                          getASTContext());
+}
+
+Type FuncDecl::getResultType(ASTContext &Ctx) const {
+  Type resultTy = getType();
+  if (!resultTy || resultTy->is<ErrorType>())
+    return resultTy;
+
+  for (unsigned i = 0, e = getNaturalArgumentCount(); i != e; ++i)
+    resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
+
+  if (!resultTy)
+    resultTy = TupleType::getEmpty(Ctx);
+
+  return resultTy;
+}
+
+void FuncDecl::revertType() {
+  BodyResultType = Type();
+  setType(Type());
+  getFuncExpr()->setType(Type());
 }
 
 bool FuncDecl::isUnaryOperator() const {
@@ -898,9 +921,8 @@ SourceRange FuncDecl::getSourceRange() const {
 
   if (auto *B = getBody())
     return { FuncLoc, B->getEndLoc() };
-  if (TheFuncExprBody->getBodyResultTypeLoc().hasLocation())
-    return { FuncLoc,
-             TheFuncExprBody->getBodyResultTypeLoc().getSourceRange().End };
+  if (getBodyResultTypeLoc().hasLocation())
+    return { FuncLoc, getBodyResultTypeLoc().getSourceRange().End };
   const Pattern *LastPat = getArgParamPatterns().back();
   return { FuncLoc, LastPat->getEndLoc() };
 }

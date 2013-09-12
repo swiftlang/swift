@@ -2099,6 +2099,14 @@ class FuncDecl : public AbstractFunctionDecl {
   SourceLoc NameLoc;
 
   FuncExpr *TheFuncExprBody;
+
+  TypeLoc FnRetType;
+
+  /// The result type as seen from the body of the function.
+  ///
+  /// \sa getBodyResultType()
+  Type BodyResultType;
+
   llvm::PointerIntPair<Decl *, 1, bool> GetOrSetDecl;
   FuncDecl *OverriddenDecl;
   OperatorDecl *Operator;
@@ -2125,18 +2133,22 @@ class FuncDecl : public AbstractFunctionDecl {
   }
 
 public:
-  static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
-                          SourceLoc FuncLoc, Identifier Name, SourceLoc NameLoc,
-                          GenericParamList *GenericParams, Type Ty,
-                          unsigned NumParamPatterns,
-                          FuncExpr *TheFuncExprBody, DeclContext *DC);
+  /// Factory function only for use by deserialization.
+  static FuncDecl *createDeserialized(ASTContext &Context, SourceLoc StaticLoc,
+                                      SourceLoc FuncLoc, Identifier Name,
+                                      SourceLoc NameLoc,
+                                      GenericParamList *GenericParams, Type Ty,
+                                      unsigned NumParamPatterns,
+                                      FuncExpr *TheFuncExprBody,
+                                      DeclContext *DC);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
                           SourceLoc FuncLoc, Identifier Name, SourceLoc NameLoc,
                           GenericParamList *GenericParams, Type Ty,
                           ArrayRef<Pattern *> ArgParams,
                           ArrayRef<Pattern *> BodyParams,
-                          FuncExpr *TheFuncExprBody, DeclContext *DC);
+                          FuncExpr *TheFuncExprBody, TypeLoc FnRetType,
+                          DeclContext *DC);
 
   bool isStatic() const {
     return FuncDeclBits.Static;
@@ -2145,8 +2157,9 @@ public:
     FuncDeclBits.Static = Static;
   }
 
-  void setParamPatterns(ArrayRef<Pattern *> ArgParams,
-                        ArrayRef<Pattern *> BodyParams);
+  void setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
+                                ArrayRef<Pattern *> BodyParams,
+                                TypeLoc FnRetType);
 
   FuncExpr *getFuncExpr() { return TheFuncExprBody; }
   const FuncExpr *getFuncExpr() const { return TheFuncExprBody; }
@@ -2190,7 +2203,7 @@ public:
     return getNumParamPatternsImpl();
   }
   
-  /// getExtensionType - If this is a method in a type extension for some type,
+  /// \brief If this is a method in a type extension for some type,
   /// return that type, otherwise return Type().
   Type getExtensionType() const;
   
@@ -2213,6 +2226,35 @@ public:
   }
   SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const;
+
+  TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
+  const TypeLoc &getBodyResultTypeLoc() const { return FnRetType; }
+
+  /// Retrieve the result type of this function.
+  ///
+  /// \sa getBodyResultType
+  Type getResultType(ASTContext &Ctx) const;
+
+  /// Retrieve the result type of this function for use within the function
+  /// definition.
+  ///
+  /// FIXME: The statement below is a wish, not reality.
+  /// The "body" result type will only differ from the result type within the
+  /// interface to the function for a polymorphic function, where the interface
+  /// may contain generic parameters while the definition will contain
+  /// the corresponding archetypes.
+  Type getBodyResultType() const { return BodyResultType; }
+
+  /// Set the result type as viewed from the function body.
+  ///
+  /// \sa getBodyResultType
+  void setBodyResultType(Type bodyResultType) {
+    assert(BodyResultType.isNull() && "Already set body result type");
+    BodyResultType = bodyResultType;
+  }
+
+  /// Revert to an empty type.
+  void revertType();
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation, in other words, the name of the function is an operator,

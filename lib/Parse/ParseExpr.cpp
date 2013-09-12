@@ -1760,11 +1760,9 @@ static void AddFuncArgumentsToScope(const Pattern *pat, CapturingExpr *CE,
   llvm_unreachable("bad pattern kind!");
 }
 
-FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, TypeLoc FuncRetTy,
-                                     ArrayRef<Pattern *> ArgParams,
+FuncExpr *Parser::actOnFuncExprStart(ArrayRef<Pattern *> ArgParams,
                                      ArrayRef<Pattern *> BodyParams) {
-  FuncExpr *FE = FuncExpr::create(Context, FuncLoc, FuncRetTy,
-                                  CurDeclContext);
+  FuncExpr *FE = FuncExpr::create(Context, CurDeclContext);
 
   for (Pattern *P : BodyParams)
     AddFuncArgumentsToScope(P, FE, *this);

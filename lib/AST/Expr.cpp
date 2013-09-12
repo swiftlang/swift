@@ -292,9 +292,8 @@ ArrayRef<const Pattern *> CapturingExpr::getParamPatterns() const {
   return ArrayRef<const Pattern *>(patterns.data(), patterns.size());
 }
 
-FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc FuncLoc,
-                           TypeLoc FnRetType, DeclContext *Parent) {
-  return new (C) FuncExpr(FuncLoc, FnRetType, Parent);
+FuncExpr *FuncExpr::create(ASTContext &C, DeclContext *Parent) {
+  return new (C) FuncExpr(Parent);
 }
 
 SourceLoc FuncExpr::getLoc() const {
@@ -303,20 +302,6 @@ SourceLoc FuncExpr::getLoc() const {
 
 SourceRange FuncExpr::getSourceRange() const {
   return getDecl()->getSourceRange();
-}
-
-Type FuncExpr::getResultType(ASTContext &Ctx) const {
-  Type resultTy = getType();
-  if (!resultTy || resultTy->is<ErrorType>())
-    return resultTy;
-
-  for (unsigned i = 0, e = getDecl()->getNaturalArgumentCount(); i != e; ++i)
-    resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
-
-  if (!resultTy)
-    resultTy = TupleType::getEmpty(Ctx);
-
-  return resultTy;
 }
 
 static ValueDecl *getCalledValue(Expr *E) {

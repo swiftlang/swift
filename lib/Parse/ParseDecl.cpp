@@ -1137,10 +1137,11 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Scope S(this, ScopeKind::FunctionBody);
 
       // Start the function.
-      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, ElementTy, Params, Params);
+      FuncExpr *GetFn = actOnFuncExprStart(Params, Params);
       Get = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), GetLoc,
                              Identifier(), GetLoc, /*GenericParams=*/nullptr,
-                             Type(), Params, Params, GetFn, CurDeclContext);
+                             Type(), Params, Params, GetFn, ElementTy,
+                             CurDeclContext);
       GetFn->setDecl(Get);
 
       // Establish the new context.
@@ -1237,12 +1238,11 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
     // Start the function.
     Type SetterRetTy = TupleType::getEmpty(Context);
-    FuncExpr *SetFn = actOnFuncExprStart(SetLoc,
-                                         TypeLoc::withoutLoc(SetterRetTy),
-                                         Params, Params);
+    FuncExpr *SetFn = actOnFuncExprStart(Params, Params);
     Set = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), SetLoc,
                            Identifier(), SetLoc, /*generic=*/nullptr, Type(),
-                           Params, Params, SetFn, CurDeclContext);
+                           Params, Params, SetFn,
+                           TypeLoc::withoutLoc(SetterRetTy), CurDeclContext);
     SetFn->setDecl(Set);
 
     // Establish the new context.
@@ -1602,11 +1602,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
         return SignatureStatus;
 
       // Create function AST nodes.
-      FuncExpr *FE =
-          actOnFuncExprStart(FuncLoc, FuncRetTy, ArgParams, BodyParams);
+      FuncExpr *FE = actOnFuncExprStart(ArgParams, BodyParams);
       FuncDecl *FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name,
                                       NameLoc, GenericParams, Type(), ArgParams,
-                                      BodyParams, FE, CurDeclContext);
+                                      BodyParams, FE, FuncRetTy, CurDeclContext);
       FE->setDecl(FD);
       FD->setBodySkipped(Tok.getLoc());
 
@@ -1622,13 +1621,12 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   {
     Scope S(this, ScopeKind::FunctionBody);
 
-    FuncExpr *FE = actOnFuncExprStart(FuncLoc, FuncRetTy,
-                                      ArgParams, BodyParams);
+    FuncExpr *FE = actOnFuncExprStart(ArgParams, BodyParams);
 
     // Create the decl for the func and add it to the parent scope.
     FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name, NameLoc,
                           GenericParams, Type(), ArgParams, BodyParams,
-                          FE, CurDeclContext);
+                          FE, FuncRetTy, CurDeclContext);
     FE->setDecl(FD);
 
     // Now that we have a context, update the generic parameters with that

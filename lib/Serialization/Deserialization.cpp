@@ -927,7 +927,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     // DeclContext for now.
     GenericParamList *genericParams = maybeReadGenericParams(DC);
 
-    auto fn = FuncDecl::create(
+    auto fn = FuncDecl::createDeserialized(
         ctx, SourceLoc(), SourceLoc(), getIdentifier(nameID), SourceLoc(),
         genericParams, /*type=*/nullptr, numParamPatterns,
         /*TheFuncExprBody=*/nullptr, DC);
@@ -953,11 +953,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     ArrayRef<Pattern *> bodyPatterns = patterns.slice(numParamPatterns);
     if (bodyPatterns.empty())
       bodyPatterns = argPatterns;
-    fn->setParamPatterns(argPatterns, bodyPatterns);
+    fn->setDeserializedSignature(argPatterns, bodyPatterns,
+                                 TypeLoc::withoutLoc(signature->getResult()));
 
-    auto body = FuncExpr::create(ctx, SourceLoc(),
-                                 TypeLoc::withoutLoc(signature->getResult()),
-                                 DC);
+    auto body = FuncExpr::create(ctx, DC);
     body->setType(signature);
     body->setDecl(fn);
     fn->setFuncExpr(body);

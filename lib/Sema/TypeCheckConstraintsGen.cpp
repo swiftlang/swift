@@ -694,7 +694,7 @@ namespace {
       // or return type is omitted, a fresh type variable is used to stand in
       // for that parameter or return type, allowing it to be inferred from
       // context.
-      auto funcTy = expr->getBodyResultTypeLoc().getType();
+      auto funcTy = expr->getDecl()->getBodyResultTypeLoc().getType();
       if (!funcTy) {
         // If no return type was specified, create a fresh type
         // variable for it.

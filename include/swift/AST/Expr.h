@@ -1677,57 +1677,18 @@ public:
 class FuncExpr : public CapturingExpr {
   FuncDecl *TheFuncDecl;
 
-  TypeLoc FnRetType;
-
-  /// The result type as seen from the body of the function.
-  ///
-  /// \sa getBodyResultType()
-  Type BodyResultType;
-
-  FuncExpr(SourceLoc FuncLoc, TypeLoc FnRetType, DeclContext *Parent)
+  FuncExpr(DeclContext *Parent)
     : CapturingExpr(ExprKind::Func, Type(), Parent),
-      TheFuncDecl(nullptr), FnRetType(FnRetType) {}
+      TheFuncDecl(nullptr) {}
 
 public:
-  static FuncExpr *create(ASTContext &Context, SourceLoc FuncLoc,
-                          TypeLoc FnRetType, DeclContext *Parent);
+  static FuncExpr *create(ASTContext &Context, DeclContext *Parent);
 
   SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 
   FuncDecl *getDecl() const { return TheFuncDecl; }
   void setDecl(FuncDecl *f) { TheFuncDecl = f; }
-
-  TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
-
-  /// Retrieve the result type of this function.
-  ///
-  /// \sa getBodyResultType
-  Type getResultType(ASTContext &Ctx) const;
-
-  /// Retrieve the result type of this function for use within the function
-  /// definition.
-  ///
-  /// FIXME: The statement below is a wish, not reality.
-  /// The "body" result type will only differ from the result type within the
-  /// interface to the function for a polymorphic function, where the interface
-  /// may contain generic parameters while the definition will contain
-  /// the corresponding archetypes.
-  Type getBodyResultType() const { return BodyResultType; }
-
-  /// Set the result type as viewed from the function body.
-  ///
-  /// \sa getBodyResultType
-  void setBodyResultType(Type bodyResultType) {
-    assert(BodyResultType.isNull() && "Already set body result type");
-    BodyResultType = bodyResultType;
-  }
-
-  /// Revert to an empty type.
-  void revertType() {
-    BodyResultType = Type();
-    setType(Type());
-  }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Func; }
   static bool classof(const DeclContext *DC) {

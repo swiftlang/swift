@@ -132,7 +132,7 @@ public:
   Type returnTypeOfFunc() {
     if (auto AFD = TheFunc.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
-        return FD->getFuncExpr()->getBodyResultType();
+        return FD->getBodyResultType();
     }
     if (auto closure = TheFunc.dyn_cast<PipeClosureExpr *>()) {
       return closure->getResultType();

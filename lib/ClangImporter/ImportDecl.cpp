@@ -787,14 +787,14 @@ namespace {
         return nullptr;
 
       // FIXME: Poor location info.
-      auto funcExpr = FuncExpr::create(Impl.SwiftContext, loc,
-                                       TypeLoc::withoutLoc(resultTy), dc);
+      auto funcExpr = FuncExpr::create(Impl.SwiftContext, dc);
       funcExpr->setType(type);
-      funcExpr->setBodyResultType(resultTy);
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto result = FuncDecl::create(
           Impl.SwiftContext, SourceLoc(), loc, name, nameLoc,
-          /*GenericParams=*/0, type, argPatterns, bodyPatterns, funcExpr, dc);
+          /*GenericParams=*/nullptr, type, argPatterns, bodyPatterns, funcExpr,
+          TypeLoc::withoutLoc(resultTy), dc);
+      result->setBodyResultType(resultTy);
       funcExpr->setDecl(result);
       setVarDeclContexts(argPatterns, funcExpr);
       setVarDeclContexts(bodyPatterns, funcExpr);
@@ -956,13 +956,13 @@ namespace {
 
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
-      auto funcExpr = FuncExpr::create(Impl.SwiftContext, loc,
-                                       TypeLoc::withoutLoc(resultTy), dc);
+      auto funcExpr = FuncExpr::create(Impl.SwiftContext, dc);
       funcExpr->setType(type);
-      funcExpr->setBodyResultType(resultTy);
       auto result = FuncDecl::create(
           Impl.SwiftContext, SourceLoc(), loc, name, nameLoc,
-          /*GenericParams=*/0, type, argPatterns, bodyPatterns, funcExpr, dc);
+          /*GenericParams=*/nullptr, type, argPatterns, bodyPatterns, funcExpr,
+          TypeLoc::withoutLoc(resultTy), dc);
+      result->setBodyResultType(resultTy);
       funcExpr->setDecl(result);
 
       setVarDeclContexts(argPatterns, funcExpr);
@@ -1422,19 +1422,18 @@ namespace {
       }
 
       // Create the getter body.
-      auto funcExpr = FuncExpr::create(context, getter->getLoc(),
-                                       TypeLoc::withoutLoc(elementTy),
-                                       getter->getDeclContext());
+      auto funcExpr = FuncExpr::create(context, getter->getDeclContext());
       funcExpr->setType(getterType);
-      funcExpr->setBodyResultType(elementTy);
       setVarDeclContexts(getterArgs, funcExpr);
 
       // Create the getter thunk.
       auto thunk = FuncDecl::create(context, SourceLoc(), getter->getLoc(),
                                     Identifier(), SourceLoc(), nullptr,
                                     getterType, getterArgs, getterArgs,
-                                    funcExpr, getter->getDeclContext());
+                                    funcExpr, TypeLoc::withoutLoc(elementTy),
+                                    getter->getDeclContext());
       funcExpr->setDecl(thunk);
+      thunk->setBodyResultType(elementTy);
 
       // Create the body of the thunk, which calls the Objective-C getter.
       auto selfRef = new (context) DeclRefExpr(selfVar, loc);
@@ -1539,18 +1538,17 @@ namespace {
 
 
       // Create the setter body.
-      auto funcExpr = FuncExpr::create(context, setter->getLoc(),
-                              TypeLoc::withoutLoc(TupleType::getEmpty(context)),
-                                       setter->getDeclContext());
+      auto funcExpr = FuncExpr::create(context, setter->getDeclContext());
       funcExpr->setType(setterType);
-      funcExpr->setBodyResultType(TupleType::getEmpty(context));
       setVarDeclContexts(setterArgs, funcExpr);
 
       // Create the setter thunk.
       auto thunk = FuncDecl::create(
           context, SourceLoc(), setter->getLoc(), Identifier(), SourceLoc(),
-          nullptr, setterType, setterArgs, setterArgs, funcExpr, dc);
+          nullptr, setterType, setterArgs, setterArgs, funcExpr,
+          TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc);
       funcExpr->setDecl(thunk);
+      thunk->setBodyResultType(TupleType::getEmpty(context));
 
       // Create the body of the thunk, which calls the Objective-C setter.
       auto valueVar = getSingleVar(setterArgs.back());
@@ -2509,17 +2507,17 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   }
 
   // Create the getter body.
-  auto funcExpr = FuncExpr::create(context, SourceLoc(),
-                                   TypeLoc::withoutLoc(type), dc);
+  auto funcExpr = FuncExpr::create(context, dc);
   funcExpr->setType(getterType);
-  funcExpr->setBodyResultType(type);
   setVarDeclContexts(getterArgs, funcExpr);
 
   // Create the getter function declaration.
   auto func = FuncDecl::create(context, SourceLoc(), SourceLoc(), Identifier(),
                                SourceLoc(), nullptr, getterType, getterArgs,
-                               getterArgs, funcExpr, dc);
+                               getterArgs, funcExpr, TypeLoc::withoutLoc(type),
+                               dc);
   funcExpr->setDecl(func);
+  func->setBodyResultType(type);
 
   // Create the integer literal value.
   // FIXME: Handle other kinds of values.

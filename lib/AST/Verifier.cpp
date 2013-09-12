@@ -271,7 +271,7 @@ namespace {
       auto func = Functions.back();
       Type resultType;
       if (FuncDecl *FD = func.dyn_cast<FuncDecl *>()) {
-        resultType = FD->getFuncExpr()->getResultType(Ctx);
+        resultType = FD->getResultType(Ctx);
       } else if (auto closure = func.dyn_cast<PipeClosureExpr *>()) {
         resultType = closure->getResultType();
       } else {

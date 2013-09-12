@@ -1183,8 +1183,8 @@ public:
       return;
 
     bool badType = false;
-    if (!FE->getBodyResultTypeLoc().isNull()) {
-      if (TC.validateType(FE->getBodyResultTypeLoc())) {
+    if (!FD->getBodyResultTypeLoc().isNull()) {
+      if (TC.validateType(FD->getBodyResultTypeLoc())) {
         badType = true;
       }
     }
@@ -1200,21 +1200,17 @@ public:
       return;
     }
 
-    Type funcTy = FE->getBodyResultTypeLoc().getType();
+    Type funcTy = FD->getBodyResultTypeLoc().getType();
     if (!funcTy) {
       funcTy = TupleType::getEmpty(TC.Context);
     }
     auto bodyResultType = funcTy;
 
     // FIXME: it would be nice to have comments explaining what this is all about.
-    auto patterns = FE->getDecl()->getArgParamPatterns();
-    bool isInstanceFunc = false;
-    GenericParamList *genericParams = nullptr;
+    GenericParamList *genericParams = FD->getGenericParams();
     GenericParamList *outerGenericParams = nullptr;
-    if (FuncDecl *FD = FE->getDecl()) {
-      isInstanceFunc = (bool)FD->computeSelfType(&outerGenericParams);
-      genericParams = FD->getGenericParams();
-    }
+    auto patterns = FD->getArgParamPatterns();
+    bool isInstanceFunc = (bool)FD->computeSelfType(&outerGenericParams);
 
     for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
       Type argTy = patterns[e - i - 1]->getType();
@@ -1240,7 +1236,7 @@ public:
 
     }
     FE->setType(funcTy);
-    FE->setBodyResultType(bodyResultType);
+    FD->setBodyResultType(bodyResultType);
   }
 
   /// Bind the given function declaration, which declares an operator, to
@@ -1336,8 +1332,6 @@ public:
     if (FD->isOperator())
       bindFuncDeclToOperator(FD);
 
-    FuncExpr *body = FD->getFuncExpr();
-
     // Before anything else, set up the 'self' argument correctly.
     GenericParamList *outerGenericParams = nullptr;
     if (Type selfType = FD->computeSelfType(&outerGenericParams)) {
@@ -1362,6 +1356,8 @@ public:
 
     semaFuncDecl(FD, /*consumeAttributes=*/!builder);
 
+    FuncExpr *body = FD->getFuncExpr();
+
     // If we have generic parameters, create archetypes now.
     if (builder) {
       // Infer requirements from the parameters of the function.
@@ -1370,7 +1366,7 @@ public:
       }
 
       // Infer requirements from the result type.
-      if (auto resultType = body->getBodyResultTypeLoc().getTypeRepr())
+      if (auto resultType = FD->getBodyResultTypeLoc().getTypeRepr())
         builder->inferRequirements(resultType);
 
       // Assign archetypes.
@@ -1379,8 +1375,8 @@ public:
       // Go through and revert all of the dependent types we computed.
 
       // Revert the result type.
-      if (!body->getBodyResultTypeLoc().isNull()) {
-        revertDependentTypeLoc(body->getBodyResultTypeLoc(), body);
+      if (!FD->getBodyResultTypeLoc().isNull()) {
+        revertDependentTypeLoc(FD->getBodyResultTypeLoc(), body);
       }
 
       // Revert the argument patterns.
@@ -1400,7 +1396,7 @@ public:
       }
 
       // Clear out the types.
-      body->revertType();
+      FD->revertType();
 
       // Type check the parameters and return type again, now with archetypes.
       semaFuncDecl(FD, /*consumeAttributes=*/true);
