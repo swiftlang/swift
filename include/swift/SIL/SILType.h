@@ -190,6 +190,11 @@ public:
   ClassDecl *getClassOrBoundGenericClass() const {
     return getSwiftRValueType()->getClassOrBoundGenericClass();
   }
+  /// Retrieve the StructDecl for a type that maps to a Swift struct or
+  /// bound generic struct type.
+  StructDecl *getStructOrBoundGenericStruct() const {
+    return getSwiftRValueType()->getStructOrBoundGenericStruct();
+  }
   /// Retrieve the UnionDecl for a type that maps to a Swift union or
   /// bound generic union type.
   UnionDecl *getUnionOrBoundGenericUnion() const {

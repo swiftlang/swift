@@ -299,6 +299,16 @@ ClassDecl *TypeBase::getClassOrBoundGenericClass() {
   return nullptr;
 }
 
+StructDecl *TypeBase::getStructOrBoundGenericStruct() {
+  if (auto structTy = getAs<StructType>())
+    return structTy->getDecl();
+  
+  if (auto boundTy = getAs<BoundGenericType>())
+    return dyn_cast<StructDecl>(boundTy->getDecl());
+  
+  return nullptr;
+}
+
 UnionDecl *TypeBase::getUnionOrBoundGenericUnion() {
   if (auto oofTy = getAs<UnionType>())
     return oofTy->getDecl();

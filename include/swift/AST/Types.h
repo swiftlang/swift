@@ -248,6 +248,10 @@ public:
   /// (possibly generic) class.
   ClassDecl *getClassOrBoundGenericClass();
   
+  /// \brief If this is a struct type or a bound generic struct type, returns
+  /// the (possibly generic) class.
+  StructDecl *getStructOrBoundGenericStruct();
+  
   /// \brief If this is a union or a bound generic union type, returns the
   /// (possibly generic) union.
   UnionDecl *getUnionOrBoundGenericUnion();
