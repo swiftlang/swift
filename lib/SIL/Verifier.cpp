@@ -416,13 +416,24 @@ public:
   }
 
   void checkStructInst(StructInst *SI) {
-    require(SI->getType().is<StructType>()
-            || SI->getType().is<BoundGenericStructType>(),
-            "StructInst must return a struct");
+    auto *structDecl = SI->getType().getStructOrBoundGenericStruct();
+    require(structDecl, "StructInst must return a struct");
     require(SI->getType().isObject(),
             "StructInst must produce an object");
-    
-    // FIXME: Verify element count and types.
+
+    CanType structTy = SI->getType().getSwiftType();
+    auto opi = SI->getElements().begin(), opEnd = SI->getElements().end();
+    for (VarDecl *field : structDecl->getPhysicalFields()) {
+      require(opi != opEnd,
+              "number of struct operands does not match number of physical "
+              "fields of struct");
+      
+      Type fieldTy = structTy->getTypeOfMember(structDecl->getModuleContext(),
+                                               field, nullptr);
+      require(fieldTy->isEqual((*opi).getType().getSwiftType()),
+              "struct operand type does not match field type");
+      ++opi;
+    }
   }
   
   void checkUnionInst(UnionInst *UI) {
