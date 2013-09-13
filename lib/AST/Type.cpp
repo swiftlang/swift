@@ -1263,6 +1263,79 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
   });
 }
 
+Type TypeBase::getTypeOfMember(Module *module, ValueDecl *member,
+                               LazyResolver *resolver, Type memberType) {
+  // If no member type was provided, use the member's type.
+  if (!memberType)
+    memberType = member->getType();
+
+  // If the member is not part of a type, there's nothing to substitute.
+  auto memberDC = member->getDeclContext();
+  if (!memberDC->isTypeContext())
+    return memberType;
+
+  // Ignore lvalues in the base type.
+  Type baseTy(getRValueType());
+
+  // Look through the metatype; it has no bearing on the result.
+  if (auto metaBase = baseTy->getAs<MetaTypeType>()) {
+    baseTy = metaBase->getInstanceType()->getRValueType();
+  }
+
+  // If the member is part of a protocol, we need to substitute in the
+  // type of Self.
+  if (auto memberProtocol = dyn_cast<ProtocolDecl>(memberDC)) {
+    // We only substitute into archetypes for now.
+    // FIXME: This seems like an odd restriction.
+    if (!baseTy->is<ArchetypeType>())
+      return memberType;
+
+    // FIXME: This feels painfully inefficient. We're creating a dense map
+    // for a single substitution.
+    TypeSubstitutionMap substitutions;
+    substitutions[memberProtocol->getSelf()->getArchetype()] = baseTy;
+    return memberType.subst(module, substitutions, /*ignoreMissing=*/false,
+                            resolver);
+  }
+
+  // Find the superclass type with the context matching that of the member.
+  auto ownerNominal = memberDC->getDeclaredTypeOfContext()->getAnyNominal();
+  while (baseTy->getAnyNominal() != ownerNominal) {
+    baseTy = baseTy->getSuperclass(resolver);
+    assert(baseTy && "Couldn't find appropriate context");
+  }
+
+  // If the base type isn't specialized, there's nothing to substitute.
+  if (!baseTy->isSpecialized())
+    return memberType;
+
+  // Gather all of the substitutions for all levels of generic arguments.
+  TypeSubstitutionMap substitutions;
+  while (baseTy) {
+    // For a bound generic type, gather the generic parameter -> generic
+    // argument substitutions.
+    if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
+      auto params = boundGeneric->getDecl()->getGenericParams()->getParams();
+      auto args = boundGeneric->getGenericArgs();
+      for (unsigned i = 0, n = args.size(); i != n; ++i) {
+        substitutions[params[i].getAsTypeParam()->getArchetype()] = args[i];
+      }
+
+      // Continue looking into the parent.
+      baseTy = boundGeneric->getParent();
+      continue;
+    }
+
+    // Continue looking into the parent.
+    baseTy = baseTy->castTo<NominalType>()->getParent();
+  }
+
+  // Perform the substitution.
+  return memberType.subst(module, substitutions, /*ignoreMissing=*/false,
+                          resolver);
+}
+
+
 //===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//

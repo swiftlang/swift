@@ -186,7 +186,7 @@ static Type getBaseMemberDeclType(TypeChecker &TC,
       ->getClassOrBoundGenericClass();
   while (Base->getClassOrBoundGenericClass() != BaseDecl)
     Base = TC.getSuperClassOf(Base);
-  return TC.substMemberTypeWithBase(D->getType(), nullptr, Base);
+  return TC.substMemberTypeWithBase(D->getType(), D, Base);
 }
 
 /// \brief Check the given set of members for any members that override a member

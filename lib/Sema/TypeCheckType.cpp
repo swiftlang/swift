@@ -762,37 +762,7 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
   if (!BaseTy)
     return T;
 
-  // Look through the metatype.
-  if (auto MetaBase = BaseTy->getAs<MetaTypeType>())
-    BaseTy = MetaBase->getInstanceType();
-
-  if (auto BGT = BaseTy->getRValueType()->getAs<BoundGenericType>()) {
-    // FIXME: Cache this?
-    TypeSubstitutionMap Substitutions;
-    auto Params = BGT->getDecl()->getGenericParams()->getParams();
-    auto Args = BGT->getGenericArgs();
-    for (unsigned i = 0, e = BGT->getGenericArgs().size(); i != e; ++i) {
-      auto ParamTy = Params[i].getAsTypeParam()->getArchetype();
-      Substitutions[ParamTy] = Args[i];
-    }
-
-    return substType(T, Substitutions);
-  }
-
-  auto BaseArchetype = BaseTy->getRValueType()->getAs<ArchetypeType>();
-  if (!BaseArchetype)
-    return T;
-
-  auto ProtoType = Member->getDeclContext()->getDeclaredTypeOfContext()
-                     ->getAs<ProtocolType>();
-  if (!ProtoType)
-    return T;
-
-  auto Proto = ProtoType->getDecl();
-  auto SelfDecl = Proto->getSelf();
-  TypeSubstitutionMap Substitutions;
-  Substitutions[SelfDecl->getArchetype()] = BaseArchetype;
-  return substType(T, Substitutions);
+  return BaseTy->getTypeOfMember(&TU, Member, this, T);
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {

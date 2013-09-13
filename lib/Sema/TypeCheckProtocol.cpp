@@ -194,7 +194,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
     witnessType = witness->getType();
 
     // If the witness resides within a type context, substitute through the
-    // based type and ignore 'self'.
+    // base type and ignore 'self'.
     if (witness->getDeclContext()->isTypeContext()) {
       witnessType = witness->getType()->castTo<AnyFunctionType>()->getResult();
       witnessType = tc.substMemberTypeWithBase(witnessType, witness, model);

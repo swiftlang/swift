@@ -293,6 +293,38 @@ public:
   /// false if the type is an rvalue or non-settable lvalue.
   bool isSettableLValue();
 
+  /// Retrieve the type of the given member as seen through the given base
+  /// type, substituting generic arguments where necessary.
+  ///
+  /// This routine allows one to take a concrete type (the "this" type) and
+  /// and a member of that type (or one of its superclasses), then determine
+  /// what type an access to that member through the base type will have.
+  /// For example, given:
+  ///
+  /// \code
+  /// class Vector<T> {
+  ///   func add(value : T) { }
+  /// }
+  /// \endcode
+  ///
+  /// Given the type \c Vector<Int> and the member \c add, the resulting type
+  /// of the member will be \c (self : Vector<Int>) -> (value : Int) -> ().
+  ///
+  /// \param module The module in which the substitution occurs.
+  ///
+  /// \param member The member whose type we are substituting.
+  ///
+  /// \param resolver The resolver for lazy type checking, which may be null for
+  /// a fully-type-checked AST.
+  ///
+  /// \param memberType The type of the member, in which archetypes will be
+  /// replaced by the generic arguments provided by the base type. If null,
+  /// the member's type will be used.
+  ///
+  /// \returns the resulting member type.
+  Type getTypeOfMember(Module *module, ValueDecl *member,
+                       LazyResolver *resolver, Type memberType = Type());
+
   void dump() const;
   void print(raw_ostream &OS) const;
   
