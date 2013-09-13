@@ -47,7 +47,7 @@
 
 #if __x86_64__
 # define SWIFT_HAVE_FAST_ENTRY_POINTS 1
-#elif __i386__  ||  __arm__
+#elif __i386__  ||  __arm__  ||  __arm64__
 # undef  SWIFT_HAVE_FAST_ENTRY_POINTS
 #else
 # error unknown architecture
