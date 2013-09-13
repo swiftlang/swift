@@ -11,8 +11,7 @@
 ##===----------------------------------------------------------------------===##
 
 SWIFT_LEVEL := ..
-PARALLEL_DIRS := swift sil-opt 
-#swift-ide-test lldb-moduleimport-test swift-demangle
+PARALLEL_DIRS := swift sil-opt swift-ide-test lldb-moduleimport-test swift-demangle
 
 include $(SWIFT_LEVEL)/../../Makefile.config
 

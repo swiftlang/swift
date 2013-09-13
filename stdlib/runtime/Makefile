@@ -19,22 +19,6 @@ SOURCES := FastEntryPoints.s Alloc.cpp KnownMetadata.cpp \
 
 include $(SWIFT_LEVEL)/Makefile
 
-ifeq ($(ENABLE_OPTIMIZED),1)
-  SWIFT_OPTFLAG := -O2
-  ifeq ($(ARCH),x86_64)
-    CFLAGS += -momit-leaf-frame-pointer
-    CXXFLAGS += -momit-leaf-frame-pointer
-  endif
-  ifeq ($(ARCH),x86)
-    CFLAGS += -momit-leaf-frame-pointer
-    CXXFLAGS += -momit-leaf-frame-pointer
-  endif
-else
-  SWIFT_OPTFLAG := -O0
-endif
-
-SWIFT_OPTFLAG := -O3
-
 $(ObjDir)/%.o: %.s $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_HEADER_DIR)
 	$(Echo) "Compiling $*.s for $(BuildMode) build" $(PIC_FLAG)
 	$(Verb) if $(Compile.C) $(DEPEND_OPTIONS) $< -o $(ObjDir)/$*.o ; \

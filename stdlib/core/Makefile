@@ -27,9 +27,14 @@ SWIFT_SOURCES := $(shell sed -e "s/\#.*//g" "$(PROJ_SRC_DIR)/tools/swift/stdlib/
 # the target architecture
 ifeq ($(ARCH),x86_64)
   WORD_SIZE := 64
-endif
-ifeq ($(ARCH),x86)
+else ifeq ($(ARCH),x86)
   WORD_SIZE := 32
+else ifeq ($(ARCH),ARM64)
+  WORD_SIZE := 64
+else ifeq ($(ARCH),ARM)
+  WORD_SIZE := 32
+else
+  $(error unknown architecture $(ARCH))
 endif
 SWIFT_SOURCES := $(subst Word.swift,Word$(WORD_SIZE).swift,$(SWIFT_SOURCES))
 
@@ -40,10 +45,11 @@ endif
 
 # Remove Float80.swift on non-x86 architectures
 ifneq ($(ARCH),x86_64)
-	ifneq ($(ARCH),x86)
-	  SWIFT_SOURCES := $(filter-out Float80.swift,$(SWIFT_SOURCES))
-	endif
+  ifneq ($(ARCH),x86)
+    SWIFT_SOURCES := $(filter-out Float80.swift,$(SWIFT_SOURCES))
+  endif
 endif
+
 #
 # Done with SWIFT_SOURCES
 #
@@ -54,34 +60,16 @@ NO_BUILD_ARCHIVE := 1
 
 include $(SWIFT_LEVEL)/Makefile
 
-ifeq ($(ENABLE_OPTIMIZED),1)
-  SWIFT_OPTFLAG := -O2
-  ifeq ($(ARCH),x86_64)
-    CFLAGS += -momit-leaf-frame-pointer
-    CXXFLAGS += -momit-leaf-frame-pointer
-  endif
-  ifeq ($(ARCH),x86)
-    CFLAGS += -momit-leaf-frame-pointer
-    CXXFLAGS += -momit-leaf-frame-pointer
-  endif
-else
-  SWIFT_OPTFLAG := -O0
-endif
-
-SWIFT_OPTFLAG := -O3
-
 LDFLAGS += -Xlinker -reexport-lobjc \
 	   -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
 
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
 
-SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
-
 $(SWIFT_HEADER_DIR)/swift.swiftmodule: $(ObjDir)/swift.o $(SWIFT_HEADER_DIR)
 
 $(ObjDir)/swift.o: $(PATH_TO_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $@) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) $(SWIFT_DEBUGFLAG) -o $@ -c -emit-module -module-link-name $(LIBRARYNAME) -parse-stdlib -parse-as-library $(PATH_TO_SWIFT_SOURCES) $(EXTRA_OPTIONS)
+	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -o $@ -c -emit-module -module-link-name $(LIBRARYNAME) -parse-stdlib -parse-as-library $(PATH_TO_SWIFT_SOURCES) 
 	@mv $(ObjDir)/swift.swiftmodule $(SWIFT_HEADER_DIR)
 
 $(SharedLibDir)/swift/%.$(SHLIBEXT): $(SharedLibDir)/swift/.dir

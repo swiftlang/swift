@@ -17,32 +17,92 @@ ifndef SWIFT_LEVEL
 
 IS_TOP_LEVEL := 1
 SWIFT_LEVEL := .
-DIRS := lib tools stdlib benchmark unittests   # include docs
 
+DIRS := lib tools   # include docs
 PARALLEL_DIRS :=
 
-ifeq ($(BUILD_EXAMPLES),1)
-  PARALLEL_DIRS += examples
-endif
-endif
+# See compiler-rt/Makefile for a description of the problems with building 
+# target-side libraries with this build machinery.
+SWIFT_LIBDIRS := stdlib benchmark unittests
 
-CXX.Flags += -std=gnu++0x -Wno-nested-anon-types -Wdocumentation
+ifeq ($(NO_RUNTIME_LIBS),1)
+  # No-runtime build. No stdlib or examples. 
+  $(warning Not building Swift stdlib because NO_RUNTIME_LIBS is set.)
+else
+  DIRS += $(SWIFT_LIBDIRS)
+  ifeq ($(BUILD_EXAMPLES),1)
+    PARALLEL_DIRS += examples
+  endif
+endif
 
 ifeq ($(MAKECMDGOALS),libs-only)
   DIRS := $(filter-out tools docs, $(DIRS))
   OPTIONAL_DIRS :=
 endif
 
-###
-# Common Makefile code, shared by all Swift Makefiles.
+endif
 
-# Set LLVM source root level.
+
 LEVEL := $(SWIFT_LEVEL)/../..
-
-# Include LLVM common makefile.
 include $(LEVEL)/Makefile.common
 
-# Set common Swift build flags.
+
+###
+# Paths to Swift tools and files
+
+ifndef SWIFT_COMPILER
+  SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
+endif
+
+ifndef SWIFT_SDK
+  ifdef SDKROOT
+    SWIFT_SDK := $(SDKROOT)
+  else ifneq ($(findstring ios,$(TARGET_TRIPLE)),)
+    ifneq ($(findstring arm,$(TARGET_TRIPLE)),)
+      SWIFT_SDK := $(shell xcrun --sdk iphoneos --show-sdk-path)
+    else
+      SWIFT_SDK := $(shell xcrun --sdk iphonesimulator --show-sdk-path)
+    endif
+  else ifneq ($(findstring macosx,$(TARGET_TRIPLE)),)
+    SWIFT_SDK := $(shell xcrun --sdk macosx --show-sdk-path)
+  else ifneq ($(findstring darwin,$(TARGET_TRIPLE)),)
+    SWIFT_SDK := $(shell xcrun --sdk macosx --show-sdk-path)
+  else
+    SWIFT_SDK := 
+  endif
+endif
+
+ifndef SWIFT_HEADER_DIR
+  SWIFT_HEADER_DIR := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift
+endif
+
+
+###
+# Settings for .swift files in Swift compiler and stdlib
+
+# Debug symbols for .swift files
+ifeq ($(DEBUG_SYMBOLS),1)
+  SWIFT_DEBUGFLAG := -g
+else
+  SWIFT_DEBUGFLAG :=
+endif
+
+# Optimization flags for .swift files
+ifeq ($(ENABLE_OPTIMIZED),1)
+  SWIFT_OPTFLAG := -O3
+else
+  SWIFT_OPTFLAG := -O0
+endif
+
+# All options for .swift files
+SWIFT_FLAGS := $(SWIFT_DEBUGFLAG) $(SWIFT_OPTFLAG) -triple $(TARGET_TRIPLE) -I=$(SWIFT_HEADER_DIR) -sdk=$(SWIFT_SDK)
+
+
+###
+# Settings for C files in Swift compiler and stdlib
+
+CXX.Flags += -std=gnu++0x -Wno-nested-anon-types -Wdocumentation
+
 CPP.Flags += -I$(PROJ_SRC_DIR)/$(SWIFT_LEVEL)/include \
              -I$(PROJ_OBJ_DIR)/$(SWIFT_LEVEL)/include \
              -I$(PROJ_SRC_DIR)/$(SWIFT_LEVEL)/../clang/include \
@@ -51,21 +111,29 @@ ifdef SWIFT_VENDOR
 CPP.Flags += -DSWIFT_VENDOR='"$(SWIFT_VENDOR) "'
 endif
 
-# Turn on swift debug symbols in debug builds.
-ifeq ($(DEBUG_SYMBOLS),1)
-  SWIFT_DEBUGFLAG="-g"
-else
-  SWIFT_DEBUGFLAG=
+ifeq ($(ENABLE_OPTIMIZED),1)
+  ifeq ($(ARCH),x86_64)
+    CFLAGS += -momit-leaf-frame-pointer
+    CXXFLAGS += -momit-leaf-frame-pointer
+  endif
+  ifeq ($(ARCH),x86)
+    CFLAGS += -momit-leaf-frame-pointer
+    CXXFLAGS += -momit-leaf-frame-pointer
+  endif
 endif
+
 
 ###
 # Create a symlink lib/swift to lib so that we can provide a consistent
 # path schema for installed and build-directory environments.
 
-SWIFT_HEADER_DIR := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift
-
 $(SWIFT_HEADER_DIR):
 	ln -s . $(SWIFT_HEADER_DIR)
+
+# Create lib/swift symlink when building the swift compiler
+# in case we're cross-compiling and not building the libraries
+$(ToolDir)/swift$(EXEEXT): $(SWIFT_HEADER_DIR)
+
 
 ###
 # Swift Top Level specific stuff.

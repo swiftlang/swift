@@ -10,10 +10,6 @@
 #
 ##===----------------------------------------------------------------------===##
 
-# skip this if $(SWIFT_SDK) isn't installed.
-SWIFT_SDK := /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
-ifeq ($(shell test -d $(SWIFT_SDK) && echo OK), OK)
-
 SWIFT_LEVEL := ../..
 LIBRARYNAME := swiftObjectiveC
 LINK_LIBS_IN_SHARED := 1
@@ -22,10 +18,18 @@ SWIFT_SOURCES := ObjectiveC.swift
 SOURCES := ObjectiveC.swift BridgeObjectiveC.mm
 NO_BUILD_ARCHIVE := 1
 
-DIRS := Foundation AppKit
-include $(SWIFT_LEVEL)/Makefile
+DIRS := Foundation
 
-SWIFT_OPTFLAG := -O3
+# Add OS-specific libraries
+ifneq ($(findstring ios,$(TARGET_TRIPLE)),)
+  DIRS += UIKit
+else ifneq ($(findstring macosx,$(TARGET_TRIPLE)),)
+  DIRS += AppKit
+else ifneq ($(findstring darwin,$(TARGET_TRIPLE)),)
+  DIRS += AppKit
+endif
+
+include $(SWIFT_LEVEL)/Makefile
 
 LDFLAGS += -lobjc  \
 	   -lswift_stdlib_core -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
@@ -35,18 +39,11 @@ $(SWIFT_HEADER_DIR)/ObjectiveC.swift: $(PATH_TO_SWIFT_SOURCES) $(SWIFT_HEADER_DI
 	$(Echo) FIXME -- HACK -- Concatenating $(SWIFT_SOURCES) to build dir
 	$(Verb) cat $(PATH_TO_SWIFT_SOURCES) > $@
 
-SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
 $(SWIFT_HEADER_DIR)/ObjectiveC.swiftmodule: $(ObjDir)/ObjectiveC.o $(SWIFT_HEADER_DIR)
 $(ObjDir)/ObjectiveC.o: $(PATH_TO_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $@) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) $(SWIFT_SDKFLAG) $(SWIFT_DEBUGFLAG) -o $@ -c -emit-module -module-link-name $(LIBRARYNAME) -parse-as-library $(SWIFT_OPTFLAG) $(PATH_TO_SWIFT_SOURCES)
+	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -o $@ -c -emit-module -module-link-name $(LIBRARYNAME) -parse-as-library $(PATH_TO_SWIFT_SOURCES)
 	@mv $(ObjDir)/ObjectiveC.swiftmodule $(SWIFT_HEADER_DIR)
 
 all-local:: $(SWIFT_HEADER_DIR)/ObjectiveC.swiftmodule
 
-else
-
-all:
-	@echo "Skipping ObjC support runtime since SWIFT_SDK isn't installed."
-
-endif
