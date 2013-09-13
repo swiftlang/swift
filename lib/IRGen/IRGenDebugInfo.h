@@ -66,6 +66,7 @@ typedef struct {
 class IRGenDebugInfo {
   const Options &Opts;
   const clang::TargetInfo &TargetInfo;
+  ASTContext &Context;
   SourceManager &SM;
   llvm::DIBuilder DBuilder;
   TypeConverter &Types;
@@ -100,7 +101,7 @@ public:
   IRGenDebugInfo(const Options &Opts,
                  const clang::TargetInfo &TargetInfo,
                  TypeConverter &Types,
-                 SourceManager &SM,
+                 ASTContext &Context,
                  llvm::Module &M);
 
   /// Finalize the llvm::DIBuilder owned by this object.
@@ -181,7 +182,8 @@ public:
   void emitByRefArgumentOrNull(IRBuilder& Builder,
                                llvm::Value *Storage,
                                DebugTypeInfo Ty,
-                               swift::LoadInst *i);
+                               swift::SILInstruction *I,
+                               swift::SILValue Op);
 
   /// Return the native, absolute path to the main file.
   StringRef getMainFilename() const { return MainFilename; }

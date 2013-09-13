@@ -1941,7 +1941,7 @@ void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
       emitByRefArgumentOrNull(Builder,
                               source.getAddress(),
                               DebugTypeInfo(i->getType().getSwiftType(), type),
-                              i);
+                              i, i->getOperand());
 
   setLoweredExplosion(SILValue(i, 0), lowered);
 }
@@ -1951,6 +1951,13 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   Address dest = getLoweredAddress(i->getDest());
   auto &type = getTypeInfo(i->getSrc().getType().getObjectType());
   cast<LoadableTypeInfo>(type).initialize(*this, source, dest);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitByRefArgumentOrNull(Builder,
+                                           dest.getAddress(),
+                                           DebugTypeInfo(i->getDest().
+                                                         getType().getSwiftType(),
+                                                         type),
+                                           i, i->getDest());
 }
 
 

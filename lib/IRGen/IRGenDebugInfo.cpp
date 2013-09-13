@@ -70,9 +70,14 @@ StringRef BumpAllocatedString(StringRef S, llvm::BumpPtrAllocator &BP) {
 IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
                                const clang::TargetInfo &TargetInfo,
                                TypeConverter &Types,
-                               SourceManager &SM,
+                               ASTContext &Context,
                                llvm::Module &M)
-  : Opts(Opts), TargetInfo(TargetInfo), SM(SM), DBuilder(M), Types(Types),
+  : Opts(Opts),
+    TargetInfo(TargetInfo),
+    Context(Context),
+    SM(Context.SourceMgr),
+    DBuilder(M),
+    Types(Types),
     LastFn(nullptr), LastLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfo);
   StringRef Dir, Filename;
@@ -369,7 +374,8 @@ static AnyFunctionType* getFunctionType(SILType SILTy) {
 /// Create a single parameter type and push it.
 void IRGenDebugInfo::
 createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
-                    SILType ParamTy,llvm::DIDescriptor Scope,
+                    SILType ParamTy,
+                    llvm::DIDescriptor Scope,
                     DeclContext* DeclCtx) {
   CanType CanTy = ParamTy.getSwiftType();
   if (DeclCtx) {
@@ -629,8 +635,7 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& Builder,
   for (auto Use : i->getUses())
     if (auto Store = dyn_cast<StoreInst>(Use->getUser()))
       if (auto SILArg = dyn_cast<SILArgument>(Store->getSrc())) {
-        assert(i && i->getParent() && i->getParent()->getParent() );
-        auto Fn = i->getParent()->getParent();
+        auto Fn = i->getFunction();
         emitArgVariableDeclaration(Builder, Storage, Ty, Name,
                                    getArgNo(Fn, SILArg));
         return;
@@ -650,12 +655,16 @@ void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
 
 void IRGenDebugInfo::emitByRefArgumentOrNull(IRBuilder& Builder,
                                              llvm::Value *Storage,
-                                             DebugTypeInfo Ty,
-                                             swift::LoadInst *i) {
-  if (auto SILArg = dyn_cast<SILArgument>(i->getOperand())) {
-    assert(i && i->getParent() && i->getParent()->getParent() );
-    auto Fn = i->getParent()->getParent();
-    emitArgVariableDeclaration(Builder, Storage, Ty, "",
+                                             DebugTypeInfo DTI,
+                                             swift::SILInstruction *I,
+                                             swift::SILValue Op) {
+  if (auto SILArg = dyn_cast<SILArgument>(Op)) {
+    auto Fn = I->getFunction();
+    auto Ty = LValueType::get(DTI.getType(),
+                              LValueType::Qual::QualBits::DefaultForType,
+                              Context);
+    DebugTypeInfo RefTy(Ty, Types.getCompleteTypeInfo(Ty->getCanonicalType()));
+    emitArgVariableDeclaration(Builder, Storage, RefTy, "",
                                getArgNo(Fn, SILArg));
   }
 }

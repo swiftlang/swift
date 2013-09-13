@@ -184,7 +184,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
     auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
     assert(CI && "no clang module loader");
     DebugInfo = new IRGenDebugInfo(Opts, CI->getTargetInfo(), Types,
-                                   Context.SourceMgr, Module);
+                                   Context, Module);
   }
 }
 
