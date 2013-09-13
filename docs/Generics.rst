@@ -553,7 +553,7 @@ implement a find() operation on lists::
 
 In addition to providing constraints on the type parameters, we also need to be
 able to constrain associated types. To do so, we introduce the notion of a
-requires clause, which follows the signature of the generic type or
+"where" clause, which follows the signature of the generic type or
 function. For example, let's generalize our find algorithm to work on any
 ordered collection::
   
@@ -562,8 +562,8 @@ ordered collection::
     func getAt(index : Int) -> Element // Element is an associated type
   }
   
-  func find<C : OrderedCollection>(collection : C, value : C.Element) -> Int
-  requires C.Element : Comparable
+  func find<C : OrderedCollection where C.Element : Comparable>(
+         collection : C, value : C.Element) -> Int
   {
     for index in 0..collection.size() {
       if (collection.getAt(index) == value) { // okay: we know that C.Element is Comparable
@@ -573,13 +573,13 @@ ordered collection::
     return -1
   }
 
-The requires clause is actually the more general way of expressing constraints,
+The where clause is actually the more general way of expressing constraints,
 and the constraints expressed in the angle brackets (e.g., <C :
-OrderedCollection>) are just sugar for a requires clause.  For example, the
+OrderedCollection>) are just sugar for a where clause.  For example, the
 above find() signature is equivalent to::
 
-  func find<C>(collection : C, value : C.Element)-> Int
-  requires C : OrderedCollection, C.Element : Comparable
+  func find<C where C : OrderedCollection, C.Element : Comparable>(
+         collection : C, value : C.Element)-> Int
 
 Note that find<C> is shorthand for (and equivalent to) find<C : Any>, since
 every type conforms to the Any protocol composition.
@@ -599,13 +599,13 @@ iteration, which we do by adding requirements into the protocol::
 
   protocol EnumerableCollection : Collection {
     typealias EnumeratorType : Enumerator
-    requires EnumeratorType.Element == Element
+    where EnumeratorType.Element == Element
     func getEnumeratorType() -> EnumeratorType
   }
 
 Here, we are specifying constraints on an associated type (EnumeratorType must
 conform to the Enumerator protocol), by adding a conformance clause (: Enumerator)
-to the associated type definition. We also use a separate requires clause to
+to the associated type definition. We also use a separate where clause to
 require that the type of values produced by querying the enumerator is the same as
 the type of values stored in the container. This is important, for example, for
 use with the Comparable protocol (and any protocol using Self types), because it
@@ -740,7 +740,7 @@ Generic functions can be overloaded based entirely on constraints. For example,
 consider a binary search algorithm::
   
    func binarySearch<
-      C : EnumerableCollection requires C.Element : Comparable
+      C : EnumerableCollection where C.Element : Comparable
    >(collection : C, value : C.Element) 
      -> C.EnumeratorType
    {
@@ -755,7 +755,7 @@ consider a binary search algorithm::
 
    func binarySearch<
       C : EnumerableCollection 
-        requires C.Element : Comparable, 
+       where C.Element : Comparable, 
                  C.EnumeratorType: RandomAccessEnumerator
    >(collection : C, value : C.Element) 
      -> C.EnumeratorType
@@ -775,7 +775,7 @@ binarySearch might be called as a subroutine of another generic function with
 minimal requirements::
 
   func doSomethingWithSearch<
-    C : EnumerableCollection requires C.Element : Ordered
+    C : EnumerableCollection where C.Element : Ordered
   >(
     collection : C, value : C.Element
   ) -> C.EnumeratorType 
