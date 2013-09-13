@@ -209,7 +209,9 @@ type grammar. SIL adds some additional kinds of type of its own:
   cast to ``Builtin.RawPointer`` values using the ``address_to_pointer``
   instruction, which could be stored.) In LLVM terms, all address arguments are
   ``noalias nocapture``. It is undefined behavior for two address arguments to
-  alias or for a captured address value to be dereferenced.
+  alias or for a captured address value to be dereferenced. (Note that class 
+  values are not considered "addresses". Their instance pointers may be
+  captured and may alias subject to `class aliasing`_ rules.)
   
   Functions cannot return an address. If an address-only
   value needs to be returned, it is done so using an indirect return argument
@@ -810,6 +812,30 @@ argument of the uncurried type, just like a native Swift method.
 
 That ``self`` is passed as the first argument at the IR level is abstracted
 away in SIL, as is the existence of the ``_cmd`` selector argument.
+
+Class Aliasing
+--------------
+
+Class instances and other *heap object references* are
+pointers at the implementation level, but unlike SIL addresses, they are
+first class values and can be ``capture``-d and alias. Swift, however, is
+memory-safe and statically typed, so aliasing of classes is constrained by
+the type system as follows:
+
+* A `Builtin.ObjectPointer` may alias any native Swift heap object,
+  including a Swift class instance, a box allocated by ``alloc_box``, an array
+  allocated by ``alloc_array``, or a thick function's closure context.
+  It may not alias natively Objective-C class instances.
+* A `Builtin.ObjCPointer` may alias any class instance, whether Swift or
+  Objective-C, but may not alias non-class-instance heap objects.
+* Two values of the same class type ``$C`` may alias. Two values of related
+  class type ``$B`` and ``$D``, where there is a subclass relationship between
+  ``$B`` and ``$D``, may alias. Two values of unrelated class types may not
+  alias.
+* Without whole-program visibility, values of archetype or protocol type must
+  be assumed to potentially alias any class instance. Even if it is locally
+  apparent that a class does not conform to that protocol, another component
+  may introduce a conformance by an extension.
 
 Instruction Set
 ---------------
