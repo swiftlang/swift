@@ -57,10 +57,6 @@ Expr *Solution::specialize(Expr *expr,
           return type;
         });
   
-  // Validate the generated type, now that we've substituted in for
-  // type variables.
-  tc.validateTypeSimple(type);
-  
   // Check that the substitutions we've produced actually work.
   // FIXME: We'd like the type checker to ensure that this always
   // succeeds.
@@ -98,10 +94,6 @@ Type Solution::computeSubstitutions(
 
         return type;
       });
-
-  // Validate the generated type, now that we've substituted in for
-  // type variables.
-  tc.validateTypeSimple(type);
 
   // Check that the substitutions we've produced actually work.
   // FIXME: We'd like the type checker to ensure that this always
@@ -2732,9 +2724,6 @@ void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
                                       tc.Context);
       }
     }
-
-    // Validate this type.
-    tc.validateTypeSimple(otherType);
   }
 }
 

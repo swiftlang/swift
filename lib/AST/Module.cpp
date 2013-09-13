@@ -366,6 +366,14 @@ void Module::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) {
 ArrayRef<Substitution> BoundGenericType::getSubstitutions(
                                            Module *module,
                                            LazyResolver *resolver) {
+  // FIXME: If there is no module, infer one. This is a hack for callers that
+  // don't have access to the module. It will have to go away once we're
+  // properly differentiating bound generic types based on the protocol
+  // conformances visible from a given module.
+  if (!module) {
+    module = getDecl()->getParentModule();
+  }
+
   // If we already have a cached copy of the substitutions, return them.
   auto *canon = getCanonicalType()->castTo<BoundGenericType>();
   const ASTContext &ctx = canon->getASTContext();

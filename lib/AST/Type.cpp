@@ -1136,13 +1136,6 @@ bool BoundGenericType::hasSubstitutions() {
   return (bool)ctx.getSubstitutions(canon);
 }
 
-ArrayRef<Substitution>
-BoundGenericType::getSubstitutions() {
-  auto *canon = getCanonicalType()->castTo<BoundGenericType>();
-  const ASTContext &ctx = canon->getASTContext();
-  return *ctx.getSubstitutions(canon);
-}
-
 void BoundGenericType::setSubstitutions(ArrayRef<Substitution> Subs){
   auto *canon = getCanonicalType()->castTo<BoundGenericType>();
   const ASTContext &ctx = canon->getASTContext();

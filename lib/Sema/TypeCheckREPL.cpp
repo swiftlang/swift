@@ -110,7 +110,8 @@ getArgRefExpr(TypeChecker &TC,
       ArgRef = new (Context) MemberRefExpr(
                                ArgRef, Loc,
                                ConcreteDeclRef(Context, VD,
-                                               BGST->getSubstitutions()),
+                                               BGST->getSubstitutions(&TC.TU,
+                                                                      &TC)),
                                Loc);
       continue;
     }

@@ -141,8 +141,6 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
       }
     }
 
-    validateTypeSimple(T);
-
     // Add any nested archetypes to the archetype stack.
     for (auto Nested : archetype->getNestedTypes()) {
       if (knownArchetypes.insert(Nested.second))

@@ -1563,9 +1563,8 @@ void Serializer::writeType(Type ty) {
       genericArgIDs.push_back(addTypeRef(next));
 
     // Get the substitutions.
-    ArrayRef<Substitution> substitutions;
-    if (generic->hasSubstitutions())
-      substitutions = generic->getSubstitutions();
+    ArrayRef<Substitution> substitutions
+      = generic->getSubstitutions((TranslationUnit *)TU, nullptr);
 
     unsigned abbrCode = DeclTypeAbbrCodes[BoundGenericTypeLayout::Code];
     BoundGenericTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,

@@ -84,7 +84,7 @@ namespace {
       // TODO: only the *primary* archetypes
       // TODO: not archetypes from outer contexts
       // TODO: but we are partially determined by the outer context!
-      for (auto &sub : type->getSubstitutions()) {
+      for (auto &sub : type->getSubstitutions(/*FIXME:*/nullptr, nullptr)) {
         CanType subbed = sub.Replacement->getCanonicalType();
         Values.push_back(IGF.emitTypeMetadataRef(subbed));
       }
@@ -93,7 +93,7 @@ namespace {
       Types.append(Values.size(), IGF.IGM.TypeMetadataPtrTy);
 
       // Add protocol witness tables for all those archetypes.
-      for (auto &sub : type->getSubstitutions())
+      for (auto &sub : type->getSubstitutions(/*FIXME:*/nullptr, nullptr))
         emitWitnessTableRefs(IGF, sub, Values);
 
       // All of those values are witness table pointers.

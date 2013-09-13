@@ -1559,7 +1559,6 @@ public:
 
     GenericParamList *outerGenericParams = nullptr;
     Type SelfTy = CD->computeSelfType(&outerGenericParams);
-    TC.validateTypeSimple(SelfTy);
     CD->getImplicitSelfDecl()->setType(SelfTy);
 
     Optional<ArchetypeBuilder> builder;
@@ -1638,7 +1637,6 @@ public:
 
     GenericParamList *outerGenericParams = nullptr;
     Type SelfTy = DD->computeSelfType(&outerGenericParams);
-    TC.validateTypeSimple(SelfTy);
     Type FnTy;
     if (outerGenericParams)
       FnTy = PolymorphicFunctionType::get(SelfTy,
@@ -1685,10 +1683,6 @@ void TypeChecker::validateTypeDecl(TypeDecl *D) {
 
     // Compute the declared type.
     nominal->computeType();
-
-    // Now that we have archetypes for our generic parameters (including
-    // generic parameters from outer scopes), we can canonicalize our type.
-    validateTypeSimple(nominal->getDeclaredTypeInContext());
 
     return;
   }

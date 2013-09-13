@@ -853,7 +853,8 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
                                          F.getASTContext());
 
   if (BoundGenericType *bgt = selfValue.getType().getAs<BoundGenericType>())
-    outerSubs = bgt->getSubstitutions();
+    outerSubs = bgt->getSubstitutions(F.getDeclContext()->getParentModule(),
+                                      nullptr);
   
   if (!innerSubs.empty() || !outerSubs.empty()) {
     // Specialize the generic method.

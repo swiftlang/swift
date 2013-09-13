@@ -2710,7 +2710,7 @@ namespace {
       }
       if (ty) {
         if (auto boundTy = ty->getAs<BoundGenericType>()) {
-          Substitutions = boundTy->getSubstitutions();
+          Substitutions = boundTy->getSubstitutions(/*FIXME:*/nullptr, nullptr);
         } else {
           assert(!ty || !ty->isSpecialized());
         }
@@ -3294,11 +3294,12 @@ namespace {
       TypesForDepths.push_back(type->getDecl());
 
       auto params = type->getDecl()->getGenericParams()->getAllArchetypes();
-      assert(params.size() >= type->getSubstitutions().size() &&
+      auto substitutions = type->getSubstitutions(/*FIXME:*/nullptr, nullptr);
+      assert(params.size() >= substitutions.size() &&
              "generic decl archetypes should parallel generic type subs");
 
-      for (unsigned i = 0, e = type->getSubstitutions().size(); i != e; ++i) {
-        auto sub = type->getSubstitutions()[i];
+      for (unsigned i = 0, e = substitutions.size(); i != e; ++i) {
+        auto sub = substitutions[i];
         assert(sub.Archetype == params[i] &&
                "substitution does not match archetype!");
         CanType arg = sub.Replacement->getCanonicalType();

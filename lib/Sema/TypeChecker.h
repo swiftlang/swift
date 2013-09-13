@@ -180,11 +180,6 @@ public:
 
   void validateTypeDecl(TypeDecl *D);
 
-  /// \brief Validate the given type, which has no location information
-  /// and shall not fail.
-  /// FIXME: This is only necessary because of generic substitutions.
-  bool validateTypeSimple(Type T);
-
   /// Resolve a reference to the given type declaration within a particular
   /// context.
   ///

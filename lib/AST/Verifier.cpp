@@ -170,7 +170,6 @@ namespace {
         verifyCheckedAlways(node);
         if (!HadError) {
           verifyChecked(node);
-          checkBoundGenericTypes(node);
         }
       }
 
@@ -1083,108 +1082,6 @@ namespace {
         Out << "\n";
         abort();
       }
-    }
-
-    void checkBoundGenericTypes(Type type) {
-      if (!type)
-        return;
-
-      TypeBase *typePtr = type.getPointer();
-
-      switch (typePtr->getKind()) {
-#define ALWAYS_CANONICAL_TYPE(Id, Parent) \
-      case TypeKind::Id:
-#define UNCHECKED_TYPE(Id, Parent) ALWAYS_CANONICAL_TYPE(Id, Parent)
-#define TYPE(Id, Parent)
-#include "swift/AST/TypeNodes.def"
-      case TypeKind::NameAlias:
-      case TypeKind::ProtocolComposition:
-      case TypeKind::AssociatedType:
-      case TypeKind::GenericTypeParam:
-      case TypeKind::DependentMember:
-        return;
-        
-      case TypeKind::Union:
-      case TypeKind::Struct:
-      case TypeKind::Class:
-        return checkBoundGenericTypes(cast<NominalType>(typePtr)->getParent());
-
-      case TypeKind::BoundGenericClass:
-      case TypeKind::BoundGenericUnion:
-      case TypeKind::BoundGenericStruct: {
-        auto BGT = cast<BoundGenericType>(typePtr);
-        if (!BGT->hasSubstitutions()) {
-          Out << "BoundGenericType without substitutions!\n";
-          abort();
-        }
-
-        if (BGT->getDecl()->getGenericParams()->size() !=
-            BGT->getGenericArgs().size()) {
-          Out << "BoundGenericType has the wrong number of arguments!\n";
-          abort();
-        }
-
-        checkBoundGenericTypes(BGT->getParent());
-        for (Type Arg : BGT->getGenericArgs())
-          checkBoundGenericTypes(Arg);
-        return;
-      }
-
-      case TypeKind::MetaType:
-        return checkBoundGenericTypes(
-                               cast<MetaTypeType>(typePtr)->getInstanceType());
-
-      case TypeKind::UnownedStorage:
-      case TypeKind::WeakStorage:
-        return checkBoundGenericTypes(
-                       cast<ReferenceStorageType>(typePtr)->getReferentType());
-
-      case TypeKind::Paren:
-        return checkBoundGenericTypes(
-                                cast<ParenType>(typePtr)->getUnderlyingType());
-
-      case TypeKind::Tuple:
-        for (auto elt : cast<TupleType>(typePtr)->getFields())
-          checkBoundGenericTypes(elt.getType());
-        return;
-        
-      case TypeKind::Substituted:
-        return checkBoundGenericTypes(
-                         cast<SubstitutedType>(typePtr)->getReplacementType());
-
-      case TypeKind::Function:
-      case TypeKind::PolymorphicFunction: {
-        auto function = cast<AnyFunctionType>(typePtr);
-        checkBoundGenericTypes(function->getInput());
-        return checkBoundGenericTypes(function->getResult());
-      }
-
-      case TypeKind::Array:
-        return checkBoundGenericTypes(cast<ArrayType>(typePtr)->getBaseType());
-        
-      case TypeKind::ArraySlice:
-      case TypeKind::Optional:
-        return checkBoundGenericTypes(
-                                 cast<SyntaxSugarType>(typePtr)->getBaseType());
-
-      case TypeKind::LValue:
-        return checkBoundGenericTypes(
-                                   cast<LValueType>(typePtr)->getObjectType());
-      }
-    }
-
-    void checkBoundGenericTypes(Expr *E) {
-      checkBoundGenericTypes(E->getType());
-    }
-
-    void checkBoundGenericTypes(Stmt *S) {
-    }
-
-    void checkBoundGenericTypes(Decl *D) {
-    }
-
-    void checkBoundGenericTypes(ValueDecl *D) {
-      checkBoundGenericTypes(D->getType());
     }
 
     void checkErrors(Expr *E) {}

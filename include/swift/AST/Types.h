@@ -860,10 +860,12 @@ public:
 
   /// \brief Retrieve the set of substitutions used to produce this bound
   /// generic type from the underlying generic type.
-  ArrayRef<Substitution> getSubstitutions();
-
-  /// \brief Retrieve the set of substitutions used to produce this bound
-  /// generic type from the underlying generic type.
+  ///
+  /// \param module The module in which we should compute the substitutions.
+  /// FIXME: We currently don't account for this properly, so it can be null.
+  ///
+  /// \param resolver The resolver that handles lazy type checking, where
+  /// required. This can be null for a fully-type-checked AST.
   ArrayRef<Substitution> getSubstitutions(Module *module,
                                           LazyResolver *resolver);
 
