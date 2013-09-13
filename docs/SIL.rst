@@ -832,8 +832,7 @@ the type system as follows:
   class type ``$B`` and ``$D``, where there is a subclass relationship between
   ``$B`` and ``$D``, may alias. Two values of unrelated class types may not
   alias. This includes different instantiations of a generic class type, such
-  as ``$C<Int>`` and ``$C<Float>``, which may not alias unless there is a
-  subclass relationship between them.
+  as ``$C<Int>`` and ``$C<Float>``, which currently may never alias.
 * Without whole-program visibility, values of archetype or protocol type must
   be assumed to potentially alias any class instance. Even if it is locally
   apparent that a class does not conform to that protocol, another component
