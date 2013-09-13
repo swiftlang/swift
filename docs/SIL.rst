@@ -831,11 +831,16 @@ the type system as follows:
 * Two values of the same class type ``$C`` may alias. Two values of related
   class type ``$B`` and ``$D``, where there is a subclass relationship between
   ``$B`` and ``$D``, may alias. Two values of unrelated class types may not
-  alias.
+  alias. This includes different instantiations of a generic class type, such
+  as ``$C<Int>`` and ``$C<Float>``, which may not alias unless there is a
+  subclass relationship between them.
 * Without whole-program visibility, values of archetype or protocol type must
   be assumed to potentially alias any class instance. Even if it is locally
   apparent that a class does not conform to that protocol, another component
-  may introduce a conformance by an extension.
+  may introduce a conformance by an extension. Similarly, a generic class
+  instance, such as ``$C<T>`` for archetype ``T``, must be assumed to
+  potentially alias concrete instances of the generic type, such as
+  ``$C<Int>``, because ``Int`` is a potential substitution for ``T``.
 
 Instruction Set
 ---------------
