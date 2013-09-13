@@ -182,8 +182,7 @@ struct SILDeclRef {
   bool isTransparent() const {
     return ( hasDecl() &&
              getDecl()->getAttrs().isTransparent() ) ||
-           isUnionElement() ||
-           isDefaultArgGenerator();
+           isUnionElement();
   }
 
   bool operator==(SILDeclRef rhs) const {

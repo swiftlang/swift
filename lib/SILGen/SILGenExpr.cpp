@@ -999,7 +999,8 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
       auto resultTy = generatorTy.getFunctionResultType();
       auto apply = SGF.emitApply(E, fnRef, { }, resultTy,
                              OwnershipConventions::getDefault(SGF,
-                                                              generatorTy));
+                                                              generatorTy),
+                                 generator.isTransparent());
       result.addElement(SGF, apply, E);
       continue;
     }
@@ -1106,7 +1107,8 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
       auto resultTy = generatorTy.getFunctionResultType();
       auto apply = gen.emitApply(E, fnRef, { }, resultTy,
                                  OwnershipConventions::getDefault(gen,
-                                                                  generatorTy));
+                                                                  generatorTy),
+                                 generator.isTransparent());
       apply.forwardInto(gen, E,
                         subInitializations[i].get()->getAddressOrNull());
       subInitializations[i]->finishInitialization(gen);
@@ -1173,7 +1175,8 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
       auto generatorTy = SGF.SGM.getConstantType(generator);
       auto resultTy = generatorTy.getFunctionResultType();
       auto apply = SGF.emitApply(E, fnRef, { }, resultTy,
-                           OwnershipConventions::getDefault(SGF, generatorTy));
+                           OwnershipConventions::getDefault(SGF, generatorTy),
+                                 generator.isTransparent());
       result.addElement(SGF, apply, E);
       continue;
     }
