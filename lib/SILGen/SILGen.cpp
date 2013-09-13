@@ -325,7 +325,6 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   // lists the captured global variables so that definite initialization can
   // reason about this escape point.
   if (TLDefiniteInit &&
-      // FIXME: Is this the right check?  What about methods in classes?
       !fd->getDeclContext()->isLocalContext() &&
       TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()) {
     SmallVector<SILValue, 4> Captures;
