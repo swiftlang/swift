@@ -958,7 +958,8 @@ namespace {
         return handleAddressOnly(structType);
 
       for (auto field : D->getPhysicalFields()) {
-        auto fieldType = field->getType()->getCanonicalType();
+        auto fieldType = structType->getTypeOfMember(D->getModuleContext(),
+                                                     field, nullptr);
         auto &lowering = TC.getTypeLowering(fieldType);
         if (lowering.isAddressOnly())
           return handleAddressOnly(structType);
@@ -989,6 +990,7 @@ namespace {
         if (!elt->hasArgumentType())
           continue;
         
+        // FIXME: Apply type substitution to the case's argument type.
         auto eltType = elt->getArgumentType()->getCanonicalType();
         auto &lowering = TC.getTypeLowering(eltType);
         if (lowering.isAddressOnly())
