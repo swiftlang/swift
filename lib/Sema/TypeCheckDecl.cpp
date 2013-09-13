@@ -2297,11 +2297,18 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
 
   if (Attrs.isTransparent()) {
     // Only functions can be 'transparent'.
-    auto *FD = dyn_cast<FuncDecl>(VD);
-    if (!FD) {
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(VD);
+
+    if (!AFD) {
       TC.diagnose(VD->getStartLoc(), diag::transparent_not_function);
       VD->getMutableAttrs().Transparent = false;
-    } else if (FD->getGenericParams()) {
+    } else if (isa<DestructorDecl>(AFD)) {
+      // Destructors are not guaranteed to be called, so don't allow users to
+      // mark them as transparent. Also, they are called as part of a release,
+      // so the mandatory inliner will not be able to inline them.
+      TC.diagnose(VD->getStartLoc(), diag::transparent_invalid_on_destructors);
+      VD->getMutableAttrs().Transparent = false;
+    } else if (AFD->getGenericParams()) {
       // We don't yet support transparent on generic functions.
       TC.diagnose(VD->getStartLoc(), diag::transparent_generic_not_supported);
       VD->getMutableAttrs().Transparent = false;
