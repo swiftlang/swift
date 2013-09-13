@@ -229,24 +229,24 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
   case DeclContextKind::ClosureExpr:
     llvm_unreachable("unnamed closure mangling not yet implemented");
 
-  case DeclContextKind::FuncDecl: {
-    auto *FD = cast<FuncDecl>(ctx);
-    // FIXME: We need a real solution here for local types.
-    if (FD->isGetterOrSetter()) {
-      mangleGetterOrSetterContext(FD);
+  case DeclContextKind::AbstractFunctionDecl: {
+    auto *AFD = cast<AbstractFunctionDecl>(ctx);
+
+    if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
+      // FIXME: We need a real solution here for local types.
+      if (FD->isGetterOrSetter()) {
+        mangleGetterOrSetterContext(FD);
+        return;
+      }
+      mangleDeclName(FD, IncludeType::Yes);
       return;
     }
-    mangleDeclName(FD, IncludeType::Yes);
-    return;
+
+    if (auto *CD = dyn_cast<ConstructorDecl>(AFD))
+      mangleDeclName(CD, IncludeType::Yes);
+
+    mangleDeclName(cast<DestructorDecl>(AFD), IncludeType::No);
   }
-
-  case DeclContextKind::ConstructorDecl:
-    mangleDeclName(cast<ConstructorDecl>(ctx), IncludeType::Yes);
-    return;
-
-  case DeclContextKind::DestructorDecl:
-    mangleDeclName(cast<DestructorDecl>(ctx), IncludeType::No);
-    return;
 
   case DeclContextKind::TopLevelCodeDecl:
     // Mangle the containing module context.

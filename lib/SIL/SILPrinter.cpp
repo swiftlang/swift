@@ -125,11 +125,12 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     Buffer << "<anonymous function>";
     return;
 
-  case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::FuncDecl:
-  case DeclContextKind::ConstructorDecl:
-  case DeclContextKind::DestructorDecl:
-    llvm_unreachable("unhandled context kind in SILPrint!");
+  case DeclContextKind::NominalTypeDecl: {
+    const NominalTypeDecl *Nominal = cast<NominalTypeDecl>(Context);
+    printFullContext(Nominal->getDeclContext(), Buffer);
+    Buffer << Nominal->getName() << ".";
+    return;
+  }
 
   case DeclContextKind::ExtensionDecl: {
     Type Ty = cast<ExtensionDecl>(Context)->getExtendedType();
@@ -162,12 +163,9 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     return;
   }
 
-  case DeclContextKind::NominalTypeDecl: {
-    const NominalTypeDecl *Nominal = cast<NominalTypeDecl>(Context);
-    printFullContext(Nominal->getDeclContext(), Buffer);
-    Buffer << Nominal->getName() << ".";
-    return;
-  }
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::AbstractFunctionDecl:
+    llvm_unreachable("unhandled context kind in SILPrint!");
   }
   llvm_unreachable("bad decl context");
 }

@@ -1913,7 +1913,7 @@ public:
 };
 
 /// \brief Base class for function-like declarations.
-class AbstractFunctionDecl : public ValueDecl {
+class AbstractFunctionDecl : public ValueDecl, public DeclContext {
   friend class FuncExpr;
 
 public:
@@ -1957,8 +1957,9 @@ protected:
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, Identifier Name,
                        VarDecl *ImplicitSelfDecl,
                        GenericParamList *GenericParams)
-      : ValueDecl(Kind, Parent, Name), Body(nullptr),
-        GenericParams(GenericParams) {
+      : ValueDecl(Kind, Parent, Name),
+        DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
+        Body(nullptr), GenericParams(GenericParams) {
     if (ImplicitSelfDecl)
       ImplicitSelfDeclAndIsCached.setPointerAndInt(ImplicitSelfDecl, true);
     else
@@ -2090,12 +2091,19 @@ public:
     return D->getKind() >= DeclKind::First_AbstractFunctionDecl &&
            D->getKind() <= DeclKind::Last_AbstractFunctionDecl;
   }
+
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::AbstractFunctionDecl;
+  }
+
+  using DeclContext::operator new;
+  using Decl::getASTContext;
 };
 
 class OperatorDecl;
 
 /// FuncDecl - 'func' declaration.
-class FuncDecl : public AbstractFunctionDecl, public DeclContext {
+class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
@@ -2120,7 +2128,6 @@ class FuncDecl : public AbstractFunctionDecl, public DeclContext {
            GenericParamList *GenericParams, Type Ty,
            FuncExpr *TheFuncExprBody, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent, Name, nullptr, GenericParams),
-      DeclContext(DeclContextKind::FuncDecl, Parent),
       StaticLoc(StaticLoc),
       FuncLoc(FuncLoc), NameLoc(NameLoc),
       TheFuncExprBody(TheFuncExprBody), OverriddenDecl(nullptr),
@@ -2326,12 +2333,6 @@ public:
   }
 
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::FuncDecl;
-  }
-
-  using DeclContext::operator new;
-  using Decl::getASTContext;
 };
 
 /// \brief This represents a case of a 'union' or 'enum' declaration.
@@ -2509,7 +2510,7 @@ public:
 ///   }
 /// }
 /// \endcode
-class ConstructorDecl : public AbstractFunctionDecl, public DeclContext {
+class ConstructorDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
 
   SourceLoc ConstructorLoc;
@@ -2528,7 +2529,6 @@ public:
                   GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Constructor, Parent, NameHack,
                            ImplicitSelfDecl, GenericParams),
-      DeclContext(DeclContextKind::ConstructorDecl, Parent),
       ConstructorLoc(ConstructorLoc), Arguments(Arguments) {
     assert(ImplicitSelfDecl && "constructors should have a non-null self");
   }
@@ -2568,18 +2568,13 @@ public:
   /// its selector in the given buffer (as UTF-8).
   StringRef getObjCSelector(SmallVectorImpl<char> &buffer) const;
 
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::Constructor;
-  }
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::ConstructorDecl;
-  }
-  
   /// Get the type of the initializing constructor.
   Type getInitializerType() const { return InitializerType; }
   void setInitializerType(Type t) { InitializerType = t; }
-  
-  using DeclContext::operator new;
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Constructor;
+  }
 };
 
 /// DestructorDecl - Declares a destructor for a type.  For example:
@@ -2592,7 +2587,7 @@ public:
 ///   }
 /// }
 /// \endcode
-class DestructorDecl : public AbstractFunctionDecl, public DeclContext {
+class DestructorDecl : public AbstractFunctionDecl {
   SourceLoc DestructorLoc;
 
 public:
@@ -2600,11 +2595,10 @@ public:
                   VarDecl *ImplicitSelfDecl, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Destructor, Parent, NameHack,
                            ImplicitSelfDecl, nullptr),
-      DeclContext(DeclContextKind::DestructorDecl, Parent),
       DestructorLoc(DestructorLoc) {
     assert(ImplicitSelfDecl && "destructors should have a non-null self");
   }
-  
+
   SourceLoc getStartLoc() const { return DestructorLoc; }
   SourceLoc getLoc() const { return DestructorLoc; }
   SourceRange getSourceRange() const;
@@ -2615,13 +2609,8 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Destructor;
   }
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::DestructorDecl;
-  }
-  
-  using DeclContext::operator new;
 };
-  
+
 /// Abstract base class of operator declarations.
 class OperatorDecl : public Decl {
   SourceLoc OperatorLoc, NameLoc, LBraceLoc, RBraceLoc;

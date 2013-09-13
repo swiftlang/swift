@@ -364,7 +364,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
     // Type check the function that contains the expression.
     if (CurDeclContext->getContextKind() == DeclContextKind::PipeClosureExpr ||
         CurDeclContext->getContextKind() == DeclContextKind::ClosureExpr ||
-        CurDeclContext->getContextKind() == DeclContextKind::FuncDecl) {
+        CurDeclContext->getContextKind() ==
+            DeclContextKind::AbstractFunctionDecl) {
       SourceLoc EndTypeCheckLoc =
           ParsedExpr ? ParsedExpr->getStartLoc()
                      : TU->Ctx.SourceMgr.getCodeCompletionLoc();
@@ -373,11 +374,12 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
       // For now, just find the nearest outer function.
       DeclContext *DCToTypeCheck = CurDeclContext;
       while (!DCToTypeCheck->isModuleContext() &&
-             !isa<FuncDecl>(DCToTypeCheck))
+             !isa<AbstractFunctionDecl>(DCToTypeCheck))
         DCToTypeCheck = DCToTypeCheck->getParent();
-      if (auto *FD = dyn_cast<FuncDecl>(DCToTypeCheck))
-        return typeCheckFunctionBodyUntil(TU, CurDeclContext, FD,
-                                          EndTypeCheckLoc);
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck))
+        if (auto *FD = dyn_cast<FuncDecl>(AFD))
+          return typeCheckFunctionBodyUntil(TU, CurDeclContext, FD,
+                                            EndTypeCheckLoc);
       return false;
     }
     if (CurDeclContext->getContextKind() == DeclContextKind::NominalTypeDecl) {
@@ -521,10 +523,11 @@ public:
           break;
         FunctionDC = Parent;
       }
-      if (auto *FD = dyn_cast<FuncDecl>(FunctionDC)) {
-        if (FD->getDeclContext()->isTypeContext()) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(FunctionDC)) {
+        if (AFD->getExtensionType()) {
           CurrMethodDC = FunctionDC;
-          InsideStaticMethod = FD->isStatic();
+          if (auto *FD = dyn_cast<FuncDecl>(AFD))
+            InsideStaticMethod = FD->isStatic();
         }
       }
     }
@@ -694,8 +697,10 @@ public:
         CompletionContext,
         CodeCompletionResult::ResultKind::Declaration);
     Builder.setAssociatedDecl(CD);
-    if (IsSuperRefExpr && isa<ConstructorDecl>(CurrDeclContext)) {
-      Builder.addTextChunk("constructor");
+    if (IsSuperRefExpr) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurrDeclContext))
+        if (isa<ConstructorDecl>(AFD))
+          Builder.addTextChunk("constructor");
     }
     Builder.addLeftParen();
     addPatternParameters(Builder, CD->getArguments());
@@ -845,8 +850,11 @@ public:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
         if (!ExprType->is<MetaTypeType>())
           return;
-        if (IsSuperRefExpr && !isa<ConstructorDecl>(CurrDeclContext))
-          return;
+        if (IsSuperRefExpr) {
+          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurrDeclContext))
+            if (!isa<ConstructorDecl>(AFD))
+              return;
+        }
         addConstructorCall(CD);
         return;
       }

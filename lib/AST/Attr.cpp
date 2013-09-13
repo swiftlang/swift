@@ -68,10 +68,8 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
     // Local declarations are always inherently fragile.
     case DeclContextKind::PipeClosureExpr:
     case DeclContextKind::ClosureExpr:
-    case DeclContextKind::FuncDecl:
-    case DeclContextKind::ConstructorDecl:
-    case DeclContextKind::DestructorDecl:
     case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::AbstractFunctionDecl:
       return Resilience::InherentlyFragile;
 
     // For unions, we walk out through the union decl.

@@ -41,7 +41,7 @@ namespace llvm {
     static swift::DeclContext *getFromVoidPointer(void *P) {
       return (swift::DeclContext*)P;
     }
-    enum { NumLowBitsAvailable = 4 };
+    enum { NumLowBitsAvailable = 3 };
   };
 }
 
@@ -57,13 +57,11 @@ enum class DeclContextKind : uint8_t {
   NominalTypeDecl,
   ExtensionDecl,
   TopLevelCodeDecl,
-  FuncDecl,
-  ConstructorDecl,
-  DestructorDecl,
-  
-  Last_DeclContextKind = DestructorDecl
+  AbstractFunctionDecl,
+
+  Last_DeclContextKind = AbstractFunctionDecl
 };
-  
+
 /// A DeclContext is an AST object which acts as a semantic container
 /// for declarations.  As a policy matter, we currently define
 /// contexts broadly: a lambda expression in a function is a new
@@ -74,8 +72,8 @@ enum class DeclContextKind : uint8_t {
 /// in general, so if an AST node class multiply inherits from DeclContext
 /// and another base class, it must 'using DeclContext::operator new;' in order
 /// to use an allocator with the correct alignment.
-class alignas(16) DeclContext {
-  // alignas(16) because we use four tag bits on DeclContext.
+class alignas(8) DeclContext {
+  // alignas(8) because we use three tag bits on DeclContext.
   
   enum {
     KindBits =
@@ -105,9 +103,7 @@ public:
     return getContextKind() == DeclContextKind::PipeClosureExpr ||
            getContextKind() == DeclContextKind::ClosureExpr ||
            getContextKind() == DeclContextKind::TopLevelCodeDecl ||
-           getContextKind() == DeclContextKind::FuncDecl ||
-           getContextKind() == DeclContextKind::ConstructorDecl ||
-           getContextKind() == DeclContextKind::DestructorDecl;
+           getContextKind() == DeclContextKind::AbstractFunctionDecl;
   }
   
   /// isModuleContext - Return true if this is a subclass of Module.

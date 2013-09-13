@@ -594,13 +594,9 @@ ParserResult<Expr> Parser::parseExprNew() {
 static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
                                                    DeclContext *DC,
                                                    SourceLoc Loc) {
-  if (auto *FD = dyn_cast<FuncDecl>(DC)) {
-    if (auto *SelfDecl = FD->getImplicitSelfDecl())
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+    if (auto *SelfDecl = AFD->getImplicitSelfDecl())
       return SelfDecl;
-  } else if (auto *CD = dyn_cast<ConstructorDecl>(DC)) {
-    return CD->getImplicitSelfDecl();
-  } else if (auto *DD = dyn_cast<DestructorDecl>(DC)) {
-    return DD->getImplicitSelfDecl();
   }
   P.diagnose(Loc, diag::super_not_in_class_method);
   return nullptr;
@@ -640,12 +636,14 @@ ParserResult<Expr> Parser::parseExprSuper() {
       SourceLoc ctorLoc = consumeToken(tok::kw_constructor);
       
       // Check that we're actually in a constructor.
-      if (!isa<ConstructorDecl>(CurDeclContext)) {
-        diagnose(ctorLoc, diag::super_constructor_not_in_constructor);
-        // No need to indicate error to the caller because this is not a parse
-        // error.
-        return makeParserResult(new (Context) ErrorExpr(
-            SourceRange(superLoc, ctorLoc), ErrorType::get(Context)));
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
+        if (!isa<ConstructorDecl>(AFD)) {
+          diagnose(ctorLoc, diag::super_constructor_not_in_constructor);
+          // No need to indicate error to the caller because this is not a parse
+          // error.
+          return makeParserResult(new (Context) ErrorExpr(
+              SourceRange(superLoc, ctorLoc), ErrorType::get(Context)));
+        }
       }
       // The constructor decl will be resolved by sema.
       Expr *result = new (Context) UnresolvedConstructorExpr(superRef,

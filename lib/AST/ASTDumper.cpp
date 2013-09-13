@@ -605,17 +605,16 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     os << "top-level code";
     break;
 
-  case DeclContextKind::FuncDecl:
-    os << "func decl";
+  case DeclContextKind::AbstractFunctionDecl: {
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(dc);
+    if (isa<FuncDecl>(AFD))
+      os << "func decl";
+    if (isa<ConstructorDecl>(AFD))
+      os << "constructor";
+    if (isa<DestructorDecl>(AFD))
+      os << "destructor";
     break;
-
-  case DeclContextKind::ConstructorDecl:
-    os << "constructor";
-    break;
-
-  case DeclContextKind::DestructorDecl:
-    os << "destructor";
-    break;
+  }
   }
 }
 

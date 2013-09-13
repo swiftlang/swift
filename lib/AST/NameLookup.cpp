@@ -293,16 +293,16 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     ValueDecl *MetaBaseDecl = 0;
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
-    if (auto *FD = dyn_cast<FuncDecl>(DC)) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       // FIXME: when we can parse and typecheck the function body partially for
-      // code completion, FD->getBody() check can be removed.
-      if (Loc.isValid() && FD->getBody()) {
+      // code completion, AFD->getBody() check can be removed.
+      if (Loc.isValid() && AFD->getBody()) {
         FindLocalVal localVal(SM, Loc, Name);
-        localVal.visit(FD->getBody());
+        localVal.visit(AFD->getBody());
         if (!localVal.MatchingValue) {
-          for (Pattern *P : FD->getBodyParamPatterns())
+          for (Pattern *P : AFD->getBodyParamPatterns())
             localVal.checkPattern(P);
         }
         if (localVal.MatchingValue) {
@@ -311,21 +311,22 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         }
       }
 
-      if (FD->getExtensionType()) {
-        ExtendedType = FD->getExtensionType();
-        BaseDecl = FD->getImplicitSelfDecl();
+      if (AFD->getExtensionType()) {
+        ExtendedType = AFD->getExtensionType();
+        BaseDecl = AFD->getImplicitSelfDecl();
         if (NominalType *NT = ExtendedType->getAs<NominalType>())
           MetaBaseDecl = NT->getDecl();
         else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
           MetaBaseDecl = UGT->getDecl();
         DC = DC->getParent();
 
-        if (FD->isStatic())
-          ExtendedType = MetaTypeType::get(ExtendedType, M.getASTContext());
+        if (auto *FD = dyn_cast<FuncDecl>(AFD))
+          if (FD->isStatic())
+            ExtendedType = MetaTypeType::get(ExtendedType, M.getASTContext());
       }
 
       // Look in the generic parameters after checking our local declaration.
-      GenericParams = FD->getGenericParams();
+      GenericParams = AFD->getGenericParams();
     } else if (PipeClosureExpr *CE = dyn_cast<PipeClosureExpr>(DC)) {
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
@@ -348,48 +349,6 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       ExtendedType = ND->getDeclaredType();
       BaseDecl = ND;
       MetaBaseDecl = BaseDecl;
-    } else if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(DC)) {
-      // Look for local variables; normally, the parser resolves these
-      // for us, but it can't do the right thing inside local types.
-      if (Loc.isValid()) {
-        FindLocalVal localVal(SM, Loc, Name);
-        localVal.visit(CD->getBody());
-        if (!localVal.MatchingValue)
-          localVal.checkPattern(CD->getArguments());
-        if (localVal.MatchingValue) {
-          Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
-          return;
-        }
-      }
-
-      BaseDecl = CD->getImplicitSelfDecl();
-      ExtendedType = CD->getDeclContext()->getDeclaredTypeOfContext();
-      if (NominalType *NT = ExtendedType->getAs<NominalType>())
-        MetaBaseDecl = NT->getDecl();
-      else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
-        MetaBaseDecl = UGT->getDecl();
-      DC = DC->getParent();
-    } else if (DestructorDecl *DD = dyn_cast<DestructorDecl>(DC)) {
-      // Look for local variables; normally, the parser resolves these
-      // for us, but it can't do the right thing inside local types.
-      if (Loc.isValid()) {
-        FindLocalVal localVal(SM, Loc, Name);
-        localVal.visit(CD->getBody());
-        if (!localVal.MatchingValue)
-          localVal.checkPattern(CD->getArguments());
-        if (localVal.MatchingValue) {
-          Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
-          return;
-        }
-      }
-
-      BaseDecl = DD->getImplicitSelfDecl();
-      ExtendedType = DD->getDeclContext()->getDeclaredTypeOfContext();
-      if (NominalType *NT = ExtendedType->getAs<NominalType>())
-        MetaBaseDecl = NT->getDecl();
-      else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
-        MetaBaseDecl = UGT->getDecl();
-      DC = DC->getParent();
     }
 
     // Check the generic parameters for something with the given name.

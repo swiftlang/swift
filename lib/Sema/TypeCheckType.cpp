@@ -82,9 +82,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
 
         case DeclContextKind::PipeClosureExpr:
         case DeclContextKind::ClosureExpr:
-        case DeclContextKind::FuncDecl:
-        case DeclContextKind::ConstructorDecl:
-        case DeclContextKind::DestructorDecl:
+        case DeclContextKind::AbstractFunctionDecl:
           continue;
         }
 
