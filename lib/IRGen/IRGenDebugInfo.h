@@ -68,6 +68,7 @@ class IRGenDebugInfo {
   const clang::TargetInfo &TargetInfo;
   ASTContext &Context;
   SourceManager &SM;
+  llvm::Module &M;
   llvm::DIBuilder DBuilder;
   TypeConverter &Types;
 
@@ -154,7 +155,8 @@ public:
                                DebugTypeInfo Ty,
                                StringRef Name,
                                unsigned Tag,
-                               unsigned ArgNo = 0);
+                               unsigned ArgNo = 0,
+                               bool Boxed = false);
 
   /// Convenience function for stack-allocated variables. Calls
   /// emitVariableDeclaration internally.
