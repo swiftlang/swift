@@ -242,10 +242,13 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
       return;
     }
 
-    if (auto *CD = dyn_cast<ConstructorDecl>(AFD))
+    if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
       mangleDeclName(CD, IncludeType::Yes);
+      return;
+    }
 
     mangleDeclName(cast<DestructorDecl>(AFD), IncludeType::No);
+    return;
   }
 
   case DeclContextKind::TopLevelCodeDecl:
