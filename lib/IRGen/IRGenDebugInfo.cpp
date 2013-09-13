@@ -265,6 +265,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
 
   // Cache it.
   ScopeCache[DS] = llvm::WeakVH(DScope);
+
   return DScope;
 }
 
@@ -364,10 +365,26 @@ static AnyFunctionType* getFunctionType(SILType SILTy) {
   return FnTy;
 }
 
+
+/// Create a single parameter type and push it.
+void IRGenDebugInfo::
+createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
+                    SILType ParamTy,llvm::DIDescriptor Scope,
+                    DeclContext* DeclCtx) {
+  CanType CanTy = ParamTy.getSwiftType();
+  if (DeclCtx) {
+    VarDecl VD(SourceLoc(), Identifier::getEmptyKey(), CanTy, DeclCtx);
+    DebugTypeInfo DTy(&VD, Types.getCompleteTypeInfo(CanTy));
+    Parameters.push_back(getOrCreateType(DTy, Scope));
+  } else {
+    DebugTypeInfo DTy(CanTy, Types.getCompleteTypeInfo(CanTy));
+    Parameters.push_back(getOrCreateType(DTy, Scope));
+  }
+}
+
 /// Create the array of function parameters for FnTy.
 llvm::DIArray IRGenDebugInfo::createParameterTypes(SILModule &SILMod,
                                                    SILType SILTy,
-                                                   llvm::FunctionType *IRTy,
                                                    llvm::DIDescriptor Scope,
                                                    DeclContext* DeclCtx) {
   if (!SILTy.getSwiftType())
@@ -377,20 +394,16 @@ llvm::DIArray IRGenDebugInfo::createParameterTypes(SILModule &SILMod,
   if (!TypeInfo) return llvm::DIArray();
 
   SmallVector<llvm::Value *, 16> Parameters;
+
+  // The function return type is the first element in the list.
+  createParameterType(Parameters, TypeInfo->getResultType(), Scope, DeclCtx);
+
   // Actually, the input type is either a single type or a tuple
   // type. We currently represent a function with one n-tuple argument
   // as an n-ary function.
   unsigned I = 0;
-  for (auto Param : TypeInfo->getInputTypes()) {
-    CanType CanTy = Param.getSwiftType();
-    if (DeclCtx) {
-      VarDecl VD(SourceLoc(), Identifier::getEmptyKey(), CanTy, DeclCtx);
-      DebugTypeInfo DTy(&VD, Types.getCompleteTypeInfo(CanTy));
-      Parameters.push_back(getOrCreateType(DTy, Scope));
-    } else {
-      DebugTypeInfo DTy(CanTy, Types.getCompleteTypeInfo(CanTy));
-      Parameters.push_back(getOrCreateType(DTy, Scope));
-    }
+  for (auto ParamTy : TypeInfo->getInputTypes()) {
+    createParameterType(Parameters, ParamTy, Scope, DeclCtx);
     ++I;
   }
 
@@ -427,8 +440,7 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   }
 
   AnyFunctionType* FnTy = getFunctionType(SILTy);
-  auto Params = createParameterTypes(SILMod, SILTy, Fn->getFunctionType(),
-                                     Scope, DeclCtx);
+  auto Params = createParameterTypes(SILMod, SILTy, Scope, DeclCtx);
   llvm::DICompositeType DIFnTy = DBuilder.createSubroutineType(File, Params);
   llvm::DIArray TemplateParameters;
   llvm::DISubprogram Decl;
@@ -636,6 +648,18 @@ void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                           llvm::dwarf::DW_TAG_arg_variable, ArgNo);
 }
 
+void IRGenDebugInfo::emitByRefArgumentOrNull(IRBuilder& Builder,
+                                             llvm::Value *Storage,
+                                             DebugTypeInfo Ty,
+                                             swift::LoadInst *i) {
+  if (auto SILArg = dyn_cast<SILArgument>(i->getOperand())) {
+    assert(i && i->getParent() && i->getParent()->getParent() );
+    auto Fn = i->getParent()->getParent();
+    emitArgVariableDeclaration(Builder, Storage, Ty, "",
+                               getArgNo(Fn, SILArg));
+  }
+}
+
 /// Return the DIFile that is the ancestor of Scope.
 llvm::DIFile IRGenDebugInfo::getFile(llvm::DIDescriptor Scope) {
   while (!Scope.isFile()) {
@@ -665,6 +689,12 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              unsigned ArgNo) {
   llvm::DebugLoc DL = Builder.getCurrentDebugLocation();
   llvm::DIDescriptor Scope(DL.getScope(Builder.getContext()));
+  // If this is an argument, attach it to the current function scope.
+  if (ArgNo > 0) {
+    while (Scope.isLexicalBlock())
+      Scope = llvm::DILexicalBlock(Scope).getContext();
+  }
+
   if (!Scope.Verify())
     return;
 
@@ -1041,7 +1071,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // FIXME: handle LValueTy->getQualifiers();
     auto LValueTy = BaseTy->castTo<LValueType>();
     auto CanTy = LValueTy->getObjectType()->getCanonicalType();
-    return getOrCreateDesugaredType(CanTy, DbgTy, Scope);
+    auto DT = getOrCreateDesugaredType(CanTy, DbgTy, Scope);
+    return DBuilder.createReferenceType(llvm::dwarf::DW_TAG_reference_type, DT);
   }
 
   case TypeKind::Archetype: {

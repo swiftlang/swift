@@ -176,6 +176,13 @@ public:
                                      StringRef LinkageName,
                                      DebugTypeInfo DebugType,
                                      Optional<SILLocation> Loc);
+
+  /// Check whether Storage is a byref argument and emit debug info for it.
+  void emitByRefArgumentOrNull(IRBuilder& Builder,
+                               llvm::Value *Storage,
+                               DebugTypeInfo Ty,
+                               swift::LoadInst *i);
+
   /// Return the native, absolute path to the main file.
   StringRef getMainFilename() const { return MainFilename; }
 
@@ -193,9 +200,11 @@ private:
   StringRef getMangledName(DebugTypeInfo DTI);
   llvm::DIArray createParameterTypes(SILModule &SILMod,
                                      SILType SILTy,
-                                     llvm::FunctionType *IRTy,
                                      llvm::DIDescriptor Scope,
                                      DeclContext *DeclCtx);
+  void createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
+                           SILType ParamTy,llvm::DIDescriptor Scope,
+                           DeclContext* DeclCtx);
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags);
   unsigned getArgNo(SILFunction *Fn, SILArgument *Arg);

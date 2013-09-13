@@ -1931,6 +1931,13 @@ void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
   Address source = getLoweredAddress(i->getOperand());
   const TypeInfo &type = getTypeInfo(i->getType().getObjectType());
   cast<LoadableTypeInfo>(type).loadAsTake(*this, source, lowered);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->
+      emitByRefArgumentOrNull(Builder,
+                              source.getAddress(),
+                              DebugTypeInfo(i->getType().getSwiftType(), type),
+                              i);
+
   setLoweredExplosion(SILValue(i, 0), lowered);
 }
 
