@@ -183,7 +183,6 @@ IdentifierID Serializer::addModuleRef(const Module *M) {
 
 const Decl *Serializer::getGenericContext(const GenericParamList *paramList) {
   auto contextDecl = GenericContexts.lookup(paramList);
-  assert(contextDecl && "Generic parameters not registered yet!");
   return contextDecl;
 }
 
@@ -1292,6 +1291,24 @@ static uint8_t getRawStableOwnership(swift::Ownership ownership) {
   llvm_unreachable("bad ownership kind");
 }
 
+/// Find the typealias given a builtin type.
+static TypeAliasDecl *findTypeAliasForBuiltin(const TranslationUnit *TU,
+                                              BuiltinType *Bt) {
+  /// Get the type name by chopping off "Builtin.".
+  llvm::SmallString<32> FullName;
+  llvm::raw_svector_ostream OS(FullName);
+  Bt->print(OS);
+  OS.flush();
+  StringRef TypeName = FullName.substr(8);
+
+  SmallVector<ValueDecl*, 4> CurModuleResults;
+  TU->Ctx.TheBuiltinModule->lookupValue(Module::AccessPathTy(),
+      TU->Ctx.getIdentifier(TypeName),
+      NLKind::QualifiedLookup, CurModuleResults);
+  assert(CurModuleResults.size() == 1);
+  return cast<TypeAliasDecl>(CurModuleResults[0]);
+}
+
 void Serializer::writeType(Type ty) {
   using namespace decls_block;
 
@@ -1304,9 +1321,15 @@ void Serializer::writeType(Type ty) {
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
-  case TypeKind::BuiltinVector:
-    llvm_unreachable("should always be accessed through an implicit typealias");
+  case TypeKind::BuiltinVector: {
+    TypeAliasDecl *typeAlias = findTypeAliasForBuiltin(TU,
+                                   ty->castTo<BuiltinType>());
 
+    unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
+    NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                    addDeclRef(typeAlias));
+    break;
+  }
   case TypeKind::NameAlias: {
     auto nameAlias = cast<NameAliasType>(ty.getPointer());
     const TypeAliasDecl *typeAlias = nameAlias->getDecl();
@@ -1467,15 +1490,18 @@ void Serializer::writeType(Type ty) {
     auto fnTy = cast<PolymorphicFunctionType>(ty.getPointer());
     const Decl *genericContext = getGenericContext(&fnTy->getGenericParams());
     auto callingConvention = fnTy->getAbstractCC();
+    DeclID dID = genericContext ? addDeclRef(genericContext) : DeclID(0);
 
     unsigned abbrCode = DeclTypeAbbrCodes[PolymorphicFunctionTypeLayout::Code];
     PolymorphicFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                               addTypeRef(fnTy->getInput()),
                                               addTypeRef(fnTy->getResult()),
-                                              addDeclRef(genericContext),
+                                              dID,
                                               getRawStableCC(callingConvention),
                                               fnTy->isThin(),
                                               fnTy->isNoReturn());
+    if (!genericContext)
+      writeGenericParams(&fnTy->getGenericParams());
     break;
   }
 

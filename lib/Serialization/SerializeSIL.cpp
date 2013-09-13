@@ -81,8 +81,6 @@ namespace {
     }
     ValueID addValueRef(const ValueBase *Val);
 
-    TypeID addTypeRef(Type ty);
-
     using TableData = FuncTableInfo::data_type;
     using Table = llvm::DenseMap<FuncTableInfo::key_type, TableData>;
     Table FuncTable;
@@ -116,24 +114,6 @@ SILSerializer::SILSerializer(Serializer &S, ASTContext &Ctx,
                             S(S), Ctx(Ctx), Out(Out), FuncID(1) {
 }
 
-TypeID SILSerializer::addTypeRef(Type ty) {
-  switch (ty.getPointer()->getKind()) {
-  case TypeKind::BuiltinInteger:
-  case TypeKind::BuiltinFloat:
-  case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinObjectPointer:
-  case TypeKind::BuiltinObjCPointer:
-  case TypeKind::BuiltinVector:
-    /// FIXME: Builtin types can't be directly added to Serializer. We need
-    /// to map Builtin types to their typealiases.
-    return 0;
-  default:
-    // FIXME: call S.addTypeRef(ty), right now, it causes problems.
-    (void)S;
-    return 0;
-  }
-}
-
 /// We enumerate all valus to update ValueIDs in a separate pass
 /// to correctly handle forward reference of a value.
 ValueID SILSerializer::addValueRef(const ValueBase *Val) {
@@ -153,7 +133,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F) {
   Funcs.push_back(Out.GetCurrentBitNo());
   InstID = 0;
   unsigned abbrCode = SILAbbrCodes[SILFunctionLayout::Code];
-  TypeID FnID = addTypeRef(F.getLoweredType().getSwiftType());
+  TypeID FnID = S.addTypeRef(F.getLoweredType().getSwiftType());
   SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                        (unsigned)F.getLinkage(), FnID);
   for (const SILBasicBlock &BB : F)
@@ -164,7 +144,7 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
   SmallVector<DeclID, 4> Args;
   for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I) {
     SILArgument *SA = *I;
-    DeclID tId = addTypeRef(SA->getType().getSwiftType());
+    DeclID tId = S.addTypeRef(SA->getType().getSwiftType());
     DeclID vId = addValueRef(static_cast<const ValueBase*>(SA));
     Args.push_back(tId);
     Args.push_back(vId);
@@ -190,7 +170,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
     SILOneTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                         (unsigned)SI.getKind(),
-                        addTypeRef(ASI->getElementType().getSwiftType()));
+                        S.addTypeRef(ASI->getElementType().getSwiftType()));
     break;
   }
   // One operand 
@@ -199,7 +179,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
                        (unsigned)SI.getKind(),
-                       addTypeRef(SI.getOperand(0).getType().getSwiftType()),
+                       S.addTypeRef(SI.getOperand(0).getType().getSwiftType()),
                        addValueRef(SI.getOperand(0)));
     break;
   }
@@ -208,7 +188,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned abbrCode = SILAbbrCodes[SILOneValueOneOperandLayout::Code];
     SILOneValueOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
                        (unsigned)SI.getKind(), addValueRef(StI->getSrc()),
-                       addTypeRef(StI->getDest().getType().getSwiftType()),
+                       S.addTypeRef(StI->getDest().getType().getSwiftType()),
                        addValueRef(StI->getDest()));
     break;
   }

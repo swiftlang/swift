@@ -1923,24 +1923,28 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
 
-    Decl *genericContext = getDecl(genericContextID);
-    assert(genericContext && "loading PolymorphicFunctionType before its decl");
-
     GenericParamList *paramList = nullptr;
-    switch (genericContext->getKind()) {
-    case DeclKind::Constructor:
-      paramList = cast<ConstructorDecl>(genericContext)->getGenericParams();
-      break;
-    case DeclKind::Func:
-      paramList = cast<FuncDecl>(genericContext)->getGenericParams();
-      break;
-    case DeclKind::Class:
-    case DeclKind::Struct:
-    case DeclKind::Union:
-      paramList = cast<NominalTypeDecl>(genericContext)->getGenericParams();
-      break;
-    default:
-      break;
+    if (genericContextID) {
+      Decl *genericContext = getDecl(genericContextID);
+      assert(genericContext && "loading PolymorphicFunctionType before its decl");
+
+      switch (genericContext->getKind()) {
+      case DeclKind::Constructor:
+        paramList = cast<ConstructorDecl>(genericContext)->getGenericParams();
+        break;
+      case DeclKind::Func:
+        paramList = cast<FuncDecl>(genericContext)->getGenericParams();
+        break;
+      case DeclKind::Class:
+      case DeclKind::Struct:
+      case DeclKind::Union:
+        paramList = cast<NominalTypeDecl>(genericContext)->getGenericParams();
+        break;
+      default:
+        break;
+      }
+    } else {
+      paramList = maybeReadGenericParams(nullptr);
     }
     assert(paramList && "missing generic params for polymorphic function");
 

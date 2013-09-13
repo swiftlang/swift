@@ -448,6 +448,7 @@ namespace decls_block {
     AbstractCCField, // calling convention
     BCFixed<1>,  // thin?
     BCFixed<1>   // noreturn?
+    // Trailed by its generic parameters, if the owning decl ID is 0.
   >;
 
   template <unsigned Code>
