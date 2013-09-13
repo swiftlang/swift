@@ -431,7 +431,8 @@ var int_global : Int
 
 
 // CHECK-LABEL: sil @test_tlc
-// CHECK: mark_uninitialized
+// CHECK-NOT: mark_uninitialized
+// CHECK: return
 sil @test_tlc : $() -> () {
   %0 = global_addr #int_global : $*Int64
   %1 = mark_uninitialized %0 : $*Int64

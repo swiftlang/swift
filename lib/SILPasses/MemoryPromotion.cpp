@@ -1097,56 +1097,70 @@ static void optimizeAllocBox(AllocBoxInst *ABI) {
     ElementPromotion(ABI, EltNo++, Elt).doIt();
 }
 
-
-/// processAssign - It is an invariant of this pass that all assign instructions
-/// are processed.  Assignments into boxes are handled in a flow sensitive way
-/// when the box is promoted.  Free standing assignments (e.g. into global
-/// variables or anything else) are always known to be assignments (not
-/// initializations) and are lowered as such.
-static void processAssign(AssignInst *AI) {
-  // Check to see if this is actually referring to a box.  If so, ignore it.
-  SILValue Pointer = AI->getDest();
-  while (isa<TupleElementAddrInst>(Pointer) ||
-         isa<StructElementAddrInst>(Pointer))
-    Pointer = cast<SILInstruction>(Pointer)->getOperand(0);
-
-  if (isa<AllocBoxInst>(Pointer))
-    return;
-
-  // If this isn't an assignment into a box, lower it as an assignment (not an
-  // initialization).
-  SILBuilder B(AI);
-  LowerAssignInstruction(B, AI, false, SILValue());
+/// checkDefiniteInitialization - Check that all memory objects that require
+/// initialization before use are properly set and transform the code as
+/// required for flow-sensitive properties.
+static void checkDefiniteInitialization(SILFunction &Fn) {
+  for (auto &BB : Fn) {
+    auto I = BB.begin(), E = BB.end();
+    while (I != E) {
+      if (auto *ABI = dyn_cast<AllocBoxInst>(I)) {
+        optimizeAllocBox(ABI);
+        
+        // Carefully move iterator to avoid invalidation problems.
+        ++I;
+        if (ABI->use_empty())
+          ABI->eraseFromParent();
+        continue;
+      }
+        
+      ++I;
+    }
+  }
 }
+
+/// lowerRawSILOperations - There are a variety of raw-sil instructions like
+/// 'assign' that are only used by this pass.  Now that definite initialization
+/// checking is done, remove them.
+static void lowerRawSILOperations(SILFunction &Fn) {
+  for (auto &BB : Fn) {
+    auto I = BB.begin(), E = BB.end();
+    while (I != E) {
+      SILInstruction *Inst = I++;
+      
+      // Unprocessed assigns just lower into assignments, not initializations.
+      if (auto *AI = dyn_cast<AssignInst>(Inst)) {
+        SILBuilder B(AI);
+        LowerAssignInstruction(B, AI, false, SILValue());
+        continue;
+      }
+
+      // mark_uninitialized just becomes a noop, resolving to its operand.
+      if (auto *MUI = dyn_cast<MarkUninitializedInst>(Inst)) {
+        SILValue(MUI, 0).replaceAllUsesWith(MUI->getOperand());
+        MUI->eraseFromParent();
+        continue;
+      }
+      
+      // mark_function_escape just gets zapped.
+      if (isa<MarkFunctionEscapeInst>(Inst)) {
+        Inst->eraseFromParent();
+        continue;
+      }
+    }
+  }
+}
+
 
 /// performSILMemoryPromotion - Promote alloc_box uses into SSA registers and
 /// perform definitive initialization analysis.
 void swift::performSILMemoryPromotion(SILModule *M) {
   for (auto &Fn : *M) {
     // Walk through an promote all of the alloc_box's that we can.
-    for (auto &BB : Fn) {
-      auto I = BB.begin(), E = BB.end();
-      while (I != E) {
-        if (auto *AI = dyn_cast<AssignInst>(I)) {
-          ++I;
-          processAssign(AI);
-          continue;
-        }
-
-        auto *ABI = dyn_cast<AllocBoxInst>(I);
-        if (ABI == nullptr) {
-          ++I;
-          continue;
-        }
-
-        optimizeAllocBox(ABI);
-
-        // Carefully move iterator to avoid invalidation problems.
-        ++I;
-        if (ABI->use_empty())
-          ABI->eraseFromParent();
-      }
-    }
+    checkDefiniteInitialization(Fn);
+    
+    // Lower raw-sil only instructions used by this pass, like "assign".
+    lowerRawSILOperations(Fn);
   }
 }
 
