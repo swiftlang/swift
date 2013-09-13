@@ -1012,16 +1012,14 @@ ConstructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
   auto tuple = dyn_cast<TuplePattern>(Arguments);
   if (tuple && tuple->getNumFields() == 0) {
     out << "init";
-    out.flush();
-    return StringRef(buffer.data(), buffer.size());
+    return out.str();
   }
 
   // If it's not a tuple at all, it's the unary selector "init:".
   // FIXME: Diagnose this?
   if (!tuple) {
     out << "init:";
-    out.flush();
-    return StringRef(buffer.data(), buffer.size());
+    return out.str();
   }
 
   // For every element, add a selector component.
@@ -1039,7 +1037,7 @@ ConstructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
     out << ':';
   }
 
-  return StringRef(buffer.data(), buffer.size());
+  return out.str();
 }
 
 Type
