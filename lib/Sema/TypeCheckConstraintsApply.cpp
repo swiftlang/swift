@@ -2661,13 +2661,13 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   return finishApply(apply, openedType, locator);
 }
 
-void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
-                            Type objectTy,
-                            MutableArrayRef<Type> otherTypes,
-                            SourceLoc loc,
-                            TypeSubstitutionMap &substitutions,
-                            ConformanceMap &conformances,
-                            GenericParamList *&genericParams) {
+static void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
+                                   Type objectTy,
+                                   MutableArrayRef<Type> otherTypes,
+                                   SourceLoc loc,
+                                   TypeSubstitutionMap &substitutions,
+                                   ConformanceMap &conformances,
+                                   GenericParamList *&genericParams) {
   ConstraintSystem cs(tc, nullptr);
 
   // The archetypes that have been opened up and replaced with type variables.
