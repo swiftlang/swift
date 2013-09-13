@@ -310,6 +310,11 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(sil_block, SIL_ONE_VALUE_ONE_OPERAND);
   RECORD(sil_block, SIL_ONE_TYPE);
   RECORD(sil_block, SIL_ONE_OPERAND);
+  RECORD(sil_block, SIL_INST_TODO);
+
+  BLOCK(SIL_INDEX_BLOCK);
+  RECORD(sil_block, SIL_FUNC_NAMES);
+  RECORD(sil_block, SIL_FUNC_OFFSETS);
 
   BLOCK(KNOWN_PROTOCOL_BLOCK);
 #define PROTOCOL(Id) RECORD(index_block, Id);

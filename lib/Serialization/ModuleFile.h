@@ -78,6 +78,9 @@ class ModuleFile {
   /// The cursor used to lazily load things from the file.
   llvm::BitstreamCursor DeclTypeCursor;
 
+  llvm::BitstreamCursor SILCursor;
+  llvm::BitstreamCursor SILIndexCursor;
+
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
 
@@ -107,6 +110,7 @@ private:
   /// All of this module's link-time dependencies.
   SmallVector<LinkLibrary, 8> LinkLibraries;
 
+public:
   template <typename T>
   class Serialized {
   private:
@@ -146,6 +150,7 @@ private:
     }
   };
 
+private:
   /// Decls referenced by this module.
   std::vector<Serialized<Decl*>> Decls;
 
@@ -266,9 +271,6 @@ private:
                 Optional<DeclContext *> ForcedContext = {},
                 std::function<void(Decl*)> DidRecord = nullptr);
 
-  /// Returns the type with the given ID, deserializing it if needed.
-  Type getType(serialization::TypeID TID);
-
   /// Returns the identifier with the given ID, deserializing it if needed.
   Identifier getIdentifier(serialization::IdentifierID IID);
 
@@ -377,6 +379,16 @@ public:
     // FIXME: This seems fragile, maybe store the filename separately ?
     return InputFile->getBufferIdentifier();
   }
+
+  llvm::BitstreamCursor getSILCursor() const {
+    return SILCursor;
+  }
+  llvm::BitstreamCursor getSILIndexCursor() const {
+    return SILIndexCursor;
+  }
+
+  /// Returns the type with the given ID, deserializing it if needed.
+  Type getType(serialization::TypeID TID);
 };
 
 class SerializedModule : public LoadedModule {

@@ -16,11 +16,52 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
 
+// This is a template-only header; eventually it should move to llvm/Support.
+#include "clang/Basic/OnDiskHashTable.h"
+
+#include "llvm/ADT/StringExtras.h"
+
 using namespace swift;
 using namespace swift::serialization;
 using namespace swift::serialization::sil_block;
 
 namespace {
+    /// Used to serialize the on-disk func hash table.
+  class FuncTableInfo {
+  public:
+    using key_type = Identifier;
+    using key_type_ref = key_type;
+    using data_type = DeclID;
+    using data_type_ref = const data_type &;
+
+    uint32_t ComputeHash(key_type_ref key) {
+      assert(!key.empty());
+      return llvm::HashString(key.str());
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      using namespace clang::io;
+      uint32_t keyLength = key.str().size();
+      uint32_t dataLength = sizeof(DeclID);
+      Emit16(out, keyLength);
+      Emit16(out, dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      out << key.str();
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(sizeof(DeclID) <= 32, "DeclID too large");
+      using namespace clang::io;
+      Emit32(out, data);
+    }
+  };
+
   class SILSerializer {
     Serializer &S;
     ASTContext &Ctx;
@@ -42,15 +83,11 @@ namespace {
 
     TypeID addTypeRef(Type ty);
 
-    /// All identifiers that need to be serialized.
-    std::vector<Identifier> IdentifiersToWrite;
-    llvm::DenseMap<Identifier, IdentifierID> IdentifierIDs;
-    IdentifierID LastIdentifierID = 0;
-
-    IdentifierID addIdentifierRef(Identifier ident);
-    IdentifierID addIdentifierRef(StringRef SR) {
-      return addIdentifierRef(Ctx.getIdentifier(SR.data()));
-    }
+    using TableData = FuncTableInfo::data_type;
+    using Table = llvm::DenseMap<FuncTableInfo::key_type, TableData>;
+    Table FuncTable;
+    std::vector<BitOffset> Funcs;
+    DeclID FuncID;
 
     std::array<unsigned, 256> SILAbbrCodes;
     template <typename Layout>
@@ -60,25 +97,23 @@ namespace {
                     "layout has invalid record code");
       SILAbbrCodes[Layout::Code] = Layout::emitAbbrev(Out);
     }
-  public:
-    SILSerializer(Serializer &S, ASTContext &Ctx, const SILModule *M,
-                  llvm::BitstreamWriter &Out);
 
     void writeSILFunction(const SILFunction &F);
     void writeSILBasicBlock(const SILBasicBlock &BB);
     void writeSILInstruction(const SILInstruction &SI);
+    void writeFuncTable();
+
+  public:
+    SILSerializer(Serializer &S, ASTContext &Ctx,
+                  llvm::BitstreamWriter &Out);
+
+    void writeAllSILFunctions(const SILModule *M);
   };
 } // end anonymous namespace
 
 SILSerializer::SILSerializer(Serializer &S, ASTContext &Ctx,
-                             const SILModule *M,
                              llvm::BitstreamWriter &Out) :
-                            S(S), Ctx(Ctx), Out(Out) {
-  registerSILAbbr<SILFunctionLayout>();
-  registerSILAbbr<SILBasicBlockLayout>();
-  registerSILAbbr<SILOneValueOneOperandLayout>();
-  registerSILAbbr<SILOneTypeLayout>();
-  registerSILAbbr<SILOneOperandLayout>();
+                            S(S), Ctx(Ctx), Out(Out), FuncID(1) {
 }
 
 TypeID SILSerializer::addTypeRef(Type ty) {
@@ -93,22 +128,10 @@ TypeID SILSerializer::addTypeRef(Type ty) {
     /// to map Builtin types to their typealiases.
     return 0;
   default:
+    // FIXME: call S.addTypeRef(ty), right now, it causes problems.
+    (void)S;
     return 0;
-    return S.addTypeRef(ty);
   }
-}
-
-IdentifierID SILSerializer::addIdentifierRef(Identifier ident) {
-  if (ident.empty())
-    return 0;
-
-  IdentifierID &id = IdentifierIDs[ident];
-  if (id != 0)
-    return id;
-
-  id = ++LastIdentifierID;
-  IdentifiersToWrite.push_back(ident);
-  return id;
 }
 
 /// We enumerate all valus to update ValueIDs in a separate pass
@@ -126,12 +149,13 @@ ValueID SILSerializer::addValueRef(const ValueBase *Val) {
 }
 
 void SILSerializer::writeSILFunction(const SILFunction &F) {
+  FuncTable[Ctx.getIdentifier(F.getName())] = FuncID++;
+  Funcs.push_back(Out.GetCurrentBitNo());
   InstID = 0;
   unsigned abbrCode = SILAbbrCodes[SILFunctionLayout::Code];
+  TypeID FnID = addTypeRef(F.getLoweredType().getSwiftType());
   SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                       (unsigned)F.getLinkage(),
-                       addIdentifierRef(F.getName()),
-                       addTypeRef(F.getLoweredType().getSwiftType()));
+                       (unsigned)F.getLinkage(), FnID);
   for (const SILBasicBlock &BB : F)
     writeSILBasicBlock(BB);
 }
@@ -155,8 +179,12 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
 
 void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   switch (SI.getKind()) {
-  default:
+  default: {
+    unsigned abbrCode = SILAbbrCodes[SILInstTodoLayout::Code];
+    SILInstTodoLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                  (unsigned)SI.getKind());
     break;
+  }
   case ValueKind::AllocStackInst: {
     const AllocStackInst *ASI = cast<AllocStackInst>(&SI);
     unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
@@ -192,17 +220,64 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 }
 
+void SILSerializer::writeFuncTable() {
+  using clang::OnDiskChainedHashTableGenerator;
+
+  if (FuncTable.empty())
+    return;
+
+  SmallVector<uint64_t, 8> scratch;
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    OnDiskChainedHashTableGenerator<FuncTableInfo> generator;
+    for (auto &entry : FuncTable)
+      generator.insert(entry.first, entry.second);
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    clang::io::Emit32(blobStream, 0);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  unsigned abbrCode = SILAbbrCodes[FuncListLayout::Code];
+  FuncListLayout::emitRecord(Out, ScratchRecord, abbrCode, tableOffset,
+                             hashTableBlob);
+
+  abbrCode = SILAbbrCodes[FuncOffsetLayout::Code];
+  FuncOffsetLayout::emitRecord(Out, ScratchRecord, abbrCode, Funcs);
+}
+
+void SILSerializer::writeAllSILFunctions(const SILModule *M) {
+  {
+    BCBlockRAII subBlock(Out, SIL_BLOCK_ID, 4);
+    registerSILAbbr<SILFunctionLayout>();
+    registerSILAbbr<SILBasicBlockLayout>();
+    registerSILAbbr<SILOneValueOneOperandLayout>();
+    registerSILAbbr<SILOneTypeLayout>();
+    registerSILAbbr<SILOneOperandLayout>();
+    registerSILAbbr<SILInstTodoLayout>();
+
+    // Go through all SILFunctions in M, and if it is transparent,
+    // write out the SILFunction.
+    for (const SILFunction &F : *M) {
+      if (F.isTransparent())
+        writeSILFunction(F);
+    }
+  }
+  {
+    BCBlockRAII restoreBlock(Out, SIL_INDEX_BLOCK_ID, 4);
+    registerSILAbbr<FuncListLayout>();
+    registerSILAbbr<FuncOffsetLayout>();
+    writeFuncTable();
+  }
+}
+
 void Serializer::writeSILFunctions(const SILModule *M) {
   if (!M)
     return;
 
-  BCBlockRAII restoreBlock(Out, SIL_BLOCK_ID, 4);
-  SILSerializer SILSer(*this, TU->Ctx, M, Out);
+  SILSerializer SILSer(*this, TU->Ctx, Out);
+  SILSer.writeAllSILFunctions(M);
 
-  // Go through all SILFunctions in M, and if it is transparent,
-  // write out the SILFunction.
-  for (const SILFunction &F : *M) {
-    if (F.isTransparent())
-      SILSer.writeSILFunction(F);
-  }
 }

@@ -408,8 +408,23 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
       break;
     }
 
-    // FIXME: for now, skip the SIL block.
+    case SIL_INDEX_BLOCK_ID: {
+      // Save the cursor.
+      SILIndexCursor = cursor;
+      SILIndexCursor.EnterSubBlock(SIL_INDEX_BLOCK_ID);
+
+      // With the main cursor, skip over the block and continue.
+      if (cursor.SkipBlock())
+        return error();
+      break;
+    }
+
     case SIL_BLOCK_ID: {
+      // Save the cursor.
+      SILCursor = cursor;
+      SILCursor.EnterSubBlock(SIL_BLOCK_ID);
+
+      // With the main cursor, skip over the block and continue.
       if (cursor.SkipBlock())
         return error();
       break;

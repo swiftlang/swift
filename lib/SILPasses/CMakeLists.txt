@@ -4,6 +4,7 @@ add_swift_library(swiftSILPasses
   ConstantPropagation.cpp
   DataflowDiagnostics.cpp
   DeadCodeElimination.cpp
+  Link.cpp
   MandatoryInlining.cpp
   MemoryPromotion.cpp
   StackToSSA.cpp

@@ -170,6 +170,10 @@ namespace swift {
   /// user code.
   void performSILDeadCodeElimination(SILModule *M);
 
+  /// \brief Link a SILFunction declaration to the actual definition in the
+  /// serialized modules.
+  void performSILLinking(SILModule *M);
+
   /// \brief Analyze the SIL module for correcntess and generate user
   /// diagnostics if any.
   void emitSILDataflowDiagnostics(const SILModule *M);

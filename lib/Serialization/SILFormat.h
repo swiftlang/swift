@@ -39,13 +39,31 @@ namespace sil_block {
     SIL_BASIC_BLOCK,
     SIL_ONE_VALUE_ONE_OPERAND,
     SIL_ONE_TYPE,
-    SIL_ONE_OPERAND
+    SIL_ONE_OPERAND,
+    SIL_INST_TODO,
+    SIL_FUNC_NAMES,
+    SIL_FUNC_OFFSETS
   };
+
+  using SILInstTodoLayout = BCRecordLayout<
+    SIL_INST_TODO,
+    SILInstOpCodeField
+  >;
+
+  using FuncListLayout = BCRecordLayout<
+    SIL_FUNC_NAMES,
+    BCVBR<16>,  // table offset within the blob
+    BCBlob // map from identifier strings to func IDs.
+  >;
+
+  using FuncOffsetLayout = BCRecordLayout<
+    SIL_FUNC_OFFSETS,
+    BCArray<BitOffsetField>
+  >;
 
   using SILFunctionLayout = BCRecordLayout<
     SIL_FUNCTION,
     BCFixed<2>,        //linkage
-    IdentifierIDField, //name
     TypeIDField
   >;
 
