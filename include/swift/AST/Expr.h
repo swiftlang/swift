@@ -1639,13 +1639,12 @@ public:
   ArrayRef<ValueDecl*> getCaptures() const { return Captures; }
   void setCaptures(ArrayRef<ValueDecl*> C) { Captures = C; }
 
-  /// getLocalCaptures - Return a filtered list of the captures for this
-  /// function, filtering out global variables.  This list returns the list that
+  /// \brief Return a filtered list of the captures for this function,
+  /// filtering out global variables.  This function returns the list that
   /// actually needs to be closed over.
-  std::vector<ValueDecl*> getLocalCaptures() const;
+  std::vector<ValueDecl *> getLocalCaptures() const;
 
-  /// hasLocalCaptures - Return true if getLocalCaptures() will return a
-  /// non-empty list.
+  /// \returns true if getLocalCaptures() will return a non-empty list.
   bool hasLocalCaptures() const;
 
   /// Returns the parameter patterns of the function, using
