@@ -677,9 +677,17 @@ public:
             "result of ref_element_addr must be lvalue");
     require(!EI->getField()->isProperty(),
             "cannot get address of logical property with ref_element_addr");
-
-    // FIXME: Verify type of instruction. This requires type substitution for
-    // generic types.
+    SILType operandTy = EI->getOperand().getType();
+    ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
+    require(cd, "ref_element_addr operand must be a class instance");
+    
+    require(EI->getField()->getDeclContext() == cd,
+            "ref_element_addr field must be a member of the class");
+    
+    Type fieldTy = operandTy.getSwiftRValueType()
+      ->getTypeOfMember(cd->getModuleContext(), EI->getField(), nullptr);
+    require(fieldTy->isEqual(EI->getType().getSwiftRValueType()),
+            "result of ref_element_addr does not match type of field");
   }
   
   CanType getMethodSelfType(AnyFunctionType *ft) {
