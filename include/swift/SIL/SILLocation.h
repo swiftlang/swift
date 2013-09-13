@@ -368,6 +368,8 @@ class InlinedLocation : public SILLocation {
 public:
   InlinedLocation(Expr *CallSite) : SILLocation(CallSite, InlinedKind) {}
 
+  InlinedLocation(Decl *D) : SILLocation(D, InlinedKind) {}
+
   /// Constructs an inlined location when the call site is represented by a
   /// SILFile location.
   InlinedLocation(SourceLoc L) : SILLocation(InlinedKind) {

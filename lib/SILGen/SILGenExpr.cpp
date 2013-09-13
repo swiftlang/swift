@@ -1986,7 +1986,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
                                        forwardingSubs);
   
   SILValue initedSelfValue
-    = B.createApply(Loc, initVal.forward(*this), selfTy, args);
+    = B.createApply(Loc, initVal.forward(*this), selfTy, args,
+                    initConstant.isTransparent());
   
   // Return the initialized 'self'.
   B.createReturn(Loc, initedSelfValue);
