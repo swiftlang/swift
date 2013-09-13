@@ -357,7 +357,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
   // Create the appropriate messenger function.
   // FIXME: this needs to be target-specific.
   llvm::Constant *messenger;
-  if (indirectResult) {
+  if (indirectResult && IGF.IGM.TargetInfo.ObjCUseStret) {
     messenger = isSuper
       ? IGF.IGM.getObjCMsgSendSuperStretFn()
       : IGF.IGM.getObjCMsgSendStretFn();
