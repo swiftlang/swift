@@ -695,7 +695,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
       Scope = llvm::DILexicalBlock(Scope).getContext();
   }
 
-  if (!Scope.Verify())
+  if (!(Scope.Verify() && Scope.isScope()))
     return;
 
   llvm::DIFile Unit = getFile(Scope);
