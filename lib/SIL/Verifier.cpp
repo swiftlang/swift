@@ -1319,8 +1319,8 @@ public:
     require(SOI->getOperand().getType().isObject(),
             "switch_union operand must be an object");
     
-    UnionDecl *uDecl
-      = SOI->getOperand().getType().getUnionOrBoundGenericUnion();
+    CanType uTy = SOI->getOperand().getType().getSwiftRValueType();
+    UnionDecl *uDecl = uTy->getUnionOrBoundGenericUnion();
     require(uDecl, "switch_union operand is not a union");
     
     // Find the set of union elements for the type so we can verify
@@ -1330,7 +1330,7 @@ public:
     llvm::DenseSet<UnionElementDecl*> unswitchedElts;
     uDecl->getAllElements(unswitchedElts);
     
-    // Verify the set of unions we dispatch on.
+    // Verify the set of union cases we dispatch on.
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
       UnionElementDecl *elt;
       SILBasicBlock *dest;
@@ -1352,13 +1352,12 @@ public:
                 "arguments");
 
         if (dest->getBBArgs().size() == 1) {
-          /* FIXME: To verify the destination argument type we need to apply
-             generic substitutions.
-          Type eltArgTy = elt->getArgumentType();
+          Type eltArgTy = uTy->getTypeOfMember(uDecl->getModuleContext(),
+                                               elt, nullptr,
+                                               elt->getArgumentType());
           CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
           require(eltArgTy->isEqual(bbArgTy),
                   "switch_union destination bbarg must match case arg type");
-           */
           require(!dest->getBBArgs()[0]->getType().isAddress(),
                   "switch_union destination bbarg type must not be an address");
         }
@@ -1382,8 +1381,8 @@ public:
     require(SOI->getOperand().getType().isAddress(),
             "destructive_switch_union_addr operand must be an object");
     
-    UnionDecl *uDecl
-      = SOI->getOperand().getType().getUnionOrBoundGenericUnion();
+    CanType uTy = SOI->getOperand().getType().getSwiftRValueType();
+    UnionDecl *uDecl = uTy->getUnionOrBoundGenericUnion();
     require(uDecl, "destructive_switch_union_addr operand must be a union");
     
     // Find the set of union elements for the type so we can verify
@@ -1393,7 +1392,7 @@ public:
     llvm::DenseSet<UnionElementDecl*> unswitchedElts;
     uDecl->getAllElements(unswitchedElts);
     
-    // Verify the set of unions we dispatch on.
+    // Verify the set of union cases we dispatch on.
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
       UnionElementDecl *elt;
       SILBasicBlock *dest;
@@ -1414,14 +1413,13 @@ public:
                 "destructive_switch_union_addr destination for case w/ args "
                 "must take an argument");
         
-        /* FIXME: To verify the dest argument type, we need to apply generic
-           substitutions.
-        Type eltArgTy = elt->getArgumentType();
+        Type eltArgTy = uTy->getTypeOfMember(uDecl->getModuleContext(),
+                                             elt, nullptr,
+                                             elt->getArgumentType());
         CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
         require(eltArgTy->isEqual(bbArgTy),
                 "destructive_switch_union_addr destination bbarg must match "
                 "case arg type");
-         */
         require(dest->getBBArgs()[0]->getType().isAddress(),
                 "destructive_switch_union_addr destination bbarg type must "
                 "be an address");
