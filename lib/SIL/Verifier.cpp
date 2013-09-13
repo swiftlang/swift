@@ -655,16 +655,20 @@ public:
     SILType operandTy = EI->getOperand().getType();
     require(operandTy.isAddress(),
             "must derive struct_element_addr from address");
-    require(operandTy.is<StructType>()
-            || operandTy.is<BoundGenericStructType>(),
-            "must derive struct_element_addr from struct address");
+    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    require(sd, "struct_element_addr operand must be struct address");
     require(EI->getType(0).isAddress(),
             "result of struct_element_addr must be address");
     require(!EI->getField()->isProperty(),
             "cannot get address of logical property with struct_element_addr");
 
-    // FIXME: Verify type of instruction. This requires type substitution for
-    // generic types.
+    require(EI->getField()->getDeclContext() == sd,
+            "struct_element_addr field is not a member of the struct");
+    
+    Type fieldTy = operandTy.getSwiftRValueType()
+      ->getTypeOfMember(sd->getModuleContext(), EI->getField(), nullptr);
+    require(fieldTy->isEqual(EI->getType().getSwiftRValueType()),
+            "result of struct_element_addr does not match type of field");
   }
 
   void checkRefElementAddrInst(RefElementAddrInst *EI) {
