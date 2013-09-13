@@ -27,22 +27,34 @@ void SILValue::replaceAllUsesWith(SILValue V) {
     (**use_begin()).set(V);
 }
 
-static unsigned getFuncNaturalUncurryLevel(CapturingExpr *func) {
-  assert(func && "no function body?!");
-  assert(func->getParamPatterns().size() >= 1 && "no arguments for func?!");
-  unsigned level = func->getParamPatterns().size() - 1;
+static unsigned getFuncNaturalUncurryLevel(PipeClosureExpr *CE) {
+  assert(CE->getParamPatterns().size() >= 1 && "no arguments for func?!");
+  unsigned Level = CE->getParamPatterns().size() - 1;
   // Functions with captures have an extra uncurry level for the capture
   // context.
-  if (func->hasLocalCaptures())
-    level += 1;
-  return level;
+  if (CE->hasLocalCaptures())
+    Level += 1;
+  return Level;
 }
 
-static unsigned getFuncNaturalUncurryLevel(FuncDecl *fd) {
-  if (fd->getFuncExpr())
-    return getFuncNaturalUncurryLevel(fd->getFuncExpr());
-  // Assume func decls without bodies (e.g., builtins) have uncurry level zero.
-  return 0;
+static unsigned getFuncNaturalUncurryLevel(ClosureExpr *CE) {
+  assert(CE->getParamPatterns().size() >= 1 && "no arguments for func?!");
+  unsigned Level = CE->getParamPatterns().size() - 1;
+  // Functions with captures have an extra uncurry level for the capture
+  // context.
+  if (CE->hasLocalCaptures())
+    Level += 1;
+  return Level;
+}
+
+static unsigned getFuncNaturalUncurryLevel(FuncDecl *FD) {
+  assert(FD->getArgParamPatterns().size() >= 1 && "no arguments for func?!");
+  unsigned Level = FD->getArgParamPatterns().size() - 1;
+  // Functions with captures have an extra uncurry level for the capture
+  // context.
+  if (FD->hasLocalCaptures())
+    Level += 1;
+  return Level;
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,

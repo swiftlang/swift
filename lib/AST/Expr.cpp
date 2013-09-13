@@ -277,21 +277,6 @@ ArchetypeSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
          "use SubscriptExpr for non-archetype type subscript");
 }
 
-ArrayRef<Pattern *> CapturingExpr::getParamPatterns() {
-  if (auto *func = dyn_cast<FuncExpr>(this))
-    return func->getDecl()->getArgParamPatterns();
-  if (auto *closure = dyn_cast<PipeClosureExpr>(this))
-    return closure->getParams();
-  if (auto *closure = dyn_cast<ClosureExpr>(this))
-    return closure->getParamPatterns();
-  llvm_unreachable("unknown capturing expr");
-}
-
-ArrayRef<const Pattern *> CapturingExpr::getParamPatterns() const {
-  auto patterns = const_cast<CapturingExpr*>(this)->getParamPatterns();
-  return ArrayRef<const Pattern *>(patterns.data(), patterns.size());
-}
-
 FuncExpr *FuncExpr::create(ASTContext &C, DeclContext *Parent) {
   return new (C) FuncExpr(Parent);
 }

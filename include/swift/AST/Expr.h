@@ -1647,11 +1647,6 @@ public:
   /// \returns true if getLocalCaptures() will return a non-empty list.
   bool hasLocalCaptures() const;
 
-  /// Returns the parameter patterns of the function, using
-  /// FuncExpr::getArgParamPatterns or ClosureExpr::getParamPatterns.
-  ArrayRef<Pattern *> getParamPatterns();
-  ArrayRef<const Pattern *> getParamPatterns() const;
-
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_CapturingExpr &&
            E->getKind() <= ExprKind::Last_CapturingExpr;
@@ -1715,6 +1710,9 @@ public:
   Pattern *getParams() { return params.getPointer(); }
   const Pattern *getParams() const { return params.getPointer(); }
   void setParams(Pattern *p) { params.setPointer(p); }
+
+  ArrayRef<Pattern *> getParamPatterns() { return getParams(); }
+  ArrayRef<const Pattern *> getParamPatterns() const { return getParams(); }
 
   /// \brief Determine whether the parameters of this closure are actually
   /// anonymous closure variables.
