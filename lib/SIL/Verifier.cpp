@@ -437,25 +437,30 @@ public:
   }
   
   void checkUnionInst(UnionInst *UI) {
-    require(UI->getType().getUnionOrBoundGenericUnion(),
-            "UnionInst must return a union");
-    require(UI->getElement()->getParentUnion()
-              == UI->getType().getUnionOrBoundGenericUnion(),
+    UnionDecl *ud = UI->getType().getUnionOrBoundGenericUnion();
+    require(ud, "UnionInst must return a union");
+    require(UI->getElement()->getParentUnion() == ud,
             "UnionInst case must be a case of the result union type");
     require(UI->getType().isObject(),
             "UnionInst must produce an object");
     require(UI->hasOperand() == UI->getElement()->hasArgumentType(),
             "UnionInst must take an argument iff the element does");
     
-    // FIXME: Match up generic parameters of generic unions to check the type
-    // of the operand.
+    if (UI->getElement()->hasArgumentType()) {
+      require(UI->getOperand().getType().isObject(),
+              "UnionInst operand must be an object");
+      Type caseTy = UI->getType().getSwiftRValueType()
+        ->getTypeOfMember(ud->getModuleContext(), UI->getElement(), nullptr,
+                          UI->getElement()->getArgumentType());
+      require(caseTy->isEqual(UI->getOperand().getType().getSwiftRValueType()),
+              "UnionInst operand type does not match type of case");
+    }
   }
 
   void checkUnionDataAddrInst(UnionDataAddrInst *UI) {
-    require(UI->getOperand().getType().getUnionOrBoundGenericUnion(),
-            "UnionDataAddrInst must take a union operand");
-    require(UI->getElement()->getParentUnion()
-              == UI->getOperand().getType().getUnionOrBoundGenericUnion(),
+    UnionDecl *ud = UI->getOperand().getType().getUnionOrBoundGenericUnion();
+    require(ud, "UnionDataAddrInst must take a union operand");
+    require(UI->getElement()->getParentUnion() == ud,
             "UnionDataAddrInst case must be a case of the union operand type");
     require(UI->getElement()->hasArgumentType(),
             "UnionDataAddrInst case must have a data type");
@@ -464,8 +469,12 @@ public:
     require(UI->getType().isAddress(),
             "UnionDataAddrInst must produce an address");
     
-    // FIXME: Match up generic parameters of generic unions to check the type
-    // of the result.
+    Type caseTy = UI->getOperand().getType().getSwiftRValueType()
+      ->getTypeOfMember(ud->getModuleContext(), UI->getElement(), nullptr,
+                        UI->getElement()->getArgumentType());
+    
+    require(caseTy->isEqual(UI->getType().getSwiftRValueType()),
+            "UnionDataAddrInst result does not match type of union case");
   }
   
   void checkInjectUnionAddrInst(InjectUnionAddrInst *IUAI) {
