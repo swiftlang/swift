@@ -100,7 +100,7 @@ public:
       DC = DD;
       return;
     }
-    DC = cast<FuncDecl>(AFD)->getFuncExpr();
+    DC = cast<FuncDecl>(AFD);
   }
 
   StmtChecker(TypeChecker &TC, PipeClosureExpr *TheClosure)
@@ -596,13 +596,13 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
 
   // Check the default argument definitions.
   for (auto pattern : FD->getBodyParamPatterns()) {
-    checkDefaultArguments(*this, pattern, FD->getFuncExpr()->getParent());
+    checkDefaultArguments(*this, pattern, FD->getParent());
   }
 
   BraceStmt *BS = FD->getBody();
   assert(BS && "Should have a body");
 
-  StmtChecker SC(*this, FD);
+  StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(FD));
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
   bool HadError = SC.typeCheckStmt(BS);
 

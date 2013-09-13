@@ -357,9 +357,9 @@ void DiagnosticEngine::flushActiveDiagnostic() {
               ppDecl = cast<NominalTypeDecl>(dc);
               break;
 
-            case DeclContextKind::FuncExpr:
             case DeclContextKind::PipeClosureExpr:
             case DeclContextKind::ClosureExpr:
+            case DeclContextKind::FuncDecl:
             case DeclContextKind::ConstructorDecl:
             case DeclContextKind::DestructorDecl:
               break;

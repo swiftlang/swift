@@ -2091,7 +2091,7 @@ public:
 class OperatorDecl;
 
 /// FuncDecl - 'func' declaration.
-class FuncDecl : public AbstractFunctionDecl {
+class FuncDecl : public AbstractFunctionDecl, public DeclContext {
   friend class AbstractFunctionDecl;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
@@ -2114,8 +2114,9 @@ class FuncDecl : public AbstractFunctionDecl {
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
            SourceLoc NameLoc, unsigned NumParamPatterns,
            GenericParamList *GenericParams, Type Ty,
-           FuncExpr *TheFuncExprBody, DeclContext *DC)
-    : AbstractFunctionDecl(DeclKind::Func, DC, Name, nullptr, GenericParams),
+           FuncExpr *TheFuncExprBody, DeclContext *Parent)
+    : AbstractFunctionDecl(DeclKind::Func, Parent, Name, nullptr, GenericParams),
+      DeclContext(DeclContextKind::FuncDecl, Parent),
       StaticLoc(StaticLoc),
       FuncLoc(FuncLoc), NameLoc(NameLoc),
       TheFuncExprBody(TheFuncExprBody), OverriddenDecl(nullptr),
@@ -2140,7 +2141,7 @@ public:
                                       GenericParamList *GenericParams, Type Ty,
                                       unsigned NumParamPatterns,
                                       FuncExpr *TheFuncExprBody,
-                                      DeclContext *DC);
+                                      DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
                           SourceLoc FuncLoc, Identifier Name, SourceLoc NameLoc,
@@ -2148,7 +2149,7 @@ public:
                           ArrayRef<Pattern *> ArgParams,
                           ArrayRef<Pattern *> BodyParams,
                           FuncExpr *TheFuncExprBody, TypeLoc FnRetType,
-                          DeclContext *DC);
+                          DeclContext *Parent);
 
   bool isStatic() const {
     return FuncDeclBits.Static;
@@ -2325,6 +2326,12 @@ public:
   }
 
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::FuncDecl;
+  }
+
+  using DeclContext::operator new;
+  using Decl::getASTContext;
 };
 
 /// \brief This represents a case of a 'union' or 'enum' declaration.

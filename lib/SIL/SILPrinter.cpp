@@ -119,14 +119,14 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
       Buffer << BM->Name << ".";
     return;
 
-  case DeclContextKind::FuncExpr:
   case DeclContextKind::PipeClosureExpr:
   case DeclContextKind::ClosureExpr:
     // FIXME
     Buffer << "<anonymous function>";
     return;
-      
+
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::FuncDecl:
   case DeclContextKind::ConstructorDecl:
   case DeclContextKind::DestructorDecl:
     llvm_unreachable("unhandled context kind in SILPrint!");

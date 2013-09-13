@@ -592,18 +592,17 @@ ParserResult<Expr> Parser::parseExprNew() {
 }
 
 static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
-                                                   DeclContext *dc,
-                                                   SourceLoc loc) {
-  if (ConstructorDecl *ctor = dyn_cast<ConstructorDecl>(dc)) {
-    return ctor->getImplicitSelfDecl();
-  } else if (DestructorDecl *dtor = dyn_cast<DestructorDecl>(dc)) {
-    return dtor->getImplicitSelfDecl();
-  } else if (FuncExpr *fe = dyn_cast<FuncExpr>(dc)) {
-    auto selfDecl = fe->getDecl()->getImplicitSelfDecl();
-    if (selfDecl)
-      return selfDecl;
+                                                   DeclContext *DC,
+                                                   SourceLoc Loc) {
+  if (auto *FD = dyn_cast<FuncDecl>(DC)) {
+    if (auto *SelfDecl = FD->getImplicitSelfDecl())
+      return SelfDecl;
+  } else if (auto *CD = dyn_cast<ConstructorDecl>(DC)) {
+    return CD->getImplicitSelfDecl();
+  } else if (auto *DD = dyn_cast<DestructorDecl>(DC)) {
+    return DD->getImplicitSelfDecl();
   }
-  P.diagnose(loc, diag::super_not_in_class_method);
+  P.diagnose(Loc, diag::super_not_in_class_method);
   return nullptr;
 }
 
@@ -1105,8 +1104,8 @@ Expr *Parser::parseExprIdentifier() {
 }
 
 // Note: defined below.
-static void AddFuncArgumentsToScope(const Pattern *pat, DeclContext *DC,
-                                    Parser &P);
+static void addFunctionParametersToScope(const Pattern *Pat, DeclContext *DC,
+                                         Parser &P);
 
 bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
                                             SourceLoc &arrowLoc,
@@ -1286,7 +1285,7 @@ Expr *Parser::parseExprClosure() {
   // Handle parameters.
   if (params) {
     // Add the parameters into scope.
-    AddFuncArgumentsToScope(params, closure, *this);
+    ::addFunctionParametersToScope(params, closure, *this);
   } else {
     // There are no parameters; allow anonymous closure variables.
     // FIXME: We could do this all the time, and then provide Fix-Its
@@ -1721,18 +1720,16 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
       new (Context) DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc));
 }
 
-/// AddFuncArgumentsToScope - Walk the type specified for a Func object (which
-/// is known to be a FunctionType on the outer level) creating and adding named
-/// arguments to the current scope.  This causes redefinition errors to be
-/// emitted.
-static void AddFuncArgumentsToScope(const Pattern *pat, DeclContext *DC,
-                                    Parser &P) {
-  switch (pat->getKind()) {
+/// \brief Walk the given pattern adding named parameters to the current scope.
+/// This also causes redefinition errors to be emitted.
+static void addFunctionParametersToScope(const Pattern *Pat, DeclContext *DC,
+                                         Parser &P) {
+  switch (Pat->getKind()) {
   case PatternKind::Named: {
     // Reparent the decl and add it to the scope.
-    VarDecl *var = cast<NamedPattern>(pat)->getDecl();
-    var->setDeclContext(DC);
-    P.addToScope(var);
+    VarDecl *VD = cast<NamedPattern>(Pat)->getDecl();
+    VD->setDeclContext(DC);
+    P.addToScope(VD);
     return;
   }
 
@@ -1740,32 +1737,31 @@ static void AddFuncArgumentsToScope(const Pattern *pat, DeclContext *DC,
     return;
 
   case PatternKind::Paren:
-    AddFuncArgumentsToScope(cast<ParenPattern>(pat)->getSubPattern(), DC, P);
+    addFunctionParametersToScope(cast<ParenPattern>(Pat)->getSubPattern(),
+                                 DC, P);
     return;
 
   case PatternKind::Typed:
-    AddFuncArgumentsToScope(cast<TypedPattern>(pat)->getSubPattern(), DC, P);
+    addFunctionParametersToScope(cast<TypedPattern>(Pat)->getSubPattern(),
+                                 DC, P);
     return;
 
   case PatternKind::Tuple:
-    for (const TuplePatternElt &field : cast<TuplePattern>(pat)->getFields())
-      AddFuncArgumentsToScope(field.getPattern(), DC, P);
+    for (const TuplePatternElt &field : cast<TuplePattern>(Pat)->getFields())
+      addFunctionParametersToScope(field.getPattern(), DC, P);
     return;
 #define PATTERN(Id, Parent)
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #include "swift/AST/PatternNodes.def"
     llvm_unreachable("pattern can't appear as a func argument!");
   }
-  
+
   llvm_unreachable("bad pattern kind!");
 }
 
-FuncExpr *Parser::actOnFuncExprStart(ArrayRef<Pattern *> ArgParams,
-                                     ArrayRef<Pattern *> BodyParams) {
-  FuncExpr *FE = FuncExpr::create(Context, CurDeclContext);
-
-  for (Pattern *P : BodyParams)
-    AddFuncArgumentsToScope(P, FE, *this);
-
-  return FE;
+void Parser::addFunctionParametersToScope(ArrayRef<Pattern *> BodyPatterns,
+                                          DeclContext *DC) {
+  for (Pattern *P : BodyPatterns)
+    ::addFunctionParametersToScope(P, DC, *this);
 }
+

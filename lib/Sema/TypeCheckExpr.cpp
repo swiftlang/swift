@@ -502,11 +502,15 @@ namespace {
 
   public:
     FindCapturedVars(TypeChecker &tc, llvm::SetVector<ValueDecl*> &captures,
+                     FuncDecl *FD)
+        : tc(tc), captures(captures) {
+      CurExprAsDC = FD;
+    }
+
+    FindCapturedVars(TypeChecker &tc, llvm::SetVector<ValueDecl*> &captures,
                      CapturingExpr *curExpr)
         : tc(tc), captures(captures) {
-      if (auto *FE = dyn_cast<FuncExpr>(curExpr))
-        CurExprAsDC = FE;
-      else if (auto *CE = dyn_cast<PipeClosureExpr>(curExpr))
+      if (auto *CE = dyn_cast<PipeClosureExpr>(curExpr))
         CurExprAsDC = CE;
       else
         CurExprAsDC = cast<ClosureExpr>(curExpr);
@@ -564,19 +568,28 @@ namespace {
   };
 }
 
-void TypeChecker::computeCaptures(CapturingExpr *capturing) {
-  llvm::SetVector<ValueDecl*> Captures;
-  FindCapturedVars finder(*this, Captures, capturing);
-  if (auto closure = dyn_cast<ClosureExpr>(capturing))
-    finder.doWalk(closure->getBody());
-  else if (auto closure = dyn_cast<PipeClosureExpr>(capturing))
-    finder.doWalk(closure->getBody());
-  else {
-    auto func = cast<FuncExpr>(capturing);
-    finder.doWalk(func->getDecl()->getBody());
-  }
-  ValueDecl** CaptureCopy
-    = Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
-  capturing->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
+void TypeChecker::computeCaptures(FuncDecl *FD) {
+  llvm::SetVector<ValueDecl *> Captures;
+  FindCapturedVars finder(*this, Captures, FD);
+  finder.doWalk(FD->getBody());
+  ValueDecl **CaptureCopy =
+      Context.AllocateCopy<ValueDecl *>(Captures.begin(), Captures.end());
+  FD->getFuncExpr()->setCaptures(
+      llvm::makeArrayRef(CaptureCopy, Captures.size()));
 }
 
+void TypeChecker::computeCaptures(CapturingExpr *capturing) {
+  llvm::SetVector<ValueDecl *> Captures;
+  FindCapturedVars finder(*this, Captures, capturing);
+
+  if (auto closure = dyn_cast<ClosureExpr>(capturing))
+    finder.doWalk(closure->getBody());
+  else {
+    auto CE = dyn_cast<PipeClosureExpr>(capturing);
+    finder.doWalk(CE->getBody());
+  }
+
+  ValueDecl **CaptureCopy =
+      Context.AllocateCopy<ValueDecl *>(Captures.begin(), Captures.end());
+  capturing->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
+}

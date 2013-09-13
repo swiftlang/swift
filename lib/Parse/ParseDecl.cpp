@@ -1137,15 +1137,16 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Scope S(this, ScopeKind::FunctionBody);
 
       // Start the function.
-      FuncExpr *GetFn = actOnFuncExprStart(Params, Params);
+      FuncExpr *GetFn = FuncExpr::create(Context, CurDeclContext);
       Get = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), GetLoc,
                              Identifier(), GetLoc, /*GenericParams=*/nullptr,
                              Type(), Params, Params, GetFn, ElementTy,
                              CurDeclContext);
       GetFn->setDecl(Get);
+      addFunctionParametersToScope(Get->getBodyParamPatterns(), Get);
 
       // Establish the new context.
-      ContextChange CC(*this, GetFn);
+      ContextChange CC(*this, Get);
 
       SmallVector<ExprStmtOrDecl, 16> Entries;
       parseBraceItems(Entries, false /*NotTopLevel*/,
@@ -1238,15 +1239,16 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
     // Start the function.
     Type SetterRetTy = TupleType::getEmpty(Context);
-    FuncExpr *SetFn = actOnFuncExprStart(Params, Params);
+    FuncExpr *SetFn = FuncExpr::create(Context, CurDeclContext);
     Set = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), SetLoc,
                            Identifier(), SetLoc, /*generic=*/nullptr, Type(),
                            Params, Params, SetFn,
                            TypeLoc::withoutLoc(SetterRetTy), CurDeclContext);
     SetFn->setDecl(Set);
+    addFunctionParametersToScope(Set->getBodyParamPatterns(), Set);
 
     // Establish the new context.
-    ContextChange CC(*this, SetFn);
+    ContextChange CC(*this, Set);
     
     // Parse the body.
     SmallVector<ExprStmtOrDecl, 16> Entries;
@@ -1602,12 +1604,14 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
         return SignatureStatus;
 
       // Create function AST nodes.
-      FuncExpr *FE = actOnFuncExprStart(ArgParams, BodyParams);
+      FuncExpr *FE = FuncExpr::create(Context, CurDeclContext);
       FuncDecl *FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name,
                                       NameLoc, GenericParams, Type(), ArgParams,
                                       BodyParams, FE, FuncRetTy, CurDeclContext);
       FE->setDecl(FD);
       FD->setBodySkipped(Tok.getLoc());
+
+      addFunctionParametersToScope(FD->getBodyParamPatterns(), FD);
 
       // Pass the function signature to code completion.
       CodeCompletion->setDelayedParsedDecl(FD);
@@ -1621,7 +1625,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   {
     Scope S(this, ScopeKind::FunctionBody);
 
-    FuncExpr *FE = actOnFuncExprStart(ArgParams, BodyParams);
+    FuncExpr *FE = FuncExpr::create(Context, CurDeclContext);
 
     // Create the decl for the func and add it to the parent scope.
     FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name, NameLoc,
@@ -1629,16 +1633,18 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
                           FE, FuncRetTy, CurDeclContext);
     FE->setDecl(FD);
 
+    addFunctionParametersToScope(FD->getBodyParamPatterns(), FD);
+
     // Now that we have a context, update the generic parameters with that
     // context.
     if (GenericParams) {
       for (auto Param : *GenericParams) {
-        Param.setDeclContext(FE);
+        Param.setDeclContext(FD);
       }
     }
-    
+
     // Establish the new context.
-    ContextChange CC(*this, FE);
+    ContextChange CC(*this, FD);
 
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
@@ -1703,7 +1709,7 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
 
   // Re-enter the lexical scope.
   Scope S(this, FunctionParserState->takeScope());
-  ContextChange CC(*this, FD->getFuncExpr());
+  ContextChange CC(*this, FD);
 
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::func_decl_without_brace);

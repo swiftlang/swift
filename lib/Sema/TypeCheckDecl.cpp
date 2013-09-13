@@ -1190,9 +1190,9 @@ public:
     }
 
     badType =
-        badType || semaFuncParamPatterns(FE, FD->getArgParamPatterns());
+        badType || semaFuncParamPatterns(FD, FD->getArgParamPatterns());
     badType =
-        badType || semaFuncParamPatterns(FE, FD->getBodyParamPatterns());
+        badType || semaFuncParamPatterns(FD, FD->getBodyParamPatterns());
 
     if (badType) {
       FE->setType(ErrorType::get(TC.Context));
@@ -1358,8 +1358,6 @@ public:
 
     semaFuncDecl(FD, /*consumeAttributes=*/!builder);
 
-    FuncExpr *body = FD->getFuncExpr();
-
     // If we have generic parameters, create archetypes now.
     if (builder) {
       // Infer requirements from the parameters of the function.
@@ -1372,13 +1370,13 @@ public:
         builder->inferRequirements(resultType);
 
       // Assign archetypes.
-      finalizeGenericParamList(*builder, FD->getGenericParams(), body);
+      finalizeGenericParamList(*builder, FD->getGenericParams(), FD);
 
       // Go through and revert all of the dependent types we computed.
 
       // Revert the result type.
       if (!FD->getBodyResultTypeLoc().isNull()) {
-        revertDependentTypeLoc(FD->getBodyResultTypeLoc(), body);
+        revertDependentTypeLoc(FD->getBodyResultTypeLoc(), FD);
       }
 
       // Revert the argument patterns.
@@ -1386,7 +1384,7 @@ public:
       if (FD->getDeclContext()->isTypeContext())
         argPatterns = argPatterns.slice(1);
       for (auto argPattern : argPatterns) {
-        revertDependentPattern(argPattern, body);
+        revertDependentPattern(argPattern, FD);
       }
 
       // Revert the body patterns.
@@ -1394,7 +1392,7 @@ public:
       if (FD->getDeclContext()->isTypeContext())
         bodyPatterns = bodyPatterns.slice(1);
       for (auto bodyPattern : bodyPatterns) {
-        revertDependentPattern(bodyPattern, body);
+        revertDependentPattern(bodyPattern, FD);
       }
 
       // Clear out the types.

@@ -579,6 +579,14 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     printName(os, cast<Module>(dc)->Name);
     break;
 
+  case DeclContextKind::PipeClosureExpr:
+    os << "pipe closure";
+    break;
+
+  case DeclContextKind::ClosureExpr:
+    os << "closure";
+    break;
+
   case DeclContextKind::NominalTypeDecl:
     printName(os, cast<NominalTypeDecl>(dc)->getName());
     break;
@@ -593,28 +601,20 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     os << "extension";
     break;
 
+  case DeclContextKind::TopLevelCodeDecl:
+    os << "top-level code";
+    break;
+
+  case DeclContextKind::FuncDecl:
+    os << "func decl";
+    break;
+
   case DeclContextKind::ConstructorDecl:
     os << "constructor";
     break;
 
   case DeclContextKind::DestructorDecl:
     os << "destructor";
-    break;
-
-  case DeclContextKind::FuncExpr:
-    os << "func expr";
-    break;
-
-  case DeclContextKind::PipeClosureExpr:
-    os << "pipe closure";
-    break;
-
-  case DeclContextKind::ClosureExpr:
-    os << "closure";
-    break;
-
-  case DeclContextKind::TopLevelCodeDecl:
-    os << "top-level code";
     break;
   }
 }

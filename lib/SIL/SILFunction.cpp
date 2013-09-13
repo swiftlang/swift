@@ -35,8 +35,8 @@ void SILFunction::setDeclContext(Decl *D) {
   if (!D)
     return;
   switch (D->getKind()) {
-  case DeclKind::Func:        DeclCtx = cast<FuncDecl>(D)->getFuncExpr(); break;
-  // These three dual-inherit from DeclContext.
+  // These four dual-inherit from DeclContext.
+  case DeclKind::Func:        DeclCtx = cast<FuncDecl>(D); break;
   case DeclKind::Constructor: DeclCtx = cast<ConstructorDecl>(D); break;
   case DeclKind::Extension:   DeclCtx = cast<ExtensionDecl>(D);   break;
   case DeclKind::Destructor:  DeclCtx = cast<DestructorDecl>(D);  break;
@@ -54,8 +54,7 @@ void SILFunction::setDeclContext(Expr *E) {
 
   switch (E->getKind()) {
   case ExprKind::Func:
-    DeclCtx = dyn_cast<FuncExpr>(E);
-    return;
+    llvm_unreachable("should not set DeclContext from FuncExpr");
 
   case ExprKind::PipeClosure:
     DeclCtx = dyn_cast<PipeClosureExpr>(E);

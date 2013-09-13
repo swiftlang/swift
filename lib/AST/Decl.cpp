@@ -679,14 +679,14 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        GenericParamList *GenericParams,
                                        Type Ty, unsigned NumParamPatterns,
                                        FuncExpr *TheFuncExprBody,
-                                       DeclContext *DC) {
+                                       DeclContext *Parent) {
   assert(NumParamPatterns > 0);
   void *Mem = Context.Allocate(
       sizeof(FuncDecl) + 2 * NumParamPatterns * sizeof(Pattern *),
       alignof(FuncDecl));
   return ::new (Mem)
       FuncDecl(StaticLoc, FuncLoc, Name, NameLoc, NumParamPatterns,
-               GenericParams, Ty, TheFuncExprBody, DC);
+               GenericParams, Ty, TheFuncExprBody, Parent);
 }
 
 FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
@@ -695,12 +695,12 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            Type Ty, ArrayRef<Pattern *> ArgParams,
                            ArrayRef<Pattern *> BodyParams,
                            FuncExpr *TheFuncExprBody, TypeLoc FnRetType,
-                           DeclContext *DC) {
+                           DeclContext *Parent) {
   assert(ArgParams.size() == BodyParams.size());
   const unsigned NumParamPatterns = ArgParams.size();
   auto *FD = FuncDecl::createDeserialized(
       Context, StaticLoc, FuncLoc, Name, NameLoc, GenericParams, Ty,
-      NumParamPatterns, TheFuncExprBody, DC);
+      NumParamPatterns, TheFuncExprBody, Parent);
   FD->setDeserializedSignature(ArgParams, BodyParams, FnRetType);
   return FD;
 }

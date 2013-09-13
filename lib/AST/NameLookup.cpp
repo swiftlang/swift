@@ -293,16 +293,16 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     ValueDecl *MetaBaseDecl = 0;
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
-    if (FuncExpr *FE = dyn_cast<FuncExpr>(DC)) {
+    if (auto *FD = dyn_cast<FuncDecl>(DC)) {
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       // FIXME: when we can parse and typecheck the function body partially for
-      // code completion, FE->getBody() check can be removed.
-      if (Loc.isValid() && FE->getDecl()->getBody()) {
+      // code completion, FD->getBody() check can be removed.
+      if (Loc.isValid() && FD->getBody()) {
         FindLocalVal localVal(SM, Loc, Name);
-        localVal.visit(FE->getDecl()->getBody());
+        localVal.visit(FD->getBody());
         if (!localVal.MatchingValue) {
-          for (Pattern *P : FE->getDecl()->getBodyParamPatterns())
+          for (Pattern *P : FD->getBodyParamPatterns())
             localVal.checkPattern(P);
         }
         if (localVal.MatchingValue) {
@@ -311,8 +311,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         }
       }
 
-      FuncDecl *FD = FE->getDecl();
-      if (FD && FD->getExtensionType()) {
+      if (FD->getExtensionType()) {
         ExtendedType = FD->getExtensionType();
         BaseDecl = FD->getImplicitSelfDecl();
         if (NominalType *NT = ExtendedType->getAs<NominalType>())
@@ -326,8 +325,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       }
 
       // Look in the generic parameters after checking our local declaration.
-      if (FD)
-        GenericParams = FD->getGenericParams();
+      GenericParams = FD->getGenericParams();
     } else if (PipeClosureExpr *CE = dyn_cast<PipeClosureExpr>(DC)) {
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.

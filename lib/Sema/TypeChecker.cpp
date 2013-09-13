@@ -591,12 +591,12 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       TC.typeCheckFunctionBody(FD);
     }
 
-    // Compute captures for the function expressions we visited, in the
-    // opposite order of type checking. i.e., the nested DefinedFunctions will be
-    // visited before the outer DefinedFunctions.
+    // Compute captures for functions we visited, in the opposite order of type
+    // checking. i.e., the nested DefinedFunctions will be visited before the
+    // outer DefinedFunctions.
     for (unsigned i = currentFunctionIdx; i > previousFunctionIdx; --i) {
       if (auto *FD = dyn_cast<FuncDecl>(DefinedFunctions[i-1]))
-        TC.computeCaptures(FD->getFuncExpr());
+        TC.computeCaptures(FD);
     }
 
     for (unsigned n = TC.Context.ExternalDefinitions.size();

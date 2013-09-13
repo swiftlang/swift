@@ -33,10 +33,10 @@ ASTContext &DeclContext::getASTContext() {
 Type DeclContext::getDeclaredTypeOfContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:
-  case DeclContextKind::FuncExpr:
   case DeclContextKind::PipeClosureExpr:
   case DeclContextKind::ClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::FuncDecl:
   case DeclContextKind::ConstructorDecl:
   case DeclContextKind::DestructorDecl:
     return Type();
@@ -54,10 +54,10 @@ Type DeclContext::getDeclaredTypeOfContext() const {
 Type DeclContext::getDeclaredTypeInContext() {
   switch (getContextKind()) {
     case DeclContextKind::Module:
-    case DeclContextKind::FuncExpr:
     case DeclContextKind::PipeClosureExpr:
     case DeclContextKind::ClosureExpr:
     case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::FuncDecl:
     case DeclContextKind::ConstructorDecl:
     case DeclContextKind::DestructorDecl:
       return Type();
@@ -76,17 +76,17 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
     case DeclContextKind::TopLevelCodeDecl:
       return nullptr;
 
-    case DeclContextKind::FuncExpr: {
-      auto *FD = cast<FuncExpr>(this)->getDecl();
+    case DeclContextKind::PipeClosureExpr:
+    case DeclContextKind::ClosureExpr:
+      return nullptr;
+
+    case DeclContextKind::FuncDecl: {
+      auto *FD = cast<FuncDecl>(this);
       if (auto GP = FD->getGenericParams())
         return GP;
 
       return FD->getDeclContext()->getGenericParamsOfContext();
     }
-
-    case DeclContextKind::PipeClosureExpr:
-    case DeclContextKind::ClosureExpr:
-      return nullptr;
 
     case DeclContextKind::ConstructorDecl: {
       auto constructor = cast<ConstructorDecl>(this);
@@ -139,14 +139,14 @@ bool DeclContext::isGenericContext() const {
     case DeclContextKind::Module:
       return false;
 
-    case DeclContextKind::FuncExpr:
-      if (cast<FuncExpr>(dc)->getDecl()->getGenericParams())
-        return true;
-      break;
-
     case DeclContextKind::PipeClosureExpr:
     case DeclContextKind::ClosureExpr:
       // Check parent context.
+      break;
+
+    case DeclContextKind::FuncDecl:
+      if (cast<FuncDecl>(dc)->getGenericParams())
+        return true;
       break;
 
     case DeclContextKind::ConstructorDecl:
@@ -179,31 +179,30 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   const char *Kind;
   switch (getContextKind()) {
   case DeclContextKind::Module:           Kind = "Module"; break;
-  case DeclContextKind::FuncExpr:         Kind = "FuncExpr"; break;
   case DeclContextKind::PipeClosureExpr:  Kind = "PipeClosureExpr"; break;
   case DeclContextKind::ClosureExpr:      Kind = "ClosureExpr"; break;
   case DeclContextKind::NominalTypeDecl:  Kind = "NominalTypeDecl"; break;
   case DeclContextKind::ExtensionDecl:    Kind = "ExtensionDecl"; break;
   case DeclContextKind::TopLevelCodeDecl: Kind = "TopLevelCodeDecl"; break;
+  case DeclContextKind::FuncDecl:         Kind = "FuncDecl"; break;
   case DeclContextKind::ConstructorDecl:  Kind = "ConstructorDecl"; break;
   case DeclContextKind::DestructorDecl:   Kind = "DestructorDecl"; break;
   }
   OS.indent(Depth*2) << "0x" << (void*)this << " " << Kind;
 
-  if (auto *FE = dyn_cast<FuncExpr>(this)) {
-    auto *FD = FE->getDecl();
-    OS << " FuncExpr=" << FD->getName()
-       << ": " << FD->getType().getString();
-  }
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
+    OS << " decl=" << NTD->getName();
+
   if (auto *CE = dyn_cast<PipeClosureExpr>(this)) {
     OS << ": " << CE->getType().getString();
   }
   if (auto *CE = dyn_cast<ClosureExpr>(this)) {
     OS << ": " << CE->getType().getString();
   }
-
-  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
-    OS << " decl=" << NTD->getName();
+  if (auto *FD = dyn_cast<FuncDecl>(this)) {
+    OS << " FuncDecl=" << FD->getName()
+       << ": " << FD->getType().getString();
+  }
 
   OS << "\n";
   return Depth + 1;

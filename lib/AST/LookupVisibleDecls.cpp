@@ -412,20 +412,19 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     const ValueDecl *MetaBaseDecl = nullptr;
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
-    if (auto FE = dyn_cast<FuncExpr>(DC)) {
-      for (auto *P : FE->getDecl()->getArgParamPatterns())
+    if (auto *FD = dyn_cast<FuncDecl>(DC)) {
+      for (auto *P : FD->getArgParamPatterns())
         FindLocalVal(SM, Loc, Consumer).checkPattern(P);
 
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       // FIXME: when we can parse and typecheck the function body partially for
-      // code completion, FE->getBody() check can be removed.
-      if (Loc.isValid() && FE->getDecl()->getBody()) {
-        FindLocalVal(SM, Loc, Consumer).visit(FE->getDecl()->getBody());
+      // code completion, FD->getBody() check can be removed.
+      if (Loc.isValid() && FD->getBody()) {
+        FindLocalVal(SM, Loc, Consumer).visit(FD->getBody());
       }
 
-      FuncDecl *FD = FE->getDecl();
-      if (FD && FD->getExtensionType()) {
+      if (FD->getExtensionType()) {
         ExtendedType = FD->getExtensionType();
         BaseDecl = FD->getImplicitSelfDecl();
         MetaBaseDecl = ExtendedType->getAnyNominal();
@@ -436,8 +435,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       }
 
       // Look in the generic parameters after checking our local declaration.
-      if (FD)
-        GenericParams = FD->getGenericParams();
+      GenericParams = FD->getGenericParams();
     } else if (auto CE = dyn_cast<PipeClosureExpr>(DC)) {
       if (Loc.isValid()) {
         FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());

@@ -587,12 +587,12 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
     return ND;
   if (auto ED = dyn_cast<ExtensionDecl>(D))
     return ED;
+  if (auto FD = dyn_cast<FuncDecl>(D))
+    return FD;
   if (auto CD = dyn_cast<ConstructorDecl>(D))
     return CD;
   if (auto DD = dyn_cast<DestructorDecl>(D))
     return DD;
-  if (auto FD = dyn_cast<FuncDecl>(D))
-    return FD->getFuncExpr();
 
   llvm_unreachable("unknown DeclContext kind");
 }
@@ -963,7 +963,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     if (genericParams)
       for (auto &genericParam : *fn->getGenericParams())
-        genericParam.getAsTypeParam()->setDeclContext(body);
+        genericParam.getAsTypeParam()->setDeclContext(fn);
 
     fn->setOverriddenDecl(cast_or_null<FuncDecl>(getDecl(overriddenID)));
 

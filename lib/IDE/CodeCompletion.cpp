@@ -362,9 +362,9 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   /// \returns true on success, false on failure.
   bool typecheckContext() {
     // Type check the function that contains the expression.
-    if (CurDeclContext->getContextKind() == DeclContextKind::FuncExpr ||
-        CurDeclContext->getContextKind() == DeclContextKind::PipeClosureExpr ||
-        CurDeclContext->getContextKind() == DeclContextKind::ClosureExpr) {
+    if (CurDeclContext->getContextKind() == DeclContextKind::PipeClosureExpr ||
+        CurDeclContext->getContextKind() == DeclContextKind::ClosureExpr ||
+        CurDeclContext->getContextKind() == DeclContextKind::FuncDecl) {
       SourceLoc EndTypeCheckLoc =
           ParsedExpr ? ParsedExpr->getStartLoc()
                      : TU->Ctx.SourceMgr.getCodeCompletionLoc();
@@ -373,10 +373,10 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
       // For now, just find the nearest outer function.
       DeclContext *DCToTypeCheck = CurDeclContext;
       while (!DCToTypeCheck->isModuleContext() &&
-             !isa<FuncExpr>(DCToTypeCheck))
+             !isa<FuncDecl>(DCToTypeCheck))
         DCToTypeCheck = DCToTypeCheck->getParent();
-      if (auto *FE = dyn_cast<FuncExpr>(DCToTypeCheck))
-        return typeCheckFunctionBodyUntil(TU, CurDeclContext, FE->getDecl(),
+      if (auto *FD = dyn_cast<FuncDecl>(DCToTypeCheck))
+        return typeCheckFunctionBodyUntil(TU, CurDeclContext, FD,
                                           EndTypeCheckLoc);
       return false;
     }
@@ -521,8 +521,7 @@ public:
           break;
         FunctionDC = Parent;
       }
-      if (auto *FE = dyn_cast<FuncExpr>(FunctionDC)) {
-        auto *FD = FE->getDecl();
+      if (auto *FD = dyn_cast<FuncDecl>(FunctionDC)) {
         if (FD->getDeclContext()->isTypeContext()) {
           CurrMethodDC = FunctionDC;
           InsideStaticMethod = FD->isStatic();
@@ -1072,7 +1071,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     return;
 
   if (auto *FD = dyn_cast_or_null<FuncDecl>(DelayedParsedDecl))
-    CurDeclContext = FD->getFuncExpr();
+    CurDeclContext = FD;
 
   if (ParsedExpr && !typecheckParsedExpr())
     return;

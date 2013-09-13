@@ -796,8 +796,8 @@ namespace {
           TypeLoc::withoutLoc(resultTy), dc);
       result->setBodyResultType(resultTy);
       funcExpr->setDecl(result);
-      setVarDeclContexts(argPatterns, funcExpr);
-      setVarDeclContexts(bodyPatterns, funcExpr);
+      setVarDeclContexts(argPatterns, result);
+      setVarDeclContexts(bodyPatterns, result);
       return result;
     }
 
@@ -965,8 +965,8 @@ namespace {
       result->setBodyResultType(resultTy);
       funcExpr->setDecl(result);
 
-      setVarDeclContexts(argPatterns, funcExpr);
-      setVarDeclContexts(bodyPatterns, funcExpr);
+      setVarDeclContexts(argPatterns, result);
+      setVarDeclContexts(bodyPatterns, result);
 
       // Mark this as an Objective-C method.
       result->getMutableAttrs().ObjC = true;
@@ -1424,7 +1424,6 @@ namespace {
       // Create the getter body.
       auto funcExpr = FuncExpr::create(context, getter->getDeclContext());
       funcExpr->setType(getterType);
-      setVarDeclContexts(getterArgs, funcExpr);
 
       // Create the getter thunk.
       auto thunk = FuncDecl::create(context, SourceLoc(), getter->getLoc(),
@@ -1434,6 +1433,8 @@ namespace {
                                     getter->getDeclContext());
       funcExpr->setDecl(thunk);
       thunk->setBodyResultType(elementTy);
+
+      setVarDeclContexts(getterArgs, thunk);
 
       // Create the body of the thunk, which calls the Objective-C getter.
       auto selfRef = new (context) DeclRefExpr(selfVar, loc);
@@ -1540,7 +1541,6 @@ namespace {
       // Create the setter body.
       auto funcExpr = FuncExpr::create(context, setter->getDeclContext());
       funcExpr->setType(setterType);
-      setVarDeclContexts(setterArgs, funcExpr);
 
       // Create the setter thunk.
       auto thunk = FuncDecl::create(
@@ -1549,6 +1549,8 @@ namespace {
           TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc);
       funcExpr->setDecl(thunk);
       thunk->setBodyResultType(TupleType::getEmpty(context));
+
+      setVarDeclContexts(setterArgs, thunk);
 
       // Create the body of the thunk, which calls the Objective-C setter.
       auto valueVar = getSingleVar(setterArgs.back());
@@ -2509,7 +2511,6 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   // Create the getter body.
   auto funcExpr = FuncExpr::create(context, dc);
   funcExpr->setType(getterType);
-  setVarDeclContexts(getterArgs, funcExpr);
 
   // Create the getter function declaration.
   auto func = FuncDecl::create(context, SourceLoc(), SourceLoc(), Identifier(),
@@ -2518,6 +2519,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                dc);
   funcExpr->setDecl(func);
   func->setBodyResultType(type);
+
+  setVarDeclContexts(getterArgs, func);
 
   // Create the integer literal value.
   // FIXME: Handle other kinds of values.

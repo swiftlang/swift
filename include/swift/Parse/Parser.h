@@ -499,7 +499,10 @@ public:
 
   ParserResult<ConstructorDecl> parseDeclConstructor(unsigned Flags);
   ParserResult<DestructorDecl> parseDeclDestructor(unsigned Flags);
-  
+
+  void addFunctionParametersToScope(ArrayRef<Pattern *> BodyPatterns,
+                                    DeclContext *DC);
+
   ParserResult<OperatorDecl> parseDeclOperator(bool AllowTopLevel);
   ParserResult<OperatorDecl> parseDeclPrefixOperator(SourceLoc OperatorLoc,
                                                      SourceLoc PrefixLoc,
@@ -691,8 +694,6 @@ public:
 
   Expr *parseExprOperator();
   Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
-  FuncExpr *actOnFuncExprStart(ArrayRef<Pattern*> ArgPatterns,
-                               ArrayRef<Pattern*> BodyPatterns);
 
   //===--------------------------------------------------------------------===//
   // Statement Parsing

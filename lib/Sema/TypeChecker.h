@@ -441,6 +441,7 @@ public:
                             Type type);
   
   /// \brief Compute the set of captures for the given function or closure.
+  void computeCaptures(FuncDecl *FD);
   void computeCaptures(CapturingExpr *capturing);
 
   /// Return the type-of-reference of the given value.  This does not

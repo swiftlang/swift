@@ -1662,12 +1662,11 @@ public:
 /// FuncExpr - An explicit unnamed func definition, which can optionally
 /// have named arguments.
 ///    e.g.  func(a : int) -> int { return a+1 }
-class FuncExpr : public CapturingExpr, public DeclContext {
+class FuncExpr : public CapturingExpr {
   FuncDecl *TheFuncDecl;
 
   FuncExpr(DeclContext *Parent)
     : CapturingExpr(ExprKind::Func, Type()),
-      DeclContext(DeclContextKind::FuncExpr, Parent),
       TheFuncDecl(nullptr)
   {}
 
@@ -1681,13 +1680,6 @@ public:
   void setDecl(FuncDecl *f) { TheFuncDecl = f; }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Func; }
-  static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
-
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::FuncExpr;
-  }
-
-  using DeclContext::operator new;
 };
 
 /// An explicit unnamed func definition, which can optionally
