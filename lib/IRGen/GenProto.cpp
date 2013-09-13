@@ -995,6 +995,7 @@ namespace {
       Alignment align = TC.IGM.getWeakReferenceAlignment();
       assert(align == TC.IGM.getPointerAlignment() &&
              "[weak] alignment not pointer alignment; fix existential layout");
+      (void)align;
 
       // We need to build a new struct for the [weak] type because the weak
       // component is not necessarily pointer-sized.
@@ -2557,6 +2558,7 @@ namespace {
         CanType sigSelfTypeForImpl =
           CanType(cast<LValueType>(sigSelfType)->getObjectType());
         assert(isa<ArchetypeType>(sigSelfTypeForImpl));
+        (void)sigSelfTypeForImpl;
 
         auto &remappedSelfTI = IGF.getTypeInfo(implSelfType);
 
