@@ -19,6 +19,7 @@
 #ifndef SWIFT_SIL_SILDeclRef_H
 #define SWIFT_SIL_SILDeclRef_H
 
+#include "swift/AST/Decl.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -175,6 +176,14 @@ struct SILDeclRef {
   /// a function.
   bool isDefaultArgGenerator() const {
     return kind == Kind::DefaultArgGenerator;
+  }
+
+  /// \brief True if the function should be treated as transparent.
+  bool isTransparent() const {
+    return ( hasDecl() &&
+             getDecl()->getAttrs().isTransparent() ) ||
+           isUnionElement() ||
+           isDefaultArgGenerator();
   }
 
   bool operator==(SILDeclRef rhs) const {
