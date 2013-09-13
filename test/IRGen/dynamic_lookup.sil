@@ -1,0 +1,46 @@
+// RUN: %swift -emit-llvm -triple=x86_64-apple-darwin10 %s | FileCheck %s
+
+import swift
+import Builtin 
+
+class X {
+  func [objc] f() { }
+}
+
+// [objc] t.X.f (t.X)() -> ()
+sil @_TToC14dynamic_lookup1X1ffS0_FT_T_ : $[cc(objc_method), thin] ((), X) -> () {
+bb0(%0 : $X):
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK: define void @dynamic_lookup_br(%objc_object*)
+sil @dynamic_lookup_br : $[thin] (obj : DynamicLookup) -> () {
+bb0(%0 : $DynamicLookup):
+  %1 = alloc_box $DynamicLookup                   
+  store %0 to %1#1 : $*DynamicLookup
+  %3 = alloc_box $Optional<() -> ()>              
+  %4 = load %1#1 : $*DynamicLookup                
+  strong_retain %4 : $DynamicLookup
+  %6 = project_existential_ref %4 : $DynamicLookup
+
+  // CHECK: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(f)", align 8
+  // CHECK: [[HAS_SEL:%[0-9]]] = call i1 @swift_objcRespondsToSelector(%objc_object* [[OBJECT:%[0-9]+]], i8* [[SEL]]) #0
+  // CHECK: br i1 [[HAS_SEL]]
+  dynamic_method_br %6 : $Builtin.ObjCPointer, #X.f!1, bb1, bb2
+
+bb1(%8 : $[cc(objc_method), thin] ((), Builtin.ObjCPointer) -> ()):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %43 = tuple ()
+  return %43 : $()
+}
+
+sil @top_level_code : $[thin] () -> () {
+  %0 = tuple ()
+  %1 = return %0 : $()
+}

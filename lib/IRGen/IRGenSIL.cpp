@@ -1759,8 +1759,13 @@ void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
   LoweredBB &noMethodBB = getLoweredBB(i->getNoMethodBB());
 
   // Emit the swift_objcRespondsToSelector() call.
+  // FIXME: Make this work for properties, subscripts as well.
+  StringRef selector;
+  llvm::SmallString<64> selectorBuffer;
+  auto fnDecl = cast<FuncDecl>(i->getMember().getDecl());
+  selector = fnDecl->getObjCSelector(selectorBuffer);
   llvm::Value *object = getLoweredExplosion(i->getOperand()).claimNext();
-  llvm::Value *loadSel = emitObjCSelectorRefLoad("respondsToSelector:");
+  llvm::Value *loadSel = emitObjCSelectorRefLoad(selector);
   llvm::CallInst *call = Builder.CreateCall2(IGM.getObjCRespondsToSelectorFn(),
                                              object, loadSel);
   call->setDoesNotThrow();
