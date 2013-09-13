@@ -188,15 +188,12 @@ Type TypeChecker::applyGenericArguments(Type type,
                                                 unbound->getParent(),
                                                 genericArgTypes);
   // Check protocol conformance.
-  // FIXME: Should be able to check even when there are type variables
-  // present?
-  if (!BGT->hasSubstitutions() && !BGT->hasTypeVariable() &&
-      !BGT->isDependentType()) {
+  // FIXME: Should be able to check when there are type variables?
+  if (!BGT->isDependentType() && !BGT->hasTypeVariable()) {
     // FIXME: Record that we're checking substitutions, so we can't end up
     // with infinite recursion.
     TypeSubstitutionMap Substitutions;
     ConformanceMap Conformance;
-    auto genericParams = BGT->getDecl()->getGenericParams();
     unsigned Index = 0;
     for (Type Arg : BGT->getGenericArgs()) {
       auto GP = genericParams->getParams()[Index++];
@@ -204,7 +201,7 @@ Type TypeChecker::applyGenericArguments(Type type,
       Substitutions[Archetype] = Arg;
     }
 
-    if (checkSubstitutions(Substitutions, Conformance, loc, &Substitutions))
+    if (checkSubstitutions(Substitutions, Conformance, loc))
       return nullptr;
   }
 

@@ -854,10 +854,6 @@ public:
 
   ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
 
-  /// \brief Determine whether this bound generic type already has substitution
-  /// information that provides protocol conformances.
-  bool hasSubstitutions();
-
   /// \brief Retrieve the set of substitutions used to produce this bound
   /// generic type from the underlying generic type.
   ///

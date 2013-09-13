@@ -1130,12 +1130,6 @@ void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
     ID.AddPointer(P.getPointer());
 }
 
-bool BoundGenericType::hasSubstitutions() {
-  auto *canon = getCanonicalType()->castTo<BoundGenericType>();
-  const ASTContext &ctx = canon->getASTContext();
-  return (bool)ctx.getSubstitutions(canon);
-}
-
 bool ProtocolType::requiresClass() const {
   return getDecl()->requiresClass();
 }
