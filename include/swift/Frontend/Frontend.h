@@ -50,6 +50,7 @@ class CompilerInvocation {
   SmallVector<LinkLibrary, 4> LinkLibraries;
   std::string RuntimeIncludePath;
   std::string SDKPath;
+  std::vector<std::string> ExtraClangArgs;
 
   LangOptions LangOpts;
 
@@ -100,7 +101,7 @@ public:
     ImportSearchPaths = Paths;
   }
 
-  std::vector<std::string> getImportSearchPaths() const {
+  ArrayRef<std::string> getImportSearchPaths() const {
     return ImportSearchPaths;
   }
 
@@ -108,8 +109,16 @@ public:
     FrameworkSearchPaths = Paths;
   }
 
-  std::vector<std::string> getFrameworkSearchPaths() const {
+  ArrayRef<std::string> getFrameworkSearchPaths() const {
     return FrameworkSearchPaths;
+  }
+
+  void setExtraClangArgs(const std::vector<std::string> &Args) {
+    ExtraClangArgs = Args;
+  }
+
+  ArrayRef<std::string> getExtraClangArgs() const {
+    return ExtraClangArgs;
   }
 
   void addLinkLibrary(StringRef name, LibraryKind kind) {

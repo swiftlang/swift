@@ -76,7 +76,8 @@ public:
                                StringRef moduleCachePath,
                                ArrayRef<std::string> importSearchPaths = {},
                                ArrayRef<std::string> frameworkSearchPaths = {},
-                               StringRef overrideResourceDir = StringRef());
+                               StringRef overrideResourceDir = StringRef(),
+                               ArrayRef<std::string> extraArgs = {});
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;

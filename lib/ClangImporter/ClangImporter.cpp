@@ -85,7 +85,8 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
                                      StringRef moduleCachePath,
                                      ArrayRef<std::string> importSearchPaths,
                                      ArrayRef<std::string> frameworkSearchPaths,
-                                     StringRef overrideResourceDir) {
+                                     StringRef overrideResourceDir,
+                                     ArrayRef<std::string> extraArgs) {
   std::unique_ptr<ClangImporter> importer(new ClangImporter(ctx));
 
   // Create a Clang diagnostics engine.
@@ -149,6 +150,10 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
   } else {
     invocationArgStrs.push_back("-resource-dir");
     invocationArgStrs.push_back(overrideResourceDir);
+  }
+
+  for (auto extraArg : extraArgs) {
+    invocationArgStrs.push_back(extraArg);
   }
 
   std::vector<const char *> invocationArgs;
