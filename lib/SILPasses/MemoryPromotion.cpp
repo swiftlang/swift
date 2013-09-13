@@ -235,7 +235,7 @@ typedef SmallVector<StructOrTupleElement, 8> AccessPathTy;
 /// the alloc box, computing the access path.
 static void ComputeAccessPath(SILValue Pointer, AccessPathTy &AccessPath) {
   // If we got to the root, we're done.
-  while (!isa<AllocBoxInst>(Pointer)) {
+  while (!isa<AllocBoxInst>(Pointer) && !isa<MarkUninitializedInst>(Pointer)) {
     if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
       AccessPath.push_back(Fixnum<31, unsigned>(TEAI->getFieldNo()));
       Pointer = TEAI->getOperand();
@@ -376,7 +376,10 @@ namespace {
   /// ElementPromotion - This is the main heavy lifting for processing the uses
   /// of an element of an allocation.
   class ElementPromotion {
-    AllocBoxInst *TheAllocBox;
+    /// TheMemory - This is either an alloc_box instruction or a
+    /// mark_uninitialized instruction.  This represents the start of the
+    /// lifetime of the value being analyzed.
+    SILInstruction *TheMemory;
     unsigned ElementNumber;
     ElementUses &Uses;
     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
@@ -392,7 +395,7 @@ namespace {
     // element as a policy decision.
     bool HadError = false;
   public:
-    ElementPromotion(AllocBoxInst *TheAllocBox, unsigned ElementNumber,
+    ElementPromotion(SILInstruction *TheMemory, unsigned ElementNumber,
                      ElementUses &Uses);
 
     void doIt();
@@ -421,9 +424,9 @@ namespace {
 } // end anonymous namespace
 
 
-ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox,
+ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
                                    unsigned ElementNumber, ElementUses &Uses)
-  : TheAllocBox(TheAllocBox), ElementNumber(ElementNumber), Uses(Uses) {
+  : TheMemory(TheMemory), ElementNumber(ElementNumber), Uses(Uses) {
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -450,14 +453,14 @@ ElementPromotion::ElementPromotion(AllocBoxInst *TheAllocBox,
     }
   }
 
-  // If isn't really a use, but we account for the alloc_box as a use so we see
-  // it in our dataflow walks.
-  NonLoadUses.insert(TheAllocBox);
-  PerBlockInfo[TheAllocBox->getParent()].HasNonLoadUse = true;
+  // If isn't really a use, but we account for the alloc_box/mark_uninitialized
+  // as a use so we see it in our dataflow walks.
+  NonLoadUses.insert(TheMemory);
+  PerBlockInfo[TheMemory->getParent()].HasNonLoadUse = true;
 
-  // If there was not another store in the alloc_box block, then it is known to
-  // be not live out.
-  auto &BBInfo = PerBlockInfo[TheAllocBox->getParent()];
+  // If there was not another store in the memory definition block, then it is
+  // known to be not live out.
+  auto &BBInfo = PerBlockInfo[TheMemory->getParent()];
   if (BBInfo.Availability == LiveOutBlockState::IsUnknown)
     BBInfo.Availability = LiveOutBlockState::IsNotLiveOut;
 }
@@ -470,14 +473,18 @@ void ElementPromotion::diagnoseInitError(SILInstruction *Use,
   // optionally an access path to the uninitialized element.
   std::string Name;
   if (ValueDecl *VD =
-        dyn_cast_or_null<ValueDecl>(TheAllocBox->getLoc().getAsASTNode<Decl>()))
+        dyn_cast_or_null<ValueDecl>(TheMemory->getLoc().getAsASTNode<Decl>()))
     Name = VD->getName().str();
   else
     Name = "<unknown>";
 
   // If the overall memory allocation is a tuple with multiple elements,
   // then dive in to explain *which* element is being used uninitialized.
-  CanType AllocTy = TheAllocBox->getElementType().getSwiftRValueType();
+  CanType AllocTy;
+  if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory))
+    AllocTy = ABI->getElementType().getSwiftRValueType();
+  else
+    AllocTy = TheMemory->getType(0).getObjectType().getSwiftRValueType();
   getPathStringToElement(AllocTy, ElementNumber, Name);
   
   diagnose(Use->getModule(), Use->getLoc(), DiagMessage, Name);
@@ -487,8 +494,7 @@ void ElementPromotion::diagnoseInitError(SILInstruction *Use,
   // TODO: The QoI could be improved in many different ways here.  For example,
   // We could give some path information where the use was uninitialized, like
   // the static analyzer.
-  diagnose(Use->getModule(), TheAllocBox->getLoc(),
-           diag::variable_defined_here);
+  diagnose(Use->getModule(), TheMemory->getLoc(), diag::variable_defined_here);
 }
 
 
@@ -773,7 +779,7 @@ ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV,
 
       // If we found the allocation itself, then we are loading something that
       // is not defined at all yet.
-      if (TheInst == TheAllocBox)
+      if (TheInst == TheMemory)
         return DI_No;
 
       // If we're trying to compute a value (due to a load), check to see if the
@@ -843,7 +849,8 @@ void ElementUseCollector::addElementUses(unsigned BaseElt, SILType UseTy,
 }
 
 /// Given a tuple_element_addr or struct_element_addr, compute the new BaseElt
-/// implicit in the selected member, and recursively add uses of the instruction.
+/// implicit in the selected member, and recursively add uses of the
+/// instruction.
 void ElementUseCollector::
 collectElementUses(SILInstruction *ElementPtr, unsigned BaseElt) {
   // struct_element_addr P, #field indexes into the current element.
@@ -1068,7 +1075,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
 }
 
 
-static void optimizeAllocBox(AllocBoxInst *ABI) {
+static void processAllocBox(AllocBoxInst *ABI) {
   DEBUG(llvm::errs() << "*** MemPromotion looking at: " << *ABI << "\n");
 
   // Set up the datastructure used to collect the uses of the alloc_box.  The
@@ -1097,6 +1104,27 @@ static void optimizeAllocBox(AllocBoxInst *ABI) {
     ElementPromotion(ABI, EltNo++, Elt).doIt();
 }
 
+static void processMarkUninitialized(MarkUninitializedInst *MUI) {
+  DEBUG(llvm::errs() << "*** MemPromotion looking at: " << *MUI << "\n");
+  
+  // Set up the datastructure used to collect the uses of the
+  // mark_uninitialized.  The uses are bucketed up into the elements of the
+  // allocation that are being used.  This matters for element-wise tuples and
+  // fragile structs.
+  SmallVector<ElementUses, 1> Uses;
+  Uses.resize(getElementCount(MUI->getType().getObjectType()
+                                     .getSwiftRValueType()));
+  
+  // Walk the use list of the pointer, collecting them into the Uses array.
+  ElementUseCollector(Uses).collectUses(SILValue(MUI, 0), 0);
+  
+  // Process each scalar value in the uses array individually.
+  unsigned EltNo = 0;
+  for (auto &Elt : Uses)
+    ElementPromotion(MUI, EltNo++, Elt).doIt();
+}
+
+
 /// checkDefiniteInitialization - Check that all memory objects that require
 /// initialization before use are properly set and transform the code as
 /// required for flow-sensitive properties.
@@ -1105,7 +1133,7 @@ static void checkDefiniteInitialization(SILFunction &Fn) {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
       if (auto *ABI = dyn_cast<AllocBoxInst>(I)) {
-        optimizeAllocBox(ABI);
+        processAllocBox(ABI);
         
         // Carefully move iterator to avoid invalidation problems.
         ++I;
@@ -1113,7 +1141,10 @@ static void checkDefiniteInitialization(SILFunction &Fn) {
           ABI->eraseFromParent();
         continue;
       }
-        
+
+      if (auto *MUI = dyn_cast<MarkUninitializedInst>(I))
+        processMarkUninitialized(MUI);
+
       ++I;
     }
   }
