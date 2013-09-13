@@ -986,12 +986,14 @@ namespace {
       // If any of the union elements have address-only data, the union is
       // address-only.
       for (auto elt : D->getAllElements()) {
-        // Singleton elements do not affect address-only-ness.
+        // No-payload elements do not affect address-only-ness.
         if (!elt->hasArgumentType())
           continue;
         
-        // FIXME: Apply type substitution to the case's argument type.
-        auto eltType = elt->getArgumentType()->getCanonicalType();
+        auto eltType = unionType->getTypeOfMember(D->getModuleContext(),
+                                                  elt, nullptr,
+                                                  elt->getArgumentType())
+          ->getCanonicalType();
         auto &lowering = TC.getTypeLowering(eltType);
         if (lowering.isAddressOnly())
           return handleAddressOnly(unionType);
