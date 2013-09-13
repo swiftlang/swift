@@ -884,7 +884,7 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
 
   // If it's an empty tuple pattern, it's a nullary selector.
   if (tuple && tuple->getNumFields() == 0)
-    return StringRef(buffer.data(), buffer.size());
+    return out.str();
 
   // Otherwise, it's at least a unary selector.
   out << ':';
