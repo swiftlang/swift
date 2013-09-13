@@ -618,14 +618,18 @@ public:
             "cannot struct_extract from address");
     require(EI->getType().isObject(),
             "result of struct_extract cannot be address");
-    require(operandTy.is<StructType>()
-            || operandTy.is<BoundGenericStructType>(),
-            "must struct_extract from struct");
+    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    require(sd, "must struct_extract from struct");
     require(!EI->getField()->isProperty(),
             "cannot load logical property with struct_extract");
 
-    // FIXME: Verify type of instruction. This requires type substitution for
-    // generic types.
+    require(EI->getField()->getDeclContext() == sd,
+            "struct_extract field is not a member of the struct");
+    
+    Type fieldTy = operandTy.getSwiftRValueType()
+      ->getTypeOfMember(sd->getModuleContext(), EI->getField(), nullptr);
+    require(fieldTy->isEqual(EI->getType().getSwiftRValueType()),
+            "result of struct_extract does not match type of field");
   }
   
   void checkTupleElementAddrInst(TupleElementAddrInst *EI) {
@@ -658,7 +662,7 @@ public:
             "result of struct_element_addr must be address");
     require(!EI->getField()->isProperty(),
             "cannot get address of logical property with struct_element_addr");
-    
+
     // FIXME: Verify type of instruction. This requires type substitution for
     // generic types.
   }
