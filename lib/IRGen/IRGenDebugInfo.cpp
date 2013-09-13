@@ -644,6 +644,14 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& Builder,
                           llvm::dwarf::DW_TAG_auto_variable);
 }
 
+void IRGenDebugInfo::emitBoxVariableDeclaration(IRBuilder& Builder,
+                                                llvm::Value *Storage,
+                                                DebugTypeInfo Ty,
+                                                StringRef Name) {
+  emitVariableDeclaration(Builder, Storage, Ty, Name,
+                          llvm::dwarf::DW_TAG_auto_variable);
+}
+
 void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 llvm::Value *Storage,
                                                 DebugTypeInfo Ty,

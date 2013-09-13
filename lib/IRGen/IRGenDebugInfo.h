@@ -164,6 +164,13 @@ public:
                                     StringRef Name,
                                     swift::AllocStackInst *i);
 
+  /// Convenience function for heap-allocated boxed variables. Calls
+  /// emitVariableDeclaration internally.
+  void emitBoxVariableDeclaration(IRBuilder& Builder,
+                                  llvm::Value *Storage,
+                                  DebugTypeInfo Ty,
+                                  StringRef Name);
+
   /// Convenience function for variables that are function arguments.
   void emitArgVariableDeclaration(IRBuilder& Builder,
                                   llvm::Value *Storage,

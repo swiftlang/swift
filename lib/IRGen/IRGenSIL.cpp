@@ -2108,12 +2108,20 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   SILValue ptrValue(i, 1);
   const TypeInfo &type = getTypeInfo(i->getElementType());
 
-  OwnedAddress addr = type.allocateBox(*this, getNameForLoc(i->getLoc()));
+  auto Name = getNameForLoc(i->getLoc());
+  OwnedAddress addr = type.allocateBox(*this, Name);
   
   Explosion box(ExplosionKind::Maximal);
   box.add(addr.getOwner());
   setLoweredExplosion(boxValue, box);
   setLoweredAddress(ptrValue, addr.getAddress());
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitBoxVariableDeclaration
+      (Builder,
+       addr.getAddress().getAddress(),
+       DebugTypeInfo(i->getElementType().getSwiftType(), type),
+       Name);
+
 }
 
 void IRGenSILFunction::visitAllocArrayInst(swift::AllocArrayInst *i) {
