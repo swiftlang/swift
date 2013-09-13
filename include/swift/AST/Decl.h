@@ -1976,6 +1976,10 @@ protected:
   }
 
 public:
+  /// \brief If this is a method in a type extension for some type,
+  /// return that type, otherwise return Type().
+  Type getExtensionType() const;
+
   /// Returns true if the function has a body written in the source file.
   ///
   /// Note that a true return value does not imply that the body was actually
@@ -2203,11 +2207,7 @@ public:
   unsigned getNaturalArgumentCount() const {
     return getNumParamPatternsImpl();
   }
-  
-  /// \brief If this is a method in a type extension for some type,
-  /// return that type, otherwise return Type().
-  Type getExtensionType() const;
-  
+
   /// \brief If this is a method in a type extension for some type, compute
   /// and return the type to be used for the 'self' argument of the type
   /// (which varies based on whether the extended type is a reference type

@@ -656,6 +656,10 @@ VarDecl *AbstractFunctionDecl::getImplicitSelfDeclSlow() const {
   return nullptr;
 }
 
+Type AbstractFunctionDecl::getExtensionType() const {
+  return getDeclContext()->getDeclaredTypeInContext();
+}
+
 VarDecl *FuncDecl::getImplicitSelfDeclImpl() const {
   ArrayRef<const Pattern *> ArgParamPatterns = getArgParamPatterns();
   if (ArgParamPatterns.empty())
@@ -741,10 +745,6 @@ bool FuncDecl::hasLocalCaptures() const {
     return TheFuncExprBody->hasLocalCaptures();
 
   return false;
-}
-
-Type FuncDecl::getExtensionType() const {
-  return getDeclContext()->getDeclaredTypeInContext();
 }
 
 Type FuncDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
