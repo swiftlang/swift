@@ -25,6 +25,10 @@
 using namespace swift;
 using namespace Lowering;
 
+// FIXME: This is gross but temporary.
+#include "llvm/Support/CommandLine.h"
+extern llvm::cl::opt<bool> TLDefiniteInit;
+
 //===--------------------------------------------------------------------===//
 // SILGenFunction Class implementation
 //===--------------------------------------------------------------------===//
@@ -316,16 +320,36 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
     emitDefaultArgGenerators(decl, patterns);
   }
 
-  // Ignore prototypes.
-  if (!fd->getBody())
-    return;
+  // If this is a function at global scope, it may close over a global variable.
+  // If we're emitting top-level code, then emit a "mark_function_escape" that
+  // lists the captured global variables so that definite initialization can
+  // reason about this escape point.
+  if (TLDefiniteInit &&
+      // FIXME: Is this the right check?  What about methods in classes?
+      !fd->getDeclContext()->isLocalContext() &&
+      TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()) {
+    SmallVector<SILValue, 4> Captures;
+   
+    for (auto Capture : fd->getCaptures()) {
+      auto It = TopLevelSGF->VarLocs.find(Capture);
+      if (It == TopLevelSGF->VarLocs.end()) continue;
+      Captures.push_back(It->second.address);
+    }
+    
+    if (!Captures.empty())
+      TopLevelSGF->B.createMarkFunctionEscape(fd, Captures);
+  }
+  
+  // Emit the actual body of the function to a new SILFunction.  Ignore
+  // prototypes.
+  if (fd->getBody()) {
+    PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
-  PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
-
-  SILDeclRef constant(decl);
-  SILFunction *f = preEmitFunction(constant, fd, fd);
-  SILGenFunction(*this, *f).emitFunction(fd);
-  postEmitFunction(constant, f);
+    SILDeclRef constant(decl);
+    SILFunction *f = preEmitFunction(constant, fd, fd);
+    SILGenFunction(*this, *f).emitFunction(fd);
+    postEmitFunction(constant, f);
+  }
 }
 
 void SILGenModule::emitCurryThunk(SILDeclRef entryPoint,
