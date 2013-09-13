@@ -173,9 +173,6 @@ bool ValueDecl::isSettableOnBase(Type baseType) const {
           baseType->getRValueType()->hasReferenceSemantics());
 }
 
-/// isDefinition - Return true if this is a definition of a decl, not a
-/// forward declaration (e.g. of a function) that is implemented outside of
-/// the swift code.
 bool ValueDecl::isDefinition() const {
   switch (getKind()) {
   case DeclKind::Import:
@@ -183,15 +180,16 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::PatternBinding:
   case DeclKind::Subscript:
   case DeclKind::TopLevelCode:
-  case DeclKind::Constructor:
-  case DeclKind::Destructor:
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
     llvm_unreachable("non-value decls shouldn't get here");
-      
+
   case DeclKind::Func:
-    return cast<FuncDecl>(this)->getFuncExpr() != 0;
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+    return cast<AbstractFunctionDecl>(this)->getBodyKind() !=
+        AbstractFunctionDecl::BodyKind::None;
 
   case DeclKind::Var:
   case DeclKind::Union:

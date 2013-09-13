@@ -1026,9 +1026,9 @@ protected:
 
 public:
 
-  /// isDefinition - Return true if this is a definition of a decl, not a
-  /// forward declaration (e.g. of a function) that is implemented outside of
-  /// the swift code.
+  /// \brief Return true if this is a definition of a decl, not a forward
+  /// declaration (e.g. of a function) that is implemented outside of the
+  /// swift code.
   bool isDefinition() const;
   
   Identifier getName() const { return Name; }
