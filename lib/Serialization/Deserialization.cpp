@@ -1885,11 +1885,9 @@ Type ModuleFile::getType(TypeID TID) {
   case decls_block::BOUND_GENERIC_TYPE: {
     DeclID declID;
     TypeID parentID;
-    unsigned numSubstitutions;
     ArrayRef<uint64_t> rawArgumentIDs;
 
     decls_block::BoundGenericTypeLayout::readRecord(scratch, declID, parentID,
-                                                    numSubstitutions,
                                                     rawArgumentIDs);
     SmallVector<Type, 8> genericArgs;
     for (TypeID type : rawArgumentIDs)
@@ -1900,17 +1898,6 @@ Type ModuleFile::getType(TypeID TID) {
 
     auto boundTy = BoundGenericType::get(nominal, parentTy, genericArgs);
     typeOrOffset = boundTy;
-
-    // BoundGenericTypes get uniqued in the ASTContext, so it's possible this
-    // type already has its substitutions. In that case, ignore the module's.
-    if (boundTy->hasSubstitutions())
-      break;
-
-    SmallVector<Substitution, 8> substitutions;
-    while (numSubstitutions--) {
-      substitutions.push_back(*maybeReadSubstitution());
-    }
-    boundTy->setSubstitutions(ctx.AllocateCopy(substitutions));
     break;
   }
 

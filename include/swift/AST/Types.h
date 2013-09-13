@@ -854,7 +854,7 @@ public:
 
   ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
 
-  /// \brief Determine whether this bound generic type has substitution
+  /// \brief Determine whether this bound generic type already has substitution
   /// information that provides protocol conformances.
   bool hasSubstitutions();
 
@@ -868,12 +868,6 @@ public:
   /// required. This can be null for a fully-type-checked AST.
   ArrayRef<Substitution> getSubstitutions(Module *module,
                                           LazyResolver *resolver);
-
-  /// \brief Set the substitution information for this bound generic type.
-  ///
-  /// \param Subs The set of substitutions, which must point into
-  /// ASTContext-allocated memory.
-  void setSubstitutions(ArrayRef<Substitution> Subs);
 
   void print(raw_ostream &O) const;
 

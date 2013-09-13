@@ -424,9 +424,7 @@ namespace decls_block {
     BOUND_GENERIC_TYPE,
     DeclIDField, // generic decl
     TypeIDField, // parent
-    BCVBR<6>,    // # of substitutions
     BCArray<TypeIDField> // generic arguments
-    // The substitutions trail this record.
   >;
 
   using BoundGenericSubstitutionLayout = BCRecordLayout<

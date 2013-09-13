@@ -206,11 +206,6 @@ Type TypeChecker::applyGenericArguments(Type type,
 
     if (checkSubstitutions(Substitutions, Conformance, loc, &Substitutions))
       return nullptr;
-    else {
-      // Record these substitutions.
-      BGT->setSubstitutions(encodeSubstitutions(genericParams, Substitutions,
-                                                Conformance, true));
-    }
   }
 
   return BGT;
