@@ -1098,6 +1098,59 @@ private:
     return Node::makeNodePointer(Node::Kind::ArchetypeRef,
                                  archetypeName(index));
   }
+  
+  NodePointer demangleArchetypeType() {
+    auto makeSelfType = [&](NodePointer proto) -> NodePointer {
+      NodePointer selfType
+        = Node::makeNodePointer(Node::Kind::SelfTypeRef);
+      selfType->push_back_child(proto);
+      Substitutions.push_back({ selfType, IsProtocol::no });
+      return selfType;
+    };
+    
+    auto makeAssociatedType = [&](NodePointer root) -> NodePointer {
+      NodePointer name = demangleIdentifier();
+      if (!name) return nullptr;
+      NodePointer assocType
+        = Node::makeNodePointer(Node::Kind::AssociatedTypeRef);
+      assocType->push_back_child(root);
+      assocType->push_back_child(name);
+      Substitutions.push_back({ assocType, IsProtocol::no });
+      return assocType;
+    };
+    
+    if (Mangled.nextIf('P')) {
+      NodePointer proto = demangleProtocolName();
+      if (!proto) return nullptr;
+      return makeSelfType(proto);
+    }
+    
+    if (Mangled.nextIf('Q')) {
+      NodePointer root = demangleArchetypeType();
+      if (!root) return nullptr;
+      return makeAssociatedType(root);
+    }
+    if (Mangled.nextIf('S')) {
+      Substitution sub = demangleSubstitutionIndexWithProtocol();
+      if (!sub.first) return nullptr;
+      if (sub.second == IsProtocol::yes)
+        return makeSelfType(sub.first);
+      else
+        return makeAssociatedType(sub.first);
+    }
+    if (Mangled.nextIf('d')) {
+      size_t depth, index;
+      if (!demangleIndex(depth))
+        return nullptr;
+      if (!demangleIndex(index))
+        return nullptr;
+      return demangleArchetypeRef(depth + 1, index);
+    }
+    size_t index;
+    if (!demangleIndex(index))
+      return nullptr;
+    return demangleArchetypeRef(0, index);
+  }
 
   NodePointer demangleTuple(IsVariadic isV) {
     NodePointer tuple = Node::makeNodePointer(
@@ -1308,38 +1361,7 @@ private:
       return demangleProtocolList();
     }
     if (c == 'Q') {
-      if (Mangled.nextIf('P')) {
-        NodePointer proto = demangleProtocolName();
-        if (!proto) return nullptr;
-        NodePointer name = demangleIdentifier();
-        if (!name) return nullptr;
-        NodePointer assocType
-          = Node::makeNodePointer(Node::Kind::AssociatedTypeRef);
-        assocType->push_back_child(proto);
-        assocType->push_back_child(name);
-        Substitutions.push_back({ assocType, IsProtocol::no });
-        return assocType;
-      }
-      if (Mangled.nextIf('Q')) {
-        NodePointer proto = demangleProtocolName();
-        if (!proto) return nullptr;
-        NodePointer selfType = Node::makeNodePointer(Node::Kind::SelfTypeRef);
-        selfType->push_back_child(proto);
-        Substitutions.push_back({ selfType, IsProtocol::no });
-        return selfType;
-      }
-      if (Mangled.nextIf('d')) {
-        size_t depth, index;
-        if (!demangleIndex(depth))
-          return nullptr;
-        if (!demangleIndex(index))
-          return nullptr;
-        return demangleArchetypeRef(depth + 1, index);
-      }
-      size_t index;
-      if (!demangleIndex(index))
-        return nullptr;
-      return demangleArchetypeRef(0, index);
+      return demangleArchetypeType();
     }
     if (c == 'R') {
       NodePointer byref = Node::makeNodePointer(Node::Kind::ByRef);

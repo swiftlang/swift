@@ -290,7 +290,7 @@ void Mangler::bindGenericParameters(const GenericParamList *genericParams,
   // the outer context.
   ArchetypesDepth = genericParams->getDepth() + 1;
   unsigned index = 0;
-  for (auto archetype : genericParams->getAllArchetypes()) {
+  for (auto archetype : genericParams->getPrimaryArchetypes()) {
     // Remember the current depth and level.
     ArchetypeInfo info;
     info.Depth = ArchetypesDepth;
@@ -429,6 +429,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <type> ::= P <protocol-list> _   # protocol composition
 /// <type> ::= Q <index>             # archetype with depth=0, index=N
 /// <type> ::= Qd <index> <index>    # archetype with depth=M+1, index=N
+/// <
 /// <type> ::= R <type>              # lvalue
 /// <type> ::= T <tuple-element>* _  # tuple
 /// <type> ::= U <generic-parameter>+ _ <type>
@@ -576,35 +577,42 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     return;
   }
 
+  // type ::= archetype
   case TypeKind::Archetype: {
     auto archetype = cast<ArchetypeType>(type);
     
-    // type ::= associated-type
-    if (!archetype->getParent())
-      if (auto assocType = archetype->getAssocType()) {
-        // associated-type ::= substitution
-        if (tryMangleSubstitution(archetype.getPointer()))
-          return;
-        
-        addSubstitution(archetype.getPointer());
-        
-        // associated-type ::= QQ <protocol>
-        if (assocType->isSelf()) {
-          Buffer << "QQ";
-          mangleProtocolName(assocType->getProtocol());
-
-          return;
-        }
-        
-        // associated-type ::= QP <protocol> <identifier>
-        Buffer << "QP";
-        mangleProtocolName(assocType->getProtocol());
-        mangleIdentifier(archetype->getName());
-        return;
-      }
+    // archetype ::= associated-type
     
-    // <type> ::= Q <index>             # archetype with depth=0, index=N
-    // <type> ::= Qd <index> <index>    # archetype with depth=M+1, index=N
+    // associated-type ::= substitution
+    if (tryMangleSubstitution(archetype.getPointer()))
+      return;
+
+    Buffer << 'Q';
+    
+    // associated-type ::= 'Q' archetype identifier
+    // Mangle the associated type of a parent archetype.
+    if (auto parent = archetype->getParent()) {
+      assert(archetype->getAssocType()
+             && "child archetype has no associated type?!");
+
+      mangleType(CanType(parent), explosion, 0);
+      mangleIdentifier(archetype->getName());
+      addSubstitution(archetype.getPointer());
+      return;
+    }
+    
+    // associated-type ::= 'Q' protocol-context
+    // Mangle the Self archetype of a protocol.
+    if (archetype->getAssocType() && archetype->getAssocType()->isSelf()) {
+      Buffer << 'P';
+      mangleProtocolName(archetype->getAssocType()->getProtocol());
+      addSubstitution(archetype.getPointer());
+      return;
+    }
+    
+    // archetype ::= 'Q' <index>             # archetype with depth=0, index=N
+    // archetype ::= 'Qd' <index> <index>    # archetype with depth=M+1, index=N
+    // Mangle generic parameter archetypes.
 
     // Find the archetype information.  It may be possible for this to
     // fail for local declarations --- that might be okay; it means we
@@ -615,7 +623,6 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     auto &info = it->second;
     assert(ArchetypesDepth >= info.Depth);
 
-    Buffer << 'Q';
     unsigned relativeDepth = ArchetypesDepth - info.Depth;
     if (relativeDepth != 0) {
       Buffer << 'd' << Index(relativeDepth - 1);

@@ -254,8 +254,7 @@ types where the metadata itself has unknown layout.)
   type ::= 'G' type <type>+ '_'              // generic type application
   type ::= 'M' type                          // metatype
   type ::= 'P' protocol-list '_'             // protocol type
-  type ::= 'Q' index                         // archetype with depth=0
-  type ::= 'Qd' index index                  // archetype with depth=M+1
+  type ::= archetype
   type ::= 'R' type                          // byref
   type ::= 'T' tuple-element* '_'            // tuple
   type ::= 't' tuple-element* '_'            // variadic tuple
@@ -268,9 +267,12 @@ types where the metadata itself has unknown layout.)
   nominal-type-kind ::= 'C'                  // class
   nominal-type-kind ::= 'O'                  // union
   nominal-type-kind ::= 'V'                  // struct
+  archetype ::= 'Q' index                    // archetype with depth=0
+  archetype ::= 'Qd' index index             // archetype with depth=M+1
+  archetype ::= associated-type
   associated-type ::= substitution
-  associated-type ::= 'QP' protocol identifier // protocol associated type
-  associated-type ::= 'QQ' protocol            // protocol Self type
+  associated-type ::= 'Q' protocol-context     // self type of protocol
+  associated-type ::= 'Q' archetype identifier // associated type
   protocol-context ::= 'P' protocol
   tuple-element ::= identifier? type
 
