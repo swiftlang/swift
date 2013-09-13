@@ -251,6 +251,12 @@ public:
   /// Forward an rvalue into a single value, imploding tuples if necessary.
   SILValue forwardAsSingleValue(SILGenFunction &gen, SILLocation l) &&;
 
+  /// Forward an rvalue into a single value, imploding tuples if necessary, and
+  /// introducing a potential conversion from semantic type to storage type.
+  SILValue forwardAsSingleStorageValue(SILGenFunction &gen,
+                                       SILType storageType,
+                                       SILLocation l) &&;
+
   /// Get the rvalue as a single value, imploding tuples if necessary.
   ManagedValue getAsSingleValue(SILGenFunction &gen, SILLocation l) &&;
   

@@ -686,6 +686,30 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
   emitStoreOfScalarRValue(*this, loc, rvalue, dest, isInit);
 }
 
+/// Convert a semantic rvalue to a value of storage type.
+SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
+                                                         SILValue semanticValue,
+                                                         SILType storageType) {
+  auto &destTL = getTypeLowering(storageType);
+  // Easy case: the types match.
+  if (semanticValue.getType() == storageType) {
+    assert(!hasDifferentTypeOfRValue(destTL));
+    return semanticValue;
+  }
+  
+  // [weak] types are never loadable, so we don't need to handle them here.
+  
+  // For [unowned] types, place into an unowned box.
+  if (storageType.is<UnownedStorageType>()) {
+    SILValue unowned = B.createRefToUnowned(loc, semanticValue, storageType);
+    B.createUnownedRetain(loc, unowned);
+    B.createStrongRelease(loc, semanticValue);
+    return unowned;
+  }
+  
+  llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
+}
+
 /// Produce a physical address that corresponds to the given l-value
 /// component.
 static SILValue drillIntoComponent(SILGenFunction &SGF,

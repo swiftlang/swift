@@ -1663,38 +1663,24 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   }
 
   emitConstructorMetatypeArg(gen, ctor);
+
+  auto *decl = selfTy.getStructOrBoundGenericStruct();
+  assert(decl && "not a struct?!");
   
-  // If we have an indirect return slot, initialize it in-place in the implicit
-  // return slot.
+  // If we have an indirect return slot, initialize it in-place.
   if (resultSlot) {
-    auto *decl = cast<StructDecl>(selfTy.getSwiftRValueType()
-                                  ->getNominalOrBoundGenericNominal());
-    unsigned memberIndex = 0;
     
-    auto findNextPhysicalField = [&] {
-      while (memberIndex < decl->getMembers().size()) {
-        if (auto *vd = dyn_cast<VarDecl>(decl->getMembers()[memberIndex])) {
-          if (!vd->isProperty())
-            break;
-        }
-        ++memberIndex;
-      }
-    };
-    findNextPhysicalField();
-    
-    for (size_t i = 0, size = elements.size(); i < size; ++i) {
-      assert(memberIndex < decl->getMembers().size() &&
-             "not enough physical struct members for value constructor?!");
-      // Store each argument in the corresponding element of 'self'.
-      auto *field = cast<VarDecl>(decl->getMembers()[memberIndex]);
-      auto &fieldTL = gen.getTypeLowering(field->getType());
-      SILValue slot = gen.B.createStructElementAddr(Loc, resultSlot,
-                                                    cast<VarDecl>(field),
+    auto elti = elements.begin(), eltEnd = elements.end();
+    for (VarDecl *field : decl->getPhysicalFields()) {
+      assert(elti != eltEnd && "number of args does not match number of fields");
+      auto fieldTy = selfTy.getSwiftRValueType()
+        ->getTypeOfMember(decl->getModuleContext(), field, nullptr);
+      auto &fieldTL = gen.getTypeLowering(fieldTy);
+      SILValue slot = gen.B.createStructElementAddr(Loc, resultSlot, field,
                                     fieldTL.getLoweredType().getAddressType());
       InitializationPtr init(new ImplicitValueInitialization(slot));
-      std::move(elements[i]).forwardInto(gen, init.get(), Loc);
-      ++memberIndex;
-      findNextPhysicalField();
+      std::move(*elti).forwardInto(gen, init.get(), Loc);
+      ++elti;
     }
     gen.B.createReturn(Loc, gen.emitEmptyTuple(Loc));
     return;
@@ -1702,8 +1688,20 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   
   // Otherwise, build a struct value directly from the elements.
   SmallVector<SILValue, 4> eltValues;
-  for (RValue &rv : elements) {
-    eltValues.push_back(std::move(rv).forwardAsSingleValue(gen, Loc));
+  
+  auto elti = elements.begin(), eltEnd = elements.end();
+  for (VarDecl *field : decl->getPhysicalFields()) {
+    assert(elti != eltEnd && "number of args does not match number of fields");
+    auto fieldTy = selfTy.getSwiftRValueType()
+      ->getTypeOfMember(decl->getModuleContext(), field, nullptr);
+    auto fieldSILTy = gen.getLoweredLoadableType(fieldTy);
+    
+    SILValue v
+      = std::move(*elti).forwardAsSingleStorageValue(gen, fieldSILTy, Loc);
+    
+    eltValues.push_back(v);
+    
+    ++elti;
   }
   
   SILValue selfValue = gen.B.createStruct(Loc, selfTy, eltValues);

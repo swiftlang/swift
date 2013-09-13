@@ -692,6 +692,10 @@ public:
                          SILValue dest, const TypeLowering &destTL,
                          IsInitialization_t isInit);
   
+  SILValue emitConversionFromSemanticValue(SILLocation loc,
+                                           SILValue semanticValue,
+                                           SILType storageType);
+  
   ManagedValue emitLoad(SILLocation loc, SILValue addr,
                         const TypeLowering &rvalueTL,
                         SGFContext C, IsTake_t isTake);

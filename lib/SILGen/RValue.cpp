@@ -331,6 +331,14 @@ SILValue RValue::forwardAsSingleValue(SILGenFunction &gen, SILLocation l) && {
   return result;
 }
 
+SILValue RValue::forwardAsSingleStorageValue(SILGenFunction &gen,
+                                             SILType storageType,
+                                             SILLocation l) && {
+  assert(isComplete() && "rvalue is not complete");
+  SILValue result = std::move(*this).forwardAsSingleValue(gen, l);
+  return gen.emitConversionFromSemanticValue(l, result, storageType);
+}
+
 void RValue::forwardInto(SILGenFunction &gen, Initialization *I,
                          SILLocation loc) && {
   assert(isComplete() && "rvalue is not complete");
