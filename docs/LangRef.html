@@ -834,7 +834,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func        ::= 'static'? 'func' <a href="#attribute-list">attribute-list</a> <a href="#any-identifier">any-identifier</a> <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
+    decl-func        ::= 'static'? 'func' <a href="#attribute-list">attribute-list</a> <a href="#any-identifier">any-identifier</a> <a href="#generic-params">generic-params</a>? <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
   </pre>
   
   <p>'func' is a declaration for a function.  The argument list and
@@ -1017,7 +1017,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-union ::= 'union' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? union-body
+    decl-union ::= 'union' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? union-body
     union-body ::= '{' decl* '}'
     
     decl-union-element ::= 'case' union-case (',' union-case)*
@@ -1081,7 +1081,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? '{' decl-struct-body '}'
+    decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? '{' decl-struct-body '}'
     decl-struct-body ::= <a href="#decl">decl</a>*
   </pre>
 
@@ -1140,7 +1140,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-class ::= 'class' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? '{' decl-class-body '}'
+    decl-class ::= 'class' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? '{' decl-class-body '}'
     decl-class-body ::= <a href="#decl">decl</a>*
   </pre>
 
@@ -1331,7 +1331,7 @@ if vec[3] {
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-constructor ::= 'constructor' <a href="#attribute-list">attribute-list</a> <a href="#pattern-tuple">pattern-tuple</a> <a href="#brace-item-list">brace-item-list</a>
+    decl-constructor ::= 'constructor' <a href="#attribute-list">attribute-list</a> <a href="#generic-params">generic-params</a>? <a href="#pattern-tuple">pattern-tuple</a> <a href="#brace-item-list">brace-item-list</a>
   </pre>
 
   <p>'constructor' declares a constructor for a class, struct, or union.  Such
@@ -1633,8 +1633,7 @@ if vec[3] {
   
   <pre class="grammar">
     type-identifier ::= type-identifier-component ('.' type-identifier-component)*
-    type-identifier-component ::= <a href="#identifier">identifier</a> generic-params?
-    generic-params ::= '&lt;' <a href="#type">type</a> (',' <a href="#type">type</a>)* '&gt;'
+    type-identifier-component ::= <a href="#identifier">identifier</a> <a href="#generic-args">generic-args</a>?
   </pre>
 
   <p>Named types may be used simply by using their name.  Named types are
@@ -2671,7 +2670,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    expr-identifier ::= <a href="#identifier">identifier</a> <a href="#type-identifier">generic-params</a>?
+    expr-identifier ::= <a href="#identifier">identifier</a> <a href="#generic-args">generic-args</a>?
   </pre>
   
   <p>A raw identifier refers to a value found via <a
@@ -3458,6 +3457,76 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ********************************************************************* -->
   <h2>Generics</h2>
   <!-- ********************************************************************* -->
+
+  <!-- ===================================================================== -->
+  <h3 id="generic-params">Generic Parameters</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    generic-params ::= '<' generic-param (',' generic-param)* where-clause? '>'
+
+    generic-param ::= identifier
+    generic-param ::= identifier ':' <a href="#type-identifier">type-identifier</a>
+    generic-param ::= identifier ':' <a href="#type-composition">type-composition</a>
+
+    <a id="where-clause">where-clause</a> ::= 'where' requirement (',' requirement) *
+
+    requirement ::= conformance-requirement
+                ::= same-type-requirement
+
+    conformance-requirement ::= <a href="#type-identifier">type-identifier</a> ':' <a href="#type-identifier">type-identifier</a>
+    conformance-requirement ::= <a href="#type-identifier">type-identifier</a> ':' <a href="#type-composition">type-composition</a>
+
+    same-type-requirement ::= <a href="#type-identifier">type-identifier</a> '==' <a href="#type-identifier">type-identifier</a>
+</pre>
+
+  <p>A generic function or type is parameterized by a given set of
+  generic parameters. The generic parameters each have a name as well
+  as some set of requirements that specify the capabilities that any
+  corresponding generic argument might have. For example, the generic
+  parameter <code>T : Printable</code> requires that any generic
+  argument substituted for the generic parameter <code>T</code> 
+  conform to the protocol <code>Printable</code>. Similarly, a generic
+  parameter <code>U : SomeClass</code> requires that any generic
+  argument substituted for the generic parameter <code>U</code>
+  inherit from the class <code>SomeClass</code>.
+
+  <p>Additional requirements on generic parameters and associated types
+  of generic parameters can be introduced via the "where" clause,
+  which can include additional protocol-conformance requirements
+  (e.g., the generic parameter list <code>&lt;T where T :
+  Printable&gt;</code>, which is equivalent to <code>&lt;T :
+  Printable&gt;</code>), as well as same-type requirements that
+  require two types to be identical (e.g., <code>&lt;T : Collection, U
+  : Collection where T.Element == U.Element&gt;</code>). 
+
+  <!-- ===================================================================== -->
+  <h3 id="generic-args">Generic Arguments</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    generic-args ::= '<' generic-arg (',' generic-arg)* '>'
+
+    generic-arg ::= <a href="#type">type</a>
+  </pre>
+
+  <p>Generic argument lists specify the generic arguments to be provided
+  to a generic type or function, which replace the generic parameters
+  of that type or function to produce a specialized version of that
+  type or function. For example, given a generic class:
+
+  <pre class="example">
+    class Dictionary&lt;Key : Hashable, Value&gt; { /* ... */ }
+  </pre>
+
+  <p>The type <code>Dictionary&lt;String, Int&gt;</code>, replaces the
+  generic parameter <code>Key</code> with <code>String</code> and the
+  generic parameter <code>Value</code> with <code>Int</code>. Each
+  generic argument must satisfy all of the requirements of its
+  corresponding generic parameter (e.g., <code>String</code> must
+  conform to the <code>Hashable</code> protocol), and all generic
+  arguments, when taken together, must satisfy the additional
+  requirements specified in the <code>where</code> clause.
 
   <!-- ********************************************************************* -->
   <h2 id="namebind">Name Binding</h2>
