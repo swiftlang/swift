@@ -691,6 +691,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
                                                          SILValue semanticValue,
                                                          SILType storageType) {
   auto &destTL = getTypeLowering(storageType);
+  (void)destTL;
   // Easy case: the types match.
   if (semanticValue.getType() == storageType) {
     assert(!hasDifferentTypeOfRValue(destTL));

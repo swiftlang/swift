@@ -1676,6 +1676,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
     auto elti = elements.begin(), eltEnd = elements.end();
     for (VarDecl *field : decl->getPhysicalFields()) {
       assert(elti != eltEnd && "number of args does not match number of fields");
+      (void)eltEnd;
       auto fieldTy = selfTy.getSwiftRValueType()
         ->getTypeOfMember(decl->getModuleContext(), field, nullptr);
       auto &fieldTL = gen.getTypeLowering(fieldTy);
@@ -1695,6 +1696,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   auto elti = elements.begin(), eltEnd = elements.end();
   for (VarDecl *field : decl->getPhysicalFields()) {
     assert(elti != eltEnd && "number of args does not match number of fields");
+    (void)eltEnd;
     auto fieldTy = selfTy.getSwiftRValueType()
       ->getTypeOfMember(decl->getModuleContext(), field, nullptr);
     auto fieldSILTy = gen.getLoweredLoadableType(fieldTy);
@@ -1725,6 +1727,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
   auto &lowering = getTypeLowering(selfDecl->getType());
   SILType selfTy = lowering.getLoweredType();
+  (void)selfTy;
   assert(!selfTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
   assert(!ctor->getAllocSelfExpr() && "alloc_this expr for value type?!");
 

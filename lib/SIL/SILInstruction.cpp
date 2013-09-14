@@ -339,6 +339,7 @@ IntegerLiteralInst::create(SILLocation Loc, SILType Ty, const APInt &Value,
   auto intTy = Ty.castTo<BuiltinIntegerType>();
   assert(intTy->getBitWidth() == Value.getBitWidth() &&
          "IntegerLiteralInst APInt value's bit width doesn't match type");
+  (void)intTy;
   
   void *buf = allocateLiteralInstWithBitSize<IntegerLiteralInst>(B,
                                                           Value.getBitWidth());
@@ -393,6 +394,7 @@ FloatLiteralInst::create(SILLocation Loc, SILType Ty, const APFloat &Value,
   auto floatTy = Ty.castTo<BuiltinFloatType>();
   assert(&floatTy->getAPFloatSemantics() == &Value.getSemantics() &&
          "FloatLiteralInst value's APFloat semantics do not match type");
+  (void)floatTy;
   
   APInt Bits = Value.bitcastToAPInt();
   
