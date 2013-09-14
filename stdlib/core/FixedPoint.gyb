@@ -22,15 +22,24 @@ def hexify(n):
         z = z[:-4]
     return '0x' + '_'.join(r)
 
+
+# Bit counts for all int types
+allBits = [8, 16, 32, 64, 128]
+
+# Number of bits in the biggest int type
+maxBits = max(allBits)
+
 # Number of bits in an Int
 intBits = 64
+
+assert(intBits in allBits)
 
 def maskBits(n):
     """Return an n-bit mask in hex"""
     return hexify((1 << n) - 1)
 
 def all_ints():
-    for bits in 8,16,32,64,128:
+    for bits in allBits:
         for signed in False, True:
             yield bits,signed
 
@@ -47,9 +56,8 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
                 ${ArrayBound}ReplPrintable {
   var value : Builtin.Int${bits}
 
-  static func [transparent] _convertFromBuiltinIntegerLiteral(val : Builtin.Int128) -> ${Self} {
-    @assert bits <= 128, 'Teach me how to deal with numbers this large'
-    return ${Self}(${'val' if bits == 128 else ('Builtin.trunc_Int128_Int%d(val)' % bits)})
+  static func [transparent] _convertFromBuiltinIntegerLiteral(val : Builtin.Int${maxBits}) -> ${Self} {
+    return ${Self}(${'val' if bits == maxBits else ('Builtin.trunc_Int%d_Int%d(val)' % (maxBits, bits) )})
   }
 
   typealias IntegerLiteralType = ${Self}
