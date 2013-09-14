@@ -19,6 +19,9 @@ TOOLNAME = swift-ide-test
 # LINK_COMPONENTS before including Makefile.rules
 include $(SWIFT_LEVEL)/../../Makefile.config
 
+# Embed an SDK path into the driver
+CXXFLAGS += -DSWIFT_MODULES_SDK="\"$(SWIFT_SDK)\""
+
 # $(TARGETS_TO_BUILD) and ipo are necessary for code generation. bitwriter is
 # necessary to write out a .bc file. jit and linker are used for
 # JIT execution.
@@ -40,12 +43,6 @@ LLVMLibsOptions :=     \
   $(LLVMLibsOptions)   \
   -ledit               \
   -framework CoreFoundation
-
-# if $(SWIFT_SDK) is installed, include that in the driver
-SWIFT_SDK := /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
-ifeq ($(shell test -d $(SWIFT_SDK) && echo OK), OK)
-  CXXFLAGS += -DSWIFT_MODULES_SDK="\"$(SWIFT_SDK)\""
-endif
 
 include $(SWIFT_LEVEL)/Makefile
 
