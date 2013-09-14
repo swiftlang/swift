@@ -673,7 +673,17 @@ void IRGenDebugInfo::emitByRefArgumentOrNull(IRBuilder& Builder,
                               LValueType::Qual::QualBits::DefaultForType,
                               Context);
     DebugTypeInfo RefTy(Ty, Types.getCompleteTypeInfo(Ty->getCanonicalType()));
-    emitArgVariableDeclaration(Builder, Storage, RefTy, "",
+    // Attempt to pull out the name from the location.
+    StringRef Name;
+    auto Loc = I->getLoc();
+    if (LoadExpr* LE = Loc.getAsASTNode<LoadExpr>()) {
+      if (DeclRefExpr* DRE = dyn_cast<DeclRefExpr>(LE->getSubExpr()))
+        Name = DRE->getDecl()->getName().str();
+    } else if (AssignExpr* AE = Loc.getAsASTNode<AssignExpr>()) {
+      if (DeclRefExpr* DRE = dyn_cast<DeclRefExpr>(AE->getDest()))
+        Name = DRE->getDecl()->getName().str();
+    }
+    emitArgVariableDeclaration(Builder, Storage, RefTy, Name,
                                getArgNo(Fn, SILArg));
   }
 }
