@@ -1250,9 +1250,11 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
                                              CapturingExpr *body) {
   // FIXME: Stash the capture args somewhere and curry them on demand rather
   // than here.
-  assert(((constant.uncurryLevel == 1 && body->hasLocalCaptures())
-          || (constant.uncurryLevel == 0 && !body->hasLocalCaptures()))
-         && "curried local functions not yet supported");
+  assert(((constant.uncurryLevel == 1 &&
+           body->getCaptureInfo().hasLocalCaptures()) ||
+          (constant.uncurryLevel == 0 &&
+           !body->getCaptureInfo().hasLocalCaptures())) &&
+         "curried local functions not yet supported");
   
   SILValue functionRef = emitGlobalFunctionRef(loc, constant);
   
@@ -1277,10 +1279,10 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
                                      getLoweredLoadableType(specialized));
   }
 
-  if (!body->hasLocalCaptures())
+  if (!body->getCaptureInfo().hasLocalCaptures())
     return ManagedValue(functionRef, ManagedValue::Unmanaged);
 
-  auto captures = body->getLocalCaptures();
+  auto captures = body->getCaptureInfo().getLocalCaptures();
   SmallVector<SILValue, 4> capturedArgs;
   for (ValueDecl *capture : captures) {
     switch (getDeclCaptureKind(capture)) {
@@ -2151,7 +2153,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
   unsigned paramCount = from.uncurryLevel + 1;
   
   // Forward implicit closure context arguments.
-  bool hasCaptures = fd->getFuncExpr()->hasLocalCaptures();
+  bool hasCaptures = fd->hasLocalCaptures();
   if (hasCaptures)
     --paramCount;
 
@@ -2163,7 +2165,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
 
   // Forward captures.
   if (hasCaptures)
-    for (auto capture : fd->getFuncExpr()->getLocalCaptures())
+    for (auto capture : fd->getLocalCaptures())
       forwardCaptureArgs(*this, curriedArgs, capture);
 
   SILValue toFn = getNextUncurryLevelRef(*this, fd, to, curriedArgs);

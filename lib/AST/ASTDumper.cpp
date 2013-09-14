@@ -1157,13 +1157,9 @@ public:
 
   llvm::raw_ostream &printCapturing(CapturingExpr *E, char const *name) {
     printCommon(E, name);
-    if (!E->getCaptures().empty()) {
-      OS << " captures=(";
-      OS << E->getCaptures()[0]->getName();
-      for (auto capture : E->getCaptures().slice(1)) {
-        OS << ", " << capture->getName();
-      }
-      OS << ')';
+    if (!E->getCaptureInfo().empty()) {
+      OS << " ";
+      E->getCaptureInfo().print(OS);
     }
     return OS;
   }

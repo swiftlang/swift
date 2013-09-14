@@ -5,6 +5,7 @@ add_swift_library(swiftAST
   ASTWalker.cpp
   Attr.cpp
   Builtins.cpp
+  CaptureInfo.cpp
   ConcreteDeclRef.cpp
   Decl.cpp
   DeclContext.cpp

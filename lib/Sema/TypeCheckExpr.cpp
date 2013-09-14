@@ -531,7 +531,7 @@ namespace {
       // list computed, we just propagate it (filtering out stuff that they
       // capture from us).
       if (CapturingExpr *SubCE = dyn_cast<CapturingExpr>(E)) {
-        for (auto D : SubCE->getCaptures())
+        for (auto D : SubCE->getCaptureInfo().getCaptures())
           if (D->getDeclContext() != CurExprAsDC)
             captures.insert(D);
         return { false, E };
@@ -574,7 +574,7 @@ void TypeChecker::computeCaptures(FuncDecl *FD) {
   finder.doWalk(FD->getBody());
   ValueDecl **CaptureCopy =
       Context.AllocateCopy<ValueDecl *>(Captures.begin(), Captures.end());
-  FD->getFuncExpr()->setCaptures(
+  FD->getFuncExpr()->getCaptureInfo().setCaptures(
       llvm::makeArrayRef(CaptureCopy, Captures.size()));
 }
 
@@ -591,5 +591,6 @@ void TypeChecker::computeCaptures(CapturingExpr *capturing) {
 
   ValueDecl **CaptureCopy =
       Context.AllocateCopy<ValueDecl *>(Captures.begin(), Captures.end());
-  capturing->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
+  capturing->getCaptureInfo().setCaptures(
+      llvm::makeArrayRef(CaptureCopy, Captures.size()));
 }

@@ -610,7 +610,7 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
 
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
-  for (auto capture : ce->getLocalCaptures())
+  for (auto capture : ce->getCaptureInfo().getLocalCaptures())
     emitCaptureArguments(*this, capture);
 }
 

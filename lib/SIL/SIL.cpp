@@ -32,7 +32,7 @@ static unsigned getFuncNaturalUncurryLevel(PipeClosureExpr *CE) {
   unsigned Level = CE->getParamPatterns().size() - 1;
   // Functions with captures have an extra uncurry level for the capture
   // context.
-  if (CE->hasLocalCaptures())
+  if (CE->getCaptureInfo().hasLocalCaptures())
     Level += 1;
   return Level;
 }
@@ -42,7 +42,7 @@ static unsigned getFuncNaturalUncurryLevel(ClosureExpr *CE) {
   unsigned Level = CE->getParamPatterns().size() - 1;
   // Functions with captures have an extra uncurry level for the capture
   // context.
-  if (CE->hasLocalCaptures())
+  if (CE->getCaptureInfo().hasLocalCaptures())
     Level += 1;
   return Level;
 }

@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_EXPR_H
 #define SWIFT_AST_EXPR_H
 
+#include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
@@ -1629,23 +1630,15 @@ public:
 /// CapturingExpr - a FuncExpr or a ClosureExpr; always returns something
 /// of function type, and can capture variables from an enclosing scope.
 class CapturingExpr : public Expr {
-  ArrayRef<ValueDecl*> Captures;
+  CaptureInfo Captures;
 
 public:
   CapturingExpr(ExprKind Kind, Type FnType)
       : Expr(Kind, FnType)
   {}
 
-  ArrayRef<ValueDecl*> getCaptures() const { return Captures; }
-  void setCaptures(ArrayRef<ValueDecl*> C) { Captures = C; }
-
-  /// \brief Return a filtered list of the captures for this function,
-  /// filtering out global variables.  This function returns the list that
-  /// actually needs to be closed over.
-  std::vector<ValueDecl *> getLocalCaptures() const;
-
-  /// \returns true if getLocalCaptures() will return a non-empty list.
-  bool hasLocalCaptures() const;
+  CaptureInfo &getCaptureInfo() { return Captures; }
+  const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_CapturingExpr &&

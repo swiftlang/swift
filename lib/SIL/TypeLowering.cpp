@@ -1359,13 +1359,13 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
   case SILDeclRef::Kind::Func: {
     if (auto *CE = c.loc.dyn_cast<PipeClosureExpr *>()) {
       auto *FuncTy = CE->getType()->castTo<AnyFunctionType>();
-      return getFunctionTypeWithCaptures(FuncTy, CE->getLocalCaptures(),
-                                         CE->getParent());
+      return getFunctionTypeWithCaptures(
+          FuncTy, CE->getCaptureInfo().getLocalCaptures(), CE->getParent());
     }
     if (auto *CE = c.loc.dyn_cast<ClosureExpr *>()) {
       auto *FuncTy = CE->getType()->castTo<AnyFunctionType>();
-      return getFunctionTypeWithCaptures(FuncTy, CE->getLocalCaptures(),
-                                         CE->getParent());
+      return getFunctionTypeWithCaptures(
+          FuncTy, CE->getCaptureInfo().getLocalCaptures(), CE->getParent());
     }
 
     FuncDecl *func = cast<FuncDecl>(vd);

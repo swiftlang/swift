@@ -725,22 +725,22 @@ void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
   this->FnRetType = FnRetType;
 }
 
-ArrayRef<ValueDecl*> FuncDecl::getCaptures() const {
+ArrayRef<ValueDecl *> FuncDecl::getCaptures() const {
   if (TheFuncExprBody)
-    return TheFuncExprBody->getCaptures();
+    return TheFuncExprBody->getCaptureInfo().getCaptures();
   else
     return {};
 }
 
 std::vector<ValueDecl*> FuncDecl::getLocalCaptures() const {
   if (TheFuncExprBody)
-    return TheFuncExprBody->getLocalCaptures();
-  return std::vector<ValueDecl*>();
+    return TheFuncExprBody->getCaptureInfo().getLocalCaptures();
+  return std::vector<ValueDecl *>();
 }
 
 bool FuncDecl::hasLocalCaptures() const {
   if (TheFuncExprBody)
-    return TheFuncExprBody->hasLocalCaptures();
+    return TheFuncExprBody->getCaptureInfo().hasLocalCaptures();
 
   return false;
 }

@@ -302,28 +302,6 @@ ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
 }
 
-bool CapturingExpr::hasLocalCaptures() const {
-  for (auto VD : getCaptures())
-    if (VD->getDeclContext()->isLocalContext())
-      return true;
-  return false;
-}
-
-std::vector<ValueDecl*> CapturingExpr::getLocalCaptures() const {
-  if (!hasLocalCaptures()) return std::vector<ValueDecl*>();
-
-  std::vector<ValueDecl*> Result;
-  Result.reserve(Captures.size());
-
-  // Filter out global variables.
-  for (auto VD : Captures)
-    if (VD->getDeclContext()->isLocalContext())
-      Result.push_back(VD);
-
-  return Result;
-}
-
-
 RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
                                                          ValueDecl *Self)
   : Expr(ExprKind::RebindSelfInConstructor,
