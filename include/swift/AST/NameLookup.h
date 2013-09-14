@@ -180,31 +180,30 @@ public:
   }
 };
 
-/// UnqualifiedLookup - This class implements and represents the result of
-/// performing unqualified lookup (i.e. lookup for a plain identifier).
+/// \brief This class implements and represents the result of performing
+/// unqualified lookup (i.e. lookup for a plain identifier).
 class UnqualifiedLookup {
 public:
-  /// UnqualifiedLookup ctor - Lookup an unqualified identifier 'Name' in the
-  /// context.  If the current DeclContext is nested in a FuncExpr, the
-  /// SourceLoc is used to determine which declarations in that FuncExpr's
-  /// context are visible.
+  /// \brief Lookup an unqualified identifier \p Name in the context.
+  ///
+  /// If the current DeclContext is nested in a function body, the SourceLoc
+  /// is used to determine which declarations in that body are visible.
   UnqualifiedLookup(Identifier Name, DeclContext *DC,
                     SourceLoc Loc = SourceLoc(),
                     bool IsTypeLookup = false);
-  
-  /// Look up an identifier 'Name' in the module named 'Module'.
+
+  /// \brief Look up an identifier \p Name in the module named \p Module.
   static Optional<UnqualifiedLookup> forModuleAndName(ASTContext &C,
                                                       StringRef Module,
                                                       StringRef Name);
 
   SmallVector<UnqualifiedLookupResult, 4> Results;
 
-  /// isSuccess - Return true if anything was found by the name lookup.
+  /// \brief Return true if anything was found by the name lookup.
   bool isSuccess() const { return !Results.empty(); }
 
-  /// getSingleTypeResult - Get the result as a single type, or
-  /// a null type if that fails.
-  TypeDecl* getSingleTypeResult();
+  /// \brief Get the result as a single type, or a null type if that fails.
+  TypeDecl *getSingleTypeResult();
 };
   
 /// VisibleDeclConsumer - An abstract base class for a visitor that consumes
