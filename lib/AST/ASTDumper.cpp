@@ -452,16 +452,25 @@ namespace {
       }
       OS << ')';
     }
+    
+    void printCommonAFD(AbstractFunctionDecl *D, const char *Type) {
+      printCommon(D, Type, FuncColor);
+
+      if (!D->getCaptureInfo().empty()) {
+        OS << " ";
+        D->getCaptureInfo().print(OS);
+      }
+    }
 
     void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
       if (auto Body = D->getBody()) {
         OS << '\n';
         printRec(Body);
       }
-    }
+     }
     
     void visitFuncDecl(FuncDecl *FD) {
-      printCommon(FD, "func_decl", FuncColor);
+      printCommonAFD(FD, "func_decl");
       if (FD->isGetterOrSetter()) {
         if (FD->getGetterDecl()) {
           OS << " getter";
@@ -482,16 +491,11 @@ namespace {
       
       printAbstractFunctionDecl(FD);
       
-      if (!FD->getCaptureInfo().empty()) {
-        OS << " ";
-        FD->getCaptureInfo().print(OS);
-      }
-
       OS << ')';
      }
 
     void visitConstructorDecl(ConstructorDecl *CD) {
-      printCommon(CD, "constructor_decl", FuncColor);
+      printCommonAFD(CD, "constructor_decl");
       if (CD->getAllocSelfExpr()) {
         OS << "\n";
         OS.indent(Indent+2);
@@ -503,7 +507,7 @@ namespace {
     }
 
     void visitDestructorDecl(DestructorDecl *DD) {
-      printCommon(DD, "destructor_decl", FuncColor);
+      printCommonAFD(DD, "destructor_decl");
       OS << '\n';
       printAbstractFunctionDecl(DD);
       OS << ')';

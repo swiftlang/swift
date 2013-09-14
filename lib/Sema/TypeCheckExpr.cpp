@@ -502,7 +502,7 @@ namespace {
 
   public:
     FindCapturedVars(TypeChecker &tc, llvm::SetVector<ValueDecl*> &captures,
-                     FuncDecl *FD)
+                     AbstractFunctionDecl *FD)
         : tc(tc), captures(captures) {
       CurExprAsDC = FD;
     }
@@ -568,7 +568,7 @@ namespace {
   };
 }
 
-void TypeChecker::computeCaptures(FuncDecl *FD) {
+void TypeChecker::computeCaptures(AbstractFunctionDecl *FD) {
   llvm::SetVector<ValueDecl *> Captures;
   FindCapturedVars finder(*this, Captures, FD);
   finder.doWalk(FD->getBody());

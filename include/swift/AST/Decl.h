@@ -1952,6 +1952,8 @@ protected:
 
   GenericParamList *GenericParams;
 
+  CaptureInfo Captures;
+
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, Identifier Name,
                        VarDecl *ImplicitSelfDecl,
                        GenericParamList *GenericParams)
@@ -2000,6 +2002,7 @@ public:
     setBodyKind(BodyKind::Parsed);
   }
 
+
   /// \brief Note that the body was skipped for this function.  Function body
   /// can not be attached after this call.
   void setBodySkipped(SourceLoc EndLoc) {
@@ -2014,6 +2017,9 @@ public:
     BodyEndLoc = EndLoc;
     setBodyKind(BodyKind::Unparsed);
   }
+
+  CaptureInfo &getCaptureInfo() { return Captures; }
+  const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   /// \brief Returns the argument pattern(s) for the function definition
   /// that determine the function type.
@@ -2119,8 +2125,6 @@ class FuncDecl : public AbstractFunctionDecl {
   FuncDecl *OverriddenDecl;
   OperatorDecl *Operator;
 
-  CaptureInfo Captures;
-
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
            SourceLoc NameLoc, unsigned NumParamPatterns,
            GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
@@ -2165,9 +2169,6 @@ public:
   void setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
                                 ArrayRef<Pattern *> BodyParams,
                                 TypeLoc FnRetType);
-
-  CaptureInfo &getCaptureInfo() { return Captures; }
-  const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   /// \brief Returns the "natural" number of argument clauses taken by this
   /// function.  This value is always at least one, and it may be more if the

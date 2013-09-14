@@ -595,7 +595,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     // checking. i.e., the nested DefinedFunctions will be visited before the
     // outer DefinedFunctions.
     for (unsigned i = currentFunctionIdx; i > previousFunctionIdx; --i) {
-      if (auto *FD = dyn_cast<FuncDecl>(DefinedFunctions[i-1]))
+      if (auto *FD = dyn_cast<AbstractFunctionDecl>(DefinedFunctions[i-1]))
         TC.computeCaptures(FD);
     }
 
