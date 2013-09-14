@@ -37,6 +37,7 @@ all:: lit.site.cfg Unit/lit.site.cfg
 test-perf: ../benchmark/lit.site.cfg
 	@ echo '--- Running swift performance tests ---'
 	@ $(PYTHON) $(LLVM_SRC_ROOT)/utils/lit/lit.py \
+	  -j1 --output $(PROJ_OBJ_DIR)/../benchmark/results.json \
 	  $(LIT_ARGS) $(TESTARGS) ../benchmark
 
 FORCE:
