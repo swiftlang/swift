@@ -21,11 +21,11 @@ NO_BUILD_ARCHIVE := 1
 DIRS := Foundation
 
 # Add OS-specific libraries
-ifneq ($(findstring ios,$(TARGET_TRIPLE)),)
+ifneq ($(findstring -darwin_ios,$(TARGET_TRIPLE)),)
   DIRS += UIKit
-else ifneq ($(findstring macosx,$(TARGET_TRIPLE)),)
-  DIRS += AppKit
-else ifneq ($(findstring darwin,$(TARGET_TRIPLE)),)
+else ifneq ($(findstring -darwin_sim,$(TARGET_TRIPLE)),)
+  DIRS += UIKit
+else ifneq ($(findstring -darwin,$(TARGET_TRIPLE)),)
   DIRS += AppKit
 endif
 

@@ -57,15 +57,11 @@ endif
 ifndef SWIFT_SDK
   ifdef SDKROOT
     SWIFT_SDK := $(SDKROOT)
-  else ifneq ($(findstring ios,$(TARGET_TRIPLE)),)
-    ifneq ($(findstring arm,$(TARGET_TRIPLE)),)
+  else ifneq ($(findstring -darwin_ios,$(TARGET_TRIPLE)),)
       SWIFT_SDK := $(shell xcrun --sdk iphoneos --show-sdk-path)
-    else
+  else ifneq ($(findstring -darwin_sim,$(TARGET_TRIPLE)),)
       SWIFT_SDK := $(shell xcrun --sdk iphonesimulator --show-sdk-path)
-    endif
-  else ifneq ($(findstring macosx,$(TARGET_TRIPLE)),)
-    SWIFT_SDK := $(shell xcrun --sdk macosx --show-sdk-path)
-  else ifneq ($(findstring darwin,$(TARGET_TRIPLE)),)
+  else ifneq ($(findstring -darwin,$(TARGET_TRIPLE)),)
     SWIFT_SDK := $(shell xcrun --sdk macosx --show-sdk-path)
   else
     SWIFT_SDK := 
