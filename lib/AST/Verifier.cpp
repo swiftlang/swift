@@ -335,13 +335,6 @@ namespace {
       }
     }
 
-    void verifyParsed(FuncExpr *E) {
-      if (!E->getDecl()) {
-        Out << "FuncExpr should have a Decl\n";
-        abort();
-      }
-    }
-
     void verifyChecked(RequalifyExpr *E) {
       LValueType::Qual dstQuals, srcQuals;
       Type dstObj = checkLValue(E->getType(), dstQuals,

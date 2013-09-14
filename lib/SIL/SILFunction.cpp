@@ -53,9 +53,6 @@ void SILFunction::setDeclContext(Expr *E) {
   }
 
   switch (E->getKind()) {
-  case ExprKind::Func:
-    llvm_unreachable("should not set DeclContext from FuncExpr");
-
   case ExprKind::PipeClosure:
     DeclCtx = dyn_cast<PipeClosureExpr>(E);
     return;

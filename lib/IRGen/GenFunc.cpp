@@ -2076,10 +2076,6 @@ struct EmitLocalDecls : public ASTWalker {
   }
   
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    if (auto *FE = dyn_cast<FuncExpr>(E)) {
-      IGM.emitLocalDecls(FE->getDecl()->getBody());
-      return { false, E };
-    }
     if (auto *CE = dyn_cast<PipeClosureExpr>(E)) {
       IGM.emitLocalDecls(CE->getBody());
       return { false, E };

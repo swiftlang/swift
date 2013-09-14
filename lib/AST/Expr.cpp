@@ -277,18 +277,6 @@ ArchetypeSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
          "use SubscriptExpr for non-archetype type subscript");
 }
 
-FuncExpr *FuncExpr::create(ASTContext &C, DeclContext *Parent) {
-  return new (C) FuncExpr(Parent);
-}
-
-SourceLoc FuncExpr::getLoc() const {
-  return getDecl()->getLoc();
-}
-
-SourceRange FuncExpr::getSourceRange() const {
-  return getDecl()->getSourceRange();
-}
-
 static ValueDecl *getCalledValue(Expr *E) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();

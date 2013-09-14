@@ -1370,9 +1370,9 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
 
     FuncDecl *func = cast<FuncDecl>(vd);
     auto *funcTy = func->getType()->castTo<AnyFunctionType>();
-    return getFunctionTypeWithCaptures(funcTy,
-                                       func->getLocalCaptures(),
-                                       func->getDeclContext());
+    return getFunctionTypeWithCaptures(
+        funcTy, func->getCaptureInfo().getLocalCaptures(),
+        func->getDeclContext());
   }
 
   case SILDeclRef::Kind::Getter:
@@ -1407,9 +1407,9 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
           ? var->getGetter()
           : var->getSetter();
         auto *propTy = propertyMethodType->castTo<AnyFunctionType>();
-        return getFunctionTypeWithCaptures(propTy,
-                                           property->getLocalCaptures(),
-                                           var->getDeclContext());
+        return getFunctionTypeWithCaptures(
+            propTy, property->getCaptureInfo().getLocalCaptures(),
+            var->getDeclContext());
       }
     }
     return propertyMethodType;

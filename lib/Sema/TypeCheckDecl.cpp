@@ -1177,8 +1177,6 @@ public:
   }
 
   void semaFuncDecl(FuncDecl *FD, bool consumeAttributes) {
-    FuncExpr *FE = FD->getFuncExpr();
-
     if (FD->hasType())
       return;
 
@@ -1195,7 +1193,6 @@ public:
         badType || semaFuncParamPatterns(FD, FD->getBodyParamPatterns());
 
     if (badType) {
-      FE->setType(ErrorType::get(TC.Context));
       FD->setType(ErrorType::get(TC.Context));
       FD->setInvalid();
       return;
@@ -1236,7 +1233,6 @@ public:
       }
 
     }
-    FE->setType(funcTy);
     FD->setType(funcTy);
     FD->setBodyResultType(bodyResultType);
   }

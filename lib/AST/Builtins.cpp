@@ -149,8 +149,7 @@ getBuiltinFunction(ASTContext &Context, Identifier Id,
 
   return FuncDecl::create(Context, SourceLoc(), SourceLoc(), Id, SourceLoc(),
                           /*GenericParams=*/nullptr, FnType, ArgPattern,
-                          ArgPattern, /*TheFuncExprBody=*/nullptr,
-                          TypeLoc::withoutLoc(ResType),
+                          ArgPattern, TypeLoc::withoutLoc(ResType),
                           Context.TheBuiltinModule);
 }
 

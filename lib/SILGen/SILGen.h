@@ -17,6 +17,7 @@
 #include "Cleanup.h"
 #include "Condition.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/Optional.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -511,7 +512,7 @@ public:
   
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
-  void emitProlog(CapturingExpr *ce, ArrayRef<Pattern*> paramPatterns,
+  void emitProlog(AnyFunctionRef TheClosure, ArrayRef<Pattern*> paramPatterns,
                   Type resultType);
   void emitProlog(ArrayRef<Pattern*> paramPatterns,
                   Type resultType);
@@ -652,7 +653,7 @@ public:
   ManagedValue emitClosureForCapturingExpr(SILLocation loc,
                                            SILDeclRef function,
                                            ArrayRef<Substitution> forwardSubs,
-                                           CapturingExpr *body);
+                                           AnyFunctionRef TheClosure);
   
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
   ManagedValue emitGetProperty(SILLocation loc,

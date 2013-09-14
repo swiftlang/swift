@@ -18,6 +18,7 @@
 #define SWIFT_DECL_H
 
 #include "swift/AST/Attr.h"
+#include "swift/AST/CaptureInfo.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/KnownProtocols.h"
@@ -45,7 +46,6 @@ namespace swift {
   class Type;
   class Expr;
   class FuncDecl;
-  class FuncExpr;
   class BraceStmt;
   class Component;
   class DeclAttributes;
@@ -1914,8 +1914,6 @@ public:
 
 /// \brief Base class for function-like declarations.
 class AbstractFunctionDecl : public ValueDecl, public DeclContext {
-  friend class FuncExpr;
-
 public:
   enum class BodyKind {
     /// The function did not have a body in the source code file.
@@ -2110,8 +2108,6 @@ class FuncDecl : public AbstractFunctionDecl {
   SourceLoc FuncLoc;    // Location of the 'func' token.
   SourceLoc NameLoc;
 
-  FuncExpr *TheFuncExprBody;
-
   TypeLoc FnRetType;
 
   /// The result type as seen from the body of the function.
@@ -2123,15 +2119,14 @@ class FuncDecl : public AbstractFunctionDecl {
   FuncDecl *OverriddenDecl;
   OperatorDecl *Operator;
 
+  CaptureInfo Captures;
+
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
            SourceLoc NameLoc, unsigned NumParamPatterns,
-           GenericParamList *GenericParams, Type Ty,
-           FuncExpr *TheFuncExprBody, DeclContext *Parent)
+           GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent, Name, nullptr, GenericParams),
-      StaticLoc(StaticLoc),
-      FuncLoc(FuncLoc), NameLoc(NameLoc),
-      TheFuncExprBody(TheFuncExprBody), OverriddenDecl(nullptr),
-      Operator(nullptr) {
+      StaticLoc(StaticLoc), FuncLoc(FuncLoc), NameLoc(NameLoc),
+      OverriddenDecl(nullptr), Operator(nullptr) {
     FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
     assert(NumParamPatterns > 0);
     FuncDeclBits.NumParamPatterns = NumParamPatterns;
@@ -2151,7 +2146,6 @@ public:
                                       SourceLoc NameLoc,
                                       GenericParamList *GenericParams, Type Ty,
                                       unsigned NumParamPatterns,
-                                      FuncExpr *TheFuncExprBody,
                                       DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
@@ -2159,8 +2153,7 @@ public:
                           GenericParamList *GenericParams, Type Ty,
                           ArrayRef<Pattern *> ArgParams,
                           ArrayRef<Pattern *> BodyParams,
-                          FuncExpr *TheFuncExprBody, TypeLoc FnRetType,
-                          DeclContext *Parent);
+                          TypeLoc FnRetType, DeclContext *Parent);
 
   bool isStatic() const {
     return FuncDeclBits.Static;
@@ -2173,22 +2166,8 @@ public:
                                 ArrayRef<Pattern *> BodyParams,
                                 TypeLoc FnRetType);
 
-  FuncExpr *getFuncExpr() { return TheFuncExprBody; }
-  const FuncExpr *getFuncExpr() const { return TheFuncExprBody; }
-  void setFuncExpr(FuncExpr *NewBody) { TheFuncExprBody = NewBody; }
-  
-  /// getCaptures - Return the list of declarations captured by the function.
-  /// This includes global variables, so it is all variables referenced.
-  ArrayRef<ValueDecl*> getCaptures() const;
-
-  /// getLocalCaptures - Return a filtered list of the captures for this
-  /// function, filtering out global variables.  This list returns the list that
-  /// actually needs to be closed over.
-  std::vector<ValueDecl*> getLocalCaptures() const;
-
-  /// hasLocalCaptures - Return true if getLocalCaptures() will return a
-  /// non-empty list.
-  bool hasLocalCaptures() const;
+  CaptureInfo &getCaptureInfo() { return Captures; }
+  const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   /// \brief Returns the "natural" number of argument clauses taken by this
   /// function.  This value is always at least one, and it may be more if the
@@ -2262,7 +2241,10 @@ public:
   }
 
   /// Revert to an empty type.
-  void revertType();
+  void revertType() {
+    BodyResultType = Type();
+    overwriteType(Type());
+  }
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation, in other words, the name of the function is an operator,
@@ -2851,9 +2833,6 @@ inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
     llvm_unreachable("unhandled derived decl kind");
   }
 }
-
-// FIXME: Fix up the AST representation of ConstructorDecls and DestructorDecls
-// to use real FuncExpr bodies.
 
 /// A convenience typedef for FuncExpr-like-things, including FuncExprs,
 /// constructors, and destructors.

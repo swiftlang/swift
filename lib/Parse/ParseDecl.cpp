@@ -1137,12 +1137,10 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Scope S(this, ScopeKind::FunctionBody);
 
       // Start the function.
-      FuncExpr *GetFn = FuncExpr::create(Context, CurDeclContext);
       Get = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), GetLoc,
                              Identifier(), GetLoc, /*GenericParams=*/nullptr,
-                             Type(), Params, Params, GetFn, ElementTy,
+                             Type(), Params, Params, ElementTy,
                              CurDeclContext);
-      GetFn->setDecl(Get);
       addFunctionParametersToScope(Get->getBodyParamPatterns(), Get);
 
       // Establish the new context.
@@ -1239,12 +1237,10 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
     // Start the function.
     Type SetterRetTy = TupleType::getEmpty(Context);
-    FuncExpr *SetFn = FuncExpr::create(Context, CurDeclContext);
     Set = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), SetLoc,
                            Identifier(), SetLoc, /*generic=*/nullptr, Type(),
-                           Params, Params, SetFn,
-                           TypeLoc::withoutLoc(SetterRetTy), CurDeclContext);
-    SetFn->setDecl(Set);
+                           Params, Params, TypeLoc::withoutLoc(SetterRetTy),
+                           CurDeclContext);
     addFunctionParametersToScope(Set->getBodyParamPatterns(), Set);
 
     // Establish the new context.
@@ -1604,11 +1600,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
         return SignatureStatus;
 
       // Create function AST nodes.
-      FuncExpr *FE = FuncExpr::create(Context, CurDeclContext);
       FuncDecl *FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name,
                                       NameLoc, GenericParams, Type(), ArgParams,
-                                      BodyParams, FE, FuncRetTy, CurDeclContext);
-      FE->setDecl(FD);
+                                      BodyParams, FuncRetTy, CurDeclContext);
       FD->setBodySkipped(Tok.getLoc());
 
       addFunctionParametersToScope(FD->getBodyParamPatterns(), FD);
@@ -1625,13 +1619,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   {
     Scope S(this, ScopeKind::FunctionBody);
 
-    FuncExpr *FE = FuncExpr::create(Context, CurDeclContext);
-
     // Create the decl for the func and add it to the parent scope.
     FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name, NameLoc,
                           GenericParams, Type(), ArgParams, BodyParams,
-                          FE, FuncRetTy, CurDeclContext);
-    FE->setDecl(FD);
+                          FuncRetTy, CurDeclContext);
 
     addFunctionParametersToScope(FD->getBodyParamPatterns(), FD);
 

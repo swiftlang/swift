@@ -197,7 +197,6 @@ namespace {
     RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
     RValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
     RValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
-    RValue visitFuncExpr(FuncExpr *E, SGFContext C);
     RValue visitPipeClosureExpr(PipeClosureExpr *E, SGFContext C);
     RValue visitClosureExpr(ClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
@@ -351,7 +350,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   // If the referenced decl is a local func with context, then the SILDeclRef
   // uncurry level is one deeper (for the context vars).
   if (auto *fd = dyn_cast<FuncDecl>(decl)) {
-    if (fd->hasLocalCaptures() &&
+    if (fd->getCaptureInfo().hasLocalCaptures() &&
         uncurryLevel != SILDeclRef::ConstructAtNaturalUncurryLevel)
       ++uncurryLevel;
   }
@@ -1247,13 +1246,13 @@ RValue RValueEmitter::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
 ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
                                              SILDeclRef constant,
                                              ArrayRef<Substitution> forwardSubs,
-                                             CapturingExpr *body) {
+                                             AnyFunctionRef TheClosure) {
   // FIXME: Stash the capture args somewhere and curry them on demand rather
   // than here.
   assert(((constant.uncurryLevel == 1 &&
-           body->getCaptureInfo().hasLocalCaptures()) ||
+           TheClosure.getCaptureInfo().hasLocalCaptures()) ||
           (constant.uncurryLevel == 0 &&
-           !body->getCaptureInfo().hasLocalCaptures())) &&
+           !TheClosure.getCaptureInfo().hasLocalCaptures())) &&
          "curried local functions not yet supported");
   
   SILValue functionRef = emitGlobalFunctionRef(loc, constant);
@@ -1279,10 +1278,10 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
                                      getLoweredLoadableType(specialized));
   }
 
-  if (!body->getCaptureInfo().hasLocalCaptures())
+  if (!TheClosure.getCaptureInfo().hasLocalCaptures())
     return ManagedValue(functionRef, ManagedValue::Unmanaged);
 
-  auto captures = body->getCaptureInfo().getLocalCaptures();
+  auto captures = TheClosure.getCaptureInfo().getLocalCaptures();
   SmallVector<SILValue, 4> capturedArgs;
   for (ValueDecl *capture : captures) {
     switch (getDeclCaptureKind(capture)) {
@@ -1330,22 +1329,10 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
     }
   }
   
-  SILType closureTy = getLoweredLoadableType(body->getType());
+  SILType closureTy = getLoweredLoadableType(TheClosure.getType());
   return emitManagedRValueWithCleanup(
                   B.createPartialApply(loc, functionRef, capturedArgs,
                                        closureTy));
-}
-
-RValue RValueEmitter::visitFuncExpr(FuncExpr *e, SGFContext C) {
-  // Generate the local function body.
-  SGF.SGM.emitFunction(e->getDecl());
-
-  // Generate the closure (if any) for the function reference.
-  return RValue(SGF,
-                SGF.emitClosureForCapturingExpr(e, SILDeclRef(e->getDecl()),
-                                              SGF.getForwardingSubstitutions(),
-                                              e),
-                e);
 }
 
 RValue RValueEmitter::visitPipeClosureExpr(PipeClosureExpr *e, SGFContext C) {
@@ -1373,7 +1360,7 @@ RValue RValueEmitter::visitClosureExpr(ClosureExpr *e, SGFContext C) {
 
 void SILGenFunction::emitFunction(FuncDecl *fd) {
   Type resultTy = fd->getResultType(F.getASTContext());
-  emitProlog(fd->getFuncExpr(), fd->getBodyParamPatterns(), resultTy);
+  emitProlog(fd, fd->getBodyParamPatterns(), resultTy);
   prepareEpilog(resultTy, CleanupLocation(fd));
   visit(fd->getBody());
   emitEpilog(fd);
@@ -2153,7 +2140,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
   unsigned paramCount = from.uncurryLevel + 1;
   
   // Forward implicit closure context arguments.
-  bool hasCaptures = fd->hasLocalCaptures();
+  bool hasCaptures = fd->getCaptureInfo().hasLocalCaptures();
   if (hasCaptures)
     --paramCount;
 
@@ -2165,7 +2152,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
 
   // Forward captures.
   if (hasCaptures)
-    for (auto capture : fd->getLocalCaptures())
+    for (auto capture : fd->getCaptureInfo().getLocalCaptures())
       forwardCaptureArgs(*this, curriedArgs, capture);
 
   SILValue toFn = getNextUncurryLevelRef(*this, fd, to, curriedArgs);

@@ -329,7 +329,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
       TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()) {
     SmallVector<SILValue, 4> Captures;
    
-    for (auto Capture : fd->getCaptures()) {
+    for (auto Capture : fd->getCaptureInfo().getCaptures()) {
       auto It = TopLevelSGF->VarLocs.find(Capture);
       if (It == TopLevelSGF->VarLocs.end()) continue;
       Captures.push_back(It->second.address);

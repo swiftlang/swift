@@ -52,7 +52,7 @@ static unsigned getFuncNaturalUncurryLevel(FuncDecl *FD) {
   unsigned Level = FD->getArgParamPatterns().size() - 1;
   // Functions with captures have an extra uncurry level for the capture
   // context.
-  if (FD->hasLocalCaptures())
+  if (FD->getCaptureInfo().hasLocalCaptures())
     Level += 1;
   return Level;
 }

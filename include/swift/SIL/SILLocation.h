@@ -324,12 +324,10 @@ class ImplicitReturnLocation : public SILLocation {
 public:
 
   ImplicitReturnLocation(CapturingExpr *E)
-    : SILLocation(E, ImplicitReturnKind) {
-    assert(!isASTNode<FuncExpr>());
-  }
+      : SILLocation(E, ImplicitReturnKind) {}
 
   ImplicitReturnLocation(AbstractFunctionDecl *AFD)
-    : SILLocation(AFD, ImplicitReturnKind) {}
+      : SILLocation(AFD, ImplicitReturnKind) {}
 
   /// \brief Construct from a RegularLocation; preserve all special bits.
   ///
@@ -338,7 +336,7 @@ public:
   static SILLocation getImplicitReturnLoc(SILLocation L) {
     // FIXME: Location points to ClassDecl in the case we have an implicit
     // destructor.
-    assert((L.isASTNode<Expr>() && !L.isASTNode<FuncExpr>()) ||
+    assert(L.isASTNode<Expr>() ||
            L.isASTNode<AbstractFunctionDecl>() ||
            L.isASTNode<ClassDecl>() ||
            (L.isNull() && L.isInTopLevel()));
@@ -397,7 +395,7 @@ private:
 /// deallocs, destructor calls.
 ///
 /// This location wraps the statement representing the enclosing scope, for
-/// example, FuncExpr, ParenExpr. The scope's end location points to
+/// example, FuncDecl, ParenExpr. The scope's end location points to
 /// the SourceLoc that shows when the operation is performed at runtime.
 ///
 /// Allowed on any instruction except for ReturnInst, AutoreleaseReturnInst.

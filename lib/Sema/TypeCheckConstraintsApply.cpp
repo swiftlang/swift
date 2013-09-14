@@ -1478,10 +1478,6 @@ namespace {
       llvm_unreachable("Unhandled pattern kind");
     }
 
-    Expr *visitFuncExpr(FuncExpr *expr) {
-      llvm_unreachable("should not see FuncExpr in expressions");
-    }
-
     Expr *visitPipeClosureExpr(PipeClosureExpr *expr) {
       llvm_unreachable("Handled by the walker directly");
     }

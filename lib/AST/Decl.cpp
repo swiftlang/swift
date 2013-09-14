@@ -680,7 +680,6 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        Identifier Name, SourceLoc NameLoc,
                                        GenericParamList *GenericParams,
                                        Type Ty, unsigned NumParamPatterns,
-                                       FuncExpr *TheFuncExprBody,
                                        DeclContext *Parent) {
   assert(NumParamPatterns > 0);
   void *Mem = Context.Allocate(
@@ -688,7 +687,7 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
       alignof(FuncDecl));
   return ::new (Mem)
       FuncDecl(StaticLoc, FuncLoc, Name, NameLoc, NumParamPatterns,
-               GenericParams, Ty, TheFuncExprBody, Parent);
+               GenericParams, Ty, Parent);
 }
 
 FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
@@ -696,13 +695,12 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            SourceLoc NameLoc, GenericParamList *GenericParams,
                            Type Ty, ArrayRef<Pattern *> ArgParams,
                            ArrayRef<Pattern *> BodyParams,
-                           FuncExpr *TheFuncExprBody, TypeLoc FnRetType,
-                           DeclContext *Parent) {
+                           TypeLoc FnRetType, DeclContext *Parent) {
   assert(ArgParams.size() == BodyParams.size());
   const unsigned NumParamPatterns = ArgParams.size();
   auto *FD = FuncDecl::createDeserialized(
       Context, StaticLoc, FuncLoc, Name, NameLoc, GenericParams, Ty,
-      NumParamPatterns, TheFuncExprBody, Parent);
+      NumParamPatterns, Parent);
   FD->setDeserializedSignature(ArgParams, BodyParams, FnRetType);
   return FD;
 }
@@ -723,26 +721,6 @@ void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
     BodyParamsRef[i] = BodyParams[i];
 
   this->FnRetType = FnRetType;
-}
-
-ArrayRef<ValueDecl *> FuncDecl::getCaptures() const {
-  if (TheFuncExprBody)
-    return TheFuncExprBody->getCaptureInfo().getCaptures();
-  else
-    return {};
-}
-
-std::vector<ValueDecl*> FuncDecl::getLocalCaptures() const {
-  if (TheFuncExprBody)
-    return TheFuncExprBody->getCaptureInfo().getLocalCaptures();
-  return std::vector<ValueDecl *>();
-}
-
-bool FuncDecl::hasLocalCaptures() const {
-  if (TheFuncExprBody)
-    return TheFuncExprBody->getCaptureInfo().hasLocalCaptures();
-
-  return false;
 }
 
 Type FuncDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
@@ -808,12 +786,6 @@ Type FuncDecl::getResultType(ASTContext &Ctx) const {
     resultTy = TupleType::getEmpty(Ctx);
 
   return resultTy;
-}
-
-void FuncDecl::revertType() {
-  BodyResultType = Type();
-  overwriteType(Type());
-  getFuncExpr()->setType(Type());
 }
 
 bool FuncDecl::isUnaryOperator() const {

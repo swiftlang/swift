@@ -345,9 +345,7 @@ StringRef IRGenDebugInfo::getName(SILLocation L) {
   if (L.isNull())
     return StringRef();
 
-  assert(!L.isASTNode<FuncExpr>());
-
-  if (FuncDecl* FD = L.getAsASTNode<FuncDecl>())
+  if (FuncDecl *FD = L.getAsASTNode<FuncDecl>())
     return getName(*FD);
 
   if (L.isASTNode<ConstructorDecl>())

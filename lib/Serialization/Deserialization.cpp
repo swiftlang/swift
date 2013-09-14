@@ -929,8 +929,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto fn = FuncDecl::createDeserialized(
         ctx, SourceLoc(), SourceLoc(), getIdentifier(nameID), SourceLoc(),
-        genericParams, /*type=*/nullptr, numParamPatterns,
-        /*TheFuncExprBody=*/nullptr, DC);
+        genericParams, /*type=*/nullptr, numParamPatterns, DC);
     declOrOffset = fn;
 
     // This must be set after recording the constructor in the map.
@@ -955,11 +954,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       bodyPatterns = argPatterns;
     fn->setDeserializedSignature(argPatterns, bodyPatterns,
                                  TypeLoc::withoutLoc(signature->getResult()));
-
-    auto body = FuncExpr::create(ctx, DC);
-    body->setType(signature);
-    body->setDecl(fn);
-    fn->setFuncExpr(body);
 
     if (genericParams)
       for (auto &genericParam : *fn->getGenericParams())

@@ -574,7 +574,7 @@ void TypeChecker::computeCaptures(FuncDecl *FD) {
   finder.doWalk(FD->getBody());
   ValueDecl **CaptureCopy =
       Context.AllocateCopy<ValueDecl *>(Captures.begin(), Captures.end());
-  FD->getFuncExpr()->getCaptureInfo().setCaptures(
+  FD->getCaptureInfo().setCaptures(
       llvm::makeArrayRef(CaptureCopy, Captures.size()));
 }
 

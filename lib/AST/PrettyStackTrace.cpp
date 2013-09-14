@@ -60,12 +60,7 @@ void PrettyStackTraceExpr::print(llvm::raw_ostream &out) const {
 
 void swift::printExprDescription(llvm::raw_ostream &out, Expr *E,
                                  ASTContext &Context) {
-  if (isa<FuncExpr>(E)) {
-    out << "function";
-  } else {
-    out << "expression";
-  }
-  out << " at ";
+  out << "expression at ";
   E->getSourceRange().print(out, Context.SourceMgr);
   out << '\n';
 }

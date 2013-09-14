@@ -689,10 +689,6 @@ namespace {
       llvm_unreachable("Unhandled pattern kind");
     }
 
-    Type visitFuncExpr(FuncExpr *expr) {
-      llvm_unreachable("should not see FuncExpr in expressions");
-    }
-
     Type visitPipeClosureExpr(PipeClosureExpr *expr) {
       // Closure expressions always have function type. In cases where a
       // parameter or return type is omitted, a fresh type variable is used to
@@ -1018,8 +1014,6 @@ namespace {
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
     virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      assert(!isa<FuncExpr>(expr));
-
       // For closures containing only a single expression, the body participates
       // in type checking.
       if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {

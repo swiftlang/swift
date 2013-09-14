@@ -22,7 +22,6 @@
 namespace swift {
 
 class ASTContext;
-class FuncExpr;
 class SILInstruction;
 class SILModule;
 class TranslationUnit;

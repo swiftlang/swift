@@ -395,15 +395,6 @@ namespace {
           OS << "_for=" << vd->getName();
         }
       }
-      auto Captures = FD->getCaptures();
-      if (!Captures.empty()) {
-        OS << " captures=(";
-        OS << Captures[0]->getName();
-        for (auto capture : Captures.slice(1))
-          OS << ", " << capture->getName();
-        OS << ')';
-      }
-      OS << '\n';
 
       for (auto P : FD->getArgParamPatterns()) {
         OS << '\n';
@@ -415,7 +406,11 @@ namespace {
         printRec(Body);
       }
 
-      printRec(FD->getFuncExpr());
+      if (!FD->getCaptureInfo().empty()) {
+        OS << " ";
+        FD->getCaptureInfo().print(OS);
+      }
+
       OS << ')';
     }
 
@@ -1164,10 +1159,6 @@ public:
     return OS;
   }
 
-  void visitFuncExpr(FuncExpr *E) {
-    printCapturing(E, "func_expr");
-    OS << ')';
-  }
   void visitPipeClosureExpr(PipeClosureExpr *expr) {
     printCapturing(expr, "closure_expr");
     if (expr->hasSingleExpressionBody()) {

@@ -299,10 +299,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
-  Expr *visitFuncExpr(FuncExpr *E) {
-    return E;
-  }
-
   Expr *visitPipeClosureExpr(PipeClosureExpr *expr) {
     if (Pattern *Pat = doIt(expr->getParams()))
       expr->setParams(Pat);
@@ -518,11 +514,6 @@ public:
       if (FD->getBodyResultTypeLoc().getTypeRepr())
         if (doIt(FD->getBodyResultTypeLoc().getTypeRepr()))
           return true;
-
-      if (FuncExpr *E2 = cast_or_null<FuncExpr>(doIt(FD->getFuncExpr())))
-        FD->setFuncExpr(E2);
-      else
-        return true;
 
       if (FD->getBody()) {
         if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(FD->getBody())))

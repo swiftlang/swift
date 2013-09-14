@@ -77,18 +77,10 @@ class alignas(8) Expr {
   enum { NumCapturingExprBits = NumExprBits + 0 };
   static_assert(NumCapturingExprBits <= 32, "fits in an unsigned");
 
-  class FuncExprBitfields {
-    friend class FuncExpr;
-    unsigned : NumCapturingExprBits;
-  };
-  enum { NumFuncExprBits = NumCapturingExprBits + 0 };
-  static_assert(NumFuncExprBits <= 32, "fits in an unsigned");
-
 protected:
   union {
     ExprBitfields ExprBits;
     CapturingExprBitfields CapturingExprBits;
-    FuncExprBitfields FuncExprBits;
   };
 
 private:
@@ -1644,29 +1636,6 @@ public:
     return E->getKind() >= ExprKind::First_CapturingExpr &&
            E->getKind() <= ExprKind::Last_CapturingExpr;
   }
-};
-
-/// FuncExpr - An explicit unnamed func definition, which can optionally
-/// have named arguments.
-///    e.g.  func(a : int) -> int { return a+1 }
-class FuncExpr : public CapturingExpr {
-  FuncDecl *TheFuncDecl;
-
-  FuncExpr(DeclContext *Parent)
-    : CapturingExpr(ExprKind::Func, Type()),
-      TheFuncDecl(nullptr)
-  {}
-
-public:
-  static FuncExpr *create(ASTContext &Context, DeclContext *Parent);
-
-  SourceLoc getLoc() const;
-  SourceRange getSourceRange() const;
-
-  FuncDecl *getDecl() const { return TheFuncDecl; }
-  void setDecl(FuncDecl *f) { TheFuncDecl = f; }
-
-  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Func; }
 };
 
 /// An explicit unnamed func definition, which can optionally
