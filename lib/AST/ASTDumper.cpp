@@ -381,39 +381,6 @@ namespace {
       OS << ')';
     }
 
-    void visitFuncDecl(FuncDecl *FD) {
-      printCommon(FD, "func_decl", FuncColor);
-      if (FD->isGetterOrSetter()) {
-        if (FD->getGetterDecl()) {
-          OS << " getter";
-        } else {
-          assert(FD->getSetterDecl() && "no getter or setter!");
-          OS << " setter";
-        }
-
-        if (ValueDecl *vd = dyn_cast<ValueDecl>(FD->getGetterOrSetterDecl())) {
-          OS << "_for=" << vd->getName();
-        }
-      }
-
-      for (auto P : FD->getArgParamPatterns()) {
-        OS << '\n';
-        printRec(P);
-      }
-
-      if (auto Body = FD->getBody()) {
-        OS << '\n';
-        printRec(Body);
-      }
-
-      if (!FD->getCaptureInfo().empty()) {
-        OS << " ";
-        FD->getCaptureInfo().print(OS);
-      }
-
-      OS << ')';
-    }
-
     void visitUnionDecl(UnionDecl *UD) {
       printCommon(UD, "union_decl");
       printInherited(UD->getInherited());
@@ -486,6 +453,43 @@ namespace {
       OS << ')';
     }
 
+    void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
+      if (auto Body = D->getBody()) {
+        OS << '\n';
+        printRec(Body);
+      }
+    }
+    
+    void visitFuncDecl(FuncDecl *FD) {
+      printCommon(FD, "func_decl", FuncColor);
+      if (FD->isGetterOrSetter()) {
+        if (FD->getGetterDecl()) {
+          OS << " getter";
+        } else {
+          assert(FD->getSetterDecl() && "no getter or setter!");
+          OS << " setter";
+        }
+        
+        if (ValueDecl *vd = dyn_cast<ValueDecl>(FD->getGetterOrSetterDecl())) {
+          OS << "_for=" << vd->getName();
+        }
+      }
+      
+      for (auto P : FD->getArgParamPatterns()) {
+        OS << '\n';
+        printRec(P);
+      }
+      
+      printAbstractFunctionDecl(FD);
+      
+      if (!FD->getCaptureInfo().empty()) {
+        OS << " ";
+        FD->getCaptureInfo().print(OS);
+      }
+
+      OS << ')';
+     }
+
     void visitConstructorDecl(ConstructorDecl *CD) {
       printCommon(CD, "constructor_decl", FuncColor);
       if (CD->getAllocSelfExpr()) {
@@ -494,17 +498,14 @@ namespace {
         OS << "this = ";
         CD->getAllocSelfExpr()->print(OS, 0);
       }
-      if (CD->getBody()) {
-        OS << '\n';
-        printRec(CD->getBody());
-      }
+      printAbstractFunctionDecl(CD);
       OS << ')';
     }
 
     void visitDestructorDecl(DestructorDecl *DD) {
-      printCommon(DD, "destructor_decl");
+      printCommon(DD, "destructor_decl", FuncColor);
       OS << '\n';
-      printRec(DD->getBody());
+      printAbstractFunctionDecl(DD);
       OS << ')';
     }
 
