@@ -21,6 +21,14 @@ SOURCES := Foundation.swift BridgeNSString.mm
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
 
+ifneq ($(findstring -darwin_ios,$(TARGET_TRIPLE)),)
+  # SWIFT_SOURCES += Foundation-ios.swift
+else ifneq ($(findstring -darwin_sim,$(TARGET_TRIPLE)),)
+  # SWIFT_SOURCES += Foundation-ios.swift
+else ifneq ($(findstring -darwin,$(TARGET_TRIPLE)),)
+  SWIFT_SOURCES += Foundation-macosx.swift
+endif
+
 include $(SWIFT_LEVEL)/Makefile
 
 LDFLAGS += -framework Foundation \
