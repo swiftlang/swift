@@ -98,6 +98,7 @@ public:
   
   /// Construct a layout strategy appropriate to the union type.
   static UnionImplStrategy *get(TypeConverter &TC,
+                                CanType type,
                                 UnionDecl *theUnion);
   
   /// Given an incomplete StructType for the union, completes layout of the
@@ -2076,6 +2077,7 @@ namespace {
 } // end anonymous namespace
 
 UnionImplStrategy *UnionImplStrategy::get(TypeConverter &TC,
+                                          CanType type,
                                           UnionDecl *theUnion)
 {
   unsigned numElements = 0;
@@ -2088,6 +2090,9 @@ UnionImplStrategy *UnionImplStrategy::get(TypeConverter &TC,
     numElements++;
     
     // Compute whether this gives us an apparent payload or dynamic layout.
+    // Note that we do *not* apply substitutions from a bound generic instance
+    // yet. We want all instances of a generic union to share an implementation
+    // strategy.
     Type argType = elt->getArgumentType();
     if (argType.isNull()) {
       elementsWithNoPayload.push_back({elt, nullptr});
@@ -2098,16 +2103,27 @@ UnionImplStrategy *UnionImplStrategy::get(TypeConverter &TC,
       elementsWithRecursivePayload.push_back({elt, nullptr});
       continue;
     }
-    if (!argTI->isFixedSize())
-      tik = Opaque;
-    
+
     auto loadableArgTI = dyn_cast<LoadableTypeInfo>(argTI);
     if (loadableArgTI
         && loadableArgTI->getExplosionSize(ExplosionKind::Minimal) == 0) {
-      elementsWithNoPayload.push_back({elt, argTI});
+      elementsWithNoPayload.push_back({elt, nullptr});
     } else {
-      elementsWithPayload.push_back({elt, argTI});
-      if (!loadableArgTI && tik > Fixed)
+      // *Now* apply the substitutions and get the type info for the instance's
+      // payload type, since we know this case carries an apparent payload in
+      // the generic case.
+      auto *substArgTI = argTI;
+      if (type->is<BoundGenericType>()) {
+        Type substArgTy = type->getTypeOfMember(theUnion->getModuleContext(),
+                                                elt, nullptr,
+                                                elt->getArgumentType());
+        substArgTI = &TC.getCompleteTypeInfo(substArgTy->getCanonicalType());
+      }
+      
+      elementsWithPayload.push_back({elt, substArgTI});
+      if (!substArgTI->isFixedSize())
+        tik = Opaque;
+      else if (!substArgTI->isLoadable() && tik > Fixed)
         tik = Fixed;
     }
   }
@@ -2326,17 +2342,14 @@ namespace {
                                                    CanType type,
                                                    UnionDecl *theUnion,
                                                    llvm::StructType *unionTy) {
-    Type eltType = theUnion->getAllElements().front()->getArgumentType();
-    
-    if (eltType.isNull()) {
+    if (ElementsWithPayload.empty()) {
       unionTy->setBody(ArrayRef<llvm::Type*>{});
       return registerUnionTypeInfo(new LoadableUnionTypeInfo(*this, unionTy,
                                                              Size(0), {},
                                                              Alignment(1),
                                                              IsPOD));
     } else {
-      const TypeInfo &eltTI
-        = TC.getCompleteTypeInfo(eltType->getCanonicalType());
+      const TypeInfo &eltTI = *getSingleton();
 
       // Use the singleton element's storage type if fixed-size.
       if (eltTI.isFixedSize()) {
@@ -2537,14 +2550,8 @@ const TypeInfo *TypeConverter::convertUnionType(CanType type,
   // Create a forward declaration for that type.
   addForwardDecl(type.getPointer(), convertedStruct);
 
-  // Determine the implementation strategy, checking if we've visited this
-  // union before.
-  UnionImplStrategy *strategy;
-  auto found = Unions.find(theUnion);
-  if (found != Unions.end())
-    strategy = found->second;
-  else
-    strategy = UnionImplStrategy::get(*this, theUnion);
+  // Determine the implementation strategy.
+  UnionImplStrategy *strategy = UnionImplStrategy::get(*this, type, theUnion);
 
   // Create the TI.
   return strategy->completeUnionTypeLayout(*this, type,

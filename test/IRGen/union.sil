@@ -1582,6 +1582,19 @@ dest(%1 : $*T):
 var a : DynamicSingleton<()>
 var b : DynamicSingleton<NoPayloads>
 
+// CHECK: define void @dynamic_singleton_instance_arg_1()
+sil @dynamic_singleton_instance_arg_1 : $(DynamicSingleton<()>) -> () {
+entry(%0 : $DynamicSingleton<()>):
+  %v = tuple ()
+  return %v : $()
+}
+// CHECK: define void @dynamic_singleton_instance_arg_2(i2)
+sil @dynamic_singleton_instance_arg_2 : $(DynamicSingleton<NoPayloads>) -> () {
+entry(%0 : $DynamicSingleton<NoPayloads>):
+  %v = tuple ()
+  return %v : $()
+}
+
 sil @top_level_code : $() -> () {
 entry:
   // Force the global variables to materialize.

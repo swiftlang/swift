@@ -119,7 +119,6 @@ private:
     friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
   };
   Types_t Types;
-  llvm::DenseMap<UnionDecl *, UnionImplStrategy *> Unions;
 };
   
 } // end namespace irgen
