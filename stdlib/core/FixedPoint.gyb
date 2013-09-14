@@ -24,7 +24,7 @@ def hexify(n):
 
 
 # Bit counts for all int types
-allBits = [8, 16, 32, 64, 128]
+allBits = [8, 16, 32, 64]
 
 # Number of bits in the biggest int type
 maxBits = max(allBits)

@@ -32,16 +32,16 @@
 #include <limits.h>
 #include "llvm/ADT/StringExtras.h"
 
-// static func String(v : Int128, radix : Int) -> String
+// static func String(v : Int64, radix : Int) -> String
 extern "C"
 unsigned long long
-print_int(char* TmpBuffer, __int64_t buf_len, __int128_t X, uint64_t Radix,
+print_int(char* TmpBuffer, __int64_t buf_len, __int64_t X, uint64_t Radix,
           bool uppercase) {
   assert(Radix != 0 && Radix <= 36 && "Invalid radix for string conversion");
   char *P = TmpBuffer;
 
   bool WasNeg = X < 0;
-  __uint128_t Y = WasNeg ? -X : X;
+  __uint64_t Y = WasNeg ? -X : X;
 
   if (Y == 0) {
     *P++ = '0';
@@ -63,10 +63,10 @@ print_int(char* TmpBuffer, __int64_t buf_len, __int128_t X, uint64_t Radix,
   return size_t(P - TmpBuffer);
 }
 
-// static func String(v : UInt128, radix : Int) -> String
+// static func String(v : UInt64, radix : Int) -> String
 extern "C"
 unsigned long long
-print_uint(char* TmpBuffer, __int64_t buf_len, __uint128_t Y, uint64_t Radix,
+print_uint(char* TmpBuffer, __int64_t buf_len, __uint64_t Y, uint64_t Radix,
            bool uppercase) {
   assert(Radix != 0 && Radix <= 36 && "Invalid radix for string conversion");
   char *P = TmpBuffer;
