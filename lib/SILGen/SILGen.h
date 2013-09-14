@@ -112,11 +112,14 @@ public:
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
 
+  void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
+  
   /// Generates code for the given FuncDecl and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(decl). For
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
   void emitFunction(FuncDecl *fd);
+  
   /// \brief Generates code for the given closure expression and adds the 
   /// SILFunction to the current SILModule under the nane SILDeclRef(ce).
   void emitClosure(PipeClosureExpr *ce);

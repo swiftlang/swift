@@ -309,6 +309,27 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   F->verify();
 }
 
+void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
+  // If this is a function at global scope, it may close over a global variable.
+  // If we're emitting top-level code, then emit a "mark_function_escape" that
+  // lists the captured global variables so that definite initialization can
+  // reason about this escape point.
+  if (TLDefiniteInit &&
+      !AFD->getDeclContext()->isLocalContext() &&
+      TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()) {
+    SmallVector<SILValue, 4> Captures;
+    
+    for (auto Capture : AFD->getCaptureInfo().getCaptures()) {
+      auto It = TopLevelSGF->VarLocs.find(Capture);
+      if (It == TopLevelSGF->VarLocs.end()) continue;
+      Captures.push_back(It->second.address);
+    }
+    
+    if (!Captures.empty())
+      TopLevelSGF->B.createMarkFunctionEscape(AFD, Captures);
+  }
+}
+
 void SILGenModule::emitFunction(FuncDecl *fd) {
   SILDeclRef::Loc decl = fd;
 
@@ -320,24 +341,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
     emitDefaultArgGenerators(decl, patterns);
   }
 
-  // If this is a function at global scope, it may close over a global variable.
-  // If we're emitting top-level code, then emit a "mark_function_escape" that
-  // lists the captured global variables so that definite initialization can
-  // reason about this escape point.
-  if (TLDefiniteInit &&
-      !fd->getDeclContext()->isLocalContext() &&
-      TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()) {
-    SmallVector<SILValue, 4> Captures;
-   
-    for (auto Capture : fd->getCaptureInfo().getCaptures()) {
-      auto It = TopLevelSGF->VarLocs.find(Capture);
-      if (It == TopLevelSGF->VarLocs.end()) continue;
-      Captures.push_back(It->second.address);
-    }
-    
-    if (!Captures.empty())
-      TopLevelSGF->B.createMarkFunctionEscape(fd, Captures);
-  }
+  emitAbstractFuncDecl(fd);
   
   // Emit the actual body of the function to a new SILFunction.  Ignore
   // prototypes.
@@ -367,6 +371,8 @@ void SILGenModule::addGlobalVariable(VarDecl *global) {
 void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   // Emit any default argument getter functions.
   emitDefaultArgGenerators(decl, decl->getArguments());
+
+  emitAbstractFuncDecl(decl);
 
   SILDeclRef constant(decl);
   SILFunction *f = preEmitFunction(constant, decl, decl);
@@ -414,6 +420,8 @@ void SILGenModule::emitClosure(ClosureExpr *ce) {
 
 void SILGenModule::emitDestructor(ClassDecl *cd,
                                   DestructorDecl /*nullable*/ *dd) {
+  if (dd) emitAbstractFuncDecl(dd);
+
   // Emit the destroying destructor.
   SILDeclRef destroyer(cd, SILDeclRef::Kind::Destroyer);
   SILFunction *f = preEmitFunction(destroyer, dd, dd);
