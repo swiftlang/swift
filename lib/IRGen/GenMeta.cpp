@@ -1404,16 +1404,24 @@ namespace {
     }
   };
 
-  /// A class for finding a type argument in a struct metadata object.
-  class FindStructArgumentIndex :
-      public MetadataSearcher<StructMetadataScanner<FindStructArgumentIndex>> {
-    typedef MetadataSearcher super;
+  /// A class for finding a type argument in a value type metadata object.
+  template<template <typename> class METADATA_SCANNER>
+  class FindValueTypeArgumentIndex :
+      public MetadataSearcher<METADATA_SCANNER<
+               FindValueTypeArgumentIndex<METADATA_SCANNER>>>
+  {
+    using super = MetadataSearcher<METADATA_SCANNER<
+              FindValueTypeArgumentIndex<METADATA_SCANNER>>>;
+    
+    using super::setTargetIndex;
+    using super::NextIndex;
+    using super::Target;
 
     ArchetypeType *TargetArchetype;
 
   public:
-    FindStructArgumentIndex(IRGenModule &IGM, StructDecl *decl,
-                            ArchetypeType *targetArchetype)
+    FindValueTypeArgumentIndex(IRGenModule &IGM, decltype(Target) decl,
+                               ArchetypeType *targetArchetype)
       : super(IGM, decl), TargetArchetype(targetArchetype) {}
 
     void addGenericArgument(ArchetypeType *argument) {
@@ -1422,25 +1430,11 @@ namespace {
       NextIndex++;
     }
   };
-
-  /// A class for finding a type argument in a union metadata object.
-  class FindUnionArgumentIndex :
-      public MetadataSearcher<UnionMetadataScanner<FindStructArgumentIndex>> {
-    typedef MetadataSearcher super;
-    
-    ArchetypeType *TargetArchetype;
-    
-  public:
-    FindUnionArgumentIndex(IRGenModule &IGM, UnionDecl *decl,
-                            ArchetypeType *targetArchetype)
-    : super(IGM, decl), TargetArchetype(targetArchetype) {}
-    
-    void addGenericArgument(ArchetypeType *argument) {
-      if (argument == TargetArchetype)
-        setTargetIndex();
-      NextIndex++;
-    }
-  };
+  
+  using FindStructArgumentIndex
+    = FindValueTypeArgumentIndex<StructMetadataScanner>;
+  using FindUnionArgumentIndex
+    = FindValueTypeArgumentIndex<UnionMetadataScanner>;
 }
 
 /// Given a reference to nominal type metadata of the given type,
@@ -1517,18 +1511,27 @@ namespace {
   };
 
   /// A class for finding a protocol witness table for a type argument
-  /// in a struct metadata object.
-  class FindStructWitnessTableIndex :
-      public MetadataSearcher<StructMetadataScanner<FindStructWitnessTableIndex>> {
-    typedef MetadataSearcher super;
+  /// in a value type metadata object.
+  template<template <typename> class METADATA_SCANNER>
+  class FindValueTypeWitnessTableIndex :
+      public MetadataSearcher<METADATA_SCANNER<
+               FindValueTypeWitnessTableIndex<METADATA_SCANNER>>>
+  {
+    using super
+      = MetadataSearcher<METADATA_SCANNER<
+          FindValueTypeWitnessTableIndex<METADATA_SCANNER>>>;
+    
+    using super::setTargetIndex;
+    using super::NextIndex;
+    using super::Target;
 
     ArchetypeType *TargetArchetype;
     ProtocolDecl *TargetProtocol;
 
   public:
-    FindStructWitnessTableIndex(IRGenModule &IGM, StructDecl *decl,
-                                ArchetypeType *targetArchetype,
-                                ProtocolDecl *targetProtocol)
+    FindValueTypeWitnessTableIndex(IRGenModule &IGM, decltype(Target) decl,
+                                   ArchetypeType *targetArchetype,
+                                   ProtocolDecl *targetProtocol)
       : super(IGM, decl),
         TargetArchetype(targetArchetype),
         TargetProtocol(targetProtocol)
@@ -1541,6 +1544,11 @@ namespace {
       NextIndex++;
     }
   };
+  
+  using FindStructWitnessTableIndex
+    = FindValueTypeWitnessTableIndex<StructMetadataScanner>;
+  using FindUnionWitnessTableIndex
+    = FindValueTypeWitnessTableIndex<UnionMetadataScanner>;
 }
 
 /// Given a reference to nominal type metadata of the given type,
@@ -1573,14 +1581,21 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
     return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
   }
 
-  case DeclKind::Union:
-  case DeclKind::Struct:
-    // FIXME: should unions really be using the struct logic? (no)
+  case DeclKind::Union: {
+    int index =
+      FindUnionWitnessTableIndex(IGF.IGM, cast<UnionDecl>(decl),
+                                 targetArchetype, targetProtocol)
+        .getTargetIndex();
+    return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
+  }
+      
+  case DeclKind::Struct: {
     int index =
       FindStructWitnessTableIndex(IGF.IGM, cast<StructDecl>(decl),
                                   targetArchetype, targetProtocol)
         .getTargetIndex();
     return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
+  }
   }
   llvm_unreachable("bad decl kind!");
 }
