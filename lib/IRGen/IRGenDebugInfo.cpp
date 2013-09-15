@@ -373,10 +373,9 @@ static AnyFunctionType* getFunctionType(SILType SILTy) {
 /// Create a single parameter type and push it.
 void IRGenDebugInfo::
 createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
-                    SILType ParamTy,
+                    CanType CanTy,
                     llvm::DIDescriptor Scope,
                     DeclContext* DeclCtx) {
-  CanType CanTy = ParamTy.getSwiftType();
   if (DeclCtx) {
     VarDecl VD(SourceLoc(), Identifier::getEmptyKey(), CanTy, DeclCtx);
     DebugTypeInfo DTy(&VD, Types.getCompleteTypeInfo(CanTy));
@@ -387,7 +386,7 @@ createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
   }
 }
 
-/// Create the array of function parameters for FnTy.
+/// Create the array of function parameters for FnTy. SIL Version.
 llvm::DIArray IRGenDebugInfo::createParameterTypes(SILModule &SILMod,
                                                    SILType SILTy,
                                                    llvm::DIDescriptor Scope,
@@ -401,19 +400,42 @@ llvm::DIArray IRGenDebugInfo::createParameterTypes(SILModule &SILMod,
   SmallVector<llvm::Value *, 16> Parameters;
 
   // The function return type is the first element in the list.
-  createParameterType(Parameters, TypeInfo->getResultType(), Scope, DeclCtx);
+  createParameterType(Parameters, TypeInfo->getResultType().getSwiftType(),
+                      Scope, DeclCtx);
 
   // Actually, the input type is either a single type or a tuple
   // type. We currently represent a function with one n-tuple argument
   // as an n-ary function.
-  unsigned I = 0;
-  for (auto ParamTy : TypeInfo->getInputTypes()) {
-    createParameterType(Parameters, ParamTy, Scope, DeclCtx);
-    ++I;
-  }
+  for (auto ParamTy : TypeInfo->getInputTypes())
+    createParameterType(Parameters, ParamTy.getSwiftType(), Scope, DeclCtx);
 
   return DBuilder.getOrCreateArray(Parameters);
 }
+
+/// Create the array of function parameters for FnTy. Swift Version.
+llvm::DIArray IRGenDebugInfo::createParameterTypes(AnyFunctionType *FnTy,
+                                                   llvm::DIDescriptor Scope,
+                                                   DeclContext* DeclCtx) {
+  SmallVector<llvm::Value *, 16> Parameters;
+
+  // The function return type is the first element in the list.
+  createParameterType(Parameters, FnTy->getResult()->getCanonicalType(),
+                      Scope, DeclCtx);
+
+  // The input type is either a single type or a tuple type. We
+  // currently represent a function with one n-tuple argument as an
+  // n-ary function.
+  auto Input = FnTy->getInput()->getCanonicalType();
+  if (auto Params = dyn_cast<TupleType>(Input)) {
+    for (auto Param : Params->getElementTypes()) {
+      CanType CanTy = Param->getCanonicalType();
+      createParameterType(Parameters, CanTy, Scope, DeclCtx);
+    }
+  } else createParameterType(Parameters, Input, Scope, DeclCtx);
+
+  return DBuilder.getOrCreateArray(Parameters);
+}
+
 
 void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
                                   llvm::Function *Fn,
@@ -1155,9 +1177,12 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Function: {
-    // FIXME: auto Function = BaseTy->castTo<AnyFunctionType>();
-    // FIXME: handle parameters.
-    auto FnTy = DBuilder.createSubroutineType(getFile(Scope), llvm::DIArray());
+    auto FunctionTy = BaseTy->castTo<AnyFunctionType>();
+    DeclContext *DC = nullptr;
+    if (auto Decl = DbgTy.getDecl())
+      DC = Decl->getDeclContext();
+    auto Params = createParameterTypes(FunctionTy, Scope, DC);
+    auto FnTy = DBuilder.createSubroutineType(MainFile, Params);
     return DBuilder.createPointerType(FnTy, SizeInBits, AlignInBits);
   }
 

@@ -209,12 +209,15 @@ private:
   StringRef getName(const FuncDecl& FD);
   StringRef getName(SILLocation L);
   StringRef getMangledName(DebugTypeInfo DTI);
+  llvm::DIArray createParameterTypes(AnyFunctionType *FnTy,
+                                     llvm::DIDescriptor Scope,
+                                     DeclContext *DeclCtx);
   llvm::DIArray createParameterTypes(SILModule &SILMod,
                                      SILType SILTy,
                                      llvm::DIDescriptor Scope,
                                      DeclContext *DeclCtx);
   void createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
-                           SILType ParamTy, llvm::DIDescriptor Scope,
+                           CanType CanTy, llvm::DIDescriptor Scope,
                            DeclContext* DeclCtx);
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags);
