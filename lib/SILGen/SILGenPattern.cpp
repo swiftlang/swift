@@ -209,7 +209,11 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       SILValue eltValue;
       if (elt->hasArgumentType() &&
           !elt->getArgumentType()->isVoid()) {
-        auto &argLowering = gen.getTypeLowering(elt->getArgumentType());
+        auto argSwiftTy = v.getType().getSwiftRValueType()
+          ->getTypeOfMember(elt->getModuleContext(), elt, nullptr,
+                            elt->getArgumentType());
+        
+        auto &argLowering = gen.getTypeLowering(argSwiftTy);
         SILType argTy = argLowering.getLoweredType();
         if (addressOnlyUnion)
           argTy = argTy.getAddressType();
