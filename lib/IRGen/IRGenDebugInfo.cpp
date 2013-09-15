@@ -621,25 +621,40 @@ unsigned IRGenDebugInfo::getArgNo(SILFunction *Fn, SILArgument *Arg) {
   return 0;
 }
 
-void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& Builder,
+bool IRGenDebugInfo::emitVarDeclForSILArgOrNull(IRBuilder& Builder,
+                                                llvm::Value *Storage,
+                                                DebugTypeInfo Ty,
+                                                StringRef Name,
+                                                SILInstruction *I,
+                                                SILValue Value) {
+  if (auto SILArg = dyn_cast<SILArgument>(Value)) {
+    emitArgVariableDeclaration(Builder, Storage, Ty, Name,
+                               getArgNo(I->getFunction(), SILArg));
+    return true;
+  }
+  return false;
+}
+
+void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
                                                   llvm::Value *Storage,
                                                   DebugTypeInfo Ty,
                                                   StringRef Name,
-                                                  AllocStackInst *i) {
+                                                  AllocStackInst *I) {
   // Make a best effort to find out if this variable is actually an
   // argument of the current function. This is done by looking at the
   // source of the first store to this alloca.  Unless we start
   // enriching SIL with debug metadata or debug intrinsics, that's the
   // best we can do.
-  for (auto Use : i->getUses())
-    if (auto Store = dyn_cast<StoreInst>(Use->getUser()))
-      if (auto SILArg = dyn_cast<SILArgument>(Store->getSrc())) {
-        auto Fn = i->getFunction();
-        emitArgVariableDeclaration(Builder, Storage, Ty, Name,
-                                   getArgNo(Fn, SILArg));
+  for (auto Use : I->getUses()) {
+    if (auto Store = dyn_cast<StoreInst>(Use->getUser())) {
+      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, Store->getSrc()))
         return;
-      }
-  emitVariableDeclaration(Builder, Storage, Ty, Name,
+    } else if (auto CopyAddr = dyn_cast<CopyAddrInst>(Use->getUser())) {
+      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, CopyAddr->getSrc()))
+        return;
+    }
+  }
+  emitVariableDeclaration(B, Storage, Ty, Name,
                           llvm::dwarf::DW_TAG_auto_variable);
 }
 
@@ -1052,6 +1067,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Protocol: {
+    // FIXME: (LLVM branch) Should be DW_TAG_interface_type
     Name = getMangledName(DbgTy);
     break;
   }

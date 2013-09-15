@@ -214,7 +214,7 @@ private:
                                      llvm::DIDescriptor Scope,
                                      DeclContext *DeclCtx);
   void createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
-                           SILType ParamTy,llvm::DIDescriptor Scope,
+                           SILType ParamTy, llvm::DIDescriptor Scope,
                            DeclContext* DeclCtx);
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags);
@@ -249,6 +249,12 @@ private:
   createUnionType(DebugTypeInfo DbgTy, UnionDecl *Decl, StringRef Name,
                   llvm::DIDescriptor Scope, llvm::DIFile File, unsigned Line,
                   Size SizeInBytes, Alignment AlignInBytes, unsigned Flags);
+  bool emitVarDeclForSILArgOrNull(IRBuilder& Builder,
+                                  llvm::Value *Storage,
+                                  DebugTypeInfo Ty,
+                                  StringRef Name,
+                                  SILInstruction *I,
+                                  SILValue Value);
 };
 
 } // irgen
