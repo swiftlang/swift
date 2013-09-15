@@ -1030,10 +1030,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   // Even builtin swift types usually come boxed in a struct.
   case TypeKind::Struct: {
+    Name = getMangledName(DbgTy);
     auto StructTy = BaseTy->castTo<StructType>();
     if (auto Decl = StructTy->getDecl()) {
       Location L = getStartLoc(SM, Decl);
-      Name = getMangledName(DbgTy);
       return createStructType(DbgTy, Decl, Name, Scope,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,
@@ -1049,9 +1049,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Classes are represented as DW_TAG_structure_type. This way the
     // DW_AT_APPLE_runtime_class( DW_LANG_Swift ) attribute can be
     // used to differentiate them from C++ and ObjC classes.
+    Name = getMangledName(DbgTy);
     auto ClassTy = BaseTy->castTo<ClassType>();
     if (auto Decl = ClassTy->getDecl()) {
-      Name = getMangledName(DbgTy);
       Location L = getStartLoc(SM, Decl);
       auto Attrs = Decl->getAttrs();
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
@@ -1067,16 +1067,25 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Protocol: {
-    // FIXME: (LLVM branch) Should be DW_TAG_interface_type
     Name = getMangledName(DbgTy);
+    auto ProtocolTy = BaseTy->castTo<ProtocolType>();
+    if (auto Decl = ProtocolTy->getDecl()) {
+      // FIXME: (LLVM branch) Should be DW_TAG_interface_type
+      Location L = getStartLoc(SM, Decl);
+      return createStructType(DbgTy, Decl, Name, Scope,
+                              getOrCreateFile(L.Filename), L.Line,
+                              SizeInBits, AlignInBits, Flags,
+                              llvm::DIType(),  // DerivedFrom
+                              DW_LANG_Swift);
+    }
     break;
   }
 
   case TypeKind::BoundGenericStruct: {
+    Name = getMangledName(DbgTy);
     auto StructTy = BaseTy->castTo<BoundGenericStructType>();
     if (auto Decl = StructTy->getDecl()) {
       Location L = getStartLoc(SM, Decl);
-      Name = getMangledName(DbgTy);
       return createStructType(DbgTy, Decl, Name, Scope,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,
@@ -1089,10 +1098,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::BoundGenericClass: {
+    Name = getMangledName(DbgTy);
     auto ClassTy = BaseTy->castTo<BoundGenericClassType>();
     if (auto Decl = ClassTy->getDecl()) {
       Location L = getStartLoc(SM, Decl);
-      Name = getMangledName(DbgTy);
       auto Attrs = Decl->getAttrs();
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
       return createStructType(DbgTy, Decl, Name, Scope,
@@ -1107,9 +1116,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Tuple: {
+    Name = getMangledName(DbgTy);
     auto TupleTy = BaseTy->castTo<TupleType>();
     // Tuples are also represented as structs.
-    Name = getMangledName(DbgTy);
     return DBuilder.
       createStructType(Scope, Name,
                        File, 0,
@@ -1153,9 +1162,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Union: {
+    Name = getMangledName(DbgTy);
     auto UnionTy = BaseTy->castTo<UnionType>();
     if (auto Decl = UnionTy->getDecl()) {
-      Name = getMangledName(DbgTy);
       Location L = getStartLoc(SM, Decl);
       return createUnionType(DbgTy, Decl, Name, Scope,
                              getOrCreateFile(L.Filename), L.Line,
