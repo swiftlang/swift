@@ -492,12 +492,36 @@ namespace {
         return In.transferInto(Out, 1);
 
       // Otherwise, this gets more complicated.
-      if (EmbedsArchetype(IGF.IGM).visitBoundGenericType(origTy))
-        IGF.unimplemented(SourceLoc(),
-               "remapping bound generic value types with archetype members");
-
+      // Handle the easy cases where one or both of the arguments are
+      // represented using single indirect pointers
+      auto *origIndirect = IGF.IGM.isSingleIndirectValue(origTy, In.getKind());
+      auto *substIndirect = IGF.IGM.isSingleIndirectValue(substTy, In.getKind());
+      
+      // Bitcast between address-only instantiations.
+      if (origIndirect && substIndirect) {
+        llvm::Value *inValue = In.claimNext();
+        auto addr = IGF.Builder.CreateBitCast(inValue, origIndirect);
+        Out.add(addr);
+        return;
+      }
+      
+      // Substitute a loadable instantiation for an address-only one by emitting
+      // to a temporary.
+      if (origIndirect && !substIndirect) {
+        auto &substTI = IGF.getTypeInfo(substTy);
+        auto addr = substTI.allocateStack(IGF, "substitution.temp").getAddress();
+        initIntoTemporary(substTy, substTI, addr);
+        addr = IGF.Builder.CreateBitCast(addr, origIndirect);
+        Out.add(addr.getAddress());
+        return;
+      }
+      
       // FIXME: This is my first shot at implementing this, but it doesn't
       // handle cases which actually need remapping.
+      if (EmbedsArchetype(IGF.IGM).visitBoundGenericType(origTy))
+        IGF.unimplemented(SourceLoc(),
+              "remapping bound generic value types with archetype members");
+      
       auto n = IGF.IGM.getExplosionSize(origTy, In.getKind());
       In.transferInto(Out, n);
     }
