@@ -207,22 +207,23 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       
       // Create a BB argument to receive the union case data if it has any.
       SILValue eltValue;
-      if (elt->hasArgumentType() &&
-          !elt->getArgumentType()->isVoid()) {
+      if (elt->hasArgumentType()) {
         auto argSwiftTy = v.getType().getSwiftRValueType()
           ->getTypeOfMember(elt->getModuleContext(), elt, nullptr,
                             elt->getArgumentType());
-        
-        auto &argLowering = gen.getTypeLowering(argSwiftTy);
-        SILType argTy = argLowering.getLoweredType();
-        if (addressOnlyUnion)
-          argTy = argTy.getAddressType();
-        eltValue = new (gen.F.getModule()) SILArgument(argTy, caseBB);
-        // Load a loadable data value from an address-only union.
-        if (addressOnlyUnion && argLowering.isLoadable()) {
-          gen.B.setInsertionPoint(caseBB);
-          eltValue = gen.B.createLoad(Loc, eltValue);
-          gen.B.setInsertionPoint(bb);
+        if (!argSwiftTy->isVoid()) {
+          
+          auto &argLowering = gen.getTypeLowering(argSwiftTy);
+          SILType argTy = argLowering.getLoweredType();
+          if (addressOnlyUnion)
+            argTy = argTy.getAddressType();
+          eltValue = new (gen.F.getModule()) SILArgument(argTy, caseBB);
+          // Load a loadable data value from an address-only union.
+          if (addressOnlyUnion && argLowering.isLoadable()) {
+            gen.B.setInsertionPoint(caseBB);
+            eltValue = gen.B.createLoad(Loc, eltValue);
+            gen.B.setInsertionPoint(bb);
+          }
         }
       } else {
         // If the element pattern for a void union element has a subpattern, it
