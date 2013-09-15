@@ -707,8 +707,13 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
     
     // If there is a subpattern, push the union element type down onto it.
     if (OP->hasSubPattern()) {
-      Type elementType = OP->getElementDecl()->getArgumentType();
-      if (!elementType)
+      UnionElementDecl *elt = OP->getElementDecl();
+      Type elementType;
+      if (elt->hasArgumentType())
+        elementType = type->getTypeOfMember(elt->getModuleContext(),
+                                            elt, this,
+                                            elt->getArgumentType());
+      else
         elementType = TupleType::getEmpty(Context);
       if (coerceToType(OP->getSubPattern(), dc, elementType))
         return true;
