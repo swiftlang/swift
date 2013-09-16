@@ -1103,6 +1103,20 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     break;
   }
 
+  case TypeKind::ProtocolComposition: {
+    Name = getMangledName(DbgTy);
+    // FIXME: emit types
+    //auto ProtocolCompositionTy = BaseTy->castTo<ProtocolCompositionType>();
+    return DBuilder.
+      createStructType(Scope, Name,
+                       File, 0,
+                       SizeInBits, AlignInBits, Flags,
+                       llvm::DIType(), // DerivedFrom
+                       llvm::DIArray(),
+                       DW_LANG_Swift);
+    break;
+  }
+
   case TypeKind::BoundGenericStruct: {
     Name = getMangledName(DbgTy);
     auto StructTy = BaseTy->castTo<BoundGenericStructType>();
@@ -1111,7 +1125,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       return createStructType(DbgTy, Decl, Name, Scope,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,
-                              llvm::DIType(),  // DerivedFrom
+                              llvm::DIType(), // DerivedFrom
                               DW_LANG_Swift);
     }
     DEBUG(llvm::dbgs() << "Bound Generic struct without Decl: ";
