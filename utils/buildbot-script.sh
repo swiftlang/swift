@@ -13,6 +13,7 @@
 # SKIP_BUILD_SWIFT -- set to skip building Swift
 # SKIP_BUILD_SOURCEKIT -- set to skip building SourceKit
 # SKIP_TEST_SWIFT -- set to skip testing Swift
+# SKIP_TEST_SWIFT_PERFORMANCE -- set to skip testing Swift performance
 # SKIP_PACKAGE_SWIFT -- set to skip packaging Swift
 # SKIP_TEST_SOURCEKIT -- set to skip testing SourceKit
 # SKIP_PACKAGE_SOURCEKIT -- set to skip packaging SourceKit
@@ -151,6 +152,23 @@ if [ \! "$SKIP_TEST_SWIFT" ]; then
   echo "--- Running Swift Tests ---"
   (cd "$WORKSPACE/swift/build" &&
     "$WORKSPACE/llvm/build/bin/llvm-lit" -sv test) || exit 1
+fi
+
+# Run the Swift performance tests.
+if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
+  echo "--- Running Swift Performance Tests ---"
+  export SWIFT="$WORKSPACE/swift/build/bin/swift"
+  (cd "$WORKSPACE/swift/build" &&
+    "$WORKSPACE/llvm/build/bin/llvm-lit" -v benchmark \
+        -j1 --output benchmark/results.json) || exit 1
+  echo "--- Submitting Swift Performance Tests ---"
+  swift_source_revision="$($WORKSPACE/llvm/utils/GetSourceVersion $WORKSPACE/swift)"
+  (cd "$WORKSPACE/swift/build" &&
+    "$WORKSPACE/swift/utils/submit-benchmark-results" benchmark/results.json \
+        --output benchmark/lnt_results.json \
+        --machine-name "matte.apple.com--${BUILD_TYPE}--x86_64--O3" \
+        --run-order $swift_source_revision \
+        --submit http://localhost:32169/submitRun) || exit 1
 fi
 
 if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
