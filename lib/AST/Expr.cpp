@@ -16,6 +16,7 @@
 
 #include "swift/AST/Expr.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
+#include "swift/AST/Stmt.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
@@ -322,6 +323,20 @@ Type PipeClosureExpr::getResultType() const {
 void PipeClosureExpr::setSingleExpressionBody(Expr *newBody) {
   cast<ReturnStmt>(body.getPointer()->getElements()[0].get<Stmt *>())
     ->setResult(newBody);
+}
+
+SourceRange ImplicitClosureExpr::getSourceRange() const {
+  return Body->getSourceRange();
+}
+
+void ImplicitClosureExpr::setBody(Expr *E) {
+  auto &Context = getASTContext();
+  auto *RS = new (Context) ReturnStmt(SourceLoc(), E);
+  Body = BraceStmt::create(Context, E->getStartLoc(), { RS }, E->getEndLoc());
+}
+
+Expr *ImplicitClosureExpr::getSingleExpressionBody() const {
+  return cast<ReturnStmt>(Body->getElements()[0].get<Stmt *>())->getResult();
 }
 
 SourceRange AssignExpr::getSourceRange() const {

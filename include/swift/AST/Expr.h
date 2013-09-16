@@ -1756,16 +1756,18 @@ public:
 ///   var x : [auto_closure] () -> int = 4
 /// \endcode
 class ImplicitClosureExpr : public CapturingExpr, public DeclContext {
-  Expr *Body;
+  BraceStmt *Body;
   Pattern *ParamPattern;
 
 public:
   ImplicitClosureExpr(Expr *Body, DeclContext *Parent, Type ResultTy)
       : CapturingExpr(ExprKind::ImplicitClosure, ResultTy),
         DeclContext(DeclContextKind::ClosureExpr, Parent),
-        Body(Body) {}
+        ParamPattern(nullptr) {
+    setBody(Body);
+  }
 
-  SourceRange getSourceRange() const { return getBody()->getSourceRange(); }
+  SourceRange getSourceRange() const;
 
   MutableArrayRef<Pattern *> getParamPatterns() {
     return ParamPattern;
@@ -1775,8 +1777,13 @@ public:
   }
   void setParamPattern(Pattern *P) { ParamPattern = P; }
 
-  Expr *getBody() const { return Body; }
-  void setBody(Expr *e) { Body = e; }
+  BraceStmt *getBody() const { return Body; }
+  void setBody(Expr *E);
+
+  /// Returns the body of the auto_closure as an \c Expr.
+  ///
+  /// The body of an auto_closure always consists of a single expression.
+  Expr *getSingleExpressionBody() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *E) {

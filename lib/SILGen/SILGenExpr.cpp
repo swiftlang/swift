@@ -1381,7 +1381,7 @@ void SILGenFunction::emitClosure(ImplicitClosureExpr *ce) {
   prepareEpilog(resultTy, CleanupLocation(ce));
 
   // Closure expressions implicitly return the result of their body expression.
-  emitReturnExpr(ImplicitReturnLocation(ce), ce->getBody());
+  emitReturnExpr(ImplicitReturnLocation(ce), ce->getSingleExpressionBody());
   emitEpilog(ce);
 }
 
