@@ -1765,6 +1765,8 @@ void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
   auto fnDecl = cast<FuncDecl>(i->getMember().getDecl());
   selector = fnDecl->getObjCSelector(selectorBuffer);
   llvm::Value *object = getLoweredExplosion(i->getOperand()).claimNext();
+  if (object->getType() != IGM.ObjCPtrTy)
+    object = Builder.CreateBitCast(object, IGM.ObjCPtrTy);
   llvm::Value *loadSel = emitObjCSelectorRefLoad(selector);
   llvm::CallInst *call = Builder.CreateCall2(IGM.getObjCRespondsToSelectorFn(),
                                              object, loadSel);

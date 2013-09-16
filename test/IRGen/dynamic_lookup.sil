@@ -5,6 +5,7 @@ import Builtin
 
 class X {
   func [objc] f() { }
+  static func [objc] g() { }
 }
 
 // [objc] t.X.f (t.X)() -> ()
@@ -12,6 +13,13 @@ sil @_TToC14dynamic_lookup1X1ffS0_FT_T_ : $[cc(objc_method), thin] ((), X) -> ()
 bb0(%0 : $X):
   %3 = tuple ()
   return %3 : $()
+}
+
+// [objc] X.g (ObjectiveC.X.metatype)() -> ()
+sil @_TToC14dynamic_lookup1X1gfMS0_FT_T_ : $[thin] ((), X.metatype) -> () {
+bb0(%0 : $X.metatype):
+  %14 = tuple ()                                  // user: %15
+  return %14 : $()
 }
 
 // CHECK: define void @dynamic_lookup_br(%objc_object*)
@@ -28,6 +36,25 @@ bb0(%0 : $DynamicLookup):
   // CHECK: [[HAS_SEL:%[0-9]]] = call i1 @swift_objcRespondsToSelector(%objc_object* [[OBJECT:%[0-9]+]], i8* [[SEL]]) #0
   // CHECK: br i1 [[HAS_SEL]]
   dynamic_method_br %6 : $Builtin.ObjCPointer, #X.f!1, bb1, bb2
+
+bb1(%8 : $[cc(objc_method), thin] ((), Builtin.ObjCPointer) -> ()):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %43 = tuple ()
+  return %43 : $()
+}
+
+// CHECK: define void @dynamic_lookup_static_br(%swift.type*)
+sil @dynamic_lookup_static_br : $[thin] (objMeta : DynamicLookup.metatype) -> () {
+bb0(%0 : $DynamicLookup.metatype):
+  // CHECK: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(g)", align 8
+  // CHECK: [[HAS_SEL:%[0-9]]] = call i1 @swift_objcRespondsToSelector(%objc_object* [[OBJECT:%[0-9]+]], i8* [[SEL]]) #0
+  // CHECK: br i1 [[HAS_SEL]]
+  dynamic_method_br %0 : $DynamicLookup.metatype, #X.g!1, bb1, bb2
 
 bb1(%8 : $[cc(objc_method), thin] ((), Builtin.ObjCPointer) -> ()):
   br bb3
