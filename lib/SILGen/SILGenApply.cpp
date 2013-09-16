@@ -1647,7 +1647,10 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   ManagedValue existential = emitRValue(e->getBase(), c)
                                .getAsSingleValue(*this, e->getBase());
 
-  SILValue operand = B.createProjectExistentialRef(e, existential.getValue());
+  SILValue operand = existential.getValue();
+  if (e->getMember().getDecl()->isInstanceMember()) {
+    operand = B.createProjectExistentialRef(e, operand);
+  }
 
   // Create the has-member block.
   SILBasicBlock *hasMemberBB = new (F.getModule()) SILBasicBlock(&F);
