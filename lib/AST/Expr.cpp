@@ -298,6 +298,12 @@ RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
     SubExpr(SubExpr), Self(Self)
 {}
 
+Type AbstractClosureExpr::getResultType() const {
+  if (getType()->is<ErrorType>())
+    return getType();
+
+  return getType()->castTo<AnyFunctionType>()->getResult();
+}
 
 SourceRange PipeClosureExpr::getSourceRange() const {
   return body.getPointer()->getSourceRange();
@@ -311,13 +317,6 @@ Expr *PipeClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
   return cast<ReturnStmt>(body.getPointer()->getElements()[0].get<Stmt *>())
            ->getResult();
-}
-
-Type PipeClosureExpr::getResultType() const {
-  if (getType()->is<ErrorType>())
-    return getType();
-
-  return getType()->castTo<AnyFunctionType>()->getResult();
 }
 
 void PipeClosureExpr::setSingleExpressionBody(Expr *newBody) {

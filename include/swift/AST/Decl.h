@@ -2008,7 +2008,6 @@ public:
     setBodyKind(BodyKind::Parsed);
   }
 
-
   /// \brief Note that the body was skipped for this function.  Function body
   /// can not be attached after this call.
   void setBodySkipped(SourceLoc EndLoc) {

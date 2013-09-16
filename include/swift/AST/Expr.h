@@ -1624,6 +1624,9 @@ public:
   CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
 
+  /// \brief Retrieve the result type of this closure.
+  Type getResultType() const;
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_AbstractClosureExpr &&
            E->getKind() <= ExprKind::Last_AbstractClosureExpr;
@@ -1737,9 +1740,6 @@ public:
   /// This routine cannot change whether a closure has a single expression as
   /// its body; it can only update that expression.
   void setSingleExpressionBody(Expr *newBody);
-
-  /// \brief Retrieve the result type of this function.
-  Type getResultType() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::PipeClosure;
