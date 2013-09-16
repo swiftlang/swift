@@ -32,6 +32,9 @@ class SILBuilder {
 public:
   SILBuilder(SILFunction &F) : F(F), BB(0) {}
 
+  static SILType getTupleElementType(SILType Ty, unsigned EltNo);
+  static SILType getStructFieldType(VarDecl *Field);
+
   explicit SILBuilder(SILInstruction *I,
                       SmallVectorImpl<SILInstruction*> *InsertedInstrs = 0)
     : F(*I->getParent()->getParent()), InsertedInstrs(InsertedInstrs) {
@@ -445,9 +448,6 @@ public:
                     InjectUnionAddrInst(Loc, Operand, Element));
   }
   
-  static SILType getTupleElementType(SILType Ty, unsigned EltNo);
-  static SILType getStructFieldType(VarDecl *Field);
-
   SILValue createTupleExtract(SILLocation Loc, SILValue Operand,
                               unsigned FieldNo, SILType ResultTy) {
     return insert(new (F.getModule())

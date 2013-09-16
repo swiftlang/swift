@@ -65,21 +65,6 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
 }
 
 //===----------------------------------------------------------------------===//
-// SILBuilder Implementation
-//===----------------------------------------------------------------------===//
-
-SILType SILBuilder::getTupleElementType(SILType Ty, unsigned EltNo) {
-  TupleType *TT = Ty.getAs<TupleType>();
-  auto EltTy = TT->getFields()[EltNo].getType()->getCanonicalType();
-  return SILType::getPrimitiveObjectType(EltTy);
-}
-SILType SILBuilder::getStructFieldType(VarDecl *Field) {
-  auto FieldTy = Field->getType()->getCanonicalType();
-  return SILType::getPrimitiveObjectType(FieldTy);
-}
-
-
-//===----------------------------------------------------------------------===//
 // SILInstruction Implementation
 //===----------------------------------------------------------------------===//
 
