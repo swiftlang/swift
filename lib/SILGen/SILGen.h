@@ -536,7 +536,7 @@ public:
   /// reachable.
   ///
   /// \param TopLevelLoc The location of the top level AST node for which we are
-  ///            constructing the epilog, such as a CapturingExpr.
+  ///            constructing the epilog, such as a AbstractClosureExpr.
   /// \returns Nothing if the epilog block is unreachable. Otherwise, returns
   ///          the epilog block's return value argument, or a null SILValue if
   ///          the epilog doesn't take a return value. Also returns the location
@@ -551,7 +551,7 @@ public:
   ///
   /// \param TopLevelLoc The location of the top-level expression during whose
   ///        evaluation the epilog is being produced, for example, the
-  ///        CapturingExpr.
+  ///        AbstractClosureExpr.
   /// \param IsAutoGen Flags if the prolog is auto-generated.
   void emitEpilog(SILLocation TopLevelLoc, bool IsAutoGen = false);
   
@@ -653,10 +653,10 @@ public:
                                unsigned uncurryLevel
                                  = SILDeclRef::ConstructAtNaturalUncurryLevel);
 
-  ManagedValue emitClosureForCapturingExpr(SILLocation loc,
-                                           SILDeclRef function,
-                                           ArrayRef<Substitution> forwardSubs,
-                                           AnyFunctionRef TheClosure);
+  ManagedValue emitClosureValue(SILLocation loc,
+                                SILDeclRef function,
+                                ArrayRef<Substitution> forwardSubs,
+                                AnyFunctionRef TheClosure);
   
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
   ManagedValue emitGetProperty(SILLocation loc,

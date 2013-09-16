@@ -519,7 +519,7 @@ namespace {
       // Don't recurse into child closures, they should already have a capture
       // list computed, we just propagate it (filtering out stuff that they
       // capture from us).
-      if (CapturingExpr *SubCE = dyn_cast<CapturingExpr>(E)) {
+      if (auto *SubCE = dyn_cast<AbstractClosureExpr>(E)) {
         for (auto D : SubCE->getCaptureInfo().getCaptures())
           if (D->getDeclContext() != CurExprAsDC)
             captures.insert(D);

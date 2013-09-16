@@ -1243,10 +1243,10 @@ RValue RValueEmitter::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
   return RValue(SGF, ManagedValue(metatype, ManagedValue::Unmanaged), E);
 }
 
-ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
-                                             SILDeclRef constant,
-                                             ArrayRef<Substitution> forwardSubs,
-                                             AnyFunctionRef TheClosure) {
+ManagedValue
+SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
+                                 ArrayRef<Substitution> forwardSubs,
+                                 AnyFunctionRef TheClosure) {
   // FIXME: Stash the capture args somewhere and curry them on demand rather
   // than here.
   assert(((constant.uncurryLevel == 1 &&
@@ -1342,9 +1342,8 @@ RValue RValueEmitter::visitPipeClosureExpr(PipeClosureExpr *e, SGFContext C) {
 
   // Generate the closure value (if any) for the closure expr's function
   // reference.
-  return RValue(SGF, SGF.emitClosureForCapturingExpr(e, SILDeclRef(e),
-                                             SGF.getForwardingSubstitutions(),
-                                             e),
+  return RValue(SGF, SGF.emitClosureValue(e, SILDeclRef(e),
+                                          SGF.getForwardingSubstitutions(), e),
                 e);
 }
 
@@ -1355,7 +1354,7 @@ RValue RValueEmitter::visitImplicitClosureExpr(ImplicitClosureExpr *e,
   
   // Generate the closure value (if any) for the closure expr's function
   // reference.
-  return RValue(SGF, SGF.emitClosureForCapturingExpr(e, SILDeclRef(e),
+  return RValue(SGF, SGF.emitClosureValue(e, SILDeclRef(e),
                                           SGF.getForwardingSubstitutions(), e),
                 e);
 }

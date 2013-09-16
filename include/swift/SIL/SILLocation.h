@@ -323,7 +323,7 @@ private:
 class ImplicitReturnLocation : public SILLocation {
 public:
 
-  ImplicitReturnLocation(CapturingExpr *E)
+  ImplicitReturnLocation(AbstractClosureExpr *E)
       : SILLocation(E, ImplicitReturnKind) {}
 
   ImplicitReturnLocation(AbstractFunctionDecl *AFD)
@@ -344,8 +344,8 @@ public:
     return L;
   }
 
-  CapturingExpr *get() {
-    return castToASTNode<CapturingExpr>();
+  AbstractClosureExpr *get() {
+    return castToASTNode<AbstractClosureExpr>();
   }
 
 private:

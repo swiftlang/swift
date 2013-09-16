@@ -54,7 +54,7 @@ class IRGenModule;
 /// levels, each of which potentially creates a different top-level
 /// function.
 class LinkEntity {
-  /// ValueDecl*, CapturingExpr*, SILFunction*, ProtocolConformance*, or
+  /// ValueDecl*, AbstractClosureExpr*, SILFunction*, ProtocolConformance*, or
   /// TypeBase*, depending on Kind.
   void *Pointer;
 
@@ -90,7 +90,7 @@ class LinkEntity {
     Function,
     
     /// An anonymous function.
-    /// The pointer is a CapturingExpr*.
+    /// The pointer is a AbstractClosureExpr*.
     AnonymousFunction,
 
     /// The getter for an entity.
@@ -198,10 +198,10 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return !isTypeKind(k) && !isCapturingExprKind(k)
+    return !isTypeKind(k) && !isAbstractClosureExprKind(k)
       && !isProtocolConformanceKind(k);
   }
-  static bool isCapturingExprKind(Kind k) {
+  static bool isAbstractClosureExprKind(Kind k) {
     return k == Kind::AnonymousFunction;
   }
   
@@ -224,10 +224,11 @@ class LinkEntity {
          | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
   }
 
-  void setForCapturingExpr(Kind kind,
-                  CapturingExpr *expr, Mangle::ExplosionKind explosionKind,
-                  unsigned uncurryLevel) {
-    assert(isCapturingExprKind(kind));
+  void setForAbstractClosureExpr(Kind kind,
+                                 AbstractClosureExpr *expr,
+                                 Mangle::ExplosionKind explosionKind,
+                                 unsigned uncurryLevel) {
+    assert(isAbstractClosureExprKind(kind));
     Pointer = expr;
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
          | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(explosionKind))
@@ -266,12 +267,12 @@ public:
     return entity;
   }
   
-  static LinkEntity forAnonymousFunction(CapturingExpr *expr,
+  static LinkEntity forAnonymousFunction(AbstractClosureExpr *expr,
                                          Mangle::ExplosionKind explosionLevel,
                                          unsigned uncurryLevel) {
     LinkEntity entity;
-    entity.setForCapturingExpr(Kind::AnonymousFunction,
-                               expr, explosionLevel, uncurryLevel);
+    entity.setForAbstractClosureExpr(Kind::AnonymousFunction,
+                                     expr, explosionLevel, uncurryLevel);
     return entity;
   }
 
@@ -402,9 +403,9 @@ public:
     return reinterpret_cast<ValueDecl*>(Pointer);
   }
   
-  CapturingExpr *getCapturingExpr() const {
-    assert(isCapturingExprKind(getKind()));
-    return reinterpret_cast<CapturingExpr*>(Pointer);
+  AbstractClosureExpr *getAbstractClosureExpr() const {
+    assert(isAbstractClosureExprKind(getKind()));
+    return reinterpret_cast<AbstractClosureExpr*>(Pointer);
   }
 
   SILFunction *getSILFunction() const {
@@ -418,7 +419,7 @@ public:
   }
   
   Mangle::ExplosionKind getExplosionKind() const {
-    assert(isDeclKind(getKind()) || isCapturingExprKind(getKind()));
+    assert(isDeclKind(getKind()) || isAbstractClosureExprKind(getKind()));
     return Mangle::ExplosionKind(LINKENTITY_GET_FIELD(Data, ExplosionLevel));
   }
   unsigned getUncurryLevel() const {

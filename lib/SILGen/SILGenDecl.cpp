@@ -120,9 +120,8 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   // If there are captures, build the local closure value for the function and
   // store it as a local constant.
   if (fd->getCaptureInfo().hasLocalCaptures()) {
-    SILValue closure = emitClosureForCapturingExpr(fd, SILDeclRef(fd),
-                                                   getForwardingSubstitutions(),
-                                                   fd)
+    SILValue closure = emitClosureValue(fd, SILDeclRef(fd),
+                                        getForwardingSubstitutions(), fd)
       .forward(*this);
     Cleanups.pushCleanup<CleanupClosureConstant>(closure);
     LocalConstants[SILDeclRef(fd)] = closure;

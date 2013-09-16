@@ -24,40 +24,40 @@ class CaptureInfo;
 /// \brief A universal function reference -- can wrap all AST nodes that
 /// represent functions and exposes a common interface to them.
 class AnyFunctionRef {
-  PointerUnion<AbstractFunctionDecl *, CapturingExpr *> TheFunction;
+  PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *> TheFunction;
 
 public:
   AnyFunctionRef(AbstractFunctionDecl *AFD) : TheFunction(AFD) {}
-  AnyFunctionRef(CapturingExpr *CE) : TheFunction(CE) {}
+  AnyFunctionRef(AbstractClosureExpr *CE) : TheFunction(CE) {}
 
   CaptureInfo &getCaptureInfo() {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
-    return TheFunction.get<CapturingExpr *>()->getCaptureInfo();
+    return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
   }
 
   Type getType() {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getType();
-    return TheFunction.get<CapturingExpr *>()->getType();
+    return TheFunction.get<AbstractClosureExpr *>()->getType();
   }
 
   BraceStmt *getBody() {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getBody();
-    auto *CE = TheFunction.get<CapturingExpr *>();
-    if (auto *PCE = dyn_cast<PipeClosureExpr>(CE))
+    auto *ACE = TheFunction.get<AbstractClosureExpr *>();
+    if (auto *PCE = dyn_cast<PipeClosureExpr>(ACE))
       return PCE->getBody();
-    return cast<ImplicitClosureExpr>(CE)->getBody();
+    return cast<ImplicitClosureExpr>(ACE)->getBody();
   }
 
   DeclContext *getAsDeclContext() {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD;
-    auto *CE = TheFunction.get<CapturingExpr *>();
-    if (auto *PCE = dyn_cast<PipeClosureExpr>(CE))
+    auto *ACE = TheFunction.get<AbstractClosureExpr *>();
+    if (auto *PCE = dyn_cast<PipeClosureExpr>(ACE))
       return PCE;
-    return cast<ImplicitClosureExpr>(CE);
+    return cast<ImplicitClosureExpr>(ACE);
   }
 };
 

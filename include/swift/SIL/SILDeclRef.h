@@ -35,15 +35,16 @@ namespace swift {
   class ASTContext;
   class ClassDecl;
 
-/// SILDeclRef - A key for referencing a Swift declaration in SIL.
+/// \brief A key for referencing a Swift declaration in SIL.
+///
 /// This can currently be either a reference to a ValueDecl for functions,
 /// methods, constructors, and other named entities, or a reference to a
-/// CapturingExpr (that is, a FuncExpr or ClosureExpr) for an anonymous
-/// function. In addition to the AST reference, there are discriminators for
-/// referencing different implementation-level entities associated with a
-/// single language-level declaration, such as uncurry levels of a function,
-/// the allocating and initializing entry points of a constructor, the getter
-/// and setter for a property, etc.
+/// AbstractClosureExpr for an anonymous function.  In addition to the AST
+/// reference, there are discriminators for referencing different
+/// implementation-level entities associated with a single language-level
+/// declaration, such as uncurry levels of a function, the allocating and
+/// initializing entry points of a constructor, the getter and setter for
+/// a property, etc.
 struct SILDeclRef {
   typedef llvm::PointerUnion3<ValueDecl *, PipeClosureExpr *,
                               ImplicitClosureExpr *> Loc;
@@ -51,8 +52,8 @@ struct SILDeclRef {
   /// Represents the "kind" of the SILDeclRef. For some Swift decls there
   /// are multiple SIL entry points, and the kind is used to distinguish them.
   enum class Kind : unsigned {
-    /// Func - this constant references the FuncDecl or CapturingExpr in loc
-    /// directly.
+    /// \brief This constant references the FuncDecl or AbstractClosureExpr
+    /// in loc.
     Func,
     
     /// Getter - this constant references the getter for the ValueDecl in loc.
@@ -84,7 +85,7 @@ struct SILDeclRef {
     DefaultArgGenerator
   };
   
-  /// The ValueDecl or CapturingExpr represented by this SILDeclRef.
+  /// The ValueDecl or AbstractClosureExpr represented by this SILDeclRef.
   Loc loc;
   /// The Kind of this SILDeclRef.
   Kind kind : 4;
@@ -112,7 +113,7 @@ struct SILDeclRef {
                        bool isObjC = false);
   
   /// Produces the 'natural' SILDeclRef for the given ValueDecl or
-  /// CapturingExpr:
+  /// AbstractClosureExpr:
   /// - If 'loc' is a func or closure, this returns a Func SILDeclRef.
   /// - If 'loc' is a getter or setter FuncDecl, this returns the Getter or
   ///   Setter SILDeclRef for the property VarDecl.

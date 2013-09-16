@@ -1611,13 +1611,12 @@ public:
   }
 };
 
-/// CapturingExpr - a FuncExpr or a ClosureExpr; always returns something
-/// of function type, and can capture variables from an enclosing scope.
-class CapturingExpr : public Expr {
+/// \brief A base class for closure expressions.
+class AbstractClosureExpr : public Expr {
   CaptureInfo Captures;
 
 public:
-  CapturingExpr(ExprKind Kind, Type FnType)
+  AbstractClosureExpr(ExprKind Kind, Type FnType)
       : Expr(Kind, FnType)
   {}
 
@@ -1625,15 +1624,15 @@ public:
   const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   static bool classof(const Expr *E) {
-    return E->getKind() >= ExprKind::First_CapturingExpr &&
-           E->getKind() <= ExprKind::Last_CapturingExpr;
+    return E->getKind() >= ExprKind::First_AbstractClosureExpr &&
+           E->getKind() <= ExprKind::Last_AbstractClosureExpr;
   }
 };
 
 /// An explicit unnamed func definition, which can optionally
 /// have named arguments.
 ///    e.g.  func(a : int) -> int { return a+1 }
-class PipeClosureExpr : public CapturingExpr, public DeclContext {
+class PipeClosureExpr : public AbstractClosureExpr, public DeclContext {
   /// \brief The set of parameters, along with a bit indicating when these
   /// parameters were synthesized from anonymous closure variables.
   llvm::PointerIntPair<Pattern *, 1, bool> params;
@@ -1652,7 +1651,7 @@ class PipeClosureExpr : public CapturingExpr, public DeclContext {
 public:
   PipeClosureExpr(Pattern *params, SourceLoc arrowLoc,
                   TypeLoc explicitResultType, DeclContext *parent)
-    : CapturingExpr(ExprKind::PipeClosure, Type()),
+    : AbstractClosureExpr(ExprKind::PipeClosure, Type()),
       DeclContext(DeclContextKind::PipeClosureExpr, parent),
       params(params, false), arrowLoc(arrowLoc),
       explicitResultType(explicitResultType), body(nullptr) { }
@@ -1739,7 +1738,7 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::PipeClosure;
   }
-  static bool classof(const CapturingExpr *E) {
+  static bool classof(const AbstractClosureExpr *E) {
     return classof(cast<Expr>(E));
   }
   static bool classof(const DeclContext *DC) {
@@ -1755,13 +1754,13 @@ public:
 /// \code
 ///   var x : [auto_closure] () -> int = 4
 /// \endcode
-class ImplicitClosureExpr : public CapturingExpr, public DeclContext {
+class ImplicitClosureExpr : public AbstractClosureExpr, public DeclContext {
   BraceStmt *Body;
   Pattern *ParamPattern;
 
 public:
   ImplicitClosureExpr(Expr *Body, DeclContext *Parent, Type ResultTy)
-      : CapturingExpr(ExprKind::ImplicitClosure, ResultTy),
+      : AbstractClosureExpr(ExprKind::ImplicitClosure, ResultTy),
         DeclContext(DeclContextKind::ClosureExpr, Parent),
         ParamPattern(nullptr) {
     setBody(Body);

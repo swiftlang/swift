@@ -49,7 +49,6 @@ namespace swift {
   class ASTContext;
   class BraceStmt;
   class CanType;
-  class CapturingExpr;
   class ClassDecl;
   class ConstructorDecl;
   class Decl;

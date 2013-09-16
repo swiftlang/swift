@@ -1155,7 +1155,7 @@ public:
     OS << ')';
   }
 
-  llvm::raw_ostream &printCapturing(CapturingExpr *E, char const *name) {
+  llvm::raw_ostream &printClosure(AbstractClosureExpr *E, char const *name) {
     printCommon(E, name);
     if (!E->getCaptureInfo().empty()) {
       OS << " ";
@@ -1165,7 +1165,7 @@ public:
   }
 
   void visitPipeClosureExpr(PipeClosureExpr *expr) {
-    printCapturing(expr, "closure_expr");
+    printClosure(expr, "closure_expr");
     if (expr->hasSingleExpressionBody()) {
       OS << " single-expression\n";
       printRec(expr->getSingleExpressionBody());
@@ -1174,8 +1174,8 @@ public:
     OS << ')';
   }
   void visitImplicitClosureExpr(ImplicitClosureExpr *E) {
-    printCapturing(E, "implicit_closure_expr") << '\n';
-    printRec(E->getBody());
+    printClosure(E, "implicit_closure_expr") << '\n';
+    printRec(E->getSingleExpressionBody());
     OS << ')';
   }
 
