@@ -32,7 +32,12 @@ static CanType getDynamicMethodType(SILGenFunction &gen,
                                     SILDeclRef methodName,
                                     Type memberType) {
   auto &ctx = memberType->getASTContext();
-  Type selfTy = ctx.TheObjCPointerType;
+  Type selfTy;
+  if (methodName.getDecl()->isInstanceMember()) {
+    selfTy = ctx.TheObjCPointerType;
+  } else {
+    selfTy = proto.getType().getSwiftType();
+  }
   auto info = FunctionType::ExtInfo()
                 .withCallingConv(gen.SGM.getConstantCC(methodName))
                 .withIsThin(true);
@@ -806,7 +811,24 @@ public:
     auto *fd = dyn_cast<FuncDecl>(dynamicMemberRef->getMember().getDecl());
     assert(fd && "dynamic property references not yet supported");
     assert(fd->isObjC() && "Dynamic member references require [objc]");
-    assert(fd->isInstanceMember() && "Non-instance dynamic member reference");
+    SILValue val;
+    if (fd->isInstanceMember()) {
+      assert(fd->isInstanceMember() && "Non-instance dynamic member reference");
+
+      // Attach the existential cleanup to the projection so that it gets consumed
+      // (or not) when the call is applied to it (or isn't).
+      val = gen.B.createProjectExistentialRef(dynamicMemberRef,
+                                              existential.getValue());
+      ManagedValue proj(val, existential.getCleanup());
+      setSelfParam(RValue(gen, proj, dynamicMemberRef), dynamicMemberRef);
+    } else {
+      assert(existential.getType().is<MetaTypeType>() &&
+             "non-dynamic-lookup-metatype for static method?!");
+      val = existential.getValue();
+      ManagedValue proj(val, existential.getCleanup());
+      setSelfParam(RValue(gen, existential, dynamicMemberRef),
+                   dynamicMemberRef);
+    }
 
     // Determine the type of the method we referenced, by replacing the
     // class type of the 'Self' parameter with Builtin.ObjCPointer.
@@ -814,13 +836,6 @@ public:
                       /*isObjC=*/true);
 
     auto methodTy = apply->getType();
-
-    // Attach the existential cleanup to the projection so that it gets consumed
-    // (or not) when the call is applied to it (or isn't).
-    SILValue val = gen.B.createProjectExistentialRef(dynamicMemberRef,
-                                                     existential.getValue());
-    ManagedValue proj(val, existential.getCleanup());
-    setSelfParam(RValue(gen, proj, dynamicMemberRef), dynamicMemberRef);
 
     setCallee(Callee::forDynamic(gen, val, member, methodTy, apply));
 

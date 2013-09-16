@@ -799,10 +799,20 @@ public:
     SILType operandType = EMI->getOperand().getType();
 
     require(EMI->getMember().getDecl()->isObjC(), "method must be [objc]");
-    require(EMI->getMember().getDecl()->isInstanceMember(),
-            "method must be an instance method");
-    require(operandType.getSwiftType()->is<BuiltinObjCPointerType>(),
-            "operand must have Builtin.ObjCPointer type");
+    if (EMI->getMember().getDecl()->isInstanceMember()) {
+      require(operandType.getSwiftType()->is<BuiltinObjCPointerType>(),
+              "operand must have Builtin.ObjCPointer type");
+    } else {
+      require(operandType.getSwiftType()->is<MetaTypeType>(),
+              "operand must have metatype type");
+      require(operandType.getSwiftType()->castTo<MetaTypeType>()
+                ->getInstanceType()->is<ProtocolType>(),
+              "operand must have metatype of protocol type");
+      require(operandType.getSwiftType()->castTo<MetaTypeType>()
+                ->getInstanceType()->castTo<ProtocolType>()->getDecl()
+                ->isSpecificProtocol(KnownProtocolKind::DynamicLookup),
+              "operand must have metatype of DynamicLookup type");
+    }
   }
 
   static bool isClassOrClassMetatype(Type t) {
