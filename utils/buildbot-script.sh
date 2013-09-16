@@ -155,8 +155,14 @@ if [ \! "$SKIP_TEST_SWIFT" ]; then
 fi
 
 # Run the Swift performance tests.
-if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ] && false; then
+if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
+  # Currently we use the toolchain-specific Clang as our CC under test, because
+  # our locally built one might not end up invoking an LD that supports
+  # autolinking on older machines. We can reconsider this when it becomes useful
+  # to have the C/C++ tests be running using the same LLVM basis as the Swift we
+  # are testing.
   echo "--- Running Swift Performance Tests ---"
+  export CLANG="$TOOLCHAIN/usr/bin/clang"
   export SWIFT="$WORKSPACE/swift/build/bin/swift"
   (cd "$WORKSPACE/swift/build" &&
     "$WORKSPACE/llvm/build/bin/llvm-lit" -v benchmark \
