@@ -684,156 +684,155 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
   checkDefaultArguments(*this, ctor->getArguments(), ctor->getDeclContext());
 
   BraceStmt *body = ctor->getBody();
+  if (!body) return;
 
-  if (body) {
-    // Type-check the body.
-    StmtChecker(*this, static_cast<AbstractFunctionDecl *>(ctor))
-        .typeCheckStmt(body);
+  // Type-check the body.
+  StmtChecker(*this, static_cast<AbstractFunctionDecl *>(ctor))
+      .typeCheckStmt(body);
 
-    // Figure out which members already have initializers. We don't
-    // default-initialize those members.
-    // FIXME: This traversal is quite simplistic and quite stupid. It should
-    // use dataflow analysis to determine which members are guaranteed to
-    // be (manually) initialized before they are used.
-    bool allOfThisInitialized = false;
-    auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
-                         ->getNominalOrBoundGenericNominal();
-    llvm::SmallPtrSet<VarDecl *, 4> initializedMembers;
-    for (auto elt : body->getElements()) {
-      auto expr = elt.dyn_cast<Expr *>();
-      if (!expr)
-        continue;
+  // Figure out which members already have initializers. We don't
+  // default-initialize those members.
+  // FIXME: This traversal is quite simplistic and quite stupid. It should
+  // use dataflow analysis to determine which members are guaranteed to
+  // be (manually) initialized before they are used.
+  bool allOfThisInitialized = false;
+  auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
+                       ->getNominalOrBoundGenericNominal();
+  llvm::SmallPtrSet<VarDecl *, 4> initializedMembers;
+  for (auto elt : body->getElements()) {
+    auto expr = elt.dyn_cast<Expr *>();
+    if (!expr)
+      continue;
 
-      auto assign = dyn_cast<AssignExpr>(expr);
-      if (!assign)
-        continue;
+    auto assign = dyn_cast<AssignExpr>(expr);
+    if (!assign)
+      continue;
 
-      // We have an assignment. Check whether the left-hand side refers to
-      // a member of our class.
-      // FIXME: Also look into TupleExpr destinations.
-      VarDecl *member = nullptr;
-      auto dest = assign->getDest()->getSemanticsProvidingExpr();
-      if (auto memberRef = dyn_cast<MemberRefExpr>(dest))
-        member = dyn_cast<VarDecl>(memberRef->getMember().getDecl());
-      else if (auto memberRef = dyn_cast<ExistentialMemberRefExpr>(dest))
-        member = dyn_cast<VarDecl>(memberRef->getDecl());
-      else if (auto memberRef = dyn_cast<ArchetypeMemberRefExpr>(dest))
-        member = dyn_cast<VarDecl>(memberRef->getDecl());
-      else if (auto memberRef = dyn_cast<UnresolvedDotExpr>(dest)) {
-        if (auto base = dyn_cast<DeclRefExpr>(
-                          memberRef->getBase()->getSemanticsProvidingExpr())) {
-          if (base->getDecl()->getName().str().equals("self")) {
-            // Look for the member within this type.
-            auto memberDecls
-              = lookupMember(nominalDecl->getDeclaredTypeInContext(),
-                             memberRef->getName(),
-                             /*allowDynamicLookup=*/false);
-            if (memberDecls.size() == 1)
-              member = dyn_cast<VarDecl>(memberDecls[0]);
-          }
-        }
-      } else if (auto declRef = dyn_cast<DeclRefExpr>(dest)) {
-        // If the left-hand side is 'self', we're initializing the
-        // whole object.
-        if (declRef->getDecl()->getName().str().equals("self")) {
-          allOfThisInitialized = true;
-          break;
+    // We have an assignment. Check whether the left-hand side refers to
+    // a member of our class.
+    // FIXME: Also look into TupleExpr destinations.
+    VarDecl *member = nullptr;
+    auto dest = assign->getDest()->getSemanticsProvidingExpr();
+    if (auto memberRef = dyn_cast<MemberRefExpr>(dest))
+      member = dyn_cast<VarDecl>(memberRef->getMember().getDecl());
+    else if (auto memberRef = dyn_cast<ExistentialMemberRefExpr>(dest))
+      member = dyn_cast<VarDecl>(memberRef->getDecl());
+    else if (auto memberRef = dyn_cast<ArchetypeMemberRefExpr>(dest))
+      member = dyn_cast<VarDecl>(memberRef->getDecl());
+    else if (auto memberRef = dyn_cast<UnresolvedDotExpr>(dest)) {
+      if (auto base = dyn_cast<DeclRefExpr>(
+                        memberRef->getBase()->getSemanticsProvidingExpr())) {
+        if (base->getDecl()->getName().str().equals("self")) {
+          // Look for the member within this type.
+          auto memberDecls
+            = lookupMember(nominalDecl->getDeclaredTypeInContext(),
+                           memberRef->getName(),
+                           /*allowDynamicLookup=*/false);
+          if (memberDecls.size() == 1)
+            member = dyn_cast<VarDecl>(memberDecls[0]);
         }
       }
-
-      if (member)
-        initializedMembers.insert(member);
+    } else if (auto declRef = dyn_cast<DeclRefExpr>(dest)) {
+      // If the left-hand side is 'self', we're initializing the
+      // whole object.
+      if (declRef->getDecl()->getName().str().equals("self")) {
+        allOfThisInitialized = true;
+        break;
+      }
     }
 
-    // Default-initialize all of the members.
-    SmallVector<BraceStmt::ExprStmtOrDecl, 4> defaultInits;
-    if (!allOfThisInitialized) {
-      for (auto member : nominalDecl->getMembers()) {
-        // We only care about pattern bindings.
-        auto patternBind = dyn_cast<PatternBindingDecl>(member);
-        if (!patternBind)
-          continue;
+    if (member)
+      initializedMembers.insert(member);
+  }
 
-        // If the pattern has an initializer, use it.
-        // FIXME: Implement this.
-        if (auto initializer = patternBind->getInit()) {
-          // Create a tuple expression with the same structure as the
-          // pattern.
-          if (Expr *dest = createPatternMemberRefExpr(
-                             *this,
-                             ctor->getImplicitSelfDecl(),
-                             patternBind->getPattern())) {
-            initializer = new (Context) DefaultValueExpr(initializer);
-            Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
-                                                    initializer);
-            typeCheckExpression(assign, ctor, Type(), /*discardedExpr=*/false);
-            defaultInits.push_back(assign);
-            continue;
-          }
+  // Default-initialize all of the members.
+  SmallVector<BraceStmt::ExprStmtOrDecl, 4> defaultInits;
+  if (!allOfThisInitialized) {
+    for (auto member : nominalDecl->getMembers()) {
+      // We only care about pattern bindings.
+      auto patternBind = dyn_cast<PatternBindingDecl>(member);
+      if (!patternBind)
+        continue;
 
-          diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar_hole);
-          diagnose(patternBind->getLoc(), diag::decl_init_here);
-        }
-
-        // Find the variables in the pattern. They'll each need to be
-        // default-initialized.
-        SmallVector<VarDecl *, 4> variables;
-        patternBind->getPattern()->collectVariables(variables);
-
-        // Initialize the variables.
-        for (auto var : variables) {
-          if (var->isProperty())
-            continue;
-
-          // If we already saw an initializer for this member, don't
-          // initialize it.
-          if (!initializedMembers.insert(var))
-            continue;
-
-          // If this variable is not default-initializable, we're done: we can't
-          // add the default constructor because it will be ill-formed.
-          auto varType = getTypeOfRValue(var);
-
-          // Don't complain about variables with ErrorType; an error was
-          // already emitted alsewhere.
-          if (varType->is<ErrorType>())
-            continue;
-
-          Expr *initializer = nullptr;
-          if (!isDefaultInitializable(varType, &initializer)) {
-            diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar,
-                     var->getName(), varType);
-            diagnose(var->getLoc(), diag::decl_declared_here, var->getName());
-            continue;
-          }
-
-          // Create the assignment.
-          auto selfDecl = ctor->getImplicitSelfDecl();
-          Expr *dest
-            = new (Context) UnresolvedDotExpr(
-                new (Context) DeclRefExpr(selfDecl, SourceLoc()),
-                SourceLoc(), 
-                var->getName(),
-                SourceLoc());
+      // If the pattern has an initializer, use it.
+      // FIXME: Implement this.
+      if (auto initializer = patternBind->getInit()) {
+        // Create a tuple expression with the same structure as the
+        // pattern.
+        if (Expr *dest = createPatternMemberRefExpr(
+                           *this,
+                           ctor->getImplicitSelfDecl(),
+                           patternBind->getPattern())) {
+          initializer = new (Context) DefaultValueExpr(initializer);
           Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
                                                   initializer);
           typeCheckExpression(assign, ctor, Type(), /*discardedExpr=*/false);
           defaultInits.push_back(assign);
+          continue;
         }
+
+        diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar_hole);
+        diagnose(patternBind->getLoc(), diag::decl_init_here);
+      }
+
+      // Find the variables in the pattern. They'll each need to be
+      // default-initialized.
+      SmallVector<VarDecl *, 4> variables;
+      patternBind->getPattern()->collectVariables(variables);
+
+      // Initialize the variables.
+      for (auto var : variables) {
+        if (var->isProperty())
+          continue;
+
+        // If we already saw an initializer for this member, don't
+        // initialize it.
+        if (!initializedMembers.insert(var))
+          continue;
+
+        // If this variable is not default-initializable, we're done: we can't
+        // add the default constructor because it will be ill-formed.
+        auto varType = getTypeOfRValue(var);
+
+        // Don't complain about variables with ErrorType; an error was
+        // already emitted alsewhere.
+        if (varType->is<ErrorType>())
+          continue;
+
+        Expr *initializer = nullptr;
+        if (!isDefaultInitializable(varType, &initializer)) {
+          diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar,
+                   var->getName(), varType);
+          diagnose(var->getLoc(), diag::decl_declared_here, var->getName());
+          continue;
+        }
+
+        // Create the assignment.
+        auto selfDecl = ctor->getImplicitSelfDecl();
+        Expr *dest
+          = new (Context) UnresolvedDotExpr(
+              new (Context) DeclRefExpr(selfDecl, SourceLoc()),
+              SourceLoc(), 
+              var->getName(),
+              SourceLoc());
+        Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
+                                                initializer);
+        typeCheckExpression(assign, ctor, Type(), /*discardedExpr=*/false);
+        defaultInits.push_back(assign);
       }
     }
-    
-    // If we added any default initializers, update the body.
-    if (!defaultInits.empty()) {
-      defaultInits.append(body->getElements().begin(),
-                          body->getElements().end());
-
-      body = BraceStmt::create(Context, body->getLBraceLoc(), defaultInits,
-                               body->getRBraceLoc());
-    }
-
-    ctor->setBody(body);
   }
+  
+  // If we added any default initializers, update the body.
+  if (!defaultInits.empty()) {
+    defaultInits.append(body->getElements().begin(),
+                        body->getElements().end());
+
+    body = BraceStmt::create(Context, body->getLBraceLoc(), defaultInits,
+                             body->getRBraceLoc());
+  }
+
+  ctor->setBody(body);
 }
 
 void TypeChecker::typeCheckDestructorBody(DestructorDecl *DD) {
