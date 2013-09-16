@@ -1989,10 +1989,12 @@ public:
     return getBodyKind() != BodyKind::None;
   }
 
-  /// Returns the function body.
+  /// Returns the function body, if it was parsed, or nullptr otherwise.
   ///
   /// Note that a null return value does not imply that the source code did not
   /// have a body for this function.
+  ///
+  /// \sa hasBody()
   BraceStmt *getBody() const {
     if (getBodyKind() == BodyKind::Parsed)
       return Body;
