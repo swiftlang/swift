@@ -162,12 +162,12 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
     "$WORKSPACE/llvm/build/bin/llvm-lit" -v benchmark \
         -j1 --output benchmark/results.json) || exit 1
   echo "--- Submitting Swift Performance Tests ---"
-  swift_source_revision="$($WORKSPACE/llvm/utils/GetSourceVersion $WORKSPACE/swift)"
+  swift_source_revision=$("$WORKSPACE/llvm/utils/GetSourceVersion" "$WORKSPACE/swift")
   (cd "$WORKSPACE/swift/build" &&
     "$WORKSPACE/swift/utils/submit-benchmark-results" benchmark/results.json \
         --output benchmark/lnt_results.json \
         --machine-name "matte.apple.com--${BUILD_TYPE}--x86_64--O3" \
-        --run-order $swift_source_revision \
+        --run-order "$swift_source_revision" \
         --submit http://localhost:32169/submitRun) || exit 1
 fi
 
