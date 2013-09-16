@@ -32,7 +32,7 @@ public:
 
   CaptureInfo &getCaptureInfo() {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return cast<FuncDecl>(AFD)->getCaptureInfo();
+      return AFD->getCaptureInfo();
     return TheFunction.get<CapturingExpr *>()->getCaptureInfo();
   }
 
@@ -40,6 +40,24 @@ public:
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getType();
     return TheFunction.get<CapturingExpr *>()->getType();
+  }
+
+  BraceStmt *getBody() {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->getBody();
+    auto *CE = TheFunction.get<CapturingExpr *>();
+    if (auto *PCE = dyn_cast<PipeClosureExpr>(CE))
+      return PCE->getBody();
+    return cast<ImplicitClosureExpr>(CE)->getBody();
+  }
+
+  DeclContext *getAsDeclContext() {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD;
+    auto *CE = TheFunction.get<CapturingExpr *>();
+    if (auto *PCE = dyn_cast<PipeClosureExpr>(CE))
+      return PCE;
+    return cast<ImplicitClosureExpr>(CE);
   }
 };
 

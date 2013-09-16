@@ -502,19 +502,8 @@ namespace {
 
   public:
     FindCapturedVars(TypeChecker &tc, llvm::SetVector<ValueDecl*> &captures,
-                     AbstractFunctionDecl *FD)
-        : tc(tc), captures(captures) {
-      CurExprAsDC = FD;
-    }
-
-    FindCapturedVars(TypeChecker &tc, llvm::SetVector<ValueDecl*> &captures,
-                     CapturingExpr *curExpr)
-        : tc(tc), captures(captures) {
-      if (auto *CE = dyn_cast<PipeClosureExpr>(curExpr))
-        CurExprAsDC = CE;
-      else
-        CurExprAsDC = cast<ImplicitClosureExpr>(curExpr);
-    }
+                     AnyFunctionRef AFR)
+        : tc(tc), captures(captures), CurExprAsDC(AFR.getAsDeclContext()) {}
 
     void doWalk(Expr *E) {
       E->walk(*this);
@@ -568,28 +557,13 @@ namespace {
   };
 }
 
-void TypeChecker::computeCaptures(AbstractFunctionDecl *FD) {
+void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   llvm::SetVector<ValueDecl *> Captures;
-  FindCapturedVars finder(*this, Captures, FD);
-  finder.doWalk(FD->getBody());
+  FindCapturedVars finder(*this, Captures, AFR);
+  finder.doWalk(AFR.getBody());
   ValueDecl **CaptureCopy =
       Context.AllocateCopy<ValueDecl *>(Captures.begin(), Captures.end());
-  FD->getCaptureInfo().setCaptures(
+  AFR.getCaptureInfo().setCaptures(
       llvm::makeArrayRef(CaptureCopy, Captures.size()));
 }
 
-void TypeChecker::computeCaptures(CapturingExpr *capturing) {
-  llvm::SetVector<ValueDecl *> Captures;
-  FindCapturedVars finder(*this, Captures, capturing);
-
-  if (auto *CE = dyn_cast<PipeClosureExpr>(capturing))
-    finder.doWalk(CE->getBody());
-  else {
-    finder.doWalk(cast<ImplicitClosureExpr>(capturing)->getBody());
-  }
-
-  ValueDecl **CaptureCopy =
-      Context.AllocateCopy<ValueDecl *>(Captures.begin(), Captures.end());
-  capturing->getCaptureInfo().setCaptures(
-      llvm::makeArrayRef(CaptureCopy, Captures.size()));
-}
