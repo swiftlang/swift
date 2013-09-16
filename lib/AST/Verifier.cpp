@@ -335,6 +335,20 @@ namespace {
       }
     }
 
+    void verifyParsed(AbstractClosureExpr *E) {
+      Type Ty = E->getType();
+      if (!Ty)
+        return;
+      if (Ty->is<ErrorType>())
+        return;
+      if (!Ty->is<AnyFunctionType>()) {
+        Out << "a closure should have a function type";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+    }
+
     void verifyChecked(RequalifyExpr *E) {
       LValueType::Qual dstQuals, srcQuals;
       Type dstObj = checkLValue(E->getType(), dstQuals,
