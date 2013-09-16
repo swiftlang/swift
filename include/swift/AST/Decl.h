@@ -1495,9 +1495,6 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
 protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
-  
-public:
-  using TypeDecl::getASTContext;
 
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   MutableArrayRef<TypeLoc> inherited,
@@ -1505,6 +1502,9 @@ public:
     TypeDecl(K, DC, name, inherited),
     DeclContext(DeclContextKind::NominalTypeDecl, DC),
     GenericParams(GenericParams), DeclaredTy(nullptr) {}
+
+public:
+  using TypeDecl::getASTContext;
 
   ArrayRef<Decl*> getMembers() const { return Members; }
   SourceRange getBraces() const { return Braces; }
