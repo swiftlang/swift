@@ -501,6 +501,12 @@ than the one it was called with. When this happens, it is either due
 to an error (in which case it will return nil) or because the object
 is being substituted for another object. 
 
+In both cases, we are left with a partially-constructed object that
+then needs to be destroyed, even though its instance variables may not
+yet havee been initialized. This is also a problem for Objective-C,
+which makes returning anything other than the original ''self''
+brittle. 
+
 In Swift, we will have a separate error-handling mechanism to report
 failures. A Swift constructor will not be allowed to return a value;
 rather, it should raise an error if an error occurs, and that error
@@ -512,13 +518,11 @@ do not initially support object substitution within Swift
 constructors. However, for memory safety we do need to recognize when
 calling the superclass constructor or delegating to another
 constructor has replaced the object (which can happen in Objective-C
-code). This has several ramifications:
-
-* The original object needs to be properly destructed, even though its
-  instance variables may not have been initialized yet.
-* The instance variables of the new object will already have been
-  initialized, so our "initialization" of those variables is actually
-  assignment.
+code). Aside from the need to destroy the original object, the
+instance variables of the new object will already have been
+initialized, so our "initialization" of those instance variables is
+actually assignment. The code generation for constructors will need to
+account for this.
 
 Alternatives
 ------------
