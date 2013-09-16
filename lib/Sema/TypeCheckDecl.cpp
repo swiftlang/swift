@@ -43,16 +43,6 @@ enum class ImplicitConstructorKind {
   Memberwise
 };
 
-/// \brief Determine whether the given pattern contains only a single variable
-/// that is a property.
-static bool isPatternProperty(Pattern *pattern) {
-  pattern = pattern->getSemanticsProvidingPattern();
-  if (auto named = dyn_cast<NamedPattern>(pattern))
-    return named->getDecl()->isProperty();
-
-  return false;
-}
-
 /// Determine whether the given declaration can inherit a class.
 static bool canInheritClass(Decl *decl) {
   // Classes can inherit from a class.
@@ -834,29 +824,6 @@ public:
                               /*allowUnknownTypes*/false)) {
         setBoundVarsTypeError(PBD->getPattern());
         return;
-      }
-
-      Type ty = PBD->getPattern()->getType();
-      Expr *initializer = nullptr;
-      if (isPatternProperty(PBD->getPattern())) {
-        // Properties don't have initializers.
-      } else if (!isa<TopLevelCodeDecl>(PBD->getDeclContext()) ||
-                 TLDefiniteInit) {
-        // If we are using the new definite initialization rules, we don't
-        // default initialize local variables, only globals.
-      } else {
-        if (!TC.isDefaultInitializable(ty, &initializer)) {
-          // FIXME: Better diagnostics here.
-          TC.diagnose(PBD, diag::decl_no_default_init, ty);
-        } else {
-          if (TC.typeCheckExpression(initializer, PBD->getDeclContext(), ty,
-                                     /*discardedExpr=*/false)) {
-            TC.diagnose(PBD, diag::while_converting_var_init, ty);
-            return;
-          }
-          
-          PBD->setInit(initializer);
-        }
       }
     } else if (PBD->getInit() && !IsFirstPass) {
       Type DestTy;

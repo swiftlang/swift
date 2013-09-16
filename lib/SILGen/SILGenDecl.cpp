@@ -26,12 +26,6 @@ using namespace Lowering;
 
 void Initialization::_anchor() {}
 
-
-// FIXME: This is gross but temporary.
-#include "llvm/Support/CommandLine.h"
-extern llvm::cl::opt<bool> TLDefiniteInit;
-
-
 namespace {
   /// A "null" initialization that indicates that any value being initialized
   /// into this initialization should be discarded. This represents AnyPatterns
@@ -331,8 +325,7 @@ struct InitializationForPattern
                           Gen.getLoweredType(vd->getType()).getAddressType());
       
       // In a top level context, all global variables must be initialized.
-      if (TLDefiniteInit)
-        addr = Gen.B.createMarkUninitialized(vd, addr);
+      addr = Gen.B.createMarkUninitialized(vd, addr);
       
       Gen.VarLocs[vd] = {SILValue(), addr};
       return InitializationPtr(new GlobalInitialization(addr));

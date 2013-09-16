@@ -25,10 +25,6 @@
 using namespace swift;
 using namespace Lowering;
 
-// FIXME: This is gross but temporary.
-#include "llvm/Support/CommandLine.h"
-extern llvm::cl::opt<bool> TLDefiniteInit;
-
 //===--------------------------------------------------------------------===//
 // SILGenFunction Class implementation
 //===--------------------------------------------------------------------===//
@@ -314,8 +310,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // If we're emitting top-level code, then emit a "mark_function_escape" that
   // lists the captured global variables so that definite initialization can
   // reason about this escape point.
-  if (TLDefiniteInit &&
-      !AFD->getDeclContext()->isLocalContext() &&
+  if (!AFD->getDeclContext()->isLocalContext() &&
       TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()) {
     SmallVector<SILValue, 4> Captures;
     
