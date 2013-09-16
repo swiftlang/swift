@@ -37,7 +37,7 @@ static unsigned getFuncNaturalUncurryLevel(PipeClosureExpr *CE) {
   return Level;
 }
 
-static unsigned getFuncNaturalUncurryLevel(ClosureExpr *CE) {
+static unsigned getFuncNaturalUncurryLevel(ImplicitClosureExpr *CE) {
   assert(CE->getParamPatterns().size() >= 1 && "no arguments for func?!");
   unsigned Level = CE->getParamPatterns().size() - 1;
   // Functions with captures have an extra uncurry level for the capture
@@ -197,7 +197,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
            "no param patterns for function?!");
     naturalUncurryLevel = getFuncNaturalUncurryLevel(PCE);
   } else {
-    auto *CE = baseLoc.dyn_cast<ClosureExpr *>();
+    auto *CE = baseLoc.dyn_cast<ImplicitClosureExpr *>();
     loc = CE;
     kind = Kind::Func;
     assert(CE->getParamPatterns().size() >= 1 &&

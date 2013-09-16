@@ -70,17 +70,9 @@ class alignas(8) Expr {
   enum { NumExprBits = 8 };
   static_assert(NumExprBits <= 32, "fits in an unsigned");
 
-  class CapturingExprBitfields {
-    friend class CapturingExpr;
-    unsigned : NumExprBits;
-  };
-  enum { NumCapturingExprBits = NumExprBits + 0 };
-  static_assert(NumCapturingExprBits <= 32, "fits in an unsigned");
-
 protected:
   union {
     ExprBitfields ExprBits;
-    CapturingExprBitfields CapturingExprBits;
   };
 
 private:
@@ -1757,77 +1749,44 @@ public:
   using DeclContext::operator new;
 };
 
-/// ClosureExpr - An expression which is implicitly created by using an
-/// expression in a function context where the expression's type matches the
-/// result of the function.  This may either be explicit in source or implicitly
-/// formed.  Once type checking has completed, ClosureExpr's are known to have
-/// FunctionType.
-///
-class ClosureExpr : public CapturingExpr, public DeclContext {
+/// \brief This is a closure of the contained subexpression that is formed
+/// when an scalar expression is converted to [auto_closure] function type.
+/// For example:
+/// \code
+///   var x : [auto_closure] () -> int = 4
+/// \endcode
+class ImplicitClosureExpr : public CapturingExpr, public DeclContext {
   Expr *Body;
-  Pattern *Pat;
+  Pattern *ParamPattern;
 
 public:
-  ClosureExpr(ExprKind Kind, Expr *Body, DeclContext *Parent,
-              Type ResultTy = Type())
-    : CapturingExpr(Kind, ResultTy),
-      DeclContext(DeclContextKind::ClosureExpr, Parent),
-      Body(Body), Pat(nullptr) {}
+  ImplicitClosureExpr(Expr *Body, DeclContext *Parent, Type ResultTy)
+      : CapturingExpr(ExprKind::ImplicitClosure, ResultTy),
+        DeclContext(DeclContextKind::ClosureExpr, Parent),
+        Body(Body) {}
+
+  SourceRange getSourceRange() const { return getBody()->getSourceRange(); }
+
+  MutableArrayRef<Pattern *> getParamPatterns() {
+    return ParamPattern;
+  }
+  ArrayRef<const Pattern *> getParamPatterns() const {
+    return ParamPattern;
+  }
+  void setParamPattern(Pattern *P) { ParamPattern = P; }
 
   Expr *getBody() const { return Body; }
   void setBody(Expr *e) { Body = e; }
-
-  Pattern *getPattern() { return Pat; }
-  const Pattern *getPattern() const { return Pat; }
-  void setPattern(Pattern *pat) { Pat = pat; }
- 
-  MutableArrayRef<Pattern*> getParamPatterns() {
-    return Pat;
-  }
-  ArrayRef<const Pattern*> getParamPatterns() const {
-    return Pat;
-  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ImplicitClosure;
   }
-  static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
-
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::ClosureExpr;
   }
 
   using DeclContext::operator new;
-};
-
-/// ImplicitClosureExpr - This is a closure of the contained subexpression that
-/// is formed when an scalar expression is converted to [auto_closure] function
-/// type.  For example:  
-///   var x : [auto_closure] () -> int = 4
-///
-class ImplicitClosureExpr : public ClosureExpr {
-public:
-  ImplicitClosureExpr(Expr *Body, DeclContext *Parent, Type ResultTy)
-    : ClosureExpr(ExprKind::ImplicitClosure, Body, Parent, ResultTy) {}
-
-  SourceRange getSourceRange() const { return getBody()->getSourceRange(); }
-
-  MutableArrayRef<Pattern*> getParamPatterns() {
-    return {};
-  }
-  ArrayRef<const Pattern*> getParamPatterns() const {
-    return {};
-  }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ImplicitClosure;
-  }
-  static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
-  static bool classof(const DeclContext *DC) {
-    return ClosureExpr::classof(DC);
-  }
 };
 
 /// NewArrayExpr - The allocation of an array.  Allocates and constructs

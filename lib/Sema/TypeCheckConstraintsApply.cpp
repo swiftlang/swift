@@ -2282,7 +2282,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                               ArrayRef<TuplePatternElt>(),
                                               expr->getLoc());
       pattern->setType(TupleType::getEmpty(tc.Context));
-      ice->setPattern(pattern);
+      ice->setParamPattern(pattern);
 
       // Compute the capture list, now that we have analyzed the expression.
       tc.computeCaptures(ice);

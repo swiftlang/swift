@@ -1363,7 +1363,7 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
       CE->getCaptureInfo().getLocalCaptures(LocalCaptures);
       return getFunctionTypeWithCaptures(FuncTy, LocalCaptures,CE->getParent());
     }
-    if (auto *CE = c.loc.dyn_cast<ClosureExpr *>()) {
+    if (auto *CE = c.loc.dyn_cast<ImplicitClosureExpr *>()) {
       auto *FuncTy = CE->getType()->castTo<AnyFunctionType>();
       CE->getCaptureInfo().getLocalCaptures(LocalCaptures);
       return getFunctionTypeWithCaptures(FuncTy, LocalCaptures,CE->getParent());

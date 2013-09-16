@@ -198,7 +198,7 @@ namespace {
     RValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
     RValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
     RValue visitPipeClosureExpr(PipeClosureExpr *E, SGFContext C);
-    RValue visitClosureExpr(ClosureExpr *E, SGFContext C);
+    RValue visitImplicitClosureExpr(ImplicitClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
@@ -1348,7 +1348,8 @@ RValue RValueEmitter::visitPipeClosureExpr(PipeClosureExpr *e, SGFContext C) {
                 e);
 }
 
-RValue RValueEmitter::visitClosureExpr(ClosureExpr *e, SGFContext C) {
+RValue RValueEmitter::visitImplicitClosureExpr(ImplicitClosureExpr *e,
+                                               SGFContext C) {
   // Generate the closure body.
   SGF.SGM.emitClosure(e);
   
@@ -1374,7 +1375,7 @@ void SILGenFunction::emitClosure(PipeClosureExpr *ce) {
   emitEpilog(ce);
 }
 
-void SILGenFunction::emitClosure(ClosureExpr *ce) {
+void SILGenFunction::emitClosure(ImplicitClosureExpr *ce) {
   Type resultTy = ce->getType()->castTo<FunctionType>()->getResult();
   emitProlog(ce, ce->getParamPatterns(), resultTy);
   prepareEpilog(resultTy, CleanupLocation(ce));

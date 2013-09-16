@@ -58,7 +58,7 @@ void SILFunction::setDeclContext(Expr *E) {
     return;
 
   case ExprKind::ImplicitClosure:
-    DeclCtx = dyn_cast<ClosureExpr>(E);
+    DeclCtx = dyn_cast<ImplicitClosureExpr>(E);
     return;
 
   default:

@@ -174,7 +174,7 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   if (auto *CE = dyn_cast<PipeClosureExpr>(this)) {
     OS << ": " << CE->getType().getString();
   }
-  if (auto *CE = dyn_cast<ClosureExpr>(this)) {
+  if (auto *CE = dyn_cast<ImplicitClosureExpr>(this)) {
     OS << ": " << CE->getType().getString();
   }
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(this)) {

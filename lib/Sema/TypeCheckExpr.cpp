@@ -513,7 +513,7 @@ namespace {
       if (auto *CE = dyn_cast<PipeClosureExpr>(curExpr))
         CurExprAsDC = CE;
       else
-        CurExprAsDC = cast<ClosureExpr>(curExpr);
+        CurExprAsDC = cast<ImplicitClosureExpr>(curExpr);
     }
 
     void doWalk(Expr *E) {
@@ -582,11 +582,10 @@ void TypeChecker::computeCaptures(CapturingExpr *capturing) {
   llvm::SetVector<ValueDecl *> Captures;
   FindCapturedVars finder(*this, Captures, capturing);
 
-  if (auto closure = dyn_cast<ClosureExpr>(capturing))
-    finder.doWalk(closure->getBody());
-  else {
-    auto CE = dyn_cast<PipeClosureExpr>(capturing);
+  if (auto *CE = dyn_cast<PipeClosureExpr>(capturing))
     finder.doWalk(CE->getBody());
+  else {
+    finder.doWalk(cast<ImplicitClosureExpr>(capturing)->getBody());
   }
 
   ValueDecl **CaptureCopy =
