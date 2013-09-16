@@ -603,7 +603,9 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
 
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
-  for (auto capture : TheClosure.getCaptureInfo().getLocalCaptures())
+  SmallVector<ValueDecl*, 4> LocalCaptures;
+  TheClosure.getCaptureInfo().getLocalCaptures(LocalCaptures);
+  for (auto capture : LocalCaptures)
     emitCaptureArguments(*this, capture);
 }
 

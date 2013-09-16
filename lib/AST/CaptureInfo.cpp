@@ -23,19 +23,15 @@ bool CaptureInfo::hasLocalCaptures() const {
   return false;
 }
 
-std::vector<ValueDecl *> CaptureInfo::getLocalCaptures() const {
-  if (!hasLocalCaptures())
-    return std::vector<ValueDecl *>();
+void CaptureInfo::getLocalCaptures(SmallVectorImpl<ValueDecl*> &Result) const {
+  if (hasLocalCaptures()) {
+    Result.reserve(Captures.size());
 
-  std::vector<ValueDecl *> Result;
-  Result.reserve(Captures.size());
-
-  // Filter out global variables.
-  for (auto VD : Captures)
-    if (VD->getDeclContext()->isLocalContext())
-      Result.push_back(VD);
-
-  return Result;
+    // Filter out global variables.
+    for (auto VD : Captures)
+      if (VD->getDeclContext()->isLocalContext())
+        Result.push_back(VD);
+  }
 }
 
 void CaptureInfo::dump() const {

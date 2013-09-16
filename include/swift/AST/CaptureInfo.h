@@ -37,7 +37,7 @@ public:
   /// \brief Return a filtered list of the captures for this function,
   /// filtering out global variables.  This function returns the list that
   /// actually needs to be closed over.
-  std::vector<ValueDecl *> getLocalCaptures() const;
+  void getLocalCaptures(SmallVectorImpl<ValueDecl*> &Result) const;
 
   /// \returns true if getLocalCaptures() will return a non-empty list.
   bool hasLocalCaptures() const;

@@ -1357,22 +1357,23 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
 
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
+    SmallVector<ValueDecl*, 4> LocalCaptures;
     if (auto *CE = c.loc.dyn_cast<PipeClosureExpr *>()) {
       auto *FuncTy = CE->getType()->castTo<AnyFunctionType>();
-      return getFunctionTypeWithCaptures(
-          FuncTy, CE->getCaptureInfo().getLocalCaptures(), CE->getParent());
+      CE->getCaptureInfo().getLocalCaptures(LocalCaptures);
+      return getFunctionTypeWithCaptures(FuncTy, LocalCaptures,CE->getParent());
     }
     if (auto *CE = c.loc.dyn_cast<ClosureExpr *>()) {
       auto *FuncTy = CE->getType()->castTo<AnyFunctionType>();
-      return getFunctionTypeWithCaptures(
-          FuncTy, CE->getCaptureInfo().getLocalCaptures(), CE->getParent());
+      CE->getCaptureInfo().getLocalCaptures(LocalCaptures);
+      return getFunctionTypeWithCaptures(FuncTy, LocalCaptures,CE->getParent());
     }
 
     FuncDecl *func = cast<FuncDecl>(vd);
     auto *funcTy = func->getType()->castTo<AnyFunctionType>();
-    return getFunctionTypeWithCaptures(
-        funcTy, func->getCaptureInfo().getLocalCaptures(),
-        func->getDeclContext());
+    func->getCaptureInfo().getLocalCaptures(LocalCaptures);
+    return getFunctionTypeWithCaptures(funcTy, LocalCaptures,
+                                       func->getDeclContext());
   }
 
   case SILDeclRef::Kind::Getter:
@@ -1407,9 +1408,10 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
           ? var->getGetter()
           : var->getSetter();
         auto *propTy = propertyMethodType->castTo<AnyFunctionType>();
-        return getFunctionTypeWithCaptures(
-            propTy, property->getCaptureInfo().getLocalCaptures(),
-            var->getDeclContext());
+        SmallVector<ValueDecl*, 4> LocalCaptures;
+        property->getCaptureInfo().getLocalCaptures(LocalCaptures);
+        return getFunctionTypeWithCaptures(propTy, LocalCaptures,
+                                           var->getDeclContext());
       }
     }
     return propertyMethodType;

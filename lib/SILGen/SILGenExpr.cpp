@@ -1281,7 +1281,8 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
   if (!TheClosure.getCaptureInfo().hasLocalCaptures())
     return ManagedValue(functionRef, ManagedValue::Unmanaged);
 
-  auto captures = TheClosure.getCaptureInfo().getLocalCaptures();
+  SmallVector<ValueDecl*, 4> captures;
+  TheClosure.getCaptureInfo().getLocalCaptures(captures);
   SmallVector<SILValue, 4> capturedArgs;
   for (ValueDecl *capture : captures) {
     switch (getDeclCaptureKind(capture)) {
@@ -2151,9 +2152,12 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
     forwarder.visit(paramPattern);
 
   // Forward captures.
-  if (hasCaptures)
-    for (auto capture : fd->getCaptureInfo().getLocalCaptures())
+  if (hasCaptures) {
+    SmallVector<ValueDecl*, 4> LocalCaptures;
+    fd->getCaptureInfo().getLocalCaptures(LocalCaptures);
+    for (auto capture : LocalCaptures)
       forwardCaptureArgs(*this, curriedArgs, capture);
+  }
 
   SILValue toFn = getNextUncurryLevelRef(*this, fd, to, curriedArgs);
   SILType resultTy
