@@ -195,8 +195,18 @@ public:
   /// Return the start location of the token that the offset in the given buffer
   /// points to.
   ///
-  /// If the offset points to whitespace the source location will point to the
-  /// exact offset.
+  /// Note that this is more expensive than \c getLocForEndOfToken because it
+  /// finds and re-lexes from the beginning of the line.
+  ///
+  /// Due to the parser splitting tokens the adjustment may be incorrect, e.g:
+  /// \code
+  ///   func +<T>(a : T, b : T)
+  /// \endcode
+  /// The start of the '<' token is '<', but the lexer will produce "+<" before
+  /// the parser splits it up.
+  ////
+  /// If the offset points to whitespace the returned source location will point
+  /// to the whitespace offset.
   static SourceLoc getLocForStartOfToken(SourceManager &SM, unsigned BufferID,
                                          unsigned Offset);
 
