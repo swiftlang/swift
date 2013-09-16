@@ -145,7 +145,7 @@ public:
            "extended objc class doesn't have constant metadata?!");
     classMetadata = llvm::ConstantExpr::getBitCast(classMetadata,
                                                    IGF.IGM.TypeMetadataPtrTy);
-    metaclassMetadata = IGF.IGM.getAddrOfObjCMetaclass(
+    metaclassMetadata = IGF.IGM.getAddrOfMetaclassObject(
                                        origTy->getClassOrBoundGenericClass());
     metaclassMetadata = llvm::ConstantExpr::getBitCast(metaclassMetadata,
                                                    IGF.IGM.TypeMetadataPtrTy);
@@ -1474,8 +1474,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     llvm_unreachable("bad extension member kind");
   }
   
-  // If the original class is ObjC, or the extension introduces a conformance to
-  // an ObjC protocol, generate a category.
+  // If the original class is ObjC, or the extension either introduces a
+  // conformance to an ObjC protocol or introduces a method that requires an
+  // Objective-C entry point, generate a category.
   ClassDecl *origClass = ext->getDeclaredTypeInContext()
     ->getClassOrBoundGenericClass();
   if (!origClass)
@@ -1488,6 +1489,25 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
         needsCategory = true;
         break;
       }
+  }
+  if (!needsCategory) {
+    for (auto member : ext->getMembers()) {
+      if (auto func = dyn_cast<FuncDecl>(member)) {
+        if (requiresObjCMethodDescriptor(func)) {
+          needsCategory = true;
+          break;
+        }
+        continue;
+      }
+
+      if (auto var = dyn_cast<VarDecl>(member)) {
+        if (requiresObjCPropertyDescriptor(var)) {
+          needsCategory = true;
+          break;
+        }
+        continue;
+      }
+    }
   }
   
   if (needsCategory) {
