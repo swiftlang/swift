@@ -192,6 +192,14 @@ public:
   /// \param Loc The source location of the beginning of a token.
   static SourceLoc getLocForEndOfToken(SourceManager &SM, SourceLoc Loc);
 
+  /// Return the start location of the token that the offset in the given buffer
+  /// points to.
+  ///
+  /// If the offset points to whitespace the source location will point to the
+  /// exact offset.
+  static SourceLoc getLocForStartOfToken(SourceManager &SM, unsigned BufferID,
+                                         unsigned Offset);
+
   /// \brief Determines if the given string is a valid non-operator
   /// identifier.
   static bool isIdentifier(StringRef identifier);

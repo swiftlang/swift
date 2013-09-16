@@ -1486,3 +1486,88 @@ SourceLoc Lexer::getLocForEndOfToken(SourceManager &SM, SourceLoc Loc) {
   return Loc.getAdvancedLoc(Length);
 }
 
+static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
+                                            unsigned BufferID,
+                                            unsigned Offset,
+                                            unsigned BufferStart,
+                                            unsigned BufferEnd,
+                                            bool InInterpolatedString) {
+  Lexer L(SM, BufferID, nullptr, /*InSILMode=*/false, /*KeepComments=*/false,
+          BufferStart, BufferEnd);
+
+  // Lex tokens until we find the token that contains the source location.
+  Token Tok;
+  do {
+    L.lex(Tok);
+
+    unsigned TokOffs = SM.getLocOffsetInBuffer(Tok.getLoc(), BufferID);
+    if (TokOffs > Offset) {
+      // We ended up skipping over the source location entirely, which means
+      // that it points into whitespace. We are done here.
+      break;
+    }
+
+    if (Offset < TokOffs+Tok.getLength()) {
+      // Current token encompasses our source location.
+
+      if (Tok.is(tok::string_literal)) {
+        assert(!InInterpolatedString);
+        SmallVector<Lexer::StringSegment, 4> Segments;
+        Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
+        for (auto &Seg : Segments) {
+          unsigned SegOffs = SM.getLocOffsetInBuffer(Seg.Loc, BufferID);
+          unsigned SegEnd = SegOffs+Seg.Length;
+          if (SegOffs > Offset)
+            break;
+
+          // If the offset is inside an interpolated expr segment, re-lex.
+          if (Seg.Kind == Lexer::StringSegment::Expr && Offset < SegEnd)
+            return getLocForStartOfTokenInBuf(SM, BufferID, Offset,
+                                              /*BufferStart=*/SegOffs,
+                                              /*BufferEnd=*/SegEnd,
+                                              /*InInterpolatedString=*/true);
+        }
+      }
+
+      return Tok.getLoc();
+    }
+  } while (Tok.isNot(tok::eof));
+
+  // We've passed our source location; just return the original source location.
+  return SM.getLocForOffset(BufferID, Offset);
+}
+
+SourceLoc Lexer::getLocForStartOfToken(SourceManager &SM, unsigned BufferID,
+                                       unsigned Offset) {
+  const llvm::MemoryBuffer *MemBuffer = SM->getMemoryBuffer(BufferID);
+  if (!MemBuffer)
+    return SourceLoc();
+  StringRef Buffer = MemBuffer->getBuffer();
+
+  const char *BufStart = Buffer.data();
+  if (Offset > Buffer.size())
+    return SourceLoc();
+
+  const char *StrData = BufStart+Offset;
+  // If it points to whitespace return the SourceLoc for it.
+  if (StrData[0] == '\n' || StrData[0] == '\r' ||
+      StrData[0] == ' ' || StrData[0] == '\t')
+    return SM.getLocForOffset(BufferID, Offset);
+
+  // Back up from the current location until we hit the beginning of a line
+  // (or the buffer). We'll relex from that point.
+  const char *LexStart = StrData;
+  while (LexStart != BufStart) {
+    if (LexStart[0] == '\n' || LexStart[0] == '\r') {
+      ++LexStart;
+      break;
+    }
+
+    --LexStart;
+  }
+
+  return getLocForStartOfTokenInBuf(SM, BufferID, Offset,
+                                    /*BufferStart=*/LexStart-BufStart,
+                                    /*BufferEnd=*/Buffer.size(),
+                                    /*InInterpolatedString=*/false);
+}

@@ -9,9 +9,8 @@ using namespace llvm;
 
 // The test fixture.
 class LexerTest : public ::testing::Test {
-  SourceManager SourceMgr;
-
 public:
+  SourceManager SourceMgr;
 
   std::vector<Token> tokenizeAndKeepEOF(unsigned BufferID) {
     Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
@@ -257,3 +256,20 @@ TEST_F(LexerTest, RestoreStopAtCodeCompletion) {
   ASSERT_EQ(tok::eof, Tok.getKind());
 }
 
+TEST_F(LexerTest, getLocForStartOfToken) {
+  const char *Source = "aaa \n \tbbb \"hello\" \"-\\(val)-\"";
+
+  MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(Source);
+  unsigned BufferID = SourceMgr->AddNewSourceBuffer(Buf, llvm::SMLoc());
+
+  // First is character offset, second is its token offset.
+  unsigned Offs[][2] =
+    { {1, 0}, {2, 0}, {3, 3}, {4, 4}, {6, 6}, {9, 7}, {14, 11},
+      // interpolated string
+      {20, 19}, {23, 23}, {24, 23}, {25, 23}, {26, 26}, {27, 19} };
+
+  for (auto Pair : Offs) {
+    ASSERT_EQ(Lexer::getLocForStartOfToken(SourceMgr, BufferID, Pair[0]),
+              SourceMgr.getLocForOffset(BufferID, Pair[1]));
+  }
+}
