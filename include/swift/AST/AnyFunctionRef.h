@@ -48,7 +48,7 @@ public:
     auto *ACE = TheFunction.get<AbstractClosureExpr *>();
     if (auto *PCE = dyn_cast<PipeClosureExpr>(ACE))
       return PCE->getBody();
-    return cast<ImplicitClosureExpr>(ACE)->getBody();
+    return cast<AutoClosureExpr>(ACE)->getBody();
   }
 
   DeclContext *getAsDeclContext() {
@@ -57,7 +57,7 @@ public:
     auto *ACE = TheFunction.get<AbstractClosureExpr *>();
     if (auto *PCE = dyn_cast<PipeClosureExpr>(ACE))
       return PCE;
-    return cast<ImplicitClosureExpr>(ACE);
+    return cast<AutoClosureExpr>(ACE);
   }
 };
 

@@ -193,10 +193,10 @@ static Location getStartLocForLinetable(SourceManager &SM,
     return {};
 
   SILLocation Loc = OptLoc.getValue();
-  if (Expr* E = Loc.getAsASTNode<Expr>()) {
-    // Implicit closures should not show up in the line table. Note
-    // that the closure function still has a valid DW_AT_decl_line.
-    if (E->getKind() == ExprKind::ImplicitClosure)
+  if (Expr *E = Loc.getAsASTNode<Expr>()) {
+    // auto_closures should not show up in the line table. Note that the
+    // closure function still has a valid DW_AT_decl_line.
+    if (isa<AutoClosureExpr>(E))
       return {};
     return getStartLoc(SM, E);
   }

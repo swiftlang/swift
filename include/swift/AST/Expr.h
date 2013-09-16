@@ -1752,13 +1752,13 @@ public:
 /// \code
 ///   var x : [auto_closure] () -> int = 4
 /// \endcode
-class ImplicitClosureExpr : public AbstractClosureExpr {
+class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
   Pattern *ParamPattern;
 
 public:
-  ImplicitClosureExpr(Expr *Body, Type ResultTy, DeclContext *Parent)
-      : AbstractClosureExpr(ExprKind::ImplicitClosure, ResultTy, Parent),
+  AutoClosureExpr(Expr *Body, Type ResultTy, DeclContext *Parent)
+      : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, Parent),
         ParamPattern(nullptr) {
     setBody(Body);
   }
@@ -1783,7 +1783,7 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ImplicitClosure;
+    return E->getKind() == ExprKind::AutoClosure;
   }
 };
 

@@ -31,7 +31,7 @@ namespace llvm {
 namespace swift {
   class ValueDecl;
   class PipeClosureExpr;
-  class ImplicitClosureExpr;
+  class AutoClosureExpr;
   class ASTContext;
   class ClassDecl;
 
@@ -47,7 +47,7 @@ namespace swift {
 /// a property, etc.
 struct SILDeclRef {
   typedef llvm::PointerUnion3<ValueDecl *, PipeClosureExpr *,
-                              ImplicitClosureExpr *> Loc;
+                              AutoClosureExpr *> Loc;
   
   /// Represents the "kind" of the SILDeclRef. For some Swift decls there
   /// are multiple SIL entry points, and the kind is used to distinguish them.
@@ -141,16 +141,16 @@ struct SILDeclRef {
   bool hasPipeClosureExpr() const {
     return loc.is<PipeClosureExpr *>();
   }
-  bool hasImplicitClosureExpr() const {
-    return loc.is<ImplicitClosureExpr *>();
+  bool hasAutoClosureExpr() const {
+    return loc.is<AutoClosureExpr *>();
   }
 
   ValueDecl *getDecl() const { return loc.get<ValueDecl *>(); }
   PipeClosureExpr *getPipeClosureExpr() const {
     return loc.dyn_cast<PipeClosureExpr *>();
   }
-  ImplicitClosureExpr *getImplicitClosureExpr() const {
-    return loc.dyn_cast<ImplicitClosureExpr *>();
+  AutoClosureExpr *getAutoClosureExpr() const {
+    return loc.dyn_cast<AutoClosureExpr *>();
   }
 
   /// True if the SILDeclRef references a function.

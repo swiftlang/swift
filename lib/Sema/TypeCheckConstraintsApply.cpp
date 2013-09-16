@@ -1482,7 +1482,7 @@ namespace {
       llvm_unreachable("Handled by the walker directly");
     }
 
-    Expr *visitImplicitClosureExpr(ImplicitClosureExpr *expr) {
+    Expr *visitAutoClosureExpr(AutoClosureExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
@@ -2277,17 +2277,17 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       expr = coerceToType(expr, toFunc->getResult(),
                           locator.withPathElement(ConstraintLocator::Load));
 
-      auto ice = new (tc.Context) ImplicitClosureExpr(expr, toType, dc);
+      auto Closure = new (tc.Context) AutoClosureExpr(expr, toType, dc);
       Pattern *pattern = TuplePattern::create(tc.Context, expr->getLoc(),
                                               ArrayRef<TuplePatternElt>(),
                                               expr->getLoc());
       pattern->setType(TupleType::getEmpty(tc.Context));
-      ice->setParamPattern(pattern);
+      Closure->setParamPattern(pattern);
 
       // Compute the capture list, now that we have analyzed the expression.
-      tc.computeCaptures(ice);
+      tc.computeCaptures(Closure);
 
-      return ice;
+      return Closure;
     }
 
     // Coercion to a block function type from non-block function type.

@@ -198,7 +198,7 @@ namespace {
     RValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
     RValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
     RValue visitPipeClosureExpr(PipeClosureExpr *E, SGFContext C);
-    RValue visitImplicitClosureExpr(ImplicitClosureExpr *E, SGFContext C);
+    RValue visitAutoClosureExpr(AutoClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
@@ -1259,10 +1259,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   
   // Forward substitutions from the outer scope.
   
-  // FIXME: ImplicitClosureExprs appear to always have null parent decl
-  // contexts, so getFunctionTypeWithCaptures is unable to find contextual
-  // generic parameters for them. The getAs null check here should be
-  // unnecessary.
+  // FIXME: AutoClosureExprs appear to always have null parent decl contexts,
+  // so getFunctionTypeWithCaptures is unable to find contextual generic
+  // parameters for them. The getAs null check here should be unnecessary.
   auto pft = SGM.getConstantType(constant).getAs<PolymorphicFunctionType>();
   
   if (pft && !forwardSubs.empty()) {
@@ -1347,8 +1346,8 @@ RValue RValueEmitter::visitPipeClosureExpr(PipeClosureExpr *e, SGFContext C) {
                 e);
 }
 
-RValue RValueEmitter::visitImplicitClosureExpr(ImplicitClosureExpr *e,
-                                               SGFContext C) {
+RValue RValueEmitter::visitAutoClosureExpr(AutoClosureExpr *e,
+                                           SGFContext C) {
   // Generate the closure body.
   SGF.SGM.emitClosure(e);
   
@@ -1374,7 +1373,7 @@ void SILGenFunction::emitClosure(PipeClosureExpr *ce) {
   emitEpilog(ce);
 }
 
-void SILGenFunction::emitClosure(ImplicitClosureExpr *ce) {
+void SILGenFunction::emitClosure(AutoClosureExpr *ce) {
   Type resultTy = ce->getType()->castTo<FunctionType>()->getResult();
   emitProlog(ce, ce->getParamPatterns(), resultTy);
   prepareEpilog(resultTy, CleanupLocation(ce));

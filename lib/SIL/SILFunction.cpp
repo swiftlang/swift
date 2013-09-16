@@ -47,23 +47,7 @@ void SILFunction::setDeclContext(Decl *D) {
 }
 
 void SILFunction::setDeclContext(Expr *E) {
-  if (!E) {
-    DeclCtx = nullptr;
-    return;
-  }
-
-  switch (E->getKind()) {
-  case ExprKind::PipeClosure:
-    DeclCtx = dyn_cast<PipeClosureExpr>(E);
-    return;
-
-  case ExprKind::ImplicitClosure:
-    DeclCtx = dyn_cast<ImplicitClosureExpr>(E);
-    return;
-
-  default:
-    DeclCtx = nullptr;
-  }
+  DeclCtx = dyn_cast_or_null<AbstractClosureExpr>(E);
 }
 
 ASTContext &SILFunction::getASTContext() const {

@@ -406,7 +406,7 @@ void SILGenModule::emitClosure(PipeClosureExpr *ce) {
   postEmitFunction(constant, f);
 }
 
-void SILGenModule::emitClosure(ImplicitClosureExpr *ce) {
+void SILGenModule::emitClosure(AutoClosureExpr *ce) {
   SILDeclRef constant(ce);
   SILFunction *f = preEmitFunction(constant, ce, ce);
   SILGenFunction(*this, *f).emitClosure(ce);

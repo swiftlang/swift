@@ -145,7 +145,7 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::ExistentialSubscript:
   case ExprKind::FunctionConversion:
   case ExprKind::If:
-  case ExprKind::ImplicitClosure:
+  case ExprKind::AutoClosure:
   case ExprKind::Load:
   case ExprKind::Materialize:
   case ExprKind::MetatypeConversion:

@@ -322,7 +322,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
 
-  Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
+  Expr *visitAutoClosureExpr(AutoClosureExpr *E) {
     if (Expr *E2 = doIt(E->getSingleExpressionBody())) {
       E->setBody(E2);
       return E;

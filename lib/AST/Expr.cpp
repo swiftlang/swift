@@ -325,17 +325,17 @@ void PipeClosureExpr::setSingleExpressionBody(Expr *newBody) {
     ->setResult(newBody);
 }
 
-SourceRange ImplicitClosureExpr::getSourceRange() const {
+SourceRange AutoClosureExpr::getSourceRange() const {
   return Body->getSourceRange();
 }
 
-void ImplicitClosureExpr::setBody(Expr *E) {
+void AutoClosureExpr::setBody(Expr *E) {
   auto &Context = getASTContext();
   auto *RS = new (Context) ReturnStmt(SourceLoc(), E);
   Body = BraceStmt::create(Context, E->getStartLoc(), { RS }, E->getEndLoc());
 }
 
-Expr *ImplicitClosureExpr::getSingleExpressionBody() const {
+Expr *AutoClosureExpr::getSingleExpressionBody() const {
   return cast<ReturnStmt>(Body->getElements()[0].get<Stmt *>())->getResult();
 }
 

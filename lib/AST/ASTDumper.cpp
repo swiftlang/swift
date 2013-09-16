@@ -583,7 +583,7 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     auto *ACE = cast<AbstractClosureExpr>(dc);
     if (isa<PipeClosureExpr>(ACE))
       os << "pipe closure";
-    if (isa<ImplicitClosureExpr>(ACE))
+    if (isa<AutoClosureExpr>(ACE))
       os << "auto_closure";
     break;
   }
@@ -1174,8 +1174,8 @@ public:
       printRec(expr->getBody());
     OS << ')';
   }
-  void visitImplicitClosureExpr(ImplicitClosureExpr *E) {
-    printClosure(E, "implicit_closure_expr") << '\n';
+  void visitAutoClosureExpr(AutoClosureExpr *E) {
+    printClosure(E, "auto_closure_expr") << '\n';
     printRec(E->getSingleExpressionBody());
     OS << ')';
   }

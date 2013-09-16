@@ -123,9 +123,9 @@ public:
   /// \brief Generates code for the given closure expression and adds the 
   /// SILFunction to the current SILModule under the nane SILDeclRef(ce).
   void emitClosure(PipeClosureExpr *ce);
-  /// \brief Generates code for the given ImplicitClosureExpr and adds the
+  /// \brief Generates code for the given AutoClosureExpr and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
-  void emitClosure(ImplicitClosureExpr *ce);
+  void emitClosure(AutoClosureExpr *ce);
   /// Generates code for the given ConstructorDecl and adds
   /// the SILFunction to the current SILModule under the name SILDeclRef(decl).
   void emitConstructor(ConstructorDecl *decl);
@@ -449,9 +449,9 @@ public:
   void emitFunction(FuncDecl *fd);
   /// \brief Emits code for a PipeClosureExpr.
   void emitClosure(PipeClosureExpr *ce);
-  /// \brief Generates code for an ImplicitClosureExpr. This is akin
-  /// to visiting the body as if wrapped in a ReturnStmt.
-  void emitClosure(ImplicitClosureExpr *ce);
+  /// \brief Generates code for an AutoClosureExpr.  This is akin to visiting
+  /// the body as if wrapped in a ReturnStmt.
+  void emitClosure(AutoClosureExpr *ce);
   /// emitDestructor - Generates code for a class destroying destructor. This
   /// emits the body code from the DestructorDecl (if any),
   /// implicitly releases the elements of the class, and calls the base

@@ -720,7 +720,7 @@ namespace {
       return funcTy;
     }
 
-    Type visitImplicitClosureExpr(ImplicitClosureExpr *expr) {
+    Type visitAutoClosureExpr(AutoClosureExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
