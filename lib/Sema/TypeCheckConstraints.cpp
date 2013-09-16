@@ -2424,6 +2424,13 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         isa<FuncDecl>(result) && !result->isInstanceMember())
       continue;
 
+    // If we're doing dynamic lookup into a metatype of DynamicLookup and we've
+    // found an instance member, ignore it.
+    if (isDynamicLookup && isMetatype && result->isInstanceMember()) {
+      // FIXME: Mark as 'unavailable' somehow.
+      continue;
+    }
+
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.
     if (isDynamicLookup && result->getDeclContext()->isTypeContext()) {
