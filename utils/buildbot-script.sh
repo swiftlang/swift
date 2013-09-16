@@ -155,14 +155,14 @@ if [ \! "$SKIP_TEST_SWIFT" ]; then
 fi
 
 # Run the Swift performance tests.
-if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
+if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ] && false; then
   echo "--- Running Swift Performance Tests ---"
   export SWIFT="$WORKSPACE/swift/build/bin/swift"
   (cd "$WORKSPACE/swift/build" &&
     "$WORKSPACE/llvm/build/bin/llvm-lit" -v benchmark \
         -j1 --output benchmark/results.json) || exit 1
   echo "--- Submitting Swift Performance Tests ---"
-  swift_source_revision=$("$WORKSPACE/llvm/utils/GetSourceVersion" "$WORKSPACE/swift")
+  swift_source_revision="$("$WORKSPACE/llvm/utils/GetSourceVersion" "$WORKSPACE/swift")"
   (cd "$WORKSPACE/swift/build" &&
     "$WORKSPACE/swift/utils/submit-benchmark-results" benchmark/results.json \
         --output benchmark/lnt_results.json \
