@@ -516,6 +516,12 @@ namespace {
     void verifyChecked(DynamicMemberRefExpr *E) {
       // The base type must be DynamicLookup.
       auto baseTy = E->getBase()->getType();
+
+      // The base might be a metatype of DynamicLookup.
+      if (auto baseMetaTy = baseTy->getAs<MetaTypeType>()) {
+        baseTy = baseMetaTy->getInstanceType();
+      }
+
       auto baseProtoTy = baseTy->getAs<ProtocolType>();
       if (!baseProtoTy ||
           !baseProtoTy->getDecl()->isSpecificProtocol(

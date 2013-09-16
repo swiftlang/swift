@@ -885,8 +885,20 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // Skip the 'self' argument if it's already been bound by the base.
   if (auto func = dyn_cast<FuncDecl>(value)) {
-    if (func->isStatic() || isInstance)
+    if (func->isStatic() || isInstance) {
       type = type->castTo<AnyFunctionType>()->getResult();
+    } else if (isDynamicResult) {
+      // For a dynamic result referring to an instance function through
+      // an object of metatype type, replace the 'Self' parameter with
+      // a DynamicLookup member.
+      auto funcTy = type->castTo<AnyFunctionType>();
+      Type resultTy = funcTy->getResult();
+      Type inputTy = TC.getProtocol(SourceLoc(),
+                                    KnownProtocolKind::DynamicLookup)
+                       ->getDeclaredTypeOfContext();
+      type = FunctionType::get(inputTy, resultTy, funcTy->getExtInfo(),
+                               TC.Context);
+    }
   } else if (isa<ConstructorDecl>(value) || isa<UnionElementDecl>(value)) {
     type = type->castTo<AnyFunctionType>()->getResult();
   }

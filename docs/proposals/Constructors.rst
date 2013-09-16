@@ -565,7 +565,7 @@ since we need to know which Objective-C initializers are guaranteed to
 initialize those instance variables not written in Swift.
 
 This choice makes interoperability with Objective-C easier (since
-we're adoptinh Objective-C's model), but it makes safety either harder
+we're adopting Objective-C's model), but it makes safety either harder
 (e.g., we have to make all of our methods guard against uninitialized
 instance variables) or more onerous (requiring initializers on the
 declarations of all instance variables).

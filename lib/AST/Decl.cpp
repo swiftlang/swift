@@ -347,8 +347,9 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (getDeclContext()->isGenericContext())
     return false;
 
+  // Dynamic lookup can find functions, variables, and subscripts.
   if (isa<FuncDecl>(this) || isa<VarDecl>(this) || isa<SubscriptDecl>(this))
-    return isInstanceMember();
+    return true;
 
   return false;
 }
