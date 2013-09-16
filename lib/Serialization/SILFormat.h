@@ -27,6 +27,8 @@ using ValueID = DeclID;
 using ValueIDField = DeclIDField;
 
 using SILInstOpCodeField = BCFixed<8>;
+using SILTypeCategoryField = BCFixed<2>;
+using SILValueResultField = BCFixed<8>;
 
 /// The record types within the "sil" block.
 ///
@@ -79,15 +81,19 @@ namespace sil_block {
     SIL_ONE_VALUE_ONE_OPERAND,
     SILInstOpCodeField,
     ValueIDField,
+    SILValueResultField,
     TypeIDField,
-    ValueIDField
+    SILTypeCategoryField,
+    ValueIDField,
+    SILValueResultField
   >;
 
   // SIL instructions with one type. (alloc_stack)
   using SILOneTypeLayout = BCRecordLayout<
     SIL_ONE_TYPE,
     SILInstOpCodeField,
-    TypeIDField
+    TypeIDField,
+    SILTypeCategoryField
   >;
 
   // SIL instructions with one typed valueref. (dealloc_stack, return)
@@ -95,7 +101,9 @@ namespace sil_block {
     SIL_ONE_OPERAND,
     SILInstOpCodeField,
     TypeIDField,
-    ValueIDField
+    SILTypeCategoryField,
+    ValueIDField,
+    SILValueResultField
   >;
 }
 

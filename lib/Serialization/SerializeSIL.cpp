@@ -20,6 +20,7 @@
 #include "clang/Basic/OnDiskHashTable.h"
 
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 using namespace swift::serialization;
@@ -114,7 +115,7 @@ SILSerializer::SILSerializer(Serializer &S, ASTContext &Ctx,
                             S(S), Ctx(Ctx), Out(Out), FuncID(1) {
 }
 
-/// We enumerate all valus to update ValueIDs in a separate pass
+/// We enumerate all values to update ValueIDs in a separate pass
 /// to correctly handle forward reference of a value.
 ValueID SILSerializer::addValueRef(const ValueBase *Val) {
   if (!Val)
@@ -129,6 +130,9 @@ ValueID SILSerializer::addValueRef(const ValueBase *Val) {
 }
 
 void SILSerializer::writeSILFunction(const SILFunction &F) {
+  DEBUG(llvm::dbgs() << "Serialize SIL:\n";
+        F.dump());
+  LastValueID = 0;
   FuncTable[Ctx.getIdentifier(F.getName())] = FuncID++;
   Funcs.push_back(Out.GetCurrentBitNo());
   InstID = 0;
@@ -165,31 +169,47 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                   (unsigned)SI.getKind());
     break;
   }
+  // The following SIL instructions has a single type.
+  case ValueKind::AllocBoxInst: {
+    const AllocBoxInst *ABI = cast<AllocBoxInst>(&SI);
+    unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
+    SILOneTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                      (unsigned)SI.getKind(),
+                      S.addTypeRef(ABI->getElementType().getSwiftRValueType()),
+                      (unsigned)ABI->getElementType().getCategory());
+    break;
+  }
   case ValueKind::AllocStackInst: {
     const AllocStackInst *ASI = cast<AllocStackInst>(&SI);
     unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
     SILOneTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                        (unsigned)SI.getKind(),
-                        S.addTypeRef(ASI->getElementType().getSwiftType()));
+                      (unsigned)SI.getKind(),
+                      S.addTypeRef(ASI->getElementType().getSwiftRValueType()),
+                      (unsigned)ASI->getElementType().getCategory());
     break;
   }
-  // One operand 
+  // The following SIL instructions has a single operand.
   case ValueKind::DeallocStackInst:
   case ValueKind::ReturnInst: {
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                       (unsigned)SI.getKind(),
-                       S.addTypeRef(SI.getOperand(0).getType().getSwiftType()),
-                       addValueRef(SI.getOperand(0)));
+                 (unsigned)SI.getKind(),
+                 S.addTypeRef(SI.getOperand(0).getType().getSwiftRValueType()),
+                 (unsigned)SI.getOperand(0).getType().getCategory(),
+                 addValueRef(SI.getOperand(0)),
+                 SI.getOperand(0).getResultNumber());
     break;
   }
   case ValueKind::StoreInst: {
     const StoreInst *StI = cast<StoreInst>(&SI);
     unsigned abbrCode = SILAbbrCodes[SILOneValueOneOperandLayout::Code];
     SILOneValueOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                       (unsigned)SI.getKind(), addValueRef(StI->getSrc()),
-                       S.addTypeRef(StI->getDest().getType().getSwiftType()),
-                       addValueRef(StI->getDest()));
+                  (unsigned)SI.getKind(), addValueRef(StI->getSrc()),
+                  StI->getSrc().getResultNumber(),
+                  S.addTypeRef(StI->getDest().getType().getSwiftRValueType()),
+                  (unsigned)StI->getDest().getType().getCategory(),
+                  addValueRef(StI->getDest()),
+                  StI->getDest().getResultNumber());
     break;
   }
   }

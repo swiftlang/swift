@@ -11,7 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "ModuleFile.h"
+#include "SILFormat.h"
 #include "swift/SIL/SILModule.h"
+
+#include "llvm/ADT/DenseMap.h"
 
 // This template should eventually move to llvm/Support.
 namespace clang {
@@ -33,13 +36,30 @@ namespace swift {
     std::unique_ptr<SerializedFuncTable> FuncTable;
 
     std::vector<ModuleFile::Serialized<SILFunction*>> Funcs;
+    /// Data structures used to perform name lookup for local values.
+    llvm::DenseMap<uint32_t, ValueBase*> LocalValues;
+    serialization::ValueID LastValueID = 0;
 
-    SILFunction *readSILFunction(serialization::DeclID);
-    void readSILBasicBlock(SILFunction *F);
-    void readSILInstruction(SILBasicBlock *BB);
+    /// Read a SIL function.
+    SILFunction *readSILFunction(serialization::DeclID, Identifier name);
+    /// Read a SIL basic block within a given SIL function.
+    SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
+                                     SmallVectorImpl<uint64_t> &scratch);
+    /// Read a SIL instruction within a given SIL basic block.
+    bool readSILInstruction(SILBasicBlock *BB,
+                            unsigned RecordKind,
+                            SmallVectorImpl<uint64_t> &scratch);
 
+    /// Read the SIL function table.
     std::unique_ptr<SerializedFuncTable>
     readFuncTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+    /// When an instruction or block argument is defined, this method is used to
+    /// register it and update our symbol table.
+    void setLocalValue(ValueBase *Value, serialization::ValueID Id);
+    /// Get a reference to a local value with the specified ID and type.
+    SILValue getLocalValue(serialization::ValueID Id, unsigned ResultNum,
+                           SILType Type);
 
 public:
     SILFunction *lookupSILFunction(Identifier name);
