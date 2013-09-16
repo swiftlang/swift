@@ -25,12 +25,6 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
-// FIXME: This is gross but temporary.
-#include "llvm/Support/CommandLine.h"
-llvm::cl::opt<bool> TLDefiniteInit("enable-top-level-definite-init",
-                                   llvm::cl::Hidden, llvm::cl::init(true));
-
-
 /// \brief Describes the kind of implicit constructor that will be
 /// generated.
 enum class ImplicitConstructorKind {
