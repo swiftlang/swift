@@ -80,8 +80,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
             return dc->getDeclaredTypeInContext();
           continue;
 
-        case DeclContextKind::PipeClosureExpr:
-        case DeclContextKind::ClosureExpr:
+        case DeclContextKind::AbstractClosureExpr:
         case DeclContextKind::AbstractFunctionDecl:
           continue;
         }

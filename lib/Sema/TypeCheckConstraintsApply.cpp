@@ -2277,7 +2277,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       expr = coerceToType(expr, toFunc->getResult(),
                           locator.withPathElement(ConstraintLocator::Load));
 
-      auto ice = new (tc.Context) ImplicitClosureExpr(expr, dc, toType);
+      auto ice = new (tc.Context) ImplicitClosureExpr(expr, toType, dc);
       Pattern *pattern = TuplePattern::create(tc.Context, expr->getLoc(),
                                               ArrayRef<TuplePatternElt>(),
                                               expr->getLoc());

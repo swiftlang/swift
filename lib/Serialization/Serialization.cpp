@@ -98,8 +98,7 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
     if (isa<TranslationUnit>(DC))
       return nullptr; // FIXME: multiple TUs within a module?
     llvm_unreachable("builtins & serialized modules should be handled");
-  case DeclContextKind::PipeClosureExpr:
-  case DeclContextKind::ClosureExpr:
+  case DeclContextKind::AbstractClosureExpr:
     // FIXME: What about default functions?
     llvm_unreachable("shouldn't serialize decls from anonymous closures");
   case DeclContextKind::NominalTypeDecl:

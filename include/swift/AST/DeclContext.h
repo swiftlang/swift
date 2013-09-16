@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the DeclContext class.  A DeclContext is the semantic
-// construct that a declaration belongs to, such as the enclosing ClosureExpr
-// or declaration.
+// construct that a declaration belongs to, such as the enclosing
+// AbstractClosureExpr or declaration.
 //
 //===----------------------------------------------------------------------===//
 
@@ -52,8 +52,7 @@ namespace swift {
 // allows for range checks in classof.
 enum class DeclContextKind : uint8_t {
   Module,
-  PipeClosureExpr,
-  ClosureExpr,
+  AbstractClosureExpr,
   NominalTypeDecl,
   ExtensionDecl,
   TopLevelCodeDecl,
@@ -100,8 +99,7 @@ public:
   /// code block.  A context that appears in such a scope, like a
   /// local type declaration, does not itself become a local context.
   bool isLocalContext() const {
-    return getContextKind() == DeclContextKind::PipeClosureExpr ||
-           getContextKind() == DeclContextKind::ClosureExpr ||
+    return getContextKind() == DeclContextKind::AbstractClosureExpr ||
            getContextKind() == DeclContextKind::TopLevelCodeDecl ||
            getContextKind() == DeclContextKind::AbstractFunctionDecl;
   }

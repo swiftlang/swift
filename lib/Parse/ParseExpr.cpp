@@ -1366,7 +1366,8 @@ Expr *Parser::parseExprAnonClosureArg() {
 
   // If this is a closure expression that did not have any named parameters,
   // generate the anonymous variables we need.
-  auto closure = dyn_cast<PipeClosureExpr>(CurDeclContext);
+  auto closure = dyn_cast_or_null<PipeClosureExpr>(
+      dyn_cast<AbstractClosureExpr>(CurDeclContext));
   if (!closure || closure->getParams()) {
     // FIXME: specialize diagnostic when there were closure parameters.
     // We can be fairly smart here.

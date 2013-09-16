@@ -362,8 +362,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   /// \returns true on success, false on failure.
   bool typecheckContext() {
     // Type check the function that contains the expression.
-    if (CurDeclContext->getContextKind() == DeclContextKind::PipeClosureExpr ||
-        CurDeclContext->getContextKind() == DeclContextKind::ClosureExpr ||
+    if (CurDeclContext->getContextKind() ==
+            DeclContextKind::AbstractClosureExpr ||
         CurDeclContext->getContextKind() ==
             DeclContextKind::AbstractFunctionDecl) {
       SourceLoc EndTypeCheckLoc =

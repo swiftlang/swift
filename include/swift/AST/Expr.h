@@ -1612,12 +1612,13 @@ public:
 };
 
 /// \brief A base class for closure expressions.
-class AbstractClosureExpr : public Expr {
+class AbstractClosureExpr : public Expr, public DeclContext {
   CaptureInfo Captures;
 
 public:
-  AbstractClosureExpr(ExprKind Kind, Type FnType)
-      : Expr(Kind, FnType)
+  AbstractClosureExpr(ExprKind Kind, Type FnType, DeclContext *Parent)
+      : Expr(Kind, FnType),
+        DeclContext(DeclContextKind::AbstractClosureExpr, Parent)
   {}
 
   CaptureInfo &getCaptureInfo() { return Captures; }
@@ -1627,12 +1628,18 @@ public:
     return E->getKind() >= ExprKind::First_AbstractClosureExpr &&
            E->getKind() <= ExprKind::Last_AbstractClosureExpr;
   }
+
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::AbstractClosureExpr;
+  }
+
+  using DeclContext::operator new;
 };
 
 /// An explicit unnamed func definition, which can optionally
 /// have named arguments.
 ///    e.g.  func(a : int) -> int { return a+1 }
-class PipeClosureExpr : public AbstractClosureExpr, public DeclContext {
+class PipeClosureExpr : public AbstractClosureExpr {
   /// \brief The set of parameters, along with a bit indicating when these
   /// parameters were synthesized from anonymous closure variables.
   llvm::PointerIntPair<Pattern *, 1, bool> params;
@@ -1650,9 +1657,8 @@ class PipeClosureExpr : public AbstractClosureExpr, public DeclContext {
   
 public:
   PipeClosureExpr(Pattern *params, SourceLoc arrowLoc,
-                  TypeLoc explicitResultType, DeclContext *parent)
-    : AbstractClosureExpr(ExprKind::PipeClosure, Type()),
-      DeclContext(DeclContextKind::PipeClosureExpr, parent),
+                  TypeLoc explicitResultType, DeclContext *Parent)
+    : AbstractClosureExpr(ExprKind::PipeClosure, Type(), Parent),
       params(params, false), arrowLoc(arrowLoc),
       explicitResultType(explicitResultType), body(nullptr) { }
 
@@ -1738,14 +1744,6 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::PipeClosure;
   }
-  static bool classof(const AbstractClosureExpr *E) {
-    return classof(cast<Expr>(E));
-  }
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::PipeClosureExpr;
-  }
-
-  using DeclContext::operator new;
 };
 
 /// \brief This is a closure of the contained subexpression that is formed
@@ -1754,14 +1752,13 @@ public:
 /// \code
 ///   var x : [auto_closure] () -> int = 4
 /// \endcode
-class ImplicitClosureExpr : public AbstractClosureExpr, public DeclContext {
+class ImplicitClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
   Pattern *ParamPattern;
 
 public:
-  ImplicitClosureExpr(Expr *Body, DeclContext *Parent, Type ResultTy)
-      : AbstractClosureExpr(ExprKind::ImplicitClosure, ResultTy),
-        DeclContext(DeclContextKind::ClosureExpr, Parent),
+  ImplicitClosureExpr(Expr *Body, Type ResultTy, DeclContext *Parent)
+      : AbstractClosureExpr(ExprKind::ImplicitClosure, ResultTy, Parent),
         ParamPattern(nullptr) {
     setBody(Body);
   }
@@ -1788,11 +1785,6 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ImplicitClosure;
   }
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::ClosureExpr;
-  }
-
-  using DeclContext::operator new;
 };
 
 /// NewArrayExpr - The allocation of an array.  Allocates and constructs

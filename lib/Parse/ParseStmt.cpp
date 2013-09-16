@@ -160,7 +160,7 @@ static void unwrapIfDiscardedClosure(Parser &P,
   //
   // Instead, recover by unwrapping the BraceStmt that is contained inside.
 
-  if (isa<PipeClosureExpr>(P.CurDeclContext))
+  if (isa<AbstractClosureExpr>(P.CurDeclContext))
     // Inside a closure expression, an expression which syntactically looks
     // like a discarded value expression, can become the return value of the
     // closure.  Don't attempt recovery.

@@ -327,18 +327,20 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
       // Look in the generic parameters after checking our local declaration.
       GenericParams = AFD->getGenericParams();
-    } else if (PipeClosureExpr *CE = dyn_cast<PipeClosureExpr>(DC)) {
+    } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC)) {
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       if (Loc.isValid()) {
-        FindLocalVal localVal(SM, Loc, Name);
-        localVal.visit(CE->getBody());
-        if (!localVal.MatchingValue) {
-          localVal.checkPattern(CE->getParams());
-        }
-        if (localVal.MatchingValue) {
-          Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
-          return;
+        if (auto *CE = dyn_cast<PipeClosureExpr>(ACE)) {
+          FindLocalVal localVal(SM, Loc, Name);
+          localVal.visit(CE->getBody());
+          if (!localVal.MatchingValue) {
+            localVal.checkPattern(CE->getParams());
+          }
+          if (localVal.MatchingValue) {
+            Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+            return;
+          }
         }
       }
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {

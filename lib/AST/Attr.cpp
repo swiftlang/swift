@@ -66,8 +66,7 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
       assert(0 && "All cases should be covered");
 
     // Local declarations are always inherently fragile.
-    case DeclContextKind::PipeClosureExpr:
-    case DeclContextKind::ClosureExpr:
+    case DeclContextKind::AbstractClosureExpr:
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
       return Resilience::InherentlyFragile;

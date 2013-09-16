@@ -579,13 +579,14 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     printName(os, cast<Module>(dc)->Name);
     break;
 
-  case DeclContextKind::PipeClosureExpr:
-    os << "pipe closure";
+  case DeclContextKind::AbstractClosureExpr: {
+    auto *ACE = cast<AbstractClosureExpr>(dc);
+    if (isa<PipeClosureExpr>(ACE))
+      os << "pipe closure";
+    if (isa<ImplicitClosureExpr>(ACE))
+      os << "auto_closure";
     break;
-
-  case DeclContextKind::ClosureExpr:
-    os << "closure";
-    break;
+  }
 
   case DeclContextKind::NominalTypeDecl:
     printName(os, cast<NominalTypeDecl>(dc)->getName());
@@ -606,7 +607,7 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::AbstractFunctionDecl: {
-    auto *AFD = dyn_cast<AbstractFunctionDecl>(dc);
+    auto *AFD = cast<AbstractFunctionDecl>(dc);
     if (isa<FuncDecl>(AFD))
       os << "func decl";
     if (isa<ConstructorDecl>(AFD))

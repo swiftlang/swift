@@ -225,8 +225,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
   }
 
-  case DeclContextKind::PipeClosureExpr:
-  case DeclContextKind::ClosureExpr:
+  case DeclContextKind::AbstractClosureExpr:
     llvm_unreachable("unnamed closure mangling not yet implemented");
 
   case DeclContextKind::AbstractFunctionDecl: {

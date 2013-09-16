@@ -33,8 +33,7 @@ ASTContext &DeclContext::getASTContext() {
 Type DeclContext::getDeclaredTypeOfContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:
-  case DeclContextKind::PipeClosureExpr:
-  case DeclContextKind::ClosureExpr:
+  case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
     return Type();
@@ -52,8 +51,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
 Type DeclContext::getDeclaredTypeInContext() {
   switch (getContextKind()) {
   case DeclContextKind::Module:
-  case DeclContextKind::PipeClosureExpr:
-  case DeclContextKind::ClosureExpr:
+  case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
     return Type();
@@ -72,8 +70,7 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
     case DeclContextKind::TopLevelCodeDecl:
       return nullptr;
 
-    case DeclContextKind::PipeClosureExpr:
-    case DeclContextKind::ClosureExpr:
+    case DeclContextKind::AbstractClosureExpr:
       return nullptr;
 
     case DeclContextKind::AbstractFunctionDecl: {
@@ -123,8 +120,7 @@ bool DeclContext::isGenericContext() const {
     case DeclContextKind::Module:
       return false;
 
-    case DeclContextKind::PipeClosureExpr:
-    case DeclContextKind::ClosureExpr:
+    case DeclContextKind::AbstractClosureExpr:
       // Check parent context.
       break;
 
@@ -157,8 +153,9 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   const char *Kind;
   switch (getContextKind()) {
   case DeclContextKind::Module:           Kind = "Module"; break;
-  case DeclContextKind::PipeClosureExpr:  Kind = "PipeClosureExpr"; break;
-  case DeclContextKind::ClosureExpr:      Kind = "ClosureExpr"; break;
+  case DeclContextKind::AbstractClosureExpr:
+    Kind = "AbstractClosureExpr";
+    break;
   case DeclContextKind::NominalTypeDecl:  Kind = "NominalTypeDecl"; break;
   case DeclContextKind::ExtensionDecl:    Kind = "ExtensionDecl"; break;
   case DeclContextKind::TopLevelCodeDecl: Kind = "TopLevelCodeDecl"; break;
@@ -171,10 +168,7 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     OS << " decl=" << NTD->getName();
 
-  if (auto *CE = dyn_cast<PipeClosureExpr>(this)) {
-    OS << ": " << CE->getType().getString();
-  }
-  if (auto *CE = dyn_cast<ImplicitClosureExpr>(this)) {
+  if (auto *CE = dyn_cast<AbstractClosureExpr>(this)) {
     OS << ": " << CE->getType().getString();
   }
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(this)) {
