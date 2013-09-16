@@ -818,6 +818,17 @@ private:
   }
 
   NodePointer demangleProtocolName() {
+    NodePointer proto = demangleProtocolNameImpl();
+    if (proto)
+    {
+      NodePointer type = Node::makeNodePointer(Node::Kind::Type);
+      type->push_back_child(proto);
+      return type;
+    }
+    return nullptr;
+  }
+  
+  NodePointer demangleProtocolNameImpl() {
     if (Mangled.nextIf('S')) {
       Substitution sub = demangleSubstitutionIndexWithProtocol();
       if (!sub.first)
@@ -928,18 +939,20 @@ private:
 
   NodePointer demangleProtocolList() {
     NodePointer proto_list = Node::makeNodePointer(Node::Kind::ProtocolList);
+    NodePointer type_list = Node::makeNodePointer(Node::Kind::TypeList);
+    proto_list->push_back_child(type_list);
     if (Mangled.nextIf('_')) {
       return proto_list;
     }
     NodePointer proto = demangleProtocolName();
     if (!proto)
       return nullptr;
-    proto_list->push_back_child(proto);
+    type_list->push_back_child(proto);
     while (Mangled.nextIf('_') == false) {
       proto = demangleProtocolName();
       if (!proto)
         return nullptr;
-      proto_list->push_back_child(proto);
+      type_list->push_back_child(proto);
     }
     return proto_list;
   }
@@ -1860,13 +1873,15 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       printer << ".Self";
       break;
     case swift::Demangle::Node::Kind::ProtocolList: {
-      if (pointer->size() == 1) {
-        toString(pointer->child_at(0), printer);
+      NodePointer type_list = pointer->child_at(0);
+      if (!type_list)
         break;
-      }
-      printer << "protocol<";
-      toStringChildren(pointer, printer, ", ");
-      printer << ">";
+      bool needs_proto_marker = (type_list->size() != 1);
+      if (needs_proto_marker)
+        printer << "protocol<";
+      toStringChildren(type_list, printer, ", ");
+      if (needs_proto_marker)
+        printer << ">";
       break;
     }
     case swift::Demangle::Node::Kind::ArchetypeList: {
@@ -1921,9 +1936,11 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       toString(child2, printer);
       break;
     }
+    case swift::Demangle::Node::Kind::TypeList:
+        toStringChildren(pointer, printer);
+        break;
     case swift::Demangle::Node::Kind::Substitution:
     case swift::Demangle::Node::Kind::TypeName:
-    case swift::Demangle::Node::Kind::TypeList:
     case swift::Demangle::Node::Kind::ArchetypeAndProtocol: {
       NodePointer child0 = pointer->child_at(0);
       NodePointer child1 = pointer->child_at(1);
