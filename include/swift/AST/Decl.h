@@ -2840,11 +2840,6 @@ inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
   }
 }
 
-/// A convenience typedef for FuncExpr-like-things, including FuncExprs,
-/// constructors, and destructors.
-using FuncExprLike =
-  llvm::PointerUnion<AbstractFunctionDecl *, PipeClosureExpr *>;
-
 } // end namespace swift
 
 #endif

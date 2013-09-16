@@ -16,6 +16,7 @@
 
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "swift/Basic/Optional.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
@@ -42,7 +43,7 @@ public:
 
   /// \brief This is the current function or closure being checked.
   /// This is null for top level code.
-  FuncExprLike TheFunc;
+  Optional<AnyFunctionRef> TheFunc;
   
   /// DC - This is the current DeclContext.
   DeclContext *DC;
@@ -128,25 +129,14 @@ public:
   //===--------------------------------------------------------------------===//
 
   Stmt *visitBraceStmt(BraceStmt *BS);
-  
-  Type returnTypeOfFunc() {
-    if (auto AFD = TheFunc.dyn_cast<AbstractFunctionDecl *>()) {
-      if (auto *FD = dyn_cast<FuncDecl>(AFD))
-        return FD->getBodyResultType();
-    }
-    if (auto closure = TheFunc.dyn_cast<PipeClosureExpr *>()) {
-      return closure->getResultType();
-    }
-    return TupleType::getEmpty(TC.Context);
-  }
-  
+
   Stmt *visitReturnStmt(ReturnStmt *RS) {
-    if (TheFunc.isNull()) {
+    if (!TheFunc.hasValue()) {
       TC.diagnose(RS->getReturnLoc(), diag::return_invalid_outside_func);
       return 0;
     }
 
-    Type ResultTy = returnTypeOfFunc();
+    Type ResultTy = TheFunc->getBodyResultType();
     if (ResultTy->is<ErrorType>())
       return 0;
 

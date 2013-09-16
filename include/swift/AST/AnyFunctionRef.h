@@ -42,6 +42,15 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getType();
   }
 
+  Type getBodyResultType() {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      if (auto *FD = dyn_cast<FuncDecl>(AFD))
+        return FD->getBodyResultType();
+      return TupleType::getEmpty(AFD->getASTContext());
+    }
+    return TheFunction.get<AbstractClosureExpr *>()->getResultType();
+  }
+
   BraceStmt *getBody() {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getBody();
