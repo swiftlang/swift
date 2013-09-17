@@ -561,8 +561,8 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     auto boundType = cast<BoundGenericType>(type);
     Buffer << 'G';
     mangleNominalType(boundType->getDecl(), explosion);
-    for (auto arg : boundType->getGenericArgs()) {
-      mangleType(CanType(arg), ExplosionKind::Minimal, /*uncurry*/ 0);
+    for (auto arg : boundType.getGenericArgs()) {
+      mangleType(arg, ExplosionKind::Minimal, /*uncurry*/ 0);
     }
     Buffer << '_';
     return;

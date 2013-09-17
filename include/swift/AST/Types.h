@@ -22,6 +22,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -659,83 +660,17 @@ public:
   }
 };
 
-/// An adapter for iterating over a range of the elements of a tuple
-/// type and returning their types.
-class TupleEltTypeArrayRef {
-  ArrayRef<TupleTypeElt> Array;
-public:
-  TupleEltTypeArrayRef(ArrayRef<TupleTypeElt> array) : Array(array) {}
+inline Type getTupleEltType(const TupleTypeElt &elt) {
+  return elt.getType();
+}
+typedef ArrayRefView<TupleTypeElt,Type,getTupleEltType> TupleEltTypeArrayRef;
 
-  class iterator {
-    friend class TupleEltTypeArrayRef;
-    const TupleTypeElt *Ptr;
-    iterator(const TupleTypeElt *ptr) : Ptr(ptr) {}
-  public:
-    Type operator*() const { return Ptr->getType(); }
-    iterator &operator++() { Ptr++; return *this; }
-    iterator operator++(int) { return iterator(Ptr++); }
-    bool operator==(iterator rhs) { return Ptr == rhs.Ptr; }
-    bool operator!=(iterator rhs) { return Ptr != rhs.Ptr; }
-  };
-  iterator begin() const { return iterator(Array.begin()); }
-  iterator end() const { return iterator(Array.end()); }
+inline CanType getCanTupleEltType(const TupleTypeElt &elt) {
+  return CanType(elt.getType());
+}
+typedef ArrayRefView<TupleTypeElt,CanType,getCanTupleEltType>
+  CanTupleEltTypeArrayRef;
 
-  bool empty() const { return Array.empty(); }
-  size_t size() const { return Array.size(); }
-  Type operator[](unsigned i) const { return Array[i].getType(); }
-  Type front() const { return Array.front().getType(); }
-  Type back() const { return Array.back().getType(); }
-
-  TupleEltTypeArrayRef slice(unsigned start) const {
-    return TupleEltTypeArrayRef(Array.slice(start));
-  }
-  TupleEltTypeArrayRef slice(unsigned start, unsigned length) const {
-    return TupleEltTypeArrayRef(Array.slice(start, length));
-  }
-};
-
-/// An adapter for iterating over a range of the elements of a
-/// canonical tuple type and returning their types.
-///
-/// This class just assumes that it's given the elements of a
-/// canonical type.
-class CanTupleEltTypeArrayRef {
-  ArrayRef<TupleTypeElt> Array;
-public:
-  CanTupleEltTypeArrayRef(ArrayRef<TupleTypeElt> array) : Array(array) {}
-
-  class iterator {
-    friend class CanTupleEltTypeArrayRef;
-    const TupleTypeElt *Ptr;
-    iterator(const TupleTypeElt *ptr) : Ptr(ptr) {}
-  public:
-    CanType operator*() const { return CanType(Ptr->getType()); }
-    iterator &operator++() { Ptr++; return *this; }
-    iterator operator++(int) { return iterator(Ptr++); }
-    bool operator==(iterator rhs) { return Ptr == rhs.Ptr; }
-    bool operator!=(iterator rhs) { return Ptr != rhs.Ptr; }
-  };
-  iterator begin() const { return iterator(Array.begin()); }
-  iterator end() const { return iterator(Array.end()); }
-
-  bool empty() const { return Array.empty(); }
-  size_t size() const { return Array.size(); }
-  CanType operator[](unsigned i) const { return CanType(Array[i].getType()); }
-  CanType front() const { return CanType(Array.front().getType()); }
-  CanType back() const { return CanType(Array.back().getType()); }
-
-  CanTupleEltTypeArrayRef slice(unsigned start) const {
-    return CanTupleEltTypeArrayRef(Array.slice(start));
-  }
-  CanTupleEltTypeArrayRef slice(unsigned start, unsigned length) const {
-    return CanTupleEltTypeArrayRef(Array.slice(start, length));
-  }
-
-  operator TupleEltTypeArrayRef() const {
-    return TupleEltTypeArrayRef(Array);
-  }
-};
-  
 /// TupleType - A tuple is a parenthesized list of types where each name has an
 /// optional name.
 ///
@@ -855,6 +790,9 @@ BEGIN_CAN_TYPE_WRAPPER(UnboundGenericType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
 END_CAN_TYPE_WRAPPER(UnboundGenericType, Type)
 
+inline CanType getAsCanType(const Type &type) { return CanType(type); }
+typedef ArrayRefView<Type,CanType,getAsCanType> CanTypeArrayRef;
+
 /// BoundGenericType - An abstract class for applying a generic
 /// nominal type to the given type arguments.
 class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
@@ -919,7 +857,9 @@ public:
 };
 BEGIN_CAN_TYPE_WRAPPER(BoundGenericType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
-  // Unfortunately, proxying getGenericArgs would be an aliasing violation.
+  CanTypeArrayRef getGenericArgs() const {
+    return CanTypeArrayRef(getPointer()->getGenericArgs());
+  }
 END_CAN_TYPE_WRAPPER(BoundGenericType, Type)
 
 

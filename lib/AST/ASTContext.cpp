@@ -421,8 +421,8 @@ static bool isOptionalType(const ASTContext &ctx, CanType type,
                            CanType arg) {
   if (auto boundType = dyn_cast<BoundGenericType>(type)) {
     return (boundType->getDecl() == ctx.getOptionalDecl() &&
-            boundType->getGenericArgs().size() == 1 &&
-            CanType(boundType->getGenericArgs()[0]) == arg);
+            boundType.getGenericArgs().size() == 1 &&
+            boundType.getGenericArgs()[0] == arg);
   }
   return false;
 }
