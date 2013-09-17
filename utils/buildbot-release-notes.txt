@@ -1,3 +1,11 @@
+2013-09-17
+----------
+
+* Variables in top-level code (i.e. scripts, but not global variables in
+  libraries) are now subject to definite initialization rules, instead of
+  being default constructed.  Specifically they now work just like local 
+  variables.  Instance variables are still not part of the model.
+
 2013-09-11
 ----------
 
