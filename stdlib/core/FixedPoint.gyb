@@ -200,3 +200,13 @@ func [assignment, transparent] ${op}=(lhs: [byref] ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
 @end
+@end  # for bits in all_ints
+
+// FIXME: rdar://14897572 
+// hack to make non-x86 architectures build at a reasonable speed
+struct Hack14897572 { }
+extension UInt32 {
+  constructor(_: Hack14897572) {
+    value = UInt32(0).value
+  }
+}
