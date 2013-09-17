@@ -286,11 +286,15 @@ public:
   Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
   void typeCheckIgnoredExpr(Expr *E);
+
+  void typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
   bool typeCheckFunctionBodyUntil(FuncDecl *FD, SourceLoc EndTypeCheckLoc);
   bool typeCheckFunctionBody(FuncDecl *FD);
   void typeCheckConstructorBody(ConstructorDecl *CD);
   void typeCheckDestructorBody(DestructorDecl *DD);
+
   void typeCheckClosureBody(PipeClosureExpr *closure);
+
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
   void processREPLTopLevel(unsigned StartElem);

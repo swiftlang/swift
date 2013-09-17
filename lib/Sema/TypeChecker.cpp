@@ -576,19 +576,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     for (unsigned n = DefinedFunctions.size(); currentFunctionIdx != n;
          ++currentFunctionIdx) {
       auto *AFD = DefinedFunctions[currentFunctionIdx];
-
-      if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
-        TC.typeCheckConstructorBody(CD);
-        continue;
-      }
-      if (auto *DD = dyn_cast<DestructorDecl>(AFD)) {
-        TC.typeCheckDestructorBody(DD);
-        continue;
-      }
-      auto *FD = cast<FuncDecl>(AFD);
-      PrettyStackTraceDecl StackEntry("type-checking", FD);
-
-      TC.typeCheckFunctionBody(FD);
+      PrettyStackTraceDecl StackEntry("type-checking", AFD);
+      TC.typeCheckAbstractFunctionBody(AFD);
     }
 
     // Compute captures for functions we visited, in the opposite order of type
@@ -604,17 +593,9 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
          ++currentExternalDef) {
       auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
 
-      if (auto constructor = dyn_cast<ConstructorDecl>(decl)) {
-        TC.typeCheckConstructorBody(constructor);
-        continue;
-      }
-      if (auto destructor = dyn_cast<DestructorDecl>(decl)) {
-        TC.typeCheckDestructorBody(destructor);
-        continue;
-      }
-      if (auto func = dyn_cast<FuncDecl>(decl)) {
-        PrettyStackTraceDecl StackEntry("type-checking", func);
-        TC.typeCheckFunctionBody(func);
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
+        PrettyStackTraceDecl StackEntry("type-checking", AFD);
+        TC.typeCheckAbstractFunctionBody(AFD);
         continue;
       }
        if (isa<StructDecl>(decl) || isa<ProtocolDecl>(decl)) {

@@ -577,6 +577,19 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
   llvm_unreachable("bad pattern kind!");
 }
 
+void TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
+  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
+    typeCheckFunctionBody(FD);
+    return;
+  }
+  if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
+    typeCheckConstructorBody(CD);
+    return;
+  }
+  auto *DD = cast<DestructorDecl>(AFD);
+  typeCheckDestructorBody(DD);
+}
+
 // Type check a function body (defined with the func keyword) that is either a
 // named function or an anonymous func expression.
 bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
