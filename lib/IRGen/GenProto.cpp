@@ -3560,11 +3560,18 @@ namespace {
       llvm_unreachable("cannot store l-value type directly");
     }
 
-    // For now, assume we don't need to add anything for nominal and
-    // generic-nominal types.  We might actually need to bind all the
-    // argument archetypes from this type and its parent.
-    void visitNominalType(CanNominalType type) {}
-    void visitBoundGenericType(CanBoundGenericType type) {}
+    // Bind archetypes from the parent of nominal types.
+    void visitNominalType(CanNominalType type) {
+      if (auto parent = CanType(type->getParent()))
+        visit(parent);
+    }
+    // Bind archetypes from bound generic types and their parents.
+    void visitBoundGenericType(CanBoundGenericType type) {
+      if (auto parent = CanType(type->getParent()))
+        visit(parent);
+      for (auto arg : type->getGenericArgs())
+        visit(CanType(arg));
+    }
 
     // FIXME: Will need to bind the archetype that this eventually refers to.
     void visitGenericTypeParamType(CanGenericTypeParamType type) { }
