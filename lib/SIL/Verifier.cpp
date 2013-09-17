@@ -63,10 +63,13 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SILVerifier(const SILVerifier&) = delete;
   void operator=(const SILVerifier&) = delete;
 public:
-  void _require(bool condition, const Twine &complaint) {
+  void _require(bool condition, const Twine &complaint,
+                const std::function<void()> &extraContext = nullptr) {
     if (condition) return;
 
     llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+
+    if (extraContext) extraContext();
 
     if (CurInstruction) {
       llvm::dbgs() << "Verifying instruction:\n";
@@ -96,6 +99,13 @@ public:
     require(value.getType().isObject(), valueDescription +" must be an object");
     require(value.getType().hasReferenceSemantics(),
             valueDescription + " must have reference semantics");
+  }
+
+  /// Assert that two types are equal.
+  void requireSameType(SILType type1, SILType type2, const Twine &complaint) {
+    _require(type1 == type2, complaint, [&] {
+      llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n';
+    });
   }
 
   SILVerifier(const SILFunction &F) : F(F) {
@@ -259,8 +269,8 @@ public:
             llvm::dbgs() << " for input type ";
             ti->getInputTypes()[i].print(llvm::dbgs());
             llvm::dbgs() << '\n');
-      require(AI->getArguments()[i].getType() == ti->getInputTypes()[i],
-              "input types to apply don't match function input types");
+      requireSameType(AI->getArguments()[i].getType(), ti->getInputTypes()[i],
+                      "operand of 'apply' doesn't match function input type");
     }
     DEBUG(llvm::dbgs() << "result type ";
           AI->getType().print(llvm::dbgs());
