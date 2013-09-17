@@ -2336,45 +2336,6 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
   return Status;
 }
 
-static void AddConstructorArgumentsToScope(const Pattern *pat,
-                                           ConstructorDecl *CD,
-                                           Parser &P) {
-  switch (pat->getKind()) {
-  case PatternKind::Named: {
-    // Reparent the decl and add it to the scope.
-    VarDecl *var = cast<NamedPattern>(pat)->getDecl();
-    var->setDeclContext(CD);
-    P.addToScope(var);
-    return;
-  }
-
-  case PatternKind::Any:
-    return;
-
-  case PatternKind::Paren:
-    AddConstructorArgumentsToScope(cast<ParenPattern>(pat)->getSubPattern(),
-                                   CD, P);
-    return;
-
-  case PatternKind::Typed:
-    AddConstructorArgumentsToScope(cast<TypedPattern>(pat)->getSubPattern(),
-                                   CD, P);
-    return;
-
-  case PatternKind::Tuple:
-    for (const TuplePatternElt &field : cast<TuplePattern>(pat)->getFields())
-      AddConstructorArgumentsToScope(field.getPattern(), CD, P);
-    return;
-
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-    llvm_unreachable("pattern can't appear as a constructor argument!");
-  }
-  llvm_unreachable("bad pattern kind!");
-}
-
-
 ParserResult<ConstructorDecl>
 Parser::parseDeclConstructor(unsigned Flags) {
   SourceLoc ConstructorLoc = consumeToken(tok::kw_constructor);
@@ -2437,7 +2398,7 @@ Parser::parseDeclConstructor(unsigned Flags) {
     for (auto Param : *GenericParams)
       Param.setDeclContext(CD);
   }
-  AddConstructorArgumentsToScope(Arguments.get(), CD, *this);
+  addFunctionParametersToScope(Arguments.get(), CD);
   addToScope(SelfDecl);
   ContextChange CC(*this, CD);
 
