@@ -240,6 +240,13 @@ public:
     return res;
   }
 
+  template<typename T, size_t N>
+  MutableArrayRef<T> AllocateCopy(
+      T (&array)[N],
+      AllocationArena arena = AllocationArena::Permanent) const {
+    return MutableArrayRef<T>(AllocateCopy<T>(array, array+N, arena), N);
+  }
+
   template<typename T>
   MutableArrayRef<T> AllocateCopy(
       ArrayRef<T> array,
