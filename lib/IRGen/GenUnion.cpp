@@ -122,12 +122,6 @@ public:
     return getTypeInfo().isPOD(scope);
   }
   
-  /// Primitive-load the union value into an explosion. This is allowed even
-  /// for address-only types for operations that need to inspect only the
-  /// binary representation of the union.
-  virtual void loadForSwitch(IRGenFunction &IGF, Address addr,
-                             Explosion &out) const = 0;
-  
   /// \group Indirect union operations
   
   /// Project the address of the data for a case. Does not check or modify
@@ -152,6 +146,15 @@ public:
                                                 UnionElementDecl *elt,
                                                 Address unionAddr) const = 0;
   
+  /// Emit a branch on the case contained by a union explosion.
+  /// Performs the branching for a SIL 'destructive_switch_union_addr'
+  /// instruction.
+  virtual void emitIndirectSwitch(IRGenFunction &IGF,
+                                  Address unionAddr,
+                                  ArrayRef<std::pair<UnionElementDecl*,
+                                                     llvm::BasicBlock*>> dests,
+                                  llvm::BasicBlock *defaultDest) const = 0;
+  
   /// \group Loadable union operations
   
   /// Emit the construction sequence for a union case into an explosion.
@@ -166,7 +169,7 @@ public:
   virtual void emitValueSwitch(IRGenFunction &IGF,
                                Explosion &value,
                                ArrayRef<std::pair<UnionElementDecl*,
-                               llvm::BasicBlock*>> dests,
+                                                  llvm::BasicBlock*>> dests,
                                llvm::BasicBlock *defaultDest) const = 0;
   
   /// Project a case value out of a union explosion. This does not check that
@@ -274,16 +277,32 @@ namespace {
                                       UnionDecl *theUnion,
                                       llvm::StructType *unionTy) override;
 
+    void emitSingletonSwitch(IRGenFunction &IGF,
+                    ArrayRef<std::pair<UnionElementDecl*,
+                                       llvm::BasicBlock*>> dests,
+                    llvm::BasicBlock *defaultDest) const {
+      // No dispatch necessary. Branch straight to the destination.
+      assert(dests.size() <= 1 && "impossible switch table for singleton union");
+      llvm::BasicBlock *dest = dests.size() == 1
+        ? dests[0].second : defaultDest;
+      IGF.Builder.CreateBr(dest);
+    }
+    
     void emitValueSwitch(IRGenFunction &IGF,
                          Explosion &value,
                          ArrayRef<std::pair<UnionElementDecl*,
                                             llvm::BasicBlock*>> dests,
                          llvm::BasicBlock *defaultDest) const override {
-      // No dispatch necessary. Branch straight to the destination.
       value.claimAll();
-      
-      assert(dests.size() == 1 && "switch table mismatch");
-      IGF.Builder.CreateBr(dests[0].second);
+      emitSingletonSwitch(IGF, dests, defaultDest);
+    }
+    
+    void emitIndirectSwitch(IRGenFunction &IGF,
+                            Address addr,
+                            ArrayRef<std::pair<UnionElementDecl*,
+                                               llvm::BasicBlock*>> dests,
+                            llvm::BasicBlock *defaultDest) const override {
+      emitSingletonSwitch(IGF, dests, defaultDest);
     }
     
     void emitValueProject(IRGenFunction &IGF,
@@ -533,6 +552,16 @@ namespace {
       }
     }
     
+    void emitIndirectSwitch(IRGenFunction &IGF,
+                            Address addr,
+                            ArrayRef<std::pair<UnionElementDecl*,
+                                               llvm::BasicBlock*>> dests,
+                            llvm::BasicBlock *defaultDest) const override {
+      Explosion value(ExplosionKind::Minimal);
+      loadAsTake(IGF, addr, value);
+      emitValueSwitch(IGF, value, dests, defaultDest);
+    }
+    
     void emitValueProject(IRGenFunction &IGF,
                           Explosion &in,
                           UnionElementDecl *elt,
@@ -595,10 +624,6 @@ namespace {
       IGF.Builder.CreateStore(val, dest);
     }
     
-    void loadForSwitch(IRGenFunction &IGF, Address addr, Explosion &out) const {
-      loadAsTake(IGF, addr, out);
-    }
-    
     static constexpr IsPOD_t IsScalarPOD = IsPOD;
   };
   
@@ -655,7 +680,8 @@ namespace {
     }
 
     void loadForSwitch(IRGenFunction &IGF, Address addr, Explosion &e)
-    const override {
+    const {
+      assert(TIK >= Fixed);
       e.add(IGF.Builder.CreateLoad(projectPayload(IGF, addr)));
       if (ExtraTagBitCount > 0)
         e.add(IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr)));
@@ -973,6 +999,76 @@ namespace {
         IGF.Builder.emitBlock(unreachableBB);
         IGF.Builder.CreateUnreachable();
       }
+    }
+    
+    void emitDynamicSwitch(IRGenFunction &IGF,
+                           Address addr,
+                           ArrayRef<std::pair<UnionElementDecl*,
+                                              llvm::BasicBlock*>> dests,
+                           llvm::BasicBlock *defaultDest) const {
+      auto payloadMetadata = emitPayloadMetadata(IGF);
+      auto numEmptyCases = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                                  ElementsWithNoPayload.size());
+      auto opaqueAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
+                                                  IGF.IGM.OpaquePtrTy);
+      
+      // Create a map of the destination blocks for quicker lookup.
+      llvm::DenseMap<UnionElementDecl*,llvm::BasicBlock*> destMap(dests.begin(),
+                                                                  dests.end());
+
+      // If there was no default branch in SIL, use an unreachable branch as
+      // the default.
+      llvm::BasicBlock *unreachableBB = nullptr;
+      if (!defaultDest) {
+        unreachableBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+        defaultDest = unreachableBB;
+      }
+      
+      // Ask the runtime to find the case index.
+      auto caseIndex = IGF.Builder.CreateCall3(
+                            IGF.IGM.getGetUnionCaseSinglePayloadFn(),
+                            opaqueAddr, payloadMetadata, numEmptyCases);
+
+      // Switch on the index.
+      auto *swi = IGF.Builder.CreateSwitch(caseIndex, defaultDest);
+
+      // Add the payload case.
+      auto payloadCase = destMap.find(getPayloadElement());
+      if (payloadCase != destMap.end())
+        swi->addCase(llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1),
+                     payloadCase->second);
+      
+      // Add the empty cases.
+      unsigned emptyCaseIndex = 0;
+      for (auto &empty : ElementsWithNoPayload) {
+        auto emptyCase = destMap.find(empty.decl);
+        if (emptyCase != destMap.end())
+          swi->addCase(llvm::ConstantInt::get(IGF.IGM.Int32Ty, emptyCaseIndex),
+                       emptyCase->second);
+        ++emptyCaseIndex;
+      }
+      
+      // Emit the unreachable block, if any.
+      if (unreachableBB) {
+        IGF.Builder.emitBlock(unreachableBB);
+        IGF.Builder.CreateUnreachable();
+      }
+    }
+    
+    void emitIndirectSwitch(IRGenFunction &IGF,
+                            Address addr,
+                            ArrayRef<std::pair<UnionElementDecl*,
+                                               llvm::BasicBlock*>> dests,
+                            llvm::BasicBlock *defaultDest) const override {
+      if (TIK >= Fixed) {
+        // Load the fixed-size representation and switch directly.
+        Explosion value(ExplosionKind::Minimal);
+        loadForSwitch(IGF, addr, value);
+        return emitValueSwitch(IGF, value, dests, defaultDest);
+      }
+      
+      // Use the runtime to dynamically switch.
+      emitDynamicSwitch(IGF, addr, dests, defaultDest);
     }
     
     void emitValueProject(IRGenFunction &IGF,
@@ -1606,6 +1702,22 @@ namespace {
         IGF.Builder.emitBlock(unreachableBB);
         IGF.Builder.CreateUnreachable();
       }
+    }
+
+    void emitIndirectSwitch(IRGenFunction &IGF,
+                            Address addr,
+                            ArrayRef<std::pair<UnionElementDecl*,
+                            llvm::BasicBlock*>> dests,
+                            llvm::BasicBlock *defaultDest) const override {
+      if (TIK >= Fixed) {
+        // Load the fixed-size representation and switch directly.
+        Explosion value(ExplosionKind::Minimal);
+        loadForSwitch(IGF, addr, value);
+        return emitValueSwitch(IGF, value, dests, defaultDest);
+      }
+      
+      // Use the runtime to dynamically switch.
+      llvm_unreachable("dynamic switch for multi-payload union not implemented");
     }
     
   private:
@@ -2847,9 +2959,7 @@ void irgen::emitSwitchAddressOnlyUnionDispatch(IRGenFunction &IGF,
                                                      llvm::BasicBlock *>> dests,
                                   llvm::BasicBlock *defaultDest) {
   auto &strategy = getUnionImplStrategy(IGF.IGM, unionTy);
-  Explosion payload(ExplosionKind::Minimal);
-  strategy.loadForSwitch(IGF, unionAddr, payload);
-  strategy.emitValueSwitch(IGF, payload, dests, defaultDest);
+  strategy.emitIndirectSwitch(IGF, unionAddr, dests, defaultDest);
 }
 
 void irgen::emitInjectLoadableUnion(IRGenFunction &IGF, SILType unionTy,

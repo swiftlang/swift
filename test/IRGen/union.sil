@@ -57,8 +57,8 @@ import Builtin
 
 // -- Dynamic unions. The type layout is opaque; we dynamically bitcast to
 //    the element type.
-// CHECK: %O5union16DynamicSingleton = type {}
 // CHECK: %O5union20DynamicSinglePayload = type {}
+// CHECK: %O5union16DynamicSingleton = type {}
 
 // -- Dynamic metadata template carries a value witness table pattern
 //    we fill in on instantiation.
@@ -799,6 +799,31 @@ union DynamicSinglePayload<T> {
   case y
   case z
   case w
+}
+
+// CHECK: define void @dynamic_single_payload_switch(%O5union20DynamicSinglePayload*, %swift.type* %T) {
+// CHECK:   [[OPAQUE_UNION:%.*]] = bitcast %O5union20DynamicSinglePayload* %0 to %swift.opaque*
+// CHECK:   [[CASE_INDEX:%.*]] = call i32 @swift_getUnionCaseSinglePayload(%swift.opaque* [[OPAQUE_UNION]], %swift.type* %T, i32 3)
+// CHECK:   switch i32 [[CASE_INDEX]], label {{%.*}} [
+// CHECK:     i32 -1, label {{%.*}}
+// CHECK:     i32 2, label {{%.*}}
+// CHECK:   ]
+sil @dynamic_single_payload_switch : $<T> (DynamicSinglePayload<T>) -> () {
+entry(%u : $*DynamicSinglePayload<T>):
+  destructive_switch_union_addr %u : $*DynamicSinglePayload<T>, case #DynamicSinglePayload.x!unionelt.1: x_dest, case #DynamicSinglePayload.w!unionelt: w_dest, default default_dest
+
+x_dest(%t : $*T):
+  br end
+
+w_dest:
+  br end
+
+default_dest:
+  br end
+
+end:
+  %v = tuple ()
+  return %v : $()
 }
 
 union MultiPayloadNoSpareBits {
