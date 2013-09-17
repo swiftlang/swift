@@ -302,7 +302,7 @@ Type AbstractClosureExpr::getResultType() const {
   if (getType()->is<ErrorType>())
     return getType();
 
-  return getType()->castTo<AnyFunctionType>()->getResult();
+  return getType()->castTo<FunctionType>()->getResult();
 }
 
 SourceRange PipeClosureExpr::getSourceRange() const {

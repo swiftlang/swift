@@ -341,7 +341,7 @@ namespace {
         return;
       if (Ty->is<ErrorType>())
         return;
-      if (!Ty->is<AnyFunctionType>()) {
+      if (!Ty->is<FunctionType>()) {
         Out << "a closure should have a function type";
         E->print(Out);
         Out << "\n";
