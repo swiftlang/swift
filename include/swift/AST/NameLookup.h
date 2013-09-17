@@ -226,9 +226,9 @@ void removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                          const Module *curModule);
 
 /// Finds decls visible in the given context and feeds them to the given
-/// VisibleDeclConsumer. If the current DeclContext is nested in a FuncExpr, the
-/// SourceLoc is used to determine which declarations in that FuncExpr's
-/// context are visible.
+/// VisibleDeclConsumer.  If the current DeclContext is nested in a function,
+/// the SourceLoc is used to determine which declarations in that function
+/// are visible.
 void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                         const DeclContext *DC, SourceLoc Loc = SourceLoc());
 
