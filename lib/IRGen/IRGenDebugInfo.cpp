@@ -1239,6 +1239,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::BoundGenericUnion:
   {
+    Name = "FIXME";//getMangledName(DbgTy);
     auto UnionTy = BaseTy->castTo<BoundGenericUnionType>();
     if (auto Decl = UnionTy->getDecl()) {
       Location L = getStartLoc(SM, Decl);
