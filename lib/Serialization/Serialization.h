@@ -150,20 +150,6 @@ private:
     llvm_unreachable("unknown offset kind");
   }
 
-  /// Records the use of the given Decl.
-  ///
-  /// The Decl will be scheduled for serialization if necessary.
-  ///
-  /// \returns The ID for the given Decl in this module.
-  DeclID addDeclRef(const Decl *D);
-
-  /// Records the use of the given Identifier.
-  ///
-  /// The Identifier will be scheduled for serialization if necessary.
-  ///
-  /// \returns The ID for the given Identifier in this module.
-  IdentifierID addIdentifierRef(Identifier ident);
-
   /// Records the use of the given module.
   ///
   /// The module's name will be scheduled for serialization if necessary.
@@ -291,6 +277,20 @@ public:
   ///
   /// \returns The ID for the given Type in this module.
   TypeID addTypeRef(Type ty);
+
+  /// Records the use of the given Identifier.
+  ///
+  /// The Identifier will be scheduled for serialization if necessary.
+  ///
+  /// \returns The ID for the given Identifier in this module.
+  IdentifierID addIdentifierRef(Identifier ident);
+
+  /// Records the use of the given Decl.
+  ///
+  /// The Decl will be scheduled for serialization if necessary.
+  ///
+  /// \returns The ID for the given Decl in this module.
+  DeclID addDeclRef(const Decl *D);
 };
 } // end namespace serialization
 } // end namespace swift

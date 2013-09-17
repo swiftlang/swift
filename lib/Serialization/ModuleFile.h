@@ -258,22 +258,6 @@ private:
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclID DID);
 
-  /// Returns the decl with the given ID, deserializing it if needed.
-  ///
-  /// \param DID The ID for the decl within this module.
-  /// \param ForcedContext Optional override for the decl context of certain
-  ///                      kinds of decls, used to avoid re-entrant
-  ///                      deserialization.
-  /// \param DidRecord Optional callback, called at some point after the decl
-  ///                  has been recorded in the decl table (but not necessarily
-  ///                  completed).
-  Decl *getDecl(serialization::DeclID DID,
-                Optional<DeclContext *> ForcedContext = {},
-                std::function<void(Decl*)> DidRecord = nullptr);
-
-  /// Returns the identifier with the given ID, deserializing it if needed.
-  Identifier getIdentifier(serialization::IdentifierID IID);
-
   /// Returns the appropriate module for the given name.
   ///
   /// If the name matches the name of the current module, a shadowed module
@@ -389,6 +373,22 @@ public:
 
   /// Returns the type with the given ID, deserializing it if needed.
   Type getType(serialization::TypeID TID);
+
+  /// Returns the identifier with the given ID, deserializing it if needed.
+  Identifier getIdentifier(serialization::IdentifierID IID);
+
+  /// Returns the decl with the given ID, deserializing it if needed.
+  ///
+  /// \param DID The ID for the decl within this module.
+  /// \param ForcedContext Optional override for the decl context of certain
+  ///                      kinds of decls, used to avoid re-entrant
+  ///                      deserialization.
+  /// \param DidRecord Optional callback, called at some point after the decl
+  ///                  has been recorded in the decl table (but not necessarily
+  ///                  completed).
+  Decl *getDecl(serialization::DeclID DID,
+                Optional<DeclContext *> ForcedContext = {},
+                std::function<void(Decl*)> DidRecord = nullptr);
 };
 
 class SerializedModule : public LoadedModule {

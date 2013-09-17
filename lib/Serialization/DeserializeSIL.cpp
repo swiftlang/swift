@@ -225,6 +225,21 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
   return CurrentBB;
 }
 
+/// Helper function to find the SILFunction given name and type.
+static SILFunction *getFuncForReference(Identifier Name, SILType Ty,
+                                        SILModule &SILMod) {
+  // Check to see if we have a function by this name already.
+  if (SILFunction *FnRef = SILMod.lookup(Name.str()))
+    // FIXME: check for matching types.
+    return FnRef;
+
+  // If we didn't find a function, create a new one.
+  SourceLoc Loc;
+  auto Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal,
+                                     Name.str(), Ty, SILFileLocation(Loc));
+  return Fn;
+}
+
 bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
                           unsigned RecordKind,
                           SmallVectorImpl<uint64_t> &scratch) {
@@ -233,10 +248,11 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
     return true;
 
   SILBuilder Builder(BB);
-  unsigned OpCode, TyCategory, ValResNum, ValResNum2;
+  unsigned OpCode, TyCategory, TyCategory2, ValResNum, ValResNum2, Attr;
   ValueID ValID, ValID2;
-  TypeID TyID;
+  TypeID TyID, TyID2;
   SourceLoc SLoc;
+  ArrayRef<uint64_t> ListOfValues;
   SILLocation Loc = SILFileLocation(SLoc);
 
   switch (RecordKind) {
@@ -254,9 +270,25 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
     SILOneOperandLayout::readRecord(scratch, OpCode, TyID, TyCategory, ValID,
                                     ValResNum);
     break;
+  case SIL_ONE_TYPE_ONE_OPERAND:
+    SILOneTypeOneOperandLayout::readRecord(scratch, OpCode, TyID, TyCategory,
+                                           TyID2, TyCategory2,
+                                           ValID, ValResNum);
+    break;
+  case SIL_ONE_TYPE_VALUES:
+    SILOneTypeValuesLayout::readRecord(scratch, OpCode, TyID, TyCategory,
+                                       ListOfValues);
+    break;
+  case SIL_INST_APPLY: {
+    OpCode = (unsigned)ValueKind::ApplyInst;
+    SILInstApplyLayout::readRecord(scratch, Attr, TyID, TyCategory,
+                                   ValID, ValResNum, ListOfValues);
+    break;
+  }
   case SIL_INST_TODO:
     SILInstTodoLayout::readRecord(scratch, OpCode);
-    break;
+    DEBUG(llvm::dbgs() << "To be handled: " << OpCode << "\n");
+    return true;
   }
 
   ValueBase *ResultVal;
@@ -264,6 +296,18 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
   default:
     DEBUG(llvm::dbgs() << "To be handled: " << OpCode << "\n");
     return true;
+  case ValueKind::SILArgument:
+    llvm_unreachable("not an instruction");
+
+  case ValueKind::AllocArrayInst: {
+    auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
+    ResultVal = Builder.createAllocArray(Loc,
+        getSILType(Ty, (SILValueCategory)TyCategory),
+        getLocalValue(ValID, ValResNum,
+                      getSILType(Ty2, (SILValueCategory)TyCategory2)));
+    break;
+  }
   case ValueKind::AllocBoxInst: {
     auto Ty = MF->getType(TyID);
     ResultVal = Builder.createAllocBox(Loc,
@@ -276,11 +320,55 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
                             getSILType(Ty, (SILValueCategory)TyCategory));
     break;
   }
+  case ValueKind::ApplyInst: {
+    // Format: attributes such as transparent, the callee's type, a value for
+    // the callee and a list of values for the arguments. Each value in the list
+    // is represented with 2 IDs: ValueID and ValueResultNumber.
+    auto Ty = MF->getType(TyID);
+    SILType FnTy = getSILType(Ty, (SILValueCategory)TyCategory);
+    SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(SILMod);
+    auto ArgTys = FTI->getInputTypes();
+
+    SmallVector<SILValue, 4> Args;
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2)
+      Args.push_back(getLocalValue(ListOfValues[I], ListOfValues[I+1],
+                                   ArgTys[I>>1]));
+    bool Transparent = (Attr == 1);
+    ResultVal = Builder.createApply(Loc, getLocalValue(ValID, ValResNum, FnTy),
+                                    FTI->getResultType(), Args, Transparent);
+    break;
+  }
   case ValueKind::DeallocStackInst: {
     auto Ty = MF->getType(TyID);
     ResultVal = Builder.createDeallocStack(Loc,
         getLocalValue(ValID, ValResNum,
                       getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
+  case ValueKind::FunctionRefInst: {
+    auto Ty = MF->getType(TyID);
+    Identifier FuncName = MF->getIdentifier(ValID); 
+    ResultVal = Builder.createFunctionRef(Loc,
+        getFuncForReference(FuncName,
+                            getSILType(Ty, (SILValueCategory)TyCategory),
+                            SILMod));
+    break;
+  }
+  case ValueKind::IntegerLiteralInst: {
+    auto Ty = MF->getType(TyID);
+    auto intTy = Ty->getAs<BuiltinIntegerType>();
+    Identifier StringVal = MF->getIdentifier(ValID);
+    APInt value(intTy->getBitWidth(), StringVal.str(), 10);
+    // Build APInt from string.
+    ResultVal = Builder.createIntegerLiteral(Loc,
+        getSILType(Ty, (SILValueCategory)TyCategory),
+        value);
+    break;
+  }
+  case ValueKind::MetatypeInst: {
+    auto Ty = MF->getType(TyID);
+    ResultVal = Builder.createMetatype(Loc,
+                            getSILType(Ty, (SILValueCategory)TyCategory));
     break;
   }
   case ValueKind::ReturnInst: {
@@ -297,6 +385,51 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
     ResultVal = Builder.createStore(Loc,
                     getLocalValue(ValID, ValResNum, ValType),
                     getLocalValue(ValID2, ValResNum2, addrType));
+    break;
+  }
+  case ValueKind::StructExtractInst: {
+    // Use SILOneValueOneOperandLayout.
+    VarDecl *Field = cast<VarDecl>(MF->getDecl(ValID));
+    auto Ty = MF->getType(TyID);
+    ResultVal = Builder.createStructExtract(Loc,
+                    getLocalValue(ValID2, ValResNum2,
+                                  getSILType(Ty, (SILValueCategory)TyCategory)),
+                    Field,
+                    getSILType(Field->getType(), SILValueCategory::Object));
+    break;
+  }
+  case ValueKind::StructInst: {
+    // Format: a type followed by a list of typed values. A typed value is
+    // expressed by 4 IDs: TypeID, TypeCategory, ValueID, ValueResultNumber.
+    auto Ty = MF->getType(TyID);
+    SmallVector<SILValue, 4> OpList;
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 4) {
+      auto EltTy = MF->getType(ListOfValues[I]); 
+      OpList.push_back(
+        getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
+                      getSILType(EltTy, (SILValueCategory)ListOfValues[I+1])));
+    }
+    ResultVal = Builder.createStruct(Loc,
+                    getSILType(Ty, (SILValueCategory)TyCategory),
+                    OpList);
+    break;
+  }
+  case ValueKind::TupleInst: {
+    // Format: a type followed by a list of values. A value is expressed by
+    // 2 IDs: ValueID, ValueResultNumber.
+    auto Ty = MF->getType(TyID);
+    TupleType *TT = Ty->getAs<TupleType>();
+    assert(TT && "Type of a TupleInst should be TupleType");
+    SmallVector<SILValue, 4> OpList;
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2) {
+      Type EltTy = TT->getFields()[I].getType();
+      OpList.push_back(
+        getLocalValue(ListOfValues[I], ListOfValues[I+1],
+                      getSILType(EltTy, SILValueCategory::Object)));
+    }
+    ResultVal = Builder.createTuple(Loc,
+                    getSILType(Ty, (SILValueCategory)TyCategory),
+                    OpList);
     break;
   }
   }

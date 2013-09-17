@@ -29,8 +29,13 @@ void swift::performSILLinking(SILModule *M) {
   
   SerializedSILLoader *SILLoader = SerializedSILLoader::create(
                                      M->getASTContext(), M);
-  for (auto &Fn : *M) {
-    for (auto &BB : Fn) {
+  SmallVector<SILFunction*, 128> Worklist;
+  for (auto &Fn : *M)
+    Worklist.push_back(&Fn);
+
+  while (!Worklist.empty()) {
+    auto Fn = Worklist.pop_back_val();
+    for (auto &BB : *Fn) {
       for (auto I = BB.begin(), E = BB.end(); I != E; I++) {
         // Handles ApplyInst only.
         auto *AI = dyn_cast<ApplyInst>(I);
@@ -47,8 +52,11 @@ void swift::performSILLinking(SILModule *M) {
         if (CalleeFunction->empty()) {
           // Try to find the definition in a serialized module when callee is
           // currently empty and the ApplyInst is transparent.
-          SILLoader->lookupSILFunction(CalleeFunction);
-          ++NumFuncLinked;
+          auto NewFn = SILLoader->lookupSILFunction(CalleeFunction);
+          if (NewFn) {
+            Worklist.push_back(NewFn);
+            ++NumFuncLinked;
+          }
         }
       }
     }

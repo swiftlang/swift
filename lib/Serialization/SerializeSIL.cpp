@@ -169,7 +169,19 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                   (unsigned)SI.getKind());
     break;
   }
-  // The following SIL instructions has a single type.
+  case ValueKind::AllocArrayInst: {
+    const AllocArrayInst *AAI = cast<AllocArrayInst>(&SI);
+    unsigned abbrCode = SILAbbrCodes[SILOneTypeOneOperandLayout::Code];
+    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned)SI.getKind(),
+        S.addTypeRef(AAI->getElementType().getSwiftRValueType()),
+        (unsigned)AAI->getElementType().getCategory(),
+        S.addTypeRef(AAI->getNumElements().getType().getSwiftRValueType()),
+        (unsigned)AAI->getNumElements().getType().getCategory(),
+        addValueRef(AAI->getNumElements()),
+        AAI->getNumElements().getResultNumber());
+    break;
+  }
   case ValueKind::AllocBoxInst: {
     const AllocBoxInst *ABI = cast<AllocBoxInst>(&SI);
     unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
@@ -188,7 +200,25 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                       (unsigned)ASI->getElementType().getCategory());
     break;
   }
-  // The following SIL instructions has a single operand.
+  case ValueKind::ApplyInst: {
+    // Format: attributes such as transparent, the callee's type, a value for
+    // the callee and a list of values for the arguments. Each value in the list
+    // is represented with 2 IDs: ValueID and ValueResultNumber.
+    const ApplyInst *AI = cast<ApplyInst>(&SI);
+    SmallVector<ValueID, 4> Args;
+    for (auto Arg: AI->getArguments()) {
+      Args.push_back(addValueRef(Arg));
+      Args.push_back(Arg.getResultNumber());
+    }
+    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstApplyLayout::Code],
+        (unsigned)AI->isTransparent(),
+        S.addTypeRef(AI->getCallee().getType().getSwiftRValueType()),
+        (unsigned)AI->getCallee().getType().getCategory(),
+        addValueRef(AI->getCallee()), AI->getCallee().getResultNumber(),
+        Args);
+    break;
+  }
   case ValueKind::DeallocStackInst:
   case ValueKind::ReturnInst: {
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
@@ -198,6 +228,41 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                  (unsigned)SI.getOperand(0).getType().getCategory(),
                  addValueRef(SI.getOperand(0)),
                  SI.getOperand(0).getResultNumber());
+    break;
+  }
+  case ValueKind::FunctionRefInst: {
+    // Use SILOneOperandLayout to specify the function type and the function
+    // name (IdentifierID).
+    const FunctionRefInst *FRI = cast<FunctionRefInst>(&SI);
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned)SI.getKind(),
+        S.addTypeRef(FRI->getType().getSwiftRValueType()),
+        (unsigned)FRI->getType().getCategory(),
+        S.addIdentifierRef(Ctx.getIdentifier(FRI->getFunction()->getName())),
+        0);
+    break;
+  }
+  case ValueKind::IntegerLiteralInst: {
+    // Use SILOneOperandLayout to specify the type and the literal.
+    const IntegerLiteralInst *ILI = cast<IntegerLiteralInst>(&SI);
+    APInt value = ILI->getValue();
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned)SI.getKind(),
+        S.addTypeRef(ILI->getType().getSwiftRValueType()),
+        (unsigned)ILI->getType().getCategory(),
+        S.addIdentifierRef(Ctx.getIdentifier(value.toString(10, true))),
+        0);
+    break;
+  }
+  case ValueKind::MetatypeInst: {
+    const MetatypeInst *MI = cast<MetatypeInst>(&SI);
+    unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
+    SILOneTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                      (unsigned)SI.getKind(),
+                      S.addTypeRef(MI->getType().getSwiftRValueType()),
+                      (unsigned)MI->getType().getCategory());
     break;
   }
   case ValueKind::StoreInst: {
@@ -210,6 +275,55 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                   (unsigned)StI->getDest().getType().getCategory(),
                   addValueRef(StI->getDest()),
                   StI->getDest().getResultNumber());
+    break;
+  }
+  case ValueKind::StructExtractInst: {
+    // Has a typed valueref and a field decl. We use SILOneValueOneOperandLayout
+    // where the field decl is streamed as a ValueID.
+    const StructExtractInst *SEI = cast<StructExtractInst>(&SI);
+    SILOneValueOneOperandLayout::emitRecord(Out, ScratchRecord, 
+        SILAbbrCodes[SILOneValueOneOperandLayout::Code],
+        (unsigned)SI.getKind(), S.addDeclRef(SEI->getField()), 0,
+        S.addTypeRef(SEI->getOperand().getType().getSwiftRValueType()),
+        (unsigned)SEI->getOperand().getType().getCategory(),
+        addValueRef(SEI->getOperand()), SEI->getOperand().getResultNumber());
+    break;
+  }
+  case ValueKind::StructInst: {
+    // Format: a type followed by a list of typed values. A typed value is
+    // expressed by 4 IDs: TypeID, TypeCategory, ValueID, ValueResultNumber.
+    const StructInst *StrI = cast<StructInst>(&SI);
+    SmallVector<ValueID, 4> ListOfValues;
+    for (auto Elt : StrI->getElements()) {
+      ListOfValues.push_back(S.addTypeRef(Elt.getType().getSwiftRValueType()));
+      ListOfValues.push_back((unsigned)Elt.getType().getCategory());
+      ListOfValues.push_back(addValueRef(Elt));
+      ListOfValues.push_back(Elt.getResultNumber());
+    }
+
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(StrI->getType().getSwiftRValueType()),
+        (unsigned)StrI->getType().getCategory(), ListOfValues);
+    break;
+  }
+  case ValueKind::TupleInst: {
+    // Format: a type followed by a list of values. A value is expressed by
+    // 2 IDs: ValueID, ValueResultNumber.
+    const TupleInst *TI = cast<TupleInst>(&SI);
+    SmallVector<ValueID, 4> ListOfValues;
+    for (auto Elt : TI->getElements()) {
+      ListOfValues.push_back(addValueRef(Elt));
+      ListOfValues.push_back(Elt.getResultNumber());
+    }
+
+    unsigned abbrCode = SILAbbrCodes[SILOneTypeValuesLayout::Code];
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned)SI.getKind(),
+        S.addTypeRef(TI->getType().getSwiftRValueType()), 
+        (unsigned)TI->getType().getCategory(),
+        ListOfValues);
     break;
   }
   }
@@ -256,12 +370,15 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
     registerSILAbbr<SILOneValueOneOperandLayout>();
     registerSILAbbr<SILOneTypeLayout>();
     registerSILAbbr<SILOneOperandLayout>();
+    registerSILAbbr<SILOneTypeOneOperandLayout>();
+    registerSILAbbr<SILOneTypeValuesLayout>();
+    registerSILAbbr<SILInstApplyLayout>();
     registerSILAbbr<SILInstTodoLayout>();
 
     // Go through all SILFunctions in M, and if it is transparent,
     // write out the SILFunction.
     for (const SILFunction &F : *M) {
-      if (F.isTransparent())
+      if (F.isTransparent() && !F.empty())
         writeSILFunction(F);
     }
   }

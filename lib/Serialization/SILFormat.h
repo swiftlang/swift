@@ -42,6 +42,9 @@ namespace sil_block {
     SIL_ONE_VALUE_ONE_OPERAND,
     SIL_ONE_TYPE,
     SIL_ONE_OPERAND,
+    SIL_ONE_TYPE_ONE_OPERAND,
+    SIL_ONE_TYPE_VALUES,
+    SIL_INST_APPLY,
     SIL_INST_TODO,
     SIL_FUNC_NAMES,
     SIL_FUNC_OFFSETS
@@ -86,6 +89,37 @@ namespace sil_block {
     SILTypeCategoryField,
     ValueIDField,
     SILValueResultField
+  >;
+
+  // SIL instructions with one type and one typed valueref.
+  using SILOneTypeOneOperandLayout = BCRecordLayout<
+    SIL_ONE_TYPE_ONE_OPERAND,
+    SILInstOpCodeField,
+    TypeIDField,
+    SILTypeCategoryField,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    SILValueResultField
+  >;
+
+  // SIL instructions with one type and a list of values.
+  using SILOneTypeValuesLayout = BCRecordLayout<
+    SIL_ONE_TYPE_VALUES,
+    SILInstOpCodeField,
+    TypeIDField,
+    SILTypeCategoryField,
+    BCArray<ValueIDField>
+  >;
+
+  using SILInstApplyLayout = BCRecordLayout<
+    SIL_INST_APPLY,
+    BCFixed<1>,           // transparent
+    TypeIDField,          // callee type
+    SILTypeCategoryField,
+    ValueIDField,         // callee value
+    SILValueResultField,
+    BCArray<ValueIDField> // a list of arguments
   >;
 
   // SIL instructions with one type. (alloc_stack)
