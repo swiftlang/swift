@@ -1504,6 +1504,35 @@ namespace {
     void storeTag(IRGenFunction &IGF,
                   UnionElementDecl *elt,
                   Address unionAddr) const override {
+      if (TIK < Fixed) {
+        // If the union isn't fixed-layout, get the runtime to do this for us.
+        llvm::Value *payload = emitPayloadMetadata(IGF);
+        llvm::Value *caseIndex;
+        if (elt == getPayloadElement()) {
+          caseIndex = llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1);
+        } else {
+          auto found = std::find_if(ElementsWithNoPayload.begin(),
+                                    ElementsWithNoPayload.end(),
+                                    [&](Element a) { return a.decl == elt; });
+          assert(found != ElementsWithNoPayload.end() &&
+                 "case not in union?!");
+          unsigned caseIndexVal = found - ElementsWithNoPayload.begin();
+          caseIndex = llvm::ConstantInt::get(IGF.IGM.Int32Ty, caseIndexVal);
+        }
+        
+        llvm::Value *numEmptyCases = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                                  ElementsWithNoPayload.size());
+        
+        llvm::Value *opaqueAddr
+          = IGF.Builder.CreateBitCast(unionAddr.getAddress(),
+                                      IGF.IGM.OpaquePtrTy);
+        
+        IGF.Builder.CreateCall4(IGF.IGM.getStoreUnionTagSinglePayloadFn(),
+                                opaqueAddr, payload, caseIndex, numEmptyCases);
+        
+        return;
+      }
+      
       if (elt == getPayloadElement()) {
         // The data occupies the entire payload. If we have extra tag bits,
         // zero them out.

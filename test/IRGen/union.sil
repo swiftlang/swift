@@ -826,6 +826,26 @@ end:
   return %v : $()
 }
 
+// CHECK: define void @dynamic_single_payload_inject_x(%O5union20DynamicSinglePayload.0* noalias sret, %swift.opaque*, %swift.type* %T) {
+// CHECK:   [[ADDR:%.*]] = bitcast %O5union20DynamicSinglePayload.0* %0 to %swift.opaque*
+// CHECK:   call void @swift_storeUnionTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 -1, i32 3)
+sil @dynamic_single_payload_inject_x : $<T> T -> DynamicSinglePayload<T> {
+entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
+  inject_union_addr %r : $*DynamicSinglePayload<T>, #DynamicSinglePayload.x!unionelt.1
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK: define void @dynamic_single_payload_inject_y(%O5union20DynamicSinglePayload.1* noalias sret, %swift.type* %T) {
+// CHECK:   [[ADDR:%.*]] = bitcast %O5union20DynamicSinglePayload.1* %0 to %swift.opaque*
+// CHECK:   call void @swift_storeUnionTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 0, i32 3)
+sil @dynamic_single_payload_inject_y : $<T> () -> DynamicSinglePayload<T> {
+entry(%r : $*DynamicSinglePayload<T>):
+  inject_union_addr %r : $*DynamicSinglePayload<T>, #DynamicSinglePayload.y!unionelt
+  %v = tuple ()
+  return %v : $()
+}
+
 union MultiPayloadNoSpareBits {
   case x(Builtin.Int64)
   case y(Builtin.Int32)

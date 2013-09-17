@@ -326,7 +326,7 @@ FUNCTION(GetUnionCaseSinglePayload,
 
 // void swift_storeUnionTagSinglePayload(opaque_t *obj,
 //                                       type_metadata_t *payload,
-//                                       int case,
+//                                       int case_index,
 //                                       unsigned num_empty_cases);
 FUNCTION(StoreUnionTagSinglePayload,
          swift_storeUnionTagSinglePayload,
