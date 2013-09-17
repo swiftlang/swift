@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/MathExtras.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Union.h"
@@ -64,7 +65,8 @@ swift::swift_initUnionValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   // FIXME: Initialize extra inhabitant witnesses.
   vwtable->size = size;
   vwtable->flags = payloadWitnesses->flags.withExtraInhabitants(false);
-  vwtable->stride = payloadWitnesses->stride;
+  vwtable->stride = llvm::RoundUpToAlignment(size,
+                                             payloadWitnesses->getAlignment());
 }
 
 int
