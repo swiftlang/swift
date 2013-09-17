@@ -670,8 +670,22 @@ bool ConstraintSystem::diagnose() {
     // we may have to hunt for the best solution. For now, we don't care.
 
     // If there are multiple solutions, try to diagnose an ambiguity.
-    if (solutions.size() > 1 && diagnoseAmbiguity(*this, solutions)) {
-      return true;
+    if (solutions.size() > 1) {
+      if (TC.getLangOpts().DebugConstraintSolver) {
+        llvm::raw_ostream &log = llvm::errs();
+        log << "---Ambiguity error: " 
+            << solutions.size() << " solutions found---\n";
+        int i = 0;
+        for (auto &solution : solutions) {
+          log << "---Ambiguous solution #" << i++ << "---\n";
+          solution.dump(&TC.Context.SourceMgr);
+          log << "\n";
+        }
+      }        
+
+      if (diagnoseAmbiguity(*this, solutions)) {
+        return true;
+      }
     }
 
     // Remove the solver state.
