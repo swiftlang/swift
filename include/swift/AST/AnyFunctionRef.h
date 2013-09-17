@@ -73,10 +73,7 @@ public:
   DeclContext *getAsDeclContext() {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD;
-    auto *ACE = TheFunction.get<AbstractClosureExpr *>();
-    if (auto *CE = dyn_cast<ClosureExpr>(ACE))
-      return CE;
-    return cast<AutoClosureExpr>(ACE);
+    return TheFunction.get<AbstractClosureExpr *>();
   }
 };
 
