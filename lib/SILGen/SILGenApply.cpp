@@ -782,6 +782,11 @@ public:
     if (!gen.SGM.requiresObjCDispatch(dynamicMemberRef->getMember().getDecl()))
       return false;
 
+    // Since we'll be collapsing this call site, make sure there's another
+    // call site that will actually perform the invocation.
+    if (callSites.empty())
+      return false;
+
     // Check whether the function we're calling is the postfix '!'.
     auto fn = ignoreParensAndImpConversions(apply->getFn());
     auto fnRef = dyn_cast<DeclRefExpr>(fn);
@@ -803,13 +808,14 @@ public:
       return false;
     }
 
+    auto *fd = dyn_cast<FuncDecl>(dynamicMemberRef->getMember().getDecl());
+    assert(fd && "Dynamic member reference to non-method");
+
     // We found it. Emit the base.
     ManagedValue existential =
       gen.emitRValue(dynamicMemberRef->getBase())
         .getAsSingleValue(gen, dynamicMemberRef->getBase());
 
-    auto *fd = dyn_cast<FuncDecl>(dynamicMemberRef->getMember().getDecl());
-    assert(fd && "dynamic property references not yet supported");
     assert(fd->isObjC() && "Dynamic member references require [objc]");
     SILValue val;
     if (fd->isInstanceMember()) {
