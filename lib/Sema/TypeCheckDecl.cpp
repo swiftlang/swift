@@ -424,21 +424,21 @@ public:
       explicit RevertWalker(DeclContext *dc) : dc(dc) { }
 
       // Skip expressions.
-      virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) {
+      std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
         return { false, expr };
       }
 
       // Skip statements.
-      virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) {
+      std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
         return { false, stmt };
       }
 
       // Skip patterns
-      virtual std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) {
+      std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
         return { false, pattern };
       }
 
-      virtual bool walkToTypeReprPost(TypeRepr *repr) {
+      bool walkToTypeReprPost(TypeRepr *repr) override {
         auto identType = dyn_cast<IdentTypeRepr>(repr);
         if (!identType)
           return true;

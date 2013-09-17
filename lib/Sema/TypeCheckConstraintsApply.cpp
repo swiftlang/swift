@@ -2734,7 +2734,7 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For an array, just walk the expression itself; its children have
       // already been type-checked.
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
@@ -2809,17 +2809,17 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
       return { true, expr };
     }
 
-    virtual Expr *walkToExprPost(Expr *expr) {
+    Expr *walkToExprPost(Expr *expr) override {
       return Rewriter.visit(expr);
     }
 
     /// \brief Ignore statements.
-    virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) {
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
 
     /// \brief Ignore declarations.
-    virtual bool walkToDeclPre(Decl *decl) { return false; }
+    bool walkToDeclPre(Decl *decl) override { return false; }
   };
 
   ExprRewriter rewriter(*this, solution);

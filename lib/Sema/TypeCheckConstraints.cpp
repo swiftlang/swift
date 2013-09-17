@@ -3414,7 +3414,7 @@ namespace {
       return { true, expr };
     }
 
-    Expr *walkToExprPost(Expr *expr) {
+    Expr *walkToExprPost(Expr *expr) override {
       // Fold sequence expressions.
       if (auto seqExpr = dyn_cast<SequenceExpr>(expr)) {
         return TC.foldSequence(seqExpr);
@@ -3504,7 +3504,7 @@ static Expr *cleanupIllFormedExpression(ASTContext &context,
       return { true, expr };
     }
 
-    Expr *walkToExprPost(Expr *expr) {
+    Expr *walkToExprPost(Expr *expr) override {
       Type type;
       if (expr->getType()) {
         type = expr->getType();

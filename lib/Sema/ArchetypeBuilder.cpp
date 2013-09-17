@@ -530,7 +530,7 @@ public:
 
   bool hadError() const { return HadError; }
 
-  virtual bool walkToTypeReprPost(TypeRepr *T) {
+  bool walkToTypeReprPost(TypeRepr *T) override {
     if (HadError)
       return false;
 

@@ -513,7 +513,7 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
+      if (auto *DRE = dyn_cast<DeclRefExpr>(E))
         return walkToDeclRefExpr(DRE);
 
       // Don't recurse into child closures, they should already have a capture

@@ -60,7 +60,7 @@ public:
     : TU(TU), ParserState(ParserState),
       CodeCompletionFactory(CodeCompletionFactory) {}
 
-  virtual bool walkToDeclPre(Decl *D) {
+  bool walkToDeclPre(Decl *D) override {
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       if (AFD->getBodyKind() != FuncDecl::BodyKind::Unparsed)
         return false;

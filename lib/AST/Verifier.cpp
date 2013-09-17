@@ -61,7 +61,7 @@ namespace {
       llvm_unreachable("not all cases handled!");
     }
 
-    Expr *walkToExprPost(Expr *E) {
+    Expr *walkToExprPost(Expr *E) override {
       switch (E->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Expr*>(E))
 #define EXPR(ID, PARENT) \
@@ -90,7 +90,7 @@ namespace {
       llvm_unreachable("not all cases handled!");
     }
 
-    Stmt *walkToStmtPost(Stmt *S) {
+    Stmt *walkToStmtPost(Stmt *S) override {
       switch (S->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Stmt*>(S))
 #define STMT(ID, PARENT) \
@@ -102,7 +102,7 @@ namespace {
       llvm_unreachable("not all cases handled!");
     }
 
-    bool walkToDeclPre(Decl *D) {
+    bool walkToDeclPre(Decl *D) override {
       switch (D->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPre(static_cast<ID##Decl*>(D))
 #define DECL(ID, PARENT) \
@@ -114,7 +114,7 @@ namespace {
       llvm_unreachable("not all cases handled!");
     }
 
-    bool walkToDeclPost(Decl *D) {
+    bool walkToDeclPost(Decl *D) override {
       switch (D->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Decl*>(D))
 #define DECL(ID, PARENT) \

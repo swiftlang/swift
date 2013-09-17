@@ -93,7 +93,7 @@ public:
 
   void visitTranslationUnit(TranslationUnit &TU, ArrayRef<SyntaxNode> Tokens);
 
-  virtual bool walkToTypeReprPre(TypeRepr *T);
+  bool walkToTypeReprPre(TypeRepr *T) override;
 
 private:
   enum PassNodesBehavior {

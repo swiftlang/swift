@@ -958,7 +958,7 @@ namespace {
   public:
     SanitizeExpr(TypeChecker &tc) : TC(tc) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // Don't recur into array-new or default-value expressions.
       return {
         !isa<NewArrayExpr>(expr)
@@ -967,7 +967,7 @@ namespace {
       };
     }
 
-    virtual Expr *walkToExprPost(Expr *expr) {
+    Expr *walkToExprPost(Expr *expr) override {
       if (auto implicit = dyn_cast<ImplicitConversionExpr>(expr)) {
         // Skip implicit conversions completely.
         return implicit->getSubExpr();
@@ -1013,7 +1013,7 @@ namespace {
   public:
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For closures containing only a single expression, the body participates
       // in type checking.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
@@ -1055,7 +1055,7 @@ namespace {
 
     /// \brief Once we've visited the children of the given expression,
     /// generate constraints from the expression.
-    virtual Expr *walkToExprPost(Expr *expr) {
+    Expr *walkToExprPost(Expr *expr) override {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         if (closure->hasSingleExpressionBody()) {
           // Visit the body. It's type needs to be convertible to the function's
@@ -1082,12 +1082,12 @@ namespace {
     }
 
     /// \brief Ignore statements.
-    virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
 
     /// \brief Ignore declarations.
-    virtual bool walkToDeclPre(Decl *decl) { return false; }
+    bool walkToDeclPre(Decl *decl) override { return false; }
   };
 } // end anonymous namespace
 
