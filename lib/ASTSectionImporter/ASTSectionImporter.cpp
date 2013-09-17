@@ -69,7 +69,7 @@ bool parseASTSection(SerializedModuleLoader* SML, StringRef Buf,
     // window into Buf.
     if (h->bitstream_ofs + h->bitstream_size > size) return false;
     auto mem = llvm::StringRef(data+h->bitstream_ofs, h->bitstream_size);
-    auto bitstream = llvm::MemoryBuffer::getMemBuffer(mem, AccessPath);
+    auto bitstream = llvm::MemoryBuffer::getMemBuffer(mem, AccessPath, false);
 
     // Register the memory buffer.
     SML->registerMemoryBuffer(AccessPath,
