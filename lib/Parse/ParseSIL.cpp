@@ -1579,8 +1579,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     
     UnionElementDecl *Elt = cast<UnionElementDecl>(EltRef.getDecl());
     
-    // FIXME: substitution means this needs to be explicit.
-    auto ResultTy = Elt->getArgumentType()->getCanonicalType();
+    auto OperandTy = Operand.getType().getSwiftRValueType();
+    auto ResultTy = OperandTy->getTypeOfMember(Elt->getModuleContext(),
+                                               Elt,
+                                               nullptr,
+                                               Elt->getArgumentType())
+      ->getCanonicalType();
     ResultVal = B.createUnionDataAddr(InstLoc, Operand, Elt,
                                     SILType::getPrimitiveAddressType(ResultTy));
     break;
