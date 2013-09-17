@@ -2439,7 +2439,6 @@ public:
   
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getSubscriptLoc(); }
-  SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 
   /// \brief Retrieve the indices for this subscript operation.
@@ -2507,7 +2506,6 @@ public:
 
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
-  SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 
   Pattern *getArguments() { return Arguments; }

@@ -909,18 +909,10 @@ SourceRange UnionElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 
-SourceLoc SubscriptDecl::getLoc() const {
-  return Indices->getStartLoc();
-}
-
 SourceRange SubscriptDecl::getSourceRange() const {
   if (Braces.isValid())
     return { getSubscriptLoc(), Braces.End };
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
-}
-
-SourceLoc ConstructorDecl::getLoc() const {
-  return Arguments->getStartLoc();
 }
 
 SourceRange ConstructorDecl::getSourceRange() const {
