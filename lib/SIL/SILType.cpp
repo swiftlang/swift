@@ -39,7 +39,7 @@ SILFunctionTypeInfo *SILType::getFunctionTypeInfo(SILModule &M) const {
   auto visitFn = [&](CanType type) {
     inputTypes.push_back(M.Types.getLoweredType(type));
   };
-  SILFunctionTypeInfo::DestructedArgumentTypeVisitor<decltype(visitFn)>(visitFn)
+  SILFunctionTypeInfo::DestructuredArgumentTypeVisitor<decltype(visitFn)>(visitFn)
   .visit(ft->getInput()->getCanonicalType());
   
   // We allocate room for an extra unsigned in the uncurriedInputCounts array,

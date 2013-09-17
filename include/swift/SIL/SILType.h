@@ -295,14 +295,14 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
 /// SIL-level calling convention for the function, including its exploded
 /// input argument types and whether it uses an indirect return argument.
 class SILFunctionTypeInfo {
-  /// Recursively destructure tuple-type arguments into SIL argument types.
+  /// Recursively destructure and visit tuple-type arguments
   template<typename F>
-  class DestructedArgumentTypeVisitor
-    : public CanTypeVisitor<DestructedArgumentTypeVisitor<F>>
+  class DestructuredArgumentTypeVisitor
+    : public CanTypeVisitor<DestructuredArgumentTypeVisitor<F>>
   {
     const F &fn;
   public:
-    DestructedArgumentTypeVisitor(const F &fn) : fn(fn) { }
+    DestructuredArgumentTypeVisitor(const F &fn) : fn(fn) { }
 
     void visitType(CanType t) {
       fn(t);
@@ -310,7 +310,7 @@ class SILFunctionTypeInfo {
 
     void visitTupleType(CanTupleType tt) {
       for (auto eltType : tt.getElementTypes()) {
-        CanTypeVisitor<DestructedArgumentTypeVisitor<F>>::visit(eltType);
+        CanTypeVisitor<DestructuredArgumentTypeVisitor<F>>::visit(eltType);
       }
     }
   };
@@ -386,7 +386,7 @@ public:
 
   template <typename F>
   void visitSwiftArgumentTypes(const F &fn) const {
-    DestructedArgumentTypeVisitor<F> visitor(fn);
+    DestructuredArgumentTypeVisitor<F> visitor(fn);
     visitor.visit(cast<AnyFunctionType>(getSwiftType()).getInput());
   }
 
