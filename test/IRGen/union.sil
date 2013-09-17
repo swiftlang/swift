@@ -55,11 +55,12 @@ import Builtin
 //      case c:     0  1  0  0  0  0  1  1
 // CHECK: %O5union24MultiPayloadTwoSpareBits = type { i64 }
 
-// -- Dynamic singleton. The type layout is opaque; we dynamically bitcast to
+// -- Dynamic unions. The type layout is opaque; we dynamically bitcast to
 //    the element type.
 // CHECK: %O5union16DynamicSingleton = type {}
+// CHECK: %O5union20DynamicSinglePayload = type {}
 
-// -- Dynamic singleton metadata template carries a value witness table pattern
+// -- Dynamic metadata template carries a value witness table pattern
 //    we fill in on instantiation.
 // CHECK: @_TMPdO5union16DynamicSingleton = global { {{.*}}* } {
 // CHECK:   void (i8*, i8*)* [[DYNAMIC_SINGLETON_FILL:@fill_generic_metadata[0-9]*]]
@@ -82,6 +83,9 @@ import Builtin
 // CHECK:   i8* inttoptr (i64 252 to i8*)
 // CHECK: ] 
 
+// CHECK: @_TMPdO5union20DynamicSinglePayload = global { {{.*}}* } {
+// CHECK:   void (i8*, i8*)* [[DYNAMIC_SINGLE_PAYLOAD_FILL:@fill_generic_metadata[0-9]*]]
+
 union Singleton {
   case val(Builtin.Int64, Builtin.Int64)
 }
@@ -89,17 +93,6 @@ union Singleton {
 union DynamicSingleton<T> {
   case val(T)
 }
-/*
-union DynamicSingleton2<T> {
-  case val(Int, T)
-}
-union DynamicSingleton3<T> {
-  case val(T, Int)
-}
-union DynamicSingleton4<T> {
-  case val(T, T)
-}
-*/
 
 // CHECK: define void @singleton_switch(i64, i64) {
 sil @singleton_switch : $(Singleton) -> () {
@@ -801,6 +794,12 @@ entry:
   return %u : $SinglePayloadSpareBit
 }
 
+union DynamicSinglePayload<T> {
+  case x(T)
+  case y
+  case z
+  case w
+}
 
 union MultiPayloadNoSpareBits {
   case x(Builtin.Int64)
@@ -1635,3 +1634,7 @@ entry:
 // CHECK:   [[T_STRIDE:%.*]] = load i8** [[T_STRIDE_ADDR]], align 8
 // CHECK:   store i8* [[T_STRIDE]], i8** [[STRIDE_ADDR]], align 8
 
+// -- Fill function for dynamic single-payload. Call into the runtime to
+//    calculate the size.
+// CHECK: define internal void [[DYNAMIC_SINGLE_PAYLOAD_FILL]](i8*, i8*) {
+// CHECK:   call void @swift_initUnionTypeValueWitnessTableSinglePayload

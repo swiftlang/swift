@@ -304,6 +304,37 @@ FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, RuntimeCC,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// void swift_initUnionTypeValueWitnessTableSinglePayload(value_witness_table_t *vwt,
+//                                               type_metadata_t *payload,
+//                                               unsigned num_empty_cases);
+FUNCTION(InitUnionTypeValueWitnessTableSinglePayload,
+         swift_initUnionTypeValueWitnessTableSinglePayload,
+         RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WitnessTablePtrTy, TypeMetadataPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// int swift_getUnionCaseSinglePayload(opaque_t *obj,
+//                                     type_metadata_t *payload,
+//                                     unsigned num_empty_cases);
+FUNCTION(GetUnionCaseSinglePayload,
+         swift_getUnionCaseSinglePayload,
+         RuntimeCC,
+         RETURNS(Int32Ty),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void swift_storeUnionTagSinglePayload(opaque_t *obj,
+//                                       type_metadata_t *payload,
+//                                       int case,
+//                                       unsigned num_empty_cases);
+FUNCTION(StoreUnionTagSinglePayload,
+         swift_storeUnionTagSinglePayload,
+         RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty, Int32Ty),
+         ATTRS(NoUnwind))
+
 // type_metadata_t *swift_staticTypeof(opaque_t *obj, type_metadata_t *self);
 FUNCTION(StaticTypeof, swift_staticTypeof, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),

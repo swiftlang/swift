@@ -76,10 +76,10 @@ protected:
                     std::vector<Element> &&ElementsWithRecursivePayload,
                     std::vector<Element> &&ElementsWithNoPayload)
   : ElementsWithPayload(std::move(ElementsWithPayload)),
-  ElementsWithRecursivePayload(std::move(ElementsWithRecursivePayload)),
-  ElementsWithNoPayload(std::move(ElementsWithNoPayload)),
-  TIK(tik),
-  NumElements(NumElements)
+    ElementsWithRecursivePayload(std::move(ElementsWithRecursivePayload)),
+    ElementsWithNoPayload(std::move(ElementsWithNoPayload)),
+    TIK(tik),
+    NumElements(NumElements)
   {}
   
   /// Save the TypeInfo created for the union.
@@ -702,10 +702,20 @@ namespace {
   protected:
     /// Do a primitive copy of the union from one address to another.
     void emitPrimitiveCopy(IRGenFunction &IGF, Address dest, Address src) const{
-      llvm::Value *payload, *extraTag;
-      std::tie(payload, extraTag)
-        = emitPrimitiveLoadPayloadAndExtraTag(IGF, src);
-      emitPrimitiveStorePayloadAndExtraTag(IGF, dest, payload, extraTag);
+      // If the layout is fixed, load and store the fixed-size payload and tag.
+      if (TIK >= Fixed) {
+        llvm::Value *payload, *extraTag;
+        std::tie(payload, extraTag)
+          = emitPrimitiveLoadPayloadAndExtraTag(IGF, src);
+        emitPrimitiveStorePayloadAndExtraTag(IGF, dest, payload, extraTag);
+        return;
+      }
+      
+      // Otherwise, do a memcpy of the dynamic size of the type.
+      IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
+                               TI->getSize(IGF),
+                               std::min(dest.getAlignment().getValue(),
+                                        src.getAlignment().getValue()));
     }
     
     void emitPrimitiveStorePayloadAndExtraTag(IRGenFunction &IGF, Address dest,
@@ -732,12 +742,6 @@ namespace {
         extraTag = IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr));
       return {payload, extraTag};
     }
-    
-    void initializeValueWitnessTable(IRGenFunction &IGF,
-                                     llvm::Value *metadata,
-                                     llvm::Value *vwtable) const override {
-      // FIXME
-    }
   };
 
   class SinglePayloadUnionImplStrategy final
@@ -755,6 +759,12 @@ namespace {
     }
     const LoadableTypeInfo &getLoadablePayloadTypeInfo() const {
       return cast<LoadableTypeInfo>(*ElementsWithPayload[0].ti);
+    }
+    
+    CanType PayloadTy;
+    
+    llvm::Value *emitPayloadMetadata(IRGenFunction &IGF) const {
+      return IGF.emitTypeMetadataRef(PayloadTy);
     }
     
   public:
@@ -798,7 +808,17 @@ namespace {
                                       CanType type,
                                       UnionDecl *theUnion,
                                       llvm::StructType *unionTy) override;
-
+  private:
+    TypeInfo *completeFixedLayout(TypeConverter &TC,
+                                  CanType type,
+                                  UnionDecl *theUnion,
+                                  llvm::StructType *unionTy);
+    TypeInfo *completeDynamicLayout(TypeConverter &TC,
+                                    CanType type,
+                                    UnionDecl *theUnion,
+                                    llvm::StructType *unionTy);
+    
+  public:
     llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth,
                                   unsigned offset) const override {
@@ -1069,13 +1089,13 @@ namespace {
     }
     
   private:
-    /// Emits the test(s) that determine whether the union contains a payload
-    /// or an empty case. Emits the basic block for the "true" case and
+    /// Emits the test(s) that determine whether the fixed-size union contains a
+    /// payload or an empty case. Emits the basic block for the "true" case and
     /// returns the unemitted basic block for the "false" case.
     llvm::BasicBlock *
-    testUnionContainsPayload(IRGenFunction &IGF,
-                             llvm::Value *payload,
-                             llvm::Value *extraBits) const {
+    testFixedUnionContainsPayload(IRGenFunction &IGF,
+                                  llvm::Value *payload,
+                                  llvm::Value *extraBits) const {
       auto *falseBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
       
       // We only need to apply the payload operation if the union contains a
@@ -1122,6 +1142,48 @@ namespace {
       return falseBB;
     }
     
+    /// Emits the test(s) that determine whether the union contains a payload
+    /// or an empty case. For a fixed-size union, this does a primitive load
+    /// of the representation and calls down to testFixedUnionContainsPayload.
+    /// For a dynamic union, this queries the value witness table of the payload
+    /// type. Emits the basic block for the "true" case and
+    /// returns the unemitted basic block for the "false" case.
+    llvm::BasicBlock *
+    testUnionContainsPayload(IRGenFunction &IGF,
+                             Address addr) const {
+      auto &C = IGF.IGM.getLLVMContext();
+      
+      if (TIK >= Fixed) {
+        llvm::Value *payload, *extraTag;
+        std::tie(payload, extraTag)
+          = emitPrimitiveLoadPayloadAndExtraTag(IGF, addr);
+        return testFixedUnionContainsPayload(IGF, payload, extraTag);
+      }
+
+      auto *payloadBB = llvm::BasicBlock::Create(C);
+      auto *noPayloadBB = llvm::BasicBlock::Create(C);
+
+      // Look up the metadata for the payload.
+      llvm::Value *metadata = emitPayloadMetadata(IGF);
+
+      // Ask the runtime what case we have.
+      llvm::Value *opaqueAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
+                                                          IGF.IGM.OpaquePtrTy);
+      llvm::Value *numCases = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                                 ElementsWithNoPayload.size());
+      llvm::Value *which = IGF.Builder.CreateCall3(
+                                       IGF.IGM.getGetUnionCaseSinglePayloadFn(),
+                                       opaqueAddr, metadata, numCases);
+      
+      // If it's -1 then we have the payload.
+      llvm::Value *hasPayload = IGF.Builder.CreateICmpEQ(which,
+                             llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1));
+      IGF.Builder.CreateCondBr(hasPayload, payloadBB, noPayloadBB);
+      
+      IGF.Builder.emitBlock(payloadBB);
+      return noPayloadBB;
+    }
+    
   public:
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
     const override {
@@ -1135,7 +1197,7 @@ namespace {
       llvm::Value *payload, *extraTag;
       std::tie(payload, extraTag) = getPayloadAndExtraTagFromExplosion(src);
       
-      llvm::BasicBlock *endBB = testUnionContainsPayload(IGF, payload, extraTag);
+      llvm::BasicBlock *endBB = testFixedUnionContainsPayload(IGF, payload, extraTag);
       
       Explosion payloadValue(ExplosionKind::Minimal);
       Explosion payloadCopy(ExplosionKind::Minimal);
@@ -1164,7 +1226,7 @@ namespace {
       llvm::Value *payload, *extraTag;
       std::tie(payload, extraTag) = getPayloadAndExtraTagFromExplosion(src);
       
-      llvm::BasicBlock *endBB = testUnionContainsPayload(IGF, payload, extraTag);
+      llvm::BasicBlock *endBB = testFixedUnionContainsPayload(IGF, payload, extraTag);
       
       // If we did, consume it.
       Explosion payloadValue(ExplosionKind::Minimal);
@@ -1181,11 +1243,7 @@ namespace {
         return;
       
       // Check that there is a payload at the address.
-      llvm::Value *payload, *extraTag;
-      std::tie(payload, extraTag)
-        = emitPrimitiveLoadPayloadAndExtraTag(IGF, addr);
-      
-      llvm::BasicBlock *endBB = testUnionContainsPayload(IGF, payload, extraTag);
+      llvm::BasicBlock *endBB = testUnionContainsPayload(IGF, addr);
       
       // If there is, project and destroy it.
       Address payloadAddr = projectPayloadData(IGF, addr);
@@ -1197,9 +1255,34 @@ namespace {
     
   private:
     llvm::ConstantInt *getZeroExtraTagConstant(IRGenModule &IGM) const {
+      assert(TIK >= Fixed && "not fixed layout");
       assert(ExtraTagBitCount > 0 && "no extra tag bits?!");
       return llvm::ConstantInt::get(IGM.getLLVMContext(),
                                     APInt(ExtraTagBitCount, 0));
+    }
+    
+    /// Initialize the extra tag bits, if any, to zero to indicate a payload.
+    void emitInitializeExtraTagBitsForPayload(IRGenFunction &IGF,
+                                              Address dest) const {
+      if (TIK >= Fixed) {
+        // We statically know whether we have extra tag bits.
+        // Store zero directly to the fixed-layout extra tag field.
+        if (ExtraTagBitCount > 0) {
+          auto *zeroTag = getZeroExtraTagConstant(IGF.IGM);
+          IGF.Builder.CreateStore(zeroTag, projectExtraTagBits(IGF, dest));
+        }
+        return;
+      }
+      
+      // Ask the runtime to store the tag.
+      llvm::Value *opaqueAddr = IGF.Builder.CreateBitCast(dest.getAddress(),
+                                                          IGF.IGM.OpaquePtrTy);
+      llvm::Value *metadata = emitPayloadMetadata(IGF);
+      IGF.Builder.CreateCall4(IGF.IGM.getStoreUnionTagSinglePayloadFn(),
+                              opaqueAddr, metadata,
+                              llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1),
+                              llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                                 ElementsWithNoPayload.size()));
     }
     
     /// Emit an reassignment sequence from a union at one address to another.
@@ -1214,24 +1297,18 @@ namespace {
         return emitPrimitiveCopy(IGF, dest, src);
 
       llvm::BasicBlock *endBB = llvm::BasicBlock::Create(C);
-      
-      // See whether the current value at the destination has a payload.
-      llvm::Value *destPayload, *destExtraTag;
-      llvm::Value *srcPayload, *srcExtraTag;
-      std::tie(destPayload, destExtraTag)
-        = emitPrimitiveLoadPayloadAndExtraTag(IGF, dest);
-      std::tie(srcPayload, srcExtraTag)
-        = emitPrimitiveLoadPayloadAndExtraTag(IGF, src);
+
       Address destData = projectPayloadData(IGF, dest);
       Address srcData = projectPayloadData(IGF, src);
+      // See whether the current value at the destination has a payload.
 
       llvm::BasicBlock *noDestPayloadBB
-        = testUnionContainsPayload(IGF, destPayload, destExtraTag);
+        = testUnionContainsPayload(IGF, dest);
       
       // Here, the destination has a payload. Now see if the source also has
       // one.
       llvm::BasicBlock *destNoSrcPayloadBB
-        = testUnionContainsPayload(IGF, srcPayload, srcExtraTag);
+        = testUnionContainsPayload(IGF, src);
       
       // Here, both source and destination have payloads. Do the reassignment
       // of the payload in-place.
@@ -1242,28 +1319,25 @@ namespace {
       // the payload and primitive-store the new no-payload value.
       IGF.Builder.emitBlock(destNoSrcPayloadBB);
       getPayloadTypeInfo().destroy(IGF, destData);
-      emitPrimitiveStorePayloadAndExtraTag(IGF, dest, srcPayload, srcExtraTag);
+      emitPrimitiveCopy(IGF, dest, src);
       IGF.Builder.CreateBr(endBB);
       
       // Now, if the destination has no payload, check if the source has one.
       IGF.Builder.emitBlock(noDestPayloadBB);
       llvm::BasicBlock *noDestNoSrcPayloadBB
-        = testUnionContainsPayload(IGF, srcPayload, srcExtraTag);
+        = testUnionContainsPayload(IGF, src);
 
       // Here, the source has a payload but the destination doesn't. We can
       // copy-initialize the source over the destination, then primitive-store
       // the zero extra tag (if any).
       (getPayloadTypeInfo().*initializeData)(IGF, destData, srcData);
-      if (ExtraTagBitCount > 0) {
-        auto *zeroTag = getZeroExtraTagConstant(IGF.IGM);
-        IGF.Builder.CreateStore(zeroTag, projectExtraTagBits(IGF, dest));
-      }
+      emitInitializeExtraTagBitsForPayload(IGF, dest);
       IGF.Builder.CreateBr(endBB);
       
       // If neither destination nor source have payloads, we can just primitive-
       // store the new empty-case value.
       IGF.Builder.emitBlock(noDestNoSrcPayloadBB);
-      emitPrimitiveStorePayloadAndExtraTag(IGF, dest, srcPayload, srcExtraTag);
+      emitPrimitiveCopy(IGF, dest, src);
       IGF.Builder.CreateBr(endBB);
       
       IGF.Builder.emitBlock(endBB);
@@ -1282,29 +1356,23 @@ namespace {
       
       llvm::BasicBlock *endBB = llvm::BasicBlock::Create(C);
 
-      // See whether the source value has a payload.
-      llvm::Value *srcPayload, *srcExtraTag;
-      std::tie(srcPayload, srcExtraTag)
-        = emitPrimitiveLoadPayloadAndExtraTag(IGF, src);
       Address destData = projectPayloadData(IGF, dest);
       Address srcData = projectPayloadData(IGF, src);
 
+      // See whether the source value has a payload.
       llvm::BasicBlock *noSrcPayloadBB
-        = testUnionContainsPayload(IGF, srcPayload, srcExtraTag);
+        = testUnionContainsPayload(IGF, src);
       
       // Here, the source value has a payload. Initialize the destination with
       // it, and set the extra tag if any to zero.
       (getPayloadTypeInfo().*initializeData)(IGF, destData, srcData);
-      if (ExtraTagBitCount > 0) {
-        auto *zeroTag = getZeroExtraTagConstant(IGF.IGM);
-        IGF.Builder.CreateStore(zeroTag, projectExtraTagBits(IGF, dest));
-      }
+      emitInitializeExtraTagBitsForPayload(IGF, dest);
       IGF.Builder.CreateBr(endBB);
 
       // If the source value has no payload, we can primitive-store the
       // empty-case value.
       IGF.Builder.emitBlock(noSrcPayloadBB);
-      emitPrimitiveStorePayloadAndExtraTag(IGF, dest, srcPayload, srcExtraTag);
+      emitPrimitiveCopy(IGF, dest, src);
       IGF.Builder.CreateBr(endBB);
       
       IGF.Builder.emitBlock(endBB);
@@ -1356,6 +1424,24 @@ namespace {
       IGF.Builder.CreateStore(payload, projectPayload(IGF, unionAddr));
       if (ExtraTagBitCount > 0)
         IGF.Builder.CreateStore(extraTag, projectExtraTagBits(IGF, unionAddr));
+    }
+    
+    void initializeValueWitnessTable(IRGenFunction &IGF,
+                                     llvm::Value *metadata,
+                                     llvm::Value *vwtable) const override
+    {
+      // Fixed-size unions don't need dynamic witness table initialization.
+      if (TIK >= Fixed) return;
+
+      // Ask the runtime to do our layout using the payload metadata and number
+      // of empty cases.
+      auto payloadMetadata = emitPayloadMetadata(IGF);
+      auto emptyCasesVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                                  ElementsWithNoPayload.size());
+      
+      IGF.Builder.CreateCall3(
+                    IGF.IGM.getInitUnionTypeValueWitnessTableSinglePayloadFn(),
+                    vwtable, payloadMetadata, emptyCasesVal);
     }
   };
 
@@ -2073,6 +2159,12 @@ namespace {
       return IGF.Builder.CreateBitCast(unionAddr,
                                payloadI->ti->getStorageType()->getPointerTo());
     }
+
+    void initializeValueWitnessTable(IRGenFunction &IGF,
+                                     llvm::Value *metadata,
+                                     llvm::Value *vwtable) const override {
+      // FIXME
+    }
   };
 } // end anonymous namespace
 
@@ -2422,11 +2514,11 @@ namespace {
     }
   }
   
-  TypeInfo *
-  SinglePayloadUnionImplStrategy::completeUnionTypeLayout(TypeConverter &TC,
-                                                  CanType type,
-                                                  UnionDecl *theUnion,
-                                                  llvm::StructType *unionTy) {
+  TypeInfo *SinglePayloadUnionImplStrategy::completeFixedLayout(
+                                      TypeConverter &TC,
+                                      CanType type,
+                                      UnionDecl *theUnion,
+                                      llvm::StructType *unionTy) {
     // See whether the payload case's type has extra inhabitants.
     unsigned fixedExtraInhabitants = 0;
     unsigned numTags = ElementsWithNoPayload.size();
@@ -2456,6 +2548,11 @@ namespace {
         = (tagsWithoutInhabitants+(tagsPerTagBitValue-1))/tagsPerTagBitValue+1;
       ExtraTagBitCount = llvm::Log2_32(NumExtraTagValues-1) + 1;
     }
+    // FIXME: Dynamic single-payload dispatch assumes that the extra tag bits
+    // fit in a single byte. This is probably a safe assumption since it would
+    // take 65535 empty cases to overflow.
+    assert(ExtraTagBitCount <= 8 &&
+           "more than 8 extra tag bits not handled by runtime");
 
     // Create the body type.
     setTaggedUnionBody(TC.IGM, unionTy,
@@ -2473,6 +2570,38 @@ namespace {
     return getFixedUnionTypeInfo(unionTy, Size(sizeWithTag), {},
                             payloadTI.getFixedAlignment(),
                             payloadTI.isPOD(ResilienceScope::Component));
+  }
+  
+  TypeInfo *SinglePayloadUnionImplStrategy::completeDynamicLayout(
+                                                  TypeConverter &TC,
+                                                  CanType type,
+                                                  UnionDecl *theUnion,
+                                                  llvm::StructType *unionTy) {
+    // The body is runtime-dependent, so we can't put anything useful here
+    // statically.
+    unionTy->setBody(ArrayRef<llvm::Type*>{});
+
+    // Layout has to be done when the value witness table is instantiated,
+    // during initializeValueWitnessTable.
+    return registerUnionTypeInfo(new NonFixedUnionTypeInfo(*this, unionTy, type,
+                       getPayloadTypeInfo().getBestKnownAlignment(),
+                       getPayloadTypeInfo().isPOD(ResilienceScope::Component)));
+  }
+  
+  TypeInfo *
+  SinglePayloadUnionImplStrategy::completeUnionTypeLayout(TypeConverter &TC,
+                                                  CanType type,
+                                                  UnionDecl *theUnion,
+                                                  llvm::StructType *unionTy) {
+    PayloadTy = type->getTypeOfMember(theUnion->getModuleContext(),
+                                      getPayloadElement(),
+                                      nullptr,
+                                      getPayloadElement()->getArgumentType())
+      ->getCanonicalType();
+    
+    if (TIK >= Fixed)
+      return completeFixedLayout(TC, type, theUnion, unionTy);
+    return completeDynamicLayout(TC, type, theUnion, unionTy);
   }
   
   TypeInfo *
