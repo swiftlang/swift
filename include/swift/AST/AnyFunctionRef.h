@@ -27,8 +27,12 @@ class AnyFunctionRef {
   PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *> TheFunction;
 
 public:
-  AnyFunctionRef(AbstractFunctionDecl *AFD) : TheFunction(AFD) {}
-  AnyFunctionRef(AbstractClosureExpr *CE) : TheFunction(CE) {}
+  AnyFunctionRef(AbstractFunctionDecl *AFD) : TheFunction(AFD) {
+    assert(AFD && "should have a function");
+  }
+  AnyFunctionRef(AbstractClosureExpr *ACE) : TheFunction(ACE) {
+    assert(ACE && "should have a closure");
+  }
 
   CaptureInfo &getCaptureInfo() {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
