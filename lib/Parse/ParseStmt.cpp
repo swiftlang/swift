@@ -167,7 +167,7 @@ static void unwrapIfDiscardedClosure(Parser &P,
     return;
 
   if (auto *E = Result.dyn_cast<Expr *>()) {
-    if (auto *CE = dyn_cast<PipeClosureExpr>(E)) {
+    if (auto *CE = dyn_cast<ClosureExpr>(E)) {
       if (!CE->hasAnonymousClosureVars())
         // Parameters are explicitly specified, and could be used in the body,
         // don't attempt recovery.
@@ -460,7 +460,7 @@ ParserResult<Stmt> Parser::parseStmtIf() {
     return makeParserResult<Stmt>(Condition, nullptr); // FIXME: better recovery
 
   ParserResult<BraceStmt> NormalBody;
-  if (auto *CE = dyn_cast<PipeClosureExpr>(Condition.get())) {
+  if (auto *CE = dyn_cast<ClosureExpr>(Condition.get())) {
     // If we parsed closure after 'if', then it was not the condition, but the
     // 'if' statement body.  We can not have a bare closure in an 'if'
     // condition because closures don't conform to LogicValue.
@@ -508,7 +508,7 @@ ParserResult<Stmt> Parser::parseStmtWhile() {
     return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
 
   ParserResult<BraceStmt> Body;
-  if (auto *CE = dyn_cast<PipeClosureExpr>(Condition.get())) {
+  if (auto *CE = dyn_cast<ClosureExpr>(Condition.get())) {
     // If we parsed a closure after 'while', then it was not the condition, but
     // the 'while' statement body.  We can not have a bare closure in a 'while'
     // condition because closures don't conform to LogicValue.
@@ -557,7 +557,7 @@ ParserResult<Stmt> Parser::parseStmtDoWhile() {
   if (Condition.isNull() || Condition.hasCodeCompletion())
     return makeParserResult<Stmt>(Condition, nullptr); // FIXME: better recovery
 
-  if (auto *CE = dyn_cast<PipeClosureExpr>(Condition.get())) {
+  if (auto *CE = dyn_cast<ClosureExpr>(Condition.get())) {
     // If we parsed a closure after 'do ... while', then it was not the
     // condition, but a beginning of the next statement.  We can not have a
     // bare closure in a 'do ... while' condition because closures don't
@@ -652,7 +652,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     FirstDeclsContext = Context.AllocateCopy(FirstDecls);
 
   if (Tok.isNot(tok::semi)) {
-    if (auto *CE = dyn_cast_or_null<PipeClosureExpr>(First.getPtrOrNull())) {
+    if (auto *CE = dyn_cast_or_null<ClosureExpr>(First.getPtrOrNull())) {
       // We have seen:
       //     for { ... }
       // and there's no semicolon after that.
@@ -690,7 +690,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   if (Tok.isNot(tok::semi) && Second.isNonNull()) {
     Expr *RecoveredCondition = nullptr;
     BraceStmt *RecoveredBody = nullptr;
-    if (auto *CE = dyn_cast<PipeClosureExpr>(Second.get())) {
+    if (auto *CE = dyn_cast<ClosureExpr>(Second.get())) {
       // We have seen:
       //     for ... ; { ... }
       // and there's no semicolon after that.
@@ -710,7 +710,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
           // We parsed the condition as a CallExpr with a brace statement as a
           // trailing closure.  Recover by using the original expression as the
           // condition and brace statement as a 'for' body.
-          RecoveredBody = cast<PipeClosureExpr>(PE->getSubExpr())->getBody();
+          RecoveredBody = cast<ClosureExpr>(PE->getSubExpr())->getBody();
           RecoveredCondition = CE->getFn();
         }
       }
@@ -787,7 +787,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
     Container =
         makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
 
-  if (auto *CE = dyn_cast<PipeClosureExpr>(Container.get())) {
+  if (auto *CE = dyn_cast<ClosureExpr>(Container.get())) {
     diagnose(CE->getStartLoc(), diag::expected_foreach_container);
 
     // If the container expression turns out to be a closure, then it was not

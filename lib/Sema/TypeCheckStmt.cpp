@@ -104,7 +104,7 @@ public:
     DC = cast<FuncDecl>(AFD);
   }
 
-  StmtChecker(TypeChecker &TC, PipeClosureExpr *TheClosure)
+  StmtChecker(TypeChecker &TC, ClosureExpr *TheClosure)
     : TC(TC), TheFunc(TheClosure), DC(TheClosure),
       LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
 
@@ -844,7 +844,7 @@ void TypeChecker::typeCheckDestructorBody(DestructorDecl *DD) {
       .typeCheckStmt(Body);
 }
 
-void TypeChecker::typeCheckClosureBody(PipeClosureExpr *closure) {
+void TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   BraceStmt *body = closure->getBody();
   StmtChecker(*this, closure).typeCheckStmt(body);
   if (body) {

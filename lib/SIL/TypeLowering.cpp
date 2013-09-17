@@ -1358,7 +1358,7 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     SmallVector<ValueDecl*, 4> LocalCaptures;
-    if (auto *CE = c.loc.dyn_cast<PipeClosureExpr *>()) {
+    if (auto *CE = c.loc.dyn_cast<ClosureExpr *>()) {
       auto *FuncTy = CE->getType()->castTo<AnyFunctionType>();
       CE->getCaptureInfo().getLocalCaptures(LocalCaptures);
       return getFunctionTypeWithCaptures(FuncTy, LocalCaptures,CE->getParent());

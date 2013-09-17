@@ -30,7 +30,7 @@ namespace llvm {
 
 namespace swift {
   class ValueDecl;
-  class PipeClosureExpr;
+  class ClosureExpr;
   class AutoClosureExpr;
   class ASTContext;
   class ClassDecl;
@@ -46,7 +46,7 @@ namespace swift {
 /// initializing entry points of a constructor, the getter and setter for
 /// a property, etc.
 struct SILDeclRef {
-  typedef llvm::PointerUnion3<ValueDecl *, PipeClosureExpr *,
+  typedef llvm::PointerUnion3<ValueDecl *, ClosureExpr *,
                               AutoClosureExpr *> Loc;
   
   /// Represents the "kind" of the SILDeclRef. For some Swift decls there
@@ -138,16 +138,16 @@ struct SILDeclRef {
   bool isNull() const { return loc.isNull(); }
   
   bool hasDecl() const { return loc.is<ValueDecl *>(); }
-  bool hasPipeClosureExpr() const {
-    return loc.is<PipeClosureExpr *>();
+  bool hasClosureExpr() const {
+    return loc.is<ClosureExpr *>();
   }
   bool hasAutoClosureExpr() const {
     return loc.is<AutoClosureExpr *>();
   }
 
   ValueDecl *getDecl() const { return loc.get<ValueDecl *>(); }
-  PipeClosureExpr *getPipeClosureExpr() const {
-    return loc.dyn_cast<PipeClosureExpr *>();
+  ClosureExpr *getClosureExpr() const {
+    return loc.dyn_cast<ClosureExpr *>();
   }
   AutoClosureExpr *getAutoClosureExpr() const {
     return loc.dyn_cast<AutoClosureExpr *>();

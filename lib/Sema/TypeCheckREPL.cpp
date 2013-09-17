@@ -528,8 +528,8 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   TC->typeCheckPattern(ParamPat,
                        Arg->getDeclContext(),
                        /*allowUnknownTypes*/false);
-  PipeClosureExpr *CE =
-      new (C) PipeClosureExpr(ParamPat, SourceLoc(), TypeLoc(), &TC->TU);
+  ClosureExpr *CE =
+      new (C) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(), &TC->TU);
   Type FuncTy = FunctionType::get(ParamPat->getType(), TupleType::getEmpty(C),
                                   C);
   CE->setType(FuncTy);

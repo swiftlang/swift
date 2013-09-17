@@ -689,7 +689,7 @@ namespace {
       llvm_unreachable("Unhandled pattern kind");
     }
 
-    Type visitPipeClosureExpr(PipeClosureExpr *expr) {
+    Type visitClosureExpr(ClosureExpr *expr) {
       // Closure expressions always have function type. In cases where a
       // parameter or return type is omitted, a fresh type variable is used to
       // stand in for that parameter or return type, allowing it to be inferred
@@ -1016,7 +1016,7 @@ namespace {
     virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For closures containing only a single expression, the body participates
       // in type checking.
-      if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
+      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         if (closure->hasSingleExpressionBody()) {
           // Visit the closure itself, which produces a function type.
           auto funcTy = CG.visit(expr)->castTo<FunctionType>();
@@ -1056,7 +1056,7 @@ namespace {
     /// \brief Once we've visited the children of the given expression,
     /// generate constraints from the expression.
     virtual Expr *walkToExprPost(Expr *expr) {
-      if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
+      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         if (closure->hasSingleExpressionBody()) {
           // Visit the body. It's type needs to be convertible to the function's
           // return type.

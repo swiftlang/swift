@@ -305,23 +305,23 @@ Type AbstractClosureExpr::getResultType() const {
   return getType()->castTo<FunctionType>()->getResult();
 }
 
-SourceRange PipeClosureExpr::getSourceRange() const {
+SourceRange ClosureExpr::getSourceRange() const {
   return body.getPointer()->getSourceRange();
 }
 
-SourceLoc PipeClosureExpr::getLoc() const {
+SourceLoc ClosureExpr::getLoc() const {
   return body.getPointer()->getStartLoc();
 }
 
-Expr *PipeClosureExpr::getSingleExpressionBody() const {
+Expr *ClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
   return cast<ReturnStmt>(body.getPointer()->getElements()[0].get<Stmt *>())
            ->getResult();
 }
 
-void PipeClosureExpr::setSingleExpressionBody(Expr *newBody) {
+void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
   cast<ReturnStmt>(body.getPointer()->getElements()[0].get<Stmt *>())
-    ->setResult(newBody);
+    ->setResult(NewBody);
 }
 
 SourceRange AutoClosureExpr::getSourceRange() const {

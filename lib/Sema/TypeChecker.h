@@ -293,7 +293,7 @@ public:
   void typeCheckConstructorBody(ConstructorDecl *CD);
   void typeCheckDestructorBody(DestructorDecl *DD);
 
-  void typeCheckClosureBody(PipeClosureExpr *closure);
+  void typeCheckClosureBody(ClosureExpr *closure);
 
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 

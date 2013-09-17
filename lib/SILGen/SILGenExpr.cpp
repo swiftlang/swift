@@ -197,7 +197,7 @@ namespace {
     RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
     RValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
     RValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
-    RValue visitPipeClosureExpr(PipeClosureExpr *E, SGFContext C);
+    RValue visitClosureExpr(ClosureExpr *E, SGFContext C);
     RValue visitAutoClosureExpr(AutoClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
@@ -1340,7 +1340,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   return emitManagedRValueWithCleanup(toClosure);
 }
 
-RValue RValueEmitter::visitPipeClosureExpr(PipeClosureExpr *e, SGFContext C) {
+RValue RValueEmitter::visitClosureExpr(ClosureExpr *e, SGFContext C) {
   // Generate the closure function.
   SGF.SGM.emitClosure(e);
 
@@ -1371,7 +1371,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   emitEpilog(fd);
 }
 
-void SILGenFunction::emitClosure(PipeClosureExpr *ce) {
+void SILGenFunction::emitClosure(ClosureExpr *ce) {
   emitProlog(ce, ce->getParams(), ce->getResultType());
   prepareEpilog(ce->getResultType(), CleanupLocation(ce));
   visit(ce->getBody());

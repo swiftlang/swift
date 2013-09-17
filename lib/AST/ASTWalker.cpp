@@ -299,7 +299,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
-  Expr *visitPipeClosureExpr(PipeClosureExpr *expr) {
+  Expr *visitClosureExpr(ClosureExpr *expr) {
     if (Pattern *Pat = doIt(expr->getParams()))
       expr->setParams(Pat);
     else

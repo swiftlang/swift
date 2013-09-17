@@ -32,7 +32,7 @@ namespace {
     const bool HadError;
 
     using FunctionLike = llvm::PointerUnion4<
-        ConstructorDecl *, DestructorDecl *, FuncDecl *, PipeClosureExpr *>;
+        ConstructorDecl *, DestructorDecl *, FuncDecl *, ClosureExpr *>;
 
     /// \brief The stack of functions we're visiting.
     SmallVector<FunctionLike, 4> Functions;
@@ -216,7 +216,7 @@ namespace {
 
     // Specialized verifiers.
 
-    bool shouldVerify(PipeClosureExpr *closure) {
+    bool shouldVerify(ClosureExpr *closure) {
       Functions.push_back(closure);
       return shouldVerify(cast<Expr>(closure));
     }
@@ -241,8 +241,8 @@ namespace {
       return shouldVerify(cast<Decl>(FD));
     }
 
-    void cleanup(PipeClosureExpr *closure) {
-      assert(Functions.back().get<PipeClosureExpr*>() == closure);
+    void cleanup(ClosureExpr *closure) {
+      assert(Functions.back().get<ClosureExpr*>() == closure);
       Functions.pop_back();
     }
 
@@ -271,7 +271,7 @@ namespace {
       Type resultType;
       if (FuncDecl *FD = func.dyn_cast<FuncDecl *>()) {
         resultType = FD->getResultType(Ctx);
-      } else if (auto closure = func.dyn_cast<PipeClosureExpr *>()) {
+      } else if (auto closure = func.dyn_cast<ClosureExpr *>()) {
         resultType = closure->getResultType();
       } else {
         resultType = TupleType::getEmpty(Ctx);

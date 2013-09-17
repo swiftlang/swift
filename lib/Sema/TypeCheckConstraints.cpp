@@ -3390,7 +3390,7 @@ namespace {
       // For closures, type-check the patterns and result type as written,
       // but do not walk into the body. That will be type-checked after
       // we've determine the complete function type.
-      if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
+      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         // Validate the parameters.
         if (TC.typeCheckPattern(closure->getParams(), DC, true)) {
           expr->setType(ErrorType::get(TC.Context));
@@ -3493,7 +3493,7 @@ static Expr *cleanupIllFormedExpression(ASTContext &context,
       // For closures, type-check the patterns and result type as written,
       // but do not walk into the body. That will be type-checked after
       // we've determine the complete function type.
-      if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
+      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         if (!closure->hasSingleExpressionBody()) {
           return { false, walkToExprPost(expr) };
         }

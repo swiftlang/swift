@@ -331,7 +331,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       if (Loc.isValid()) {
-        if (auto *CE = dyn_cast<PipeClosureExpr>(ACE)) {
+        if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
           FindLocalVal localVal(SM, Loc, Name);
           localVal.visit(CE->getBody());
           if (!localVal.MatchingValue) {

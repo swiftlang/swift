@@ -581,8 +581,8 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
 
   case DeclContextKind::AbstractClosureExpr: {
     auto *ACE = cast<AbstractClosureExpr>(dc);
-    if (isa<PipeClosureExpr>(ACE))
-      os << "pipe closure";
+    if (isa<ClosureExpr>(ACE))
+      os << "explicit closure";
     if (isa<AutoClosureExpr>(ACE))
       os << "auto_closure";
     break;
@@ -1165,7 +1165,7 @@ public:
     return OS;
   }
 
-  void visitPipeClosureExpr(PipeClosureExpr *expr) {
+  void visitClosureExpr(ClosureExpr *expr) {
     printClosure(expr, "closure_expr");
     if (expr->hasSingleExpressionBody()) {
       OS << " single-expression\n";

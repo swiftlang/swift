@@ -113,7 +113,7 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::NewArray:
   case ExprKind::OverloadedDeclRef:
   case ExprKind::Paren:
-  case ExprKind::PipeClosure:
+  case ExprKind::Closure:
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::IntegerLiteral:
   case ExprKind::StringLiteral:
@@ -1272,9 +1272,9 @@ Expr *Parser::parseExprClosure() {
   parseClosureSignatureIfPresent(params, arrowLoc, explicitResultType, inLoc);
 
   // Create the closure expression and enter its context.
-  PipeClosureExpr *closure = new (Context) PipeClosureExpr(params, arrowLoc,
-                                                           explicitResultType,
-                                                           CurDeclContext);
+  ClosureExpr *closure = new (Context) ClosureExpr(params, arrowLoc,
+                                                   explicitResultType,
+                                                   CurDeclContext);
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);
   ContextChange cc(*this, closure);
@@ -1367,7 +1367,7 @@ Expr *Parser::parseExprAnonClosureArg() {
 
   // If this is a closure expression that did not have any named parameters,
   // generate the anonymous variables we need.
-  auto closure = dyn_cast_or_null<PipeClosureExpr>(
+  auto closure = dyn_cast_or_null<ClosureExpr>(
       dyn_cast<AbstractClosureExpr>(CurDeclContext));
   if (!closure || closure->getParams()) {
     // FIXME: specialize diagnostic when there were closure parameters.

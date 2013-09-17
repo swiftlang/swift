@@ -1478,7 +1478,7 @@ namespace {
       llvm_unreachable("Unhandled pattern kind");
     }
 
-    Expr *visitPipeClosureExpr(PipeClosureExpr *expr) {
+    Expr *visitClosureExpr(ClosureExpr *expr) {
       llvm_unreachable("Handled by the walker directly");
     }
 
@@ -2770,7 +2770,7 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
       }
 
       // For closures, update the parameter types and check the body.
-      if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
+      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         Rewriter.simplifyExprType(expr);
         auto &cs = Rewriter.getConstraintSystem();
         auto &tc = cs.getTypeChecker();

@@ -120,9 +120,9 @@ public:
   /// added to the current SILModule.
   void emitFunction(FuncDecl *fd);
   
-  /// \brief Generates code for the given closure expression and adds the 
+  /// \brief Generates code for the given closure expression and adds the
   /// SILFunction to the current SILModule under the nane SILDeclRef(ce).
-  void emitClosure(PipeClosureExpr *ce);
+  void emitClosure(ClosureExpr *ce);
   /// \brief Generates code for the given AutoClosureExpr and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
   void emitClosure(AutoClosureExpr *ce);
@@ -447,8 +447,8 @@ public:
   
   /// \brief Generates code for a FuncDecl.
   void emitFunction(FuncDecl *fd);
-  /// \brief Emits code for a PipeClosureExpr.
-  void emitClosure(PipeClosureExpr *ce);
+  /// \brief Emits code for a ClosureExpr.
+  void emitClosure(ClosureExpr *ce);
   /// \brief Generates code for an AutoClosureExpr.  This is akin to visiting
   /// the body as if wrapped in a ReturnStmt.
   void emitClosure(AutoClosureExpr *ce);

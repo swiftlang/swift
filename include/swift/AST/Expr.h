@@ -77,22 +77,22 @@ class alignas(8) Expr {
   enum { NumAbstractClosureExprBits = NumExprBits + 0 };
   static_assert(NumAbstractClosureExprBits <= 32, "fits in an unsigned");
 
-  class PipeClosureExprBitfields {
-    friend class PipeClosureExpr;
+  class ClosureExprBitfields {
+    friend class ClosureExpr;
     unsigned : NumAbstractClosureExprBits;
 
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     unsigned HasAnonymousClosureVars : 1;
   };
-  enum { NumPipeClosureExprBits = NumAbstractClosureExprBits + 1 };
-  static_assert(NumPipeClosureExprBits <= 32, "fits in an unsigned");
+  enum { NumClosureExprBits = NumAbstractClosureExprBits + 1 };
+  static_assert(NumClosureExprBits <= 32, "fits in an unsigned");
 
 protected:
   union {
     ExprBitfields ExprBits;
     AbstractClosureExprBitfields AbstractClosureExprBits;
-    PipeClosureExprBitfields PipeClosureExprBits;
+    ClosureExprBitfields ClosureExprBits;
   };
 
 private:
@@ -1671,10 +1671,15 @@ public:
   using DeclContext::operator new;
 };
 
-/// An explicit unnamed func definition, which can optionally
-/// have named arguments.
-///    e.g.  func(a : int) -> int { return a+1 }
-class PipeClosureExpr : public AbstractClosureExpr {
+/// \brief An explicit unnamed function expression, which can optionally have
+/// named arguments.
+///
+/// \code
+///     { $0 + $1 }
+///     { a, b -> Int in a + b }
+///     { (a : Int, b : Int) -> Int in a + b }
+/// \endcode
+class ClosureExpr : public AbstractClosureExpr {
   /// \brief The location of the '->' denoting an explicit return type,
   /// if present.
   SourceLoc arrowLoc;
@@ -1687,13 +1692,13 @@ class PipeClosureExpr : public AbstractClosureExpr {
   llvm::PointerIntPair<BraceStmt *, 1, bool> body;
   
 public:
-  PipeClosureExpr(Pattern *Params, SourceLoc arrowLoc,
-                  TypeLoc explicitResultType, DeclContext *Parent)
-    : AbstractClosureExpr(ExprKind::PipeClosure, Type(), Parent),
+  ClosureExpr(Pattern *Params, SourceLoc arrowLoc,
+              TypeLoc explicitResultType, DeclContext *Parent)
+    : AbstractClosureExpr(ExprKind::Closure, Type(), Parent),
       arrowLoc(arrowLoc), explicitResultType(explicitResultType),
       body(nullptr) {
     setParams(Params);
-    PipeClosureExprBits.HasAnonymousClosureVars = false;
+    ClosureExprBits.HasAnonymousClosureVars = false;
   }
 
   SourceRange getSourceRange() const;
@@ -1708,13 +1713,13 @@ public:
   /// \brief Determine whether the parameters of this closure are actually
   /// anonymous closure variables.
   bool hasAnonymousClosureVars() const {
-    return PipeClosureExprBits.HasAnonymousClosureVars;
+    return ClosureExprBits.HasAnonymousClosureVars;
   }
 
   /// \brief Set the parameters of this closure along with a flag indicating
   /// whether these parameters are actually anonymous closure variables.
   void setHasAnonymousClosureVars() {
-    PipeClosureExprBits.HasAnonymousClosureVars = true;
+    ClosureExprBits.HasAnonymousClosureVars = true;
   }
 
   /// \brief Determine whether this closure expression has an
@@ -1764,10 +1769,10 @@ public:
   ///
   /// This routine cannot change whether a closure has a single expression as
   /// its body; it can only update that expression.
-  void setSingleExpressionBody(Expr *newBody);
+  void setSingleExpressionBody(Expr *NewBody);
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::PipeClosure;
+    return E->getKind() == ExprKind::Closure;
   }
 };
 

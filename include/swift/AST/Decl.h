@@ -54,7 +54,6 @@ namespace swift {
   class NameAliasType;
   class UnionElementDecl;
   class Pattern;
-  class PipeClosureExpr;
   struct PrintOptions;
   class ProtocolDecl;
   class ProtocolType;
