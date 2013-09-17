@@ -1014,13 +1014,15 @@ public:
 /// have a type, etc.
 class ValueDecl : public Decl {
   Identifier Name;
+  SourceLoc NameLoc;
   llvm::PointerIntPair<const DeclAttributes *, 1, bool> AttrsAndIsObjC;
   static const DeclAttributes EmptyAttrs;
   Type Ty;
 
 protected:
-  ValueDecl(DeclKind K, DeclContext *DC, Identifier name)
-    : Decl(K, DC), Name(name), AttrsAndIsObjC(&EmptyAttrs, false) {
+  ValueDecl(DeclKind K, DeclContext *DC, Identifier name, SourceLoc NameLoc)
+    : Decl(K, DC), Name(name), NameLoc(NameLoc),
+      AttrsAndIsObjC(&EmptyAttrs, false) {
   }
 
 public:
@@ -1032,7 +1034,10 @@ public:
   
   Identifier getName() const { return Name; }
   bool isOperator() const { return Name.isOperator(); }
-  
+
+  SourceLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
+
   DeclAttributes &getMutableAttrs();
   const DeclAttributes &getAttrs() const {
     return *AttrsAndIsObjC.getPointer();
@@ -1130,9 +1135,9 @@ class TypeDecl : public ValueDecl {
   ArrayRef<ProtocolConformance *> Conformances;
 
 protected:
-  TypeDecl(DeclKind K, DeclContext *DC, Identifier name,
+  TypeDecl(DeclKind K, DeclContext *DC, Identifier name, SourceLoc NameLoc,
            MutableArrayRef<TypeLoc> inherited) :
-    ValueDecl(K, DC, name), Inherited(inherited)
+    ValueDecl(K, DC, name, NameLoc), Inherited(inherited)
   {
     TypeDeclBits.CheckedInheritanceClause = false;
   }
@@ -1195,7 +1200,6 @@ class TypeAliasDecl : public TypeDecl {
   mutable NameAliasType *AliasTy;
 
   SourceLoc TypeAliasLoc; // The location of the 'typalias' keyword
-  SourceLoc NameLoc; // The location of the declared type
   TypeLoc UnderlyingTy;
 
 public:
@@ -1204,7 +1208,6 @@ public:
                 DeclContext *DC, MutableArrayRef<TypeLoc> Inherited);
 
   SourceLoc getStartLoc() const { return TypeAliasLoc; }
-  SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const;
 
   /// getUnderlyingType - Returns the underlying type, which is
@@ -1239,8 +1242,9 @@ class AbstractTypeParamDecl : public TypeDecl {
   ArchetypeType *Archetype;
 
 protected:
-  AbstractTypeParamDecl(DeclKind kind, DeclContext *dc, Identifier name)
-    : TypeDecl(kind, dc, name, { }), Archetype(nullptr) { }
+  AbstractTypeParamDecl(DeclKind kind, DeclContext *dc, Identifier name,
+                        SourceLoc NameLoc)
+    : TypeDecl(kind, dc, name, NameLoc, { }), Archetype(nullptr) { }
 
 public:
   /// Return the superclass of the generic parameter.
@@ -1281,8 +1285,6 @@ public:
 /// func min<T : Comparable>(x : T, y : T) -> T { ... }
 /// \endcode
 class GenericTypeParamDecl : public AbstractTypeParamDecl {
-  /// The location of the name.
-  SourceLoc NameLoc;
   unsigned Depth : 16;
   unsigned Index : 16;
 
@@ -1327,8 +1329,7 @@ public:
   /// Here 'T' and 'U' have indexes 0 and 1, respectively. 'V' has index 0.
   unsigned getIndex() const { return Index; }
 
-  SourceLoc getStartLoc() const { return NameLoc; }
-  SourceLoc getLoc() const { return NameLoc; }
+  SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const;
 
   static bool classof(const Decl *D) {
@@ -1360,9 +1361,6 @@ class AssociatedTypeDecl : public AbstractTypeParamDecl {
   /// The location of the initial keyword.
   SourceLoc KeywordLoc;
 
-  /// The location of the name.
-  SourceLoc NameLoc;
-
 public:
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
                      SourceLoc nameLoc);
@@ -1376,7 +1374,6 @@ public:
   }
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
-  SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const;
 
   static bool classof(const Decl *D) {
@@ -1496,9 +1493,10 @@ protected:
   Type DeclaredTyInContext;
 
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
+                  SourceLoc NameLoc,
                   MutableArrayRef<TypeLoc> inherited,
                   GenericParamList *GenericParams) :
-    TypeDecl(K, DC, name, inherited),
+    TypeDecl(K, DC, name, NameLoc, inherited),
     DeclContext(DeclContextKind::NominalTypeDecl, DC),
     GenericParams(GenericParams), DeclaredTy(nullptr) {}
 
@@ -1591,7 +1589,6 @@ public:
 /// \endcode
 class UnionDecl : public NominalTypeDecl {
   SourceLoc UnionLoc;
-  SourceLoc NameLoc;
   bool Enum;
 
 public:
@@ -1600,7 +1597,6 @@ public:
             GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return UnionLoc; }
-  SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const {
     return SourceRange(UnionLoc, getBraces().End);
   }
@@ -1649,7 +1645,6 @@ public:
 /// to get the declared type ("Complex" in the above example).
 class StructDecl : public NominalTypeDecl {
   SourceLoc StructLoc;
-  SourceLoc NameLoc;
 
 public:
   StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -1657,7 +1652,6 @@ public:
              GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return StructLoc; }
-  SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const {
     return SourceRange(StructLoc, getBraces().End);
   }
@@ -1682,7 +1676,6 @@ public:
 /// to get the declared type ("Complex" in the above example).
 class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;
-  SourceLoc NameLoc;
   Type Superclass;
 
 public:
@@ -1691,7 +1684,6 @@ public:
             GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return ClassLoc; }
-  SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const {
     return SourceRange(ClassLoc, getBraces().End);
   }
@@ -1735,7 +1727,6 @@ public:
 ///   }
 class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
-  SourceLoc NameLoc;
 
   bool requiresClassSlow();
 
@@ -1761,7 +1752,6 @@ public:
   }
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
-  SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const {
     return SourceRange(ProtocolLoc, getBraces().End);
   }
@@ -1848,27 +1838,26 @@ public:
 /// VarDecl - 'var' declaration.
 class VarDecl : public ValueDecl {
 private:
-  SourceLoc VarLoc;    // Location of the 'var' token.
-  
   struct GetSetRecord {
     SourceRange Braces;
     FuncDecl *Get;       // User-defined getter
     FuncDecl *Set;       // User-defined setter
   };
   
+  // FIXME: These fields are useless for most of the VarDecls that are created
+  // for patterns. We should refactor to a new node.
   GetSetRecord *GetSet;
   VarDecl *OverriddenDecl;
 
 public:
-  VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, DeclContext *DC)
-    : ValueDecl(DeclKind::Var, DC, Name),
-      VarLoc(VarLoc), GetSet(), OverriddenDecl(nullptr) {
+  VarDecl(SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
+    : ValueDecl(DeclKind::Var, DC, Name, NameLoc),
+      GetSet(), OverriddenDecl(nullptr) {
     setType(Ty);
   }
 
-  SourceLoc getLoc() const { return VarLoc; }
-  SourceLoc getStartLoc() const { return VarLoc; }
-  SourceRange getSourceRange() const { return VarLoc; }
+  SourceLoc getStartLoc() const { return getNameLoc(); }
+  SourceRange getSourceRange() const { return getNameLoc(); }
 
   /// \brief Determine whether this variable is actually a property, which
   /// has no storage but does have a user-defined getter or setter.
@@ -1954,9 +1943,10 @@ protected:
   CaptureInfo Captures;
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, Identifier Name,
+                       SourceLoc NameLoc,
                        VarDecl *ImplicitSelfDecl,
                        GenericParamList *GenericParams)
-      : ValueDecl(Kind, Parent, Name),
+      : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
         Body(nullptr), GenericParams(GenericParams) {
     if (ImplicitSelfDecl)
@@ -2116,7 +2106,6 @@ class FuncDecl : public AbstractFunctionDecl {
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
-  SourceLoc NameLoc;
 
   TypeLoc FnRetType;
 
@@ -2132,8 +2121,9 @@ class FuncDecl : public AbstractFunctionDecl {
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
            SourceLoc NameLoc, unsigned NumParamPatterns,
            GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
-    : AbstractFunctionDecl(DeclKind::Func, Parent, Name, nullptr, GenericParams),
-      StaticLoc(StaticLoc), FuncLoc(FuncLoc), NameLoc(NameLoc),
+    : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc, nullptr,
+                           GenericParams),
+      StaticLoc(StaticLoc), FuncLoc(FuncLoc),
       OverriddenDecl(nullptr), Operator(nullptr) {
     FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
     assert(NumParamPatterns > 0);
@@ -2216,7 +2206,6 @@ public:
   SourceLoc getStartLoc() const {
     return StaticLoc.isValid() ? StaticLoc : FuncLoc;
   }
-  SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const;
 
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
@@ -2344,7 +2333,6 @@ public:
 /// union.
 class UnionElementDecl : public ValueDecl {
   SourceLoc CaseLoc;
-  SourceLoc IdentifierLoc;
 
   /// This is the type specified with the union element, for
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
@@ -2364,8 +2352,8 @@ public:
                    SourceLoc ArrowLoc,
                    TypeLoc ResultType,
                    DeclContext *DC)
-  : ValueDecl(DeclKind::UnionElement, DC, Name),
-    CaseLoc(CaseLoc), IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType),
+  : ValueDecl(DeclKind::UnionElement, DC, Name, IdentifierLoc),
+    CaseLoc(CaseLoc), ArgumentType(ArgumentType),
     ResultArrowLoc(ArrowLoc),
     ResultType(ResultType)
   {}
@@ -2391,9 +2379,8 @@ public:
   SourceLoc getCaseLoc() const { return CaseLoc; }
   
   SourceLoc getStartLoc() const {
-    return CaseLoc.isValid() ? CaseLoc : IdentifierLoc;
+    return CaseLoc.isValid() ? CaseLoc : getNameLoc();
   }
-  SourceLoc getLoc() const { return IdentifierLoc; }
   SourceLoc getResultArrowLoc() const { return ResultArrowLoc; }
   SourceRange getSourceRange() const;
 
@@ -2433,7 +2420,6 @@ public:
 /// FIXME: SubscriptDecl isn't naturally a ValueDecl, but it's currently useful
 /// to get name lookup to find it with a bogus name.
 class SubscriptDecl : public ValueDecl {
-  SourceLoc SubscriptLoc;
   SourceLoc ArrowLoc;
   Pattern *Indices;
   TypeLoc ElementTy;
@@ -2447,12 +2433,12 @@ public:
                 SourceLoc ArrowLoc, TypeLoc ElementTy,
                 SourceRange Braces, FuncDecl *Get, FuncDecl *Set,
                 DeclContext *Parent)
-    : ValueDecl(DeclKind::Subscript, Parent, NameHack),
-      SubscriptLoc(SubscriptLoc),
+    : ValueDecl(DeclKind::Subscript, Parent, NameHack, SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
       Braces(Braces), Get(Get), Set(Set), OverriddenDecl(nullptr) { }
   
-  SourceLoc getStartLoc() const { return SubscriptLoc; }
+  SourceLoc getSubscriptLoc() const { return getNameLoc(); }
+  SourceLoc getStartLoc() const { return getSubscriptLoc(); }
   SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 
@@ -2500,7 +2486,6 @@ public:
 class ConstructorDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
 
-  SourceLoc ConstructorLoc;
   Pattern *Arguments;
   
   /// The type of the initializing constructor.
@@ -2515,12 +2500,13 @@ public:
                   Pattern *Arguments, VarDecl *ImplicitSelfDecl,
                   GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Constructor, Parent, NameHack,
-                           ImplicitSelfDecl, GenericParams),
-      ConstructorLoc(ConstructorLoc), Arguments(Arguments) {
+                           ConstructorLoc, ImplicitSelfDecl, GenericParams),
+      Arguments(Arguments) {
     assert(ImplicitSelfDecl && "constructors should have a non-null self");
   }
 
-  SourceLoc getStartLoc() const { return ConstructorLoc; }
+  SourceLoc getConstructorLoc() const { return getNameLoc(); }
+  SourceLoc getStartLoc() const { return getConstructorLoc(); }
   SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 
@@ -2575,19 +2561,17 @@ public:
 /// }
 /// \endcode
 class DestructorDecl : public AbstractFunctionDecl {
-  SourceLoc DestructorLoc;
 
 public:
   DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
                   VarDecl *ImplicitSelfDecl, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Destructor, Parent, NameHack,
-                           ImplicitSelfDecl, nullptr),
-      DestructorLoc(DestructorLoc) {
+                           DestructorLoc, ImplicitSelfDecl, nullptr) {
     assert(ImplicitSelfDecl && "destructors should have a non-null self");
   }
 
-  SourceLoc getStartLoc() const { return DestructorLoc; }
-  SourceLoc getLoc() const { return DestructorLoc; }
+  SourceLoc getDestructorLoc() const { return getNameLoc(); }
+  SourceLoc getStartLoc() const { return getDestructorLoc(); }
   SourceRange getSourceRange() const;
 
   /// \brief Compute and return the type of 'self'.

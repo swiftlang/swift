@@ -443,8 +443,8 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
                              DeclContext *DC,
                              MutableArrayRef<TypeLoc> Inherited)
-  : TypeDecl(DeclKind::TypeAlias, DC, Name, Inherited),
-    TypeAliasLoc(TypeAliasLoc), NameLoc(NameLoc),
+  : TypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, Inherited),
+    TypeAliasLoc(TypeAliasLoc),
     UnderlyingTy(UnderlyingTy)
 {
   // Set the type of the TypeAlias to the right MetaTypeType.
@@ -457,14 +457,14 @@ SourceRange TypeAliasDecl::getSourceRange() const {
   if (UnderlyingTy.hasLocation())
     return { TypeAliasLoc, UnderlyingTy.getSourceRange().End };
   // FIXME: Inherits clauses
-  return { TypeAliasLoc, NameLoc };
+  return { TypeAliasLoc, getNameLoc() };
 }
 
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
                                            SourceLoc nameLoc,
                                            unsigned depth, unsigned index)
-  : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name),
-    NameLoc(nameLoc), Depth(depth), Index(index)
+  : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc),
+    Depth(depth), Index(index)
 {
   // FIXME: Arbitrarily consider this generic type parameter type to be
   // canonical. In the long run, it won't be.
@@ -475,18 +475,18 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
 }
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
-  SourceLoc endLoc = NameLoc;
+  SourceLoc endLoc = getNameLoc();
 
   if (!getInherited().empty()) {
     endLoc = getInherited().back().getSourceRange().End;
   }
-  return SourceRange(NameLoc, endLoc);
+  return SourceRange(getNameLoc(), endLoc);
 }
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc)
-  : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name),
-    KeywordLoc(keywordLoc), NameLoc(nameLoc)
+  : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+    KeywordLoc(keywordLoc)
 {
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) AssociatedTypeType(this);
@@ -494,7 +494,7 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
 }
 
 SourceRange AssociatedTypeDecl::getSourceRange() const {
-  SourceLoc endLoc = NameLoc;
+  SourceLoc endLoc = getNameLoc();
 
   if (!getInherited().empty()) {
     endLoc = getInherited().back().getSourceRange().End;
@@ -506,20 +506,23 @@ UnionDecl::UnionDecl(SourceLoc UnionLoc, bool Enum,
                      Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
-  : NominalTypeDecl(DeclKind::Union, Parent, Name, Inherited, GenericParams),
-    UnionLoc(UnionLoc), NameLoc(NameLoc) { }
+  : NominalTypeDecl(DeclKind::Union, Parent, Name, NameLoc, Inherited,
+                    GenericParams),
+    UnionLoc(UnionLoc) { }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
                        MutableArrayRef<TypeLoc> Inherited,
                        GenericParamList *GenericParams, DeclContext *Parent)
-  : NominalTypeDecl(DeclKind::Struct, Parent, Name, Inherited, GenericParams),
-    StructLoc(StructLoc), NameLoc(NameLoc) { }
+  : NominalTypeDecl(DeclKind::Struct, Parent, Name, NameLoc, Inherited,
+                    GenericParams),
+    StructLoc(StructLoc) { }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
-  : NominalTypeDecl(DeclKind::Class, Parent, Name, Inherited, GenericParams),
-    ClassLoc(ClassLoc), NameLoc(NameLoc) {
+  : NominalTypeDecl(DeclKind::Class, Parent, Name, NameLoc, Inherited,
+                    GenericParams),
+    ClassLoc(ClassLoc) {
   ClassDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
 }
@@ -536,8 +539,8 @@ UnionElementDecl *UnionDecl::getElement(Identifier Name) const {
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
                            SourceLoc NameLoc, Identifier Name,
                            MutableArrayRef<TypeLoc> Inherited)
-  : NominalTypeDecl(DeclKind::Protocol, DC, Name, Inherited, nullptr),
-    ProtocolLoc(ProtocolLoc), NameLoc(NameLoc)
+  : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited, nullptr),
+    ProtocolLoc(ProtocolLoc)
 {
   ProtocolDeclBits.RequiresClassValid = false;
   ProtocolDeclBits.RequiresClass = false;
@@ -903,7 +906,7 @@ SourceRange UnionElementDecl::getSourceRange() const {
     return {getStartLoc(), ResultType.getSourceRange().End};
   if (ArgumentType.hasLocation())
     return {getStartLoc(), ArgumentType.getSourceRange().End};
-  return {getStartLoc(), IdentifierLoc};
+  return {getStartLoc(), getNameLoc()};
 }
 
 SourceLoc SubscriptDecl::getLoc() const {
@@ -912,8 +915,8 @@ SourceLoc SubscriptDecl::getLoc() const {
 
 SourceRange SubscriptDecl::getSourceRange() const {
   if (Braces.isValid())
-    return { SubscriptLoc, Braces.End };
-  return { SubscriptLoc, ElementTy.getSourceRange().End };
+    return { getSubscriptLoc(), Braces.End };
+  return { getSubscriptLoc(), ElementTy.getSourceRange().End };
 }
 
 SourceLoc ConstructorDecl::getLoc() const {
@@ -923,7 +926,7 @@ SourceLoc ConstructorDecl::getLoc() const {
 SourceRange ConstructorDecl::getSourceRange() const {
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
-    return { ConstructorLoc, BodyEndLoc };
+    return { getConstructorLoc(), BodyEndLoc };
 
   if (!Body || !Body->getEndLoc().isValid()) {
     const DeclContext *DC = getDeclContext();
@@ -936,7 +939,7 @@ SourceRange ConstructorDecl::getSourceRange() const {
       llvm_unreachable("Unhandled decl kind");
     }
   }
-  return { ConstructorLoc, Body->getEndLoc() };
+  return { getConstructorLoc(), Body->getEndLoc() };
 }
 
 Type
@@ -1035,7 +1038,7 @@ DestructorDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
 SourceRange DestructorDecl::getSourceRange() const {
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
-    return { DestructorLoc, BodyEndLoc };
+    return { getDestructorLoc(), BodyEndLoc };
 
-  return { DestructorLoc, Body->getEndLoc() };
+  return { getDestructorLoc(), Body->getEndLoc() };
 }
