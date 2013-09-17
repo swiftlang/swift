@@ -24,58 +24,69 @@ namespace swift {
 bool parseASTSection(SerializedModuleLoader* SML, StringRef Buf,
                      SmallVectorImpl<std::string> &foundModules) {
   struct apple_ast_hdr {
+    uint32_t magic;
     uint32_t version;
-    uint32_t nmods;
-  };
-
-  struct module_header {
-   uint64_t bitstream_ofs;
-   uint64_t bitstream_size;
-   uint64_t name_ofs;
-   uint32_t language;
-   uint32_t flags;
+    uint32_t language;
+    uint32_t flags;
+    uint64_t bitstream_ofs;
+    uint64_t bitstream_size;
+    uint32_t name_len;
+    char name[0];
   };
 
   size_t size = Buf.size();
   const char *data = Buf.data();
 
-  if (size < sizeof(struct apple_ast_hdr) + sizeof(struct module_header)) {
-    llvm::dbgs() << "__ast section is too small.\n";
-    return false;
-  }
-
-  auto apple_ast_hdr = reinterpret_cast<const struct apple_ast_hdr *>(data);
-  if (apple_ast_hdr->version != 1) {
-    llvm::dbgs() << "Unsupported __ast section version.\n";
-    return false;
-  }
-
+  // An AST section consists of one or more AST modules + headers.
   // Iterate over all AST modules.
-  for (uint32_t i = 0; i < apple_ast_hdr->nmods; ++i) {
-    auto mh = reinterpret_cast<const struct module_header *>
-      (data+sizeof(apple_ast_hdr));
+  while (size > sizeof(struct apple_ast_hdr)) {
+    auto h = reinterpret_cast<const struct apple_ast_hdr *>(data);
 
-    if (mh->language != dwarf::DW_LANG_Swift)
+    // Check for fatal errors first.
+    if (h->magic != 0x41535473) {
+      llvm::dbgs() << "Magic number not found.\n";
+      return false;
+    }
+
+    if (h->version != 1) {
+      llvm::dbgs() << "Unsupported __ast section version.\n";
+      return false;
+    }
+    
+    if (h->language != dwarf::DW_LANG_Swift)
       continue;
 
     // Get the access path.
-    if (mh->name_ofs + 4 > size) return false;
-    auto nchars = *reinterpret_cast<const uint32_t *>(data + mh->name_ofs);
-    if (mh->name_ofs+sizeof(nchars) > size) return false;
-    assert(nchars < (2 << 10) && "path failed sanity check");
-    llvm::StringRef AccessPath(data+mh->name_ofs+sizeof(nchars), nchars);
+    if (sizeof(h)+h->name_len > size) {
+      llvm::dbgs() << "Impossible access path length. Section corrupted?\n";
+      return false;
+    }
+    assert(h->name_len < (2 << 10) && "path failed sanity check");
+    llvm::StringRef AccessPath(h->name, h->name_len);
 
     // loadModule() wants to take ownership of the input memory
     // buffer, but we don't let it own the memory, since it's just a
     // window into Buf.
-    if (mh->bitstream_ofs + mh->bitstream_size > size) return false;
-    auto mem = llvm::StringRef(data+mh->bitstream_ofs, mh->bitstream_size);
+    if (h->bitstream_ofs + h->bitstream_size > size) return false;
+    auto mem = llvm::StringRef(data+h->bitstream_ofs, h->bitstream_size);
     auto bitstream = llvm::MemoryBuffer::getMemBuffer(mem, AccessPath);
 
     // Register the memory buffer.
     SML->registerMemoryBuffer(AccessPath,
                               std::unique_ptr<llvm::MemoryBuffer>(bitstream));
     foundModules.push_back(AccessPath);
+
+    // Forward to the next module.
+    uint64_t skip =
+      llvm::RoundUpToAlignment(h->bitstream_ofs + h->bitstream_size, 32);
+
+    if (skip > size) {
+      llvm::dbgs() << "AST section too small.\n";
+      return false;
+    }
+
+    data += skip;
+    size -= skip;
   }
   return true;
 }
