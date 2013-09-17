@@ -672,7 +672,7 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
 }
 
 void SILGenFunction::prepareEpilog(Type resultType, CleanupLocation CleanupL) {
-  auto *epilogBB = new (F.getModule()) SILBasicBlock(&F);
+  auto *epilogBB = createBasicBlock();
   
   // If we have a non-null, non-void, non-address-only return type, receive the
   // return value via a BB argument.

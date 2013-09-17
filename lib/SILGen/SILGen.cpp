@@ -31,7 +31,7 @@ using namespace Lowering;
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
   : SGM(SGM), F(F), LastInsnWithoutScope(0),
-    B(new (F.getModule()) SILBasicBlock(&F), &InsertedInstrs),
+    B(createBasicBlock(), &InsertedInstrs),
     ReturnDest(CleanupLocation::getCleanupLocation(F.getLocation())),
     CurrentSILLoc(F.getLocation()), Cleanups(*this)
 {

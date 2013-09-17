@@ -158,8 +158,8 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       destructured.push_back(cast);
       
       // Emit the branch.
-      SILBasicBlock *trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
-      SILBasicBlock *falseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      SILBasicBlock *trueBB = gen.createBasicBlock();
+      SILBasicBlock *falseBB = gen.createBasicBlock();
       
       gen.B.createCondBranch(Loc, didMatch,
                              trueBB, falseBB);
@@ -203,7 +203,7 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
              && "specializing same union case twice?!");
       unmatchedCases.erase(elt);
       
-      SILBasicBlock *caseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      SILBasicBlock *caseBB = gen.createBasicBlock();
       
       // Create a BB argument to receive the union case data if it has any.
       SILValue eltValue;
@@ -241,7 +241,7 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     
     // If we didn't cover every case, then we need a default block.
     if (!unmatchedCases.empty())
-      defaultBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      defaultBB = gen.createBasicBlock();
     
     // Emit the switch instruction.
     if (addressOnlyUnion) {
@@ -637,7 +637,7 @@ SILBasicBlock *createCaseBlock(SILGenFunction &gen, CaseMap &caseMap,
   }
   
   // Set up the basic block for the case.
-  dest.entry = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+  dest.entry = gen.createBasicBlock();
   dest.cleanupsDepth = cleanupsDepth;
   dest.cont = contBB;
   
@@ -1149,7 +1149,7 @@ public:
     SILBasicBlock *falseBB = nullptr;
     auto getFalseBB = [&] {
       if (!falseBB)
-        falseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+        falseBB = gen.createBasicBlock();
       return falseBB;
     };
     
@@ -1159,7 +1159,7 @@ public:
       // Test ExprPatterns from the row in an "and" chain.
       for (const ExprPattern *ep : row.exprGuards) {
         // The last pattern test jumps to the guard.
-        trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+        trueBB = gen.createBasicBlock();
         
         // Emit the match test.
         SILValue testBool;
@@ -1191,7 +1191,7 @@ public:
       }
       
       // Branch either to the row destination or the new BB.
-      trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      trueBB = gen.createBasicBlock();
       gen.B.createCondBranch(row.getCaseBlock(), guardBool,
                              trueBB, getFalseBB());
       gen.B.emitBlock(trueBB);
@@ -1361,7 +1361,7 @@ recur:
     
     // Create a nested scope and cont bb to clean up var bindings exposed by
     // specializing the matrix.
-    SILBasicBlock *innerContBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+    SILBasicBlock *innerContBB = gen.createBasicBlock();
     
     {
       Scope patternVarScope(gen.Cleanups,
@@ -1437,7 +1437,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     Scope patternVarScope(Cleanups, CleanupLocation(S));
 
     // Create a continuation bb for life after the switch.
-    SILBasicBlock *contBB = new (F.getModule()) SILBasicBlock(&F);
+    SILBasicBlock *contBB = createBasicBlock();
     
     // Set up an initial clause matrix.
     ClauseMatrix clauses(subject, S->getCases().size());

@@ -61,8 +61,8 @@ Condition SILGenFunction::emitCondition(Expr *E,
   
   SILValue V = emitConditionValue(*this, E);
   
-  SILBasicBlock *ContBB = new (F.getModule()) SILBasicBlock(&F);
-  SILBasicBlock *TrueBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *ContBB = createBasicBlock();
+  SILBasicBlock *TrueBB = createBasicBlock();
 
   for (SILType argTy : contArgs) {
     new (F.getModule()) SILArgument(argTy, ContBB);
@@ -70,7 +70,7 @@ Condition SILGenFunction::emitCondition(Expr *E,
   
   SILBasicBlock *FalseBB, *FalseDestBB;
   if (hasFalseCode) {
-    FalseBB = FalseDestBB = new (F.getModule()) SILBasicBlock(&F);
+    FalseBB = FalseDestBB = createBasicBlock();
   } else {
     FalseBB = nullptr;
     FalseDestBB = ContBB;
@@ -175,11 +175,11 @@ void SILGenFunction::visitIfStmt(IfStmt *S) {
 
 void SILGenFunction::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
-  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *LoopBB = createBasicBlock();
   B.emitBlock(LoopBB, S);
   
   // Set the destinations for 'break' and 'continue'
-  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *EndBB = createBasicBlock();
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth(),
                               CleanupLocation(S->getBody()));
   ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth(),
@@ -212,12 +212,12 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
 
 void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
-  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *LoopBB = createBasicBlock();
   B.emitBlock(LoopBB, S);
   
   // Set the destinations for 'break' and 'continue'
-  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
-  SILBasicBlock *CondBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *EndBB = createBasicBlock();
+  SILBasicBlock *CondBB = createBasicBlock();
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth(),
                               CleanupLocation(S->getBody()));
   ContinueDestStack.emplace_back(CondBB, getCleanupsDepth(),
@@ -268,12 +268,12 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   if (!B.hasValidInsertionPoint()) return;
   
   // Create a new basic block and jump into it.
-  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *LoopBB = createBasicBlock();
   B.emitBlock(LoopBB, S);
   
   // Set the destinations for 'break' and 'continue'
-  SILBasicBlock *IncBB = new (F.getModule()) SILBasicBlock(&F);
-  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *IncBB = createBasicBlock();
+  SILBasicBlock *EndBB = createBasicBlock();
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth(),
                               CleanupLocation(S->getBody()));
   ContinueDestStack.emplace_back(IncBB, getCleanupsDepth(),
@@ -324,11 +324,11 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   if (!B.hasValidInsertionPoint()) return;
   
   // Create a new basic block and jump into it.
-  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *LoopBB = createBasicBlock();
   B.emitBlock(LoopBB, S);
   
   // Set the destinations for 'break' and 'continue'
-  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *EndBB = createBasicBlock();
   BreakDestStack.emplace_back(EndBB,
                               getCleanupsDepth(),
                               CleanupLocation(S->getBody()));
