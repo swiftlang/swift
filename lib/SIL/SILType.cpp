@@ -115,5 +115,8 @@ CanType SILFunctionTypeInfo::getSwiftArgumentType(unsigned ArgNo) const {
   return getDestructuredArgument(FT->getInput()->getCanonicalType(), ArgNo);
 }
 
-
-
+/// getSwiftResultType - Return the swift type of the result
+CanType SILFunctionTypeInfo::getSwiftResultType() const {
+  AnyFunctionType *FT = cast<AnyFunctionType>(getSwiftType());
+  return FT->getResult()->getCanonicalType();
+}

@@ -2180,26 +2180,18 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       return true;
     }
 
-    SmallVector<TupleTypeElt, 4> NewArgTypes;
-
     // Compute the result type of the partial_apply, based on which arguments
     // are getting applied.
-    unsigned ArgNo = 0, NewArgCount = ArgTys.size() - ArgNames.size();
-    while (ArgNo != NewArgCount)
-      NewArgTypes.push_back(ArgTys[ArgNo++].getSwiftType());
-
     SILValue FnVal = getLocalValue(FnName, Ty, InstLoc);
     SmallVector<SILValue, 4> Args;
+    unsigned ArgNo = ArgTys.size() - ArgNames.size();
     for (auto &ArgName : ArgNames)
       Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc));
 
-    Type ArgTy = TupleType::get(NewArgTypes, P.Context);
-    Type ResTy = FunctionType::get(ArgTy, FTI->getResultType().getSwiftType(),
-                                   P.Context);
-
+    SILType closureTy =
+      SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod);
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    ResultVal = B.createPartialApply(InstLoc, FnVal, Args,
-                                     SILMod.Types.getLoweredType(ResTy));
+    ResultVal = B.createPartialApply(InstLoc, FnVal, Args, closureTy);
     break;
   }
   }

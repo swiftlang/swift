@@ -1329,10 +1329,15 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     }
   }
   
-  SILType closureTy = getLoweredLoadableType(TheClosure.getType());
-  return emitManagedRValueWithCleanup(
-                  B.createPartialApply(loc, functionRef, capturedArgs,
-                                       closureTy));
+  SILType resultTy = getLoweredLoadableType(TheClosure.getType());
+  SILType closureTy =
+    SILBuilder::getPartialApplyResultType(functionRef.getType(),
+                                          capturedArgs.size(), SGM.M);
+  SILInstruction *toClosure =
+    B.createPartialApply(loc, functionRef, capturedArgs, closureTy);
+  if (resultTy != closureTy)
+    toClosure = B.createConvertFunction(loc, toClosure, resultTy);
+  return emitManagedRValueWithCleanup(toClosure);
 }
 
 RValue RValueEmitter::visitPipeClosureExpr(PipeClosureExpr *e, SGFContext C) {
@@ -2170,7 +2175,13 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
   }
   
   // Partially apply the next uncurry level and return the result closure.
-  auto toClosure = B.createPartialApply(fd, toFn, curriedArgs, resultTy);
+  auto closureTy =
+    SILBuilder::getPartialApplyResultType(toFn.getType(), curriedArgs.size(),
+                                          SGM.M);
+  SILInstruction *toClosure =
+    B.createPartialApply(fd, toFn, curriedArgs, closureTy);
+  if (resultTy != closureTy)
+    toClosure = B.createConvertFunction(fd, toClosure, resultTy);
   B.createReturn(fd, toClosure);
 }
 

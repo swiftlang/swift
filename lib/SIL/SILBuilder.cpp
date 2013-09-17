@@ -28,6 +28,24 @@ SILType SILBuilder::getStructFieldType(VarDecl *Field) {
   return SILType::getPrimitiveObjectType(FieldTy);
 }
 
+SILType SILBuilder::getPartialApplyResultType(SILType Ty, unsigned ArgCount,
+                                              SILModule &M) {
+  SILFunctionTypeInfo *FTI = Ty.getFunctionTypeInfo(M);
+  unsigned NewArgCount = FTI->getInputTypes().size() - ArgCount;
+
+  SmallVector<TupleTypeElt, 4> NewArgTypes;
+  unsigned ArgNo = 0;
+  if (FTI->hasIndirectReturn())
+    ++ArgNo;
+  while (ArgNo != NewArgCount)
+    NewArgTypes.push_back(FTI->getSwiftArgumentType(ArgNo++));
+
+  Type ArgTy = TupleType::get(NewArgTypes, M.getASTContext());
+  Type ResTy =
+    FunctionType::get(ArgTy, FTI->getSwiftResultType(), M.getASTContext());
+  return M.Types.getLoweredType(ResTy);
+}
+
 BranchInst *SILBuilder::createBranch(SILLocation Loc,
                                      SILBasicBlock *TargetBlock,
                                      OperandValueArrayRef Args) {

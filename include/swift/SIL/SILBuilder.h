@@ -30,10 +30,12 @@ class SILBuilder {
   /// instruction is recorded in this list.
   SmallVectorImpl<SILInstruction*> *InsertedInstrs = nullptr;
 public:
-  SILBuilder(SILFunction &F) : F(F), BB(0) {}
-
   static SILType getTupleElementType(SILType Ty, unsigned EltNo);
   static SILType getStructFieldType(VarDecl *Field);
+  static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
+                                           SILModule &M);
+
+  SILBuilder(SILFunction &F) : F(F), BB(0) {}
 
   explicit SILBuilder(SILInstruction *I,
                       SmallVectorImpl<SILInstruction*> *InsertedInstrs = 0)
