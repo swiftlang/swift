@@ -287,11 +287,14 @@ public:
 
   void typeCheckIgnoredExpr(Expr *E);
 
-  void typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
+  bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
+                                          SourceLoc EndTypeCheckLoc);
+  bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
   bool typeCheckFunctionBodyUntil(FuncDecl *FD, SourceLoc EndTypeCheckLoc);
-  bool typeCheckFunctionBody(FuncDecl *FD);
-  void typeCheckConstructorBody(ConstructorDecl *CD);
-  void typeCheckDestructorBody(DestructorDecl *DD);
+  bool typeCheckConstructorBodyUntil(ConstructorDecl *CD,
+                                     SourceLoc EndTypeCheckLoc);
+  bool typeCheckDestructorBodyUntil(DestructorDecl *DD,
+                                    SourceLoc EndTypeCheckLoc);
 
   void typeCheckClosureBody(ClosureExpr *closure);
 

@@ -36,7 +36,7 @@ namespace swift {
   class Decl;
   class DeclContext;
   class Expr;
-  class FuncDecl;
+  class AbstractFunctionDecl;
   class SILModule;
   struct TypeLoc;
   class SILParserTUState;
@@ -136,8 +136,9 @@ namespace swift {
   bool typeCheckCompletionContextExpr(TranslationUnit *TU, Expr *&parsedExpr);
 
   /// Partially typecheck the specified function body.
-  bool typeCheckFunctionBodyUntil(TranslationUnit *TU, DeclContext *DC,
-                                  FuncDecl *FD, SourceLoc EndTypeCheckLoc);
+  bool typeCheckAbstractFunctionBodyUntil(TranslationUnit *TU,
+                                          AbstractFunctionDecl *AFD,
+                                          SourceLoc EndTypeCheckLoc);
 
   /// performCaptureAnalysis - Analyse the AST and mark local declarations
   /// and expressions which can capture them so they can be emitted more

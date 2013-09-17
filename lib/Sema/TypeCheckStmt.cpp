@@ -577,17 +577,20 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
   llvm_unreachable("bad pattern kind!");
 }
 
-void TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-    typeCheckFunctionBody(FD);
-    return;
-  }
-  if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
-    typeCheckConstructorBody(CD);
-    return;
-  }
+bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
+                                                     SourceLoc EndTypeCheckLoc) {
+  if (auto *FD = dyn_cast<FuncDecl>(AFD))
+    return typeCheckFunctionBodyUntil(FD, EndTypeCheckLoc);
+
+  if (auto *CD = dyn_cast<ConstructorDecl>(AFD))
+    return typeCheckConstructorBodyUntil(CD, EndTypeCheckLoc);
+
   auto *DD = cast<DestructorDecl>(AFD);
-  typeCheckDestructorBody(DD);
+  return typeCheckDestructorBodyUntil(DD, EndTypeCheckLoc);
+}
+
+bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
+  return typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
 }
 
 // Type check a function body (defined with the func keyword) that is either a
@@ -611,10 +614,6 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
 
   FD->setBody(BS);
   return HadError;
-}
-
-bool TypeChecker::typeCheckFunctionBody(FuncDecl *FD) {
-  return typeCheckFunctionBodyUntil(FD, SourceLoc());
 }
 
 /// \brief Given a pattern declaring some number of member variables, build an
@@ -677,7 +676,8 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *selfDecl,
   }
 }
 
-void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
+bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
+                                                SourceLoc EndTypeCheckLoc) {
   if (auto allocSelf = ctor->getAllocSelfExpr()) {
     if (!typeCheckExpression(allocSelf, ctor, Type(), /*discardedExpr=*/false))
       ctor->setAllocSelfExpr(allocSelf);
@@ -687,11 +687,13 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
   checkDefaultArguments(*this, ctor->getArguments(), ctor->getDeclContext());
 
   BraceStmt *body = ctor->getBody();
-  if (!body) return;
+  if (!body)
+    return true;
 
   // Type-check the body.
-  StmtChecker(*this, static_cast<AbstractFunctionDecl *>(ctor))
-      .typeCheckStmt(body);
+  StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(ctor));
+  SC.EndTypeCheckLoc = EndTypeCheckLoc;
+  bool HadError = SC.typeCheckStmt(body);
 
   // Figure out which members already have initializers. We don't
   // default-initialize those members.
@@ -836,12 +838,18 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
   }
 
   ctor->setBody(body);
+  return HadError;
 }
 
-void TypeChecker::typeCheckDestructorBody(DestructorDecl *DD) {
-  Stmt *Body = DD->getBody();
-  StmtChecker(*this, static_cast<AbstractFunctionDecl *>(DD))
-      .typeCheckStmt(Body);
+bool TypeChecker::typeCheckDestructorBodyUntil(DestructorDecl *DD,
+                                               SourceLoc EndTypeCheckLoc) {
+  StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(DD));
+  SC.EndTypeCheckLoc = EndTypeCheckLoc;
+  BraceStmt *Body = DD->getBody();
+  bool HadError = SC.typeCheckStmt(Body);
+
+  DD->setBody(Body);
+  return HadError;
 }
 
 void TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {

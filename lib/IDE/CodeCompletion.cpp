@@ -375,16 +375,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
       while (!DCToTypeCheck->isModuleContext() &&
              !isa<AbstractFunctionDecl>(DCToTypeCheck))
         DCToTypeCheck = DCToTypeCheck->getParent();
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck)) {
-        if (auto *FD = dyn_cast<FuncDecl>(AFD))
-          return typeCheckFunctionBodyUntil(TU, CurDeclContext, FD,
-                                            EndTypeCheckLoc);
-        if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD)) {
-          // FIXME: constructors and destructors.
-          // Just return success until we can type check these.
-          return true;
-        }
-      }
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck))
+        return typeCheckAbstractFunctionBodyUntil(TU, AFD, EndTypeCheckLoc);
       return false;
     }
     if (CurDeclContext->getContextKind() == DeclContextKind::NominalTypeDecl) {
