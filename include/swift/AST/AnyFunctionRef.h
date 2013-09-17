@@ -40,6 +40,12 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
   }
 
+  ArrayRef<Pattern *> getArgParamPatterns() {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->getArgParamPatterns();
+    return TheFunction.get<AbstractClosureExpr *>()->getParamPatterns();
+  }
+
   Type getType() {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getType();

@@ -15,6 +15,7 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILType.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
@@ -27,32 +28,12 @@ void SILValue::replaceAllUsesWith(SILValue V) {
     (**use_begin()).set(V);
 }
 
-static unsigned getFuncNaturalUncurryLevel(PipeClosureExpr *CE) {
-  assert(CE->getParamPatterns().size() >= 1 && "no arguments for func?!");
-  unsigned Level = CE->getParamPatterns().size() - 1;
+static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
+  assert(AFR.getArgParamPatterns().size() >= 1 && "no arguments for func?!");
+  unsigned Level = AFR.getArgParamPatterns().size() - 1;
   // Functions with captures have an extra uncurry level for the capture
   // context.
-  if (CE->getCaptureInfo().hasLocalCaptures())
-    Level += 1;
-  return Level;
-}
-
-static unsigned getFuncNaturalUncurryLevel(AutoClosureExpr *CE) {
-  assert(CE->getParamPatterns().size() >= 1 && "no arguments for func?!");
-  unsigned Level = CE->getParamPatterns().size() - 1;
-  // Functions with captures have an extra uncurry level for the capture
-  // context.
-  if (CE->getCaptureInfo().hasLocalCaptures())
-    Level += 1;
-  return Level;
-}
-
-static unsigned getFuncNaturalUncurryLevel(FuncDecl *FD) {
-  assert(FD->getArgParamPatterns().size() >= 1 && "no arguments for func?!");
-  unsigned Level = FD->getArgParamPatterns().size() - 1;
-  // Functions with captures have an extra uncurry level for the capture
-  // context.
-  if (FD->getCaptureInfo().hasLocalCaptures())
+  if (AFR.getCaptureInfo().hasLocalCaptures())
     Level += 1;
   return Level;
 }
