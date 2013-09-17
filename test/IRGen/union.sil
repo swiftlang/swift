@@ -1682,4 +1682,4 @@ entry:
 // -- Fill function for dynamic single-payload. Call into the runtime to
 //    calculate the size.
 // CHECK: define internal void [[DYNAMIC_SINGLE_PAYLOAD_FILL]](i8*, i8*) {
-// CHECK:   call void @swift_initUnionTypeValueWitnessTableSinglePayload
+// CHECK:   call void @swift_initUnionValueWitnessTableSinglePayload
