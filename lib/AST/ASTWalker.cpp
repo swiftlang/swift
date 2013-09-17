@@ -548,17 +548,21 @@ public:
 
       CD->setArguments(arguments);
 
-      Stmt *S = CD->getBody();
-      if (S) {
-        S = doIt(S);
-        CD->setBody(cast<BraceStmt>(S));
+      if (CD->getBody()) {
+        if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(CD->getBody())))
+          CD->setBody(S);
+        else
+          return true;
       }
     } else if (DestructorDecl *DD = dyn_cast<DestructorDecl>(D)) {
-      Stmt *S = DD->getBody();
-      S = doIt(S);
-      DD->setBody(cast<BraceStmt>(S));
+      if (DD->getBody()) {
+        if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(DD->getBody())))
+          DD->setBody(S);
+        else
+          return true;
+      }
     }
-    
+
     return !Walker.walkToDeclPost(D);
   }
   

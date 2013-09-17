@@ -2456,10 +2456,14 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
   addToScope(SelfDecl);
   ContextChange CC(*this, DD);
 
-  ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+  if (!isDelayedParsingEnabled()) {
+    ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
 
-  if (!Body.isNull())
-    DD->setBody(Body.get());
+    if (!Body.isNull())
+      DD->setBody(Body.get());
+  } else {
+    consumeAbstractFunctionBody(DD, Attributes);
+  }
 
   if (Attributes.isValid())
     DD->getMutableAttrs() = Attributes;
