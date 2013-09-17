@@ -1526,7 +1526,7 @@ public:
       checkGenericParamList(builder, gp);
 
       // Type check the constructor parameters.
-      if (TC.typeCheckPattern(CD->getArguments(),
+      if (TC.typeCheckPattern(CD->getArgParams(),
                               CD,
                               /*allowUnknownTypes*/false)) {
         CD->overwriteType(ErrorType::get(TC.Context));
@@ -1534,18 +1534,18 @@ public:
       }
 
       // Infer requirements from the parameters of the constructor.
-      builder.inferRequirements(CD->getArguments());
+      builder.inferRequirements(CD->getArgParams());
 
       // Assign archetypes.
       finalizeGenericParamList(builder, gp, CD);
 
-      // Reverse the constructor parameter pattern; it will be checked
+      // Reverse the constructor argument parameter pattern; it will be checked
       // again, with archetypes, below.
-      revertDependentPattern(CD->getArguments(), CD);
+      revertDependentPattern(CD->getArgParams(), CD);
     }
 
     // Type check the constructor parameters.
-    if (TC.typeCheckPattern(CD->getArguments(),
+    if (TC.typeCheckPattern(CD->getArgParams(),
                             CD,
                             /*allowUnknownTypes*/false)) {
       CD->overwriteType(ErrorType::get(TC.Context));
@@ -1556,11 +1556,11 @@ public:
       Type InitFnTy;
       if (GenericParamList *innerGenericParams = CD->getGenericParams()) {
         innerGenericParams->setOuterParameters(outerGenericParams);
-        FnTy = PolymorphicFunctionType::get(CD->getArguments()->getType(),
+        FnTy = PolymorphicFunctionType::get(CD->getArgParams()->getType(),
                                             SelfTy, innerGenericParams,
                                             TC.Context);
       } else
-        FnTy = FunctionType::get(CD->getArguments()->getType(),
+        FnTy = FunctionType::get(CD->getArgParams()->getType(),
                                  SelfTy, TC.Context);
       Type SelfMetaTy = MetaTypeType::get(SelfTy, TC.Context);
       if (outerGenericParams) {
@@ -1574,6 +1574,14 @@ public:
       }
       CD->setType(AllocFnTy);
       CD->setInitializerType(InitFnTy);
+
+      // Type check the constructor body parameters.
+      if (TC.typeCheckPattern(CD->getBodyParams(),
+                              CD,
+                              /*allowUnknownTypes*/false)) {
+        CD->overwriteType(ErrorType::get(TC.Context));
+        CD->setInvalid();
+      }
     }
 
     validateAttributes(CD);
@@ -1703,7 +1711,8 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
                             Type(), structDecl);
   ConstructorDecl *ctor
     = new (context) ConstructorDecl(constructorID, structDecl->getLoc(),
-                                    nullptr, selfDecl, nullptr, structDecl);
+                                    nullptr, nullptr, selfDecl, nullptr,
+                                    structDecl);
   selfDecl->setDeclContext(ctor);
   for (auto var : allArgs) {
     var->setDeclContext(ctor);
@@ -1712,7 +1721,8 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   // Set its arguments.
   auto pattern = TuplePattern::create(context, structDecl->getLoc(),
                                       patternElts, structDecl->getLoc());
-  ctor->setArguments(pattern);
+  ctor->setArgParams(pattern);
+  ctor->setBodyParams(pattern);
 
   // Mark implicit.
   ctor->setImplicit();

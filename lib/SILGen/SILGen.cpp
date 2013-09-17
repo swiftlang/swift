@@ -365,7 +365,7 @@ void SILGenModule::addGlobalVariable(VarDecl *global) {
 
 void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   // Emit any default argument getter functions.
-  emitDefaultArgGenerators(decl, decl->getArguments());
+  emitDefaultArgGenerators(decl, decl->getBodyParams());
 
   emitAbstractFuncDecl(decl);
 

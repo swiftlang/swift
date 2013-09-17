@@ -545,7 +545,8 @@ bool PrintAST::printSelectorStyleArgs(ValueDecl *decl,
                                       ArrayRef<Pattern *> argPatterns,
                                       ArrayRef<Pattern *> bodyPatterns) {
   // Skip over the implicit 'self'.
-  if (decl->getDeclContext()->isTypeContext()) {
+  if (decl->getDeclContext()->isTypeContext() &&
+      !isa<ConstructorDecl>(decl)) {
     argPatterns = argPatterns.slice(1);
     bodyPatterns = bodyPatterns.slice(1);
   }
@@ -744,7 +745,11 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     OS << " ";
   }
   printAttributes(decl->getAttrs());
-  printPattern(decl->getArguments());
+  if (!printSelectorStyleArgs(decl,
+                              decl->getArgParamPatterns(),
+                              decl->getBodyParamPatterns())) {
+    printPattern(decl->getArgParams());
+  }
   if (!Options.FunctionDefinitions || !decl->getBody()) {
     return;
   }

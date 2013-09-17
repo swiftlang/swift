@@ -330,6 +330,77 @@ Parser::parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
   return Status;
 }
 
+ParserStatus Parser::parseConstructorArguments(Pattern *&ArgPattern,
+                                               Pattern *&BodyPattern) {
+  // It's just a pattern. Parse it.
+  if (Tok.is(tok::l_paren)) {
+    ParserResult<Pattern> params = parsePatternTuple(/*AllowInitExpr=*/true);
+    if (params.hasCodeCompletion())
+      return params;
+
+    // If we failed to parse the pattern, create an empty tuple to recover.
+    if (params.isNull()) {
+      params = makeParserErrorResult(
+                 TuplePattern::createSimple(Context, Tok.getLoc(), {},
+                                            Tok.getLoc()));
+    }
+
+    ArgPattern = params.get();
+    BodyPattern = ArgPattern->clone(Context);
+    return params;
+  }
+
+  if (!isStartOfBindingName(Tok)) {
+    // Complain that we expected '(' or a parameter name.
+    {
+      auto diag = diagnose(Tok, diag::expected_lparen_constructor);
+      if (Tok.is(tok::l_brace))
+        diag.fixItInsert(Tok.getLoc(), "() ");
+    }
+
+    // Create the empty tuple to recover.
+    ArgPattern = TuplePattern::createSimple(Context, Tok.getLoc(), {},
+                                            Tok.getLoc());
+    BodyPattern = ArgPattern->clone(Context);
+    ParserStatus status;
+    status.setIsParseError();
+    return status;
+  }
+
+  // We have the start of a binding name, so this is a selector-style
+  // declaration.
+
+  // Parse additional selectors as long as we can.
+  llvm::StringMap<VarDecl*> selectorNames;
+
+  ParserStatus status;
+  SmallVector<TuplePatternElt, 4> argElts;
+  SmallVector<TuplePatternElt, 4> bodyElts;
+  SourceLoc rightParen;
+  for (;;) {
+    if (isStartOfBindingName(Tok)) {
+      status |= parseSelectorArgument(*this, argElts, bodyElts, selectorNames,
+                                      rightParen);
+      continue;
+    }
+
+    if (Tok.is(tok::l_paren)) {
+      // FIXME: Should we assume this is '_'?
+      diagnose(Tok, diag::func_selector_with_curry);
+      // FIXME: better recovery: just parse a tuple instead of skipping tokens.
+      skipUntilDeclRBrace(tok::l_brace);
+      status.setIsParseError();
+    }
+    break;
+  }
+
+  ArgPattern = TuplePattern::create(Context, SourceLoc(), argElts,
+                                     SourceLoc());
+  BodyPattern = TuplePattern::create(Context, SourceLoc(), bodyElts,
+                                      SourceLoc());
+  return status;
+}
+
 /// Parse a pattern.
 ///   pattern ::= pattern-atom
 ///   pattern ::= pattern-atom ':' type-annotation

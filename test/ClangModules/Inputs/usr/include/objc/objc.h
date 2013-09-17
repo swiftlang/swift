@@ -48,7 +48,9 @@
 
 - initWithInt:(int)i;
 - initWithInt:(int)i andDouble:(double)d;
-
+- initWithDouble:(double)d1 :(double)d2;
+- initBBB:(B*)b;
+- initForWorldDomination;
 - (void)anotherMethodOnB;
 @end
 

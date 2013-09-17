@@ -339,7 +339,9 @@ namespace {
 
       // Create the constructor
       auto constructor = new (context) ConstructorDecl(name, SourceLoc(),
-                                                       paramPattern, selfDecl,
+                                                       paramPattern,
+                                                       paramPattern,
+                                                       selfDecl,
                                                        nullptr, structDecl);
 
       // Set the constructor's type.
@@ -1107,12 +1109,6 @@ namespace {
         llvm_unreachable("Caller did not filter non-constructor methods");
 
       case clang::OMF_init: {
-        // FIXME: Ignore no-argument 'init' methods other than 'init' itself
-        // for now. Swift can't support more than one no-argument constructor.
-        if (objcMethod->param_size() == 0 &&
-            objcMethod->getSelector().getNameForSlot(0) != "init")
-          return nullptr;
-        
         // Make sure we have a usable 'alloc' method. Otherwise, we can't
         // build this constructor anyway.
         const clang::ObjCInterfaceDecl *interface;
@@ -1202,9 +1198,9 @@ namespace {
                                                           selfName, selfTy, dc);
 
       // Create the actual constructor.
-      // FIXME: Losing body patterns here.
       auto result = new (Impl.SwiftContext) ConstructorDecl(name, loc,
                                                             argPatterns.back(),
+                                                            bodyPatterns.back(),
                                                             selfVar,
                                                             /*GenericParams=*/0,
                                                             dc);
@@ -1257,7 +1253,7 @@ namespace {
 
       // Form the call arguments.
       SmallVector<Expr *, 2> callArgs;
-      auto tuple = dyn_cast<TuplePattern>(argPatterns[1]);
+      auto tuple = dyn_cast<TuplePattern>(bodyPatterns[1]);
       if (!tuple) {
         // FIXME: We don't want this to be the case. We should always ensure
         // that the body has names, even if the interface does not.

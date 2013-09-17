@@ -837,14 +837,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto genericParams = maybeReadGenericParams(parent);
 
     auto ctor = new (ctx) ConstructorDecl(ctx.getIdentifier("constructor"),
-                                          SourceLoc(), /*args=*/nullptr,
-                                          selfDecl, genericParams, parent);
+                                          SourceLoc(), /*argParams=*/nullptr,
+                                          /*bodyParams=*/nullptr, selfDecl,
+                                          genericParams, parent);
     declOrOffset = ctor;
     selfDecl->setDeclContext(ctor);
 
-    Pattern *args = maybeReadPattern();
-    assert(args && "missing arguments for constructor");
-    ctor->setArguments(args);
+    Pattern *argParams = maybeReadPattern();
+    assert(argParams && "missing argument patterns for constructor");
+    ctor->setArgParams(argParams);
+
+    Pattern *bodyParams = maybeReadPattern();
+    assert(bodyParams && "missing body patterns for constructor");
+    ctor->setBodyParams(bodyParams);
 
     // This must be set after recording the constructor in the map.
     // A polymorphic constructor type needs to refer to the constructor to get

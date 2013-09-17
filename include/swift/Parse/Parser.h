@@ -566,6 +566,8 @@ public:
   ParserStatus parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
                                       SmallVectorImpl<Pattern *> &bodyPatterns,
                                       TypeRepr *&retLoc);
+  ParserStatus parseConstructorArguments(Pattern *&ArgPattern,
+                                         Pattern *&BodyPattern);
 
   ParserResult<Pattern> parsePattern();
 

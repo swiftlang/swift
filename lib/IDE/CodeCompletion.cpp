@@ -700,7 +700,7 @@ public:
           Builder.addTextChunk("constructor");
     }
     Builder.addLeftParen();
-    addPatternParameters(Builder, CD->getArguments());
+    addPatternParameters(Builder, CD->getArgParams());
     Builder.addRightParen();
     addTypeAnnotation(Builder, CD->getResultType());
   }

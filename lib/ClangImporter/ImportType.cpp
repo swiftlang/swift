@@ -555,6 +555,35 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
   return converted;
 }
 
+/// Given the first selector piece for an init method, e.g., \c initWithFoo,
+/// produce the
+///
+/// \param piece The first selector piece, e.g., \c initWithFoo.
+/// \param buffer A scratch buffer.
+/// \returns the name of the parameter that corresponds to this selector piece.
+static StringRef getFirstInitParameterName(StringRef piece,
+                                           SmallVectorImpl<char> &buffer) {
+  assert(piece.startswith("init") && "Must be in the init family");
+  piece = piece.substr(4);
+
+  // If the second character is uppercase, we have an acronym, so don't
+  // make any changes. Similarly, if there's nothing to change, or lowercasing
+  // the first letter would have no effect, there's nothing more to do.
+  // just re
+  if (piece.empty() ||
+      (piece.size() > 1 && isupper(piece[1])) ||
+      tolower(piece[0]) == piece[0]) {
+    return piece;
+  }
+
+  // Lowercase the first letter.
+  buffer.clear();
+  buffer.reserve(piece.size());
+  buffer.push_back(tolower(piece[0]));
+  buffer.append(piece.begin() + 1, piece.end());
+  return StringRef(buffer.data(), buffer.size());
+}
+
 Type ClangImporter::Implementation::importFunctionType(
        clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
@@ -597,6 +626,19 @@ Type ClangImporter::Implementation::importFunctionType(
       // For parameters after the first, or all parameters in a constructor,
       // the name comes from the selector.
       name = importName(selector.getIdentifierInfoForSlot(index));
+
+      // For the first selector piece in a constructor, strip off the 'init'
+      // prefer and lowercase the first letter of the remainder (unless the
+      // second letter is also uppercase, in which case we probably have an
+      // acronym anyway).
+      if (index == 0 && isConstructor && !name.empty()) {
+        llvm::SmallString<32> buffer;
+        auto newName = getFirstInitParameterName(name.str(), buffer);
+        if (newName.empty())
+          name = Identifier();
+        else
+          name = SwiftContext.getIdentifier(newName);
+      }
     }
 
     // Compute the pattern to put into the body.
@@ -643,6 +685,32 @@ Type ClangImporter::Implementation::importFunctionType(
     swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name));
     swiftBodyParams.push_back(TupleTypeElt(swiftParamTy, bodyName));
     ++index;
+  }
+
+  // If we have a constructor with no parameters and a unary selector that is
+  // not 'init', synthesize a Void parameter with the name following 'init',
+  // suitably modified for a parameter name.
+  if (isConstructor && selector.isUnarySelector() && params.empty()) {
+    llvm::SmallString<32> buffer;
+    auto paramName = getFirstInitParameterName(
+                       selector.getIdentifierInfoForSlot(0)->getName(),
+                       buffer);
+    if (!paramName.empty()) {
+      auto name = SwiftContext.getIdentifier(paramName);
+      auto type = TupleType::getEmpty(SwiftContext);
+      auto var = new (SwiftContext) VarDecl(SourceLoc(), name, type,
+                                            firstClangModule);
+      Pattern *pattern = new (SwiftContext) NamedPattern(var);
+      pattern->setType(type);
+      pattern = new (SwiftContext) TypedPattern(pattern,
+                                                TypeLoc::withoutLoc(type));
+      pattern->setType(type);
+
+      argPatternElts.push_back(TuplePatternElt(pattern));
+      bodyPatternElts.push_back(TuplePatternElt(pattern));
+      swiftArgParams.push_back(TupleTypeElt(type, name));
+      swiftBodyParams.push_back(TupleTypeElt(type, name));
+    }
   }
 
   // Form the parameter tuples.

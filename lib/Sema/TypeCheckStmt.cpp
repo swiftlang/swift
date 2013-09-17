@@ -684,7 +684,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   }
 
   // Check the default argument definitions.
-  checkDefaultArguments(*this, ctor->getArguments(), ctor->getDeclContext());
+  checkDefaultArguments(*this, ctor->getArgParams(), ctor->getDeclContext());
 
   BraceStmt *body = ctor->getBody();
   if (!body)

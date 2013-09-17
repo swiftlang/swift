@@ -475,6 +475,9 @@
 
     // in addition to the starting character set.
     id-continue ::= id-start
+
+    identifier-or-any ::= identifier
+    identifier-or-any ::= '_'
   </pre>
     
   <p>The set of valid identifier characters is consistent with WG14 N1518,
@@ -872,7 +875,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
     func-signature ::= func-arguments func-signature-result?
     func-arguments ::= <a href="#pattern-tuple">pattern-tuple</a>+
     func-arguments ::= selector-tuple
-    selector-tuple ::= '(' <a href="#pattern-tuple">pattern-tuple-element</a> ')' (<a href="#identifier">identifier</a> '(' pattern-tuple-element ')')+
+    <a id="selector-tuple">selector-tuple</a> ::= '(' <a href="#pattern-tuple">pattern-tuple-element</a> ')' (<a href="#identifier">identifier-or-any</a> '(' pattern-tuple-element ')')+
     func-signature-result ::= '-&gt;' <a href="#type">type</a>
   </pre>
 
@@ -1331,7 +1334,10 @@ if vec[3] {
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-constructor ::= 'constructor' <a href="#attribute-list">attribute-list</a> <a href="#generic-params">generic-params</a>? <a href="#pattern-tuple">pattern-tuple</a> <a href="#brace-item-list">brace-item-list</a>
+    decl-constructor ::= 'constructor' <a href="#attribute-list">attribute-list</a> <a href="#generic-params">generic-params</a>? constructor-signature <a href="#brace-item-list">brace-item-list</a>
+
+    constructor-signature ::= <a href="#pattern-tuple">pattern-tuple</a>
+    constructor-signature ::= <a href="#identifier">identifier-or-any</a> <a href="#selector-tuple">selector-tuple</a>
   </pre>
 
   <p>'constructor' declares a constructor for a class, struct, or union.  Such

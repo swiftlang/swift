@@ -2090,8 +2090,8 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
                                               SourceLoc());
     ConstructorDecl *Constructor =
         new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
-                                     SourceLoc(), Arguments, SelfDecl,
-                                     nullptr, CD);
+                                      SourceLoc(), Arguments, Arguments,
+                                      SelfDecl, nullptr, CD);
     Constructor->setImplicit();
     SelfDecl->setDeclContext(Constructor);
     MemberDecls.push_back(Constructor);
@@ -2357,27 +2357,21 @@ Parser::parseDeclConstructor(unsigned Flags) {
   Scope S(this, ScopeKind::Generics);
   GenericParamList *GenericParams = maybeParseGenericParams();
 
-  // pattern-tuple
-  ParserResult<Pattern> Arguments;
-  if (!Tok.is(tok::l_paren))
-    diagnose(Tok, diag::expected_lparen_constructor);
-  else
-    Arguments = parsePatternTuple(/*AllowInitExpr=*/true);
-
+  // Parse the parameters.
   // FIXME: handle code completion in Arguments.
-
-  if (Arguments.isNull())
-    // Recover by creating an empty parameter tuple.
-    Arguments = makeParserErrorResult(
-        TuplePattern::createSimple(Context, Tok.getLoc(), {}, Tok.getLoc()));
+  Pattern *argPattern;
+  Pattern *bodyPattern;
+  ParserStatus status = parseConstructorArguments(argPattern, bodyPattern);
 
   // '{'
   if (!Tok.is(tok::l_brace)) {
-    if (!Arguments.isParseError()) {
+    if (!status.isError()) {
       // Don't emit this diagnostic if we already complained about this
       // constructor decl.
       diagnose(Tok, diag::expected_lbrace_constructor);
     }
+
+    // FIXME: This is brutal. Can't we at least create the declaration?
     return nullptr;
   }
 
@@ -2388,8 +2382,8 @@ Parser::parseDeclConstructor(unsigned Flags) {
   Scope S2(this, ScopeKind::ConstructorBody);
   ConstructorDecl *CD =
       new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
-                                    ConstructorLoc, Arguments.get(), SelfDecl,
-                                    GenericParams, CurDeclContext);
+                                    ConstructorLoc, argPattern, bodyPattern,
+                                    SelfDecl, GenericParams, CurDeclContext);
   SelfDecl->setDeclContext(CD);
   if (ConstructorsNotAllowed) {
     // Tell the type checker not to touch this constructor.
@@ -2399,7 +2393,9 @@ Parser::parseDeclConstructor(unsigned Flags) {
     for (auto Param : *GenericParams)
       Param.setDeclContext(CD);
   }
-  addFunctionParametersToScope(Arguments.get(), CD);
+  addFunctionParametersToScope(bodyPattern, CD);
+  argPattern->walk(SetVarContext(CD));
+
   addToScope(SelfDecl);
   ContextChange CC(*this, CD);
 

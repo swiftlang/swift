@@ -542,11 +542,11 @@ public:
         TLCD->setBody(S);
     } else if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D)) {
       // Visit arguments.
-      auto *arguments = doIt(CD->getArguments());
-      if (!arguments)
+      auto *argParams = doIt(CD->getArgParams());
+      if (!argParams)
         return nullptr;
 
-      CD->setArguments(arguments);
+      CD->setArgParams(argParams);
 
       if (CD->getBody()) {
         if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(CD->getBody())))

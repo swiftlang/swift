@@ -2485,7 +2485,8 @@ public:
 class ConstructorDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
 
-  Pattern *Arguments;
+  Pattern *ArgParams;
+  Pattern *BodyParams;
   
   /// The type of the initializing constructor.
   Type InitializerType = Type();
@@ -2496,11 +2497,12 @@ class ConstructorDecl : public AbstractFunctionDecl {
   
 public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
-                  Pattern *Arguments, VarDecl *ImplicitSelfDecl,
+                  Pattern *ArgParams, Pattern *BodyParams,
+                  VarDecl *ImplicitSelfDecl,
                   GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Constructor, Parent, NameHack,
                            ConstructorLoc, ImplicitSelfDecl, GenericParams),
-      Arguments(Arguments) {
+      ArgParams(ArgParams), BodyParams(BodyParams) {
     assert(ImplicitSelfDecl && "constructors should have a non-null self");
   }
 
@@ -2508,11 +2510,18 @@ public:
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
   SourceRange getSourceRange() const;
 
-  Pattern *getArguments() { return Arguments; }
-  const Pattern *getArguments() const { return Arguments; }
+  Pattern *getArgParams() { return ArgParams; }
+  const Pattern *getArgParams() const { return ArgParams; }
 
-  void setArguments(Pattern *args) {
-    Arguments = args;
+  void setArgParams(Pattern *argParams) {
+    ArgParams = argParams;
+  }
+
+  Pattern *getBodyParams() { return BodyParams; }
+  const Pattern *getBodyParams() const { return BodyParams; }
+
+  void setBodyParams(Pattern *bodyParams) {
+    BodyParams = bodyParams;
   }
 
   /// \brief Compute and return the type of 'self'.
@@ -2782,7 +2791,7 @@ inline bool NominalTypeDecl::isPhysicalField(VarDecl *vd) {
 inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getArgParamBuffer() {
   switch (getKind()) {
   case DeclKind::Constructor:
-    return MutableArrayRef<Pattern *>(&cast<ConstructorDecl>(this)->Arguments,
+    return MutableArrayRef<Pattern *>(&cast<ConstructorDecl>(this)->ArgParams,
                                       1);
 
   case DeclKind::Destructor:
@@ -2802,7 +2811,7 @@ inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getArgParamBuffer() {
 inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
   switch (getKind()) {
   case DeclKind::Constructor:
-    return MutableArrayRef<Pattern *>(&cast<ConstructorDecl>(this)->Arguments,
+    return MutableArrayRef<Pattern *>(&cast<ConstructorDecl>(this)->BodyParams,
                                       1);
 
   case DeclKind::Destructor:

@@ -1237,7 +1237,8 @@ void Serializer::writeDecl(const Decl *D) {
                                   addDeclRef(implicitSelf));
 
     writeGenericParams(ctor->getGenericParams());
-    writePattern(ctor->getArguments());
+    writePattern(ctor->getArgParams());
+    writePattern(ctor->getBodyParams());
     break;
   }
 

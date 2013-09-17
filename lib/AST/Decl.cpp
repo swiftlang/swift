@@ -278,7 +278,7 @@ ValueDecl::getDefaultArg(unsigned index) const {
       patterns = patterns.slice(1);
   } else {
     auto constructor = dyn_cast<ConstructorDecl>(this);
-    patterns = constructor->getArguments();
+    patterns = constructor->getArgParams();
   }
 
   // Find the (sub-)pattern for this index.
@@ -974,24 +974,40 @@ ConstructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
 
   llvm::raw_svector_ostream out(buffer);
 
+  // In the beginning, there was 'init'.
+  out << "init";
 
-  // If it's an empty tuple pattern, it's the nullary selector "init".
-  // FIXME: This leaves us without a way to describe "new".
-  auto tuple = dyn_cast<TuplePattern>(Arguments);
-  if (tuple && tuple->getNumFields() == 0) {
-    out << "init";
+  // If there are no parameters, this is just 'init'.
+  auto tuple = cast<TuplePattern>(getArgParams());
+  if (tuple->getNumFields() == 0) {
     return out.str();
   }
 
-  // If it's not a tuple at all, it's the unary selector "init:".
-  // FIXME: Diagnose this?
-  if (!tuple) {
-    out << "init:";
-    return out.str();
+  // The first field is special: we uppercase the name.
+  const auto &firstElt = tuple->getFields()[0];
+  auto firstPattern = firstElt.getPattern()->getSemanticsProvidingPattern();
+  if (auto firstNamed = dyn_cast<NamedPattern>(firstPattern)) {
+    if (!firstNamed->getBoundName().empty()) {
+      auto nameStr = firstNamed->getBoundName().str();
+      out << (char)toupper(nameStr[0]);
+      out << nameStr.substr(1);
+    }
+
+    // If there is only a single parameter and its type is the empty tuple
+    // type, we're done: don't add the trailing colon.
+    if (tuple->getNumFields() == 1) {
+      auto emptyTupleTy = TupleType::getEmpty(getASTContext());
+      if (!firstPattern->getType()->isEqual(emptyTupleTy));
+        out << ':';
+      return out.str();
+    }
+
+    // Continue with the remaining selectors.
+    out << ':';
   }
 
-  // For every element, add a selector component.
-  for (auto &elt : tuple->getFields()) {
+  // For every remaining element, add a selector component.
+  for (auto &elt : tuple->getFields().slice(1)) {
     auto eltPattern = elt.getPattern()->getSemanticsProvidingPattern();
 
     // Add a label to the selector component if there's a tag.
