@@ -31,7 +31,7 @@ bool parseASTSection(SerializedModuleLoader* SML, StringRef Buf,
     uint64_t bitstream_ofs;
     uint64_t bitstream_size;
     uint32_t name_len;
-    char name[0];
+    char name[1]; // There's at least a NUL there.
   };
 
   size_t size = Buf.size();

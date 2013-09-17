@@ -120,6 +120,7 @@ SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
     // If this value is already defined, check it to make sure types match.
     SILType EntryTy = Entry->getType(ResultNum);
     assert(EntryTy == Type && "Value Type mismatch?");
+    (void)EntryTy;
     return SILValue(Entry, ResultNum);
   }
   // FIXME: handle forward references.

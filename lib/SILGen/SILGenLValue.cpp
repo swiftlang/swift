@@ -545,9 +545,11 @@ static void emitUnloweredStoreOfCopy(SILBuilder &B, SILLocation loc,
   }
 }
 
+#ifndef NDEBUG
 static bool hasDifferentTypeOfRValue(const TypeLowering &srcTL) {
   return srcTL.getLoweredType().is<ReferenceStorageType>();
 }
+#endif
 
 /// Given that the type-of-rvalue differs from the type-of-storage,
 /// and given that the type-of-rvalue is loadable, produce a +1 scalar
