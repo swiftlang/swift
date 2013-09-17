@@ -1,5 +1,6 @@
 add_swift_unittest(SwiftRuntimeTests
   Metadata.cpp
+  Union.cpp
   )
 
 find_library(FOUNDATION_LIBRARY Foundation)

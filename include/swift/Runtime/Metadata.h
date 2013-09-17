@@ -73,6 +73,7 @@ class ValueWitnessFlags {
     AlignmentMask = 0x0000FFFF,
     IsNonPOD =      0x00010000,
     IsNonInline =   0x00020000,
+    HasExtraInhabitants = 0x00040000,
     // Everything else is reserved.
   };
   int_type Data;
@@ -122,6 +123,40 @@ public:
   constexpr ValueWitnessFlags withPOD(bool isPOD) const {
     return ValueWitnessFlags((Data & ~IsNonPOD) |
                                (isPOD ? 0 : IsNonPOD));
+  }
+  
+  /// True if this type's binary representation has extra inhabitants, that is,
+  /// bit patterns that do not form valid values of the type.
+  ///
+  /// If true, then the extra inhabitant value witness table entries are
+  /// available in this type's value witness table.
+  bool hasExtraInhabitants() const { return Data & HasExtraInhabitants; }
+  constexpr ValueWitnessFlags
+  withExtraInhabitants(bool hasExtraInhabitants) const {
+    return ValueWitnessFlags((Data & ~HasExtraInhabitants) |
+                               (hasExtraInhabitants ? HasExtraInhabitants : 0));
+  }
+};
+  
+class ExtraInhabitantFlags {
+  typedef size_t int_type;
+  enum : int_type {
+    NumExtraInhabitantsMask = 0x7FFFFFFFU,
+  };
+  int_type Data;
+  
+  constexpr ExtraInhabitantFlags(int_type data) : Data(data) {}
+
+public:
+  constexpr ExtraInhabitantFlags() : Data(0) {}
+  
+  /// The number of extra inhabitants in the type's representation.
+  int getNumExtraInhabitants() const { return Data & NumExtraInhabitantsMask; }
+  
+  constexpr ExtraInhabitantFlags
+  withNumExtraInhabitants(unsigned numExtraInhabitants) const {
+    return ExtraInhabitantFlags((Data & ~NumExtraInhabitantsMask) |
+                                  numExtraInhabitants);
   }
 };
 
@@ -323,6 +358,20 @@ typedef ValueWitnessFlags flags;
 /// between array elements.  This value may be zero.  This value is always
 /// a multiple of the alignment.
 typedef size_t stride;
+  
+/// Store an extra inhabitant, named by a unique positive or zero index,
+/// into the given uninitialized storage for the type.
+typedef void storeExtraInhabitant(OpaqueValue *dest,
+                                  int index,
+                                  const Metadata *self);
+  
+/// Get the extra inhabitant index for the bit pattern stored at the given
+/// address, or return -1 if there is a valid value at the address.
+typedef int getExtraInhabitantIndex(const OpaqueValue *src,
+                                    const Metadata *self);
+  
+/// Flags which describe extra inhabitants.
+typedef ExtraInhabitantFlags extraInhabitantFlags;
 
 } // end namespace value_witness_types
 
@@ -408,7 +457,39 @@ struct ValueWitnessTable {
   size_t getAlignmentMask() const {
     return flags.getAlignmentMask();
   }
+  
+  /// The number of extra inhabitants, that is, bit patterns that do not form
+  /// valid values of the type, in this type's binary representation.
+  unsigned getNumExtraInhabitants() const;
 };
+  
+/// A value-witness table with extra inhabitants entry points.
+/// These entry points are available only if the HasExtraInhabitants flag bit is
+/// set in the 'flags' field.
+struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
+  value_witness_types::storeExtraInhabitant *storeExtraInhabitant;
+  value_witness_types::getExtraInhabitantIndex *getExtraInhabitantIndex;
+  value_witness_types::extraInhabitantFlags extraInhabitantFlags;
+  
+  constexpr ExtraInhabitantsValueWitnessTable()
+    : ValueWitnessTable{}, storeExtraInhabitant(nullptr),
+      getExtraInhabitantIndex(nullptr), extraInhabitantFlags() {}
+  constexpr ExtraInhabitantsValueWitnessTable(const ValueWitnessTable &base,
+                            value_witness_types::storeExtraInhabitant *sei,
+                            value_witness_types::getExtraInhabitantIndex *geii,
+                            value_witness_types::extraInhabitantFlags eif)
+    : ValueWitnessTable(base), storeExtraInhabitant(sei),
+      getExtraInhabitantIndex(geii), extraInhabitantFlags(eif) {}
+};
+  
+inline unsigned ValueWitnessTable::getNumExtraInhabitants() const {
+  // If the table does not have extra inhabitant witnesses, then there are zero.
+  if (!flags.hasExtraInhabitants())
+    return 0;
+  return static_cast<const ExtraInhabitantsValueWitnessTable &>(*this)
+    .extraInhabitantFlags
+    .getNumExtraInhabitants();
+}
 
 // Standard value-witness tables.
 
@@ -432,10 +513,6 @@ extern "C" const ValueWitnessTable _TWVFT_T_;     // () -> ()
 // The () table can be used for arbitrary empty types.
 extern "C" const ValueWitnessTable _TWVT_;        // ()
   
-// The Bool value witness table.
-// FIXME: The compiler should generate this.
-extern "C" const ValueWitnessTable _TWVSb;        // swift.Bool
-
 /// Return the value witnesses for unmanaged pointers.
 static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
 #ifdef __LP64__

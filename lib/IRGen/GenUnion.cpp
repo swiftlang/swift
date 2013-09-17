@@ -2548,11 +2548,6 @@ namespace {
         = (tagsWithoutInhabitants+(tagsPerTagBitValue-1))/tagsPerTagBitValue+1;
       ExtraTagBitCount = llvm::Log2_32(NumExtraTagValues-1) + 1;
     }
-    // FIXME: Dynamic single-payload dispatch assumes that the extra tag bits
-    // fit in a single byte. This is probably a safe assumption since it would
-    // take 65535 empty cases to overflow.
-    assert(ExtraTagBitCount <= 8 &&
-           "more than 8 extra tag bits not handled by runtime");
 
     // Create the body type.
     setTaggedUnionBody(TC.IGM, unionTy,

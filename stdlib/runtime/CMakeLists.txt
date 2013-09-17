@@ -6,7 +6,8 @@ add_swift_library(swift_runtime INSTALL
   KnownMetadata.cpp
   Metadata.cpp
   Stubs.cpp
-  SwiftObject.mm)
+  SwiftObject.mm
+  Union.cpp)
 
 add_swift_optimization_flags(swift_runtime)
 
