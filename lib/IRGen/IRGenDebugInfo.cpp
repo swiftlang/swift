@@ -1249,6 +1249,16 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                                      Subscripts);
   }
 
+  // Reference storage types.
+  case TypeKind::UnownedStorage:
+  case TypeKind::WeakStorage: {
+    Name = getMangledName(DbgTy);
+    auto ReferenceTy = cast<ReferenceStorageType>(BaseTy);
+    auto CanTy = ReferenceTy->getReferentType();
+    auto Line = 0;
+    return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy, Scope),
+                                  Name, MainFile, Line, File);
+  }
 
   // Sugared types.
 
