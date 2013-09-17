@@ -70,9 +70,29 @@ class alignas(8) Expr {
   enum { NumExprBits = 8 };
   static_assert(NumExprBits <= 32, "fits in an unsigned");
 
+  class AbstractClosureExprBitfields {
+    friend class AbstractClosureExpr;
+    unsigned : NumExprBits;
+  };
+  enum { NumAbstractClosureExprBits = NumExprBits + 0 };
+  static_assert(NumAbstractClosureExprBits <= 32, "fits in an unsigned");
+
+  class PipeClosureExprBitfields {
+    friend class PipeClosureExpr;
+    unsigned : NumAbstractClosureExprBits;
+
+    /// True if closure parameters were synthesized from anonymous closure
+    /// variables.
+    unsigned HasAnonymousClosureVars : 1;
+  };
+  enum { NumPipeClosureExprBits = NumAbstractClosureExprBits + 1 };
+  static_assert(NumPipeClosureExprBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     ExprBitfields ExprBits;
+    AbstractClosureExprBitfields AbstractClosureExprBits;
+    PipeClosureExprBitfields PipeClosureExprBits;
   };
 
 private:
@@ -1615,14 +1635,26 @@ public:
 class AbstractClosureExpr : public Expr, public DeclContext {
   CaptureInfo Captures;
 
+  /// \brief The set of parameters.
+  Pattern *ParamPattern;
+
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, DeclContext *Parent)
       : Expr(Kind, FnType),
-        DeclContext(DeclContextKind::AbstractClosureExpr, Parent)
+        DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
+        ParamPattern(nullptr)
   {}
 
   CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
+
+  /// \brief Retrieve the parameters of this closure.
+  Pattern *getParams() { return ParamPattern; }
+  const Pattern *getParams() const { return ParamPattern; }
+  void setParams(Pattern *P) { ParamPattern = P; }
+
+  ArrayRef<Pattern *> getParamPatterns() { return ParamPattern; }
+  ArrayRef<const Pattern *> getParamPatterns() const { return ParamPattern; }
 
   /// \brief Retrieve the result type of this closure.
   Type getResultType() const;
@@ -1643,10 +1675,6 @@ public:
 /// have named arguments.
 ///    e.g.  func(a : int) -> int { return a+1 }
 class PipeClosureExpr : public AbstractClosureExpr {
-  /// \brief The set of parameters, along with a bit indicating when these
-  /// parameters were synthesized from anonymous closure variables.
-  llvm::PointerIntPair<Pattern *, 1, bool> params;
-
   /// \brief The location of the '->' denoting an explicit return type,
   /// if present.
   SourceLoc arrowLoc;
@@ -1659,37 +1687,34 @@ class PipeClosureExpr : public AbstractClosureExpr {
   llvm::PointerIntPair<BraceStmt *, 1, bool> body;
   
 public:
-  PipeClosureExpr(Pattern *params, SourceLoc arrowLoc,
+  PipeClosureExpr(Pattern *Params, SourceLoc arrowLoc,
                   TypeLoc explicitResultType, DeclContext *Parent)
     : AbstractClosureExpr(ExprKind::PipeClosure, Type(), Parent),
-      params(params, false), arrowLoc(arrowLoc),
-      explicitResultType(explicitResultType), body(nullptr) { }
+      arrowLoc(arrowLoc), explicitResultType(explicitResultType),
+      body(nullptr) {
+    setParams(Params);
+    PipeClosureExprBits.HasAnonymousClosureVars = false;
+  }
 
   SourceRange getSourceRange() const;
   SourceLoc getLoc() const;
-
-  /// \brief Retrieve the parameters of this closure.
-  Pattern *getParams() { return params.getPointer(); }
-  const Pattern *getParams() const { return params.getPointer(); }
-  void setParams(Pattern *p) { params.setPointer(p); }
-
-  ArrayRef<Pattern *> getParamPatterns() { return getParams(); }
-  ArrayRef<const Pattern *> getParamPatterns() const { return getParams(); }
-
-  /// \brief Determine whether the parameters of this closure are actually
-  /// anonymous closure variables.
-  bool hasAnonymousClosureVars() const { return params.getInt(); }
-
-  /// \brief Set the parameters of this closure along with a flag indicating
-  /// whether these parameters are actually anonymous closure variables.
-  void setParams(Pattern *pattern, bool anonymousClosureVars) {
-    params.setPointerAndInt(pattern, anonymousClosureVars);
-  }
 
   BraceStmt *getBody() const { return body.getPointer(); }
   void setBody(BraceStmt *S, bool isSingleExpression) {
     body.setPointer(S);
     body.setInt(isSingleExpression);
+  }
+
+  /// \brief Determine whether the parameters of this closure are actually
+  /// anonymous closure variables.
+  bool hasAnonymousClosureVars() const {
+    return PipeClosureExprBits.HasAnonymousClosureVars;
+  }
+
+  /// \brief Set the parameters of this closure along with a flag indicating
+  /// whether these parameters are actually anonymous closure variables.
+  void setHasAnonymousClosureVars() {
+    PipeClosureExprBits.HasAnonymousClosureVars = true;
   }
 
   /// \brief Determine whether this closure expression has an
@@ -1754,24 +1779,14 @@ public:
 /// \endcode
 class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
-  Pattern *ParamPattern;
 
 public:
   AutoClosureExpr(Expr *Body, Type ResultTy, DeclContext *Parent)
-      : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, Parent),
-        ParamPattern(nullptr) {
+      : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, Parent) {
     setBody(Body);
   }
 
   SourceRange getSourceRange() const;
-
-  MutableArrayRef<Pattern *> getParamPatterns() {
-    return ParamPattern;
-  }
-  ArrayRef<const Pattern *> getParamPatterns() const {
-    return ParamPattern;
-  }
-  void setParamPattern(Pattern *P) { ParamPattern = P; }
 
   BraceStmt *getBody() const { return Body; }
   void setBody(Expr *E);

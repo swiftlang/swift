@@ -1323,7 +1323,8 @@ Expr *Parser::parseExprClosure() {
     AnonClosureVars.pop_back();
 
     // Attach the parameters to the closure.
-    closure->setParams(params, /*anonymousClosureVars=*/true);
+    closure->setParams(params);
+    closure->setHasAnonymousClosureVars();
   }
 
   // If the body consists of a single expression, turn it into a return
