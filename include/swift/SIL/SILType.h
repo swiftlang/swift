@@ -18,6 +18,7 @@
 #ifndef SWIFT_SIL_SILType_H
 #define SWIFT_SIL_SILType_H
 
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -294,6 +295,26 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
 /// SIL-level calling convention for the function, including its exploded
 /// input argument types and whether it uses an indirect return argument.
 class SILFunctionTypeInfo {
+  /// Recursively destructure tuple-type arguments into SIL argument types.
+  template<typename F>
+  class DestructedArgumentTypeVisitor
+    : public CanTypeVisitor<DestructedArgumentTypeVisitor<F>>
+  {
+    const F &fn;
+  public:
+    DestructedArgumentTypeVisitor(const F &fn) : fn(fn) { }
+
+    void visitType(CanType t) {
+      fn(t);
+    }
+
+    void visitTupleType(CanTupleType tt) {
+      for (auto eltType : tt.getElementTypes()) {
+        CanTypeVisitor<DestructedArgumentTypeVisitor<F>>::visit(eltType);
+      }
+    }
+  };
+
   CanType swiftType;
   SILType resultType;
   unsigned inputTypeCount : 31;
@@ -362,6 +383,12 @@ public:
   /// the arguments to an apply or partial_apply instruction.  If the function
   /// has an indirect return, this cannot ask about its argument slot.
   CanType getSwiftArgumentType(unsigned ArgNo) const;
+
+  template <typename F>
+  void visitSwiftArgumentTypes(const F &fn) const {
+    DestructedArgumentTypeVisitor<F> visitor(fn);
+    visitor.visit(cast<AnyFunctionType>(getSwiftType()).getInput());
+  }
 
   /// getSwiftResultType - Return the swift type of the result
   CanType getSwiftResultType() const;

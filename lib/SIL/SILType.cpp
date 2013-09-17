@@ -12,35 +12,9 @@
 
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
-
-namespace {
-  /// Recursively destructure tuple-type arguments into SIL argument types.
-  class LoweredFunctionInputTypeVisitor
-  : public CanTypeVisitor<LoweredFunctionInputTypeVisitor>
-  {
-    SILModule &M;
-    SmallVectorImpl<SILType> &inputTypes;
-  public:
-    LoweredFunctionInputTypeVisitor(SILModule &M,
-                                    SmallVectorImpl<SILType> &inputTypes)
-    : M(M), inputTypes(inputTypes) {}
-    
-    void visitType(CanType t) {
-      inputTypes.push_back(M.Types.getLoweredType(t));
-    }
-    
-    void visitTupleType(CanTupleType tt) {
-      for (auto eltType : tt.getElementTypes()) {
-        visit(eltType);
-      }
-    }
-  };
-} // end anonymous namespace
-
 
 SILFunctionTypeInfo *SILType::getFunctionTypeInfo(SILModule &M) const {
   AnyFunctionType *ft = cast<AnyFunctionType>(getSwiftRValueType());
@@ -62,9 +36,11 @@ SILFunctionTypeInfo *SILType::getFunctionTypeInfo(SILModule &M) const {
   }
   
   // Destructure the input tuple type.
-  LoweredFunctionInputTypeVisitor(M, inputTypes)
+  auto visitFn = [&](CanType type) {
+    inputTypes.push_back(M.Types.getLoweredType(type));
+  };
+  SILFunctionTypeInfo::DestructedArgumentTypeVisitor<decltype(visitFn)>(visitFn)
   .visit(ft->getInput()->getCanonicalType());
-  
   
   // We allocate room for an extra unsigned in the uncurriedInputCounts array,
   // so that we can stuff a leading zero in there and be able to efficiently
