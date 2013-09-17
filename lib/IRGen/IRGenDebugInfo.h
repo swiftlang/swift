@@ -244,14 +244,15 @@ private:
                                        llvm::DIDescriptor Scope,
                                        llvm::DIFile File,
                                        unsigned Flags);
-  llvm::DIArray getUnionElements(UnionDecl *D, llvm::DIDescriptor Scope,
+  llvm::DIArray getUnionElements(DebugTypeInfo DbgTy,
+                                 UnionDecl *D,
+                                 llvm::DIDescriptor Scope,
                                  llvm::DIFile File,
-                                 Size SizeInBytes, Alignment AlignInBytes,
                                  unsigned Flags);
   llvm::DICompositeType
   createUnionType(DebugTypeInfo DbgTy, UnionDecl *Decl, StringRef Name,
                   llvm::DIDescriptor Scope, llvm::DIFile File, unsigned Line,
-                  Size SizeInBytes, Alignment AlignInBytes, unsigned Flags);
+                  unsigned Flags);
   bool emitVarDeclForSILArgOrNull(IRBuilder& Builder,
                                   llvm::Value *Storage,
                                   DebugTypeInfo Ty,

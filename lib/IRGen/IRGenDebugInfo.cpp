@@ -903,13 +903,14 @@ IRGenDebugInfo::createStructType(DebugTypeInfo DbgTy,
 
 /// Return an array with the DITypes for each of a union's elements.
 llvm::DIArray IRGenDebugInfo::
-getUnionElements(UnionDecl *D, llvm::DIDescriptor Scope, llvm::DIFile File,
-                 Size SizeInBytes, Alignment AlignInBytes, unsigned Flags) {
+getUnionElements(DebugTypeInfo DbgTy,
+                 UnionDecl *D, llvm::DIDescriptor Scope, llvm::DIFile File,
+                 unsigned Flags) {
   SmallVector<llvm::Value *, 16> Elements;
   for (auto Decl : D->getAllElements()) {
     auto CanTy = Decl->getType()->getCanonicalType();
-    auto DTI = DebugTypeInfo(CanTy, SizeInBytes, AlignInBytes);
-    Elements.push_back(getOrCreateType(DTI, Scope));
+    auto DTy = getOrCreateDesugaredType(CanTy, DbgTy, Scope);
+    Elements.push_back(DTy);
   }
   return DBuilder.getOrCreateArray(Elements);
 }
@@ -922,11 +923,10 @@ IRGenDebugInfo::createUnionType(DebugTypeInfo DbgTy,
                                 StringRef Name,
                                 llvm::DIDescriptor Scope,
                                 llvm::DIFile File, unsigned Line,
-                                Size SizeInBytes, Alignment AlignInBytes,
                                 unsigned Flags) {
   unsigned SizeOfByte = TargetInfo.getCharWidth();
-  unsigned SizeInBits = (unsigned)SizeInBytes * SizeOfByte;
-  unsigned AlignInBits = (unsigned)AlignInBytes * SizeOfByte;
+  unsigned SizeInBits = (unsigned)DbgTy.size * SizeOfByte;
+  unsigned AlignInBits = (unsigned)DbgTy.align * SizeOfByte;
   auto FwdDecl = DBuilder.createForwardDecl
     (llvm::dwarf::DW_TAG_union_type,
      Name, Scope, File, Line, dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
@@ -935,8 +935,7 @@ IRGenDebugInfo::createUnionType(DebugTypeInfo DbgTy,
 
   auto DTy = DBuilder.createUnionType(Scope, Name, File, Line,
                                       SizeInBits, AlignInBits, Flags,
-                                      getUnionElements(Decl, Scope, File,
-                                                       SizeInBytes, AlignInBytes,
+                                      getUnionElements(DbgTy, Decl, Scope, File,
                                                        Flags),
                                       dwarf::DW_LANG_Swift);
   FwdDecl->replaceAllUsesWith(DTy);
@@ -1225,17 +1224,28 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Union:
-  case TypeKind::BoundGenericUnion:
   {
     Name = getMangledName(DbgTy);
     auto UnionTy = BaseTy->castTo<UnionType>();
     if (auto Decl = UnionTy->getDecl()) {
       Location L = getStartLoc(SM, Decl);
       return createUnionType(DbgTy, Decl, Name, Scope,
-                             getOrCreateFile(L.Filename), L.Line,
-                             DbgTy.size, DbgTy.align, Flags);
+                             getOrCreateFile(L.Filename), L.Line, Flags);
     }
     DEBUG(llvm::dbgs() << "Union type without Decl: ";
+          DbgTy.getType()->dump(); llvm::dbgs() << "\n");
+    break;
+  }
+
+  case TypeKind::BoundGenericUnion:
+  {
+    auto UnionTy = BaseTy->castTo<BoundGenericUnionType>();
+    if (auto Decl = UnionTy->getDecl()) {
+      Location L = getStartLoc(SM, Decl);
+      return createUnionType(DbgTy, Decl, Name, Scope,
+                             getOrCreateFile(L.Filename), L.Line, Flags);
+    }
+    DEBUG(llvm::dbgs() << "Bound generic union type without Decl: ";
           DbgTy.getType()->dump(); llvm::dbgs() << "\n");
     break;
   }
