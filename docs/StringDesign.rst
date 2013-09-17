@@ -3,8 +3,11 @@
 .. raw:: html
 
     <style> 
+    
     .repl, .emph, .look {color:rgb(47,175,187)}
     .emph {font-weight:bold}
+
+    pre, .pre { font-family: Monaco, monospace; font-size:90% }
 
     pre.literal-block {
       overflow: hidden;
@@ -99,6 +102,9 @@ Swift String Design
    * represents the intended design of Swift strings, not their
      current implementation state.
 
+   * is being delivered in installments.  Content still to come is
+     outlined in `Coming Installments`_.
+
 .. contents:: 
    :depth: 3
               
@@ -107,7 +113,7 @@ Introduction
 
 Like all things Swift, our approach to strings begins with a deep
 respect for the lessons learned from many languages and libraries,
-including Objective-C and Cocoa.
+especially Objective-C and Cocoa.
 
 Overview By Example
 ===================
@@ -122,6 +128,21 @@ string usage while discovering its essential properties.
 
   |swift| var s = "Yo"
   `// s:` :emph:`String` `= "Yo"`
+
+Strings are **Efficient**
+-------------------------
+
+The implementation of ``String`` takes advantage of state-of-the-art
+optimizations, including:
+
+- Storing short strings without heap allocation
+- Sharing allocated buffers among copies and slices
+- In-place modification of uniquely-owned buffers
+
+As a result, copying_ and slicing__ strings, in particular, can be
+viewed by most programmers as being “almost free.”
+
+__ sliceable_
 
 Strings are **Mutable**
 -----------------------
@@ -142,6 +163,8 @@ Strings are **Mutable**
   |swift| :look1:`s.addEcho()`\ :aside:`s is modified in place`
   |swift| s
   `// s: String =` :emph:`"YoYo"`
+
+.. _copying:
 
 Strings are **Value Types**
 ---------------------------
@@ -184,9 +207,10 @@ Strings are **Unicode-Aware**
    possible points of deviation for Swift ``String``:
 
    1. The `Unicode Text Segmentation Specification`_ says, “`do not
-      break between CR and LF`__.”  However, breaking between CR and LF
-      may necessary if we wish ``String`` to “behave normally” for users
-      of pure ASCII.  This point is still open for discussion.
+      break between CR and LF`__.”  However, breaking extended
+      grapheme clusters between CR and LF may necessary if we wish
+      ``String`` to “behave normally” for users of pure ASCII.  This
+      point is still open for discussion.
 
       __ http://www.unicode.org/reports/tr29/#GB2
 
@@ -206,10 +230,10 @@ Strings are **Unicode-Aware**
 
 Swift applies Unicode algorithms wherever possible.  For example,
 distinct sequences of code points are treated as equal if they
-represent the same character:
+represent the same character: [#canonical]_
 
 .. parsed-literal::
-  |swift| var n1 = "\\u006E\\u0303"
+  |swift| var n1 = ":look1:`\\u006E\\u0303`\ :aside:`Multiple code points, but only one Character`"
   `// n1 : String =` **"ñ"**
   |swift| var n2 = "\\u00F1"
   `// n2 : String =` **"ñ"**
@@ -236,7 +260,7 @@ foundation on which to build locale-aware interfaces.\ [#locales]_
 Strings are **Indexable**
 -------------------------
 
-.. Admonition:: String Indices
+.. sidebar:: String Indices
 
           ``String`` implements the ``Indexable`` protocol, but
           **cannot be indexed by integers**.  Instead,
@@ -252,7 +276,7 @@ Strings are **Indexable**
 .. parsed-literal::
    |swift| var s = "Strings are awesome"
    `// s : String = "Strings are awesome"`
-   |swift| var r = s.find("awe")\ :look1:`!`\ :aside:`s.find() returns “.None” when the substring isn't found.  Since we know "awe" is present in s, we use “!” to force-unwrap the result`
+   |swift| var r = s.find("awe")
    `// r : Range<StringIndex> = <"…are a̲w̲e̲some">`
    |swift| s[r.start]
    `// r0 : Character =` :look:`Character("a")`\ :aside:`String elements have type Character (see below)`
@@ -263,12 +287,17 @@ Strings are **Indexable**
 Strings are Composed of ``Character``\ s
 ----------------------------------------
 
-``Character``, the element type of ``String``, represents a
-**Unicode** `extended grapheme cluster`__ (not a byte, code unit, or code point).\ [#char]_ The
-``Character``\ s that make up a Swift string are determined by
-Unicode's `default segmentation`__ algorithm.
+``Character``, the element type of ``String``, represents a **Unicode
+extended grapheme cluster**.  This term is `precisely defined`__ by
+the Unicode specification, but it roughly means `what the user thinks
+of when she hears “character”`__. For example, the pair of code points
+“LATIN SMALL LETTER N, COMBINING TILDE” forms a single grapheme
+cluster, “ñ”.  The ``Character``\ s that make up a Swift string are
+determined by Unicode's `Default Grapheme Cluster Boundary
+Specification`__. [#char]_
 
 __ http://www.unicode.org/glossary/#extended_grapheme_cluster
+__ http://useless-factor.blogspot.com/2007/08/unicode-implementers-guide-part-4.html
 
 __ http://www.unicode.org/reports/tr29/#Default_Grapheme_Cluster_Table
 
@@ -279,6 +308,8 @@ Access to lower-level elements is still possible by explicit request:
    `// r1 : CodePoint = CodePoint(83) /* S */`
    |swift| s.bytes[s.bytes.start]
    `// r2 : UInt8 = UInt8(83)`
+
+.. _sliceable:
 
 Strings are **Sliceable**
 -------------------------
@@ -305,8 +336,8 @@ Strings are **Extended with Restraint**
 
    ``String`` is a “vocabulary type” with which most other types
    interact.  Making these interactions members of ``String`` could
-   quickly lead to an extremely broad ``String`` interface with
-   intolerably slow code completion.
+   quickly lead to an extremely broad interface with intolerably slow
+   code completion.
 
 Users are of course free to extend ``String`` at will.  The standard
 library, however, is designed so that users are never *forced* to
@@ -338,17 +369,85 @@ Strings are **Encoded as UTF-8**
    109
    112
 
+Coming Installments
+===================
+
+* Reference Manual
+
+* Rationales
+
+* Cocoa Bridging Strategy
+
+* Comparisons with NSString
+
+  - High Level
+  - Member-by-member
 
 Reference Manual
 ================
 
-**WRITEME**
+
+* s.bytes
+* s.indices
+* s[i]
+* s[start...end]
+* s == t, s != t
+* s < t, s > t, s <= t, s >= t
+* s.hash()
+* s.startsWith(), s.endsWith()
+* s + t, s += t, s.append(t)
+* s.split(), s.split(n), s.split(sep, n)
+* s.strip(), s.stripStart(), s.stripEnd()
+* s.commonPrefix(t), s.mismatch(t)
+* s.toUpper(), s.toLower()
+* s.trim(predicate)
+* s.replace(old, new, count)
+* s.join(sequenceOfStrings)
+
+.. Stuff from Python that we don't need to do
+
+   * s.capitalize()
+   * s.find(), s.rfind()
+   * Stuff for monospace
+     * s * 20
+     * s.center()
+     * s.count() [no arguments]
+     * s.expandTabs(tabsize)
+     * s.leftJustify(width, fillchar)
+     * s.rightJustify(width, fillchar)
+     * s.count()
+   * s.isAlphanumeric()
+   * s.isAlphabetic()
+   * s.isNumeric()
+   * s.isDecimal()
+   * s.isDigit()?
+   * s.isLower()
+   * s.isUpper()
+   * s.isSpace()
+   * s.isTitle()
+
+Cocoa Bridging Strategy
+=======================
+.. 
+
 
 Rationales
 ==========
 
 Why a Built-In String Type?
 ---------------------------
+
+.. Admonition:: DaveZ Sez
+
+   In the "why a built-in string type" section, I think the main
+   narrative is that two string types is bad, but that we have two
+   string types in Objective-C for historically good reasons. To get
+   one string type, we need to merge the high-level features of
+   Objective-C with the performance of C, all while not having the
+   respective bad the bad semantics of either (reference semantics and
+   "anarchy" memory-management respectively). Furthermore, I'd write
+   "value semantics" in place of "C++ semantics". I know that is what
+   you meant, but we need to tread carefully in the final document.
 
 ``NSString`` and ``NSMutableString``\ —the string types provided by
 Cocoa—are full-featured classes with high-level functionality for
@@ -390,6 +489,22 @@ goodness of ObjC.
 
 How Would You Design It?
 ------------------------
+
+.. Admonition:: DaveZ Sez
+
+   In the "how would you design it" section, the main narrative is
+   twofold: how does it "feel" and how efficient is it? The former is
+   about feeling built in, which we can easily argue that both C
+   strings or Cocoa strings fail at for their respective semantic (and
+   often memory management related) reasons. Additionally, the "feel"
+   should be modern, which is where the Cocoa framework and the
+   Unicode standard body do better than C. Nevertheless, we can still
+   do better than Objective-C and your strong work at helping people
+   reason about grapheme clusters instead of code points (or worse,
+   units) is wonderful and it feels right to developers. The second
+   part of the narrative is about being efficient, which is where
+   arguing for UTF8 is the non-obvious but "right" answer for the
+   reasons we have discussed.
 
 * It'd be an independent *value* so you don't have to micromanage
   sharing and mutation
@@ -435,6 +550,17 @@ Comparisons with ``NSString``
 High-Level Comparison with ``NSString``
 ---------------------------------------
 
+.. Admonition:: DaveZ Sez
+
+   I think the main message of the API breadth subsection is that
+   URLs, paths, etc would be modeled as formal types in Swift
+   (i.e. not as extensions on String). Second, I'd speculate less on
+   what Foundation could do (like extending String) and instead focus
+   on the fact that NSString still exists as an escape hatch for those
+   that feel that they need or want it. Furthermore, I'd move up the
+   "element access" discussion above the "escape hatch" discussion
+   (which should be last in the comparison with NSString discussion).
+
 API Breadth
 ~~~~~~~~~~~
 
@@ -468,6 +594,10 @@ address this need.  For example:
   .. parsed-literal::
 
     **NString(mySwiftString)**\ .localizedStandardCompare(otherSwiftString)
+
+For Swift version 1.0, we err on the side of keeping the string
+interface small, coherent, and sufficient for implementing
+higher-level functionality.
 
 Element Access
 ~~~~~~~~~~~~~~
@@ -542,8 +672,8 @@ Indexing
 
   .. parsed-literal::
 
-       for j in 0...\ **s.utf8.length** {
-         doSomethingWith(**s.utf8[j]**)
+       for j in 0...\ **s.bytes.length** {
+         doSomethingWith(**s.bytes[j]**)
        }
 
 ---------
@@ -741,13 +871,13 @@ Searching
 
 :Swift:
   .. parsed-literal::
-       func **findRange**\ (sought: String) -> Range<String.IndexType>
+       func **find**\ (sought: String) -> Range<String.IndexType>
 
   .. Note:: Most other languages provide something like
             ``s1.indexOf(s2)``, which returns only the starting index of
             the first match.  This is far less useful than the range of
             the match, and is always available via
-            ``s1.findRangeOf(s2).bounds.0``
+            ``s1.find(s2).bounds.0``
 
 ----
 
@@ -763,7 +893,7 @@ Searching
 
 :Swift:
   .. parsed-literal::
-       func **findRange**\ (match: (Character)->Bool) -> Range<String.IndexType>
+       func **find**\ (match: (Character)->Bool) -> Range<String.IndexType>
 
   .. Admonition:: Usage Example
 
@@ -771,7 +901,7 @@ Searching
 
      .. parsed-literal::
 
-        someString.findRange( {someCharSet.contains($0)} )
+        someString.find( {someCharSet.contains($0)} )
 
 -----
 
@@ -940,10 +1070,8 @@ Capitalization
      \- (NSString \*)\ **stringByPaddingToLength:**\ (NSUInteger)newLength \ **withString:**\ (NSString \*)padString \ **startingAtIndex:**\ (NSUInteger)padIndex;
 
 :Swift:
-  .. parsed-literal::
-        **TBD**
-
-.. Note:: It's not clear whether this is useful for non-ASCII strings.
+  .. parsed-literal:: *Not provided*.  It's not clear whether this is
+                      useful at all for non-ASCII strings, and 
 
 ---------
 
@@ -1542,6 +1670,11 @@ Why YAGNI
    make reasonable sense in most contexts.  Using these algorithms
    allows strings to be naturally compared and combined, generating
    the expected results when the content is ASCII
+
+.. [#canonical] Technically, ``==`` checks for `Unicode canonical
+                equivalence`__
+
+                __ http://www.unicode.org/reports/tr15/tr15-18.html#Introduction
 
 .. [#locales] We have some specific ideas for locale-sensitive
               interfaces, but details are still TBD and wide open for
