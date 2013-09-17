@@ -369,17 +369,22 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
       SourceLoc EndTypeCheckLoc =
           ParsedExpr ? ParsedExpr->getStartLoc()
                      : TU->Ctx.SourceMgr.getCodeCompletionLoc();
-      // FIXME: constructors and destructors.
       // FIXME: closures.
       // For now, just find the nearest outer function.
       DeclContext *DCToTypeCheck = CurDeclContext;
       while (!DCToTypeCheck->isModuleContext() &&
              !isa<AbstractFunctionDecl>(DCToTypeCheck))
         DCToTypeCheck = DCToTypeCheck->getParent();
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck))
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck)) {
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           return typeCheckFunctionBodyUntil(TU, CurDeclContext, FD,
                                             EndTypeCheckLoc);
+        if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD)) {
+          // FIXME: constructors and destructors.
+          // Just return success until we can type check these.
+          return true;
+        }
+      }
       return false;
     }
     if (CurDeclContext->getContextKind() == DeclContextKind::NominalTypeDecl) {

@@ -76,16 +76,18 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
 }
 
 namespace {
-  /// Don't parse any function bodies except those that are transparent.
-  class SkipNonTransparentFunctions : public DelayedParsingCallbacks {
-    bool shouldDelayFunctionBodyParsing(Parser &parser, FuncDecl *FD,
-                                        const DeclAttributes &Attrs,
-                                        SourceRange bodyRange) override {
-      return Attrs.isTransparent();
-    }
-  };
-}
 
+/// Don't parse any function bodies except those that are transparent.
+class SkipNonTransparentFunctions : public DelayedParsingCallbacks {
+  bool shouldDelayFunctionBodyParsing(Parser &TheParser,
+                                      AbstractFunctionDecl *AFD,
+                                      const DeclAttributes &Attrs,
+                                      SourceRange BodyRange) override {
+    return Attrs.isTransparent();
+  }
+};
+
+} // unnamed namespace
 
 Module *SourceLoader::loadModule(SourceLoc importLoc,
                              ArrayRef<std::pair<Identifier, SourceLoc>> path) {

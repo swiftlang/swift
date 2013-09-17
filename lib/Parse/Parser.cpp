@@ -61,21 +61,21 @@ public:
       CodeCompletionFactory(CodeCompletionFactory) {}
 
   virtual bool walkToDeclPre(Decl *D) {
-    if (auto FD = dyn_cast<FuncDecl>(D)) {
-      if (FD->getBodyKind() != FuncDecl::BodyKind::Unparsed)
+    if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (AFD->getBodyKind() != FuncDecl::BodyKind::Unparsed)
         return false;
-      parseFunctionBody(FD);
+      parseFunctionBody(AFD);
       return true;
     }
     return true;
   }
 
 private:
-  void parseFunctionBody(FuncDecl *FD) {
-    assert(FD->getBodyKind() == FuncDecl::BodyKind::Unparsed);
+  void parseFunctionBody(AbstractFunctionDecl *AFD) {
+    assert(AFD->getBodyKind() == FuncDecl::BodyKind::Unparsed);
 
     unsigned BufferID =
-        TU->Ctx.SourceMgr.findBufferContainingLoc(FD->getLoc());
+        TU->Ctx.SourceMgr.findBufferContainingLoc(AFD->getLoc());
     Parser TheParser(BufferID, TU, nullptr, &ParserState);
 
     std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
@@ -84,7 +84,7 @@ private:
           CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
-    TheParser.parseDeclFuncBodyDelayed(FD);
+    TheParser.parseAbstractFunctionBodyDelayed(AFD);
     if (CodeCompletion)
       CodeCompletion->doneParsing();
   }

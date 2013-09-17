@@ -1466,7 +1466,8 @@ Pattern *Parser::buildImplicitSelfParameter() {
   return new (Context) TypedPattern(P, TypeLoc());
 }
 
-void Parser::consumeFunctionBody(FuncDecl *FD, const DeclAttributes &Attrs) {
+void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
+                                         const DeclAttributes &Attrs) {
   auto BeginParserPosition = getParserPosition();
   SourceRange BodyRange;
   BodyRange.Start = Tok.getLoc();
@@ -1500,13 +1501,13 @@ void Parser::consumeFunctionBody(FuncDecl *FD, const DeclAttributes &Attrs) {
 
   BodyRange.End = PreviousLoc;
 
-  if (DelayedParseCB->shouldDelayFunctionBodyParsing(*this, FD, Attrs,
+  if (DelayedParseCB->shouldDelayFunctionBodyParsing(*this, AFD, Attrs,
                                                      BodyRange)) {
-    State->delayFunctionBodyParsing(FD, BodyRange,
+    State->delayFunctionBodyParsing(AFD, BodyRange,
                                     BeginParserPosition.PreviousLoc);
-    FD->setBodyDelayed(BodyRange.End);
+    AFD->setBodyDelayed(BodyRange.End);
   } else {
-    FD->setBodySkipped(BodyRange.End);
+    AFD->setBodySkipped(BodyRange.End);
   }
 }
 
@@ -1654,7 +1655,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
           FD->setBody(Body.get());
         }
       } else {
-        consumeFunctionBody(FD, Attributes);
+        consumeAbstractFunctionBody(FD, Attributes);
       }
     } else if (Attributes.AsmName.empty() && !(Flags & PD_DisallowFuncDef) &&
                !HadSignatureParseError) {
@@ -1671,16 +1672,16 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   return makeParserResult(FD);
 }
 
-bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
-  assert(!FD->getBody() && "function should not have a parsed body");
-  assert(FD->getBodyKind() == FuncDecl::BodyKind::Unparsed &&
+bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
+  assert(!AFD->getBody() && "function should not have a parsed body");
+  assert(AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Unparsed &&
          "function body should be delayed");
 
-  auto FunctionParserState = State->takeBodyState(FD);
+  auto FunctionParserState = State->takeBodyState(AFD);
   assert(FunctionParserState.get() && "should have a valid state");
 
   auto BeginParserPosition = getParserPosition(FunctionParserState->BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(FD->getEndLoc());
+  auto EndLexerState = L->getStateForEndOfTokenLoc(AFD->getEndLoc());
 
   // ParserPositionRAII needs a primed parser to restore to.
   if (Tok.is(tok::NUM_TOKENS))
@@ -1700,7 +1701,7 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
 
   // Re-enter the lexical scope.
   Scope S(this, FunctionParserState->takeScope());
-  ContextChange CC(*this, FD);
+  ContextChange CC(*this, AFD);
 
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::func_decl_without_brace);
@@ -1708,7 +1709,7 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
     // FIXME: Should do some sort of error recovery here?
     return true;
   } else {
-    FD->setBody(Body.get());
+    AFD->setBody(Body.get());
   }
 
   return false;
@@ -2402,10 +2403,14 @@ Parser::parseDeclConstructor(unsigned Flags) {
   addToScope(SelfDecl);
   ContextChange CC(*this, CD);
 
-  ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+  if (!isDelayedParsingEnabled()) {
+    ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
 
-  if (!Body.isNull())
-    CD->setBody(Body.get());
+    if (!Body.isNull())
+      CD->setBody(Body.get());
+  } else {
+    consumeAbstractFunctionBody(CD, Attributes);
+  }
 
   if (Attributes.isValid())
     CD->getMutableAttrs() = Attributes;
