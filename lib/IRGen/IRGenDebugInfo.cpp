@@ -1292,6 +1292,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   // SyntaxSugarType derivations.
   case TypeKind::ArraySlice:
+  case TypeKind::Optional:
   {
     auto SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
     auto CanTy = SyntaxSugarTy->getDesugaredType();
@@ -1299,9 +1300,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   default:
-    DEBUG(llvm::dbgs() << "Unhandled type: "; DbgTy.getType()->dump();
-          llvm::dbgs() << "\n");
+    DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();
+          llvm::errs() << "\n");
     Name = "<unknown>";
+    assert(false && "Debug info: Unhandled type");
   }
   return DBuilder.createBasicType(Name, SizeInBits, AlignInBits, Encoding);
 }
