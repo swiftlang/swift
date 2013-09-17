@@ -1105,15 +1105,33 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::ProtocolComposition: {
     Name = getMangledName(DbgTy);
+    auto Line = 0;
     // FIXME: emit types
     //auto ProtocolCompositionTy = BaseTy->castTo<ProtocolCompositionType>();
     return DBuilder.
-      createStructType(Scope, Name,
-                       File, 0,
+      createStructType(Scope, Name, File, Line,
                        SizeInBits, AlignInBits, Flags,
                        llvm::DIType(), // DerivedFrom
                        llvm::DIArray(),
                        DW_LANG_Swift);
+    break;
+  }
+
+  case TypeKind::UnboundGeneric: {
+    Name = getMangledName(DbgTy);
+    auto UnboundTy = BaseTy->castTo<UnboundGenericType>();
+    if (auto Decl = UnboundTy->getDecl()) {
+      Location L = getStartLoc(SM, Decl);
+      return DBuilder.
+        createStructType(Scope, Name,
+                         getOrCreateFile(L.Filename), L.Line,
+                         SizeInBits, AlignInBits, Flags,
+                         llvm::DIType(), // DerivedFrom
+                         llvm::DIArray(),
+                         DW_LANG_Swift);
+    }
+    DEBUG(llvm::dbgs() << "Unbound generic without Decl: ";
+          DbgTy.getType()->dump(); llvm::dbgs() << "\n");
     break;
   }
 
@@ -1190,7 +1208,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return DBuilder.createQualifiedType(DW_TAG_meta_type, DITy);
   }
 
-  case TypeKind::Function: {
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction:
+  {
     auto FunctionTy = BaseTy->castTo<AnyFunctionType>();
     DeclContext *DC = nullptr;
     if (auto Decl = DbgTy.getDecl())
@@ -1200,7 +1220,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return DBuilder.createPointerType(FnTy, SizeInBits, AlignInBits);
   }
 
-  case TypeKind::Union: {
+  case TypeKind::Union:
+  case TypeKind::BoundGenericUnion:
+  {
     Name = getMangledName(DbgTy);
     auto UnionTy = BaseTy->castTo<UnionType>();
     if (auto Decl = UnionTy->getDecl()) {
@@ -1213,6 +1235,20 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
           DbgTy.getType()->dump(); llvm::dbgs() << "\n");
     break;
   }
+
+  case TypeKind::BuiltinVector: {
+    Name = getMangledName(DbgTy);
+    (void)Name; // FIXME emit the name somewhere.
+    auto BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
+    auto DTI = DebugTypeInfo(BuiltinVectorTy->getElementType(),
+                             DbgTy.size, DbgTy.align);
+    auto Subscripts = llvm::DIArray();
+    return DBuilder.createVectorType(BuiltinVectorTy->getNumElements(),
+                                     AlignInBits,
+                                     getOrCreateType(DTI, File),
+                                     Subscripts);
+  }
+
 
   // Sugared types.
 
@@ -1235,9 +1271,30 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     break;
   }
 
-  case TypeKind::ArraySlice: {
-    auto ArraySliceTy = cast<ArraySliceType>(BaseTy);
-    auto CanTy = ArraySliceTy->getDesugaredType();
+  case TypeKind::Substituted: {
+    Name = getMangledName(DbgTy);
+    auto SubstitutedTy = cast<SubstitutedType>(BaseTy);
+    auto CanTy = SubstitutedTy->getDesugaredType();
+    auto Line = 0;
+    return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy, Scope),
+                                  Name, MainFile, Line, File);
+  }
+
+  case TypeKind::Paren:
+  {
+    Name = getMangledName(DbgTy);
+    auto ParenTy = cast<ParenType>(BaseTy);
+    auto CanTy = ParenTy->getDesugaredType();
+    auto Line = 0;
+    return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy, Scope),
+                                  Name, MainFile, Line, File);
+  }
+
+  // SyntaxSugarType derivations.
+  case TypeKind::ArraySlice:
+  {
+    auto SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
+    auto CanTy = SyntaxSugarTy->getDesugaredType();
     return getOrCreateDesugaredType(CanTy, DbgTy, Scope);
   }
 
