@@ -2,9 +2,25 @@
 ----------
 
 * Variables in top-level code (i.e. scripts, but not global variables in
-  libraries) are now subject to definite initialization rules, instead of
-  being default constructed.  Specifically they now work just like local 
+  libraries) are now subject to definite initialization rules instead of
+  being default constructed.  Specifically, they now work just like local 
   variables.  Instance variables are still not part of the model.
+
+* Generic unions with a single payload case and any number of empty cases
+  are now implemented, for example:
+
+    union Maybe<T> {
+      case Some(T)
+      case None
+    }
+
+    union Tristate<T> {
+      case Initialized(T)
+      case Initializing
+      case Uninitialized
+    }
+
+  Generic unions with multiple payload cases are still not yet implemented.
 
 2013-09-11
 ----------
@@ -54,7 +70,7 @@
   "var x = Int()" (which works for any default-constructible type).
 
 * The implementation now supports unions containing protocol types and weak
-  reference types. Generic parameters on unions are still not yet supported.
+  reference types.
 
 * The type annotation syntax, 'x as T', has been removed from the language.
   The checked cast operations 'x as! T' and 'x is T' still remain.
@@ -102,8 +118,7 @@
       println("<a href=\"\(escape(href))\">")
     }
 
-  Due to implementation limitations, unions cannot yet contain values of
-  generic parameter type. Recursive unions are also not yet supported.
+  Due to implementation limitations, recursive unions are not yet supported.
 
 
 * Swift now supports autolinking, so importing frameworks or Swift libraries
