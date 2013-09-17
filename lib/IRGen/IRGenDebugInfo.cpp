@@ -1105,11 +1105,13 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::ProtocolComposition: {
     Name = getMangledName(DbgTy);
-    auto Line = 0;
+    Location L = getStartLoc(SM, DbgTy.getDecl());
+    auto File = getOrCreateFile(L.Filename);
+
     // FIXME: emit types
     //auto ProtocolCompositionTy = BaseTy->castTo<ProtocolCompositionType>();
     return DBuilder.
-      createStructType(Scope, Name, File, Line,
+      createStructType(Scope, Name, File, L.Line,
                        SizeInBits, AlignInBits, Flags,
                        llvm::DIType(), // DerivedFrom
                        llvm::DIArray(),
@@ -1172,10 +1174,12 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Tuple: {
     Name = getMangledName(DbgTy);
     auto TupleTy = BaseTy->castTo<TupleType>();
+    Location L = getStartLoc(SM, DbgTy.getDecl());
+    auto File = getOrCreateFile(L.Filename);
     // Tuples are also represented as structs.
     return DBuilder.
       createStructType(Scope, Name,
-                       File, 0,
+                       File, L.Line,
                        SizeInBits, AlignInBits, Flags,
                        llvm::DIType(), // DerivedFrom
                        getTupleElements(TupleTy, Scope, File, Flags),
@@ -1255,9 +1259,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto ReferenceTy = cast<ReferenceStorageType>(BaseTy);
     auto CanTy = ReferenceTy->getReferentType();
-    auto Line = 0;
+    Location L = getStartLoc(SM, DbgTy.getDecl());
+    auto File = getOrCreateFile(L.Filename);
     return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy, Scope),
-                                  Name, MainFile, Line, File);
+                                  Name, File, L.Line, File);
   }
 
   // Sugared types.
@@ -1285,9 +1290,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto SubstitutedTy = cast<SubstitutedType>(BaseTy);
     auto CanTy = SubstitutedTy->getDesugaredType();
-    auto Line = 0;
+    Location L = getStartLoc(SM, DbgTy.getDecl());
+    auto File = getOrCreateFile(L.Filename);
     return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy, Scope),
-                                  Name, MainFile, Line, File);
+                                  Name, File, L.Line, File);
   }
 
   case TypeKind::Paren:
@@ -1295,9 +1301,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto ParenTy = cast<ParenType>(BaseTy);
     auto CanTy = ParenTy->getDesugaredType();
-    auto Line = 0;
+    Location L = getStartLoc(SM, DbgTy.getDecl());
+    auto File = getOrCreateFile(L.Filename);
     return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy, Scope),
-                                  Name, MainFile, Line, File);
+                                  Name, File, L.Line, File);
   }
 
   // SyntaxSugarType derivations.
