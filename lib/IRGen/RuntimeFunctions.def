@@ -304,11 +304,11 @@ FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, RuntimeCC,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// void swift_initUnionTypeValueWitnessTableSinglePayload(value_witness_table_t *vwt,
-//                                               type_metadata_t *payload,
-//                                               unsigned num_empty_cases);
-FUNCTION(InitUnionTypeValueWitnessTableSinglePayload,
-         swift_initUnionTypeValueWitnessTableSinglePayload,
+// void swift_initUnionValueWitnessTableSinglePayload(value_witness_table_t *vwt,
+//                                                    type_metadata_t *payload,
+//                                                    unsigned num_empty_cases);
+FUNCTION(InitUnionValueWitnessTableSinglePayload,
+         swift_initUnionValueWitnessTableSinglePayload,
          RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WitnessTablePtrTy, TypeMetadataPtrTy, Int32Ty),

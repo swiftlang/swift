@@ -1565,7 +1565,7 @@ namespace {
                                                   ElementsWithNoPayload.size());
       
       IGF.Builder.CreateCall3(
-                    IGF.IGM.getInitUnionTypeValueWitnessTableSinglePayloadFn(),
+                    IGF.IGM.getInitUnionValueWitnessTableSinglePayloadFn(),
                     vwtable, payloadMetadata, emptyCasesVal);
     }
   };
