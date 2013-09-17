@@ -2363,10 +2363,6 @@ UnionImplStrategy *UnionImplStrategy::get(TypeConverter &TC,
   
   assert(numElements != 0);
   
-  if (!TC.IGM.Opts.EnableDynamicValueTypeLayout && tik < Fixed) {
-    TC.IGM.unimplemented(theUnion->getLoc(), "non-fixed union layout");
-    exit(1);
-  }
   // FIXME recursive unions
   if (!elementsWithRecursivePayload.empty()) {
     TC.IGM.unimplemented(theUnion->getLoc(), "recursive union layout");
@@ -2745,6 +2741,13 @@ namespace {
                                                   CanType type,
                                                   UnionDecl *theUnion,
                                                   llvm::StructType *unionTy) {
+    // TODO Dynamic layout for multi-payload unions.
+    if (!TC.IGM.Opts.EnableDynamicValueTypeLayout && TIK < Fixed) {
+      TC.IGM.unimplemented(theUnion->getLoc(),
+                           "non-fixed multi-payload union layout");
+      exit(1);
+    }
+
     // We need tags for each of the payload types, which we may be able to form
     // using spare bits, plus a minimal number of tags with which we can
     // represent the empty cases.
