@@ -152,7 +152,7 @@ extension ${Self} {
 @for (src_bits, src_signed) in all_ints():
 @    That = int_name(src_bits, src_signed)
 @    if Self != That:
-  constructor(v: ${That}) {
+  init(v: ${That}) {
          @if bits == src_bits:
     value = v.value
          @else:
@@ -206,7 +206,7 @@ func [assignment, transparent] ${op}=(lhs: [byref] ${Self}, rhs: ${Self}) {
 // hack to make non-x86 architectures build at a reasonable speed
 struct Hack14897572 { }
 extension UInt32 {
-  constructor(_: Hack14897572) {
+  init(_: Hack14897572) {
     value = UInt32(0).value
   }
 }
