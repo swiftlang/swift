@@ -1157,7 +1157,7 @@ void CodeCompletionCallbacksImpl::loadedModule(ModuleLoader *Loader,
 
 void PrintingCodeCompletionConsumer::handleResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
-  OS << "Begin completions\n";
+  OS << "Begin completions, " << Results.size() << " items\n";
   for (auto Result : Results) {
     Result->print(OS);
     OS << "\n";
