@@ -1354,29 +1354,29 @@ void Type::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
-void Type::print(raw_ostream &OS) const {
+void Type::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   if (isNull())
     OS << "<null>";
   else
-    Ptr->print(OS);
+    Ptr->print(OS, PO);
 }
 
 /// getString - Return the name of the type as a string, for use in
 /// diagnostics only.
-std::string Type::getString() const {
+std::string Type::getString(const Type::PrintOptions &PO) const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
-  print(OS);
+  print(OS, PO);
   return OS.str();
 }
 
 
 /// getString - Return the name of the type as a string, for use in
 /// diagnostics only.
-std::string TypeBase::getString() const {
+std::string TypeBase::getString(const Type::PrintOptions &PO) const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
-  print(OS);
+  print(OS, PO);
   return OS.str();
 }
 
@@ -1386,62 +1386,66 @@ void TypeBase::dump() const {
   llvm::errs() << '\n';
 }
 
-namespace {
-  /// Helper wrapper for printing a type that is embedded within a larger type.
-  ///
-  /// This is necessary whenever the inner type may not normally be represented
-  /// as a 'type-simple' production in the type grammar.
-  struct ParensIfNotSimple {
-    Type ty;
-  };
 
-  static inline raw_ostream &operator<<(raw_ostream &OS,
-                                        ParensIfNotSimple wrapper) {
-    if (wrapper.ty.isNull()) {
-      wrapper.ty.print(OS);
-    } else {
-      switch (wrapper.ty->getKind()) {
-      case TypeKind::Array:
-      case TypeKind::ArraySlice:
-      case TypeKind::Function:
-      case TypeKind::PolymorphicFunction:
-        OS << '(' << wrapper.ty << ')';
-        break;
+/// Helper function for printing a type that is embedded within a larger type.
+///
+/// This is necessary whenever the inner type may not normally be represented
+/// as a 'type-simple' production in the type grammar.
 
-      default:
-        wrapper.ty.print(OS);
-      }
+static void
+ParensIfNotSimple(raw_ostream &OS, const Type::PrintOptions &PO, Type ty)
+{
+  if (ty.isNull()) {
+    ty.print(OS, PO);
+  } else {
+    switch (ty->getKind()) {
+    case TypeKind::Array:
+    case TypeKind::ArraySlice:
+    case TypeKind::Function:
+    case TypeKind::PolymorphicFunction:
+      OS << '(';
+      ty.print(OS, PO);
+      OS << ')';
+      break;
+
+    default:
+      ty.print(OS, PO);
     }
-    return OS;
   }
 }
 
-void TypeBase::print(raw_ostream &OS) const {
+
+void TypeBase::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   switch (getKind()) {
 #define TYPE(id, parent) \
-  case TypeKind::id:            return cast<id##Type>(this)->print(OS);
+  case TypeKind::id:            return cast<id##Type>(this)->print(OS, PO);
 #include "swift/AST/TypeNodes.def"
   }
   llvm_unreachable("bad type kind!");
 }
 
-void BuiltinRawPointerType::print(raw_ostream &OS) const {
+void BuiltinRawPointerType::print(raw_ostream &OS, 
+                                  const Type::PrintOptions &PO) const {
   OS << "Builtin.RawPointer";
 }
 
-void BuiltinObjectPointerType::print(raw_ostream &OS) const {
+void BuiltinObjectPointerType::print(raw_ostream &OS, 
+                                     const Type::PrintOptions &PO) const {
   OS << "Builtin.ObjectPointer";
 }
 
-void BuiltinObjCPointerType::print(raw_ostream &OS) const {
+void BuiltinObjCPointerType::print(raw_ostream &OS, 
+                                   const Type::PrintOptions &PO) const {
   OS << "Builtin.ObjCPointer";
 }
 
-void BuiltinIntegerType::print(raw_ostream &OS) const {
+void BuiltinIntegerType::print(raw_ostream &OS, 
+                               const Type::PrintOptions &PO) const {
   OS << "Builtin.Int" << cast<BuiltinIntegerType>(this)->getBitWidth();
 }
 
-void BuiltinFloatType::print(raw_ostream &OS) const {
+void BuiltinFloatType::print(raw_ostream &OS, 
+                             const Type::PrintOptions &PO) const {
   switch (getFPKind()) {
   case IEEE16:  OS << "Builtin.FPIEEE16"; return;
   case IEEE32:  OS << "Builtin.FPIEEE32"; return;
@@ -1452,13 +1456,14 @@ void BuiltinFloatType::print(raw_ostream &OS) const {
   }
 }
 
-void BuiltinVectorType::print(raw_ostream &OS) const {
+void BuiltinVectorType::print(raw_ostream &OS, 
+                              const Type::PrintOptions &PO) const {
   llvm::SmallString<32> underlyingStrVec;
   StringRef underlyingStr;
   {
     // FIXME: Ugly hack: remove the .Builtin from the element type.
     llvm::raw_svector_ostream underlyingOS(underlyingStrVec);
-    elementType.print(OS);
+    elementType.print(OS, PO);
     if (underlyingStrVec.startswith("Builtin."))
       underlyingStr = underlyingStrVec.substr(9);
     else
@@ -1468,21 +1473,61 @@ void BuiltinVectorType::print(raw_ostream &OS) const {
   OS << "Builtin.Vec" << numElements << "x" << underlyingStr;
 }
 
-void ErrorType::print(raw_ostream &OS) const {
+void ErrorType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   OS << "<<error type>>";
 }
 
-void ParenType::print(raw_ostream &OS) const {
+void ParenType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   OS << '(';
-  UnderlyingType->print(OS);
+  UnderlyingType->print(OS, PO);
   OS << ')';
 }
 
-void NameAliasType::print(raw_ostream &OS) const {
+static bool dumpDeclContext(DeclContext *ctx, 
+                            raw_ostream &OS, 
+                            const Type::PrintOptions &PO) {
+  switch (ctx->getContextKind()) {
+  case DeclContextKind::Module: {
+    Module *module = cast<Module>(ctx);
+            
+    if (auto parent = module->getParent())
+      dumpDeclContext(parent, OS, PO);
+    OS << module->Name;
+    return true;
+  }
+            
+  case DeclContextKind::NominalTypeDecl:
+    cast<NominalTypeDecl>(ctx)->getType()->print(OS, PO);
+    return true;
+            
+  case DeclContextKind::ExtensionDecl:
+    cast<ExtensionDecl>(ctx)->getExtendedType()->print(OS, PO);
+    return true;
+  
+  case DeclContextKind::AbstractFunctionDecl:
+    cast<AbstractFunctionDecl>(ctx)->getType()->print(OS, PO);
+    return true;
+
+  default:
+    llvm_unreachable("bad decl context");
+  }
+}
+
+void NameAliasType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
+  if (PO.show_modules) {
+    auto decl = getDecl();
+    auto parentDC = decl->getDeclContext();
+    if (parentDC) {
+      if (dumpDeclContext(parentDC, OS, PO))
+        OS << '.';
+    }
+  }
   OS << TheDecl->getName().get();
 }
 
-static void printGenericArgs(raw_ostream &OS, ArrayRef<Type> Args) {
+static void printGenericArgs(raw_ostream &OS, 
+                             const Type::PrintOptions &PO, 
+                             ArrayRef<Type> Args) {
   if (Args.empty())
     return;
 
@@ -1493,21 +1538,22 @@ static void printGenericArgs(raw_ostream &OS, ArrayRef<Type> Args) {
       First = false;
     else
       OS << ", ";
-    Arg->print(OS);
+    Arg->print(OS, PO);
   }
   OS << '>';
 }
 
-void MetaTypeType::print(raw_ostream &OS) const {
-  OS << ParensIfNotSimple{InstanceType} << ".metatype";
+void MetaTypeType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
+  ParensIfNotSimple(OS, PO, InstanceType);
+  OS << ".metatype";
 }
 
-void ModuleType::print(raw_ostream &OS) const {
+void ModuleType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   OS << "module<" << TheModule->Name << '>';
 }
 
 
-void TupleType::print(raw_ostream &OS) const {
+void TupleType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   OS << "(";
   
   for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
@@ -1566,7 +1612,7 @@ namespace {
   }
 }
 
-void FunctionType::print(raw_ostream &OS) const {
+void FunctionType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   AttributePrinter attrs(OS);
 
   if (isAutoClosure())
@@ -1580,11 +1626,14 @@ void FunctionType::print(raw_ostream &OS) const {
     attrs.next() << "noreturn";
 
   attrs.finish();
-  
-  OS << ParensIfNotSimple{getInput()} << " -> " << getResult();
+  ParensIfNotSimple(OS, PO, getInput());
+  OS << " -> " << getResult();
 }
 
-void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
+void 
+PolymorphicFunctionType::printGenericParams(raw_ostream &OS, 
+                                            const Type::PrintOptions &PO) const 
+{
   OS << '<';
   auto params = getGenericParameters();
   for (unsigned i = 0, e = params.size(); i != e; ++i) {
@@ -1602,7 +1651,7 @@ void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
         bool printedFirst = false;
         if (auto superclass = paramTy->getSuperclass()) {
           printedFirst = true;
-          superclass->print(OS);
+          superclass->print(OS, PO);
         }
         for (auto proto : paramTy->getProtocols()) {
           if (printedFirst) {
@@ -1611,7 +1660,7 @@ void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
             printedFirst = true;
           }
 
-          proto->getDeclaredType()->print(OS);
+          proto->getDeclaredType()->print(OS, PO);
         }
         if (printSize > 1)
           OS << ">";
@@ -1633,7 +1682,8 @@ void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
   OS << '>';
 }
 
-void PolymorphicFunctionType::print(raw_ostream &OS) const {
+void PolymorphicFunctionType::print(raw_ostream &OS, 
+                                    const Type::PrintOptions &PO) const {
   AttributePrinter attrs(OS);
   printCC(attrs, getAbstractCC());
   if (isThin())
@@ -1644,27 +1694,34 @@ void PolymorphicFunctionType::print(raw_ostream &OS) const {
   attrs.finish();
     
   printGenericParams(OS);
+  OS << ' ';
+  ParensIfNotSimple(OS, PO, getInput());
 
-  OS << ' ' << ParensIfNotSimple{getInput()} << " -> " << getResult();
+  OS << " -> " << getResult();
 }
 
-void ArraySliceType::print(raw_ostream &OS) const {
-  OS << ParensIfNotSimple{getBaseType()} << "[]";
+void ArraySliceType::print(raw_ostream &OS, 
+                           const Type::PrintOptions &PO) const {
+  ParensIfNotSimple(OS, PO, getBaseType());
+  OS << "[]";
 }
 
-void OptionalType::print(raw_ostream &OS) const {
-  OS << ParensIfNotSimple{getBaseType()} << '?';
+void OptionalType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
+  ParensIfNotSimple(OS, PO, getBaseType());
+  OS << '?';
 }
 
-void ArrayType::print(raw_ostream &OS) const {
-  OS << ParensIfNotSimple{Base} << '[' << Size << ']';
+void ArrayType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
+  ParensIfNotSimple(OS, PO, Base);
+  OS << '[' << Size << ']';
 }
 
-void ProtocolType::print(raw_ostream &OS) const {
+void ProtocolType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   OS << getDecl()->getName().str();
 }
 
-void ProtocolCompositionType::print(raw_ostream &OS) const {
+void ProtocolCompositionType::print(raw_ostream &OS, 
+                                    const Type::PrintOptions &PO) const {
   OS << "protocol<";
   bool First = true;
   for (auto Proto : Protocols) {
@@ -1672,12 +1729,12 @@ void ProtocolCompositionType::print(raw_ostream &OS) const {
       First = false;
     else
       OS << ", ";
-    Proto->print(OS);
+    Proto->print(OS, PO);
   }
   OS << ">";
 }
 
-void LValueType::print(raw_ostream &OS) const {
+void LValueType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   OS << "[byref";
 
   Qual qs = getQualifiers();
@@ -1699,60 +1756,73 @@ void LValueType::print(raw_ostream &OS) const {
 #undef APPEND_QUAL
   }
   OS << "] ";
-  getObjectType().print(OS);
+  getObjectType().print(OS, PO);
 }
 
-void UnboundGenericType::print(raw_ostream &OS) const {
+void UnboundGenericType::print(raw_ostream &OS, 
+                               const Type::PrintOptions &PO) const {
   if (auto parent = getParent()) {
-    parent.print(OS);
+    parent.print(OS, PO);
     OS << ".";
+  } else if (PO.show_modules) {
+    OS << getDecl()->getModuleContext()->Name << ".";
+  }
+  OS << getDecl()->getName().get();
+}
+
+void BoundGenericType::print(raw_ostream &OS, 
+                             const Type::PrintOptions &PO) const {
+  if (auto parent = getParent()) {
+    parent.print(OS, PO);
+    OS << ".";
+  } else if (PO.show_modules) {
+    OS << getDecl()->getModuleContext()->Name << ".";
+  }
+
+  OS << getDecl()->getName().get();
+  printGenericArgs(OS, PO, getGenericArgs());
+}
+
+void StructType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
+  if (auto parent = getParent()) {
+    parent.print(OS, PO);
+    OS << ".";
+  } else if (PO.show_modules) {
+    OS << getDecl()->getModuleContext()->Name << ".";
   }
 
   OS << getDecl()->getName().get();
 }
 
-void BoundGenericType::print(raw_ostream &OS) const {
+void ClassType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   if (auto parent = getParent()) {
-    parent.print(OS);
+    parent.print(OS, PO);
     OS << ".";
-  }
-
-  OS << getDecl()->getName().get();
-  printGenericArgs(OS, getGenericArgs());
-}
-
-void StructType::print(raw_ostream &OS) const {
-  if (auto parent = getParent()) {
-    parent.print(OS);
-    OS << ".";
+  } else if (PO.show_modules) {
+    OS << getDecl()->getModuleContext()->Name << ".";
   }
 
   OS << getDecl()->getName().get();
 }
 
-void ClassType::print(raw_ostream &OS) const {
+void UnionType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   if (auto parent = getParent()) {
-    parent.print(OS);
+    parent.print(OS, PO);
     OS << ".";
+  } else if (PO.show_modules) {
+    OS << getDecl()->getModuleContext()->Name << ".";
   }
 
   OS << getDecl()->getName().get();
 }
 
-void UnionType::print(raw_ostream &OS) const {
-  if (auto parent = getParent()) {
-    parent.print(OS);
-    OS << ".";
-  }
-
-  OS << getDecl()->getName().get();
-}
-
-void ArchetypeType::print(raw_ostream &OS) const {
+void ArchetypeType::print(raw_ostream &OS, 
+                          const Type::PrintOptions &PO) const {
   OS << getFullName();
 }
 
-void GenericTypeParamType::print(raw_ostream &OS) const {
+void GenericTypeParamType::print(raw_ostream &OS, 
+                                 const Type::PrintOptions &PO) const {
   auto name = getDecl()->getName();
   if (name.empty())
     OS << "<anonymous>";
@@ -1760,7 +1830,8 @@ void GenericTypeParamType::print(raw_ostream &OS) const {
     OS << name.str();
 }
 
-void AssociatedTypeType::print(raw_ostream &OS) const {
+void AssociatedTypeType::print(raw_ostream &OS, 
+                               const Type::PrintOptions &PO) const {
   auto name = getDecl()->getName();
   if (name.empty())
     OS << "<anonymous>";
@@ -1768,19 +1839,25 @@ void AssociatedTypeType::print(raw_ostream &OS) const {
     OS << name.str();
 }
 
-void SubstitutedType::print(raw_ostream &OS) const {
-  getReplacementType().print(OS);
+void SubstitutedType::print(raw_ostream &OS, 
+                            const Type::PrintOptions &PO) const {
+  getReplacementType().print(OS, PO);
 }
 
-void DependentMemberType::print(raw_ostream &OS) const {
-  getBase().print(OS);
+void DependentMemberType::print(raw_ostream &OS, 
+                                const Type::PrintOptions &PO) const {
+  getBase().print(OS, PO);
   OS << "." << getName().str();
 }
 
-void UnownedStorageType::print(raw_ostream &OS) const {
-  OS << "[unowned] " << getReferentType();
+void UnownedStorageType::print(raw_ostream &OS, 
+                               const Type::PrintOptions &PO) const {
+  OS << "[unowned] ";
+  getReferentType().print(OS, PO);
 }
 
-void WeakStorageType::print(raw_ostream &OS) const {
-  OS << "[weak] " << getReferentType();
+void WeakStorageType::print(raw_ostream &OS, 
+                            const Type::PrintOptions &PO) const {
+  OS << "[weak] ";
+  getReferentType().print(OS, PO);
 }

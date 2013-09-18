@@ -102,11 +102,17 @@ public:
              bool ignoreMissing, LazyResolver *resolver) const;
 
   void dump() const;
-  void print(raw_ostream &OS) const;
+  
+  struct PrintOptions {
+    bool show_modules;
+    PrintOptions() : show_modules(false) {}
+    PrintOptions(bool _show_modules) : show_modules(_show_modules) {}
+  };
+  void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
 
   /// getString - Return the name of the type as a string, for use in
   /// diagnostics only.
-  std::string getString() const;
+  std::string getString(const PrintOptions &PO = PrintOptions()) const;
   
 private:
   // Direct comparison is disabled for types, because they may not be canonical.

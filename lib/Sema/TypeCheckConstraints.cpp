@@ -52,7 +52,7 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &Out) {
   Out << "$T" << ID;
 }
 
-void TypeVariableType::print(raw_ostream &OS) const {
+void TypeVariableType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   OS << "$T" << getImpl().getID();
 }
 
