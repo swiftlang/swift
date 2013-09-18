@@ -276,11 +276,12 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
     SILOneTypeLayout::readRecord(scratch, OpCode, TyID, TyCategory);
     break;
   case SIL_ONE_OPERAND:
-    SILOneOperandLayout::readRecord(scratch, OpCode, TyID, TyCategory, ValID,
-                                    ValResNum);
+    SILOneOperandLayout::readRecord(scratch, OpCode, Attr,
+                                    TyID, TyCategory, ValID, ValResNum);
     break;
   case SIL_ONE_TYPE_ONE_OPERAND:
-    SILOneTypeOneOperandLayout::readRecord(scratch, OpCode, TyID, TyCategory,
+    SILOneTypeOneOperandLayout::readRecord(scratch, OpCode, Attr,
+                                           TyID, TyCategory,
                                            TyID2, TyCategory2,
                                            ValID, ValResNum);
     break;
@@ -560,6 +561,48 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
     }
     break;
   }
+  // Checked Conversion instructions.
+  case ValueKind::DowncastInst:
+  case ValueKind::SuperToArchetypeRefInst:
+  case ValueKind::DowncastArchetypeAddrInst:
+  case ValueKind::DowncastArchetypeRefInst:
+  case ValueKind::ProjectDowncastExistentialAddrInst:
+  case ValueKind::DowncastExistentialRefInst: {
+    SILValue Val = getLocalValue(ValID, ValResNum,
+                       getSILType(MF->getType(TyID2),
+                                  (SILValueCategory)TyCategory2));
+    SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+    CheckedCastMode Mode;
+    if (Attr == (unsigned)CheckedCastMode::Unconditional)
+      Mode = CheckedCastMode::Unconditional;
+    else if (Attr == (unsigned)CheckedCastMode::Conditional)
+      Mode = CheckedCastMode::Conditional;
+    else
+      llvm_unreachable("Not an valid CheckedCastMode");
+    switch ((ValueKind)OpCode) {
+    default: assert(0 && "Out of sync with parent switch");
+    case ValueKind::DowncastInst:
+      ResultVal = Builder.createDowncast(Loc, Val, Ty, Mode);
+      break;
+    case ValueKind::SuperToArchetypeRefInst:
+      ResultVal = Builder.createSuperToArchetypeRef(Loc, Val, Ty, Mode);
+      break;
+    case ValueKind::DowncastArchetypeAddrInst:
+      ResultVal = Builder.createDowncastArchetypeAddr(Loc, Val, Ty, Mode);
+      break;
+    case ValueKind::DowncastArchetypeRefInst:
+      ResultVal = Builder.createDowncastArchetypeRef(Loc, Val, Ty, Mode);
+      break;
+    case ValueKind::ProjectDowncastExistentialAddrInst:
+      ResultVal = Builder.createProjectDowncastExistentialAddr(Loc,
+                                                         Val, Ty, Mode);
+      break;
+    case ValueKind::DowncastExistentialRefInst:
+      ResultVal = Builder.createDowncastExistentialRef(Loc, Val, Ty, Mode);
+      break;
+    }
+    break;
+  }
   case ValueKind::DestroyAddrInst: {
     auto Ty = MF->getType(TyID);
     ResultVal = Builder.createDestroyAddr(Loc,
@@ -572,6 +615,15 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
     ResultVal = Builder.createLoad(Loc,
         getLocalValue(ValID, ValResNum,
                       getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
+  case ValueKind::LoadWeakInst: {
+    auto Ty = MF->getType(TyID);
+    bool isTake = (Attr > 0);
+    ResultVal = Builder.createLoadWeak(Loc,
+        getLocalValue(ValID, ValResNum,
+                      getSILType(Ty, (SILValueCategory)TyCategory)),
+        IsTake_t(isTake));
     break;
   }
   case ValueKind::ReturnInst: {

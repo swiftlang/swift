@@ -548,7 +548,10 @@ public:
                [&] { OS << ", "; });
   }
   void visitLoadWeakInst(LoadWeakInst *LI) {
-    OS << "load_weak " << getIDAndType(LI->getOperand());
+    OS << "load_weak ";
+    if (LI->isTake())
+      OS << "[take] ";
+    OS << getIDAndType(LI->getOperand());
   }
   void visitStoreWeakInst(StoreWeakInst *SI) {
     OS << "store_weak " << getID(SI->getSrc()) << " to ";

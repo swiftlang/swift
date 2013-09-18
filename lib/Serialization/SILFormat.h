@@ -96,6 +96,7 @@ namespace sil_block {
   using SILOneTypeOneOperandLayout = BCRecordLayout<
     SIL_ONE_TYPE_ONE_OPERAND,
     SILInstOpCodeField,
+    BCFixed<2>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     TypeIDField,
@@ -136,6 +137,7 @@ namespace sil_block {
   using SILOneOperandLayout = BCRecordLayout<
     SIL_ONE_OPERAND,
     SILInstOpCodeField,
+    BCFixed<2>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,
