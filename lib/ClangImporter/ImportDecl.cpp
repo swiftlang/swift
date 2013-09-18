@@ -1748,6 +1748,48 @@ namespace {
       return Impl.SwiftContext.AllocateCopy(protocols);
     }
 
+    /// Import members of the given Objective-C container and add them to the
+    /// list of corresponding Swift members.
+    void importObjCMembers(const clang::ObjCContainerDecl *decl,
+                           DeclContext *swiftContext,
+                           SmallVectorImpl<Decl *> &members) {
+      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
+           m != mEnd; ++m) {
+        auto nd = dyn_cast<clang::NamedDecl>(*m);
+        if (!nd)
+          continue;
+
+        auto member = Impl.importDecl(nd);
+        if (!member)
+          continue;
+
+        // If this member is a method that is a getter or setter for a property
+        // that was imported, don't add it to the list of members so it won't
+        // be found by name lookup. This eliminates the ambiguity between
+        // property names and getter names (by choosing to only have a
+        // variable).
+        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
+          if (auto property = objcMethod->findPropertyDecl())
+            if (Impl.importDecl(
+                                const_cast<clang::ObjCPropertyDecl *>(property)))
+              continue;
+
+          // If there is a special declaration associated with this member,
+          // add it now.
+          if (auto special = importSpecialMethod(member, swiftContext)) {
+            members.push_back(special);
+
+            // If we imported a constructor, the underlying init method is not
+            // visible.
+            if (isa<ConstructorDecl>(special))
+              continue;
+          }
+        }
+        
+        members.push_back(member);
+      }
+    }
+
     /// \brief Import the members of all of the protocols to which the given
     /// Objective-C class, category, or extension explicitly conforms into
     /// the given list of members, so long as the the method was not already
@@ -1873,36 +1915,7 @@ namespace {
 
       // Import each of the members.
       SmallVector<Decl *, 4> members;
-      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
-           m != mEnd; ++m) {
-        auto nd = dyn_cast<clang::NamedDecl>(*m);
-        if (!nd)
-          continue;
-
-        auto member = Impl.importDecl(nd);
-        if (!member)
-          continue;
-
-        // If this member is a method that is a getter or setter for a property
-        // that was imported, don't add it to the list of members so it won't
-        // be found by name lookup. This eliminates the ambiguity between
-        // property names and getter names (by choosing to only have a
-        // variable).
-        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
-          if (auto property = objcMethod->findPropertyDecl())
-            if (Impl.importDecl(
-                  const_cast<clang::ObjCPropertyDecl *>(property)))
-              continue;
-
-          // If there is a special declaration associated with this member,
-          // add it now.
-          if (auto special = importSpecialMethod(member, result)) {
-            members.push_back(special);
-          }
-        }
-
-        members.push_back(member);
-      }
+      importObjCMembers(decl, result, members);
 
       // Import mirrored declarations for protocols to which this category
       // or extension conforms.
@@ -1979,40 +1992,7 @@ namespace {
       // Import each of the members.
       SmallVector<Decl *, 4> members;
       members.push_back(selfDecl);
-      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
-           m != mEnd; ++m) {
-        auto nd = dyn_cast<clang::NamedDecl>(*m);
-        if (!nd)
-          continue;
-
-        // FIXME: Failure to import a non-optional requirement from a protocol
-        // seems like a serious problem, because we can't actually prove
-        // conformance to the protocol. Somehow mark this as an incomplete
-        // protocol, or drop it entirely (?).
-        auto member = Impl.importDecl(nd);
-        if (!member)
-          continue;
-
-        // If this member is a method that is a getter or setter for a property
-        // that was imported, don't add it to the list of members so it won't
-        // be found by name lookup. This eliminates the ambiguity between
-        // property names and getter names (by choosing to only have a
-        // variable).
-        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
-          if (auto property = objcMethod->findPropertyDecl())
-            if (Impl.importDecl(
-                                const_cast<clang::ObjCPropertyDecl *>(property)))
-              continue;
-
-          // If there is a special declaration associated with this member,
-          // add it now.
-          if (auto special = importSpecialMethod(member, result)) {
-            members.push_back(special);
-          }
-        }
-
-        members.push_back(member);
-      }
+      importObjCMembers(decl, result, members);
 
       // FIXME: Source range isn't accurate.
       result->setMembers(Impl.SwiftContext.AllocateCopy(members),
@@ -2076,36 +2056,7 @@ namespace {
       
       // Import each of the members.
       SmallVector<Decl *, 4> members;
-      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
-           m != mEnd; ++m) {
-        auto nd = dyn_cast<clang::NamedDecl>(*m);
-        if (!nd)
-          continue;
-
-        auto member = Impl.importDecl(nd);
-        if (!member)
-          continue;
-
-        // If this member is a method that is a getter or setter for a property
-        // that was imported, don't add it to the list of members so it won't
-        // be found by name lookup. This eliminates the ambiguity between
-        // property names and getter names (by choosing to only have a
-        // variable).
-        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
-          if (auto property = objcMethod->findPropertyDecl())
-            if (Impl.importDecl(
-                  const_cast<clang::ObjCPropertyDecl *>(property)))
-              continue;
-
-          // If there is a special declaration associated with this member,
-          // add it now.
-          if (auto special = importSpecialMethod(member, result)) {
-            members.push_back(special);
-          }
-        }
-
-        members.push_back(member);
-      }
+      importObjCMembers(decl, result, members);
 
       // Import inherited constructors.
       importInheritedConstructors(decl, result, members);
