@@ -141,11 +141,12 @@ public:
   /// Convenience function useful for functions without any source
   /// location. Internally calls emitFunction, emits a debug
   /// scope, and finally sets it using setCurrentLoc.
-  inline void emitArtificialFunction(IRGenFunction &IGF, llvm::Function *Fn) {
-    emitArtificialFunction(*IGF.IGM.SILMod, IGF.Builder, Fn);
+  inline void emitArtificialFunction(IRGenFunction &IGF, llvm::Function *Fn,
+                                     SILType SILTy = SILType()) {
+    emitArtificialFunction(*IGF.IGM.SILMod, IGF.Builder, Fn, SILTy);
   }
   void emitArtificialFunction(SILModule &SILMod, IRBuilder &Builder,
-                                llvm::Function *Fn);
+                              llvm::Function *Fn, SILType SILTy = SILType());
 
   /// Emit a dbg.declare instrinsic at the current insertion point and
   /// the Builder's current debug location.

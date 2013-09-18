@@ -369,8 +369,14 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
           llvm::GlobalValue::ExternalLinkage, "main", &Module);
 
     IRGenFunction mainIGF(*this, ExplosionKind::Minimal, mainFn);
-    if (DebugInfo)
-      DebugInfo->emitArtificialFunction(mainIGF, mainFn);
+    if (DebugInfo) {
+      // Emit at least the return type.
+      auto ArgTy = BuiltinIntegerType::get(32, Context);
+      auto RetTy = TupleType::getEmpty(Context);
+      auto FnTy = FunctionType::get(RetTy, ArgTy, Context)->getCanonicalType();
+      auto SILTy = SILType::getPrimitiveLocalStorageType(FnTy);
+      DebugInfo->emitArtificialFunction(mainIGF, mainFn, SILTy);
+    }
 
     // Poke argc and argv into variables declared in the Swift stdlib
     auto args = mainFn->arg_begin();
