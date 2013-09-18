@@ -425,11 +425,35 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     auto intTy = Ty->getAs<BuiltinIntegerType>();
     Identifier StringVal = MF->getIdentifier(ValID);
-    APInt value(intTy->getBitWidth(), StringVal.str(), 10);
     // Build APInt from string.
+    APInt value(intTy->getBitWidth(), StringVal.str(), 10);
     ResultVal = Builder.createIntegerLiteral(Loc,
         getSILType(Ty, (SILValueCategory)TyCategory),
         value);
+    break;
+  }
+  case ValueKind::FloatLiteralInst: {
+    auto Ty = MF->getType(TyID);
+    auto floatTy = Ty->getAs<BuiltinFloatType>();
+    Identifier StringVal = MF->getIdentifier(ValID);
+    // Build APInt from string.
+    APInt bits(floatTy->getBitWidth(), StringVal.str(), 16);
+    if (bits.getBitWidth() != floatTy->getBitWidth())
+      bits = bits.zextOrTrunc(floatTy->getBitWidth());
+
+    APFloat value(floatTy->getAPFloatSemantics(), bits);
+
+    ResultVal = Builder.createFloatLiteral(Loc,
+        getSILType(Ty, (SILValueCategory)TyCategory),
+        value);
+    break;
+  }
+  case ValueKind::StringLiteralInst: {
+    auto Ty = MF->getType(TyID);
+    Identifier StringVal = MF->getIdentifier(ValID);
+    ResultVal = Builder.createStringLiteral(Loc,
+        getSILType(Ty, (SILValueCategory)TyCategory),
+        StringVal.str());
     break;
   }
   case ValueKind::MetatypeInst: {

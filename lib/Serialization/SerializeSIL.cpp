@@ -27,6 +27,9 @@
 static llvm::cl::opt<bool>
 EnableSerializeAll("sil-serialize-all", llvm::cl::Hidden,
                    llvm::cl::init(false));
+static llvm::cl::opt<bool>
+EnableSerialize("enable-sil-serialization", llvm::cl::Hidden,
+                llvm::cl::init(false));
 
 using namespace swift;
 using namespace swift::serialization;
@@ -297,16 +300,34 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         addValueRef(IRP->getIndex()), IRP->getIndex().getResultNumber());
     break;
   }
-  case ValueKind::IntegerLiteralInst: {
+  case ValueKind::FloatLiteralInst:
+  case ValueKind::IntegerLiteralInst:
+  case ValueKind::StringLiteralInst: {
     // Use SILOneOperandLayout to specify the type and the literal.
-    const IntegerLiteralInst *ILI = cast<IntegerLiteralInst>(&SI);
-    APInt value = ILI->getValue();
+    StringRef Str;
+    SILType Ty;
+    switch (SI.getKind()) {
+    default: assert(0 && "Out of sync with parent switch");
+    case ValueKind::IntegerLiteralInst:
+      Str = cast<IntegerLiteralInst>(&SI)->getValue().toString(10, true);
+      Ty = cast<IntegerLiteralInst>(&SI)->getType();
+      break;
+    case ValueKind::FloatLiteralInst:
+      Str = cast<FloatLiteralInst>(&SI)->getBits().toString(16,
+                                                            /*Signed*/false);
+      Ty = cast<FloatLiteralInst>(&SI)->getType();
+      break;
+    case ValueKind::StringLiteralInst:
+      Str = cast<StringLiteralInst>(&SI)->getValue();
+      Ty = cast<StringLiteralInst>(&SI)->getType();
+      break;
+    }
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
         (unsigned)SI.getKind(),
-        S.addTypeRef(ILI->getType().getSwiftRValueType()),
-        (unsigned)ILI->getType().getCategory(),
-        S.addIdentifierRef(Ctx.getIdentifier(value.toString(10, true))),
+        S.addTypeRef(Ty.getSwiftRValueType()),
+        (unsigned)Ty.getCategory(),
+        S.addIdentifierRef(Ctx.getIdentifier(Str)),
         0);
     break;
   }
@@ -565,7 +586,9 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
     // Go through all SILFunctions in M, and if it is transparent,
     // write out the SILFunction.
     for (const SILFunction &F : *M) {
-      if ((EnableSerializeAll || F.isTransparent()) && !F.empty())
+      if ((EnableSerialize || EnableSerializeAll) &&
+          (EnableSerializeAll || F.isTransparent())
+          && !F.empty())
         writeSILFunction(F);
     }
   }
