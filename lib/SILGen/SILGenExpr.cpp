@@ -2318,39 +2318,92 @@ RValue RValueEmitter::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
   return RValue(SGF, SGF.emitManagedRValueWithCleanup(block), E);
 }
 
+namespace {
+  /// An Initialization representing the result of an address-only ternary.
+  class TernaryInitialization : public SingleInitializationBase {
+    SILValue valueAddr;
+  public:
+    TernaryInitialization(SILValue valueAddr)
+      : valueAddr(valueAddr)
+    {}
+    
+    SILValue getAddressOrNull() override {
+      return valueAddr;
+    }
+    
+    void finishInitialization(SILGenFunction &gen) {
+    }
+  };
+}
+
 RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
-  // FIXME: We could avoid imploding and reexploding tuples here.
-  // FIXME: "emit into" optimization
+  auto &lowering = SGF.getTypeLowering(E->getType());
   
-  Condition cond = SGF.emitCondition(E->getCondExpr(),
-                                     /*hasFalse*/ true,
-                                     /*invertCondition*/ false,
-                                     SGF.getLoweredType(E->getType()));
-  
-  cond.enterTrue(SGF.B);
-  SILValue trueValue;
-  {
-    auto TE = E->getThenExpr();
-    FullExpr trueScope(SGF.Cleanups, CleanupLocation(TE));
-    trueValue = visit(TE).forwardAsSingleValue(SGF, TE);
+  if (lowering.isLoadable()) {
+    // If the result is loadable, emit each branch and forward its result
+    // into the destination block argument.
+    
+    // FIXME: We could avoid imploding and reexploding tuples here.
+    Condition cond = SGF.emitCondition(E->getCondExpr(),
+                                       /*hasFalse*/ true,
+                                       /*invertCondition*/ false,
+                                       SGF.getLoweredType(E->getType()));
+    
+    cond.enterTrue(SGF.B);
+    SILValue trueValue;
+    {
+      auto TE = E->getThenExpr();
+      FullExpr trueScope(SGF.Cleanups, CleanupLocation(TE));
+      trueValue = visit(TE).forwardAsSingleValue(SGF, TE);
+    }
+    cond.exitTrue(SGF.B, trueValue);
+    
+    cond.enterFalse(SGF.B);
+    SILValue falseValue;
+    {
+      auto EE = E->getElseExpr();
+      FullExpr falseScope(SGF.Cleanups, CleanupLocation(EE));
+      falseValue = visit(EE).forwardAsSingleValue(SGF, EE);
+    }
+    cond.exitFalse(SGF.B, falseValue);
+    
+    SILBasicBlock *cont = cond.complete(SGF.B);
+    assert(cont && "no continuation block for if expr?!");
+    
+    SILValue result = cont->bbarg_begin()[0];
+    
+    return RValue(SGF, SGF.emitManagedRValueWithCleanup(result), E);
+  } else {
+    // If the result is address-only, emit the result into a common stack buffer
+    // that dominates both branches.
+    SILValue resultAddr = SGF.getBufferForExprResult(
+                                               E, lowering.getLoweredType(), C);
+    
+    Condition cond = SGF.emitCondition(E->getCondExpr(),
+                                       /*hasFalse*/ true,
+                                       /*invertCondition*/ false);
+    cond.enterTrue(SGF.B);
+    {
+      auto TE = E->getThenExpr();
+      FullExpr trueScope(SGF.Cleanups, CleanupLocation(TE));
+      InitializationPtr initialization(new TernaryInitialization(resultAddr));
+      SGF.emitExprInto(TE, initialization.get());
+    }
+    cond.exitTrue(SGF.B);
+    
+    cond.enterFalse(SGF.B);
+    {
+      auto EE = E->getElseExpr();
+      FullExpr trueScope(SGF.Cleanups, CleanupLocation(EE));
+      InitializationPtr initialization(new TernaryInitialization(resultAddr));
+      SGF.emitExprInto(EE, initialization.get());
+    }
+    cond.exitFalse(SGF.B);
+    
+    cond.complete(SGF.B);
+    
+    return RValue(SGF, SGF.emitManagedRValueWithCleanup(resultAddr, lowering), E);
   }
-  cond.exitTrue(SGF.B, trueValue);
-  
-  cond.enterFalse(SGF.B);
-  SILValue falseValue;
-  {
-    auto EE = E->getElseExpr();
-    FullExpr falseScope(SGF.Cleanups, CleanupLocation(EE));
-    falseValue = visit(EE).forwardAsSingleValue(SGF, EE);
-  }
-  cond.exitFalse(SGF.B, falseValue);
-  
-  SILBasicBlock *cont = cond.complete(SGF.B);
-  assert(cont && "no continuation block for if expr?!");
-  
-  SILValue result = cont->bbarg_begin()[0];
-  
-  return RValue(SGF, SGF.emitManagedRValueWithCleanup(result), E);
 }
 
 RValue RValueEmitter::visitZeroValueExpr(ZeroValueExpr *E, SGFContext C) {
