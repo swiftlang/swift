@@ -689,15 +689,17 @@ public:
   }
 
   void addConstructorCall(const ConstructorDecl *CD) {
-    assert(!HaveDot && "can not add a constructor call after a dot");
     CodeCompletionResultBuilder Builder(
         CompletionContext,
         CodeCompletionResult::ResultKind::Declaration);
     Builder.setAssociatedDecl(CD);
-    if (IsSuperRefExpr) {
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurrDeclContext))
-        if (isa<ConstructorDecl>(AFD))
-          Builder.addTextChunk("constructor");
+     if (IsSuperRefExpr) {
+      assert(isa<ConstructorDecl>(
+                 dyn_cast<AbstractFunctionDecl>(CurrDeclContext)) &&
+             "can call super.init only inside a constructor");
+      if (needDot())
+        Builder.addLeadingDot();
+      Builder.addTextChunk("init");
     }
     Builder.addLeftParen();
     addPatternParameters(Builder, CD->getArgParams());
@@ -840,21 +842,23 @@ public:
         return;
       }
 
-      if (HaveDot)
-        return;
-
-      // FIXME: super.constructor
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
-        if (!ExprType->is<MetaTypeType>())
-          return;
+        if (ExprType->is<MetaTypeType>()) {
+          if (HaveDot)
+            return;
+          addConstructorCall(CD);
+        }
         if (IsSuperRefExpr) {
           if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurrDeclContext))
             if (!isa<ConstructorDecl>(AFD))
               return;
+          addConstructorCall(CD);
         }
-        addConstructorCall(CD);
         return;
       }
+
+      if (HaveDot)
+        return;
 
       if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
         if (ExprType->is<MetaTypeType>())
