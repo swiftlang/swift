@@ -24,7 +24,6 @@ class SILModule;
 /// on each SILDeserializer.
 class SerializedSILLoader {
 private:
-  ASTContext &Ctx;
   std::vector<std::unique_ptr<SILDeserializer> > LoadedSILSections;
 
   explicit SerializedSILLoader(ASTContext &ctx, SILModule *SILMod);

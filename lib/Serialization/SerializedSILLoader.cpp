@@ -18,11 +18,11 @@
 using namespace swift;
 
 SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
-                                         SILModule *SILMod) : Ctx(Ctx) {
+                                         SILModule *SILMod) {
   // Get a list of SerializedModules from ASTContext.
   for (auto &CtxM : Ctx.LoadedModules) {
     if (SerializedModule *LM = dyn_cast<SerializedModule>(CtxM.getValue())) {
-      auto Des = new SILDeserializer(LM->File, *SILMod);
+      auto Des = new SILDeserializer(LM->File, *SILMod, Ctx);
       LoadedSILSections.emplace_back(std::unique_ptr<SILDeserializer>(Des));
     }
   }
@@ -32,8 +32,7 @@ SerializedSILLoader::~SerializedSILLoader() = default;
 
 SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
   for (auto &Des : LoadedSILSections) {
-    if (auto Func = Des->lookupSILFunction(
-                           Ctx.getIdentifier(Callee->getName())))
+    if (auto Func = Des->lookupSILFunction(Callee))
       return Func;
   }
   return nullptr;

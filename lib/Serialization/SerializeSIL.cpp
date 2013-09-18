@@ -20,7 +20,13 @@
 #include "clang/Basic/OnDiskHashTable.h"
 
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+
+// To help testing serialization, deserialization, we turn on sil-serialize-all.
+static llvm::cl::opt<bool>
+EnableSerializeAll("sil-serialize-all", llvm::cl::Hidden,
+                   llvm::cl::init(false));
 
 using namespace swift;
 using namespace swift::serialization;
@@ -215,11 +221,27 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Args.push_back(Arg.getResultNumber());
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code],
+        SILAbbrCodes[SILInstApplyLayout::Code], 0/*Transparent*/,
         (unsigned)AI->isTransparent(),
         S.addTypeRef(AI->getCallee().getType().getSwiftRValueType()),
         (unsigned)AI->getCallee().getType().getCategory(),
         addValueRef(AI->getCallee()), AI->getCallee().getResultNumber(),
+        Args);
+    break;
+  }
+  case ValueKind::PartialApplyInst: {
+    const PartialApplyInst *PAI = cast<PartialApplyInst>(&SI);
+        SmallVector<ValueID, 4> Args;
+    for (auto Arg: PAI->getArguments()) {
+      Args.push_back(addValueRef(Arg));
+      Args.push_back(Arg.getResultNumber());
+    }
+    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstApplyLayout::Code], 1/*PartialApply*/,
+        0/*Transparent*/,
+        S.addTypeRef(PAI->getCallee().getType().getSwiftRValueType()),
+        (unsigned)PAI->getCallee().getType().getCategory(),
+        addValueRef(PAI->getCallee()), PAI->getCallee().getResultNumber(),
         Args);
     break;
   }
@@ -543,7 +565,7 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
     // Go through all SILFunctions in M, and if it is transparent,
     // write out the SILFunction.
     for (const SILFunction &F : *M) {
-      if (F.isTransparent() && !F.empty())
+      if ((EnableSerializeAll || F.isTransparent()) && !F.empty())
         writeSILFunction(F);
     }
   }

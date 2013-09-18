@@ -16,9 +16,13 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 
+// To help testing serialization, deserialization, we turn on sil-link-all.
+static llvm::cl::opt<bool>
+EnableLinkAll("sil-link-all", llvm::cl::Hidden, llvm::cl::init(false));
 STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 
 //===----------------------------------------------------------------------===//
@@ -39,7 +43,8 @@ void swift::performSILLinking(SILModule *M) {
       for (auto I = BB.begin(), E = BB.end(); I != E; I++) {
         // Handles ApplyInst only.
         auto *AI = dyn_cast<ApplyInst>(I);
-        if (!AI || !AI->isTransparent())
+        // When EnableLinkAll is true, we don't check whether it is transparent.
+        if (!AI || (!EnableLinkAll && !AI->isTransparent()))
           continue;
 
         SILValue Callee = AI->getCallee();

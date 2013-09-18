@@ -115,6 +115,7 @@ namespace sil_block {
 
   using SILInstApplyLayout = BCRecordLayout<
     SIL_INST_APPLY,
+    BCFixed<1>,           // is partial apply?
     BCFixed<1>,           // transparent
     TypeIDField,          // callee type
     SILTypeCategoryField,

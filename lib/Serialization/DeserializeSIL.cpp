@@ -68,8 +68,9 @@ public:
   }
 };
 
-SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M) :
-                                MF(MF), SILMod(M) {
+SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
+                                 ASTContext &Ctx) :
+                                MF(MF), SILMod(M), Ctx(Ctx) {
   SILCursor = MF->getSILCursor();
   // Load any abbrev records at the start of the block.
   SILCursor.advance();
@@ -134,7 +135,7 @@ static SILType getSILType(Type Ty, SILValueCategory Category) {
                                    Category);
 }
 
-SILFunction *SILDeserializer::readSILFunction(DeclID FID, Identifier name) {
+SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
   LastValueID = 0;
   if (FID == 0)
     return nullptr;
@@ -167,13 +168,14 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, Identifier name) {
   }
 
   auto Ty = MF->getType(FuncTyID);
-  if (funcOrOffset.isComplete())
-    return funcOrOffset;
 
-  auto Fn = new (SILMod) SILFunction(SILMod, (SILLinkage)Linkage,
-                                     name.str(),
-                                     getSILType(Ty, SILValueCategory::Object));
-
+  // Verify that the types match up.
+  if (InFunc->getLoweredType() != getSILType(Ty, SILValueCategory::Object)) {
+    DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
+    return nullptr;
+  }
+  auto Fn = InFunc;
+  Fn->setLinkage((SILLinkage)Linkage);
   SILBasicBlock *CurrentBB = nullptr;
 
   // Fetch the next record.
@@ -193,7 +195,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, Identifier name) {
       // Handle a SILInstruction record.
       if (readSILInstruction(CurrentBB, kind, scratch)) {
         DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
-        return nullptr;
+        return Fn;
       }
     }
 
@@ -292,9 +294,11 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
                                     ValResNum2);
     break;
   case SIL_INST_APPLY: {
-    OpCode = (unsigned)ValueKind::ApplyInst;
-    SILInstApplyLayout::readRecord(scratch, Attr, TyID, TyCategory,
+    unsigned IsPartial;
+    SILInstApplyLayout::readRecord(scratch, IsPartial, Attr, TyID, TyCategory,
                                    ValID, ValResNum, ListOfValues);
+    OpCode = (unsigned)(IsPartial ? ValueKind::PartialApplyInst :
+                                    ValueKind::ApplyInst);
     break;
   }
   case SIL_INST_TODO:
@@ -341,6 +345,8 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
     SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(SILMod);
     auto ArgTys = FTI->getInputTypes();
 
+    assert((ArgTys.size() << 1) == ListOfValues.size() &&
+           "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2)
       Args.push_back(getLocalValue(ListOfValues[I], ListOfValues[I+1],
@@ -348,6 +354,37 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
     bool Transparent = (Attr == 1);
     ResultVal = Builder.createApply(Loc, getLocalValue(ValID, ValResNum, FnTy),
                                     FTI->getResultType(), Args, Transparent);
+    break;
+  }
+  case ValueKind::PartialApplyInst: {
+    auto Ty = MF->getType(TyID);
+    SILType FnTy = getSILType(Ty, (SILValueCategory)TyCategory);
+    SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(SILMod);
+    auto ArgTys = FTI->getInputTypes();
+
+    assert((ArgTys.size() << 1) >= ListOfValues.size() &&
+           "Argument number mismatch in PartialApplyInst.");
+
+    SmallVector<TupleTypeElt, 4> NewArgTypes;
+    // Compute the result type of the partial_apply, based on which arguments
+    // are getting applied.
+    unsigned ArgNo = 0, NewArgCount = ArgTys.size() - (ListOfValues.size()>>1);
+    while (ArgNo != NewArgCount)
+      NewArgTypes.push_back(ArgTys[ArgNo++].getSwiftType());
+
+    SILValue FnVal = getLocalValue(ValID, ValResNum, FnTy);
+    SmallVector<SILValue, 4> Args;
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2)
+      Args.push_back(getLocalValue(ListOfValues[I], ListOfValues[I+1],
+                                   ArgTys[ArgNo++]));
+
+    Type ArgTy = TupleType::get(NewArgTypes, Ctx);
+    Type ResTy = FunctionType::get(ArgTy, FTI->getResultType().getSwiftType(),
+                                   Ctx);
+
+    // FIXME: Why the arbitrary order difference in IRBuilder type argument?
+    ResultVal = Builder.createPartialApply(Loc, FnVal, Args,
+                                           SILMod.Types.getLoweredType(ResTy));
     break;
   }
   case ValueKind::BuiltinFunctionRefInst: {
@@ -602,14 +639,15 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
   return false;
 }
 
-SILFunction *SILDeserializer::lookupSILFunction(Identifier name) {
+SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
+  Identifier name = Ctx.getIdentifier(InFunc->getName());
   if (!FuncTable)
     return nullptr;
   auto iter = FuncTable->find(name);
   if (iter == FuncTable->end())
     return nullptr;
 
-  auto Func = readSILFunction(*iter, name);
+  auto Func = readSILFunction(*iter, InFunc);
   return Func;
 }
 

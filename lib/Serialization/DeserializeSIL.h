@@ -26,6 +26,7 @@ namespace swift {
   class SILDeserializer {
     ModuleFile *MF;
     SILModule &SILMod;
+    ASTContext &Ctx;
 
     /// The cursor used to lazily load SILFunctions.
     llvm::BitstreamCursor SILCursor;
@@ -41,7 +42,7 @@ namespace swift {
     serialization::ValueID LastValueID = 0;
 
     /// Read a SIL function.
-    SILFunction *readSILFunction(serialization::DeclID, Identifier name);
+    SILFunction *readSILFunction(serialization::DeclID, SILFunction *InFunc);
     /// Read a SIL basic block within a given SIL function.
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
                                      SmallVectorImpl<uint64_t> &scratch);
@@ -62,8 +63,8 @@ namespace swift {
                            SILType Type);
 
 public:
-    SILFunction *lookupSILFunction(Identifier name);
-    SILDeserializer(ModuleFile *MF, SILModule &M);
+    SILFunction *lookupSILFunction(SILFunction *InFunc);
+    SILDeserializer(ModuleFile *MF, SILModule &M, ASTContext &Ctx);
 
     // Out of line to avoid instantiation OnDiskChainedHashTable here.
     ~SILDeserializer();
