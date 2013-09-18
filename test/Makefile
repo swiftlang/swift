@@ -50,6 +50,7 @@ lit.site.cfg: FORCE
 	@$(ECHOPATH) s=@LLVM_LIBS_DIR@=$(LibDir)=g >> lit.tmp
 	@$(ECHOPATH) s=@SWIFT_SOURCE_DIR@=$(PROJ_SRC_DIR)/..=g >> lit.tmp
 	@$(ECHOPATH) s=@SWIFT_BINARY_DIR@=$(PROJ_OBJ_DIR)/..=g >> lit.tmp
+	@$(ECHOPATH) s=@HOST_TRIPLE@=$(HOST_TRIPLE)=g >> lit.tmp
 	@$(ECHOPATH) s=@TARGET_TRIPLE@=$(TARGET_TRIPLE)=g >> lit.tmp
 	@$(ECHOPATH) s=@MODULES_SDK@=$(MODULES_SDK)=g >> lit.tmp
 	@sed -f lit.tmp $(PROJ_SRC_DIR)/lit.site.cfg.in > $@
@@ -64,6 +65,7 @@ Unit/lit.site.cfg: FORCE
 	@$(ECHOPATH) s=@LLVM_LIBS_DIR@=$(LibDir)=g >> unit.tmp
 	@$(ECHOPATH) s=@SWIFT_SOURCE_DIR@=$(PROJ_SRC_DIR)/..=g >> unit.tmp
 	@$(ECHOPATH) s=@SWIFT_BINARY_DIR@=$(PROJ_OBJ_DIR)/..=g >> unit.tmp
+	@$(ECHOPATH) s=@HOST_TRIPLE@=$(HOST_TRIPLE)=g >> unit.tmp
 	@$(ECHOPATH) s=@TARGET_TRIPLE@=$(TARGET_TRIPLE)=g >> unit.tmp
 	@$(ECHOPATH) s=@LLVM_BUILD_MODE@=$(BuildMode)=g >> unit.tmp
 	@$(ECHOPATH) s=@ENABLE_SHARED@=$(ENABLE_SHARED)=g >> unit.tmp
