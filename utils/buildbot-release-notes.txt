@@ -1,3 +1,25 @@
+2013-09-24
+----------
+
+* The Optional type 'T?' is now represented as a union. This means that, in
+  addition to the existing Optional APIs, it can be pattern-matched with switch:
+
+    var x : X?, y : Y?
+    switch (x, y) {
+    // Both are present
+    case (.Some(var a), .Some(var b)):
+      println("both")
+
+    // One is present
+    case (.Some, .None):
+    case (.None, .Some):
+      println("one")
+
+    // Neither is present
+    case (.None, .None):
+      println("neither")
+    }
+
 2013-09-17
 ----------
 
