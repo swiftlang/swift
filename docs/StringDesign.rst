@@ -115,19 +115,49 @@ Like all things Swift, our approach to strings begins with a deep
 respect for the lessons learned from many languages and libraries,
 especially Objective-C and Cocoa.
 
+Goals
+-----
+
+``String`` should:
+
+* honor industry standards such as Unicode
+* when handling non-ASCII text, deliver “reasonably correct”
+  results to users thinking only in terms of ASCII
+* when handling ASCII text, provide “expected behavior” to users
+  thinking only in terms of ASCII
+* be hard to use incorrectly
+* be easy to use correctly
+* provide near-optimal efficiency for 99% of use cases
+* provide a foundation upon which proper locale-sensitive operations
+  can be built
+
+Non-Goals
+---------
+
+``String`` need not:
+
+* have behavior appropriate to all locales and contexts
+* be an appropriate type (or base type) for all text storage
+  applications
+
 Overview By Example
 ===================
 
 In this section, we'll walk through some basic examples of Swift
 string usage while discovering its essential properties.
 
-``String`` is a **First-Class** Type
+``String`` is a `First-Class Type`__
 ------------------------------------
+
+__ http://en.wikipedia.org/wiki/First-class_citizen
 
 .. parsed-literal::
 
   |swift| var s = "Yo"
   `// s:` :emph:`String` `= "Yo"`
+
+Unlike, say, C's ``char*``, the meaning of a swift string is always
+unambiguous.
 
 Strings are **Efficient**
 -------------------------
