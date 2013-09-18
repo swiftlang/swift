@@ -1605,30 +1605,13 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
     BodyParams.push_back(SelfPattern);
   }
 
-  bool HadSignatureParseError = false;
   TypeRepr *FuncRetTy = nullptr;
-  {
-    ParserStatus SignatureStatus =
-        parseFunctionSignature(ArgParams, BodyParams, FuncRetTy);
+  ParserStatus SignatureStatus =
+      parseFunctionSignature(ArgParams, BodyParams, FuncRetTy);
 
-    HadSignatureParseError = SignatureStatus.isError();
-
-    if (SignatureStatus.hasCodeCompletion()) {
-      if (!CodeCompletion)
-        // Trigger delayed parsing, no need to continue.
-        return SignatureStatus;
-
-      // Create function AST nodes.
-      FuncDecl *FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name,
-                                      NameLoc, GenericParams, Type(), ArgParams,
-                                      BodyParams, FuncRetTy, CurDeclContext);
-      FD->setBodySkipped(Tok.getLoc());
-
-      addFunctionParametersToScope(FD->getBodyParamPatterns(), FD);
-
-      // Pass the function signature to code completion.
-      CodeCompletion->setDelayedParsedDecl(FD);
-    }
+  if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
+    // Trigger delayed parsing, no need to continue.
+    return SignatureStatus;
   }
 
   // Enter the arguments for the function into a new function-body scope.  We
@@ -1642,6 +1625,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
     FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name, NameLoc,
                           GenericParams, Type(), ArgParams, BodyParams,
                           FuncRetTy, CurDeclContext);
+
+    // Pass the function signature to code completion.
+    if (SignatureStatus.hasCodeCompletion())
+      CodeCompletion->setDelayedParsedDecl(FD);
 
     addFunctionParametersToScope(FD->getBodyParamPatterns(), FD);
 
@@ -1669,6 +1656,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
             parseBraceItemList(diag::func_decl_without_brace);
         if (Body.isNull()) {
           // FIXME: Should do some sort of error recovery here?
+        } else if (SignatureStatus.hasCodeCompletion()) {
+          // Code completion was inside the signature, don't attach the body.
+          FD->setBodySkipped(Body.get()->getEndLoc());
         } else {
           FD->setBody(Body.get());
         }
@@ -1676,7 +1666,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
         consumeAbstractFunctionBody(FD, Attributes);
       }
     } else if (Attributes.AsmName.empty() && !(Flags & PD_DisallowFuncDef) &&
-               !HadSignatureParseError) {
+               !SignatureStatus.isError()) {
       diagnose(Tok.getLoc(), diag::func_decl_without_brace);
     }
   }
