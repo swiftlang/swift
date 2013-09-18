@@ -308,7 +308,14 @@ void CodeCompletionContext::sortCompletionResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
   std::sort(Results.begin(), Results.end(),
             [](CodeCompletionResult * LHS, CodeCompletionResult * RHS) {
-    return getFirstTextChunk(LHS).compare_lower(getFirstTextChunk(RHS)) < 0;
+    StringRef LHSChunk = getFirstTextChunk(LHS);
+    StringRef RHSChunk = getFirstTextChunk(RHS);
+    int Result = LHSChunk.compare_lower(RHSChunk);
+    // If the case insensitive comparison is equal, then secondary sort order
+    // should be case sensitive.
+    if (Result == 0)
+      Result = LHSChunk.compare(RHSChunk);
+    return Result < 0;
   });
 }
 
