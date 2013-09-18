@@ -250,10 +250,10 @@
   <pre class="grammar">
     // Declarations and Type Keywords
     keyword ::= 'class'
-    keyword ::= 'constructor'
     keyword ::= 'destructor'
     keyword ::= 'extension'
     keyword ::= 'import'
+    keyword ::= 'init'
     keyword ::= 'func'
     keyword ::= 'metatype'
     keyword ::= 'union'
@@ -1334,7 +1334,7 @@ if vec[3] {
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-constructor ::= 'constructor' <a href="#attribute-list">attribute-list</a> <a href="#generic-params">generic-params</a>? constructor-signature <a href="#brace-item-list">brace-item-list</a>
+    decl-constructor ::= 'init' <a href="#attribute-list">attribute-list</a> <a href="#generic-params">generic-params</a>? constructor-signature <a href="#brace-item-list">brace-item-list</a>
 
     constructor-signature ::= <a href="#pattern-tuple">pattern-tuple</a>
     constructor-signature ::= <a href="#identifier">identifier-or-any</a> <a href="#selector-tuple">selector-tuple</a>
@@ -1356,7 +1356,7 @@ if vec[3] {
   <pre class="example">
     struct X {
       var member : Int
-      constructor(x : Int) {
+      init(x : Int) {
         member = x
       }
     }
@@ -1364,24 +1364,24 @@ if vec[3] {
   </pre>
 
   <p>If a class is derived from a superclass, it must explicitly invoke a
-  superclass constructor using the <tt>super.constructor</tt> syntax.
-  <tt>super.constructor</tt> may only be used in a subclass constructor;
+  superclass constructor using the <tt>super.init</tt> syntax.
+  <tt>super.init</tt> may only be used in a subclass constructor;
   it is not valid in a struct, union, or root class constructor. Additionally,
-  <tt>super.constructor</tt> may only be referenced exactly once per derived
+  <tt>super.init</tt> may only be referenced exactly once per derived
   constructor. An example:</p>
 
   <pre class="example">
     class View {
       var bounds : Rect
-      constructor(bounds:Rect) {
+      init(bounds:Rect) {
         self.bounds = bounds
       }
     }
 
     class Button : View {
       var onClick : () -&gt; ()
-      constructor(bounds:Rect, onClick:() -&gt; ()) {
-        super.constructor(bounds)
+      init(bounds:Rect, onClick:() -&gt; ()) {
+        super.init(bounds)
         self.onClick = onClick
       }
     }
@@ -2693,7 +2693,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <pre class="example">
     <i>// A generic struct.</i>
     struct Dict&lt;K,V&gt; {
-      constructor() {}
+      init() {}
       static func fromKeysAndValues(keys:K[], values:T[]) -&gt; Dict&lt;K,V&gt; {}
     }
 
@@ -2766,7 +2766,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
     expr-super-method ::= 'super' '.' <a href="#expr-identifier">expr-identifier</a>
     expr-super-subscript ::= 'super' '[' <a href="#expr">expr</a> ']'
-    expr-super-constructor ::= 'super' '.' 'constructor'
+    expr-super-constructor ::= 'super' '.' 'init'
   </pre>
 
   <p>The keyword <tt>super</tt> is used to refer to superclass members from
@@ -2779,12 +2779,12 @@ ill-formed if the type does not conform to the protocol.</p>
   <li>A superclass subscript accessor can be accessed with the form
     <tt>super[index]</tt>.</li>
   <li>Within a constructor, a superclass constructor can be accessed with the
-    form <tt>super.constructor</tt>.</li>
+    form <tt>super.init</tt>.</li>
   </ul>
 
   <p><tt>super</tt> expressions are invalid outside of a subclass method.
-  <tt>super.constructor</tt> is invalid outside of a subclass constructor.
-  <tt>super.constructor</tt> furthermore may only be called once per derived
+  <tt>super.init</tt> is invalid outside of a subclass constructor.
+  <tt>super.init</tt> furthermore may only be called once per derived
   constructor, and must be called before the derived constructor accesses
   <tt>self</tt> or any instance variables.
   </p>
