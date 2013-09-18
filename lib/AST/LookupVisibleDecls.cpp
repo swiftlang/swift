@@ -421,7 +421,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         FindLocalVal(SM, Loc, Consumer).visit(AFD->getBody());
       }
 
-      for (auto *P : AFD->getArgParamPatterns())
+      for (auto *P : AFD->getBodyParamPatterns())
         FindLocalVal(SM, Loc, Consumer).checkPattern(P);
 
       if (AFD->getExtensionType()) {
