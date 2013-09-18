@@ -397,7 +397,7 @@ func _backgroundSortNewFilteredMessages(messages : Vector) -&gt; _FilteredListIn
 <p>
 This need not imply a performance penalty with reference counting and
 copy-on-write.  Especially when the argument is a temporary as is the
-case in this example:
+case in this example.
 </p>
 
 <p>
@@ -438,8 +438,8 @@ semantics is that of performance.  One understandably does not want to
 be copying tons of data around. The plan for Swift containers is to
 implement them with the reference-counted copy-on-write idiom.  In doing
 so, the Swift programmer is freed from the tedious task of writing "deep
-copy" functions.  And yet the type behaves just like an
-<code>Int</code>.  And can be passed by reference, just like an
+copy" functions, and yet the type behaves just like an <code>Int</code>.
+ Additionally the type can be passed by reference, just like an
 <code>Int</code>, in the relatively few places where pass-by-reference
 is the desired behavior.
 </p>
