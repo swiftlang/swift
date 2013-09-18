@@ -1,7 +1,38 @@
 2013-09-17
 ----------
 
-* 
+* Constructor syntax has been improved to align better with
+  Objective-C's init methods. The "constructor" keyword has been
+  replaced with "init", and the selector style of declaration used for
+  func declarations is now supported. For example:
+
+    class Y : NSObject {
+      init withInt(i : Int) string(s : String) {
+        super.init() // call superclass initializer
+      }
+    }
+
+  One can use this constructor to create a Y object with, e.g.,
+
+    Y(withInt:17, string:"Hello")
+
+  Additionally, the rules regarding the selector corresponding to such
+  a declaration have been revised. The selector for the above
+  initializer is "initWithInt:string:"; the specific rules are
+  described in the documentation. 
+
+  Finally, Swift initializers now introduce Objective-C entry points,
+  so a declaration such as:
+
+    class X : NSObject {
+      init() {
+        super.init()
+      }
+    }
+
+  Overrides NSObject's '-init' method (which it calls first) as well
+  as introducing the 'allocating' entry point so that one can create a
+  new 'X' instance with the syntax 'X()'.
 
 * Variables in top-level code (i.e. scripts, but not global variables in
   libraries) that lack an initializer now work just like local variables:
