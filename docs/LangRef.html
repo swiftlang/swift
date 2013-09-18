@@ -1136,7 +1136,23 @@ an lvalue unless it has a <code>var-get</code> clause but not
       var x1_area = x1.width*x1.height
       var x1_area2 = x1.area()
     }
-  </pre>    
+  </pre>
+
+  <div class="commentary">
+    Structs do not support inheritance due to undesirable ripple effects across
+    the design of the language. For example, method dispatch would arguably need
+    to become virtual, not static. The storage of the type would arguably need
+    to become indirected so that an array of T could be implemented sanely
+    (because we don't know if T is actually a T, or a subclass of T). We'd need
+    to store the "isa"/vtable in the struct so that virtual method dispatch
+    could be implemented, and this has additional storage costs. None of these
+    tradeoffs make sense for the intended use cases we have in mind for structs
+    (Ints, Floats, Points, Rects, Strings, URLs, Paths, UUIDs, IP addresses,
+    Colors, etc, etc). Said differently: we're trying to force a hard wall
+    between types that need indirect access by their nature and those types
+    that need direct access by their nature. The former are called classes. The
+    latter are called structs.
+  </div>
 
   <!-- ===================================================================== -->
   <h3 id="decl-class">class Declarations</h3>
@@ -1239,7 +1255,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
     read-only or write-only subscript operation or variable. We may
     end up doing this with some kind of 'const' or 'immutable'
     attribute.
- </div>
+  </div>
 
    <!-- _____________________________________________________________________ -->
   <h4 id="protocol-member-typealias">'typealias' protocol elements (associated types)</h4>
