@@ -150,14 +150,6 @@ private:
     llvm_unreachable("unknown offset kind");
   }
 
-  /// Records the use of the given module.
-  ///
-  /// The module's name will be scheduled for serialization if necessary.
-  ///
-  /// \returns The ID for the identifier for the module's name, or 0 for the
-  ///          builtin module.
-  IdentifierID addModuleRef(const Module *M);
-
   /// Returns the declaration the given generic parameter list is associated
   /// with.
   const Decl *getGenericContext(const GenericParamList *paramList);
@@ -291,6 +283,14 @@ public:
   ///
   /// \returns The ID for the given Decl in this module.
   DeclID addDeclRef(const Decl *D);
+
+  /// Records the use of the given module.
+  ///
+  /// The module's name will be scheduled for serialization if necessary.
+  ///
+  /// \returns The ID for the identifier for the module's name, or 0 for the
+  ///          builtin module.
+  IdentifierID addModuleRef(const Module *M);
 };
 } // end namespace serialization
 } // end namespace swift

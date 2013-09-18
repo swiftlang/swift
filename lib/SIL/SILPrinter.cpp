@@ -163,8 +163,11 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   }
 
   case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::AbstractFunctionDecl:
     llvm_unreachable("unhandled context kind in SILPrint!");
+  case DeclContextKind::AbstractFunctionDecl:
+    // FIXME
+    Buffer << "<abstract function>";
+    return;
   }
   llvm_unreachable("bad decl context");
 }

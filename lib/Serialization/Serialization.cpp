@@ -310,6 +310,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(sil_block, SIL_ONE_OPERAND);
   RECORD(sil_block, SIL_ONE_TYPE_ONE_OPERAND);
   RECORD(sil_block, SIL_ONE_TYPE_VALUES);
+  RECORD(sil_block, SIL_TWO_OPERANDS);
   RECORD(sil_block, SIL_INST_APPLY);
   RECORD(sil_block, SIL_INST_TODO);
 

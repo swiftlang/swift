@@ -44,6 +44,7 @@ namespace sil_block {
     SIL_ONE_OPERAND,
     SIL_ONE_TYPE_ONE_OPERAND,
     SIL_ONE_TYPE_VALUES,
+    SIL_TWO_OPERANDS,
     SIL_INST_APPLY,
     SIL_INST_TODO,
     SIL_FUNC_NAMES,
@@ -134,6 +135,20 @@ namespace sil_block {
   using SILOneOperandLayout = BCRecordLayout<
     SIL_ONE_OPERAND,
     SILInstOpCodeField,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    SILValueResultField
+  >;
+
+  // SIL instructions with two typed values.
+  using SILTwoOperandsLayout = BCRecordLayout<
+    SIL_TWO_OPERANDS,
+    SILInstOpCodeField,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    SILValueResultField,
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,

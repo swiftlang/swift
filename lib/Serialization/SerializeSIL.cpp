@@ -95,6 +95,8 @@ namespace {
       static_assert(Layout::Code <= std::tuple_size<AbbrArrayTy>::value,
                     "layout has invalid record code");
       SILAbbrCodes[Layout::Code] = Layout::emitAbbrev(Out);
+      DEBUG(llvm::dbgs() << "SIL abbre code " << SILAbbrCodes[Layout::Code]
+                         << "\n");
     }
 
     void writeSILFunction(const SILFunction &F);
@@ -138,6 +140,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F) {
   InstID = 0;
   unsigned abbrCode = SILAbbrCodes[SILFunctionLayout::Code];
   TypeID FnID = S.addTypeRef(F.getLoweredType().getSwiftType());
+  DEBUG(llvm::dbgs() << "SILFunction @" << Out.GetCurrentBitNo() <<
+        " abbrCode " << abbrCode << " FnID " << FnID << "\n");
   SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                        (unsigned)F.getLinkage(), FnID);
   for (const SILBasicBlock &BB : F)
@@ -219,7 +223,22 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         Args);
     break;
   }
+  case ValueKind::BuiltinFunctionRefInst: {
+    // Format: FuncDecl and type. Use SILOneOperandLayout.
+    const BuiltinFunctionRefInst *BFR = cast<BuiltinFunctionRefInst>(&SI);
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneOperandLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(BFR->getType().getSwiftRValueType()),
+        (unsigned)BFR->getType().getCategory(),
+        S.addDeclRef(BFR->getFunction()), 0);
+    break;
+  }
   case ValueKind::DeallocStackInst:
+  case ValueKind::DestroyAddrInst:
+  case ValueKind::LoadInst:
+  case ValueKind::StrongReleaseInst:
+  case ValueKind::StrongRetainInst:
   case ValueKind::ReturnInst: {
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -243,6 +262,19 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         0);
     break;
   }
+  case ValueKind::IndexRawPointerInst: {
+    const IndexRawPointerInst *IRP = cast<IndexRawPointerInst>(&SI);
+    SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILTwoOperandsLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(IRP->getBase().getType().getSwiftRValueType()),
+        (unsigned)IRP->getBase().getType().getCategory(),
+        addValueRef(IRP->getBase()), IRP->getBase().getResultNumber(),
+        S.addTypeRef(IRP->getIndex().getType().getSwiftRValueType()),
+        (unsigned)IRP->getIndex().getType().getCategory(),
+        addValueRef(IRP->getIndex()), IRP->getIndex().getResultNumber());
+    break;
+  }
   case ValueKind::IntegerLiteralInst: {
     // Use SILOneOperandLayout to specify the type and the literal.
     const IntegerLiteralInst *ILI = cast<IntegerLiteralInst>(&SI);
@@ -263,6 +295,82 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                       (unsigned)SI.getKind(),
                       S.addTypeRef(MI->getType().getSwiftRValueType()),
                       (unsigned)MI->getType().getCategory());
+    break;
+  }
+  case ValueKind::ModuleInst: {
+    // Has IdentifierID for the module reference. Use SILOneTypeLayout.
+    const ModuleInst *MI = cast<ModuleInst>(&SI);
+    ModuleType *MT = MI->getType().castTo<ModuleType>();
+    SILOneTypeLayout::emitRecord(Out, ScratchRecord,
+                      SILAbbrCodes[SILOneTypeLayout::Code],
+                      (unsigned)SI.getKind(),
+                      S.addModuleRef(MT->getModule()), 0);
+    break;
+  }
+  // Conversion instructions.
+  case ValueKind::RefToObjectPointerInst:
+  case ValueKind::UpcastInst:
+  case ValueKind::CoerceInst:
+  case ValueKind::AddressToPointerInst:
+  case ValueKind::PointerToAddressInst:
+  case ValueKind::ObjectPointerToRefInst:
+  case ValueKind::RefToRawPointerInst:
+  case ValueKind::RawPointerToRefInst:
+  case ValueKind::RefToUnownedInst:
+  case ValueKind::UnownedToRefInst: {
+    SILValue operand;
+    SILType Ty;
+    switch (SI.getKind()) {
+    default: assert(0 && "Out of sync with parent switch");
+    case ValueKind::RefToObjectPointerInst:
+      operand = cast<RefToObjectPointerInst>(&SI)->getOperand();
+      Ty = cast<RefToObjectPointerInst>(&SI)->getType();
+      break;
+    case ValueKind::UpcastInst:
+      operand = cast<UpcastInst>(&SI)->getOperand();
+      Ty = cast<UpcastInst>(&SI)->getType();
+      break;
+    case ValueKind::CoerceInst:
+      operand = cast<CoerceInst>(&SI)->getOperand();
+      Ty = cast<CoerceInst>(&SI)->getType();
+      break;
+    case ValueKind::AddressToPointerInst:
+      operand = cast<AddressToPointerInst>(&SI)->getOperand();
+      Ty = cast<AddressToPointerInst>(&SI)->getType();
+      break;
+    case ValueKind::PointerToAddressInst:
+      operand = cast<PointerToAddressInst>(&SI)->getOperand();
+      Ty = cast<PointerToAddressInst>(&SI)->getType();
+      break;
+    case ValueKind::ObjectPointerToRefInst:
+      operand = cast<ObjectPointerToRefInst>(&SI)->getOperand();
+      Ty = cast<ObjectPointerToRefInst>(&SI)->getType();
+      break;
+    case ValueKind::RefToRawPointerInst:
+      operand = cast<RefToRawPointerInst>(&SI)->getOperand();
+      Ty = cast<RefToRawPointerInst>(&SI)->getType();
+      break;
+    case ValueKind::RawPointerToRefInst:
+      operand = cast<RawPointerToRefInst>(&SI)->getOperand();
+      Ty = cast<RawPointerToRefInst>(&SI)->getType();
+      break;
+    case ValueKind::RefToUnownedInst:
+      operand = cast<RefToUnownedInst>(&SI)->getOperand();
+      Ty = cast<RefToUnownedInst>(&SI)->getType();
+      break;
+    case ValueKind::UnownedToRefInst:
+      operand = cast<UnownedToRefInst>(&SI)->getOperand();
+      Ty = cast<UnownedToRefInst>(&SI)->getType();
+      break;
+    }
+    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(Ty.getSwiftRValueType()),
+        (unsigned)Ty.getCategory(),
+        S.addTypeRef(operand.getType().getSwiftRValueType()),
+        (unsigned)operand.getType().getCategory(),
+        addValueRef(operand), operand.getResultNumber());
     break;
   }
   case ValueKind::StoreInst: {
@@ -306,6 +414,32 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(),
         S.addTypeRef(StrI->getType().getSwiftRValueType()),
         (unsigned)StrI->getType().getCategory(), ListOfValues);
+    break;
+  }
+  case ValueKind::TupleElementAddrInst:
+  case ValueKind::TupleExtractInst: {
+    SILValue operand;
+    unsigned FieldNo;
+    switch (SI.getKind()) {
+    default: assert(0 && "Out of sync with parent switch");
+    case ValueKind::TupleElementAddrInst:
+      operand = cast<TupleElementAddrInst>(&SI)->getOperand();
+      FieldNo = cast<TupleElementAddrInst>(&SI)->getFieldNo();
+      break;
+    case ValueKind::TupleExtractInst:
+      operand = cast<TupleExtractInst>(&SI)->getOperand();
+      FieldNo = cast<TupleExtractInst>(&SI)->getFieldNo();
+      break;
+    }
+
+    // Use OneTypeOneOperand layout where the field number is stored in TypeID.
+    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
+        (unsigned)SI.getKind(),
+        FieldNo, 0,
+        S.addTypeRef(operand.getType().getSwiftRValueType()),
+        (unsigned)operand.getType().getCategory(),
+        addValueRef(operand), operand.getResultNumber());
     break;
   }
   case ValueKind::TupleInst: {
@@ -372,6 +506,7 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
     registerSILAbbr<SILOneOperandLayout>();
     registerSILAbbr<SILOneTypeOneOperandLayout>();
     registerSILAbbr<SILOneTypeValuesLayout>();
+    registerSILAbbr<SILTwoOperandsLayout>();
     registerSILAbbr<SILInstApplyLayout>();
     registerSILAbbr<SILInstTodoLayout>();
 

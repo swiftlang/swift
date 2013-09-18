@@ -258,12 +258,6 @@ private:
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclID DID);
 
-  /// Returns the appropriate module for the given name.
-  ///
-  /// If the name matches the name of the current module, a shadowed module
-  /// is loaded instead. An empty name represents the Builtin module.
-  Module *getModule(Identifier name);
-
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
 
@@ -389,6 +383,12 @@ public:
   Decl *getDecl(serialization::DeclID DID,
                 Optional<DeclContext *> ForcedContext = {},
                 std::function<void(Decl*)> DidRecord = nullptr);
+
+  /// Returns the appropriate module for the given name.
+  ///
+  /// If the name matches the name of the current module, a shadowed module
+  /// is loaded instead. An empty name represents the Builtin module.
+  Module *getModule(Identifier name);
 };
 
 class SerializedModule : public LoadedModule {
