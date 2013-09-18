@@ -997,7 +997,7 @@ ConstructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
     // type, we're done: don't add the trailing colon.
     if (tuple->getNumFields() == 1) {
       auto emptyTupleTy = TupleType::getEmpty(getASTContext());
-      if (!firstPattern->getType()->isEqual(emptyTupleTy));
+      if (!firstPattern->getType()->isEqual(emptyTupleTy))
         out << ':';
       return out.str();
     }
