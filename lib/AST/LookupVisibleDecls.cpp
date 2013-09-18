@@ -424,6 +424,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       for (auto *P : AFD->getBodyParamPatterns())
         FindLocalVal(SM, Loc, Consumer).checkPattern(P);
 
+      // Constructors and destructors don't have 'self' in parameter patterns.
+      if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD))
+        Consumer.foundDecl(AFD->getImplicitSelfDecl());
+
       if (AFD->getExtensionType()) {
         ExtendedType = AFD->getExtensionType();
         BaseDecl = AFD->getImplicitSelfDecl();
