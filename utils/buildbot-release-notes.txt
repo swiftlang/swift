@@ -36,7 +36,7 @@
 
 * Variables in top-level code (i.e. scripts, but not global variables in
   libraries) that lack an initializer now work just like local variables:
-  them must be explicitly assigned to sometime before any use, instead of
+  they must be explicitly assigned-to sometime before any use, instead of
   being default constructed.  Instance variables are still on the TODO 
   list.
 
