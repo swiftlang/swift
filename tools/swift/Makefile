@@ -20,7 +20,7 @@ TOOLNAME = swift
 include $(SWIFT_LEVEL)/../../Makefile.config
 
 # Embed an SDK path into the driver
-CXXFLAGS += -DSWIFT_MODULES_SDK="\"$(SWIFT_SDK)\""
+CXXFLAGS += -DSWIFT_MODULES_SDK="\"$(MODULES_SDK)\""
 
 # $(TARGETS_TO_BUILD) and ipo are necessary for code generation. bitwriter is
 # necessary to write out a .bc file. jit and linker are used for

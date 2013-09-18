@@ -54,17 +54,17 @@ ifndef SWIFT_COMPILER
   SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
 endif
 
-ifndef SWIFT_SDK
+ifndef MODULES_SDK
   ifdef SDKROOT
-    SWIFT_SDK := $(SDKROOT)
+    MODULES_SDK := $(SDKROOT)
   else ifneq ($(findstring -darwin_ios,$(TARGET_TRIPLE)),)
-      SWIFT_SDK := $(shell xcrun --sdk iphoneos --show-sdk-path)
+      MODULES_SDK := $(shell xcrun --sdk iphoneos --show-sdk-path)
   else ifneq ($(findstring -darwin_sim,$(TARGET_TRIPLE)),)
-      SWIFT_SDK := $(shell xcrun --sdk iphonesimulator --show-sdk-path)
+      MODULES_SDK := $(shell xcrun --sdk iphonesimulator --show-sdk-path)
   else ifneq ($(findstring -darwin,$(TARGET_TRIPLE)),)
-    SWIFT_SDK := $(shell xcrun --sdk macosx --show-sdk-path)
+    MODULES_SDK := $(shell xcrun --sdk macosx --show-sdk-path)
   else
-    SWIFT_SDK := 
+    MODULES_SDK := 
   endif
 endif
 
@@ -91,7 +91,7 @@ else
 endif
 
 # All options for .swift files
-SWIFT_FLAGS := $(SWIFT_DEBUGFLAG) $(SWIFT_OPTFLAG) -triple $(TARGET_TRIPLE) -I=$(SWIFT_HEADER_DIR) -sdk=$(SWIFT_SDK)
+SWIFT_FLAGS := $(SWIFT_DEBUGFLAG) $(SWIFT_OPTFLAG) -triple $(TARGET_TRIPLE) -I=$(SWIFT_HEADER_DIR) -sdk=$(MODULES_SDK)
 
 
 ###
