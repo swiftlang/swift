@@ -84,6 +84,7 @@ namespace sil_block {
   using SILOneValueOneOperandLayout = BCRecordLayout<
     SIL_ONE_VALUE_ONE_OPERAND,
     SILInstOpCodeField,
+    BCFixed<2>,          // Optional attributes
     ValueIDField,
     SILValueResultField,
     TypeIDField,

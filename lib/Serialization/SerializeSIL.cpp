@@ -182,17 +182,45 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                   (unsigned)SI.getKind());
     break;
   }
+  case ValueKind::DeallocBoxInst:
+  case ValueKind::ArchetypeMetatypeInst:
+  case ValueKind::ClassMetatypeInst:
+  case ValueKind::ProtocolMetatypeInst:
   case ValueKind::AllocArrayInst: {
-    const AllocArrayInst *AAI = cast<AllocArrayInst>(&SI);
+    SILValue operand;
+    SILType Ty;
+    switch (SI.getKind()) {
+    default: assert(0 && "Out of sync with parent switch");
+    case ValueKind::ArchetypeMetatypeInst:
+      operand = cast<ArchetypeMetatypeInst>(&SI)->getOperand();
+      Ty = cast<ArchetypeMetatypeInst>(&SI)->getType();
+      break;
+    case ValueKind::ClassMetatypeInst:
+      operand = cast<ClassMetatypeInst>(&SI)->getOperand();
+      Ty = cast<ClassMetatypeInst>(&SI)->getType();
+      break;
+    case ValueKind::ProtocolMetatypeInst:
+      operand = cast<ProtocolMetatypeInst>(&SI)->getOperand();
+      Ty = cast<ProtocolMetatypeInst>(&SI)->getType();
+      break;
+    case ValueKind::DeallocBoxInst:
+      operand = cast<DeallocBoxInst>(&SI)->getOperand();
+      Ty = cast<DeallocBoxInst>(&SI)->getElementType();
+      break;
+    case ValueKind::AllocArrayInst:
+      operand = cast<AllocArrayInst>(&SI)->getNumElements();
+      Ty = cast<AllocArrayInst>(&SI)->getElementType();
+      break;
+    }
     unsigned abbrCode = SILAbbrCodes[SILOneTypeOneOperandLayout::Code];
     SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
         (unsigned)SI.getKind(), 0,
-        S.addTypeRef(AAI->getElementType().getSwiftRValueType()),
-        (unsigned)AAI->getElementType().getCategory(),
-        S.addTypeRef(AAI->getNumElements().getType().getSwiftRValueType()),
-        (unsigned)AAI->getNumElements().getType().getCategory(),
-        addValueRef(AAI->getNumElements()),
-        AAI->getNumElements().getResultNumber());
+        S.addTypeRef(Ty.getSwiftRValueType()),
+        (unsigned)Ty.getCategory(),
+        S.addTypeRef(operand.getType().getSwiftRValueType()),
+        (unsigned)operand.getType().getCategory(),
+        addValueRef(operand),
+        operand.getResultNumber());
     break;
   }
   case ValueKind::AllocBoxInst: {
@@ -202,6 +230,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                       (unsigned)SI.getKind(),
                       S.addTypeRef(ABI->getElementType().getSwiftRValueType()),
                       (unsigned)ABI->getElementType().getCategory());
+    break;
+  }
+  case ValueKind::AllocRefInst: {
+    const AllocRefInst *ARI = cast<AllocRefInst>(&SI);
+    unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
+    SILOneTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                      (unsigned)SI.getKind(),
+                      S.addTypeRef(ARI->getType().getSwiftRValueType()),
+                      (unsigned)ARI->getType().getCategory());
     break;
   }
   case ValueKind::AllocStackInst: {
@@ -260,6 +297,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::DeallocStackInst:
+  case ValueKind::DeallocRefInst:
   case ValueKind::DestroyAddrInst:
   case ValueKind::LoadInst:
   case ValueKind::LoadWeakInst:
@@ -525,16 +563,32 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         addValueRef(operand), operand.getResultNumber());
     break;
   }
-  case ValueKind::StoreInst: {
-    const StoreInst *StI = cast<StoreInst>(&SI);
+  case ValueKind::AssignInst:
+  case ValueKind::StoreInst:
+  case ValueKind::StoreWeakInst: {
+    SILValue operand, value;
+    unsigned Attr = 0;
+    if (SI.getKind() == ValueKind::StoreWeakInst) {
+      Attr = cast<StoreWeakInst>(&SI)->isInitializationOfDest();
+      operand = cast<StoreWeakInst>(&SI)->getDest();
+      value = cast<StoreWeakInst>(&SI)->getSrc();
+    } else if (SI.getKind() == ValueKind::StoreInst) {
+      operand = cast<StoreInst>(&SI)->getDest();
+      value = cast<StoreInst>(&SI)->getSrc();
+    } else if (SI.getKind() == ValueKind::AssignInst) {
+      operand = cast<AssignInst>(&SI)->getDest();
+      value = cast<AssignInst>(&SI)->getSrc();
+    } else
+      llvm_unreachable("switch out of sync");
+
     unsigned abbrCode = SILAbbrCodes[SILOneValueOneOperandLayout::Code];
     SILOneValueOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                  (unsigned)SI.getKind(), addValueRef(StI->getSrc()),
-                  StI->getSrc().getResultNumber(),
-                  S.addTypeRef(StI->getDest().getType().getSwiftRValueType()),
-                  (unsigned)StI->getDest().getType().getCategory(),
-                  addValueRef(StI->getDest()),
-                  StI->getDest().getResultNumber());
+                  (unsigned)SI.getKind(), Attr, addValueRef(value),
+                  value.getResultNumber(),
+                  S.addTypeRef(operand.getType().getSwiftRValueType()),
+                  (unsigned)operand.getType().getCategory(),
+                  addValueRef(operand),
+                  operand.getResultNumber());
     break;
   }
   case ValueKind::StructExtractInst: {
@@ -543,7 +597,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     const StructExtractInst *SEI = cast<StructExtractInst>(&SI);
     SILOneValueOneOperandLayout::emitRecord(Out, ScratchRecord, 
         SILAbbrCodes[SILOneValueOneOperandLayout::Code],
-        (unsigned)SI.getKind(), S.addDeclRef(SEI->getField()), 0,
+        (unsigned)SI.getKind(), 0, S.addDeclRef(SEI->getField()), 0,
         S.addTypeRef(SEI->getOperand().getType().getSwiftRValueType()),
         (unsigned)SEI->getOperand().getType().getCategory(),
         addValueRef(SEI->getOperand()), SEI->getOperand().getResultNumber());

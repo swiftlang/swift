@@ -268,7 +268,7 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
   default:
     assert(0 && "Record kind for a SIL instruction is not supported.");
   case SIL_ONE_VALUE_ONE_OPERAND:
-    SILOneValueOneOperandLayout::readRecord(scratch, OpCode,
+    SILOneValueOneOperandLayout::readRecord(scratch, OpCode, Attr,
                                             ValID, ValResNum, TyID, TyCategory,
                                             ValID2, ValResNum2);
     break;
@@ -316,13 +316,33 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
   case ValueKind::SILArgument:
     llvm_unreachable("not an instruction");
 
+  case ValueKind::DeallocBoxInst:
+  case ValueKind::ArchetypeMetatypeInst:
+  case ValueKind::ClassMetatypeInst:
+  case ValueKind::ProtocolMetatypeInst:
   case ValueKind::AllocArrayInst: {
-    auto Ty = MF->getType(TyID);
+    auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Ty2 = MF->getType(TyID2);
-    ResultVal = Builder.createAllocArray(Loc,
-        getSILType(Ty, (SILValueCategory)TyCategory),
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty2, (SILValueCategory)TyCategory2)));
+    SILValue operand = getLocalValue(ValID, ValResNum,
+                         getSILType(Ty2, (SILValueCategory)TyCategory2));
+    switch ((ValueKind)OpCode) {
+    default: assert(0 && "Out of sync with parent switch");
+    case ValueKind::ArchetypeMetatypeInst:
+      ResultVal = Builder.createArchetypeMetatype(Loc, Ty, operand);
+      break;
+    case ValueKind::ClassMetatypeInst:
+      ResultVal = Builder.createClassMetatype(Loc, Ty, operand);
+      break;
+    case ValueKind::ProtocolMetatypeInst:
+      ResultVal = Builder.createProtocolMetatype(Loc, Ty, operand);
+      break;
+    case ValueKind::DeallocBoxInst:
+      ResultVal = Builder.createDeallocBox(Loc, Ty, operand);
+      break;
+    case ValueKind::AllocArrayInst:
+      ResultVal = Builder.createAllocArray(Loc, Ty, operand);
+      break;
+    }
     break;
   }
   case ValueKind::AllocBoxInst: {
@@ -334,6 +354,12 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
   case ValueKind::AllocStackInst: {
     auto Ty = MF->getType(TyID);
     ResultVal = Builder.createAllocStack(Loc,
+                            getSILType(Ty, (SILValueCategory)TyCategory));
+    break;
+  }
+  case ValueKind::AllocRefInst: {
+    auto Ty = MF->getType(TyID);
+    ResultVal = Builder.createAllocRef(Loc,
                             getSILType(Ty, (SILValueCategory)TyCategory));
     break;
   }
@@ -399,6 +425,13 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
   case ValueKind::DeallocStackInst: {
     auto Ty = MF->getType(TyID);
     ResultVal = Builder.createDeallocStack(Loc,
+        getLocalValue(ValID, ValResNum,
+                      getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
+  case ValueKind::DeallocRefInst: {
+    auto Ty = MF->getType(TyID);
+    ResultVal = Builder.createDeallocRef(Loc,
         getLocalValue(ValID, ValResNum,
                       getSILType(Ty, (SILValueCategory)TyCategory)));
     break;
@@ -638,6 +671,27 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
     SILType ValType = addrType.getObjectType();
     ResultVal = Builder.createStore(Loc,
+                    getLocalValue(ValID, ValResNum, ValType),
+                    getLocalValue(ValID2, ValResNum2, addrType));
+    break;
+  }
+  case ValueKind::StoreWeakInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
+    auto refType = addrType.getAs<WeakStorageType>();
+    auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType());
+    bool isInit = (Attr > 0);
+    ResultVal = Builder.createStoreWeak(Loc,
+                    getLocalValue(ValID, ValResNum, ValType),
+                    getLocalValue(ValID2, ValResNum2, addrType),
+                    IsInitialization_t(isInit));
+    break;
+  }
+  case ValueKind::AssignInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
+    SILType ValType = addrType.getObjectType();
+    ResultVal = Builder.createAssign(Loc,
                     getLocalValue(ValID, ValResNum, ValType),
                     getLocalValue(ValID2, ValResNum2, addrType));
     break;
