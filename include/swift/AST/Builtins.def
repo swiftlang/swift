@@ -131,7 +131,7 @@ BUILTIN_SIL_OPERATION(Destroy, "destroy", Special)
 BUILTIN_SIL_OPERATION(Assign, "assign", Special)
 
 /// Init has type (T, Builtin.RawPointer) -> ()
-BUILTIN_SIL_OPERATION(Init, "init", Special)
+BUILTIN_SIL_OPERATION(Init, "initialize", Special)
 
 /// CastToObjectPointer has type (T) -> Builtin.ObjectPointer.
 BUILTIN_SIL_OPERATION(CastToObjectPointer, "castToObjectPointer", Special)
