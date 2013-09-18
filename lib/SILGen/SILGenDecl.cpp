@@ -706,6 +706,19 @@ bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
   return false;
 }
 
+bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
+  // We don't export generic methods or subclasses to Objective-C yet.
+  if (constructor->getType()->is<PolymorphicFunctionType>()
+      || constructor->getType()->castTo<AnyFunctionType>()
+            ->getResult()->is<PolymorphicFunctionType>()
+      || (constructor->getDeclContext()->getDeclaredTypeInContext()
+          && constructor->getDeclContext()->getDeclaredTypeInContext()
+               ->is<BoundGenericType>()))
+    return false;
+
+  return constructor->isObjC();
+}
+
 bool SILGenModule::requiresObjCPropertyEntryPoints(VarDecl *property) {
   // We don't export generic methods or subclasses to IRGen yet.
   if (property->getDeclContext()->getDeclaredTypeInContext()
@@ -731,6 +744,8 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
     return true;
   if (auto *fd = dyn_cast<FuncDecl>(vd))
     return requiresObjCMethodEntryPoint(fd);
+  if (auto *cd = dyn_cast<ConstructorDecl>(vd))
+    return requiresObjCMethodEntryPoint(cd);
   if (auto *pd = dyn_cast<VarDecl>(vd))
     return requiresObjCPropertyEntryPoints(pd);
   return vd->isObjC();
@@ -787,6 +802,10 @@ public:
   }
   void visitConstructorDecl(ConstructorDecl *cd) {
     SGM.emitConstructor(cd);
+
+    if (SGM.requiresObjCMethodEntryPoint(cd) &&
+        !isa<ProtocolDecl>(cd->getDeclContext()))
+      SGM.emitObjCConstructorThunk(cd);
   }
   void visitDestructorDecl(DestructorDecl *dd) {
     // Save the destructor decl so we can use it to generate the destructor later.

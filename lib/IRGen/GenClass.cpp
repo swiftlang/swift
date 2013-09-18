@@ -839,6 +839,13 @@ namespace {
       }
     }
 
+    /// Constructors need to be collected into the appropriate methods list.
+    void visitConstructorDecl(ConstructorDecl *constructor) {
+      if (!requiresObjCMethodDescriptor(constructor)) return;
+      llvm::Constant *entry = emitObjCMethodDescriptor(IGM, constructor);
+      InstanceMethods.push_back(entry);
+    }
+
   private:
     llvm::Constant *buildClassMethodList()  {
       return buildMethodList(ClassMethods, TheExtension
@@ -1125,11 +1132,6 @@ namespace {
 
     /// Subscripts should probably be collected in extended metadata.
     void visitSubscriptDecl(SubscriptDecl *subscript) {
-      // TODO
-    }
-
-    /// Constructors should probably be collected in extended metadata.
-    void visitConstructorDecl(ConstructorDecl *ctor) {
       // TODO
     }
 

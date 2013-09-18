@@ -536,7 +536,7 @@ static llvm::Function *findSwiftAsObjCThunk(IRGenModule &IGM, StringRef name) {
 /// given Swift implementation, at the given explosion and uncurry levels.
 static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
                                                   const Selector &selector,
-                                                  FuncDecl *method,
+                                                  AbstractFunctionDecl *method,
                                                   llvm::Function *swiftImpl,
                                                   ExplosionKind explosionLevel,
                                                   unsigned uncurryLevel) {
@@ -626,6 +626,24 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
                                           uncurryLevel);
 }
 
+/// Produce a function pointer, suitable for invocation by
+/// objc_msgSend, for the given constructor implementation.
+///
+/// Returns a value of type i8*.
+static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
+                                            const Selector &selector,
+                                            ConstructorDecl *constructor) {
+  auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, constructor);
+  llvm::Function *swiftImpl
+    = IGM.getAddrOfConstructor(constructor, ConstructorKind::Initializing,
+                               absCallee.getBestExplosionLevel());
+
+  return getObjCMethodPointerForSwiftImpl(IGM, selector, constructor,
+                                          swiftImpl,
+                                          absCallee.getBestExplosionLevel(),
+                                          absCallee.getMaxUncurryLevel());
+}
+
 /// True if the value is of class type, or of a type that is bridged to class
 /// type.
 bool irgen::hasObjCClassRepresentation(IRGenModule &IGM, Type t) {
@@ -662,7 +680,7 @@ static const char * const SetterMethodSignature = "v@:@";
 /// Emit the components of an Objective-C method descriptor: its selector,
 /// type encoding, and IMP pointer.
 void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
-                                          FuncDecl *method,
+                                          AbstractFunctionDecl *method,
                                           llvm::Constant *&selectorRef,
                                           llvm::Constant *&atEncoding,
                                           llvm::Constant *&impl) {
@@ -685,7 +703,10 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
     atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   
   /// The third element is the method implementation pointer.
-  impl = getObjCMethodPointer(IGM, selector, method);
+  if (auto func = dyn_cast<FuncDecl>(method))
+    impl = getObjCMethodPointer(IGM, selector, func);
+  else
+    impl = getObjCMethodPointer(IGM, selector, cast<ConstructorDecl>(method));
 }
 
 /// Emit the components of an Objective-C method descriptor for a
@@ -731,7 +752,7 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
 ///   IMP imp;
 /// };
 llvm::Constant *irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
-                                                FuncDecl *method) {
+                                                AbstractFunctionDecl *method) {
   llvm::Constant *selectorRef, *atEncoding, *impl;
   emitObjCMethodDescriptorParts(IGM, method,
                                 selectorRef, atEncoding, impl);
@@ -785,6 +806,19 @@ bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
   if (auto override = method->getOverriddenDecl())
     return requiresObjCMethodDescriptor(override);
   return false;
+}
+
+bool irgen::requiresObjCMethodDescriptor(ConstructorDecl *constructor) {
+  // We don't export generic methods or subclasses to IRGen yet.
+  // FIXME: Total hack. Sema should filter these out.
+  if (constructor->getType()->is<PolymorphicFunctionType>()
+      || constructor->getType()->getAs<AnyFunctionType>()
+           ->getResult()->is<PolymorphicFunctionType>()
+      || constructor->getDeclContext()->getDeclaredTypeInContext()
+           ->is<BoundGenericType>())
+    return false;
+
+  return constructor->isObjC();
 }
 
 bool irgen::requiresObjCPropertyDescriptor(VarDecl *property) {

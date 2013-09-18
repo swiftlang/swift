@@ -492,6 +492,20 @@ void SILGenModule::emitObjCPropertyMethodThunks(VarDecl *prop) {
   postEmitFunction(setter, f);
 }
 
+void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
+  SILDeclRef thunk(constructor,
+                   SILDeclRef::Kind::Initializer,
+                   SILDeclRef::ConstructAtNaturalUncurryLevel,
+                   /*isObjC*/ true);
+
+  // Don't emit the thunk if it already exists.
+  if (hasFunction(thunk))
+    return;
+  SILFunction *f = preEmitFunction(thunk, constructor, constructor);
+  SILGenFunction(*this, *f).emitObjCMethodThunk(thunk);
+  postEmitFunction(thunk, f);
+}
+
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
   // Emit initializers for variables in top-level code.
   // FIXME: Global initialization order?!

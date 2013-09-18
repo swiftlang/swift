@@ -52,6 +52,9 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::Func:
     return getSelectorFamily(c.getDecl()->getName());
 
+  case SILDeclRef::Kind::Initializer:
+    return SelectorFamily::Init;
+
   case SILDeclRef::Kind::Getter:
     // Getter selectors can belong to families if their name begins with the
     // wrong thing.
@@ -65,7 +68,6 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   /// Currently IRGen wraps alloc/init methods into Swift constructors
   /// with Swift conventions.
   case SILDeclRef::Kind::Allocator:
-  case SILDeclRef::Kind::Initializer:
   /// These constants don't correspond to method families we care about yet.
   case SILDeclRef::Kind::UnionElement:
   case SILDeclRef::Kind::Destroyer:
@@ -83,6 +85,11 @@ static const clang::Decl *findClangMethod(ValueDecl *method) {
     
     if (auto overridden = methodFn->getOverriddenDecl())
       return findClangMethod(overridden);
+  }
+
+  if (ConstructorDecl *constructor = dyn_cast<ConstructorDecl>(method)) {
+    if (auto *decl = constructor->getClangDecl())
+      return decl;
   }
   
   return nullptr;

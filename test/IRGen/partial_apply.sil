@@ -14,6 +14,19 @@ class [objc] ObjCClass {
   func method(x:Builtin.Int64) {}
 }
 
+sil @_TCSo9ObjCClasscfMS_FT_S_ : $[cc(method), thin] ((), ObjCClass) -> ObjCClass {
+bb0(%0 : $ObjCClass):
+  return %0 : $ObjCClass
+}
+
+sil @_TToCSo9ObjCClasscfMS_FT_S_ : $[cc(objc_method), thin] ((), ObjCClass) -> ObjCClass {
+bb0(%0 : $ObjCClass):
+  // function_ref ObjectiveC.ObjCClass.constructor (ObjectiveC.ObjCClass.metatype)() -> ObjectiveC.ObjCClass
+  %1 = function_ref @_TCSo9ObjCClasscfMS_FT_S_ : $[cc(method), thin] ((), ObjCClass) -> ObjCClass // user: %2
+  %2 = apply %1(%0) : $[cc(method), thin] ((), ObjCClass) -> ObjCClass // user: %3
+  return %2 : $ObjCClass
+}
+
 sil @_TToCSo9ObjCClass6methodfS_FT1xBi64__T_ : $[cc(objc_method), thin] ((x : Builtin.Int64), ObjCClass) -> () {
 entry(%x : $Builtin.Int64, %c : $ObjCClass):
   %v = tuple()

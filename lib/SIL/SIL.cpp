@@ -157,6 +157,9 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
       loc = cd;
       kind = Kind::Allocator;
       naturalUncurryLevel = 1;
+
+      // FIXME: Should we require the caller to think about this?
+      asObjC = false;
     }
     // Map UnionElementDecls to the UnionElement SILDeclRef of the element.
     else if (UnionElementDecl *ed = dyn_cast<UnionElementDecl>(vd)) {

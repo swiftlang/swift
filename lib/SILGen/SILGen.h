@@ -167,11 +167,18 @@ public:
   /// Emit the ObjC-compatible getter and setter for an instance variable or
   /// property.
   void emitObjCPropertyMethodThunks(VarDecl *prop);
-  
+
+  /// Emit the ObjC-compatible entry point for a constructor.
+  void emitObjCConstructorThunk(ConstructorDecl *constructor);
+
   /// True if the given function requires an entry point for ObjC method
   /// dispatch.
   bool requiresObjCMethodEntryPoint(FuncDecl *method);
-  
+
+  /// True if the given constructor requires an entry point for ObjC method
+  /// dispatch.
+  bool requiresObjCMethodEntryPoint(ConstructorDecl *constructor);
+
   /// True if the given property requires entry points for ObjC property method
   /// dispatch.
   bool requiresObjCPropertyEntryPoints(VarDecl *property);

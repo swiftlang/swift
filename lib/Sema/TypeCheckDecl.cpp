@@ -1584,6 +1584,19 @@ public:
       }
     }
 
+    // A method is ObjC-compatible if it's explicitly [objc], a member of an
+    // ObjC-compatible class, or an accessor for an ObjC property.
+    DeclContext *dc = CD->getDeclContext();
+    if (dc && dc->getDeclaredTypeInContext()) {
+      ClassDecl *classContext = dc->getDeclaredTypeInContext()
+                                  ->getClassOrBoundGenericClass();
+      ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(dc);
+      bool isObjC = CD->getAttrs().isObjC()
+        || (classContext && classContext->isObjC())
+        || (protocolContext && protocolContext->isObjC());
+      CD->setIsObjC(isObjC);
+    }
+
     validateAttributes(CD);
   }
 
@@ -2066,6 +2079,8 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     } else if (isa<FuncDecl>(VD) && isInClassContext(VD)) {
       if (isOperator)
         error = diag::invalid_objc_decl;
+    } else if (isa<ConstructorDecl>(VD) && isInClassContext(VD)) {
+      /* ok */
     } else if (isa<VarDecl>(VD) && isInClassContext(VD)) {
       /* ok */
     } else if (auto *protocol = dyn_cast<ProtocolDecl>(VD)) {

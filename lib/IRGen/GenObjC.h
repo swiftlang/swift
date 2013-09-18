@@ -71,9 +71,9 @@ namespace irgen {
                                               llvm::Value *value);
 
   /// Build the components of an Objective-C method descriptor for the given
-  /// method implementation.
+  /// method or constructor implementation.
   void emitObjCMethodDescriptorParts(IRGenModule &IGM,
-                                     FuncDecl *method,
+                                     AbstractFunctionDecl *method,
                                      llvm::Constant *&selectorRef,
                                      llvm::Constant *&atEncoding,
                                      llvm::Constant *&impl);
@@ -94,9 +94,10 @@ namespace irgen {
                                      llvm::Constant *&atEncoding,
                                      llvm::Constant *&impl);
 
-  /// Build an Objective-C method descriptor for the given method
+  /// Build an Objective-C method descriptor for the given method or constructor
   /// implementation.
-  llvm::Constant *emitObjCMethodDescriptor(IRGenModule &IGM, FuncDecl *method);
+  llvm::Constant *emitObjCMethodDescriptor(IRGenModule &IGM,
+                                           AbstractFunctionDecl *method);
   
   /// Build an Objective-C method descriptor for the given property's
   /// getter and setter methods.
@@ -105,6 +106,9 @@ namespace irgen {
 
   /// True if the FuncDecl requires an ObjC method descriptor.
   bool requiresObjCMethodDescriptor(FuncDecl *method);
+
+  /// True if the ConstructorDecl requires an ObjC method descriptor.
+  bool requiresObjCMethodDescriptor(ConstructorDecl *constructor);
 
   /// True if the VarDecl requires ObjC accessor methods and a property
   /// descriptor.

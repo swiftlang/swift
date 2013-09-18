@@ -175,7 +175,27 @@ public:
     
     IGF.Builder.CreateCall(class_replaceMethod, args);
   }
-  
+
+  void visitConstructorDecl(ConstructorDecl *constructor) {
+    if (!requiresObjCMethodDescriptor(constructor)) return;
+    llvm::Constant *name, *imp, *types;
+    emitObjCMethodDescriptorParts(IGF.IGM, constructor, name, types, imp);
+
+    // When generating JIT'd code, we need to call sel_registerName() to force
+    // the runtime to unique the selector.
+    llvm::Value *sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
+                                              name);
+
+    llvm::Value *args[] = {
+      classMetadata,
+      sel,
+      imp,
+      types
+    };
+
+    IGF.Builder.CreateCall(class_replaceMethod, args);
+  }
+
   void visitVarDecl(VarDecl *prop) {
     if (!requiresObjCPropertyDescriptor(prop)) return;
     
@@ -1494,6 +1514,14 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     for (auto member : ext->getMembers()) {
       if (auto func = dyn_cast<FuncDecl>(member)) {
         if (requiresObjCMethodDescriptor(func)) {
+          needsCategory = true;
+          break;
+        }
+        continue;
+      }
+
+      if (auto constructor = dyn_cast<ConstructorDecl>(member)) {
+        if (requiresObjCMethodDescriptor(constructor)) {
           needsCategory = true;
           break;
         }
