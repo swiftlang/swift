@@ -1159,7 +1159,19 @@ namespace {
                                      expr->getConstructorLoc(),
                                      ctor->getInitializerType());
       if (auto polyFn = ctorRef->getType()->getAs<PolymorphicFunctionType>()) {
-        ctorRef = solution.specialize(ctorRef, polyFn, selected.second);
+        auto &ctx = cs.getASTContext();
+
+        // Add the type of 'self' back on to the opened type of the overload.
+        // FIXME: Feels like a hack.
+        auto specializedType = selected.second;
+        auto selfType = specializedType->castTo<AnyFunctionType>()->getResult();
+        if (!selfType->hasReferenceSemantics())
+          selfType = LValueType::get(selfType,
+                                     LValueType::Qual::DefaultForMemberAccess,
+                                     ctx);
+        specializedType = FunctionType::get(selfType, specializedType, ctx);
+
+        ctorRef = solution.specialize(ctorRef, polyFn, specializedType);
       }
 
       auto *call

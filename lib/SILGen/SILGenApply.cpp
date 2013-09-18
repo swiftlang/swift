@@ -715,6 +715,10 @@ public:
     // The callee for a super call has to be either a method or constructor.
     Expr *fn = apply->getFn();
     SILDeclRef constant;
+    SpecializeExpr *specialize = dyn_cast<SpecializeExpr>(fn);
+    if (specialize)
+      fn = specialize->getSubExpr();
+
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
       constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
@@ -745,6 +749,9 @@ public:
       // Native Swift super calls are direct.
       setCallee(Callee::forDirect(gen, constant, fn));
     }
+
+    if (specialize)
+      callee->addSubstitutions(gen, specialize, callDepth-1);
   }
   
   Callee getCallee() {

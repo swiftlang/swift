@@ -856,19 +856,19 @@ namespace {
       DeclContext *typeContext = selfDecl->getDeclContext()->getParent();
       assert(typeContext && "constructor without parent context?!");
       auto &tc = CS.getTypeChecker();
-      const ClassType *classType
-        = typeContext->getDeclaredTypeInContext()->getAs<ClassType>();
-      if (!classType) {
+      ClassDecl *classDecl = typeContext->getDeclaredTypeInContext()
+                               ->getClassOrBoundGenericClass();
+      if (!classDecl) {
         tc.diagnose(diagLoc, diag_not_in_class);
         return Type();
       }
-      ClassDecl *classDecl = classType->getDecl();
       if (!classDecl->hasSuperclass()) {
         tc.diagnose(diagLoc, diag_no_base_class);
         return Type();
       }
 
-      Type superclassTy = classDecl->getSuperclass();
+      Type superclassTy = typeContext->getDeclaredTypeInContext()
+                            ->getSuperclass(&tc);
       if (selfDecl->getType()->is<MetaTypeType>())
         superclassTy = MetaTypeType::get(superclassTy, CS.getASTContext());
       return superclassTy;

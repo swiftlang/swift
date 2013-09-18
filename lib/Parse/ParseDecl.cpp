@@ -2083,28 +2083,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
       Status.setIsParseError();
   }
 
-  bool hasConstructor = false;
-  for (Decl *Member : MemberDecls) {
-    if (isa<ConstructorDecl>(Member))
-      hasConstructor = true;
-  }
-
-  if (!hasConstructor) {
-    VarDecl *SelfDecl
-      = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
-                              Type(), CD);
-    Pattern *Arguments = TuplePattern::create(Context, SourceLoc(),
-                                              ArrayRef<TuplePatternElt>(),
-                                              SourceLoc());
-    ConstructorDecl *Constructor =
-        new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
-                                      SourceLoc(), Arguments, Arguments,
-                                      SelfDecl, nullptr, CD);
-    Constructor->setImplicit();
-    SelfDecl->setDeclContext(Constructor);
-    MemberDecls.push_back(Constructor);
-  }
-
   CD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
   addToScope(CD);
 
