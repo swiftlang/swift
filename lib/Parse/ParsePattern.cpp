@@ -362,9 +362,7 @@ ParserStatus Parser::parseConstructorArguments(Pattern *&ArgPattern,
     ArgPattern = TuplePattern::createSimple(Context, Tok.getLoc(), {},
                                             Tok.getLoc());
     BodyPattern = ArgPattern->clone(Context);
-    ParserStatus status;
-    status.setIsParseError();
-    return status;
+    return makeParserError();
   }
 
   // We have the start of a binding name, so this is a selector-style
