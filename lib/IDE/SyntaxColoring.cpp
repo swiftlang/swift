@@ -93,9 +93,11 @@ public:
 
   void visitTranslationUnit(TranslationUnit &TU, ArrayRef<SyntaxNode> Tokens);
 
+  bool walkToDeclPre(Decl *D) override;
   bool walkToTypeReprPre(TypeRepr *T) override;
 
 private:
+  bool passTypeRepr(TypeRepr *T);
   enum PassNodesBehavior {
     /// Pass all nodes up to but not including the location.
     ExcludeNodeAtLocation,
@@ -128,8 +130,22 @@ void ColorASTWalker::visitTranslationUnit(TranslationUnit &TU,
     passNode(TokNode);
 }
 
+bool ColorASTWalker::walkToDeclPre(Decl *D) {
+  if (NominalTypeDecl *TD = dyn_cast<NominalTypeDecl>(D)) {
+    for (auto Inherit : TD->getInherited()) {
+      if (!passTypeRepr(Inherit.getTypeRepr()))
+        return false;
+    }
+  }
+  return true;
+}
+
 bool ColorASTWalker::walkToTypeReprPre(TypeRepr *T) {
-  if (IdentTypeRepr *IdT = dyn_cast<IdentTypeRepr>(T)) {
+  return passTypeRepr(T);
+}
+
+bool ColorASTWalker::passTypeRepr(TypeRepr *T) {
+  if (IdentTypeRepr *IdT = dyn_cast_or_null<IdentTypeRepr>(T)) {
     for (auto &comp : IdT->Components) {
       if (!passNonTokenNode({ SyntaxNodeKind::TypeId,
                               CharSourceRange(comp.getIdLoc(),
