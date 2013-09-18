@@ -264,6 +264,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::LoadInst:
   case ValueKind::StrongReleaseInst:
   case ValueKind::StrongRetainInst:
+  case ValueKind::StrongRetainAutoreleasedInst:
+  case ValueKind::AutoreleaseReturnInst:
+  case ValueKind::StrongRetainUnownedInst:
+  case ValueKind::UnownedRetainInst:
+  case ValueKind::UnownedReleaseInst:
   case ValueKind::ReturnInst: {
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -348,6 +353,30 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                       SILAbbrCodes[SILOneTypeLayout::Code],
                       (unsigned)SI.getKind(),
                       S.addModuleRef(MT->getModule()), 0);
+    break;
+  }
+  case ValueKind::ProjectExistentialInst: {
+    const ProjectExistentialInst *PEI = cast<ProjectExistentialInst>(&SI);
+    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(PEI->getType().getSwiftRValueType()),
+        (unsigned)PEI->getType().getCategory(),
+        S.addTypeRef(PEI->getOperand().getType().getSwiftRValueType()),
+        (unsigned)PEI->getOperand().getType().getCategory(),
+        addValueRef(PEI->getOperand()),
+        PEI->getOperand().getResultNumber());
+    break;
+  }
+  case ValueKind::ProjectExistentialRefInst: {
+    const ProjectExistentialRefInst *PEI = cast<ProjectExistentialRefInst>(&SI);
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneOperandLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(PEI->getOperand().getType().getSwiftRValueType()),
+        (unsigned)PEI->getOperand().getType().getCategory(),
+        addValueRef(PEI->getOperand()),
+        PEI->getOperand().getResultNumber());
     break;
   }
   // Conversion instructions.

@@ -469,6 +469,22 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
                     getSILType(ModuleType::get(Mod), SILValueCategory::Object));
     break;
   }
+  case ValueKind::ProjectExistentialInst: {
+    auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
+    ResultVal = Builder.createProjectExistential(Loc,
+                    getLocalValue(ValID, ValResNum,
+                         getSILType(Ty2, (SILValueCategory)TyCategory2)),
+                    getSILType(Ty, (SILValueCategory)TyCategory));
+    break;
+  }
+  case ValueKind::ProjectExistentialRefInst: {
+    auto Ty = MF->getType(TyID);
+    ResultVal = Builder.createProjectExistentialRef(Loc,
+                    getLocalValue(ValID, ValResNum,
+                         getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
   // Conversion instructions.
   case ValueKind::RefToObjectPointerInst:
   case ValueKind::UpcastInst:
@@ -584,6 +600,41 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
   case ValueKind::StrongRetainInst: {
     auto Ty = MF->getType(TyID);
     ResultVal = Builder.createStrongRetainInst(Loc,
+        getLocalValue(ValID, ValResNum,
+                      getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
+  case ValueKind::StrongRetainAutoreleasedInst: {
+    auto Ty = MF->getType(TyID);
+    ResultVal = Builder.createStrongRetainAutoreleased(Loc,
+        getLocalValue(ValID, ValResNum,
+                      getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
+  case ValueKind::AutoreleaseReturnInst: {
+    auto Ty = MF->getType(TyID);
+    ResultVal = Builder.createAutoreleaseReturn(Loc,
+        getLocalValue(ValID, ValResNum,
+                      getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
+  case ValueKind::StrongRetainUnownedInst: {
+    auto Ty = MF->getType(TyID);
+    ResultVal = Builder.createStrongRetainUnowned(Loc,
+        getLocalValue(ValID, ValResNum,
+                      getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
+  case ValueKind::UnownedRetainInst: {
+    auto Ty = MF->getType(TyID);
+    ResultVal = Builder.createUnownedRetain(Loc,
+        getLocalValue(ValID, ValResNum,
+                      getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
+  case ValueKind::UnownedReleaseInst: {
+    auto Ty = MF->getType(TyID);
+    ResultVal = Builder.createUnownedRelease(Loc,
         getLocalValue(ValID, ValResNum,
                       getSILType(Ty, (SILValueCategory)TyCategory)));
     break;
