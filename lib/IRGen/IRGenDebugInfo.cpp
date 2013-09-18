@@ -909,7 +909,9 @@ getUnionElements(DebugTypeInfo DbgTy,
   SmallVector<llvm::Value *, 16> Elements;
   for (auto Decl : D->getAllElements()) {
     auto CanTy = Decl->getType()->getCanonicalType();
-    auto DTy = getOrCreateDesugaredType(CanTy, DbgTy, Scope);
+    // Use Decl as DeclContext.
+    DebugTypeInfo DTI(Decl, DbgTy.size, DbgTy.align);
+    auto DTy = getOrCreateDesugaredType(CanTy, DTI, Scope);
     Elements.push_back(DTy);
   }
   return DBuilder.getOrCreateArray(Elements);
@@ -1239,7 +1241,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::BoundGenericUnion:
   {
-    Name = "FIXME";//getMangledName(DbgTy);
+    Name = getMangledName(DbgTy);
     auto UnionTy = BaseTy->castTo<BoundGenericUnionType>();
     if (auto Decl = UnionTy->getDecl()) {
       Location L = getStartLoc(SM, Decl);
