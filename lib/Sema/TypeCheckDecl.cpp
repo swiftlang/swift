@@ -2284,16 +2284,35 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     if (!AFD) {
       TC.diagnose(VD->getStartLoc(), diag::transparent_not_valid);
       VD->getMutableAttrs().Transparent = false;
+
+    // Destructors cannot be transparent.
     } else if (isa<DestructorDecl>(AFD)) {
       // Destructors are not guaranteed to be called, so don't allow users to
       // mark them as transparent. Also, they are called as part of a release,
       // so the mandatory inliner will not be able to inline them.
       TC.diagnose(VD->getStartLoc(), diag::transparent_invalid_on_destructors);
       VD->getMutableAttrs().Transparent = false;
+
+    // FIXME: We currently do not support transparent generics.
     } else if (AFD->getGenericParams()) {
       // We don't yet support transparent on generic functions.
       TC.diagnose(VD->getStartLoc(), diag::transparent_generic_not_supported);
       VD->getMutableAttrs().Transparent = false;
+
+    // Protocol method declarations cannot be transparent.
+    } else if (isa<ProtocolDecl>(AFD->getParent())) {
+      TC.diagnose(VD->getStartLoc(), diag::transparent_in_protocols_not_supported);
+      VD->getMutableAttrs().Transparent = false;
+
+    // Class methods cannot be transparent.
+    } else if (isa<ClassDecl>(AFD->getParent())) {
+      if (const FuncDecl *FD = dyn_cast<FuncDecl>(AFD)) {
+        if (FD->isStatic()) {
+          TC.diagnose(VD->getStartLoc(),
+                      diag::transparent_class_methods_not_supported);
+          VD->getMutableAttrs().Transparent = false;
+        }
+      }
     }
   }
 
