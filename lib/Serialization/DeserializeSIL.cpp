@@ -418,7 +418,13 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RawPointerToRefInst:
   case ValueKind::RefToUnownedInst:
-  case ValueKind::UnownedToRefInst: {
+  case ValueKind::UnownedToRefInst:
+  case ValueKind::ConvertCCInst:
+  case ValueKind::ThinToThickFunctionInst:
+  case ValueKind::BridgeToBlockInst:
+  case ValueKind::ArchetypeRefToSuperInst:
+  case ValueKind::ConvertFunctionInst:
+  case ValueKind::UpcastExistentialRefInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
     auto Val = getLocalValue(ValID, ValResNum,
@@ -455,6 +461,24 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
       break;
     case ValueKind::ObjectPointerToRefInst:
       ResultVal = Builder.createObjectPointerToRef(Loc, Val, SILTy);
+      break;
+    case ValueKind::ConvertCCInst:
+      ResultVal = Builder.createConvertCC(Loc, Val, SILTy);
+      break;
+    case ValueKind::ThinToThickFunctionInst:
+      ResultVal = Builder.createThinToThickFunction(Loc, Val, SILTy);
+      break;
+    case ValueKind::BridgeToBlockInst:
+      ResultVal = Builder.createBridgeToBlock(Loc, Val, SILTy);
+      break;
+    case ValueKind::ArchetypeRefToSuperInst:
+      ResultVal = Builder.createArchetypeRefToSuper(Loc, Val, SILTy);
+      break;
+    case ValueKind::ConvertFunctionInst:
+      ResultVal = Builder.createConvertFunction(Loc, Val, SILTy);
+      break;
+    case ValueKind::UpcastExistentialRefInst:
+      ResultVal = Builder.createUpcastExistentialRef(Loc, Val, SILTy);
       break;
     }
     break;

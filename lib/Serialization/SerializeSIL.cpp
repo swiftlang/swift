@@ -317,7 +317,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RawPointerToRefInst:
   case ValueKind::RefToUnownedInst:
-  case ValueKind::UnownedToRefInst: {
+  case ValueKind::UnownedToRefInst:
+  case ValueKind::ConvertCCInst:
+  case ValueKind::ThinToThickFunctionInst:
+  case ValueKind::BridgeToBlockInst:
+  case ValueKind::ArchetypeRefToSuperInst:
+  case ValueKind::ConvertFunctionInst:
+  case ValueKind::UpcastExistentialRefInst: {
     SILValue operand;
     SILType Ty;
     switch (SI.getKind()) {
@@ -361,6 +367,30 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     case ValueKind::UnownedToRefInst:
       operand = cast<UnownedToRefInst>(&SI)->getOperand();
       Ty = cast<UnownedToRefInst>(&SI)->getType();
+      break;
+    case ValueKind::ConvertCCInst:
+      operand = cast<ConvertCCInst>(&SI)->getOperand();
+      Ty = cast<ConvertCCInst>(&SI)->getType();
+      break;
+    case ValueKind::ThinToThickFunctionInst:
+      operand = cast<ThinToThickFunctionInst>(&SI)->getOperand();
+      Ty = cast<ThinToThickFunctionInst>(&SI)->getType();
+      break;
+    case ValueKind::BridgeToBlockInst:
+      operand = cast<BridgeToBlockInst>(&SI)->getOperand();
+      Ty = cast<BridgeToBlockInst>(&SI)->getType();
+      break;
+    case ValueKind::ArchetypeRefToSuperInst:
+      operand = cast<ArchetypeRefToSuperInst>(&SI)->getOperand();
+      Ty = cast<ArchetypeRefToSuperInst>(&SI)->getType();
+      break;
+    case ValueKind::ConvertFunctionInst:
+      operand = cast<ConvertFunctionInst>(&SI)->getOperand();
+      Ty = cast<ConvertFunctionInst>(&SI)->getType();
+      break;
+    case ValueKind::UpcastExistentialRefInst:
+      operand = cast<UpcastExistentialRefInst>(&SI)->getOperand();
+      Ty = cast<UpcastExistentialRefInst>(&SI)->getType();
       break;
     }
     SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
