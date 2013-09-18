@@ -1165,10 +1165,8 @@ static void lowerRawSILOperations(SILFunction &Fn) {
         LowerAssignInstruction(B, AI, false, SILValue());
         // Assign lowering may split the block. If it did,
         // reset our iteration range to the block after the insertion.
-        if (B.getInsertionBB() != &BB) {
-          I = B.getInsertionBB()->begin();
-          E = B.getInsertionBB()->end();
-        }
+        if (B.getInsertionBB() != &BB)
+          I = E;
         continue;
       }
 
