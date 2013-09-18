@@ -1017,12 +1017,12 @@ ERROR(assignment_without_byref,sema_tcd,none,
 ERROR(conversion_not_instance_method,sema_tcd,none,
       "conversion function %0 is not an instance method",
       (Identifier))
-ERROR(transparent_not_function,sema_tcd,none,
-      "'transparent' attribute can only be applied to functions", ())
+ERROR(transparent_not_valid,sema_tcd,none,
+      "'transparent' attribute cannot be applied to this declaration", ())
 ERROR(transparent_invalid_on_destructors,sema_tcd,none,
       "'transparent' attribute cannot be applied to destructors", ())
 ERROR(transparent_generic_not_supported,sema_tcd,none,
-      "'transparent' attribute not supported for generic functions", ())
+      "'transparent' attribute is not supported for generic declarations", ())
 ERROR(conversion_params,sema_tcd,none,
       "conversion function %0 has non-defaulted parameters", (Identifier))
 ERROR(invalid_objc_decl,sema_tcd,none,

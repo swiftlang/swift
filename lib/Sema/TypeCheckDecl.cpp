@@ -2282,7 +2282,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     auto *AFD = dyn_cast<AbstractFunctionDecl>(VD);
 
     if (!AFD) {
-      TC.diagnose(VD->getStartLoc(), diag::transparent_not_function);
+      TC.diagnose(VD->getStartLoc(), diag::transparent_not_valid);
       VD->getMutableAttrs().Transparent = false;
     } else if (isa<DestructorDecl>(AFD)) {
       // Destructors are not guaranteed to be called, so don't allow users to
