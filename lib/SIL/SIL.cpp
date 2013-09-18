@@ -210,6 +210,34 @@ SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
   return result;
 }
 
+/// \brief True if the function should be treated as transparent.
+bool SILDeclRef::isTransparent() const {
+  if (isUnionElement())
+    return true;
+
+  if (hasDecl()) {
+    const ValueDecl *D = getDecl();
+    if (isProperty()) {
+      if (kind == Kind::Getter) {
+        if (const SubscriptDecl *SD = dyn_cast<SubscriptDecl>(getDecl()))
+          D = SD->getGetter();
+        else
+          D = cast<VarDecl>(getDecl())->getGetter();
+      } else if (kind == Kind::Setter) {
+        if (const SubscriptDecl *SD = dyn_cast<SubscriptDecl>(getDecl()))
+          D = SD->getSetter();
+        else
+          D = cast<VarDecl>(getDecl())->getSetter();
+      } else {
+        llvm_unreachable("Property decl is either a getter or a setter.");
+      }
+    }
+    
+    return D ? D->getAttrs().isTransparent() : false;
+  }
+  return false;
+}
+
 SILType SILType::getObjectPointerType(const ASTContext &C) {
   return SILType(CanType(C.TheObjectPointerType), SILValueCategory::Object);
 }

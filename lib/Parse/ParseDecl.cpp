@@ -1095,7 +1095,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     }
     if (Tok.isContextualKeyword("get") || !Tok.isContextualKeyword("set")) {
       //   get         ::= 'get' stmt-brace
-      
+
+      DeclAttributes GetAttributes;
+
       // Have we already parsed a get clause?
       if (Get) {
         diagnose(Tok, diag::duplicate_getset, false);
@@ -1108,6 +1110,10 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       SourceLoc GetLoc = Tok.getLoc(), ColonLoc = Tok.getLoc();
       if (Tok.isContextualKeyword("get")) {
         GetLoc = consumeToken();
+
+        // FIXME: Implicitly add immutable attribute.
+        parseAttributeList(GetAttributes);
+
         if (Tok.isNot(tok::colon)) {
           diagnose(Tok, diag::expected_colon_get);
           Invalid = true;
@@ -1154,6 +1160,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                                           Entries, Tok.getLoc());
       Get->setBody(Body);
 
+      if (GetAttributes.isValid())
+        Get->getMutableAttrs() = GetAttributes;
+
       LastValidLoc = Body->getRBraceLoc();
       continue;
     }
@@ -1170,7 +1179,12 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     }
     
     SourceLoc SetLoc = consumeToken();
-    
+
+    DeclAttributes SetAttributes;
+
+    // FIXME: Implicitly add immutable attribute.
+    parseAttributeList(SetAttributes);
+
     //   var-set-name    ::= '(' identifier ')'
     Identifier SetName;
     SourceLoc SetNameLoc;
@@ -1254,6 +1268,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
                                         Entries, Tok.getLoc());
     Set->setBody(Body);
+
+    if (SetAttributes.isValid())
+      Set->getMutableAttrs() = SetAttributes;
 
     LastValidLoc = Body->getRBraceLoc();
   }

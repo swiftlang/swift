@@ -2278,7 +2278,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   }
 
   if (Attrs.isTransparent()) {
-    // Only functions can be 'transparent'.
+    // Only abstract functions can be 'transparent'.
     auto *AFD = dyn_cast<AbstractFunctionDecl>(VD);
 
     if (!AFD) {

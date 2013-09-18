@@ -180,12 +180,8 @@ struct SILDeclRef {
   }
 
   /// \brief True if the function should be treated as transparent.
-  bool isTransparent() const {
-    return ( hasDecl() &&
-             getDecl()->getAttrs().isTransparent() ) ||
-           isUnionElement();
-  }
-
+  bool isTransparent() const;
+  
   bool operator==(SILDeclRef rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
       && kind == rhs.kind
