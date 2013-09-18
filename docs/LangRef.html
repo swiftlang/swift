@@ -1147,8 +1147,8 @@ an lvalue unless it has a <code>var-get</code> clause but not
     to store the "isa"/vtable in the struct so that virtual method dispatch
     could be implemented, and this has additional storage costs. None of these
     tradeoffs make sense for the intended use cases we have in mind for structs
-    (Ints, Floats, Points, Rects, Strings, URLs, Paths, UUIDs, IP addresses,
-    Colors, etc, etc). Said differently: we're trying to force a hard wall
+    (Ints, Floats, Points, Rects, UUIDs, IP addresses, C struct interop, etc, 
+    etc). Said differently: we're trying to force a hard wall
     between types that need indirect access by their nature and those types
     that need direct access by their nature. The former are called classes. The
     latter are called structs.
