@@ -632,6 +632,9 @@ public:
     }
   }
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {
+    // FIXME: We might need to go through ObjC dispatch for references to
+    // constructors imported from Clang (which won't have a direct entry point)
+    // or to delegate to a designated initializer.
     setCallee(Callee::forDirect(gen,
                 SILDeclRef(e->getDecl(), SILDeclRef::Kind::Initializer), e));
   }

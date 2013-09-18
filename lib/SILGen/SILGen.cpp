@@ -378,12 +378,16 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
     SILGenFunction(*this, *f)
       .emitClassConstructorAllocator(decl);
     postEmitFunction(constant, f);
-    
-    SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
-    SILFunction *initF = preEmitFunction(initConstant, decl, decl);
-    SILGenFunction(*this, *initF)
-      .emitClassConstructorInitializer(decl);
-    postEmitFunction(initConstant, initF);
+
+    // If this constructor was imported, we don't need the initializing
+    // constructor to be emitted.
+    if (!decl->hasClangNode()) {
+      SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
+      SILFunction *initF = preEmitFunction(initConstant, decl, decl);
+      SILGenFunction(*this, *initF)
+        .emitClassConstructorInitializer(decl);
+      postEmitFunction(initConstant, initF);
+    }
   } else {
     // Struct constructors do everything in a single function.
     SILGenFunction(*this, *f)

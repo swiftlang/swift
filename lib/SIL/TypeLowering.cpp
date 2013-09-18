@@ -1181,7 +1181,9 @@ static AbstractCC getAbstractCC(SILDeclRef c) {
   // dispatches yet.
   assert((!c.getDecl()->hasClangNode() ||
           c.kind == SILDeclRef::Kind::Getter ||
-          c.kind == SILDeclRef::Kind::Setter)
+          c.kind == SILDeclRef::Kind::Setter ||
+          c.kind == SILDeclRef::Kind::Initializer ||
+          c.kind == SILDeclRef::Kind::Allocator)
          && "should not be referencing native entry point of foreign decl");
 
   if (c.getDecl()->isInstanceMember() ||

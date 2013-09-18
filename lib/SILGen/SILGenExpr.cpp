@@ -1973,15 +1973,40 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   args.push_back(selfValue);
 
   // Call the initializer.
-  SILDeclRef initConstant = SILDeclRef(ctor, SILDeclRef::Kind::Initializer);
+  SILDeclRef initConstant =
+    SILDeclRef(ctor, SILDeclRef::Kind::Initializer,
+               SILDeclRef::ConstructAtNaturalUncurryLevel,
+               /*isObjC=*/ctor->hasClangNode());
 
-  ArrayRef<ArchetypeType *> archetypes;
-  if (auto genericParams = ctor->getGenericParams())
-    archetypes = genericParams->getAllArchetypes();
-  auto forwardingSubs = buildForwardingSubstitutions(archetypes);
-  ManagedValue initVal = emitMethodRef(Loc, selfValue, initConstant,
-                                       forwardingSubs);
-  
+  ManagedValue initVal;
+  if (ctor->hasClangNode()) {
+    // If the constructor was imported from Clang, we perform dynamic dispatch
+    // to it because we can't refer directly to the Objective-C method.
+    SILType methodType = SGM.getConstantType(initConstant.atUncurryLevel(1));
+    SILValue methodRef = B.createClassMethod(Loc, selfValue, initConstant,
+                                             methodType);
+    initVal = ManagedValue(methodRef, ManagedValue::Unmanaged);
+
+    // Bridge arguments.
+    Scope scope(Cleanups, CleanupLocation::getCleanupLocation(Loc));
+    SILFunctionTypeInfo *objcInfo = methodType.getFunctionTypeInfo(SGM.M);
+    unsigned idx = 0;
+    for (auto &arg : args) {
+      arg = emitNativeToBridgedValue(Loc,
+                                     ManagedValue(arg, ManagedValue::Unmanaged),
+                                     AbstractCC::ObjCMethod,
+                                     objcInfo->getInputTypes()[idx++]
+                                       .getSwiftType()).forward(*this);
+    }
+  } else {
+    // Otherwise, directly call the constructor.
+    ArrayRef<ArchetypeType *> archetypes;
+    if (auto genericParams = ctor->getGenericParams())
+      archetypes = genericParams->getAllArchetypes();
+    auto forwardingSubs = buildForwardingSubstitutions(archetypes);
+    initVal = emitMethodRef(Loc, selfValue, initConstant, forwardingSubs);
+  }
+
   SILValue initedSelfValue
     = B.createApply(Loc, initVal.forward(*this), selfTy, args,
                     initConstant.isTransparent());

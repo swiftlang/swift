@@ -1228,6 +1228,9 @@ namespace {
                                                             dc);
       result->setType(allocType);
       result->setInitializerType(initType);
+      result->getMutableAttrs().ObjC = true;
+      result->setClangNode(objcMethod);
+      
       selfVar->setDeclContext(result);
       setVarDeclContexts(argPatterns, result);
       setVarDeclContexts(bodyPatterns, result);
@@ -1263,81 +1266,6 @@ namespace {
         result->setAllocSelfExpr(initExpr);
       }
       
-      // Create the body of the constructor, which will call the
-      // corresponding init method.
-      Expr *initExpr = new (Impl.SwiftContext) DeclRefExpr(selfVar, loc);
-      
-      // Form a reference to the actual method.
-      auto func = cast<FuncDecl>(decl);
-      auto funcRef = new (Impl.SwiftContext) DeclRefExpr(func, loc);
-      initExpr = new (Impl.SwiftContext) DotSyntaxCallExpr(funcRef, loc,
-                                                           initExpr);
-
-      // Form the call arguments.
-      SmallVector<Expr *, 2> callArgs;
-      auto tuple = dyn_cast<TuplePattern>(bodyPatterns[1]);
-      if (!tuple) {
-        // FIXME: We don't want this to be the case. We should always ensure
-        // that the body has names, even if the interface does not.
-        return nullptr;
-      }
-
-      for (auto elt : tuple->getFields()) {
-        auto named = dyn_cast<NamedPattern>(
-                       elt.getPattern()->getSemanticsProvidingPattern());
-        if (!named) {
-          // FIXME: We don't want this to be the case. Can we fake up names
-          // in the body parameters so this doesn't happen?
-          return nullptr;
-        }
-
-        // Create a reference to this parameter.
-        Expr *ref = new (Impl.SwiftContext) DeclRefExpr(named->getDecl(),
-                                                        loc,
-                                                        named->getType());
-
-        // If the parameter is [byref], take its address.
-        if (named->getDecl()->getType()->is<LValueType>())
-          ref = new (Impl.SwiftContext) AddressOfExpr(loc, ref,
-                                                      ref->getType());
-
-        callArgs.push_back(ref);
-      }
-
-      // Form the method call.
-      Expr *callArg;
-
-      if (callArgs.size() == 1) {
-        callArg = callArgs[0];
-      } else {
-        auto callArgsCopy = Impl.SwiftContext.AllocateCopy(callArgs);
-        callArg
-          = new (Impl.SwiftContext) TupleExpr(loc, callArgsCopy,
-                                              nullptr, loc,
-                                              /*hasTrailingClosure=*/false);
-      }
-
-      initExpr = new (Impl.SwiftContext) CallExpr(initExpr, callArg);
-
-      // Cast the result of the alloc call to the (metatype) 'self'.
-      // FIXME: instancetype should make this unnecessary.
-      auto cast = new (Impl.SwiftContext) UnconditionalCheckedCastExpr(
-                                           initExpr,
-                                           SourceLoc(),
-                                           SourceLoc(),
-                                           TypeLoc::withoutLoc(selfTy));
-      cast->setCastKind(CheckedCastKind::Downcast);
-      initExpr = cast;
-
-      // Form the assignment statement.
-      auto SelfRef = new (Impl.SwiftContext) DeclRefExpr(selfVar, loc);
-      auto assign = new (Impl.SwiftContext) AssignExpr(SelfRef, loc, initExpr);
-
-      // Set the body of the constructor.
-      result->setBody(BraceStmt::create(Impl.SwiftContext, loc,
-                                        BraceStmt::ExprStmtOrDecl(assign),
-                                        loc));
-
       // Inform the context that we have external definitions.
       Impl.SwiftContext.addedExternalDecl(result);
 
