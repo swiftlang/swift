@@ -23,7 +23,7 @@ using namespace swift;
 /// < T : Comparable, U : Container> along with an optional requires clause.
 ///
 ///   generic-params:
-///     '<' generic-param (',' generic-param)? where-clause? '>'
+///     '<' generic-param (',' generic-param)* where-clause? '>'
 ///
 ///   generic-param:
 ///     identifier

@@ -630,9 +630,9 @@ ParserResult<Expr> Parser::parseExprSuper() {
 
     SourceLoc dotLoc = consumeToken(tok::period);
     
-    if (Tok.is(tok::kw_constructor)) {
-      // super.constructor
-      SourceLoc ctorLoc = consumeToken(tok::kw_constructor);
+    if (Tok.is(tok::kw_constructor) || Tok.is(tok::kw_init)) {
+      // super.init
+      SourceLoc ctorLoc = consumeToken();
       
       // Check that we're actually in a constructor.
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {

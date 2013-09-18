@@ -592,6 +592,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     Status = DeclResult;
     break;
   case tok::kw_constructor:
+  case tok::kw_init:
     DeclResult = parseDeclConstructor(Flags);
     Status = DeclResult;
     break;
@@ -2339,7 +2340,8 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
 
 ParserResult<ConstructorDecl>
 Parser::parseDeclConstructor(unsigned Flags) {
-  SourceLoc ConstructorLoc = consumeToken(tok::kw_constructor);
+  assert(Tok.is(tok::kw_constructor) || Tok.is(tok::kw_init));
+  SourceLoc ConstructorLoc = consumeToken();
 
   const bool ConstructorsNotAllowed =
       !(Flags & PD_HasContainerType) || (Flags & PD_InProtocol);

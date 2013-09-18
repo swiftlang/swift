@@ -199,6 +199,11 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
     Loc = P.Tok.getLoc();
     P.consumeToken();
     return false;
+  case tok::kw_init:
+    Result = P.Context.getIdentifier("constructor");
+    Loc = P.Tok.getLoc();
+    P.consumeToken();
+    return false;
   default:
     P.diagnose(P.Tok, D);
     return true;
