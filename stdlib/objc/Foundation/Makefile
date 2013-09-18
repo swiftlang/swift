@@ -31,8 +31,7 @@ endif
 
 include $(SWIFT_LEVEL)/Makefile
 
-LDFLAGS += -framework Foundation \
-	   -lswift_stdlib_core -lswift_runtime -lswiftObjectiveC -Wl,-force_load,$(LibDir)/libswift_runtime.a
+LDFLAGS += -framework Foundation -lswift_stdlib_core -lswiftObjectiveC
 
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
 

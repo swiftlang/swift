@@ -24,7 +24,7 @@ NO_BUILD_ARCHIVE := 1
 include $(SWIFT_LEVEL)/Makefile
 
 LDFLAGS += -framework AppKit \
-	   -lswift_stdlib_core -lswift_runtime -lswiftObjectiveC -lswiftFoundation -Wl,-force_load,$(LibDir)/libswift_runtime.a
+	   -lswift_stdlib_core -lswiftObjectiveC -lswiftFoundation
 
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
 
