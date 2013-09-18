@@ -91,11 +91,16 @@ namespace {
     }
     ValueID addValueRef(const ValueBase *Val);
 
+    /// FuncTable maps function name to an ID.
     using TableData = FuncTableInfo::data_type;
     using Table = llvm::DenseMap<FuncTableInfo::key_type, TableData>;
     Table FuncTable;
     std::vector<BitOffset> Funcs;
+    /// The current function ID.
     DeclID FuncID;
+
+    /// Give each SILBasicBlock a unique ID.
+    llvm::DenseMap<const SILBasicBlock*, unsigned> BasicBlockMap;
 
     std::array<unsigned, 256> SILAbbrCodes;
     template <typename Layout>
@@ -153,6 +158,13 @@ void SILSerializer::writeSILFunction(const SILFunction &F) {
         " abbrCode " << abbrCode << " FnID " << FnID << "\n");
   SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                        (unsigned)F.getLinkage(), FnID);
+  
+  // Assign a unique ID to each basic block of the SILFunction.
+  unsigned BasicID = 0;
+  BasicBlockMap.clear();
+  for (const SILBasicBlock &BB : F)
+    BasicBlockMap.insert(std::make_pair(&BB, BasicID++));
+
   for (const SILBasicBlock &BB : F)
     writeSILBasicBlock(BB);
 }
@@ -294,6 +306,61 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addTypeRef(BFR->getType().getSwiftRValueType()),
         (unsigned)BFR->getType().getCategory(),
         S.addDeclRef(BFR->getFunction()), 0);
+    break;
+  }
+  case ValueKind::BranchInst: {
+    // Format: destination basic block ID, a list of arguments. Use
+    // SILOneTypeValuesLayout.
+    const BranchInst *BrI = cast<BranchInst>(&SI);
+    SmallVector<ValueID, 4> ListOfValues;
+    for (auto Elt : BrI->getArgs()) {
+      ListOfValues.push_back(S.addTypeRef(Elt.getType().getSwiftRValueType()));
+      ListOfValues.push_back((unsigned)Elt.getType().getCategory());
+      ListOfValues.push_back(addValueRef(Elt));
+      ListOfValues.push_back(Elt.getResultNumber());
+    }
+
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
+        BasicBlockMap[BrI->getDestBB()], 0, ListOfValues);
+    break;
+  }
+  case ValueKind::CondBranchInst: {
+    // Format: condition, true basic block ID, a list of arguments, false basic
+    // block ID, a list of arguments. Use SILOneTypeValuesLayout: the type is
+    // for condition, the list has value for condition, true basic block ID,
+    // false basic block ID, number of true arguments, and a list of true|false
+    // arguments.
+    const CondBranchInst *CBI = cast<CondBranchInst>(&SI);
+    SmallVector<ValueID, 4> ListOfValues;
+    ListOfValues.push_back(addValueRef(CBI->getCondition()));
+    ListOfValues.push_back(CBI->getCondition().getResultNumber());
+    ListOfValues.push_back(BasicBlockMap[CBI->getTrueBB()]);
+    ListOfValues.push_back(BasicBlockMap[CBI->getFalseBB()]);
+    ListOfValues.push_back(CBI->getTrueArgs().size());
+    for (auto Elt : CBI->getTrueArgs()) {
+      ListOfValues.push_back(S.addTypeRef(Elt.getType().getSwiftRValueType()));
+      ListOfValues.push_back((unsigned)Elt.getType().getCategory());
+      ListOfValues.push_back(addValueRef(Elt));
+      ListOfValues.push_back(Elt.getResultNumber());
+    }
+    for (auto Elt : CBI->getFalseArgs()) {
+      ListOfValues.push_back(S.addTypeRef(Elt.getType().getSwiftRValueType()));
+      ListOfValues.push_back((unsigned)Elt.getType().getCategory());
+      ListOfValues.push_back(addValueRef(Elt));
+      ListOfValues.push_back(Elt.getResultNumber());
+    }
+
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(CBI->getCondition().getType().getSwiftRValueType()),
+        (unsigned)CBI->getCondition().getType().getCategory(),
+        ListOfValues);
+    break;
+  }
+  case ValueKind::UnreachableInst: {
     break;
   }
   case ValueKind::DeallocStackInst:

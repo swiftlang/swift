@@ -41,13 +41,22 @@ namespace swift {
     llvm::DenseMap<uint32_t, ValueBase*> LocalValues;
     serialization::ValueID LastValueID = 0;
 
+    /// Data structures used to perform lookup of basic blocks.
+    llvm::DenseMap<unsigned, SILBasicBlock*> BlocksByID;
+    llvm::DenseMap<SILBasicBlock*, unsigned> UndefinedBlocks;
+    unsigned BasicBlockID = 0;
+
+    /// Return the SILBasicBlock of a given ID.
+    SILBasicBlock *getBBForReference(SILFunction *Fn, unsigned ID);
+    SILBasicBlock *getBBForDefinition(SILFunction *Fn, unsigned ID);
+
     /// Read a SIL function.
     SILFunction *readSILFunction(serialization::DeclID, SILFunction *InFunc);
     /// Read a SIL basic block within a given SIL function.
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
                                      SmallVectorImpl<uint64_t> &scratch);
     /// Read a SIL instruction within a given SIL basic block.
-    bool readSILInstruction(SILBasicBlock *BB,
+    bool readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                             unsigned RecordKind,
                             SmallVectorImpl<uint64_t> &scratch);
 

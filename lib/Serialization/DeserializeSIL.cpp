@@ -128,6 +128,37 @@ SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
   return SILValue(nullptr, 0); 
 }
 
+/// Return the SILBasicBlock of a given ID.
+SILBasicBlock *SILDeserializer::getBBForDefinition(SILFunction *Fn,
+                                                   unsigned ID) {
+  SILBasicBlock *&BB = BlocksByID[ID];
+  // If the block has never been named yet, just create it.
+  if (BB == nullptr)
+    return BB = new (SILMod) SILBasicBlock(Fn);
+
+  // If it already exists, it was either a forward reference or a redefinition.
+  // If it is a forward reference, it should be in our undefined set.
+  if (!UndefinedBlocks.erase(BB)) {
+    // If we have a redefinition, return a new BB to avoid inserting
+    // instructions after the terminator.
+    return new (SILMod) SILBasicBlock(Fn);
+  }
+  return BB;
+}
+
+/// Return the SILBasicBlock of a given ID.
+SILBasicBlock *SILDeserializer::getBBForReference(SILFunction *Fn,
+                                                  unsigned ID) {
+  SILBasicBlock *&BB = BlocksByID[ID];
+  if (BB != nullptr)
+    return BB;
+
+  // Otherwise, create it and remember that this is a forward reference
+  BB = new (SILMod) SILBasicBlock(Fn);
+  UndefinedBlocks[BB] = ID;
+  return BB;
+}
+
 /// Helper function to convert from Type to SILType.
 static SILType getSILType(Type Ty, SILValueCategory Category) {
   auto TyLoc = TypeLoc::withoutLoc(Ty);
@@ -177,6 +208,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
   auto Fn = InFunc;
   Fn->setLinkage((SILLinkage)Linkage);
   SILBasicBlock *CurrentBB = nullptr;
+  BasicBlockID = 0;
 
   // Fetch the next record.
   scratch.clear();
@@ -193,7 +225,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
       CurrentBB = readSILBasicBlock(Fn, scratch);
     else {
       // Handle a SILInstruction record.
-      if (readSILInstruction(CurrentBB, kind, scratch)) {
+      if (readSILInstruction(Fn, CurrentBB, kind, scratch)) {
         DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
         return Fn;
       }
@@ -218,7 +250,7 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
 
   // Args should be a list of pairs, the first number is a TypeID, the
   // second number is a ValueID.
-  SILBasicBlock *CurrentBB = new (SILMod) SILBasicBlock(Fn);
+  SILBasicBlock *CurrentBB = getBBForDefinition(Fn, BasicBlockID++);
   for (unsigned I = 0, E = Args.size(); I < E; I += 2) {
     TypeID TyID = Args[I];
     if (!TyID) return nullptr;
@@ -249,7 +281,7 @@ static SILFunction *getFuncForReference(Identifier Name, SILType Ty,
   return Fn;
 }
 
-bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
+bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                           unsigned RecordKind,
                           SmallVectorImpl<uint64_t> &scratch) {
   // Return error if Basic Block is null.
@@ -304,8 +336,7 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
   }
   case SIL_INST_TODO:
     SILInstTodoLayout::readRecord(scratch, OpCode);
-    DEBUG(llvm::dbgs() << "To be handled: " << OpCode << "\n");
-    return true;
+    break;
   }
 
   ValueBase *ResultVal;
@@ -812,6 +843,54 @@ bool SILDeserializer::readSILInstruction(SILBasicBlock *BB,
     ResultVal = Builder.createTuple(Loc,
                     getSILType(Ty, (SILValueCategory)TyCategory),
                     OpList);
+    break;
+  }
+  case ValueKind::BranchInst: {
+    SmallVector<SILValue, 4> Args;
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 4)
+      Args.push_back(
+        getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
+                      getSILType(MF->getType(ListOfValues[I]),
+                                 (SILValueCategory)ListOfValues[I+1])));
+
+    ResultVal = Builder.createBranch(Loc, getBBForReference(Fn, TyID),
+                    Args);
+    break;
+  }
+  case ValueKind::CondBranchInst: {
+    // Format: condition, true basic block ID, a list of arguments, false basic
+    // block ID, a list of arguments. Use SILOneTypeValuesLayout: the type is
+    // for condition, the list has value for condition, true basic block ID,
+    // false basic block ID, number of true arguments, and a list of true|false
+    // arguments.
+    SILValue Cond = getLocalValue(ListOfValues[0], ListOfValues[1],
+                                  getSILType(MF->getType(TyID),
+                                             (SILValueCategory)TyCategory));
+
+    unsigned NumTrueArgs = ListOfValues[4];
+    unsigned StartOfTrueArg = 5;
+    unsigned StartOfFalseArg = StartOfTrueArg + 4*NumTrueArgs;
+    SmallVector<SILValue, 4> TrueArgs;
+    for (unsigned I = StartOfTrueArg, E = StartOfFalseArg; I < E; I += 4)
+      TrueArgs.push_back(
+        getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
+                      getSILType(MF->getType(ListOfValues[I]), 
+                                 (SILValueCategory)ListOfValues[I+1])));
+
+    SmallVector<SILValue, 4> FalseArgs;
+    for (unsigned I = StartOfFalseArg, E = ListOfValues.size(); I < E; I += 4)
+      FalseArgs.push_back(
+        getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
+                      getSILType(MF->getType(ListOfValues[I]),
+                                 (SILValueCategory)ListOfValues[I+1])));
+
+    ResultVal = Builder.createCondBranch(Loc, Cond,
+                    getBBForReference(Fn, ListOfValues[2]), TrueArgs,
+                    getBBForReference(Fn, ListOfValues[3]), FalseArgs);
+    break;
+  }
+  case ValueKind::UnreachableInst: {
+    ResultVal = Builder.createUnreachable(Loc);
     break;
   }
   }
