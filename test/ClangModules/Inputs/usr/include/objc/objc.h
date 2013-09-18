@@ -51,6 +51,8 @@
 - initWithDouble:(double)d1 :(double)d2;
 - initBBB:(B*)b;
 - initForWorldDomination;
+- notAnInit __attribute__((objc_method_family(init), ns_returns_retained));
+- (id)_initFoo;
 - (void)anotherMethodOnB;
 @end
 

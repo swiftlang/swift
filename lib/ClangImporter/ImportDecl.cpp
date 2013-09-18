@@ -1013,6 +1013,26 @@ namespace {
     }
 
   private:
+    /// Check whether the given name starts with the given word.
+    static bool startsWithWord(StringRef name, StringRef word) {
+      if (name.size() < word.size()) return false;
+      return ((name.size() == word.size() || !islower(name[word.size()])) &&
+              name.startswith(word));
+    }
+
+    /// Determine whether the given Objective-C method, which Clang classifies
+    /// as an init method, is considered an init method in Swift.
+    static bool isReallyInitMethod(const clang::ObjCMethodDecl *method) {
+      if (!method->isInstanceMethod())
+        return false;
+
+      auto selector = method->getSelector();
+      auto first = selector.getIdentifierInfoForSlot(0);
+      if (!first) return false;
+
+      return startsWithWord(first->getName(), "init");
+    }
+
     /// \brief Given an imported method, try to import it as some kind of
     /// special declaration, e.g., a constructor or subscript.
     Decl *importSpecialMethod(Decl *decl, DeclContext *dc) {
@@ -1036,7 +1056,7 @@ namespace {
 
       case clang::OMF_init:
         // An init instance method can be a constructor.
-        if (objcMethod->isInstanceMethod())
+        if (isReallyInitMethod(objcMethod))
           return importConstructor(decl, objcMethod, dc);
         return nullptr;
 
@@ -1105,10 +1125,12 @@ namespace {
       case clang::OMF_retain:
       case clang::OMF_retainCount:
       case clang::OMF_self:
-        case clang::OMF_new:
+      case clang::OMF_new:
         llvm_unreachable("Caller did not filter non-constructor methods");
 
       case clang::OMF_init: {
+        assert(isReallyInitMethod(objcMethod) && "Caller didn't filter");
+
         // Make sure we have a usable 'alloc' method. Otherwise, we can't
         // build this constructor anyway.
         const clang::ObjCInterfaceDecl *interface;
@@ -1867,7 +1889,7 @@ namespace {
                   methEnd = container->meth_end();
              meth != methEnd; ++meth) {
           if ((*meth)->getMethodFamily() == clang::OMF_init &&
-              (*meth)->isInstanceMethod() &&
+              isReallyInitMethod(*meth) &&
               !hasMethodShallow((*meth)->getSelector(),
                                 (*meth)->isInstanceMethod(),
                                 objcClass) &&
