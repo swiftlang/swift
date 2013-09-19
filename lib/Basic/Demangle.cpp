@@ -1409,21 +1409,21 @@ private:
       return generics;
     }
     if (c == 'X') {
-      if (c == 'o') {
+      if (Mangled.nextIf('o')) {
         NodePointer type = demangleType();
         if (!type)
           return nullptr;
         NodePointer unowned = Node::makeNodePointer(Node::Kind::Unowned);
-        unowned->setNextNode(type);
+        unowned->push_back_child(type);
         return unowned;
       }
-      if (c == 'w') {
+      if (Mangled.nextIf('w')) {
         NodePointer type = demangleType();
         if (!type)
           return nullptr;
-        NodePointer unowned = Node::makeNodePointer(Node::Kind::Weak);
-        unowned->setNextNode(type);
-        return unowned;
+        NodePointer weak = Node::makeNodePointer(Node::Kind::Weak);
+        weak->push_back_child(type);
+        return weak;
       }
       return nullptr;
     }
@@ -1724,10 +1724,12 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     }
     case swift::Demangle::Node::Kind::Weak:
       printer << "[weak] ";
-      pointer = pointer->getNextNode(); continue;
+      toStringChildren(pointer, printer);
+      break;
     case swift::Demangle::Node::Kind::Unowned:
       printer << "[unowned] ";
-      pointer = pointer->getNextNode(); continue;
+      toStringChildren(pointer, printer);
+      break;
     case swift::Demangle::Node::Kind::ByRef:
       printer << "[byref] ";
       pointer = pointer->child_at(0); continue;
