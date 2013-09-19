@@ -342,6 +342,13 @@ NominalTypeDecl *TypeBase::getAnyNominal() {
   return nullptr;
 }
 
+Type TypeBase::getOptionalObjectType(const ASTContext &context) {
+  if (auto boundTy = getAs<BoundGenericType>())
+    if (boundTy->getDecl() == context.getOptionalDecl())
+      return boundTy->getGenericArgs()[0];
+  return Type();
+}
+
 static Type getStrippedType(const ASTContext &context, Type type,
                             bool stripLabels, bool stripDefaultArgs) {
   return type.transform(context,

@@ -330,6 +330,10 @@ public:
   Type getTypeOfMember(Module *module, ValueDecl *member,
                        LazyResolver *resolver, Type memberType = Type());
 
+
+  /// Return T if this type is Optional<T>; otherwise, return the null type.
+  Type getOptionalObjectType(const ASTContext &C);
+
   void dump() const;
   void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
   
