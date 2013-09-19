@@ -1356,6 +1356,62 @@ static Type getFixedTypeRecursive(ConstraintSystem &cs,
   return type;
 }
 
+/// If the given type has user-defined conversions, introduce new
+/// relational constraint between the result of performing the user-defined
+/// conversion and an arbitrary other type.
+static ConstraintSystem::SolutionKind
+tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
+                  Type otherType, ConstraintLocatorBuilder locator) {
+  assert(kind != ConstraintKind::Construction &&
+         kind != ConstraintKind::Conversion &&
+         "Construction/conversion constraints create potential cycles");
+
+  // If this isn't a type that can have user-defined conversions, there's
+  // nothing to do.
+  if (!type->getNominalOrBoundGenericNominal() && !type->is<ArchetypeType>())
+    return ConstraintSystem::SolutionKind::Unsolved;
+
+  // If there are no user-defined conversions, there's nothing to do.
+  // FIXME: lame name!
+  auto &ctx = cs.getASTContext();
+  auto name = ctx.getIdentifier("__conversion");
+  if (!cs.lookupMember(type, name))
+    return ConstraintSystem::SolutionKind::Unsolved;
+
+  auto memberLocator = cs.getConstraintLocator(
+                         locator.withPathElement(
+                           ConstraintLocator::ConversionMember));
+  auto inputTV = cs.createTypeVariable(
+                   cs.getConstraintLocator(memberLocator,
+                                           ConstraintLocator::FunctionArgument),
+                   /*canBindToLValue=*/false);
+  auto outputTV = cs.createTypeVariable(
+                    cs.getConstraintLocator(memberLocator,
+                                            ConstraintLocator::FunctionResult),
+                    /*canBindToLValue=*/false);
+
+  // The conversion function will have function type TI -> TO, for fresh
+  // type variables TI and TO.
+  cs.addValueMemberConstraint(type, name,
+                              FunctionType::get(inputTV, outputTV, ctx),
+                              memberLocator);
+
+  // A conversion function must accept an empty parameter list ().
+  // Note: This should never fail, because the declaration checker
+  // should ensure that conversions have no non-defaulted parameters.
+  cs.addConstraint(ConstraintKind::Conversion, TupleType::getEmpty(ctx),
+                   inputTV, cs.getConstraintLocator(locator));
+
+  // Relate the output of the conversion function to the other type, using
+  // the provided constraint kind.
+  cs.addConstraint(kind, outputTV, otherType,
+                   cs.getConstraintLocator(
+                     locator.withPathElement(
+                       ConstraintLocator::ConversionResult)));
+  
+  return ConstraintSystem::SolutionKind::Solved;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags,
@@ -1887,48 +1943,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   
   // A nominal type can be converted to another type via a user-defined
   // conversion function.
-  if (concrete && kind >= TypeMatchKind::Conversion &&
-      (type1->getNominalOrBoundGenericNominal() || type1->is<ArchetypeType>())){
-    auto &context = getASTContext();
-    // FIXME: lame name!
-    auto name = context.getIdentifier("__conversion");
-    if (lookupMember(type1, name)) {
-      auto memberLocator = getConstraintLocator(
-                              locator.withPathElement(
-                                ConstraintLocator::ConversionMember));
-      auto inputTV = createTypeVariable(
-                       getConstraintLocator(
-                          memberLocator,
-                          ConstraintLocator::FunctionArgument),
-                      /*canBindToLValue=*/false);
-      auto outputTV = createTypeVariable(
-                        getConstraintLocator(
-                           memberLocator,
-                           ConstraintLocator::FunctionResult),
-                        /*canBindToLValue=*/false);
+  if (concrete && kind >= TypeMatchKind::Conversion) {
+    switch (tryUserConversion(*this, type1, ConstraintKind::Subtype, type2,
+                              locator)) {
+    case SolutionKind::Error:
+      return SolutionKind::Error;
 
-      // The conversion function will have function type TI -> TO, for fresh
-      // type variables TI and TO.
-      addValueMemberConstraint(type1, name,
-                               FunctionType::get(inputTV, outputTV, context),
-                               memberLocator);
+    case SolutionKind::Unsolved:
+      // Keep trying.
+      break;
 
-      // A conversion function must accept an empty parameter list ().
-      // Note: This should never fail, because the declaration checker
-      // should ensure that conversions have no non-defaulted parameters.
-      addConstraint(ConstraintKind::Conversion, TupleType::getEmpty(context),
-                    inputTV, getConstraintLocator(locator));
-
-      // The output of the conversion function must be a subtype of the
-      // type we're trying to convert to. The use of subtyping here eliminates
-      // multiple-step user-defined conversions, which also eliminates concerns
-      // about cyclic conversions causing infinite loops in the constraint
-      // solver.
-      addConstraint(ConstraintKind::Subtype, outputTV, type2,
-                    getConstraintLocator(
-                      locator.withPathElement(
-                        ConstraintLocator::ConversionResult)));
-      
+    case SolutionKind::Solved:
+    case SolutionKind::TriviallySolved:
+      trivial = false;
       return SolutionKind::Solved;
     }
   }
@@ -2231,6 +2258,32 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   if (TC.conformsToProtocol(type, protocol))
     return SolutionKind::TriviallySolved;
 
+  // FIXME: If we're dealing with _Nil, allow user conversions. This should be
+  // general, but we can't break the recursion without fixing locators to
+  // not lose information. Ugh!
+  SmallVector<LocatorPathElt, 4> pathElts;
+  (void)locator.getLocatorParts(pathElts);
+  if (type->is<StructType>() &&
+      !type->castTo<StructType>()->getDecl()->getName().empty() &&
+      type->castTo<StructType>()->getDecl()->getName().str().equals("_Nil")) {
+    // If the type has any user-defined conversions, one of them might work.
+    // Break this constraint down into a conformance constraint on the result of
+    // conversion.
+    switch (tryUserConversion(*this, type, ConstraintKind::ConformsTo,
+                              protocol->getDeclaredType(), locator)) {
+    case SolutionKind::Error:
+      return SolutionKind::Error;
+
+    case SolutionKind::Unsolved:
+      break;
+
+    case SolutionKind::Solved:
+    case SolutionKind::TriviallySolved:
+      return SolutionKind::Solved;
+    }
+  }
+
+  // There's nothing more we can do; fail.
   recordFailure(getConstraintLocator(locator),
                 Failure::DoesNotConformToProtocol, type,
                 protocol->getDeclaredType());
