@@ -51,22 +51,33 @@ swift::swift_initUnionValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   size_t payloadSize = payloadWitnesses->getSize();
   unsigned payloadNumExtraInhabitants
     = payloadWitnesses->getNumExtraInhabitants();
+  
+  unsigned unusedExtraInhabitants = 0;
+  
   // If there are enough extra inhabitants for all of the cases, then the size
   // of the union is the same as its payload.
   size_t size;
   if (payloadNumExtraInhabitants >= emptyCases) {
     size = payloadSize;
+    unusedExtraInhabitants = payloadNumExtraInhabitants - emptyCases;
   } else {
     size = payloadSize + getNumTagBytes(payloadSize,
                                       emptyCases - payloadNumExtraInhabitants);
   }
-  
-  // Initialize the fields of the value witness table.
-  // FIXME: Initialize extra inhabitant witnesses.
+
   vwtable->size = size;
-  vwtable->flags = payloadWitnesses->flags.withExtraInhabitants(false);
+  vwtable->flags = payloadWitnesses->flags
+    .withExtraInhabitants(unusedExtraInhabitants > 0);
   vwtable->stride = llvm::RoundUpToAlignment(size,
                                              payloadWitnesses->getAlignment());
+  
+  // If the payload has extra inhabitants left over after the ones we used,
+  // forward them as our own.
+  if (unusedExtraInhabitants > 0) {
+    auto xiVWTable = static_cast<ExtraInhabitantsValueWitnessTable*>(vwtable);
+    xiVWTable->extraInhabitantFlags = ExtraInhabitantFlags()
+      .withNumExtraInhabitants(unusedExtraInhabitants);
+  }
 }
 
 int

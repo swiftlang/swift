@@ -210,6 +210,23 @@ public:
   virtual void initializeValueWitnessTable(IRGenFunction &IGF,
                                            llvm::Value *metadata,
                                            llvm::Value *vwtable) const = 0;
+
+  virtual bool mayHaveExtraInhabitants() const = 0;
+
+  virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                               Address src) const = 0;
+  virtual void storeExtraInhabitant(IRGenFunction &IGF,
+                                    llvm::Value *index,
+                                    Address dest) const = 0;
+  
+  /// \group Delegated FixedTypeInfo operations
+  
+  virtual unsigned getFixedExtraInhabitantCount() const = 0;
+  
+  virtual llvm::ConstantInt *
+  getFixedExtraInhabitantValue(IRGenModule &IGM,
+                               unsigned bits,
+                               unsigned index) const = 0;
   
   /// \group Delegated LoadableTypeInfo operations
   
@@ -467,20 +484,85 @@ namespace {
       Address vwtAddr(vwtable, IGF.IGM.getPointerAlignment());
       Address eltVWTAddr(eltVWT, IGF.IGM.getPointerAlignment());
       
-      auto copyWitnessFromElt = [&](ValueWitness witness) {
+      auto copyWitnessFromElt = [&](ValueWitness witness) -> llvm::Value* {
         Address dest = IGF.Builder.CreateConstArrayGEP(vwtAddr,
                                    unsigned(witness), IGF.IGM.getPointerSize());
         Address src = IGF.Builder.CreateConstArrayGEP(eltVWTAddr,
                                    unsigned(witness), IGF.IGM.getPointerSize());
-        IGF.Builder.CreateStore(IGF.Builder.CreateLoad(src), dest);
+        auto val = IGF.Builder.CreateLoad(src);
+        IGF.Builder.CreateStore(val, dest);
+        return val;
       };
 
       copyWitnessFromElt(ValueWitness::Size);
-      copyWitnessFromElt(ValueWitness::Flags);
+      auto flags = copyWitnessFromElt(ValueWitness::Flags);
       copyWitnessFromElt(ValueWitness::Stride);
       
-      // FIXME: We should also carry over the extra inhabitant flags if the
-      // element type has extra inhabitants.
+      // If the original type had extra inhabitants, carry over its
+      // extra inhabitant flags.
+      auto xiBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+      auto noXIBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+      
+      auto xiFlag = IGF.Builder.CreatePtrToInt(flags, IGF.IGM.SizeTy);
+      auto xiMask
+        = IGF.IGM.getSize(Size(ValueWitnessFlags::Union_HasExtraInhabitants));
+      xiFlag = IGF.Builder.CreateAnd(xiFlag, xiMask);
+      auto xiBool = IGF.Builder.CreateICmpNE(xiFlag,
+                                             IGF.IGM.getSize(Size(0)));
+      IGF.Builder.CreateCondBr(xiBool, xiBB, noXIBB);
+      
+      IGF.Builder.emitBlock(xiBB);
+      copyWitnessFromElt(ValueWitness::ExtraInhabitantFlags);
+      IGF.Builder.CreateBr(noXIBB);
+      
+      IGF.Builder.emitBlock(noXIBB);
+    }
+    
+    bool mayHaveExtraInhabitants() const override {
+      // FIXME: Hold off on registering extra inhabitants for dynamic unions
+      // until initializeValueWitnessTable handles them.
+      if (!getSingleton())
+        return false;
+      return getSingleton()->mayHaveExtraInhabitants();
+    }
+    
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                         Address src) const override {
+      if (!getSingleton()) {
+        // Any empty value is a valid value.
+        return llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1);
+      }
+
+      return getSingleton()->getExtraInhabitantIndex(IGF,
+                                                 getSingletonAddress(IGF, src));
+    }
+    
+    void storeExtraInhabitant(IRGenFunction &IGF,
+                              llvm::Value *index,
+                              Address dest) const override {
+      if (!getSingleton()) {
+        // Nothing to store for empty singletons.
+        return;
+      }
+      getSingleton()->storeExtraInhabitant(IGF, index,
+                                           getSingletonAddress(IGF, dest));
+    }
+    
+    unsigned getFixedExtraInhabitantCount() const override {
+      assert(TIK >= Fixed);
+      if (!getSingleton())
+        return 0;
+      return getFixedSingleton()->getFixedExtraInhabitantCount();
+    }
+    
+    llvm::ConstantInt *
+    getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                 unsigned bits,
+                                 unsigned index) const override {
+      assert(TIK >= Fixed);
+      assert(getSingleton() && "empty singletons have no extra inhabitants");
+      return getFixedSingleton()
+        ->getFixedExtraInhabitantValue(IGM, bits, index);
     }
   };
   
@@ -601,6 +683,70 @@ namespace {
                                      llvm::Value *vwtable) const override {
       // No-payload unions are always fixed-size so never need dynamic value
       // witness table initialization.
+    }
+    
+    /// \group Extra inhabitants for no-payload unions.
+
+    // No-payload unions have all values above their greatest discriminator
+    // value that fit inside their storage size available as extra inhabitants.
+    
+    bool mayHaveExtraInhabitants() const override {
+      return getFixedExtraInhabitantCount() > 0;
+    }
+    
+    unsigned getFixedExtraInhabitantCount() const override {
+      unsigned bits = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
+      assert(bits < 32 && "freakishly huge no-payload union");
+      return (1U << bits) - ElementsWithNoPayload.size();
+    }
+    
+    llvm::ConstantInt *
+    getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                 unsigned bits,
+                                 unsigned index) const override {
+      unsigned value = index + ElementsWithNoPayload.size();
+      return llvm::ConstantInt::get(IGM.getLLVMContext(),
+                                    APInt(bits, value));
+    }
+    
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                         Address src) const override {
+      auto &C = IGF.IGM.getLLVMContext();
+
+      // Load the value.
+      auto payloadTy = llvm::IntegerType::get(C,
+                      cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits());
+      src = IGF.Builder.CreateBitCast(src, payloadTy->getPointerTo());
+      llvm::Value *val = IGF.Builder.CreateLoad(src);
+      
+      // Subtract the number of cases.
+      val = IGF.Builder.CreateSub(val,
+              llvm::ConstantInt::get(payloadTy, ElementsWithNoPayload.size()));
+      
+      // If signed less than zero, we have a valid value. Otherwise, we have
+      // an extra inhabitant.
+      auto valid
+        = IGF.Builder.CreateICmpSLT(val, llvm::ConstantInt::get(payloadTy, 0));
+      val = IGF.Builder.CreateSelect(valid,
+                                     llvm::ConstantInt::getSigned(payloadTy, -1),
+                                     val);
+      
+      val = IGF.Builder.CreateZExtOrTrunc(val, IGF.IGM.Int32Ty);
+      return val;
+    }
+    
+    void storeExtraInhabitant(IRGenFunction &IGF,
+                              llvm::Value *index,
+                              Address dest) const override {
+      auto &C = IGF.IGM.getLLVMContext();
+      auto payloadTy = llvm::IntegerType::get(C,
+                      cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits());
+      dest = IGF.Builder.CreateBitCast(dest, payloadTy->getPointerTo());
+
+      index = IGF.Builder.CreateZExtOrTrunc(index, payloadTy);
+      index = IGF.Builder.CreateAdd(index,
+                llvm::ConstantInt::get(payloadTy, ElementsWithNoPayload.size()));
+      IGF.Builder.CreateStore(index, dest);
     }
     
     /// \group Required for SingleScalarTypeInfo
@@ -1568,6 +1714,71 @@ namespace {
                     IGF.IGM.getInitUnionValueWitnessTableSinglePayloadFn(),
                     vwtable, payloadMetadata, emptyCasesVal);
     }
+    
+    /// \group Extra inhabitants
+    
+    // Extra inhabitants from the payload that we didn't use for our empty cases
+    // are available to outer unions.
+    // FIXME: If we spilled extra tag bits, we could offer spare bits from the
+    // tag.
+    
+    bool mayHaveExtraInhabitants() const override {
+      if (TIK >= Fixed)
+        return getFixedExtraInhabitantCount() > 0;
+
+      return getPayloadTypeInfo().mayHaveExtraInhabitants();
+    }
+    
+    unsigned getFixedExtraInhabitantCount() const override {
+      unsigned payloadXI
+        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount();
+      
+      unsigned numEmptyCases = ElementsWithNoPayload.size();
+      
+      if (payloadXI <= numEmptyCases)
+        return 0;
+      
+      return payloadXI - numEmptyCases;
+    }
+    
+    llvm::ConstantInt *
+    getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                 unsigned bits,
+                                 unsigned index) const override {
+      return getFixedPayloadTypeInfo()
+        .getFixedExtraInhabitantValue(IGM, bits,
+                                      index + ElementsWithNoPayload.size());
+    }
+    
+    llvm::Value *
+    getExtraInhabitantIndex(IRGenFunction &IGF,
+                            Address src) const override {
+      auto payload = projectPayloadData(IGF, src);
+      llvm::Value *index
+        = getPayloadTypeInfo().getExtraInhabitantIndex(IGF, payload);
+      
+      // Offset the payload extra inhabitant index by the number of inhabitants
+      // we used. If less than zero, it's a valid value of the union type.
+      index = IGF.Builder.CreateSub(index,
+         llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithNoPayload.size()));
+      auto valid = IGF.Builder.CreateICmpSLT(index,
+                                   llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
+      index = IGF.Builder.CreateSelect(valid,
+                              llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1),
+                              index);
+      return index;
+    }
+    
+    void storeExtraInhabitant(IRGenFunction &IGF,
+                              llvm::Value *index,
+                              Address dest) const override {
+      // Offset the index to skip the extra inhabitants we used.
+      index = IGF.Builder.CreateAdd(index,
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithNoPayload.size()));
+      
+      auto payload = projectPayloadData(IGF, dest);
+      getPayloadTypeInfo().storeExtraInhabitant(IGF, index, payload);
+    }
   };
 
   class MultiPayloadUnionImplStrategy final
@@ -2306,6 +2517,34 @@ namespace {
                                      llvm::Value *vwtable) const override {
       // FIXME
     }
+    
+    /// \group Extra inhabitants
+    
+    // TODO
+    
+    bool mayHaveExtraInhabitants() const override { return false; }
+    
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                         Address src) const override {
+      llvm_unreachable("extra inhabitants for multi-payload unions not implemented");
+    }
+    
+    void storeExtraInhabitant(IRGenFunction &IGF,
+                              llvm::Value *index,
+                              Address dest) const override {
+      llvm_unreachable("extra inhabitants for multi-payload unions not implemented");
+    }
+    
+    unsigned getFixedExtraInhabitantCount() const override {
+      return 0;
+    }
+    
+    llvm::ConstantInt *
+    getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                 unsigned bits,
+                                 unsigned index) const override {
+      llvm_unreachable("extra inhabitants for multi-payload unions not implemented");
+    }
   };
 } // end anonymous namespace
 
@@ -2447,16 +2686,40 @@ namespace {
                                          llvm::Value *vwtable) const override {
       return Strategy.initializeValueWitnessTable(IGF, metadata, vwtable);
     }
+    bool mayHaveExtraInhabitants() const override {
+      return Strategy.mayHaveExtraInhabitants();
+    }
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                         Address src) const override {
+      return Strategy.getExtraInhabitantIndex(IGF, src);
+    }
+    void storeExtraInhabitant(IRGenFunction &IGF,
+                              llvm::Value *index,
+                              Address dest) const override {
+      return Strategy.storeExtraInhabitant(IGF, index, dest);
+    }
   };
   
   /// TypeInfo for fixed-layout, address-only union types.
   class FixedUnionTypeInfo : public UnionTypeInfoBase<FixedTypeInfo> {
   public:
-    // FIXME: Derive spare bits from element layout.
     FixedUnionTypeInfo(UnionImplStrategy &strategy,
                        llvm::StructType *T, Size S, llvm::BitVector SB,
                        Alignment A, IsPOD_t isPOD)
       : UnionTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD) {}
+    
+    /// \group Methods delegated to the UnionImplStrategy
+
+    unsigned getFixedExtraInhabitantCount() const override {
+      return Strategy.getFixedExtraInhabitantCount();
+    }
+
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                    unsigned bits,
+                                                    unsigned index)
+    const override {
+      return Strategy.getFixedExtraInhabitantValue(IGM, bits, index);
+    }
   };
 
   /// TypeInfo for loadable union types.
@@ -2509,6 +2772,16 @@ namespace {
                             Explosion &dest,
                             unsigned offset) const override {
       return Strategy.unpackUnionPayload(IGF, payload, dest, offset);
+    }
+    unsigned getFixedExtraInhabitantCount() const override {
+      return Strategy.getFixedExtraInhabitantCount();
+    }
+    
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                    unsigned bits,
+                                                    unsigned index)
+    const override {
+      return Strategy.getFixedExtraInhabitantValue(IGM, bits, index);
     }
   };
   

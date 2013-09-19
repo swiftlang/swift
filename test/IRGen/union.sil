@@ -24,6 +24,17 @@ import Builtin
 //      case z:     1  0  0  1 0 0 0 0
 // CHECK: %O5union21SinglePayloadSpareBit = type { i64 }
 
+// -- Single-payload union containing a no-payload union as its payload.
+//    The representation takes extra inhabitants starting after the greatest
+//    discriminator value used by the nested no-payload union.
+// CHECK: %O5union19SinglePayloadNested = type { i8 }
+
+// -- Single-payload union containing another single-payload union as its
+//    payload.
+//    The representation takes extra inhabitants from the nested union's payload
+//    that were unused by the nested union.
+// CHECK: %O5union25SinglePayloadNestedNested = type { i8 }
+
 // -- Multi-payload union, no spare bits. The representation adds tag bits
 //    to discriminate payloads. No-payload cases all share a tag.
 //      case x(i8): X0 X1 X2 ... X7 X8 | 0 0
@@ -62,10 +73,15 @@ import Builtin
 
 // -- Dynamic metadata template carries a value witness table pattern
 //    we fill in on instantiation.
+//    The witness table pattern includes extra inhabitant witness
+//    implementations which are used if the instance has extra inhabitants.
 // CHECK: @_TMPdO5union16DynamicSingleton = global { {{.*}}* } {
 // CHECK:   void (i8*, i8*)* [[DYNAMIC_SINGLETON_FILL:@fill_generic_metadata[0-9]*]]
+// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO5union16DynamicSingleton to i8*),
+// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO5union16DynamicSingleton to i8*),
+// CHECK:   i8* null
 
-// -- No-payload unions have spare bits, and therefore extra inhabitants, in
+// -- No-payload unions have extra inhabitants in
 //    their value witness table.
 // CHECK: @_TWVO5union10NoPayloads = constant [19 x i8*] [
 // -- ...
@@ -79,12 +95,34 @@ import Builtin
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO5union10NoPayloads to i8*),
 // -- getExtraInhabitantIndex
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO5union10NoPayloads to i8*),
-// -- num extra inhabitants (256 - 4 valid states)
-// CHECK:   i8* inttoptr (i64 252 to i8*)
+// -- num extra inhabitants (256 - 3 valid states)
+// CHECK:   i8* inttoptr (i64 253 to i8*)
 // CHECK: ] 
+
+// -- Single-payload unions take unused extra inhabitants from their payload
+//    as their own.
+// CHECK: @_TWVO5union19SinglePayloadNested = constant [19 x i8*] [
+// -- ...
+// -- size
+// CHECK:   i8* inttoptr (i64 1 to i8*),
+// -- flags                 0x4_0000 - alignment 1, has extra inhabitants
+// CHECK:   i8* inttoptr (i64 262144 to i8*),
+// -- stride
+// CHECK:   i8* inttoptr (i64 1 to i8*),
+// -- storeExtraInhabitant
+// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO5union19SinglePayloadNested to i8*),
+// -- getExtraInhabitantIndex
+// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO5union19SinglePayloadNested to i8*),
+// -- num extra inhabitants (253 from payload - 3 empty cases)
+// CHECK:   i8* inttoptr (i64 250 to i8*)
+// CHECK: ] 
+
 
 // CHECK: @_TMPdO5union20DynamicSinglePayload = global { {{.*}}* } {
 // CHECK:   void (i8*, i8*)* [[DYNAMIC_SINGLE_PAYLOAD_FILL:@fill_generic_metadata[0-9]*]]
+// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO5union20DynamicSinglePayload to i8*),
+// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO5union20DynamicSinglePayload to i8*),
+// CHECK:   i8* null
 
 union Singleton {
   case val(Builtin.Int64, Builtin.Int64)
@@ -792,6 +830,70 @@ sil @single_payload_spare_bit_inject_z : $() -> SinglePayloadSpareBit {
 entry:
   %u = union $SinglePayloadSpareBit, #SinglePayloadSpareBit.z!unionelt
   return %u : $SinglePayloadSpareBit
+}
+
+union SinglePayloadNested {
+  case a(NoPayloads)
+  case b
+  case c
+  case d
+}
+
+union SinglePayloadNestedNested {
+  case e(SinglePayloadNested)
+  case f
+  case g
+  case h
+}
+
+// CHECK: define void @single_payload_nested_switch(i8) {
+sil @single_payload_nested_switch : $(SinglePayloadNestedNested) -> () {
+entry(%u : $SinglePayloadNestedNested):
+// CHECK:   switch i8 {{%.*}}, label {{%.*}} [
+// CHECK:     i8 6, label {{%.*}}
+// CHECK:     i8 7, label {{%.*}}
+// CHECK:     i8 8, label {{%.*}}
+// CHECK:   ]
+  switch_union %u : $SinglePayloadNestedNested, case #SinglePayloadNestedNested.e!unionelt.1: e_dest, case #SinglePayloadNestedNested.f!unionelt: f_dest, case #SinglePayloadNestedNested.g!unionelt: g_dest, case #SinglePayloadNestedNested.h!unionelt: h_dest
+
+e_dest(%v : $SinglePayloadNested):
+// CHECK:   switch i8 {{%.*}}, label {{%.*}} [
+// CHECK:     i8 3, label {{%.*}}
+// CHECK:     i8 4, label {{%.*}}
+// CHECK:     i8 5, label {{%.*}}
+// CHECK:   ]
+  switch_union %v : $SinglePayloadNested, case #SinglePayloadNested.a!unionelt.1: a_dest, case #SinglePayloadNested.b!unionelt: b_dest, case #SinglePayloadNested.c!unionelt: c_dest, case #SinglePayloadNested.d!unionelt: d_dest
+f_dest:
+  br end
+g_dest:
+  br end
+h_dest:
+  br end
+
+a_dest(%w : $NoPayloads):
+// CHECK:   switch i2 {{%.*}}, label {{%.*}} [
+// CHECK:     i2 0, label {{%.*}}
+// CHECK:     i2 1, label {{%.*}}
+// CHECK:     i2 -2, label {{%.*}}
+// CHECK:   ]
+  switch_union %w : $NoPayloads, case #NoPayloads.x!unionelt: x_dest, case #NoPayloads.y!unionelt: y_dest, case #NoPayloads.z!unionelt: z_dest
+b_dest:
+  br end
+c_dest:
+  br end
+d_dest:
+  br end
+
+x_dest:
+  br end
+y_dest:
+  br end
+z_dest:
+  br end
+
+end:
+  %x = tuple()
+  return %x : $()
 }
 
 union DynamicSinglePayload<T> {
@@ -1603,6 +1705,8 @@ typealias AllConcreteTestUnions = (
   SinglePayloadNoXI,
   SinglePayloadNoXI2,
   SinglePayloadSpareBit,
+  SinglePayloadNested,
+  SinglePayloadNestedNested,
   MultiPayloadNoSpareBits,
   MultiPayloadOneSpareBit,
   MultiPayloadTwoSpareBits)
@@ -1678,6 +1782,19 @@ entry:
 // CHECK:   [[T_STRIDE_ADDR:%.*]] = getelementptr inbounds i8** [[T_VWT]], i32 15
 // CHECK:   [[T_STRIDE:%.*]] = load i8** [[T_STRIDE_ADDR]], align 8
 // CHECK:   store i8* [[T_STRIDE]], i8** [[STRIDE_ADDR]], align 8
+// -- Test the 'has extra inhabitants' bit and carry over the extra inhabitants
+//    flag if set.
+// CHECK:   [[T_FLAGS_VAL:%.*]] = ptrtoint i8* [[T_FLAGS]] to i64
+// CHECK:   [[XI_FLAG:%.*]] = and i64 [[T_FLAGS_VAL]], 262144
+// CHECK:   [[XI_BIT:%.*]] = icmp ne i64 [[XI_FLAG]], 0
+// CHECK:   br i1 [[XI_BIT]], label %[[HAS_XI:[0-9]+]], label %[[HAS_NO_XI:[0-9]+]]
+// CHECK: ; <label>:[[HAS_XI]]
+// CHECK:   [[XI_FLAGS_ADDR:%.*]] = getelementptr inbounds i8** [[VWT]], i32 18
+// CHECK:   [[T_XI_FLAGS_ADDR:%.*]] = getelementptr inbounds i8** [[T_VWT]], i32 18
+// CHECK:   [[T_XI_FLAGS:%.*]] = load i8** [[T_XI_FLAGS_ADDR]], align 8
+// CHECK:   store i8* [[T_XI_FLAGS]], i8** [[XI_FLAGS_ADDR]], align 8
+// CHECK:   br label %[[HAS_NO_XI]]
+// CHECK: ; <label>:[[HAS_NO_XI]]
 
 // -- Fill function for dynamic single-payload. Call into the runtime to
 //    calculate the size.

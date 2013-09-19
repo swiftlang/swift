@@ -241,11 +241,17 @@ public:
   
   /// Map an extra inhabitant representation in memory to a unique 31-bit
   /// identifier, and map a valid representation of the type to -1.
+  ///
+  /// Calls to this witness must be dominated by a runtime check that the type
+  /// has extra inhabitants.
   virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src) const = 0;
   
   /// Store the extra inhabitant representation indexed by a 31-bit identifier
   /// to memory.
+  ///
+  /// Calls to this witness must be dominated by a runtime check that the type
+  /// has extra inhabitants.
   virtual void storeExtraInhabitant(IRGenFunction &IGF,
                                     llvm::Value *index,
                                     Address dest) const = 0;

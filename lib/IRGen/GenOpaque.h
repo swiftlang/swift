@@ -103,6 +103,19 @@ namespace irgen {
                               llvm::Value *metadata,
                               llvm::Value *object);
   
+  /// Emit a call to the 'getExtraInhabitantIndex' operation.
+  /// The type must be dynamically known to have extra inhabitant witnesses.
+  llvm::Value *emitGetExtraInhabitantIndexCall(IRGenFunction &IGF,
+                                               llvm::Value *metadata,
+                                               llvm::Value *srcObject);
+  
+  /// Emit a call to the 'storeExtraInhabitant' operation.
+  /// The type must be dynamically known to have extra inhabitant witnesses.
+  llvm::Value *emitStoreExtraInhabitantCall(IRGenFunction &IGF,
+                                            llvm::Value *metadata,
+                                            llvm::Value *index,
+                                            llvm::Value *destObject);
+  
   /// Emit a load of the 'size' value witness.
   llvm::Value *emitLoadOfSize(IRGenFunction &IGF, llvm::Value *vwtable);
 

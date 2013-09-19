@@ -186,7 +186,7 @@ public:
                           Explosion &dest,
                           unsigned offset) const override {
     UnpackUnionPayload unpack(IGF, payload);
-    dest.add(unpack.claimAtOffset(getScalarType(), offset));
+    dest.add(unpack.claimAtOffset(asDerived().getScalarType(), offset));
   }
 };
 

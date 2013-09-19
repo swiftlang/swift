@@ -1139,6 +1139,21 @@ namespace {
       // never be independently initialized for one.
       llvm_unreachable("initializing value witness table for archetype?!");
     }
+    
+    bool mayHaveExtraInhabitants() const override {
+      return true;
+    }
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                         Address src) const override {
+      auto metadata = getMetadataRef(IGF);
+      return emitGetExtraInhabitantIndexCall(IGF, metadata, src.getAddress());
+    }
+    void storeExtraInhabitant(IRGenFunction &IGF,
+                              llvm::Value *index,
+                              Address dest) const override {
+      auto metadata = getMetadataRef(IGF);
+      emitStoreExtraInhabitantCall(IGF, metadata, index, dest.getAddress());
+    }
   };
   
   /// Ways in which an object can fit into a fixed-size buffer.

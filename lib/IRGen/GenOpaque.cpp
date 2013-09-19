@@ -453,6 +453,36 @@ llvm::Value *irgen::emitTypeofCall(IRGenFunction &IGF,
   return call;
 }
 
+/// Emit a call to the 'getExtraInhabitantIndex' operation.
+/// The type must be dynamically known to have extra inhabitant witnesses.
+llvm::Value *irgen::emitGetExtraInhabitantIndexCall(IRGenFunction &IGF,
+                                                    llvm::Value *metadata,
+                                                    llvm::Value *srcObject) {
+  auto fn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
+                                         ValueWitness::GetExtraInhabitantIndex);
+  
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall2(fn, srcObject, metadata);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  setHelperAttributes(call);
+  return call;
+}
+
+/// Emit a call to the 'storeExtraInhabitant' operation.
+/// The type must be dynamically known to have extra inhabitant witnesses.
+llvm::Value *irgen::emitStoreExtraInhabitantCall(IRGenFunction &IGF,
+                                                 llvm::Value *metadata,
+                                                 llvm::Value *index,
+                                                 llvm::Value *destObject) {
+  auto fn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
+                                       ValueWitness::StoreExtraInhabitant);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall3(fn, destObject, index, metadata);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  setHelperAttributes(call);
+  return call;
+}
+
 /// Load the 'size' value witness from the given table as a size_t.
 llvm::Value *irgen::emitLoadOfSize(IRGenFunction &IGF, llvm::Value *wtable) {
   return emitLoadOfValueWitness(IGF, wtable, ValueWitness::Size);
