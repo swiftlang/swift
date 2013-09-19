@@ -2346,20 +2346,14 @@ Parser::parseDeclConstructor(unsigned Flags) {
 
   // Parse the parameters.
   // FIXME: handle code completion in Arguments.
-  Pattern *argPattern;
-  Pattern *bodyPattern;
-  ParserStatus status = parseConstructorArguments(argPattern, bodyPattern);
+  Pattern *ArgPattern;
+  Pattern *BodyPattern;
+  ParserStatus SignatureStatus =
+      parseConstructorArguments(ArgPattern, BodyPattern);
 
-  // '{'
-  if (!Tok.is(tok::l_brace)) {
-    if (!status.isError()) {
-      // Don't emit this diagnostic if we already complained about this
-      // constructor decl.
-      diagnose(Tok, diag::expected_lbrace_constructor);
-    }
-
-    // FIXME: This is brutal. Can't we at least create the declaration?
-    return nullptr;
+  if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
+    // Trigger delayed parsing, no need to continue.
+    return SignatureStatus;
   }
 
   VarDecl *SelfDecl
@@ -2369,9 +2363,15 @@ Parser::parseDeclConstructor(unsigned Flags) {
   Scope S2(this, ScopeKind::ConstructorBody);
   ConstructorDecl *CD =
       new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
-                                    ConstructorLoc, argPattern, bodyPattern,
+                                    ConstructorLoc, ArgPattern, BodyPattern,
                                     SelfDecl, GenericParams, CurDeclContext);
+
+  // Pass the function signature to code completion.
+  if (SignatureStatus.hasCodeCompletion())
+    CodeCompletion->setDelayedParsedDecl(CD);
+
   SelfDecl->setDeclContext(CD);
+
   if (ConstructorsNotAllowed) {
     // Tell the type checker not to touch this constructor.
     CD->setInvalid();
@@ -2380,10 +2380,23 @@ Parser::parseDeclConstructor(unsigned Flags) {
     for (auto Param : *GenericParams)
       Param.setDeclContext(CD);
   }
-  addFunctionParametersToScope(bodyPattern, CD);
-  argPattern->walk(SetVarContext(CD));
+  addFunctionParametersToScope(BodyPattern, CD);
+  ArgPattern->walk(SetVarContext(CD));
 
   addToScope(SelfDecl);
+
+  // '{'
+  if (!Tok.is(tok::l_brace)) {
+    if (!SignatureStatus.isError()) {
+      // Don't emit this diagnostic if we already complained about this
+      // constructor decl.
+      diagnose(Tok, diag::expected_lbrace_constructor);
+    }
+
+    // FIXME: This is brutal. Can't we at least return the declaration?
+    return nullptr;
+  }
+
   ContextChange CC(*this, CD);
 
   if (!isDelayedParsingEnabled()) {

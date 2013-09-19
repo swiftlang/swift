@@ -175,64 +175,65 @@ static Pattern *getFirstSelectorPattern(ASTContext &Context,
 
 static ParserStatus
 parseSelectorFunctionArguments(Parser &P,
-                               SmallVectorImpl<Pattern *> &argPat,
-                               SmallVectorImpl<Pattern *> &bodyPat,
-                               Pattern *firstPattern) {
-  SourceLoc lp;
-  SourceLoc rp;
-  SmallVector<TuplePatternElt, 8> argElts;
-  SmallVector<TuplePatternElt, 8> bodyElts;
+                               SmallVectorImpl<Pattern *> &ArgPatterns,
+                               SmallVectorImpl<Pattern *> &BodyPatterns,
+                               Pattern *FirstPattern) {
+  SourceLoc LParenLoc;
+  SourceLoc RParenLoc;
+  SmallVector<TuplePatternElt, 8> ArgElts;
+  SmallVector<TuplePatternElt, 8> BodyElts;
 
   // For the argument pattern, try to convert the first parameter pattern to
   // an anonymous AnyPattern of the same type as the body parameter.
-  if (ParenPattern *firstParen = dyn_cast<ParenPattern>(firstPattern)) {
-    bodyElts.push_back(TuplePatternElt(firstParen->getSubPattern()));
-    lp = firstParen->getLParenLoc();
-    rp = firstParen->getRParenLoc();
-    argElts.push_back(TuplePatternElt(
-      getFirstSelectorPattern(P.Context,
-                              firstParen->getSubPattern(),
-                              firstParen->getLoc())));
-  } else if (TuplePattern *firstTuple = dyn_cast<TuplePattern>(firstPattern)) {
-    lp = firstTuple->getLParenLoc();
-    rp = firstTuple->getRParenLoc();
-    if (firstTuple->getNumFields() != 1) {
+  if (ParenPattern *FirstParen = dyn_cast<ParenPattern>(FirstPattern)) {
+    BodyElts.push_back(TuplePatternElt(FirstParen->getSubPattern()));
+    LParenLoc = FirstParen->getLParenLoc();
+    RParenLoc = FirstParen->getRParenLoc();
+    ArgElts.push_back(TuplePatternElt(
+        getFirstSelectorPattern(P.Context,
+                                FirstParen->getSubPattern(),
+                                FirstParen->getLoc())));
+  } else if (TuplePattern *FirstTuple = dyn_cast<TuplePattern>(FirstPattern)) {
+    LParenLoc = FirstTuple->getLParenLoc();
+    RParenLoc = FirstTuple->getRParenLoc();
+    if (FirstTuple->getNumFields() != 1) {
       P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
     }
-    
-    if (firstTuple->getNumFields() >= 1) {
-      const TuplePatternElt &firstElt = firstTuple->getFields()[0];
-      bodyElts.push_back(firstElt);
-      argElts.push_back(TuplePatternElt(
+
+    if (FirstTuple->getNumFields() >= 1) {
+      const TuplePatternElt &FirstElt = FirstTuple->getFields()[0];
+      BodyElts.push_back(FirstElt);
+      ArgElts.push_back(TuplePatternElt(
           getFirstSelectorPattern(P.Context,
-                                  firstElt.getPattern(),
-                                  firstTuple->getLoc()),
-        firstElt.getInit(),
-        firstElt.getDefaultArgKind()));
+                                  FirstElt.getPattern(),
+                                  FirstTuple->getLoc()),
+        FirstElt.getInit(),
+        FirstElt.getDefaultArgKind()));
     } else {
       // Recover by creating a '(_: ())' pattern.
-      TuplePatternElt firstElt(
+      TuplePatternElt FirstElt(
           new (P.Context) TypedPattern(
-              new (P.Context) AnyPattern(firstTuple->getLParenLoc()),
+              new (P.Context) AnyPattern(FirstTuple->getLParenLoc()),
               TupleTypeRepr::create(P.Context, {},
-                                    firstTuple->getSourceRange(),
+                                    FirstTuple->getSourceRange(),
                                     SourceLoc())));
-      bodyElts.push_back(firstElt);
-      argElts.push_back(firstElt);
+      BodyElts.push_back(FirstElt);
+      ArgElts.push_back(FirstElt);
     }
   } else
     llvm_unreachable("unexpected function argument pattern!");
 
-  assert(argElts.size() > 0);
-  assert(bodyElts.size() > 0);
+  assert(ArgElts.size() > 0);
+  assert(BodyElts.size() > 0);
 
   // Parse additional selectors as long as we can.
-  llvm::StringMap<VarDecl*> selectorNames;
+  llvm::StringMap<VarDecl *> SelectorNames;
 
   ParserStatus Status;
   for (;;) {
     if (P.isStartOfBindingName(P.Tok)) {
-      Status |= parseSelectorArgument(P, argElts, bodyElts, selectorNames, rp);
+      Status |= parseSelectorArgument(P, ArgElts, BodyElts, SelectorNames,
+                                      RParenLoc);
       continue;
     }
     if (P.Tok.is(tok::l_paren)) {
@@ -244,8 +245,10 @@ parseSelectorFunctionArguments(Parser &P,
     break;
   }
 
-  argPat.push_back(TuplePattern::create(P.Context, lp, argElts, rp));
-  bodyPat.push_back(TuplePattern::create(P.Context, lp, bodyElts, rp));
+  ArgPatterns.push_back(
+      TuplePattern::create(P.Context, LParenLoc, ArgElts, RParenLoc));
+  BodyPatterns.push_back(
+      TuplePattern::create(P.Context, LParenLoc, BodyElts, RParenLoc));
   return Status;
 }
 
@@ -334,20 +337,17 @@ ParserStatus Parser::parseConstructorArguments(Pattern *&ArgPattern,
                                                Pattern *&BodyPattern) {
   // It's just a pattern. Parse it.
   if (Tok.is(tok::l_paren)) {
-    ParserResult<Pattern> params = parsePatternTuple(/*AllowInitExpr=*/true);
-    if (params.hasCodeCompletion())
-      return params;
+    ParserResult<Pattern> Params = parsePatternTuple(/*AllowInitExpr=*/true);
 
     // If we failed to parse the pattern, create an empty tuple to recover.
-    if (params.isNull()) {
-      params = makeParserErrorResult(
-                 TuplePattern::createSimple(Context, Tok.getLoc(), {},
-                                            Tok.getLoc()));
+    if (Params.isNull()) {
+      Params = makeParserResult(Params,
+          TuplePattern::createSimple(Context, Tok.getLoc(), {}, Tok.getLoc()));
     }
 
-    ArgPattern = params.get();
+    ArgPattern = Params.get();
     BodyPattern = ArgPattern->clone(Context);
-    return params;
+    return Params;
   }
 
   if (!isStartOfBindingName(Tok)) {
@@ -358,7 +358,7 @@ ParserStatus Parser::parseConstructorArguments(Pattern *&ArgPattern,
         diag.fixItInsert(Tok.getLoc(), "() ");
     }
 
-    // Create the empty tuple to recover.
+    // Create an empty tuple to recover.
     ArgPattern = TuplePattern::createSimple(Context, Tok.getLoc(), {},
                                             Tok.getLoc());
     BodyPattern = ArgPattern->clone(Context);
@@ -368,17 +368,21 @@ ParserStatus Parser::parseConstructorArguments(Pattern *&ArgPattern,
   // We have the start of a binding name, so this is a selector-style
   // declaration.
 
-  // Parse additional selectors as long as we can.
-  llvm::StringMap<VarDecl*> selectorNames;
+  // This is not a parenthesis, but we should provide a reasonable source range
+  // for parameters.
+  SourceLoc LParenLoc = Tok.getLoc();
 
-  ParserStatus status;
-  SmallVector<TuplePatternElt, 4> argElts;
-  SmallVector<TuplePatternElt, 4> bodyElts;
-  SourceLoc rightParen;
+  // Parse additional selectors as long as we can.
+  llvm::StringMap<VarDecl *> selectorNames;
+
+  ParserStatus Status;
+  SmallVector<TuplePatternElt, 4> ArgElts;
+  SmallVector<TuplePatternElt, 4> BodyElts;
+  SourceLoc RParenLoc;
   for (;;) {
     if (isStartOfBindingName(Tok)) {
-      status |= parseSelectorArgument(*this, argElts, bodyElts, selectorNames,
-                                      rightParen);
+      Status |= parseSelectorArgument(*this, ArgElts, BodyElts, selectorNames,
+                                      RParenLoc);
       continue;
     }
 
@@ -387,16 +391,15 @@ ParserStatus Parser::parseConstructorArguments(Pattern *&ArgPattern,
       diagnose(Tok, diag::func_selector_with_curry);
       // FIXME: better recovery: just parse a tuple instead of skipping tokens.
       skipUntilDeclRBrace(tok::l_brace);
-      status.setIsParseError();
+      Status.setIsParseError();
     }
     break;
   }
 
-  ArgPattern = TuplePattern::create(Context, SourceLoc(), argElts,
-                                     SourceLoc());
-  BodyPattern = TuplePattern::create(Context, SourceLoc(), bodyElts,
-                                      SourceLoc());
-  return status;
+  ArgPattern = TuplePattern::create(Context, LParenLoc, ArgElts, RParenLoc);
+  BodyPattern = TuplePattern::create(Context, LParenLoc, BodyElts,
+                                     RParenLoc);
+  return Status;
 }
 
 /// Parse a pattern.

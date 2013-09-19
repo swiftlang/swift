@@ -1086,8 +1086,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (DelayedParsedDecl && !typecheckDelayedParsedDecl())
     return;
 
-  if (auto *FD = dyn_cast_or_null<FuncDecl>(DelayedParsedDecl))
-    CurDeclContext = FD;
+  if (auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(DelayedParsedDecl))
+    CurDeclContext = AFD;
 
   if (ParsedExpr && !typecheckParsedExpr())
     return;
