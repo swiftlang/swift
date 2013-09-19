@@ -626,7 +626,9 @@ SwitchIntInst::SwitchIntInst(SILLocation Loc, SILValue Operand,
   : TermInst(ValueKind::SwitchIntInst, Loc),
     Operands(this, Operand),
     NumCases(CaseBBs.size()),
-    HasDefault(bool(DefaultBB))
+    HasDefault(bool(DefaultBB)),
+    BitWidthForCase(Operand.getType().castTo<BuiltinIntegerType>()
+                                                               ->getBitWidth())
 {
   // Initialize the case and successor arrays.
   auto *cases = getCaseBuf();

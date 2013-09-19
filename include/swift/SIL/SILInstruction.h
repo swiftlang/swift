@@ -2062,6 +2062,8 @@ class SwitchIntInst : public TermInst {
   FixedOperandList<1> Operands;
   unsigned NumCases : 31;
   unsigned HasDefault : 1;
+  /// \brief The number of APInt bits required to represent a case value.
+  unsigned BitWidthForCase;
   
   SwitchIntInst(SILLocation Loc, SILValue Operand,
                 SILBasicBlock *DefaultBB,
@@ -2077,7 +2079,7 @@ class SwitchIntInst : public TermInst {
   /// Returns the number of APInt bits required to represent a case value, all
   /// of which are of the operand's type.
   unsigned getBitWidthForCase() const {
-    return getOperand().getType().castTo<BuiltinIntegerType>()->getBitWidth();
+    return BitWidthForCase;
   }
   
   /// Returns the number of APInt words required to represent a case value, all
