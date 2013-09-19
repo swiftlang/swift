@@ -216,6 +216,9 @@ static SILInstruction *constantFoldInstruction(SILInstruction &I,
 }
 
 static bool CCPFunctionBody(SILFunction &F, SILModule &M) {
+  DEBUG(llvm::errs() << "*** ConstPropagation processing: " << F.getName()
+        << "\n");
+
   // Initialize the worklist to all of the instructions ready to process...
   std::set<SILInstruction*> WorkList;
   for (auto &BB : F) {
@@ -234,16 +237,16 @@ static bool CCPFunctionBody(SILFunction &F, SILModule &M) {
 
       // Try to fold the instruction.
       if (SILInstruction *C = constantFoldInstruction(*I, M)) {
-        // We were able to fold, so all users should use the new folded value.
-        assert(I->getTypes().size() == 1 &&
-               "Currently, we only support single result instructions.");
-        SILValue(I).replaceAllUsesWith(C);
-
         // The users could be constant propagatable now.
         for (auto UseI = I->use_begin(),
                   UseE = I->use_end(); UseI != UseE; ++UseI) {
           WorkList.insert(cast<SILInstruction>(UseI.getUser()));
         }
+
+        // We were able to fold, so all users should use the new folded value.
+        assert(I->getTypes().size() == 1 &&
+               "Currently, we only support single result instructions.");
+        SILValue(I).replaceAllUsesWith(C);
 
         // Remove the unused instruction.
         WorkList.erase(I);

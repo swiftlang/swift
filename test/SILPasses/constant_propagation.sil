@@ -107,3 +107,19 @@ bb0:
 // CHECK-NEXT: }
 }
 
+sil @testChainingCCP : $[thin] () -> Builtin.Int1 {
+bb0:
+  %1 = builtin_function_ref #Builtin.trunc_Int64_Int1 : $[thin] Builtin.Int64 -> Builtin.Int1
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = struct_extract %3 : $Int64, #value
+  %5 = apply %1(%4) : $[thin] Builtin.Int64 -> Builtin.Int1
+  return %5 : $Builtin.Int1
+
+// CHECK-LABEL: sil @testChainingCCP
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: return %0 : $Builtin.Int1
+// CHECK-NEXT: }
+}
+
