@@ -1019,14 +1019,14 @@ ERROR(conversion_not_instance_method,sema_tcd,none,
       (Identifier))
 ERROR(transparent_not_valid,sema_tcd,none,
       "'transparent' attribute cannot be applied to this declaration", ())
-ERROR(transparent_invalid_on_destructors,sema_tcd,none,
-      "'transparent' attribute cannot be applied to destructors", ())
 ERROR(transparent_generic_not_supported,sema_tcd,none,
       "'transparent' attribute is not supported for generic declarations", ())
 ERROR(transparent_in_protocols_not_supported,sema_tcd,none,
-      "'transparent' attribute is not supported on declarations within protocols", ())
-ERROR(transparent_class_methods_not_supported,sema_tcd,none,
-      "'transparent' attribute is not supported on class methods", ())
+      "'transparent' attribute is not supported on declarations within protocols",
+      ())
+ERROR(transparent_in_classes_not_supported,sema_tcd,none,
+      "'transparent' attribute is not supported on declarations within classes",
+      ())
 
 ERROR(conversion_params,sema_tcd,none,
       "conversion function %0 has non-defaulted parameters", (Identifier))
