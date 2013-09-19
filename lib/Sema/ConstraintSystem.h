@@ -747,6 +747,9 @@ public:
     path.clear();
     return nullptr;
   }
+
+  /// Attempt to simplify this locator to a single expression.
+  Expr *trySimplifyToExpr() const;
 };
 
 struct ResolvedOverloadSetListItem;
@@ -790,7 +793,9 @@ public:
     /// \brief The first type does not have a member with the given name.
     DoesNotHaveMember,
     /// \brief The type is not an archetype.
-    IsNotArchetype
+    IsNotArchetype,
+    /// \brief The type is not allowed to be an l-value.
+    IsForbiddenLValue,
   };
 
 private:
@@ -864,6 +869,7 @@ public:
     case TypesNotSubtypes:
     case TypesNotTrivialSubtypes:
     case DoesNotConformToProtocol:
+    case IsForbiddenLValue:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                      getSecondType());
 
@@ -2056,6 +2062,12 @@ public:
   /// \returns a possibly-sanitized expression, or null if an error occurred.
   Expr *generateConstraintsShallow(Expr *E);
 
+  /// \brief Generate constraints for binding the given pattern to the
+  /// value of the given expression.
+  ///
+  /// \returns a possibly-sanitized initializer, or null if an error occurred.
+  Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator);
+
   /// \brief The result of attempting to resolve a constraint or set of
   /// constraints.
   enum class SolutionKind : char {
@@ -2333,10 +2345,21 @@ Type adjustLValueForReference(Type type, bool isAssignment,
 /// \c where \c consumed[i] is \c TupleShuffleExpr::FirstVariadic). The values
 /// are indices into the source tuple.
 ///
+/// \param sourceLabelsAreMandatory True if labels in the source type are
+/// mandatory to match; false means to make an effort to match them, but
+/// they can also be dropped.
+///
 /// \returns true if no tuple conversion is possible, false otherwise.
 bool computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
                          SmallVectorImpl<int> &sources,
-                         SmallVectorImpl<unsigned> &variadicArgs);
+                         SmallVectorImpl<unsigned> &variadicArgs,
+                         bool sourceLabelsAreMandatory);
+
+/// Given that an expression has tuple type, are labels in that type
+/// mandatory or advistory?  Mandatory labels must be matched in the
+/// destination type; optional labels can be matched with unlabeled
+/// elements.
+bool hasMandatoryTupleLabels(Expr *expr);
 
 /// Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.
@@ -2363,6 +2386,12 @@ ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
                                    SourceRange &range1,
                                    SourceRange &range2,
                                    ConstraintLocator **targetLocator = nullptr);
+
+void simplifyLocator(Expr *&anchor,
+                     ArrayRef<LocatorPathElt> &path,
+                     Expr *&targetAnchor,
+                     SmallVectorImpl<LocatorPathElt> &targetPath,
+                     SourceRange &range1, SourceRange &range2);
 
 /// Describes the kind of entity to which a locator was resolved.
 enum class ResolvedLocatorKind : uint8_t {

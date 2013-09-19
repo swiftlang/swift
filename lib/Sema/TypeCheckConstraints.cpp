@@ -565,7 +565,8 @@ Type constraints::adjustLValueForReference(Type type, bool isAssignment,
 
 bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
                                       SmallVectorImpl<int> &sources,
-                                      SmallVectorImpl<unsigned> &variadicArgs) {
+                                      SmallVectorImpl<unsigned> &variadicArgs,
+                                      bool sourceLabelsAreMandatory) {
   const int unassigned = -3;
   
   SmallVector<bool, 4> consumed(fromTuple->getFields().size(), false);
@@ -599,17 +600,15 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
     // Record this match.
     sources[i] = matched;
     consumed[matched] = true;
-  }
+  }  
 
   // Resolve any unmatched elements.
   unsigned fromNext = 0, fromLast = fromTuple->getFields().size();
-  auto skipToNextUnnamedInput = [&] {
-    while (fromNext != fromLast &&
-           (consumed[fromNext] ||
-            !fromTuple->getFields()[fromNext].getName().empty()))
+  auto skipToNextAvailableInput = [&] {
+    while (fromNext != fromLast && consumed[fromNext])
       ++fromNext;
   };
-  skipToNextUnnamedInput();
+  skipToNextAvailableInput();
 
   for (unsigned i = 0, n = toTuple->getFields().size(); i != n; ++i) {
     // Check whether we already found a value for this element.
@@ -622,9 +621,16 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
     if (elt2.isVararg()) {
       // Collect the remaining (unnamed) inputs.
       while (fromNext != fromLast) {
+        // Labeled elements can't be adopted into varargs even if
+        // they're non-mandatory.  There isn't a really strong reason
+        // for this, though.
+        if (fromTuple->getFields()[fromNext].hasName()) {
+          return true;
+        }
+
         variadicArgs.push_back(fromNext);
         consumed[fromNext] = true;
-        skipToNextUnnamedInput();
+        skipToNextAvailableInput();
       }
       sources[i] = TupleShuffleExpr::FirstVariadic;
       break;
@@ -640,15 +646,29 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
       return true;
     }
 
+    // Otherwise, assign this input to the next output element.
+
+    // Complain if the input element is named and either the label is
+    // mandatory or we're trying to match it with something with a
+    // different label.
+    if (fromTuple->getFields()[fromNext].hasName() &&
+        (sourceLabelsAreMandatory || elt2.hasName())) {
+      return true;
+    }
+
     sources[i] = fromNext;
     consumed[fromNext] = true;
-    skipToNextUnnamedInput();
+    skipToNextAvailableInput();
   }
 
-  // Check whether there were any unused input values.
-  // FIXME: Could short-circuit this check, above, by not skipping named
-  // input values.
-  return std::find(consumed.begin(), consumed.end(), false) != consumed.end();
+  // Complain if we didn't reach the end of the inputs.
+  if (fromNext != fromLast) {
+    return true;
+  }
+
+  // If we got here, we should have claimed all the arguments.
+  assert(std::find(consumed.begin(), consumed.end(), false) == consumed.end());
+  return false;
 }
 
 // A property or subscript is settable if:
@@ -946,6 +966,29 @@ ConstraintSystem::getGeneratedOverloadSet(ConstraintLocator *locator) {
   return nullptr;
 }
 
+Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
+  SmallVector<LocatorPathElt, 4> pathBuffer;
+  Expr *anchor = getLocatorParts(pathBuffer);
+  ArrayRef<LocatorPathElt> path = pathBuffer;
+
+  Expr *targetAnchor;
+  SmallVector<LocatorPathElt, 4> targetPathBuffer;
+  SourceRange range1, range2;
+
+  simplifyLocator(anchor, path, targetAnchor, targetPathBuffer, range1, range2);
+  return (path.empty() ? anchor : nullptr);
+}
+
+bool constraints::hasMandatoryTupleLabels(Expr *e) {
+  return isa<TupleExpr>(e->getSemanticsProvidingExpr());
+}
+
+static bool hasMandatoryTupleLabels(const ConstraintLocatorBuilder &locator) {
+  if (Expr *e = locator.trySimplifyToExpr())
+    return hasMandatoryTupleLabels(e);
+  return false;
+}
+
 //===--------------------------------------------------------------------===//
 // Constraint simplification
 //===--------------------------------------------------------------------===//
@@ -1070,13 +1113,20 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   // Compute the element shuffles for conversions.
   SmallVector<int, 16> sources;
   SmallVector<unsigned, 4> variadicArguments;
-  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments)) {
+  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments,
+                          ::hasMandatoryTupleLabels(locator))) {
     // If the second tuple can be initialized from a scalar, fall back to
     // that.
     if (tuple2->getFieldForScalarInit() >= 0)
       return Nothing;
-    
+
     // FIXME: Record why the tuple shuffle couldn't be computed.
+    if (shouldRecordFailures()) {
+      if (tuple1->getNumElements() != tuple2->getNumElements()) {
+        recordFailure(getConstraintLocator(locator),
+                      Failure::TupleSizeMismatch, tuple1, tuple2);
+      }
+    }
     return SolutionKind::Error;
   }
 
@@ -1369,11 +1419,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         if (wantRvalue)
           type2 = type2->getRValueType();
 
-        // If the left-hand type variable cannot bind to an rvalue,
-        // but we still have an rvalue, fail.
+        // If the left-hand type variable cannot bind to an lvalue,
+        // but we still have an lvalue, fail.
         if (!typeVar1->getImpl().canBindToLValue()) {
           if (type2->is<LValueType>()) {
-            // FIXME: Produce a "not an lvalue" failure.
+            if (false && shouldRecordFailures()) {
+              recordFailure(getConstraintLocator(locator),
+                            Failure::IsForbiddenLValue, type1, type2);
+            }
             return SolutionKind::Error;
           }
 
@@ -1390,7 +1443,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
       if (!typeVar2->getImpl().canBindToLValue()) {
         if (type1->is<LValueType>()) {
-          // FIXME: Produce a "not an lvalue" failure.
+          if (false && shouldRecordFailures()) {
+            recordFailure(getConstraintLocator(locator),
+                          Failure::IsForbiddenLValue, type1, type2);
+          }
           return SolutionKind::Error;
         }
         
@@ -3743,6 +3799,112 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   }
 
   expr = result;
+  cleanup.disable();
+  return false;
+}
+
+bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
+  PrettyStackTraceDecl stackTrace("type-checking", binding);
+
+  Expr *init = binding->getInit();
+  assert(init && "type-checking an uninitialized binding?");
+
+  auto pattern = binding->getPattern();
+
+  DeclContext *dc = binding->getDeclContext();
+
+  // First, pre-check the initializer, validating any types that occur in the
+  // expression and folding sequence expressions.
+  if (preCheckExpression(init, dc))
+    return true;
+
+  // Pre-check the pattern as well.
+  if (typeCheckPattern(pattern, dc, /*allowUnknownTypes*/ true))
+    return true;
+
+  ConstraintSystem cs(*this, dc);
+
+  // Collect constraints from the initializer.
+  CleanupIllFormedExpressionRAII cleanup(cs, init);
+  if (auto generatedExpr = cs.generateConstraints(init))
+    init = generatedExpr;
+  else {
+    return true;
+  }
+
+  auto initLocator = cs.getConstraintLocator(init, { });
+
+  // Collect constraints from the pattern.
+  Type patternType = cs.generateConstraints(pattern, initLocator);
+  if (!patternType) return true;
+
+  // Add a conversion constraint between the types.
+  cs.addConstraint(ConstraintKind::Conversion, init->getType(),
+                   patternType, initLocator);
+
+  if (getLangOpts().DebugConstraintSolver) {
+    llvm::raw_ostream &log = llvm::errs();
+    log << "---Initial constraints for the given variable binding---\n";
+    init->print(log);
+    log << "\n";
+    cs.dump();
+  }
+
+  // Attempt to solve the constraint system.
+  SmallVector<Solution, 4> viable;
+  if (cs.solve(viable)) {
+    // Try to provide a decent diagnostic.
+    if (cs.diagnose()) {
+      return true;
+    }
+
+    // FIXME: Crappy diagnostic.
+    diagnose(init->getLoc(), diag::constraint_type_check_fail)
+      .highlight(init->getSourceRange());
+
+    return true;
+  }
+
+  auto &solution = viable[0];
+  if (getLangOpts().DebugConstraintSolver) {
+    llvm::errs() << "---Solution---\n";
+    solution.dump(&Context.SourceMgr);
+  }
+
+  // Apply the solution to the expression.
+  init = cs.applySolution(solution, init);
+  if (!init) {
+    // Failure already diagnosed, above, as part of applying the solution.
+   return true;
+  }
+
+  // Figure out what type the constraints decided on.
+  patternType = solution.simplifyType(*this, patternType);
+
+  // Convert the initializer to the type of the pattern.
+  init = solution.coerceToType(init, patternType, initLocator);
+  if (!init) {
+    return true;
+  }
+
+  // Force the initializer to be materializable.
+  // FIXME: work this into the constraint system
+  init = coerceToMaterializable(init);
+  if (!init) {
+    return true;
+  }
+
+  // Apply the solution to the pattern as well.
+  if (coerceToType(pattern, dc, init->getType())) {
+    return true;
+  }
+
+  if (getLangOpts().DebugConstraintSolver) {
+    llvm::errs() << "---Type-checked expression---\n";
+    init->dump();
+  }
+
+  binding->setInit(init);
   cleanup.disable();
   return false;
 }

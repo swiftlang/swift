@@ -631,28 +631,29 @@ namespace {
     /// type information with fresh type variables.
     ///
     /// \param pattern The pattern.
-    /// \param expr The expression that 'anchors' the pattern, which is used
-    /// to create fresh type variables.
-    Type getTypeForPattern(Pattern *pattern, Expr *expr,
+    Type getTypeForPattern(Pattern *pattern, bool forFunctionParam,
                            ConstraintLocatorBuilder locator) {
       switch (pattern->getKind()) {
       case PatternKind::Paren:
         // Parentheses don't affect the type.
         return getTypeForPattern(cast<ParenPattern>(pattern)->getSubPattern(),
-                                 expr, locator);
+                                 forFunctionParam, locator);
 
       case PatternKind::Any:
         // For a pattern of unknown type, create a new type variable.
         return CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                     /*canBindToLValue=*/true);
+                                     /*canBindToLValue*/ forFunctionParam);
 
       case PatternKind::Named: {
+        auto var = cast<NamedPattern>(pattern)->getDecl();
+
         // For a named pattern without a type, create a new type variable
         // and use it as the type of the variable.
-        auto tv = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                        /*canBindToLValue=*/true);
-        cast<NamedPattern>(pattern)->getDecl()->setType(tv);
-        return tv;
+        Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                        /*canBindToLValue*/ forFunctionParam);
+
+        var->setType(ty);
+        return ty;
       }
 
       case PatternKind::Typed:
@@ -667,10 +668,14 @@ namespace {
         for (unsigned i = 0, e = tuplePat->getFields().size(); i != e; ++i) {
           auto tupleElt = tuplePat->getFields()[i];
           bool isVararg = tuplePat->hasVararg() && i == e-1;
-          Type eltTy = getTypeForPattern(tupleElt.getPattern(), expr,
+          Type eltTy = getTypeForPattern(tupleElt.getPattern(), forFunctionParam,
                                          locator.withPathElement(
                                            LocatorPathElt::getTupleElement(i)));
-          auto name = findPatternName(tupleElt.getPattern());
+
+          // Only cons up a tuple element name in a function signature.
+          Identifier name;
+          if (forFunctionParam) name = findPatternName(tupleElt.getPattern());
+
           Type varArgBaseTy;
           tupleTypeElts.push_back(TupleTypeElt(eltTy, name,
                                                tupleElt.getDefaultArgKind(),
@@ -711,7 +716,7 @@ namespace {
       // variables where parameter types where no provided) and building the
       // eventual function type.
       auto paramTy = getTypeForPattern(
-                       expr->getParams(), expr,
+                       expr->getParams(), /*forFunctionParam*/ true,
                        CS.getConstraintLocator(
                          expr,
                          LocatorPathElt::getTupleElement(0)));
@@ -1114,3 +1119,8 @@ Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
   return expr;
 }
 
+Type ConstraintSystem::generateConstraints(Pattern *pattern,
+                                           ConstraintLocatorBuilder locator) {
+  ConstraintGenerator cg(*this);
+  return cg.getTypeForPattern(pattern, /*forFunctionParam*/ false, locator);
+}

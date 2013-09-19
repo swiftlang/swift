@@ -442,6 +442,8 @@ public:
   bool coerceToType(Pattern *P, DeclContext *dc, Type Ty, bool isVararg =false);
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);
+
+  bool typeCheckBinding(PatternBindingDecl *D);
   
   /// \brief Compute the set of captures for the given function or closure.
   void computeCaptures(AnyFunctionRef AFR);

@@ -95,6 +95,11 @@ void Failure::dump(SourceManager *sm) {
     out << getFirstType().getString() << " is not equal to "
         << getSecondType().getString();
     break;
+
+  case IsForbiddenLValue:
+    out << "disallowed l-value binding of " << getFirstType().getString()
+        << " and " << getSecondType().getString();
+    break;
   }
 
   out << ")\n";
@@ -111,16 +116,43 @@ constraints::simplifyLocator(ConstraintSystem &cs,
   if (targetLocator)
     *targetLocator = nullptr;
 
-  range1 = SourceRange();
-  range2 = SourceRange();
-
   // The path to be tacked on to the target locator to identify the specific
   // target.
-  Expr *targetAnchor = nullptr;
+  Expr *targetAnchor;
   SmallVector<LocatorPathElt, 4> targetPath;
 
   auto path = locator->getPath();
   auto anchor = locator->getAnchor();
+  simplifyLocator(anchor, path, targetAnchor, targetPath, range1, range2);
+
+
+  // If we have a target anchor, build and simplify the target locator.
+  if (targetLocator && targetAnchor) {
+    SourceRange targetRange1, targetRange2;
+    *targetLocator = simplifyLocator(cs,
+                                     cs.getConstraintLocator(targetAnchor,
+                                                             targetPath),
+                                     targetRange1, targetRange2);
+  }
+
+  // If we didn't simplify anything, just return the input.
+  if (anchor == locator->getAnchor() &&
+      path.size() == locator->getPath().size()) {
+    return locator;
+  }
+
+  return cs.getConstraintLocator(anchor, path);
+}
+
+void constraints::simplifyLocator(Expr *&anchor,
+                                  ArrayRef<LocatorPathElt> &path,
+                                  Expr *&targetAnchor,
+                                  SmallVectorImpl<LocatorPathElt> &targetPath,
+                                  SourceRange &range1, SourceRange &range2) {
+  range1 = SourceRange();
+  range2 = SourceRange();
+  targetAnchor = nullptr;
+
   while (!path.empty()) {
     switch (path[0].getKind()) {
     case ConstraintLocator::ApplyArgument:
@@ -204,22 +236,6 @@ constraints::simplifyLocator(ConstraintSystem &cs,
     // If we get here, we couldn't simplify the path further.
     break;
   }
-
-  // If we have a target anchor, build and simplify the target locator.
-  if (targetLocator && targetAnchor) {
-    SourceRange targetRange1, targetRange2;
-    *targetLocator = simplifyLocator(cs,
-                                     cs.getConstraintLocator(targetAnchor,
-                                                             targetPath),
-                                     targetRange1, targetRange2);
-  }
-
-  if (anchor == locator->getAnchor() &&
-      path.size() == locator->getPath().size()) {
-    return locator;
-  }
-
-  return cs.getConstraintLocator(anchor, path);
 }
 
 /// Simplify the given locator down to a specific anchor expression,
@@ -523,6 +539,17 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
     if (targetLocator)
       noteTargetOfDiagnostic(cs, failure, targetLocator);
     break;
+
+  case Failure::IsForbiddenLValue:
+    if (auto lvalueTy = failure.getSecondType()->getAs<LValueType>()) {
+      if (!lvalueTy->getQualifiers().isImplicit()) {
+        tc.diagnose(loc, diag::reference_non_byref, lvalueTy->getObjectType())
+          .highlight(range1).highlight(range2);
+        return true;
+      }
+    }
+    // FIXME: diagnose other cases
+    return false;
 
   default:
     // FIXME: Handle all failure kinds

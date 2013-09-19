@@ -2194,7 +2194,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (auto fromTuple = fromType->getAs<TupleType>()) {
       SmallVector<int, 4> sources;
       SmallVector<unsigned, 4> variadicArgs;
-      if (!computeTupleShuffle(fromTuple, toTuple, sources, variadicArgs)) {
+      if (!computeTupleShuffle(fromTuple, toTuple, sources, variadicArgs,
+                               hasMandatoryTupleLabels(expr))) {
         return coerceTupleToTuple(expr, fromTuple, toTuple,
                                   locator, sources, variadicArgs);
       }

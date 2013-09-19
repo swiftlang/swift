@@ -809,7 +809,7 @@ public:
 
     // If there is no initializer and we are not in a type context,
     // create a default initializer.
-    if (!PBD->getInit() && !IsFirstPass &&
+    if (!IsFirstPass && !PBD->getInit() &&
         isa<TypedPattern>(PBD->getPattern()) &&
         !PBD->getDeclContext()->isTypeContext()) {
       // Type-check the pattern.
@@ -819,39 +819,10 @@ public:
         setBoundVarsTypeError(PBD->getPattern());
         return;
       }
-    } else if (PBD->getInit() && !IsFirstPass) {
-      Type DestTy;
-      if (isa<TypedPattern>(PBD->getPattern())) {
-        if (TC.typeCheckPattern(PBD->getPattern(),
-                                PBD->getDeclContext(),
-                                /*allowUnknownTypes*/false)) {
-          setBoundVarsTypeError(PBD->getPattern());
-          return;
-        }
-        DestTy = PBD->getPattern()->getType();
-      }
-      Expr *Init = PBD->getInit();
-      if (TC.typeCheckExpression(Init, PBD->getDeclContext(), DestTy,
-                                 /*discardedExpr=*/false)) {
-        if (DestTy)
-          TC.diagnose(PBD, diag::while_converting_var_init,
-                      DestTy);
-        else
-          setBoundVarsTypeError(PBD->getPattern());
+    } else if (!IsFirstPass && PBD->getInit()) {
+      if (TC.typeCheckBinding(PBD)) {
+        setBoundVarsTypeError(PBD->getPattern());
         return;
-      }
-      if (!DestTy) {
-        Expr *newInit = TC.coerceToMaterializable(Init);
-        if (newInit) Init = newInit;
-      }
-      PBD->setInit(Init);
-      if (!DestTy) {
-        if (TC.coerceToType(PBD->getPattern(),
-                            PBD->getDeclContext(),
-                            Init->getType())) {
-          setBoundVarsTypeError(PBD->getPattern());
-          return;
-        }
       }
     } else if (!IsFirstPass || !DelayCheckingPattern) {
       if (TC.typeCheckPattern(PBD->getPattern(),
@@ -2114,12 +2085,11 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       return;
     }
 
-    // Type of declaration must be a reference type.
-    if (!VD->getType()->allowsOwnership()) {
+    Type type = VD->getType();
+    if (!type->allowsOwnership()) {
       // If we have an opaque type, suggest the possibility of adding
       // a class bound.
-      if (VD->getType()->isExistentialType() ||
-          VD->getType()->getAs<ArchetypeType>()) {
+      if (type->isExistentialType() || type->getAs<ArchetypeType>()) {
         TC.diagnose(VD->getStartLoc(), diag::invalid_ownership_opaque_type,
                     ownershipKind, VD->getType());
       } else {
@@ -2131,7 +2101,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
 
     // Change the type to the appropriate reference storage type.
-    VD->overwriteType(ReferenceStorageType::get(VD->getType(),
+    VD->overwriteType(ReferenceStorageType::get(type,
                                                 Attrs.getOwnership(),
                                                 TC.Context));
   }

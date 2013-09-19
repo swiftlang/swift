@@ -530,7 +530,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       P->setType(ErrorType::get(Context));
       return true;
     }
-    if (!missingType)
+    if (!missingType && !allowUnknownTypes)
       P->setType(TupleType::get(typeElts, Context));
     return false;
   }
