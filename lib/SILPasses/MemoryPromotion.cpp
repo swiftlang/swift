@@ -235,7 +235,8 @@ typedef SmallVector<StructOrTupleElement, 8> AccessPathTy;
 /// the alloc box, computing the access path.
 static void ComputeAccessPath(SILValue Pointer, AccessPathTy &AccessPath) {
   // If we got to the root, we're done.
-  while (!isa<AllocBoxInst>(Pointer) && !isa<MarkUninitializedInst>(Pointer)) {
+  while (!isa<AllocBoxInst>(Pointer) && !isa<MarkUninitializedInst>(Pointer) &&
+         !isa<AllocStackInst>(Pointer)) {
     if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
       AccessPath.push_back(Fixnum<31, unsigned>(TEAI->getFieldNo()));
       Pointer = TEAI->getOperand();
@@ -483,6 +484,8 @@ void ElementPromotion::diagnoseInitError(SILInstruction *Use,
   CanType AllocTy;
   if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory))
     AllocTy = ABI->getElementType().getSwiftRValueType();
+  else if (auto *ASI = dyn_cast<AllocStackInst>(TheMemory))
+    AllocTy = ASI->getElementType().getSwiftRValueType();
   else
     AllocTy = TheMemory->getType(0).getObjectType().getSwiftRValueType();
   getPathStringToElement(AllocTy, ElementNumber, Name);
@@ -1104,6 +1107,41 @@ static void processAllocBox(AllocBoxInst *ABI) {
     ElementPromotion(ABI, EltNo++, Elt).doIt();
 }
 
+static void processAllocStack(AllocStackInst *ASI) {
+  // FIXME: HACK: work around SILGen union issue.
+  if (!ASI->getLoc().is<SILFileLocation>())
+    if (ASI->getLoc().getAsASTNode<Decl>() == nullptr ||
+        !isa<ValueDecl>(ASI->getLoc().getAsASTNode<Decl>()))
+      return;
+  
+  DEBUG(llvm::errs() << "*** MemPromotion looking at: " << *ASI << "\n");
+
+  // Set up the datastructure used to collect the uses of the alloc_box.  The
+  // uses are bucketed up into the elements of the allocation that are being
+  // used.  This matters for element-wise tuples and fragile structs.
+  SmallVector<ElementUses, 1> Uses;
+  Uses.resize(getElementCount(ASI->getElementType().getSwiftRValueType()));
+  
+  // Walk the use list of the pointer, collecting them into the Uses array.
+  ElementUseCollector(Uses).collectUses(SILValue(ASI, 1), 0);
+  
+  // Collect information about the retain count result as well.
+  for (auto UI : SILValue(ASI, 0).getUses()) {
+    auto *User = cast<SILInstruction>(UI->getUser());
+    
+    // If this is a release or dealloc_stack, then remember it as such.
+    if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User)) {
+      for (auto &UseArray : Uses)
+        UseArray.push_back({ User, UseKind::Release });
+    }
+  }
+  
+  // Process each scalar value in the uses array individually.
+  unsigned EltNo = 0;
+  for (auto &Elt : Uses)
+    ElementPromotion(ASI, EltNo++, Elt).doIt();
+}
+
 static void processMarkUninitialized(MarkUninitializedInst *MUI) {
   DEBUG(llvm::errs() << "*** MemPromotion looking at: " << *MUI << "\n");
   
@@ -1141,6 +1179,9 @@ static void checkDefiniteInitialization(SILFunction &Fn) {
           ABI->eraseFromParent();
         continue;
       }
+
+      if (auto *ASI = dyn_cast<AllocStackInst>(I))
+        processAllocStack(ASI);
 
       if (auto *MUI = dyn_cast<MarkUninitializedInst>(I))
         processMarkUninitialized(MUI);

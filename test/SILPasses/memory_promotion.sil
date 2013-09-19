@@ -440,3 +440,23 @@ sil @test_tlc : $() -> () {
   %9 = tuple ()
   return %9 : $()
 }
+
+// CHECK-LABEL: sil @promote_alloc_stack
+sil @promote_alloc_stack : $[thin] (i : Int64) -> Builtin.Int64 {
+bb0(%0 : $Int64):
+  %5 = integer_literal $Builtin.Int64, 1
+  %18 = struct $Int64 (%5 : $Builtin.Int64)
+  %22 = alloc_stack $Int64
+
+  // CHECK: [[SE:%[0-9]+]] = struct_extract
+  // CHECK: store
+
+  store %18 to %22#1 : $*Int64
+  %24 = struct_element_addr %22#1 : $*Int64, #value
+  %25 = load %24 : $*Builtin.Int64
+  dealloc_stack %22#0 : $*[local_storage] Int64
+  // CHECK: return [[SE]]
+  return %25 : $Builtin.Int64
+}
+
+
