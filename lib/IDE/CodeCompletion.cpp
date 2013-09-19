@@ -480,6 +480,7 @@ namespace {
 class CompletionLookup : swift::VisibleDeclConsumer {
   CodeCompletionContext &CompletionContext;
   ASTContext &SwiftContext;
+  Identifier SelfIdent;
   const DeclContext *CurrDeclContext;
 
   enum class LookupKind {
@@ -517,6 +518,7 @@ public:
                    ASTContext &SwiftContext,
                    const DeclContext *CurrDeclContext)
       : CompletionContext(CompletionContext), SwiftContext(SwiftContext),
+        SelfIdent(SwiftContext.getIdentifier("self")),
         CurrDeclContext(CurrDeclContext) {
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext->isLocalContext()) {
@@ -575,7 +577,15 @@ public:
     if (needDot())
       Builder.addLeadingDot();
     Builder.addTextChunk(Name);
-    addTypeAnnotation(Builder, VD->getType());
+
+    // Add a type annotation.
+    Type T = VD->getType();
+    if (VD->getName() == SelfIdent) {
+      // Strip [byref] from 'self'.  It is useful to show [byref] for function
+      // parameters.  But for 'self' it is just noise.
+      T = T->getRValueType();
+    }
+    addTypeAnnotation(Builder, T);
   }
 
   void addPatternParameters(CodeCompletionResultBuilder &Builder,
