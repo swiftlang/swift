@@ -355,7 +355,7 @@ public:
   }
   
   /// True if this function type takes an indirect return address as its
-  /// final argument.
+  /// first argument.
   bool hasIndirectReturn() const {
     return bool(indirectReturn);
   }
