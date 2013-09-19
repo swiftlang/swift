@@ -64,17 +64,7 @@
       z-index: 2;
     }
 
-    a:link {color:blue}
-    h1 a:link {color:#0c3762} 
-    h2 a:link {color:#0c3762} 
-    h3 a:link {color:#0c3762} 
-    h4 a:link {color:#0c3762} 
-    h5 a:link {color:#0c3762} 
-    h1 a:visited {color:#0c3762} 
-    h2 a:visited {color:#0c3762} 
-    h3 a:visited {color:#0c3762} 
-    h4 a:visited {color:#0c3762} 
-    h5 a:visited {color:#0c3762} 
+    /*a:link {color:blue}*/
     </style>
 
 .. role:: repl
@@ -358,28 +348,6 @@ Strings are **Sliceable**
    `// s : String = "Strings are` :look:`handsome`\ :aside:`slice replacement can resize the string`\ `"` 
 
 .. _extending:
-
-Strings are **Extended with Restraint**
----------------------------------------
-
-.. sidebar:: Rationale
-
-   ``String`` is a “vocabulary type” with which most other types
-   interact.  Making these interactions members of ``String`` could
-   quickly lead to an extremely broad interface with intolerably slow
-   code completion.
-
-Users are of course free to extend ``String`` at will.  The standard
-library, however, is designed so that users are never *forced* to
-extend ``String``.  Instead, string interactions with other types are
-generally surfaced as extensions to those other types.  For example,
-
-.. parsed-literal::
-
-    **extension X** : Printable, Parseable {
-      func format() -> String { ... }
-      static func parse(input: String) -> X { ... }
-    }
 
 Strings are **Encoded as UTF-8**
 --------------------------------
