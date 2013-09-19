@@ -25,7 +25,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <unistd.h>
-#include <os/tsd.h>
 
 using namespace swift;
 
