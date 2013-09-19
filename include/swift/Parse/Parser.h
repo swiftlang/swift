@@ -282,7 +282,6 @@ public:
 
   void skipUntilDeclRBrace(tok T1, tok T2 = tok::unknown);
 
-private:
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///
   /// Note: this does \em not match angle brackets ("<" and ">")! These are

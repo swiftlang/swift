@@ -67,6 +67,16 @@ static DefaultArgumentKind getDefaultArgKind(ExprHandle *init) {
   }
 }
 
+static void recoverFromBadSelectorArgument(Parser &P) {
+  while (P.Tok.isNot(tok::eof) && P.Tok.isNot(tok::r_paren) &&
+         P.Tok.isNot(tok::l_brace) && P.Tok.isNot(tok::r_brace) &&
+         !P.isStartOfStmt(P.Tok) &&
+         !P.isStartOfDecl(P.Tok, P.peekToken())) {
+    P.skipSingle();
+  }
+  P.consumeIf(tok::r_paren);
+}
+
 static ParserStatus
 parseSelectorArgument(Parser &P,
                       SmallVectorImpl<TuplePatternElt> &argElts,
@@ -89,13 +99,13 @@ parseSelectorArgument(Parser &P,
       selectorNames[id] = decl;
     }
   }
-  
+
   if (!P.Tok.is(tok::l_paren)) {
     P.diagnose(P.Tok, diag::func_selector_without_paren);
     return makeParserError();
   }
-  P.consumeToken();
-  
+  P.consumeToken(tok::l_paren);
+
   if (P.Tok.is(tok::r_paren)) {
     P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
     rp = P.consumeToken(tok::r_paren);
@@ -104,7 +114,7 @@ parseSelectorArgument(Parser &P,
 
   ParserResult<Pattern> bodyPattern = P.parsePatternAtom();
   if (bodyPattern.isNull()) {
-    P.skipUntil(tok::r_paren);
+    recoverFromBadSelectorArgument(P);
     return makeParserError();
   }
   
@@ -115,8 +125,9 @@ parseSelectorArgument(Parser &P,
     if (type.isNull()) {
       type = makeParserErrorResult(
           new (P.Context) ErrorTypeRepr(P.Tok.getLoc()));
-      P.skipUntil(tok::r_paren);
-      P.consumeIf(tok::r_paren);
+    }
+    if (type.isParseError()) {
+      recoverFromBadSelectorArgument(P);
     }
 
     argPattern = makeParserResult(
@@ -132,11 +143,11 @@ parseSelectorArgument(Parser &P,
     ParserResult<Expr> initR =
       P.parseExpr(diag::expected_initializer_expr);
     if (initR.hasCodeCompletion()) {
-      P.skipUntil(tok::r_paren);
+      recoverFromBadSelectorArgument(P);
       return makeParserCodeCompletionStatus();
     }
     if (initR.isNull()) {
-      P.skipUntil(tok::r_paren);
+      recoverFromBadSelectorArgument(P);
       return makeParserError();
     }
     init = ExprHandle::get(P.Context, initR.get());
@@ -144,8 +155,7 @@ parseSelectorArgument(Parser &P,
   
   if (P.Tok.is(tok::comma)) {
     P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
-    P.skipUntil(tok::r_paren);
-    P.consumeIf(tok::r_paren);
+    recoverFromBadSelectorArgument(P);
     return makeParserError();
   }
   
