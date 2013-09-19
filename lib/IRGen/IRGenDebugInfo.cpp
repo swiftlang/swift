@@ -17,22 +17,11 @@
 #include "IRGenDebugInfo.h"
 #include "GenType.h"
 #include "Linking.h"
-#include "clang/Basic/TargetInfo.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallString.h"
-#include "swift/Basic/Dwarf.h"
-#include "llvm/Config/config.h"
-#include "llvm/DebugInfo.h"
-#include "llvm/IR/Module.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/raw_ostream.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/Pattern.h"
+#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Punycode.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/IRGen/Options.h"
@@ -41,10 +30,19 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "clang/Basic/TargetInfo.h"
+#include "llvm/Config/config.h"
+#include "llvm/DebugInfo.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace irgen;
-
 
 /// Strdup a raw char array using the bump pointer.
 static

@@ -18,6 +18,7 @@
 #define SWIFT_IRGEN_DEBUGINFO_H
 
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ValueHandle.h"
 #include "llvm/DebugInfo.h"
 #include "llvm/DIBuilder.h"
