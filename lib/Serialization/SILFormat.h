@@ -149,6 +149,7 @@ namespace sil_block {
   using SILTwoOperandsLayout = BCRecordLayout<
     SIL_TWO_OPERANDS,
     SILInstOpCodeField,
+    BCFixed<2>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,
