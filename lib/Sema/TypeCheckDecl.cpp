@@ -749,6 +749,17 @@ public:
     llvm_unreachable("bad pattern kind!");
   }
 
+  /// Set ErrorType as the type of any variables bound by this pattern
+  /// that don't yet have types.
+  ///
+  /// This method is called when some kind of further checking has
+  /// failed, e.g. when the initializer didn't type-check.  We may
+  /// encounter references to the bound variables later, so for
+  /// sanity's sake, we need to make sure that every variable has a
+  /// type.  At the same time, some of the variables may have explicit
+  /// type annotations, and we don't want to lose those annotations
+  /// unnecessarily because that would impede downstream type-checking
+  /// and code completion.
   void setBoundVarsTypeError(Pattern *pattern) {
     switch (pattern->getKind()) {
     case PatternKind::Tuple:
@@ -771,9 +782,16 @@ public:
 
     // Handle vars.
     case PatternKind::Named: {
+      // Don't change the type of a variable that we've been able to
+      // compute a type for.
       VarDecl *var = cast<NamedPattern>(pattern)->getDecl();
-      var->overwriteType(ErrorType::get(TC.Context));
-      var->setInvalid();
+      if (var->hasType()) {
+        if (var->getType()->is<ErrorType>())
+          var->setInvalid();
+      } else {
+        var->setType(ErrorType::get(TC.Context));
+        var->setInvalid();
+      }
       return;
     }
 

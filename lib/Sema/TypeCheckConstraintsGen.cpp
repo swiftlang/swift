@@ -652,7 +652,15 @@ namespace {
         Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
                                         /*canBindToLValue*/ forFunctionParam);
 
-        var->setType(ty);
+        // We want to set the variable's type here when type-checking
+        // a function's parameter clauses because we're going to
+        // type-check the entire function body within the context of
+        // the constraint system.  In contrast, when type-checking a
+        // variable binding, we really don't want to set the
+        // variable's type because it can easily escape the constraint
+        // system and become a dangling type reference.
+        if (forFunctionParam)
+          var->setType(ty);
         return ty;
       }
 

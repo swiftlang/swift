@@ -443,6 +443,7 @@ public:
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);
 
+  /// Type-check an initialized variable pattern declaration.
   bool typeCheckBinding(PatternBindingDecl *D);
   
   /// \brief Compute the set of captures for the given function or closure.
