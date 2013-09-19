@@ -21,6 +21,14 @@
 
 using namespace swift;
 
+void LookupResult::filter(const std::function<bool(ValueDecl *)> &pred) {
+  Results.erase(std::remove_if(Results.begin(), Results.end(),
+                               [&](ValueDecl *decl) -> bool {
+                                 return !pred(decl);
+                               }),
+                Results.end());
+}
+
 LookupResult TypeChecker::lookupMember(Type type, Identifier name,
                                        bool allowDynamicLookup) {
   LookupResult result;

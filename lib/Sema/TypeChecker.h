@@ -61,6 +61,9 @@ public:
   explicit operator bool() const {
     return !Results.empty();
   }
+
+  /// Filter out any results that aren't accepted by the given predicate.
+  void filter(const std::function<bool(ValueDecl *)> &pred);
 };
 
 /// The result of name lookup for types.

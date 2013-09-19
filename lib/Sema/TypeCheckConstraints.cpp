@@ -301,12 +301,67 @@ bool ConstraintSystem::hasFreeTypeVariables() {
   return false;
 }
 
+/// Retrieve a uniqued selector ID for the given declaration.
+static std::pair<unsigned, CanType>
+getDynamicResultSignature(ValueDecl *decl,
+                          llvm::StringMap<unsigned> &selectors) {
+  llvm::SmallString<32> buffer;
+
+  StringRef selector;
+  Type type;
+  if (auto func = dyn_cast<FuncDecl>(decl)) {
+    // Handle functions.
+    selector = func->getObjCSelector(buffer);
+    type = decl->getType()->castTo<AnyFunctionType>()->getResult();
+  } else if (auto var = dyn_cast<VarDecl>(decl)) {
+    // Handle properties. Only the getter matters.
+    selector = var->getObjCGetterSelector(buffer);
+    type = decl->getType();
+  } else if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+    // Handle constructors.
+    selector = ctor->getObjCSelector(buffer);
+    type = decl->getType()->castTo<AnyFunctionType>()->getResult();
+  } else {
+    // FIXME: Handle subscripts.
+    llvm_unreachable("Dynamic lookup found a non-[objc] result");
+  }
+
+  // Look for this selector in the table. If we find it, we're done.
+  auto known = selectors.find(selector);
+  if (known != selectors.end())
+    return { known->second, type->getCanonicalType() };
+
+  // Add this selector to the table.
+  unsigned result = selectors.size();
+  selectors[selector] = result;
+  return { result, type->getCanonicalType() };
+}
+
 LookupResult &ConstraintSystem::lookupMember(Type base, Identifier name) {
   base = base->getCanonicalType();
   auto &result = MemberLookups[{base, name}];
   if (!result) {
     result = TC.lookupMember(base, name);
+
+    // If we aren't performing dynamic lookup, we're done.
+    auto instanceTy = base->getRValueType();
+    if (auto metaTy = instanceTy->getAs<MetaTypeType>())
+      instanceTy = metaTy->getInstanceType();
+    auto protoTy = instanceTy->getAs<ProtocolType>();
+    if (!*result ||
+        !protoTy ||
+        !protoTy->getDecl()->isSpecificProtocol(
+                               KnownProtocolKind::DynamicLookup))
+      return *result;
+
+    // We are performing dynamic lookup. Filter out redundant results early.
+    llvm::DenseSet<std::pair<unsigned, CanType>> known;
+    llvm::StringMap<unsigned> selectors;
+    result->filter([&](ValueDecl *decl) -> bool {
+      return known.insert(getDynamicResultSignature(decl, selectors)).second;
+    });
   }
+
   return *result;
 }
 
@@ -2542,7 +2597,9 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.
-    if (isDynamicLookup && result->getDeclContext()->isTypeContext()) {
+    if (isDynamicLookup) {
+      assert(result->getDeclContext()->isTypeContext() && "Dynamic lookup bug");
+
       // We found this declaration via dynamic lookup, record it as such.
       choices.push_back(OverloadChoice::getDeclViaDynamic(baseTy, result));
       continue;
@@ -2778,57 +2835,6 @@ static bool sameDecl(Decl *decl1, Decl *decl2) {
   return false;
 }
 
-/// Determine whether the given declarations are equivalent in the Objective-C
-/// runtime and have compatible types.
-static bool areEquivalentObjCDecls(ValueDecl *decl1, ValueDecl *decl2) {
-  if (!decl1->isObjC() || !decl2->isObjC() ||
-      decl1->getKind() != decl2->getKind())
-    return false;
-
-  Type type1, type2;
-  if (auto func1 = dyn_cast<FuncDecl>(decl1)) {
-    auto func2 = cast<FuncDecl>(decl2);
-
-    // Compare selectors
-    llvm::SmallString<32> sel1, sel2;
-    if (func1->getObjCSelector(sel1) != func2->getObjCSelector(sel2))
-      return false;
-
-    // Extract the function type.
-    type1 = func1->getType()->castTo<AnyFunctionType>()->getResult();
-    type2 = func2->getType()->castTo<AnyFunctionType>()->getResult();
-  } else if (auto con1 = dyn_cast<ConstructorDecl>(decl1)) {
-    auto con2 = cast<ConstructorDecl>(decl2);
-
-    // Compare selectors
-    llvm::SmallString<32> sel1, sel2;
-    if (con1->getObjCSelector(sel1) != con2->getObjCSelector(sel2))
-      return false;
-
-    // Extract the function type.
-    type1 = con1->getType()->castTo<AnyFunctionType>()->getResult();
-    type2 = con2->getType()->castTo<AnyFunctionType>()->getResult();
-  } else if (auto var1 = dyn_cast<VarDecl>(decl1)) {
-    auto var2 = cast<VarDecl>(decl2);
-
-    // Compare getter/setter selectors.
-    llvm::SmallString<32> sel1, sel2;
-    if (var1->getObjCGetterSelector(sel1)!=var2->getObjCGetterSelector(sel2) ||
-        var1->getObjCSetterSelector(sel1)!=var2->getObjCSetterSelector(sel2))
-      return false;
-
-    // Extract the type.
-    type1 = var1->getType();
-    type2 = var2->getType();
-  } else {
-    // FIXME: Subscript declarations.
-    return false;
-  }
-
-  // Require exact type equality, at least for now.
-  return type1->isEqual(type2);
-}
-
 /// \brief Compare two overload choices for equality.
 static bool sameOverloadChoice(const OverloadChoice &x,
                                const OverloadChoice &y) {
@@ -2842,16 +2848,8 @@ static bool sameOverloadChoice(const OverloadChoice &x,
     // FIXME: Compare base types after substitution?
     return true;
 
-  case OverloadChoiceKind::DeclViaDynamic:
-      // If both declarations are the same, we're done.
-    if (sameDecl(x.getDecl(), y.getDecl()))
-      return true;
-
-    // Otherwise, if both declarations are Objective-C declarations with the
-    // same underlying selector and type.
-    return areEquivalentObjCDecls(x.getDecl(), y.getDecl());
-
   case OverloadChoiceKind::Decl:
+  case OverloadChoiceKind::DeclViaDynamic:
     return sameDecl(x.getDecl(), y.getDecl());
 
   case OverloadChoiceKind::TypeDecl:
