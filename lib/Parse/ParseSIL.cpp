@@ -877,11 +877,13 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("convert_cc", ValueKind::ConvertCCInst)
     .Case("convert_function", ValueKind::ConvertFunctionInst)
     .Case("copy_addr", ValueKind::CopyAddrInst)
+    .Case("copy_value", ValueKind::CopyValueInst)
     .Case("dealloc_box", ValueKind::DeallocBoxInst)
     .Case("dealloc_ref", ValueKind::DeallocRefInst)
     .Case("dealloc_stack", ValueKind::DeallocStackInst)
     .Case("deinit_existential", ValueKind::DeinitExistentialInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
+    .Case("destroy_value", ValueKind::DestroyValueInst)
     .Case("destructive_switch_union_addr",
           ValueKind::DestructiveSwitchUnionAddrInst)
     .Case("downcast", ValueKind::DowncastInst)
@@ -1162,48 +1164,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createProjectExistential(InstLoc, Val, Ty);
     break;
   }
-  case ValueKind::ProjectExistentialRefInst:
-    if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createProjectExistentialRef(InstLoc, Val);
+#define UNARY_INSTRUCTION_HELPER(ID, CREATOR) \
+  case ValueKind::ID##Inst:                   \
+    if (parseTypedValueRef(Val)) return true; \
+    ResultVal = B.CREATOR(InstLoc, Val);      \
     break;
-      
-  case ValueKind::StrongRetainInst:
-    if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createStrongRetainInst(InstLoc, Val);
-    break;
-  case ValueKind::StrongReleaseInst:
-    if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createStrongReleaseInst(InstLoc, Val);
-    break;
-  case ValueKind::StrongRetainAutoreleasedInst:
-    if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createStrongRetainAutoreleased(InstLoc, Val);
-    break;
-  case ValueKind::AutoreleaseReturnInst:
-    if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createAutoreleaseReturn(InstLoc, Val);
-    break;
-  case ValueKind::StrongRetainUnownedInst:
-    if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createStrongRetainUnowned(InstLoc, Val);
-    break;
-  case ValueKind::UnownedRetainInst:
-    if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createUnownedRetain(InstLoc, Val);
-    break;
-  case ValueKind::UnownedReleaseInst:
-    if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createUnownedRelease(InstLoc, Val);
-    break;
-  case ValueKind::DestroyAddrInst:
-    if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createDestroyAddr(InstLoc, Val);
-    break;
+#define UNARY_INSTRUCTION(ID) UNARY_INSTRUCTION_HELPER(ID, create##ID)
+  UNARY_INSTRUCTION_HELPER(StrongRetain, createStrongRetainInst)
+  UNARY_INSTRUCTION_HELPER(StrongRelease, createStrongReleaseInst)
+  UNARY_INSTRUCTION(ProjectExistentialRef)
+  UNARY_INSTRUCTION(StrongRetainAutoreleased)
+  UNARY_INSTRUCTION(AutoreleaseReturn)
+  UNARY_INSTRUCTION(StrongRetainUnowned)
+  UNARY_INSTRUCTION(UnownedRetain)
+  UNARY_INSTRUCTION(UnownedRelease)
+  UNARY_INSTRUCTION(DestroyAddr)
+  UNARY_INSTRUCTION(DestroyValue)
+  UNARY_INSTRUCTION(CopyValue)
+  UNARY_INSTRUCTION(Load)
+#undef UNARY_INSTRUCTION
+#undef UNARY_INSTRUCTION_HELPER
 
-  case ValueKind::LoadInst:
-    if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createLoad(InstLoc, Val);
-    break;
   case ValueKind::LoadWeakInst: {
     bool isTake = false;
     if (parseSILOptional(isTake, *this, "take") ||

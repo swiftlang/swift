@@ -423,6 +423,14 @@ public:
                       SILType::getBuiltinIntegerType(1, F.getASTContext())));
   }
 
+  CopyValueInst *createCopyValue(SILLocation loc, SILValue operand) {
+    return insert(new (F.getModule()) CopyValueInst(loc, operand));
+  }
+
+  DestroyValueInst *createDestroyValue(SILLocation loc, SILValue operand) {
+    return insert(new (F.getModule()) DestroyValueInst(loc, operand));
+  }
+
   StructInst *createStruct(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements) {
     return insert(StructInst::create(Loc, Ty, Elements, F));

@@ -79,6 +79,26 @@ union SinglePayloadNontrivial {
   case c
 }
 
+sil @single_payload_nontrivial_copy_destroy : $(SinglePayloadNontrivial) -> () {
+bb0(%0 : $SinglePayloadNontrivial):
+  %1 = copy_value %0 : $SinglePayloadNontrivial
+  destroy_value %1 : $SinglePayloadNontrivial
+  %v = tuple ()
+  return %v : $()
+}
+// CHECK: define void @single_payload_nontrivial_copy_destroy(i64, i1)
+// CHECK:      [[T0:%.*]] = icmp eq i1 [[D:%.*]], false
+// CHECK-NEXT: br i1 [[T0]]
+// CHECK:      [[T0:%.*]] = inttoptr i64 [[V:%.*]] to %swift.refcounted*
+// CHECK-NEXT: call void @swift_retain_noresult(%swift.refcounted* [[T0]])
+// CHECK-NEXT: br label
+// CHECK:      [[T0:%.*]] = icmp eq i1 [[D]], false
+// CHECK-NEXT: br i1 [[T0]]
+// CHECK:      [[T0:%.*]] = inttoptr i64 [[V:%.*]] to %swift.refcounted*
+// CHECK-NEXT: call void @swift_release(%swift.refcounted* [[T0]])
+// CHECK-NEXT: br label
+// CHECK:      ret void
+
 // -- SinglePayloadNontrivial destroyBuffer
 // CHECK: define linkonce_odr hidden void @_TwxxO21union_value_semantics23SinglePayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {
 // CHECK: entry:

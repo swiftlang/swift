@@ -1169,6 +1169,22 @@ public:
   }
 };
 
+/// CopyValueInst - Copies a loadable value.
+class CopyValueInst : public UnaryInstructionBase<ValueKind::CopyValueInst> {
+public:
+  CopyValueInst(SILLocation loc, SILValue operand)
+    : UnaryInstructionBase(loc, operand, operand.getType()) {}
+};
+
+/// DestroyValueInst - Destroys a loadable value.
+class DestroyValueInst : public UnaryInstructionBase<ValueKind::DestroyValueInst,
+                                                     SILInstruction,
+                                                     /*HasValue*/ false> {
+public:
+  DestroyValueInst(SILLocation loc, SILValue operand)
+    : UnaryInstructionBase(loc, operand) {}
+};
+
 /// TupleInst - Represents a constructed loadable tuple.
 class TupleInst : public SILInstruction {
   TailAllocatedOperandList<0> Operands;

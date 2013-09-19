@@ -996,3 +996,14 @@ sil @test_mark_fn_escape : $() -> () {
   %28 = tuple ()
   return %28 : $()
 }
+
+// CHECK-LABEL: sil @test_copy_destroy_value
+sil @test_copy_destroy_value : $(v : Val) -> (Val) {
+bb0(%0 : $Val):
+  %1 = copy_value %0 : $Val
+  destroy_value %0 : $Val
+  return %1 : $Val
+// CHECK:      [[T1:%.*]] = copy_value [[T0:%.*]] : $Val
+// CHECK-NEXT: destroy_value [[T0]] : $Val
+// CHECK-NEXT: return [[T1]] : $Val
+}

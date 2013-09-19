@@ -515,6 +515,22 @@ SILCloner<ImplClass>::visitDowncastExistentialRefInst(DowncastExistentialRefInst
 
 template<typename ImplClass>
 SILValue
+SILCloner<ImplClass>::visitCopyValueInst(CopyValueInst* Inst) {
+  return doPostProcess(Inst,
+    Builder.createCopyValue(getOpLocation(Inst->getLoc()),
+                            getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+SILValue
+SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst* Inst) {
+  return doPostProcess(Inst,
+    Builder.createDestroyValue(getOpLocation(Inst->getLoc()),
+                               getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+SILValue
 SILCloner<ImplClass>::visitStructInst(StructInst* Inst) {
   auto Elements = getOpValueArray<8>(Inst->getElements());
   return doPostProcess(Inst,

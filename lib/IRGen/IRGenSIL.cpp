@@ -521,6 +521,8 @@ public:
   }
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
+  void visitCopyValueInst(CopyValueInst *i);
+  void visitDestroyValueInst(DestroyValueInst *i);
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
   void visitUnionInst(UnionInst *i);
@@ -1815,6 +1817,19 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
   addIncomingSILArgumentsToPHINodes(*this, falseBB, i->getFalseArgs());
   
   Builder.CreateCondBr(condValue, trueBB.bb, falseBB.bb);
+}
+
+void IRGenSILFunction::visitCopyValueInst(swift::CopyValueInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  Explosion out(in.getKind());
+  cast<LoadableTypeInfo>(getTypeInfo(i->getType())).copy(*this, in, out);
+  setLoweredExplosion(SILValue(i, 0), out);
+}
+
+void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType()))
+    .consume(*this, in);
 }
 
 void IRGenSILFunction::visitStructInst(swift::StructInst *i) {

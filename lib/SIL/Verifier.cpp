@@ -404,7 +404,19 @@ public:
     require(SI->getDest().getType() == SI->getSrc().getType(),
             "Store operand type and dest type mismatch");
   }
-  
+
+  void checkCopyValueInst(CopyValueInst *I) {
+    require(I->getOperand().getType().isObject(),
+            "Source value should be an object value");
+    require(I->getOperand().getType() == I->getType(),
+            "Result type does not match input type");
+  }
+
+  void checkDestroyValueInst(DestroyValueInst *I) {
+    require(I->getOperand().getType().isObject(),
+            "Source value should be an object value");
+  }
+
   void checkInitializeVarInst(InitializeVarInst *ZI) {
     require(ZI->getOperand().getType().isAddress(),
             "Dest address should be lvalue");

@@ -679,6 +679,14 @@ public:
     OS << "is_nonnull " << getIDAndType(I->getOperand());
   }
 
+  void visitCopyValueInst(CopyValueInst *I) {
+    OS << "copy_value " << getIDAndType(I->getOperand());
+  }
+
+  void visitDestroyValueInst(DestroyValueInst *I) {
+    OS << "destroy_value " << getIDAndType(I->getOperand());
+  }
+
   void visitStructInst(StructInst *SI) {
     OS << "struct " << SI->getType() << " (";
     interleave(SI->getElements(),

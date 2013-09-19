@@ -1910,6 +1910,54 @@ Aggregate Types
 These instructions construct and project elements from structs, tuples, and
 class instances.
 
+copy_value
+``````````
+
+::
+
+  sil-instruction ::= 'copy_value' sil-operand
+
+  %1 = copy_value %0 : $A
+
+Copies a loadable value, producing a new value of the type.
+
+This is defined to be equivalent to storing the operand into a stack
+allocation, using ``copy_addr`` to copy from that into a different
+allocation, and then loading from the new allocation.
+
+For trivial types, this is equivalent to returning the operand.  For
+reference types, this is equivalent to a ``strong_retain`` and
+returning the operand.  For ``[unowned]`` types, this is equivalent to
+an ``unowned_retain`` and returning the operand.  In each of these
+cases, those are the preferred forms.
+
+For aggregate types, especially unions, it is typically both easier
+and more efficient to reason about aggregate copies than it is to
+reason about copies of the subobjects.
+
+destroy_value
+``````````
+
+::
+
+  sil-instruction ::= 'destroy_value' sil-operand
+
+  destroy_value %0 : $A
+
+Destroys a loadable value.
+
+This is defined to be equivalent to storing the operand into a stack
+allocation and using 'destroy_addr' to destroy the object there.
+
+For trivial types, this is a no-op.  For reference types, this is
+equivalent to a ``strong_release``.  For ``[unowned]`` types, this is
+equivalent to an ``unowned_release``.  In each of these cases, those
+are the preferred forms.
+
+For aggregate types, especially unions, it is typically both easier
+and more efficient to reason about aggregate destroys than it is to
+reason about destroys of the subobjects.
+
 tuple
 `````
 ::

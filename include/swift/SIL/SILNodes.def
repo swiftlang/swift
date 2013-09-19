@@ -127,6 +127,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(ProtocolMetatypeInst, SILInstruction, None)
 
   // Aggregate Types
+  INST(CopyValueInst, SILInstruction, MayHaveSideEffects)
+  INST(DestroyValueInst, SILInstruction, MayHaveSideEffects)
   INST(TupleInst, SILInstruction, None)
   INST(TupleExtractInst, SILInstruction, None)
   INST(TupleElementAddrInst, SILInstruction, None)
