@@ -17,20 +17,30 @@
 #ifndef SWIFT_RUNTIME_FASTENTRYPOINTS_H
 #define SWIFT_RUNTIME_FASTENTRYPOINTS_H
 
+#include <TargetConditionals.h>
+
 // Note: This file is #included in assembly files.
 
-// Allocation cache layout.
 // XXX FIXME -- we need to clean this up when the project isn't a secret.
-// There are only 256 slots, and the latter half is basically unused. We can
-// go lower than 128, but we eventually begin to stomp on other frameworks.
-#define ALLOC_CACHE_RESERVED 128
-#define ALLOC_CACHE_BUCKETS  64
-#ifdef __LP64__
-# define SWIFT_TSD_ALLOC_BASE (ALLOC_CACHE_RESERVED*8)
-# define SWIFT_TSD_RAW_ALLOC_BASE (SWIFT_TSD_ALLOC_BASE + ALLOC_CACHE_BUCKETS*8)
+// Allocation cache layout.
+// This uses slots in pthread direct tsd. There are 256 slots. 
+// Most of the first 128 are reserved for OS use. 
+// The last 128 are unused except on iOS Simulator.
+// We store two caches in these unused slots.
+#if !TARGET_IPHONE_SIMULATOR
+# define ALLOC_CACHE_COUNT 64
 #else
-# define SWIFT_TSD_ALLOC_BASE (ALLOC_CACHE_RESERVED*4)
-# define SWIFT_TSD_RAW_ALLOC_BASE (SWIFT_TSD_ALLOC_BASE + ALLOC_CACHE_BUCKETS*4)
+# define ALLOC_CACHE_COUNT 32  // dodge libSystem simulator keys at 210..215
+#endif
+#define ALLOC_CACHE_START 128
+#define ALLOC_RAW_CACHE_START (ALLOC_CACHE_START + ALLOC_CACHE_COUNT)
+
+#ifdef __LP64__
+# define SWIFT_TSD_ALLOC_BASE (ALLOC_CACHE_START*8)
+# define SWIFT_TSD_RAW_ALLOC_BASE (ALLOC_RAW_CACHE_START*8)
+#else
+# define SWIFT_TSD_ALLOC_BASE (ALLOC_CACHE_START*4)
+# define SWIFT_TSD_RAW_ALLOC_BASE (ALLOC_RAW_CACHE_START*4)
 #endif
 
 #define RC_OFFSET 0x8
