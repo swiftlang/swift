@@ -508,8 +508,17 @@ namespace {
         return ProtocolCompositionType::get(Impl.SwiftContext, protocols);
       }
 
-      // FIXME: We fake 'id' and 'Class' by using NSObject. We need a proper
-      // 'top' type for Objective-C objects.
+      // id maps to DynamicLookup.
+      if (type->isObjCIdType()) {
+        auto proto = Impl.SwiftContext.getProtocol(
+                       KnownProtocolKind::DynamicLookup);
+        if (!proto)
+          return Type();
+
+        return proto->getDeclaredType();
+      }
+
+      // FIXME: We fake 'Class' by using NSObject.
       return Impl.getNSObjectType();
     }
   };
