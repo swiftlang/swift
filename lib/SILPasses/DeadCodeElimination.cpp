@@ -13,8 +13,10 @@
 #include "swift/Subsystems.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+
 using namespace swift;
 
 STATISTIC(NumBlocksRemoved, "Number of unreachable basic blocks removed");
@@ -59,7 +61,7 @@ static bool eraseAndCleanup(const llvm::DenseSet<SILInstruction*> &ToBeDeleted){
   return AdditionalChanged;
 }
 
-/// \brief Deletes the instrcution and any instructions that could become dead
+/// \brief Deletes the instruction and any instructions that could become dead
 /// after its removal.
 static bool eraseAndCleanup(SILInstruction *I) {
   llvm::DenseSet<SILInstruction*> Set;
@@ -81,25 +83,85 @@ static bool constantFoldTerminator(SILBasicBlock &BB) {
 
       // Determine which of the successors is unreachable and create a new
       // terminator that only branches to the reachable sucessor.
-      BranchInst *BI = 0;
       if (ConstCond->getValue() == APInt(1, /*value*/ 0, false)) {
-        BI = B.createBranch(CBI->getLoc(),
-                            CBI->getFalseBB(), CBI->getFalseArgs());
+        B.createBranch(CBI->getLoc(),
+                       CBI->getFalseBB(), CBI->getFalseArgs());
       } else {
         assert(ConstCond->getValue() == APInt(1, /*value*/ 1, false) &&
                "Our representation of true/false does not match.");
-        BI = B.createBranch(CBI->getLoc(),
-                            CBI->getTrueBB(), CBI->getTrueArgs());
+        B.createBranch(CBI->getLoc(),
+                       CBI->getTrueBB(), CBI->getTrueArgs());
       }
 
-      // TODO: Produce an unreachable code warning here if the basic block
-      // contains user code.
+      // TODO: Produce an unreachable code warning here if the basic blocks
+      // contains user code. Only if we are not within an inlined or generic
+      // function.
 
-      eraseAndCleanup(CBI);
-
+      eraseAndCleanup(TI);
       return true;
     }
   }
+
+  // Constant fold switch union.
+  if (SwitchUnionInst *SUI = dyn_cast<SwitchUnionInst>(TI)) {
+    if (UnionInst *TheUnion = dyn_cast<UnionInst>(SUI->getOperand().getDef())) {
+      const UnionElementDecl *TheUnionElem = TheUnion->getElement();
+      SILBasicBlock *TheSuccessorBlock = 0;
+      for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
+        const UnionElementDecl *EI;
+        SILBasicBlock *BI;
+        llvm::tie(EI, BI) = SUI->getCase(Idx);
+        if (EI == TheUnionElem)
+          TheSuccessorBlock = BI;
+      }
+
+      // FIXME: Should we produce a warning if there is no default?
+      if (!TheSuccessorBlock)
+        if (SUI->hasDefault())
+          TheSuccessorBlock = SUI->getDefaultBB();
+
+      // Add the branch instruction with the block.
+      if (TheSuccessorBlock) {
+        SILBuilder B(&BB);
+        B.createBranch(TI->getLoc(), TheSuccessorBlock);
+
+        // TODO: Produce an unreachable code warning here if the basic blocks
+        // contains user code. Only if we are not within an inlined or generic
+        // function.
+
+        eraseAndCleanup(TI);
+        return true;
+      }
+    }
+  }
+
+  // Constant fold switch int.
+  if (SwitchIntInst *SUI = dyn_cast<SwitchIntInst>(TI)) {
+    if (IntegerLiteralInst *SwitchVal =
+          dyn_cast<IntegerLiteralInst>(SUI->getOperand().getDef())) {
+      SILBasicBlock *TheSuccessorBlock = 0;
+      for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
+        APInt EI;
+        SILBasicBlock *BI;
+        llvm::tie(EI, BI) = SUI->getCase(Idx);
+        if (EI == SwitchVal->getValue())
+          TheSuccessorBlock = BI;
+      }
+
+      if (!TheSuccessorBlock)
+        if (SUI->hasDefault())
+          TheSuccessorBlock = SUI->getDefaultBB();
+
+      // Add the branch instruction with the block.
+      if (TheSuccessorBlock) {
+        SILBuilder B(&BB);
+        B.createBranch(TI->getLoc(), TheSuccessorBlock);
+        eraseAndCleanup(TI);
+        return true;
+      }
+    }
+  }
+
   return false;
 }
 
