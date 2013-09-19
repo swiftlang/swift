@@ -149,11 +149,11 @@ Location getDeserializedLoc(Decl* D)  {
 
 /// Use the SM to figure out the actual line/column of a SourceLoc.
 template<typename WithLoc>
-Location getStartLoc(SourceManager &SM, WithLoc *S) {
+Location getLoc(SourceManager &SM, WithLoc *S, bool End = false) {
   Location L = {};
   if (S == nullptr) return L;
 
-  SourceLoc StartLoc = S->getStartLoc();
+  SourceLoc StartLoc = End ? S->getEndLoc() : S->getStartLoc();
   if (StartLoc.isInvalid())
     // This may be a deserialized or clang-imported decl. And modules
     // don't come with SourceLocs right now. Get at least the name of
@@ -166,45 +166,48 @@ Location getStartLoc(SourceManager &SM, WithLoc *S) {
   return L;
 }
 
-/// getStartLoc - extract the start location from a SILLocation.
-static Location getStartLoc(SourceManager &SM, Optional<SILLocation> OptLoc) {
+/// getLoc - extract the start location from a SILLocation.
+static Location getLoc(SourceManager &SM, Optional<SILLocation> OptLoc) {
   if (!OptLoc)
     return {};
 
   SILLocation Loc = OptLoc.getValue();
-  if (Expr* E = Loc.getAsASTNode<Expr>()) return getStartLoc(SM, E);
-  if (Stmt* S = Loc.getAsASTNode<Stmt>()) return getStartLoc(SM, S);
-  if (Decl* D = Loc.getAsASTNode<Decl>()) return getStartLoc(SM, D);
-  if (Pattern* P = Loc.getAsASTNode<Pattern>()) return getStartLoc(SM, P);
+  if (Expr* E = Loc.getAsASTNode<Expr>()) return getLoc(SM, E);
+  if (Decl* D = Loc.getAsASTNode<Decl>()) return getLoc(SM, D);
+  if (Stmt* S = Loc.getAsASTNode<Stmt>()) return getLoc(SM, S);
+  if (Pattern* P = Loc.getAsASTNode<Pattern>()) return getLoc(SM, P);
 
   Location None = {};
   return None;
 }
 
-/// getStartLocForLinetable - extract the start location from a SILLocation.
+/// getLocForLinetable - extract the start location from a SILLocation.
 /// NOTE: Depending on how we decide to resolve
 /// rdar://problem/14627460, we may want to use the regular
-/// getStartLoc instead and rather use the column info.
-static Location getStartLocForLinetable(SourceManager &SM,
-                                        Optional<SILLocation> OptLoc) {
+/// getLoc instead and rather use the column info.
+static Location getLocForLinetable(SourceManager &SM,
+                                   Optional<SILLocation> OptLoc) {
   if (!OptLoc)
     return {};
 
   SILLocation Loc = OptLoc.getValue();
+
+  if (Loc.isNull()) return {};
   if (Expr *E = Loc.getAsASTNode<Expr>()) {
     // auto_closures should not show up in the line table. Note that the
     // closure function still has a valid DW_AT_decl_line.
     if (isa<AutoClosureExpr>(E))
       return {};
-    return getStartLoc(SM, E);
+    return getLoc(SM, E);
   }
+  if (Pattern* P = Loc.getAsASTNode<Pattern>()) return getLoc(SM, P);
+  if (Stmt* S = Loc.getAsASTNode<Stmt>()) return getLoc(SM, S);
+  if (Decl* D = Loc.getAsASTNode<Decl>())
+    // FIXME: It may or may not be better to fix this in SILLocation.
+    return getLoc(SM, D, Loc.getKind() == SILLocation::ImplicitReturnKind);
 
-  if (Stmt* S = Loc.getAsASTNode<Stmt>()) return getStartLoc(SM, S);
-  if (Decl* D = Loc.getAsASTNode<Decl>()) return getStartLoc(SM, D);
-  if (Pattern* P = Loc.getAsASTNode<Pattern>()) return getStartLoc(SM, P);
-
-  Location None = {};
-  return None;
+  llvm_unreachable("unexpected location type");
+  //  return {};
 }
 
 /// Determine whether this debug scope belongs to an explicit closure.
@@ -219,12 +222,12 @@ static bool isExplicitClosure(SILDebugScope *DS) {
 void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
                                    SILDebugScope *DS,
                                    Optional<SILLocation> Loc) {
-  Location L = getStartLocForLinetable(SM, Loc);
+  Location L = getLocForLinetable(SM, Loc);
 
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
   if (!Scope.Verify()) return;
 
-  if (L.Filename && L.Filename != getStartLoc(SM, DS->Loc).Filename) {
+  if (L.Filename && L.Filename != getLoc(SM, DS->Loc).Filename) {
     // We changed files in the middle of a scope. This happens, for
     // example, when constructors are inlined. Create a new scope to
     // reflect this.
@@ -258,7 +261,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
     return llvm::DIDescriptor(cast<llvm::MDNode>(CachedScope->second));
   }
 
-  Location L = getStartLoc(SM, DS->Loc);
+  Location L = getLoc(SM, DS->Loc);
   llvm::DIFile File = getOrCreateFile(L.Filename);
   llvm::DIDescriptor Parent = getOrCreateScope(DS->Parent);
   if (Parent == 0)
@@ -443,8 +446,8 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   Location L = {};
   Location PrologLoc = {};
   if (DS) {
-    L = getStartLoc(SM, DS->Loc);
-    PrologLoc = getStartLocForLinetable(SM, DS->Loc);
+    L = getLoc(SM, DS->Loc);
+    PrologLoc = getLocForLinetable(SM, DS->Loc);
     Name = getName(DS->Loc);
   }
   assert(Fn);
@@ -553,7 +556,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
 
   // Create the imported module.
   StringRef Name = BumpAllocatedString(Printed, DebugInfoNames);
-  Location L = getStartLoc(SM, D);
+  Location L = getLoc(SM, D);
   auto Import = DBuilder.createImportedModule(TheCU,
                                               llvm::DINameSpace(Namespace),
                                               L.Line, Name);
@@ -798,7 +801,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                                    StringRef LinkageName,
                                                    DebugTypeInfo DebugType,
                                                    Optional<SILLocation> Loc) {
-  Location L = getStartLoc(SM, Loc);
+  Location L = getLoc(SM, Loc);
   llvm::DIFile Unit = getOrCreateFile(L.Filename);
 
   // FIXME: Can there be nested types?
@@ -1055,7 +1058,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto StructTy = BaseTy->castTo<StructType>();
     if (auto Decl = StructTy->getDecl()) {
-      Location L = getStartLoc(SM, Decl);
+      Location L = getLoc(SM, Decl);
       return createStructType(DbgTy, Decl, Name, Scope,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,
@@ -1074,7 +1077,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto ClassTy = BaseTy->castTo<ClassType>();
     if (auto Decl = ClassTy->getDecl()) {
-      Location L = getStartLoc(SM, Decl);
+      Location L = getLoc(SM, Decl);
       auto Attrs = Decl->getAttrs();
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
       return createStructType(DbgTy, Decl, Name, Scope,
@@ -1093,7 +1096,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto ProtocolTy = BaseTy->castTo<ProtocolType>();
     if (auto Decl = ProtocolTy->getDecl()) {
       // FIXME: (LLVM branch) Should be DW_TAG_interface_type
-      Location L = getStartLoc(SM, Decl);
+      Location L = getLoc(SM, Decl);
       return createStructType(DbgTy, Decl, Name, Scope,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,
@@ -1105,7 +1108,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::ProtocolComposition: {
     Name = getMangledName(DbgTy);
-    Location L = getStartLoc(SM, DbgTy.getDecl());
+    Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
 
     // FIXME: emit types
@@ -1123,7 +1126,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto UnboundTy = BaseTy->castTo<UnboundGenericType>();
     if (auto Decl = UnboundTy->getDecl()) {
-      Location L = getStartLoc(SM, Decl);
+      Location L = getLoc(SM, Decl);
       return DBuilder.
         createStructType(Scope, Name,
                          getOrCreateFile(L.Filename), L.Line,
@@ -1141,7 +1144,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto StructTy = BaseTy->castTo<BoundGenericStructType>();
     if (auto Decl = StructTy->getDecl()) {
-      Location L = getStartLoc(SM, Decl);
+      Location L = getLoc(SM, Decl);
       return createStructType(DbgTy, Decl, Name, Scope,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,
@@ -1157,7 +1160,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto ClassTy = BaseTy->castTo<BoundGenericClassType>();
     if (auto Decl = ClassTy->getDecl()) {
-      Location L = getStartLoc(SM, Decl);
+      Location L = getLoc(SM, Decl);
       auto Attrs = Decl->getAttrs();
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
       return createStructType(DbgTy, Decl, Name, Scope,
@@ -1174,7 +1177,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Tuple: {
     Name = getMangledName(DbgTy);
     auto TupleTy = BaseTy->castTo<TupleType>();
-    Location L = getStartLoc(SM, DbgTy.getDecl());
+    Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
     // Tuples are also represented as structs.
     return DBuilder.
@@ -1229,7 +1232,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto UnionTy = BaseTy->castTo<UnionType>();
     if (auto Decl = UnionTy->getDecl()) {
-      Location L = getStartLoc(SM, Decl);
+      Location L = getLoc(SM, Decl);
       return createUnionType(DbgTy, Decl, Name, Scope,
                              getOrCreateFile(L.Filename), L.Line, Flags);
     }
@@ -1243,7 +1246,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto UnionTy = BaseTy->castTo<BoundGenericUnionType>();
     if (auto Decl = UnionTy->getDecl()) {
-      Location L = getStartLoc(SM, Decl);
+      Location L = getLoc(SM, Decl);
       return createUnionType(DbgTy, Decl, Name, Scope,
                              getOrCreateFile(L.Filename), L.Line, Flags);
     }
@@ -1271,7 +1274,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto ReferenceTy = cast<ReferenceStorageType>(BaseTy);
     auto CanTy = ReferenceTy->getReferentType();
-    Location L = getStartLoc(SM, DbgTy.getDecl());
+    Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
     return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy, Scope),
                                   Name, File, L.Line, File);
@@ -1284,7 +1287,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto NameAliasTy = cast<NameAliasType>(BaseTy);
     if (auto Decl = NameAliasTy->getDecl()) {
       Name = Decl->getName().str();
-      Location L = getStartLoc(SM, Decl);
+      Location L = getLoc(SM, Decl);
       auto AliasedTy = Decl->hasUnderlyingType()
         ? Decl->getUnderlyingType()
         : NameAliasTy->getDesugaredType();
@@ -1302,7 +1305,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto SubstitutedTy = cast<SubstitutedType>(BaseTy);
     auto CanTy = SubstitutedTy->getDesugaredType();
-    Location L = getStartLoc(SM, DbgTy.getDecl());
+    Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
     return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy, Scope),
                                   Name, File, L.Line, File);
@@ -1313,7 +1316,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Name = getMangledName(DbgTy);
     auto ParenTy = cast<ParenType>(BaseTy);
     auto CanTy = ParenTy->getDesugaredType();
-    Location L = getStartLoc(SM, DbgTy.getDecl());
+    Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
     return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy, Scope),
                                   Name, File, L.Line, File);
