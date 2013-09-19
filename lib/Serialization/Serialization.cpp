@@ -1222,6 +1222,8 @@ void Serializer::writeDecl(const Decl *D) {
 
     DeclAttributes remainingAttrs = ctor->getAttrs();
     remainingAttrs.ObjC = false;
+    remainingAttrs.Transparent = false;
+
     assert(remainingAttrs.empty() && "unhandled constructor attrs");
 
     assert(!ctor->getAllocSelfExpr() && "allocating constructors not handled");
