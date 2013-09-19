@@ -2467,7 +2467,9 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
   // Reject 'destructor' functions outside of classes
   if (!(Flags & PD_AllowDestructor)) {
     diagnose(DestructorLoc, diag::destructor_decl_outside_class);
-    return nullptr;
+
+    // Tell the type checker not to touch this destructor.
+    DD->setInvalid();
   }
 
   return makeParserResult(DD);

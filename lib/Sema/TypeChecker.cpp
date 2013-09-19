@@ -663,6 +663,9 @@ bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
 bool swift::typeCheckAbstractFunctionBodyUntil(TranslationUnit *TU,
                                                AbstractFunctionDecl *AFD,
                                                SourceLoc EndTypeCheckLoc) {
+  if (AFD->isInvalid())
+    return false;
+
   // Set up a diagnostics engine that swallows diagnostics.
   DiagnosticEngine Diags(TU->Ctx.SourceMgr);
 

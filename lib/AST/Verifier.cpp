@@ -781,7 +781,27 @@ namespace {
         Out << "ConstructorDecl should have exactly one parameter pattern";
         abort();
       }
+
+      auto *DC = CD->getDeclContext();
+      if (!isa<NominalTypeDecl>(DC) && !isa<ExtensionDecl>(DC) &&
+          !CD->isInvalid()) {
+        Out << "ConstructorDecls outside nominal types and extensions "
+               "should be marked invalid";
+        abort();
+      }
+
       return verifyParsed(cast<AbstractFunctionDecl>(CD));
+    }
+
+    void verifyChecked(ConstructorDecl *CD) {
+      auto *ND = CD->getExtensionType()->getNominalOrBoundGenericNominal();
+      if (!isa<ClassDecl>(ND) && !isa<StructDecl>(ND) && !isa<UnionDecl>(ND) &&
+          !CD->isInvalid()) {
+        Out << "ConstructorDecls outside structs, classes or unions"
+               "should be marked invalid";
+        abort();
+      }
+      return verifyChecked(cast<AbstractFunctionDecl>(CD));
     }
 
     void verifyParsed(DestructorDecl *DD) {
@@ -794,7 +814,25 @@ namespace {
         Out << "DestructorDecl should not have parameter patterns";
         abort();
       }
+
+      auto *DC = DD->getDeclContext();
+      if (!isa<NominalTypeDecl>(DC) && !isa<ExtensionDecl>(DC) &&
+          !DD->isInvalid()) {
+        Out << "DestructorDecls outside nominal types and extensions "
+               "should be marked invalid";
+        abort();
+      }
+
       return verifyParsed(cast<AbstractFunctionDecl>(DD));
+    }
+
+    void verifyChecked(DestructorDecl *DD) {
+      auto *ND = DD->getExtensionType()->getNominalOrBoundGenericNominal();
+      if (!isa<ClassDecl>(ND) && !DD->isInvalid()) {
+        Out << "DestructorDecls outside classes should be marked invalid";
+        abort();
+      }
+      return verifyChecked(cast<AbstractFunctionDecl>(DD));
     }
 
     void verifyParsed(FuncDecl *FD) {

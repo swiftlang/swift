@@ -1590,6 +1590,11 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
+    if (DD->isInvalid()) {
+      DD->overwriteType(ErrorType::get(TC.Context));
+      return;
+    }
+
     if (!IsFirstPass) {
       if (DD->getBody())
         TC.definedFunctions.push_back(DD);
