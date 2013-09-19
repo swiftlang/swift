@@ -209,6 +209,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
   Fn->setLinkage((SILLinkage)Linkage);
   SILBasicBlock *CurrentBB = nullptr;
   BasicBlockID = 0;
+  BlocksByID.clear();
+  UndefinedBlocks.clear();
 
   // Fetch the next record.
   scratch.clear();
@@ -887,6 +889,32 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createCondBranch(Loc, Cond,
                     getBBForReference(Fn, ListOfValues[2]), TrueArgs,
                     getBBForReference(Fn, ListOfValues[3]), FalseArgs);
+    break;
+  }
+  case ValueKind::SwitchUnionInst:
+  case ValueKind::DestructiveSwitchUnionAddrInst: {
+    // Format: condition, a list of cases (UnionElementDecl + Basic Block ID),
+    // default basic block ID. Use SILOneTypeValuesLayout: the type is
+    // for condition, the list has value for condition, hasDefault, default
+    // basic block ID, a list of (DeclID, BasicBlock ID).
+    SILValue Cond = getLocalValue(ListOfValues[0], ListOfValues[1],
+                                  getSILType(MF->getType(TyID),
+                                             (SILValueCategory)TyCategory));
+
+    SILBasicBlock *DefaultBB = nullptr;
+    if (ListOfValues[2])
+      DefaultBB = getBBForReference(Fn, ListOfValues[3]);
+
+    SmallVector<std::pair<UnionElementDecl*, SILBasicBlock*>, 4> CaseBBs;
+    for (unsigned I = 4, E = ListOfValues.size(); I < E; I += 2) {
+      CaseBBs.push_back( {cast<UnionElementDecl>(MF->getDecl(ListOfValues[I])),
+                            getBBForReference(Fn, ListOfValues[I+1])} );
+    }
+    if ((ValueKind)OpCode == ValueKind::SwitchUnionInst)
+      ResultVal = Builder.createSwitchUnion(Loc, Cond, DefaultBB, CaseBBs);
+    else
+      ResultVal = Builder.createDestructiveSwitchUnionAddr(Loc, Cond,
+                      DefaultBB, CaseBBs);
     break;
   }
   case ValueKind::UnreachableInst: {

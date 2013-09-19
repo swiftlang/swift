@@ -360,7 +360,35 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
-  case ValueKind::UnreachableInst: {
+  case ValueKind::SwitchUnionInst:
+  case ValueKind::DestructiveSwitchUnionAddrInst: {
+    // Format: condition, a list of cases (UnionElementDecl + Basic Block ID),
+    // default basic block ID. Use SILOneTypeValuesLayout: the type is
+    // for condition, the list has value for condition, hasDefault, default
+    // basic block ID, a list of (DeclID, BasicBlock ID).
+    const SwitchUnionInstBase *SOI = cast<SwitchUnionInstBase>(&SI);
+    SmallVector<ValueID, 4> ListOfValues;
+    ListOfValues.push_back(addValueRef(SOI->getOperand()));
+    ListOfValues.push_back(SOI->getOperand().getResultNumber());
+    ListOfValues.push_back((unsigned)SOI->hasDefault());
+    if (SOI->hasDefault())
+      ListOfValues.push_back(BasicBlockMap[SOI->getDefaultBB()]);
+    else
+      ListOfValues.push_back(0);
+
+    for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
+      UnionElementDecl *elt;
+      SILBasicBlock *dest;
+      std::tie(elt, dest) = SOI->getCase(i);
+      ListOfValues.push_back(S.addDeclRef(elt));
+      ListOfValues.push_back(BasicBlockMap[dest]);
+    }
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(SOI->getOperand().getType().getSwiftRValueType()),
+        (unsigned)SOI->getOperand().getType().getCategory(),
+        ListOfValues);
     break;
   }
   case ValueKind::DeallocStackInst:
