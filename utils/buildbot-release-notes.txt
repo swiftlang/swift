@@ -60,7 +60,7 @@
 
    sender.isEqual!(other)
 
-  This will fail at runtime if in fact sender does not respond to  -isEqual:.
+  This will fail at runtime if in fact sender does not respond to -isEqual:.
   We have some additional syntactic optimizations planned for testing
   an optional value and handling both the success and failure cases
   concisely. Watch this space.
