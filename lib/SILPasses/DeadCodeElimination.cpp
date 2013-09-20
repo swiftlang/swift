@@ -102,7 +102,12 @@ static bool constantFoldTerminator(SILBasicBlock &BB) {
     }
   }
 
-  // Constant fold switch enum.
+  // Constant fold switch union.
+  //   %1 = union $Bool, #Bool.false!unionelt
+  //   switch_union %1 : $Bool, case #Bool.true!unionelt: bb1,
+  //                            case #Bool.false!unionelt: bb2
+  // =>
+  //   br bb2
   if (SwitchEnumInst *SUI = dyn_cast<SwitchEnumInst>(TI)) {
     if (EnumInst *TheEnum = dyn_cast<EnumInst>(SUI->getOperand().getDef())) {
       const EnumElementDecl *TheEnumElem = TheEnum->getElement();
@@ -136,6 +141,10 @@ static bool constantFoldTerminator(SILBasicBlock &BB) {
   }
 
   // Constant fold switch int.
+  //   %1 = integer_literal $Builtin.Int64, 2
+  //   switch_int %1 : $Builtin.Int64, case 1: bb1, case 2: bb2
+  // =>
+  //   br bb2
   if (SwitchIntInst *SUI = dyn_cast<SwitchIntInst>(TI)) {
     if (IntegerLiteralInst *SwitchVal =
           dyn_cast<IntegerLiteralInst>(SUI->getOperand().getDef())) {
