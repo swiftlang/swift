@@ -1902,7 +1902,7 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
     }
     
     // Create the element.
-    auto *result = new (Context) EnumElementDecl(nullptr, NameLoc, Name,
+    auto *result = new (Context) EnumElementDecl(NameLoc, Name,
                                                  ArgType.getPtrOrNull(),
                                                  ArrowLoc,
                                                  ResultType.getPtrOrNull(),
@@ -1923,16 +1923,12 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
     return Status;
   }
 
-  // Create and return the EnumCaseDecl containing all the elements.
-  auto theCase = EnumCaseDecl::create(CaseLoc, Elements, CurDeclContext);
-  Decls.push_back(theCase);
+  // Create and insert the EnumCaseDecl containing all the elements.
+  auto TheCase = EnumCaseDecl::create(CaseLoc, Elements, CurDeclContext);
+  Decls.push_back(TheCase);
   
-  // Associate the elements with the case decl and return them.
-  for (auto elt : Elements) {
-    elt->setContainingCase(theCase);
-    Decls.push_back(elt);
-  }
-
+  // Insert the element decls.
+  std::copy(Elements.begin(), Elements.end(), std::back_inserter(Decls));
   return Status;
 }
 

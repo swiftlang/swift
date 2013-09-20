@@ -2369,9 +2369,6 @@ public:
 /// parent EnumDecl, although syntactically they are subordinate to the
 /// EnumCaseDecl.
 class EnumElementDecl : public ValueDecl {
-  /// The CaseDecl that contains the enum element.
-  EnumCaseDecl *ContainingCase;
-
   /// This is the type specified with the enum element, for
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
@@ -2384,14 +2381,13 @@ class EnumElementDecl : public ValueDecl {
   TypeLoc ResultType;
     
 public:
-  EnumElementDecl(EnumCaseDecl *ContainingCase,
-                   SourceLoc IdentifierLoc, Identifier Name,
+  EnumElementDecl( SourceLoc IdentifierLoc, Identifier Name,
                    TypeLoc ArgumentType,
                    SourceLoc ArrowLoc,
                    TypeLoc ResultType,
                    DeclContext *DC)
   : ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
-    ContainingCase(ContainingCase), ArgumentType(ArgumentType),
+    ArgumentType(ArgumentType),
     ResultArrowLoc(ArrowLoc),
     ResultType(ResultType)
   {}
@@ -2408,10 +2404,6 @@ public:
   EnumDecl *getParentEnum() const {
     return cast<EnumDecl>(getDeclContext());
   }
-  
-  /// The 'case' declaration that declares the element.
-  EnumCaseDecl *getContainingCase() const { return ContainingCase; }
-  void setContainingCase(EnumCaseDecl *theCase) { ContainingCase = theCase; }
   
   SourceLoc getStartLoc() const {
     return getNameLoc();

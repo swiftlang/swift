@@ -1248,13 +1248,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto argTy = getType(argTypeID);
     auto resTy = getType(resTypeID);
-    auto elem = new (ctx) EnumElementDecl(nullptr,
-                                           SourceLoc(),
-                                           getIdentifier(nameID),
-                                           TypeLoc::withoutLoc(argTy),
-                                           SourceLoc(),
-                                           TypeLoc::withoutLoc(resTy),
-                                           DC);
+    auto elem = new (ctx) EnumElementDecl(SourceLoc(),
+                                          getIdentifier(nameID),
+                                          TypeLoc::withoutLoc(argTy),
+                                          SourceLoc(),
+                                          TypeLoc::withoutLoc(resTy),
+                                          DC);
     declOrOffset = elem;
 
     elem->setType(getType(ctorTypeID));

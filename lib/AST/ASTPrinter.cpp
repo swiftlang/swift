@@ -715,8 +715,9 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
 }
 
 void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
-  // Enum elements are printed as part of the EnumCaseDecl.
-  if (decl->getContainingCase())
+  // Enum elements are printed as part of the EnumCaseDecl, unless they were
+  // imported without source info.
+  if (decl->getSourceRange().isValid())
     return;
   
   // In cases where there is no parent EnumCaseDecl (such as imported or

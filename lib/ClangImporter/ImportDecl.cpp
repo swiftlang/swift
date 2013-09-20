@@ -700,7 +700,7 @@ namespace {
           return known->second;
 
         auto element
-          = new (context) EnumElementDecl(nullptr, SourceLoc(),
+          = new (context) EnumElementDecl(SourceLoc(),
                                           name, TypeLoc(),
                                           SourceLoc(), TypeLoc(),
                                           dc);
