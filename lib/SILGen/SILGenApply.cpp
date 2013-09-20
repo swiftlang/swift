@@ -818,8 +818,10 @@ public:
       return false;
     }
 
+    // Only methods can be forced.
     auto *fd = dyn_cast<FuncDecl>(dynamicMemberRef->getMember().getDecl());
-    assert(fd && "Dynamic member reference to non-method");
+    if (!fd)
+      return false;
 
     // We found it. Emit the base.
     ManagedValue existential =
@@ -1682,8 +1684,13 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   SILValue optMethodArg = new (F.getModule()) SILArgument(loweredOptTy, contBB);
 
   // Create the branch.
-  B.createDynamicMethodBranch(e, operand, SILDeclRef(e->getMember().getDecl()),
-                              hasMemberBB, noMemberBB);
+  SILDeclRef member(e->getMember().getDecl(),
+                    isa<VarDecl>(e->getMember().getDecl())
+                      ? SILDeclRef::Kind::Getter
+                      : SILDeclRef::Kind::Func,
+                    SILDeclRef::ConstructAtNaturalUncurryLevel,
+                    /*isObjC=*/true);
+  B.createDynamicMethodBranch(e, operand, member, hasMemberBB, noMemberBB);
 
   // Create the has-member branch.
   {
@@ -1692,12 +1699,13 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     FullExpr hasMemberScope(Cleanups, CleanupLocation(e->getCreateSome()));
 
     // The argument to the has-member block is the uncurried method.
-    SILDeclRef member(e->getMember().getDecl(),
-                      SILDeclRef::ConstructAtNaturalUncurryLevel,
-                      /*isObjC=*/true);
+    auto valueTy =e->getType()->castTo<BoundGenericType>()->getGenericArgs()[0];
+    auto methodTy = valueTy;
 
-    auto methodTy =
-      e->getType()->castTo<BoundGenericType>()->getGenericArgs()[0];
+    // For a property, we want the getter.
+    if (member.isProperty())
+      methodTy = FunctionType::get(TupleType::getEmpty(getASTContext()),
+                                   methodTy, getASTContext());
 
     auto dynamicMethodTy = getDynamicMethodType(*this, operand, member,
                                                 methodTy);
@@ -1705,15 +1713,17 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     SILValue memberArg = new (F.getModule()) SILArgument(loweredMethodTy,
                                                          hasMemberBB);
 
-    // Apply the operand to the argument.
-    SILValue appliedMethod = B.createPartialApply(e, memberArg, operand,
-                                                  getLoweredType(methodTy));
+    // Create the result value.
+    SILValue result = B.createPartialApply(e, memberArg, operand,
+                                           getLoweredType(methodTy));
+    if (member.isProperty()) {
+      result = B.createApply(e, result, getLoweredType(valueTy), { });
+    }
 
+    // Package up the result in an optional.
     SILValue optResult;
-
     {
-      // Package up the applied method in .Some().
-      OpaqueValueRAII opaqueValue(*this, e->getOpaqueFn(), appliedMethod);
+      OpaqueValueRAII opaqueValue(*this, e->getOpaqueFn(), result);
 
       optResult = emitRValue(e->getCreateSome()).forwardAsSingleValue(*this, e);
     }

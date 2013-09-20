@@ -1761,11 +1761,16 @@ void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
   LoweredBB &noMethodBB = getLoweredBB(i->getNoMethodBB());
 
   // Emit the swift_objcRespondsToSelector() call.
-  // FIXME: Make this work for properties, subscripts as well.
+  // FIXME: Make this work for subscripts as well.
   StringRef selector;
   llvm::SmallString<64> selectorBuffer;
-  auto fnDecl = cast<FuncDecl>(i->getMember().getDecl());
-  selector = fnDecl->getObjCSelector(selectorBuffer);
+  if (auto fnDecl = dyn_cast<FuncDecl>(i->getMember().getDecl()))
+    selector = fnDecl->getObjCSelector(selectorBuffer);
+  else if (auto var = dyn_cast<VarDecl>(i->getMember().getDecl()))
+    selector = var->getObjCGetterSelector(selectorBuffer);
+  else
+    llvm_unreachable("Unhandled dynamic method branch query");
+
   llvm::Value *object = getLoweredExplosion(i->getOperand()).claimNext();
   if (object->getType() != IGM.ObjCPtrTy)
     object = Builder.CreateBitCast(object, IGM.ObjCPtrTy);

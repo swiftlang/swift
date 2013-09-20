@@ -6,6 +6,9 @@ import Builtin
 class X {
   func [objc] f() { }
   static func [objc] g() { }
+  var [objc] value : Int { 
+    return 17
+  }
 }
 
 // [objc] t.X.f (t.X)() -> ()
@@ -20,6 +23,18 @@ sil @_TToC14dynamic_lookup1X1gfMS0_FT_T_ : $[thin] ((), X.metatype) -> () {
 bb0(%0 : $X.metatype):
   %14 = tuple ()                                  // user: %15
   return %14 : $()
+}
+
+sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64
+
+// [objc] dynamic_lookup.X.value.getter : swift.Int64
+sil @_TToC14dynamic_lookup1X5valueSig : $[cc(objc_method), thin] ((), X) -> Int64 {
+bb0(%0 : $X):
+  %4 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64 // user: %7
+  %5 = metatype $Int64.metatype                   // user: %7
+  %6 = integer_literal $Builtin.Int64, 5          // user: %7
+  %7 = apply [transparent] %4(%6, %5) : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64 // user: %9
+  return %7 : $Int64
 }
 
 // CHECK: define void @dynamic_lookup_br(%objc_object*)
@@ -65,6 +80,26 @@ bb2:
 bb3:
   %43 = tuple ()
   return %43 : $()
+}
+
+sil @_T1t23dynamic_lookup_propertyFT1xPSo13DynamicLookup__T_ : $[thin] (x : DynamicLookup) -> () {
+  bb0(%0 : $DynamicLookup):
+  %1 = alloc_box $DynamicLookup
+  store %0 to %1#1 : $*DynamicLookup
+  %6 = load %1#1 : $*DynamicLookup                // users: %24, %8, %7
+  strong_retain %6 : $DynamicLookup
+  %8 = project_existential_ref %6 : $DynamicLookup // users: %11, %9
+  dynamic_method_br %8 : $Builtin.ObjCPointer, #X.value!getter.1.objc, bb1, bb2
+
+bb1(%10 : $[cc(objc_method), thin] ((), Builtin.ObjCPointer) -> Int64):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %43 = tuple ()
+  return %43 : $()  
 }
 
 sil @top_level_code : $[thin] () -> () {

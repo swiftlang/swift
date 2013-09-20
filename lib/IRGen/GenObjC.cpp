@@ -243,6 +243,33 @@ namespace {
       property->getObjCSetterSelector(Text);
     }
 
+    Selector(SILDeclRef ref) {
+      switch (ref.kind) {
+      case SILDeclRef::Kind::Allocator:
+      case SILDeclRef::Kind::DefaultArgGenerator:
+      case SILDeclRef::Kind::Destroyer:
+      case SILDeclRef::Kind::EnumElement:
+      case SILDeclRef::Kind::GlobalAccessor:
+        llvm_unreachable("Method does not have a selector");
+
+      case SILDeclRef::Kind::Func:
+        cast<FuncDecl>(ref.getDecl())->getObjCSelector(Text);
+        break;
+
+      case SILDeclRef::Kind::Getter:
+        cast<VarDecl>(ref.getDecl())->getObjCGetterSelector(Text);
+        break;
+
+      case SILDeclRef::Kind::Initializer:
+        cast<ConstructorDecl>(ref.getDecl())->getObjCSelector(Text);
+        break;
+
+      case SILDeclRef::Kind::Setter:
+        cast<VarDecl>(ref.getDecl())->getObjCSetterSelector(Text);
+        break;
+      }
+    }
+
     StringRef str() const {
       return Text;
     }
@@ -340,8 +367,9 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                               ExplosionKind maxExplosion,
                                               bool isSuper) {
   assert((method.kind == SILDeclRef::Kind::Initializer
-          || method.kind == SILDeclRef::Kind::Func)
-         && "objc method call must be to a func or constructor decl");
+          || method.kind == SILDeclRef::Kind::Func
+          || method.kind == SILDeclRef::Kind::Getter)
+         && "objc method call must be to a func, initializer, or getter");
   llvm::AttributeSet attrs;
   auto fnTy = IGF.IGM.getFunctionType(AbstractCC::ObjCMethod,
                                       origType.getSwiftRValueType(),
@@ -376,9 +404,6 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                                  subs,
                                                  messenger, nullptr,
                                                  ExplosionKind::Minimal));
-  // Compute the selector.
-  Selector selector(method.getDecl());
-
   return emission;
 }
 
@@ -389,7 +414,7 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                                llvm::Value *self,
                                                SILType searchType) {
   // Compute the selector.
-  Selector selector(method.getDecl());
+  Selector selector(method);
     
   // super.constructor references an instance method (even though the
   // decl is really a 'static' member).
