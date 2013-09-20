@@ -378,8 +378,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                     ValueKind::ApplyInst);
     break;
   }
-  case SIL_INST_TODO:
-    SILInstTodoLayout::readRecord(scratch, OpCode);
+  case SIL_INST_NO_OPERAND:
+    SILInstNoOperandLayout::readRecord(scratch, OpCode);
     break;
   }
 

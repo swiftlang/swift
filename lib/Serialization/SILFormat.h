@@ -46,13 +46,13 @@ namespace sil_block {
     SIL_ONE_TYPE_VALUES,
     SIL_TWO_OPERANDS,
     SIL_INST_APPLY,
-    SIL_INST_TODO,
+    SIL_INST_NO_OPERAND,
     SIL_FUNC_NAMES,
     SIL_FUNC_OFFSETS
   };
 
-  using SILInstTodoLayout = BCRecordLayout<
-    SIL_INST_TODO,
+  using SILInstNoOperandLayout = BCRecordLayout<
+    SIL_INST_NO_OPERAND,
     SILInstOpCodeField
   >;
 

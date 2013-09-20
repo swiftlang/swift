@@ -213,10 +213,13 @@ void SILSerializer::handleMethodInst(const MethodInst *MI,
 
 void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   switch (SI.getKind()) {
-  default: {
-    unsigned abbrCode = SILAbbrCodes[SILInstTodoLayout::Code];
-    SILInstTodoLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                  (unsigned)SI.getKind());
+  default:
+    llvm_unreachable("To be handled SILInstruction");
+
+  case ValueKind::UnreachableInst: {
+    unsigned abbrCode = SILAbbrCodes[SILInstNoOperandLayout::Code];
+    SILInstNoOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       (unsigned)SI.getKind());
     break;
   }
   case ValueKind::DeallocBoxInst:
@@ -1110,7 +1113,7 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
     registerSILAbbr<SILOneTypeValuesLayout>();
     registerSILAbbr<SILTwoOperandsLayout>();
     registerSILAbbr<SILInstApplyLayout>();
-    registerSILAbbr<SILInstTodoLayout>();
+    registerSILAbbr<SILInstNoOperandLayout>();
 
     // Go through all SILFunctions in M, and if it is transparent,
     // write out the SILFunction.
