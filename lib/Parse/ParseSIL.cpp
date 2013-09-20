@@ -389,7 +389,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
   // it until we see a real definition.
   ForwardRefLocalValues[Name.Name] = Name.NameLoc;
 
-  if (Name.ResultVal == ~0U) {
+  if (!Name.isMRV()) {
     Entry = new (SILMod) GlobalAddrInst(Loc, nullptr, Type);
     return Entry;
   }

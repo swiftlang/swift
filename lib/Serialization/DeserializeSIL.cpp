@@ -110,7 +110,17 @@ SILDeserializer::readFuncTable(ArrayRef<uint64_t> fields, StringRef blobData) {
 }
 
 void SILDeserializer::setLocalValue(ValueBase *Value, ValueID Id) {
-  LocalValues[Id] = Value;
+  ValueBase *&Entry = LocalValues[Id];
+  if (Entry) {
+    // If this value was already referenced, check it to make sure types match.
+    assert(Entry->getTypes() != Value->getTypes() && "Value Type mismatch?");
+    // FIXME: RAUW all SILValues with the same base.
+    Entry = Value;
+    return;
+  }
+
+  // Otherwise, just store it in our map.
+  Entry = Value;
 }
 
 SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
@@ -118,13 +128,14 @@ SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
   // Check to see if this is already defined.
   ValueBase *&Entry = LocalValues[Id];
   if (Entry) {
-    // If this value is already defined, check it to make sure types match.
+    // If this value was already defined, check it to make sure types match.
     SILType EntryTy = Entry->getType(ResultNum);
     assert(EntryTy == Type && "Value Type mismatch?");
     (void)EntryTy;
     return SILValue(Entry, ResultNum);
   }
   // FIXME: handle forward references.
+  llvm_unreachable("Handle forward references of Values.");
   return SILValue(nullptr, 0); 
 }
 
@@ -208,9 +219,13 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
   auto Fn = InFunc;
   Fn->setLinkage((SILLinkage)Linkage);
   SILBasicBlock *CurrentBB = nullptr;
+
+  // Clear up at the beginning of each SILFunction.
   BasicBlockID = 0;
   BlocksByID.clear();
   UndefinedBlocks.clear();
+  LastValueID = 0;
+  LocalValues.clear();
 
   // Fetch the next record.
   scratch.clear();
@@ -253,15 +268,15 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
   // Args should be a list of pairs, the first number is a TypeID, the
   // second number is a ValueID.
   SILBasicBlock *CurrentBB = getBBForDefinition(Fn, BasicBlockID++);
-  for (unsigned I = 0, E = Args.size(); I < E; I += 2) {
+  for (unsigned I = 0, E = Args.size(); I < E; I += 3) {
     TypeID TyID = Args[I];
     if (!TyID) return nullptr;
-    ValueID ValId = Args[I+1];
+    ValueID ValId = Args[I+2];
     if (!ValId) return nullptr;
 
     auto ArgTy = MF->getType(TyID);
     auto Arg = new (SILMod) SILArgument(getSILType(ArgTy,
-                                                   SILValueCategory::Object),
+                                                   (SILValueCategory)Args[I+1]),
                                         CurrentBB);
     setLocalValue(Arg, ++LastValueID);
   }
@@ -891,7 +906,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getLocalValue(ValID2, ValResNum2,
                                   getSILType(Ty, (SILValueCategory)TyCategory)),
                     Field,
-                    getSILType(Field->getType(), SILValueCategory::Object));
+                    getSILType(Field->getType(), SILValueCategory::Address));
     break;
   }
   case ValueKind::StructExtractInst: {

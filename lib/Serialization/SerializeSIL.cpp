@@ -29,7 +29,7 @@ EnableSerializeAll("sil-serialize-all", llvm::cl::Hidden,
                    llvm::cl::init(false));
 static llvm::cl::opt<bool>
 EnableSerialize("enable-sil-serialization", llvm::cl::Hidden,
-                llvm::cl::init(false));
+                llvm::cl::init(true));
 
 using namespace swift;
 using namespace swift::serialization;
@@ -154,9 +154,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F) {
   DEBUG(llvm::dbgs() << "Serialize SIL:\n";
         F.dump());
   LastValueID = 0;
+  ValueIDs.clear();
+  InstID = 0;
+
   FuncTable[Ctx.getIdentifier(F.getName())] = FuncID++;
   Funcs.push_back(Out.GetCurrentBitNo());
-  InstID = 0;
   unsigned abbrCode = SILAbbrCodes[SILFunctionLayout::Code];
   TypeID FnID = S.addTypeRef(F.getLoweredType().getSwiftType());
   DEBUG(llvm::dbgs() << "SILFunction @" << Out.GetCurrentBitNo() <<
@@ -178,9 +180,10 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
   SmallVector<DeclID, 4> Args;
   for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I) {
     SILArgument *SA = *I;
-    DeclID tId = S.addTypeRef(SA->getType().getSwiftType());
+    DeclID tId = S.addTypeRef(SA->getType().getSwiftRValueType());
     DeclID vId = addValueRef(static_cast<const ValueBase*>(SA));
     Args.push_back(tId);
+    Args.push_back((unsigned)SA->getType().getCategory());
     Args.push_back(vId);
   }
 

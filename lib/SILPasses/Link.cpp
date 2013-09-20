@@ -23,6 +23,9 @@ using namespace swift;
 // To help testing serialization, deserialization, we turn on sil-link-all.
 static llvm::cl::opt<bool>
 EnableLinkAll("sil-link-all", llvm::cl::Hidden, llvm::cl::init(false));
+static llvm::cl::opt<bool>
+EnableLinking("enable-sil-linking", llvm::cl::Hidden, llvm::cl::init(false));
+
 STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 
 //===----------------------------------------------------------------------===//
@@ -30,7 +33,9 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 //===----------------------------------------------------------------------===//
 
 void swift::performSILLinking(SILModule *M) {
-  
+  if (!EnableLinking && !EnableLinkAll)
+    return;
+ 
   SerializedSILLoader *SILLoader = SerializedSILLoader::create(
                                      M->getASTContext(), M);
   SmallVector<SILFunction*, 128> Worklist;
