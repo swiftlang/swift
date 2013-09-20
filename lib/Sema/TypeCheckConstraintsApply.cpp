@@ -478,41 +478,42 @@ namespace {
       auto type = simplifyType(openedType);
       auto fnType = type->castTo<BoundGenericType>()->getGenericArgs()[0];
 
-      // Create the .Some(fn) helper expression.
-      // FIXME: This is currently swift.Some(fn).
+      // Create the helper expression to build the
+
+
+      // Create the expression to inject a value.
       auto opaqueFn = new (context) OpaqueValueExpr(dotLoc, fnType);
       opaqueFn->setUniquelyReferenced(true);
-      auto swiftRef = new (context) UnresolvedDeclRefExpr(
-                                      context.getIdentifier("swift"),
-                                      DeclRefKind::Ordinary,
-                                      dotLoc);
-      auto someRef = new (context) UnresolvedDotExpr(
-                                     swiftRef,
-                                     dotLoc,
-                                     context.getIdentifier("Some"),
-                                     memberLoc);
-      Expr *someCall = new (context) CallExpr(someRef, opaqueFn);
-      if (tc.typeCheckExpression(someCall, dc, type, /*discardedExpr=*/false))
+      auto injectValueDecl = context.getInjectValueIntoOptionalDecl();
+      if (!injectValueDecl)
         return nullptr;
 
-      // Create the .None helper expression.
-      // FIXME: THis is currently swift.None
-      swiftRef = new (context) UnresolvedDeclRefExpr(
-                                 context.getIdentifier("swift"),
-                                 DeclRefKind::Ordinary,
-                                 dotLoc);
-      Expr *noneRef = new (context) UnresolvedDotExpr(
-                                      swiftRef,
-                                      dotLoc,
-                                      context.getIdentifier("None"),
-                                      memberLoc);
-      if (tc.typeCheckExpression(noneRef, dc, type, /*discardedExpr=*/false))
+      auto injectValueRef = new (context) DeclRefExpr(injectValueDecl, dotLoc);
+      Expr *injectValue = new (context) CallExpr(injectValueRef, opaqueFn);
+      if (tc.typeCheckExpression(injectValue, dc, type,
+                                 /*discardedExpr=*/false))
+        return nullptr;
+
+      // Create the expression to inject no value.
+      auto injectNothingDecl = context.getInjectNothingIntoOptionalDecl();
+      if (!injectNothingDecl)
+        return nullptr;
+
+      auto injectNothingRef = new (context) DeclRefExpr(injectNothingDecl,
+                                                        dotLoc);
+      auto emptyTuple = new (context) TupleExpr(SourceLoc(), { }, nullptr,
+                                                SourceLoc(),
+                                                /*hasTrailingClosure=*/false);
+      Expr *injectNothing = new (context) CallExpr(injectNothingRef,emptyTuple);
+      if (tc.typeCheckExpression(injectNothing, dc, type,
+                                 /*discardedExpr=*/false))
         return nullptr;
 
 
       auto result = new (context) DynamicMemberRefExpr(base, dotLoc, *memberRef,
                                                        memberLoc, opaqueFn,
-                                                       someCall, noneRef);
+                                                       injectValue,
+                                                       injectNothing);
       result->setType(type);
       return result;
     }
