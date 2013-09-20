@@ -1,6 +1,5 @@
 add_swift_library(swiftSIL
   Dominance.cpp
-  Mangle.cpp
   PrettyStackTrace.cpp
   SIL.cpp
   SILBasicBlock.cpp

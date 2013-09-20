@@ -14,6 +14,7 @@ add_swift_library(swiftAST
   Expr.cpp
   Identifier.cpp
   LookupVisibleDecls.cpp
+  Mangle.cpp
   Module.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp

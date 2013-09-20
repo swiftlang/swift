@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Mangle.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Module.h"
@@ -28,7 +29,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
-#include "swift/SIL/Mangle.h"
 
 using namespace swift;
 using namespace Mangle;

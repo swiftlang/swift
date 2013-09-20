@@ -19,7 +19,7 @@
 #define SWIFT_IRGEN_IRGEN_H
 
 #include "llvm/Support/DataTypes.h"
-#include "swift/SIL/Mangle.h"
+#include "swift/AST/Mangle.h"
 #include <cassert>
 
 namespace llvm {

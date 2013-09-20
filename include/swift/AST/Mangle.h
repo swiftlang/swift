@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_SIL_MANGLE_H__
-#define __SWIFT_SIL_MANGLE_H__
+#ifndef __SWIFT_AST_MANGLE_H__
+#define __SWIFT_AST_MANGLE_H__
 
 #include "llvm/ADT/DenseMap.h"
 #include "swift/AST/Types.h"

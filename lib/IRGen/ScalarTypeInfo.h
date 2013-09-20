@@ -22,7 +22,7 @@
 #include "Explosion.h"
 #include "TypeInfo.h"
 #include "IRGenFunction.h"
-#include "swift/SIL/Mangle.h"
+#include "swift/AST/Mangle.h"
 #include "GenEnum.h"
 
 namespace swift {

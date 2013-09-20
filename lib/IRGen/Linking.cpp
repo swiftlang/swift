@@ -17,7 +17,7 @@
 #include "Linking.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Fallthrough.h"
-#include "swift/SIL/Mangle.h"
+#include "swift/AST/Mangle.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
