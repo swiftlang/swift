@@ -2322,7 +2322,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   (void)locator.getLocatorParts(pathElts);
   if (type->is<StructType>() &&
       !type->castTo<StructType>()->getDecl()->getName().empty() &&
-      type->castTo<StructType>()->getDecl()->getName().str().equals("_Nil")) {
+      (type->castTo<StructType>()->getDecl()->getName().str().equals("_Nil") ||        type->castTo<StructType>()->getDecl()->getName().str().equals("String"))) {
     // If the type has any user-defined conversions, one of them might work.
     // Break this constraint down into a conformance constraint on the result of
     // conversion.
