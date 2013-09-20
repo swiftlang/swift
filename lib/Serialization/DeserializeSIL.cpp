@@ -282,7 +282,6 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
     if (entry.Kind == llvm::BitstreamEntry::EndBlock)
       // EndBlock means the end of this SILFunction.
       return Fn;
-    DEBUG(llvm::dbgs() << "Advance record ID " << entry.ID << "\n");
     kind = SILCursor.readRecord(entry.ID, scratch);
   }
   return Fn;
@@ -388,7 +387,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   switch ((ValueKind)OpCode) {
   default:
     DEBUG(llvm::dbgs() << "To be handled: " << OpCode << "\n");
-    return true;
+    llvm_unreachable("To be handled SILInstruction");
 
   case ValueKind::SILArgument:
     llvm_unreachable("not an instruction");
@@ -1075,6 +1074,30 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     else
       ResultVal = Builder.createDestructiveSwitchEnumAddr(Loc, Cond,
                       DefaultBB, CaseBBs);
+    break;
+  }
+  case ValueKind::SwitchIntInst: {
+    // Format: condition, a list of cases (APInt + Basic Block ID),
+    // default basic block ID. Use SILOneTypeValuesLayout: the type is
+    // for condition, the list contains value for condition, hasDefault, default
+    // basic block ID, a list of (APInt(Identifier ID), BasicBlock ID).
+    SILValue Cond = getLocalValue(ListOfValues[0], ListOfValues[1],
+                                  getSILType(MF->getType(TyID),
+                                             (SILValueCategory)TyCategory));
+
+    SILBasicBlock *DefaultBB = nullptr;
+    if (ListOfValues[2])
+      DefaultBB = getBBForReference(Fn, ListOfValues[3]);
+
+    SmallVector<std::pair<APInt, SILBasicBlock*>, 4> CaseBBs;
+    for (unsigned I = 4, E = ListOfValues.size(); I < E; I += 2) {
+      auto intTy = Cond.getType().getAs<BuiltinIntegerType>();
+      // Build APInt from string.
+      Identifier StringVal = MF->getIdentifier(ListOfValues[I]);
+      APInt value(intTy->getBitWidth(), StringVal.str(), 10);
+      CaseBBs.push_back( {value, getBBForReference(Fn, ListOfValues[I+1])} );
+    }
+    ResultVal = Builder.createSwitchInt(Loc, Cond, DefaultBB, CaseBBs);
     break;
   }
   case ValueKind::EnumInst: {

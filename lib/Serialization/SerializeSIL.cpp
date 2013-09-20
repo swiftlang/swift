@@ -446,6 +446,37 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
+  case ValueKind::SwitchIntInst: {
+    // Format: condition, a list of cases (APInt + Basic Block ID),
+    // default basic block ID. Use SILOneTypeValuesLayout: the type is
+    // for condition, the list contains value for condition, hasDefault, default
+    // basic block ID, a list of (APInt(Identifier ID), BasicBlock ID).
+    const SwitchIntInst *SII = cast<SwitchIntInst>(&SI);
+    SmallVector<ValueID, 4> ListOfValues;
+    ListOfValues.push_back(addValueRef(SII->getOperand()));
+    ListOfValues.push_back(SII->getOperand().getResultNumber());
+    ListOfValues.push_back((unsigned)SII->hasDefault());
+    if (SII->hasDefault())
+      ListOfValues.push_back(BasicBlockMap[SII->getDefaultBB()]);
+    else
+      ListOfValues.push_back(0);
+
+    for (unsigned i = 0, e = SII->getNumCases(); i < e; ++i) {
+      APInt value;
+      SILBasicBlock *dest;
+      std::tie(value, dest) = SII->getCase(i);
+      StringRef Str = value.toString(10, true);
+      ListOfValues.push_back(S.addIdentifierRef(Ctx.getIdentifier(Str)));
+      ListOfValues.push_back(BasicBlockMap[dest]);
+    }
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(SII->getOperand().getType().getSwiftRValueType()),
+        (unsigned)SII->getOperand().getType().getCategory(),
+        ListOfValues);
+    break;
+  }
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocRefInst:
   case ValueKind::DeinitExistentialInst:
