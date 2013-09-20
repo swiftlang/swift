@@ -637,7 +637,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
       // Check that we're actually in a constructor.
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
         if (!isa<ConstructorDecl>(AFD)) {
-          diagnose(ctorLoc, diag::super_constructor_not_in_constructor);
+          diagnose(ctorLoc, diag::super_initializer_not_in_initializer);
           // No need to indicate error to the caller because this is not a parse
           // error.
           return makeParserResult(new (Context) ErrorExpr(
@@ -659,7 +659,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
         result = new (Context) CallExpr(result, arg.get());
       } else {
         // It's invalid to refer to an uncalled constructor.
-        diagnose(ctorLoc, diag::super_constructor_must_be_called);
+        diagnose(ctorLoc, diag::super_initializer_must_be_called);
         result->setType(ErrorType::get(Context));
         return makeParserErrorResult(result);
       }

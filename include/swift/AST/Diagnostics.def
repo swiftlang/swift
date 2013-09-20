@@ -281,13 +281,13 @@ ERROR(subscript_without_get,decl_parsing,none,
 ERROR(subscript_static,decl_parsing,none,
      "subscript can not be 'static'", ())
 
-// Constructor
-ERROR(constructor_decl_wrong_scope,decl_parsing,none,
-      "constructors may only be declared within a class, struct, or enum", ())
-ERROR(expected_lparen_constructor,decl_parsing,PointsToFirstBadToken,
-      "expected '(' or parameter name for constructor parameters", ())
-ERROR(expected_lbrace_constructor,decl_parsing,PointsToFirstBadToken,
-      "expected '{' for constructor", ())
+// initializer
+ERROR(initializer_decl_wrong_scope,decl_parsing,none,
+      "initializers may only be declared within a class, struct, or enum", ())
+ERROR(expected_lparen_initializer,decl_parsing,PointsToFirstBadToken,
+      "expected '(' or parameter name for initializer parameters", ())
+ERROR(expected_lbrace_initializer,decl_parsing,PointsToFirstBadToken,
+      "expected '{' for initializer", ())
 
 // Destructor
 ERROR(destructor_decl_outside_class,decl_parsing,none,
@@ -658,9 +658,9 @@ ERROR(expected_identifier_after_super_dot_expr,expr_parsing,
       "expected identifier or 'init' after super '.' expression", ())
 ERROR(expected_dot_or_subscript_after_super,expr_parsing,PointsToFirstBadToken,
       "expected '.' or '[' after 'super'", ())
-ERROR(super_constructor_not_in_constructor,expr_parsing,none,
-      "'super.init' cannot be called outside of a constructor", ())
-ERROR(super_constructor_must_be_called,expr_parsing,none,
+ERROR(super_initializer_not_in_initializer,expr_parsing,none,
+      "'super.init' cannot be called outside of an initializer", ())
+ERROR(super_initializer_must_be_called,expr_parsing,none,
       "'super.init' cannot be referenced without arguments", ())
 
 ERROR(trailing_closure_not_postfix,expr_parsing,none,
@@ -979,8 +979,8 @@ NOTE(note_call_to_operator,sema_tcc,none,
      "in call to operator %0", (Identifier))
 NOTE(note_call_to_func,sema_tcc,none,
      "in call to function %0", (Identifier))
-NOTE(note_call_to_constructor,sema_tcc,none,
-     "in call to constructor", ())
+NOTE(note_call_to_initializer,sema_tcc,none,
+     "in call to initializer", ())
 NOTE(note_init_parameter,sema_tcc,none,
      "in initialization of parameter %0", (Identifier))
 

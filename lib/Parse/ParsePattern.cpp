@@ -363,7 +363,7 @@ ParserStatus Parser::parseConstructorArguments(Pattern *&ArgPattern,
   if (!isStartOfBindingName(Tok)) {
     // Complain that we expected '(' or a parameter name.
     {
-      auto diag = diagnose(Tok, diag::expected_lparen_constructor);
+      auto diag = diagnose(Tok, diag::expected_lparen_initializer);
       if (Tok.is(tok::l_brace))
         diag.fixItInsert(Tok.getLoc(), "() ");
     }

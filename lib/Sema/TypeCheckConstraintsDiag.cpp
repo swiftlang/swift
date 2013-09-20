@@ -450,7 +450,7 @@ static void noteTargetOfDiagnostic(ConstraintSystem &cs,
   case ResolvedLocatorKind::Constructor:
     // FIXME: Specialize for implicitly-generated constructors.
     cs.getTypeChecker().diagnose(resolved.getDecl(),
-                                 diag::note_call_to_constructor);
+                                 diag::note_call_to_initializer);
     return;
 
   case ResolvedLocatorKind::Parameter:

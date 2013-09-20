@@ -2333,7 +2333,7 @@ Parser::parseDeclConstructor(unsigned Flags) {
 
   // Reject 'constructor' functions outside of types
   if (ConstructorsNotAllowed) {
-    diagnose(Tok, diag::constructor_decl_wrong_scope);
+    diagnose(Tok, diag::initializer_decl_wrong_scope);
   }
 
   // attribute-list
@@ -2390,7 +2390,7 @@ Parser::parseDeclConstructor(unsigned Flags) {
     if (!SignatureStatus.isError()) {
       // Don't emit this diagnostic if we already complained about this
       // constructor decl.
-      diagnose(Tok, diag::expected_lbrace_constructor);
+      diagnose(Tok, diag::expected_lbrace_initializer);
     }
 
     // FIXME: This is brutal. Can't we at least return the declaration?
