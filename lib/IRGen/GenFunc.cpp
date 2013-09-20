@@ -2039,6 +2039,7 @@ struct EmitLocalDecls : public ASTWalker {
     case DeclKind::TopLevelCode:
     case DeclKind::Protocol:
     case DeclKind::Extension:
+    case DeclKind::EnumCase:
     case DeclKind::EnumElement:
     case DeclKind::Constructor:
     case DeclKind::Destructor:

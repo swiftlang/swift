@@ -856,6 +856,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
       
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
+  case DeclKind::EnumCase:
   case DeclKind::EnumElement:
   case DeclKind::Enum:
   case DeclKind::TopLevelCode:

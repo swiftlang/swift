@@ -178,6 +178,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::Import:
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
+  case DeclKind::EnumCase:
   case DeclKind::Subscript:
   case DeclKind::TopLevelCode:
   case DeclKind::InfixOperator:
@@ -213,6 +214,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Import:
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
+  case DeclKind::EnumCase:
   case DeclKind::TopLevelCode:
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
@@ -525,6 +527,16 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
     ClassLoc(ClassLoc) {
   ClassDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
+}
+
+EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
+                                   ArrayRef<EnumElementDecl *> Elements,
+                                   DeclContext *DC) {
+  void *buf = DC->getASTContext()
+    .Allocate(sizeof(EnumCaseDecl) +
+                    sizeof(EnumElementDecl*) * Elements.size(),
+                  alignof(EnumCaseDecl));
+  return ::new (buf) EnumCaseDecl(CaseLoc, Elements, DC);
 }
 
 EnumElementDecl *EnumDecl::getElement(Identifier Name) const {

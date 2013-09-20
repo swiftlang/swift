@@ -117,6 +117,7 @@ static ImportKind getBestImportKind(const ValueDecl *VD) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::EnumCase:
     llvm_unreachable("not a ValueDecl");
 
   case DeclKind::AssociatedType:

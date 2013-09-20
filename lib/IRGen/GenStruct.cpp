@@ -257,6 +257,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
     case DeclKind::Protocol:
     case DeclKind::Extension:
     case DeclKind::Destructor:
+    case DeclKind::EnumCase:
     case DeclKind::EnumElement:
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:

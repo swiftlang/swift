@@ -580,8 +580,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     Status = DeclResult;
     break;
   case tok::kw_case:
-    DeclResult = parseDeclEnumElement(Flags);
-    Status = DeclResult;
+    Status = parseDeclEnumCase(Flags, Entries);
     break;
   case tok::kw_struct:
     DeclResult = parseDeclStruct(Flags);
@@ -1816,77 +1815,123 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags) {
 ///   decl-enum-element:
 ///      'case' identifier type-tuple? ('->' type)?
 /// \endverbatim
-ParserResult<EnumElementDecl> Parser::parseDeclEnumElement(unsigned Flags) {
+ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
+                                       llvm::SmallVectorImpl<Decl *> &Decls) {
   SourceLoc CaseLoc = consumeToken(tok::kw_case);
   
   // TODO: Accept attributes here?
   
-  Identifier Name;
-  SourceLoc NameLoc;
+  // Parse comma-separated enum elements.
+  SmallVector<EnumElementDecl*, 4> elements;
+  
+  ParserStatus status;
+  
+  SourceLoc commaLoc;
+  for (;;) {
+    Identifier Name;
+    SourceLoc NameLoc;
 
-  const bool NameIsNotIdentifier = Tok.isNot(tok::identifier);
-  if (parseIdentifierDeclName(*this, Name, NameLoc, tok::l_paren,
-                              tok::kw_case, tok::colon,
-                              diag::invalid_diagnostic).isError()) {
-    // For recovery, see if the user typed something resembling a switch "case"
-    // label.
-    parseMatchingPattern();
-  }
-  if (NameIsNotIdentifier) {
-    if (consumeIf(tok::colon)) {
-      diagnose(CaseLoc, diag::case_outside_of_switch, "case");
-      return nullptr;
+    const bool NameIsNotIdentifier = Tok.isNot(tok::identifier);
+    if (parseIdentifierDeclName(*this, Name, NameLoc, tok::l_paren,
+                                tok::kw_case, tok::colon,
+                                diag::invalid_diagnostic).isError()) {
+      // Handle the likely case someone typed 'case X, case Y'.
+      if (Tok.is(tok::kw_case) && commaLoc.isValid()) {
+        diagnose(Tok, diag::expected_identifier_after_case_comma);
+        return status;
+      }
+      
+      // For recovery, see if the user typed something resembling a switch
+      // "case" label.
+      parseMatchingPattern();
     }
-    diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum case");
-  }
+    if (NameIsNotIdentifier) {
+      if (consumeIf(tok::colon)) {
+        diagnose(CaseLoc, diag::case_outside_of_switch, "case");
+        status.setIsParseError();
+        return status;
+      }
+      if (commaLoc.isValid()) {
+        diagnose(Tok, diag::expected_identifier_after_case_comma);
+        return status;
+      }
+      diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum case");
+    }
 
-  // See if there's a following argument type.
-  ParserResult<TypeRepr> ArgType;
-  if (Tok.isFollowingLParen()) {
-    ArgType = parseTypeTupleBody();
-    if (ArgType.hasCodeCompletion())
-      return makeParserCodeCompletionResult<EnumElementDecl>();
-    if (ArgType.isNull())
-      return nullptr;
+    // See if there's a following argument type.
+    ParserResult<TypeRepr> ArgType;
+    if (Tok.isFollowingLParen()) {
+      ArgType = parseTypeTupleBody();
+      if (ArgType.hasCodeCompletion()) {
+        status.setHasCodeCompletion();
+        return status;
+      }
+      if (ArgType.isNull()) {
+        status.setIsParseError();
+        return status;
+      }
+    }
+    
+    // See if there's a result type.
+    SourceLoc ArrowLoc;
+    ParserResult<TypeRepr> ResultType;
+    if (Tok.is(tok::arrow)) {
+      ArrowLoc = consumeToken();
+      ResultType = parseType(diag::expected_type_enum_element_result);
+      if (ResultType.hasCodeCompletion()) {
+        status.setHasCodeCompletion();
+        return status;
+      }
+      if (ResultType.isNull()) {
+        status.setIsParseError();
+        return status;
+      }
+    }
+    
+    // For recovery, again make sure the the user didn't try to spell a switch
+    // case label:
+    // 'case Identifier:' or
+    // 'case Identifier where ...:'
+    if (Tok.is(tok::colon) || Tok.is(tok::kw_where)) {
+      diagnose(CaseLoc, diag::case_outside_of_switch, "case");
+      skipUntilDeclRBrace();
+      status.setIsParseError();
+      return status;
+    }
+    
+    // Create the element.
+    auto *result = new (Context) EnumElementDecl(nullptr, NameLoc, Name,
+                                                 ArgType.getPtrOrNull(),
+                                                 ArrowLoc,
+                                                 ResultType.getPtrOrNull(),
+                                                 CurDeclContext);
+    elements.push_back(result);
+    
+    // Continue through the comma-separated list.
+    if (!Tok.is(tok::comma))
+      break;
+    commaLoc = consumeToken(tok::comma);
   }
   
-  // See if there's a result type.
-  SourceLoc ArrowLoc;
-  ParserResult<TypeRepr> ResultType;
-  if (Tok.is(tok::arrow)) {
-    ArrowLoc = consumeToken();
-    ResultType = parseType(diag::expected_type_enum_element_result);
-    if (ResultType.hasCodeCompletion())
-      return makeParserCodeCompletionResult<EnumElementDecl>();
-    if (ResultType.isNull())
-      return nullptr;
-  }
-  
-  // For recovery, again make sure the the user didn't try to spell a switch
-  // case label:
-  // 'case Identifier:',
-  // 'case Identifier, ...:', or
-  // 'case Identifier where ...:'
-  if (Tok.is(tok::colon) || Tok.is(tok::comma) || Tok.is(tok::kw_where)) {
-    diagnose(CaseLoc, diag::case_outside_of_switch, "case");
-    skipUntilDeclRBrace();
-    return nullptr;
-  }
-  
-  // Create the element.
-  auto *result = new (Context) EnumElementDecl(CaseLoc, NameLoc, Name,
-                                                ArgType.getPtrOrNull(),
-                                                ArrowLoc,
-                                                ResultType.getPtrOrNull(),
-                                                CurDeclContext);
   if (!(Flags & PD_AllowEnumElement)) {
     diagnose(CaseLoc, diag::disallowed_enum_element);
-    // Don't return the EnumElementDecl unless it is allowed to have
-    // an EnumElementDecl in the current context.
-    return nullptr;
+    // Don't add the EnumElementDecls unless the current context
+    // is allowed to have EnumElementDecls.
+    status.setIsParseError();
+    return status;
   }
 
-  return makeParserResult(result);
+  // Create and return the EnumCaseDecl containing all the elements.
+  auto theCase = EnumCaseDecl::create(CaseLoc, elements, CurDeclContext);
+  Decls.push_back(theCase);
+  
+  // Associate the elements with the case decl and return them.
+  for (auto elt : elements) {
+    elt->setContainingCase(theCase);
+    Decls.push_back(elt);
+  }
+
+  return status;
 }
 
 /// \brief Parse the members in a struct/class/protocol definition.

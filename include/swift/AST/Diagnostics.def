@@ -147,6 +147,8 @@ ERROR(expected_decl,decl_parsing,none,
       "expected declaration", ())
 ERROR(expected_identifier_in_decl,decl_parsing,none,
       "expected identifier in %0 declaration", (StringRef))
+ERROR(expected_identifier_after_case_comma,decl_parsing,none,
+      "expected identifier after comma in enum 'case' declaration", ())
 ERROR(decl_redefinition,decl_parsing,none,
       "%select{declaration|definition}0 conflicts with previous value", 
       (bool))

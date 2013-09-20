@@ -781,6 +781,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::Subscript:
     llvm_unreachable("there are no global subscript operations");
       
+  case DeclKind::EnumCase:
   case DeclKind::EnumElement:
     llvm_unreachable("there are no global enum elements");
 
@@ -836,6 +837,7 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
+  case DeclKind::EnumCase:
   case DeclKind::EnumElement:
   case DeclKind::Enum:
   case DeclKind::TopLevelCode:
@@ -1456,6 +1458,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   for (Decl *member : ext->getMembers()) {
     switch (member->getKind()) {
     case DeclKind::Import:
+    case DeclKind::EnumCase:
     case DeclKind::EnumElement:
     case DeclKind::TopLevelCode:
     case DeclKind::Protocol:

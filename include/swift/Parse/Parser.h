@@ -475,7 +475,8 @@ public:
   ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
   ParserResult<ExtensionDecl> parseDeclExtension(unsigned Flags);
   ParserResult<EnumDecl> parseDeclEnum(unsigned Flags);
-  ParserResult<EnumElementDecl> parseDeclEnumElement(unsigned Flags);
+  ParserStatus parseDeclEnumCase(unsigned Flags,
+                                 SmallVectorImpl<Decl *> &decls);
   bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
                                SourceLoc LBLoc, SourceLoc &RBLoc,
                                Diag<> ErrorDiag, unsigned flags);

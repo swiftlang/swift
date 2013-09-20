@@ -2310,23 +2310,67 @@ public:
 
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
 };
+  
+/// \brief This represents a 'case' declaration in an 'enum', which may declare
+/// one or more individual comma-separated EnumElementDecls.
+class EnumCaseDecl : public Decl {
+  SourceLoc CaseLoc;
+  
+  /// The number of tail-allocated element pointers.
+  unsigned NumElements;
+  
+  EnumCaseDecl(SourceLoc CaseLoc,
+               ArrayRef<EnumElementDecl *> Elements,
+               DeclContext *DC)
+    : Decl(DeclKind::EnumCase, DC),
+      CaseLoc(CaseLoc), NumElements(Elements.size())
+  {
+    memcpy(this + 1, Elements.begin(), NumElements * sizeof(EnumElementDecl*));
+  }
+  
+  EnumElementDecl * const *getElementsBuf() const {
+    return reinterpret_cast<EnumElementDecl * const*>(this + 1);
+  }
+  
+public:
+  static EnumCaseDecl *create(SourceLoc CaseLoc,
+                              ArrayRef<EnumElementDecl*> Elements,
+                              DeclContext *DC);
+  
+  /// Get the list of elements declared in this case.
+  ArrayRef<EnumElementDecl *> getElements() const {
+    return {getElementsBuf(), NumElements};
+  }
+  
+  SourceLoc getLoc() const {
+    return CaseLoc;
+  }
+  
+  SourceRange getSourceRange() const;
+  
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::EnumCase;
+  }
+};
 
-/// \brief This represents a case of an 'enum' declaration.
+/// \brief This represents a single case of an 'enum' declaration.
 ///
 /// For example, the X, Y, and Z in this enum:
 ///
 /// \code
 ///   enum V {
-///     case X(Int)
-///     case Y(Int)
+///     case X(Int), Y(Int)
 ///     case Z
 ///   }
 /// \endcode
 ///
 /// The type of an EnumElementDecl is always the EnumType for the containing
-/// enum.
+/// enum. EnumElementDecls are represented in the AST as members of their
+/// parent EnumDecl, although syntactically they are subordinate to the
+/// EnumCaseDecl.
 class EnumElementDecl : public ValueDecl {
-  SourceLoc CaseLoc;
+  /// The CaseDecl that contains the enum element.
+  EnumCaseDecl *ContainingCase;
 
   /// This is the type specified with the enum element, for
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
@@ -2340,14 +2384,14 @@ class EnumElementDecl : public ValueDecl {
   TypeLoc ResultType;
     
 public:
-  EnumElementDecl(SourceLoc CaseLoc,
+  EnumElementDecl(EnumCaseDecl *ContainingCase,
                    SourceLoc IdentifierLoc, Identifier Name,
                    TypeLoc ArgumentType,
                    SourceLoc ArrowLoc,
                    TypeLoc ResultType,
                    DeclContext *DC)
   : ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
-    CaseLoc(CaseLoc), ArgumentType(ArgumentType),
+    ContainingCase(ContainingCase), ArgumentType(ArgumentType),
     ResultArrowLoc(ArrowLoc),
     ResultType(ResultType)
   {}
@@ -2360,20 +2404,17 @@ public:
   Type getResultType() const { return ResultType.getType(); }
   TypeLoc &getResultTypeLoc() { return ResultType; }
   
-  /// True if this element is part of an 'enum' declaration.
-  bool isEnumElement() const { return CaseLoc.isInvalid(); }
-  
   /// Return the containing EnumDecl.
   EnumDecl *getParentEnum() const {
     return cast<EnumDecl>(getDeclContext());
   }
   
-  /// Location of the 'case' keyword for the element, or invalid if the element
-  /// appears in an enum.
-  SourceLoc getCaseLoc() const { return CaseLoc; }
+  /// The 'case' declaration that declares the element.
+  EnumCaseDecl *getContainingCase() const { return ContainingCase; }
+  void setContainingCase(EnumCaseDecl *theCase) { ContainingCase = theCase; }
   
   SourceLoc getStartLoc() const {
-    return CaseLoc.isValid() ? CaseLoc : getNameLoc();
+    return getNameLoc();
   }
   SourceLoc getResultArrowLoc() const { return ResultArrowLoc; }
   SourceRange getSourceRange() const;
@@ -2382,6 +2423,13 @@ public:
     return D->getKind() == DeclKind::EnumElement;
   }
 };
+  
+inline SourceRange EnumCaseDecl::getSourceRange() const {
+  auto subRange = getElements().back()->getSourceRange();
+  if (subRange.isValid())
+    return {CaseLoc, subRange.End};
+  return {};
+}
 
 /// \brief Declares a subscripting operator for a type.
 ///

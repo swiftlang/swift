@@ -505,8 +505,9 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
+    case DeclKind::EnumCase:
       llvm_unreachable("decl not allowed in class!");
-
+        
     // We can have meaningful initializers for variables, but
     // we can't handle them yet.  For the moment, just ignore them.
     case DeclKind::PatternBinding:

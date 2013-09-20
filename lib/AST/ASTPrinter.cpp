@@ -690,19 +690,39 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   }
 }
 
-void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
+static void printEnumElement(raw_ostream &OS, EnumElementDecl *elt) {
+  OS << elt->getName();
+  
+  if (elt->hasArgumentType())
+    elt->getArgumentType().print(OS);
+  
+  if (elt->hasResultType()) {
+    OS << " -> ";
+    elt->getResultType().print(OS);
+  }
+}
+
+void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
   // FIXME: Attributes?
   recordDeclLoc(decl);
   OS << "case ";
-  OS << decl->getName();
-
-  if (decl->hasArgumentType())
-    decl->getArgumentType().print(OS);
   
-  if (decl->hasResultType()) {
-    OS << " -> ";
-    decl->getResultType().print(OS);
-  }
+  interleave(decl->getElements().begin(), decl->getElements().end(),
+    [&](EnumElementDecl *elt) {
+      printEnumElement(OS, elt);
+    },
+    [&] { OS << ", "; });
+}
+
+void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
+  // Enum elements are printed as part of the EnumCaseDecl.
+  if (decl->getContainingCase())
+    return;
+  
+  // In cases where there is no parent EnumCaseDecl (such as imported or
+  // deserialized elements), print the element independently.
+  OS << "case ";
+  printEnumElement(OS, decl);
 }
 
 void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {

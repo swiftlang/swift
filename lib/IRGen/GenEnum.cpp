@@ -3115,7 +3115,7 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
-      llvm_unreachable("decl not allowed in struct!");
+      llvm_unreachable("decl not allowed in enum!");
 
     // We can't have meaningful initializers for variables; these just show
     // up as part of parsing properties.
@@ -3149,6 +3149,8 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
     case DeclKind::Constructor:
       emitLocalDecls(cast<ConstructorDecl>(member));
       continue;
+        
+    case DeclKind::EnumCase:
     case DeclKind::EnumElement:
       // Lowered in SIL.
       continue;

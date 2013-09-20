@@ -733,6 +733,36 @@ void Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions) {
   }
 }
 
+static bool shouldSerializeMember(Decl *D) {
+  switch (D->getKind()) {
+  case DeclKind::Import:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+  case DeclKind::TopLevelCode:
+  case DeclKind::Extension:
+    llvm_unreachable("decl should never be a member");
+  
+  case DeclKind::EnumCase:
+    return false;
+
+  case DeclKind::EnumElement:
+  case DeclKind::Protocol:
+  case DeclKind::Destructor:
+  case DeclKind::PatternBinding:
+  case DeclKind::Subscript:
+  case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Var:
+  case DeclKind::Func:
+  case DeclKind::Constructor:
+    return true;
+  }
+}
 
 void Serializer::writeMembers(ArrayRef<Decl*> members, bool isClass) {
   using namespace decls_block;
@@ -740,6 +770,9 @@ void Serializer::writeMembers(ArrayRef<Decl*> members, bool isClass) {
   unsigned abbrCode = DeclTypeAbbrCodes[DeclContextLayout::Code];
   SmallVector<DeclID, 16> memberIDs;
   for (auto member : members) {
+    if (!shouldSerializeMember(member))
+      continue;
+    
     DeclID memberID = addDeclRef(member);
     memberIDs.push_back(memberID);
 
@@ -865,6 +898,9 @@ void Serializer::writeDecl(const Decl *D) {
     break;
   }
 
+  case DeclKind::EnumCase:
+    llvm_unreachable("enum case decls should not be serialized");
+      
   case DeclKind::PatternBinding: {
     auto binding = cast<PatternBindingDecl>(D);
     const Decl *DC = getDeclForContext(binding->getDeclContext());

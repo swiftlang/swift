@@ -211,6 +211,7 @@ namespace {
       case DeclKind::Struct:
       case DeclKind::Class:
       case DeclKind::Protocol:
+      case DeclKind::EnumCase:
       case DeclKind::EnumElement:
       case DeclKind::Constructor:
       case DeclKind::Destructor:

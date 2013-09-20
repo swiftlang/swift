@@ -700,10 +700,10 @@ namespace {
           return known->second;
 
         auto element
-          = new (context) EnumElementDecl(SourceLoc(), SourceLoc(),
-                                           name, TypeLoc(),
-                                           SourceLoc(), TypeLoc(),
-                                           dc);
+          = new (context) EnumElementDecl(nullptr, SourceLoc(),
+                                          name, TypeLoc(),
+                                          SourceLoc(), TypeLoc(),
+                                          dc);
 
         // Give the enum element the appropriate type.
         auto theEnum = cast<EnumDecl>(dc);
