@@ -1219,22 +1219,22 @@ public:
   }
 };
   
-/// UnionInst - Represents a loadable union constructed from one of its
+/// EnumInst - Represents a loadable enum constructed from one of its
 /// elements.
-class UnionInst : public SILInstruction {
+class EnumInst : public SILInstruction {
   Optional<FixedOperandList<1>> OptionalOperand;
-  UnionElementDecl *Element;
+  EnumElementDecl *Element;
 
 public:
-  UnionInst(SILLocation Loc, SILValue Operand, UnionElementDecl *Element,
+  EnumInst(SILLocation Loc, SILValue Operand, EnumElementDecl *Element,
             SILType ResultTy)
-    : SILInstruction(ValueKind::UnionInst, Loc, ResultTy), Element(Element) {
+    : SILInstruction(ValueKind::EnumInst, Loc, ResultTy), Element(Element) {
     if (Operand) {
       OptionalOperand.emplace(this, Operand);
     }
   }
   
-  UnionElementDecl *getElement() const { return Element; }
+  EnumElementDecl *getElement() const { return Element; }
   
   bool hasOperand() const { return OptionalOperand.hasValue(); }
   SILValue getOperand() const { return OptionalOperand->asValueArray()[0]; }
@@ -1251,39 +1251,39 @@ public:
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::UnionInst;
+    return V->getKind() == ValueKind::EnumInst;
   }
 };
   
-/// UnionDataAddrInst - Projects the address of the data for a case inside the
-/// union.
-class UnionDataAddrInst
-  : public UnaryInstructionBase<ValueKind::UnionDataAddrInst>
+/// EnumDataAddrInst - Projects the address of the data for a case inside the
+/// enum.
+class EnumDataAddrInst
+  : public UnaryInstructionBase<ValueKind::EnumDataAddrInst>
 {
-  UnionElementDecl *Element;
+  EnumElementDecl *Element;
 public:
-  UnionDataAddrInst(SILLocation Loc, SILValue Operand,
-                    UnionElementDecl *Element, SILType ResultTy)
+  EnumDataAddrInst(SILLocation Loc, SILValue Operand,
+                    EnumElementDecl *Element, SILType ResultTy)
     : UnaryInstructionBase(Loc, Operand, ResultTy),
       Element(Element) {}
   
-  UnionElementDecl *getElement() const { return Element; }
+  EnumElementDecl *getElement() const { return Element; }
 };
   
-/// InjectUnionAddrInst - Tags a union as containing a case. The data for
-/// that case, if any, must have been written into the union first.
-class InjectUnionAddrInst
-  : public UnaryInstructionBase<ValueKind::InjectUnionAddrInst,
+/// InjectEnumAddrInst - Tags an enum as containing a case. The data for
+/// that case, if any, must have been written into the enum first.
+class InjectEnumAddrInst
+  : public UnaryInstructionBase<ValueKind::InjectEnumAddrInst,
                                 SILInstruction,
                                 /*HAS_RESULT*/ false>
 {
-  UnionElementDecl *Element;
+  EnumElementDecl *Element;
 public:
-  InjectUnionAddrInst(SILLocation Loc, SILValue Operand,
-                      UnionElementDecl *Element)
+  InjectEnumAddrInst(SILLocation Loc, SILValue Operand,
+                      EnumElementDecl *Element)
     : UnaryInstructionBase(Loc, Operand), Element(Element) {}
   
-  UnionElementDecl *getElement() const { return Element; }
+  EnumElementDecl *getElement() const { return Element; }
 };
 
 /// BuiltinZeroInst - Represents the zero value of a builtin integer,
@@ -2143,26 +2143,26 @@ public:
   }
 };
 
-/// Common implementation for the switch_union and
-/// destructive_switch_union_addr instructions.
-class SwitchUnionInstBase : public TermInst {
+/// Common implementation for the switch_enum and
+/// destructive_switch_enum_addr instructions.
+class SwitchEnumInstBase : public TermInst {
   FixedOperandList<1> Operands;
   unsigned NumCases : 31;
   unsigned HasDefault : 1;
   
-  // Tail-allocated after the SwitchUnionInst record are:
-  // - an array of `NumCases` UnionElementDecl* pointers, referencing the case
+  // Tail-allocated after the SwitchEnumInst record are:
+  // - an array of `NumCases` EnumElementDecl* pointers, referencing the case
   //   discriminators
   // - `NumCases + HasDefault` SILSuccessor records, referencing the
   //   destinations for each case, ending with the default destination if
   //   present.
   
-  UnionElementDecl **getCaseBuf() {
-    return reinterpret_cast<UnionElementDecl**>(this + 1);
+  EnumElementDecl **getCaseBuf() {
+    return reinterpret_cast<EnumElementDecl**>(this + 1);
     
   }
-  UnionElementDecl * const* getCaseBuf() const {
-    return reinterpret_cast<UnionElementDecl* const*>(this + 1);
+  EnumElementDecl * const* getCaseBuf() const {
+    return reinterpret_cast<EnumElementDecl* const*>(this + 1);
     
   }
   
@@ -2174,20 +2174,20 @@ class SwitchUnionInstBase : public TermInst {
   }
 
 protected:
-  SwitchUnionInstBase(ValueKind Kind, SILLocation Loc, SILValue Operand,
+  SwitchEnumInstBase(ValueKind Kind, SILLocation Loc, SILValue Operand,
                 SILBasicBlock *DefaultBB,
-                ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs);
+                ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs);
 
-  template<typename SWITCH_UNION_INST>
-  static SWITCH_UNION_INST *
-  createSwitchUnion(SILLocation Loc, SILValue Operand,
+  template<typename SWITCH_ENUM_INST>
+  static SWITCH_ENUM_INST *
+  createSwitchEnum(SILLocation Loc, SILValue Operand,
                 SILBasicBlock *DefaultBB,
-                ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
+                ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs,
                 SILFunction &F);
   
 public:
   /// Clean up tail-allocated successor records for the switch cases.
-  ~SwitchUnionInstBase();
+  ~SwitchEnumInstBase();
   
   SILValue getOperand() const { return Operands[0].get(); }
   
@@ -2199,7 +2199,7 @@ public:
   }
   
   unsigned getNumCases() const { return NumCases; }
-  std::pair<UnionElementDecl*, SILBasicBlock*>
+  std::pair<EnumElementDecl*, SILBasicBlock*>
   getCase(unsigned i) const {
     assert(i < NumCases && "case out of bounds");
     return {getCaseBuf()[i], getSuccessorBuf()[i].getBB()};
@@ -2212,53 +2212,53 @@ public:
   }
 };
   
-/// A switch on a loadable union's discriminator. The data for each case is
+/// A switch on a loadable enum's discriminator. The data for each case is
 /// passed into the corresponding destination block as an argument.
-class SwitchUnionInst : public SwitchUnionInstBase {
+class SwitchEnumInst : public SwitchEnumInstBase {
 private:
-  friend class SwitchUnionInstBase;
+  friend class SwitchEnumInstBase;
   
-  SwitchUnionInst(SILLocation Loc, SILValue Operand,
+  SwitchEnumInst(SILLocation Loc, SILValue Operand,
               SILBasicBlock *DefaultBB,
-              ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs)
-    : SwitchUnionInstBase(ValueKind::SwitchUnionInst, Loc, Operand, DefaultBB,
+              ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs)
+    : SwitchEnumInstBase(ValueKind::SwitchEnumInst, Loc, Operand, DefaultBB,
                           CaseBBs)
     {}
   
 public:
-  static SwitchUnionInst *create(SILLocation Loc, SILValue Operand,
+  static SwitchEnumInst *create(SILLocation Loc, SILValue Operand,
                SILBasicBlock *DefaultBB,
-               ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
+               ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs,
                SILFunction &F);
 
   static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::SwitchUnionInst;
+    return V->getKind() == ValueKind::SwitchEnumInst;
   }
 };
 
-/// A switch on an address-only union's discriminator. If a case is matched, the
+/// A switch on an address-only enum's discriminator. If a case is matched, the
 /// tag is invalidated and the address of the data for the case is passed as
 /// an argument to the destination block.
-class DestructiveSwitchUnionAddrInst : public SwitchUnionInstBase {
+class DestructiveSwitchEnumAddrInst : public SwitchEnumInstBase {
 private:
-  friend class SwitchUnionInstBase;
+  friend class SwitchEnumInstBase;
 
-  DestructiveSwitchUnionAddrInst(SILLocation Loc, SILValue Operand,
+  DestructiveSwitchEnumAddrInst(SILLocation Loc, SILValue Operand,
               SILBasicBlock *DefaultBB,
-              ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs)
-    : SwitchUnionInstBase(ValueKind::DestructiveSwitchUnionAddrInst,
+              ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs)
+    : SwitchEnumInstBase(ValueKind::DestructiveSwitchEnumAddrInst,
                           Loc, Operand, DefaultBB, CaseBBs)
     {}
   
 public:
-  static DestructiveSwitchUnionAddrInst *create(
+  static DestructiveSwitchEnumAddrInst *create(
                SILLocation Loc, SILValue Operand,
                SILBasicBlock *DefaultBB,
-               ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
+               ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs,
                SILFunction &F);
   
   static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::DestructiveSwitchUnionAddrInst;
+    return V->getKind() == ValueKind::DestructiveSwitchEnumAddrInst;
   }
 };
 

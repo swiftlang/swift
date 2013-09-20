@@ -7,7 +7,7 @@ add_swift_library(swift_runtime INSTALL
   Metadata.cpp
   Stubs.cpp
   SwiftObject.mm
-  Union.cpp)
+  Enum.cpp)
 
 add_swift_optimization_flags(swift_runtime)
 

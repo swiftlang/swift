@@ -298,8 +298,8 @@ namespace decls_block {
     POSTFIX_OPERATOR_DECL,
     INFIX_OPERATOR_DECL,
     CLASS_DECL,
-    UNION_DECL,
-    UNION_ELEMENT_DECL,
+    ENUM_DECL,
+    ENUM_ELEMENT_DECL,
     SUBSCRIPT_DECL,
     EXTENSION_DECL,
     DESTRUCTOR_DECL,
@@ -519,7 +519,7 @@ namespace decls_block {
   >;
 
   using StructLayout = NominalLayout<STRUCT_DECL>;
-  using UnionLayout = NominalLayout<UNION_DECL>;
+  using EnumLayout = NominalLayout<ENUM_DECL>;
 
   using ClassLayout = BCRecordLayout<
     CLASS_DECL,
@@ -610,8 +610,8 @@ namespace decls_block {
     BCFixed<8>   // precedence
   >;
 
-  using UnionElementLayout = BCRecordLayout<
-    UNION_ELEMENT_DECL,
+  using EnumElementLayout = BCRecordLayout<
+    ENUM_ELEMENT_DECL,
     IdentifierIDField, // name
     DeclIDField, // context decl
     TypeIDField, // argument type
@@ -804,8 +804,8 @@ static inline decls_block::RecordKind getKindForTable(const Decl *D) {
   switch (D->getKind()) {
   case DeclKind::TypeAlias:
     return decls_block::TYPE_ALIAS_DECL;
-  case DeclKind::Union:
-    return decls_block::UNION_DECL;
+  case DeclKind::Enum:
+    return decls_block::ENUM_DECL;
   case DeclKind::Struct:
     return decls_block::STRUCT_DECL;
   case DeclKind::Class:

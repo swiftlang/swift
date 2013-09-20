@@ -683,7 +683,7 @@ bool SILParser::parseSILType(SILType &Result) {
 ///  sil-decl-subref-part ::= 'setter'
 ///  sil-decl-subref-part ::= 'allocator'
 ///  sil-decl-subref-part ::= 'initializer'
-///  sil-decl-subref-part ::= 'unionelt'
+///  sil-decl-subref-part ::= 'enumelt'
 ///  sil-decl-subref-part ::= 'destroyer'
 ///  sil-decl-subref-part ::= 'globalaccessor'
 ///  sil-decl-uncurry-level ::= [0-9]+
@@ -754,8 +754,8 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
       } else if (!ParseState && Id.str() == "initializer") {
         Kind = SILDeclRef::Kind::Initializer;
         ParseState = 1;
-      } else if (!ParseState && Id.str() == "unionelt") {
-        Kind = SILDeclRef::Kind::UnionElement;
+      } else if (!ParseState && Id.str() == "enumelt") {
+        Kind = SILDeclRef::Kind::EnumElement;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "destroyer") {
         Kind = SILDeclRef::Kind::Destroyer;
@@ -884,8 +884,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("deinit_existential", ValueKind::DeinitExistentialInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
     .Case("destroy_value", ValueKind::DestroyValueInst)
-    .Case("destructive_switch_union_addr",
-          ValueKind::DestructiveSwitchUnionAddrInst)
+    .Case("destructive_switch_enum_addr",
+          ValueKind::DestructiveSwitchEnumAddrInst)
     .Case("downcast", ValueKind::DowncastInst)
     .Case("downcast_archetype_addr", ValueKind::DowncastArchetypeAddrInst)
     .Case("downcast_archetype_ref", ValueKind::DowncastArchetypeRefInst)
@@ -899,7 +899,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("init_existential", ValueKind::InitExistentialInst)
     .Case("init_existential_ref", ValueKind::InitExistentialRefInst)
     .Case("initialize_var", ValueKind::InitializeVarInst)
-    .Case("inject_union_addr", ValueKind::InjectUnionAddrInst)
+    .Case("inject_enum_addr", ValueKind::InjectEnumAddrInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("is_nonnull", ValueKind::IsNonnullInst)
     .Case("function_ref", ValueKind::FunctionRefInst)
@@ -938,13 +938,13 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("super_method", ValueKind::SuperMethodInst)
     .Case("super_to_archetype_ref", ValueKind::SuperToArchetypeRefInst)
     .Case("switch_int", ValueKind::SwitchIntInst)
-    .Case("switch_union", ValueKind::SwitchUnionInst)
+    .Case("switch_enum", ValueKind::SwitchEnumInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
     .Case("tuple", ValueKind::TupleInst)
     .Case("tuple_element_addr", ValueKind::TupleElementAddrInst)
     .Case("tuple_extract", ValueKind::TupleExtractInst)
-    .Case("union", ValueKind::UnionInst)
-    .Case("union_data_addr", ValueKind::UnionDataAddrInst)
+    .Case("enum", ValueKind::EnumInst)
+    .Case("enum_data_addr", ValueKind::EnumDataAddrInst)
     .Case("unreachable", ValueKind::UnreachableInst)
     .Case("upcast", ValueKind::UpcastInst)
     .Case("upcast_existential", ValueKind::UpcastExistentialInst)
@@ -1536,7 +1536,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createTuple(InstLoc, Ty, OpList);
     break;
   }
-  case ValueKind::UnionInst: {
+  case ValueKind::EnumInst: {
     SILType Ty;
     SILDeclRef Elt;
     SILValue Operand;
@@ -1551,11 +1551,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         return true;
     }
     
-    ResultVal = B.createUnion(InstLoc, Operand,
-                              cast<UnionElementDecl>(Elt.getDecl()), Ty);
+    ResultVal = B.createEnum(InstLoc, Operand,
+                              cast<EnumElementDecl>(Elt.getDecl()), Ty);
     break;
   }
-  case ValueKind::UnionDataAddrInst: {
+  case ValueKind::EnumDataAddrInst: {
     SILValue Operand;
     SILDeclRef EltRef;
     if (parseTypedValueRef(Operand) ||
@@ -1563,7 +1563,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILDeclRef(EltRef))
       return true;
     
-    UnionElementDecl *Elt = cast<UnionElementDecl>(EltRef.getDecl());
+    EnumElementDecl *Elt = cast<EnumElementDecl>(EltRef.getDecl());
     
     auto OperandTy = Operand.getType().getSwiftRValueType();
     auto ResultTy = OperandTy->getTypeOfMember(Elt->getModuleContext(),
@@ -1571,11 +1571,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                                                nullptr,
                                                Elt->getArgumentType())
       ->getCanonicalType();
-    ResultVal = B.createUnionDataAddr(InstLoc, Operand, Elt,
+    ResultVal = B.createEnumDataAddr(InstLoc, Operand, Elt,
                                     SILType::getPrimitiveAddressType(ResultTy));
     break;
   }
-  case ValueKind::InjectUnionAddrInst: {
+  case ValueKind::InjectEnumAddrInst: {
     SILValue Operand;
     SILDeclRef EltRef;
     if (parseTypedValueRef(Operand) ||
@@ -1583,8 +1583,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILDeclRef(EltRef))
       return true;
     
-    UnionElementDecl *Elt = cast<UnionElementDecl>(EltRef.getDecl());
-    ResultVal = B.createInjectUnionAddr(InstLoc, Operand, Elt);
+    EnumElementDecl *Elt = cast<EnumElementDecl>(EltRef.getDecl());
+    ResultVal = B.createInjectEnumAddr(InstLoc, Operand, Elt);
     break;
   }
   case ValueKind::TupleElementAddrInst:
@@ -1897,12 +1897,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createGlobalAddr(InstLoc, cast<VarDecl>(VD), Ty);
     break;
   }
-  case ValueKind::SwitchUnionInst:
-  case ValueKind::DestructiveSwitchUnionAddrInst: {
+  case ValueKind::SwitchEnumInst:
+  case ValueKind::DestructiveSwitchEnumAddrInst: {
     if (parseTypedValueRef(Val))
       return true;
 
-    SmallVector<std::pair<UnionElementDecl*, SILBasicBlock*>, 4> CaseBBs;
+    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 4> CaseBBs;
     SILBasicBlock *DefaultBB = nullptr;
     while (P.consumeIf(tok::comma)) {
       Identifier BBName;
@@ -1919,10 +1919,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         SILDeclRef ElemRef;
         if (parseSILDeclRef(ElemRef))
           return true;
-        assert(ElemRef.hasDecl() && isa<UnionElementDecl>(ElemRef.getDecl()));
+        assert(ElemRef.hasDecl() && isa<EnumElementDecl>(ElemRef.getDecl()));
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":");
         parseSILIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
-        CaseBBs.push_back( {cast<UnionElementDecl>(ElemRef.getDecl()),
+        CaseBBs.push_back( {cast<EnumElementDecl>(ElemRef.getDecl()),
                             getBBForReference(BBName, BBLoc)} );
         continue;
       }
@@ -1930,10 +1930,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "case or default");
       return true;
     }
-    if (Opcode == ValueKind::SwitchUnionInst)
-      ResultVal = B.createSwitchUnion(InstLoc, Val, DefaultBB, CaseBBs);
+    if (Opcode == ValueKind::SwitchEnumInst)
+      ResultVal = B.createSwitchEnum(InstLoc, Val, DefaultBB, CaseBBs);
     else
-      ResultVal = B.createDestructiveSwitchUnionAddr(
+      ResultVal = B.createDestructiveSwitchEnumAddr(
                                              InstLoc, Val, DefaultBB, CaseBBs);
     break;
   }

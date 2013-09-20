@@ -34,7 +34,7 @@ enum class MetadataKind : uintptr_t {
 
   /// A union type.
   /// If we add reference unions, that needs to go here.
-  Union         = 2,
+  Enum          = 2,
 
   /// A type whose value is not exposed in the metadata system.
   Opaque        = 8,

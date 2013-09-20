@@ -549,9 +549,9 @@ SILCloner<ImplClass>::visitTupleInst(TupleInst* Inst) {
 
 template<typename ImplClass>
 SILValue
-SILCloner<ImplClass>::visitUnionInst(UnionInst* Inst) {
+SILCloner<ImplClass>::visitEnumInst(EnumInst* Inst) {
   return doPostProcess(Inst,
-    Builder.createUnion(getOpLocation(Inst->getLoc()),
+    Builder.createEnum(getOpLocation(Inst->getLoc()),
                         Inst->hasOperand() ? getOpValue(Inst->getOperand())
                                            : SILValue(),
                         Inst->getElement(),
@@ -560,9 +560,9 @@ SILCloner<ImplClass>::visitUnionInst(UnionInst* Inst) {
   
 template<typename ImplClass>
 SILValue
-SILCloner<ImplClass>::visitUnionDataAddrInst(UnionDataAddrInst* Inst) {
+SILCloner<ImplClass>::visitEnumDataAddrInst(EnumDataAddrInst* Inst) {
   return doPostProcess(Inst,
-    Builder.createUnionDataAddr(getOpLocation(Inst->getLoc()),
+    Builder.createEnumDataAddr(getOpLocation(Inst->getLoc()),
                                 getOpValue(Inst->getOperand()),
                                 Inst->getElement(),
                                 getOpType(Inst->getType())));
@@ -570,9 +570,9 @@ SILCloner<ImplClass>::visitUnionDataAddrInst(UnionDataAddrInst* Inst) {
   
 template<typename ImplClass>
 SILValue
-SILCloner<ImplClass>::visitInjectUnionAddrInst(InjectUnionAddrInst* Inst) {
+SILCloner<ImplClass>::visitInjectEnumAddrInst(InjectEnumAddrInst* Inst) {
   return doPostProcess(Inst,
-    Builder.createInjectUnionAddr(getOpLocation(Inst->getLoc()),
+    Builder.createInjectEnumAddr(getOpLocation(Inst->getLoc()),
                                   getOpValue(Inst->getOperand()),
                                   Inst->getElement()));
 }
@@ -960,33 +960,33 @@ SILCloner<ImplClass>::visitSwitchIntInst(SwitchIntInst* Inst) {
 
 template<typename ImplClass>
 SILValue
-SILCloner<ImplClass>::visitSwitchUnionInst(SwitchUnionInst* Inst) {
+SILCloner<ImplClass>::visitSwitchEnumInst(SwitchEnumInst* Inst) {
   SILBasicBlock *DefaultBB = nullptr;
   if (Inst->hasDefault())
     DefaultBB = getOpBasicBlock(Inst->getDefaultBB());
-  SmallVector<std::pair<UnionElementDecl*, SILBasicBlock*>, 8> CaseBBs;
+  SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> CaseBBs;
   for(int i = 0, e = Inst->getNumCases(); i != e; ++i)
     CaseBBs.push_back(std::make_pair(Inst->getCase(i).first,
                                      getOpBasicBlock(Inst->getCase(i).second)));
   return doPostProcess(Inst,
-    Builder.createSwitchUnion(getOpLocation(Inst->getLoc()),
+    Builder.createSwitchEnum(getOpLocation(Inst->getLoc()),
                             getOpValue(Inst->getOperand()),
                             DefaultBB, CaseBBs));
 }
 
 template<typename ImplClass>
 SILValue
-SILCloner<ImplClass>::visitDestructiveSwitchUnionAddrInst(
-                                        DestructiveSwitchUnionAddrInst* Inst) {
+SILCloner<ImplClass>::visitDestructiveSwitchEnumAddrInst(
+                                        DestructiveSwitchEnumAddrInst* Inst) {
   SILBasicBlock *DefaultBB = nullptr;
   if (Inst->hasDefault())
     DefaultBB = getOpBasicBlock(Inst->getDefaultBB());
-  SmallVector<std::pair<UnionElementDecl*, SILBasicBlock*>, 8> CaseBBs;
+  SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> CaseBBs;
   for(int i = 0, e = Inst->getNumCases(); i != e; ++i)
     CaseBBs.push_back(std::make_pair(Inst->getCase(i).first,
                                      getOpBasicBlock(Inst->getCase(i).second)));
   return doPostProcess(Inst,
-    Builder.createDestructiveSwitchUnionAddr(getOpLocation(Inst->getLoc()),
+    Builder.createDestructiveSwitchEnumAddr(getOpLocation(Inst->getLoc()),
                                              getOpValue(Inst->getOperand()),
                                              DefaultBB, CaseBBs));
 }

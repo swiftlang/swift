@@ -269,8 +269,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
   }
       
-  case PatternKind::UnionElement: {
-    auto elt = cast<UnionElementPattern>(pattern);
+  case PatternKind::EnumElement: {
+    auto elt = cast<EnumElementPattern>(pattern);
     // FIXME: Print element expr.
     if (elt->hasSubPattern())
       printPattern(elt->getSubPattern());
@@ -396,8 +396,8 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
   case ImportKind::Class:
     OS << "class ";
     break;
-  case ImportKind::Union:
-    OS << "union ";
+  case ImportKind::Enum:
+    OS << "enum ";
     break;
   case ImportKind::Protocol:
     OS << "protocol ";
@@ -466,8 +466,8 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   printInheritedWithSuperclass(decl);
 }
 
-void PrintAST::visitUnionDecl(UnionDecl *decl) {
-  OS << "union ";
+void PrintAST::visitEnumDecl(EnumDecl *decl) {
+  OS << "enum ";
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
   printNominalDeclName(decl);
@@ -690,7 +690,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   }
 }
 
-void PrintAST::visitUnionElementDecl(UnionElementDecl *decl) {
+void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
   // FIXME: Attributes?
   recordDeclLoc(decl);
   OS << "case ";

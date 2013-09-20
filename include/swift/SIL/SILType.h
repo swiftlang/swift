@@ -196,10 +196,10 @@ public:
   StructDecl *getStructOrBoundGenericStruct() const {
     return getSwiftRValueType()->getStructOrBoundGenericStruct();
   }
-  /// Retrieve the UnionDecl for a type that maps to a Swift union or
-  /// bound generic union type.
-  UnionDecl *getUnionOrBoundGenericUnion() const {
-    return getSwiftRValueType()->getUnionOrBoundGenericUnion();
+  /// Retrieve the EnumDecl for a type that maps to a Swift enum or
+  /// bound generic enum type.
+  EnumDecl *getEnumOrBoundGenericEnum() const {
+    return getSwiftRValueType()->getEnumOrBoundGenericEnum();
   }
   
   /// True if the type is an address type.

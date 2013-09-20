@@ -458,56 +458,56 @@ public:
     }
   }
   
-  void checkUnionInst(UnionInst *UI) {
-    UnionDecl *ud = UI->getType().getUnionOrBoundGenericUnion();
-    require(ud, "UnionInst must return a union");
-    require(UI->getElement()->getParentUnion() == ud,
-            "UnionInst case must be a case of the result union type");
+  void checkEnumInst(EnumInst *UI) {
+    EnumDecl *ud = UI->getType().getEnumOrBoundGenericEnum();
+    require(ud, "EnumInst must return an enum");
+    require(UI->getElement()->getParentEnum() == ud,
+            "EnumInst case must be a case of the result enum type");
     require(UI->getType().isObject(),
-            "UnionInst must produce an object");
+            "EnumInst must produce an object");
     require(UI->hasOperand() == UI->getElement()->hasArgumentType(),
-            "UnionInst must take an argument iff the element does");
+            "EnumInst must take an argument iff the element does");
     
     if (UI->getElement()->hasArgumentType()) {
       require(UI->getOperand().getType().isObject(),
-              "UnionInst operand must be an object");
+              "EnumInst operand must be an object");
       Type caseTy = UI->getType().getSwiftRValueType()
         ->getTypeOfMember(ud->getModuleContext(), UI->getElement(), nullptr,
                           UI->getElement()->getArgumentType());
       require(caseTy->isEqual(UI->getOperand().getType().getSwiftRValueType()),
-              "UnionInst operand type does not match type of case");
+              "EnumInst operand type does not match type of case");
     }
   }
 
-  void checkUnionDataAddrInst(UnionDataAddrInst *UI) {
-    UnionDecl *ud = UI->getOperand().getType().getUnionOrBoundGenericUnion();
-    require(ud, "UnionDataAddrInst must take a union operand");
-    require(UI->getElement()->getParentUnion() == ud,
-            "UnionDataAddrInst case must be a case of the union operand type");
+  void checkEnumDataAddrInst(EnumDataAddrInst *UI) {
+    EnumDecl *ud = UI->getOperand().getType().getEnumOrBoundGenericEnum();
+    require(ud, "EnumDataAddrInst must take an enum operand");
+    require(UI->getElement()->getParentEnum() == ud,
+            "EnumDataAddrInst case must be a case of the enum operand type");
     require(UI->getElement()->hasArgumentType(),
-            "UnionDataAddrInst case must have a data type");
+            "EnumDataAddrInst case must have a data type");
     require(UI->getOperand().getType().isAddress(),
-            "UnionDataAddrInst must take an address operand");
+            "EnumDataAddrInst must take an address operand");
     require(UI->getType().isAddress(),
-            "UnionDataAddrInst must produce an address");
+            "EnumDataAddrInst must produce an address");
     
     Type caseTy = UI->getOperand().getType().getSwiftRValueType()
       ->getTypeOfMember(ud->getModuleContext(), UI->getElement(), nullptr,
                         UI->getElement()->getArgumentType());
     
     require(caseTy->isEqual(UI->getType().getSwiftRValueType()),
-            "UnionDataAddrInst result does not match type of union case");
+            "EnumDataAddrInst result does not match type of enum case");
   }
   
-  void checkInjectUnionAddrInst(InjectUnionAddrInst *IUAI) {
-    require(IUAI->getOperand().getType().is<UnionType>()
-              || IUAI->getOperand().getType().is<BoundGenericUnionType>(),
-            "InjectUnionAddrInst must take a union operand");
-    require(IUAI->getElement()->getParentUnion()
-              == IUAI->getOperand().getType().getUnionOrBoundGenericUnion(),
-            "InjectUnionAddrInst case must be a case of the union operand type");
+  void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
+    require(IUAI->getOperand().getType().is<EnumType>()
+              || IUAI->getOperand().getType().is<BoundGenericEnumType>(),
+            "InjectEnumAddrInst must take an enum operand");
+    require(IUAI->getElement()->getParentEnum()
+              == IUAI->getOperand().getType().getEnumOrBoundGenericEnum(),
+            "InjectEnumAddrInst case must be a case of the enum operand type");
     require(IUAI->getOperand().getType().isAddress(),
-            "InjectUnionAddrInst must take an address operand");
+            "InjectEnumAddrInst must take an address operand");
   }
   
   void checkTupleInst(TupleInst *TI) {
@@ -1347,32 +1347,32 @@ public:
               "switch_int default destination cannot take arguments");
   }
 
-  void checkSwitchUnionInst(SwitchUnionInst *SOI) {
+  void checkSwitchEnumInst(SwitchEnumInst *SOI) {
     require(SOI->getOperand().getType().isObject(),
-            "switch_union operand must be an object");
+            "switch_enum operand must be an object");
     
     CanType uTy = SOI->getOperand().getType().getSwiftRValueType();
-    UnionDecl *uDecl = uTy->getUnionOrBoundGenericUnion();
-    require(uDecl, "switch_union operand is not a union");
+    EnumDecl *uDecl = uTy->getEnumOrBoundGenericEnum();
+    require(uDecl, "switch_enum operand is not an enum");
     
-    // Find the set of union elements for the type so we can verify
+    // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
-    // FIXME: We also need to consider if the union is resilient, in which case
+    // FIXME: We also need to consider if the enum is resilient, in which case
     // we're never guaranteed to be exhaustive.
-    llvm::DenseSet<UnionElementDecl*> unswitchedElts;
+    llvm::DenseSet<EnumElementDecl*> unswitchedElts;
     uDecl->getAllElements(unswitchedElts);
     
-    // Verify the set of union cases we dispatch on.
+    // Verify the set of enum cases we dispatch on.
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
-      UnionElementDecl *elt;
+      EnumElementDecl *elt;
       SILBasicBlock *dest;
       std::tie(elt, dest) = SOI->getCase(i);
       
       require(elt->getDeclContext() == uDecl,
-              "switch_union dispatches on union element that is not part of "
+              "switch_enum dispatches on enum element that is not part of "
               "its type");
       require(unswitchedElts.count(elt),
-              "switch_union dispatches on same union element more than once");
+              "switch_enum dispatches on same enum element more than once");
       unswitchedElts.erase(elt);
       
       // The destination BB can take the argument payload, if any, as a BB
@@ -1380,7 +1380,7 @@ public:
       if (elt->hasArgumentType()) {
         require(dest->getBBArgs().size() == 0
                   || dest->getBBArgs().size() == 1,
-                "switch_union destination for case w/ args must take 0 or 1 "
+                "switch_enum destination for case w/ args must take 0 or 1 "
                 "arguments");
 
         if (dest->getBBArgs().size() == 1) {
@@ -1389,52 +1389,52 @@ public:
                                                elt->getArgumentType());
           CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
           require(eltArgTy->isEqual(bbArgTy),
-                  "switch_union destination bbarg must match case arg type");
+                  "switch_enum destination bbarg must match case arg type");
           require(!dest->getBBArgs()[0]->getType().isAddress(),
-                  "switch_union destination bbarg type must not be an address");
+                  "switch_enum destination bbarg type must not be an address");
         }
         
       } else {
         require(dest->getBBArgs().size() == 0,
-                "switch_union destination for no-argument case must take no "
+                "switch_enum destination for no-argument case must take no "
                 "arguments");
       }
     }
     
     // If the switch is non-exhaustive, we require a default.
     require(unswitchedElts.empty() || SOI->hasDefault(),
-            "nonexhaustive switch_union must have a default destination");
+            "nonexhaustive switch_enum must have a default destination");
     if (SOI->hasDefault())
       require(SOI->getDefaultBB()->bbarg_empty(),
-              "switch_union default destination must take no arguments");
+              "switch_enum default destination must take no arguments");
   }
   
-  void checkDestructiveSwitchUnionAddrInst(DestructiveSwitchUnionAddrInst *SOI){
+  void checkDestructiveSwitchEnumAddrInst(DestructiveSwitchEnumAddrInst *SOI){
     require(SOI->getOperand().getType().isAddress(),
-            "destructive_switch_union_addr operand must be an object");
+            "destructive_switch_enum_addr operand must be an object");
     
     CanType uTy = SOI->getOperand().getType().getSwiftRValueType();
-    UnionDecl *uDecl = uTy->getUnionOrBoundGenericUnion();
-    require(uDecl, "destructive_switch_union_addr operand must be a union");
+    EnumDecl *uDecl = uTy->getEnumOrBoundGenericEnum();
+    require(uDecl, "destructive_switch_enum_addr operand must be an enum");
     
-    // Find the set of union elements for the type so we can verify
+    // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
-    // FIXME: We also need to consider if the union is resilient, in which case
+    // FIXME: We also need to consider if the enum is resilient, in which case
     // we're never guaranteed to be exhaustive.
-    llvm::DenseSet<UnionElementDecl*> unswitchedElts;
+    llvm::DenseSet<EnumElementDecl*> unswitchedElts;
     uDecl->getAllElements(unswitchedElts);
     
-    // Verify the set of union cases we dispatch on.
+    // Verify the set of enum cases we dispatch on.
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
-      UnionElementDecl *elt;
+      EnumElementDecl *elt;
       SILBasicBlock *dest;
       std::tie(elt, dest) = SOI->getCase(i);
       
       require(elt->getDeclContext() == uDecl,
-              "destructive_switch_union_addr dispatches on union element that "
+              "destructive_switch_enum_addr dispatches on enum element that "
               "is not part of its type");
       require(unswitchedElts.count(elt),
-              "destructive_switch_union_addr dispatches on same union element "
+              "destructive_switch_enum_addr dispatches on same enum element "
               "more than once");
       unswitchedElts.erase(elt);
       
@@ -1442,7 +1442,7 @@ public:
       // argument.
       if (elt->hasArgumentType()) {
         require(dest->getBBArgs().size() == 1,
-                "destructive_switch_union_addr destination for case w/ args "
+                "destructive_switch_enum_addr destination for case w/ args "
                 "must take an argument");
         
         Type eltArgTy = uTy->getTypeOfMember(uDecl->getModuleContext(),
@@ -1450,25 +1450,25 @@ public:
                                              elt->getArgumentType());
         CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
         require(eltArgTy->isEqual(bbArgTy),
-                "destructive_switch_union_addr destination bbarg must match "
+                "destructive_switch_enum_addr destination bbarg must match "
                 "case arg type");
         require(dest->getBBArgs()[0]->getType().isAddress(),
-                "destructive_switch_union_addr destination bbarg type must "
+                "destructive_switch_enum_addr destination bbarg type must "
                 "be an address");
       } else {
         require(dest->getBBArgs().size() == 0,
-                "destructive_switch_union_addr destination for no-argument "
+                "destructive_switch_enum_addr destination for no-argument "
                 "case must take no arguments");
       }
     }
     
     // If the switch is non-exhaustive, we require a default.
     require(unswitchedElts.empty() || SOI->hasDefault(),
-            "nonexhaustive destructive_switch_union_addr must have a default "
+            "nonexhaustive destructive_switch_enum_addr must have a default "
             "destination");
     if (SOI->hasDefault())
       require(SOI->getDefaultBB()->bbarg_empty(),
-              "destructive_switch_union_addr default destination must take "
+              "destructive_switch_enum_addr default destination must take "
               "no arguments");
   }
   

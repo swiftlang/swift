@@ -2,14 +2,14 @@
 
 import Builtin
 
-// -- Singleton union. The representation is just the singleton payload.
+// -- Singleton enum. The representation is just the singleton payload.
 // CHECK: %O5union9Singleton = type { { i64, i64 } }
 
 // -- No-payload unions. The representation is just an enum tag.
 // CHECK: %O5union10NoPayloads = type { i2 }
 // CHECK: %O5union11NoPayloads2 = type { i3 }
 
-// -- Single-payload union, no extra inhabitants in the payload type. The
+// -- Single-payload enum, no extra inhabitants in the payload type. The
 //    representation adds a tag bit to distinguish payload from enum tag:
 //      case x(i64): X0 X1 X2 ... X63 | 0, where X0...X63 are the payload bits
 //      case y:      0  0  0  ... 0   | 1
@@ -17,25 +17,25 @@ import Builtin
 // CHECK: %O5union17SinglePayloadNoXI = type { i64, i1 }
 // CHECK: %O5union18SinglePayloadNoXI2 = type { i64, i1 }
 
-// -- Single-payload union, spare bits. The representation uses a tag bit
+// -- Single-payload enum, spare bits. The representation uses a tag bit
 //    out of the payload to distinguish payload from enum tag:
 //      case x(i3): X0 X1 X2 0 0 0 0 0
 //      case y:     0  0  0  1 0 0 0 0
 //      case z:     1  0  0  1 0 0 0 0
 // CHECK: %O5union21SinglePayloadSpareBit = type { i64 }
 
-// -- Single-payload union containing a no-payload union as its payload.
+// -- Single-payload enum containing a no-payload enum as its payload.
 //    The representation takes extra inhabitants starting after the greatest
-//    discriminator value used by the nested no-payload union.
+//    discriminator value used by the nested no-payload enum.
 // CHECK: %O5union19SinglePayloadNested = type { i8 }
 
-// -- Single-payload union containing another single-payload union as its
+// -- Single-payload enum containing another single-payload enum as its
 //    payload.
-//    The representation takes extra inhabitants from the nested union's payload
-//    that were unused by the nested union.
+//    The representation takes extra inhabitants from the nested enum's payload
+//    that were unused by the nested enum.
 // CHECK: %O5union25SinglePayloadNestedNested = type { i8 }
 
-// -- Multi-payload union, no spare bits. The representation adds tag bits
+// -- Multi-payload enum, no spare bits. The representation adds tag bits
 //    to discriminate payloads. No-payload cases all share a tag.
 //      case x(i8): X0 X1 X2 ... X7 X8 | 0 0
 //      case y(i7): Y0 Y1 Y2 ... Y7 0  | 1 0
@@ -45,7 +45,7 @@ import Builtin
 //      case c:     0  1  0  ... 0  0  | 1 1
 // CHECK: %O5union23MultiPayloadNoSpareBits = type { i64, i2 }
 
-// -- Multi-payload union, one spare bit. The representation uses spare bits
+// -- Multi-payload enum, one spare bit. The representation uses spare bits
 //    common to all payloads to partially discriminate payloads, with added
 //    tag bits to cover the gap. No-payload cases all share a tag.
 //      case x(i7): X0 X1 X2 X3 X4 X5 X6 0 | 0
@@ -56,7 +56,7 @@ import Builtin
 //      case c:     0  1  0  0  0  0  0  1 | 1
 // CHECK: %O5union23MultiPayloadOneSpareBit = type { i64, i1 }
 
-// -- Multi-payload union, two spare bits. Same as above, except we have enough
+// -- Multi-payload enum, two spare bits. Same as above, except we have enough
 //    spare bits not to require any added tag bits.
 //      case x(i6): X0 X1 X2 X3 X4 X5 0  0
 //      case y(i1): Y  0  0  0  0  0  1  0
@@ -124,11 +124,11 @@ import Builtin
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO5union20DynamicSinglePayload to i8*),
 // CHECK:   i8* null
 
-union Singleton {
+enum Singleton {
   case val(Builtin.Int64, Builtin.Int64)
 }
 
-union DynamicSingleton<T> {
+enum DynamicSingleton<T> {
   case val(T)
 }
 
@@ -137,7 +137,7 @@ sil @singleton_switch : $(Singleton) -> () {
 // CHECK: entry:
 entry(%u : $Singleton):
 // CHECK:   br label %[[DEST:[0-9]+]]
-  switch_union %u : $Singleton, case #Singleton.val!unionelt.1: dest
+  switch_enum %u : $Singleton, case #Singleton.val!enumelt.1: dest
 
 // CHECK: ; <label>:[[DEST]]
 dest:
@@ -151,7 +151,7 @@ sil @singleton_switch_arg : $(Singleton) -> () {
 // CHECK: entry:
 entry(%u : $Singleton):
 // CHECK:   br label %[[PREDEST:[0-9]+]]
-  switch_union %u : $Singleton, case #Singleton.val!unionelt.1: dest
+  switch_enum %u : $Singleton, case #Singleton.val!enumelt.1: dest
 
 // CHECK: ; <label>:[[PREDEST]]
 // CHECK:   br label %[[DEST:[0-9]+]]
@@ -176,7 +176,7 @@ dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
 // CHECK: }
 sil @singleton_switch_indirect : $([byref] Singleton) -> () {
 entry(%u : $*Singleton):
-  destructive_switch_union_addr %u : $*Singleton, case #Singleton.val!unionelt.1: dest
+  destructive_switch_enum_addr %u : $*Singleton, case #Singleton.val!enumelt.1: dest
 dest(%u2 : $*(Builtin.Int64, Builtin.Int64)):
   %x = tuple ()
   return %x : $()
@@ -191,7 +191,7 @@ dest(%u2 : $*(Builtin.Int64, Builtin.Int64)):
 sil @singleton_inject : $(Builtin.Int64, Builtin.Int64) -> Singleton {
 entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
   %t = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
-  %u = union $Singleton, #Singleton.val!unionelt.1, %t : $(Builtin.Int64, Builtin.Int64)
+  %u = enum $Singleton, #Singleton.val!enumelt.1, %t : $(Builtin.Int64, Builtin.Int64)
   return %u : $Singleton
 }
 
@@ -207,15 +207,15 @@ entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
 sil @singleton_inject_indirect : $(Builtin.Int64, Builtin.Int64, [byref] Singleton) -> () {
 entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $*Singleton):
   %t = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
-  %a = union_data_addr %2 : $*Singleton, #Singleton.val!unionelt.1
+  %a = enum_data_addr %2 : $*Singleton, #Singleton.val!enumelt.1
   store %t to %a : $*(Builtin.Int64, Builtin.Int64)
-  inject_union_addr %2 : $*Singleton, #Singleton.val!unionelt.1
+  inject_enum_addr %2 : $*Singleton, #Singleton.val!enumelt.1
   %v = tuple ()
   return %v : $()
 }
 
 
-union NoPayloads {
+enum NoPayloads {
   case x
   case y
   case z
@@ -240,7 +240,7 @@ entry(%u : $NoPayloads):
 // CHECK:   ]
 // CHECK: ; <label>:[[DFLT]]
 // CHECK:   unreachable
-  switch_union %u : $NoPayloads, case #NoPayloads.x!unionelt: x_dest, case #NoPayloads.y!unionelt: y_dest, case #NoPayloads.z!unionelt: z_dest
+  switch_enum %u : $NoPayloads, case #NoPayloads.x!enumelt: x_dest, case #NoPayloads.y!enumelt: y_dest, case #NoPayloads.z!enumelt: z_dest
 
 // CHECK: ; <label>:[[X_DEST]]
 // CHECK:   call void @a()
@@ -277,7 +277,7 @@ entry(%u : $*NoPayloads):
 // CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O5union10NoPayloads* %0, i32 0, i32 0
 // CHECK:   [[TAG:%.*]] = load i2* [[TAG_ADDR]]
 // CHECK:   switch i2 [[TAG]]
-  destructive_switch_union_addr %u : $*NoPayloads, case #NoPayloads.x!unionelt: x_dest, case #NoPayloads.y!unionelt: y_dest, case #NoPayloads.z!unionelt: z_dest
+  destructive_switch_enum_addr %u : $*NoPayloads, case #NoPayloads.x!enumelt: x_dest, case #NoPayloads.y!enumelt: y_dest, case #NoPayloads.z!enumelt: z_dest
 
 x_dest:
   br end
@@ -296,7 +296,7 @@ end:
 // CHECK: }
 sil @no_payload_inject_x : $() -> NoPayloads {
 entry:
-  %u = union $NoPayloads, #NoPayloads.x!unionelt
+  %u = enum $NoPayloads, #NoPayloads.x!enumelt
   return %u : $NoPayloads
 }
 
@@ -306,7 +306,7 @@ entry:
 // CHECK: }
 sil @no_payload_inject_y : $() -> NoPayloads {
 entry:
-  %u = union $NoPayloads, #NoPayloads.y!unionelt
+  %u = enum $NoPayloads, #NoPayloads.y!enumelt
   return %u : $NoPayloads
 }
 
@@ -316,7 +316,7 @@ entry:
 // CHECK: }
 sil @no_payload_inject_z : $() -> NoPayloads {
 entry:
-  %u = union $NoPayloads, #NoPayloads.z!unionelt
+  %u = enum $NoPayloads, #NoPayloads.z!enumelt
   return %u : $NoPayloads
 }
 
@@ -328,13 +328,13 @@ entry:
 // CHECK: }
 sil @no_payload_inject_z_indirect : $([byref] NoPayloads) -> () {
 entry(%0 : $*NoPayloads):
-  inject_union_addr %0 : $*NoPayloads, #NoPayloads.z!unionelt
+  inject_enum_addr %0 : $*NoPayloads, #NoPayloads.z!enumelt
   %v = tuple ()
   return %v : $()
 }
 
 
-union NoPayloads2 {
+enum NoPayloads2 {
   case a
   case e
   case i
@@ -350,7 +350,7 @@ entry(%u : $NoPayloads2):
 // CHECK:   switch i3 %0, label %[[DEFAULT_DEST:[0-9]+]] [
 // CHECK:     i3 -4, label %[[U_DEST:[0-9]+]]
 // CHECK:   ]
-  switch_union %u : $NoPayloads2, case #NoPayloads2.u!unionelt: u_dest, default default_dest
+  switch_enum %u : $NoPayloads2, case #NoPayloads2.u!enumelt: u_dest, default default_dest
 
 // CHECK: ; <label>:[[U_DEST]]
 u_dest:
@@ -376,12 +376,12 @@ end:
 }
 
 
-union SinglePayloadNoXI {
+enum SinglePayloadNoXI {
   case x(Builtin.Int64)
   case y
 }
 
-union SinglePayloadNoXI2 {
+enum SinglePayloadNoXI2 {
   case x(Builtin.Int64)
   case y
   case z
@@ -402,7 +402,7 @@ entry(%u : $SinglePayloadNoXI2):
 // CHECK:   ]
 // CHECK: ; <label>:[[DFLT]]
 // CHECK:   unreachable
-  switch_union %u : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.x!unionelt.1: x_dest, case #SinglePayloadNoXI2.y!unionelt: y_dest, case #SinglePayloadNoXI2.z!unionelt: z_dest
+  switch_enum %u : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.x!enumelt.1: x_dest, case #SinglePayloadNoXI2.y!enumelt: y_dest, case #SinglePayloadNoXI2.z!enumelt: z_dest
 
 // CHECK: ; <label>:[[X_DEST]]
 // CHECK:   call void @a()
@@ -450,7 +450,7 @@ entry(%u : $SinglePayloadNoXI2):
 // CHECK:   ]
 // CHECK: ; <label>:[[DFLT]]
 // CHECK:   unreachable
-  switch_union %u : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.x!unionelt.1: x_dest, case #SinglePayloadNoXI2.y!unionelt: y_dest, case #SinglePayloadNoXI2.z!unionelt: z_dest
+  switch_enum %u : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.x!enumelt.1: x_dest, case #SinglePayloadNoXI2.y!enumelt: y_dest, case #SinglePayloadNoXI2.z!enumelt: z_dest
 
 // CHECK: ; <label>:[[X_PREDEST]]
 // CHECK:   br label %[[X_DEST:[0-9]+]]
@@ -494,7 +494,7 @@ end:
 // CHECK: }
 sil @single_payload_no_xi_inject_x : $(Builtin.Int64) -> SinglePayloadNoXI2 {
 entry(%0 : $Builtin.Int64):
-  %u = union $SinglePayloadNoXI2, #SinglePayloadNoXI2.x!unionelt.1, %0 : $Builtin.Int64
+  %u = enum $SinglePayloadNoXI2, #SinglePayloadNoXI2.x!enumelt.1, %0 : $Builtin.Int64
   return %u : $SinglePayloadNoXI2
 }
 
@@ -508,9 +508,9 @@ entry(%0 : $Builtin.Int64):
 // CHECK: }
 sil @single_payload_no_xi_inject_x_indirect : $(Builtin.Int64, [byref] SinglePayloadNoXI2) -> () {
 entry(%0 : $Builtin.Int64, %1 : $*SinglePayloadNoXI2):
-  %a = union_data_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!unionelt.1
+  %a = enum_data_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!enumelt.1
   store %0 to %a : $*Builtin.Int64
-  inject_union_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!unionelt.1
+  inject_enum_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!enumelt.1
   %v = tuple ()
   return %v : $()
 }
@@ -521,7 +521,7 @@ entry(%0 : $Builtin.Int64, %1 : $*SinglePayloadNoXI2):
 // CHECK: }
 sil @single_payload_no_xi_inject_y : $() -> SinglePayloadNoXI2 {
 entry:
-  %u = union $SinglePayloadNoXI2, #SinglePayloadNoXI2.y!unionelt
+  %u = enum $SinglePayloadNoXI2, #SinglePayloadNoXI2.y!enumelt
   return %u : $SinglePayloadNoXI2
 }
 
@@ -535,7 +535,7 @@ entry:
 // CHECK: }
 sil @single_payload_no_xi_inject_y_indirect : $([byref] SinglePayloadNoXI2) -> () {
 entry(%0 : $*SinglePayloadNoXI2):
-  inject_union_addr %0 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.y!unionelt
+  inject_enum_addr %0 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.y!enumelt
   %v = tuple ()
   return %v : $()
 }
@@ -546,14 +546,14 @@ entry(%0 : $*SinglePayloadNoXI2):
 // CHECK: }
 sil @single_payload_no_xi_inject_z : $() -> SinglePayloadNoXI2 {
 entry:
-  %u = union $SinglePayloadNoXI2, #SinglePayloadNoXI2.z!unionelt
+  %u = enum $SinglePayloadNoXI2, #SinglePayloadNoXI2.z!enumelt
   return %u : $SinglePayloadNoXI2
 }
 
 
 // -- Test packing and unpacking aggregates.
 
-union AggregateSinglePayload {
+enum AggregateSinglePayload {
   case x(Builtin.Int21, Builtin.Int64)
   case y
   case z
@@ -562,7 +562,7 @@ union AggregateSinglePayload {
 // CHECK: define void @aggregate_single_payload_unpack(i128, i1) {
 sil @aggregate_single_payload_unpack : $[thin] (AggregateSinglePayload) -> () {
 entry(%u : $AggregateSinglePayload):
-  switch_union %u : $AggregateSinglePayload, case #AggregateSinglePayload.x!unionelt.1: x_dest, default end
+  switch_enum %u : $AggregateSinglePayload, case #AggregateSinglePayload.x!enumelt.1: x_dest, default end
 
 // CHECK:   {{%.*}} = trunc i128 %0 to i21
 // CHECK:   [[SHIFT_1:%.*]] = lshr i128 %0, 64
@@ -588,7 +588,7 @@ end:
 sil @aggregate_single_payload_inject : $(Builtin.Int21, Builtin.Int64) -> AggregateSinglePayload {
 entry(%0 : $Builtin.Int21, %1 : $Builtin.Int64):
   %t = tuple (%0 : $Builtin.Int21, %1 : $Builtin.Int64)
-  %u = union $AggregateSinglePayload, #AggregateSinglePayload.x!unionelt.1, %t : $(Builtin.Int21, Builtin.Int64)
+  %u = enum $AggregateSinglePayload, #AggregateSinglePayload.x!enumelt.1, %t : $(Builtin.Int21, Builtin.Int64)
   return %u : $AggregateSinglePayload
 }
 
@@ -596,7 +596,7 @@ struct CharLike { var value : Builtin.Int21 }
 struct IntLike { var value : Builtin.Int64 }
 struct RangeLike { var from, to : Builtin.Int64 }
 
-union AggregateSinglePayload2 {
+enum AggregateSinglePayload2 {
   case x(CharLike, IntLike, RangeLike)
   case y
   case z
@@ -605,7 +605,7 @@ union AggregateSinglePayload2 {
 // CHECK: define void @aggregate_single_payload_unpack_2(i256, i1) {
 sil @aggregate_single_payload_unpack_2 : $[thin] (AggregateSinglePayload2) -> () {
 entry(%u : $AggregateSinglePayload2):
-  switch_union %u : $AggregateSinglePayload2, case #AggregateSinglePayload2.x!unionelt.1: x_dest, default end
+  switch_enum %u : $AggregateSinglePayload2, case #AggregateSinglePayload2.x!enumelt.1: x_dest, default end
 
 // CHECK:   {{%.*}} = trunc i256 %0 to i21
 // CHECK:   [[SHIFT_1:%.*]] = lshr i256 %0, 64
@@ -641,12 +641,12 @@ end:
 sil @aggregate_single_payload_2_inject : $(CharLike, IntLike, RangeLike) -> AggregateSinglePayload2 {
 entry(%0 : $CharLike, %1 : $IntLike, %2 : $RangeLike):
   %t = tuple (%0 : $CharLike, %1 : $IntLike, %2 : $RangeLike)
-  %u = union $AggregateSinglePayload2, #AggregateSinglePayload2.x!unionelt.1, %t : $(CharLike, IntLike, RangeLike)
+  %u = enum $AggregateSinglePayload2, #AggregateSinglePayload2.x!enumelt.1, %t : $(CharLike, IntLike, RangeLike)
   return %u : $AggregateSinglePayload2
 }
 
 
-union SinglePayloadSpareBit {
+enum SinglePayloadSpareBit {
   case x(Builtin.Int63)
   case y
   case z
@@ -662,7 +662,7 @@ entry(%u : $SinglePayloadSpareBit):
 // --           0x8000_0000_0000_0001
 // CHECK:    i64 -9223372036854775807, label %[[Z_DEST:[0-9]+]]
 // CHECK:  ]
-  switch_union %u : $SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!unionelt.1: x_dest, case #SinglePayloadSpareBit.y!unionelt: y_dest, case #SinglePayloadSpareBit.z!unionelt: z_dest
+  switch_enum %u : $SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!enumelt.1: x_dest, case #SinglePayloadSpareBit.y!enumelt: y_dest, case #SinglePayloadSpareBit.z!enumelt: z_dest
 
 // CHECK: ; <label>:[[X_DEST]]
 x_dest:
@@ -705,7 +705,7 @@ entry(%u : $SinglePayloadSpareBit):
 // --           0x8000_0000_0000_0001
 // CHECK:    i64 -9223372036854775807, label %[[Z_DEST:[0-9]+]]
 // CHECK:  ]
-  switch_union %u : $SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!unionelt.1: x_dest, case #SinglePayloadSpareBit.y!unionelt: y_dest, case #SinglePayloadSpareBit.z!unionelt: z_dest
+  switch_enum %u : $SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!enumelt.1: x_dest, case #SinglePayloadSpareBit.y!enumelt: y_dest, case #SinglePayloadSpareBit.z!enumelt: z_dest
 
 // CHECK: ; <label>:[[X_PREDEST]]
 // CHECK:   [[TRUNC_PAYLOAD:%.*]] = trunc i64 %0 to i63
@@ -747,7 +747,7 @@ entry(%u : $*SinglePayloadSpareBit):
 // CHECK:  [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union21SinglePayloadSpareBit* %0, i32 0, i32 0
 // CHECK:  [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]]
 // CHECK:  switch i64 [[PAYLOAD]]
-  destructive_switch_union_addr %u : $*SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!unionelt.1: x_dest, case #SinglePayloadSpareBit.y!unionelt: y_dest, case #SinglePayloadSpareBit.z!unionelt: z_dest
+  destructive_switch_enum_addr %u : $*SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!enumelt.1: x_dest, case #SinglePayloadSpareBit.y!enumelt: y_dest, case #SinglePayloadSpareBit.z!enumelt: z_dest
 
 // CHECK: ; <label>:[[X_PREDEST:[0-9]+]]
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O5union21SinglePayloadSpareBit* %0 to i63*
@@ -777,7 +777,7 @@ end:
 // CHECK: }
 sil @single_payload_spare_bit_inject_x : $(Builtin.Int63) -> SinglePayloadSpareBit {
 entry(%0 : $Builtin.Int63):
-  %u = union $SinglePayloadSpareBit, #SinglePayloadSpareBit.x!unionelt.1, %0 : $Builtin.Int63
+  %u = enum $SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1, %0 : $Builtin.Int63
   return %u : $SinglePayloadSpareBit
 }
 
@@ -789,9 +789,9 @@ entry(%0 : $Builtin.Int63):
 // CHECK: }
 sil @single_payload_spare_bit_inject_x_indirect : $(Builtin.Int63, [byref] SinglePayloadSpareBit) -> () {
 entry(%0 : $Builtin.Int63, %1 : $*SinglePayloadSpareBit):
-  %a = union_data_addr %1 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!unionelt.1
+  %a = enum_data_addr %1 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1
   store %0 to %a : $*Builtin.Int63
-  inject_union_addr %1 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!unionelt.1
+  inject_enum_addr %1 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1
   %v = tuple ()
   return %v : $()
 }
@@ -803,7 +803,7 @@ entry(%0 : $Builtin.Int63, %1 : $*SinglePayloadSpareBit):
 // CHECK: }
 sil @single_payload_spare_bit_inject_y : $() -> SinglePayloadSpareBit {
 entry:
-  %u = union $SinglePayloadSpareBit, #SinglePayloadSpareBit.y!unionelt
+  %u = enum $SinglePayloadSpareBit, #SinglePayloadSpareBit.y!enumelt
   return %u : $SinglePayloadSpareBit
 }
 
@@ -816,7 +816,7 @@ entry:
 // CHECK: }
 sil @single_payload_spare_bit_inject_y_indirect : $([byref] SinglePayloadSpareBit) -> () {
 entry(%0 : $*SinglePayloadSpareBit):
-  inject_union_addr %0 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.y!unionelt
+  inject_enum_addr %0 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.y!enumelt
   %v = tuple ()
   return %v : $()
 }
@@ -828,18 +828,18 @@ entry(%0 : $*SinglePayloadSpareBit):
 // CHECK: }
 sil @single_payload_spare_bit_inject_z : $() -> SinglePayloadSpareBit {
 entry:
-  %u = union $SinglePayloadSpareBit, #SinglePayloadSpareBit.z!unionelt
+  %u = enum $SinglePayloadSpareBit, #SinglePayloadSpareBit.z!enumelt
   return %u : $SinglePayloadSpareBit
 }
 
-union SinglePayloadNested {
+enum SinglePayloadNested {
   case a(NoPayloads)
   case b
   case c
   case d
 }
 
-union SinglePayloadNestedNested {
+enum SinglePayloadNestedNested {
   case e(SinglePayloadNested)
   case f
   case g
@@ -854,7 +854,7 @@ entry(%u : $SinglePayloadNestedNested):
 // CHECK:     i8 7, label {{%.*}}
 // CHECK:     i8 8, label {{%.*}}
 // CHECK:   ]
-  switch_union %u : $SinglePayloadNestedNested, case #SinglePayloadNestedNested.e!unionelt.1: e_dest, case #SinglePayloadNestedNested.f!unionelt: f_dest, case #SinglePayloadNestedNested.g!unionelt: g_dest, case #SinglePayloadNestedNested.h!unionelt: h_dest
+  switch_enum %u : $SinglePayloadNestedNested, case #SinglePayloadNestedNested.e!enumelt.1: e_dest, case #SinglePayloadNestedNested.f!enumelt: f_dest, case #SinglePayloadNestedNested.g!enumelt: g_dest, case #SinglePayloadNestedNested.h!enumelt: h_dest
 
 e_dest(%v : $SinglePayloadNested):
 // CHECK:   switch i8 {{%.*}}, label {{%.*}} [
@@ -862,7 +862,7 @@ e_dest(%v : $SinglePayloadNested):
 // CHECK:     i8 4, label {{%.*}}
 // CHECK:     i8 5, label {{%.*}}
 // CHECK:   ]
-  switch_union %v : $SinglePayloadNested, case #SinglePayloadNested.a!unionelt.1: a_dest, case #SinglePayloadNested.b!unionelt: b_dest, case #SinglePayloadNested.c!unionelt: c_dest, case #SinglePayloadNested.d!unionelt: d_dest
+  switch_enum %v : $SinglePayloadNested, case #SinglePayloadNested.a!enumelt.1: a_dest, case #SinglePayloadNested.b!enumelt: b_dest, case #SinglePayloadNested.c!enumelt: c_dest, case #SinglePayloadNested.d!enumelt: d_dest
 f_dest:
   br end
 g_dest:
@@ -876,7 +876,7 @@ a_dest(%w : $NoPayloads):
 // CHECK:     i2 1, label {{%.*}}
 // CHECK:     i2 -2, label {{%.*}}
 // CHECK:   ]
-  switch_union %w : $NoPayloads, case #NoPayloads.x!unionelt: x_dest, case #NoPayloads.y!unionelt: y_dest, case #NoPayloads.z!unionelt: z_dest
+  switch_enum %w : $NoPayloads, case #NoPayloads.x!enumelt: x_dest, case #NoPayloads.y!enumelt: y_dest, case #NoPayloads.z!enumelt: z_dest
 b_dest:
   br end
 c_dest:
@@ -896,7 +896,7 @@ end:
   return %x : $()
 }
 
-union DynamicSinglePayload<T> {
+enum DynamicSinglePayload<T> {
   case x(T)
   case y
   case z
@@ -905,14 +905,14 @@ union DynamicSinglePayload<T> {
 
 // CHECK: define void @dynamic_single_payload_switch(%O5union20DynamicSinglePayload*, %swift.type* %T) {
 // CHECK:   [[OPAQUE_UNION:%.*]] = bitcast %O5union20DynamicSinglePayload* %0 to %swift.opaque*
-// CHECK:   [[CASE_INDEX:%.*]] = call i32 @swift_getUnionCaseSinglePayload(%swift.opaque* [[OPAQUE_UNION]], %swift.type* %T, i32 3)
+// CHECK:   [[CASE_INDEX:%.*]] = call i32 @swift_getEnumCaseSinglePayload(%swift.opaque* [[OPAQUE_UNION]], %swift.type* %T, i32 3)
 // CHECK:   switch i32 [[CASE_INDEX]], label {{%.*}} [
 // CHECK:     i32 -1, label {{%.*}}
 // CHECK:     i32 2, label {{%.*}}
 // CHECK:   ]
 sil @dynamic_single_payload_switch : $<T> (DynamicSinglePayload<T>) -> () {
 entry(%u : $*DynamicSinglePayload<T>):
-  destructive_switch_union_addr %u : $*DynamicSinglePayload<T>, case #DynamicSinglePayload.x!unionelt.1: x_dest, case #DynamicSinglePayload.w!unionelt: w_dest, default default_dest
+  destructive_switch_enum_addr %u : $*DynamicSinglePayload<T>, case #DynamicSinglePayload.x!enumelt.1: x_dest, case #DynamicSinglePayload.w!enumelt: w_dest, default default_dest
 
 x_dest(%t : $*T):
   br end
@@ -930,25 +930,25 @@ end:
 
 // CHECK: define void @dynamic_single_payload_inject_x(%O5union20DynamicSinglePayload.0* noalias sret, %swift.opaque*, %swift.type* %T) {
 // CHECK:   [[ADDR:%.*]] = bitcast %O5union20DynamicSinglePayload.0* %0 to %swift.opaque*
-// CHECK:   call void @swift_storeUnionTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 -1, i32 3)
+// CHECK:   call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 -1, i32 3)
 sil @dynamic_single_payload_inject_x : $<T> T -> DynamicSinglePayload<T> {
 entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
-  inject_union_addr %r : $*DynamicSinglePayload<T>, #DynamicSinglePayload.x!unionelt.1
+  inject_enum_addr %r : $*DynamicSinglePayload<T>, #DynamicSinglePayload.x!enumelt.1
   %v = tuple ()
   return %v : $()
 }
 
 // CHECK: define void @dynamic_single_payload_inject_y(%O5union20DynamicSinglePayload.1* noalias sret, %swift.type* %T) {
 // CHECK:   [[ADDR:%.*]] = bitcast %O5union20DynamicSinglePayload.1* %0 to %swift.opaque*
-// CHECK:   call void @swift_storeUnionTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 0, i32 3)
+// CHECK:   call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 0, i32 3)
 sil @dynamic_single_payload_inject_y : $<T> () -> DynamicSinglePayload<T> {
 entry(%r : $*DynamicSinglePayload<T>):
-  inject_union_addr %r : $*DynamicSinglePayload<T>, #DynamicSinglePayload.y!unionelt
+  inject_enum_addr %r : $*DynamicSinglePayload<T>, #DynamicSinglePayload.y!enumelt
   %v = tuple ()
   return %v : $()
 }
 
-union MultiPayloadNoSpareBits {
+enum MultiPayloadNoSpareBits {
   case x(Builtin.Int64)
   case y(Builtin.Int32)
   case z(Builtin.Int63)
@@ -974,7 +974,7 @@ entry(%u : $MultiPayloadNoSpareBits):
 // CHECK:   ]
 // CHECK: ; <label>:[[UNREACHABLE]]
 // CHECK:   unreachable
-  switch_union %u : $MultiPayloadNoSpareBits, case #MultiPayloadNoSpareBits.x!unionelt.1: x_dest, case #MultiPayloadNoSpareBits.y!unionelt.1: y_dest, case #MultiPayloadNoSpareBits.z!unionelt.1: z_dest, case #MultiPayloadNoSpareBits.a!unionelt: a_dest, case #MultiPayloadNoSpareBits.b!unionelt: b_dest, case #MultiPayloadNoSpareBits.c!unionelt: c_dest
+  switch_enum %u : $MultiPayloadNoSpareBits, case #MultiPayloadNoSpareBits.x!enumelt.1: x_dest, case #MultiPayloadNoSpareBits.y!enumelt.1: y_dest, case #MultiPayloadNoSpareBits.z!enumelt.1: z_dest, case #MultiPayloadNoSpareBits.a!enumelt: a_dest, case #MultiPayloadNoSpareBits.b!enumelt: b_dest, case #MultiPayloadNoSpareBits.c!enumelt: c_dest
 
 // CHECK: ; <label>:[[X_PREDEST]]
 // CHECK:   br label %[[X_DEST:[0-9]+]]
@@ -1040,7 +1040,7 @@ entry(%u : $*MultiPayloadNoSpareBits):
 // CHECK:   switch i64 [[PAYLOAD]]
 // CHECK: ; <label>:
 // CHECK:   unreachable
-  destructive_switch_union_addr %u : $*MultiPayloadNoSpareBits, case #MultiPayloadNoSpareBits.x!unionelt.1: x_dest, case #MultiPayloadNoSpareBits.y!unionelt.1: y_dest, case #MultiPayloadNoSpareBits.z!unionelt.1: z_dest, case #MultiPayloadNoSpareBits.a!unionelt: a_dest, case #MultiPayloadNoSpareBits.b!unionelt: b_dest, case #MultiPayloadNoSpareBits.c!unionelt: c_dest
+  destructive_switch_enum_addr %u : $*MultiPayloadNoSpareBits, case #MultiPayloadNoSpareBits.x!enumelt.1: x_dest, case #MultiPayloadNoSpareBits.y!enumelt.1: y_dest, case #MultiPayloadNoSpareBits.z!enumelt.1: z_dest, case #MultiPayloadNoSpareBits.a!enumelt: a_dest, case #MultiPayloadNoSpareBits.b!enumelt: b_dest, case #MultiPayloadNoSpareBits.c!enumelt: c_dest
 
 // CHECK: ; <label>:[[X_PREDEST:[0-9]+]]
 // CHECK:   bitcast %O5union23MultiPayloadNoSpareBits* %0 to i64*
@@ -1080,7 +1080,7 @@ end:
 // CHECK: }
 sil @multi_payload_no_spare_bit_inject_x : $(Builtin.Int64) -> MultiPayloadNoSpareBits {
 entry(%0 : $Builtin.Int64):
-  %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!unionelt.1, %0 : $Builtin.Int64
+  %u = enum $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1, %0 : $Builtin.Int64
   return %u : $MultiPayloadNoSpareBits
 }
 
@@ -1094,9 +1094,9 @@ entry(%0 : $Builtin.Int64):
 // CHECK: }
 sil @multi_payload_no_spare_bit_inject_x_indirect : $(Builtin.Int64, [byref] MultiPayloadNoSpareBits) -> () {
 entry(%0 : $Builtin.Int64, %1 : $*MultiPayloadNoSpareBits):
-  %a = union_data_addr %1 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!unionelt.1
+  %a = enum_data_addr %1 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1
   store %0 to %a : $*Builtin.Int64
-  inject_union_addr %1 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!unionelt.1
+  inject_enum_addr %1 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1
   %v = tuple ()
   return %v : $()
 }
@@ -1110,7 +1110,7 @@ entry(%0 : $Builtin.Int64, %1 : $*MultiPayloadNoSpareBits):
 // CHECK: }
 sil @multi_payload_no_spare_bit_inject_y : $(Builtin.Int32) -> MultiPayloadNoSpareBits {
 entry(%0 : $Builtin.Int32):
-  %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.y!unionelt.1, %0 : $Builtin.Int32
+  %u = enum $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.y!enumelt.1, %0 : $Builtin.Int32
   return %u : $MultiPayloadNoSpareBits
 }
 
@@ -1123,7 +1123,7 @@ entry(%0 : $Builtin.Int32):
 // CHECK: }
 sil @multi_payload_no_spare_bit_inject_z : $(Builtin.Int63) -> MultiPayloadNoSpareBits {
 entry(%0 : $Builtin.Int63):
-  %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.z!unionelt.1, %0 : $Builtin.Int63
+  %u = enum $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.z!enumelt.1, %0 : $Builtin.Int63
   return %u : $MultiPayloadNoSpareBits
 }
 
@@ -1133,7 +1133,7 @@ entry(%0 : $Builtin.Int63):
 // CHECK: }
 sil @multi_payload_no_spare_bit_inject_a : $() -> MultiPayloadNoSpareBits {
 entry:
-  %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.a!unionelt
+  %u = enum $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.a!enumelt
   return %u : $MultiPayloadNoSpareBits
 }
 
@@ -1147,7 +1147,7 @@ entry:
 // CHECK: }
 sil @multi_payload_no_spare_bit_inject_a_indirect : $([byref] MultiPayloadNoSpareBits) -> () {
 entry(%0 : $*MultiPayloadNoSpareBits):
-  inject_union_addr %0 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.a!unionelt
+  inject_enum_addr %0 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.a!enumelt
   %v = tuple ()
   return %v : $()
 }
@@ -1158,7 +1158,7 @@ entry(%0 : $*MultiPayloadNoSpareBits):
 // CHECK: }
 sil @multi_payload_no_spare_bit_inject_b : $() -> MultiPayloadNoSpareBits {
 entry:
-  %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.b!unionelt
+  %u = enum $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.b!enumelt
   return %u : $MultiPayloadNoSpareBits
 }
 
@@ -1168,11 +1168,11 @@ entry:
 // CHECK: }
 sil @multi_payload_no_spare_bit_inject_c : $() -> MultiPayloadNoSpareBits {
 entry:
-  %u = union $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.c!unionelt
+  %u = enum $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.c!enumelt
   return %u : $MultiPayloadNoSpareBits
 }
 
-union MultiPayloadOneSpareBit {
+enum MultiPayloadOneSpareBit {
   case x(Builtin.Int62)
   case y(Builtin.Int63)
   case z(Builtin.Int61)
@@ -1209,7 +1209,7 @@ entry(%u : $MultiPayloadOneSpareBit):
 
 // CHECK: ; <label>:[[UNREACHABLE]]
 // CHECK:   unreachable
-  switch_union %u : $MultiPayloadOneSpareBit, case #MultiPayloadOneSpareBit.x!unionelt.1: x_dest, case #MultiPayloadOneSpareBit.y!unionelt.1: y_dest, case #MultiPayloadOneSpareBit.z!unionelt.1: z_dest, case #MultiPayloadOneSpareBit.a!unionelt: a_dest, case #MultiPayloadOneSpareBit.b!unionelt: b_dest, case #MultiPayloadOneSpareBit.c!unionelt: c_dest
+  switch_enum %u : $MultiPayloadOneSpareBit, case #MultiPayloadOneSpareBit.x!enumelt.1: x_dest, case #MultiPayloadOneSpareBit.y!enumelt.1: y_dest, case #MultiPayloadOneSpareBit.z!enumelt.1: z_dest, case #MultiPayloadOneSpareBit.a!enumelt: a_dest, case #MultiPayloadOneSpareBit.b!enumelt: b_dest, case #MultiPayloadOneSpareBit.c!enumelt: c_dest
 
 // CHECK: ; <label>:[[X_PREDEST]]
 // CHECK:   [[X_VALUE:%.*]] = trunc i64 %0 to i62
@@ -1277,7 +1277,7 @@ entry(%u : $*MultiPayloadOneSpareBit):
 // CHECK:   switch i64 [[PAYLOAD]]
 // CHECK: ; <label>:
 // CHECK:   unreachable
-  destructive_switch_union_addr %u : $*MultiPayloadOneSpareBit, case #MultiPayloadOneSpareBit.x!unionelt.1: x_dest, case #MultiPayloadOneSpareBit.y!unionelt.1: y_dest, case #MultiPayloadOneSpareBit.z!unionelt.1: z_dest, case #MultiPayloadOneSpareBit.a!unionelt: a_dest, case #MultiPayloadOneSpareBit.b!unionelt: b_dest, case #MultiPayloadOneSpareBit.c!unionelt: c_dest
+  destructive_switch_enum_addr %u : $*MultiPayloadOneSpareBit, case #MultiPayloadOneSpareBit.x!enumelt.1: x_dest, case #MultiPayloadOneSpareBit.y!enumelt.1: y_dest, case #MultiPayloadOneSpareBit.z!enumelt.1: z_dest, case #MultiPayloadOneSpareBit.a!enumelt: a_dest, case #MultiPayloadOneSpareBit.b!enumelt: b_dest, case #MultiPayloadOneSpareBit.c!enumelt: c_dest
 
 // CHECK: ; <label>:[[X_PREDEST:[0-9]+]]
 // CHECK:   bitcast %O5union23MultiPayloadOneSpareBit* %0 to i62*
@@ -1325,7 +1325,7 @@ end:
 // CHECK: }
 sil @multi_payload_one_spare_bit_inject_x : $(Builtin.Int62) -> MultiPayloadOneSpareBit {
 entry(%0 : $Builtin.Int62):
-  %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!unionelt.1, %0 : $Builtin.Int62
+  %u = enum $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1, %0 : $Builtin.Int62
   return %u : $MultiPayloadOneSpareBit
 }
 
@@ -1344,9 +1344,9 @@ entry(%0 : $Builtin.Int62):
 // CHECK: }
 sil @multi_payload_one_spare_bit_inject_x_indirect : $(Builtin.Int62, [byref] MultiPayloadOneSpareBit) -> () {
 entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadOneSpareBit):
-  %a = union_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!unionelt.1
+  %a = enum_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1
   store %0 to %a : $*Builtin.Int62
-  inject_union_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!unionelt.1
+  inject_enum_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1
   %v = tuple ()
   return %v : $()
 }
@@ -1362,7 +1362,7 @@ entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadOneSpareBit):
 // CHECK: }
 sil @multi_payload_one_spare_bit_inject_y : $(Builtin.Int63) -> MultiPayloadOneSpareBit {
 entry(%0 : $Builtin.Int63):
-  %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!unionelt.1, %0 : $Builtin.Int63
+  %u = enum $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!enumelt.1, %0 : $Builtin.Int63
   return %u : $MultiPayloadOneSpareBit
 }
 
@@ -1384,9 +1384,9 @@ entry(%0 : $Builtin.Int63):
 
 sil @multi_payload_one_spare_bit_inject_y_indirect : $(Builtin.Int63, [byref] MultiPayloadOneSpareBit) -> () {
 entry(%0 : $Builtin.Int63, %1 : $*MultiPayloadOneSpareBit):
-  %a = union_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!unionelt.1
+  %a = enum_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!enumelt.1
   store %0 to %a : $*Builtin.Int63
-  inject_union_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!unionelt.1
+  inject_enum_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!enumelt.1
   %v = tuple ()
   return %v : $()
 }
@@ -1400,7 +1400,7 @@ entry(%0 : $Builtin.Int63, %1 : $*MultiPayloadOneSpareBit):
 // CHECK: }
 sil @multi_payload_one_spare_bit_inject_z : $(Builtin.Int61) -> MultiPayloadOneSpareBit {
 entry(%0 : $Builtin.Int61):
-  %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.z!unionelt.1, %0 : $Builtin.Int61
+  %u = enum $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.z!enumelt.1, %0 : $Builtin.Int61
   return %u : $MultiPayloadOneSpareBit
 }
 
@@ -1411,7 +1411,7 @@ entry(%0 : $Builtin.Int61):
 // CHECK: }
 sil @multi_payload_one_spare_bit_inject_a : $() -> MultiPayloadOneSpareBit {
 entry:
-  %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.a!unionelt
+  %u = enum $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.a!enumelt
   return %u : $MultiPayloadOneSpareBit
 }
 
@@ -1426,7 +1426,7 @@ entry:
 // CHECK: }
 sil @multi_payload_one_spare_bit_inject_a_indirect : $([byref] MultiPayloadOneSpareBit) -> () {
 entry(%0 : $*MultiPayloadOneSpareBit):
-  inject_union_addr %0 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.a!unionelt
+  inject_enum_addr %0 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.a!enumelt
   %v = tuple ()
   return %v : $()
 }
@@ -1438,7 +1438,7 @@ entry(%0 : $*MultiPayloadOneSpareBit):
 // CHECK: }
 sil @multi_payload_one_spare_bit_inject_b : $() -> MultiPayloadOneSpareBit {
 entry:
-  %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.b!unionelt
+  %u = enum $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.b!enumelt
   return %u : $MultiPayloadOneSpareBit
 }
 
@@ -1449,12 +1449,12 @@ entry:
 // CHECK: }
 sil @multi_payload_one_spare_bit_inject_c : $() -> MultiPayloadOneSpareBit {
 entry:
-  %u = union $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.c!unionelt
+  %u = enum $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.c!enumelt
   return %u : $MultiPayloadOneSpareBit
 }
 
 
-union MultiPayloadTwoSpareBits {
+enum MultiPayloadTwoSpareBits {
   case x(Builtin.Int62)
   case y(Builtin.Int60)
   case z(Builtin.Int61)
@@ -1485,7 +1485,7 @@ entry(%u : $MultiPayloadTwoSpareBits):
 // CHECK:   ]
 // CHECK: ; <label>:[[UNREACHABLE]]
 // CHECK:   unreachable
-  switch_union %u : $MultiPayloadTwoSpareBits, case #MultiPayloadTwoSpareBits.x!unionelt.1: x_dest, case #MultiPayloadTwoSpareBits.y!unionelt.1: y_dest, case #MultiPayloadTwoSpareBits.z!unionelt.1: z_dest, case #MultiPayloadTwoSpareBits.a!unionelt: a_dest, case #MultiPayloadTwoSpareBits.b!unionelt: b_dest, case #MultiPayloadTwoSpareBits.c!unionelt: c_dest
+  switch_enum %u : $MultiPayloadTwoSpareBits, case #MultiPayloadTwoSpareBits.x!enumelt.1: x_dest, case #MultiPayloadTwoSpareBits.y!enumelt.1: y_dest, case #MultiPayloadTwoSpareBits.z!enumelt.1: z_dest, case #MultiPayloadTwoSpareBits.a!enumelt: a_dest, case #MultiPayloadTwoSpareBits.b!enumelt: b_dest, case #MultiPayloadTwoSpareBits.c!enumelt: c_dest
 
 // CHECK: ; <label>:[[X_PREDEST]]
 // CHECK:   [[X_VALUE:%.*]] = trunc i64 %0 to i62
@@ -1554,7 +1554,7 @@ end:
 // CHECK: }
 sil @multi_payload_two_spare_bits_inject_x : $(Builtin.Int62) -> MultiPayloadTwoSpareBits {
 entry(%0 : $Builtin.Int62):
-  %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!unionelt.1, %0 : $Builtin.Int62
+  %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!enumelt.1, %0 : $Builtin.Int62
   return %u : $MultiPayloadTwoSpareBits
 }
 
@@ -1571,9 +1571,9 @@ entry(%0 : $Builtin.Int62):
 // CHECK: }
 sil @multi_payload_two_spare_bits_inject_x_indirect : $(Builtin.Int62, [byref] MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadTwoSpareBits):
-  %a = union_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!unionelt.1
+  %a = enum_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!enumelt.1
   store %0 to %a : $*Builtin.Int62
-  inject_union_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!unionelt.1
+  inject_enum_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!enumelt.1
   %v = tuple ()
   return %v : $()
 }
@@ -1587,7 +1587,7 @@ entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadTwoSpareBits):
 // CHECK: }
 sil @multi_payload_two_spare_bits_inject_y : $(Builtin.Int60) -> MultiPayloadTwoSpareBits {
 entry(%0 : $Builtin.Int60):
-  %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!unionelt.1, %0 : $Builtin.Int60
+  %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!enumelt.1, %0 : $Builtin.Int60
   return %u : $MultiPayloadTwoSpareBits
 }
 
@@ -1606,9 +1606,9 @@ entry(%0 : $Builtin.Int60):
 // CHECK: }
 sil @multi_payload_two_spare_bits_inject_y_indirect : $(Builtin.Int60, [byref] MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $Builtin.Int60, %1 : $*MultiPayloadTwoSpareBits):
-  %a = union_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!unionelt.1
+  %a = enum_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!enumelt.1
   store %0 to %a : $*Builtin.Int60
-  inject_union_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!unionelt.1
+  inject_enum_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!enumelt.1
   %v = tuple ()
   return %v : $()
 }
@@ -1622,7 +1622,7 @@ entry(%0 : $Builtin.Int60, %1 : $*MultiPayloadTwoSpareBits):
 // CHECK: }
 sil @multi_payload_two_spare_bits_inject_z : $(Builtin.Int61) -> MultiPayloadTwoSpareBits {
 entry(%0 : $Builtin.Int61):
-  %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.z!unionelt.1, %0 : $Builtin.Int61
+  %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.z!enumelt.1, %0 : $Builtin.Int61
   return %u : $MultiPayloadTwoSpareBits
 }
 
@@ -1633,7 +1633,7 @@ entry(%0 : $Builtin.Int61):
 // CHECK: }
 sil @multi_payload_two_spare_bits_inject_a : $() -> MultiPayloadTwoSpareBits {
 entry:
-  %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.a!unionelt
+  %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.a!enumelt
   return %u : $MultiPayloadTwoSpareBits
 }
 
@@ -1646,7 +1646,7 @@ entry:
 // CHECK: }
 sil @multi_payload_two_spare_bits_inject_a_indirect : $([byref] MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $*MultiPayloadTwoSpareBits):
-  inject_union_addr %0 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.a!unionelt
+  inject_enum_addr %0 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.a!enumelt
   %v = tuple ()
   return %v : $()
 }
@@ -1658,7 +1658,7 @@ entry(%0 : $*MultiPayloadTwoSpareBits):
 // CHECK: }
 sil @multi_payload_two_spare_bits_inject_b : $() -> MultiPayloadTwoSpareBits {
 entry:
-  %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.b!unionelt
+  %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.b!enumelt
   return %u : $MultiPayloadTwoSpareBits
 }
 
@@ -1669,13 +1669,13 @@ entry:
 // CHECK: }
 sil @multi_payload_two_spare_bits_inject_c : $() -> MultiPayloadTwoSpareBits {
 entry:
-  %u = union $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.c!unionelt
+  %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.c!enumelt
   return %u : $MultiPayloadTwoSpareBits
 }
 
-// -- test for a switch_union bug for multi-payload, no-empty-case unions
+// -- test for a switch_enum bug for multi-payload, no-empty-case unions
 //    uncovered by Chris
-union OnlyPayloads {
+enum OnlyPayloads {
   case x(Builtin.Int64)
   case y(Builtin.Int32)
   case z(Builtin.Int16)
@@ -1683,7 +1683,7 @@ union OnlyPayloads {
 
 sil @only_payloads_switch : $(OnlyPayloads) -> () {
 entry(%0 : $OnlyPayloads):
-  switch_union %0 : $OnlyPayloads, case #OnlyPayloads.x!unionelt.1: x_dest, case #OnlyPayloads.y!unionelt.1: y_dest, case #OnlyPayloads.z!unionelt.1: z_dest
+  switch_enum %0 : $OnlyPayloads, case #OnlyPayloads.x!enumelt.1: x_dest, case #OnlyPayloads.y!enumelt.1: y_dest, case #OnlyPayloads.z!enumelt.1: z_dest
 
 x_dest:
   br end
@@ -1719,14 +1719,14 @@ var x : AllConcreteTestUnions
 // CHECK: }
 sil @dynamic_singleton_switch_indirect : $<T> (DynamicSingleton<T>) -> () {
 entry(%0 : $*DynamicSingleton<T>):
-  destructive_switch_union_addr %0 : $*DynamicSingleton<T>, case #DynamicSingleton.val!unionelt.1: dest
+  destructive_switch_enum_addr %0 : $*DynamicSingleton<T>, case #DynamicSingleton.val!enumelt.1: dest
 
 dest(%1 : $*T):
   %v = tuple ()
   return %v : $()
 }
 
-// Verify that we can instantiate generic union instances of dynamic size.
+// Verify that we can instantiate generic enum instances of dynamic size.
 var a : DynamicSingleton<()>
 var b : DynamicSingleton<NoPayloads>
 
@@ -1799,4 +1799,4 @@ entry:
 // -- Fill function for dynamic single-payload. Call into the runtime to
 //    calculate the size.
 // CHECK: define internal void [[DYNAMIC_SINGLE_PAYLOAD_FILL]](i8*, i8*) {
-// CHECK:   call void @swift_initUnionValueWitnessTableSinglePayload
+// CHECK:   call void @swift_initEnumValueWitnessTableSinglePayload

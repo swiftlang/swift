@@ -185,7 +185,7 @@ class LinkEntity {
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
   static bool isFunction(ValueDecl *decl) {
-    return (isa<FuncDecl>(decl) || isa<UnionElementDecl>(decl) ||
+    return (isa<FuncDecl>(decl) || isa<EnumElementDecl>(decl) ||
             isa<ConstructorDecl>(decl));
   }
 

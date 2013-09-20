@@ -207,11 +207,11 @@ namespace {
       case DeclKind::Extension:
       case DeclKind::PatternBinding:
       case DeclKind::TopLevelCode:
-      case DeclKind::Union:
+      case DeclKind::Enum:
       case DeclKind::Struct:
       case DeclKind::Class:
       case DeclKind::Protocol:
-      case DeclKind::UnionElement:
+      case DeclKind::EnumElement:
       case DeclKind::Constructor:
       case DeclKind::Destructor:
       case DeclKind::InfixOperator:
@@ -818,22 +818,22 @@ namespace {
       asDerived().emitPayloadRelease(IGF, value);
     }
     
-    llvm::Value *packUnionPayload(IRGenFunction &IGF,
+    llvm::Value *packEnumPayload(IRGenFunction &IGF,
                                   Explosion &src,
                                   unsigned bitWidth,
                                   unsigned offset) const override {
-      PackUnionPayload pack(IGF, bitWidth);
+      PackEnumPayload pack(IGF, bitWidth);
       for (unsigned i = 0; i < NumProtocols; ++i)
         pack.addAtOffset(src.claimNext(), offset);
       pack.add(src.claimNext());
       return pack.get();
     }
     
-    void unpackUnionPayload(IRGenFunction &IGF,
+    void unpackEnumPayload(IRGenFunction &IGF,
                             llvm::Value *payload,
                             Explosion &dest,
                             unsigned offset) const override {
-      UnpackUnionPayload unpack(IGF, payload);
+      UnpackEnumPayload unpack(IGF, payload);
       for (unsigned i = 0; i < NumProtocols; ++i)
         dest.add(unpack.claimAtOffset(IGF.IGM.WitnessTablePtrTy,
                                       offset));
@@ -1277,7 +1277,7 @@ static FixedPacking computePacking(IRGenModule &IGM,
   // Flat out, if we need more space than the buffer provides,
   // we always have to allocate.
   // FIXME: there might be some interesting cases where this
-  // is suboptimal for unions.
+  // is suboptimal for enums.
   if (requiredSize > bufferSize)
     return FixedPacking::Allocate;
 
@@ -1818,8 +1818,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   }
 
   // TODO
-  case ValueWitness::GetUnionTag:
-  case ValueWitness::InplaceProjectUnionData: {
+  case ValueWitness::GetEnumTag:
+  case ValueWitness::InplaceProjectEnumData: {
     IGF.Builder.CreateUnreachable();
     return;
   }
@@ -2265,7 +2265,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
         flags |= ValueWitnessFlags::IsNonInline;
       
       if (fixedTI->getFixedExtraInhabitantCount() > 0)
-        flags |= ValueWitnessFlags::Union_HasExtraInhabitants;
+        flags |= ValueWitnessFlags::Enum_HasExtraInhabitants;
       
       auto value = IGM.getSize(Size(flags));
       return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
@@ -2308,8 +2308,8 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   }
   
   /// TODO:
-  case ValueWitness::GetUnionTag:
-  case ValueWitness::InplaceProjectUnionData:
+  case ValueWitness::GetEnumTag:
+  case ValueWitness::InplaceProjectEnumData:
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   }
   llvm_unreachable("bad value witness kind");

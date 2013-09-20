@@ -408,8 +408,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
     return;
   }
 
-  // FIXME: We should handle UnionTypes at some point, but
-  // it's tricky to represent in the AST without a "match" statement.
+  // FIXME: We should handle EnumTypes at some point.
 
   PrintLiteralString("<unprintable value>", TC, Loc, PrintDecls,
                      BodyContent);

@@ -202,7 +202,7 @@ static Node::Kind nominalTypeMarkerToNodeKind(char c) {
   if (c == 'V')
     return Node::Kind::Structure;
   if (c == 'O')
-    return Node::Kind::Union;
+    return Node::Kind::Enum;
   return Node::Kind::Identifier;
 }
 
@@ -361,8 +361,8 @@ private:
     Typeof,
     StoreExtraInhabitant,
     GetExtraInhabitantIndex,
-    GetUnionTag,
-    InplaceProjectUnionData,
+    GetEnumTag,
+    InplaceProjectEnumData,
     Unknown
   };
 
@@ -398,10 +398,10 @@ private:
       return "storeExtraInhabitant";
     case ValueWitnessKind::GetExtraInhabitantIndex:
       return "getExtraInhabitantIndex";
-    case ValueWitnessKind::GetUnionTag:
-      return "getUnionTag";
-    case ValueWitnessKind::InplaceProjectUnionData:
-      return "inplaceProjectUnionData";
+    case ValueWitnessKind::GetEnumTag:
+      return "getEnumTag";
+    case ValueWitnessKind::InplaceProjectEnumData:
+      return "inplaceProjectEnumData";
     default:
       return "unknown";
     }
@@ -445,9 +445,9 @@ private:
     if (c1 == 'x' && c2 == 'g')
       return ValueWitnessKind::GetExtraInhabitantIndex;
     if (c1 == 'u' && c2 == 'g')
-      return ValueWitnessKind::GetUnionTag;
+      return ValueWitnessKind::GetEnumTag;
     if (c1 == 'u' && c2 == 'p')
-      return ValueWitnessKind::InplaceProjectUnionData;
+      return ValueWitnessKind::InplaceProjectEnumData;
     return ValueWitnessKind::Unknown;
   }
 
@@ -898,7 +898,7 @@ private:
     switch (srcKind) {
       case swift::Demangle::Node::Kind::Class:
       case swift::Demangle::Node::Kind::Structure:
-      case swift::Demangle::Node::Kind::Union:
+      case swift::Demangle::Node::Kind::Enum:
       case swift::Demangle::Node::Kind::Module:
       case swift::Demangle::Node::Kind::Protocol:
         dest->push_back_child(Node::makeNodePointer(srcKind,src->getText()));
@@ -983,7 +983,7 @@ private:
       switch (childKind) {
         case Node::Kind::Class:
         case Node::Kind::Structure:
-        case Node::Kind::Union:
+        case Node::Kind::Enum:
         case Node::Kind::Protocol:
           return childKind;
         default:
@@ -1350,11 +1350,11 @@ private:
         case Node::Kind::Structure:
           bound_type_kind = Node::Kind::BoundGenericStructure;
           break;
-        case Node::Kind::Union:
-          bound_type_kind = Node::Kind::BoundGenericUnion;
+        case Node::Kind::Enum:
+          bound_type_kind = Node::Kind::BoundGenericEnum;
           break;
         default:
-          assert(false && "trying to make a generic type application for a non class|struct|union");
+          assert(false && "trying to make a generic type application for a non class|struct|enum");
       }
       NodePointer type_application =
           Node::makeNodePointer(bound_type_kind);
@@ -1635,7 +1635,7 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
     case swift::Demangle::Node::Kind::Module:
     case swift::Demangle::Node::Kind::Class:
     case swift::Demangle::Node::Kind::Structure:
-    case swift::Demangle::Node::Kind::Union:
+    case swift::Demangle::Node::Kind::Enum:
       printer << pointer->getText();
       break;
     case swift::Demangle::Node::Kind::Identifier:
@@ -1833,7 +1833,7 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       }
     case swift::Demangle::Node::Kind::BoundGenericClass:
     case swift::Demangle::Node::Kind::BoundGenericStructure:
-    case swift::Demangle::Node::Kind::BoundGenericUnion: {
+    case swift::Demangle::Node::Kind::BoundGenericEnum: {
       if (pointer->size() < 2)
         break;
       NodePointer typelist = pointer->child_at(1);

@@ -256,7 +256,7 @@
     keyword ::= 'init'
     keyword ::= 'func'
     keyword ::= 'metatype'
-    keyword ::= 'union'
+    keyword ::= 'enum'
     keyword ::= 'protocol'
     keyword ::= 'static'
     keyword ::= 'struct'
@@ -604,8 +604,8 @@
     decl ::= <a href="#decl-extension">decl-extension</a>
     decl ::= <a href="#decl-func">decl-func</a>
     decl ::= <a href="#decl-import">decl-import</a>
-    decl ::= <a href="#decl-union">decl-union</a>
-    decl ::= <a href="#decl-union-element">decl-union-element</a>
+    decl ::= <a href="#decl-enum">decl-enum</a>
+    decl ::= <a href="#decl-enum-element">decl-enum-element</a>
     decl ::= <a href="#decl-protocol">decl-protocol</a>
     decl ::= <a href="#decl-struct">decl-struct</a>
     decl ::= <a href="#decl-typealias">decl-typealias</a>
@@ -656,7 +656,7 @@
     import-kind ::= 'typealias'
     import-kind ::= 'struct'
     import-kind ::= 'class'
-    import-kind ::= 'union'
+    import-kind ::= 'enum'
     import-kind ::= 'protocol'
     import-kind ::= 'var'
     import-kind ::= 'func'
@@ -690,12 +690,12 @@
   
   <ul>
     <li><code>typealias</code> can be used to import any concrete type (struct,
-    class, union, or another typealias). It cannot be used to import protocols,
+    class, enum, or another typealias). It cannot be used to import protocols,
     which are often used for more than just their existential type.</li>
     
-    <li><code>struct</code>, <code>class</code>, <code>union</code> can be used
+    <li><code>struct</code>, <code>class</code>, <code>enum</code> can be used
     to import any type whose <i>canonical type</i> is a struct, class,
-    or union, respectively. (This allows "Int" to be imported as a struct, for
+    or enum, respectively. (This allows "Int" to be imported as a struct, for
     example, even though its definition in the standard library may be a
     typealias for another struct type.)</li>
     
@@ -734,7 +734,7 @@
   </p>
   
   <!-- _____________________________________________________________________ -->
-  <h4 id="decl-extension-union-struct"><a href="#decl-union">union</a>, <a
+  <h4 id="decl-extension-enum-struct"><a href="#decl-enum">enum</a>, <a
     href="#decl-struct">struct</a>, and <a href="#decl-class">class</a>
     declaration extensions</h4>
 
@@ -964,15 +964,15 @@ an lvalue unless it has a <code>var-get</code> clause but not
 
     <i>// A function with selector-style signature.</i>
 
-    union PersonOfInterest {
+    enum PersonOfInterest {
       case ColonelMustard
       case MissScarlet
     }
-    union Room {
+    enum Room {
       case Conservatory
       case Ballroom
     }
-    union Weapon {
+    enum Weapon {
       case Candlestick
       case LeadPipe
     }
@@ -1016,45 +1016,45 @@ an lvalue unless it has a <code>var-get</code> clause but not
   </pre>
   
   <!-- ===================================================================== -->
-  <h3 id="decl-union">union Declarations</h3>
+  <h3 id="decl-enum">enum Declarations</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-union ::= 'union' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? union-body
-    union-body ::= '{' decl* '}'
+    decl-enum ::= 'enum' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? enum-body
+    enum-body ::= '{' decl* '}'
     
-    decl-union-element ::= 'case' union-case (',' union-case)*
-    union-case ::= <a href="#identifier">identifier</a> <a href="#type-tuple">type-tuple</a>? ('->' <a href="#type">type</a>)?
+    decl-enum-element ::= 'case' enum-case (',' enum-case)*
+    enum-case ::= <a href="#identifier">identifier</a> <a href="#type-tuple">type-tuple</a>? ('->' <a href="#type">type</a>)?
   </pre>
   
-  <p>A union declaration creates a <a href="#type-union">union type</a>.
-  Here are some examples of union declarations:</p>
+  <p>an enum declaration creates a <a href="#type-enum">enum type</a>.
+  Here are some examples of enum declarations:</p>
   
   <pre class="example">
-    <i>// Declare discriminated union with union decl.</i>
-    union SomeInts {
-      case None
-      case One(Int)
-      case Two(Int, Int)
-    }
-    
-    <i>// Declares three "enums".</i>
-    union DataSearchFlags {
+    <i>// Declares three enums.</i>
+    enum DataSearchFlags {
       case None
       case Backward
       case Anchored
     }
     
+    <i>// Declare discriminated union with enum decl.</i>
+    enum SomeInts {
+      case None
+      case One(Int)
+      case Two(Int, Int)
+    }
+    
     func f1(searchpolicy : DataSearchFlags)  <i>// DataSearchFlags is a valid type name</i>
     func test1() {
       f1(DataSearchFlags.None)  <i>// Use of constructor with qualified identifier</i>
-      f1(.None)                  <i>// Use of constructor with context sensitive type inference</i> 
+      f1(.None)                 <i>// Use of constructor with context sensitive type inference</i>
     
       <i>// "None" has no type argument, so the constructor's type is "DataSearchFlags".</i> 
       var a : DataSearchFlags = .None
     }
     
-    union SomeMoreInts {
+    enum SomeMoreInts {
       case None           <i>// Doesn't conflict with previous "None".</i>
       case One(Int)
       case Two(Int, Int)
@@ -1063,7 +1063,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
     func f2(a : SomeMoreInts)
     
     func test2() {
-      <i>// Constructors for union element can be used in the obvious way.</i>
+      <i>// Constructors for enum element can be used in the obvious way.</i>
       f2(.None)
       f2(.One(4))
       f2(.Two(1, 2))
@@ -1356,15 +1356,15 @@ if vec[3] {
     constructor-signature ::= <a href="#identifier">identifier-or-any</a> <a href="#selector-tuple">selector-tuple</a>
   </pre>
 
-  <p>'constructor' declares a constructor for a class, struct, or union.  Such
+  <p>'constructor' declares a constructor for a class, struct, or enum.  Such
      a declaration is used whenever an object is constructed.  Specifically,
      for classes, it is used when a new expression is written, and for structs
-     and unions, it is used for function application when the "function"
+     and enums, it is used for function application when the "function"
      is a metatype.</p>
 
   <p>FIXME: We haven't decided the precise rules for when constructors are
      implicitly declared.  Default construction doesn't work right for structs
-     or unions.  We haven't decided what the restrictions are if a member
+     or enums.  We haven't decided what the restrictions are if a member
      isn't default-constructible.</p>
   
   <p>A simple example:</p>
@@ -1382,7 +1382,7 @@ if vec[3] {
   <p>If a class is derived from a superclass, it must explicitly invoke a
   superclass constructor using the <tt>super.init</tt> syntax.
   <tt>super.init</tt> may only be used in a subclass constructor;
-  it is not valid in a struct, union, or root class constructor. Additionally,
+  it is not valid in a struct, enum, or root class constructor. Additionally,
   <tt>super.init</tt> may only be referenced exactly once per derived
   constructor. An example:</p>
 
@@ -1709,7 +1709,7 @@ if vec[3] {
 
   <p>Tuples are the low-level form of data aggregation in Swift, and are used as
   the building block of <a href="#type-function">function</a> argument lists,
-  multiple return values, <a href="#decl-union">union</a> bodies, etc. Because
+  multiple return values, <a href="#decl-enum">enum</a> bodies, etc. Because
   tuples are widely accessible and available everywhere in the language,
   aggregate data access and transformation is uniform and powerful.</p>
 
@@ -1733,11 +1733,11 @@ if vec[3] {
   <i>// Function argument and result is a tuple type.</i>
   func foo(x : Int, y : Int) -&gt; (val : Int, err : Int)
 
-  <i>// union and struct declarations with tuple values.</i>
+  <i>// enum and struct declarations with tuple values.</i>
   struct S {
     var (a : Int, b : Int)
   }
-  union Vertex {
+  enum Vertex {
     case Point2(x : Int, y : Int)
     case Point3(x : Int, y : Int, z : Int)
     case Point4(w : Int, x : Int, y : Int, z : Int)
@@ -1798,45 +1798,46 @@ if vec[3] {
   </pre>
   
   <!-- ===================================================================== -->
-  <h3 id="type-union">Union Types</h3>
+  <h3 id="type-enum">Enum Types</h3>
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    'union' types are known as <a 
+    'enum' types are known as <a 
       href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
-      types</a> by the broader programming language community.  The name 'union'
-    is inspired by C's unions, though Swift's are much safer.
+      types</a> (ADTs) by the broader programming language community.
+    We name them 'enum' after C enums, because ADTs
+    fulfill many of the same roles as enums in the C tradition.
   </div>
   
-  <p>A union type is a simple discriminated union: the runtime representation
-  of a value of union type only has one of the specified elements at a time.</p>
+  <p>an enum type is a simple discriminated union: the runtime representation
+  of a value of enum type only has one of the specified elements at a time.</p>
 
-  <p>All of the element types of a union type must
+  <p>All of the element types of an enum type must
   be <a href="#materializable">materializable</a>.</p>
   
-  <p>A union type is defined by a <a href="#decl-union">union decl</a>.
+  <p>an enum type is defined by a <a href="#decl-enum">enum decl</a>.
 
-  <p>Values of union type may not be default initialized unless the user 
+  <p>Values of enum type may not be default initialized unless the user 
   provides a no-argument constructor.</p>
 
-  <p>The union metatype has a member corresponding to each declared element.
+  <p>The enum metatype has a member corresponding to each declared element.
   For elements with a declared type, this member is a function which can
-  construct a union containing that element.  For elements without a
-  declared type, the member is simply a union value for that element.  A
-  union value has no accessible members except those explicitly defined
+  construct an enum containing that element.  For elements without a
+  declared type, the member is simply an enum value for that element.  A
+  enum value has no accessible members except those explicitly defined
   by the user.</p>
 
-  <p>A reference to a member of the union metatype can be shortened using <a
+  <p>A reference to a member of the enum metatype can be shortened using <a
   href="#expr-delayed-identifier">delayed identifier resolution</a>
   with <a href="#typecheck_context">context sensitive type inference</a>.
   </p>
 
-  <p>The union's value can be tested and accessed by pattern-matching the union
-    against a <a href="#pattern-union-element">union element pattern</a>.
+  <p>The enum's value can be tested and accessed by pattern-matching the enum
+    against a <a href="#pattern-enum-element">enum element pattern</a>.
 
-  <p>TODO: Should attributes be allowed on union elements?
+  <p>TODO: Should attributes be allowed on enum elements?
   TODO: Eventually, with generics we'll have equality and inequality operators.
-    Union decls should be able to implicitly define these for their types.
+    Enum decls should be able to implicitly define these for their types.
   TODO: Need pattern matching and element extraction.
   </p>
 
@@ -1949,14 +1950,14 @@ if vec[3] {
     </pre>
 
     <p>An optional type is syntactic sugar for the library type 
-    Optional&lt;T&gt;. This is a <a href="#decl-union">union</a> with two 
+    Optional&lt;T&gt;. This is a <a href="#decl-enum">enum</a> with two 
     cases: None and Some, used to represent a value that may or may not be 
     present.</p>
 
     <p>FIXME: The current implementation of Optional is a hack and None and 
     Some are currently both globals rather than members.</p>
 
-    <p>Optional types are different from other unions in that any value 
+    <p>Optional types are different from other enums in that any value 
     <code>x</code> is implicitly convertible to Some(<code>x</code>). This is
     part of the language, not the library; therefore, the libary type Optional
     is required to have a constructor that accepts a single argument.</p>
@@ -2028,7 +2029,7 @@ protocol C : A, B { }
     inheritance ::= ':' <a href="#type-identifier">type-identifier</a> (',' <a href="#type-identifier">type-identifier</a>)*
   </pre>
 
-  <p>A named type (e.g., a class, struct, union, or protocol) can
+  <p>A named type (e.g., a class, struct, enum, or protocol) can
  "inherit" some set of protocols, which implies that any object of
 that type conforms to each of those protocols. When a protocol
 inherits other protocols, the set of requirements from all of those
@@ -2074,7 +2075,7 @@ ill-formed if the type does not conform to the protocol.</p>
     pattern-atom ::= <a href="#pattern-any">pattern-any</a>
     pattern-atom ::= <a href="#pattern-tuple">pattern-tuple</a>
     pattern-atom ::= <a href="#pattern-is">pattern-is</a>
-    pattern-atom ::= <a href="#pattern-union-element">pattern-union-element</a>
+    pattern-atom ::= <a href="#pattern-enum-element">pattern-enum-element</a>
     pattern-atom ::= <a href="#pattern-expr">expr</a>
 
     pattern      ::= pattern-atom
@@ -2285,20 +2286,20 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
 
   <!-- ********************************************************************* -->
-  <h3 id="pattern-union-element">Union Element Patterns</h3>
+  <h3 id="pattern-enum-element">Enum Element Patterns</h3>
   <!-- ********************************************************************* -->
 
   <pre class="grammar">
-    pattern-union-element ::= <a href="#type-identifier">type-identifier</a>? '.' identifier <a href="#pattern-tuple">pattern-tuple</a>?
+    pattern-enum-element ::= <a href="#type-identifier">type-identifier</a>? '.' identifier <a href="#pattern-tuple">pattern-tuple</a>?
   </pre>
 
-  <p>Union element patterns match a value of
-    <a href="#type-union">union type</a> if the value matches the referenced
-    <tt>case</tt> of the union. If the <tt>case</tt> has a type, the value
+  <p>Enum element patterns match a value of
+    <a href="#type-enum">enum type</a> if the value matches the referenced
+    <tt>case</tt> of the enum. If the <tt>case</tt> has a type, the value
     of that type can be matched against an optional subpattern.</pre>
 
   <pre class="example">
-    union HTMLTag {
+    enum HTMLTag {
       case A(href:String)
       case IMG(src:String, alt:String)
       case BR
@@ -2314,9 +2315,9 @@ ill-formed if the type does not conform to the protocol.</p>
     }
   </pre>
 
-  <p>Union element patterns are refutable and thus cannot appear in
+  <p>Enum element patterns are refutable and thus cannot appear in
     declarations.
-    (They are currently considered refutable even if the union contains only
+    (They are currently considered refutable even if the enum contains only
     a single <tt>case</tt>.)
 
   <!-- ********************************************************************* -->
@@ -2899,12 +2900,12 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
   
   <p>A delayed identifier expression refers to a constructor of a <a 
-    href="type-union">union</a> type, without knowing which type it is referring
+    href="type-enum">enum</a> type, without knowing which type it is referring
     to.  The expression is resolved to a constructor of a concrete type through
     context sensitive type inference.</p>
   
   <pre class="example">
-    union Direction { case Up, Down }
+    enum Direction { case Up, Down }
     func search(val : Int, direction : Direction)
     
     func f() {
@@ -3560,14 +3561,14 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <p>Value names (for <a 
   href="#decl-var">var</a> and <a href="#decl-func">func</a> declarations) and
   type names (for <a href="#decl-typealias">typealias</a>, <a
-  href="#decl-union">union</a>, and <a href="#decl-struct">struct</a>
+  href="#decl-enum">enum</a>, and <a href="#decl-struct">struct</a>
   declarations) follow the same <a href="#namebind_scope">scope</a> and
   <a href="#namebind_typevalue_lookup">name lookup</a> rules as described below.
   </p>
 
   <p>tuple element names</p>
   
-  <p>scope within union decls</p>
+  <p>scope within enum decls</p>
   
   <p>Context sensitive member references are resolved <a
     href="#typecheck_context">during type checking</a>.</p>
@@ -3710,8 +3711,8 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <h4 id="stdlib-Bool">Bool, true, false</h4>
   
   <pre class="stdlib">
-    <i>// Bool is a simple discriminated union.</i>
-    union Bool {
+    <i>// Bool is a simple enum.</i>
+    enum Bool {
       true, false
     }
     

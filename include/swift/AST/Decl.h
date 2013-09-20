@@ -52,7 +52,7 @@ namespace swift {
   class GenericTypeParamDecl;
   class Module;
   class NameAliasType;
-  class UnionElementDecl;
+  class EnumElementDecl;
   class Pattern;
   struct PrintOptions;
   class ProtocolDecl;
@@ -719,7 +719,7 @@ enum class ImportKind : uint8_t {
   Type,
   Struct,
   Class,
-  Union,
+  Enum,
   Protocol,
   Var,
   Func
@@ -1079,7 +1079,7 @@ public:
   bool isSettableOnBase(Type baseType) const;
   
   /// isInstanceMember - Determine whether this value is an instance member
-  /// of a union or protocol.
+  /// of an enum or protocol.
   bool isInstanceMember() const;
 
   /// needsCapture - Check whether referring to this decl from a nested
@@ -1561,17 +1561,17 @@ public:
   using DeclContext::operator new;
 };
 
-/// \brief This is the declaration of a union.
+/// \brief This is the declaration of an enum.
 ///
 /// For example:
 ///
 /// \code
-///    union Bool {
+///    enum Bool {
 ///      case false
 ///      case true
 ///    }
 ///
-///    union Optional<T> {
+///    enum Optional<T> {
 ///      case None
 ///      case Just(T)
 ///    }
@@ -1580,57 +1580,57 @@ public:
 /// The type of the decl itself is a MetaTypeType; use getDeclaredType()
 /// to get the declared type ("Bool" or "Optional" in the above example).
 ///
-/// Enum declarations are syntactic sugar for unions consisting only of
+/// Enum declarations are syntactic sugar for enums consisting only of
 /// simple cases with no associated data or member methods or properties.
 /// For example, the Bool declaration above could be written equivalently as:
 ///
 /// \code
 ///   enum Bool { false, true }
 /// \endcode
-class UnionDecl : public NominalTypeDecl {
-  SourceLoc UnionLoc;
+class EnumDecl : public NominalTypeDecl {
+  SourceLoc EnumLoc;
   bool Enum;
 
 public:
-  UnionDecl(SourceLoc UnionLoc, bool Enum, Identifier Name, SourceLoc NameLoc,
+  EnumDecl(SourceLoc EnumLoc, bool Enum, Identifier Name, SourceLoc NameLoc,
             MutableArrayRef<TypeLoc> Inherited,
             GenericParamList *GenericParams, DeclContext *DC);
 
-  SourceLoc getStartLoc() const { return UnionLoc; }
+  SourceLoc getStartLoc() const { return EnumLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(UnionLoc, getBraces().End);
+    return SourceRange(EnumLoc, getBraces().End);
   }
   
   /// True if this declaration uses 'enum' syntax.
   bool isEnum() const { return Enum; }
 
-  UnionElementDecl *getElement(Identifier Name) const;
+  EnumElementDecl *getElement(Identifier Name) const;
   
 private:
   /// Predicate used to filter ElementRange.
-  static bool isElement(UnionElementDecl *ued) { return true; }
+  static bool isElement(EnumElementDecl *ued) { return true; }
   
 public:
-  /// A range for iterating the elements of a union.
-  using ElementRange = DeclFilterRange<UnionElementDecl, isElement>;
+  /// A range for iterating the elements of an enum.
+  using ElementRange = DeclFilterRange<EnumElementDecl, isElement>;
 
-  /// Return a range that iterates over all the elements of a union.
+  /// Return a range that iterates over all the elements of an enum.
   ElementRange getAllElements() const {
     return ElementRange(getMembers());
   }
   
   /// Insert all of the 'case' element declarations into a DenseSet.
-  void getAllElements(llvm::DenseSet<UnionElementDecl*> &elements) const {
+  void getAllElements(llvm::DenseSet<EnumElementDecl*> &elements) const {
     for (auto elt : getAllElements())
       elements.insert(elt);
   }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::Union;
+    return D->getKind() == DeclKind::Enum;
   }
   static bool classof(const NominalTypeDecl *D) {
-    return D->getKind() == DeclKind::Union;
+    return D->getKind() == DeclKind::Enum;
   }
   static bool classof(const DeclContext *C) {
     return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
@@ -1925,11 +1925,11 @@ protected:
   // If a function has a body at all, we have either a parsed body AST node or
   // we have saved the end location of the unparsed body.
   union {
-    /// This union member is active if getBodyKind() == BodyKind::Parsed.
+    /// This enum member is active if getBodyKind() == BodyKind::Parsed.
     BraceStmt *Body;
 
     /// End location of the function body when the body is delayed or skipped.
-    /// This union member is active if getBodyKind() is BodyKind::Unparsed or
+    /// This enum member is active if getBodyKind() is BodyKind::Unparsed or
     /// BodyKind::Skipped.
     SourceLoc BodyEndLoc;
   };
@@ -2311,30 +2311,24 @@ public:
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
 };
 
-/// \brief This represents a case of a 'union' or 'enum' declaration.
+/// \brief This represents a case of an 'enum' declaration.
 ///
-/// For example, the X, Y, and Z in this union:
+/// For example, the X, Y, and Z in this enum:
 ///
 /// \code
-///   union V {
+///   enum V {
 ///     case X(Int)
 ///     case Y(Int)
 ///     case Z
 ///   }
 /// \endcode
 ///
-/// Also, the X, Y, and Z in this enum:
-///
-/// \code
-///   enum E { X, Y, Z }
-/// \endcode
-///
-/// The type of a UnionElementDecl is always the UnionType for the containing
-/// union.
-class UnionElementDecl : public ValueDecl {
+/// The type of an EnumElementDecl is always the EnumType for the containing
+/// enum.
+class EnumElementDecl : public ValueDecl {
   SourceLoc CaseLoc;
 
-  /// This is the type specified with the union element, for
+  /// This is the type specified with the enum element, for
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
   /// definitions.
@@ -2342,17 +2336,17 @@ class UnionElementDecl : public ValueDecl {
   
   SourceLoc ResultArrowLoc;
   /// The optional refined type of the case. Must be an instance of the generic
-  /// type of the containing union.
+  /// type of the containing enum.
   TypeLoc ResultType;
     
 public:
-  UnionElementDecl(SourceLoc CaseLoc,
+  EnumElementDecl(SourceLoc CaseLoc,
                    SourceLoc IdentifierLoc, Identifier Name,
                    TypeLoc ArgumentType,
                    SourceLoc ArrowLoc,
                    TypeLoc ResultType,
                    DeclContext *DC)
-  : ValueDecl(DeclKind::UnionElement, DC, Name, IdentifierLoc),
+  : ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
     CaseLoc(CaseLoc), ArgumentType(ArgumentType),
     ResultArrowLoc(ArrowLoc),
     ResultType(ResultType)
@@ -2369,9 +2363,9 @@ public:
   /// True if this element is part of an 'enum' declaration.
   bool isEnumElement() const { return CaseLoc.isInvalid(); }
   
-  /// Return the containing UnionDecl.
-  UnionDecl *getParentUnion() const {
-    return cast<UnionDecl>(getDeclContext());
+  /// Return the containing EnumDecl.
+  EnumDecl *getParentEnum() const {
+    return cast<EnumDecl>(getDeclContext());
   }
   
   /// Location of the 'case' keyword for the element, or invalid if the element
@@ -2385,7 +2379,7 @@ public:
   SourceRange getSourceRange() const;
 
   static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::UnionElement;
+    return D->getKind() == DeclKind::EnumElement;
   }
 };
 

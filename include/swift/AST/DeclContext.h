@@ -109,7 +109,7 @@ public:
     return getContextKind() == DeclContextKind::Module;
   }
 
-  /// isTypeContext - Return true if this is a type context, e.g., a union,
+  /// isTypeContext - Return true if this is a type context, e.g., an enum,
   /// an extension, or a protocol.
   bool isTypeContext() const {
     return getContextKind() == DeclContextKind::NominalTypeDecl ||

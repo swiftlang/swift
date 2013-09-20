@@ -813,9 +813,9 @@ public:
     explicitDestructor = dd;
   }
   
-  void visitUnionElementDecl(UnionElementDecl *ued) {
-    assert(isa<UnionDecl>(theType));
-    SGM.emitUnionConstructor(ued);
+  void visitEnumElementDecl(EnumElementDecl *ued) {
+    assert(isa<EnumDecl>(theType));
+    SGM.emitEnumConstructor(ued);
   }
   
   // no-op. We don't deal with the layout of types here.
@@ -855,8 +855,8 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
       
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
-  case DeclKind::UnionElement:
-  case DeclKind::Union:
+  case DeclKind::EnumElement:
+  case DeclKind::Enum:
   case DeclKind::Class:
   case DeclKind::TopLevelCode:
   case DeclKind::TypeAlias:

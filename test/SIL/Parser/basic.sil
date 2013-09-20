@@ -345,7 +345,7 @@ bb0(%0 : $Aleph.metatype):
   %18 = return %14 : $Aleph
 }
 
-union Beth {
+enum Beth {
   case EmptyCase
   case DataCase(Int)
 }
@@ -353,40 +353,40 @@ union Beth {
 // CHECK: sil @test_union_empty_case : $() -> Beth {
 sil @test_union_empty_case : $() -> Beth {
 bb0:
-  // CHECK: %0 = union $Beth, #Beth.EmptyCase!unionelt
-  %0 = union $Beth, #Beth.EmptyCase!unionelt
+  // CHECK: %0 = enum $Beth, #Beth.EmptyCase!enumelt
+  %0 = enum $Beth, #Beth.EmptyCase!enumelt
   return %0 : $Beth
 }
 
 // CHECK: sil @test_union_data_case : $Int64 -> Beth {
 sil @test_union_data_case : $Int64 -> Beth {
 bb0(%0 : $Int):
-  // CHECK: %1 = union $Beth, #Beth.DataCase!unionelt.1, %0 : $Int64
-  %1 = union $Beth, #Beth.DataCase!unionelt.1, %0 : $Int64
+  // CHECK: %1 = enum $Beth, #Beth.DataCase!enumelt.1, %0 : $Int64
+  %1 = enum $Beth, #Beth.DataCase!enumelt.1, %0 : $Int64
   return %1 : $Beth
 }
 
 protocol Q {}
 
-union Gimel {
+enum Gimel {
   case EmptyCase
   case DataCase(Q)
 }
 
 sil @test_union_addr_empty_case : $() -> Gimel {
 bb0(%0 : $*Gimel):
-  // CHECK: inject_union_addr {{%.*}} : $*Gimel, #Gimel.EmptyCase!unionelt
-  inject_union_addr %0 : $*Gimel, #Gimel.EmptyCase!unionelt
+  // CHECK: inject_enum_addr {{%.*}} : $*Gimel, #Gimel.EmptyCase!enumelt
+  inject_enum_addr %0 : $*Gimel, #Gimel.EmptyCase!enumelt
   %t = tuple ()
   return %t : $()
 }
 
 sil @test_union_addr_data_case : $(Q) -> Gimel {
 bb0(%0 : $*Gimel, %1 : $*Q):
-  // CHECK: {{%.*}} = union_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!unionelt.1
-  %p = union_data_addr %0 : $*Gimel, #Gimel.DataCase!unionelt.1
+  // CHECK: {{%.*}} = enum_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!enumelt.1
+  %p = enum_data_addr %0 : $*Gimel, #Gimel.DataCase!enumelt.1
   copy_addr [take] %1 to [initialization] %p : $*Q
-  inject_union_addr %0 : $*Gimel, #Gimel.DataCase!unionelt.1
+  inject_enum_addr %0 : $*Gimel, #Gimel.DataCase!enumelt.1
   %t = tuple ()
   return %t : $()
 }
@@ -808,7 +808,7 @@ bb0(%t : $ClassP):
   return %1 : $()
 }
 
-union MaybePair {
+enum MaybePair {
   case Neither
   case Left(Int)
 }
@@ -824,8 +824,8 @@ bb0(%0 : $MaybePair):
   store %0 to %1#1 : $*MaybePair
   %3 = load %1#1 : $*MaybePair
   %4 = tuple ()
-  // CHECK: switch_union %{{.*}} : $MaybePair, case #MaybePair.Neither!unionelt: bb{{.*}}, case #MaybePair.Left!unionelt.1: bb
-  switch_union %3 : $MaybePair, case #MaybePair.Neither!unionelt: bb1, case #MaybePair.Left!unionelt.1: bb3
+  // CHECK: switch_enum %{{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: bb{{.*}}, case #MaybePair.Left!enumelt.1: bb
+  switch_enum %3 : $MaybePair, case #MaybePair.Neither!enumelt: bb1, case #MaybePair.Left!enumelt.1: bb3
 
 bb1:
   br bb2
@@ -851,7 +851,7 @@ bb5:
   return %18 : $()                                        // CHECK: return
 }
 
-union MaybeAddressOnlyPair {
+enum MaybeAddressOnlyPair {
   case Neither
   case Left(Q)
 }
@@ -859,8 +859,8 @@ union MaybeAddressOnlyPair {
 // CHECK-LABEL: sil @test_switch_union_addr : $[thin] (u : MaybeAddressOnlyPair) -> ()
 sil @test_switch_union_addr : $[thin] (u : MaybeAddressOnlyPair) -> () {
 bb0(%0 : $*MaybeAddressOnlyPair):
-  // CHECK: destructive_switch_union_addr %{{.*}} : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!unionelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!unionelt.1: bb
-  destructive_switch_union_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!unionelt: bb1, case #MaybeAddressOnlyPair.Left!unionelt.1: bb2
+  // CHECK: destructive_switch_enum_addr %{{.*}} : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt.1: bb
+  destructive_switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt.1: bb2
 
 bb1:
   br bb3

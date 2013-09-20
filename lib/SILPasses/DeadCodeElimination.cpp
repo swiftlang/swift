@@ -102,16 +102,16 @@ static bool constantFoldTerminator(SILBasicBlock &BB) {
     }
   }
 
-  // Constant fold switch union.
-  if (SwitchUnionInst *SUI = dyn_cast<SwitchUnionInst>(TI)) {
-    if (UnionInst *TheUnion = dyn_cast<UnionInst>(SUI->getOperand().getDef())) {
-      const UnionElementDecl *TheUnionElem = TheUnion->getElement();
+  // Constant fold switch enum.
+  if (SwitchEnumInst *SUI = dyn_cast<SwitchEnumInst>(TI)) {
+    if (EnumInst *TheEnum = dyn_cast<EnumInst>(SUI->getOperand().getDef())) {
+      const EnumElementDecl *TheEnumElem = TheEnum->getElement();
       SILBasicBlock *TheSuccessorBlock = 0;
       for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
-        const UnionElementDecl *EI;
+        const EnumElementDecl *EI;
         SILBasicBlock *BI;
         llvm::tie(EI, BI) = SUI->getCase(Idx);
-        if (EI == TheUnionElem)
+        if (EI == TheEnumElem)
           TheSuccessorBlock = BI;
       }
 

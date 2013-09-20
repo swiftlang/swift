@@ -34,7 +34,7 @@ namespace swift {
   class MetaTypeType;
   class ModuleType;
   class NominalTypeDecl;
-  class UnionDecl;
+  class EnumDecl;
   class ProtocolCompositionType;
   class ProtocolDecl;
   class ProtocolType;
@@ -42,7 +42,7 @@ namespace swift {
   class TupleType;
   class TypeBase;
   class Type;
-  class UnionDecl;
+  class EnumDecl;
   class UnownedStorageType;
   class WeakStorageType;
 
@@ -52,7 +52,7 @@ namespace irgen {
   class ProtocolInfo;
   class Size;
   class TypeInfo;
-  class UnionImplStrategy; // defined in GenUnion.cpp
+  class EnumImplStrategy; // defined in GenEnum.cpp
   class UnownedTypeInfo;
   class WeakTypeInfo;
 
@@ -79,7 +79,7 @@ private:
   TypeCacheEntry convertAnyNominalType(CanType T, NominalTypeDecl *D);
   const TypeInfo *convertTupleType(TupleType *T);
   const TypeInfo *convertClassType(ClassDecl *D);
-  const TypeInfo *convertUnionType(CanType type, UnionDecl *D);
+  const TypeInfo *convertEnumType(CanType type, EnumDecl *D);
   const TypeInfo *convertStructType(CanType type, StructDecl *D);
   const TypeInfo *convertFunctionType(AnyFunctionType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);

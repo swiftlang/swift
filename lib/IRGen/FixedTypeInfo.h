@@ -35,7 +35,7 @@ namespace irgen {
 class FixedTypeInfo : public TypeInfo {
 private:
   /// The storage size of this type in bytes.  This may be zero even
-  /// for well-formed and complete types, such as a trivial union or
+  /// for well-formed and complete types, such as a trivial enum or
   /// tuple.
   Size StorageSize;
   
@@ -178,15 +178,15 @@ public:
   /// filled with bits direct from the spare bits mask. If the bitvector is
   /// larger than this type, the trailing bits are untouched.
   ///
-  /// The intent is that, for all the data types of a union, you should be able
+  /// The intent is that, for all the data types of an enum, you should be able
   /// to do this:
   ///
   ///   llvm::BitVector spareBits;
-  ///   for (UnionElementDecl *elt : u->getAllElements())
+  ///   for (EnumElementDecl *elt : u->getAllElements())
   ///     getFragileTypeInfo(elt->getArgumentType())
   ///       .applyFixedSpareBitsMask(spareBits, 0);
   ///
-  /// and end up with a spare bits mask for the entire union.
+  /// and end up with a spare bits mask for the entire enum.
   void applyFixedSpareBitsMask(llvm::BitVector &bits) const;
   
   /// Fixed-size types never need dynamic value witness table instantiation.

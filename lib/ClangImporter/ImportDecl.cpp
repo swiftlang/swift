@@ -406,9 +406,9 @@ namespace {
       if (!dc)
         return nullptr;
 
-      // Create the union declaration and record it.
+      // Create the enum declaration and record it.
       Decl *result;
-      UnionDecl *unionDecl = nullptr;
+      EnumDecl *enumDecl = nullptr;
       switch (Impl.classifyEnum(decl)) {
       case EnumKind::Constants: {
         // There is no declaration. Rather, the type is mapped to the
@@ -462,14 +462,14 @@ namespace {
         break;
       }
 
-      case EnumKind::Union:
-        unionDecl = new (Impl.SwiftContext)
-          UnionDecl(Impl.importSourceLoc(decl->getLocStart()),
+      case EnumKind::Enum:
+        enumDecl = new (Impl.SwiftContext)
+          EnumDecl(Impl.importSourceLoc(decl->getLocStart()),
                     /*isEnum*/ true,
                     name,
                     Impl.importSourceLoc(decl->getLocation()),
                     { }, nullptr, dc);
-        result = unionDecl;
+        result = enumDecl;
         break;
       }
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
@@ -490,8 +490,8 @@ namespace {
       // location of the '{'.
       // FIXME: Eventually, we'd like to be able to do this for structs as well,
       // but we need static variables first.
-      if (unionDecl) {
-        unionDecl->setMembers(Impl.SwiftContext.AllocateCopy(members),
+      if (enumDecl) {
+        enumDecl->setMembers(Impl.SwiftContext.AllocateCopy(members),
                                 Impl.importSourceRange(clang::SourceRange(
                                                        decl->getLocation(),
                                                        decl->getRBraceLoc())));
@@ -685,9 +685,9 @@ namespace {
         return result;
       }
 
-      case EnumKind::Union: {
-        // The enumeration was mapped to a Swift union. Create an element of
-        // that union.
+      case EnumKind::Enum: {
+        // The enumeration was mapped to a Swift enum. Create an element of
+        // that enum.
         auto dc = Impl.importDeclContextOf(decl);
         if (!dc)
           return nullptr;
@@ -700,16 +700,16 @@ namespace {
           return known->second;
 
         auto element
-          = new (context) UnionElementDecl(SourceLoc(), SourceLoc(),
+          = new (context) EnumElementDecl(SourceLoc(), SourceLoc(),
                                            name, TypeLoc(),
                                            SourceLoc(), TypeLoc(),
                                            dc);
 
-        // Give the union element the appropriate type.
-        auto theUnion = cast<UnionDecl>(dc);
-        auto argTy = MetaTypeType::get(theUnion->getDeclaredType(), context);
+        // Give the enum element the appropriate type.
+        auto theEnum = cast<EnumDecl>(dc);
+        auto argTy = MetaTypeType::get(theEnum->getDeclaredType(), context);
         element->overwriteType(FunctionType::get(argTy,
-                                                 theUnion->getDeclaredType(),
+                                                 theEnum->getDeclaredType(),
                                                  context));
         Impl.ImportedDecls[decl->getCanonicalDecl()] = element;
         return element;
@@ -2278,7 +2278,7 @@ EnumKind ClangImporter::Implementation::classifyEnum(const clang::EnumDecl *decl
   if (name.empty())
     return EnumKind::Constants;
 
-  // FIXME: For now, Options is the only usable answer, because unions
+  // FIXME: For now, Options is the only usable answer, because enums
   // are broken in IRgen.
   return EnumKind::Options;
 }

@@ -824,7 +824,7 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DTI) {
   return BumpAllocatedString(Buffer, DebugInfoNames);
 }
 
-/// Create a member of a struct, class, tuple, or union.
+/// Create a member of a struct, class, tuple, or enum.
 llvm::DIDerivedType IRGenDebugInfo::createMemberType(DebugTypeInfo DTI,
                                                      unsigned &OffsetInBits,
                                                      llvm::DIDescriptor Scope,
@@ -903,10 +903,10 @@ IRGenDebugInfo::createStructType(DebugTypeInfo DbgTy,
 }
 
 
-/// Return an array with the DITypes for each of a union's elements.
+/// Return an array with the DITypes for each of an enum's elements.
 llvm::DIArray IRGenDebugInfo::
-getUnionElements(DebugTypeInfo DbgTy,
-                 UnionDecl *D, llvm::DIDescriptor Scope, llvm::DIFile File,
+getEnumElements(DebugTypeInfo DbgTy,
+                 EnumDecl *D, llvm::DIDescriptor Scope, llvm::DIFile File,
                  unsigned Flags) {
   SmallVector<llvm::Value *, 16> Elements;
   for (auto Decl : D->getAllElements()) {
@@ -919,11 +919,11 @@ getUnionElements(DebugTypeInfo DbgTy,
   return DBuilder.getOrCreateArray(Elements);
 }
 
-/// Create a temporary forward declaration for a union and add it to
+/// Create a temporary forward declaration for an enum and add it to
 /// the type cache so we can safely build recursive types.
 llvm::DICompositeType
-IRGenDebugInfo::createUnionType(DebugTypeInfo DbgTy,
-                                UnionDecl *Decl,
+IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy,
+                                EnumDecl *Decl,
                                 StringRef Name,
                                 llvm::DIDescriptor Scope,
                                 llvm::DIFile File, unsigned Line,
@@ -931,6 +931,7 @@ IRGenDebugInfo::createUnionType(DebugTypeInfo DbgTy,
   unsigned SizeOfByte = TargetInfo.getCharWidth();
   unsigned SizeInBits = (unsigned)DbgTy.size * SizeOfByte;
   unsigned AlignInBits = (unsigned)DbgTy.align * SizeOfByte;
+  // FIXME: Is DW_TAG_union_type the right thing here?
   auto FwdDecl = DBuilder.createForwardDecl
     (llvm::dwarf::DW_TAG_union_type,
      Name, Scope, File, Line, dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
@@ -939,7 +940,7 @@ IRGenDebugInfo::createUnionType(DebugTypeInfo DbgTy,
 
   auto DTy = DBuilder.createUnionType(Scope, Name, File, Line,
                                       SizeInBits, AlignInBits, Flags,
-                                      getUnionElements(DbgTy, Decl, Scope, File,
+                                      getEnumElements(DbgTy, Decl, Scope, File,
                                                        Flags),
                                       dwarf::DW_LANG_Swift);
   FwdDecl->replaceAllUsesWith(DTy);
@@ -1227,21 +1228,21 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return DBuilder.createPointerType(FnTy, SizeInBits, AlignInBits);
   }
 
-  case TypeKind::Union:
+  case TypeKind::Enum:
   {
     Name = getMangledName(DbgTy);
-    auto UnionTy = BaseTy->castTo<UnionType>();
-    if (auto Decl = UnionTy->getDecl()) {
+    auto EnumTy = BaseTy->castTo<EnumType>();
+    if (auto Decl = EnumTy->getDecl()) {
       Location L = getLoc(SM, Decl);
-      return createUnionType(DbgTy, Decl, Name, Scope,
+      return createEnumType(DbgTy, Decl, Name, Scope,
                              getOrCreateFile(L.Filename), L.Line, Flags);
     }
-    DEBUG(llvm::dbgs() << "Union type without Decl: ";
+    DEBUG(llvm::dbgs() << "Enum type without Decl: ";
           DbgTy.getType()->dump(); llvm::dbgs() << "\n");
     break;
   }
 
-  case TypeKind::BoundGenericUnion:
+  case TypeKind::BoundGenericEnum:
   {
     if (DbgTy.getDecl() &&
         (DbgTy.getDecl()->getDeclContext()->getContextKind() ==
@@ -1250,13 +1251,13 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       Name = "FIXME: AbstractClosureExpr with empty DeclContext";
     else
       Name = getMangledName(DbgTy);
-    auto UnionTy = BaseTy->castTo<BoundGenericUnionType>();
-    if (auto Decl = UnionTy->getDecl()) {
+    auto EnumTy = BaseTy->castTo<BoundGenericEnumType>();
+    if (auto Decl = EnumTy->getDecl()) {
       Location L = getLoc(SM, Decl);
-      return createUnionType(DbgTy, Decl, Name, Scope,
+      return createEnumType(DbgTy, Decl, Name, Scope,
                              getOrCreateFile(L.Filename), L.Line, Flags);
     }
-    DEBUG(llvm::dbgs() << "Bound generic union type without Decl: ";
+    DEBUG(llvm::dbgs() << "Bound generic enum type without Decl: ";
           DbgTy.getType()->dump(); llvm::dbgs() << "\n");
     break;
   }

@@ -521,7 +521,7 @@ public:
         if (doIt(M))
           return true;
       }
-    } else if (UnionDecl *UD = dyn_cast<UnionDecl>(D)) {
+    } else if (EnumDecl *UD = dyn_cast<EnumDecl>(D)) {
       for (Decl *Member : UD->getMembers())
         if (doIt(Member))
           return true;
@@ -847,7 +847,7 @@ Pattern *Traversal::visitNominalTypePattern(NominalTypePattern *P) {
   return P;
 }
 
-Pattern *Traversal::visitUnionElementPattern(UnionElementPattern *P) {
+Pattern *Traversal::visitEnumElementPattern(EnumElementPattern *P) {
   if (P->hasSubPattern()) {
     if (Pattern *newSub = doIt(P->getSubPattern()))
       P->setSubPattern(newSub);

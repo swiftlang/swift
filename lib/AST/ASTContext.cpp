@@ -117,7 +117,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, Type>, SubstitutedType *> SubstitutedTypes;
     llvm::DenseMap<std::pair<Type, Identifier>, DependentMemberType *>
       DependentMemberTypes;
-    llvm::FoldingSet<UnionType> UnionTypes;
+    llvm::FoldingSet<EnumType> EnumTypes;
     llvm::FoldingSet<StructType> StructTypes;
     llvm::FoldingSet<ClassType> ClassTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
@@ -930,8 +930,8 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
                                                     IsCanonical ? &C : 0,
                                                     HasTypeVariable);
   } else {
-    auto theUnion = cast<UnionDecl>(TheDecl);
-    newType = new (C, arena) BoundGenericUnionType(theUnion, Parent, ArgsCopy,
+    auto theEnum = cast<EnumDecl>(TheDecl);
+    newType = new (C, arena) BoundGenericEnumType(theEnum, Parent, ArgsCopy,
                                                    IsCanonical ? &C : 0,
                                                    HasTypeVariable);
   }
@@ -942,8 +942,8 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
 
 NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext &C) {
   switch (D->getKind()) {
-  case DeclKind::Union:
-    return UnionType::get(cast<UnionDecl>(D), Parent, C);
+  case DeclKind::Enum:
+    return EnumType::get(cast<EnumDecl>(D), Parent, C);
   case DeclKind::Struct:
     return StructType::get(cast<StructDecl>(D), Parent, C);
   case DeclKind::Class:
@@ -962,28 +962,28 @@ NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext 
   }
 }
 
-UnionType::UnionType(UnionDecl *TheDecl, Type Parent, const ASTContext &C,
+EnumType::EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &C,
                      bool HasTypeVariable)
-  : NominalType(TypeKind::Union, &C, TheDecl, Parent, HasTypeVariable) { }
+  : NominalType(TypeKind::Enum, &C, TheDecl, Parent, HasTypeVariable) { }
 
-UnionType *UnionType::get(UnionDecl *D, Type Parent, const ASTContext &C) {
+EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
   llvm::FoldingSetNodeID id;
-  UnionType::Profile(id, D, Parent);
+  EnumType::Profile(id, D, Parent);
 
   bool hasTypeVariable = Parent && Parent->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
   void *insertPos = 0;
-  if (auto unionTy
-        = C.Impl.getArena(arena).UnionTypes.FindNodeOrInsertPos(id, insertPos))
-    return unionTy;
+  if (auto enumTy
+        = C.Impl.getArena(arena).EnumTypes.FindNodeOrInsertPos(id, insertPos))
+    return enumTy;
 
-  auto unionTy = new (C, arena) UnionType(D, Parent, C, hasTypeVariable);
-  C.Impl.getArena(arena).UnionTypes.InsertNode(unionTy, insertPos);
-  return unionTy;
+  auto enumTy = new (C, arena) EnumType(D, Parent, C, hasTypeVariable);
+  C.Impl.getArena(arena).EnumTypes.InsertNode(enumTy, insertPos);
+  return enumTy;
 }
 
-void UnionType::Profile(llvm::FoldingSetNodeID &ID, UnionDecl *D, Type Parent) {
+void EnumType::Profile(llvm::FoldingSetNodeID &ID, EnumDecl *D, Type Parent) {
   ID.AddPointer(D);
   ID.AddPointer(Parent.getPointer());
 }

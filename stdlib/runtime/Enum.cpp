@@ -1,4 +1,4 @@
-//===--- Union.cpp - Runtime declarations for unions -----------*- C++ -*--===//
+//===--- Enum.cpp - Runtime declarations for enums -----------*- C++ -*--===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,20 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Swift runtime functions in support of unions.
+// Swift runtime functions in support of enums.
 //
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/MathExtras.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Union.h"
+#include "swift/Runtime/Enum.h"
 #include <cstring>
 #include <algorithm>
 
 using namespace swift;
 
-// FIXME: We should cache this in the union's metadata.
+// FIXME: We should cache this in the enum's metadata.
 static unsigned getNumTagBytes(size_t size, unsigned cases) {
   // We can use the payload area with a tag bit set somewhere outside of the
   // payload area to represent cases. See how many bytes we need to cover
@@ -44,7 +44,7 @@ static unsigned getNumTagBytes(size_t size, unsigned cases) {
 }
 
 void
-swift::swift_initUnionValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
+swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
                                                      const Metadata *payload,
                                                      unsigned emptyCases) {
   auto *payloadWitnesses = payload->getValueWitnesses();
@@ -55,7 +55,7 @@ swift::swift_initUnionValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   unsigned unusedExtraInhabitants = 0;
   
   // If there are enough extra inhabitants for all of the cases, then the size
-  // of the union is the same as its payload.
+  // of the enum is the same as its payload.
   size_t size;
   if (payloadNumExtraInhabitants >= emptyCases) {
     size = payloadSize;
@@ -81,7 +81,7 @@ swift::swift_initUnionValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
 }
 
 int
-swift::swift_getUnionCaseSinglePayload(const OpaqueValue *value,
+swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                        const Metadata *payload,
                                        unsigned emptyCases) {
   auto *payloadWitnesses = payload->getValueWitnesses();
@@ -127,7 +127,7 @@ swift::swift_getUnionCaseSinglePayload(const OpaqueValue *value,
 }
 
 void
-swift::swift_storeUnionTagSinglePayload(OpaqueValue *value,
+swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                         const Metadata *payload,
                                         int whichCase, unsigned emptyCases) {
   auto *payloadWitnesses = payload->getValueWitnesses();

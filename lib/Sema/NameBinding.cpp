@@ -38,7 +38,7 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 typedef TranslationUnit::ImportedModule ImportedModule;
-typedef llvm::PointerUnion<const ImportedModule*, UnionType*> BoundScope;
+typedef llvm::PointerUnion<const ImportedModule*, EnumType*> BoundScope;
 
 namespace {  
   class NameBinder {    
@@ -124,7 +124,7 @@ static ImportKind getBestImportKind(const ValueDecl *VD) {
   case DeclKind::Destructor:
   case DeclKind::GenericTypeParam:
   case DeclKind::Subscript:
-  case DeclKind::UnionElement:
+  case DeclKind::EnumElement:
     llvm_unreachable("not a top-level ValueDecl");
 
   case DeclKind::Protocol:
@@ -132,8 +132,8 @@ static ImportKind getBestImportKind(const ValueDecl *VD) {
 
   case DeclKind::Class:
     return ImportKind::Class;
-  case DeclKind::Union:
-    return ImportKind::Union;
+  case DeclKind::Enum:
+    return ImportKind::Enum;
   case DeclKind::Struct:
     return ImportKind::Struct;
 
@@ -187,7 +187,7 @@ static bool isCompatibleImportKind(ImportKind expected, ImportKind actual) {
     llvm_unreachable("individual decls cannot have abstract import kind");
   case ImportKind::Struct:
   case ImportKind::Class:
-  case ImportKind::Union:
+  case ImportKind::Enum:
     return true;
   case ImportKind::Protocol:
   case ImportKind::Var:
@@ -206,8 +206,8 @@ static const char *getImportKindString(ImportKind kind) {
     return "struct";
   case ImportKind::Class:
     return "class";
-  case ImportKind::Union:
-    return "union";
+  case ImportKind::Enum:
+    return "enum";
   case ImportKind::Protocol:
     return "protocol";
   case ImportKind::Var:

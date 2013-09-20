@@ -23,7 +23,7 @@
 #include "TypeInfo.h"
 #include "IRGenFunction.h"
 #include "swift/SIL/Mangle.h"
-#include "GenUnion.h"
+#include "GenEnum.h"
 
 namespace swift {
 namespace irgen {
@@ -172,20 +172,20 @@ public:
     }
   }
   
-  llvm::Value *packUnionPayload(IRGenFunction &IGF,
+  llvm::Value *packEnumPayload(IRGenFunction &IGF,
                                 Explosion &src,
                                 unsigned bitWidth,
                                 unsigned offset) const override {
-    PackUnionPayload pack(IGF, bitWidth);
+    PackEnumPayload pack(IGF, bitWidth);
     pack.addAtOffset(src.claimNext(), offset);
     return pack.get();
   }
   
-  void unpackUnionPayload(IRGenFunction &IGF,
+  void unpackEnumPayload(IRGenFunction &IGF,
                           llvm::Value *payload,
                           Explosion &dest,
                           unsigned offset) const override {
-    UnpackUnionPayload unpack(IGF, payload);
+    UnpackEnumPayload unpack(IGF, payload);
     dest.add(unpack.claimAtOffset(asDerived().getScalarType(), offset));
   }
 };

@@ -15,7 +15,7 @@
    ;; Decl and type keywords
    `(,(regexp-opt '("class" "init" "destructor" "extension" "func"
                     "import" "protocol" "static" "struct" "subscript"
-                    "typealias" "union" "var" "where")
+                    "typealias" "enum" "var" "where")
                   'words) . font-lock-keyword-face)
    ;; SIL Types
    '("\\b[$][*]?[A-Z][z-aA-Z_[0-9]*\\b" . font-lock-type-face)
@@ -30,7 +30,7 @@
    `(,(regexp-opt '("sil" "internal" "thunk")
                   'words) . font-lock-keyword-face)
    ;; SIL Declaration
-   `(,(regexp-opt '("getter" "setter" "allocator" "initializer" "unionelt"
+   `(,(regexp-opt '("getter" "setter" "allocator" "initializer" "enumelt"
 		    "destroyer" "globalaccessor" "objc") 'words) .
 		    font-lock-keyword-face)
    ;; Expressions
@@ -85,7 +85,7 @@
 		  'words) . font-lock-keyword-face)
    ;; Terminators
    `(,(regexp-opt '("unreachable" "return" "autorelease_return" "br"
-		    "condbranch" "switch_int" "switch_union")
+		    "condbranch" "switch_int" "switch_enum")
 		  'words) . font-lock-keyword-face)
    ;; SIL Value
    '("\\b[%][A-Za-z_0-9]+\\([#][0-9]+\\)?\\b" . font-lock-variable-name-face)

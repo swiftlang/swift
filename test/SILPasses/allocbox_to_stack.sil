@@ -179,7 +179,7 @@ sil @dealloc_box : $[thin] <T> () -> () {
 }
 
 
-union SomeUnion {
+enum SomeUnion {
   case x(Int)
   case y(SomeClass)
 }

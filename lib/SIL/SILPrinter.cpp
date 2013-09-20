@@ -138,8 +138,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     switch (Base->getKind()) {
       default:
         llvm_unreachable("unhandled context kind in SILPrint!");
-      case TypeKind::Union:
-        ExtNominal = cast<UnionType>(Base)->getDecl();
+      case TypeKind::Enum:
+        ExtNominal = cast<EnumType>(Base)->getDecl();
         break;
       case TypeKind::Struct:
         ExtNominal = cast<StructType>(Base)->getDecl();
@@ -147,8 +147,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
       case TypeKind::Class:
         ExtNominal = cast<ClassType>(Base)->getDecl();
         break;
-      case TypeKind::BoundGenericUnion:
-        ExtNominal = cast<BoundGenericUnionType>(Base)->getDecl();
+      case TypeKind::BoundGenericEnum:
+        ExtNominal = cast<BoundGenericEnumType>(Base)->getDecl();
         break;
       case TypeKind::BoundGenericStruct:
         ExtNominal = cast<BoundGenericStructType>(Base)->getDecl();
@@ -201,8 +201,8 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::Initializer:
     OS << "!initializer";
     break;
-  case SILDeclRef::Kind::UnionElement:
-    OS << "!unionelt";
+  case SILDeclRef::Kind::EnumElement:
+    OS << "!enumelt";
     break;
   case SILDeclRef::Kind::Destroyer:
     OS << "!destroyer";
@@ -725,24 +725,24 @@ public:
     }
   }
   
-  void visitUnionInst(UnionInst *UI) {
-    OS << "union " << UI->getType() << ", "
-       << SILDeclRef(UI->getElement(), SILDeclRef::Kind::UnionElement);
+  void visitEnumInst(EnumInst *UI) {
+    OS << "enum " << UI->getType() << ", "
+       << SILDeclRef(UI->getElement(), SILDeclRef::Kind::EnumElement);
     if (UI->hasOperand()) {
       OS << ", " << getIDAndType(UI->getOperand());
     }
   }
   
-  void visitUnionDataAddrInst(UnionDataAddrInst *UDAI) {
-    OS << "union_data_addr "
+  void visitEnumDataAddrInst(EnumDataAddrInst *UDAI) {
+    OS << "enum_data_addr "
        << getIDAndType(UDAI->getOperand()) << ", "
-       << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::UnionElement);
+       << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
   
-  void visitInjectUnionAddrInst(InjectUnionAddrInst *IUAI) {
-    OS << "inject_union_addr "
+  void visitInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
+    OS << "inject_enum_addr "
        << getIDAndType(IUAI->getOperand()) << ", "
-       << SILDeclRef(IUAI->getElement(), SILDeclRef::Kind::UnionElement);
+       << SILDeclRef(IUAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
   
   void visitTupleExtractInst(TupleExtractInst *EI) {
@@ -914,26 +914,26 @@ public:
       OS << ", default " << getID(SII->getDefaultBB());
   }
   
-  void printSwitchUnionInst(SwitchUnionInstBase *SOI) {
+  void printSwitchEnumInst(SwitchEnumInstBase *SOI) {
     OS << getIDAndType(SOI->getOperand());
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
-      UnionElementDecl *elt;
+      EnumElementDecl *elt;
       SILBasicBlock *dest;
       std::tie(elt, dest) = SOI->getCase(i);
-      OS << ", case " << SILDeclRef(elt, SILDeclRef::Kind::UnionElement)
+      OS << ", case " << SILDeclRef(elt, SILDeclRef::Kind::EnumElement)
       << ": " << getID(dest);
     }
     if (SOI->hasDefault())
       OS << ", default " << getID(SOI->getDefaultBB());
   }
   
-  void visitSwitchUnionInst(SwitchUnionInst *SOI) {
-    OS << "switch_union ";
-    printSwitchUnionInst(SOI);
+  void visitSwitchEnumInst(SwitchEnumInst *SOI) {
+    OS << "switch_enum ";
+    printSwitchEnumInst(SOI);
   }
-  void visitDestructiveSwitchUnionAddrInst(DestructiveSwitchUnionAddrInst *SOI){
-    OS << "destructive_switch_union_addr ";
-    printSwitchUnionInst(SOI);
+  void visitDestructiveSwitchEnumAddrInst(DestructiveSwitchEnumAddrInst *SOI){
+    OS << "destructive_switch_enum_addr ";
+    printSwitchEnumInst(SOI);
   }
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
     OS << "dynamic_method_br " << getIDAndType(DMBI->getOperand()) << ", ";

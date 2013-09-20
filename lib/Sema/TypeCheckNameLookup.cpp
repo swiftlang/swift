@@ -54,12 +54,12 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
       }
     }
 
-    // If we're looking for constructors in a union, return the union
+    // If we're looking for constructors in an enum, return the enum
     // elements.
     // FIXME: This feels like a hack.
-    if (auto unionDecl = dyn_cast<UnionDecl>(nominalDecl)) {
-      for (auto member : unionDecl->getMembers()) {
-        if (auto element = dyn_cast<UnionElementDecl>(member))
+    if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl)) {
+      for (auto member : enumDecl->getMembers()) {
+        if (auto element = dyn_cast<EnumElementDecl>(member))
           result.addResult(element);
       }
     }

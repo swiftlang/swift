@@ -71,13 +71,13 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
     case DeclContextKind::AbstractFunctionDecl:
       return Resilience::InherentlyFragile;
 
-    // For unions, we walk out through the union decl.
+    // For enums, we walk out through the enum decl.
     case DeclContextKind::NominalTypeDecl:
       if (isa<ProtocolDecl>(DC)) {
         // FIXME: no attrs here, either.
         return Resilience::Fragile;
       }
-      assert(isa<StructDecl>(DC) || isa<UnionDecl>(DC) || isa<ClassDecl>(DC) &&
+      assert(isa<StructDecl>(DC) || isa<EnumDecl>(DC) || isa<ClassDecl>(DC) &&
              "Unexpected decl");
       D = cast<NominalTypeDecl>(DC);
       goto HandleDecl;

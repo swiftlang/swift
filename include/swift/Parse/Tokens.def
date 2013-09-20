@@ -34,6 +34,7 @@
 KEYWORD(class)
 KEYWORD(constructor)
 KEYWORD(destructor)
+KEYWORD(enum)
 KEYWORD(extension)
 KEYWORD(func)
 KEYWORD(import)
@@ -43,7 +44,6 @@ KEYWORD(static)
 KEYWORD(struct)
 KEYWORD(subscript)
 KEYWORD(typealias)
-KEYWORD(union)
 KEYWORD(var)
 
 KEYWORD(sil)        // This is only enabled when parsing .sil files.

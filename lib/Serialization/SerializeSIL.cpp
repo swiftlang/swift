@@ -412,13 +412,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
-  case ValueKind::SwitchUnionInst:
-  case ValueKind::DestructiveSwitchUnionAddrInst: {
-    // Format: condition, a list of cases (UnionElementDecl + Basic Block ID),
+  case ValueKind::SwitchEnumInst:
+  case ValueKind::DestructiveSwitchEnumAddrInst: {
+    // Format: condition, a list of cases (EnumElementDecl + Basic Block ID),
     // default basic block ID. Use SILOneTypeValuesLayout: the type is
     // for condition, the list has value for condition, hasDefault, default
     // basic block ID, a list of (DeclID, BasicBlock ID).
-    const SwitchUnionInstBase *SOI = cast<SwitchUnionInstBase>(&SI);
+    const SwitchEnumInstBase *SOI = cast<SwitchEnumInstBase>(&SI);
     SmallVector<ValueID, 4> ListOfValues;
     ListOfValues.push_back(addValueRef(SOI->getOperand()));
     ListOfValues.push_back(SOI->getOperand().getResultNumber());
@@ -429,7 +429,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back(0);
 
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
-      UnionElementDecl *elt;
+      EnumElementDecl *elt;
       SILBasicBlock *dest;
       std::tie(elt, dest) = SOI->getCase(i);
       ListOfValues.push_back(S.addDeclRef(elt));
@@ -786,8 +786,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::RefElementAddrInst:
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst:
-  case ValueKind::UnionDataAddrInst:
-  case ValueKind::InjectUnionAddrInst: {
+  case ValueKind::EnumDataAddrInst:
+  case ValueKind::InjectEnumAddrInst: {
     // Has a typed valueref and a field decl. We use SILOneValueOneOperandLayout
     // where the field decl is streamed as a ValueID.
     SILValue operand;
@@ -806,13 +806,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       operand = cast<StructExtractInst>(&SI)->getOperand();
       tDecl = cast<StructExtractInst>(&SI)->getField();
       break;
-    case ValueKind::UnionDataAddrInst:
-      operand = cast<UnionDataAddrInst>(&SI)->getOperand();
-      tDecl = cast<UnionDataAddrInst>(&SI)->getElement();
+    case ValueKind::EnumDataAddrInst:
+      operand = cast<EnumDataAddrInst>(&SI)->getOperand();
+      tDecl = cast<EnumDataAddrInst>(&SI)->getElement();
       break;
-    case ValueKind::InjectUnionAddrInst:
-      operand = cast<InjectUnionAddrInst>(&SI)->getOperand();
-      tDecl = cast<InjectUnionAddrInst>(&SI)->getElement();
+    case ValueKind::InjectEnumAddrInst:
+      operand = cast<InjectEnumAddrInst>(&SI)->getOperand();
+      tDecl = cast<InjectEnumAddrInst>(&SI)->getElement();
       break;
     }
     SILOneValueOneOperandLayout::emitRecord(Out, ScratchRecord, 
@@ -886,10 +886,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
-  case ValueKind::UnionInst: {
+  case ValueKind::EnumInst: {
     // Format: a type, an operand and a decl ID. Use SILTwoOperandsLayout: type,
     // (DeclID + hasOperand), and an operand.
-    const UnionInst *UI = cast<UnionInst>(&SI);
+    const EnumInst *UI = cast<EnumInst>(&SI);
     TypeID OperandTy = UI->hasOperand() ?
       S.addTypeRef(UI->getOperand().getType().getSwiftRValueType()) : (TypeID)0;
     unsigned OperandTyCategory = UI->hasOperand() ?

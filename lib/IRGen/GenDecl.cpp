@@ -781,8 +781,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::Subscript:
     llvm_unreachable("there are no global subscript operations");
       
-  case DeclKind::UnionElement:
-    llvm_unreachable("there are no global union elements");
+  case DeclKind::EnumElement:
+    llvm_unreachable("there are no global enum elements");
 
   case DeclKind::Constructor:
     llvm_unreachable("there are no global constructor");
@@ -795,8 +795,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::AssociatedType:
     return;
 
-  case DeclKind::Union:
-    return emitUnionDecl(cast<UnionDecl>(D));
+  case DeclKind::Enum:
+    return emitEnumDecl(cast<EnumDecl>(D));
 
   case DeclKind::Struct:
     return emitStructDecl(cast<StructDecl>(D));
@@ -836,8 +836,8 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
-  case DeclKind::UnionElement:
-  case DeclKind::Union:
+  case DeclKind::EnumElement:
+  case DeclKind::Enum:
   case DeclKind::Class:
   case DeclKind::TopLevelCode:
   case DeclKind::TypeAlias:
@@ -928,14 +928,14 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
 }
 
 /// getAddrOfGlobalInjectionFunction - Get the address of the function to
-/// perform a particular injection into a union type.
-llvm::Function *IRGenModule::getAddrOfInjectionFunction(UnionElementDecl *D) {
+/// perform a particular injection into an enum type.
+llvm::Function *IRGenModule::getAddrOfInjectionFunction(EnumElementDecl *D) {
   // TODO: emit at more optimal explosion kinds when reasonable!
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   unsigned uncurryLevel = D->hasArgumentType() ? 1 : 0;
 
   LinkEntity entity =
-    LinkEntity::forFunction(CodeRef::forUnionElement(D, ExplosionKind::Minimal,
+    LinkEntity::forFunction(CodeRef::forEnumElement(D, ExplosionKind::Minimal,
                                                      uncurryLevel));
 
   llvm::Function *&entry = GlobalFuncs[entity];
@@ -1453,7 +1453,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   for (Decl *member : ext->getMembers()) {
     switch (member->getKind()) {
     case DeclKind::Import:
-    case DeclKind::UnionElement:
+    case DeclKind::EnumElement:
     case DeclKind::TopLevelCode:
     case DeclKind::Protocol:
     case DeclKind::Extension:
@@ -1476,8 +1476,8 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::GenericTypeParam:
     case DeclKind::AssociatedType:
       continue;
-    case DeclKind::Union:
-      emitUnionDecl(cast<UnionDecl>(member));
+    case DeclKind::Enum:
+      emitEnumDecl(cast<EnumDecl>(member));
       continue;
     case DeclKind::Struct:
       emitStructDecl(cast<StructDecl>(member));

@@ -51,7 +51,7 @@ public:
 template<typename ImplClass, typename RetTy = void>
 class ClassMemberVisitor : public TypeMemberVisitor<ImplClass, RetTy> {
 public:
-  BAD_MEMBER(UnionElement)
+  BAD_MEMBER(EnumElement)
 
   void visitMembers(ClassDecl *D) {
     TypeMemberVisitor<ImplClass, RetTy>::visitMembers(D);

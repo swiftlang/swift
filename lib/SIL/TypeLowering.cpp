@@ -375,14 +375,14 @@ namespace {
       return visitAbstracted(type);
     }
 
-    // Unions depend on their enumerators.
-    RetTy visitUnionType(CanUnionType type) {
-      return asImpl().visitAnyUnionType(type, type->getDecl());
+    // Enums depend on their enumerators.
+    RetTy visitEnumType(CanEnumType type) {
+      return asImpl().visitAnyEnumType(type, type->getDecl());
     }
-    RetTy visitBoundGenericUnionType(CanBoundGenericUnionType type) {
-      return asImpl().visitAnyUnionType(type, type->getDecl());
+    RetTy visitBoundGenericEnumType(CanBoundGenericEnumType type) {
+      return asImpl().visitAnyEnumType(type, type->getDecl());
     }
-    RetTy visitAnyUnionType(CanType type, UnionDecl *D) {
+    RetTy visitAnyEnumType(CanType type, EnumDecl *D) {
       // Consult the type lowering.
       auto &lowering = M.Types.getTypeLowering(type);
       return handleClassificationFromLowering(type, lowering);
@@ -667,30 +667,30 @@ namespace {
     }
   };
   
-  /// A lowering for loadable but non-trivial union types.
-  class LoadableUnionTypeLowering final : public LoadableTypeLowering {
+  /// A lowering for loadable but non-trivial enum types.
+  class LoadableEnumTypeLowering final : public LoadableTypeLowering {
   public:
-    /// A non-trivial case of the union.
+    /// A non-trivial case of the enum.
     class NonTrivialElement {
       /// The non-trivial element.
-      UnionElementDecl *element;
+      EnumElementDecl *element;
       
       /// Its type lowering.
       const TypeLowering *lowering;
       
     public:
-      NonTrivialElement(UnionElementDecl *element, const TypeLowering &lowering)
+      NonTrivialElement(EnumElementDecl *element, const TypeLowering &lowering)
         : element(element), lowering(&lowering) {}
       
       const TypeLowering &getLowering() const { return *lowering; }
-      UnionElementDecl *getElement() const { return element; }
+      EnumElementDecl *getElement() const { return element; }
     };
     
   private:
     /// The number of tail-allocated NonTrivialElements following this object.
     unsigned numNonTrivial;
     
-    LoadableUnionTypeLowering(SILType type,
+    LoadableEnumTypeLowering(SILType type,
                               ArrayRef<NonTrivialElement> nonTrivial)
       : LoadableTypeLowering(type, IsNotTrivial),
         numNonTrivial(nonTrivial.size())
@@ -702,15 +702,15 @@ namespace {
     using SimpleOperationTy = void (TypeLowering::*)(SILBuilder &B,
                                                      SILLocation loc,
                                                      SILValue value) const;
-    /// Emit a value semantics operation for each nontrivial case of the union.
+    /// Emit a value semantics operation for each nontrivial case of the enum.
     void ifNonTrivialElement(SILBuilder &B, SILLocation loc,
                              SILValue value,
                              SimpleOperationTy operation) const {
-      SmallVector<std::pair<UnionElementDecl*,SILBasicBlock*>, 4> nonTrivialBBs;
+      SmallVector<std::pair<EnumElementDecl*,SILBasicBlock*>, 4> nonTrivialBBs;
       
       auto &M = B.getFunction().getModule();
 
-      // Create all the blocks up front, so we can set up our switch_union.
+      // Create all the blocks up front, so we can set up our switch_enum.
       for (auto &elt : getNonTrivialElements()) {
         auto bb = new (M) SILBasicBlock(&B.getFunction());
         auto argTy = elt.getLowering().getLoweredType();
@@ -723,7 +723,7 @@ namespace {
       // emitting this operation into the middle of existing code, we split the
       // block.
       SILBasicBlock *doneBB = B.splitBlockForFallthrough();
-      B.createSwitchUnion(loc, value, doneBB, nonTrivialBBs);
+      B.createSwitchEnum(loc, value, doneBB, nonTrivialBBs);
       
       for (size_t i = 0; i < nonTrivialBBs.size(); ++i) {
         SILBasicBlock *bb = nonTrivialBBs[i].second;
@@ -737,17 +737,17 @@ namespace {
     }
     
   public:
-    static const LoadableUnionTypeLowering *create(TypeConverter &TC,
+    static const LoadableEnumTypeLowering *create(TypeConverter &TC,
                                        CanType type,
                                        ArrayRef<NonTrivialElement> nonTrivial) {
       void *buffer
-        = operator new(sizeof(LoadableUnionTypeLowering)
+        = operator new(sizeof(LoadableEnumTypeLowering)
                          + sizeof(NonTrivialElement) * nonTrivial.size(),
                        TC);
       
       auto silTy = SILType::getPrimitiveObjectType(type);
       
-      return ::new (buffer) LoadableUnionTypeLowering(silTy, nonTrivial);
+      return ::new (buffer) LoadableEnumTypeLowering(silTy, nonTrivial);
     }
     
     ArrayRef<NonTrivialElement> getNonTrivialElements() const {
@@ -974,35 +974,35 @@ namespace {
                                                 nonTrivialFields);
     }
         
-    const TypeLowering *visitAnyUnionType(CanType unionType, UnionDecl *D) {
+    const TypeLowering *visitAnyEnumType(CanType enumType, EnumDecl *D) {
       // For consistency, if it's anywhere resilient, we need to treat the type
       // as resilient in SIL.
       if (TC.isAnywhereResilient(D))
-        return handleAddressOnly(unionType);
+        return handleAddressOnly(enumType);
       
-      typedef LoadableUnionTypeLowering::NonTrivialElement NonTrivialElement;
+      typedef LoadableEnumTypeLowering::NonTrivialElement NonTrivialElement;
       SmallVector<NonTrivialElement, 8> nonTrivialElts;
       
-      // If any of the union elements have address-only data, the union is
+      // If any of the enum elements have address-only data, the enum is
       // address-only.
       for (auto elt : D->getAllElements()) {
         // No-payload elements do not affect address-only-ness.
         if (!elt->hasArgumentType())
           continue;
         
-        auto eltType = unionType->getTypeOfMember(D->getModuleContext(),
+        auto eltType = enumType->getTypeOfMember(D->getModuleContext(),
                                                   elt, nullptr,
                                                   elt->getArgumentType())
           ->getCanonicalType();
         auto &lowering = TC.getTypeLowering(eltType);
         if (lowering.isAddressOnly())
-          return handleAddressOnly(unionType);
+          return handleAddressOnly(enumType);
         if (!lowering.isTrivial())
           nonTrivialElts.push_back(NonTrivialElement(elt, lowering));        
       }
       if (nonTrivialElts.empty())
-        return handleTrivial(unionType);
-      return LoadableUnionTypeLowering::create(TC, unionType, nonTrivialElts);
+        return handleTrivial(enumType);
+      return LoadableEnumTypeLowering::create(TC, enumType, nonTrivialElts);
     }
   };
 }
@@ -1420,7 +1420,7 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
   }
       
   case SILDeclRef::Kind::Allocator:
-  case SILDeclRef::Kind::UnionElement:
+  case SILDeclRef::Kind::EnumElement:
     return vd->getType();
   
   case SILDeclRef::Kind::Initializer:

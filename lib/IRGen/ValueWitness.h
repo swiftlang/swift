@@ -182,12 +182,12 @@ enum class ValueWitness : unsigned {
   /// The ValueWitnessIsNonInline bit is set if the type cannot be
   /// represented in a fixed-size buffer.
   ///
-  /// The Union_HasExtraInhabitants bit is set if the type's binary
+  /// The Enum_HasExtraInhabitants bit is set if the type's binary
   /// representation has "extra inhabitants" that do not form valid values of
   /// the type, and the value witness table contains the ExtraInhabitantWitness
   /// entries.
   ///
-  /// The Union_HasSpareBits bit is set if the type's binary representation
+  /// The Enum_HasSpareBits bit is set if the type's binary representation
   /// has unused bits.
   Flags,
 
@@ -199,7 +199,7 @@ enum class ValueWitness : unsigned {
   Last_RequiredValueWitness = Stride,
   
   /// The following value witnesses are conditionally present based on
-  /// the Union_HasExtraInhabitants bit of the flags.
+  /// the Enum_HasExtraInhabitants bit of the flags.
   First_ExtraInhabitantValueWitness,
   
   ///   void (*storeExtraInhabitant)(T *obj, unsigned index, M *self);
@@ -228,7 +228,7 @@ enum class ValueWitness : unsigned {
   /// - The NumExtraInhabitantsMask bits contain the number of extra
   ///   inhabitants of the type representation.
   ///
-  /// If the Union_HasSpareBits flag is set in the value witness flags, these
+  /// If the Enum_HasSpareBits flag is set in the value witness flags, these
   /// additional flags are available:
   ///
   /// - The NumSpareBitsMask bits contain the number of (host-endian) contiguous
@@ -240,26 +240,26 @@ enum class ValueWitness : unsigned {
   Last_ExtraInhabitantValueWitness = ExtraInhabitantFlags,
   
   /// The following value witnesses are conditionally present if the witnessed
-  /// type is a union.
-  First_UnionValueWitness,
+  /// type is an enum.
+  First_EnumValueWitness,
   
-  ///   unsigned (*getUnionTag)(T *obj, M *self);
+  ///   unsigned (*getEnumTag)(T *obj, M *self);
   ///
-  /// Given a valid object of this union type, extracts the tag value indicating
-  /// which case of the union is inhabited.
-  GetUnionTag = First_UnionValueWitness,
+  /// Given a valid object of this enum type, extracts the tag value indicating
+  /// which case of the enum is inhabited.
+  GetEnumTag = First_EnumValueWitness,
   
-  ///   U *(*inplaceProjectUnionData)(T *obj, unsigned tag, M *self);
+  ///   U *(*inplaceProjectEnumData)(T *obj, unsigned tag, M *self);
   ///
-  /// Given a valid object of this union type with the given tag, destructively
+  /// Given a valid object of this enum type with the given tag, destructively
   /// extracts the associated data for that tag inplace, and returns a pointer
-  /// to the data. The tag must match the result of getUnionTag for the value;
+  /// to the data. The tag must match the result of getEnumTag for the value;
   /// it is not validated prior to the operation.
-  InplaceProjectUnionData,
+  InplaceProjectEnumData,
   
-  Last_UnionValueWitness = InplaceProjectUnionData,
+  Last_EnumValueWitness = InplaceProjectEnumData,
   
-  Last_ValueWitness = Last_UnionValueWitness,
+  Last_ValueWitness = Last_EnumValueWitness,
 };
 
 // The namespaces here are to force the enumerators to be scoped.  We don't
@@ -271,22 +271,22 @@ namespace ValueWitnessFlags {
     IsNonPOD      = 0x10000,
     IsNonInline   = 0x20000,
     
-    /// Flags pertaining to union representation.
-    Union_FlagMask = 0xC0000,
+    /// Flags pertaining to enum representation.
+    Enum_FlagMask = 0xC0000,
     
-    /// If Flags & Union_FlagMask == Union_IsOpaque, then the type does not
-    /// support any optimized representation in unions.
-    Union_IsOpaque = 0x00000,
-    /// If Flags & Union_FlagMask == Union_HasExtraInhabitants, then the type
+    /// If Flags & Enum_FlagMask == Enum_IsOpaque, then the type does not
+    /// support any optimized representation in enums.
+    Enum_IsOpaque = 0x00000,
+    /// If Flags & Enum_FlagMask == Enum_HasExtraInhabitants, then the type
     /// has "extra inhabitants" of its binary representation which do not form
     /// valid values of the type, such as null in a class type. The
     /// ExtraInhabitants value witnesses are present in the value witness table.
-    Union_HasExtraInhabitants = 0x40000,
-    /// If Flags & Union_FlagMask == Union_HasSpareBits, then the type has
+    Enum_HasExtraInhabitants = 0x40000,
+    /// If Flags & Enum_FlagMask == Enum_HasSpareBits, then the type has
     /// unused bits in its binary representation. This implies
     /// HasExtraInhabitants. Both the ExtraInhabitants and SpareBits value
     /// witnesses are present in the value witness table.
-    Union_HasSpareBits = 0xC0000,
+    Enum_HasSpareBits = 0xC0000,
   };
 }
   
@@ -318,8 +318,8 @@ static inline bool isValueWitnessFunction(ValueWitness witness) {
     || (ord >= unsigned(ValueWitness::First_ExtraInhabitantValueWitness)
         && ord <= unsigned(
                        ValueWitness::Last_ExtraInhabitantValueWitnessFunction))
-    || (ord >= unsigned(ValueWitness::First_UnionValueWitness)
-        && ord <= unsigned(ValueWitness::Last_UnionValueWitness));
+    || (ord >= unsigned(ValueWitness::First_EnumValueWitness)
+        && ord <= unsigned(ValueWitness::Last_EnumValueWitness));
 }
 
 } // end namespace irgen

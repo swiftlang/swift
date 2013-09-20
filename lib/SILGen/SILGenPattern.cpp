@@ -46,7 +46,7 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Tuple:
   case PatternKind::Isa:
   case PatternKind::NominalType:
-  case PatternKind::UnionElement:
+  case PatternKind::EnumElement:
     return false;
   
   // Recur into simple wrapping patterns.
@@ -177,35 +177,35 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     return defaultBB;
   }
       
-  case PatternKind::UnionElement: {
-    /// We'll want to know if we matched every case of the union to see if we
+  case PatternKind::EnumElement: {
+    /// We'll want to know if we matched every case of the enum to see if we
     /// need a default block.
     ///
-    /// FIXME: If the union is resilient, then we always need a default block.
-    llvm::DenseSet<UnionElementDecl*> unmatchedCases;
-    type->getUnionOrBoundGenericUnion()->getAllElements(unmatchedCases);
+    /// FIXME: If the enum is resilient, then we always need a default block.
+    llvm::DenseSet<EnumElementDecl*> unmatchedCases;
+    type->getEnumOrBoundGenericEnum()->getAllElements(unmatchedCases);
     
-    SmallVector<std::pair<UnionElementDecl*, SILBasicBlock*>, 4> caseBBs;
+    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 4> caseBBs;
     
-    bool addressOnlyUnion = v.getType().isAddress();
+    bool addressOnlyEnum = v.getType().isAddress();
     
     SILValue voidValue;
     
     SILBasicBlock *bb = gen.B.getInsertionBB();
     
     for (const Pattern *p : patterns) {
-      auto *up = cast<UnionElementPattern>(p);
-      RegularLocation Loc(const_cast<UnionElementPattern*>(up));
+      auto *up = cast<EnumElementPattern>(p);
+      RegularLocation Loc(const_cast<EnumElementPattern*>(up));
 
-      UnionElementDecl *elt = up->getElementDecl();
+      EnumElementDecl *elt = up->getElementDecl();
       
       assert(unmatchedCases.count(elt)
-             && "specializing same union case twice?!");
+             && "specializing same enum case twice?!");
       unmatchedCases.erase(elt);
       
       SILBasicBlock *caseBB = gen.createBasicBlock();
       
-      // Create a BB argument to receive the union case data if it has any.
+      // Create a BB argument to receive the enum case data if it has any.
       SILValue eltValue;
       if (elt->hasArgumentType()) {
         auto argSwiftTy = v.getType().getSwiftRValueType()
@@ -215,18 +215,18 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
           
           auto &argLowering = gen.getTypeLowering(argSwiftTy);
           SILType argTy = argLowering.getLoweredType();
-          if (addressOnlyUnion)
+          if (addressOnlyEnum)
             argTy = argTy.getAddressType();
           eltValue = new (gen.F.getModule()) SILArgument(argTy, caseBB);
-          // Load a loadable data value from an address-only union.
-          if (addressOnlyUnion && argLowering.isLoadable()) {
+          // Load a loadable data value from an address-only enum.
+          if (addressOnlyEnum && argLowering.isLoadable()) {
             gen.B.setInsertionPoint(caseBB);
             eltValue = gen.B.createLoad(Loc, eltValue);
             gen.B.setInsertionPoint(bb);
           }
         }
       } else {
-        // If the element pattern for a void union element has a subpattern, it
+        // If the element pattern for a void enum element has a subpattern, it
         // will bind to a void value.
         if (!voidValue)
           voidValue = gen.emitEmptyTuple(Loc);
@@ -244,11 +244,11 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       defaultBB = gen.createBasicBlock();
     
     // Emit the switch instruction.
-    if (addressOnlyUnion) {
-      gen.B.createDestructiveSwitchUnionAddr(stmt, v,
+    if (addressOnlyEnum) {
+      gen.B.createDestructiveSwitchEnumAddr(stmt, v,
                                              defaultBB, caseBBs);
     } else {
-      gen.B.createSwitchUnion(stmt, v, defaultBB, caseBBs);
+      gen.B.createSwitchEnum(stmt, v, defaultBB, caseBBs);
     }
     
     // Return the default BB.
@@ -284,7 +284,7 @@ unsigned getDestructuredWidth(const Pattern *specializer) {
   case PatternKind::Isa:
     return 1;
   
-  case PatternKind::UnionElement:
+  case PatternKind::EnumElement:
     // The pattern destructures to a single tuple value. Even if the element has
     // no argument, we still model its value as having empty tuple type.
     return 1;
@@ -392,10 +392,10 @@ void destructurePattern(SILGenFunction &gen,
     return;
   }
       
-  case PatternKind::UnionElement: {
-    auto *up = cast<UnionElementPattern>(p);
+  case PatternKind::EnumElement: {
+    auto *up = cast<EnumElementPattern>(p);
     
-    // If the union case has a value, but the pattern does not specify a
+    // If the enum case has a value, but the pattern does not specify a
     // subpattern, then treat it like a wildcard.
     if (!up->hasSubPattern())
       destructured.push_back(nullptr);
@@ -485,12 +485,12 @@ bool isPatternSubsumed(const Pattern *sub, const Pattern *super) {
     return false;
   }
 
-  case PatternKind::UnionElement: {
-    auto *usub = cast<UnionElementPattern>(sub);
+  case PatternKind::EnumElement: {
+    auto *usub = cast<EnumElementPattern>(sub);
     // Wildcard 'super' should have been handled above.
-    auto *usup = cast<UnionElementPattern>(super);
+    auto *usup = cast<EnumElementPattern>(super);
     
-    // UnionElements are subsumed by equivalent UnionElements.
+    // EnumElements are subsumed by equivalent EnumElements.
     return usub->getElementDecl() == usup->getElementDecl();
   }
     
@@ -583,9 +583,9 @@ bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
     return false;
   }
       
-  case PatternKind::UnionElement: {
-    auto *ua = cast<UnionElementPattern>(a);
-    auto *ub = cast<UnionElementPattern>(b);
+  case PatternKind::EnumElement: {
+    auto *ua = cast<EnumElementPattern>(a);
+    auto *ub = cast<EnumElementPattern>(b);
     if (!ub)
       return false;
     
@@ -753,7 +753,7 @@ const ExprPattern *getAsExprPattern(const Pattern *p) {
   case PatternKind::Any:
   case PatternKind::Isa:
   case PatternKind::NominalType:
-  case PatternKind::UnionElement:
+  case PatternKind::EnumElement:
     return nullptr;
 
   // Recur into simple wrapping patterns.
@@ -1051,7 +1051,7 @@ public:
       case PatternKind::Any:
       case PatternKind::Tuple:
       case PatternKind::NominalType:
-      case PatternKind::UnionElement:
+      case PatternKind::EnumElement:
       case PatternKind::Isa:
         continue;
           

@@ -396,10 +396,10 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   }  
 }
 
-void SILGenModule::emitUnionConstructor(UnionElementDecl *decl) {
+void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
   SILDeclRef constant(decl);
   SILFunction *f = preEmitFunction(constant, decl, decl);
-  SILGenFunction(*this, *f).emitUnionConstructor(decl);
+  SILGenFunction(*this, *f).emitEnumConstructor(decl);
   postEmitFunction(constant, f);
 }
 

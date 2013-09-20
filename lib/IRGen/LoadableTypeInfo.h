@@ -88,15 +88,15 @@ public:
   /// Release reference counts or other resources owned by the explosion.
   virtual void consume(IRGenFunction &IGF, Explosion &explosion) const = 0;
   
-  /// Pack the source explosion into a union payload.
-  virtual llvm::Value *packUnionPayload(IRGenFunction &IGF,
+  /// Pack the source explosion into an enum payload.
+  virtual llvm::Value *packEnumPayload(IRGenFunction &IGF,
                                         Explosion &sourceExplosion,
                                         unsigned bitWidth,
                                         unsigned offset) const = 0;
   
-  /// Unpack a union payload containing a valid value of the type into the
+  /// Unpack an enum payload containing a valid value of the type into the
   /// destination explosion.
-  virtual void unpackUnionPayload(IRGenFunction &IGF,
+  virtual void unpackEnumPayload(IRGenFunction &IGF,
                                   llvm::Value *payload,
                                   Explosion &targetExplosion,
                                   unsigned offset) const = 0;

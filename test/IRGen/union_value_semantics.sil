@@ -65,14 +65,14 @@ import Builtin
 // CHECK:   %swift.type* null
 // CHECK: }
 
-union SinglePayloadTrivial {
+enum SinglePayloadTrivial {
   case payload(Builtin.Int64)
   case a
   case b
   case c
 }
 
-union SinglePayloadNontrivial {
+enum SinglePayloadNontrivial {
   case payload(Builtin.ObjectPointer)
   case a
   case b
@@ -118,7 +118,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK:   ret void
 // CHECK: }
 
-union MultiPayloadTrivial {
+enum MultiPayloadTrivial {
   case payload1(Builtin.Int64)
   case payload2(Builtin.Int32, Builtin.Int32)
   case a
@@ -126,7 +126,7 @@ union MultiPayloadTrivial {
   case c
 }
 
-union MultiPayloadNontrivial {
+enum MultiPayloadNontrivial {
   case payload1(Builtin.ObjectPointer)
   case payload2(Builtin.Int64)
   case payload3(Builtin.Int64, Builtin.ObjCPointer)
@@ -162,7 +162,7 @@ union MultiPayloadNontrivial {
 // CHECK:   ret void
 // CHECK: }
 
-union GenericFixedLayout<T> {
+enum GenericFixedLayout<T> {
   case foo(Builtin.Int64)
   case bar(Builtin.ObjectPointer)
 }

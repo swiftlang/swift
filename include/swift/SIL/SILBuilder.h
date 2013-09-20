@@ -441,21 +441,21 @@ public:
     return insert(TupleInst::create(Loc, Ty, Elements, F));
   }
   
-  UnionInst *createUnion(SILLocation Loc, SILValue Operand,
-                         UnionElementDecl *Element, SILType Ty) {
-    return insert(new (F.getModule()) UnionInst(Loc, Operand, Element, Ty));
+  EnumInst *createEnum(SILLocation Loc, SILValue Operand,
+                         EnumElementDecl *Element, SILType Ty) {
+    return insert(new (F.getModule()) EnumInst(Loc, Operand, Element, Ty));
   }
   
-  UnionDataAddrInst *createUnionDataAddr(SILLocation Loc, SILValue Operand,
-                                         UnionElementDecl *Element, SILType Ty){
+  EnumDataAddrInst *createEnumDataAddr(SILLocation Loc, SILValue Operand,
+                                         EnumElementDecl *Element, SILType Ty){
     return insert(
-              new (F.getModule()) UnionDataAddrInst(Loc, Operand, Element, Ty));
+              new (F.getModule()) EnumDataAddrInst(Loc, Operand, Element, Ty));
   }
   
-  InjectUnionAddrInst *createInjectUnionAddr(SILLocation Loc, SILValue Operand,
-                                             UnionElementDecl *Element) {
+  InjectEnumAddrInst *createInjectEnumAddr(SILLocation Loc, SILValue Operand,
+                                             EnumElementDecl *Element) {
     return insert(new (F.getModule())
-                    InjectUnionAddrInst(Loc, Operand, Element));
+                    InjectEnumAddrInst(Loc, Operand, Element));
   }
   
   SILValue createTupleExtract(SILLocation Loc, SILValue Operand,
@@ -774,19 +774,19 @@ public:
                                                   CaseBBs, F));
   }
 
-  SwitchUnionInst *createSwitchUnion(SILLocation Loc, SILValue Operand,
+  SwitchEnumInst *createSwitchEnum(SILLocation Loc, SILValue Operand,
          SILBasicBlock *DefaultBB,
-         ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs) {
-    return insertTerminator(SwitchUnionInst::create(Loc, Operand, DefaultBB,
+         ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs) {
+    return insertTerminator(SwitchEnumInst::create(Loc, Operand, DefaultBB,
                                                     CaseBBs, F));
   }
 
-  DestructiveSwitchUnionAddrInst *
-  createDestructiveSwitchUnionAddr(SILLocation Loc, SILValue Operand,
+  DestructiveSwitchEnumAddrInst *
+  createDestructiveSwitchEnumAddr(SILLocation Loc, SILValue Operand,
          SILBasicBlock *DefaultBB,
-         ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs) {
+         ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs) {
     return insertTerminator(
-              DestructiveSwitchUnionAddrInst::create(Loc, Operand, DefaultBB,
+              DestructiveSwitchEnumAddrInst::create(Loc, Operand, DefaultBB,
                                                      CaseBBs, F));
   }
 

@@ -81,8 +81,8 @@ namespace irgen {
   /// Emit the metadata associated with the given struct declaration.
   void emitStructMetadata(IRGenModule &IGM, StructDecl *theStruct);
 
-  /// Emit the metadata associated with the given union declaration.
-  void emitUnionMetadata(IRGenModule &IGM, UnionDecl *theUnion);
+  /// Emit the metadata associated with the given enum declaration.
+  void emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum);
   
   /// Given a reference to nominal type metadata of the given type,
   /// derive a reference to the parent type metadata.  There must be a

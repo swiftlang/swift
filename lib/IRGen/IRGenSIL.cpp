@@ -45,7 +45,7 @@
 #include "GenProto.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
-#include "GenUnion.h"
+#include "GenEnum.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenModule.h"
 #include "Linking.h"
@@ -525,9 +525,9 @@ public:
   void visitDestroyValueInst(DestroyValueInst *i);
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
-  void visitUnionInst(UnionInst *i);
-  void visitUnionDataAddrInst(UnionDataAddrInst *i);
-  void visitInjectUnionAddrInst(InjectUnionAddrInst *i);
+  void visitEnumInst(EnumInst *i);
+  void visitEnumDataAddrInst(EnumDataAddrInst *i);
+  void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
   void visitBuiltinZeroInst(BuiltinZeroInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitClassMetatypeInst(ClassMetatypeInst *i);
@@ -602,8 +602,8 @@ public:
   void visitReturnInst(ReturnInst *i);
   void visitAutoreleaseReturnInst(AutoreleaseReturnInst *i);
   void visitSwitchIntInst(SwitchIntInst *i);
-  void visitSwitchUnionInst(SwitchUnionInst *i);
-  void visitDestructiveSwitchUnionAddrInst(DestructiveSwitchUnionAddrInst *i);
+  void visitSwitchEnumInst(SwitchEnumInst *i);
+  void visitDestructiveSwitchEnumAddrInst(DestructiveSwitchEnumAddrInst *i);
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *i);
 };
 
@@ -1662,10 +1662,10 @@ static void addIncomingSILArgumentsToPHINodes(IRGenSILFunction &IGF,
   }
 }
 
-static llvm::BasicBlock *emitBBMapForSwitchUnion(
+static llvm::BasicBlock *emitBBMapForSwitchEnum(
         IRGenSILFunction &IGF,
-        SmallVectorImpl<std::pair<UnionElementDecl*, llvm::BasicBlock*>> &dests,
-        SwitchUnionInstBase *inst) {
+        SmallVectorImpl<std::pair<EnumElementDecl*, llvm::BasicBlock*>> &dests,
+        SwitchEnumInstBase *inst) {
   for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
     auto casePair = inst->getCase(i);
     
@@ -1687,16 +1687,16 @@ static llvm::BasicBlock *emitBBMapForSwitchUnion(
   return defaultDest;
 }
 
-void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *inst) {
+void IRGenSILFunction::visitSwitchEnumInst(SwitchEnumInst *inst) {
   Explosion value = getLoweredExplosion(inst->getOperand());
   
   // Map the SIL dest bbs to their LLVM bbs.
-  SmallVector<std::pair<UnionElementDecl*, llvm::BasicBlock*>, 4> dests;
+  SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
   llvm::BasicBlock *defaultDest
-    = emitBBMapForSwitchUnion(*this, dests, inst);
+    = emitBBMapForSwitchEnum(*this, dests, inst);
   
   // Emit the dispatch.
-  emitSwitchLoadableUnionDispatch(*this, inst->getOperand().getType(),
+  emitSwitchLoadableEnumDispatch(*this, inst->getOperand().getType(),
                                   value, dests, defaultDest);
   
   // Bind arguments for cases that want them.
@@ -1711,7 +1711,7 @@ void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *inst) {
       
       Explosion inValue = getLoweredExplosion(inst->getOperand());
       Explosion projected(ExplosionKind::Minimal);
-      emitProjectLoadableUnion(*this, inst->getOperand().getType(),
+      emitProjectLoadableEnum(*this, inst->getOperand().getType(),
                                inValue, casePair.first, projected);
       
       unsigned phiIndex = 0;
@@ -1723,17 +1723,17 @@ void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *inst) {
 }
 
 void
-IRGenSILFunction::visitDestructiveSwitchUnionAddrInst(
-                                        DestructiveSwitchUnionAddrInst *inst) {
+IRGenSILFunction::visitDestructiveSwitchEnumAddrInst(
+                                        DestructiveSwitchEnumAddrInst *inst) {
   Address value = getLoweredAddress(inst->getOperand());
   
   // Map the SIL dest bbs to their LLVM bbs.
-  SmallVector<std::pair<UnionElementDecl*, llvm::BasicBlock*>, 4> dests;
+  SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
   llvm::BasicBlock *defaultDest
-    = emitBBMapForSwitchUnion(*this, dests, inst);
+    = emitBBMapForSwitchEnum(*this, dests, inst);
   
   // Emit the dispatch.
-  emitSwitchAddressOnlyUnionDispatch(*this, inst->getOperand().getType(),
+  emitSwitchAddressOnlyEnumDispatch(*this, inst->getOperand().getType(),
                                      value, dests, defaultDest);
 
   // Bind arguments for cases that want them.
@@ -1746,7 +1746,7 @@ IRGenSILFunction::visitDestructiveSwitchUnionAddrInst(
       Builder.emitBlock(waypointBB);
 
       Address data
-        = emitDestructiveProjectUnionAddressForLoad(*this,
+        = emitDestructiveProjectEnumAddressForLoad(*this,
                                                   inst->getOperand().getType(),
                                                   value, casePair.first);
       unsigned phiIndex = 0;
@@ -1846,28 +1846,28 @@ void IRGenSILFunction::visitTupleInst(swift::TupleInst *i) {
   setLoweredExplosion(SILValue(i, 0), out);
 }
 
-void IRGenSILFunction::visitUnionInst(swift::UnionInst *i) {
+void IRGenSILFunction::visitEnumInst(swift::EnumInst *i) {
   Explosion data = (i->hasOperand())
     ? getLoweredExplosion(i->getOperand())
     : Explosion(ExplosionKind::Minimal);
   Explosion out(ExplosionKind::Maximal);
-  emitInjectLoadableUnion(*this, i->getType(), i->getElement(), data, out);
+  emitInjectLoadableEnum(*this, i->getType(), i->getElement(), data, out);
   setLoweredExplosion(SILValue(i, 0), out);
 }
 
-void IRGenSILFunction::visitUnionDataAddrInst(swift::UnionDataAddrInst *i) {
-  Address unionAddr = getLoweredAddress(i->getOperand());
-  Address dataAddr = emitProjectUnionAddressForStore(*this,
+void IRGenSILFunction::visitEnumDataAddrInst(swift::EnumDataAddrInst *i) {
+  Address enumAddr = getLoweredAddress(i->getOperand());
+  Address dataAddr = emitProjectEnumAddressForStore(*this,
                                                      i->getOperand().getType(),
-                                                     unionAddr,
+                                                     enumAddr,
                                                      i->getElement());
   setLoweredAddress(SILValue(i, 0), dataAddr);
 }
 
-void IRGenSILFunction::visitInjectUnionAddrInst(swift::InjectUnionAddrInst *i) {
-  Address unionAddr = getLoweredAddress(i->getOperand());
-  emitStoreUnionTagToAddress(*this, i->getOperand().getType(),
-                             unionAddr, i->getElement());
+void IRGenSILFunction::visitInjectEnumAddrInst(swift::InjectEnumAddrInst *i) {
+  Address enumAddr = getLoweredAddress(i->getOperand());
+  emitStoreEnumTagToAddress(*this, i->getOperand().getType(),
+                             enumAddr, i->getElement());
 }
 
 void IRGenSILFunction::visitBuiltinZeroInst(swift::BuiltinZeroInst *i) {

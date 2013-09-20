@@ -40,7 +40,7 @@
 #include "IRGenDebugInfo.h"
 #include "ScalarTypeInfo.h"
 #include "StructMetadataLayout.h"
-#include "UnionMetadataLayout.h"
+#include "EnumMetadataLayout.h"
 
 #include "GenMeta.h"
 
@@ -1376,7 +1376,7 @@ llvm::Value *irgen::emitParentMetadataRef(IRGenFunction &IGF,
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
   }
 
-  case DeclKind::Union:
+  case DeclKind::Enum:
   case DeclKind::Struct:
     // In both of these cases, 'Parent' is always the third field.
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, 2);
@@ -1433,8 +1433,8 @@ namespace {
   
   using FindStructArgumentIndex
     = FindValueTypeArgumentIndex<StructMetadataScanner>;
-  using FindUnionArgumentIndex
-    = FindValueTypeArgumentIndex<UnionMetadataScanner>;
+  using FindEnumArgumentIndex
+    = FindValueTypeArgumentIndex<EnumMetadataScanner>;
 }
 
 /// Given a reference to nominal type metadata of the given type,
@@ -1472,9 +1472,9 @@ llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
   }
 
-  case DeclKind::Union: {
+  case DeclKind::Enum: {
     int index =
-      FindUnionArgumentIndex(IGF.IGM, cast<UnionDecl>(decl), targetArchetype)
+      FindEnumArgumentIndex(IGF.IGM, cast<EnumDecl>(decl), targetArchetype)
         .getTargetIndex();
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
   }
@@ -1547,8 +1547,8 @@ namespace {
   
   using FindStructWitnessTableIndex
     = FindValueTypeWitnessTableIndex<StructMetadataScanner>;
-  using FindUnionWitnessTableIndex
-    = FindValueTypeWitnessTableIndex<UnionMetadataScanner>;
+  using FindEnumWitnessTableIndex
+    = FindValueTypeWitnessTableIndex<EnumMetadataScanner>;
 }
 
 /// Given a reference to nominal type metadata of the given type,
@@ -1581,9 +1581,9 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
     return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
   }
 
-  case DeclKind::Union: {
+  case DeclKind::Enum: {
     int index =
-      FindUnionWitnessTableIndex(IGF.IGM, cast<UnionDecl>(decl),
+      FindEnumWitnessTableIndex(IGF.IGM, cast<EnumDecl>(decl),
                                  targetArchetype, targetProtocol)
         .getTargetIndex();
     return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
@@ -2039,13 +2039,13 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
   var->setInitializer(init);
 }
 
-// Unions
+// Enums
 
 namespace {
 
 template<class Impl>
-class UnionMetadataBuilderBase : public UnionMetadataLayout<Impl> {
-  using super = UnionMetadataLayout<Impl>;
+class EnumMetadataBuilderBase : public EnumMetadataLayout<Impl> {
+  using super = EnumMetadataLayout<Impl>;
 
 protected:
   using super::IGM;
@@ -2054,11 +2054,11 @@ protected:
   unsigned getNextIndex() const { return Fields.size(); }
 
 public:
-  UnionMetadataBuilderBase(IRGenModule &IGM, UnionDecl *theUnion)
-    : super(IGM, theUnion) {}
+  EnumMetadataBuilderBase(IRGenModule &IGM, EnumDecl *theEnum)
+    : super(IGM, theEnum) {}
   
   void addMetadataFlags() {
-    Fields.push_back(getMetadataKind(IGM, MetadataKind::Union));
+    Fields.push_back(getMetadataKind(IGM, MetadataKind::Enum));
   }
   
   void addNominalTypeDescriptor() {
@@ -2084,12 +2084,12 @@ public:
   }
 };
   
-class UnionMetadataBuilder
-  : public UnionMetadataBuilderBase<UnionMetadataBuilder>
+class EnumMetadataBuilder
+  : public EnumMetadataBuilderBase<EnumMetadataBuilder>
 {
 public:
-  UnionMetadataBuilder(IRGenModule &IGM, UnionDecl *theUnion)
-    : UnionMetadataBuilderBase(IGM, theUnion) {}
+  EnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum)
+    : EnumMetadataBuilderBase(IGM, theEnum) {}
   
   void addValueWitnessTable() {
     auto type = Target->getDeclaredType()->getCanonicalType();
@@ -2101,14 +2101,14 @@ public:
   }
 };
   
-class GenericUnionMetadataBuilder
-  : public GenericMetadataBuilderBase<GenericUnionMetadataBuilder,
-                        UnionMetadataBuilderBase<GenericUnionMetadataBuilder>>
+class GenericEnumMetadataBuilder
+  : public GenericMetadataBuilderBase<GenericEnumMetadataBuilder,
+                        EnumMetadataBuilderBase<GenericEnumMetadataBuilder>>
 {
 public:
-  GenericUnionMetadataBuilder(IRGenModule &IGM, UnionDecl *theUnion,
-                              const GenericParamList &unionGenerics)
-    : GenericMetadataBuilderBase(IGM, unionGenerics, theUnion) {}
+  GenericEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
+                              const GenericParamList &enumGenerics)
+    : GenericMetadataBuilderBase(IGM, enumGenerics, theEnum) {}
   
   void addValueWitnessTable() {
     HasDependentVWT
@@ -2131,18 +2131,18 @@ public:
   
 }
 
-void irgen::emitUnionMetadata(IRGenModule &IGM, UnionDecl *theUnion) {
-  // TODO: unions nested inside generic types
+void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
+  // TODO: enums nested inside generic types
   llvm::Constant *init;
   
   bool isPattern;
-  if (auto *generics = theUnion->getGenericParamsOfContext()) {
-    GenericUnionMetadataBuilder builder(IGM, theUnion, *generics);
+  if (auto *generics = theEnum->getGenericParamsOfContext()) {
+    GenericEnumMetadataBuilder builder(IGM, theEnum, *generics);
     builder.layout();
     init = builder.getInit();
     isPattern = true;
   } else {
-    UnionMetadataBuilder builder(IGM, theUnion);
+    EnumMetadataBuilder builder(IGM, theEnum);
     builder.layout();
     init = builder.getInit();
     isPattern = false;
@@ -2151,7 +2151,7 @@ void irgen::emitUnionMetadata(IRGenModule &IGM, UnionDecl *theUnion) {
   // For now, all type metadata is directly stored.
   bool isIndirect = false;
   
-  CanType declaredType = theUnion->getDeclaredType()->getCanonicalType();
+  CanType declaredType = theEnum->getDeclaredType()->getCanonicalType();
   auto var = cast<llvm::GlobalVariable>(
                               IGM.getAddrOfTypeMetadata(declaredType,
                                                         isIndirect, isPattern,

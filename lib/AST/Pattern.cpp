@@ -42,8 +42,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
     return OS << "expression pattern";
   case PatternKind::Var:
     return OS << "'var' binding pattern";
-  case PatternKind::UnionElement:
-    return OS << "union case matching pattern";
+  case PatternKind::EnumElement:
+    return OS << "enum case matching pattern";
   }
 }
 
@@ -146,8 +146,8 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
     return cast<NominalTypePattern>(this)->getSubPattern()
              ->collectVariables(variables);
       
-  case PatternKind::UnionElement: {
-    auto *OP = cast<UnionElementPattern>(this);
+  case PatternKind::EnumElement: {
+    auto *OP = cast<EnumElementPattern>(this);
     if (OP->hasSubPattern())
       OP->collectVariables(variables);
     return;
@@ -225,12 +225,12 @@ Pattern *Pattern::clone(ASTContext &context) const {
     break;
   }
       
-  case PatternKind::UnionElement: {
-    auto oof = cast<UnionElementPattern>(this);
+  case PatternKind::EnumElement: {
+    auto oof = cast<EnumElementPattern>(this);
     Pattern *sub = nullptr;
     if (oof->hasSubPattern())
       sub = oof->getSubPattern()->clone(context);
-    result = new(context) UnionElementPattern(oof->getParentType(),
+    result = new(context) EnumElementPattern(oof->getParentType(),
                                               oof->getLoc(),
                                               oof->getNameLoc(),
                                               oof->getName(),

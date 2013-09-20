@@ -1108,7 +1108,7 @@ static void processAllocBox(AllocBoxInst *ABI) {
 }
 
 static void processAllocStack(AllocStackInst *ASI) {
-  // FIXME: HACK: work around SILGen union issue.
+  // FIXME: HACK: work around SILGen enum issue.
   if (!ASI->getLoc().is<SILFileLocation>())
     if (ASI->getLoc().getAsASTNode<Decl>() == nullptr ||
         !isa<ValueDecl>(ASI->getLoc().getAsASTNode<Decl>()))

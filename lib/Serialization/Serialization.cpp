@@ -132,7 +132,7 @@ DeclID Serializer::addDeclRef(const Decl *D) {
     break;
   case DeclKind::Class:
   case DeclKind::Struct:
-  case DeclKind::Union:
+  case DeclKind::Enum:
     paramList = cast<NominalTypeDecl>(D)->getGenericParams();
     break;
   default:
@@ -266,8 +266,8 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, POSTFIX_OPERATOR_DECL);
   RECORD(decls_block, INFIX_OPERATOR_DECL);
   RECORD(decls_block, CLASS_DECL);
-  RECORD(decls_block, UNION_DECL);
-  RECORD(decls_block, UNION_ELEMENT_DECL);
+  RECORD(decls_block, ENUM_DECL);
+  RECORD(decls_block, ENUM_ELEMENT_DECL);
   RECORD(decls_block, SUBSCRIPT_DECL);
   RECORD(decls_block, EXTENSION_DECL);
   RECORD(decls_block, DESTRUCTOR_DECL);
@@ -491,7 +491,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     writePattern(nom->getSubPattern());
     break;
   }
-  case PatternKind::UnionElement:
+  case PatternKind::EnumElement:
   case PatternKind::Expr:
     llvm_unreachable("FIXME: not implemented");
 
@@ -1018,24 +1018,24 @@ void Serializer::writeDecl(const Decl *D) {
     break;
   }
 
-  case DeclKind::Union: {
-    auto theUnion = cast<UnionDecl>(D);
+  case DeclKind::Enum: {
+    auto theEnum = cast<EnumDecl>(D);
 
     // FIXME: Handle attributes.
-    assert(theUnion->getAttrs().empty() && "union attrs not handled");
+    assert(theEnum->getAttrs().empty() && "enum attrs not handled");
 
-    const Decl *DC = getDeclForContext(theUnion->getDeclContext());
+    const Decl *DC = getDeclForContext(theEnum->getDeclContext());
 
-    unsigned abbrCode = DeclTypeAbbrCodes[UnionLayout::Code];
-    UnionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                            addIdentifierRef(theUnion->getName()),
+    unsigned abbrCode = DeclTypeAbbrCodes[EnumLayout::Code];
+    EnumLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                            addIdentifierRef(theEnum->getName()),
                             addDeclRef(DC),
-                            theUnion->isImplicit());
+                            theEnum->isImplicit());
 
-    writeGenericParams(theUnion->getGenericParams());
-    writeConformances(theUnion->getProtocols(), theUnion->getConformances(),
-                      theUnion);
-    writeMembers(theUnion->getMembers(), false);
+    writeGenericParams(theEnum->getGenericParams());
+    writeConformances(theEnum->getProtocols(), theEnum->getConformances(),
+                      theEnum);
+    writeMembers(theEnum->getMembers(), false);
     break;
   }
 
@@ -1173,16 +1173,16 @@ void Serializer::writeDecl(const Decl *D) {
     break;
   }
 
-  case DeclKind::UnionElement: {
-    auto elem = cast<UnionElementDecl>(D);
+  case DeclKind::EnumElement: {
+    auto elem = cast<EnumElementDecl>(D);
 
     // FIXME: Handle attributes.
-    assert(elem->getAttrs().empty() && "unhandled union element attrs");
+    assert(elem->getAttrs().empty() && "unhandled enum element attrs");
 
     const Decl *DC = getDeclForContext(elem->getDeclContext());
 
-    unsigned abbrCode = DeclTypeAbbrCodes[UnionElementLayout::Code];
-    UnionElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
+    unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
+    EnumElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addIdentifierRef(elem->getName()),
                                    addDeclRef(DC),
                                    addTypeRef(elem->getArgumentType()),
@@ -1376,7 +1376,7 @@ void Serializer::writeType(Type ty) {
   }
 
   case TypeKind::Struct:
-  case TypeKind::Union:
+  case TypeKind::Enum:
   case TypeKind::Class:
   case TypeKind::Protocol: {
     auto nominalTy = cast<NominalType>(ty.getPointer());
@@ -1591,7 +1591,7 @@ void Serializer::writeType(Type ty) {
   }
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericUnion:
+  case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
     auto generic = cast<BoundGenericType>(ty.getPointer());
 
@@ -1654,8 +1654,8 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<PostfixOperatorLayout>();
     registerDeclTypeAbbr<InfixOperatorLayout>();
     registerDeclTypeAbbr<ClassLayout>();
-    registerDeclTypeAbbr<UnionLayout>();
-    registerDeclTypeAbbr<UnionElementLayout>();
+    registerDeclTypeAbbr<EnumLayout>();
+    registerDeclTypeAbbr<EnumElementLayout>();
     registerDeclTypeAbbr<SubscriptLayout>();
     registerDeclTypeAbbr<ExtensionLayout>();
     registerDeclTypeAbbr<DestructorLayout>();

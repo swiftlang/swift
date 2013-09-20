@@ -147,8 +147,8 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
       ->getPointerTo();
   }
   
-  /// unsigned (*getUnionTag)(T *obj, M *self);
-  case ValueWitness::GetUnionTag: {
+  /// unsigned (*getEnumTag)(T *obj, M *self);
+  case ValueWitness::GetEnumTag: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
     llvm::Type *indexTy = IGM.Int32Ty;
@@ -159,8 +159,8 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
       ->getPointerTo();
   }
     
-  /// U *(*inplaceProjectUnionData)(T *obj, unsigned tag, M *self);
-  case ValueWitness::InplaceProjectUnionData: {
+  /// U *(*inplaceProjectEnumData)(T *obj, unsigned tag, M *self);
+  case ValueWitness::InplaceProjectEnumData: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
     llvm::Type *indexTy = IGM.Int32Ty;
@@ -232,10 +232,10 @@ static StringRef getValueWitnessLabel(ValueWitness index) {
     return "getExtraInhabitantIndex";
   case ValueWitness::ExtraInhabitantFlags:
     return "extraInhabitantFlags";
-  case ValueWitness::GetUnionTag:
-    return "getUnionTag";
-  case ValueWitness::InplaceProjectUnionData:
-    return "inplaceProjectUnionData";
+  case ValueWitness::GetEnumTag:
+    return "getEnumTag";
+  case ValueWitness::InplaceProjectEnumData:
+    return "inplaceProjectEnumData";
   }
   llvm_unreachable("bad value witness index");
 }

@@ -532,7 +532,7 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags) {
 ///     decl-extension
 ///     decl-var
 ///     decl-func
-///     decl-union
+///     decl-enum
 ///     decl-struct
 ///     decl-import
 ///     decl-operator
@@ -575,12 +575,12 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
                                      Flags & PD_InProtocol);
     Status = DeclResult;
     break;
-  case tok::kw_union:
-    DeclResult = parseDeclUnion(Flags);
+  case tok::kw_enum:
+    DeclResult = parseDeclEnum(Flags);
     Status = DeclResult;
     break;
   case tok::kw_case:
-    DeclResult = parseDeclUnionElement(Flags);
+    DeclResult = parseDeclEnumElement(Flags);
     Status = DeclResult;
     break;
   case tok::kw_struct:
@@ -700,7 +700,7 @@ void Parser::parseDeclDelayed() {
 ///     'typealias'
 ///     'struct'
 ///     'class'
-///     'union'
+///     'enum'
 ///     'protocol'
 ///     'var'
 ///     'func'
@@ -739,8 +739,8 @@ ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags) {
     case tok::kw_class:
       Kind = ImportKind::Class;
       break;
-    case tok::kw_union:
-      Kind = ImportKind::Union;
+    case tok::kw_enum:
+      Kind = ImportKind::Enum;
       break;
     case tok::kw_protocol:
       Kind = ImportKind::Protocol;
@@ -1723,30 +1723,30 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   return false;
 }
 
-/// \brief Parse a 'union' declaration, returning true (and doing no token
+/// \brief Parse a 'enum' declaration, returning true (and doing no token
 /// skipping) on error.
 ///
 /// \verbatim
-///   decl-union:
-///      'union' attribute-list identifier generic-params? inheritance?
-///          '{' decl-union-body '}'
-///   decl-union-body:
+///   decl-enum:
+///      'enum' attribute-list identifier generic-params? inheritance?
+///          '{' decl-enum-body '}'
+///   decl-enum-body:
 ///      decl*
 /// \endverbatim
-ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
-  SourceLoc UnionLoc = consumeToken(tok::kw_union);
+ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags) {
+  SourceLoc EnumLoc = consumeToken(tok::kw_enum);
 
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
   
-  Identifier UnionName;
-  SourceLoc UnionNameLoc;
+  Identifier EnumName;
+  SourceLoc EnumNameLoc;
   ParserStatus Status;
 
   Status |=
-      parseIdentifierDeclName(*this, UnionName, UnionNameLoc, tok::colon,
+      parseIdentifierDeclName(*this, EnumName, EnumNameLoc, tok::colon,
                               tok::l_brace, TokenProperty::StartsWithLess,
-                              diag::expected_identifier_in_decl, "union");
+                              diag::expected_identifier_in_decl, "enum");
   if (Status.isError())
     return nullptr;
 
@@ -1757,9 +1757,9 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
     GenericParams = maybeParseGenericParams();
   }
 
-  UnionDecl *UD = new (Context) UnionDecl(UnionLoc,
+  EnumDecl *UD = new (Context) EnumDecl(EnumLoc,
                                           /*isEnum*/ false,
-                                          UnionName, UnionNameLoc,
+                                          EnumName, EnumNameLoc,
                                           { },
                                           GenericParams, CurDeclContext);
 
@@ -1772,7 +1772,7 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
     for (auto Param : *GenericParams)
       Param.setDeclContext(UD);
 
-  // Parse optional inheritance clause within the context of the union.
+  // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
     ContextChange CC(*this, UD);
     SmallVector<TypeLoc, 2> Inherited;
@@ -1782,7 +1782,7 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
 
   SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_union)) {
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
     LBLoc = Tok.getLoc();
     RBLoc = LBLoc;
     Status.setIsParseError();
@@ -1790,8 +1790,8 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
     ContextChange CC(*this, UD);
     Scope S(this, ScopeKind::ClassBody);
     if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
-                                diag::expected_rbrace_union,
-                                PD_HasContainerType | PD_AllowUnionElement |
+                                diag::expected_rbrace_enum,
+                                PD_HasContainerType | PD_AllowEnumElement |
                                 PD_DisallowVar))
       Status.setIsParseError();
   }
@@ -1803,20 +1803,20 @@ ParserResult<UnionDecl> Parser::parseDeclUnion(unsigned Flags) {
   addToScope(UD);
 
   if (Flags & PD_DisallowNominalTypes) {
-    diagnose(UnionLoc, diag::disallowed_type);
+    diagnose(EnumLoc, diag::disallowed_type);
     Status.setIsParseError();
   }
 
   return makeParserResult(Status, UD);
 }
 
-/// \brief Parse a 'case' of a union.
+/// \brief Parse a 'case' of an enum.
 ///
 /// \verbatim
-///   decl-union-element:
+///   decl-enum-element:
 ///      'case' identifier type-tuple? ('->' type)?
 /// \endverbatim
-ParserResult<UnionElementDecl> Parser::parseDeclUnionElement(unsigned Flags) {
+ParserResult<EnumElementDecl> Parser::parseDeclEnumElement(unsigned Flags) {
   SourceLoc CaseLoc = consumeToken(tok::kw_case);
   
   // TODO: Accept attributes here?
@@ -1837,7 +1837,7 @@ ParserResult<UnionElementDecl> Parser::parseDeclUnionElement(unsigned Flags) {
       diagnose(CaseLoc, diag::case_outside_of_switch, "case");
       return nullptr;
     }
-    diagnose(CaseLoc, diag::expected_identifier_in_decl, "union case");
+    diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum case");
   }
 
   // See if there's a following argument type.
@@ -1845,7 +1845,7 @@ ParserResult<UnionElementDecl> Parser::parseDeclUnionElement(unsigned Flags) {
   if (Tok.isFollowingLParen()) {
     ArgType = parseTypeTupleBody();
     if (ArgType.hasCodeCompletion())
-      return makeParserCodeCompletionResult<UnionElementDecl>();
+      return makeParserCodeCompletionResult<EnumElementDecl>();
     if (ArgType.isNull())
       return nullptr;
   }
@@ -1855,9 +1855,9 @@ ParserResult<UnionElementDecl> Parser::parseDeclUnionElement(unsigned Flags) {
   ParserResult<TypeRepr> ResultType;
   if (Tok.is(tok::arrow)) {
     ArrowLoc = consumeToken();
-    ResultType = parseType(diag::expected_type_union_element_result);
+    ResultType = parseType(diag::expected_type_enum_element_result);
     if (ResultType.hasCodeCompletion())
-      return makeParserCodeCompletionResult<UnionElementDecl>();
+      return makeParserCodeCompletionResult<EnumElementDecl>();
     if (ResultType.isNull())
       return nullptr;
   }
@@ -1874,15 +1874,15 @@ ParserResult<UnionElementDecl> Parser::parseDeclUnionElement(unsigned Flags) {
   }
   
   // Create the element.
-  auto *result = new (Context) UnionElementDecl(CaseLoc, NameLoc, Name,
+  auto *result = new (Context) EnumElementDecl(CaseLoc, NameLoc, Name,
                                                 ArgType.getPtrOrNull(),
                                                 ArrowLoc,
                                                 ResultType.getPtrOrNull(),
                                                 CurDeclContext);
-  if (!(Flags & PD_AllowUnionElement)) {
-    diagnose(CaseLoc, diag::disallowed_union_element);
-    // Don't return the UnionElementDecl unless it is allowed to have
-    // a UnionElementDecl in the current context.
+  if (!(Flags & PD_AllowEnumElement)) {
+    diagnose(CaseLoc, diag::disallowed_enum_element);
+    // Don't return the EnumElementDecl unless it is allowed to have
+    // an EnumElementDecl in the current context.
     return nullptr;
   }
 

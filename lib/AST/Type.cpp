@@ -101,14 +101,14 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinVector:
   case TypeKind::Tuple:
-  case TypeKind::Union:
+  case TypeKind::Enum:
   case TypeKind::Struct:
   case TypeKind::MetaType:
   case TypeKind::Module:
   case TypeKind::Array:
   case TypeKind::LValue:
   case TypeKind::TypeVariable:
-  case TypeKind::BoundGenericUnion:
+  case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
     return false;
 
@@ -208,7 +208,7 @@ bool TypeBase::isUnspecializedGeneric() {
     return true;
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericUnion:
+  case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
     return true;
 
@@ -221,7 +221,7 @@ bool TypeBase::isUnspecializedGeneric() {
 
   case TypeKind::Class:
   case TypeKind::Struct:
-  case TypeKind::Union:
+  case TypeKind::Enum:
     if (auto parentTy = cast<NominalType>(this)->getParent())
       return parentTy->isUnspecializedGeneric();
     return false;
@@ -309,12 +309,12 @@ StructDecl *TypeBase::getStructOrBoundGenericStruct() {
   return nullptr;
 }
 
-UnionDecl *TypeBase::getUnionOrBoundGenericUnion() {
-  if (auto oofTy = getAs<UnionType>())
+EnumDecl *TypeBase::getEnumOrBoundGenericEnum() {
+  if (auto oofTy = getAs<EnumType>())
     return oofTy->getDecl();
   
   if (auto boundTy = getAs<BoundGenericType>())
-    return dyn_cast<UnionDecl>(boundTy->getDecl());
+    return dyn_cast<EnumDecl>(boundTy->getDecl());
   
   return nullptr;
 }
@@ -547,7 +547,7 @@ CanType TypeBase::getCanonicalType() {
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
 
-  case TypeKind::Union:
+  case TypeKind::Enum:
   case TypeKind::Struct:
   case TypeKind::Class: {
     auto nominalTy = cast<NominalType>(this);
@@ -661,7 +661,7 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericUnion:
+  case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
     BoundGenericType *BGT = cast<BoundGenericType>(this);
     Type parentTy;
@@ -697,9 +697,9 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::ProtocolComposition:
   case TypeKind::MetaType:
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericUnion:
+  case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
-  case TypeKind::Union:
+  case TypeKind::Enum:
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::GenericTypeParam:
@@ -802,7 +802,7 @@ bool TypeBase::isSpelledLike(Type other) {
 #define UNCHECKED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Union:
+  case TypeKind::Enum:
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::NameAlias:
@@ -813,7 +813,7 @@ bool TypeBase::isSpelledLike(Type other) {
     return false;
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericUnion:
+  case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
     auto bgMe = cast<BoundGenericType>(me);
     auto bgThem = cast<BoundGenericType>(them);
@@ -1812,7 +1812,7 @@ void ClassType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   OS << getDecl()->getName().get();
 }
 
-void UnionType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
+void EnumType::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
   if (auto parent = getParent()) {
     parent.print(OS, PO);
     OS << ".";

@@ -500,7 +500,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
     case DeclKind::Import:
     case DeclKind::TopLevelCode:
     case DeclKind::Protocol:
-    case DeclKind::UnionElement:
+    case DeclKind::EnumElement:
     case DeclKind::Extension:
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
@@ -520,8 +520,8 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
     case DeclKind::AssociatedType:
     case DeclKind::GenericTypeParam:
       continue;
-    case DeclKind::Union:
-      emitUnionDecl(cast<UnionDecl>(member));
+    case DeclKind::Enum:
+      emitEnumDecl(cast<EnumDecl>(member));
       continue;
     case DeclKind::Struct:
       emitStructDecl(cast<StructDecl>(member));

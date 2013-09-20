@@ -255,7 +255,7 @@ swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
-  case MetadataKind::Union:
+  case MetadataKind::Enum:
   case MetadataKind::Opaque:
   case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
@@ -286,7 +286,7 @@ swift::swift_dynamicCastUnconditional(const void *object,
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
-  case MetadataKind::Union:
+  case MetadataKind::Enum:
   case MetadataKind::Opaque:
   case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
@@ -321,7 +321,7 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
     case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
-    case MetadataKind::Union:
+    case MetadataKind::Enum:
     case MetadataKind::Opaque:
     case MetadataKind::PolyFunction:
     case MetadataKind::Struct:
@@ -335,7 +335,7 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
-  case MetadataKind::Union:
+  case MetadataKind::Enum:
   case MetadataKind::Opaque:
   case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
@@ -372,7 +372,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
     case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
-    case MetadataKind::Union:
+    case MetadataKind::Enum:
     case MetadataKind::Opaque:
     case MetadataKind::PolyFunction:
     case MetadataKind::Struct:
@@ -386,7 +386,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
-  case MetadataKind::Union:
+  case MetadataKind::Enum:
   case MetadataKind::Opaque:
   case MetadataKind::PolyFunction:
   case MetadataKind::Struct:

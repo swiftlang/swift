@@ -332,12 +332,12 @@ namespace {
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
     void consume(IRGenFunction &IGF, Explosion &src) const {}
     void destroy(IRGenFunction &IGF, Address addr) const {}
-    llvm::Value *packUnionPayload(IRGenFunction &IGF, Explosion &src,
+    llvm::Value *packEnumPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth,
                                   unsigned offset) const override {
-      return PackUnionPayload::getEmpty(IGF.IGM, bitWidth);
+      return PackEnumPayload::getEmpty(IGF.IGM, bitWidth);
     }
-    void unpackUnionPayload(IRGenFunction &IGF, llvm::Value *payload,
+    void unpackEnumPayload(IRGenFunction &IGF, llvm::Value *payload,
                             Explosion &dest,
                             unsigned offset) const override {}
   };
@@ -628,11 +628,11 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   case TypeKind::Archetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::Class:
-  case TypeKind::Union:
+  case TypeKind::Enum:
   case TypeKind::Struct:
     return convertAnyNominalType(ty, cast<NominalType>(ty)->getDecl());
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericUnion:
+  case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
     return convertAnyNominalType(ty, cast<BoundGenericType>(ty)->getDecl());
   case TypeKind::LValue:
@@ -725,8 +725,8 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
 
     case DeclKind::Class:
       return convertClassType(cast<ClassDecl>(decl));
-    case DeclKind::Union:
-      return convertUnionType(type, cast<UnionDecl>(decl));
+    case DeclKind::Enum:
+      return convertEnumType(type, cast<EnumDecl>(decl));
     case DeclKind::Struct:
       return convertStructType(type, cast<StructDecl>(decl));
     }
@@ -765,8 +765,8 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
     return result;
   }
 
-  case DeclKind::Union: {
-    auto result = convertUnionType(CanType(key), cast<UnionDecl>(decl));
+  case DeclKind::Enum: {
+    auto result = convertEnumType(CanType(key), cast<EnumDecl>(decl));
     overwriteForwardDecl(Types.Cache, key, result);
     return result;
   }
@@ -978,27 +978,27 @@ namespace {
       return result;
     }
 
-    ObjectSize visitUnionType(CanUnionType type) {
+    ObjectSize visitEnumType(CanEnumType type) {
       if (type->getDecl()->getGenericParams())
-        return visitGenericUnionType(type, type->getDecl());
+        return visitGenericEnumType(type, type->getDecl());
       if (IGM.isResilient(type->getDecl(), Scope))
         return ObjectSize::Resilient;
       return ObjectSize::Fixed;
     }
 
-    ObjectSize visitBoundGenericUnionType(CanBoundGenericUnionType type) {
-      return visitGenericUnionType(type, type->getDecl());
+    ObjectSize visitBoundGenericEnumType(CanBoundGenericEnumType type) {
+      return visitGenericEnumType(type, type->getDecl());
     }
 
-    ObjectSize visitGenericUnionType(CanType type, UnionDecl *D) {
+    ObjectSize visitGenericEnumType(CanType type, EnumDecl *D) {
       assert(D->getGenericParams());
 
-      // If a generic union is resilient, we have to assume that any
+      // If a generic enum is resilient, we have to assume that any
       // unknown elements might be dependently-sized.
       if (IGM.isResilient(D, Scope))
         return ObjectSize::Dependent;
 
-      // TODO: apply substitutions to decide whether the union data
+      // TODO: apply substitutions to decide whether the enum data
       // members are actually dependently-sized with the given
       // arguments.
       ObjectSize result = ObjectSize::Fixed;

@@ -56,8 +56,8 @@ namespace swift {
   class ExtensionDecl;
   class FuncDecl;
   class SILFunction;
-  class UnionElementDecl;
-  class UnionDecl;
+  class EnumElementDecl;
+  class EnumDecl;
   class ProtocolCompositionType;
   class ProtocolDecl;
   struct SILDeclRef;
@@ -272,7 +272,7 @@ public:
   void emitTranslationUnit(TranslationUnit *TU, unsigned StartElem);
 
   void emitProtocolDecl(ProtocolDecl *D);
-  void emitUnionDecl(UnionDecl *D);
+  void emitEnumDecl(EnumDecl *D);
   void emitStructDecl(StructDecl *D);
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
@@ -305,7 +305,7 @@ public:
   Address getAddrOfGlobalVariable(VarDecl *D);
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect);
   llvm::Function *getAddrOfFunction(FunctionRef ref, ExtraData data);
-  llvm::Function *getAddrOfInjectionFunction(UnionElementDecl *D);
+  llvm::Function *getAddrOfInjectionFunction(EnumElementDecl *D);
   llvm::Function *getAddrOfGetter(ValueDecl *D, FormalType type,
                                   Mangle::ExplosionKind kind);
   llvm::Function *getAddrOfGetter(ValueDecl *D, Mangle::ExplosionKind kind);

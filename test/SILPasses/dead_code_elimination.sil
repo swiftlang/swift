@@ -254,10 +254,10 @@ bb0:
 // CHECK: dealloc_stack
 // CHECK: }
 
-sil @constant_fold_switch_union : $[thin] (i : Int64) -> Int64 {
+sil @constant_fold_switch_enum : $[thin] (i : Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %6 = union $Bool, #Bool.false!unionelt          // user: %9
-  switch_union %6 : $Bool, case #Bool.true!unionelt: bb1, case #Bool.false!unionelt: bb2
+  %6 = enum $Bool, #Bool.false!enumelt          // user: %9
+  switch_enum %6 : $Bool, case #Bool.true!enumelt: bb1, case #Bool.false!enumelt: bb2
 
 bb1:                                              // Preds: bb0
   br bb3
@@ -267,10 +267,10 @@ bb2:                                              // Preds: bb0
 
 bb3:                                              // Preds: bb2 bb1
   return %0 : $Int64
-// CHECK-LABEL: sil @constant_fold_switch_union
+// CHECK-LABEL: sil @constant_fold_switch_enum
 // CHECK: bb0(%0 : $Int64):
 // CHECK-NEXT: br bb1
-// CHECK-NOT: switch_union
+// CHECK-NOT: switch_enum
 // CHECK: }
 }
 

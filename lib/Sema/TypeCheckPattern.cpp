@@ -202,39 +202,39 @@ public:
   }
 };
   
-/// Find a union element in a union type.
-UnionElementDecl *
-lookupUnionMemberElement(TypeChecker &TC, Type ty, Identifier name) {
-  // The type must be a union.
-  UnionDecl *oof = ty->getUnionOrBoundGenericUnion();
+/// Find an enum element in an enum type.
+EnumElementDecl *
+lookupEnumMemberElement(TypeChecker &TC, Type ty, Identifier name) {
+  // The type must be an enum.
+  EnumDecl *oof = ty->getEnumOrBoundGenericEnum();
   if (!oof)
     return nullptr;
   
-  // Look up the case inside the union.
+  // Look up the case inside the enum.
   LookupResult foundElements = TC.lookupMember(ty, name,
                                                /*allowDynamicLookup=*/false);
   if (!foundElements)
     return nullptr;
   
-  // See if there is any union element in there.
-  UnionElementDecl *foundElement = nullptr;
+  // See if there is any enum element in there.
+  EnumElementDecl *foundElement = nullptr;
   for (ValueDecl *e : foundElements) {
-    auto *oe = dyn_cast<UnionElementDecl>(e);
+    auto *oe = dyn_cast<EnumElementDecl>(e);
     if (!oe)
       continue;
     // Ambiguities should be ruled out by parsing.
-    assert(!foundElement && "ambiguity in union case name lookup?!");
+    assert(!foundElement && "ambiguity in enum case name lookup?!");
     foundElement = oe;
   }
   
   return foundElement;
 }
   
-/// Resolve a chain of unresolved dot expressions 'T.U<V>.W' to a union element
+/// Resolve a chain of unresolved dot expressions 'T.U<V>.W' to an enum element
 /// reference, returning a TypeLoc over the type reference and the referenced
-/// UnionElementDecl if successful, or returning null on failure.
-static std::pair<TypeLoc, UnionElementDecl*>
-lookupUnionElementReference(TypeChecker &TC,
+/// EnumElementDecl if successful, or returning null on failure.
+static std::pair<TypeLoc, EnumElementDecl*>
+lookupEnumElementReference(TypeChecker &TC,
                             UnresolvedDotExpr *refExpr,
                             DeclContext *DC) {
   // The left side of the dot needs to be a type; do type lookup on it.
@@ -244,9 +244,9 @@ lookupUnionElementReference(TypeChecker &TC,
   if (!ty)
     return {{}, nullptr};
   
-  // Look up the case inside the union.
-  UnionElementDecl *foundElement
-    = lookupUnionMemberElement(TC, ty, refExpr->getName());
+  // Look up the case inside the enum.
+  EnumElementDecl *foundElement
+    = lookupEnumMemberElement(TC, ty, refExpr->getName());
   if (!foundElement)
     return {{}, nullptr};
   
@@ -279,7 +279,7 @@ public:
   ALWAYS_RESOLVED_PATTERN(Paren)
   ALWAYS_RESOLVED_PATTERN(Tuple)
   ALWAYS_RESOLVED_PATTERN(NominalType)
-  ALWAYS_RESOLVED_PATTERN(UnionElement)
+  ALWAYS_RESOLVED_PATTERN(EnumElement)
   ALWAYS_RESOLVED_PATTERN(Typed)
 #undef ALWAYS_RESOLVED_PATTERN
 
@@ -345,27 +345,27 @@ public:
                                 patternElts, E->getRParenLoc());
   }
   
-  // Unresolved member syntax '.Element' forms a UnionElement pattern. The
+  // Unresolved member syntax '.Element' forms an EnumElement pattern. The
   // element will be resolved when we type-check the pattern.
   Pattern *visitUnresolvedMemberExpr(UnresolvedMemberExpr *ume) {
-    return new (TC.Context) UnionElementPattern(TypeLoc(), ume->getDotLoc(),
+    return new (TC.Context) EnumElementPattern(TypeLoc(), ume->getDotLoc(),
                                                 ume->getNameLoc(),
                                                 ume->getName(),
                                                 nullptr, nullptr);
   }
   
-  // Member syntax 'T.Element' forms a pattern if 'T' is a union and the
-  // member name is a member of the union.
+  // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
+  // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
     TypeLoc referencedType;
-    UnionElementDecl *referencedDecl;
+    EnumElementDecl *referencedDecl;
     std::tie(referencedType, referencedDecl)
-      = lookupUnionElementReference(TC, ude, DC);
+      = lookupEnumElementReference(TC, ude, DC);
     
     if (!referencedDecl)
       return nullptr;
     
-    return new (TC.Context) UnionElementPattern(referencedType,
+    return new (TC.Context) EnumElementPattern(referencedType,
                                                 ude->getDotLoc(),
                                                 ude->getNameLoc(),
                                                 ude->getName(),
@@ -376,34 +376,34 @@ public:
   }
   
   // Call syntax 'T.Element(x...)' or '.Element(x...)' forms a pattern if
-  // the callee references a union element. The arguments then form a tuple
+  // the callee references an enum element. The arguments then form a tuple
   // pattern matching the element's data.
   Pattern *visitCallExpr(CallExpr *ce) {
-    // '.Element(x...)' is always treated as a UnionElementPattern.
+    // '.Element(x...)' is always treated as an EnumElementPattern.
     if (auto *ume = dyn_cast<UnresolvedMemberExpr>(ce->getFn())) {
       auto *subPattern = getSubExprPattern(ce->getArg());
-      return new (TC.Context) UnionElementPattern(TypeLoc(), ume->getDotLoc(),
+      return new (TC.Context) EnumElementPattern(TypeLoc(), ume->getDotLoc(),
                                          ume->getNameLoc(),
                                          ume->getName(),
                                          nullptr,
                                          subPattern);
     }
     
-    // 'T.Element(x...)' is treated as a UnionElementPattern if the dotted path
-    // references a union element.
+    // 'T.Element(x...)' is treated as an EnumElementPattern if the dotted path
+    // references an enum element.
     
     if (auto *ude = dyn_cast<UnresolvedDotExpr>(ce->getFn())) {
       TypeLoc referencedType;
-      UnionElementDecl *referencedDecl;
+      EnumElementDecl *referencedDecl;
       std::tie(referencedType, referencedDecl)
-        = lookupUnionElementReference(TC, ude, DC);
+        = lookupEnumElementReference(TC, ude, DC);
       
       if (!referencedDecl)
         return nullptr;
       
-      if (auto oofElt = dyn_cast<UnionElementDecl>(referencedDecl)) {
+      if (auto oofElt = dyn_cast<EnumElementDecl>(referencedDecl)) {
         auto *subPattern = getSubExprPattern(ce->getArg());
-        return new (TC.Context) UnionElementPattern(referencedType,
+        return new (TC.Context) EnumElementPattern(referencedType,
                                                     ude->getDotLoc(),
                                                     ude->getNameLoc(),
                                                     ude->getName(),
@@ -689,25 +689,25 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
     return false;
   }
       
-  case PatternKind::UnionElement: {
-    auto *OP = cast<UnionElementPattern>(P);
+  case PatternKind::EnumElement: {
+    auto *OP = cast<EnumElementPattern>(P);
     
     // If the element decl was not resolved (because it was spelled without a
     // type as `.Foo`), resolve it now that we have a type.
     if (!OP->getElementDecl()) {
-      UnionElementDecl *element
-        = lookupUnionMemberElement(*this, type, OP->getName());
+      EnumElementDecl *element
+        = lookupEnumMemberElement(*this, type, OP->getName());
       if (!element) {
-        diagnose(OP->getLoc(), diag::union_element_pattern_member_not_found,
+        diagnose(OP->getLoc(), diag::enum_element_pattern_member_not_found,
                  OP->getName().str(), type);
         return true;
       }
       OP->setElementDecl(element);
     }
     
-    // If there is a subpattern, push the union element type down onto it.
+    // If there is a subpattern, push the enum element type down onto it.
     if (OP->hasSubPattern()) {
-      UnionElementDecl *elt = OP->getElementDecl();
+      EnumElementDecl *elt = OP->getElementDecl();
       Type elementType;
       if (elt->hasArgumentType())
         elementType = type->getTypeOfMember(elt->getModuleContext(),

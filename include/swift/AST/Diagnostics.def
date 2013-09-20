@@ -164,8 +164,8 @@ ERROR(disallowed_init,decl_parsing,none,
       "variable initializer is not allowed here", ())
 ERROR(var_init_self_referential,expr_parsing,none,
       "variable used within its own initializer", ())
-ERROR(disallowed_union_element,decl_parsing,none,
-      "union 'case' is not allowed outside of a union", ())
+ERROR(disallowed_enum_element,decl_parsing,none,
+      "enum 'case' is not allowed outside of an enum", ())
 ERROR(decl_inner_scope,decl_parsing,none,
       "declaration is only valid at file scope", ())
 
@@ -241,11 +241,11 @@ ERROR(func_selector_with_curry,decl_parsing,none,
 ERROR(func_decl_expected_arrow,decl_parsing,none,
       "expected '->' after function parameter tuple", ())
 
-// Union
-ERROR(expected_lbrace_union,decl_parsing,PointsToFirstBadToken,
-      "expected '{' in union", ())
-ERROR(expected_rbrace_union,decl_parsing,none,
-      "expected '}' at end of union", ())
+// Enum
+ERROR(expected_lbrace_enum,decl_parsing,PointsToFirstBadToken,
+      "expected '{' in enum", ())
+ERROR(expected_rbrace_enum,decl_parsing,none,
+      "expected '}' at end of enum", ())
 
 // Struct
 ERROR(expected_lbrace_struct,decl_parsing,PointsToFirstBadToken,
@@ -283,7 +283,7 @@ ERROR(subscript_static,decl_parsing,none,
 
 // Constructor
 ERROR(constructor_decl_wrong_scope,decl_parsing,none,
-      "constructors may only be declared within a class, struct, or union", ())
+      "constructors may only be declared within a class, struct, or enum", ())
 ERROR(expected_lparen_constructor,decl_parsing,PointsToFirstBadToken,
       "expected '(' or parameter name for constructor parameters", ())
 ERROR(expected_lbrace_constructor,decl_parsing,PointsToFirstBadToken,
@@ -441,8 +441,8 @@ ERROR(expected_rangle_generic_arg_list,type_parsing,PointsToFirstBadToken,
 ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
       "expected type for function result", ())
 
-// Union Types
-ERROR(expected_type_union_element_result,type_parsing,PointsToFirstBadToken,
+// Enum Types
+ERROR(expected_type_enum_element_result,type_parsing,PointsToFirstBadToken,
       "expected type after '->' in 'case'", ())
 
 // Array Types
@@ -905,7 +905,7 @@ ERROR(no_decl_in_module,sema_nb,none,
       "no such decl in module", ())
 ERROR(imported_decl_is_wrong_kind,sema_nb,none,
       "%0 was imported as '%1', but is a "
-      "%select{**MODULE**|type|struct|class|union|protocol|variable|function}2",
+      "%select{**MODULE**|type|struct|class|enum|protocol|variable|function}2",
       (Identifier, StringRef, /*ImportKind*/ unsigned))
 ERROR(ambiguous_decl_in_module,sema_nb,none,
       "ambiguous name %0 in module %1", (Identifier, Identifier))
@@ -995,8 +995,8 @@ ERROR(custom_operator_addressof,sema_tcd,none,
       "cannot declare a custom unary '&' operator", ())
 ERROR(var_type_not_materializable,sema_tcd,none,
       "type %0 of variable is not materializable", (Type))
-ERROR(union_element_not_materializable,sema_tcd,none,
-      "type of union element is not materializable", ())
+ERROR(enum_element_not_materializable,sema_tcd,none,
+      "type of enum element is not materializable", ())
 
 // Attributes
 ERROR(invalid_infix_input,sema_tcd,none,
@@ -1322,8 +1322,8 @@ ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
 ERROR(tuple_pattern_length_mismatch,sema_tcp,none,
       "tuple pattern has the wrong length for tuple type %0", (Type))
-ERROR(union_element_pattern_member_not_found,sema_tcp,none,
-      "union element '%0' not found in type %1", (StringRef, Type))
+ERROR(enum_element_pattern_member_not_found,sema_tcp,none,
+      "enum element '%0' not found in type %1", (StringRef, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Types

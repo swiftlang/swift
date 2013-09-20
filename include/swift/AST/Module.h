@@ -45,7 +45,7 @@ namespace swift {
   class ModuleLoader;
   class NameAliasType;
   class NominalTypeDecl;
-  class UnionElementDecl;
+  class EnumElementDecl;
   class OperatorDecl;
   class PostfixOperatorDecl;
   class PrefixOperatorDecl;

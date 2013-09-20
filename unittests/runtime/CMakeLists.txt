@@ -1,6 +1,6 @@
 add_swift_unittest(SwiftRuntimeTests
   Metadata.cpp
-  Union.cpp
+  Enum.cpp
   )
 
 find_library(FOUNDATION_LIBRARY Foundation)

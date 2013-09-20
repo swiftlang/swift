@@ -132,7 +132,7 @@ unsigned irgen::getDeclNaturalUncurryLevel(ValueDecl *val) {
   if (FuncDecl *FD = dyn_cast<FuncDecl>(val)) {
     return FD->getNaturalArgumentCount() - 1;
   }
-  if (isa<ConstructorDecl>(val) || isa<UnionElementDecl>(val)) {
+  if (isa<ConstructorDecl>(val) || isa<EnumElementDecl>(val)) {
     return 1;
   }
   llvm_unreachable("Unexpected ValueDecl");
@@ -459,21 +459,21 @@ namespace {
       IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
     }
     
-    llvm::Value *packUnionPayload(IRGenFunction &IGF,
+    llvm::Value *packEnumPayload(IRGenFunction &IGF,
                                   Explosion &src,
                                   unsigned bitWidth,
                                   unsigned offset) const override {
-      PackUnionPayload pack(IGF, bitWidth);
+      PackEnumPayload pack(IGF, bitWidth);
       pack.addAtOffset(src.claimNext(), offset);
       pack.add(src.claimNext());
       return pack.get();
     }
     
-    void unpackUnionPayload(IRGenFunction &IGF,
+    void unpackEnumPayload(IRGenFunction &IGF,
                             llvm::Value *payload,
                             Explosion &dest,
                             unsigned offset) const override {
-      UnpackUnionPayload unpack(IGF, payload);
+      UnpackEnumPayload unpack(IGF, payload);
       dest.add(unpack.claimAtOffset(getStorageType()->getElementType(0),
                                     offset));
       dest.add(unpack.claim(getStorageType()->getElementType(1)));
@@ -2039,7 +2039,7 @@ struct EmitLocalDecls : public ASTWalker {
     case DeclKind::TopLevelCode:
     case DeclKind::Protocol:
     case DeclKind::Extension:
-    case DeclKind::UnionElement:
+    case DeclKind::EnumElement:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
     case DeclKind::InfixOperator:
@@ -2061,8 +2061,8 @@ struct EmitLocalDecls : public ASTWalker {
       IGM.emitLocalDecls(cast<FuncDecl>(D));
       return false;
       
-    case DeclKind::Union:
-      IGM.emitUnionDecl(cast<UnionDecl>(D));
+    case DeclKind::Enum:
+      IGM.emitEnumDecl(cast<EnumDecl>(D));
       return false;
       
     case DeclKind::Struct:

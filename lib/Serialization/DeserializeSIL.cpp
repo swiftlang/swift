@@ -1007,9 +1007,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getBBForReference(Fn, ListOfValues[3]), FalseArgs);
     break;
   }
-  case ValueKind::SwitchUnionInst:
-  case ValueKind::DestructiveSwitchUnionAddrInst: {
-    // Format: condition, a list of cases (UnionElementDecl + Basic Block ID),
+  case ValueKind::SwitchEnumInst:
+  case ValueKind::DestructiveSwitchEnumAddrInst: {
+    // Format: condition, a list of cases (EnumElementDecl + Basic Block ID),
     // default basic block ID. Use SILOneTypeValuesLayout: the type is
     // for condition, the list has value for condition, hasDefault, default
     // basic block ID, a list of (DeclID, BasicBlock ID).
@@ -1021,19 +1021,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     if (ListOfValues[2])
       DefaultBB = getBBForReference(Fn, ListOfValues[3]);
 
-    SmallVector<std::pair<UnionElementDecl*, SILBasicBlock*>, 4> CaseBBs;
+    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 4> CaseBBs;
     for (unsigned I = 4, E = ListOfValues.size(); I < E; I += 2) {
-      CaseBBs.push_back( {cast<UnionElementDecl>(MF->getDecl(ListOfValues[I])),
+      CaseBBs.push_back( {cast<EnumElementDecl>(MF->getDecl(ListOfValues[I])),
                             getBBForReference(Fn, ListOfValues[I+1])} );
     }
-    if ((ValueKind)OpCode == ValueKind::SwitchUnionInst)
-      ResultVal = Builder.createSwitchUnion(Loc, Cond, DefaultBB, CaseBBs);
+    if ((ValueKind)OpCode == ValueKind::SwitchEnumInst)
+      ResultVal = Builder.createSwitchEnum(Loc, Cond, DefaultBB, CaseBBs);
     else
-      ResultVal = Builder.createDestructiveSwitchUnionAddr(Loc, Cond,
+      ResultVal = Builder.createDestructiveSwitchEnumAddr(Loc, Cond,
                       DefaultBB, CaseBBs);
     break;
   }
-  case ValueKind::UnionInst: {
+  case ValueKind::EnumInst: {
     // Format: a type, an operand and a decl ID. Use SILTwoOperandsLayout: type,
     // (DeclID + hasOperand), and an operand.
     SILValue Operand;
@@ -1041,21 +1041,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       Operand = getLocalValue(ValID2, ValResNum2,
                     getSILType(MF->getType(TyID2),
                                (SILValueCategory)TyCategory2));
-    ResultVal = Builder.createUnion(Loc, Operand,
-                                    cast<UnionElementDecl>(MF->getDecl(ValID)),
+    ResultVal = Builder.createEnum(Loc, Operand,
+                                    cast<EnumElementDecl>(MF->getDecl(ValID)),
                                     getSILType(MF->getType(TyID),
                                                (SILValueCategory)TyCategory));
     break;
   }
-  case ValueKind::UnionDataAddrInst: {
+  case ValueKind::EnumDataAddrInst: {
     // Use SILOneValueOneOperandLayout.
-    UnionElementDecl *Elt = cast<UnionElementDecl>(MF->getDecl(ValID));
+    EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));
     auto OperandTy = MF->getType(TyID);
     auto ResultTy = OperandTy->getTypeOfMember(Elt->getModuleContext(),
                                                Elt,
                                                nullptr,
                                                Elt->getArgumentType());
-    ResultVal = Builder.createUnionDataAddr(Loc,
+    ResultVal = Builder.createEnumDataAddr(Loc,
                     getLocalValue(ValID2, ValResNum2,
                                   getSILType(OperandTy,
                                              (SILValueCategory)TyCategory)),
@@ -1063,11 +1063,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(ResultTy, SILValueCategory::Address));
     break;
   }
-  case ValueKind::InjectUnionAddrInst: {
+  case ValueKind::InjectEnumAddrInst: {
     // Use SILOneValueOneOperandLayout.
-    UnionElementDecl *Elt = cast<UnionElementDecl>(MF->getDecl(ValID));
+    EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));
     auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createInjectUnionAddr(Loc,
+    ResultVal = Builder.createInjectEnumAddr(Loc,
                     getLocalValue(ValID2, ValResNum2,
                                   getSILType(Ty, (SILValueCategory)TyCategory)),
                     Elt);

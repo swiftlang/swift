@@ -59,7 +59,7 @@ enum class ScopeKind {
   Extension,
   FunctionBody,
   Generics,
-  UnionBody,
+  EnumBody,
   StructBody,
   ClassBody,
   ProtocolBody,

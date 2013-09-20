@@ -760,9 +760,9 @@ namespace {
       }
     }
 
-    void verifyParsed(UnionElementDecl *UED) {
-      if (!isa<UnionDecl>(UED->getDeclContext())) {
-        Out << "UnionElementDecl has wrong DeclContext";
+    void verifyParsed(EnumElementDecl *UED) {
+      if (!isa<EnumDecl>(UED->getDeclContext())) {
+        Out << "EnumElementDecl has wrong DeclContext";
         abort();
       }
     }
@@ -795,9 +795,9 @@ namespace {
 
     void verifyChecked(ConstructorDecl *CD) {
       auto *ND = CD->getExtensionType()->getNominalOrBoundGenericNominal();
-      if (!isa<ClassDecl>(ND) && !isa<StructDecl>(ND) && !isa<UnionDecl>(ND) &&
+      if (!isa<ClassDecl>(ND) && !isa<StructDecl>(ND) && !isa<EnumDecl>(ND) &&
           !CD->isInvalid()) {
-        Out << "ConstructorDecls outside structs, classes or unions"
+        Out << "ConstructorDecls outside structs, classes or enums"
                "should be marked invalid";
         abort();
       }

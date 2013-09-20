@@ -141,8 +141,8 @@ namespace {
       printRec(P->getSubPattern());
       OS << ')';
     }
-    void visitUnionElementPattern(UnionElementPattern *P) {
-      printCommon(P, "pattern_union_element");
+    void visitEnumElementPattern(EnumElementPattern *P) {
+      printCommon(P, "pattern_enum_element");
       OS << ' ';
       P->getParentType().getType().print(OS);
       OS << '.' << P->getName();
@@ -254,8 +254,8 @@ namespace {
       case ImportKind::Class:
         KindString = "class";
         break;
-      case ImportKind::Union:
-        KindString = "union";
+      case ImportKind::Enum:
+        KindString = "enum";
         break;
       case ImportKind::Protocol:
         KindString = "protocol";
@@ -381,8 +381,8 @@ namespace {
       OS << ')';
     }
 
-    void visitUnionDecl(UnionDecl *UD) {
-      printCommon(UD, "union_decl");
+    void visitEnumDecl(EnumDecl *UD) {
+      printCommon(UD, "enum_decl");
       printInherited(UD->getInherited());
       for (Decl *D : UD->getMembers()) {
         if (D->isImplicit())
@@ -394,8 +394,8 @@ namespace {
       OS << ')';
     }
 
-    void visitUnionElementDecl(UnionElementDecl *UED) {
-      printCommon(UED, "union_element_decl");
+    void visitEnumElementDecl(EnumElementDecl *UED) {
+      printCommon(UED, "enum_element_decl");
       OS << ')';
     }
 

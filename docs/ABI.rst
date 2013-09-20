@@ -28,38 +28,38 @@ Class Layout
 
 TODO
 
-Fragile Union Layout
+Fragile Enum Layout
 --------------------
 
-In laying out union types, the ABI attempts to avoid requiring additional
-storage to store the tag for the union case. The ABI chooses one of five
-strategies based on the layout of the union:
+In laying out enum types, the ABI attempts to avoid requiring additional
+storage to store the tag for the enum case. The ABI chooses one of five
+strategies based on the layout of the enum:
 
-Empty Unions
+Empty Enums
 ````````````
 
-In the degenerate case of a union with no cases, the union is an empty type.
+In the degenerate case of an enum with no cases, the enum is an empty type.
 
 ::
 
-  union Empty {} // => empty type
+  enum Empty {} // => empty type
 
-Single-Case Unions
+Single-Case Enums
 ``````````````````
 
-In the degenerate case of a union with a single case, there is no
-discriminator needed, and the union type has the exact same layout as its
+In the degenerate case of an enum with a single case, there is no
+discriminator needed, and the enum type has the exact same layout as its
 case's data type, or is empty if the case has no data type.
 
 ::
 
-  union EmptyCase { case X }             // => empty type
-  union DataCase { case Y(Int, Double) } // => LLVM { i64, double }
+  enum EmptyCase { case X }             // => empty type
+  enum DataCase { case Y(Int, Double) } // => LLVM { i64, double }
 
-Enum-Like Unions
-````````````````
+C-Like Enums
+````````````
 
-If none of the cases has a data type (an "enum-like" union), then the union
+If none of the cases has a data type (a "C-like" enum), then the enum
 is laid out as an integer tag with the minimal number of bits to contain
 all of the cases. The machine-level layout of the type then follows LLVM's
 data layout rules for integer types on the target platform. The cases are
@@ -67,12 +67,12 @@ assigned tag values in declaration order.
 
 ::
 
-  union EnumLike2 { // => LLVM i1
+  enum EnumLike2 { // => LLVM i1
     case A          // => i1 0
     case B          // => i1 1
   }
 
-  union EnumLike8 { // => LLVM i3
+  enum EnumLike8 { // => LLVM i3
     case A          // => i3 0
     case B          // => i3 1
     case C          // => i3 2
@@ -83,11 +83,11 @@ assigned tag values in declaration order.
     case H
   }
 
-Single-Payload Unions
+Single-Payload Enums
 `````````````````````
 
-If a union has a single case with a data type and one or more no-data cases
-(a "single-payload" union), then the case with data type is represented using
+If an enum has a single case with a data type and one or more no-data cases
+(a "single-payload" enum), then the case with data type is represented using
 the data type's binary representation, with added zero bits for tag if
 necessary. If the data type's binary representation
 has *extra inhabitants*, that is, bit patterns with the size and alignment of
@@ -95,13 +95,13 @@ the type but which do not form valid values of that type, they are used to
 represent the no-data cases, with extra inhabitants in order of ascending
 numeric value matching no-data cases in declaration order. The only
 currently considered extra inhabitants are those that use *spare bits*
-(see `Multi-Payload Unions`_) of an integer type, such as the top 11 bits of
-an ``i21``. The union value is then represented as an integer with the storage
+(see `Multi-Payload Enums`_) of an integer type, such as the top 11 bits of
+an ``i21``. The enum value is then represented as an integer with the storage
 size in bits of the data type.
 
 ::
 
-  union CharOrSectionMarker { => LLVM i32
+  enum CharOrSectionMarker { => LLVM i32
     case Paragraph            => i32 0x0020_0000
     case Char(Char)           => i32 (zext i21 %Char to i32)
     case Chapter              => i32 0x0020_0001
@@ -112,12 +112,12 @@ size in bits of the data type.
 
 If the data type has no extra inhabitants, or there are not enough extra
 inhabitants to represent all of the no-data cases, then a tag bit is added
-to the union's representation. The tag bit is set for the no-data cases, which
-are then assigned values in the data area of the union in declaration order.
+to the enum's representation. The tag bit is set for the no-data cases, which
+are then assigned values in the data area of the enum in declaration order.
 
 ::
 
-  union IntOrInfinity { => LLVM { i64, i1 }
+  enum IntOrInfinity { => LLVM { i64, i1 }
     case NegInfinity    => { i64, i1 } {    0, 1 }
     case Int(Int)       => { i64, i1 } { %Int, 0 }
     case PosInfinity    => { i64, i1 } {    1, 1 }
@@ -126,21 +126,21 @@ are then assigned values in the data area of the union in declaration order.
   IntOrInfinity.Int(    0) => { i64, i1 } {     0, 0 }
   IntOrInfinity.Int(20721) => { i64, i1 } { 20721, 0 }
 
-Multi-Payload Unions
+Multi-Payload Enums
 ````````````````````
 
-If a union has more than one case with data type, then a tag is necessary to
+If an enum has more than one case with data type, then a tag is necessary to
 discriminate the data types. The ABI will first try to find common
 *spare bits*, that is, bits in the data types' binary representations which are
 either fixed-zero or ignored by valid values of all of the data types. The tag
 will be scattered into these spare bits as much as possible. Currently only
 spare bits of primitive integer types, such as the high bits of an ``i21``
-type, are considered. The union data is represented as an integer with the
+type, are considered. The enum data is represented as an integer with the
 storage size in bits of the largest data type.
 
 ::
 
-  union TerminalChar {   => LLVM i32
+  enum TerminalChar {   => LLVM i32
     case Plain(Char)     => i32     (zext i21 %Plain     to i32)
     case Bold(Char)      => i32 (or (zext i21 %Bold      to i32), 0x0020_0000)
     case Underline(Char) => i32 (or (zext i21 %Underline to i32), 0x0040_0000)
@@ -153,13 +153,13 @@ If there are not enough spare bits to contain the tag, then additional bits are
 added to the representation to contain the tag. Tag values are
 assigned to data cases in declaration order. If there are no-data cases, they
 are collected under a common tag, and assigned values in the data area of the
-union in declaration order.
+enum in declaration order.
 
 ::
 
   class Bignum {}
 
-  union IntDoubleOrBignum { => LLVM { i64, i2 }
+  enum IntDoubleOrBignum { => LLVM { i64, i2 }
     case Int(Int)           => { i64, i2 } {           %Int,            0 }
     case Double(Double)     => { i64, i2 } { (bitcast  %Double to i64), 1 }
     case Bignum(Bignum)     => { i64, i2 } { (ptrtoint %Bignum to i64), 2 }
@@ -265,7 +265,7 @@ types where the metadata itself has unknown layout.)
   nominal-type ::= substitution
   nominal-type ::= nominal-type-kind declaration-name
   nominal-type-kind ::= 'C'                  // class
-  nominal-type-kind ::= 'O'                  // union
+  nominal-type-kind ::= 'O'                  // enum
   nominal-type-kind ::= 'V'                  // struct
   archetype ::= 'Q' index                    // archetype with depth=0
   archetype ::= 'Qd' index index             // archetype with depth=M+1
@@ -320,8 +320,8 @@ the conformance.
   value-witness-kind ::= 'ty'                // typeof
   value-witness-kind ::= 'xs'                // storeExtraInhabitant
   value-witness-kind ::= 'xg'                // getExtraInhabitantIndex
-  value-witness-kind ::= 'ug'                // getUnionTag
-  value-witness-kind ::= 'up'                // inplaceProjectUnionData
+  value-witness-kind ::= 'ug'                // getEnumTag
+  value-witness-kind ::= 'up'                // inplaceProjectEnumData
 
 <value-witness-kind> differentiates the kinds of function value
 witnesses for a type.

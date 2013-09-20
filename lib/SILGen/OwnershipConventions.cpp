@@ -69,7 +69,7 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   /// with Swift conventions.
   case SILDeclRef::Kind::Allocator:
   /// These constants don't correspond to method families we care about yet.
-  case SILDeclRef::Kind::UnionElement:
+  case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:

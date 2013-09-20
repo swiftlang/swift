@@ -57,9 +57,9 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
     assert((kind == Kind::Allocator || kind == Kind::Initializer)
            && "can only create Allocator or Initializer SILDeclRef for ctor");
     naturalUncurryLevel = 1;
-  } else if (auto *ed = dyn_cast<UnionElementDecl>(vd)) {
-    assert(kind == Kind::UnionElement
-           && "can only create UnionElement SILDeclRef for union element");
+  } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
+    assert(kind == Kind::EnumElement
+           && "can only create EnumElement SILDeclRef for enum element");
     naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
   } else if (isa<ClassDecl>(vd)) {
     assert(kind == Kind::Destroyer
@@ -161,10 +161,10 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
       // FIXME: Should we require the caller to think about this?
       asObjC = false;
     }
-    // Map UnionElementDecls to the UnionElement SILDeclRef of the element.
-    else if (UnionElementDecl *ed = dyn_cast<UnionElementDecl>(vd)) {
+    // Map EnumElementDecls to the EnumElement SILDeclRef of the element.
+    else if (EnumElementDecl *ed = dyn_cast<EnumElementDecl>(vd)) {
       loc = ed;
-      kind = Kind::UnionElement;
+      kind = Kind::EnumElement;
       naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
     }
     // VarDecl constants require an explicit kind.
@@ -212,7 +212,7 @@ SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
 
 /// \brief True if the function should be treated as transparent.
 bool SILDeclRef::isTransparent() const {
-  if (isUnionElement())
+  if (isEnumElement())
     return true;
 
   if (hasDecl()) {

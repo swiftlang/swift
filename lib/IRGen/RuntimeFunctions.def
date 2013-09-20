@@ -304,32 +304,32 @@ FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, RuntimeCC,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// void swift_initUnionValueWitnessTableSinglePayload(value_witness_table_t *vwt,
+// void swift_initEnumValueWitnessTableSinglePayload(value_witness_table_t *vwt,
 //                                                    type_metadata_t *payload,
 //                                                    unsigned num_empty_cases);
-FUNCTION(InitUnionValueWitnessTableSinglePayload,
-         swift_initUnionValueWitnessTableSinglePayload,
+FUNCTION(InitEnumValueWitnessTableSinglePayload,
+         swift_initEnumValueWitnessTableSinglePayload,
          RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WitnessTablePtrTy, TypeMetadataPtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
-// int swift_getUnionCaseSinglePayload(opaque_t *obj,
+// int swift_getEnumCaseSinglePayload(opaque_t *obj,
 //                                     type_metadata_t *payload,
 //                                     unsigned num_empty_cases);
-FUNCTION(GetUnionCaseSinglePayload,
-         swift_getUnionCaseSinglePayload,
+FUNCTION(GetEnumCaseSinglePayload,
+         swift_getEnumCaseSinglePayload,
          RuntimeCC,
          RETURNS(Int32Ty),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
-// void swift_storeUnionTagSinglePayload(opaque_t *obj,
+// void swift_storeEnumTagSinglePayload(opaque_t *obj,
 //                                       type_metadata_t *payload,
 //                                       int case_index,
 //                                       unsigned num_empty_cases);
-FUNCTION(StoreUnionTagSinglePayload,
-         swift_storeUnionTagSinglePayload,
+FUNCTION(StoreEnumTagSinglePayload,
+         swift_storeEnumTagSinglePayload,
          RuntimeCC,
          RETURNS(VoidTy),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty, Int32Ty),

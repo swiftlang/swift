@@ -48,7 +48,7 @@ bb0(%0 : $*Single, %1 : $Int64):
 
 class SomeClass {}
 
-union SomeUnion {
+enum SomeUnion {
   case x(Int)
   case y(SomeClass)
 }

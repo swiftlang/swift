@@ -246,13 +246,13 @@ private:
                                        llvm::DIDescriptor Scope,
                                        llvm::DIFile File,
                                        unsigned Flags);
-  llvm::DIArray getUnionElements(DebugTypeInfo DbgTy,
-                                 UnionDecl *D,
+  llvm::DIArray getEnumElements(DebugTypeInfo DbgTy,
+                                 EnumDecl *D,
                                  llvm::DIDescriptor Scope,
                                  llvm::DIFile File,
                                  unsigned Flags);
   llvm::DICompositeType
-  createUnionType(DebugTypeInfo DbgTy, UnionDecl *Decl, StringRef Name,
+  createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl, StringRef Name,
                   llvm::DIDescriptor Scope, llvm::DIFile File, unsigned Line,
                   unsigned Flags);
   bool emitVarDeclForSILArgOrNull(IRBuilder& Builder,

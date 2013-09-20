@@ -440,7 +440,7 @@ static bool canonicalizeInputFunction(Function &F) {
 /// object, zap both.
 static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
   // FIXME: Call classifier should identify the object for us.  Too bad C++
-  // doesn't have nice Swift-style unions.
+  // doesn't have nice Swift-style enums.
   Value *ReleasedObject = Release.getArgOperand(0);
   
   BasicBlock::iterator BBI = &Release;
@@ -568,7 +568,7 @@ OutOfLoop:
 ///
 static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
   // FIXME: Call classifier should identify the object for us.  Too bad C++
-  // doesn't have nice Swift-style unions.
+  // doesn't have nice Swift-style enums.
   Value *RetainedObject = Retain.getArgOperand(0);
   
   BasicBlock::iterator BBI = &Retain, BBE = BB.getTerminator();

@@ -62,7 +62,7 @@ namespace swift {
   class ModuleLoadListener;
   class NominalTypeDecl;
   class TupleTypeElt;
-  class UnionElementDecl;
+  class EnumElementDecl;
   class ProtocolDecl;
   class SubstitutableType;
   class SourceManager;

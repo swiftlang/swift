@@ -353,7 +353,7 @@ namespace {
         }
         assert(base && "Unable to convert base?");
 
-        if (isa<FuncDecl>(member) || isa<UnionElementDecl>(member) ||
+        if (isa<FuncDecl>(member) || isa<EnumElementDecl>(member) ||
             isa<ConstructorDecl>(member)) {
           // We're binding a reference to an instance method of a generic
           // type, which we build as a reference to the underlying declaration
@@ -414,13 +414,13 @@ namespace {
         }
       }
 
-      // Handle references to non-variable struct/class/union members, as
+      // Handle references to non-variable struct/class/enum members, as
       // well as module members.
       Expr *ref = tc.buildCheckedRefExpr(member, memberLoc);
 
       // Refer to a member function that binds 'self':
       if ((isa<FuncDecl>(member) && member->getDeclContext()->isTypeContext()) ||
-          isa<UnionElementDecl>(member) || isa<ConstructorDecl>(member)) {
+          isa<EnumElementDecl>(member) || isa<ConstructorDecl>(member)) {
         // Constructor calls.
         if (isa<ConstructorDecl>(member)) {
           return finishApply(new (context) ConstructorRefCallExpr(ref, base),
@@ -1270,14 +1270,14 @@ namespace {
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      // Dig out the type of the 'union', which will either be the result
-      // type of this expression (for unit UnionElements) or the result of
-      // the function type of this expression (for non-unit UnionElements).
-      Type unionTy = simplifyType(expr->getType());
-      if (auto funcTy = unionTy->getAs<FunctionType>())
-        unionTy = funcTy->getResult();
+      // Dig out the type of the 'enum', which will either be the result
+      // type of this expression (for unit EnumElements) or the result of
+      // the function type of this expression (for non-unit EnumElements).
+      Type enumTy = simplifyType(expr->getType());
+      if (auto funcTy = enumTy->getAs<FunctionType>())
+        enumTy = funcTy->getResult();
       auto &tc = cs.getTypeChecker();
-      auto unionMetaTy = MetaTypeType::get(unionTy, tc.Context);
+      auto enumMetaTy = MetaTypeType::get(enumTy, tc.Context);
 
       // Find the selected member.
       auto selected = getOverloadChoice(
@@ -1285,10 +1285,10 @@ namespace {
                           expr, ConstraintLocator::UnresolvedMember));
       auto member = selected.first.getDecl();
 
-      // The base expression is simply the metatype of a union type.
+      // The base expression is simply the metatype of an enum type.
       auto base = new (tc.Context) MetatypeExpr(nullptr,
                                                 expr->getDotLoc(),
-                                                unionMetaTy);
+                                                enumMetaTy);
 
       // Build the member reference.
       return buildMemberRef(base, expr->getDotLoc(), member, expr->getNameLoc(),
@@ -2414,7 +2414,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // FIXME: Location information is suspect throughout.
       // Form a reference to the constructor.
       
-      // Form a reference to the constructor or union declaration.
+      // Form a reference to the constructor or enum declaration.
       Expr *typeBase = new (tc.Context) MetatypeExpr(
                                           nullptr,
                                           expr->getStartLoc(),
@@ -2635,7 +2635,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     return coerceToType(apply->getArg(), tupleTy, locator);
   }
 
-  // We're constructing a struct or union. Look for the constructor or union
+  // We're constructing a struct or enum. Look for the constructor or enum
   // element to use.
   // Note: we also allow class types here, for now, because T(x) is still
   // allowed to use coercion syntax.
@@ -2658,7 +2658,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto choice = selected->first;
   auto decl = choice.getDecl();
 
-  // Form a reference to the constructor or union declaration.
+  // Form a reference to the constructor or enum declaration.
   Expr *typeBase = new (tc.Context) MetatypeExpr(nullptr, apply->getLoc(),
                                                  metaTy);
   Expr *declRef = buildMemberRef(typeBase, apply->getLoc(),

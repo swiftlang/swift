@@ -703,8 +703,8 @@ public:
       return visitBoundVars(cast<TypedPattern>(P)->getSubPattern());
     case PatternKind::NominalType:
       return visitBoundVars(cast<NominalTypePattern>(P)->getSubPattern());
-    case PatternKind::UnionElement: {
-      auto *OP = cast<UnionElementPattern>(P);
+    case PatternKind::EnumElement: {
+      auto *OP = cast<EnumElementPattern>(P);
       if (OP->hasSubPattern())
         visitBoundVars(OP->getSubPattern());
       return;
@@ -775,8 +775,8 @@ public:
                                      ->getSubPattern());
     case PatternKind::Var:
       return setBoundVarsTypeError(cast<VarPattern>(pattern)->getSubPattern());
-    case PatternKind::UnionElement:
-      if (auto subpattern = cast<UnionElementPattern>(pattern)->getSubPattern())
+    case PatternKind::EnumElement:
+      if (auto subpattern = cast<EnumElementPattern>(pattern)->getSubPattern())
         setBoundVarsTypeError(subpattern);
       return;
 
@@ -892,7 +892,7 @@ public:
       checkExplicitConformance(TAD, TAD->getDeclaredType());
   }
 
-  void visitUnionDecl(UnionDecl *UD) {
+  void visitEnumDecl(EnumDecl *UD) {
     if (!IsSecondPass) {
       TC.validateTypeDecl(UD);
       validateAttributes(UD);
@@ -1378,11 +1378,11 @@ public:
     }
   }
 
-  void visitUnionElementDecl(UnionElementDecl *ED) {
+  void visitEnumElementDecl(EnumElementDecl *ED) {
     if (IsSecondPass)
       return;
 
-    UnionDecl *UD = ED->getParentUnion();
+    EnumDecl *UD = ED->getParentEnum();
     Type ElemTy = UD->getDeclaredTypeInContext();
 
     if (!ED->getArgumentTypeLoc().isNull())
@@ -1421,7 +1421,7 @@ public:
 
     // Require the carried type to be materializable.
     if (!ED->getArgumentType()->isMaterializable()) {
-      TC.diagnose(ED->getLoc(), diag::union_element_not_materializable);
+      TC.diagnose(ED->getLoc(), diag::enum_element_not_materializable);
       ED->overwriteType(ErrorType::get(TC.Context));
       ED->setInvalid();
     }
@@ -1449,10 +1449,10 @@ public:
         ExtendedTy = boundType->getCanonicalType();
       }
 
-      if (!isa<UnionType>(ExtendedTy) &&
+      if (!isa<EnumType>(ExtendedTy) &&
           !isa<StructType>(ExtendedTy) &&
           !isa<ClassType>(ExtendedTy) &&
-          !isa<BoundGenericUnionType>(ExtendedTy) &&
+          !isa<BoundGenericEnumType>(ExtendedTy) &&
           !isa<BoundGenericStructType>(ExtendedTy) &&
           !isa<BoundGenericClassType>(ExtendedTy) &&
           !isa<ErrorType>(ExtendedTy)) {
@@ -1797,8 +1797,8 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
   switch (canTy->getKind()) {
   case TypeKind::Archetype:
   case TypeKind::BoundGenericStruct:
-  case TypeKind::BoundGenericUnion:
-  case TypeKind::Union:
+  case TypeKind::BoundGenericEnum:
+  case TypeKind::Enum:
   case TypeKind::Struct:
     // Break to look for constructors.
     break;

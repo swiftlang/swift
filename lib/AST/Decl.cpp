@@ -192,8 +192,8 @@ bool ValueDecl::isDefinition() const {
         AbstractFunctionDecl::BodyKind::None;
 
   case DeclKind::Var:
-  case DeclKind::Union:
-  case DeclKind::UnionElement:
+  case DeclKind::Enum:
+  case DeclKind::EnumElement:
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::TypeAlias:
@@ -220,7 +220,7 @@ bool ValueDecl::isInstanceMember() const {
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:
-  case DeclKind::Union:
+  case DeclKind::Enum:
   case DeclKind::Protocol:
   case DeclKind::Struct:
   case DeclKind::TypeAlias:
@@ -242,8 +242,8 @@ bool ValueDecl::isInstanceMember() const {
     // Non-static methods are instance members.
     return !cast<FuncDecl>(this)->isStatic();
 
-  case DeclKind::UnionElement:
-    // union elements are not instance members.
+  case DeclKind::EnumElement:
+    // enum elements are not instance members.
     return false;
 
   case DeclKind::Subscript:
@@ -502,13 +502,13 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
   return SourceRange(KeywordLoc, endLoc);
 }
 
-UnionDecl::UnionDecl(SourceLoc UnionLoc, bool Enum,
+EnumDecl::EnumDecl(SourceLoc EnumLoc, bool Enum,
                      Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
-  : NominalTypeDecl(DeclKind::Union, Parent, Name, NameLoc, Inherited,
+  : NominalTypeDecl(DeclKind::Enum, Parent, Name, NameLoc, Inherited,
                     GenericParams),
-    UnionLoc(UnionLoc) { }
+    EnumLoc(EnumLoc) { }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
                        MutableArrayRef<TypeLoc> Inherited,
@@ -527,10 +527,10 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
     = static_cast<unsigned>(CircularityCheck::Unchecked);
 }
 
-UnionElementDecl *UnionDecl::getElement(Identifier Name) const {
-  // FIXME: Linear search is not great for large union decls.
+EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
+  // FIXME: Linear search is not great for large enum decls.
   for (Decl *D : getMembers())
-    if (UnionElementDecl *Elt = dyn_cast<UnionElementDecl>(D))
+    if (EnumElementDecl *Elt = dyn_cast<EnumElementDecl>(D))
       if (Elt->getName() == Name)
         return Elt;
   return 0;
@@ -901,7 +901,7 @@ SourceRange FuncDecl::getSourceRange() const {
   return { FuncLoc, LastPat->getEndLoc() };
 }
 
-SourceRange UnionElementDecl::getSourceRange() const {
+SourceRange EnumElementDecl::getSourceRange() const {
   if (ResultType.hasLocation())
     return {getStartLoc(), ResultType.getSourceRange().End};
   if (ArgumentType.hasLocation())

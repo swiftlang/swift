@@ -46,8 +46,8 @@ namespace swift {
   class TypeAliasDecl;
   class TypeDecl;
   class NominalTypeDecl;
-  class UnionDecl;
-  class UnionElementDecl;
+  class EnumDecl;
+  class EnumElementDecl;
   class StructDecl;
   class ProtocolDecl;
   class TypeVariableType;
@@ -253,9 +253,9 @@ public:
   /// the (possibly generic) class.
   StructDecl *getStructOrBoundGenericStruct();
   
-  /// \brief If this is a union or a bound generic union type, returns the
-  /// (possibly generic) union.
-  UnionDecl *getUnionOrBoundGenericUnion();
+  /// \brief If this is an enum or a bound generic enum type, returns the
+  /// (possibly generic) enum.
+  EnumDecl *getEnumOrBoundGenericEnum();
   
   /// \brief Determine whether this type may have a superclass, which holds for
   /// classes, bound generic classes, and archetypes that are only instantiable
@@ -898,36 +898,36 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericClassType, BoundGenericType)
 
-/// BoundGenericUnionType - A subclass of BoundGenericType for the case
-/// when the nominal type is a generic union type.
-class BoundGenericUnionType : public BoundGenericType {
+/// BoundGenericEnumType - A subclass of BoundGenericType for the case
+/// when the nominal type is a generic enum type.
+class BoundGenericEnumType : public BoundGenericType {
 private:
-  BoundGenericUnionType(UnionDecl *theDecl, Type parent,
+  BoundGenericEnumType(EnumDecl *theDecl, Type parent,
                         ArrayRef<Type> genericArgs, const ASTContext *context,
                         bool hasTypeVariable)
-    : BoundGenericType(TypeKind::BoundGenericUnion,
+    : BoundGenericType(TypeKind::BoundGenericEnum,
                        reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
                        genericArgs, context, hasTypeVariable) {}
   friend class BoundGenericType;
 
 public:
-  static BoundGenericUnionType* get(UnionDecl *theDecl, Type parent,
+  static BoundGenericEnumType* get(EnumDecl *theDecl, Type parent,
                                     ArrayRef<Type> genericArgs) {
-    return cast<BoundGenericUnionType>(
+    return cast<BoundGenericEnumType>(
              BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
                                    parent, genericArgs));
   }
 
   /// \brief Returns the declaration that declares this type.
-  UnionDecl *getDecl() const {
-    return reinterpret_cast<UnionDecl*>(BoundGenericType::getDecl());
+  EnumDecl *getDecl() const {
+    return reinterpret_cast<EnumDecl*>(BoundGenericType::getDecl());
   }
 
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::BoundGenericUnion;
+    return T->getKind() == TypeKind::BoundGenericEnum;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericUnionType, BoundGenericType)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericEnumType, BoundGenericType)
 
 /// BoundGenericStructType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic struct type.
@@ -1004,35 +1004,35 @@ BEGIN_CAN_TYPE_WRAPPER(NominalType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
 END_CAN_TYPE_WRAPPER(NominalType, Type)
 
-/// UnionType - This represents the type declared by a UnionDecl.
-class UnionType : public NominalType, public llvm::FoldingSetNode {
+/// EnumType - This represents the type declared by an EnumDecl.
+class EnumType : public NominalType, public llvm::FoldingSetNode {
 public:
   /// getDecl() - Returns the decl which declares this type.
-  UnionDecl *getDecl() const {
-    return reinterpret_cast<UnionDecl *>(NominalType::getDecl());
+  EnumDecl *getDecl() const {
+    return reinterpret_cast<EnumDecl *>(NominalType::getDecl());
   }
 
-  /// \brief Retrieve the type when we're referencing the given union
+  /// \brief Retrieve the type when we're referencing the given enum
   /// declaration in the parent type \c Parent.
-  static UnionType *get(UnionDecl *D, Type Parent, const ASTContext &C);
+  static EnumType *get(EnumDecl *D, Type Parent, const ASTContext &C);
 
   void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent());
   }
-  static void Profile(llvm::FoldingSetNodeID &ID, UnionDecl *D, Type Parent);
+  static void Profile(llvm::FoldingSetNodeID &ID, EnumDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Union;
+    return T->getKind() == TypeKind::Enum;
   }
 
 private:
-  UnionType(UnionDecl *TheDecl, Type Parent, const ASTContext &Ctx,
+  EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &Ctx,
             bool HasTypeVariable);
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnionType, NominalType)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(EnumType, NominalType)
 
 /// StructType - This represents the type declared by a StructDecl.
 class StructType : public NominalType, public llvm::FoldingSetNode {  
@@ -2214,7 +2214,7 @@ case TypeKind::Id:
     case TypeKind::GenericTypeParam:
       return false;
 
-    case TypeKind::Union:
+    case TypeKind::Enum:
     case TypeKind::Struct:
     case TypeKind::Class:
       if (auto parentTy = cast<NominalType>(base)->getParent()) {
@@ -2238,7 +2238,7 @@ case TypeKind::Id:
     }
 
     case TypeKind::BoundGenericClass:
-    case TypeKind::BoundGenericUnion:
+    case TypeKind::BoundGenericEnum:
     case TypeKind::BoundGenericStruct: {
       auto bound = cast<BoundGenericType>(base);
 
@@ -2340,7 +2340,7 @@ case TypeKind::Id:
   case TypeKind::GenericTypeParam:
     return *this;
 
-  case TypeKind::Union:
+  case TypeKind::Enum:
   case TypeKind::Struct:
   case TypeKind::Class: {
     auto nominalTy = cast<NominalType>(base);
@@ -2382,7 +2382,7 @@ case TypeKind::Id:
   }
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericUnion:
+  case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
     auto bound = cast<BoundGenericType>(base);
     SmallVector<Type, 4> substArgs;

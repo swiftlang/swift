@@ -134,9 +134,9 @@ public:
   /// SILDeclRef(cd, Destructor). If a DestructorDecl is provided, it will be
   /// used, otherwise only the implicit destruction behavior will be emitted.
   void emitDestructor(ClassDecl *cd, DestructorDecl /*nullable*/ *dd);
-  /// Generates the union constructor for the given
-  /// UnionElementDecl under the name SILDeclRef(decl).
-  void emitUnionConstructor(UnionElementDecl *decl);
+  /// Generates the enum constructor for the given
+  /// EnumElementDecl under the name SILDeclRef(decl).
+  void emitEnumConstructor(EnumElementDecl *decl);
 
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, Expr *arg);
@@ -469,10 +469,10 @@ public:
   /// This allocates the new 'self' value, emits the
   /// body code, then returns the final initialized 'self'.
   void emitValueConstructor(ConstructorDecl *ctor);
-  /// Generates code for a union case constructor.
-  /// This allocates the new 'self' value, injects the union case,
+  /// Generates code for an enum case constructor.
+  /// This allocates the new 'self' value, injects the enum case,
   /// then returns the final initialized 'self'.
-  void emitUnionConstructor(UnionElementDecl *element);
+  void emitEnumConstructor(EnumElementDecl *element);
   /// Generates code for a class constructor's
   /// allocating entry point. This allocates the new 'self' value, passes it to
   /// the initializer entry point, then returns the initialized 'self'.
