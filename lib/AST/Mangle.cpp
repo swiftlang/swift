@@ -19,16 +19,16 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Basic/Punycode.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/Support/SaveAndRestore.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/ErrorHandling.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace Mangle;
