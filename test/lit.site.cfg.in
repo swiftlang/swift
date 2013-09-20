@@ -29,8 +29,6 @@ if "@MODULES_SDK@" != "":
   config.available_features.add("sdk")
   config.substitutions.append(('%sdk', "@MODULES_SDK@"))
 
-# Enable interpreter-based tests if we are not cross-compiling
-# FIXME: this is wrong for a 32-bit target that matches the 64-bit host
-if "@HOST_TRIPLE@" == "@TARGET_TRIPLE@":
-  config.available_features.add('swift_interpreter')
-  config.available_features.add('swift_repl')
+# Enable interpreter-based tests
+config.available_features.add('swift_interpreter')
+config.available_features.add('swift_repl')
