@@ -750,8 +750,25 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       initializedMembers.insert(member);
   }
 
-  // Default-initialize all of the members.
   SmallVector<BraceStmt::ExprStmtOrDecl, 4> defaultInits;
+
+  // If this is the implicit default constructor for a class with a superclass,
+  // call the superclass constructor.
+  if (ctor->isImplicit() && isa<ClassDecl>(ctor->getDeclContext()) &&
+      cast<ClassDecl>(ctor->getDeclContext())->getSuperclass()) {
+    Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
+                                                SourceLoc());
+    Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
+                                                           SourceLoc(),
+                                                           SourceLoc());
+    Expr *args = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc(),
+                                         /*hasTrailingClosure=*/false);
+    result = new (Context) CallExpr(result, args);
+    if (!typeCheckExpression(result, ctor, Type(), /*discardedExpr=*/true))
+      defaultInits.push_back(result);
+  }
+
+  // Default-initialize all of the members.
   if (!allOfThisInitialized) {
     for (auto member : nominalDecl->getMembers()) {
       // We only care about pattern bindings.

@@ -319,8 +319,8 @@ public:
   ArrayRef<ProtocolDecl *> getDirectConformsTo(ExtensionDecl *extension);
 
   /// \brief Add any implicitly-defined constructors required for the given
-  /// struct.
-  void addImplicitConstructors(StructDecl *structDecl);
+  /// struct or class.
+  void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
   /// \name Name lookup
   ///
@@ -336,15 +336,15 @@ private:
   /// \brief The list of structs that require default constructors
   /// to be defined.
   ///
-  /// This vector lists all structs that have implicitly-defined default
-  /// constructors. Those structs not also in
-  /// \c structsNeedingDefaultConstructor still need to heave their
+  /// This vector lists all structs and classes that have
+  /// implicitly-defined default constructors. Those structs not also
+  /// in \c structsNeedingDefaultConstructor still need to heave their
   /// default constructors defined.
-  std::vector<StructDecl *> structsWithImplicitDefaultConstructor;
+  std::vector<NominalTypeDecl *> typesWithImplicitDefaultConstructor;
 
-  /// \brief The set of structs that still need a default constructor to be
-  /// implicitly defined.
-  llvm::DenseSet<StructDecl *> structsNeedingImplicitDefaultConstructor;
+  /// \brief The set of structs or classes that still need a default
+  /// constructor to be implicitly defined.
+  llvm::DenseSet<NominalTypeDecl *> typesNeedingImplicitDefaultConstructor;
 
   Optional<Type> boolType;
   
@@ -355,10 +355,14 @@ public:
   ///
   /// \param initializer If non-null, we will assigned an initializer expression
   /// that performs the default initialization.
-  bool isDefaultInitializable(Type ty, Expr **initializer);
+  ///
+  /// \param useConstructor Whether we must use a constructor for a class
+  /// (rather than default-initializing to zero).
+  bool isDefaultInitializable(Type ty, Expr **initializer, 
+                              bool useConstructor = false);
 
-  /// \brief Define the default constructor for the given struct.
-  void defineDefaultConstructor(StructDecl *structDecl);
+  /// \brief Define the default constructor for the given struct or class.
+  void defineDefaultConstructor(NominalTypeDecl *decl);
 
   /// \brief Define any implicit declarations that are still pending.
   void definePendingImplicitDecls();

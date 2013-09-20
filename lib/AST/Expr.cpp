@@ -137,6 +137,12 @@ bool Expr::isImplicit() const {
   if (auto assign = dyn_cast<AssignExpr>(this))
     return assign->getEqualLoc().isInvalid();
 
+  if (auto constructorRef = dyn_cast<OtherConstructorDeclRefExpr>(this))
+    return constructorRef->getLoc().isInvalid();
+
+  if (auto superRef = dyn_cast<SuperRefExpr>(this))
+    return superRef->getLoc().isInvalid();
+
   return false;
 }
 

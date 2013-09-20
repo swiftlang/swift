@@ -975,6 +975,9 @@ public:
     for (Decl *Member : CD->getMembers())
       visit(Member);
 
+    if (!IsSecondPass) {
+      TC.addImplicitConstructors(CD);
+    }
     if (!IsFirstPass) {
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
       checkObjCConformances(CD->getProtocols(), CD->getConformances());
@@ -1672,22 +1675,24 @@ TypeChecker::getDirectConformsTo(ExtensionDecl *ext) {
   return ext->getProtocols();
 }
 
-/// \brief Create an implicit struct constructor.
+/// \brief Create an implicit struct or class constructor.
 ///
-/// \param structDecl The struct for which a constructor will be created.
+/// \param decl The struct or class for which a constructor will be created.
 /// \param ICK The kind of implicit constructor to create.
 ///
 /// \returns The newly-created constructor, which has already been type-checked
-/// (but has not been added to the containing struct).
+/// (but has not been added to the containing struct or class).
 static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
-                                                  StructDecl *structDecl,
+                                                  NominalTypeDecl *decl,
                                                   ImplicitConstructorKind ICK) {
   ASTContext &context = tc.Context;
   // Determine the parameter type of the implicit constructor.
   SmallVector<TuplePatternElt, 8> patternElts;
   SmallVector<VarDecl *, 8> allArgs;
   if (ICK == ImplicitConstructorKind::Memberwise) {
-    for (auto member : structDecl->getMembers()) {
+    assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
+
+    for (auto member : decl->getMembers()) {
       auto var = dyn_cast<VarDecl>(member);
       if (!var)
         continue;
@@ -1701,7 +1706,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       // Create the parameter.
       auto *arg = new (context) VarDecl(SourceLoc(),
                                         var->getName(),
-                                        varType, structDecl);
+                                        varType, decl);
       allArgs.push_back(arg);
       Pattern *pattern = new (context) NamedPattern(arg);
       TypeLoc tyLoc = TypeLoc::withoutLoc(varType);
@@ -1710,24 +1715,24 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
     }
   }
 
-  // Crate the onstructor.
+  // Create the constructor.
   auto constructorID = context.getIdentifier("constructor");
   VarDecl *selfDecl
     = new (context) VarDecl(SourceLoc(),
                             context.getIdentifier("self"),
-                            Type(), structDecl);
+                            Type(), decl);
   ConstructorDecl *ctor
-    = new (context) ConstructorDecl(constructorID, structDecl->getLoc(),
+    = new (context) ConstructorDecl(constructorID, decl->getLoc(),
                                     nullptr, nullptr, selfDecl, nullptr,
-                                    structDecl);
+                                    decl);
   selfDecl->setDeclContext(ctor);
   for (auto var : allArgs) {
     var->setDeclContext(ctor);
   }
 
   // Set its arguments.
-  auto pattern = TuplePattern::create(context, structDecl->getLoc(),
-                                      patternElts, structDecl->getLoc());
+  auto pattern = TuplePattern::create(context, decl->getLoc(),
+                                      patternElts, decl->getLoc());
   ctor->setArgParams(pattern);
   ctor->setBodyParams(pattern);
 
@@ -1739,19 +1744,21 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
 
   // If the struct in which this constructor is being added was imported,
   // add it as an external definition.
-  if (structDecl->hasClangNode()) {
+  if (decl->hasClangNode()) {
     tc.Context.ExternalDefinitions.insert(ctor);
   }
 
   return ctor;
 }
 
-void TypeChecker::addImplicitConstructors(StructDecl *structDecl) {
-  // Check whether there is a user-declared constructor or,
-  // failing that, an instance variable.
+void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
+  assert(isa<StructDecl>(decl) || isa<ClassDecl>(decl));
+
+  // Check whether there is a user-declared constructor or an instance
+  // variable.
   bool FoundConstructor = false;
   bool FoundInstanceVar = false;
-  for (auto member : structDecl->getMembers()) {
+  for (auto member : decl->getMembers()) {
     if (isa<ConstructorDecl>(member)) {
       FoundConstructor = true;
       break;
@@ -1763,36 +1770,42 @@ void TypeChecker::addImplicitConstructors(StructDecl *structDecl) {
     }
   }
 
+  // If we found a constructor, don't add any implicit constructors.
+  if (FoundConstructor)
+    return;
+
   // If we didn't find such a constructor, add the implicit one(s).
-  if (!FoundConstructor) {
+
+  // For a struct, we add a memberwise constructor.
+  if (isa<StructDecl>(decl)) {
     // Copy the list of members, so we can add to it.
     // FIXME: Painfully inefficient to do the copy here.
-    SmallVector<Decl *, 4> members(structDecl->getMembers().begin(),
-                                   structDecl->getMembers().end());
+    SmallVector<Decl *, 4> members(decl->getMembers().begin(),
+                                   decl->getMembers().end());
 
     // Create the implicit memberwise constructor.
-    auto ctor = createImplicitConstructor(*this, structDecl,
+    auto ctor = createImplicitConstructor(*this, decl,
                                           ImplicitConstructorKind::Memberwise);
     members.push_back(ctor);
 
     // Set the members of the struct.
-    structDecl->setMembers(Context.AllocateCopy(members),
-                           structDecl->getBraces());
+    decl->setMembers(Context.AllocateCopy(members), decl->getBraces());
 
-    // If we found any instance variables, the default constructor will be
-    // different than the memberwise constructor. Whether this
-    // constructor will actually be defined depends on whether all of
-    // the instance variables can be default-initialized, which we
-    // don't know yet. This will be determined lazily.
-    if (FoundInstanceVar) {
-      assert(!structsNeedingImplicitDefaultConstructor.count(structDecl));
-      structsNeedingImplicitDefaultConstructor.insert(structDecl);
-      structsWithImplicitDefaultConstructor.push_back(structDecl);
-    }
+    // If we didn't find any instance variables, the default
+    // constructor will be the same as the memberwise constructor, so
+    // we're done.
+    if (!FoundInstanceVar)
+      return;
   }
+
+  // Note that we need a default constructor.
+  assert(!typesNeedingImplicitDefaultConstructor.count(decl));
+  typesNeedingImplicitDefaultConstructor.insert(decl);
+  typesWithImplicitDefaultConstructor.push_back(decl);
 }
 
-bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
+bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer, 
+                                         bool useConstructor) {
   CanType canTy = ty->getCanonicalType();
   switch (canTy->getKind()) {
   case TypeKind::Archetype:
@@ -1815,6 +1828,10 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
 
   case TypeKind::BoundGenericClass:
   case TypeKind::Class:
+    // If we were asked to use a constructor, do so below.
+    if (useConstructor)
+      break;
+
     // Classes are default-initializable (with 0).
     // FIXME: This may not be what we want in the long term.
     if (initializer) {
@@ -1954,18 +1971,18 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
   return true;
 }
 
-void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
+void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   PrettyStackTraceDecl stackTrace("defining default constructor for",
-                                  structDecl);
+                                  decl);
 
-  // Erase this from the set of structs that need an implicit default
+  // Erase this from the set of types that need an implicit default
   // constructor.
-  assert(structsNeedingImplicitDefaultConstructor.count(structDecl));
-  structsNeedingImplicitDefaultConstructor.erase(structDecl);
+  assert(typesNeedingImplicitDefaultConstructor.count(decl));
+  typesNeedingImplicitDefaultConstructor.erase(decl);
 
-  // Verify that all of the instance variables of this struct have default
+  // Verify that all of the instance variables of this type have default
   // constructors.
-  for (auto member : structDecl->getMembers()) {
+  for (auto member : decl->getMembers()) {
     // We only care about pattern bindings.
     auto patternBind = dyn_cast<PatternBindingDecl>(member);
     if (!patternBind)
@@ -1992,21 +2009,29 @@ void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
     }
   }
 
+  // For a class, check whether the superclass (if it exists) is
+  // default-initializable.
+  if (isa<ClassDecl>(decl)) {
+    if (auto superTy = getSuperClassOf(decl->getDeclaredTypeInContext())) {
+      if (!isDefaultInitializable(superTy, nullptr, /*useConstructor=*/true))
+        return;
+    }
+  }
+
   // Create the default constructor.
   auto ctor = createImplicitConstructor(
-                *this, structDecl, ImplicitConstructorKind::Default);
+                *this, decl, ImplicitConstructorKind::Default);
 
   // Copy the list of members, so we can add to it.
   // FIXME: Painfully inefficient to do the copy here.
-  SmallVector<Decl *, 4> members(structDecl->getMembers().begin(),
-                                 structDecl->getMembers().end());
+  SmallVector<Decl *, 4> members(decl->getMembers().begin(),
+                                 decl->getMembers().end());
 
-  // Create the implicit memberwise constructor.
+  // Add the constructor.
   members.push_back(ctor);
 
-  // Set the members of the struct.
-  structDecl->setMembers(Context.AllocateCopy(members),
-                         structDecl->getBraces());
+  // Set the members of the type.
+  decl->setMembers(Context.AllocateCopy(members), decl->getBraces());
 
   // Create an empty body for the default constructor. The type-check of the
   // constructor body will introduce default initializations of the members.
@@ -2018,9 +2043,10 @@ void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
 
 void TypeChecker::definePendingImplicitDecls() {
   // Default any implicit default constructors.
-  for (auto structDecl : structsWithImplicitDefaultConstructor) {
-    if (structsNeedingImplicitDefaultConstructor.count(structDecl))
-      defineDefaultConstructor(structDecl);
+  for (unsigned i = 0; i != typesWithImplicitDefaultConstructor.size(); ++i) {
+    auto decl = typesWithImplicitDefaultConstructor[i];
+    if (typesNeedingImplicitDefaultConstructor.count(decl))
+      defineDefaultConstructor(decl);
   }
 }
 

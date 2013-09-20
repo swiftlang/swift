@@ -856,6 +856,24 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     // its generic parameters.
     ctor->setType(getType(signatureID));
 
+    // Set the initializer type of the constructor.
+    auto allocType = ctor->getType();
+    auto selfTy = allocType->castTo<AnyFunctionType>()->getInput()
+                    ->castTo<MetaTypeType>()->getInstanceType();
+    if (auto polyFn = allocType->getAs<PolymorphicFunctionType>()) {
+      ctor->setInitializerType(
+        PolymorphicFunctionType::get(selfTy, polyFn->getResult(),
+                                     &polyFn->getGenericParams(),
+                                     polyFn->getExtInfo(),
+                                     ctx));
+    } else {
+      auto fn = allocType->castTo<FunctionType>();
+      ctor->setInitializerType(FunctionType::get(selfTy,
+                                                 fn->getResult(),
+                                                 fn->getExtInfo(),
+                                                 ctx));
+    }
+
     if (isImplicit)
       ctor->setImplicit();
     ctor->setIsObjC(isObjC);
