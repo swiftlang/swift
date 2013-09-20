@@ -4,7 +4,8 @@
 * The 'union' keyword has been replaced with 'enum'.  Unions and enums
   are semantically identical in swift (the former just has data 
   associated with its discriminators) and 'enum' is the vastly more
-  common case.
+  common case.  For more rationale, please see docs/proposals/Enums.rst
+  in the Swift source tree.
 
 * The Optional type 'T?' is now represented as an enum:
 
