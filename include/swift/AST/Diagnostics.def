@@ -1175,6 +1175,19 @@ ERROR(circular_class_inheritance,sema_tcd,none,
 NOTE(class_here,sema_tcd,none,
      "class %0 declared here", (Identifier))
 
+// Enum raw types
+ERROR(multiple_enum_raw_types,sema_tcd,none,
+  "multiple enum raw types %0 and %1", (Type, Type))
+ERROR(circular_enum_inheritance,sema_tcd,none,
+      "circular enum raw types %0", (StringRef))
+ERROR(raw_type_not_first,sema_tcd,none,
+  "raw type %0 must appear first in the enum inheritance clause", (Type))
+ERROR(raw_type_not_literal_convertible,sema_tcd,none,
+      "raw type %0 is not integer-, float-, char-, or string-literal-convertible",
+      (Type))
+NOTE(enum_here,sema_tcd,none,
+     "enum %0 declared here", (Identifier))
+
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------

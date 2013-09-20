@@ -189,6 +189,16 @@ class alignas(8) Decl {
   enum { NumClassDeclBits = NumNominalTypeDeclBits + 2 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
+  class EnumDeclBitFields {
+    friend class EnumDecl;
+    unsigned : NumNominalTypeDeclBits;
+    
+    /// The stage of the raw type circularity check for this class.
+    unsigned Circularity : 2;
+  };
+  enum { NumEnumDeclBits = NumNominalTypeDeclBits + 2 };
+  static_assert(NumEnumDeclBits <= 32, "fits in an unsigned");
+  
   class InfixOperatorDeclBitFields {
     friend class InfixOperatorDecl;
     unsigned : NumDeclBits;
@@ -230,6 +240,7 @@ protected:
     TypeDeclBitFields TypeDeclBits;
     ProtocolDeclBitFields ProtocolDeclBits;
     ClassDeclBitFields ClassDeclBits;
+    EnumDeclBitFields EnumDeclBits;
     InfixOperatorDeclBitFields InfixOperatorDeclBits;
     ImportDeclBitFields ImportDeclBits;
     ExtensionDeclBitFields ExtensionDeclBits;
@@ -1589,6 +1600,7 @@ public:
 /// \endcode
 class EnumDecl : public NominalTypeDecl {
   SourceLoc EnumLoc;
+  Type RawType;
   bool Enum;
 
 public:
@@ -1625,6 +1637,16 @@ public:
       elements.insert(elt);
   }
   
+  /// Retrieve the status of circularity checking for class inheritance.
+  CircularityCheck getCircularityCheck() const {
+    return static_cast<CircularityCheck>(EnumDeclBits.Circularity);
+  }
+  
+  /// Record the current stage of circularity checking.
+  void setCircularityCheck(CircularityCheck circularity) {
+    EnumDeclBits.Circularity = static_cast<unsigned>(circularity);
+  }
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Enum;
@@ -1635,6 +1657,15 @@ public:
   static bool classof(const DeclContext *C) {
     return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
   }
+  
+  /// Determine whether this enum declares a raw type in its inheritance clause.
+  bool hasRawType() const { return (bool)RawType; }
+  /// Retrieve the declared raw type of the enum from its inheritance clause,
+  /// or null if it has none.
+  Type getRawType() const { return RawType; }
+
+  /// Set the raw type of the enum from its inheritance clause.
+  void setRawType(Type rawType) { RawType = rawType; }
 };
 
 /// StructDecl - This is the declaration of a struct, for example:

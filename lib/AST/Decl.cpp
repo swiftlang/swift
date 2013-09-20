@@ -510,7 +510,11 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc, bool Enum,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Enum, Parent, Name, NameLoc, Inherited,
                     GenericParams),
-    EnumLoc(EnumLoc) { }
+    EnumLoc(EnumLoc)
+{
+  EnumDeclBits.Circularity
+    = static_cast<unsigned>(CircularityCheck::Unchecked);
+}
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
                        MutableArrayRef<TypeLoc> Inherited,

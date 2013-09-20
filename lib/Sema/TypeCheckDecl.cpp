@@ -150,6 +150,41 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
       allProtocols.insert(protocols.begin(), protocols.end());
       continue;
     }
+    
+    // If this is an enum inheritance clause, check for a raw type.
+    if (isa<EnumDecl>(decl)) {
+      // Check if we already had a raw type.
+      if (superclassTy) {
+        tc.diagnose(inherited.getSourceRange().Start,
+                    diag::multiple_enum_raw_types, superclassTy, inheritedTy)
+          .highlight(superclassRange);
+        continue;
+      }
+      
+      // If this is not the first entry in the inheritance clause, complain.
+      if (i > 0) {
+        SourceLoc afterPriorLoc
+          = Lexer::getLocForEndOfToken(
+              tc.Context.SourceMgr,
+              inheritedClause[i-1].getSourceRange().End);
+        SourceLoc afterMyEndLoc
+          = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                       inherited.getSourceRange().End);
+
+        tc.diagnose(inherited.getSourceRange().Start,
+                    diag::raw_type_not_first, inheritedTy)
+          .fixItRemoveChars(afterPriorLoc, afterMyEndLoc)
+          .fixItInsert(inheritedClause[0].getSourceRange().Start,
+                       inheritedTy.getString() + ", ");
+
+        // Fall through to record the raw type.
+      }
+
+      // Record the raw type.
+      superclassTy = inheritedTy;
+      superclassRange = inherited.getSourceRange();
+      continue;
+    }
 
     // If this is a class type, it may be the superclass.
     if (inheritedTy->getClassOrBoundGenericClass()) {
@@ -235,6 +270,8 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
   if (superclassTy) {
     if (auto classDecl = dyn_cast<ClassDecl>(decl))
       classDecl->setSuperclass(superclassTy);
+    else if (auto enumDecl = dyn_cast<EnumDecl>(decl))
+      enumDecl->setRawType(superclassTy);
     else
       cast<AbstractTypeParamDecl>(decl)->setSuperclass(superclassTy);
   }
@@ -275,6 +312,19 @@ static ArrayRef<ClassDecl *> getInheritedForCycleCheck(TypeChecker &tc,
   return { };
 }
 
+/// Retrieve the raw type of the given enum.
+static ArrayRef<EnumDecl *> getInheritedForCycleCheck(TypeChecker &tc,
+                                                      EnumDecl *enumDecl,
+                                                      EnumDecl **scratch) {
+  checkInheritanceClause(tc, enumDecl);
+  
+  if (enumDecl->hasRawType()) {
+    *scratch = enumDecl->getRawType()->getEnumOrBoundGenericEnum();
+    return *scratch ? ArrayRef<EnumDecl*>(*scratch) : ArrayRef<EnumDecl*>{};
+  }
+  return { };
+}
+
 // Break the inheritance cycle for a protocol by removing all inherited
 // protocols.
 //
@@ -284,9 +334,14 @@ static void breakInheritanceCycle(ProtocolDecl *proto) {
   proto->setConformances({ });
 }
 
-/// Break the inheritance cycle for a protocol by removing its superclass.
+/// Break the inheritance cycle for a class by removing its superclass.
 static void breakInheritanceCycle(ClassDecl *classDecl) {
   classDecl->setSuperclass(Type());
+}
+
+/// Break the inheritance cycle for an enum by removing its raw type.
+static void breakInheritanceCycle(EnumDecl *enumDecl) {
+  enumDecl->setRawType(Type());
 }
 
 /// Check for circular inheritance.
@@ -898,6 +953,34 @@ public:
       validateAttributes(UD);
 
       checkInheritanceClause(TC, UD);
+      
+      {
+        // Check for circular inheritance of the raw type.
+        SmallVector<EnumDecl *, 8> path;
+        checkCircularity(TC, UD, diag::circular_enum_inheritance,
+                         diag::enum_here, path);
+      }
+    } else if (auto rawTy = UD->getRawType()) {
+      // Check that the raw type is convertible from one of the primitive
+      // literal protocols.
+      bool literalConvertible = false;
+      for (auto literalProtocol : {KnownProtocolKind::IntegerLiteralConvertible,
+        KnownProtocolKind::StringLiteralConvertible,
+        KnownProtocolKind::FloatLiteralConvertible,
+        KnownProtocolKind::CharacterLiteralConvertible})
+      {
+        if (TC.conformsToProtocol(rawTy,
+                            TC.getProtocol(UD->getLoc(), literalProtocol))) {
+          literalConvertible = true;
+          break;
+        }
+      }
+      
+      if (!literalConvertible) {
+        TC.diagnose(UD->getInherited()[0].getSourceRange().Start,
+                    diag::raw_type_not_literal_convertible,
+                    rawTy);
+      }
     }
 
     for (Decl *member : UD->getMembers())
@@ -984,7 +1067,7 @@ public:
       checkObjCConformances(CD->getProtocols(), CD->getConformances());
     }
   }
-
+  
   void visitProtocolDecl(ProtocolDecl *PD) {
     if (IsSecondPass) {
       return;
