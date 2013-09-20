@@ -101,7 +101,7 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
     return ManagedValue(v, ManagedValue::Unmanaged);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
 
-  lowering.emitRetain(B, loc, v);
+  v = lowering.emitCopyValue(B, loc, v);
   return emitManagedRValueWithCleanup(v, lowering);
 }
 
@@ -1766,7 +1766,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   assert(selfBox);
 
   // We have to do a retain because someone else may be using the box.
-  lowering.emitRetain(B, ctor, selfValue);
+  selfValue = lowering.emitCopyValue(B, ctor, selfValue);
 
   // Release the box.
   B.createStrongRelease(ctor, selfBox);
@@ -2048,7 +2048,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   assert(selfBox);
 
   // We have to do a retain because someone else may be using the box.
-  B.emitRetainValue(ctor, selfValue);
+  selfValue = B.emitCopyValueOperation(ctor, selfValue);
   B.createStrongRelease(ctor, selfBox);
 
   B.createReturn(ctor, selfValue);

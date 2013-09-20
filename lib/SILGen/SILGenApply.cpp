@@ -938,7 +938,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     
     case OwnershipConventions::Return::Unretained:
       // Unretained. Retain the value.
-      resultTI.emitRetain(B, Loc, result);
+      result = resultTI.emitCopyValue(B, Loc, result);
       break;
     }
   

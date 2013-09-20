@@ -205,8 +205,8 @@ bb0:
   return %10 : $()
   
 // CHECK: dealloc_stack %0#0 : $*[local_storage] SomeUnion
-// CHECK-NEXT:  %14 = tuple ()
-// CHECK-NEXT:  return %14 : $()
+// CHECK-NEXT:  [[T0:%.*]] = tuple ()
+// CHECK-NEXT:  return [[T0]] : $()
 }
 
 // CHECK-LABEL: sil @multiple_release_test

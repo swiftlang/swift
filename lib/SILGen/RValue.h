@@ -92,8 +92,8 @@ public:
                            IsNotTake, IsInitialization);
       return gen.emitManagedRValueWithCleanup(buf, lowering);
     }
-    lowering.emitRetain(gen.B, l, getValue());
-    return gen.emitManagedRValueWithCleanup(getValue(), lowering);
+    auto result = lowering.emitCopyValue(gen.B, l, getValue());
+    return gen.emitManagedRValueWithCleanup(result, lowering);
   }
   
   /// Store a copy of this value with independent ownership into the given
@@ -105,8 +105,8 @@ public:
                            IsNotTake, IsInitialization);
       return;
     }
-    lowering.emitRetain(gen.B, L, getValue());
-    gen.B.createStore(L, getValue(), dest);
+    auto result = lowering.emitCopyValue(gen.B, L, getValue());
+    gen.B.createStore(L, result, dest);
   }
   
   bool hasCleanup() const { return cleanup.isValid(); }

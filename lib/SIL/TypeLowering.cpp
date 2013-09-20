@@ -477,7 +477,12 @@ namespace {
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
       SILValue value = B.createLoad(loc, addr);
-      emitRelease(B, loc, value);
+      emitDestroyValue(B, loc, value);
+    }
+
+    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      emitDestroyValue(B, loc, value);
     }
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
@@ -510,25 +515,54 @@ namespace {
       // Trivial
     }
 
-    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+                                 SILValue value, bool deep) const override {
+      // Trivial
+    }
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value, bool deep) const override {
+      // Trivial
+      return value;
+    }
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
       // Trivial
+      return value;
     }
 
-    void emitRetain(SILBuilder &B, SILLocation loc,
-                    SILValue value) const override {
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
       // Trivial
     }
+  };
 
-    void emitRelease(SILBuilder &B, SILLocation loc,
-                     SILValue value) const override {
-      // Trivial
+  class NonTrivialLoadableTypeLowering : public LoadableTypeLowering {
+  public:
+    NonTrivialLoadableTypeLowering(SILType type)
+      : LoadableTypeLowering(type, IsNotTrivial) {}
+
+    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
+                            SILValue addr, IsTake_t isTake) const override {
+      SILValue value = B.createLoad(loc, addr);
+      if (!isTake) value = emitCopyValue(B, loc, value);
+      return value;
+    }
+
+    void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
+                         SILValue newValue, SILValue addr,
+                         IsInitialization_t isInit) const override {
+      SILValue oldValue;
+      if (!isInit) oldValue = B.createLoad(loc, addr);
+      B.createStore(loc, newValue, addr);
+      if (!isInit) emitDestroyValue(B, loc, oldValue);
     }
   };
 
   /// A CRTP helper class for loadable but non-trivial aggregate types.
   template <class Impl, class IndexType>
-  class LoadableAggTypeLowering : public LoadableTypeLowering {
+  class LoadableAggTypeLowering : public NonTrivialLoadableTypeLowering {
   public:
     /// A non-trivial child of this aggregate type.
     class NonTrivialChild {
@@ -554,7 +588,7 @@ namespace {
 
   protected:
     LoadableAggTypeLowering(SILType type, ArrayRef<NonTrivialChild> nonTrivial)
-        : LoadableTypeLowering(type, IsNotTrivial),
+        : NonTrivialLoadableTypeLowering(type),
           NumNonTrivial(nonTrivial.size()) {
       memcpy(reinterpret_cast<NonTrivialChild*>(&asImpl()+1),
              nonTrivial.data(),
@@ -602,36 +636,43 @@ namespace {
         });
     }
 
-    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
-                            SILValue addr, IsTake_t isTake) const override {
-      SILValue value = B.createLoad(loc, addr);
-      if (!isTake) asImpl().Impl::emitRetain(B, loc, value);
-      return value;
-    }
-
-    void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
-                         SILValue newValue, SILValue addr,
-                         IsInitialization_t isInit) const override {
-      SILValue oldValue;
-      if (!isInit) oldValue = B.createLoad(loc, addr);
-      B.createStore(loc, newValue, addr);
-      if (!isInit) asImpl().Impl::emitRelease(B, loc, oldValue);
-    }
-
-    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue aggValue) const override {
+      return B.createCopyValue(loc, aggValue);
+    }
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue aggValue, bool deep) const override {
+      // Types with non-trivial copy semantics will need to override this.
+      bool hasDifference = false;
+      SmallVector<SILValue, 4> copiedChildren;
+
       forEachNonTrivialChild(B, loc, aggValue,
-                             &TypeLowering::emitDestroyRValue);
+        [&](SILBuilder &B, SILLocation loc, IndexType index,
+            SILValue childValue, const TypeLowering &childLowering) {
+          SILValue copiedChildValue =
+            childLowering.emitLoweredCopyChildValue(B, loc, childValue, deep);
+          hasDifference |= (copiedChildValue != childValue);
+          copiedChildren.push_back(copiedChildValue);
+        });
+
+      if (hasDifference) {
+        return asImpl().Impl::rebuildAggregate(B, loc, copiedChildren);
+      } else {
+        return aggValue;
+      }
     }
 
-    void emitRetain(SILBuilder &B, SILLocation loc,
-                    SILValue aggValue) const override {
-      forEachNonTrivialChild(B, loc, aggValue, &TypeLowering::emitRetain);
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue aggValue) const override {
+      B.createDestroyValue(loc, aggValue);
     }
 
-    void emitRelease(SILBuilder &B, SILLocation loc,
-                     SILValue aggValue) const override {
-      forEachNonTrivialChild(B, loc, aggValue, &TypeLowering::emitRelease);
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+                                 SILValue aggValue, bool deep) const override {
+      forEachNonTrivialChild(B, loc, aggValue,
+                             deep ? &TypeLowering::emitLoweredDestroyValueDeep
+                                  : &TypeLowering::emitDestroyValue);
     }
   };
 
@@ -649,6 +690,11 @@ namespace {
       return B.createTupleExtract(loc, tupleValue, index,
                                   eltLowering.getLoweredType());
     }
+
+    SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                              ArrayRef<SILValue> values) const {
+      return B.createTuple(loc, getLoweredType(), values);
+    }
   };
 
   /// A lowering for loadable but non-trivial struct types.
@@ -665,10 +711,15 @@ namespace {
       return B.createStructExtract(loc, structValue, field,
                                    fieldLowering.getLoweredType());
     }
+
+    SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                              ArrayRef<SILValue> values) const {
+      return B.createStruct(loc, getLoweredType(), values);
+    }
   };
   
   /// A lowering for loadable but non-trivial enum types.
-  class LoadableEnumTypeLowering final : public LoadableTypeLowering {
+  class LoadableEnumTypeLowering final : public NonTrivialLoadableTypeLowering {
   public:
     /// A non-trivial case of the enum.
     class NonTrivialElement {
@@ -691,21 +742,21 @@ namespace {
     unsigned numNonTrivial;
     
     LoadableEnumTypeLowering(SILType type,
-                              ArrayRef<NonTrivialElement> nonTrivial)
-      : LoadableTypeLowering(type, IsNotTrivial),
-        numNonTrivial(nonTrivial.size())
+                             ArrayRef<NonTrivialElement> nonTrivial)
+      : NonTrivialLoadableTypeLowering(type), numNonTrivial(nonTrivial.size())
     {
       memcpy(reinterpret_cast<NonTrivialElement*>(this+1), nonTrivial.data(),
              numNonTrivial * sizeof(NonTrivialElement));
     }
     
-    using SimpleOperationTy = void (TypeLowering::*)(SILBuilder &B,
-                                                     SILLocation loc,
-                                                     SILValue value) const;
+    using SimpleOperationTy = 
+      void(*)(SILBuilder &B, SILLocation loc, SILValue value,
+              const TypeLowering &valueLowering, SILBasicBlock *dest,
+              bool deep);
+
     /// Emit a value semantics operation for each nontrivial case of the enum.
-    void ifNonTrivialElement(SILBuilder &B, SILLocation loc,
-                             SILValue value,
-                             SimpleOperationTy operation) const {
+    void ifNonTrivialElement(SILBuilder &B, SILLocation loc, SILValue value,
+                             SimpleOperationTy operation, bool deep) const {
       SmallVector<std::pair<EnumElementDecl*,SILBasicBlock*>, 4> nonTrivialBBs;
       
       auto &M = B.getFunction().getModule();
@@ -729,8 +780,7 @@ namespace {
         SILBasicBlock *bb = nonTrivialBBs[i].second;
         const TypeLowering &lowering = getNonTrivialElements()[i].getLowering();
         B.emitBlock(bb);
-        (lowering.*operation)(B, loc, bb->getBBArgs()[0]);
-        B.createBranch(loc, doneBB);
+        operation(B, loc, bb->getBBArgs()[0], lowering, doneBB, deep);
       }
       
       B.emitBlock(doneBB);
@@ -755,101 +805,87 @@ namespace {
       return ArrayRef<NonTrivialElement>(buffer, numNonTrivial);
     }
 
-    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
-                            SILValue addr, IsTake_t isTake) const override {
-      SILValue value = B.createLoad(loc, addr);
-      if (!isTake) emitRetain(B, loc, value);
-      return value;
-    }
-
-    void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
-                         SILValue newValue, SILValue addr,
-                         IsInitialization_t isInit) const override {
-      SILValue oldValue;
-      if (!isInit) oldValue = B.createLoad(loc, addr);
-      B.createStore(loc, newValue, addr);
-      if (!isInit) emitRelease(B, loc, oldValue);
-    }
-    
-    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      ifNonTrivialElement(B, loc, value, &TypeLowering::emitDestroyRValue);
+      return B.createCopyValue(loc, value);
     }
 
-    void emitRetain(SILBuilder &B, SILLocation loc,
-                    SILValue value) const override {
-      ifNonTrivialElement(B, loc, value, &TypeLowering::emitRetain);
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value, bool deep) const override {
+      ifNonTrivialElement(B, loc, value,
+        [](SILBuilder &B, SILLocation loc, SILValue child,
+           const TypeLowering &childLowering, SILBasicBlock *dest, bool deep) {
+          SILValue copiedChild =
+            childLowering.emitLoweredCopyChildValue(B, loc, child, deep);
+          B.createBranch(loc, dest, copiedChild);
+      }, deep);
+      return new (B.getFunction().getModule())
+               SILArgument(value.getType(), B.getInsertionBB());
     }
     
-    void emitRelease(SILBuilder &B, SILLocation loc,
-                     SILValue value) const override {
-      ifNonTrivialElement(B, loc, value, &TypeLowering::emitRelease);
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      B.createDestroyValue(loc, value);
+    }
+
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+                                 SILValue value, bool deep) const override {
+      ifNonTrivialElement(B, loc, value,
+        [](SILBuilder &B, SILLocation loc, SILValue child,
+           const TypeLowering &childLowering, SILBasicBlock *dest, bool deep) {
+          childLowering.emitLoweredDestroyChildValue(B, loc, child, deep);
+          B.createBranch(loc, dest);
+      }, deep);
     }
   };
 
-  template <class Impl>
-  class RefCountTypeLowering : public LoadableTypeLowering {
-    const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
+  class LeafLoadableTypeLowering : public NonTrivialLoadableTypeLowering {
   public:
-    RefCountTypeLowering(SILType type)
-      : LoadableTypeLowering(type, IsNotTrivial) {}
+    LeafLoadableTypeLowering(SILType type)
+      : NonTrivialLoadableTypeLowering(type) {}
 
-    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
-                            SILValue addr, IsTake_t isTake) const override {
-      SILValue value = B.createLoad(loc, addr);
-      if (!isTake) asImpl().Impl::emitRetain(B, loc, value);
-      return value;
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value, bool deep) const override {
+      return emitCopyValue(B, loc, value);
     }
 
-    void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
-                         SILValue newValue, SILValue addr,
-                         IsInitialization_t isInit) const override {
-      if (isInit) {
-        B.createStore(loc, newValue, addr);
-      } else {
-        SILValue oldValue = B.createLoad(loc, addr);
-        B.createStore(loc, newValue, addr);
-        asImpl().Impl::emitRelease(B, loc, oldValue);
-      }
-    }
-
-    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
-                           SILValue value) const override {
-      asImpl().Impl::emitRelease(B, loc, value);
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+                                 SILValue value, bool deep) const override {
+      emitDestroyValue(B, loc, value);
     }
   };
 
   /// A class for reference types, which are all non-trivial but still
   /// loadable.
-  class ReferenceTypeLowering
-    : public RefCountTypeLowering<ReferenceTypeLowering> {
+  class ReferenceTypeLowering : public LeafLoadableTypeLowering {
   public:
-    ReferenceTypeLowering(SILType type) : RefCountTypeLowering(type) {}
+    ReferenceTypeLowering(SILType type) : LeafLoadableTypeLowering(type) {}
 
-    void emitRetain(SILBuilder &B, SILLocation loc,
-                    SILValue value) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
       B.createStrongRetain(loc, value);
+      return value;
     }
 
-    void emitRelease(SILBuilder &B, SILLocation loc,
-                     SILValue value) const override {
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
       B.createStrongRelease(loc, value);
     }
   };
 
   /// A type lowering for [unowned] types.
-  class UnownedTypeLowering final
-    : public RefCountTypeLowering<UnownedTypeLowering> {
+  class UnownedTypeLowering final : public LeafLoadableTypeLowering {
   public:
-    UnownedTypeLowering(SILType type) : RefCountTypeLowering(type) {}
+    UnownedTypeLowering(SILType type) : LeafLoadableTypeLowering(type) {}
 
-    void emitRetain(SILBuilder &B, SILLocation loc,
-                    SILValue value) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
       B.createUnownedRetain(loc, value);
+      return value;
     }
 
-    void emitRelease(SILBuilder &B, SILLocation loc,
-                     SILValue value) const override {
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
       B.createUnownedRelease(loc, value);
     }
   };
@@ -888,13 +924,23 @@ namespace {
       B.createDestroyAddr(loc, value);
     }
 
-    void emitRetain(SILBuilder &B, SILLocation loc,
-                    SILValue value) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                       SILValue value) const override {
       llvm_unreachable("type is not loadable!");
     }
 
-    void emitRelease(SILBuilder &B, SILLocation loc,
-                     SILValue value) const override {
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value, bool deep) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+                                 SILValue value, bool deep) const override {
       llvm_unreachable("type is not loadable!");
     }
   };

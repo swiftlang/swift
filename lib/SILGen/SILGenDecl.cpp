@@ -533,7 +533,7 @@ class CleanupCaptureValue : public Cleanup {
 public:
   CleanupCaptureValue(SILValue v) : v(v) {}
   void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.emitReleaseValue(l, v);
+    gen.B.emitDestroyValueOperation(l, v);
   }
 };
   
@@ -1033,7 +1033,7 @@ static void emitObjCReturnValue(SILGenFunction &gen,
     gen.B.createAutoreleaseReturn(loc, result);
     return;
   case OwnershipConventions::Return::Unretained:
-    gen.B.emitReleaseValue(loc, result);
+    gen.B.emitDestroyValueOperation(loc, result);
     SWIFT_FALLTHROUGH;
   case OwnershipConventions::Return::Retained:
     gen.B.createReturn(loc, result);
@@ -1053,8 +1053,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
     return tmp;
   }
   
-  lowering.emitRetain(gen.B, loc, arg);
-  return arg;
+  return lowering.emitCopyValue(gen.B, loc, arg);
 }
 
 /// Bridge argument types and adjust retain count conventions for an ObjC thunk.

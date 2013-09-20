@@ -185,6 +185,43 @@ public:
   virtual void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                                  SILValue value) const = 0;
 
+  /// Emit a lowered 'copy_value' operation.
+  ///
+  /// This type must be loadable.
+  virtual SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                        SILValue value, bool deep) const = 0;
+
+  /// Emit a lowered 'destroy_value' operation.
+  ///
+  /// This type must be loadable.
+  virtual void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+                                       SILValue value, bool deep) const = 0;
+
+  void emitLoweredDestroyChildValue(SILBuilder &B, SILLocation loc,
+                                    SILValue value, bool wasDeep) const {
+    if (wasDeep) {
+      return emitLoweredDestroyValue(B, loc, value, true);
+    } else {
+      return emitDestroyValue(B, loc, value);
+    }
+  }
+
+  /// Emit a lowered 'destroy_value' operation.
+  ///
+  /// This type must be loadable.
+  void emitLoweredDestroyValueShallow(SILBuilder &B, SILLocation loc,
+                                      SILValue value) const {
+    emitLoweredDestroyValue(B, loc, value, false);
+  }
+
+  /// Emit a lowered 'destroy_value' operation.
+  ///
+  /// This type must be loadable.
+  void emitLoweredDestroyValueDeep(SILBuilder &B, SILLocation loc,
+                                   SILValue value) const {
+    emitLoweredDestroyValue(B, loc, value, true);
+  }
+
   /// Given a primitively loaded value of this type (which must be
   /// loadable), +1 it.
   ///
@@ -192,8 +229,17 @@ public:
   /// with exactly the same semantics.  For example, it performs an
   /// unowned_retain on a value of [unknown] type.  It is therefore
   /// not necessarily the right thing to do on a semantic load.
-  virtual void emitRetain(SILBuilder &B, SILLocation loc,
-                          SILValue value) const = 0;
+  virtual SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                                 SILValue value) const = 0;
+
+  SILValue emitLoweredCopyChildValue(SILBuilder &B, SILLocation loc,
+                                     SILValue value, bool wasDeep) const {
+    if (wasDeep) {
+      return emitLoweredCopyValue(B, loc, value, true);
+    } else {
+      return emitCopyValue(B, loc, value);
+    }
+  }
 
   /// Given a primitively loaded value of this type (which must be
   /// loadable), -1 it.
@@ -203,8 +249,8 @@ public:
   /// example, it performs an unowned_release on a value of [unknown]
   /// type.  It is therefore not necessarily the right thing to do on
   /// a semantic load.
-  virtual void emitRelease(SILBuilder &B, SILLocation loc,
-                           SILValue value) const = 0;
+  virtual void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                                SILValue value) const = 0;
 
   /// Allocate a new TypeLowering using the TypeConverter's allocator.
   void *operator new(size_t size, TypeConverter &tc);

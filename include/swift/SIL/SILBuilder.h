@@ -806,16 +806,18 @@ public:
   
   /// Convenience function for calling emitRetain on the type lowering
   /// for the non-address value.
-  void emitRetainValue(SILLocation loc, SILValue v) {
+  SILValue emitCopyValueOperation(SILLocation loc, SILValue v) {
     assert(!v.getType().isAddress());
-    F.getModule().getTypeLowering(v.getType()).emitRetain(*this, loc, v);
+    auto &lowering = F.getModule().getTypeLowering(v.getType());
+    return lowering.emitCopyValue(*this, loc, v);
   }
 
   /// Convenience function for calling emitRelease on the type
   /// lowering for the non-address value.
-  void emitReleaseValue(SILLocation loc, SILValue v) {
+  void emitDestroyValueOperation(SILLocation loc, SILValue v) {
     assert(!v.getType().isAddress());
-    F.getModule().getTypeLowering(v.getType()).emitRelease(*this, loc, v);
+    auto &lowering = F.getModule().getTypeLowering(v.getType());
+    lowering.emitDestroyValue(*this, loc, v);
   }
 
   /// Generalize a function value.  This is a hack and probably not
