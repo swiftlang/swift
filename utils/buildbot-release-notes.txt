@@ -33,6 +33,38 @@
       println("neither")
     }
 
+* The Objective-C 'id' and 'Class' types now support referring to
+  methods declared in any class or protocol without a downcast. For
+  example, given a variable "sender" of type "id", one can refer to
+  -isEqual: with:
+
+    sender.isEqual
+
+  The actual object may or may not respond to -isEqual, so this
+  expression returns result of optional type whose value is determined via a
+  compiler-generated -respondsToSelector send. When it succeeds, the
+  optional contains the method; when it fails, the optional is empty. 
+
+  To safely test the optional, one can use, e.g.,
+
+    var senderIsEqual = sender.isEqual
+    if senderIsEqual {
+      // this will never trigger an "unrecognized selector" failure
+      var equal = senderIsEqual.get()(other)
+    } else {
+      // sender does not respond to -isEqual:
+    }
+
+  When you *know* that the method is there, you can use postfix '!' to
+  force unwrapping of the optional, e.g.,
+
+   sender.isEqual!(other)
+
+  This will fail at runtime if in fact sender does not respond to  -isEqual:.
+  We have some additional syntactic optimizations planned for testing
+  an optional value and handling both the success and failure cases
+  concisely. Watch this space.
+
 2013-09-17
 ----------
 
