@@ -50,7 +50,7 @@
     var senderIsEqual = sender.isEqual
     if senderIsEqual {
       // this will never trigger an "unrecognized selector" failure
-      var equal = senderIsEqual.get()(other)
+      var equal = senderIsEqual!()(other)
     } else {
       // sender does not respond to -isEqual:
     }
