@@ -385,10 +385,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
   ValueBase *ResultVal;
   switch ((ValueKind)OpCode) {
-  default:
-    DEBUG(llvm::dbgs() << "To be handled: " << OpCode << "\n");
-    llvm_unreachable("To be handled SILInstruction");
-
   case ValueKind::SILArgument:
     llvm_unreachable("not an instruction");
 
@@ -649,13 +645,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(Ty, (SILValueCategory)TyCategory));
     break;
   }
-  case ValueKind::ProjectExistentialRefInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createProjectExistentialRef(Loc,
-                    getLocalValue(ValID, ValResNum,
-                         getSILType(Ty, (SILValueCategory)TyCategory)));
-    break;
-  }
   // Conversion instructions.
   case ValueKind::RefToObjectPointerInst:
   case ValueKind::UpcastInst:
@@ -773,34 +762,32 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     break;
   }
-  case ValueKind::DeinitExistentialInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createDeinitExistential(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
+#define UNARY_INSTRUCTION_HELPER(ID, CREATOR) \
+  case ValueKind::ID##Inst:                   \
+    ResultVal = Builder.CREATOR(Loc, getLocalValue(ValID, ValResNum,  \
+                    getSILType(MF->getType(TyID),                     \
+                               (SILValueCategory)TyCategory)));       \
     break;
-  }
-  case ValueKind::DestroyAddrInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createDestroyAddr(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
-    break;
-  }
-  case ValueKind::IsNonnullInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createIsNonnull(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
-    break;
-  }
-  case ValueKind::LoadInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createLoad(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
-    break;
-  }
+#define UNARY_INSTRUCTION(ID) UNARY_INSTRUCTION_HELPER(ID, create##ID)
+  UNARY_INSTRUCTION(CopyValue)
+  UNARY_INSTRUCTION(DestroyValue)
+  UNARY_INSTRUCTION(DeinitExistential)
+  UNARY_INSTRUCTION(DestroyAddr)
+  UNARY_INSTRUCTION(IsNonnull)
+  UNARY_INSTRUCTION(Load)
+  UNARY_INSTRUCTION(MarkUninitialized)
+  UNARY_INSTRUCTION(Return)
+  UNARY_INSTRUCTION_HELPER(StrongRetain, createStrongRetainInst)
+  UNARY_INSTRUCTION_HELPER(StrongRelease, createStrongReleaseInst)
+  UNARY_INSTRUCTION(StrongRetainAutoreleased)
+  UNARY_INSTRUCTION(AutoreleaseReturn)
+  UNARY_INSTRUCTION(StrongRetainUnowned)
+  UNARY_INSTRUCTION(UnownedRetain)
+  UNARY_INSTRUCTION(UnownedRelease)
+  UNARY_INSTRUCTION(ProjectExistentialRef)
+#undef UNARY_INSTRUCTION
+#undef UNARY_INSTRUCTION_HELPER
+
   case ValueKind::LoadWeakInst: {
     auto Ty = MF->getType(TyID);
     bool isTake = (Attr > 0);
@@ -817,20 +804,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         getLocalValue(ValID, ValResNum,
                       getSILType(Ty, (SILValueCategory)TyCategory)),
         canDefault);
-    break;
-  }
-  case ValueKind::MarkUninitializedInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createMarkUninitialized(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
-    break;
-  }
-  case ValueKind::ReturnInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createReturn(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
     break;
   }
   case ValueKind::StoreInst: {
@@ -875,55 +848,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createAssign(Loc,
                     getLocalValue(ValID, ValResNum, ValType),
                     getLocalValue(ValID2, ValResNum2, addrType));
-    break;
-  }
-  case ValueKind::StrongReleaseInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createStrongReleaseInst(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
-    break;
-  }
-  case ValueKind::StrongRetainInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createStrongRetainInst(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
-    break;
-  }
-  case ValueKind::StrongRetainAutoreleasedInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createStrongRetainAutoreleased(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
-    break;
-  }
-  case ValueKind::AutoreleaseReturnInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createAutoreleaseReturn(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
-    break;
-  }
-  case ValueKind::StrongRetainUnownedInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createStrongRetainUnowned(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
-    break;
-  }
-  case ValueKind::UnownedRetainInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createUnownedRetain(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
-    break;
-  }
-  case ValueKind::UnownedReleaseInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createUnownedRelease(Loc,
-        getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
     break;
   }
   case ValueKind::StructElementAddrInst: {

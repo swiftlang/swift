@@ -213,8 +213,8 @@ void SILSerializer::handleMethodInst(const MethodInst *MI,
 
 void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   switch (SI.getKind()) {
-  default:
-    llvm_unreachable("To be handled SILInstruction");
+  case ValueKind::SILArgument:
+    llvm_unreachable("not an instruction");
 
   case ValueKind::UnreachableInst: {
     unsigned abbrCode = SILAbbrCodes[SILInstNoOperandLayout::Code];
@@ -480,6 +480,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
+  case ValueKind::CopyValueInst:
+  case ValueKind::DestroyValueInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocRefInst:
   case ValueKind::DeinitExistentialInst:
