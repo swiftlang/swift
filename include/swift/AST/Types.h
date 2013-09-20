@@ -170,10 +170,6 @@ public:
     return cast<T>(getDesugaredType());
   }
 
-  /// getString - Return the name of the type as a string, for use in
-  /// diagnostics only.
-  std::string getString(const Type::PrintOptions &PO = Type::PrintOptions()) const;
-
   /// isMaterializable - Is this type 'materializable' according to
   /// the rules of the language?  Basically, does it not contain any
   /// l-value types?
@@ -335,8 +331,13 @@ public:
   Type getOptionalObjectType(const ASTContext &C);
 
   void dump() const;
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
+  void print(raw_ostream &OS,
+             const Type::PrintOptions &PO = Type::PrintOptions()) const;
+
+  /// Return the name of the type as a string, for use in diagnostics only.
+  std::string getString(const Type::PrintOptions &PO =
+                            Type::PrintOptions()) const;
+
 private:
   // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;
@@ -360,9 +361,7 @@ class ErrorType : public TypeBase {
     : TypeBase(TypeKind::Error, &C, /*HasTypeVariable=*/false) { }
 public:
   static Type get(const ASTContext &C);
-  
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Error;
@@ -390,8 +389,6 @@ class BuiltinRawPointerType : public BuiltinType {
   BuiltinRawPointerType(const ASTContext &C)
     : BuiltinType(TypeKind::BuiltinRawPointer, C) {}
 public:
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinRawPointer;
   }
@@ -406,8 +403,6 @@ class BuiltinObjectPointerType : public BuiltinType {
   BuiltinObjectPointerType(const ASTContext &C)
     : BuiltinType(TypeKind::BuiltinObjectPointer, C) {}
 public:
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinObjectPointer;
   }
@@ -421,8 +416,6 @@ class BuiltinObjCPointerType : public BuiltinType {
   BuiltinObjCPointerType(const ASTContext &C)
     : BuiltinType(TypeKind::BuiltinObjCPointer, C) {}
 public:
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinObjCPointer;
   }
@@ -444,8 +437,6 @@ class BuiltinVectorType : public BuiltinType, public llvm::FoldingSetNode {
 public:
   static BuiltinVectorType *get(const ASTContext &context, Type elementType,
                                 unsigned numElements);
-
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
 
   /// \brief Retrieve the type of this vector's elements.
   Type getElementType() const { return elementType; }
@@ -487,8 +478,6 @@ public:
     return BitWidth;
   }
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinInteger;
   }
@@ -526,8 +515,6 @@ public:
     case PPC128: return 128;
     }
   }
-  
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinFloat;
@@ -552,8 +539,6 @@ public:
   /// sugar until we get down to a non-sugar type.
   TypeBase *getDesugaredType();
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::NameAlias;
@@ -577,8 +562,6 @@ public:
   /// sugar until we get down to a non-sugar type.
   TypeBase *getDesugaredType();
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Paren;
@@ -718,8 +701,6 @@ public:
   /// return -1.
   int getFieldForScalarInit() const;
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Tuple;
@@ -776,8 +757,6 @@ public:
   /// represented as an UnboundGenericType with Dictionary<String, Int> as its
   /// parent type.
   Type getParent() const { return Parent; }
-
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent());
@@ -842,8 +821,6 @@ public:
   /// required. This can be null for a fully-type-checked AST.
   ArrayRef<Substitution> getSubstitutions(Module *module,
                                           LazyResolver *resolver);
-
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     bool hasTypeVariable = false;
@@ -1016,8 +993,6 @@ public:
   /// declaration in the parent type \c Parent.
   static EnumType *get(EnumDecl *D, Type Parent, const ASTContext &C);
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent());
   }
@@ -1046,8 +1021,6 @@ public:
   /// declaration in the parent type \c Parent.
   static StructType *get(StructDecl *D, Type Parent, const ASTContext &C);
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent());
   }
@@ -1075,8 +1048,6 @@ public:
   /// \brief Retrieve the type when we're referencing the given class
   /// declaration in the parent type \c Parent.
   static ClassType *get(ClassDecl *D, Type Parent, const ASTContext &C);
-
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent());
@@ -1109,8 +1080,6 @@ public:
 
   Type getInstanceType() const { return InstanceType; }
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::MetaType;
@@ -1135,9 +1104,7 @@ public:
   static ModuleType *get(Module *M);
 
   Module *getModule() const { return TheModule; }
-  
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return  T->getKind() == TypeKind::Module;
@@ -1352,8 +1319,6 @@ public:
   static FunctionType *get(Type Input, Type Result,
                            const ExtInfo &Info, const ASTContext &C);
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Function;
@@ -1389,7 +1354,6 @@ public:
 
   GenericParamList &getGenericParams() const { return *Params; }
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
   void printGenericParams(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
   
   // Implement isa/cast/dyncast/etc.
@@ -1419,9 +1383,7 @@ public:
 
   Type getBaseType() const { return Base; }
   uint64_t getSize() const { return Size; }
-  
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Array;
@@ -1472,8 +1434,6 @@ public:
   /// Return a uniqued array slice type with the specified base type.
   static ArraySliceType *get(Type baseTy, const ASTContext &C);
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ArraySlice;
   }
@@ -1488,8 +1448,6 @@ public:
   /// Return a uniqued optional type with the specified base type.
   static OptionalType *get(Type baseTy, const ASTContext &C);
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Optional;
@@ -1503,9 +1461,7 @@ public:
   ProtocolDecl *getDecl() const {
     return reinterpret_cast<ProtocolDecl *>(NominalType::getDecl());
   }
-  
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
+
   /// True if only classes may conform to the protocol.
   bool requiresClass() const;
   
@@ -1546,9 +1502,7 @@ public:
   
   /// \brief Retrieve the set of protocols composed to create this type.
   ArrayRef<Type> getProtocols() const { return Protocols; }
-  
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
+
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Protocols);
   }
@@ -1734,8 +1688,6 @@ public:
     return false;
   }
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *type) {
     return type->getKind() == TypeKind::LValue;
@@ -1830,8 +1782,6 @@ public:
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass,
                                Optional<unsigned> Index = Optional<unsigned>());
-
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
 
   /// \brief Retrieve the name of this archetype.
   Identifier getName() const { return Name; }
@@ -1949,8 +1899,6 @@ public:
     return T->getKind() == TypeKind::GenericTypeParam;
   }
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-
 private:
   friend class GenericTypeParamDecl;
 
@@ -1981,8 +1929,6 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::AssociatedType;
   }
-
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
 
 private:
   friend class AssociatedTypeDecl;
@@ -2019,9 +1965,7 @@ public:
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
   TypeBase *getDesugaredType();
-  
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Substituted;
@@ -2048,8 +1992,6 @@ public:
 
   /// Retrieve the name of the member type.
   Identifier getName() const { return Name; }
-
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2106,8 +2048,6 @@ public:
                  ReferenceStorageType::get(referent, Ownership::Unowned, C));
   }
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::UnownedStorage;
@@ -2126,8 +2066,6 @@ public:
     return static_cast<WeakStorageType*>(
                     ReferenceStorageType::get(referent, Ownership::Weak, C));
   }
-
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2172,7 +2110,8 @@ public:
     return reinterpret_cast<Implementation *>(this + 1);
   }
 
-  void print(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
+  void printImpl(raw_ostream &OS,
+                 const Type::PrintOptions &PO) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
