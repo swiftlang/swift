@@ -57,10 +57,12 @@ void TypeVariableType::print(raw_ostream &OS, const Type::PrintOptions &PO) cons
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVar(typeVar), ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
+  : TypeVar(typeVar), ParentOrFixed(typeVar->getImpl().ParentOrFixed),
+    Options(typeVar->getImpl().Options){ }
 
 void SavedTypeVariableBinding::restore() {
   TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
+  TypeVar->getImpl().Options = Options;
 }
 
 ArchetypeType *TypeVariableType::Implementation::getArchetype() const {
@@ -460,7 +462,7 @@ Type ConstraintSystem::openType(
       auto tv = CS.createTypeVariable(
                   CS.getConstraintLocator((Expr *)nullptr,
                                           LocatorPathElt(archetype)),
-                  /*canBindToLValue=*/false);
+                  TVO_PrefersSubtypeBinding);
 
       // If there is a superclass for the archetype, add the appropriate
       // trivial subtype requirement on the type variable.
@@ -1439,11 +1441,11 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
   auto inputTV = cs.createTypeVariable(
                    cs.getConstraintLocator(memberLocator,
                                            ConstraintLocator::FunctionArgument),
-                   /*canBindToLValue=*/false);
+                   /*options=*/0);
   auto outputTV = cs.createTypeVariable(
                     cs.getConstraintLocator(memberLocator,
                                             ConstraintLocator::FunctionResult),
-                    /*canBindToLValue=*/false);
+                    /*options=*/0);
 
   // The conversion function will have function type TI -> TO, for fresh
   // type variables TI and TO.
@@ -2107,7 +2109,7 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
                                   getConstraintLocator(
                                     ovl->getLocator(),
                                     ConstraintLocator::FunctionResult),
-                                  /*canBindToLValue=*/false),
+                                  /*options=*/0),
                                 choice.getBaseType(),
                                 getASTContext());
     break;
@@ -2268,8 +2270,8 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   auto applyLocator = getConstraintLocator(locator,
                                            ConstraintLocator::ApplyArgument);
   auto tv = createTypeVariable(applyLocator,
-                               /*canBindToLValue=*/true);
-  
+                               TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
+
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. Note that these constraints specifically require a
   // match on the result type because the constructors for unions and struct
@@ -3084,6 +3086,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   // Compare the type variable bindings.
   for (auto &binding : diff.typeBindings) {
+    // If the type variable isn't one for which we should be looking at the
+    // bindings, don't.
+    if (!binding.typeVar->getImpl().prefersSubtypeBinding())
+      continue;
+
     auto type1 = binding.bindings[idx1];
     auto type2 = binding.bindings[idx2];
 
@@ -3994,7 +4001,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     auto objectTv = createTypeVariable(
                       getConstraintLocator(dest,
                                            ConstraintLocator::AssignDest),
-                      /*canBindToLValue=*/true);
+                      TVO_CanBindToLValue);
     auto refTv = LValueType::get(objectTv,
                                  LValueType::Qual::Implicit,
                                  getASTContext());

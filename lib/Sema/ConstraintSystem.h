@@ -60,6 +60,9 @@ class SavedTypeVariableBinding {
   /// \brief The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
 
+  /// The options.
+  unsigned Options;
+
 public:
   explicit SavedTypeVariableBinding(TypeVariableType *typeVar);
 
@@ -74,6 +77,16 @@ class ConstraintLocator;
 
 } // end namespace constraints
 
+/// Options that describe how a type variable can be used.
+enum TypeVariableOptions {
+  /// Whether the type variable can be bound to an lvalue type or not.
+  TVO_CanBindToLValue = 0x01,
+
+  /// Whether a more specific deduction for this type variable implies a
+  /// better solution to the constraint system.
+  TVO_PrefersSubtypeBinding = 0x02
+};
+
 /// \brief The implementation object for a type variable used within the
 /// constraint-solving type checker.
 ///
@@ -83,10 +96,10 @@ class ConstraintLocator;
 /// which it is assigned.
 class TypeVariableType::Implementation {
   /// \brief The unique number assigned to this type variable.
-  unsigned ID : 31;
+  unsigned ID : 32;
 
-  /// Whether this type variable can be bound to an lvalue type.
-  unsigned CanBindToLValue : 1;
+  /// Type variable options.
+  unsigned Options : 2;
 
   /// \brief The locator that describes where this type variable was generated.
   constraints::ConstraintLocator *locator;
@@ -100,15 +113,21 @@ class TypeVariableType::Implementation {
 
 public:
   explicit Implementation(unsigned ID, constraints::ConstraintLocator *locator,
-                          bool canBindToLValue)
-    : ID(ID), CanBindToLValue(canBindToLValue), locator(locator),
-              ParentOrFixed(getTypeVariable()) { }
+                          unsigned options)
+    : ID(ID), Options(options), locator(locator),
+      ParentOrFixed(getTypeVariable()) { }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
   unsigned getID() const { return ID; }
 
   /// Whether this type variable can bind to an lvalue type.
-  bool canBindToLValue() const { return CanBindToLValue; }
+  bool canBindToLValue() const { return Options & TVO_CanBindToLValue; }
+
+  /// Whether this type variable prefers a subtype binding over a supertype
+  /// binding.
+  bool prefersSubtypeBinding() const {
+    return Options & TVO_PrefersSubtypeBinding;
+  }
 
   /// \brief Retrieve the type variable associated with this implementation.
   TypeVariableType *getTypeVariable() {
@@ -203,13 +222,25 @@ public:
       if (record)
         rep->getImpl().recordBinding(*record);
       rep->getImpl().ParentOrFixed = getTypeVariable();
+      if (rep->getImpl().prefersSubtypeBinding()) {
+        auto myRep = getRepresentative(record);
+        if (record)
+          myRep->getImpl().recordBinding(*record);
+        myRep->getImpl().Options|=TVO_PrefersSubtypeBinding;
+      }
       assert(rep->getImpl().canBindToLValue() == canBindToLValue());
     } else {
       auto rep = getRepresentative(record);
       if (record)
         rep->getImpl().recordBinding(*record);
       rep->getImpl().ParentOrFixed = other;
-      assert(rep->getImpl().canBindToLValue() 
+      if (rep->getImpl().prefersSubtypeBinding()) {
+        auto otherRep = other->getImpl().getRepresentative(record);
+        if (record)
+          otherRep->getImpl().recordBinding(*record);
+        otherRep->getImpl().Options |= TVO_PrefersSubtypeBinding;
+      }
+      assert(rep->getImpl().canBindToLValue()
                == other->getImpl().canBindToLValue());
     }
   }
@@ -1728,9 +1759,9 @@ public:
 
   /// \brief Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
-                                       bool canBindToLValue) {
+                                       unsigned options) {
     auto tv = TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
-                                       locator, canBindToLValue);
+                                       locator, options);
     TypeVariables.push_back(tv);
     return tv;
   }
