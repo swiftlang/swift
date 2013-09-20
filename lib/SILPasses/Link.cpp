@@ -24,7 +24,7 @@ using namespace swift;
 static llvm::cl::opt<bool>
 EnableLinkAll("sil-link-all", llvm::cl::Hidden, llvm::cl::init(false));
 static llvm::cl::opt<bool>
-EnableLinking("enable-sil-linking", llvm::cl::Hidden, llvm::cl::init(false));
+EnableLinking("enable-sil-linking", llvm::cl::Hidden, llvm::cl::init(true));
 
 STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 
