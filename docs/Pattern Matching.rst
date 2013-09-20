@@ -23,7 +23,7 @@ Swift has a pretty small set of types right now:
 * Tuples. Heterogenous fixed-length products. Swift's system
   provides two basic kinds of element: positional and labelled.
 * Arrays. Homogenous fixed-length aggregates.
-* Algebraic data types (ADTs), introduce by union.  Nominal closed
+* Algebraic data types (ADTs), introduce by enum.  Nominal closed
   disjoint unions of heterogenous types.
 * Struct types.  Nominal heterogenous fixed-length products.
 * Class types.  Nominal, subtypeable heterogenous fixed-length products
@@ -693,8 +693,8 @@ interpreted according to what is found:
   type, and the value of that property must satisfy the element
   pattern.
 
-- If the name resolves to a union element, then the dynamic type
-  of the matched value must match the union type as discussed above,
+- If the name resolves to a enum element, then the dynamic type
+  of the matched value must match the enum type as discussed above,
   and the value must be of the specified element.  There must be
   an arguments clause if and only if the element has a value type.
   If so, the value of the element is matched against the clause

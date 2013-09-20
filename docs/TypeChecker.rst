@@ -58,7 +58,7 @@ constraint either places a requirement on a single type (e.g., it is
 an integer literal type) or relates two types (e.g., one is a subtype
 of the other). The types described in constraints can be any type in
 the Swift type system including, e.g., builtin types, tuple types,
-function types, union/struct/class types, protocol types, and generic
+function types, enum/struct/class types, protocol types, and generic
 types. Additionally, a type can be a type variable ``T`` (which are
 typically numbered, ``T0``, ``T1``, ``T2``, etc., and are introduced
 as needed), and type variables can be used in place of any other type,
@@ -173,7 +173,7 @@ and types generated from the primary expression kinds are:
 
 **Unresolved member reference**
   An unresolved member reference ``.name`` refers to a member of a
-  union type. The union type is assumed to have a fresh variable
+  enum type. The enum type is assumed to have a fresh variable
   type``T0`` (since that type can only be known from context), and a
   value member constraint ``T0.name == T1``, for fresh type variable
   ``T1``, captures the fact that it has a member named ``name`` with
@@ -297,23 +297,23 @@ resolving to a set of overloaded declarations. One particularly
 interesting case is the unresolved member reference, e.g.,
 ``.name``. As noted in the prior section, this generates the
 constraint ``T0.name == T1``, where ``T0`` is a fresh type variable
-that will be bound to the union type and ``T1`` is a fresh type
+that will be bound to the enum type and ``T1`` is a fresh type
 variable that will be bound to the type of the selected member. The
 issue noted in the prior section is that this constraint does not give
 the solver enough information to determine ``T0`` without
-guesswork. However, we note that the type of a union member actually
+guesswork. However, we note that the type of a enum member actually
 has a regular structure. For example, consider the ``Optional`` type::
 
-  union Optional<T> {
+  enum Optional<T> {
     case none
     case value(value : T)
   }
 
 The type of ``Optional<T>.none`` is ``Optional<T>``, while the type of
 ``Optional<T>.value`` is ``(value : T) -> Optional<T>``. In fact, the
-type of a union element can have one of two forms: it can be ``T0``,
-for a union element that has no extra data, or it can be ``T2 -> T0``,
-where ``T2`` is the data associated with the union element.  Letting
+type of a enum element can have one of two forms: it can be ``T0``,
+for a enum element that has no extra data, or it can be ``T2 -> T0``,
+where ``T2`` is the data associated with the enum element.  Letting
 ``T2`` by a fresh type variable, we introduce a disjunction constraint
 ``T1 := T0 or T1 := T2 -> T0``. Note that, in both cases, the context
 of the unresolved member reference helps determine which form matches,

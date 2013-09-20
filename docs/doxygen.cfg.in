@@ -260,7 +260,7 @@ HIDE_UNDOC_MEMBERS     = NO
 HIDE_UNDOC_CLASSES     = NO
 
 # If the HIDE_FRIEND_COMPOUNDS tag is set to YES, Doxygen will hide all 
-# friend (class|struct|union) declarations. 
+# friend (class|struct|enum) declarations. 
 # If set to NO (the default) these declarations will be included in the 
 # documentation.
 
@@ -594,7 +594,7 @@ VERBATIM_HEADERS       = YES
 
 # If the ALPHABETICAL_INDEX tag is set to YES, an alphabetical index 
 # of all compounds will be generated. Enable this if the project 
-# contains a lot of classes, structs, unions or interfaces.
+# contains a lot of classes, structs, enums or interfaces.
 
 ALPHABETICAL_INDEX     = YES
 

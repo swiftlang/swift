@@ -9,12 +9,13 @@ IMPORT SYNTAX
   import-item ::= identifier-path '.' '(' import-item-list ')'
 
   import-kind ::= 'module'
+
   import-kind ::= 'class'
+  import-kind ::= 'enum'
   import-kind ::= 'func'
   import-kind ::= 'protocol'
   import-kind ::= 'struct'
   import-kind ::= 'typealias'
-  import-kind ::= 'union'
   import-kind ::= 'var'
   // ...
 

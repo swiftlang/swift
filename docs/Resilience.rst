@@ -269,7 +269,7 @@ A type exists on a deployment if:
 
 * it is a tuple type and all of its component types exist on the deployment, or
 
-* it is a struct, class, or union type and it does not have an [available]
+* it is a struct, class, or enum type and it does not have an [available]
   attribute with a later version for a matching platform name.
 
 It is an interface change for an exported type to gain an [available] attribute.
@@ -280,7 +280,7 @@ A type is empty if it has a fragile representation (defined below) and:
 
 * it is a struct type with no non-empty fields, or
 
-* it is a union type with one alternative which either carries no data or
+* it is an enum type with one alternative which either carries no data or
   carries data with an empty type.
 
 A type has a fragile representation if:
@@ -430,7 +430,7 @@ It is an error to place the [unchanging] annotation on any of these types:
 
 * a struct type with member types that are not universally non- resilient
 
-* a union type with an enumerator whose type is not universally non- resilient
+* an enum type with an enumerator whose type is not universally non- resilient
 
 * a class extension
 
@@ -551,7 +551,7 @@ protocols - born_fragile => laid out as vtable. Can these be resilient?
 
 their implementations: contents of vtable are knowable
 
-unions - layout, set of variants
+enums - layout, set of variants
 
 Notes from second meeting
 -------------------------
@@ -598,7 +598,7 @@ access something resilient fragilely or not.
 
 Resilience is lexically inherited.
 
-* Declarations inside a fragile union are implicitly fragile, etc.
+* Declarations inside a fragile enum are implicitly fragile, etc.
 
 * Except anything inside a function is fragile.
 
@@ -639,9 +639,9 @@ Break it down by types of declarations.
   methods. Doing this resiliently requires load-time checking.  vtable for
   non-defaulted methods, ? for rest?
 
-* union - set of directly represented cases
+* enum - set of directly represented cases
 
-* union elements - directly represented vs. injection/projection.
+* enum elements - directly represented vs. injection/projection.
 
 * enum - called out so that we can have an extensible thing that promises no
   data fields. Always an i32 when resilient.
