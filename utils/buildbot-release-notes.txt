@@ -1,7 +1,10 @@
 2013-09-24
 ----------
 
-* The 'union' keyword has been replaced with 'enum'.
+* The 'union' keyword has been replaced with 'enum'.  Unions and enums
+  are semantically identical in swift (the former just has data 
+  associated with its discriminators) and 'enum' is the vastly more
+  common case.
 
 * The Optional type 'T?' is now represented as an enum:
 
