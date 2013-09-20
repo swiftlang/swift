@@ -836,7 +836,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto selfDecl = cast<VarDecl>(getDecl(implicitSelfID, nullptr));
     auto genericParams = maybeReadGenericParams(parent);
 
-    auto ctor = new (ctx) ConstructorDecl(ctx.getIdentifier("constructor"),
+    auto ctor = new (ctx) ConstructorDecl(ctx.getIdentifier("init"),
                                           SourceLoc(), /*argParams=*/nullptr,
                                           /*bodyParams=*/nullptr, selfDecl,
                                           genericParams, parent);

@@ -2272,7 +2272,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
 
   auto &context = getASTContext();
   // FIXME: lame name
-  auto name = context.getIdentifier("constructor");
+  auto name = context.getIdentifier("init");
   auto applyLocator = getConstraintLocator(locator,
                                            ConstraintLocator::ApplyArgument);
   auto tv = createTypeVariable(applyLocator,
@@ -2428,7 +2428,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // left-hand side of a dot expression before we look for members.
 
   bool isExistential = instanceTy->isExistentialType();
-  if (name.str() == "constructor") {
+  if (name.str() == "init") {
     // Constructors have their own approach to name lookup.
     auto ctors = TC.lookupConstructors(baseObjTy);
     if (!ctors) {

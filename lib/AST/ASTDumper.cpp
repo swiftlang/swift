@@ -611,7 +611,7 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     if (isa<FuncDecl>(AFD))
       os << "func decl";
     if (isa<ConstructorDecl>(AFD))
-      os << "constructor";
+      os << "init";
     if (isa<DestructorDecl>(AFD))
       os << "destructor";
     break;

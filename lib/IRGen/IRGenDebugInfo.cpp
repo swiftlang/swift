@@ -350,7 +350,7 @@ StringRef IRGenDebugInfo::getName(SILLocation L) {
     return getName(*FD);
 
   if (L.isASTNode<ConstructorDecl>())
-    return "constructor";
+    return "init";
 
   return StringRef();
 }

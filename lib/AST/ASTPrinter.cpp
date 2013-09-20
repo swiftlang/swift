@@ -738,7 +738,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
 
 void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   recordDeclLoc(decl);
-  OS << "constructor";
+  OS << "init";
   if (decl->isGeneric()) {
     printGenericParams(decl->getGenericParams());
   } else {

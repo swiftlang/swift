@@ -1717,7 +1717,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   }
 
   // Create the constructor.
-  auto constructorID = context.getIdentifier("constructor");
+  auto constructorID = context.getIdentifier("init");
   VarDecl *selfDecl
     = new (context) VarDecl(SourceLoc(),
                             context.getIdentifier("self"),

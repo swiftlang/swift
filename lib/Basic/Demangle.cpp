@@ -1914,10 +1914,10 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       break;
     }
     case swift::Demangle::Node::Kind::Allocator:
-      printer << "__allocating_constructor";
+      printer << "__allocating_init";
       break;
     case swift::Demangle::Node::Kind::Constructor:
-      printer << "constructor";
+      printer << "init";
       break;
     case swift::Demangle::Node::Kind::Destructor:
       printer << "destructor";

@@ -2362,7 +2362,7 @@ Parser::parseDeclConstructor(unsigned Flags) {
 
   Scope S2(this, ScopeKind::ConstructorBody);
   ConstructorDecl *CD =
-      new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
+      new (Context) ConstructorDecl(Context.getIdentifier("init"),
                                     ConstructorLoc, ArgPattern, BodyPattern,
                                     SelfDecl, GenericParams, CurDeclContext);
 

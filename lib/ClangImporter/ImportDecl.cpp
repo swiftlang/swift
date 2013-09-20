@@ -300,7 +300,7 @@ namespace {
       auto &context = Impl.SwiftContext;
 
       // FIXME: Name hack.
-      auto name = context.getIdentifier("constructor");
+      auto name = context.getIdentifier("init");
 
       // Create the 'self' declaration.
       auto selfType = structDecl->getDeclaredTypeInContext();
@@ -1155,7 +1155,7 @@ namespace {
 
       // FIXME: Hack.
       auto loc = decl->getLoc();
-      auto name = Impl.SwiftContext.getIdentifier("constructor");
+      auto name = Impl.SwiftContext.getIdentifier("init");
 
       // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;

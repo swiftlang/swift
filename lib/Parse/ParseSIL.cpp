@@ -194,13 +194,13 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
                                    const Diagnostic &D) {
   switch (P.Tok.getKind()) {
   case tok::identifier:
-  case tok::kw_constructor:
     Result = P.Context.getIdentifier(P.Tok.getText());
     Loc = P.Tok.getLoc();
     P.consumeToken();
     return false;
+  case tok::kw_constructor:
   case tok::kw_init:
-    Result = P.Context.getIdentifier("constructor");
+    Result = P.Context.getIdentifier("init");
     Loc = P.Tok.getLoc();
     P.consumeToken();
     return false;
