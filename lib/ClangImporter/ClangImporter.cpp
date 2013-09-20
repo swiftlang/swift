@@ -654,23 +654,25 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
   // FIXME: Do we really have to import every single method?
   // FIXME: Need a more efficient table in Clang to find "all selectors whose
   // first piece is this name".
+  auto importMethods = [&](const clang::ObjCMethodList *list) {
+    for (; list != nullptr; list = list->getNext()) {
+      if (list->Method->isUnavailable())
+        continue;
+      if (auto VD = cast_or_null<ValueDecl>(Impl.importDecl(list->Method)))
+        consumer.foundDecl(VD);
+    }
+  };
+
   for (auto entry : S.MethodPool) {
     if (!name.empty() &&
         !selectorStartsWithName(Impl.SwiftContext, entry.first, name))
       continue;
   
     auto &methodListPair = entry.second;
-    if (methodListPair.first.Method == nullptr)
-      continue;
-    
-    // Only include instance methods.
-    for (const clang::ObjCMethodList *list = &methodListPair.first;
-         list != nullptr; list = list->getNext()) {
-      if (list->Method->isUnavailable())
-        continue;
-      if (auto VD = cast_or_null<ValueDecl>(Impl.importDecl(list->Method)))
-        consumer.foundDecl(VD);
-    }
+    if (methodListPair.first.Method)
+      importMethods(&methodListPair.first);
+    if (methodListPair.second.Method)
+      importMethods(&methodListPair.second);
   }
 }
 
