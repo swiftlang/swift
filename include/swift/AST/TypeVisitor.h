@@ -27,7 +27,7 @@ template<typename ImplClass, typename RetTy = void, typename... Args>
 class TypeVisitor {
 public:
 
-  template <class... As> RetTy visit(Type T, Args... args) {
+  RetTy visit(Type T, Args... args) {
     switch (T->getKind()) {
 #define TYPE(CLASS, PARENT) \
     case TypeKind::CLASS: \
@@ -45,7 +45,6 @@ public:
   // a template, it will only instantiate cases that are used and thus we still
   // require full coverage of the AST nodes by the visitor.
 #define ABSTRACT_TYPE(CLASS, PARENT)                           \
-  template <class... As>                                       \
   RetTy visit##CLASS##Type(CLASS##Type *T, Args... args) {     \
      return static_cast<ImplClass*>(this)                      \
               ->visit##PARENT(T, std::forward<Args>(args)...); \
