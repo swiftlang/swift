@@ -1243,7 +1243,13 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::BoundGenericUnion:
   {
-    Name = getMangledName(DbgTy);
+    if (DbgTy.getDecl() &&
+        (DbgTy.getDecl()->getDeclContext()->getContextKind() ==
+         DeclContextKind::AbstractClosureExpr) &&
+        !DbgTy.getDecl()->getDeclContext()->getGenericParamsOfContext())
+      Name = "FIXME: AbstractClosureExpr with empty DeclContext";
+    else
+      Name = getMangledName(DbgTy);
     auto UnionTy = BaseTy->castTo<BoundGenericUnionType>();
     if (auto Decl = UnionTy->getDecl()) {
       Location L = getLoc(SM, Decl);
