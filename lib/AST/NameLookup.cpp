@@ -813,6 +813,7 @@ bool Module::lookupQualified(Type type,
 
     // For each declaration whose context is not something we've
     // already visited above, add it to the list of declarations.
+    llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
     for (auto decl : allDecls) {
       // If the declaration has an override, name lookup will also have
       // found the overridden method. Skip this declaration, because we
@@ -830,7 +831,7 @@ bool Module::lookupQualified(Type type,
 
       // If we didn't visit this nominal type above, add this
       // declaration to the list.
-      if (!visited.count(nominal))
+      if (!visited.count(nominal) && knownDecls.insert(decl))
         decls.push_back(decl);
     }
   }
