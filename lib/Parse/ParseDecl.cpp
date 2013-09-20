@@ -1812,8 +1812,10 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags) {
 /// \brief Parse a 'case' of an enum.
 ///
 /// \verbatim
+///   enum-case:
+///      identifier type-tuple? ('->' type)?
 ///   decl-enum-element:
-///      'case' identifier type-tuple? ('->' type)?
+///      'case' enum-case (',' enum-case)*
 /// \endverbatim
 ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
                                        llvm::SmallVectorImpl<Decl *> &Decls) {
@@ -1822,11 +1824,11 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
   // TODO: Accept attributes here?
   
   // Parse comma-separated enum elements.
-  SmallVector<EnumElementDecl*, 4> elements;
+  SmallVector<EnumElementDecl*, 4> Elements;
   
-  ParserStatus status;
+  ParserStatus Status;
   
-  SourceLoc commaLoc;
+  SourceLoc CommaLoc;
   for (;;) {
     Identifier Name;
     SourceLoc NameLoc;
@@ -1836,9 +1838,9 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
                                 tok::kw_case, tok::colon,
                                 diag::invalid_diagnostic).isError()) {
       // Handle the likely case someone typed 'case X, case Y'.
-      if (Tok.is(tok::kw_case) && commaLoc.isValid()) {
+      if (Tok.is(tok::kw_case) && CommaLoc.isValid()) {
         diagnose(Tok, diag::expected_identifier_after_case_comma);
-        return status;
+        return Status;
       }
       
       // For recovery, see if the user typed something resembling a switch
@@ -1848,12 +1850,12 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
     if (NameIsNotIdentifier) {
       if (consumeIf(tok::colon)) {
         diagnose(CaseLoc, diag::case_outside_of_switch, "case");
-        status.setIsParseError();
-        return status;
+        Status.setIsParseError();
+        return Status;
       }
-      if (commaLoc.isValid()) {
+      if (CommaLoc.isValid()) {
         diagnose(Tok, diag::expected_identifier_after_case_comma);
-        return status;
+        return Status;
       }
       diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum case");
     }
@@ -1863,12 +1865,12 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
     if (Tok.isFollowingLParen()) {
       ArgType = parseTypeTupleBody();
       if (ArgType.hasCodeCompletion()) {
-        status.setHasCodeCompletion();
-        return status;
+        Status.setHasCodeCompletion();
+        return Status;
       }
       if (ArgType.isNull()) {
-        status.setIsParseError();
-        return status;
+        Status.setIsParseError();
+        return Status;
       }
     }
     
@@ -1879,12 +1881,12 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
       ArrowLoc = consumeToken();
       ResultType = parseType(diag::expected_type_enum_element_result);
       if (ResultType.hasCodeCompletion()) {
-        status.setHasCodeCompletion();
-        return status;
+        Status.setHasCodeCompletion();
+        return Status;
       }
       if (ResultType.isNull()) {
-        status.setIsParseError();
-        return status;
+        Status.setIsParseError();
+        return Status;
       }
     }
     
@@ -1895,8 +1897,8 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
     if (Tok.is(tok::colon) || Tok.is(tok::kw_where)) {
       diagnose(CaseLoc, diag::case_outside_of_switch, "case");
       skipUntilDeclRBrace();
-      status.setIsParseError();
-      return status;
+      Status.setIsParseError();
+      return Status;
     }
     
     // Create the element.
@@ -1905,33 +1907,33 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
                                                  ArrowLoc,
                                                  ResultType.getPtrOrNull(),
                                                  CurDeclContext);
-    elements.push_back(result);
+    Elements.push_back(result);
     
     // Continue through the comma-separated list.
     if (!Tok.is(tok::comma))
       break;
-    commaLoc = consumeToken(tok::comma);
+    CommaLoc = consumeToken(tok::comma);
   }
   
   if (!(Flags & PD_AllowEnumElement)) {
     diagnose(CaseLoc, diag::disallowed_enum_element);
     // Don't add the EnumElementDecls unless the current context
     // is allowed to have EnumElementDecls.
-    status.setIsParseError();
-    return status;
+    Status.setIsParseError();
+    return Status;
   }
 
   // Create and return the EnumCaseDecl containing all the elements.
-  auto theCase = EnumCaseDecl::create(CaseLoc, elements, CurDeclContext);
+  auto theCase = EnumCaseDecl::create(CaseLoc, Elements, CurDeclContext);
   Decls.push_back(theCase);
   
   // Associate the elements with the case decl and return them.
-  for (auto elt : elements) {
+  for (auto elt : Elements) {
     elt->setContainingCase(theCase);
     Decls.push_back(elt);
   }
 
-  return status;
+  return Status;
 }
 
 /// \brief Parse the members in a struct/class/protocol definition.
