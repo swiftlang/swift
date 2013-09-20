@@ -1,8 +1,17 @@
 2013-09-24
 ----------
 
-* The Optional type 'T?' is now represented as a union. This means that, in
-  addition to the existing Optional APIs, it can be pattern-matched with switch:
+* The 'union' keyword has been replaced with 'enum'.
+
+* The Optional type 'T?' is now represented as an enum:
+
+    enum Optional<T> {
+      case None
+      case Some(T)
+    }
+
+  This means that, in addition to the existing Optional APIs, it can be
+  pattern-matched with switch:
 
     var x : X?, y : Y?
     switch (x, y) {
