@@ -310,7 +310,7 @@ namespace {
                          ArrayRef<std::pair<EnumElementDecl*,
                                             llvm::BasicBlock*>> dests,
                          llvm::BasicBlock *defaultDest) const override {
-      value.claimAll();
+      value.claim(getExplosionSize(value.getKind()));
       emitSingletonSwitch(IGF, dests, defaultDest);
     }
     
@@ -649,7 +649,7 @@ namespace {
                           EnumElementDecl *elt,
                           Explosion &out) const override {
       // All of the cases project an empty explosion.
-      in.claimAll();
+      in.claim(getExplosionSize(in.getKind()));
     }
     
     void emitValueInjection(IRGenFunction &IGF,
@@ -1224,7 +1224,7 @@ namespace {
       // Only the payload case has anything to project. The other cases are
       // empty.
       if (theCase != getPayloadElement()) {
-        inEnum.claimAll();
+        inEnum.claim(getExplosionSize(inEnum.getKind()));
         return;
       }
       
@@ -1446,7 +1446,7 @@ namespace {
       auto &loadableTI = getLoadablePayloadTypeInfo();
       loadableTI.unpackEnumPayload(IGF, payload, payloadValue, 0);
       loadableTI.copy(IGF, payloadValue, payloadCopy);
-      payloadCopy.claimAll();
+      payloadCopy.claimAll(); // FIXME: repack if not bit-identical
       
       IGF.Builder.CreateBr(endBB);
       IGF.Builder.emitBlock(endBB);
@@ -1460,7 +1460,7 @@ namespace {
       assert(TIK >= Loadable);
 
       if (isPOD(ResilienceScope::Local)) {
-        src.claimAll();
+        src.claim(getExplosionSize(src.getKind()));
         return;
       }
       
@@ -1995,7 +1995,7 @@ namespace {
       
       // Non-payload cases project to an empty explosion.
       if (foundPayload == ElementsWithPayload.end()) {
-        inValue.claimAll();
+        inValue.claim(getExplosionSize(inValue.getKind()));
         return;
       }
       
@@ -2188,7 +2188,7 @@ namespace {
 
           Explosion tmp(value.getKind());
           lti.copy(IGF, value, tmp);
-          tmp.claimAll();
+          tmp.claimAll(); // FIXME: repack if not bit-identical
         });
       
       dest.add(payload);
@@ -2198,7 +2198,7 @@ namespace {
     
     void consume(IRGenFunction &IGF, Explosion &src) const override {
       if (isPOD(ResilienceScope::Local)) {
-        src.claimAll();
+        src.claim(getExplosionSize(src.getKind()));
         return;
       }
       
