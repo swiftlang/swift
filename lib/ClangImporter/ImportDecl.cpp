@@ -1092,24 +1092,6 @@ namespace {
       auto containerTy = dc->getDeclaredTypeOfContext();
       assert(containerTy && "Method in non-type context?");
 
-      // Make sure that NSObject is a supertype of the container.
-      // FIXME: This is a hack because we don't have a suitable 'top' type for
-      // Objective-C classes.
-      auto checkTy = containerTy;
-      do {
-        auto classDecl = checkTy->getClassOrBoundGenericClass();
-        if (!classDecl) {
-          return nullptr;
-        }
-
-        if (classDecl->getName().str() == "NSObject")
-          break;
-
-        checkTy = classDecl->getSuperclass();
-        if (!checkTy)
-          return nullptr;
-      } while (true);
-
       // Only methods in the 'init' family can become constructors.
       FuncDecl *alloc = nullptr;
       switch (objcMethod->getMethodFamily()) {

@@ -7,6 +7,8 @@
 - init;
 + new;
 - performSelector:(SEL)selector withObject:(id)obj;
+- (Class)myClass;
++ description;
 @end
 
 @interface A : NSObject

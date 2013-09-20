@@ -315,6 +315,12 @@ getDynamicResultSignature(ValueDecl *decl,
     // Handle functions.
     selector = func->getObjCSelector(buffer);
     type = decl->getType()->castTo<AnyFunctionType>()->getResult();
+
+    // Append a '+' for static methods.
+    if (func->isStatic()) {
+      buffer += '+';
+      selector = buffer.str();
+    }
   } else if (auto var = dyn_cast<VarDecl>(decl)) {
     // Handle properties. Only the getter matters.
     selector = var->getObjCGetterSelector(buffer);
