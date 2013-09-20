@@ -51,6 +51,13 @@ int main(int argc, char **argv) {
   llvm::PrettyStackTraceProgram ST(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
+  // If no SDK was specified via -sdk, check environment variable SDKROOT.
+  if (SDK.getNumOccurrences() == 0) {
+    const char *SDKROOT = getenv("SDKROOT");
+    if (SDKROOT)
+      SDK = SDKROOT;
+  }
+
   // Create a Swift compiler.
   llvm::SmallVector<std::string, 4> modules;
   swift::CompilerInstance CI;
