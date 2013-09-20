@@ -63,6 +63,7 @@ class Mangler {
   llvm::DenseMap<void*, unsigned> Substitutions;
   llvm::DenseMap<ArchetypeType*, ArchetypeInfo> Archetypes;
   unsigned ArchetypesDepth = 0;
+  DeclContext *DeclCtx = nullptr;
   
 public:
   Mangler(raw_ostream &buffer) : Buffer(buffer) {}

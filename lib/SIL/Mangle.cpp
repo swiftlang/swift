@@ -397,6 +397,8 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
   auto result = ClassifyDecl().visit(decl);
   assert(result.first || !result.second);
 
+  DeclCtx = decl->getDeclContext();
+
   // Bind the contextual archetypes if requested.
   llvm::SaveAndRestore<unsigned> oldArchetypesDepth(ArchetypesDepth);
   if (result.second) {
@@ -616,12 +618,21 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     // archetype ::= 'Qd' <index> <index>    # archetype with depth=M+1, index=N
     // Mangle generic parameter archetypes.
 
-    // Find the archetype information.  It may be possible for this to
-    // fail for local declarations --- that might be okay; it means we
-    // probably need to insert contexts for all the enclosing contexts.
-    // And of course, linkage is not critical for such things.
+    // Find the archetype information.
     auto it = Archetypes.find(archetype);
-    assert(it != Archetypes.end());
+    while (it == Archetypes.end()) {
+      // This Archetype comes from an enclosing context -- proceed to
+      // bind the generic params form all parent contexts.
+      GenericParamList *GenericParams = nullptr;
+      do { // Skip over empty parent contexts.
+        DeclCtx = DeclCtx->getParent();
+        assert(DeclCtx);
+        GenericParams = DeclCtx->getGenericParamsOfContext();
+      } while (!GenericParams);
+
+      bindGenericParameters(GenericParams);
+      it = Archetypes.find(archetype);
+    }
     auto &info = it->second;
     assert(ArchetypesDepth >= info.Depth);
 

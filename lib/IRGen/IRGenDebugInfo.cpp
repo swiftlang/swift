@@ -1244,13 +1244,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::BoundGenericEnum:
   {
-    if (DbgTy.getDecl() &&
-        (DbgTy.getDecl()->getDeclContext()->getContextKind() ==
-         DeclContextKind::AbstractClosureExpr) &&
-        !DbgTy.getDecl()->getDeclContext()->getGenericParamsOfContext())
-      Name = "FIXME: AbstractClosureExpr with empty DeclContext";
-    else
-      Name = getMangledName(DbgTy);
+    Name = getMangledName(DbgTy);
     auto EnumTy = BaseTy->castTo<BoundGenericEnumType>();
     if (auto Decl = EnumTy->getDecl()) {
       Location L = getLoc(SM, Decl);
