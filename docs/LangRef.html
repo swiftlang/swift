@@ -1037,6 +1037,11 @@ an lvalue unless it has a <code>var-get</code> clause but not
       case Backward
       case Anchored
     }
+
+    <i>// Shorthand for the above.</i>
+    enum DataSearchFlags {
+      case None, Backward, Anchored
+    }
     
     <i>// Declare discriminated union with enum decl.</i>
     enum SomeInts {
