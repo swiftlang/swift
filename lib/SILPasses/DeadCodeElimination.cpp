@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "dead-code-elimination"
 #include "swift/Subsystems.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/STLExtras.h"
@@ -67,6 +68,101 @@ static bool eraseAndCleanup(SILInstruction *I) {
   llvm::DenseSet<SILInstruction*> Set;
   Set.insert(I);
   return eraseAndCleanup(Set);
+}
+
+/// \brief Propagate/remove basic block input values when all predecessors
+/// supply the same arguments.
+static void propagateBasicBlockArgs(SILBasicBlock &BB) {
+  // This functions would simplify the code as following:
+  //
+  //   bb0:
+  //     br bb1(%1 : $Builtin.Int1, %2 : $Builtin.Int1)
+  //   bb1:
+  //     br bb1(%1 : $Builtin.Int1, %2 : $Builtin.Int1)
+  //   bb2(%3 : $Builtin.Int1, %4 : $Builtin.Int1):
+  //     use(%3 : $Builtin.Int1)
+  //     use(%4 : $Builtin.Int1)
+  // =>
+  //   bb0:
+  //     br bb1
+  //   bb2:
+  //     use(%1 : $Builtin.Int1)
+  //     use(%2 : $Builtin.Int1)
+
+  // If there are no predecessors or no arguments, there is nothing to do.
+  if (BB.pred_empty() || BB.bbarg_empty())
+    return;
+
+  // Check if all the predecessors supply the same arguments to the BB.
+  SmallVector<SILValue, 4> Args;
+  bool checkArgs = false;
+  for (SILBasicBlock::pred_iterator PI = BB.pred_begin(), PE = BB.pred_end();
+       PI != PE; ++PI) {
+    SILBasicBlock *PredB = *PI;
+
+    // We are only simplifying branch instructions.
+    if (BranchInst *BI = dyn_cast<BranchInst>(PredB->getTerminator())) {
+      unsigned Idx = 0;
+      assert(!BI->getArgs().empty());
+      for (OperandValueArrayRef::iterator AI = BI->getArgs().begin(),
+                                          AE = BI->getArgs().end();
+                                          AI != AE; ++AI, ++Idx) {
+        // When processing the first predecessor, record the arguments.
+        if (!checkArgs)
+          Args.push_back(*AI);
+        else
+          // On each subsequent predecessor, check the arguments.
+          if (Args[Idx] != *AI)
+            return;
+      }
+
+    // If the terminator is not a branch instruction, do not simplify.
+    } else {
+      return;
+    }
+
+    // After the first branch is processed, the arguments vector is poulated.
+    assert(Args.size() > 0);
+    checkArgs = true;
+  }
+
+  // If we've reached this point, the optimization is valid, so optimize.
+  // We know that the incomming arguments from all predecessors are the same,
+  // so just use them directly and remove the basic block paramters.
+
+  // Drop the arguments from the branch instructions by creating a new branch
+  // instruction and deleting the old one.
+  llvm::DenseSet<SILInstruction*> ToBeDeleted;
+  for (SILBasicBlock::pred_iterator PI = BB.pred_begin(), PE = BB.pred_end();
+       PI != PE; ++PI) {
+    SILBasicBlock *PredB = *PI;
+    BranchInst *BI = cast<BranchInst>(PredB->getTerminator());
+    SILBuilder Bldr(PredB);
+    Bldr.createBranch(BI->getLoc(), BI->getDestBB());
+    ToBeDeleted.insert(BI);
+  }
+
+  // Drop the paranters from basic blocks and replace all uses with the passed
+  // in arguments.
+  unsigned Idx = 0;
+  for (SILBasicBlock::bbarg_iterator AI = BB.bbarg_begin(),
+                                     AE = BB.bbarg_end();
+                                     AI != AE; ++AI, ++Idx) {
+    // FIXME: These could be further propagatable now, we might want to move
+    // this to CCP and trigger another round of copy propagation.
+    SILArgument *Arg = *AI;
+
+    // We were able to fold, so all users should use the new folded value.
+    assert(Arg->getTypes().size() == 1 &&
+           "Currently, we only support single result instructions.");
+    SILValue(Arg).replaceAllUsesWith(Args[Idx]);
+
+    // Remove args from the block.
+    BB.dropAllArgs();
+  }
+
+  // The old branch instructions are no longer used, erase them.
+  eraseAndCleanup(ToBeDeleted);
 }
 
 static bool constantFoldTerminator(SILBasicBlock &BB) {
@@ -295,6 +391,11 @@ static bool removeUnreachableBlocks(SILFunction &F) {
 
 void swift::performSILDeadCodeElimination(SILModule *M) {
   for (auto &Fn : *M) {
+
+    for (auto &BB : Fn) {
+      propagateBasicBlockArgs(BB);
+    }
+
     for (auto &BB : Fn) {
       // Simplify the blocks with terminators that rely on constant conditions.
       if (constantFoldTerminator(BB))

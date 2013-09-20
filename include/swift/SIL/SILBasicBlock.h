@@ -122,6 +122,9 @@ public:
   
   ArrayRef<SILArgument*> getBBArgs() const { return BBArgList; }
 
+  /// \brief Remove all block arguments.
+  void dropAllArgs() { BBArgList.clear(); }
+
   //===--------------------------------------------------------------------===//
   // Predecessors and Successors
   //===--------------------------------------------------------------------===//

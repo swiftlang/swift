@@ -195,9 +195,9 @@ bb3(%5 : $Int64):
 // CHECK-LABEL: sil @testCondBranchBBArgs
 // CHECK: bb0
 // CHECK-NEXT:  br bb1(%{{[0-9]+}} : $Int64)
-// CHECK: bb1(%{{[0-9]+}} : $Int64):                                 
-// CHECK-NEXT: br bb2
-// CHECK: bb2
+// CHECK: bb1(%{{[0-9]+}} : $Int64):
+// CHECK-NEXT: br bb2(%{{[0-9]+}} : $Int64)
+// CHECK: bb2(%{{[0-9]+}} : $Int64):
 // CHECK-NEXT:  return
 // CHECK: }
 
@@ -286,6 +286,10 @@ bb0(%6 : $Int64, %10 : $Char):
 bb1(%15 : $(Int64, Char)):
   return %15 : $(Int64, Char)
 
+b2:
+  %111 = tuple (%6 : $Int64, %10 : $Char)
+  br bb1(%111 : $(Int64, Char))
+
 // CHECK-LABEL: sil @constant_fold_switch_enum_with_payload
 // CHECK: bb0(%{{[0-9]+}} : $Int64, %{{[0-9]+}} : $Char):
 // CHECK:   br bb1(%{{[0-9]+}} : $(Int64, Char))
@@ -310,4 +314,47 @@ bb3:
 // CHECK-NEXT: br bb1
 // CHECK-NOT: switch_int
 // CHECK: }
+}
+
+sil @propagate_BB_args : $[thin] (i : Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int1, 0
+  br bb1(%1 : $Builtin.Int1)
+
+bb1(%2 : $Builtin.Int1):
+  br bb2(%2 : $Builtin.Int1)
+
+bb2(%3 : $Builtin.Int1):
+  condbranch %3, bb4, bb3
+
+bb3:
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  return %0 : $Int64
+// CHECK-LABEL:sil @propagate_BB_args
+// CHECK: bb0(%0 : $Int64):
+// CHECK-NEXT: br bb1
+// CHECK: bb1:
+// CHECK-NOT: condbranch
+}
+
+sil @propagate_BB_mult_args : $[thin] () -> Builtin.Int1 {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  %1 = integer_literal $Builtin.Int1, 1
+  br bb1(%0 : $Builtin.Int1, %1 : $Builtin.Int1)
+
+bb1(%3 : $Builtin.Int1, %4 : $Builtin.Int1):
+  return %3 : $Builtin.Int1
+// CHECK-LABEL:sil @propagate_BB_mult_args
+// CHECK: bb0:
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: br bb1
+// CHECK: bb1:
+// CHECK-NOT: condbranch
+// CHECK: return
 }
