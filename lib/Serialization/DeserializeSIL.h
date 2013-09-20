@@ -39,6 +39,7 @@ namespace swift {
     std::vector<ModuleFile::Serialized<SILFunction*>> Funcs;
     /// Data structures used to perform name lookup for local values.
     llvm::DenseMap<uint32_t, ValueBase*> LocalValues;
+    llvm::DenseMap<uint32_t, std::vector<SILValue>> ForwardMRVLocalValues;
     serialization::ValueID LastValueID = 0;
 
     /// Data structures used to perform lookup of basic blocks.

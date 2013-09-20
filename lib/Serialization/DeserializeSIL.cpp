@@ -114,12 +114,30 @@ void SILDeserializer::setLocalValue(ValueBase *Value, ValueID Id) {
   if (Entry) {
     // If this value was already referenced, check it to make sure types match.
     assert(Entry->getTypes() != Value->getTypes() && "Value Type mismatch?");
-    // FIXME: RAUW all SILValues with the same base.
-    Entry = Value;
-    return;
+
+    auto It = ForwardMRVLocalValues.find(Id);
+    if (It != ForwardMRVLocalValues.end()) {
+      // Take the information about the forward ref out of the map.
+      std::vector<SILValue> Entries(std::move(It->second));
+
+      // Remove the entries from the map.
+      ForwardMRVLocalValues.erase(It);
+
+      assert(Entries.size() <= Value->getTypes().size() &&
+             "Value Type mismatch?");
+      // Validate that any forward-referenced elements have the right type, and
+      // RAUW them.
+      for (unsigned i = 0, e = Entries.size(); i != e; ++i) {
+        if (!Entries[i]) continue;
+
+        assert(Entries[i]->getType(0) != Value->getType(i) &&
+               "Value Type mismatch?");
+        Entries[i].replaceAllUsesWith(SILValue(Value, i));
+      }
+    }
   }
 
-  // Otherwise, just store it in our map.
+  // Store it in our map.
   Entry = Value;
 }
 
@@ -134,9 +152,18 @@ SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
     (void)EntryTy;
     return SILValue(Entry, ResultNum);
   }
-  // FIXME: handle forward references.
-  llvm_unreachable("Handle forward references of Values.");
-  return SILValue(nullptr, 0); 
+
+  // Otherwise, this is a forward reference.  Create a dummy node to represent
+  // it until we see a real definition.
+  std::vector<SILValue> &Placeholders = ForwardMRVLocalValues[Id];
+  SourceLoc Loc;
+  if (Placeholders.size() <= ResultNum)
+    Placeholders.resize(ResultNum+1);
+
+  if (!Placeholders[ResultNum])
+    Placeholders[ResultNum] =
+      new (SILMod) GlobalAddrInst(SILFileLocation(Loc), nullptr, Type);
+  return Placeholders[ResultNum];
 }
 
 /// Return the SILBasicBlock of a given ID.
@@ -226,6 +253,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
   UndefinedBlocks.clear();
   LastValueID = 0;
   LocalValues.clear();
+  ForwardMRVLocalValues.clear();
 
   // Fetch the next record.
   scratch.clear();
@@ -361,6 +389,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   default:
     DEBUG(llvm::dbgs() << "To be handled: " << OpCode << "\n");
     return true;
+
   case ValueKind::SILArgument:
     llvm_unreachable("not an instruction");
 
@@ -1162,6 +1191,30 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getBBForReference(Fn, ListOfValues[7]));
     break;
   }
+  case ValueKind::SpecializeInst: {
+    // Format: a typed value, a type, a list of substitutions (Archetype name,
+    // Replacement type). Use SILOneTypeValuesLayout.
+    assert(ListOfValues.size() >= 4 &&
+           "Expect 4 or more numbers for SpecializeInst");
+    SmallVector<Substitution, 4> Substitutions;
+    for (unsigned I = 4, E = ListOfValues.size(); I < E; I += 2) {
+      Substitution Sub;
+      Sub.Replacement = MF->getType(ListOfValues[I+1]);
+      Sub.Archetype = cast<ArchetypeType>(
+                          MF->getType(ListOfValues[I]).getPointer());
+      Substitutions.push_back(Sub);
+    }
+    auto ValTy = MF->getType(ListOfValues[0]);
+    assert(ValTy->is<PolymorphicFunctionType>() &&
+           "Should be a polymorphic function");
+    ResultVal = Builder.createSpecialize(Loc,
+                  getLocalValue(ListOfValues[2], ListOfValues[3],
+                                getSILType(ValTy,
+                                           (SILValueCategory)ListOfValues[1])),
+                  Ctx.AllocateCopy(Substitutions),
+                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    break;
+  }
   case ValueKind::UnreachableInst: {
     ResultVal = Builder.createUnreachable(Loc);
     break;
@@ -1181,6 +1234,9 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
     return nullptr;
 
   auto Func = readSILFunction(*iter, InFunc);
+  if (Func)
+    DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
+          Func->dump());
   return Func;
 }
 

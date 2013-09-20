@@ -1009,6 +1009,28 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)DMB->getOperand().getType().getCategory(), ListOfValues);
     break;
   }
+  case ValueKind::SpecializeInst: {
+    // Format: a typed value, a type, a list of substitutions (Archetype name,
+    // Replacement type). Use SILOneTypeValuesLayout.
+    const SpecializeInst *SpI = cast<SpecializeInst>(&SI);
+    SmallVector<ValueID, 8> ListOfValues;
+    ListOfValues.push_back(S.addTypeRef(
+        SpI->getOperand().getType().getSwiftRValueType()));
+    ListOfValues.push_back((unsigned)SpI->getOperand().getType().getCategory());
+    ListOfValues.push_back(addValueRef(SpI->getOperand()));
+    ListOfValues.push_back(SpI->getOperand().getResultNumber());
+
+    for (auto Sub : SpI->getSubstitutions()) {
+      ListOfValues.push_back(S.addTypeRef(Sub.Archetype));
+      ListOfValues.push_back(S.addTypeRef(Sub.Replacement));
+    }
+
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+        S.addTypeRef(SpI->getType().getSwiftRValueType()),
+        (unsigned)SpI->getType().getCategory(), ListOfValues);
+    break;
+  }
   }
   // Non-void values get registered in the value table.
   if (SI.hasValue()) {
