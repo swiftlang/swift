@@ -27,9 +27,6 @@ namespace swift {
 
     /// \brief A new declaration was added to the AST.
     virtual void addedExternalDecl(Decl *decl) = 0;
-
-    /// \brief A new type was added to the AST.
-    virtual void addedExternalType(Type type) = 0;
   };
 }
 

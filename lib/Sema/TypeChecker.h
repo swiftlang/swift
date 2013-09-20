@@ -705,10 +705,6 @@ public:
 
   /// \brief A new declaration was added to the AST.
   virtual void addedExternalDecl(Decl *decl);
-
-  /// \brief A new type was added to the AST.
-  virtual void addedExternalType(Type type);
-
   /// @}
 
   /// \name Lazy resolution.

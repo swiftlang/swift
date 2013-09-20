@@ -560,10 +560,7 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
   }
   
   SwiftTypeConverter converter(*this, kind);
-  Type converted = converter.Visit(type.getTypePtr());
-  if (converted)
-    SwiftContext.addedExternalType(converted);
-  return converted;
+  return converter.Visit(type.getTypePtr());
 }
 
 /// Given the first selector piece for an init method, e.g., \c initWithFoo,

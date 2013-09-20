@@ -183,9 +183,6 @@ public:
   /// This state should be tracked somewhere else.
   unsigned LastCheckedExternalDefinition = 0;
 
-  /// \brief The list of externally-created types that need validation.
-  std::vector<Type> ExternalTypes;
-
 private:
   /// \brief The current generation number, which reflects the number of
   /// times that external modules have been loaded.
@@ -335,10 +332,6 @@ public:
   /// \brief Notify all of the mutation listeners that the given declaration
   /// was just added.
   void addedExternalDecl(Decl *decl);
-
-  /// \brief Notify all of the mutation listeners that the given type
-  /// was just added.
-  void addedExternalType(Type type);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);

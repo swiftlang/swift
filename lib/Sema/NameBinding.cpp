@@ -332,11 +332,6 @@ namespace {
     virtual void addedExternalDecl(Decl *decl) {
       TU->getASTContext().ExternalDefinitions.insert(decl);
     }
-
-    /// \brief A new type was added to the AST.
-    virtual void addedExternalType(Type type) {
-      TU->getASTContext().ExternalTypes.push_back(type);
-    }
 };
 }
 

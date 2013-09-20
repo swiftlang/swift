@@ -541,11 +541,6 @@ void ASTContext::addedExternalDecl(Decl *decl) {
     listener->addedExternalDecl(decl);
 }
 
-void ASTContext::addedExternalType(Type type) {
-  for (auto listener : Impl.MutationListeners)
-    listener->addedExternalType(type);
-}
-
 void ASTContext::addCleanup(std::function<void(void)> cleanup) {
   Impl.Cleanups.push_back(std::move(cleanup));
 }

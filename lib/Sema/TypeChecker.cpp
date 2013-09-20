@@ -62,10 +62,6 @@ void TypeChecker::addedExternalDecl(Decl *decl) {
   Context.ExternalDefinitions.insert(decl);
 }
 
-void TypeChecker::addedExternalType(Type type) {
-  Context.ExternalTypes.push_back(type);
-}
-
 ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
   auto protocol = Context.getProtocol(kind);
   if (!protocol && loc.isValid()) {
