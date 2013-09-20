@@ -253,3 +253,61 @@ bb0:
 // CHECK: alloc_stack
 // CHECK: dealloc_stack
 // CHECK: }
+
+sil @constant_fold_switch_enum : $[thin] (i : Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %6 = enum $Bool, #Bool.false!enumelt          // user: %9
+  switch_enum %6 : $Bool, case #Bool.true!enumelt: bb1, case #Bool.false!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  return %0 : $Int64
+// CHECK-LABEL: sil @constant_fold_switch_enum
+// CHECK: bb0(%0 : $Int64):
+// CHECK-NEXT: br bb1
+// CHECK-NOT: switch_enum
+// CHECK: }
+}
+
+enum Singleton {
+  case x(Int, Char)
+};
+sil @constant_fold_switch_enum_with_payload : $[thin] (i : Int64, c : Char) -> (Int64, Char) {
+bb0(%6 : $Int64, %10 : $Char):
+  %11 = tuple (%6 : $Int64, %10 : $Char)
+  %12 = enum $Singleton, #Singleton.x!enumelt.1, %11 : $(Int64, Char)
+  switch_enum %12 : $Singleton, case #Singleton.x!enumelt.1: bb1
+
+bb1(%15 : $(Int64, Char)):
+  return %15 : $(Int64, Char)
+
+// CHECK-LABEL: sil @constant_fold_switch_enum_with_payload
+// CHECK: bb0(%{{[0-9]+}} : $Int64, %{{[0-9]+}} : $Char):
+// CHECK:   br bb1(%{{[0-9]+}} : $(Int64, Char))
+// CHECK: bb1(%{{[0-9]+}} : $(Int64, Char)):
+// CHECK:   return
+}
+
+sil @constant_fold_switch_int : $[thin] (u : Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 2
+  switch_int %1 : $Builtin.Int64, case 1: bb1, case 2: bb2
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  return %0 : $Int64
+// CHECK-LABEL: sil @constant_fold_switch_int
+// CHECK: bb0(%0 : $Int64):
+// CHECK-NEXT: br bb1
+// CHECK-NOT: switch_int
+// CHECK: }
+}

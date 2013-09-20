@@ -102,6 +102,79 @@ static bool constantFoldTerminator(SILBasicBlock &BB) {
     }
   }
 
+  // Constant fold switch union.
+  //   %1 = union $Bool, #Bool.false!unionelt
+  //   switch_union %1 : $Bool, case #Bool.true!unionelt: bb1,
+  //                            case #Bool.false!unionelt: bb2
+  // =>
+  //   br bb2
+  if (SwitchEnumInst *SUI = dyn_cast<SwitchEnumInst>(TI)) {
+    if (EnumInst *TheEnum = dyn_cast<EnumInst>(SUI->getOperand().getDef())) {
+      const EnumElementDecl *TheEnumElem = TheEnum->getElement();
+      SILBasicBlock *TheSuccessorBlock = 0;
+      for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
+        const EnumElementDecl *EI;
+        SILBasicBlock *BI;
+        llvm::tie(EI, BI) = SUI->getCase(Idx);
+        if (EI == TheEnumElem)
+          TheSuccessorBlock = BI;
+      }
+
+      // FIXME: Should we produce a warning if there is no default?
+      if (!TheSuccessorBlock)
+        if (SUI->hasDefault())
+          TheSuccessorBlock = SUI->getDefaultBB();
+
+      // Add the branch instruction with the block.
+      if (TheSuccessorBlock) {
+        SILBuilder B(&BB);
+        if (TheEnum->hasOperand())
+          B.createBranch(TI->getLoc(), TheSuccessorBlock,
+                         TheEnum->getOperand());
+        else
+          B.createBranch(TI->getLoc(), TheSuccessorBlock);
+
+        // TODO: Produce an unreachable code warning here if the basic blocks
+        // contains user code. Only if we are not within an inlined or generic
+        // function.
+
+        eraseAndCleanup(TI);
+        return true;
+      }
+    }
+  }
+
+  // Constant fold switch int.
+  //   %1 = integer_literal $Builtin.Int64, 2
+  //   switch_int %1 : $Builtin.Int64, case 1: bb1, case 2: bb2
+  // =>
+  //   br bb2
+  if (SwitchIntInst *SUI = dyn_cast<SwitchIntInst>(TI)) {
+    if (IntegerLiteralInst *SwitchVal =
+          dyn_cast<IntegerLiteralInst>(SUI->getOperand().getDef())) {
+      SILBasicBlock *TheSuccessorBlock = 0;
+      for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
+        APInt EI;
+        SILBasicBlock *BI;
+        llvm::tie(EI, BI) = SUI->getCase(Idx);
+        if (EI == SwitchVal->getValue())
+          TheSuccessorBlock = BI;
+      }
+
+      if (!TheSuccessorBlock)
+        if (SUI->hasDefault())
+          TheSuccessorBlock = SUI->getDefaultBB();
+
+      // Add the branch instruction with the block.
+      if (TheSuccessorBlock) {
+        SILBuilder B(&BB);
+        B.createBranch(TI->getLoc(), TheSuccessorBlock);
+        eraseAndCleanup(TI);
+        return true;
+      }
+    }
+  }
+
   return false;
 }
 
