@@ -838,7 +838,6 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   case DeclKind::PatternBinding:
   case DeclKind::EnumElement:
   case DeclKind::Enum:
-  case DeclKind::Class:
   case DeclKind::TopLevelCode:
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
@@ -861,7 +860,11 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
     // Emit Swift metadata for the external struct.
     emitStructMetadata(*this, cast<StructDecl>(D));
     break;
-    
+
+  case DeclKind::Class:
+    // No need to emit Swift metadata for external ObjC classes.
+    break;
+
   case DeclKind::Protocol:
     // Emit Swift metadata for the protocol type.
     emitProtocolDecl(cast<ProtocolDecl>(D));

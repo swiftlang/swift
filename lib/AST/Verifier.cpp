@@ -846,6 +846,22 @@ namespace {
       return verifyParsed(cast<AbstractFunctionDecl>(FD));
     }
 
+    void verifyChecked(ClassDecl *CD) {
+      unsigned NumDestructors = 0;
+      for (auto Member : CD->getMembers()) {
+        if (isa<DestructorDecl>(Member)) {
+          NumDestructors++;
+        }
+      }
+      if (NumDestructors != 1) {
+        Out << "every class should have exactly one destructor, "
+               "explicitly provided or created by the type checker";
+        abort();
+      }
+
+      return verifyChecked(cast<NominalTypeDecl>(CD));
+    }
+
     /// Look through a possible l-value type, returning true if it was
     /// an l-value.
     bool lookThroughLValue(Type &type, LValueType::Qual &qs) {

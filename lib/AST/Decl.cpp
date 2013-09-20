@@ -1048,5 +1048,8 @@ SourceRange DestructorDecl::getSourceRange() const {
       getBodyKind() == BodyKind::Skipped)
     return { getDestructorLoc(), BodyEndLoc };
 
+  if (getBodyKind() == BodyKind::None)
+    return getDestructorLoc();
+
   return { getDestructorLoc(), Body->getEndLoc() };
 }

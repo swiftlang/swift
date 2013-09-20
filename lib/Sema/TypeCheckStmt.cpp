@@ -863,6 +863,9 @@ bool TypeChecker::typeCheckDestructorBodyUntil(DestructorDecl *DD,
   StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(DD));
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
   BraceStmt *Body = DD->getBody();
+  if (!Body)
+    return false;
+
   bool HadError = SC.typeCheckStmt(Body);
 
   DD->setBody(Body);

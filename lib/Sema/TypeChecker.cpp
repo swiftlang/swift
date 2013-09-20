@@ -55,6 +55,9 @@ void TypeChecker::handleExternalDecl(Decl *decl) {
   if (auto structDecl = dyn_cast<StructDecl>(decl)) {
     addImplicitConstructors(structDecl);
   }
+  if (auto CD = dyn_cast<ClassDecl>(decl)) {
+    addImplicitDestructor(CD);
+  }
 }
 
 void TypeChecker::addedExternalDecl(Decl *decl) {
@@ -594,7 +597,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         TC.typeCheckAbstractFunctionBody(AFD);
         continue;
       }
-       if (isa<StructDecl>(decl) || isa<ProtocolDecl>(decl)) {
+       if (isa<StructDecl>(decl) || isa<ClassDecl>(decl) ||
+           isa<ProtocolDecl>(decl)) {
          // Type decls should already be typed by the ClangImporter and don't
          // need additional typechecking.
          continue;

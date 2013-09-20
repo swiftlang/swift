@@ -848,6 +848,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     break;
   }
   case DeclKind::Struct:
+  case DeclKind::Class:
   case DeclKind::Protocol: {
     // Nothing to do in SILGen for external types.
     break;
@@ -857,7 +858,6 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::PatternBinding:
   case DeclKind::EnumElement:
   case DeclKind::Enum:
-  case DeclKind::Class:
   case DeclKind::TopLevelCode:
   case DeclKind::TypeAlias:
   case DeclKind::AssociatedType:

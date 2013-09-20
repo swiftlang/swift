@@ -334,11 +334,8 @@ public:
   /// Note, this can construct an implicit return for an arbitrary expression
   /// (specifically, in case of auto-generated bodies).
   static SILLocation getImplicitReturnLoc(SILLocation L) {
-    // FIXME: Location points to ClassDecl in the case we have an implicit
-    // destructor.
     assert(L.isASTNode<Expr>() ||
            L.isASTNode<AbstractFunctionDecl>() ||
-           L.isASTNode<ClassDecl>() ||
            (L.isNull() && L.isInTopLevel()));
     L.setKind(ImplicitReturnKind);
     return L;

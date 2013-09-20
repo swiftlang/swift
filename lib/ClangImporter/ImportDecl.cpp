@@ -2055,6 +2055,9 @@ namespace {
                                                   decl->getLocation(),
                                                   decl->getLocEnd())));
 
+      // Pass the class to the type checker to create an implicit destructor.
+      Impl.SwiftContext.addedExternalDecl(result);
+
       return result;
     }
 

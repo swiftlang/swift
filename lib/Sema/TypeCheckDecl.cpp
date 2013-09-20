@@ -977,6 +977,7 @@ public:
 
     if (!IsSecondPass) {
       TC.addImplicitConstructors(CD);
+      TC.addImplicitDestructor(CD);
     }
     if (!IsFirstPass) {
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
@@ -1802,6 +1803,45 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   assert(!typesNeedingImplicitDefaultConstructor.count(decl));
   typesNeedingImplicitDefaultConstructor.insert(decl);
   typesWithImplicitDefaultConstructor.push_back(decl);
+}
+
+void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
+  bool FoundDestructor = false;
+  for (auto Member : CD->getMembers()) {
+    if (isa<DestructorDecl>(Member)) {
+      FoundDestructor = true;
+      break;
+    }
+  }
+
+  if (FoundDestructor)
+    return;
+
+  VarDecl *SelfDecl = new (Context)
+      VarDecl(SourceLoc(), Context.getIdentifier("self"), Type(), CD);
+  DestructorDecl *DD =
+      new (Context) DestructorDecl(Context.getIdentifier("destructor"),
+                                   CD->getLoc(), SelfDecl, CD);
+  SelfDecl->setDeclContext(DD);
+
+  DD->setImplicit();
+
+  // Type-check the constructor declaration.
+  typeCheckDecl(DD, /*isFirstPass=*/true);
+
+  // Copy the list of members, so we can add to it.
+  // FIXME: Painfully inefficient to do the copy here.
+  SmallVector<Decl *, 4> Members(CD->getMembers().begin(),
+                                 CD->getMembers().end());
+  Members.push_back(DD);
+
+  // Create an empty body for the destructor.
+  DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc()));
+
+  CD->setMembers(Context.AllocateCopy(Members), CD->getBraces());
+
+  // Add this to the list of implicitly-defined functions.
+  implicitlyDefinedFunctions.push_back(DD);
 }
 
 bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer, 
