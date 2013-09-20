@@ -161,9 +161,9 @@ ERROR(disallowed_func_def,decl_parsing,none,
 ERROR(disallowed_type,decl_parsing,none,
       "type not allowed here", ())
 ERROR(disallowed_init,decl_parsing,none,
-      "variable initializer is not allowed here", ())
+      "initial value is not allowed here", ())
 ERROR(var_init_self_referential,expr_parsing,none,
-      "variable used within its own initializer", ())
+      "variable used within its own initial value", ())
 ERROR(disallowed_enum_element,decl_parsing,none,
       "enum 'case' is not allowed outside of an enum", ())
 ERROR(decl_inner_scope,decl_parsing,none,
@@ -199,7 +199,7 @@ ERROR(expected_colon_set,decl_parsing,none,
 ERROR(var_set_without_get,decl_parsing,none,
       "variable with a setter must also have a getter", ())
 ERROR(getset_init,decl_parsing,none,
-      "variable with getter/setter cannot have an initializer", ())
+      "variable with getter/setter cannot have an initial value", ())
 ERROR(getset_cannot_be_implied,decl_parsing,none,
       "variable with implied type cannot have implied getter/setter", ())
 
@@ -423,8 +423,8 @@ ERROR(multiple_sil_stage_decls, decl_parsing, none,
 
 ERROR(expected_type,type_parsing,PointsToFirstBadToken,
       "expected type", ())
-ERROR(expected_initializer_expr,expr_parsing,PointsToFirstBadToken,
-      "expected initializer expression after '='", ())
+ERROR(expected_init_value,expr_parsing,PointsToFirstBadToken,
+      "expected initial value after '='", ())
 ERROR(attribute_does_not_apply_to_type,type_parsing,none,
       "attribute does not apply to type", ())
 
@@ -461,7 +461,7 @@ ERROR(expected_rparen_tuple_type_list,type_parsing,none,
 ERROR(empty_tuple_ellipsis,type_parsing,none,
       "varargs used in tuple type with no fields", ())
 ERROR(tuple_ellipsis_init,type_parsing,none,
-      "varargs used with tuple field with initializer", ())
+      "varargs used with tuple field with default value", ())
 ERROR(unexpected_ellipsis_in_tuple,type_parsing,none,
       "unexpected '...' before the end of a tuple list", ())
 ERROR(tuple_type_init,pattern_parsing,none,
@@ -839,7 +839,7 @@ NOTE(decl_declared_here,sema,none,
      "%0 declared here", (Identifier))
 
 NOTE(while_converting_var_init,sema,none,
-     "while converting 'var' initializer to declared type %0", (Type))
+     "while converting 'var' initial value to declared type %0", (Type))
 NOTE(while_converting_default_tuple_value,sema,none,
      "while converting default tuple value to element type %0", (Type))
 NOTE(while_converting_function_argument,sema,none,
@@ -1149,9 +1149,9 @@ ERROR(decl_no_default_init_ivar,sema_tcd,none,
       "cannot default-initialize instance variable %0 of type %1", 
       (Identifier, Type))
 ERROR(decl_no_default_init_ivar_hole,sema_tcd,none,
-      "cannot use member initializer when one of the variables is '_'", ())
+      "cannot use initial value when one of the variables is '_'", ())
 NOTE(decl_init_here,sema_tcd,none,
-     "member initializer is here", ())
+     "initial value is here", ())
 
 // Inheritance
 ERROR(duplicate_inheritance,sema_tcd,none,

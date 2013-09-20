@@ -441,7 +441,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     // than dying when we see it.
     if (Tok.is(tok::equal)) {
       SourceLoc equalLoc = consumeToken(tok::equal);
-      auto init = parseExpr(diag::expected_initializer_expr);
+      auto init = parseExpr(diag::expected_init_value);
       auto inFlight = diagnose(equalLoc, diag::tuple_type_init);
       if (init.isNonNull())
         inFlight.fixItRemove(SourceRange(equalLoc, init.get()->getEndLoc()));

@@ -1391,7 +1391,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
       RestoreVarsRAII RestoreCurVars(CurVars, {CurDeclContext, Vars});
 
       SourceLoc EqualLoc = consumeToken(tok::equal);
-      Init = parseExpr(diag::expected_initializer_expr);
+      Init = parseExpr(diag::expected_init_value);
       if (Init.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
       if (Init.isNull()) {

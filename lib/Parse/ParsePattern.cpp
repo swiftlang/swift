@@ -141,7 +141,7 @@ parseSelectorArgument(Parser &P,
   ExprHandle *init = nullptr;
   if (P.consumeIf(tok::equal)) {
     ParserResult<Expr> initR =
-      P.parseExpr(diag::expected_initializer_expr);
+      P.parseExpr(diag::expected_init_value);
     if (initR.hasCodeCompletion()) {
       recoverFromBadSelectorArgument(P);
       return makeParserCodeCompletionStatus();
@@ -525,7 +525,7 @@ Parser::parsePatternTupleElement(bool allowInitExpr) {
   ExprHandle *init = nullptr;
   if (Tok.is(tok::equal)) {
     SourceLoc EqualLoc = consumeToken();
-    ParserResult<Expr> initR = parseExpr(diag::expected_initializer_expr);
+    ParserResult<Expr> initR = parseExpr(diag::expected_init_value);
 
     if (!allowInitExpr) {
       auto inFlight = diagnose(EqualLoc, diag::non_func_decl_pattern_init);
