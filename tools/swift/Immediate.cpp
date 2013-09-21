@@ -918,6 +918,14 @@ class REPLEnvironment {
     bool ShouldRun = swift::appendToREPLTranslationUnit(
         TU, RC, llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>"));
     
+    // SILGen the module and produce SIL diagnostics.
+    llvm::OwningPtr<SILModule> sil;
+    
+    if (!CI.getASTContext().hadError()) {
+      sil.reset(performSILGeneration(TU, RC.CurIRGenElem));
+      runSILDiagnosticPasses(*sil.get());
+    }
+
     if (CI.getASTContext().hadError()) {
       CI.getASTContext().Diags.resetHadAnyError();
       while (TU->Decls.size() > RC.CurTUElem)
@@ -937,15 +945,9 @@ class REPLEnvironment {
     // side-effects, keep reading.
     if (!ShouldRun)
       return true;
-    
-    
-    
-    // IRGen the current line(s).
+
+     // IRGen the current line(s).
     llvm::Module LineModule("REPLLine", LLVMContext);
-    
-    llvm::OwningPtr<SILModule> sil(performSILGeneration(TU, RC.CurIRGenElem));
-    if (runSILDiagnosticPasses(*sil.get()))
-      return false;
 
     performIRGeneration(Options, &LineModule, TU, sil.get(),
                         RC.CurIRGenElem);
