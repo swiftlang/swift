@@ -1354,8 +1354,6 @@ public:
 
   GenericParamList &getGenericParams() const { return *Params; }
 
-  void printGenericParams(raw_ostream &OS, const Type::PrintOptions &PO = Type::PrintOptions()) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PolymorphicFunction;

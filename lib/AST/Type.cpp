@@ -1477,6 +1477,56 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     }
   }
 
+  void printGenericParams(ArrayRef<GenericParam> Params) {
+    OS << '<';
+    for (unsigned i = 0, e = Params.size(); i != e; ++i) {
+      if (i)
+        OS << ", ";
+
+      auto ParamTy = Params[i].getAsTypeParam();
+      OS << ParamTy->getName().str();
+      auto inherited = ParamTy->getInherited();
+      if (inherited.empty()) {
+        if (unsigned PrintSize = (ParamTy->getSuperclass() ? 1 : 0) +
+                                 ParamTy->getProtocols().size()) {
+          OS << " : ";
+          if (PrintSize > 1)
+            OS << "protocol<";
+          bool PrintedFirst = false;
+          if (auto Superclass = ParamTy->getSuperclass()) {
+            PrintedFirst = true;
+            visit(Superclass);
+          }
+          for (auto Proto : ParamTy->getProtocols()) {
+            if (PrintedFirst) {
+              OS << ", ";
+            } else {
+              PrintedFirst = true;
+            }
+
+            visit(Proto->getDeclaredType());
+          }
+          if (PrintSize > 1)
+            OS << ">";
+        }
+      } else {
+        OS << " : ";
+        if (inherited.size() > 1)
+          OS << "protocol<";
+        for (unsigned ii = 0, ie = inherited.size(); ii != ie; ++ii) {
+          if (ii)
+            OS << ", ";
+
+          OS << inherited[ii].getType();
+        }
+        if (inherited.size() > 1)
+          OS << ">";
+      }
+    }
+    OS << '>';
+  }
+
+
 public:
   TypePrinter(raw_ostream &OS, const Type::PrintOptions &PO)
       : OS(OS), Options(PO) {}
@@ -1657,7 +1707,7 @@ public:
 
     Attrs.finish();
 
-    T->printGenericParams(OS, Options);
+    printGenericParams(T->getGenericParameters());
     OS << ' ';
     printWithParensIfNotSimple(T->getInput());
 
@@ -1768,61 +1818,6 @@ public:
   }
 };
 } // unnamed namespace
-
-namespace {
-}
-
-void 
-PolymorphicFunctionType::printGenericParams(raw_ostream &OS, 
-                                            const Type::PrintOptions &PO) const 
-{
-  OS << '<';
-  auto params = getGenericParameters();
-  for (unsigned i = 0, e = params.size(); i != e; ++i) {
-    if (i) OS << ", ";
-    
-    auto paramTy = params[i].getAsTypeParam();
-    OS << paramTy->getName().str();
-    auto inherited = paramTy->getInherited();
-    if (inherited.empty()) {
-      if (unsigned printSize = (paramTy->getSuperclass()? 1 : 0)
-                             + paramTy->getProtocols().size()) {
-        OS << " : ";
-        if (printSize > 1)
-          OS << "protocol<";
-        bool printedFirst = false;
-        if (auto superclass = paramTy->getSuperclass()) {
-          printedFirst = true;
-          superclass->print(OS, PO);
-        }
-        for (auto proto : paramTy->getProtocols()) {
-          if (printedFirst) {
-            OS << ", ";
-          } else {
-            printedFirst = true;
-          }
-
-          proto->getDeclaredType()->print(OS, PO);
-        }
-        if (printSize > 1)
-          OS << ">";
-      }
-    } else {
-      OS << " : ";
-      if (inherited.size() > 1)
-        OS << "protocol<";
-      for (unsigned ii = 0, ie = inherited.size(); ii != ie; ++ii) {
-        if (ii)
-          OS << ", ";
-
-        OS << inherited[ii].getType();
-      }
-      if (inherited.size() > 1)
-        OS << ">";
-    }
-  }
-  OS << '>';
-}
 
 void Type::dump() const {
   print(llvm::errs());
