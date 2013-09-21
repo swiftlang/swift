@@ -16,11 +16,12 @@
 
 
 #include "SILGen.h"
+#include "LValue.h"
+#include "RValue.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
-#include "LValue.h"
-#include "RValue.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
 #include "ASTVisitor.h"
@@ -551,18 +552,187 @@ static bool hasDifferentTypeOfRValue(const TypeLowering &srcTL) {
 }
 #endif
 
+/// Apply a substitution to the given type.
+///
+/// TODO: use an AST library for this when it exists.
+static CanType applySubstitution(CanType typeParam, CanType typeArg,
+                                 CanType type, ASTContext &ctx) {
+  auto applySubs = [&ctx, typeParam, typeArg](Type type_) -> Type {
+    auto type = CanType(type_);
+    if (type == typeParam) return typeArg;
+    return type;
+  };
+
+  // Type::transform doesn't call BoundGenericType::setSubstitutions,
+  // but that's okay because, in our narrow use cases, the bound
+  // generic types we create should correspond to bound generic types
+  // that Sema already checked.
+  return CanType(type.transform(ctx, applySubs));
+}
+
+/// Emit a reference to the given generic function.
+static SILValue emitSpecializedFunctionRef(SILGenFunction &gen,
+                                           SILLocation loc,
+                                           CanType typeArg,
+                                           FuncDecl *fn) {
+  // Sema should have diagnosed this.
+  assert(fn && "couldn't find intrinsic function!");
+
+  // Build the reference to the function.
+  auto fnMV = gen.emitFunctionRef(loc, SILDeclRef(fn, SILDeclRef::Kind::Func));
+  assert(!fnMV.hasCleanup());
+  auto fnRef = fnMV.getValue();
+
+  auto polyFnType = fnRef.getType().castTo<PolymorphicFunctionType>();
+
+  // Make the substitutions.  This is valid by the known constraints
+  // on these generic intrinsics.
+  auto typeParamDecl = polyFnType->getGenericParameters()[0].getAsTypeParam();
+  auto typeParam = CanType(typeParamDecl->getArchetype());
+  Substitution subs[] = {
+    Substitution{typeParamDecl->getArchetype(), typeArg, {}}
+  };
+
+  // Apply the substitutions to the given type.
+  ASTContext &ctx = gen.getASTContext();
+  auto specializedFnType =
+    FunctionType::get(applySubstitution(typeParam, typeArg,
+                                        polyFnType.getInput(), ctx),
+                      applySubstitution(typeParam, typeArg,
+                                        polyFnType.getResult(), ctx),
+                      polyFnType->getExtInfo(), ctx);
+
+  auto specializedType = gen.getLoweredType(specializedFnType, 0);
+  return gen.B.createSpecialize(loc, fnRef, subs, specializedType);
+}
+
+/// Emit code to convert the given possibly-null reference value into
+/// a value of the corresponding optional type.
+static SILValue emitRefToOptional(SILGenFunction &gen, SILLocation loc,
+                                  SILValue ref, const TypeLowering &optTL) {
+  // TODO: we should probably emit this as a call to a helper function
+  // that does this, because (1) this is a lot of code and (2) it's
+  // dumb to redundantly emit and optimize it.
+  auto isNullBB = gen.createBasicBlock();
+  auto isNonNullBB = gen.createBasicBlock();
+  auto contBB = gen.createBasicBlock();
+
+  SILType optType = optTL.getLoweredType();
+  auto result = new (gen.SGM.M) SILArgument(optType, contBB);
+
+  CanType refType = ref.getType().getSwiftRValueType();
+  assert(refType.hasReferenceSemantics());
+
+  // Ask whether the value is null.
+  auto isNonNull = gen.B.createIsNonnull(loc, ref);
+  gen.B.createCondBranch(loc, isNonNull, isNonNullBB, isNullBB);
+
+  // If it's non-null, use _injectValueIntoOptional.
+  gen.B.emitBlock(isNonNullBB);
+  auto injectValueFn =
+    emitSpecializedFunctionRef(gen, loc, refType,
+                         gen.getASTContext().getInjectValueIntoOptionalDecl());
+  SILValue injectedValue = gen.B.createApply(loc, injectValueFn, optType, ref);
+  gen.B.createBranch(loc, contBB, injectedValue);
+
+  // If it's null, use _injectValueIntoNothing.
+  gen.B.emitBlock(isNullBB);
+  auto injectNothingFn =
+    emitSpecializedFunctionRef(gen, loc, refType,
+                       gen.getASTContext().getInjectNothingIntoOptionalDecl());
+  SILValue injectedNothing =
+    gen.B.createApply(loc, injectNothingFn, optType, {});
+  gen.B.createBranch(loc, contBB, injectedNothing);
+
+  // Continue.
+  gen.B.emitBlock(contBB);
+  return result;
+}
+
+/// Emit code to convert the givenvalue of optional type into a
+/// possibly-null reference value.
+static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
+                                  SILValue opt, const TypeLowering &optTL,
+                                  SILType refType) {
+  // TODO: we should probably emit this as a call to a helper function
+  // that does this, because (1) this is a lot of code and (2) it's
+  // dumb to redundantly emit and optimize it.
+  auto isNotPresentBB = gen.createBasicBlock();
+  auto isPresentBB = gen.createBasicBlock();
+  auto contBB = gen.createBasicBlock();
+
+  auto optType = opt.getType();
+  assert(optType == optTL.getLoweredType());
+
+  // This assertion might be unreasonable in the short term.
+  assert(!optType.isAddress() &&
+         "Optional<T> is address-only for reference type T?");
+
+  assert(!refType.isAddress());
+  assert(refType.hasReferenceSemantics());
+
+  // Make an argument on contBB.
+  auto result = new (gen.SGM.M) SILArgument(refType, contBB);
+
+  // Materialize the optional value so we can pass it byref to
+  // _doesOptionalHaveValue.  Really, we just want to pass it +0.
+  auto allocation = gen.B.createAllocStack(loc, optType);
+
+  // Note that our SIL-generation patterns here assume that these
+  // library intrinsic functions won't throw.
+
+  auto optAddr = allocation->getAddressResult();
+  gen.B.createStore(loc, opt, optAddr);
+
+  ASTContext &ctx = gen.getASTContext();
+
+  // Ask whether the value is present.
+  auto isPresentFn =
+    emitSpecializedFunctionRef(gen, loc, refType.getSwiftRValueType(),
+                               ctx.getDoesOptionalHaveValueDecl());
+  auto i1Type = 
+    SILType::getPrimitiveObjectType(CanType(BuiltinIntegerType::get(1, ctx)));
+  auto isPresent = gen.B.createApply(loc, isPresentFn, i1Type, optAddr);
+  gen.B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
+
+  // If it's present, use _getOptionalValue.
+  // Note that we pass 'opt' directly, not indirectly, thus consuming the value.
+  gen.B.emitBlock(isPresentBB);
+  auto getValueFn =
+    emitSpecializedFunctionRef(gen, loc, refType.getSwiftRValueType(),
+                               gen.getASTContext().getGetOptionalValueDecl());
+  SILValue refValue = gen.B.createApply(loc, getValueFn, refType, opt);
+  gen.B.createBranch(loc, contBB, refValue);
+
+  // If it's not present, just create a null value.
+  gen.B.emitBlock(isNotPresentBB);
+  SILValue null = gen.B.createBuiltinZero(loc, refType);
+  optTL.emitDestroyValue(gen.B, loc, opt);
+  gen.B.createBranch(loc, contBB, null);
+
+  // Continue.
+  gen.B.emitBlock(contBB);
+  gen.B.createDeallocStack(CleanupLocation::getCleanupLocation(loc),
+                           allocation->getContainerResult());
+
+  return result;
+}
+
 /// Given that the type-of-rvalue differs from the type-of-storage,
 /// and given that the type-of-rvalue is loadable, produce a +1 scalar
 /// of the type-of-rvalue.
-static SILValue emitLoadOfScalarRValue(SILGenFunction &gen,
-                                       SILLocation loc,
-                                       SILType storageType,
-                                       SILValue src,
-                                       IsTake_t isTake) {
+static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         SILValue src,
+                                         const TypeLowering &valueTL,
+                                         IsTake_t isTake) {
+  SILType storageType = src.getType();
+
   // For [weak] types, we need to create an Optional<T>.
+  // Optional<T> is currently loadable, but it probably won't be forever.
   if (storageType.is<WeakStorageType>()) {
-    // TODO: actually make an Optional<T>
-    return gen.B.createLoadWeak(loc, src, isTake);
+    auto refValue = gen.B.createLoadWeak(loc, src, isTake);
+    return emitRefToOptional(gen, loc, refValue, valueTL);
   }
 
   // For [unowned] types, we need to strip the unowned box.
@@ -580,11 +750,12 @@ static SILValue emitLoadOfScalarRValue(SILGenFunction &gen,
 /// Given that the type-of-rvalue differs from the type-of-storage,
 /// store a +1 value (possibly not a scalar) of the type-of-rvalue
 /// into the given address.
-static void emitStoreOfScalarRValue(SILGenFunction &gen,
-                                    SILLocation loc,
-                                    SILValue value,
-                                    SILValue dest,
-                                    IsInitialization_t isInit) {
+static void emitStoreOfSemanticRValue(SILGenFunction &gen,
+                                      SILLocation loc,
+                                      SILValue value,
+                                      SILValue dest,
+                                      const TypeLowering &valueTL,
+                                      IsInitialization_t isInit) {
   auto storageType = dest.getType();
 
   // Function values might need to be generalized.  This is actually
@@ -598,12 +769,13 @@ static void emitStoreOfScalarRValue(SILGenFunction &gen,
 
   // For [weak] types, we need to break down an Optional<T> and then
   // emit the storeWeak ourselves.
-  if (storageType.is<WeakStorageType>()) {
-    // TODO: actually expect an Optional<T>
-    gen.B.createStoreWeak(loc, value, dest, isInit);
+  if (auto weakType = storageType.getAs<WeakStorageType>()) {
+    auto refType = SILType::getPrimitiveObjectType(weakType.getReferentType());
+    auto refValue = emitOptionalToRef(gen, loc, value, valueTL, refType);
+    gen.B.createStoreWeak(loc, refValue, dest, isInit);
 
     // store_weak doesn't take ownership of the input, so cancel it out.
-    gen.B.createStrongRelease(loc, value);
+    gen.B.createStrongRelease(loc, refValue);
 
     return;
   }
@@ -638,8 +810,7 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
     return srcTL.emitLoadOfCopy(B, loc, src, isTake);
   }
 
-  return emitLoadOfScalarRValue(*this, loc, srcTL.getLoweredType(),
-                                src, isTake);
+  return emitLoadOfSemanticRValue(*this, loc, src, rvalueTL, isTake);
 }
 
 /// Load a value of the type-of-reference out of the given address
@@ -661,7 +832,7 @@ void SILGenFunction::emitSemanticLoadInto(SILLocation loc,
   }
 
   auto rvalue =
-    emitLoadOfScalarRValue(*this, loc, srcTL.getLoweredType(), src, isTake);
+    emitLoadOfSemanticRValue(*this, loc, src, srcTL, isTake);
   emitUnloweredStoreOfCopy(B, loc, rvalue, dest, isInit);
 }
 
@@ -685,7 +856,8 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
     return;
   }
 
-  emitStoreOfScalarRValue(*this, loc, rvalue, dest, isInit);
+  auto &rvalueTL = getTypeLowering(rvalue.getType());
+  emitStoreOfSemanticRValue(*this, loc, rvalue, dest, rvalueTL, isInit);
 }
 
 /// Convert a semantic rvalue to a value of storage type.

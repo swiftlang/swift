@@ -358,7 +358,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value) {
       diagnose(value->getLoc(), diag::optional_intrinsics_not_found);
     }
 
-    return refTy; // FIXME: optTy
+    return optTy;
 
   // Ignore [unowned] qualification.
   } else if (isa<UnownedStorageType>(canType)) {

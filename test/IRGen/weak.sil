@@ -17,7 +17,7 @@ protocol [class_protocol] P {
 }
 
 struct A {
-  var [weak] x : C
+  var [weak] x : C?
 }
 
 sil @test_weak_load_store : $[thin] (val : [byref] A, v : C) -> () {
@@ -37,7 +37,7 @@ bb0(%0 : $*A, %1 : $C):
 // CHECK-NEXT: ret void
 
 struct B {
-  var [weak] x : P
+  var [weak] x : P?
 }
 
 sil @test_weak_load_store_proto : $[thin] (val : [byref] B, ref : P) -> () {

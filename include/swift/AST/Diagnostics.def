@@ -814,6 +814,8 @@ ERROR(invalid_ownership_type,attribute_parsing,none,
 ERROR(invalid_ownership_opaque_type,attribute_parsing,none,
       "'%select{strong|weak|unowned}0' attribute cannot be applied to "
       "non-class type %1; consider adding a class bound", (unsigned, Type))
+ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
+      "'weak' variable should have Optional type %0", (Type))
 
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics

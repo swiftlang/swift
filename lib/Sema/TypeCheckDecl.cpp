@@ -2258,6 +2258,23 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
 
     Type type = VD->getType();
+
+    // A [weak] variable must have type R? for some ownership-capable type R.
+    if (Attrs.isWeak()) {
+      Type objType = type->getOptionalObjectType(TC.Context);
+
+      // Use this special diagnostic if it's actually a reference type
+      // but just isn't Optional.
+      if (!objType && type->allowsOwnership()) {
+        TC.diagnose(VD->getStartLoc(), diag::invalid_weak_ownership_not_optional,
+                    OptionalType::get(type, TC.Context));
+        VD->getMutableAttrs().clearOwnership();
+        return;
+      } else if (objType) {
+        type = objType;
+      }
+    }
+
     if (!type->allowsOwnership()) {
       // If we have an opaque type, suggest the possibility of adding
       // a class bound.

@@ -647,6 +647,12 @@ namespace {
                                         forFunctionParam? TVO_CanBindToLValue
                                                         : 0);
 
+        // For [weak] variables, use Optional<T>.
+        if (!forFunctionParam && var->getAttrs().isWeak()) {
+          ty = CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
+          if (!ty) return Type();
+        }
+
         // We want to set the variable's type here when type-checking
         // a function's parameter clauses because we're going to
         // type-check the entire function body within the context of
