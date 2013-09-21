@@ -543,14 +543,16 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
     llvm::raw_string_ostream MS(Mangled), PS(Printed);
     bool first = true;
     for (auto elt : D->getModulePath()) {
-      if (first) first = false;
-      else PS << '.';
       auto Component = elt.first.str();
-      PS << Component;
 
       // We model each component of the access path as a namespace.
-      mangleIdent(MS, Component);
+      if (first && Component == "swift") MS << "S";
+      else mangleIdent(MS, Component);
       Namespace = getOrCreateNamespace(Namespace, Component, MainFile, 1);
+
+      if (first) first = false;
+      else PS << '.';
+      PS << Component;
     }
   }
 
