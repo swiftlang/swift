@@ -553,7 +553,7 @@ void IRGenModule::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) {
     emitGlobalDecl(TU->Decls[i]);
   }
 
-  // Emit the implicit import of swift.swift.
+  // Emit the implicit import of the swift standard libary.
   if (DebugInfo) {
     std::vector<std::pair<swift::Identifier, swift::SourceLoc> > AccessPath;
     AccessPath.push_back({ Context.getIdentifier("swift"),
