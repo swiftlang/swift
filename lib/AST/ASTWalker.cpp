@@ -525,6 +525,16 @@ public:
       for (Decl *Member : UD->getMembers())
         if (doIt(Member))
           return true;
+    } else if (EnumElementDecl *ED = dyn_cast<EnumElementDecl>(D)) {
+      // The getRawValueExpr should remain the untouched original LiteralExpr for
+      // serialization and validation purposes. We only traverse the type-checked
+      // form.
+      if (auto *rawValueExpr = ED->getTypeCheckedRawValueExpr()) {
+        if (auto newRawValueExpr = doIt(rawValueExpr))
+          ED->setTypeCheckedRawValueExpr(newRawValueExpr);
+        else
+          return true;
+      }
     } else if (StructDecl *SD = dyn_cast<StructDecl>(D)) {
       for (Decl *Member : SD->getMembers())
         if (doIt(Member))
