@@ -80,7 +80,7 @@ class alignas(8) TypeBase {
   /// Kind - The discriminator that indicates what subclass of type this is.
   const TypeKind Kind;
 
-  struct TypeBaseBits {
+  struct TypeBaseBitfields {
     /// \brief Whether this type has a type variable somewhere in it.
     unsigned HasTypeVariable : 1;
   };
@@ -89,7 +89,7 @@ class alignas(8) TypeBase {
   static_assert(NumTypeBaseBits <= 32, "fits in an unsigned");
 
 protected:
-  struct AnyFunctionTypeBits {
+  struct AnyFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
 
     /// Extra information which affects how the function is called, like
@@ -100,10 +100,10 @@ protected:
   static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
 
   union {
-    TypeBaseBits TypeBase;
-    AnyFunctionTypeBits AnyFunctionType;
-  } TypeBits;
-  
+    TypeBaseBitfields TypeBaseBits;
+    AnyFunctionTypeBitfields AnyFunctionTypeBits;
+  };
+
 protected:
   TypeBase(TypeKind kind, const ASTContext *CanTypeCtx, bool HasTypeVariable)
     : CanonicalType((TypeBase*)nullptr), Kind(kind) {
@@ -116,7 +116,7 @@ protected:
 
   /// \brief Mark this type as having a type variable.
   void setHasTypeVariable(bool TV = true) {
-    TypeBits.TypeBase.HasTypeVariable = TV;
+    TypeBaseBits.HasTypeVariable = TV;
   }
 
 public:
@@ -1253,7 +1253,7 @@ protected:
                   const ExtInfo &Info)
   : TypeBase(Kind, CanTypeContext, HasTypeVariable),
   Input(Input), Output(Output) {
-    TypeBits.AnyFunctionType.ExtInfo = Info.Bits;
+    AnyFunctionTypeBits.ExtInfo = Info.Bits;
   }
 
 public:
@@ -1262,7 +1262,7 @@ public:
   Type getResult() const { return Output; }
 
   ExtInfo getExtInfo() const {
-    return ExtInfo(TypeBits.AnyFunctionType.ExtInfo);
+    return ExtInfo(AnyFunctionTypeBits.ExtInfo);
   }
 
   /// \brief Returns the calling conventions of the function.
@@ -2576,7 +2576,7 @@ case TypeKind::Id:
 }
 
 inline bool TypeBase::hasTypeVariable() const {
-  return TypeBits.TypeBase.HasTypeVariable;
+  return TypeBaseBits.HasTypeVariable;
 }
 
 inline bool TypeBase::isExistentialType() {

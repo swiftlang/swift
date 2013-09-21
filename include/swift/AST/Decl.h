@@ -123,7 +123,7 @@ class alignas(8) Decl {
   enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 2 };
   static_assert(NumAbstractFunctionDeclBits <= 32, "fits in an unsigned");
 
-  class FuncDeclBitFields {
+  class FuncDeclBitfields {
     friend class FuncDecl;
     unsigned : NumAbstractFunctionDeclBits;
 
@@ -136,7 +136,7 @@ class alignas(8) Decl {
   enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 17 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
-  class TypeDeclBitFields {
+  class TypeDeclBitfields {
     friend class TypeDecl;
     unsigned : NumValueDeclBits;
 
@@ -153,7 +153,7 @@ class alignas(8) Decl {
   enum { NumNominalTypeDeclBits = NumTypeDeclBits};
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
-  class ProtocolDeclBitFields {
+  class ProtocolDeclBitfields {
     friend class ProtocolDecl;
     unsigned : NumNominalTypeDeclBits;
 
@@ -179,7 +179,7 @@ class alignas(8) Decl {
   enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 11 };
   static_assert(NumProtocolDeclBits <= 32, "fits in an unsigned");
 
-  class ClassDeclBitFields {
+  class ClassDeclBitfields {
     friend class ClassDecl;
     unsigned : NumNominalTypeDeclBits;
 
@@ -189,7 +189,7 @@ class alignas(8) Decl {
   enum { NumClassDeclBits = NumNominalTypeDeclBits + 2 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
-  class EnumDeclBitFields {
+  class EnumDeclBitfields {
     friend class EnumDecl;
     unsigned : NumNominalTypeDeclBits;
     
@@ -199,7 +199,7 @@ class alignas(8) Decl {
   enum { NumEnumDeclBits = NumNominalTypeDeclBits + 2 };
   static_assert(NumEnumDeclBits <= 32, "fits in an unsigned");
   
-  class InfixOperatorDeclBitFields {
+  class InfixOperatorDeclBitfields {
     friend class InfixOperatorDecl;
     unsigned : NumDeclBits;
 
@@ -209,7 +209,7 @@ class alignas(8) Decl {
   enum { NumInfixOperatorDeclBits = NumDeclBits + 10 };
   static_assert(NumInfixOperatorDeclBits <= 32, "fits in an unsigned");
 
-  class ImportDeclBitFields {
+  class ImportDeclBitfields {
     friend class ImportDecl;
     unsigned : NumDeclBits;
 
@@ -219,7 +219,7 @@ class alignas(8) Decl {
   enum { NumImportDeclBits = NumDeclBits + 4 };
   static_assert(NumImportDeclBits <= 32, "fits in an unsigned");
 
-  class ExtensionDeclBitFields {
+  class ExtensionDeclBitfields {
     friend class ExtensionDecl;
     unsigned : NumDeclBits;
 
@@ -236,14 +236,14 @@ protected:
     DeclBitfields DeclBits;
     ValueDeclBitfields ValueDeclBits;
     AbstractFunctionDeclBitfields AbstractFunctionDeclBits;
-    FuncDeclBitFields FuncDeclBits;
-    TypeDeclBitFields TypeDeclBits;
-    ProtocolDeclBitFields ProtocolDeclBits;
-    ClassDeclBitFields ClassDeclBits;
-    EnumDeclBitFields EnumDeclBits;
-    InfixOperatorDeclBitFields InfixOperatorDeclBits;
-    ImportDeclBitFields ImportDeclBits;
-    ExtensionDeclBitFields ExtensionDeclBits;
+    FuncDeclBitfields FuncDeclBits;
+    TypeDeclBitfields TypeDeclBits;
+    ProtocolDeclBitfields ProtocolDeclBits;
+    ClassDeclBitfields ClassDeclBits;
+    EnumDeclBitfields EnumDeclBits;
+    InfixOperatorDeclBitfields InfixOperatorDeclBits;
+    ImportDeclBitfields ImportDeclBits;
+    ExtensionDeclBitfields ExtensionDeclBits;
   };
 
 private:
