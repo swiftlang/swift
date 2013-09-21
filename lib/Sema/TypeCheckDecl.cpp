@@ -19,8 +19,11 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Parse/Lexer.h"
+#include "llvm/ADT/APInt.h"
+#include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -946,7 +949,42 @@ public:
     if (!IsFirstPass)
       checkExplicitConformance(TAD, TAD->getDeclaredType());
   }
-
+  
+  // Given the raw value literal expression for an enum case, produces the
+  // auto-incremented raw value for the subsequent case, or returns null if
+  // the value is not auto-incrementable.
+  LiteralExpr *getAutoIncrementedLiteralExpr(Type rawTy,
+                                             EnumElementDecl *forElt,
+                                             LiteralExpr *prevValue) {
+    // If there was no previous value, start from zero.
+    if (!prevValue) {
+      // The raw type must be integer literal convertible for this to work.
+      if (!TC.conformsToProtocol(rawTy,
+                 TC.getProtocol(forElt->getLoc(),
+                                KnownProtocolKind::IntegerLiteralConvertible)))
+      {
+        TC.diagnose(forElt->getLoc(),
+                    diag::enum_non_integer_convertible_raw_type_no_value);
+        return nullptr;
+      }
+      
+      return new (TC.Context) IntegerLiteralExpr("0", SourceLoc());
+    }
+    
+    if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
+      APInt nextVal = intLit->getValue() + 1;
+      llvm::SmallString<10> nextValStr;
+      nextVal.toStringSigned(nextValStr);
+      return new (TC.Context)
+        IntegerLiteralExpr(TC.Context.AllocateCopy(StringRef(nextValStr)),
+                           SourceLoc());
+    }
+    
+    TC.diagnose(forElt->getLoc(),
+                diag::enum_non_integer_raw_value_auto_increment);
+    return nullptr;
+  }
+  
   void visitEnumDecl(EnumDecl *UD) {
     if (!IsSecondPass) {
       TC.validateTypeDecl(UD);
@@ -960,34 +998,71 @@ public:
         checkCircularity(TC, UD, diag::circular_enum_inheritance,
                          diag::enum_here, path);
       }
-    } else if (auto rawTy = UD->getRawType()) {
-      // Check that the raw type is convertible from one of the primitive
-      // literal protocols.
-      bool literalConvertible = false;
-      for (auto literalProtocol : {KnownProtocolKind::IntegerLiteralConvertible,
-        KnownProtocolKind::StringLiteralConvertible,
-        KnownProtocolKind::FloatLiteralConvertible,
-        KnownProtocolKind::CharacterLiteralConvertible})
-      {
-        if (TC.conformsToProtocol(rawTy,
-                            TC.getProtocol(UD->getLoc(), literalProtocol))) {
-          literalConvertible = true;
-          break;
-        }
-      }
-      
-      if (!literalConvertible) {
-        TC.diagnose(UD->getInherited()[0].getSourceRange().Start,
-                    diag::raw_type_not_literal_convertible,
-                    rawTy);
-      }
     }
 
     for (Decl *member : UD->getMembers())
       visit(member);
 
-    if (!IsFirstPass)
+    if (!IsFirstPass) {
       checkExplicitConformance(UD, UD->getDeclaredTypeInContext());
+      
+      // If we have a raw type, check it and the cases' raw values.
+      if (auto rawTy = UD->getRawType()) {
+        // Check that the raw type is convertible from one of the primitive
+        // literal protocols.
+        bool literalConvertible = false;
+        for (auto literalProtocol : {
+                                KnownProtocolKind::IntegerLiteralConvertible,
+                                KnownProtocolKind::StringLiteralConvertible,
+                                KnownProtocolKind::FloatLiteralConvertible,
+                                KnownProtocolKind::CharacterLiteralConvertible})
+        {
+          if (TC.conformsToProtocol(rawTy,
+                              TC.getProtocol(UD->getLoc(), literalProtocol))) {
+            literalConvertible = true;
+            break;
+          }
+        }
+        
+        if (!literalConvertible) {
+          TC.diagnose(UD->getInherited()[0].getSourceRange().Start,
+                      diag::raw_type_not_literal_convertible,
+                      rawTy);
+        }
+        
+        // Check the raw values of the cases.
+        LiteralExpr *prevValue = nullptr;
+        EnumElementDecl *lastExplicitValueElt = nullptr;
+        
+        for (auto elt : UD->getAllElements()) {
+          // We don't yet support raw values on payload cases.
+          if (elt->hasArgumentType()) {
+            TC.diagnose(elt->getLoc(),
+                        diag::enum_with_raw_type_case_with_argument);
+            TC.diagnose(UD->getInherited()[0].getSourceRange().Start,
+                        diag::enum_raw_type_here, rawTy);
+          }
+          
+          // If the union element has no explicit raw value, try to
+          // autoincrement from the previous value, or start from zero if this
+          // is the first element.
+          if (!elt->hasRawValueExpr()) {
+            auto nextValue = getAutoIncrementedLiteralExpr(rawTy,elt,prevValue);
+            if (!nextValue) {
+              break;
+            }
+            elt->setRawValueExpr(nextValue);
+            Expr *typeChecked = nextValue;
+            if (!TC.typeCheckExpression(typeChecked, UD, rawTy, false))
+              elt->setTypeCheckedRawValueExpr(typeChecked);
+          } else {
+            lastExplicitValueElt = elt;
+          }
+          prevValue = elt->getRawValueExpr();
+          assert(prevValue && "continued without setting raw value of enum case");
+        }
+      }
+    }
   }
 
   void visitStructDecl(StructDecl *SD) {
@@ -1478,12 +1553,28 @@ public:
         ED->setInvalid();
         return;
       }
-    if (!ED->getResultTypeLoc().isNull())
+    if (!ED->getResultTypeLoc().isNull()) {
       if (TC.validateType(ED->getResultTypeLoc())) {
         ED->overwriteType(ErrorType::get(TC.Context));
         ED->setInvalid();
         return;
       }
+      if (ED->getResultType()->getEnumOrBoundGenericEnum() != UD)
+        TC.diagnose(ED->getLoc(), diag::invalid_enum_case_result_type);
+      ElemTy = ED->getResultType();
+    }
+
+    // Check the raw value, if we have one.
+    if (auto *rawValue = ED->getRawValueExpr()) {
+      auto rawTy = UD->getRawType();
+      if (!rawTy) {
+        TC.diagnose(rawValue->getLoc(), diag::enum_raw_value_without_raw_type);
+        return;
+      }
+      Expr *typeCheckedExpr = rawValue;
+      if (!TC.typeCheckExpression(typeCheckedExpr, UD, rawTy, false))
+        ED->setTypeCheckedRawValueExpr(typeCheckedExpr);
+    }
 
     // If we have a simple element, just set the type.
     if (ED->getArgumentType().isNull()) {

@@ -699,10 +699,12 @@ namespace {
         if (known != Impl.ImportedDecls.end())
           return known->second;
 
+        // FIXME: Import the raw type from the enum element decl.
         auto element
           = new (context) EnumElementDecl(SourceLoc(),
                                           name, TypeLoc(),
                                           SourceLoc(), TypeLoc(),
+                                          SourceLoc(), nullptr,
                                           dc);
 
         // Give the enum element the appropriate type.

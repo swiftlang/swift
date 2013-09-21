@@ -1890,6 +1890,31 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
       }
     }
     
+    // See if there's a raw value expression.
+    SourceLoc EqualsLoc;
+    ParserResult<Expr> RawValueExpr;
+    LiteralExpr *LiteralRawValueExpr = nullptr;
+    if (Tok.is(tok::equal)) {
+      EqualsLoc = consumeToken();
+      RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
+      if (RawValueExpr.hasCodeCompletion()) {
+        Status.setHasCodeCompletion();
+        return Status;
+      }
+      if (RawValueExpr.isNull()) {
+        Status.setIsParseError();
+        return Status;
+      }
+      // The raw value must be syntactically a simple literal.
+      LiteralRawValueExpr = dyn_cast<LiteralExpr>(RawValueExpr.getPtrOrNull());
+      if (!LiteralRawValueExpr
+          || isa<InterpolatedStringLiteralExpr>(LiteralRawValueExpr)) {
+        diagnose(RawValueExpr.getPtrOrNull()->getLoc(),
+                 diag::nonliteral_enum_case_raw_value);
+        LiteralRawValueExpr = nullptr;
+      }
+    }
+    
     // For recovery, again make sure the the user didn't try to spell a switch
     // case label:
     // 'case Identifier:' or
@@ -1906,6 +1931,8 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
                                                  ArgType.getPtrOrNull(),
                                                  ArrowLoc,
                                                  ResultType.getPtrOrNull(),
+                                                 EqualsLoc,
+                                                 LiteralRawValueExpr,
                                                  CurDeclContext);
     Elements.push_back(result);
     

@@ -45,6 +45,7 @@ namespace swift {
   class ASTWalker;
   class Type;
   class Expr;
+  class LiteralExpr;
   class FuncDecl;
   class BraceStmt;
   class Component;
@@ -2410,17 +2411,28 @@ class EnumElementDecl : public ValueDecl {
   /// The optional refined type of the case. Must be an instance of the generic
   /// type of the containing enum.
   TypeLoc ResultType;
-    
+  
+  SourceLoc EqualsLoc;
+  
+  /// The raw value literal for the enum element, or null.
+  LiteralExpr *RawValueExpr;
+  /// The type-checked raw value expression.
+  Expr *TypeCheckedRawValueExpr = nullptr;
+  
 public:
-  EnumElementDecl( SourceLoc IdentifierLoc, Identifier Name,
-                   TypeLoc ArgumentType,
-                   SourceLoc ArrowLoc,
-                   TypeLoc ResultType,
-                   DeclContext *DC)
+  EnumElementDecl(SourceLoc IdentifierLoc, Identifier Name,
+                  TypeLoc ArgumentType,
+                  SourceLoc ArrowLoc,
+                  TypeLoc ResultType,
+                  SourceLoc EqualsLoc,
+                  LiteralExpr *RawValueExpr,
+                  DeclContext *DC)
   : ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
     ArgumentType(ArgumentType),
     ResultArrowLoc(ArrowLoc),
-    ResultType(ResultType)
+    ResultType(ResultType),
+    EqualsLoc(EqualsLoc),
+    RawValueExpr(RawValueExpr)
   {}
 
   bool hasArgumentType() const { return !ArgumentType.getType().isNull(); }
@@ -2430,6 +2442,17 @@ public:
   bool hasResultType() const { return !ResultType.getType().isNull(); }
   Type getResultType() const { return ResultType.getType(); }
   TypeLoc &getResultTypeLoc() { return ResultType; }
+  
+  bool hasRawValueExpr() const { return RawValueExpr; }
+  LiteralExpr *getRawValueExpr() const { return RawValueExpr; }
+  void setRawValueExpr(LiteralExpr *e) { RawValueExpr = e; }
+  
+  Expr *getTypeCheckedRawValueExpr() const {
+    return TypeCheckedRawValueExpr;
+  }
+  void setTypeCheckedRawValueExpr(Expr *e) {
+    TypeCheckedRawValueExpr = e;
+  }
   
   /// Return the containing EnumDecl.
   EnumDecl *getParentEnum() const {

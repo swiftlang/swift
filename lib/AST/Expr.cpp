@@ -143,6 +143,9 @@ bool Expr::isImplicit() const {
   if (auto superRef = dyn_cast<SuperRefExpr>(this))
     return superRef->getLoc().isInvalid();
 
+  if (auto literalExpr = dyn_cast<LiteralExpr>(this))
+    return literalExpr->getLoc().isInvalid();
+
   return false;
 }
 

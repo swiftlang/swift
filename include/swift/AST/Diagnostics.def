@@ -446,6 +446,10 @@ ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
 // Enum Types
 ERROR(expected_type_enum_element_result,type_parsing,PointsToFirstBadToken,
       "expected type after '->' in 'case'", ())
+ERROR(expected_expr_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
+      "expected expression after '=' in 'case'", ())
+ERROR(nonliteral_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
+      "raw value for enum case must be an integer, float, character, or string literal", ())
 
 // Array Types
 ERROR(expected_expr_array_type,expr_parsing,PointsToFirstBadToken,
@@ -1000,7 +1004,9 @@ ERROR(custom_operator_addressof,sema_tcd,none,
 ERROR(var_type_not_materializable,sema_tcd,none,
       "type %0 of variable is not materializable", (Type))
 ERROR(enum_element_not_materializable,sema_tcd,none,
-      "type of enum element is not materializable", ())
+      "type of enum case is not materializable", ())
+ERROR(invalid_enum_case_result_type,sema_tcd,none,
+      "result type of enum case must be an instance of the enum", ())
 
 // Attributes
 ERROR(invalid_infix_input,sema_tcd,none,
@@ -1189,6 +1195,16 @@ ERROR(raw_type_not_literal_convertible,sema_tcd,none,
       (Type))
 NOTE(enum_here,sema_tcd,none,
      "enum %0 declared here", (Identifier))
+ERROR(enum_raw_value_without_raw_type,sema_tcd,none,
+      "enum case cannot have a raw value if the enum does not have a raw type", ())
+ERROR(enum_with_raw_type_case_with_argument,sema_tcd,none,
+      "enum with raw type cannot have cases with arguments", ())
+NOTE(enum_raw_type_here,sema_tcd,none,
+     "declared raw type %0 here", (Type))
+ERROR(enum_non_integer_raw_value_auto_increment,sema_tcd,none,
+      "enum case must declare a raw value when the preceding raw value is not an integer", ())
+ERROR(enum_non_integer_convertible_raw_type_no_value,sema_tcd,none,
+      "enum cases require explicit raw values when the raw type is not integer literal convertible", ())
 
 //------------------------------------------------------------------------------
 // Type Check Expressions
@@ -1340,7 +1356,7 @@ ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,
 ERROR(tuple_pattern_length_mismatch,sema_tcp,none,
       "tuple pattern has the wrong length for tuple type %0", (Type))
 ERROR(enum_element_pattern_member_not_found,sema_tcp,none,
-      "enum element '%0' not found in type %1", (StringRef, Type))
+      "enum case '%0' not found in type %1", (StringRef, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Types

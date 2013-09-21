@@ -1248,11 +1248,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto argTy = getType(argTypeID);
     auto resTy = getType(resTypeID);
+    // FIXME: Deserialize the literal raw value, if any.
     auto elem = new (ctx) EnumElementDecl(SourceLoc(),
                                           getIdentifier(nameID),
                                           TypeLoc::withoutLoc(argTy),
                                           SourceLoc(),
                                           TypeLoc::withoutLoc(resTy),
+                                          SourceLoc(),
+                                          nullptr,
                                           DC);
     declOrOffset = elem;
 

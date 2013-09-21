@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/raw_ostream.h"
@@ -918,6 +919,8 @@ SourceRange FuncDecl::getSourceRange() const {
 }
 
 SourceRange EnumElementDecl::getSourceRange() const {
+  if (RawValueExpr && !RawValueExpr->isImplicit())
+    return {getStartLoc(), RawValueExpr->getEndLoc()};
   if (ResultType.hasLocation())
     return {getStartLoc(), ResultType.getSourceRange().End};
   if (ArgumentType.hasLocation())
