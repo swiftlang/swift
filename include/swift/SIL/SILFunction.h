@@ -163,7 +163,8 @@ public:
   void verify() const;
   
   /// Pretty-print the SILFunction.
-  void dump(bool Verbose = false) const;
+  void dump(bool Verbose) const;
+  void dump() const { dump(false); }
 
   /// Pretty-print the SILFunction with the designated stream as a 'sil'
   /// definition.
