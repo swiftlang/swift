@@ -696,7 +696,10 @@ void ElementPromotion::handleEscape(SILInstruction *Inst) {
     return;
 
   // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
-  diagnoseInitError(Inst, diag::variable_escape_before_initialized);
+  if (isa<MarkFunctionEscapeInst>(Inst))
+    diagnoseInitError(Inst, diag::global_variable_function_use_uninit);
+  else
+    diagnoseInitError(Inst, diag::variable_escape_before_initialized);
 }
 
 /// At the time when a box is destroyed, it might be completely uninitialized,
