@@ -627,7 +627,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     // FIXME: Attributes
     recordDeclLoc(decl);
     if (decl->getGetterDecl()) {
-      OS << "get: ";
+      OS << "get:";
     } else {
       OS << "set";
 
@@ -636,7 +636,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       if (auto named = dyn_cast<NamedPattern>(valueParam)) {
         OS << "(" << named->getBoundName().str() << ")";
       }
-      OS << ": ";
+      OS << ":";
     }
 
     if (!Options.FunctionDefinitions || !decl->getBody()) {
