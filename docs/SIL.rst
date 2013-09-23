@@ -1610,7 +1610,7 @@ archetype_method
   // $T must be an archetype
   // #Proto.method!1 must be a reference to a method of one of the protocol
   // constraints on T
-  // $U -> V must be the type of the referenced method with "This == T"
+  // $U -> V must be the type of the referenced method with "Self == T"
   // substitution applied
   // %1 will be of type $[thin] U -> V
 
@@ -1645,7 +1645,7 @@ be projected out of the same existential container as the ``protocol_method``
 operand:
 
 - If the operand is the address of an address-only protocol type, then the
-  "self" argument of the method is of type ``$*P.This``, the ``This`` archetype
+  "self" argument of the method is of type ``$*P.Self``, the ``Self`` archetype
   of the method's protocol.
 - If the operand is a value of a class protocol type, then the "self"
   argument of the method is of type ``Builtin.ObjCPointer``, and can be
@@ -2249,12 +2249,12 @@ project_existential
 
   sil-instruction ::= 'project_existential' sil-operand 'to' sil-type
 
-  %1 = project_existential %0 : $*P to $*P.This
+  %1 = project_existential %0 : $*P to $*P.Self
   // %0 must be of a $*P type for non-class protocol or protocol composition
   //   type P
-  // $*P.This must be the address-of-This type for one of the protocols %0
+  // $*P.Self must be the address-of-Self type for one of the protocols %0
   //   conforms to
-  // %1 will be of type $*P.This
+  // %1 will be of type $*P.Self
 
 Obtains the address of the concrete value inside the
 existential container referenced by ``%0``. This pointer can be passed to
