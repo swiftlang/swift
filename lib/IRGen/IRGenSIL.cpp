@@ -2207,16 +2207,16 @@ static void emitPointerCastInst(IRGenSILFunction &IGF,
 
 void IRGenSILFunction::visitRefToObjectPointerInst(
                                              swift::RefToObjectPointerInst *i) {
-  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
-                      IGM.RefCountedPtrTy);
+  auto &ti = getTypeInfo(i->getType());
+  llvm::Type *destType = ti.getStorageType();
+  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0), destType);
 }
 
 void IRGenSILFunction::visitObjectPointerToRefInst(
                                              swift::ObjectPointerToRefInst *i) {
   auto &ti = getTypeInfo(i->getType());
   llvm::Type *destType = ti.getStorageType();
-  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
-                      destType);
+  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0), destType);
 }
 
 void IRGenSILFunction::visitRefToRawPointerInst(

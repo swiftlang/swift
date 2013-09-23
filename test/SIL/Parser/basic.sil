@@ -195,6 +195,8 @@ bb0:
   %C = alloc_ref $C
   // CHECK: ref_to_object_pointer %0 : $C to $Builtin.ObjectPointer
   %1 = ref_to_object_pointer %C : $C to $Builtin.ObjectPointer
+  // CHECK: ref_to_object_pointer %0 : $C to $Builtin.ObjCPointer
+  %O = ref_to_object_pointer %C : $C to $Builtin.ObjCPointer
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
   %2 = class_method %C : $C, #C.doIt!1 : $[cc(method), thin] ((), C) -> ()

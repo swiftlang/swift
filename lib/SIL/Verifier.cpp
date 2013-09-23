@@ -1221,18 +1221,22 @@ public:
     require(AI->getOperand().getType()
               .getSwiftType()->mayHaveSuperclass(),
             "ref-to-object-pointer operand must be a class reference");
-    require(AI->getType().getSwiftType()->isEqual(
-                            AI->getType().getASTContext().TheObjectPointerType),
-            "ref-to-object-pointer result must be ObjectPointer");
+    auto destType = AI->getType().getSwiftType();
+    auto &C = AI->getType().getASTContext();
+    require(destType->isEqual(C.TheObjectPointerType)
+            || destType->isEqual(C.TheObjCPointerType),
+            "ref-to-object-pointer result must be ObjectPointer or ObjCPointer");
   }
   
   void checkObjectPointerToRefInst(ObjectPointerToRefInst *AI) {
     require(AI->getType()
               .getSwiftType()->mayHaveSuperclass(),
             "object-pointer-to-ref result must be a class reference");
-    require(AI->getOperand().getType().getSwiftType()->isEqual(
-                            AI->getType().getASTContext().TheObjectPointerType),
-            "object-pointer-to-ref operand must be ObjectPointer");
+    auto srcType = AI->getOperand().getType().getSwiftType();
+    auto &C = AI->getOperand().getType().getASTContext();
+    require(srcType->isEqual(C.TheObjectPointerType)
+            || srcType->isEqual(C.TheObjCPointerType),
+            "object-pointer-to-ref operand must be ObjectPointer or ObjCPointer");
   }
   
   void checkRefToRawPointerInst(RefToRawPointerInst *AI) {

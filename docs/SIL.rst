@@ -2437,10 +2437,12 @@ ref_to_object_pointer
   sil-instruction ::= 'ref_to_object_pointer' sil-operand 'to' sil-type
 
   %1 = ref_to_object_pointer %0 : $C to $Builtin.ObjectPointer
+  %1 = ref_to_object_pointer %0 : $C to $Builtin.ObjCPointer
   // %0 must be of class type $C
-  // %1 will be of type $Builtin.ObjectPointer
+  // %1 will be of type $Builtin.ObjectPointer or ObjCPointer
 
-Converts a class instance reference to the ``Builtin.ObjectPointer`` type.
+Converts a class instance reference to one of the ``Builtin.ObjectPointer`` or
+``Builtin.ObjCPointer`` types.
 
 object_pointer_to_ref
 `````````````````````
@@ -2449,14 +2451,15 @@ object_pointer_to_ref
   sil-instruction ::= 'object_pointer_to_ref' sil-operand 'to' sil-type
 
   %1 = object_pointer_to_ref %0 : $Builtin.ObjectPointer to $C
+  %1 = object_pointer_to_ref %0 : $Builtin.ObjCPointer to $C
   // $C must be a class type
   // %1 will be of type $C
 
-Converts a ``Builtin.ObjectPointer`` value to a class instance reference.
-The destination type ``$C`` must be the correct type (or a superclass) of the
-type of the referenced heap object. This conversion, however, is unchecked and
-it is undefined behavior if the destination type is not a valid type for the
-heap object.
+Converts a ``Builtin.ObjectPointer`` or ``Builtin.ObjCPointer`` value to a
+class instance reference.  The destination type ``$C`` must match
+the type of the referenced heap object (or a superclass thereof). This
+conversion, however, is unchecked and it is undefined behavior if the
+destination type is not a valid type for the heap object.
 
 ref_to_raw_pointer
 ``````````````````

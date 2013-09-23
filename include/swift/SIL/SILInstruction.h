@@ -927,7 +927,7 @@ public:
 };
   
 /// RefToObjectPointerInst - Convert a class instance reference to a
-/// Builtin.ObjectPointer.
+/// Builtin.ObjectPointer or Builtin.ObjCPointer.
 class RefToObjectPointerInst
   : public UnaryInstructionBase<ValueKind::RefToObjectPointerInst,
                                 ConversionInst>
@@ -937,8 +937,8 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
   
-/// ObjectPointerToRefInst - Convert a Builtin.ObjectPointer to a class instance
-/// reference.
+/// ObjectPointerToRefInst - Convert a Builtin.ObjectPointer or
+/// Builtin.ObjCPointer to a class instance reference.
 class ObjectPointerToRefInst
   : public UnaryInstructionBase<ValueKind::ObjectPointerToRefInst,
                                 ConversionInst>
