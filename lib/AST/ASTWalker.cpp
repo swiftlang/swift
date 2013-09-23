@@ -522,6 +522,11 @@ public:
           return true;
       }
     } else if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
+      for (auto Inherit : NTD->getInherited()) {
+        if (TypeRepr *T = Inherit.getTypeRepr())
+          if (doIt(T))
+            return true;
+      }
       for (Decl *Member : NTD->getMembers())
         if (doIt(Member))
           return true;
