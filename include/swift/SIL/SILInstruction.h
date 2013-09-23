@@ -1550,7 +1550,7 @@ class ProjectExistentialRefInst
   : public UnaryInstructionBase<ValueKind::ProjectExistentialRefInst>
 {
 public:
-  ProjectExistentialRefInst(SILLocation Loc, SILValue Operand, SILFunction &F);
+  ProjectExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty);
 };
   
 /// InitExistentialInst - Given an address to an uninitialized buffer of

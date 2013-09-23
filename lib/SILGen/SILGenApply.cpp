@@ -188,21 +188,19 @@ private:
                                        SILDeclRef methodName,
                                        Type memberType) {
     // 'self' for instance methods is projected out of the existential container
-    // as an ObjCPointer or as the address of its Self archetype.
+    // as its Self archetype.
     // 'self' for existential metatypes is the metatype itself.
     Type selfTy;
     bool isThin;
     if (methodName.getDecl()->isInstanceMember()) {
+      selfTy = cast<ProtocolDecl>(methodName.getDecl()->getDeclContext())
+            ->getSelf()->getArchetype();
       if (proto.getType().isClassExistentialType()) {
-        selfTy = memberType->getASTContext().TheObjCPointerType;
         isThin = true;
       } else {
-        Type protoSelfTy
-          = cast<ProtocolDecl>(methodName.getDecl()->getDeclContext())
-              ->getSelf()->getArchetype();
-        selfTy = LValueType::get(protoSelfTy,
+        selfTy = LValueType::get(selfTy,
                                  LValueType::Qual::DefaultForByrefSelf,
-                                 protoSelfTy->getASTContext());
+                                 selfTy->getASTContext());
         isThin = false;
       }
     } else {
@@ -505,6 +503,16 @@ public:
   }
 };
 
+/// Get the 'Self' type of a DynamicLookup operand to use as the result type of
+/// projecting the object instance handle.
+SILType getSelfTypeForDynamicLookup(SILGenFunction &gen,
+                                    SILValue existential) {
+  CanType ty = existential.getType().getSwiftRValueType();
+  ProtocolDecl *proto = cast<ProtocolType>(ty)->getDecl();
+  // DynamicLookup is a class protocol so its projection should be loadable.
+  return gen.getLoweredLoadableType(proto->getSelf()->getDeclaredType());
+}
+  
 /// An ASTVisitor for building SIL function calls.
 /// Nested ApplyExprs applied to an underlying curried function or method
 /// reference are flattened into a single SIL apply to the most uncurried entry
@@ -655,13 +663,13 @@ public:
       // Attach the existential cleanup to the projection so that it gets consumed
       // (or not) when the call is applied to it (or isn't).
       ManagedValue proj;
+      SILType protoSelfTy
+        = gen.getLoweredType(proto->getSelf()->getArchetype());
       if (existential.getType().isClassExistentialType()) {
         SILValue val = gen.B.createProjectExistentialRef(e,
-                                                         existential.getValue());
+                                           existential.getValue(), protoSelfTy);
         proj = ManagedValue(val, existential.getCleanup());
       } else {
-        SILType protoSelfTy
-          = gen.getLoweredType(proto->getSelf()->getArchetype());
         assert(protoSelfTy.isAddress() && "Self should be address-only");
         SILValue val = gen.B.createProjectExistential(e, existential.getValue(),
                                                       protoSelfTy);
@@ -776,7 +784,7 @@ public:
       return expr;
     }
   }
-
+  
   /// If this application forces a dynamic member reference with !, emit
   /// a direct reference to the member.
   bool emitForcedDynamicMemberRef(ApplyExpr *apply) {
@@ -836,7 +844,10 @@ public:
       // Attach the existential cleanup to the projection so that it gets consumed
       // (or not) when the call is applied to it (or isn't).
       val = gen.B.createProjectExistentialRef(dynamicMemberRef,
-                                              existential.getValue());
+                      existential.getValue(),
+                      getSelfTypeForDynamicLookup(gen, existential.getValue()));
+      val = gen.B.createRefToObjectPointer(dynamicMemberRef, val,
+                             SILType::getObjCPointerType(gen.getASTContext()));
       ManagedValue proj(val, existential.getCleanup());
       setSelfParam(RValue(gen, proj, dynamicMemberRef), dynamicMemberRef);
     } else {
@@ -1667,7 +1678,11 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 
   SILValue operand = existential.getValue();
   if (e->getMember().getDecl()->isInstanceMember()) {
-    operand = B.createProjectExistentialRef(e, operand);
+    
+    operand = B.createProjectExistentialRef(e, operand,
+                                  getSelfTypeForDynamicLookup(*this, operand));
+    operand = B.createRefToObjectPointer(e, operand,
+                                 SILType::getObjCPointerType(getASTContext()));
   }
 
   // Create the has-member block.

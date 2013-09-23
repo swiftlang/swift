@@ -529,9 +529,8 @@ ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc,
 
 ProjectExistentialRefInst::ProjectExistentialRefInst(SILLocation Loc,
                                                      SILValue Operand,
-                                                     SILFunction &F)
-  : UnaryInstructionBase(Loc, Operand,
-                         SILType::getObjCPointerType(F.getASTContext()))
+                                                     SILType Ty)
+  : UnaryInstructionBase(Loc, Operand, Ty)
 {}
 
 

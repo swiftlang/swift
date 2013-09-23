@@ -764,14 +764,22 @@ public:
     }
   }
   
-  bool isSelfArchetype(CanType t) {
+  bool isSelfArchetype(CanType t, ArrayRef<ProtocolDecl*> protocols) {
     ArchetypeType *archetype = dyn_cast<ArchetypeType>(t);
     if (!archetype)
       return false;
-    if (archetype->getName().str() != "Self")
+    if (!archetype->getAssocType())
       return false;
-    // FIXME: Walk back to the protocol for verification?
-    return true;
+    if (!archetype->getAssocType()->isSelf())
+      return false;
+    
+    auto *selfProto = archetype->getAssocType()->getProtocol();
+    for (auto checkProto : protocols) {
+      if (checkProto == selfProto || checkProto->inheritsFrom(selfProto))
+        return true;
+    }
+    
+    return false;
   }
 
   void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
@@ -784,22 +792,21 @@ public:
             "result method must be thin function type if class protocol, or "
             "thick if not class");
     
+    auto proto = dyn_cast<ProtocolDecl>(EMI->getMember().getDecl()
+                                          ->getDeclContext());
+    require(proto, "protocol_method must take a method of a protocol");
+    
     if (EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.isExistentialType(),
               "instance protocol_method must apply to an existential address");
-      if (operandType.isClassExistentialType()) {
-        require(getMethodSelfType(methodType)->isEqual(
-                               operandType.getASTContext().TheObjCPointerType),
-                "result must be a method of objc pointer");
-        
-      } else {
-        CanType selfType = getMethodSelfType(methodType);
+      CanType selfType = getMethodSelfType(methodType);
+      if (!operandType.isClassExistentialType()) {
         require(isa<LValueType>(selfType),
                 "protocol_method result must take its this parameter byref");
-        CanType selfObjType = selfType->getRValueType()->getCanonicalType();
-        require(isSelfArchetype(selfObjType),
-                "result must be a method of opaque pointer");
       }
+      CanType selfObjType = selfType->getRValueType()->getCanonicalType();
+      require(isSelfArchetype(selfObjType, proto),
+              "result must be a method of protocol's Self archetype");
     } else {
       require(operandType.isObject(),
               "static protocol_method cannot apply to an address");
@@ -891,17 +898,22 @@ public:
     require(PEI->getType().isAddress(),
             "project_existential result must be an address");
     
-    require(isSelfArchetype(PEI->getType().getSwiftRValueType()),
-            "project_existential result must be Self archetype of a protocol");
+    require(isSelfArchetype(PEI->getType().getSwiftRValueType(), protocols),
+            "project_existential result must be Self archetype of protocol");
   }
   
   void checkProjectExistentialRefInst(ProjectExistentialRefInst *PEI) {
-    require(PEI->getOperand().getType().isObject(),
+    SILType operandType = PEI->getOperand().getType();
+    require(operandType.isObject(),
             "project_existential_ref operand must not be address");
-    require(PEI->getOperand().getType().isClassExistentialType(),
+    SmallVector<ProtocolDecl*, 4> protocols;
+    require(operandType.getSwiftType()->isExistentialType(protocols),
+            "project_existential must be applied to existential");
+    require(operandType.isClassExistentialType(),
             "project_existential_ref operand must be class existential");
-    require(PEI->getType() == SILType::getObjCPointerType(F.getASTContext()),
-            "project_existential_ref result must be an ObjCPointer");
+    
+    require(isSelfArchetype(PEI->getType().getSwiftRValueType(), protocols),
+            "project_existential_ref result must be Self archetype of protocol");
   }
   
   void checkInitExistentialInst(InitExistentialInst *AEI) {
@@ -1225,7 +1237,7 @@ public:
     auto &C = AI->getType().getASTContext();
     require(destType->isEqual(C.TheObjectPointerType)
             || destType->isEqual(C.TheObjCPointerType),
-            "ref-to-object-pointer result must be ObjectPointer or ObjCPointer");
+          "ref-to-object-pointer result must be ObjectPointer or ObjCPointer");
   }
   
   void checkObjectPointerToRefInst(ObjectPointerToRefInst *AI) {
@@ -1236,7 +1248,7 @@ public:
     auto &C = AI->getOperand().getType().getASTContext();
     require(srcType->isEqual(C.TheObjectPointerType)
             || srcType->isEqual(C.TheObjCPointerType),
-            "object-pointer-to-ref operand must be ObjectPointer or ObjCPointer");
+          "object-pointer-to-ref operand must be ObjectPointer or ObjCPointer");
   }
   
   void checkRefToRawPointerInst(RefToRawPointerInst *AI) {

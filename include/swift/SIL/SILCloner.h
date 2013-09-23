@@ -747,7 +747,8 @@ SILValue
 SILCloner<ImplClass>::visitProjectExistentialRefInst(ProjectExistentialRefInst* Inst) {
   return doPostProcess(Inst,
     Builder.createProjectExistentialRef(getOpLocation(Inst->getLoc()),
-                                        getOpValue(Inst->getOperand())));
+                                        getOpValue(Inst->getOperand()),
+                                        getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>

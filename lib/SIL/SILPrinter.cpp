@@ -806,10 +806,11 @@ public:
   }
   void visitProjectExistentialInst(ProjectExistentialInst *PI) {
     OS << "project_existential " << getIDAndType(PI->getOperand())
-      << " to " << PI->getType();
+       << " to " << PI->getType();
   }
   void visitProjectExistentialRefInst(ProjectExistentialRefInst *PI) {
-    OS << "project_existential_ref " << getIDAndType(PI->getOperand());
+    OS << "project_existential_ref " << getIDAndType(PI->getOperand())
+       << " to " << PI->getType();
   }
   void visitInitExistentialInst(InitExistentialInst *AEI) {
     OS << "init_existential " << getIDAndType(AEI->getOperand()) << ", ";

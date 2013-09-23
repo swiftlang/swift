@@ -1631,10 +1631,9 @@ protocol_method
   // #P.method!1 must be a reference to a method of one of the protocols of P
   //
   // If %0 is an address-only protocol address, then the "self" argument of
-  //   the method type $[thin] U -> V must be $*P.This for #P.method's protocol
-  //   of P
+  //   the method type $[thin] U -> V must be $*P.Self, the Self archetype of P
   // If %0 is a class protocol value, then the "self" argument of
-  //   the method type $[thin] U -> V must be Builtin.ObjCPointer
+  //   the method type $[thin] U -> V must be $P.Self, the Self archetype of P
   // If %0 is a protocol metatype, then the "self" argument of
   //   the method type $[thin] U -> V must be P.metatype
 
@@ -1646,9 +1645,10 @@ operand:
 
 - If the operand is the address of an address-only protocol type, then the
   "self" argument of the method is of type ``$*P.Self``, the ``Self`` archetype
-  of the method's protocol.
+  of the method's protocol, and can be projected using the
+  ``project_existential`` instruction.
 - If the operand is a value of a class protocol type, then the "self"
-  argument of the method is of type ``Builtin.ObjCPointer``, and can be
+  argument of the method is of type ``$P.Self`` and can be
   projected using the ``project_existential_ref`` instruction.
 - If the operand is a protocol metatype, it does not need to be projected, and
   the "self" argument of the method is the protocol metatype itself.
@@ -2319,12 +2319,14 @@ project_existential_ref
 
   %1 = project_existential_ref %0 : $P
   // %0 must be of a class protocol or protocol composition type $P
-  // %1 will be of type $Builtin.ObjCPointer
+  // $P.Self must be the Self type for one of the protocols %0
+  //   conforms to
+  // %1 will be of type $P.Self
 
-Extracts the class instance reference from a class existential container as a
-``Builtin.ObjCPointer``. This value can be passed to protocol instance methods
-obtained by ``protocol_method`` from the same existential container. A method
-call on a class-protocol-type value in Swift::
+Extracts the class instance reference from a class existential container.
+This value can be passed to protocol instance methods obtained by
+``protocol_method`` from the same existential container. A method call on a
+class-protocol-type value in Swift::
 
   protocol [class_protocol] Foo {
     func bar(x:Int)
@@ -2342,7 +2344,7 @@ compiles to this SIL sequence::
   %one_two_three = integer_literal $Int, 123
   apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.ObjCPointer) -> ()
 
-It is undefined behavior for the ``ObjCPointer`` value to be passed as the
+It is undefined behavior for the ``Self``-typed value to be passed as the
 "self" argument to a method value obtained by ``protocol_method`` from
 a different existential container. It is also undefined behavior if the
 ``ObjCPointer`` value is dereferenced, cast, or passed to a method after the

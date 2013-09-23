@@ -1145,7 +1145,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                       cast<FuncDecl>(FuncRef.getDecl()), Ty);
     break;
   }
-  case ValueKind::ProjectExistentialInst: {
+  case ValueKind::ProjectExistentialInst:
+  case ValueKind::ProjectExistentialRefInst: {
     SILType Ty;
     Identifier ToToken;
     SourceLoc ToLoc;
@@ -1161,7 +1162,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
-    ResultVal = B.createProjectExistential(InstLoc, Val, Ty);
+    if (Opcode == ValueKind::ProjectExistentialInst)
+      ResultVal = B.createProjectExistential(InstLoc, Val, Ty);
+    else
+      ResultVal = B.createProjectExistentialRef(InstLoc, Val, Ty);
     break;
   }
 #define UNARY_INSTRUCTION_HELPER(ID, CREATOR) \
@@ -1172,7 +1176,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 #define UNARY_INSTRUCTION(ID) UNARY_INSTRUCTION_HELPER(ID, create##ID)
   UNARY_INSTRUCTION_HELPER(StrongRetain, createStrongRetainInst)
   UNARY_INSTRUCTION_HELPER(StrongRelease, createStrongReleaseInst)
-  UNARY_INSTRUCTION(ProjectExistentialRef)
   UNARY_INSTRUCTION(StrongRetainAutoreleased)
   UNARY_INSTRUCTION(AutoreleaseReturn)
   UNARY_INSTRUCTION(StrongRetainUnowned)

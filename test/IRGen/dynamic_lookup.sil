@@ -45,12 +45,13 @@ bb0(%0 : $DynamicLookup):
   %3 = alloc_box $Optional<() -> ()>              
   %4 = load %1#1 : $*DynamicLookup                
   strong_retain %4 : $DynamicLookup
-  %6 = project_existential_ref %4 : $DynamicLookup
+  %6 = project_existential_ref %4 : $DynamicLookup to $DynamicLookup.Self
+  %7 = ref_to_object_pointer %6 : $DynamicLookup.Self to $Builtin.ObjCPointer
 
   // CHECK: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(f)", align 8
   // CHECK: [[HAS_SEL:%[0-9]]] = call i1 @swift_objcRespondsToSelector(%objc_object* [[OBJECT:%[0-9]+]], i8* [[SEL]]) #0
   // CHECK: br i1 [[HAS_SEL]]
-  dynamic_method_br %6 : $Builtin.ObjCPointer, #X.f!1, bb1, bb2
+  dynamic_method_br %7 : $Builtin.ObjCPointer, #X.f!1, bb1, bb2
 
 bb1(%8 : $[cc(objc_method), thin] ((), Builtin.ObjCPointer) -> ()):
   br bb3
@@ -88,8 +89,9 @@ sil @_T1t23dynamic_lookup_propertyFT1xPSo13DynamicLookup__T_ : $[thin] (x : Dyna
   store %0 to %1#1 : $*DynamicLookup
   %6 = load %1#1 : $*DynamicLookup                // users: %24, %8, %7
   strong_retain %6 : $DynamicLookup
-  %8 = project_existential_ref %6 : $DynamicLookup // users: %11, %9
-  dynamic_method_br %8 : $Builtin.ObjCPointer, #X.value!getter.1.objc, bb1, bb2
+  %8 = project_existential_ref %6 : $DynamicLookup to $DynamicLookup.Self // users: %11, %9
+  %9 = ref_to_object_pointer %8 : $DynamicLookup.Self to $Builtin.ObjCPointer
+  dynamic_method_br %9 : $Builtin.ObjCPointer, #X.value!getter.1.objc, bb1, bb2
 
 bb1(%10 : $[cc(objc_method), thin] ((), Builtin.ObjCPointer) -> Int64):
   br bb3

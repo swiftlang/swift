@@ -636,13 +636,20 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(ModuleType::get(Mod), SILValueCategory::Object));
     break;
   }
-  case ValueKind::ProjectExistentialInst: {
+  case ValueKind::ProjectExistentialInst:
+  case ValueKind::ProjectExistentialRefInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
-    ResultVal = Builder.createProjectExistential(Loc,
-                    getLocalValue(ValID, ValResNum,
-                         getSILType(Ty2, (SILValueCategory)TyCategory2)),
-                    getSILType(Ty, (SILValueCategory)TyCategory));
+    if ((ValueKind)OpCode == ValueKind::ProjectExistentialInst)
+      ResultVal = Builder.createProjectExistential(Loc,
+                      getLocalValue(ValID, ValResNum,
+                           getSILType(Ty2, (SILValueCategory)TyCategory2)),
+                      getSILType(Ty, (SILValueCategory)TyCategory));
+    else
+      ResultVal = Builder.createProjectExistentialRef(Loc,
+                      getLocalValue(ValID, ValResNum,
+                           getSILType(Ty2, (SILValueCategory)TyCategory2)),
+                      getSILType(Ty, (SILValueCategory)TyCategory));
     break;
   }
   // Conversion instructions.
@@ -784,7 +791,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(StrongRetainUnowned)
   UNARY_INSTRUCTION(UnownedRetain)
   UNARY_INSTRUCTION(UnownedRelease)
-  UNARY_INSTRUCTION(ProjectExistentialRef)
 #undef UNARY_INSTRUCTION
 #undef UNARY_INSTRUCTION_HELPER
 
