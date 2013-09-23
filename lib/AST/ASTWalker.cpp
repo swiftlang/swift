@@ -521,8 +521,8 @@ public:
         if (doIt(M))
           return true;
       }
-    } else if (EnumDecl *UD = dyn_cast<EnumDecl>(D)) {
-      for (Decl *Member : UD->getMembers())
+    } else if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
+      for (Decl *Member : NTD->getMembers())
         if (doIt(Member))
           return true;
     } else if (EnumElementDecl *ED = dyn_cast<EnumElementDecl>(D)) {
@@ -535,18 +535,6 @@ public:
         else
           return true;
       }
-    } else if (StructDecl *SD = dyn_cast<StructDecl>(D)) {
-      for (Decl *Member : SD->getMembers())
-        if (doIt(Member))
-          return true;
-    } else if (ClassDecl *CD = dyn_cast<ClassDecl>(D)) {
-      for (Decl *Member : CD->getMembers())
-        if (doIt(Member))
-          return true;
-    } else if (ProtocolDecl *PD = dyn_cast<ProtocolDecl>(D)) {
-      for (Decl *Member : PD->getMembers())
-        if (doIt(Member))
-          return true;
     } else if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(TLCD->getBody())))
         TLCD->setBody(S);
