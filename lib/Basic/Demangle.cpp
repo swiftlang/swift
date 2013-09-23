@@ -1303,6 +1303,13 @@ private:
       block->push_back_child(postProcessReturnTypeNode(out_args));
       return block;
     }
+    if (c == 'E') {
+      if (!Mangled.nextIf('R'))
+        return nullptr;
+      if (!Mangled.nextIf('R'))
+        return nullptr;
+      return Node::makeNodePointer(Node::Kind::ErrorType, std::string());
+    }
     if (c == 'F') {
       NodePointer in_args = demangleType();
       if (!in_args)
@@ -1952,6 +1959,9 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       break;
     }
     case swift::Demangle::Node::Kind::Unknown:
+      break;
+    case swift::Demangle::Node::Kind::ErrorType:
+      printer << "<ERROR TYPE>";
       break;
     }
     pointer.reset();

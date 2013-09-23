@@ -426,6 +426,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <type> ::= Bp                    # Builtin.RawPointer
 /// <type> ::= Bv <natural> <type>   # Builtin.Vector
 /// <type> ::= C <decl>              # class (substitutable)
+/// <type> ::= ERR                   # Error type
 /// <type> ::= F <type> <type>       # function type
 /// <type> ::= f <type> <type>       # uncurried function type
 /// <type> ::= G <type> <type>+ _    # bound generic type
@@ -448,13 +449,15 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 void Mangler::mangleType(CanType type, ExplosionKind explosion,
                          unsigned uncurryLevel) {
   switch (type->getKind()) {
-  case TypeKind::Error:
-    llvm_unreachable("mangling error type");
   case TypeKind::TypeVariable:
     llvm_unreachable("mangling type variable");
 
   case TypeKind::Module:
     llvm_unreachable("Cannot mangle module type yet");
+
+  case TypeKind::Error:
+    Buffer << "ERR";
+    return;
       
   // We don't care about these types being a bit verbose because we
   // don't expect them to come up that often in API names.

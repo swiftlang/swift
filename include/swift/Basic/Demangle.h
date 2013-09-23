@@ -106,7 +106,8 @@ public:
     DeclarationName,
     Path,
     DeclarationType,
-    Type
+    Type,
+    ErrorType
   };
   
   size_type size ();
