@@ -843,6 +843,19 @@ namespace {
             << " parameter patterns";
         abort();
       }
+
+      if (FD->isGetterOrSetter()) {
+        unsigned NumExpectedParamPatterns = 1;
+        if (FD->getImplicitSelfDecl())
+          NumExpectedParamPatterns++;
+        if (isa<SubscriptDecl>(FD->getGetterOrSetterDecl()))
+          NumExpectedParamPatterns++;
+        if (FD->getArgParamPatterns().size() != NumExpectedParamPatterns) {
+          Out << "getters and setters should not be curried";
+          abort();
+        }
+      }
+
       return verifyParsed(cast<AbstractFunctionDecl>(FD));
     }
 

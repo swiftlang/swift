@@ -1228,15 +1228,21 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     if (Indices) {
       Params.push_back(Indices->clone(Context));
     }
-    
+
+    bool IsNameImplicit = false;
     // Add the parameter. If no name was specified, the name defaults to
     // 'value'.
-    if (SetName.empty())
+    if (SetName.empty()) {
       SetName = Context.getIdentifier("value");
+      IsNameImplicit = true;
+    }
+
     {
       VarDecl *Value = new (Context) VarDecl(SetNameLoc, SetName,
                                              Type(), CurDeclContext);
-      
+      if (IsNameImplicit)
+        Value->setImplicit();
+
       Pattern *ValuePattern
         = new (Context) TypedPattern(new (Context) NamedPattern(Value),
                                      ElementTy);
@@ -1244,6 +1250,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Pattern *ValueParamsPattern
         = TuplePattern::create(Context, SetNameParens.Start, ValueElt,
                                SetNameParens.End);
+      if (IsNameImplicit)
+        ValueParamsPattern->setImplicit();
+
       Params.push_back(ValueParamsPattern);
     }
 
