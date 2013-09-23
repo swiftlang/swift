@@ -502,10 +502,10 @@ static void minimizeProtocols(SmallVectorImpl<ProtocolDecl *> &Protocols) {
 }
 
 /// \brief Compare two protocols to establish an ordering between them.
-static int compareProtocols(const void *V1, const void *V2) {
-  const ProtocolDecl *P1 = *reinterpret_cast<const ProtocolDecl *const *>(V1);
-  const ProtocolDecl *P2 = *reinterpret_cast<const ProtocolDecl *const *>(V2);
-
+static int compareProtocols(ProtocolDecl * const* PP1, 
+                            ProtocolDecl * const* PP2) {
+  auto *P1 = *PP1;
+  auto *P2 = *PP2;
   Module *M1 = P1->getParentModule();
   Module *M2 = P2->getParentModule();
 
