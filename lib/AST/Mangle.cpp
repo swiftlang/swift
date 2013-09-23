@@ -219,7 +219,13 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
 
   case DeclContextKind::ExtensionDecl: {
-    auto decl = cast<ExtensionDecl>(ctx)->getExtendedType()->getAnyNominal();
+    auto ExtD = cast<ExtensionDecl>(ctx);
+    auto ExtTy = ExtD->getExtendedType();
+    // Recover from erroneous extension.
+    if (ExtTy->is<ErrorType>())
+      return mangleDeclContext(ExtD->getDeclContext());
+
+    auto decl = ExtTy->getAnyNominal();
     assert(decl && "extension of non-nominal type?");
     mangleNominalType(decl, ExplosionKind::Minimal);
     return;
