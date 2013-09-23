@@ -132,7 +132,10 @@ static OwnershipConventions::Return getReturnKind(const clang::Decl *clangDecl,
                                                   clang::QualType resultType) {
   // If the result type is an ObjC pointer, consult the decl attributes (if any)
   if (resultType->isObjCRetainableType()) {
-    if (clangDecl->hasAttr<clang::NSReturnsRetainedAttr>())
+    // Objective-C Class maps to a metatype, which needs no retains.
+    if (resultType->isObjCClassType())
+      return OwnershipConventions::Return::Unretained;
+    else if (clangDecl->hasAttr<clang::NSReturnsRetainedAttr>())
       return OwnershipConventions::Return::Retained;
     else if (clangDecl->hasAttr<clang::NSReturnsNotRetainedAttr>())
       return OwnershipConventions::Return::Unretained;
