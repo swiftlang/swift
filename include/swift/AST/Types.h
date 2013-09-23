@@ -99,9 +99,19 @@ protected:
   enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 8 };
   static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
 
+  struct TypeVariableTypeBitfields {
+    unsigned : NumTypeBaseBits;
+
+    /// \brief The unique number assigned to this type variable.
+    unsigned ID : 31;
+  };
+  enum { NumTypeVariableTypeBits = NumTypeBaseBits + 31 };
+  static_assert(NumTypeVariableTypeBits <= 32, "fits in an unsigned");
+
   union {
     TypeBaseBitfields TypeBaseBits;
     AnyFunctionTypeBitfields AnyFunctionTypeBits;
+    TypeVariableTypeBitfields TypeVariableTypeBits;
   };
 
 protected:
@@ -2074,8 +2084,10 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(WeakStorageType, ReferenceStorageType)
 
 /// \brief A type variable used during type checking.
 class TypeVariableType : public TypeBase {
-  TypeVariableType(const ASTContext &C)
-    : TypeBase(TypeKind::TypeVariable, &C, true) { }
+  TypeVariableType(const ASTContext &C, unsigned ID)
+    : TypeBase(TypeKind::TypeVariable, &C, true) {
+    TypeVariableTypeBits.ID = ID;
+  }
 
   class Implementation;
   
@@ -2083,7 +2095,8 @@ public:
   /// \brief Create a new type variable whose implementation is constructed
   /// with the given arguments.
   template<typename ...Args>
-  static TypeVariableType *getNew(const ASTContext &C, Args &&...args);
+  static TypeVariableType *getNew(const ASTContext &C, unsigned ID,
+                                  Args &&...args);
 
   /// \brief Retrieve the implementation data corresponding to this type
   /// variable.
@@ -2108,8 +2121,7 @@ public:
     return reinterpret_cast<Implementation *>(this + 1);
   }
 
-  void printImpl(raw_ostream &OS,
-                 const Type::PrintOptions &PO) const;
+  unsigned getID() const { return TypeVariableTypeBits.ID; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

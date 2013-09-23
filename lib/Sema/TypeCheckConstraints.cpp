@@ -48,13 +48,8 @@ using llvm::SmallPtrSet;
 //===--------------------------------------------------------------------===//
 #pragma mark Type variable implementation
 
-void TypeVariableType::Implementation::print(llvm::raw_ostream &Out) {
-  Out << "$T" << ID;
-}
-
-void TypeVariableType::printImpl(raw_ostream &OS,
-                                 const Type::PrintOptions &PO) const {
-  OS << "$T" << getImpl().getID();
+void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
+  getTypeVariable()->print(OS, Type::PrintOptions());
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)

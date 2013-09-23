@@ -95,9 +95,6 @@ enum TypeVariableOptions {
 /// to, what specific types it might be and, eventually, the fixed type to
 /// which it is assigned.
 class TypeVariableType::Implementation {
-  /// \brief The unique number assigned to this type variable.
-  unsigned ID : 32;
-
   /// Type variable options.
   unsigned Options : 2;
 
@@ -112,13 +109,13 @@ class TypeVariableType::Implementation {
   friend class constraints::SavedTypeVariableBinding;
 
 public:
-  explicit Implementation(unsigned ID, constraints::ConstraintLocator *locator,
+  explicit Implementation(constraints::ConstraintLocator *locator,
                           unsigned options)
-    : ID(ID), Options(options), locator(locator),
+    : Options(options), locator(locator),
       ParentOrFixed(getTypeVariable()) { }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
-  unsigned getID() const { return ID; }
+  unsigned getID() const { return getTypeVariable()->getID(); }
 
   /// Whether this type variable can bind to an lvalue type.
   bool canBindToLValue() const { return Options & TVO_CanBindToLValue; }
@@ -300,7 +297,7 @@ public:
   }
 
   /// \brief Print the type variable to the given output stream.
-  void print(llvm::raw_ostream &Out);
+  void print(llvm::raw_ostream &OS);
 };
 
 namespace constraints {
@@ -2493,7 +2490,7 @@ ResolvedLocator resolveLocatorToDecl(
 } // end namespace constraints
 
 template<typename ...Args>
-TypeVariableType *TypeVariableType::getNew(const ASTContext &C,
+TypeVariableType *TypeVariableType::getNew(const ASTContext &C, unsigned ID,
                                            Args &&...args) {
   // Allocate memory
   void *mem = C.Allocate(sizeof(TypeVariableType) + sizeof(Implementation),
@@ -2501,7 +2498,7 @@ TypeVariableType *TypeVariableType::getNew(const ASTContext &C,
                          AllocationArena::ConstraintSolver);
 
   // Construct the type variable.
-  auto *result = ::new (mem) TypeVariableType(C);
+  auto *result = ::new (mem) TypeVariableType(C, ID);
 
   // Construct the implementation object.
   new (result+1) TypeVariableType::Implementation(std::forward<Args>(args)...);

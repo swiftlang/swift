@@ -1406,8 +1406,7 @@ public:
   }
 
   void visitTypeVariableType(TypeVariableType *T) {
-    // FIXME: this creates a circular dependency between AST and Sema.
-    T->printImpl(OS, Options);
+    OS << "$T" << T->getID();
   }
 };
 } // unnamed namespace
