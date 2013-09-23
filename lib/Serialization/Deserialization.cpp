@@ -587,12 +587,8 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
     return ND;
   if (auto ED = dyn_cast<ExtensionDecl>(D))
     return ED;
-  if (auto FD = dyn_cast<FuncDecl>(D))
-    return FD;
-  if (auto CD = dyn_cast<ConstructorDecl>(D))
-    return CD;
-  if (auto DD = dyn_cast<DestructorDecl>(D))
-    return DD;
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
+    return AFD;
 
   llvm_unreachable("unknown DeclContext kind");
 }
