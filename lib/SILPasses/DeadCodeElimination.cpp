@@ -393,14 +393,28 @@ void swift::performSILDeadCodeElimination(SILModule *M) {
   for (auto &Fn : *M) {
 
     for (auto &BB : Fn) {
+      // Simplify the blocks with terminators that rely on constant conditions.
+      if (constantFoldTerminator(BB))
+        continue;
+
+      // Remove instructions from the basic block after a call to a noreturn
+      // function.
+      if (simplifyBlocksWithCallsToNoReturn(BB))
+        continue;
+    }
+
+    // Remove unreachable blocks.
+    removeUnreachableBlocks(Fn);
+
+    for (auto &BB : Fn) {
       propagateBasicBlockArgs(BB);
     }
 
     for (auto &BB : Fn) {
       // Simplify the blocks with terminators that rely on constant conditions.
-      if (constantFoldTerminator(BB))
+      if (constantFoldTerminator(BB)) {
         continue;
-
+      }
       // Remove instructions from the basic block after a call to a noreturn
       // function.
       if (simplifyBlocksWithCallsToNoReturn(BB))
