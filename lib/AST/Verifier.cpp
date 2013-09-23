@@ -862,6 +862,16 @@ namespace {
       return verifyChecked(cast<NominalTypeDecl>(CD));
     }
 
+    void verifyParsed(AssociatedTypeDecl *ATD) {
+      auto *DC = ATD->getDeclContext();
+      if (!isa<NominalTypeDecl>(DC) ||
+          !isa<ProtocolDecl>(cast<NominalTypeDecl>(DC))) {
+        Out << "AssociatedTypeDecl should only occur inside a protocol";
+        abort();
+      }
+      return verifyParsed(cast<AbstractTypeParamDecl>(ATD));
+    }
+
     /// Look through a possible l-value type, returning true if it was
     /// an l-value.
     bool lookThroughLValue(Type &type, LValueType::Qual &qs) {
