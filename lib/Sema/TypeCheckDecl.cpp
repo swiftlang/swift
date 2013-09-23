@@ -1569,7 +1569,7 @@ public:
       auto rawTy = UD->getRawType();
       if (!rawTy) {
         TC.diagnose(rawValue->getLoc(), diag::enum_raw_value_without_raw_type);
-        return;
+        // Recover by setting the raw type as this element's type.
       }
       Expr *typeCheckedExpr = rawValue;
       if (!TC.typeCheckExpression(typeCheckedExpr, UD, rawTy, false))
