@@ -1102,6 +1102,8 @@ void SILSerializer::writeFuncTable() {
 }
 
 void SILSerializer::writeAllSILFunctions(const SILModule *M) {
+  if (!EnableSerialize && !EnableSerializeAll)
+    return;
   {
     BCBlockRAII subBlock(Out, SIL_BLOCK_ID, 5);
     registerSILAbbr<SILFunctionLayout>();
@@ -1127,12 +1129,10 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
 
     // Go through all SILFunctions in M, and if it is transparent,
     // write out the SILFunction.
-    if (M && (EnableSerialize || EnableSerializeAll)) {
-      for (const SILFunction &F : *M) {
-        if ((EnableSerializeAll || F.isTransparent())
-            && !F.empty())
-          writeSILFunction(F);
-      }
+    for (const SILFunction &F : *M) {
+      if ((EnableSerializeAll || F.isTransparent())
+          && !F.empty())
+        writeSILFunction(F);
     }
   }
   {
@@ -1144,6 +1144,9 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
 }
 
 void Serializer::writeSILFunctions(const SILModule *M) {
+  if (!M)
+    return;
+
   SILSerializer SILSer(*this, TU->Ctx, Out);
   SILSer.writeAllSILFunctions(M);
 

@@ -73,9 +73,13 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
                                  ASTContext &Ctx) :
                                 MF(MF), SILMod(M), Ctx(Ctx) {
   SILCursor = MF->getSILCursor();
+  SILIndexCursor = MF->getSILIndexCursor();
+  // Early return if either sil block or sil index block does not exist.
+  if (!SILCursor.getBitStreamReader() || !SILIndexCursor.getBitStreamReader())
+    return;
+
   // Load any abbrev records at the start of the block.
   SILCursor.advance();
-  SILIndexCursor = MF->getSILIndexCursor();
 
   llvm::BitstreamCursor cursor = SILIndexCursor;
   // Read SIL_FUNC_NAMES record and update FuncTable.
