@@ -41,14 +41,18 @@ namespace {
     /// \brief RAII object that increases the indentation level.
     class IndentRAII {
       PrintAST &Self;
+      bool DoIndent;
 
     public:
-      IndentRAII(PrintAST &self) : Self(self) {
-        Self.IndentLevel += Self.Options.Indent;
+      IndentRAII(PrintAST &self, bool DoIndent = true)
+          : Self(self), DoIndent(DoIndent) {
+        if (DoIndent)
+          Self.IndentLevel += Self.Options.Indent;
       }
 
       ~IndentRAII() {
-        Self.IndentLevel -= Self.Options.Indent;
+        if (DoIndent)
+          Self.IndentLevel -= Self.Options.Indent;
       }
     };
 
@@ -78,7 +82,7 @@ namespace {
     
     void printInherited(const TypeDecl *decl);
     void printInherited(const ExtensionDecl *decl);
-    void printBraceStmtElements(BraceStmt *stmt);
+    void printBraceStmtElements(BraceStmt *stmt, bool NeedIndent = true);
 
     /// \brief Print the function parameters in curried or selector style,
     /// to match the original function declaration.
@@ -434,7 +438,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
 }
 
 void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
-  visit(decl->getBody());
+  printBraceStmtElements(decl->getBody(), /*NeedIndent=*/false);
 }
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
@@ -575,13 +579,14 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   }
 }
 
-void PrintAST::printBraceStmtElements(BraceStmt *stmt) {
-  IndentRAII indentMore(*this);
+void PrintAST::printBraceStmtElements(BraceStmt *stmt, bool NeedIndent) {
+  IndentRAII IndentMore(*this, NeedIndent);
   for (auto element : stmt->getElements()) {
     OS << "\n";
     indent();
     if (auto decl = element.dyn_cast<Decl*>()) {
-      visit(decl);
+      if (decl->shouldPrintInContext())
+        visit(decl);
     } else if (auto stmt = element.dyn_cast<Stmt*>()) {
       visit(stmt);
     } else {
