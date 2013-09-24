@@ -1,9 +1,14 @@
+@protocol NSAnsing
+- (void) anse;
+@end
+
 @interface NSObject
 + (NSObject*) alloc;
 - (NSObject*) init;
 + (NSObject*) new;
 + (void) load;
 @property Class classProp;
+@property Class<NSAnsing> qualifiedClassProp;
 @end
 
 #define NS_RETURNS_RETAINED __attribute__((ns_returns_retained))
@@ -56,7 +61,3 @@ typedef long NSInteger;
 struct NSRect NSMakeRect(double, double, double, double);
 struct NSRect NSInsetRect(struct NSRect, double, double);
 NSString *NSStringFromRect(struct NSRect r);
-
-@protocol NSAnsing
-- (void) anse;
-@end
