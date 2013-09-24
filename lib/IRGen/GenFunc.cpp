@@ -610,10 +610,13 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
     // ObjC methods take their 'self' argument first, followed by an implicit
     // _cmd argument.
     CanTupleType inputTuple = cast<TupleType>(inputTy);
-    assert(inputTuple->getNumElements() == 2 && "invalid objc method type");
-    decomposeTopLevelArg(inputTuple.getElementType(1));
+    unsigned numElements = inputTuple->getNumElements();
+    assert(numElements >= 2 && "invalid objc method type");
+    decomposeTopLevelArg(inputTuple.getElementType(--numElements));
     argTypes.push_back(IGM.Int8PtrTy);
-    decomposeTopLevelArg(inputTuple.getElementType(0));
+    while (numElements > 0) {
+      decomposeTopLevelArg(inputTuple.getElementType(--numElements));
+    }
     break;
   }
   }
@@ -1480,9 +1483,10 @@ void CallEmission::addArg(Explosion &arg) {
     break;
   }
   case AbstractCC::ObjCMethod: {
-    // The method will be uncurried to ((Args...), Self). The self arg gets
-    // lowered to the first argument, and the implicit _cmd argument
-    // goes in between it and the rest of the args.
+    // The method will be uncurried to ((ArgsN...), ..., (Args1...),
+    // Self). The self arg gets lowered to the first argument, and the
+    // implicit _cmd argument goes in between it and the rest of the
+    // args.
     Explosion externalized(arg.getKind());
     // self
     externalized.add(arg.claimNext());
@@ -1491,9 +1495,13 @@ void CallEmission::addArg(Explosion &arg) {
     // method args
     CanTupleType inputTuple =
       cast<TupleType>(cast<AnyFunctionType>(CurOrigType).getInput());
-    assert(inputTuple->getNumElements() == 2 && "invalid objc method type");
-    externalizeArguments(externalized, arg, newByvals,
-                         inputTuple.getElementType(0));
+    unsigned numElements = inputTuple->getNumElements();
+    assert(numElements >= 2 && "invalid objc method type");
+    --numElements;
+    while (numElements > 0) {
+      externalizeArguments(externalized, arg, newByvals,
+                           inputTuple.getElementType(--numElements));
+    }
     arg = std::move(externalized);
     break;
   }
