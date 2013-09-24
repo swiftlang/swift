@@ -68,6 +68,17 @@ namespace {
         DeclOffsets->push_back({decl, OS.tell()});
     }
 
+    void printTypeLoc(const TypeLoc &TL) {
+      // Print a TypeRepr if instructed to do so by options, or if the type
+      // is null.
+      if ((Options.PreferTypeRepr && TL.hasLocation()) ||
+          TL.getType().isNull()) {
+        TL.getTypeRepr()->print(OS);
+        return;
+      }
+      TL.getType().print(OS);
+    }
+
     void printAttributes(const DeclAttributes &attrs);
     void printPattern(const Pattern *pattern);
     void printGenericParams(GenericParamList *params);
@@ -324,14 +335,14 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       }
       switch (Req.getKind()) {
       case RequirementKind::Conformance:
-        Req.getSubject()->print(OS);
+        printTypeLoc(Req.getSubjectLoc());
         OS << " : ";
-        Req.getConstraint()->print(OS);
+        printTypeLoc(Req.getConstraintLoc());
         break;
       case RequirementKind::SameType:
-        Req.getFirstType()->print(OS);
+        printTypeLoc(Req.getFirstTypeLoc());
         OS << " == ";
-        Req.getSecondType()->print(OS);
+        printTypeLoc(Req.getSecondTypeLoc());
         break;
       }
     }

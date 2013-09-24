@@ -30,6 +30,14 @@ namespace swift {
     /// \brief Whether to print variable initializers.
     bool VarInitializers = false;
 
+    /// \brief Whether to prefer printing TypeReprs instead of Types,
+    /// if a TypeRepr is available.  This allows us to print the original
+    /// spelling of the type name.
+    ///
+    /// \note This should be \c true when printing AST with the intention show
+    /// it to the user.
+    bool PreferTypeRepr = true;
+
     /// \brief Retrieve the set of options that prints everything.
     static PrintOptions printEverything() {
       PrintOptions result;
