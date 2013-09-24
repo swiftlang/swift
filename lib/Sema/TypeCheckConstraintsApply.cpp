@@ -719,7 +719,8 @@ namespace {
         if (!base)
           return nullptr;
 
-        auto elementTy = cast<OptionalType>(resultTy)->getBaseType();
+        auto elementTy = cast<OptionalType>(resultTy.getPointer())
+                           ->getBaseType();
         OpaqueValueExpr *opaqueValue = nullptr;
         Expr *injectValue = nullptr;
         Expr *injectNone = nullptr;
