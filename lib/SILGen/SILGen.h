@@ -784,9 +784,6 @@ public:
   /// Emit a dynamic member reference.
   RValue emitDynamicMemberRefExpr(DynamicMemberRefExpr *e, SGFContext c);
 
-  /// Emit a dynamic subscript.
-  RValue emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, SGFContext c);
-
   /// \brief Emit the cast instruction appropriate to the kind of checked cast.
   ///
   /// \param loc          The AST location associated with the operation.

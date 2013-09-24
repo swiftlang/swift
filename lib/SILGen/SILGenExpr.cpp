@@ -2278,7 +2278,7 @@ RValue RValueEmitter::visitArchetypeSubscriptExpr(
 
 RValue RValueEmitter::visitDynamicSubscriptExpr(
                                      DynamicSubscriptExpr *E, SGFContext C) {
-  return SGF.emitDynamicSubscriptExpr(E, C);
+  llvm_unreachable("not implemented");
 }
 
 RValue RValueEmitter::visitExistentialSubscriptExpr(
