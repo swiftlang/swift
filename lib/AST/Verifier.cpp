@@ -1102,8 +1102,10 @@ namespace {
         Out << "\n";
         abort();
       }
-      checkSourceRanges(E->getSourceRange(), Parent,
-                        [&]{ E->print(Out); } );
+      // FIXME: Re-visit this to always do the check.
+      if (!E->isImplicit())
+        checkSourceRanges(E->getSourceRange(), Parent,
+                          [&]{ E->print(Out); } );
     }
     
     void checkSourceRanges(Stmt *S) {

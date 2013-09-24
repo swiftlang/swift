@@ -347,7 +347,8 @@ public:
     
     // Compute the expression that determines whether the range is empty.
     Expr *Empty
-      = TC.callWitness(TC.buildCheckedRefExpr(Range, S->getInLoc()),
+      = TC.callWitness(TC.buildCheckedRefExpr(Range, S->getInLoc(),
+                                              /*Implicit=*/true),
                        DC, EnumeratorProto, Conformance,
                        TC.Context.getIdentifier("isEmpty"),
                        { },
@@ -358,7 +359,8 @@ public:
     
     // Compute the expression that extracts a value from the range.
     Expr *GetFirstAndAdvance
-      = TC.callWitness(TC.buildCheckedRefExpr(Range, S->getInLoc()),
+      = TC.callWitness(TC.buildCheckedRefExpr(Range, S->getInLoc(),
+                                              /*Implicit=*/true),
                        DC, EnumeratorProto, Conformance,
                        TC.Context.getIdentifier("next"),
                        { },
@@ -633,10 +635,10 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *selfDecl,
 
   case PatternKind::Named:
     return new (tc.Context) UnresolvedDotExpr(
-             tc.buildRefExpr(selfDecl, SourceLoc()),
+             tc.buildRefExpr(selfDecl, SourceLoc(), /*Implicit=*/true),
              SourceLoc(), 
              cast<NamedPattern>(pattern)->getDecl()->getName(), 
-             SourceLoc());
+             SourceLoc(), /*Implicit=*/true);
 
   case PatternKind::Paren:
     return createPatternMemberRefExpr(
@@ -660,7 +662,8 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *selfDecl,
                                       tc.Context.AllocateCopy(elements),
                                       nullptr,
                                       SourceLoc(),
-                                      /*hasTrailingClosure=*/false);
+                                      /*hasTrailingClosure=*/false,
+                                      /*Implicit=*/true);
   }
 
   case PatternKind::Typed:
@@ -757,13 +760,15 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   if (ctor->isImplicit() && isa<ClassDecl>(ctor->getDeclContext()) &&
       cast<ClassDecl>(ctor->getDeclContext())->getSuperclass()) {
     Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
-                                                SourceLoc());
+                                                SourceLoc(), /*Implicit=*/true);
     Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
                                                            SourceLoc(),
-                                                           SourceLoc());
+                                                           SourceLoc(),
+                                                           /*Implicit=*/true);
     Expr *args = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc(),
-                                         /*hasTrailingClosure=*/false);
-    result = new (Context) CallExpr(result, args);
+                                         /*hasTrailingClosure=*/false,
+                                         /*Implicit=*/true);
+    result = new (Context) CallExpr(result, args, /*Implicit=*/true);
     if (!typeCheckExpression(result, ctor, Type(), /*discardedExpr=*/true))
       defaultInits.push_back(result);
   }
@@ -787,7 +792,8 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                            patternBind->getPattern())) {
           initializer = new (Context) DefaultValueExpr(initializer);
           Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
-                                                  initializer);
+                                                  initializer,
+                                                  /*Implicit=*/true);
           typeCheckExpression(assign, ctor, Type(), /*discardedExpr=*/false);
           defaultInits.push_back(assign);
           continue;
@@ -833,12 +839,14 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
         auto selfDecl = ctor->getImplicitSelfDecl();
         Expr *dest
           = new (Context) UnresolvedDotExpr(
-              new (Context) DeclRefExpr(selfDecl, SourceLoc()),
+              new (Context) DeclRefExpr(selfDecl, SourceLoc(),
+                                        /*Implicit=*/true),
               SourceLoc(), 
               var->getName(),
-              SourceLoc());
+              SourceLoc(),
+              /*Implicit=*/true);
         Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
-                                                initializer);
+                                                initializer, /*Implicit=*/true);
         typeCheckExpression(assign, ctor, Type(), /*discardedExpr=*/false);
         defaultInits.push_back(assign);
       }

@@ -30,8 +30,9 @@ PrintLiteralString(StringRef Str, TypeChecker &TC, SourceLoc Loc,
                    SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent) {
   ASTContext &Context = TC.Context;
   Expr *PrintStr = new (Context) StringLiteralExpr(Str, Loc);
-  Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc);
-  BodyContent.push_back(new (Context) CallExpr(PrintStrFn, PrintStr));
+  Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc, /*Implicit=*/true);
+  BodyContent.push_back(new (Context) CallExpr(PrintStrFn, PrintStr,
+                                               /*Implicit=*/true));
 }
 
 static void
@@ -90,7 +91,7 @@ getArgRefExpr(TypeChecker &TC,
               SourceLoc Loc) {
   ASTContext &Context = TC.Context;
 
-  Expr *ArgRef = TC.buildCheckedRefExpr(Arg, Loc);
+  Expr *ArgRef = TC.buildCheckedRefExpr(Arg, Loc, /*Implicit=*/true);
   ArgRef = TC.coerceToRValue(ArgRef);
   for (unsigned i : MemberIndexes) {
     bool failed = TC.typeCheckExpression(ArgRef, &TC.TU, Type(),
@@ -102,7 +103,8 @@ getArgRefExpr(TypeChecker &TC,
     CanType CurT = ArgRef->getType()->getRValueType()->getCanonicalType();
     if (StructType *ST = dyn_cast<StructType>(CurT)) {
       VarDecl *VD = cast<VarDecl>(ST->getDecl()->getMembers()[i]);
-      ArgRef = new (Context) MemberRefExpr(ArgRef, Loc, VD, Loc);
+      ArgRef = new (Context) MemberRefExpr(ArgRef, Loc, VD, Loc,
+                                           /*Implicit=*/true);
       continue;
     }
     if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(CurT)) {
@@ -112,7 +114,7 @@ getArgRefExpr(TypeChecker &TC,
                                ConcreteDeclRef(Context, VD,
                                                BGST->getSubstitutions(&TC.TU,
                                                                       &TC)),
-                               Loc);
+                               Loc, /*Implicit=*/true);
       continue;
     }
     TupleType *TT = cast<TupleType>(CurT);
@@ -144,16 +146,18 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
     MetatypeExpr *Meta = new (Context) MetatypeExpr(ArgRef,
                                                     Loc,
                                                     MetaT);
-    Expr *Res = new (TC.Context) UnresolvedDotExpr(Meta, Loc, MemberName, EndLoc);
+    Expr *Res = new (TC.Context) UnresolvedDotExpr(Meta, Loc, MemberName, EndLoc,
+                                                   /*Implicit=*/true);
     TupleExpr *CallArgs
       = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
                                 /*hasTrailingClosure=*/false,
+                                /*Implicit=*/true,
                                 TupleType::getEmpty(Context));
-    Expr *CE = new (Context) CallExpr(Res, CallArgs, Type());
+    Expr *CE = new (Context) CallExpr(Res, CallArgs, /*Implicit=*/true, Type());
     Res = CE;
 
-    Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc);
-    CE = new (Context) CallExpr(PrintStrFn, Res);
+    Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc, /*Implicit=*/true);
+    CE = new (Context) CallExpr(PrintStrFn, Res, /*Implicit=*/true);
     if (TC.typeCheckExpression(CE, Arg->getDeclContext(), Type(),
                                /*discardedExpr=*/false))
       goto dynamicTypeFailed;
@@ -212,7 +216,7 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
     pattern = new (context) TypedPattern(pattern, TypeLoc::withoutLoc(boolTy));
     pattern->setType(boolTy);
 
-    Expr *init = TC.buildCheckedRefExpr(trueDecl, Loc);
+    Expr *init = TC.buildCheckedRefExpr(trueDecl, Loc, /*Implicit=*/true);
     BodyContent.push_back(new (context) PatternBindingDecl(Loc, pattern, init,
                                                            &TC.TU));
   }
@@ -270,10 +274,10 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
   // First, print the ", " between elements.
   if (firstVar) {
     // if branch: set first to false
-    Expr *firstRef = TC.buildCheckedRefExpr(firstVar, Loc);
-    Expr *falseRef = TC.buildCheckedRefExpr(falseDecl, Loc);
+    Expr *firstRef = TC.buildCheckedRefExpr(firstVar, Loc, /*Implicit=*/true);
+    Expr *falseRef = TC.buildCheckedRefExpr(falseDecl, Loc, /*Implicit=*/true);
     Expr *setFirstToFalse
-      = new (context) AssignExpr(firstRef, Loc, falseRef);
+      = new (context) AssignExpr(firstRef, Loc, falseRef, /*Implicit=*/true);
     Stmt *thenStmt = BraceStmt::create(context, Loc,
                                BraceStmt::ExprStmtOrDecl(setFirstToFalse), Loc);
 
@@ -283,7 +287,7 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
     Stmt *elseStmt = BraceStmt::create(context, Loc, elseBodyContents, Loc);
 
     // if-then-else statement.
-    firstRef = TC.buildCheckedRefExpr(firstVar, Loc);
+    firstRef = TC.buildCheckedRefExpr(firstVar, Loc, /*Implicit=*/true);
     loopBodyContents.push_back(new (context) IfStmt(Loc, firstRef,
                                                     thenStmt,
                                                     Loc, elseStmt));
@@ -348,12 +352,13 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
   if (TC.lookupMember(T, MemberName, /*allowDynamicLookup=*/false)) {
     Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
     Expr *Res = new (TC.Context) UnresolvedDotExpr(ArgRef, Loc, MemberName, 
-                                                   EndLoc);
+                                                   EndLoc, /*Implicit=*/true);
     TupleExpr *CallArgs
       = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
                                 /*hasTrailingClosure=*/false,
+                                /*Implicit=*/true,
                                 TupleType::getEmpty(Context));
-    Expr *CE = new (Context) CallExpr(Res, CallArgs, Type());
+    Expr *CE = new (Context) CallExpr(Res, CallArgs, /*Implicit=*/true, Type());
     if (TC.typeCheckExpression(CE, Arg->getDeclContext(), Type(),
                                /*discardedExpr=*/false))
       return;
@@ -561,7 +566,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   CE->setBody(Body, false);
   TC->typeCheckClosureBody(CE);
   
-  Expr *TheCall = new (C) CallExpr(CE, E);
+  Expr *TheCall = new (C) CallExpr(CE, E, /*Implicit=*/true);
   if (TC->typeCheckExpressionShallow(TheCall, Arg->getDeclContext()))
     return ;
   
@@ -614,7 +619,7 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC) {
   TC->TU.Decls.push_back(metavarBinding);
 
   // Finally, print the variable's value.
-  E = TC->buildCheckedRefExpr(vd, E->getStartLoc());
+  E = TC->buildCheckedRefExpr(vd, E->getStartLoc(), /*Implicit=*/true);
   generatePrintOfExpression(vd->getName().str(), E, TC);
 }
 
@@ -629,7 +634,8 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   // Decl to print it.
   if (auto *NP = dyn_cast<NamedPattern>(PBD->getPattern()->
                                            getSemanticsProvidingPattern())) {
-    Expr *E = TC->buildCheckedRefExpr(NP->getDecl(), PBD->getStartLoc());
+    Expr *E = TC->buildCheckedRefExpr(NP->getDecl(), PBD->getStartLoc(),
+                                      /*Implicit=*/true);
     generatePrintOfExpression(PatternString, E, TC);
     return;
   }
@@ -670,13 +676,13 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
 
   
   // Replace the initializer of PBD with a reference to our repl temporary.
-  Expr *E = TC->buildCheckedRefExpr(vd, vd->getStartLoc());
+  Expr *E = TC->buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
   E = TC->coerceToMaterializable(E);
   PBD->setInit(E);
   TC->TU.Decls.push_back(PBTLCD);
 
   // Finally, print out the result, by referring to the repl temp.
-  E = TC->buildCheckedRefExpr(vd, vd->getStartLoc());
+  E = TC->buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
   generatePrintOfExpression(PatternString, E, TC);
 }
 

@@ -96,59 +96,6 @@ Expr *Expr::getValueProvidingExpr() {
   return getSemanticsProvidingExpr();
 }
 
-bool Expr::isImplicit() const {
-  if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(this))
-    return !DRE->getLoc().isValid();
-  
-  if (const ImplicitConversionExpr *ICE
-        = dyn_cast<ImplicitConversionExpr>(this))
-    return ICE->getSubExpr()->isImplicit();
-  
-  if (const MemberRefExpr *memberRef = dyn_cast<MemberRefExpr>(this))
-    return memberRef->getNameLoc().isInvalid();
-  if (auto memberRef = dyn_cast<ArchetypeMemberRefExpr>(this))
-    return memberRef->getNameLoc().isInvalid();
-
-  if (const MetatypeExpr *metatype = dyn_cast<MetatypeExpr>(this))
-    return metatype->getLoc().isInvalid();
-
-  if (const ApplyExpr *apply = dyn_cast<ApplyExpr>(this))
-    return apply->getArg() && apply->getArg()->isImplicit();
-
-  if (const TupleExpr *tuple = dyn_cast<TupleExpr>(this)) {
-    if (!tuple->getSourceRange().isInvalid())
-      return false;
-
-    for (auto elt : tuple->getElements()) {
-      if (!elt->isImplicit())
-        return false;
-    }
-    return true;
-  }
-
-  if (auto downcast = dyn_cast<ExplicitCastExpr>(this)) {
-    return downcast->getLoc().isInvalid() &&
-           downcast->getSubExpr()->isImplicit();
-  }
-
-  if (isa<ZeroValueExpr>(this) || isa<DefaultValueExpr>(this))
-    return true;
-  
-  if (auto assign = dyn_cast<AssignExpr>(this))
-    return assign->getEqualLoc().isInvalid();
-
-  if (auto constructorRef = dyn_cast<OtherConstructorDeclRefExpr>(this))
-    return constructorRef->getLoc().isInvalid();
-
-  if (auto superRef = dyn_cast<SuperRefExpr>(this))
-    return superRef->getLoc().isInvalid();
-
-  if (auto literalExpr = dyn_cast<LiteralExpr>(this))
-    return literalExpr->getLoc().isInvalid();
-
-  return false;
-}
-
 //===----------------------------------------------------------------------===//
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
@@ -191,20 +138,23 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
 }
 
 MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
-                             ConcreteDeclRef member, SourceLoc nameLoc)
-  : Expr(ExprKind::MemberRef), Base(base),
+                             ConcreteDeclRef member, SourceLoc nameLoc,
+                             bool Implicit)
+  : Expr(ExprKind::MemberRef, Implicit), Base(base),
     Member(member), DotLoc(dotLoc), NameLoc(nameLoc) { }
 
 ExistentialMemberRefExpr::ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc,
                                                    ValueDecl *Value,
                                                    SourceLoc NameLoc)
-  : Expr(ExprKind::ExistentialMemberRef), Base(Base), Value(Value),
+  : Expr(ExprKind::ExistentialMemberRef, /*Implicit=*/false),
+    Base(Base), Value(Value),
     DotLoc(DotLoc), NameLoc(NameLoc) { }
 
 ArchetypeMemberRefExpr::ArchetypeMemberRefExpr(Expr *Base, SourceLoc DotLoc,
                                                ValueDecl *Value,
                                                SourceLoc NameLoc)
-  : Expr(ExprKind::ArchetypeMemberRef), Base(Base), Value(Value),
+  : Expr(ExprKind::ArchetypeMemberRef, /*Implicit=*/false),
+    Base(Base), Value(Value),
     DotLoc(DotLoc), NameLoc(NameLoc) { }
 
 ArchetypeType *ArchetypeMemberRefExpr::getArchetype() const {
@@ -273,7 +223,8 @@ SourceRange TupleExpr::getSourceRange() const {
 
 ExistentialSubscriptExpr::
 ExistentialSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
-  : Expr(ExprKind::ExistentialSubscript, D? D->getElementType() : Type()),
+  : Expr(ExprKind::ExistentialSubscript, /*Implicit=*/false,
+         D? D->getElementType() : Type()),
     D(D), Base(Base), Index(Index) {
   assert(Base->getType()->getRValueType()->isExistentialType() &&
          "use SubscriptExpr for non-existential type subscript");
@@ -281,7 +232,8 @@ ExistentialSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
 
 ArchetypeSubscriptExpr::
 ArchetypeSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
-  : Expr(ExprKind::ArchetypeSubscript, D? D->getElementType() : Type()),
+  : Expr(ExprKind::ArchetypeSubscript, /*Implicit=*/false,
+         D? D->getElementType() : Type()),
     D(D), Base(Base), Index(Index) {
   assert(Base->getType()->getRValueType()->is<ArchetypeType>() &&
          "use SubscriptExpr for non-archetype type subscript");
@@ -302,7 +254,7 @@ ValueDecl *ApplyExpr::getCalledValue() const {
 
 RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
                                                          ValueDecl *Self)
-  : Expr(ExprKind::RebindSelfInConstructor,
+  : Expr(ExprKind::RebindSelfInConstructor, /*Implicit=*/true,
          TupleType::getEmpty(Self->getASTContext())),
     SubExpr(SubExpr), Self(Self)
 {}

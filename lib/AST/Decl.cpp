@@ -154,8 +154,11 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {
-  if (Init && !Init->isImplicit())
-    return { VarLoc, Init->getSourceRange().End };
+  if (Init) {
+    SourceLoc EndLoc = Init->getSourceRange().End;
+    if (EndLoc.isValid())
+      return { VarLoc, EndLoc };
+  }
   return { VarLoc, Pat->getSourceRange().End };
 }
 

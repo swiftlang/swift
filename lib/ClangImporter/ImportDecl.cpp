@@ -364,15 +364,19 @@ namespace {
           continue;
 
         // Construct left-hand side.
-        Expr *lhs = new (context) DeclRefExpr(selfDecl, SourceLoc());
-        lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, SourceLoc());
+        Expr *lhs = new (context) DeclRefExpr(selfDecl, SourceLoc(),
+                                              /*Implicit=*/true);
+        lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, SourceLoc(),
+                                          /*Implicit=*/true);
 
         // Construct right-hand side.
         auto param = params[paramIdx++];
-        auto rhs = new (context) DeclRefExpr(param, SourceLoc());
+        auto rhs = new (context) DeclRefExpr(param, SourceLoc(),
+                                             /*Implicit=*/true);
 
         // Add assignment.
-        stmts.push_back(new (context) AssignExpr(lhs, SourceLoc(), rhs));
+        stmts.push_back(new (context) AssignExpr(lhs, SourceLoc(), rhs,
+                                                 /*Implicit=*/true));
       }
 
       // Create the function body.
@@ -1227,15 +1231,18 @@ namespace {
                                                               selfMetaTy);
 
         // For an 'init' method, we need to call alloc first.
-        Expr *allocRef = new (Impl.SwiftContext) DeclRefExpr(alloc, loc);
+        Expr *allocRef = new (Impl.SwiftContext) DeclRefExpr(alloc, loc,
+                                                             /*Implicit=*/true);
 
         auto allocCall = new (Impl.SwiftContext) DotSyntaxCallExpr(allocRef,
                                                                    loc,
                                                                    initExpr);
         auto emptyTuple
           = new (Impl.SwiftContext) TupleExpr(loc, {}, nullptr, loc,
-                                              /*hasTrailingClosure=*/false);
-        initExpr = new (Impl.SwiftContext) CallExpr(allocCall, emptyTuple);
+                                              /*hasTrailingClosure=*/false,
+                                              /*Implicit=*/true);
+        initExpr = new (Impl.SwiftContext) CallExpr(allocCall, emptyTuple,
+                                                    /*Implicit=*/true);
 
         // Cast the result of the alloc call to the (metatype) 'self'.
         // FIXME: instancetype should make this unnecessary.
@@ -1244,6 +1251,7 @@ namespace {
                                              SourceLoc(),
                                              SourceLoc(),
                                              TypeLoc::withoutLoc(selfTy));
+        cast->setImplicit();
         cast->setCastKind(CheckedCastKind::Downcast);
         initExpr = cast;
 
@@ -1356,8 +1364,8 @@ namespace {
       setVarDeclContexts(getterArgs, thunk);
 
       // Create the body of the thunk, which calls the Objective-C getter.
-      auto selfRef = new (context) DeclRefExpr(selfVar, loc);
-      auto getterRef = new (context) DeclRefExpr(getter, loc);
+      auto selfRef = new (context) DeclRefExpr(selfVar, loc, /*Implicit=*/true);
+      auto getterRef = new (context) DeclRefExpr(getter, loc,/*Implicit=*/true);
 
       // First, bind 'self' to the method.
       Expr *call = new (context) DotSyntaxCallExpr(getterRef, loc, selfRef);
@@ -1366,13 +1374,15 @@ namespace {
       if (indices) {
         // For a subscript, pass the index.
         auto indexVar = getSingleVar(getterArgs[1]);
-        auto indexRef = new (context) DeclRefExpr(indexVar, loc);
-        call = new (context) CallExpr(call, indexRef);
+        auto indexRef = new (context) DeclRefExpr(indexVar, loc,
+                                                  /*Implicit=*/true);
+        call = new (context) CallExpr(call, indexRef, /*Implicit=*/true);
       } else {
         // For a property, call with no arguments.
         auto emptyTuple = new (context) TupleExpr(loc, { }, nullptr, loc,
-                                                  /*hasTrailingClosure=*/false);
-        call = new (context) CallExpr(call, emptyTuple);
+                                                  /*hasTrailingClosure=*/false,
+                                                  /*Implicit=*/true);
+        call = new (context) CallExpr(call, emptyTuple, /*Implicit=*/true);
       }
 
       // Create the return statement.
@@ -1468,9 +1478,9 @@ namespace {
       // Create the body of the thunk, which calls the Objective-C setter.
       auto valueVar = getSingleVar(setterArgs.back());
 
-      auto selfRef = new (context) DeclRefExpr(selfVar, loc);
-      auto valueRef = new (context) DeclRefExpr(valueVar, loc);
-      auto setterRef = new (context) DeclRefExpr(setter, loc);
+      auto selfRef = new (context) DeclRefExpr(selfVar, loc, /*Implicit=*/true);
+      auto valueRef = new (context) DeclRefExpr(valueVar,loc,/*Implicit=*/true);
+      auto setterRef = new (context) DeclRefExpr(setter, loc,/*Implicit=*/true);
 
       // First, bind 'self' to the method.
       Expr *call = new (context) DotSyntaxCallExpr(setterRef, loc, selfRef);
@@ -1480,7 +1490,8 @@ namespace {
       if (indices) {
         // For subscript setters, we have both value and index.
         auto indexVar = getSingleVar(setterArgs[1]);
-        auto indexRef = new (context) DeclRefExpr(indexVar, loc);
+        auto indexRef = new (context) DeclRefExpr(indexVar, loc,
+                                                  /*Implicit=*/true);
 
         Expr *callArgsArray[2] = { valueRef, indexRef };
         callArgs
@@ -1488,11 +1499,12 @@ namespace {
                                     context.AllocateCopy(
                                       MutableArrayRef<Expr*>(callArgsArray)),
                                     nullptr, loc,
-                                    /*hasTrailingClosure=*/false);
+                                    /*hasTrailingClosure=*/false,
+                                    /*Implicit=*/true);
       } else {
         callArgs = valueRef;
       }
-      call = new (context) CallExpr(call, callArgs);
+      call = new (context) CallExpr(call, callArgs, /*Implicit=*/true);
 
       // Finally, set the body.
       thunk->setBody(BraceStmt::create(context, loc,
@@ -2421,9 +2433,11 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     StringRef printedValueCopy(context.AllocateCopy(printedValue).data(),
                                printedValue.size());
     if (value.getKind() == clang::APValue::Int) {
-      expr = new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc());
+      expr = new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
+                                              /*Implicit=*/true);
     } else {
-      expr = new (context) FloatLiteralExpr(printedValueCopy, SourceLoc());
+      expr = new (context) FloatLiteralExpr(printedValueCopy, SourceLoc(),
+                                            /*Implicit=*/true);
     }
 
     if (!isNegative)
@@ -2451,7 +2465,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
       return nullptr;
 
     if (found.size() == 1) {
-      minusRef = new (context) DeclRefExpr(found[0], SourceLoc());
+      minusRef = new (context) DeclRefExpr(found[0], SourceLoc(),
+                                           /*Implicit=*/true);
     } else {
       auto foundCopy = context.AllocateCopy(found);
       minusRef = new (context) OverloadedDeclRefExpr(
@@ -2471,7 +2486,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   case ConstantConvertKind::Construction: {
     auto typeRef = new (context) MetatypeExpr(nullptr, SourceLoc(),
                                               MetaTypeType::get(type, context));
-    expr = new (context) CallExpr(typeRef, expr);
+    expr = new (context) CallExpr(typeRef, expr, /*Implicit=*/true);
     break;
    }
 
@@ -2484,6 +2499,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                                      SourceLoc(),
                                                      TypeLoc::withoutLoc(type));
     cast->setCastKind(CheckedCastKind::Downcast);
+    cast->setImplicit();
     expr = cast;
     break;
   }

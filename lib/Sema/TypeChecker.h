@@ -674,12 +674,12 @@ public:
                                       const ConformanceMap &Conformances);
 
   /// \brief Build a type-checked reference to the given value.
-  Expr *buildCheckedRefExpr(ValueDecl *D, SourceLoc nameLoc);
+  Expr *buildCheckedRefExpr(ValueDecl *D, SourceLoc nameLoc, bool Implicit);
 
   /// \brief Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.
   Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
-                     bool isSpecialized = false);
+                     bool Implicit, bool isSpecialized = false);
   /// @}
 
   /// \brief Retrieve a specific, known protocol.

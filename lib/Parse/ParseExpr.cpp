@@ -54,7 +54,8 @@ static Expr *createArgWithTrailingClosure(ASTContext &context,
   // Form a full tuple expression.
   return new (context) TupleExpr(leftParen, context.AllocateCopy(elements),
                                  names, rightParen,
-                                 /*hasTrailingClosure=*/true);
+                                 /*hasTrailingClosure=*/true,
+                                 /*Implicit=*/false);
 }
 
 /// \brief Add the given trailing closure argument to the call argument.
@@ -270,7 +271,8 @@ ParserResult<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
       // Otherwise, the closure implicitly forms a call.
       Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
                                                nullptr, SourceLoc(), closure);
-      expr = makeParserResult(new (Context) CallExpr(expr.get(), arg));
+      expr = makeParserResult(new (Context) CallExpr(expr.get(), arg,
+                                                     /*Implicit=*/true));
     }
   }
 
@@ -623,7 +625,8 @@ ParserResult<Expr> Parser::parseExprSuper() {
                                                          CurDeclContext,
                                                          superLoc);
   Expr *superRef = selfDecl
-    ? cast<Expr>(new (Context) SuperRefExpr(selfDecl, superLoc))
+    ? cast<Expr>(new (Context) SuperRefExpr(selfDecl, superLoc,
+                                            /*Implicit=*/false))
     : cast<Expr>(new (Context) ErrorExpr(superLoc));
   
   if (Tok.is(tok::period)) {
@@ -647,7 +650,8 @@ ParserResult<Expr> Parser::parseExprSuper() {
       }
       // The constructor decl will be resolved by sema.
       Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
-                                                             dotLoc, ctorLoc);
+                                                             dotLoc, ctorLoc,
+                                                             /*Implicit=*/false);
       if (Tok.isFollowingLParen()) {
         // Parse Swift-style constructor arguments.
         ParserResult<Expr> arg = parseExprList(tok::l_paren, tok::r_paren);
@@ -657,7 +661,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
         if (arg.isNull())
           return nullptr;
         
-        result = new (Context) CallExpr(result, arg.get());
+        result = new (Context) CallExpr(result, arg.get(), /*Implicit=*/false);
       } else {
         // It's invalid to refer to an uncalled constructor.
         diagnose(ctorLoc, diag::super_initializer_must_be_called);
@@ -689,7 +693,8 @@ ParserResult<Expr> Parser::parseExprSuper() {
             SourceRange(superLoc, nameLoc), ErrorType::get(Context)));
       
       return makeParserResult(new (Context) UnresolvedDotExpr(superRef, dotLoc,
-                                                              name, nameLoc));
+                                                              name, nameLoc,
+                                                           /*Implicit=*/false));
     }
   } else if (Tok.isFollowingLSquare()) {
     // super[expr]
@@ -773,13 +778,15 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
-    Result = makeParserResult(new (Context) IntegerLiteralExpr(Text, Loc));
+    Result = makeParserResult(new (Context) IntegerLiteralExpr(Text, Loc,
+                                                           /*Implicit=*/false));
     break;
   }
   case tok::floating_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::floating_literal);
-    Result = makeParserResult(new (Context) FloatLiteralExpr(Text, Loc));
+    Result = makeParserResult(new (Context) FloatLiteralExpr(Text, Loc,
+                                                           /*Implicit=*/false));
     break;
   }
   case tok::character_literal: {
@@ -796,14 +803,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     auto Kind = MagicIdentifierLiteralExpr::File;
     SourceLoc Loc = consumeToken(tok::kw___FILE__);
     Result = makeParserResult(
-        new (Context) MagicIdentifierLiteralExpr(Kind, Loc));
+        new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
     break;
   }
   case tok::kw___LINE__: {  // __LINE__
     auto Kind = MagicIdentifierLiteralExpr::Line;
     SourceLoc Loc = consumeToken(tok::kw___LINE__);
     Result = makeParserResult(
-        new (Context) MagicIdentifierLiteralExpr(Kind, Loc));
+        new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
     break;
   }
 
@@ -811,7 +818,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     auto Kind = MagicIdentifierLiteralExpr::Column;
     SourceLoc Loc = consumeToken(tok::kw___COLUMN__);
     Result = makeParserResult(
-        new (Context) MagicIdentifierLiteralExpr(Kind, Loc));
+        new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
     break;
   }
       
@@ -899,7 +906,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
           Identifier Name = Context.getIdentifier(Tok.getText());
           Result = makeParserResult(
               new (Context) UnresolvedDotExpr(Result.get(), TokLoc,
-                                              Name, Tok.getLoc()));
+                                              Name, Tok.getLoc(),
+                                              /*Implicit=*/false));
           consumeToken();
         }
         if (Tok.is(tok::code_complete)) {
@@ -928,7 +936,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
       Identifier Name = Context.getIdentifier(Tok.getText());
       Result = makeParserResult(
           new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
-                                          Tok.getLoc()));
+                                          Tok.getLoc(),
+                                          /*Implicit=*/false));
       if (Tok.is(tok::identifier)) {
         consumeToken(tok::identifier);
         if (canParseAsGenericArgumentList()) {
@@ -961,7 +970,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
       if (Arg.isNull())
         return nullptr;
       Result = makeParserResult(
-          new (Context) CallExpr(Result.get(), Arg.get()));
+          new (Context) CallExpr(Result.get(), Arg.get(), /*Implicit=*/false));
       continue;
     }
     
@@ -1388,7 +1397,8 @@ Expr *Parser::parseExprAnonClosureArg() {
     decls.push_back(var);
   }
 
-  return new (Context) DeclRefExpr(AnonClosureVars.back()[ArgNo], Loc);
+  return new (Context) DeclRefExpr(AnonClosureVars.back()[ArgNo], Loc,
+                                   /*Implicit=*/false);
 }
 
 Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
@@ -1430,7 +1440,7 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
     unresolved->setSpecialized(hasGenericArgumentList);
     E = unresolved;
   } else {
-    auto declRef = new (Context) DeclRefExpr(D, loc);
+    auto declRef = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
     declRef->setSpecialized(hasGenericArgumentList);
     E = declRef;
   }
@@ -1534,7 +1544,8 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 
   return makeParserResult(
       new (Context) TupleExpr(LLoc, NewSubExprs, NewSubExprsNames, RLoc,
-                              /*hasTrailingClosure=*/false));
+                              /*hasTrailingClosure=*/false,
+                              /*Implicit=*/false));
 }
 
 /// parseExprCollection - Parse a collection literal expression.
@@ -1552,7 +1563,8 @@ ParserResult<Expr> Parser::parseExprCollection() {
     SourceLoc RSquareLoc = consumeToken();
     return makeParserResult(
         new (Context) TupleExpr(LSquareLoc, { }, nullptr, RSquareLoc,
-                                /*hasTrailingClosure=*/false));
+                                /*hasTrailingClosure=*/false,
+                                /*Implicit=*/false));
   }
 
   // Parse the first expression.
@@ -1623,7 +1635,8 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
     SubExpr = new (Context) TupleExpr(LSquareLoc,
                                       Context.AllocateCopy(SubExprs),
                                       nullptr, RSquareLoc,
-                                      /*hasTrailingClosure=*/false);
+                                      /*hasTrailingClosure=*/false,
+                                      /*Implicit=*/false);
 
   return makeParserResult(
       Status, new (Context) ArrayExpr(LSquareLoc, SubExpr, RSquareLoc));
@@ -1656,7 +1669,8 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
                                                Context.AllocateCopy(Exprs),
                                                nullptr,
                                                SourceLoc(),
-                                               /*hasTrailingClosure=*/false));
+                                               /*hasTrailingClosure=*/false,
+                                               /*Implicit=*/false));
   };
 
   // Parse the first value.
@@ -1714,7 +1728,8 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
     SubExpr = new (Context) TupleExpr(LSquareLoc,
                                       Context.AllocateCopy(SubExprs),
                                       nullptr, RSquareLoc,
-                                      /*hasTrailingClosure=*/false);
+                                      /*hasTrailingClosure=*/false,
+                                      /*Implicit=*/false);
 
   return makeParserResult(
       new (Context) DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc));

@@ -242,7 +242,7 @@ namespace {
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
                          SourceLoc memberLoc, Type openedType,
-                         ConstraintLocatorBuilder locator) {
+                         ConstraintLocatorBuilder locator, bool Implicit) {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
@@ -361,7 +361,7 @@ namespace {
           // type.
 
           // Reference to the generic member.
-          Expr *ref = tc.buildCheckedRefExpr(member, memberLoc);
+          Expr *ref = tc.buildCheckedRefExpr(member, memberLoc, Implicit);
 
           // Specialize the member with the types deduced from the object
           // argument. This eliminates the genericity that comes from being
@@ -392,7 +392,7 @@ namespace {
           = new (context) MemberRefExpr(base, dotLoc,
                                         ConcreteDeclRef(context, member,
                                                         substitutionsVec),
-                                        memberLoc);
+                                        memberLoc, Implicit);
         result->setType(substTy);
         return result;
       }
@@ -408,7 +408,8 @@ namespace {
           base = coerceObjectArgumentToType(base, containerTy, nullptr);
 
           auto result
-            = new (context) MemberRefExpr(base, dotLoc, var, memberLoc);
+            = new (context) MemberRefExpr(base, dotLoc, var, memberLoc,
+                                          Implicit);
           result->setType(simplifyType(openedType));
           return result;
         }
@@ -416,7 +417,7 @@ namespace {
 
       // Handle references to non-variable struct/class/enum members, as
       // well as module members.
-      Expr *ref = tc.buildCheckedRefExpr(member, memberLoc);
+      Expr *ref = tc.buildCheckedRefExpr(member, memberLoc, Implicit);
 
       // Refer to a member function that binds 'self':
       if ((isa<FuncDecl>(member) && member->getDeclContext()->isTypeContext()) ||
@@ -478,8 +479,10 @@ namespace {
       if (!injectValueDecl)
         return Type();
 
-      auto injectValueRef = new (context) DeclRefExpr(injectValueDecl, loc);
-      injectValue = new (context) CallExpr(injectValueRef, opaqueValue);
+      auto injectValueRef = new (context) DeclRefExpr(injectValueDecl, loc,
+                                                      /*Implicit=*/true);
+      injectValue = new (context) CallExpr(injectValueRef, opaqueValue,
+                                           /*Implicit=*/true);
       if (tc.typeCheckExpression(injectValue, dc, optType,
                                  /*discardedExpr=*/false))
         return Type();
@@ -490,11 +493,13 @@ namespace {
         return Type();
 
       auto injectNothingRef = new (context) DeclRefExpr(injectNothingDecl,
-                                                        loc);
+                                                        loc, /*Implicit=*/true);
       auto emptyTuple = new (context) TupleExpr(SourceLoc(), { }, nullptr,
                                                 SourceLoc(),
-                                                /*hasTrailingClosure=*/false);
-      injectNone = new (context) CallExpr(injectNothingRef,emptyTuple);
+                                                /*hasTrailingClosure=*/false,
+        /*Implicit=*/true);
+      injectNone = new (context) CallExpr(injectNothingRef, emptyTuple,
+                                          /*Implicit=*/true);
       if (tc.typeCheckExpression(injectNone, dc, optType,
                                  /*discardedExpr=*/false))
         return Type();
@@ -817,7 +822,8 @@ namespace {
     /// \brief Build a reference to an operator within a protocol.
     Expr *buildProtocolOperatorRef(ProtocolDecl *proto, ValueDecl *value,
                                    SourceLoc nameLoc, Type openedType,
-                                   ConstraintLocatorBuilder locator) {
+                                   ConstraintLocatorBuilder locator,
+                                   bool Implicit) {
       assert(isa<FuncDecl>(value) && "Only functions allowed");
       assert(cast<FuncDecl>(value)->isOperator() && "Only operators allowed");
 
@@ -847,7 +853,7 @@ namespace {
       auto base = new (ctx) MetatypeExpr(nullptr, nameLoc,
                                          MetaTypeType::get(baseTy, ctx));
       return buildMemberRef(base, SourceLoc(), value, nameLoc, openedType,
-                            locator);
+                            locator, Implicit);
     }
 
   public:
@@ -1079,7 +1085,8 @@ namespace {
       Expr *memberRef = buildMemberRef(typeRef, expr->getStartLoc(), member,
                                        expr->getStartLoc(),
                                        tc.getUnopenedTypeOfReference(member),
-                                       cs.getConstraintLocator(expr, { }));
+                                       cs.getConstraintLocator(expr, { }),
+                                       /*Implicit=*/true);
 
       // Create a tuple containing all of the coerced segments.
       SmallVector<Expr *, 4> segments;
@@ -1108,12 +1115,14 @@ namespace {
                                               nullptr,
                                               expr->getStartLoc(),
                                               /*hasTrailingClosure=*/false,
+                                              /*Implicit=*/true,
                                               TupleType::get(tupleElements,
                                                              tc.Context));
       }
 
       // Call the convertFromStringInterpolation member with the arguments.
-      ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, argument);
+      ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, argument,
+                                                   /*Implicit=*/true);
       expr->setSemanticExpr(finishApply(apply, openedType, locatorBuilder));
       return expr;
     }
@@ -1156,7 +1165,8 @@ namespace {
         // reference.
         return buildProtocolOperatorRef(proto, expr->getDecl(), expr->getLoc(),
                                         fromType,
-                                        cs.getConstraintLocator(expr, { }));
+                                        cs.getConstraintLocator(expr, { }),
+                                        expr->isImplicit());
       }
 
       // Set the type of this expression to the actual type of the reference.
@@ -1258,12 +1268,14 @@ namespace {
         // reference.
         return buildProtocolOperatorRef(proto, decl, expr->getLoc(),
                                         selected.second,
-                                        cs.getConstraintLocator(expr, { }));
+                                        cs.getConstraintLocator(expr, { }),
+                                        expr->isImplicit());
       }
 
       // Normal path: build a declaration reference.
       auto type = getTypeOfDeclReference(decl, expr->isSpecialized());
-      auto result = new (context) DeclRefExpr(decl, expr->getLoc(), type);
+      auto result = new (context) DeclRefExpr(decl, expr->getLoc(),
+                                              expr->isImplicit(), type);
 
       // For a polymorphic function type, we have to specialize our reference.
       if (auto polyFn = result->getType()->getAs<PolymorphicFunctionType>()) {
@@ -1280,7 +1292,8 @@ namespace {
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
                             selected.first.getDecl(), expr->getMemberLoc(),
                             selected.second,
-                            cs.getConstraintLocator(expr, { }));
+                            cs.getConstraintLocator(expr, { }),
+                            expr->isImplicit());
     }
 
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
@@ -1299,7 +1312,8 @@ namespace {
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
                             expr->getMember().getDecl(),
                             expr->getNameLoc(), expr->getType(),
-                            cs.getConstraintLocator(expr, { }));
+                            cs.getConstraintLocator(expr, { }),
+                            expr->isImplicit());
     }
 
     Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
@@ -1313,7 +1327,8 @@ namespace {
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
                             selected.first.getDecl(), expr->getNameLoc(),
                             selected.second,
-                            cs.getConstraintLocator(expr, { }));
+                            cs.getConstraintLocator(expr, { }),
+                            expr->isImplicit());
     }
 
     Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
@@ -1352,7 +1367,8 @@ namespace {
       // Build the member reference.
       return buildMemberRef(base, expr->getDotLoc(), member, expr->getNameLoc(),
                             selected.second,
-                            cs.getConstraintLocator(expr, { }));
+                            cs.getConstraintLocator(expr, { }),
+                            expr->isImplicit());
     }
 
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
@@ -1367,7 +1383,8 @@ namespace {
         return buildMemberRef(expr->getBase(), expr->getDotLoc(),
                               selected.first.getDecl(), expr->getNameLoc(),
                               selected.second,
-                              cs.getConstraintLocator(expr, { }));
+                              cs.getConstraintLocator(expr, { }),
+                              expr->isImplicit());
 
       case OverloadChoiceKind::DeclViaDynamic:
         return buildDynamicMemberRef(expr->getBase(), expr->getDotLoc(),
@@ -1896,7 +1913,8 @@ static Expr *getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
 
   // Create the default argument, which is a converted magic identifier
   // literal expression.
-  Expr *init = new (tc.Context) MagicIdentifierLiteralExpr(magicKind, loc);
+  Expr *init = new (tc.Context) MagicIdentifierLiteralExpr(magicKind, loc,
+                                                           /*Implicit=*/true);
   bool invalid = tc.typeCheckExpression(init, dc, defArg.second,
                                         /*discardedExpr=*/false);
   assert(!invalid && "conversion cannot fail");
@@ -2441,16 +2459,19 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                       selected.first.getDecl(),
                                       expr->getEndLoc(),
                                       selected.second,
-                                      locator);
+                                      locator,
+                                      /*Implicit=*/true);
 
       // Form an empty tuple.
       Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(), { },
                                               nullptr, expr->getEndLoc(),
                                               /*hasTrailingClosure=*/false,
+                                              /*Implicit=*/true,
                                               TupleType::getEmpty(tc.Context));
 
       // Call the conversion function with an empty tuple.
-      ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, args);
+      ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, args,
+                                                   /*Implicit=*/true);
       auto openedType = selected.second->castTo<FunctionType>()->getResult();
       expr = finishApply(apply, openedType,
                          ConstraintLocatorBuilder(
@@ -2487,10 +2508,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                      selected.first.getDecl(),
                                      expr->getStartLoc(),
                                      selected.second,
-                                     storedLocator);
+                                     storedLocator,
+                                     /*Implicit=*/true);
 
       // FIXME: Lack of openedType here is an issue.
-      ApplyExpr *apply = new (tc.Context) CallExpr(declRef, expr);
+      ApplyExpr *apply = new (tc.Context) CallExpr(declRef, expr,
+                                                   /*Implicit=*/true);
       expr = finishApply(apply, toType, locator);
     }
 
@@ -2727,7 +2750,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                                  metaTy);
   Expr *declRef = buildMemberRef(typeBase, apply->getLoc(),
                                  decl, apply->getLoc(),
-                                 selected->second, locator);
+                                 selected->second, locator,
+                                 apply->isImplicit());
   apply->setFn(declRef);
 
   // Tail-recurse to actually call the constructor.
@@ -2957,6 +2981,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                   nullptr,
                                   base->getEndLoc(),
                                   /*hasTrailingClosure=*/false,
+                                  /*Implicit=*/true,
                                   TupleType::get(elementTypes, Context));
   }
 
@@ -2977,10 +3002,11 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   auto memberRef = rewriter.buildMemberRef(base, base->getStartLoc(),
                                            witness, base->getEndLoc(),
-                                           openedType, locator);
+                                           openedType, locator,
+                                           /*Implicit=*/true);
 
   // Call the witness.
-  ApplyExpr *apply = new (Context) CallExpr(memberRef, arg);
+  ApplyExpr *apply = new (Context) CallExpr(memberRef, arg, /*Implicit=*/true);
   return rewriter.finishApply(apply, openedType,
                               cs.getConstraintLocator(arg, { }));
 }
@@ -3033,15 +3059,18 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
       = witness->getType()->castTo<AnyFunctionType>()->getResult();
     auto memberRef = rewriter.buildMemberRef(expr, expr->getStartLoc(),
                                              witness, expr->getEndLoc(),
-                                             openedType, locator);
+                                             openedType, locator,
+                                             /*Implicit=*/true);
 
     // Call the witness.
     Expr *arg = new (tc.Context) TupleExpr(expr->getStartLoc(),
                                            { }, nullptr,
                                            expr->getEndLoc(),
                                            /*hasTrailingClosure=*/false,
+                                           /*Implicit=*/true,
                                            TupleType::getEmpty(tc.Context));
-    ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg);
+    ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg,
+                                                 /*Implicit=*/true);
     expr = rewriter.finishApply(apply, openedType, locator);
 
     // At this point, we must have a type with the builtin member.
@@ -3070,15 +3099,18 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
     = builtinMethod->getType()->castTo<AnyFunctionType>()->getResult();
   auto memberRef = rewriter.buildMemberRef(expr, expr->getStartLoc(),
                                            builtinMethod, expr->getEndLoc(),
-                                           openedType, locator);
+                                           openedType, locator,
+                                           /*Implicit=*/true);
 
   // Call the builtin method.
   Expr *arg = new (tc.Context) TupleExpr(expr->getStartLoc(),
                                          { }, nullptr,
                                          expr->getEndLoc(),
                                          /*hasTrailingClosure=*/false,
+                                         /*Implicit=*/true,
                                          TupleType::getEmpty(tc.Context));
-  ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg);
+  ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg,
+                                               /*Implicit=*/true);
   return rewriter.finishApply(apply, openedType, locator);
 }
 

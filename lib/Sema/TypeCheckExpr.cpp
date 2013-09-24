@@ -102,7 +102,7 @@ Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
   Expr *injectionFn = new (Context) UnresolvedDotExpr(
                                       sliceTypeRef, Loc,
                                       Context.getIdentifier("convertFromHeapArray"),
-                                      Loc);
+                                      Loc, /*Implicit=*/true);
   if (typeCheckExpressionShallow(injectionFn, dc))
     return nullptr;
 
@@ -210,10 +210,11 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
   auto ArgElts2 = TC.Context.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
   TupleExpr *Arg = new (TC.Context) TupleExpr(SourceLoc(), 
                                               ArgElts2, 0, SourceLoc(),
-                                              /*hasTrailingClosure=*/false);
+                                              /*hasTrailingClosure=*/false,
+                                        LHS->isImplicit() && RHS->isImplicit());
 
   // Build the operation.
-  return new (TC.Context) BinaryExpr(Op, Arg);
+  return new (TC.Context) BinaryExpr(Op, Arg, Op->isImplicit());
 }
 
 /// foldSequence - Take a sequence of expressions and fold a prefix of
@@ -385,17 +386,18 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType) {
   return value->getType();
 }
 
-Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, SourceLoc loc) {
+Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, SourceLoc loc,
+                                       bool Implicit) {
   auto type = getUnopenedTypeOfReference(value);
-  return new (Context) DeclRefExpr(value, loc, type);
+  return new (Context) DeclRefExpr(value, loc, Implicit, type);
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
-                                bool isSpecialized) {
+                                bool Implicit, bool isSpecialized) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
   if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
-    auto result = new (Context) DeclRefExpr(Decls[0], NameLoc);
+    auto result = new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit);
     result->setSpecialized(isSpecialized);
     return result;
   }

@@ -3462,7 +3462,8 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
       return new (TC.Context) ErrorExpr(Loc);
     }
 
-    return TC.buildRefExpr(ResultValues, Loc, UDRE->isSpecialized());
+    return TC.buildRefExpr(ResultValues, Loc, UDRE->isImplicit(),
+                           UDRE->isSpecialized());
   }
 
   ResultValues.clear();
@@ -3501,9 +3502,10 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
                                       TC.Context);
       BaseExpr = new (TC.Context) MetatypeExpr(nullptr, Loc, BaseTy);
     } else {
-      BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc);
+      BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc, UDRE->isImplicit());
     }
-    return new (TC.Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name, Loc);
+    return new (TC.Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name, Loc,
+                                              UDRE->isImplicit());
   }
   
   llvm_unreachable("Can't represent lookup result");
@@ -4265,9 +4267,10 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   }
   
   // Build the 'expr ~= var' expression.
-  auto *matchOp = buildRefExpr(choices, EP->getLoc());
+  auto *matchOp = buildRefExpr(choices, EP->getLoc(), /*Implicit=*/true);
   auto *matchVarRef = new (Context) DeclRefExpr(matchVar,
-                                                EP->getLoc());
+                                                EP->getLoc(),
+                                                /*Implicit=*/true);
   
   Expr *matchArgElts[] = {EP->getSubExpr(), matchVarRef};
   auto *matchArgs
@@ -4275,9 +4278,10 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                     Context.AllocateCopy(MutableArrayRef<Expr*>(matchArgElts)),
                     nullptr,
                     EP->getSubExpr()->getSourceRange().End,
-                    false);
+                    false, /*Implicit=*/true);
   
-  Expr *matchCall = new (Context) BinaryExpr(matchOp, matchArgs);
+  Expr *matchCall = new (Context) BinaryExpr(matchOp, matchArgs,
+                                             /*Implicit=*/true);
   
   // Check the expression as a condition.
   if (typeCheckCondition(matchCall, DC))

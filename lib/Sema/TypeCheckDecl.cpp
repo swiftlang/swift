@@ -1101,7 +1101,8 @@ public:
         return nullptr;
       }
       
-      return new (TC.Context) IntegerLiteralExpr("0", SourceLoc());
+      return new (TC.Context) IntegerLiteralExpr("0", SourceLoc(),
+                                                 /*Implicit=*/true);
     }
     
     if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
@@ -1110,7 +1111,7 @@ public:
       nextVal.toStringSigned(nextValStr);
       return new (TC.Context)
         IntegerLiteralExpr(TC.Context.AllocateCopy(StringRef(nextValStr)),
-                           SourceLoc());
+                           SourceLoc(), /*Implicit=*/true);
     }
     
     TC.diagnose(forElt->getLoc(),
@@ -2270,7 +2271,8 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer,
                                     Context.AllocateCopy(eltInits),
                                     Context.AllocateCopy(eltNames).data(),
                                     SourceLoc(),
-                                    /*hasTrailingClosure=*/false);
+                                    /*hasTrailingClosure=*/false,
+                                    /*Implicit=*/true);
     }
     return true;
   }
@@ -2344,10 +2346,11 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer,
   // We found a default constructor. Construct the initializer expression.
   // FIXME: As an optimization, we could build a fully type-checked AST here.
   Expr *arg = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc(),
-                                      /*hasTrailingClosure=*/false);
+                                      /*hasTrailingClosure=*/false,
+                                      /*Implicit=*/true);
   Expr *metatype = new (Context) MetatypeExpr(nullptr, SourceLoc(),
                                               MetaTypeType::get(ty, Context));
-  *initializer = new (Context) CallExpr(metatype, arg);
+  *initializer = new (Context) CallExpr(metatype, arg, /*Implicit=*/true);
 
   return true;
 }
