@@ -497,7 +497,7 @@ namespace {
       auto emptyTuple = new (context) TupleExpr(SourceLoc(), { }, nullptr,
                                                 SourceLoc(),
                                                 /*hasTrailingClosure=*/false,
-        /*Implicit=*/true);
+                                                /*Implicit=*/true);
       injectNone = new (context) CallExpr(injectNothingRef, emptyTuple,
                                           /*Implicit=*/true);
       if (tc.typeCheckExpression(injectNone, dc, optType,
