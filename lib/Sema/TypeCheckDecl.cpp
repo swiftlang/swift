@@ -25,8 +25,11 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
+
+namespace {
 
 /// \brief Describes the kind of implicit constructor that will be
 /// generated.
@@ -39,6 +42,120 @@ enum class ImplicitConstructorKind {
   /// name.
   Memberwise
 };
+
+/// Used during enum raw value checking to identify duplicate raw values.
+/// Character, string, float, and integer literals are all keyed by value.
+/// Float and integer literals are additionally keyed by numeric equivalence.
+struct RawValueKey {
+  enum class Kind : uint8_t { String, Char, Float, Int, Tombstone, Empty } kind;
+  
+  // FIXME: doesn't accommodate >64-bit or signed raw integer or float values.
+  union {
+    StringRef stringValue;
+    uint32_t charValue;
+    uint64_t intValue;
+    double floatValue;
+  };
+  
+  explicit RawValueKey(LiteralExpr *expr) {
+    switch (expr->getKind()) {
+    case ExprKind::IntegerLiteral:
+      kind = Kind::Int;
+      intValue = cast<IntegerLiteralExpr>(expr)->getValue().getZExtValue();
+      return;
+    case ExprKind::FloatLiteral: {
+      double v = cast<FloatLiteralExpr>(expr)->getValue().convertToDouble();
+      // If the value losslessly converts to int, key it as an int.
+      if (v <= (double)UINT64_MAX && round(v) == v) {
+        kind = Kind::Int;
+        intValue = (uint64_t)v;
+      } else {
+        kind = Kind::Float;
+        floatValue = v;
+      }
+      return;
+    }
+    case ExprKind::CharacterLiteral:
+      kind = Kind::Char;
+      charValue = cast<CharacterLiteralExpr>(expr)->getValue();
+      return;
+    case ExprKind::StringLiteral:
+      kind = Kind::String;
+      stringValue = cast<StringLiteralExpr>(expr)->getValue();
+      return;
+    default:
+      llvm_unreachable("not a valid literal expr for raw value");
+    }
+  }
+  
+  explicit RawValueKey(Kind k) : kind(k) {
+    assert((k == Kind::Tombstone || k == Kind::Empty)
+           && "this ctor is only for creating DenseMap special values");
+  }
+};
+  
+/// Used during enum raw value checking to identify the source of a raw value,
+/// which may have been derived by auto-incrementing, for diagnostic purposes.
+struct RawValueSource {
+  /// The decl that has the raw value.
+  EnumElementDecl *sourceElt;
+  /// If the sourceDecl didn't explicitly name a raw value, this is the most
+  /// recent preceding decl with an explicit raw value. This is used to
+  /// diagnose 'autoincrementing from' messages.
+  EnumElementDecl *lastExplicitValueElt;
+};
+
+} // end anonymous namespace
+
+namespace llvm {
+
+template<>
+class DenseMapInfo<RawValueKey> {
+public:
+  static RawValueKey getEmptyKey() {
+    return RawValueKey(RawValueKey::Kind::Empty);
+  }
+  static RawValueKey getTombstoneKey() {
+    return RawValueKey(RawValueKey::Kind::Tombstone);
+  }
+  static unsigned getHashValue(RawValueKey k) {
+    switch (k.kind) {
+    case RawValueKey::Kind::Float:
+      // Hash as bits. We want to treat distinct but IEEE-equal values as not
+      // equal.
+    case RawValueKey::Kind::Int:
+      return DenseMapInfo<uint64_t>::getHashValue(k.intValue);
+      return DenseMapInfo<uint64_t>::getHashValue(k.intValue);
+    case RawValueKey::Kind::Char:
+      return DenseMapInfo<uint32_t>::getHashValue(k.charValue);
+    case RawValueKey::Kind::String:
+      return llvm::HashString(k.stringValue);
+    case RawValueKey::Kind::Empty:
+    case RawValueKey::Kind::Tombstone:
+      return 0;
+    }
+  }
+  static bool isEqual(RawValueKey a, RawValueKey b) {
+    if (a.kind != b.kind)
+      return false;
+    switch (a.kind) {
+    case RawValueKey::Kind::Float:
+      // Hash as bits. We want to treat distinct but IEEE-equal values as not
+      // equal.
+    case RawValueKey::Kind::Int:
+      return a.intValue == b.intValue;
+    case RawValueKey::Kind::Char:
+      return a.charValue == b.charValue;
+    case RawValueKey::Kind::String:
+      return a.stringValue.equals(b.stringValue);
+    case RawValueKey::Kind::Empty:
+    case RawValueKey::Kind::Tombstone:
+      return true;
+    }
+  }
+};
+  
+} // end llvm namespace
 
 /// Determine whether the given declaration can inherit a class.
 static bool canInheritClass(Decl *decl) {
@@ -1033,6 +1150,8 @@ public:
         // Check the raw values of the cases.
         LiteralExpr *prevValue = nullptr;
         EnumElementDecl *lastExplicitValueElt = nullptr;
+        // Keep a map we can use to check for duplicate case values.
+        llvm::DenseMap<RawValueKey, RawValueSource> uniqueRawValues;
         
         for (auto elt : UD->getAllElements()) {
           // We don't yet support raw values on payload cases.
@@ -1060,6 +1179,38 @@ public:
           }
           prevValue = elt->getRawValueExpr();
           assert(prevValue && "continued without setting raw value of enum case");
+          
+          // Check that the raw value is unique.
+          RawValueKey key(elt->getRawValueExpr());
+          auto found = uniqueRawValues.find(key);
+          if (found != uniqueRawValues.end()) {
+            SourceLoc diagLoc = elt->getRawValueExpr()->isImplicit()
+              ? elt->getLoc() : elt->getRawValueExpr()->getLoc();
+            TC.diagnose(diagLoc, diag::enum_raw_value_not_unique);
+            assert(lastExplicitValueElt &&
+                   "should not be able to have non-unique raw values when "
+                   "relying on autoincrement");
+            if (lastExplicitValueElt != elt)
+              TC.diagnose(lastExplicitValueElt->getRawValueExpr()->getLoc(),
+                          diag::enum_raw_value_incrementing_from_here);
+            
+            auto foundElt = found->second.sourceElt;
+            diagLoc = foundElt->getRawValueExpr()->isImplicit()
+              ? foundElt->getLoc() : foundElt->getRawValueExpr()->getLoc();
+            TC.diagnose(diagLoc, diag::enum_raw_value_used_here);
+            if (foundElt != found->second.lastExplicitValueElt) {
+              if (found->second.lastExplicitValueElt)
+                TC.diagnose(found->second.lastExplicitValueElt
+                              ->getRawValueExpr()->getLoc(),
+                            diag::enum_raw_value_incrementing_from_here);
+              else
+                TC.diagnose(UD->getAllElements().front()->getLoc(),
+                            diag::enum_raw_value_incrementing_from_zero);
+            }
+          } else {
+            uniqueRawValues.insert({RawValueKey(elt->getRawValueExpr()),
+                                    RawValueSource{elt, lastExplicitValueElt}});
+          }
         }
       }
     }
