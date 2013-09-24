@@ -823,11 +823,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
   case decls_block::CONSTRUCTOR_DECL: {
     DeclID parentID;
-    bool isImplicit, isObjC;
+    bool isImplicit, hasSelectorStyleSignature, isObjC;
     TypeID signatureID;
     DeclID implicitSelfID;
 
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
+                                               hasSelectorStyleSignature,
                                                isObjC, signatureID,
                                                implicitSelfID);
     auto parent = getDeclContext(parentID);
@@ -877,6 +878,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     if (isImplicit)
       ctor->setImplicit();
+    if (hasSelectorStyleSignature)
+      ctor->setHasSelectorStyleSignature();
     ctor->setIsObjC(isObjC);
 
     if (genericParams)
@@ -928,6 +931,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
+    bool hasSelectorStyleSignature;
     bool isClassMethod;
     bool isAssignmentOrConversion;
     bool isObjC, isIBAction, isTransparent;
@@ -937,6 +941,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID overriddenID;
 
     decls_block::FuncLayout::readRecord(scratch, nameID, contextID, isImplicit,
+                                        hasSelectorStyleSignature,
                                         isClassMethod, isAssignmentOrConversion,
                                         isObjC, isIBAction, isTransparent,
                                         numParamPatterns, signatureID,
@@ -988,6 +993,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     fn->setStatic(isClassMethod);
     if (isImplicit)
       fn->setImplicit();
+    if (hasSelectorStyleSignature)
+      fn->setHasSelectorStyleSignature();
     if (!blobData.empty())
       fn->getMutableAttrs().AsmName = ctx.AllocateCopy(blobData);
     if (isAssignmentOrConversion) {

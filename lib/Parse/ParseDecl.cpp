@@ -1614,8 +1614,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   }
 
   TypeRepr *FuncRetTy = nullptr;
+  bool HasSelectorStyleSignature;
   ParserStatus SignatureStatus =
-      parseFunctionSignature(ArgParams, BodyParams, FuncRetTy);
+      parseFunctionSignature(ArgParams, BodyParams, FuncRetTy,
+                             HasSelectorStyleSignature);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
@@ -1633,6 +1635,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
     FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name, NameLoc,
                           GenericParams, Type(), ArgParams, BodyParams,
                           FuncRetTy, CurDeclContext);
+
+    if (HasSelectorStyleSignature)
+      FD->setHasSelectorStyleSignature();
 
     // Pass the function signature to code completion.
     if (SignatureStatus.hasCodeCompletion())
@@ -2427,8 +2432,10 @@ Parser::parseDeclConstructor(unsigned Flags) {
   // FIXME: handle code completion in Arguments.
   Pattern *ArgPattern;
   Pattern *BodyPattern;
+  bool HasSelectorStyleSignature;
   ParserStatus SignatureStatus =
-      parseConstructorArguments(ArgPattern, BodyPattern);
+      parseConstructorArguments(ArgPattern, BodyPattern,
+                                HasSelectorStyleSignature);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
@@ -2445,11 +2452,14 @@ Parser::parseDeclConstructor(unsigned Flags) {
                                     ConstructorLoc, ArgPattern, BodyPattern,
                                     SelfDecl, GenericParams, CurDeclContext);
 
+  if (HasSelectorStyleSignature)
+    CD->setHasSelectorStyleSignature();
+
+  SelfDecl->setDeclContext(CD);
+
   // Pass the function signature to code completion.
   if (SignatureStatus.hasCodeCompletion())
     CodeCompletion->setDelayedParsedDecl(CD);
-
-  SelfDecl->setDeclContext(CD);
 
   if (ConstructorsNotAllowed) {
     // Tell the type checker not to touch this constructor.

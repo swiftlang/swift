@@ -562,12 +562,15 @@ public:
   // Pattern Parsing
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Pattern*> &ArgPatterns,
-                                      SmallVectorImpl<Pattern*> &BodyPatterns);
+                                      SmallVectorImpl<Pattern*> &BodyPatterns,
+                                      bool &HasSelectorStyleSignature);
   ParserStatus parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
                                       SmallVectorImpl<Pattern *> &bodyPatterns,
-                                      TypeRepr *&retLoc);
+                                      TypeRepr *&retType,
+                                      bool &HasSelectorStyleSignature);
   ParserStatus parseConstructorArguments(Pattern *&ArgPattern,
-                                         Pattern *&BodyPattern);
+                                         Pattern *&BodyPattern,
+                                         bool &HasSelectorStyleSignature);
 
   ParserResult<Pattern> parsePattern();
 

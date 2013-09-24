@@ -264,7 +264,8 @@ parseSelectorFunctionArguments(Parser &P,
 
 ParserStatus
 Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
-                               SmallVectorImpl<Pattern *> &BodyPatterns) {
+                               SmallVectorImpl<Pattern *> &BodyPatterns,
+                               bool &HasSelectorStyleSignature) {
   // Parse the first function argument clause.
   ParserResult<Pattern> FirstPattern = parsePatternTuple(/*AllowInitExpr=*/true);
   if (FirstPattern.isNull()) {
@@ -280,6 +281,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
     // This looks like a selector-style argument.  Try to convert the first
     // argument pattern into a single argument type and parse subsequent
     // selector forms.
+    HasSelectorStyleSignature = true;
     return ParserStatus(FirstPattern) |
            parseSelectorFunctionArguments(*this, ArgPatterns, BodyPatterns,
                                           FirstPattern.get());
@@ -301,11 +303,15 @@ Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
 ParserStatus
 Parser::parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
                                SmallVectorImpl<Pattern *> &bodyPatterns,
-                               TypeRepr *&retType) {
+                               TypeRepr *&retType,
+                               bool &HasSelectorStyleSignature) {
+  HasSelectorStyleSignature = false;
+
   ParserStatus Status;
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.is(tok::l_paren))
-    Status = parseFunctionArguments(argPatterns, bodyPatterns);
+    Status = parseFunctionArguments(argPatterns, bodyPatterns,
+                                    HasSelectorStyleSignature);
   else {
     diagnose(Tok, diag::func_decl_without_paren);
     Status = makeParserError();
@@ -343,8 +349,11 @@ Parser::parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
   return Status;
 }
 
-ParserStatus Parser::parseConstructorArguments(Pattern *&ArgPattern,
-                                               Pattern *&BodyPattern) {
+ParserStatus
+Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
+                                  bool &HasSelectorStyleSignature) {
+  HasSelectorStyleSignature = false;
+
   // It's just a pattern. Parse it.
   if (Tok.is(tok::l_paren)) {
     ParserResult<Pattern> Params = parsePatternTuple(/*AllowInitExpr=*/true);
@@ -377,6 +386,7 @@ ParserStatus Parser::parseConstructorArguments(Pattern *&ArgPattern,
 
   // We have the start of a binding name, so this is a selector-style
   // declaration.
+  HasSelectorStyleSignature = true;
 
   // This is not a parenthesis, but we should provide a reasonable source range
   // for parameters.

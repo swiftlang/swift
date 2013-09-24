@@ -120,8 +120,12 @@ class alignas(8) Decl {
 
     /// \see AbstractFunctionDecl::BodyKind
     unsigned BodyKind : 2;
+
+    /// \brief Whether this function was declared with a selector-style
+    /// signature.
+    unsigned HasSelectorStyleSignature : 1;
   };
-  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 2 };
+  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 3 };
   static_assert(NumAbstractFunctionDeclBits <= 32, "fits in an unsigned");
 
   class FuncDeclBitfields {
@@ -1986,6 +1990,7 @@ protected:
     else
       ImplicitSelfDeclAndIsCached.setPointerAndInt(nullptr, false);
     setBodyKind(BodyKind::None);
+    AbstractFunctionDeclBits.HasSelectorStyleSignature = false;
   }
 
   VarDecl *getImplicitSelfDeclSlow() const;
@@ -2046,6 +2051,14 @@ public:
 
   CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
+
+  bool hasSelectorStyleSignature() const {
+    return AbstractFunctionDeclBits.HasSelectorStyleSignature;
+  }
+
+  void setHasSelectorStyleSignature() {
+    AbstractFunctionDeclBits.HasSelectorStyleSignature = true;
+  }
 
   /// \brief Returns the argument pattern(s) for the function definition
   /// that determine the function type.

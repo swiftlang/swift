@@ -773,6 +773,17 @@ namespace {
         Out << "number of arg and body parameter patterns should be equal";
         abort();
       }
+
+      if (AFD->hasSelectorStyleSignature()) {
+        unsigned NumExpectedParamPatterns = 1;
+        if (AFD->getImplicitSelfDecl() && isa<FuncDecl>(AFD))
+          NumExpectedParamPatterns++;
+        if (AFD->getArgParamPatterns().size() != NumExpectedParamPatterns) {
+          Out << "functions with selector-style signature should "
+                 "not be curried";
+          abort();
+        }
+      }
     }
 
     void verifyParsed(ConstructorDecl *CD) {
@@ -820,6 +831,11 @@ namespace {
           !DD->isInvalid()) {
         Out << "DestructorDecls outside nominal types and extensions "
                "should be marked invalid";
+        abort();
+      }
+
+      if (DD->hasSelectorStyleSignature()) {
+        Out << "DestructorDecls can not have a selector-style signature";
         abort();
       }
 

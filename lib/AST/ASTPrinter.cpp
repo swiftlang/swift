@@ -84,7 +84,7 @@ namespace {
     ///
     /// \returns true if the arguments were printed in a selector style,
     /// false otherwise.
-    bool printSelectorStyleArgs(ValueDecl *decl,
+    bool printSelectorStyleArgs(AbstractFunctionDecl *AFD,
                                 ArrayRef<Pattern *> argPatterns,
                                 ArrayRef<Pattern *> bodyPatterns);
 
@@ -542,66 +542,35 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   }
 }
 
-bool PrintAST::printSelectorStyleArgs(ValueDecl *decl,
-                                      ArrayRef<Pattern *> argPatterns,
-                                      ArrayRef<Pattern *> bodyPatterns) {
+bool PrintAST::printSelectorStyleArgs(AbstractFunctionDecl *AFD,
+                                      ArrayRef<Pattern *> ArgPatterns,
+                                      ArrayRef<Pattern *> BodyPatterns) {
+  if (!AFD->hasSelectorStyleSignature())
+    return false;
+
   // Skip over the implicit 'self'.
-  if (decl->getDeclContext()->isTypeContext() &&
-      !isa<ConstructorDecl>(decl)) {
-    argPatterns = argPatterns.slice(1);
-    bodyPatterns = bodyPatterns.slice(1);
+  if (AFD->getImplicitSelfDecl() && isa<FuncDecl>(AFD)) {
+    ArgPatterns = ArgPatterns.slice(1);
+    BodyPatterns = BodyPatterns.slice(1);
   }
 
-  // Only works for a single pattern.
-  if (argPatterns.size() != 1 || bodyPatterns.size() != 1)
-    return false;
-
-  // Only applies when we have a tuple with at least two elements.
-  auto argTuple = argPatterns[0]->getType()->getAs<TupleType>();
-  auto bodyTuple = bodyPatterns[0]->getType()->getAs<TupleType>();
-  if (!argTuple || argTuple->getFields().size() < 2 ||
-      !bodyTuple ||
-      bodyTuple->getFields().size() != argTuple->getFields().size())
-    return false;
-
-  // Step through the elements one by one, checking whether we have a name
-  // mismatch at any point. That implies we need to use selector style.
-  // FIXME: This is bogus. We should record whether selector style was used
-  // within the AST.
-  bool mismatched = false;
-  for (unsigned i = 1, n = argTuple->getFields().size(); i != n; ++i) {
-    if (argTuple->getFields()[i].getName() !=
-          bodyTuple->getFields()[i].getName()) {
-      mismatched = true;
-      break;
-    }
-  }
-
-  // All of the names match up. There's nothing to do here.
-  if (!mismatched)
-    return false;
+  auto ArgTuple = cast<TuplePattern>(ArgPatterns[0]);
+  auto BodyTuple = cast<TuplePattern>(BodyPatterns[0]);
 
   // Print in selector style.
-  for (unsigned i = 0, n = argTuple->getFields().size(); i != n; ++i) {
-    auto argName = argTuple->getFields()[i].getName();
-    auto bodyName = bodyTuple->getFields()[i].getName();
-    if (i != 0) {
+  for (unsigned i = 0, e = ArgTuple->getFields().size(); i != e; ++i) {
+    if (isa<ConstructorDecl>(AFD) || (isa<FuncDecl>(AFD) && i != 0)) {
       OS << ' ';
-      if (argName.empty())
+      auto ArgName = ArgTuple->getFields()[i].getPattern()->getBoundName();
+      if (ArgName.empty())
         OS << '_';
       else
-        OS << argName.str();
+        OS << ArgName.str();
     }
 
-    OS << "(";
-    if (bodyName.empty())
-      OS << '_';
-    else
-      OS << bodyName.str();
-
-    OS << ": ";
-    argTuple->getElementType(i).print(OS);
-    OS << ")";
+    OS << '(';
+    printPattern(BodyTuple->getFields()[i].getPattern());
+    OS << ')';
   }
   return true;
 }
@@ -769,8 +738,6 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   OS << "init";
   if (decl->isGeneric()) {
     printGenericParams(decl->getGenericParams());
-  } else {
-    OS << " ";
   }
   printAttributes(decl->getAttrs());
   if (!printSelectorStyleArgs(decl,

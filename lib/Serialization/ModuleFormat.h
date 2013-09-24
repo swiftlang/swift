@@ -546,6 +546,7 @@ namespace decls_block {
     CONSTRUCTOR_DECL,
     DeclIDField, // context decl
     BCFixed<1>,  // implicit?
+    BCFixed<1>,  // has selector-style signature?
     BCFixed<1>,  // objc?
     TypeIDField, // type (signature)
     DeclIDField  // implicit this decl
@@ -571,6 +572,7 @@ namespace decls_block {
     IdentifierIDField, // name
     DeclIDField,  // context decl
     BCFixed<1>,   // implicit?
+    BCFixed<1>,   // has selector-style signature?
     BCFixed<1>,   // class method?
     BCFixed<1>,   // assignment? / conversion?
     BCFixed<1>,   // explicitly objc?

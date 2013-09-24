@@ -1191,6 +1191,7 @@ void Serializer::writeDecl(const Decl *D) {
                            addIdentifierRef(fn->getName()),
                            addDeclRef(DC),
                            fn->isImplicit(),
+                           fn->hasSelectorStyleSignature(),
                            fn->isStatic(),
                            fn->getAttrs().isAssignment() ||
                              fn->getAttrs().isConversion(),
@@ -1280,6 +1281,7 @@ void Serializer::writeDecl(const Decl *D) {
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   addDeclRef(DC),
                                   ctor->isImplicit(),
+                                  ctor->hasSelectorStyleSignature(),
                                   ctor->isObjC(),
                                   addTypeRef(ctor->getType()),
                                   addDeclRef(implicitSelf));
