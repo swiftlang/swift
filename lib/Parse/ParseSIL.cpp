@@ -2301,7 +2301,9 @@ bool Parser::parseDeclSIL() {
   SourceLoc FnNameLoc;
 
   Scope S(this, ScopeKind::TopLevel);
+  bool isTransparent = false;
   if (parseSILLinkage(FnLinkage, *this) ||
+      parseSILOptional(isTransparent, FunctionState, "transparent") ||
       parseToken(tok::sil_at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -2317,6 +2319,7 @@ bool Parser::parseDeclSIL() {
   
     FunctionState.F =
       FunctionState.getGlobalNameForDefinition(FnName, FnType, FnNameLoc);
+    FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
     FunctionState.F->setLinkage(FnLinkage);
 
     // Now that we have a SILFunction parse the body, if present.

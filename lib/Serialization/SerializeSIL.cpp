@@ -164,7 +164,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F) {
   DEBUG(llvm::dbgs() << "SILFunction @" << Out.GetCurrentBitNo() <<
         " abbrCode " << abbrCode << " FnID " << FnID << "\n");
   SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                       (unsigned)F.getLinkage(), FnID);
+                       (unsigned)F.getLinkage(), (unsigned)F.isTransparent(),
+                       FnID);
   
   // Assign a unique ID to each basic block of the SILFunction.
   unsigned BasicID = 0;

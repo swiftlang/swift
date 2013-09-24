@@ -234,8 +234,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
   (void)kind;
 
   TypeID FuncTyID;
-  unsigned Linkage;
-  SILFunctionLayout::readRecord(scratch, Linkage, FuncTyID);
+  unsigned Linkage, Transparent;
+  SILFunctionLayout::readRecord(scratch, Linkage, Transparent, FuncTyID);
   if (FuncTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
     return nullptr;
@@ -251,6 +251,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
   auto Fn = InFunc;
   // FIXME: what should we set the linkage to?
   Fn->setLinkage(SILLinkage::Deserialized);
+  Fn->setTransparent(IsTransparent_t(Transparent == 1));
   // FIXME: use the correct SILLocation from module.
   SourceLoc Loc;
   Fn->setLocation(SILFileLocation(Loc));

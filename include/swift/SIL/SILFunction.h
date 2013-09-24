@@ -134,6 +134,7 @@ public:
   
   /// Get this function's transparent attribute.
   IsTransparent_t isTransparent() const { return IsTransparent_t(Transparent); }
+  void setTransparent(IsTransparent_t isT) { Transparent = isT; }
 
   //===--------------------------------------------------------------------===//
   // Block List Access

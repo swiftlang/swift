@@ -1059,6 +1059,9 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << "deserialized ";
     break;
   }
+
+  if (isTransparent())
+    OS << "[transparent] ";
   
   printName(OS);
   OS << " : " << LoweredType;

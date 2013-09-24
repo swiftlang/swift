@@ -59,7 +59,7 @@ namespace sil_block {
   using FuncListLayout = BCRecordLayout<
     SIL_FUNC_NAMES,
     BCVBR<16>,  // table offset within the blob
-    BCBlob // map from identifier strings to func IDs.
+    BCBlob      // map from identifier strings to func IDs.
   >;
 
   using FuncOffsetLayout = BCRecordLayout<
@@ -69,7 +69,8 @@ namespace sil_block {
 
   using SILFunctionLayout = BCRecordLayout<
     SIL_FUNCTION,
-    BCFixed<2>,        //linkage
+    BCFixed<2>,        // linkage
+    BCFixed<1>,        // Optional attributes
     TypeIDField
   >;
 
