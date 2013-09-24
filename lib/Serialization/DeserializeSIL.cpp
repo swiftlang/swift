@@ -399,34 +399,72 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::SILArgument:
     llvm_unreachable("not an instruction");
 
-  case ValueKind::DeallocBoxInst:
+#define ONETYPE_INST(ID)                      \
+  case ValueKind::ID##Inst:                   \
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");         \
+    ResultVal = Builder.create##ID(Loc,                                        \
+                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
+    break;
+  ONETYPE_INST(AllocBox)
+  ONETYPE_INST(AllocRef)
+  ONETYPE_INST(AllocStack)
+  ONETYPE_INST(BuiltinZero)
+  ONETYPE_INST(Metatype)
+#undef ONETYPE_INST
+#define ONETYPE_ONEOPERAND_INST(ID)           \
+  case ValueKind::ID##Inst:                   \
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&       \
+           "Layout should be OneTypeOneOperand.");         \
+    ResultVal = Builder.create##ID(Loc,                    \
+                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory), \
+                  getLocalValue(ValID, ValResNum,                              \
+                    getSILType(MF->getType(TyID2),                             \
+                               (SILValueCategory)TyCategory2)));               \
+    break;
+  ONETYPE_ONEOPERAND_INST(DeallocBox)
+  ONETYPE_ONEOPERAND_INST(ArchetypeMetatype)
+  ONETYPE_ONEOPERAND_INST(ClassMetatype)
+  ONETYPE_ONEOPERAND_INST(ProtocolMetatype)
+  ONETYPE_ONEOPERAND_INST(AllocArray)
+#undef ONETYPE_ONEOPERAND_INST
+#define ONEOPERAND_ONETYPE_INST(ID)           \
+  case ValueKind::ID##Inst:                   \
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&       \
+           "Layout should be OneTypeOneOperand.");         \
+    ResultVal = Builder.create##ID(Loc,                    \
+                  getLocalValue(ValID, ValResNum,                              \
+                    getSILType(MF->getType(TyID2),                             \
+                               (SILValueCategory)TyCategory2)),                \
+                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
+    break;
+  ONEOPERAND_ONETYPE_INST(ProjectExistential)
+  ONEOPERAND_ONETYPE_INST(ProjectExistentialRef)
+  // Conversion instructions.
+  ONEOPERAND_ONETYPE_INST(RefToObjectPointer)
+  ONEOPERAND_ONETYPE_INST(Upcast)
+  ONEOPERAND_ONETYPE_INST(Coerce)
+  ONEOPERAND_ONETYPE_INST(AddressToPointer)
+  ONEOPERAND_ONETYPE_INST(PointerToAddress)
+  ONEOPERAND_ONETYPE_INST(ObjectPointerToRef)
+  ONEOPERAND_ONETYPE_INST(RefToRawPointer)
+  ONEOPERAND_ONETYPE_INST(RawPointerToRef)
+  ONEOPERAND_ONETYPE_INST(RefToUnowned)
+  ONEOPERAND_ONETYPE_INST(UnownedToRef)
+  ONEOPERAND_ONETYPE_INST(ConvertCC)
+  ONEOPERAND_ONETYPE_INST(ThinToThickFunction)
+  ONEOPERAND_ONETYPE_INST(BridgeToBlock)
+  ONEOPERAND_ONETYPE_INST(ArchetypeRefToSuper)
+  ONEOPERAND_ONETYPE_INST(ConvertFunction)
+  ONEOPERAND_ONETYPE_INST(UpcastExistentialRef)
+#undef ONEOPERAND_ONETYPE_INST
   case ValueKind::InitExistentialInst:
-  case ValueKind::InitExistentialRefInst:
-  case ValueKind::ArchetypeMetatypeInst:
-  case ValueKind::ClassMetatypeInst:
-  case ValueKind::ProtocolMetatypeInst:
-  case ValueKind::AllocArrayInst: {
+  case ValueKind::InitExistentialRefInst: {
     auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Ty2 = MF->getType(TyID2);
     SILValue operand = getLocalValue(ValID, ValResNum,
                          getSILType(Ty2, (SILValueCategory)TyCategory2));
     switch ((ValueKind)OpCode) {
     default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::ArchetypeMetatypeInst:
-      ResultVal = Builder.createArchetypeMetatype(Loc, Ty, operand);
-      break;
-    case ValueKind::ClassMetatypeInst:
-      ResultVal = Builder.createClassMetatype(Loc, Ty, operand);
-      break;
-    case ValueKind::ProtocolMetatypeInst:
-      ResultVal = Builder.createProtocolMetatype(Loc, Ty, operand);
-      break;
-    case ValueKind::DeallocBoxInst:
-      ResultVal = Builder.createDeallocBox(Loc, Ty, operand);
-      break;
-    case ValueKind::AllocArrayInst:
-      ResultVal = Builder.createAllocArray(Loc, Ty, operand);
-      break;
     case ValueKind::InitExistentialInst:
       // FIXME: Conformances in InitExistentialInst needs to be serialized.
       ResultVal = Builder.createInitExistential(Loc, operand, Ty,
@@ -438,30 +476,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                       ArrayRef<ProtocolConformance*>());
       break;
     }
-    break;
-  }
-  case ValueKind::AllocBoxInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createAllocBox(Loc,
-                            getSILType(Ty, (SILValueCategory)TyCategory));
-    break;
-  }
-  case ValueKind::AllocStackInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createAllocStack(Loc,
-                            getSILType(Ty, (SILValueCategory)TyCategory));
-    break;
-  }
-  case ValueKind::AllocRefInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createAllocRef(Loc,
-                            getSILType(Ty, (SILValueCategory)TyCategory));
-    break;
-  }
-  case ValueKind::BuiltinZeroInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createBuiltinZero(Loc,
-                            getSILType(Ty, (SILValueCategory)TyCategory));
     break;
   }
   case ValueKind::ApplyInst: {
@@ -634,108 +648,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createMarkFunctionEscape(Loc, OpList);
     break;
   }
-  case ValueKind::MetatypeInst: {
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createMetatype(Loc,
-                            getSILType(Ty, (SILValueCategory)TyCategory));
-    break;
-  }
   case ValueKind::ModuleInst: {
     // Has IdentifierID for the module reference. Use SILOneTypeLayout.
     auto Mod = MF->getModule(MF->getIdentifier(TyID));
     ResultVal = Builder.createModule(Loc,
                     getSILType(ModuleType::get(Mod), SILValueCategory::Object));
-    break;
-  }
-  case ValueKind::ProjectExistentialInst:
-  case ValueKind::ProjectExistentialRefInst: {
-    auto Ty = MF->getType(TyID);
-    auto Ty2 = MF->getType(TyID2);
-    if ((ValueKind)OpCode == ValueKind::ProjectExistentialInst)
-      ResultVal = Builder.createProjectExistential(Loc,
-                      getLocalValue(ValID, ValResNum,
-                           getSILType(Ty2, (SILValueCategory)TyCategory2)),
-                      getSILType(Ty, (SILValueCategory)TyCategory));
-    else
-      ResultVal = Builder.createProjectExistentialRef(Loc,
-                      getLocalValue(ValID, ValResNum,
-                           getSILType(Ty2, (SILValueCategory)TyCategory2)),
-                      getSILType(Ty, (SILValueCategory)TyCategory));
-    break;
-  }
-  // Conversion instructions.
-  case ValueKind::RefToObjectPointerInst:
-  case ValueKind::UpcastInst:
-  case ValueKind::CoerceInst:
-  case ValueKind::AddressToPointerInst:
-  case ValueKind::PointerToAddressInst:
-  case ValueKind::ObjectPointerToRefInst:
-  case ValueKind::RefToRawPointerInst:
-  case ValueKind::RawPointerToRefInst:
-  case ValueKind::RefToUnownedInst:
-  case ValueKind::UnownedToRefInst:
-  case ValueKind::ConvertCCInst:
-  case ValueKind::ThinToThickFunctionInst:
-  case ValueKind::BridgeToBlockInst:
-  case ValueKind::ArchetypeRefToSuperInst:
-  case ValueKind::ConvertFunctionInst:
-  case ValueKind::UpcastExistentialRefInst: {
-    auto Ty = MF->getType(TyID);
-    auto Ty2 = MF->getType(TyID2);
-    auto Val = getLocalValue(ValID, ValResNum,
-                             getSILType(Ty2, (SILValueCategory)TyCategory2));
-    auto SILTy = getSILType(Ty, (SILValueCategory)TyCategory);
-    switch ((ValueKind)OpCode) {
-    default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::UpcastInst:
-      ResultVal = Builder.createUpcast(Loc, Val, SILTy);
-      break;
-    case ValueKind::CoerceInst:
-      ResultVal = Builder.createCoerce(Loc, Val, SILTy);
-      break;
-    case ValueKind::AddressToPointerInst:
-      ResultVal = Builder.createAddressToPointer(Loc, Val, SILTy);
-      break;
-    case ValueKind::RefToUnownedInst:
-      ResultVal = Builder.createRefToUnowned(Loc, Val, SILTy);
-      break;
-    case ValueKind::UnownedToRefInst:
-      ResultVal = Builder.createUnownedToRef(Loc, Val, SILTy);
-      break;
-    case ValueKind::PointerToAddressInst:
-      ResultVal = Builder.createPointerToAddress(Loc, Val, SILTy);
-      break;
-    case ValueKind::RefToObjectPointerInst:
-      ResultVal = Builder.createRefToObjectPointer(Loc, Val, SILTy);
-      break;
-    case ValueKind::RefToRawPointerInst:
-      ResultVal = Builder.createRefToRawPointer(Loc, Val, SILTy);
-      break;
-    case ValueKind::RawPointerToRefInst:
-      ResultVal = Builder.createRawPointerToRef(Loc, Val, SILTy);
-      break;
-    case ValueKind::ObjectPointerToRefInst:
-      ResultVal = Builder.createObjectPointerToRef(Loc, Val, SILTy);
-      break;
-    case ValueKind::ConvertCCInst:
-      ResultVal = Builder.createConvertCC(Loc, Val, SILTy);
-      break;
-    case ValueKind::ThinToThickFunctionInst:
-      ResultVal = Builder.createThinToThickFunction(Loc, Val, SILTy);
-      break;
-    case ValueKind::BridgeToBlockInst:
-      ResultVal = Builder.createBridgeToBlock(Loc, Val, SILTy);
-      break;
-    case ValueKind::ArchetypeRefToSuperInst:
-      ResultVal = Builder.createArchetypeRefToSuper(Loc, Val, SILTy);
-      break;
-    case ValueKind::ConvertFunctionInst:
-      ResultVal = Builder.createConvertFunction(Loc, Val, SILTy);
-      break;
-    case ValueKind::UpcastExistentialRefInst:
-      ResultVal = Builder.createUpcastExistentialRef(Loc, Val, SILTy);
-      break;
-    }
     break;
   }
   // Checked Conversion instructions.
@@ -782,6 +699,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
 #define UNARY_INSTRUCTION_HELPER(ID, CREATOR) \
   case ValueKind::ID##Inst:                   \
+    assert(RecordKind == SIL_ONE_OPERAND &&            \
+           "Layout should be OneOperand.");            \
     ResultVal = Builder.CREATOR(Loc, getLocalValue(ValID, ValResNum,  \
                     getSILType(MF->getType(TyID),                     \
                                (SILValueCategory)TyCategory)));       \

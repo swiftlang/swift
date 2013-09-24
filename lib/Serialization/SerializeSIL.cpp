@@ -638,9 +638,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case ValueKind::ProjectExistentialRefInst: {
     const ProjectExistentialRefInst *PEI = cast<ProjectExistentialRefInst>(&SI);
-    SILOneOperandLayout::emitRecord(Out, ScratchRecord,
+    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0,
+        S.addTypeRef(PEI->getType().getSwiftRValueType()),
+        (unsigned)PEI->getType().getCategory(),
         S.addTypeRef(PEI->getOperand().getType().getSwiftRValueType()),
         (unsigned)PEI->getOperand().getType().getCategory(),
         addValueRef(PEI->getOperand()),
