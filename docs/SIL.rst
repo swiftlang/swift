@@ -1658,7 +1658,7 @@ with a "self" argument not derived from the same existential container as the
 method itself.
 
 dynamic_method
-```````````````
+``````````````
 ::
 
   sil-instruction ::= 'dynamic_method' sil-method-attributes?
