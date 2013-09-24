@@ -230,8 +230,8 @@ namespace {
       } else if (auto *ctor = dyn_cast<ConstructorDecl>(methodOrCtor)) {
         ctor->getObjCSelector(Text);
       } else {
-        llvm_unreachable("property selector should be generated using ForGetter"
-                         " or ForSetter constructors");
+        llvm_unreachable("property or subscript selector should be generated "
+                         "using ForGetter or ForSetter constructors");
       }
     }
     
@@ -241,6 +241,14 @@ namespace {
 
     Selector(VarDecl *property, ForSetter_t) {
       property->getObjCSetterSelector(Text);
+    }
+
+    Selector(SubscriptDecl *subscript, ForGetter_t) {
+      Text = subscript->getObjCGetterSelector();
+    }
+
+    Selector(SubscriptDecl *subscript, ForSetter_t) {
+      Text = subscript->getObjCSetterSelector();
     }
 
     Selector(SILDeclRef ref) {
@@ -257,7 +265,10 @@ namespace {
         break;
 
       case SILDeclRef::Kind::Getter:
-        cast<VarDecl>(ref.getDecl())->getObjCGetterSelector(Text);
+        if (auto var = dyn_cast<VarDecl>(ref.getDecl()))
+          var->getObjCGetterSelector(Text);
+        else
+          Text = cast<SubscriptDecl>(ref.getDecl())->getObjCGetterSelector();
         break;
 
       case SILDeclRef::Kind::Initializer:
@@ -265,7 +276,10 @@ namespace {
         break;
 
       case SILDeclRef::Kind::Setter:
-        cast<VarDecl>(ref.getDecl())->getObjCSetterSelector(Text);
+        if (auto var = dyn_cast<VarDecl>(ref.getDecl()))
+          var->getObjCSetterSelector(Text);
+        else
+          Text = cast<SubscriptDecl>(ref.getDecl())->getObjCSetterSelector();
         break;
       }
     }
