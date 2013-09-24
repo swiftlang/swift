@@ -291,22 +291,50 @@ void PrintAST::printPattern(const Pattern *pattern) {
   }
 }
 
-void PrintAST::printGenericParams(GenericParamList *params) {
-  if (!params)
+void PrintAST::printGenericParams(GenericParamList *Params) {
+  if (!Params)
     return;
 
   OS << "<";
-  bool first = true;
-  for (auto gp : params->getParams()) {
-    if (first) {
-      first = false;
+  bool IsFirst = true;
+  for (auto GP : Params->getParams()) {
+    if (IsFirst) {
+      IsFirst = false;
     } else {
       OS << ", ";
     }
 
-    auto typeParam = gp.getAsTypeParam();
-    OS << typeParam->getName().str();
-    printInheritedWithSuperclass(typeParam);
+    auto TypeParam = GP.getAsTypeParam();
+    OS << TypeParam->getName().str();
+    printInheritedWithSuperclass(TypeParam);
+  }
+
+  auto Requirements = Params->getRequirements();
+  if (!Requirements.empty()) {
+    OS << " where";
+    bool IsFirst = true;
+    for (auto &Req : Requirements) {
+      if (Req.isInvalid())
+        continue;
+      if (IsFirst) {
+        OS << " ";
+        IsFirst = false;
+      } else {
+        OS << ", ";
+      }
+      switch (Req.getKind()) {
+      case RequirementKind::Conformance:
+        Req.getSubject()->print(OS);
+        OS << " : ";
+        Req.getConstraint()->print(OS);
+        break;
+      case RequirementKind::SameType:
+        Req.getFirstType()->print(OS);
+        OS << " == ";
+        Req.getSecondType()->print(OS);
+        break;
+      }
+    }
   }
   OS << ">";
 }
