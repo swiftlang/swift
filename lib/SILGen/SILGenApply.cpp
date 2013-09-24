@@ -1678,7 +1678,6 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 
   SILValue operand = existential.getValue();
   if (e->getMember().getDecl()->isInstanceMember()) {
-    
     operand = B.createProjectExistentialRef(e, operand,
                                   getSelfTypeForDynamicLookup(*this, operand));
     operand = B.createRefToObjectPointer(e, operand,
@@ -1766,3 +1765,90 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   return RValue(*this, emitManagedRValueWithCleanup(optMethodArg), e);
 }
 
+RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, 
+                                                SGFContext c) {
+  // Emit the base operand.
+  ManagedValue existential = emitRValue(e->getBase(), c)
+                               .getAsSingleValue(*this, e->getBase());
+
+  SILValue base = existential.getValue();
+  base = B.createProjectExistentialRef(e, base, 
+           getSelfTypeForDynamicLookup(*this, base));
+  base = B.createRefToObjectPointer(e, base,
+           SILType::getObjCPointerType(getASTContext()));
+
+  // Create the has-member block.
+  SILBasicBlock *hasMemberBB = new (F.getModule()) SILBasicBlock(&F);
+
+  // Create the no-member block.
+  SILBasicBlock *noMemberBB = new (F.getModule()) SILBasicBlock(&F);
+
+  // Create the continuation block.
+  SILBasicBlock *contBB = new (F.getModule()) SILBasicBlock(&F);
+
+  // The continuation block
+  auto loweredOptTy = getLoweredType(e->getType());
+  SILValue optMethodArg = new (F.getModule()) SILArgument(loweredOptTy, contBB);
+
+  // Create the branch.
+  SILDeclRef member(e->getMember().getDecl(),
+                    SILDeclRef::Kind::Getter,
+                    SILDeclRef::ConstructAtNaturalUncurryLevel,
+                    /*isObjC=*/true);
+  B.createDynamicMethodBranch(e, base, member, hasMemberBB, noMemberBB);
+
+  // Create the has-member branch.
+  {
+    B.emitBlock(hasMemberBB);
+
+    FullExpr hasMemberScope(Cleanups, CleanupLocation(e->getCreateSome()));
+
+    // The argument to the has-member block is the uncurried method.
+    auto valueTy =e->getType()->castTo<BoundGenericType>()->getGenericArgs()[0];
+    auto subscript = cast<SubscriptDecl>(e->getMember().getDecl());
+    auto methodTy = subscript->getGetter()->getType()
+                      ->castTo<AnyFunctionType>()->getResult();
+    auto dynamicMethodTy = getDynamicMethodType(*this, base, member,
+                                                methodTy);
+    auto loweredMethodTy = getLoweredType(dynamicMethodTy, 2);
+    SILValue memberArg = new (F.getModule()) SILArgument(loweredMethodTy,
+                                                         hasMemberBB);
+    // Emit the application of 'self'.
+    SILValue result = B.createPartialApply(e, memberArg, base, 
+                                           getLoweredType(methodTy, 1));
+
+    // Emit the index.
+    llvm::SmallVector<SILValue, 1> indexArgs;
+    emitRValue(e->getIndex(), c).forwardAll(*this, indexArgs);
+    result = B.createApply(e, result, getLoweredType(valueTy), indexArgs); 
+
+    // Package up the result in an optional.
+    SILValue optResult;
+    {
+      OpaqueValueRAII opaqueValue(*this, e->getOpaqueValue(), result);
+
+      optResult = emitRValue(e->getCreateSome()).forwardAsSingleValue(*this, e);
+    }
+
+    // Branch to the continuation block.
+    B.createBranch(e, contBB, optResult);
+  }
+
+  // Create the no-member branch.
+  {
+    B.emitBlock(noMemberBB);
+
+    FullExpr noMemberScope(Cleanups, CleanupLocation(e->getCreateNone()));
+
+    // Branch to the continuation block.
+    B.createBranch(e, contBB,
+                   emitRValue(e->getCreateNone()).forwardAsSingleValue(*this,
+                                                                       e));
+  }
+
+  // Emit the continuation block.
+  B.emitBlock(contBB);
+
+  // Package up the result.
+  return RValue(*this, emitManagedRValueWithCleanup(optMethodArg), e);
+}
