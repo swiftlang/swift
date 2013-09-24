@@ -33,6 +33,13 @@
       println("neither")
     }
 
+* Enums now allow multiple cases to be declared in a comma-separated list
+  in a single 'case' declaration:
+
+    enum Color {
+      case Red, Green, Blue
+    }
+
 * The Objective-C 'id' and 'Class' types now support referring to
   methods declared in any class or protocol without a downcast. For
   example, given a variable "sender" of type "id", one can refer to
