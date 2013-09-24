@@ -471,8 +471,9 @@ class OverloadSetRefExpr : public Expr {
   ArrayRef<ValueDecl*> Decls;
 
 protected:
-  OverloadSetRefExpr(ExprKind Kind, ArrayRef<ValueDecl*> decls, Type Ty)
-    : Expr(Kind, /*Implicit=*/true, Ty), Decls(decls) {}
+  OverloadSetRefExpr(ExprKind Kind, ArrayRef<ValueDecl*> decls, bool Implicit,
+                     Type Ty)
+    : Expr(Kind, Implicit, Ty), Decls(decls) {}
 
 public:
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
@@ -500,8 +501,9 @@ class OverloadedDeclRefExpr : public OverloadSetRefExpr {
 
 public:
   OverloadedDeclRefExpr(ArrayRef<ValueDecl*> Decls, SourceLoc Loc,
-                        Type Ty = Type())
-    : OverloadSetRefExpr(ExprKind::OverloadedDeclRef, Decls, Ty), Loc(Loc) { }
+                        bool Implicit, Type Ty = Type())
+    : OverloadSetRefExpr(ExprKind::OverloadedDeclRef, Decls, Implicit, Ty),
+      Loc(Loc) { }
   
   SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
@@ -528,8 +530,8 @@ class OverloadedMemberRefExpr : public OverloadSetRefExpr {
 public:
   OverloadedMemberRefExpr(Expr *SubExpr, SourceLoc DotLoc,
                           ArrayRef<ValueDecl *> Decls, SourceLoc MemberLoc,
-                          Type Ty = Type())
-    : OverloadSetRefExpr(ExprKind::OverloadedMemberRef, Decls, Ty),
+                          bool Implicit, Type Ty = Type())
+    : OverloadSetRefExpr(ExprKind::OverloadedMemberRef, Decls, Implicit, Ty),
       SubExpr(SubExpr), DotLoc(DotLoc), MemberLoc(MemberLoc) { }
 
   SourceLoc getDotLoc() const { return DotLoc; }

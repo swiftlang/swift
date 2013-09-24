@@ -403,7 +403,7 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
   }
 
   Decls = Context.AllocateCopy(Decls);
-  auto result = new (Context) OverloadedDeclRefExpr(Decls, NameLoc);
+  auto result = new (Context) OverloadedDeclRefExpr(Decls, NameLoc, Implicit);
   result->setSpecialized(isSpecialized);
   return result;
 }

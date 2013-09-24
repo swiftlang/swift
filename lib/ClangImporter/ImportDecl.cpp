@@ -2470,7 +2470,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     } else {
       auto foundCopy = context.AllocateCopy(found);
       minusRef = new (context) OverloadedDeclRefExpr(
-                                 foundCopy, SourceLoc());
+                                 foundCopy, SourceLoc(), /*Implicit=*/true);
     }
 
     expr = new (context) PrefixUnaryExpr(minusRef, expr);

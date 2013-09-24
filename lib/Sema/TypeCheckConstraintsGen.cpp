@@ -990,7 +990,8 @@ namespace {
           auto members
             = TC.Context.AllocateCopy(ArrayRef<ValueDecl *>(&member, 1));
           return new (TC.Context) OverloadedMemberRefExpr(base,
-                                   dotCall->getDotLoc(), members, memberLoc);
+                                   dotCall->getDotLoc(), members, memberLoc,
+                                   expr->isImplicit());
         }
       }
 
@@ -1006,7 +1007,7 @@ namespace {
             = TC.Context.AllocateCopy(ArrayRef<ValueDecl *>(&member, 1));
           return new (TC.Context) OverloadedMemberRefExpr(base,
                                     dotIgnored->getDotLoc(), members,
-                                                          memberLoc);
+                                    memberLoc, expr->isImplicit());
         }
       }
       
