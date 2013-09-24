@@ -859,7 +859,10 @@ public:
   }
 
   raw_ostream &printCommon(Expr *E, const char *C) {
-    return OS.indent(Indent) << '(' << C << " type='" << E->getType() << '\'';
+    OS.indent(Indent) << '(' << C;
+    if (E->isImplicit())
+      OS << " implicit";
+    return OS << " type='" << E->getType() << '\'';
   }
 
   void visitErrorExpr(ErrorExpr *E) {
