@@ -2490,6 +2490,18 @@ inline SourceRange EnumCaseDecl::getSourceRange() const {
   return {};
 }
 
+/// Describes the kind of subscripting used in Objective-C.
+enum class ObjCSubscriptKind {
+  /// Not an Objective-C subscripting kind.
+  None,
+  /// Objective-C indexed subscripting, which is based on an integral
+  /// index.
+  Indexed,
+  /// Objective-C keyed subscripting, which is based on an object
+  /// argument or metatype thereof.
+  Keyed
+};
+
 /// \brief Declares a subscripting operator for a type.
 ///
 /// A subscript declaration is defined as a get/set pair that produces a
@@ -2564,7 +2576,19 @@ public:
   
   /// \brief Returns whether the subscript operation has a setter.
   bool isSettable() const { return Set; }
-  
+
+  /// Determine the kind of Objective-C subscripting this declaration
+  /// implies.
+  ObjCSubscriptKind getObjCSubscriptKind() const;
+
+  /// Given that this is an Objective-C subscript declaration, produce
+  /// its getter selector.
+  StringRef getObjCGetterSelector() const;
+
+  /// Given that this is an Objective-C subscript declaration, produce
+  /// its setter selector.
+  StringRef getObjCSetterSelector() const;
+
   SubscriptDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(SubscriptDecl *over) { OverriddenDecl = over; }
 

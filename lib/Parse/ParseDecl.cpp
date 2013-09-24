@@ -2402,6 +2402,9 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
       Decls.push_back(Get);
     }
 
+    if (Attributes.isValid())
+      Subscript->getMutableAttrs() = Attributes;
+
     Decls.push_back(Subscript);
   }
   return Status;

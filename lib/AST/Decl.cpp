@@ -918,6 +918,124 @@ SourceRange FuncDecl::getSourceRange() const {
   return { FuncLoc, LastPat->getEndLoc() };
 }
 
+/// Determine whether the given type is (or bridges to) an
+/// Objective-C object type.
+static bool isObjCObjectOrBridgedType(Type type) {
+  // FIXME: Bridged types info should be available here in the AST
+  // library, rather than hard-coding them.
+  if (auto structTy = type->getAs<StructType>()) {
+    auto structDecl = structTy->getDecl();
+    if (auto module = dyn_cast<Module>(structDecl->getDeclContext())) {
+      if (module->Name.str().equals("swift") &&
+          !structDecl->getName().empty() &&
+          structDecl->getName().str().equals("String"))
+        return true;
+    }
+   
+    return false;
+  }
+
+  // Unwrap metatypes for remaining checks.
+  if (auto metaTy = type->getAs<MetaTypeType>())
+    type = metaTy->getInstanceType();
+
+  // Class types are Objective-C object types.
+  if (type->is<ClassType>())
+    return true;
+
+  // [objc] protocols
+  if (auto protoTy = type->getAs<ProtocolType>()) {
+    auto proto = protoTy->getDecl();
+    return proto->requiresClass() && proto->getAttrs().isObjC();
+  }
+
+  return false;
+}
+
+/// Determine whether the given Swift type is an integral type, i.e.,
+/// a type that wraps a builtin integer.
+static bool isIntegralType(Type type) {
+  // Consider structs in the "swift" module that wrap a builtin
+  // integer type to be integral types.
+  if (auto structTy = type->getAs<StructType>()) {
+    auto structDecl = structTy->getDecl();
+    auto module = dyn_cast<Module>(structDecl->getDeclContext());
+    if (!module || !module->Name.str().equals("swift"))
+      return false;
+
+    // Find the single ivar.
+    VarDecl *singleVar = nullptr;
+    for (auto member : structDecl->getMembers()) {
+      auto var = dyn_cast<VarDecl>(member);
+      if (!var || var->isProperty())
+        continue;
+
+      if (singleVar)
+        return false;
+
+      singleVar = var;
+    }
+
+    if (!singleVar)
+      return false;
+
+    // Check whether it has integer type.
+    return singleVar->getType()->is<BuiltinIntegerType>();
+  }
+
+  return false;
+}
+
+ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
+  auto indexTy = getIndices()->getType();
+
+  // Look through a named 1-tuple.
+  if (auto tupleTy = indexTy->getAs<TupleType>()) {
+    if (tupleTy->getNumElements() == 1 &&
+        !tupleTy->getFields()[0].isVararg()) {
+      indexTy = tupleTy->getElementType(0);
+    }
+  }
+
+  // If the index type is an integral type, we have an indexed
+  // subscript.
+  if (isIntegralType(indexTy))
+    return ObjCSubscriptKind::Indexed;
+
+  // If the index type is an object type in Objective-C, we have a
+  // keyed subscript.
+  if (isObjCObjectOrBridgedType(indexTy))
+    return ObjCSubscriptKind::Keyed;
+
+  return ObjCSubscriptKind::None;
+}
+
+StringRef SubscriptDecl::getObjCGetterSelector() const {
+  switch (getObjCSubscriptKind()) {
+  case ObjCSubscriptKind::None:
+    llvm_unreachable("Not an Objective-C subscript");
+   
+  case ObjCSubscriptKind::Indexed:
+    return "objectAtIndexedSubscript:";
+
+  case ObjCSubscriptKind::Keyed:
+    return "objectForKeyedSubscript:";
+  }
+}
+
+StringRef SubscriptDecl::getObjCSetterSelector() const {
+  switch (getObjCSubscriptKind()) {
+  case ObjCSubscriptKind::None:
+    llvm_unreachable("Not an Objective-C subscript");
+   
+  case ObjCSubscriptKind::Indexed:
+    return "setObject:atIndexedSubscript:";
+
+  case ObjCSubscriptKind::Keyed:
+    return "setObject:forKeyedSubscript:";
+  }
+}
+
 SourceRange EnumElementDecl::getSourceRange() const {
   if (RawValueExpr && !RawValueExpr->isImplicit())
     return {getStartLoc(), RawValueExpr->getEndLoc()};

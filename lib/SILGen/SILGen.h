@@ -171,6 +171,10 @@ public:
   /// Emit the ObjC-compatible entry point for a constructor.
   void emitObjCConstructorThunk(ConstructorDecl *constructor);
 
+  /// Emit the ObjC-compatible getter and setter for a subscript
+  /// declaration.
+  void emitObjCSubscriptMethodThunks(SubscriptDecl *subscript);
+
   /// True if the given function requires an entry point for ObjC method
   /// dispatch.
   bool requiresObjCMethodEntryPoint(FuncDecl *method);
@@ -182,6 +186,10 @@ public:
   /// True if the given property requires entry points for ObjC property method
   /// dispatch.
   bool requiresObjCPropertyEntryPoints(VarDecl *property);
+
+  /// True if the given subscript requires entry points for ObjC
+  /// subscript operations
+  bool requiresObjCSubscriptEntryPoints(SubscriptDecl *subscript);
   
   /// True if calling the given method should use ObjC dispatch.
   bool requiresObjCDispatch(ValueDecl *vd);
@@ -496,6 +504,12 @@ public:
   
   /// Generate an ObjC-compatible setter for a property.
   void emitObjCPropertySetter(SILDeclRef setter);
+
+  /// Generate an ObjC-compatible getter for a subscript.
+  void emitObjCSubscriptGetter(SILDeclRef getter);
+  
+  /// Generate an ObjC-compatible setter for a subscript.
+  void emitObjCSubscriptSetter(SILDeclRef setter);
 
   //===--------------------------------------------------------------------===//
   // Control flow

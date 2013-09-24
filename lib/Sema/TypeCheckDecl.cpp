@@ -1027,7 +1027,6 @@ public:
     }
 
     visitBoundVars(PBD->getPattern());
-
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
@@ -1049,6 +1048,23 @@ public:
       SD->setType(FunctionType::get(SD->getIndices()->getType(),
                                     SD->getElementType(), TC.Context));
     }
+
+    // A subscript is ObjC-compatible if it's explicitly [objc], or a
+    // member of an ObjC-compatible class or property.
+    DeclContext *dc = SD->getDeclContext();
+    if (dc && dc->getDeclaredTypeInContext()) {
+      ClassDecl *classContext = dc->getDeclaredTypeInContext()
+        ->getClassOrBoundGenericClass();
+      ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(dc);
+      bool isObjC = (classContext && classContext->isObjC())
+                  || (protocolContext && protocolContext->isObjC())
+                  || SD->getAttrs().ObjC;
+      if (isObjC && SD->getObjCSubscriptKind() != ObjCSubscriptKind::None) {
+        SD->setIsObjC(true);
+      }
+    }
+
+    validateAttributes(SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -1684,7 +1700,7 @@ public:
         // because the property accessors may be visited before the VarDecl and
         // prop->isObjC() may not yet be set by typechecking.
         ValueDecl *prop = cast<ValueDecl>(FD->getGetterOrSetterDecl());
-        isObjC = prop->getAttrs().isObjC() || prop->getAttrs().isIBOutlet();
+        isObjC = prop->isObjC() || prop->getAttrs().isIBOutlet();
       }
 
       FD->setIsObjC(isObjC);
@@ -2456,8 +2472,8 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   };
 
   if (Attrs.isObjC()) {
-    // Only classes, class protocols, instance properties, and methods can be
-    // ObjC.
+    // Only classes, class protocols, instance properties, methods,
+    // constructors, and subscripts can be ObjC.
     Optional<Diag<>> error;
     if (isa<ClassDecl>(VD)) {
       /* ok */
@@ -2465,6 +2481,10 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       if (isOperator)
         error = diag::invalid_objc_decl;
     } else if (isa<ConstructorDecl>(VD) && isInClassContext(VD)) {
+      /* ok */
+    } else if (isa<SubscriptDecl>(VD) && isInClassContext(VD) &&
+               cast<SubscriptDecl>(VD)->getObjCSubscriptKind() 
+                 != ObjCSubscriptKind::None) {
       /* ok */
     } else if (isa<VarDecl>(VD) && isInClassContext(VD)) {
       /* ok */
