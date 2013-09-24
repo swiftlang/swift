@@ -80,13 +80,9 @@ namespace {
     void printInherited(const ExtensionDecl *decl);
     void printBraceStmtElements(BraceStmt *stmt);
 
-    /// Print the argument/body patterns in selector style, if possible.
-    ///
-    /// \returns true if the arguments were printed in a selector style,
-    /// false otherwise.
-    bool printSelectorStyleArgs(AbstractFunctionDecl *AFD,
-                                ArrayRef<Pattern *> argPatterns,
-                                ArrayRef<Pattern *> bodyPatterns);
+    /// \brief Print the function parameters in curried or selector style,
+    /// to match the original function declaration.
+    void printFunctionParameters(AbstractFunctionDecl *AFD);
 
 #define DECL(Name,Parent) void visit##Name##Decl(Name##Decl *decl);
 #define ABSTRACT_DECL(Name, Parent)
@@ -542,16 +538,21 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   }
 }
 
-bool PrintAST::printSelectorStyleArgs(AbstractFunctionDecl *AFD,
-                                      ArrayRef<Pattern *> ArgPatterns,
-                                      ArrayRef<Pattern *> BodyPatterns) {
-  if (!AFD->hasSelectorStyleSignature())
-    return false;
+void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
+  ArrayRef<Pattern *> ArgPatterns = AFD->getArgParamPatterns();
+  ArrayRef<Pattern *> BodyPatterns = AFD->getBodyParamPatterns();
 
   // Skip over the implicit 'self'.
   if (AFD->getImplicitSelfDecl() && isa<FuncDecl>(AFD)) {
     ArgPatterns = ArgPatterns.slice(1);
     BodyPatterns = BodyPatterns.slice(1);
+  }
+
+  if (!AFD->hasSelectorStyleSignature()) {
+    for (auto Pat : ArgPatterns) {
+      printPattern(Pat);
+    }
+    return;
   }
 
   auto ArgTuple = cast<TuplePattern>(ArgPatterns[0]);
@@ -572,7 +573,6 @@ bool PrintAST::printSelectorStyleArgs(AbstractFunctionDecl *AFD,
     printPattern(BodyTuple->getFields()[i].getPattern());
     OS << ')';
   }
-  return true;
 }
 
 void PrintAST::printBraceStmtElements(BraceStmt *stmt) {
@@ -633,22 +633,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       printGenericParams(decl->getGenericParams());
     }
 
-    if (!printSelectorStyleArgs(decl,
-                                decl->getArgParamPatterns(),
-                                decl->getBodyParamPatterns())) {
-      bool first = true;
-      for (auto pattern : decl->getArgParamPatterns()) {
-        if (first) {
-          first = false;
-
-          // Don't print the implicit 'self' parameter.
-          if (decl->getDeclContext()->isTypeContext())
-            continue;
-        }
-
-        printPattern(pattern);
-      }
-    }
+    printFunctionParameters(decl);
 
     auto &Context = decl->getASTContext();
     Type ResultTy = decl->getResultType(Context);
@@ -740,11 +725,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     printGenericParams(decl->getGenericParams());
   }
   printAttributes(decl->getAttrs());
-  if (!printSelectorStyleArgs(decl,
-                              decl->getArgParamPatterns(),
-                              decl->getBodyParamPatterns())) {
-    printPattern(decl->getArgParams());
-  }
+  printFunctionParameters(decl);
   if (!Options.FunctionDefinitions || !decl->getBody()) {
     return;
   }
