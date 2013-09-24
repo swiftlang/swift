@@ -853,7 +853,10 @@ public:
   }
   
   void checkClassMethodInst(ClassMethodInst *CMI) {
-    auto methodType = CMI->getType(0).getAs<AnyFunctionType>();
+    require(CMI->getType()
+              == F.getModule().Types.getConstantType(CMI->getMember()),
+            "result type of class_method must match type of method");
+    auto methodType = CMI->getType().getAs<AnyFunctionType>();
     require(methodType,
             "result method must be of a function type");
     require(methodType->isThin(),
@@ -866,6 +869,9 @@ public:
   }
   
   void checkSuperMethodInst(SuperMethodInst *CMI) {
+    require(CMI->getType()
+              == F.getModule().Types.getConstantType(CMI->getMember()),
+            "result type of class_method must match type of method");
     auto methodType = CMI->getType(0).getAs<AnyFunctionType>();
     require(methodType,
             "result method must be of a function type");
