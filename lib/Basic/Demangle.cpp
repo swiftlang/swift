@@ -720,7 +720,7 @@ private:
     if (Mangled.nextIf('q')) {
       NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                            Node::makeNodePointer(Node::Kind::Structure,"Optional"));
+                                                  Node::makeNodePointer(Node::Kind::Enum,"Optional"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('S')) {
