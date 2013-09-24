@@ -32,7 +32,7 @@ public:
   friend class SILCloner<SILInliner>;
 
   explicit SILInliner(SILFunction &F)
-    : SILCloner<SILInliner>(F) {
+    : SILCloner<SILInliner>(F), DebugScope(nullptr) {
   }
 
   /// inlineFunction - This method inlines a callee function, assuming that it
@@ -84,6 +84,8 @@ private:
   }
 
   SILValue postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+    if (DebugScope)
+      Cloned->setDebugScope(DebugScope);
     InstructionMap.insert(std::make_pair(Orig, Cloned));
     return Cloned;
   }
@@ -91,8 +93,10 @@ private:
   SILLocation remapLocation(SILLocation InLoc) {
     // Inlined location wraps the call site that is being inlined, regardless
     // of the input location.
-    assert(Loc.hasValue());
-    return Loc.getValue();
+    if (Loc.hasValue())
+      return Loc.getValue();
+    else
+      return InLoc;
   }
 
   SILBasicBlock* CalleeEntryBB;
@@ -107,6 +111,7 @@ private:
   /// Alternatively, it can be the SIL file location of the call site (in case
   /// of SIL-to-SIL transformations).
   Optional<SILLocation> Loc;
+  SILDebugScope* DebugScope;
 };
 
 } // end namespace swift

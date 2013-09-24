@@ -38,6 +38,7 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
   // Compute the SILLocation which should be used by all the inlined
   // instructions.
   Loc = InlinedLocation::getInlinedLocation(I->getLoc());
+  DebugScope = I->getDebugScope();
 
   // If the caller's BB is not the last BB in the calling function, then keep
   // track of the next BB so we always insert new BBs before it; otherwise,
