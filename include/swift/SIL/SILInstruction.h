@@ -1486,7 +1486,7 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
 
-/// ArchetypeMethodInst - Given the address of an archetype value and a method
+/// ArchetypeMethodInst - Given an archetype type and a protocol method
 /// constant, extracts the implementation of that method for the archetype.
 class ArchetypeMethodInst : public MethodInst {
   SILType LookupType;
