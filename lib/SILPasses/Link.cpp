@@ -44,29 +44,41 @@ void swift::performSILLinking(SILModule *M) {
 
   while (!Worklist.empty()) {
     auto Fn = Worklist.pop_back_val();
+
     for (auto &BB : *Fn) {
       for (auto I = BB.begin(), E = BB.end(); I != E; I++) {
-        // Handles ApplyInst only.
-        auto *AI = dyn_cast<ApplyInst>(I);
-        // When EnableLinkAll is true, we don't check whether it is transparent.
-        if (!AI || (!EnableLinkAll && !AI->isTransparent()))
+        SILFunction *CalleeFunction = nullptr;
+        bool TryLinking = false;
+        if (ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
+          SILValue Callee = AI->getCallee();
+          // Handles FunctionRefInst only.
+          if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef()))
+            CalleeFunction = FRI->getFunction();
+
+          // When EnableLinkAll is true, we always link the Callee.
+          TryLinking = EnableLinkAll ? true : AI->isTransparent();
+        }
+        else if (SpecializeInst *SI = dyn_cast<SpecializeInst>(I)) {
+          SILValue Callee = SI->getOperand();
+          // Handles FunctionRefInst only.
+          if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef()))
+            CalleeFunction = FRI->getFunction();
+        }
+        if (!CalleeFunction)
           continue;
 
-        SILValue Callee = AI->getCallee();
-        // Handles FunctionRefInst only.
-        FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef());
-        if (!FRI)
-          continue;
-
-        SILFunction *CalleeFunction = FRI->getFunction();
         if (CalleeFunction->empty()) {
           // Try to find the definition in a serialized module when callee is
-          // currently empty and the ApplyInst is transparent.
-          auto NewFn = SILLoader->lookupSILFunction(CalleeFunction);
-          if (NewFn) {
-            Worklist.push_back(NewFn);
-            ++NumFuncLinked;
+          // currently empty.
+          if (TryLinking) {
+            if (auto NewFn = SILLoader->lookupSILFunction(CalleeFunction)) {
+              Worklist.push_back(NewFn);
+              ++NumFuncLinked;
+              continue;
+            }
           }
+          // FIXME: Make sure the declaration has external linkage?
+          CalleeFunction->setLinkage(SILLinkage::External);
         }
       }
     }

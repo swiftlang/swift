@@ -222,7 +222,8 @@ private:
   ProtocolConformance *
   readUnderlyingConformance(ProtocolDecl *proto,
                             serialization::DeclID typeID,
-                            serialization::IdentifierID moduleID);
+                            serialization::IdentifierID moduleID,
+                            llvm::BitstreamCursor &Cursor);
 
   /// Recursively reads a protocol conformance from \c DeclTypeCursor.
   ///
@@ -232,12 +233,7 @@ private:
   /// If the record at the cursor is not a protocol conformance, returns
   /// Nothing. Note that a null pointer is a valid conformance value.
   Optional<std::pair<ProtocolDecl *, ProtocolConformance *>>
-  maybeReadConformance(Type conformingType);
-
-  /// Reads a substitution record from \c DeclTypeCursor.
-  ///
-  /// If the record at the cursor is not a substitution, returns Nothing.
-  Optional<Substitution> maybeReadSubstitution();
+  maybeReadConformance(Type conformingType, llvm::BitstreamCursor &Cursor);
 
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
@@ -389,6 +385,11 @@ public:
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead. An empty name represents the Builtin module.
   Module *getModule(Identifier name);
+
+  /// Reads a substitution record from \c DeclTypeCursor.
+  ///
+  /// If the record at the cursor is not a substitution, returns Nothing.
+  Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor);
 };
 
 class SerializedModule : public LoadedModule {

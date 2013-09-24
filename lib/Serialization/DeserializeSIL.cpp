@@ -15,6 +15,7 @@
 #include "SILFormat.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Serialization/BCReadingExtras.h"
 
@@ -244,7 +245,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
     return nullptr;
   }
   auto Fn = InFunc;
-  Fn->setLinkage((SILLinkage)Linkage);
+  // FIXME: what should we set the linkage to?
+  Fn->setLinkage(SILLinkage::Deserialized);
+  // FIXME: use the correct SILLocation from module.
+  SourceLoc Loc;
+  Fn->setLocation(SILFileLocation(Loc));
+  Fn->setDebugScope(new (SILMod) SILDebugScope(Fn->getLocation()));
   SILBasicBlock *CurrentBB = nullptr;
 
   // Clear up at the beginning of each SILFunction.
@@ -1147,16 +1153,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::SpecializeInst: {
     // Format: a typed value, a type, a list of substitutions (Archetype name,
     // Replacement type). Use SILOneTypeValuesLayout.
-    assert(ListOfValues.size() >= 4 &&
-           "Expect 4 or more numbers for SpecializeInst");
+    assert(ListOfValues.size() == 5 && "Expect 5 numbers for SpecializeInst");
+    unsigned NumSub = ListOfValues[4];
+    // Read the substitutions.
     SmallVector<Substitution, 4> Substitutions;
-    for (unsigned I = 4, E = ListOfValues.size(); I < E; I += 2) {
-      Substitution Sub;
-      Sub.Replacement = MF->getType(ListOfValues[I+1]);
-      Sub.Archetype = cast<ArchetypeType>(
-                          MF->getType(ListOfValues[I]).getPointer());
-      Substitutions.push_back(Sub);
+    while (NumSub--) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      assert(sub.hasValue() && "Missing substitution?");
+      Substitutions.push_back(*sub);
     }
+
     auto ValTy = MF->getType(ListOfValues[0]);
     assert(ValTy->is<PolymorphicFunctionType>() &&
            "Should be a polymorphic function");

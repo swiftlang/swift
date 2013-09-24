@@ -1055,6 +1055,9 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
     break;
   case SILLinkage::External:
     break;
+  case SILLinkage::Deserialized:
+    OS << "deserialized ";
+    break;
   }
   
   printName(OS);

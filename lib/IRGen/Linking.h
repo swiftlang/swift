@@ -397,6 +397,7 @@ public:
   void mangle(SmallVectorImpl<char> &buffer) const;
   bool isLocalLinkage() const;
   bool isThunk() const;
+  bool isDeserialized() const;
 
   ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));

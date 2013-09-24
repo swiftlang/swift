@@ -577,11 +577,12 @@ Serializer::encodeUnderlyingConformance(const ProtocolConformance *conformance,
 void
 Serializer::writeConformance(const ProtocolDecl *protocol,
                              const ProtocolConformance *conformance,
-                             const Decl *associatedDecl) {
+                             const Decl *associatedDecl,
+                             const std::array<unsigned, 256> &abbrCodes) {
   using namespace decls_block;
 
   if (!conformance) {
-    unsigned abbrCode = DeclTypeAbbrCodes[NoConformanceLayout::Code];
+    unsigned abbrCode = abbrCodes[NoConformanceLayout::Code];
     NoConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     addDeclRef(protocol));
     return;
@@ -621,7 +622,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
 
     unsigned numInheritedConformances = conf->getInheritedConformances().size();
     unsigned abbrCode
-      = DeclTypeAbbrCodes[NormalProtocolConformanceLayout::Code];
+      = abbrCodes[NormalProtocolConformanceLayout::Code];
     NormalProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                                 addDeclRef(protocol),
                                                 numValueWitnesses,
@@ -637,12 +638,14 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
       inheritedProtos.push_back(inheritedMapping.first);
       inheritedConformance.push_back(inheritedMapping.second);
     }
-    writeConformances(inheritedProtos, inheritedConformance, associatedDecl);
+    writeConformances(inheritedProtos, inheritedConformance, associatedDecl,
+                      abbrCodes);
     for (auto valueMapping : conf->getWitnesses()) {
-      writeSubstitutions(valueMapping.second.getSubstitutions());
+      writeSubstitutions(valueMapping.second.getSubstitutions(),
+        abbrCodes);
     }
     for (auto typeMapping : conf->getTypeWitnesses())
-      writeSubstitutions(typeMapping.second);
+      writeSubstitutions(typeMapping.second, abbrCodes);
 
     break;
   }
@@ -658,7 +661,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     }
     auto substitutions = conf->getGenericSubstitutions();
     unsigned abbrCode
-      = DeclTypeAbbrCodes[SpecializedProtocolConformanceLayout::Code];
+      = abbrCodes[SpecializedProtocolConformanceLayout::Code];
     DeclID typeID;
     IdentifierID moduleID;
 
@@ -674,12 +677,13 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
                                                      numTypeWitnesses,
                                                      substitutions.size(),
                                                      data);
-    writeSubstitutions(substitutions);
+    writeSubstitutions(substitutions, abbrCodes);
     for (auto typeMapping : conf->getTypeWitnesses())
-      writeSubstitutions(typeMapping.second);
+      writeSubstitutions(typeMapping.second, abbrCodes);
 
     if (appendGenericConformance) {
-      writeConformance(protocol, conf->getGenericConformance(), nullptr);
+      writeConformance(protocol, conf->getGenericConformance(), nullptr,
+                       abbrCodes);
     }
     break;
   }
@@ -687,7 +691,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
   case ProtocolConformanceKind::Inherited: {
     auto conf = cast<InheritedProtocolConformance>(conformance);
     unsigned abbrCode
-      = DeclTypeAbbrCodes[InheritedProtocolConformanceLayout::Code];
+      = abbrCodes[InheritedProtocolConformanceLayout::Code];
     DeclID typeID;
     IdentifierID moduleID;
 
@@ -701,7 +705,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
                                                    typeID,
                                                    moduleID);
     if (appendInheritedConformance) {
-      writeConformance(protocol, conf->getInheritedConformance(), nullptr);
+      writeConformance(protocol, conf->getInheritedConformance(), nullptr,
+                       abbrCodes);
     }
     break;
   }
@@ -711,25 +716,29 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
 void
 Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
                               ArrayRef<ProtocolConformance *> conformances,
-                              const Decl *associatedDecl) {
+                              const Decl *associatedDecl,
+                              const std::array<unsigned, 256> &abbrCodes) {
   using namespace decls_block;
 
   for_each(protocols, conformances,
            [&](const ProtocolDecl *proto, const ProtocolConformance *conf) {
-    writeConformance(proto, conf, associatedDecl);
+    writeConformance(proto, conf, associatedDecl, abbrCodes);
   });
 }
 
-void Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions) {
+/// Writes a list of generic substitutions.
+void Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
+                     const std::array<unsigned, 256> &abbrCodes) {
   using namespace decls_block;
-  auto abbrCode = DeclTypeAbbrCodes[BoundGenericSubstitutionLayout::Code];
+  auto abbrCode = abbrCodes[BoundGenericSubstitutionLayout::Code];
   for (auto &sub : substitutions) {
     BoundGenericSubstitutionLayout::emitRecord(
       Out, ScratchRecord, abbrCode,
       addTypeRef(sub.Archetype),
       addTypeRef(sub.Replacement),
       sub.Archetype->getConformsTo().size());
-    writeConformances(sub.Archetype->getConformsTo(), sub.Conformance);
+    writeConformances(sub.Archetype->getConformsTo(), sub.Conformance, nullptr,
+                      abbrCodes);
   }
 }
 
@@ -886,7 +895,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 extension->isImplicit());
 
     writeConformances(extension->getProtocols(), extension->getConformances(),
-                      extension);
+                      extension, DeclTypeAbbrCodes);
 
     bool isClassExtension = false;
     if (auto baseNominal = baseTy->getAnyNominal()) {
@@ -980,7 +989,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 typeAlias->isImplicit());
 
     writeConformances(typeAlias->getProtocols(), typeAlias->getConformances(),
-                      typeAlias);
+                      typeAlias, DeclTypeAbbrCodes);
     break;
   }
 
@@ -1005,7 +1014,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     writeConformances(genericParam->getProtocols(),
                       genericParam->getConformances(),
-                      genericParam);
+                      genericParam, DeclTypeAbbrCodes);
     break;
   }
 
@@ -1029,7 +1038,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     writeConformances(assocType->getProtocols(),
                       assocType->getConformances(),
-                      assocType);
+                      assocType, DeclTypeAbbrCodes);
     break;
   }
 
@@ -1049,7 +1058,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     writeGenericParams(theStruct->getGenericParams());
     writeConformances(theStruct->getProtocols(), theStruct->getConformances(),
-                      theStruct);
+                      theStruct, DeclTypeAbbrCodes);
     writeMembers(theStruct->getMembers(), false);
     break;
   }
@@ -1070,7 +1079,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     writeGenericParams(theEnum->getGenericParams());
     writeConformances(theEnum->getProtocols(), theEnum->getConformances(),
-                      theEnum);
+                      theEnum, DeclTypeAbbrCodes);
     writeMembers(theEnum->getMembers(), false);
     break;
   }
@@ -1094,7 +1103,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     writeGenericParams(theClass->getGenericParams());
     writeConformances(theClass->getProtocols(), theClass->getConformances(),
-                      theClass);
+                      theClass, DeclTypeAbbrCodes);
     writeMembers(theClass->getMembers(), true);
     break;
   }

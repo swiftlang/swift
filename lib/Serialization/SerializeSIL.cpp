@@ -1055,16 +1055,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back((unsigned)SpI->getOperand().getType().getCategory());
     ListOfValues.push_back(addValueRef(SpI->getOperand()));
     ListOfValues.push_back(SpI->getOperand().getResultNumber());
-
-    for (auto Sub : SpI->getSubstitutions()) {
-      ListOfValues.push_back(S.addTypeRef(Sub.Archetype));
-      ListOfValues.push_back(S.addTypeRef(Sub.Replacement));
-    }
+    ListOfValues.push_back(SpI->getSubstitutions().size());
 
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
         S.addTypeRef(SpI->getType().getSwiftRValueType()),
         (unsigned)SpI->getType().getCategory(), ListOfValues);
+
+    S.writeSubstitutions(SpI->getSubstitutions(), SILAbbrCodes);
     break;
   }
   }
@@ -1105,7 +1103,7 @@ void SILSerializer::writeFuncTable() {
 
 void SILSerializer::writeAllSILFunctions(const SILModule *M) {
   {
-    BCBlockRAII subBlock(Out, SIL_BLOCK_ID, 4);
+    BCBlockRAII subBlock(Out, SIL_BLOCK_ID, 5);
     registerSILAbbr<SILFunctionLayout>();
     registerSILAbbr<SILBasicBlockLayout>();
     registerSILAbbr<SILOneValueOneOperandLayout>();
@@ -1116,6 +1114,16 @@ void SILSerializer::writeAllSILFunctions(const SILModule *M) {
     registerSILAbbr<SILTwoOperandsLayout>();
     registerSILAbbr<SILInstApplyLayout>();
     registerSILAbbr<SILInstNoOperandLayout>();
+
+    // Register the abbreviation codes so these layouts can exist in both
+    // decl blocks and sil blocks.
+    // We have to make sure BOUND_GENERIC_SUBSTITUTION does not overlap with
+    // SIL-specific records.
+    registerSILAbbr<decls_block::BoundGenericSubstitutionLayout>();
+    registerSILAbbr<decls_block::NoConformanceLayout>();
+    registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
+    registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
+    registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
 
     // Go through all SILFunctions in M, and if it is transparent,
     // write out the SILFunction.

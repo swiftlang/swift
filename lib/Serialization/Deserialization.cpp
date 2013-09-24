@@ -149,10 +149,11 @@ Pattern *ModuleFile::maybeReadPattern() {
 ProtocolConformance *
 ModuleFile::readUnderlyingConformance(ProtocolDecl *proto,
                                       DeclID typeID,
-                                      IdentifierID moduleID) {
+                                      IdentifierID moduleID,
+                                      llvm::BitstreamCursor &Cursor) {
   if (!moduleID) {
     // The underlying conformance is in the following record.
-    return maybeReadConformance(getType(typeID))->second;
+    return maybeReadConformance(getType(typeID), Cursor)->second;
   }
 
   // Dig out the protocol conformance within the nominal declaration.
@@ -187,17 +188,18 @@ ModuleFile::readUnderlyingConformance(ProtocolDecl *proto,
   llvm_unreachable("Unable to find underlying conformance");
 }
 
-Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
+Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
+                              llvm::BitstreamCursor &Cursor){
   using namespace decls_block;
 
-  BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+  BCOffsetRAII lastRecordOffset(Cursor);
   SmallVector<uint64_t, 16> scratch;
 
-  auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  auto next = Cursor.advance(AF_DontPopBlockAtEnd);
   if (next.Kind != llvm::BitstreamEntry::Record)
     return Nothing;
 
-  unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch);
+  unsigned kind = Cursor.readRecord(next.ID, scratch);
   switch (kind) {
   case NO_CONFORMANCE: {
     lastRecordOffset.reset();
@@ -231,7 +233,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
     // Read the substitutions.
     SmallVector<Substitution, 4> substitutions;
     while (numSubstitutions--) {
-      auto sub = maybeReadSubstitution();
+      auto sub = maybeReadSubstitution(Cursor);
       assert(sub.hasValue() && "Missing substitution?");
       substitutions.push_back(*sub);
     }
@@ -243,14 +245,14 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
       // FIXME: We don't actually want to allocate an archetype here; we just
       // want to get an access path within the protocol.
       auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
-      auto second = maybeReadSubstitution();
+      auto second = maybeReadSubstitution(Cursor);
       assert(second.hasValue());
       typeWitnesses[first] = *second;
     }
     assert(rawIDIter <= rawIDs.end() && "read too much");
 
     ProtocolConformance *genericConformance
-      = readUnderlyingConformance(proto, typeID, moduleID);
+      = readUnderlyingConformance(proto, typeID, moduleID, Cursor);
 
     // Reset the offset RAII to the end of the trailing records.
     lastRecordOffset.reset();
@@ -276,7 +278,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
     auto proto = cast<ProtocolDecl>(getDecl(protoID));
 
     ProtocolConformance *inheritedConformance
-      = readUnderlyingConformance(proto, typeID, moduleID);
+      = readUnderlyingConformance(proto, typeID, moduleID, Cursor);
 
     // Reset the offset RAII to the end of the trailing records.
     lastRecordOffset.reset();
@@ -305,7 +307,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
   InheritedConformanceMap inheritedConformances;
 
   while (inheritedCount--) {
-    auto inherited = maybeReadConformance(conformingType);
+    auto inherited = maybeReadConformance(conformingType, Cursor);
     assert(inherited.hasValue());
 
     inheritedConformances.insert(inherited.getValue());
@@ -324,7 +326,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
 
     SmallVector<Substitution, 8> substitutions;
     while (substitutionCount--) {
-      auto sub = maybeReadSubstitution();
+      auto sub = maybeReadSubstitution(Cursor);
       assert(sub.hasValue());
       substitutions.push_back(sub.getValue());
     }
@@ -344,7 +346,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
     // FIXME: We don't actually want to allocate an archetype here; we just
     // want to get an access path within the protocol.
     auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
-    auto second = maybeReadSubstitution();
+    auto second = maybeReadSubstitution(Cursor);
     assert(second.hasValue());
     typeWitnesses[first] = *second;
   }
@@ -387,17 +389,18 @@ void processConformances(ASTContext &ctx, T *decl,
 }
 
 
-Optional<Substitution> ModuleFile::maybeReadSubstitution() {
-  BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+Optional<Substitution> ModuleFile::maybeReadSubstitution(
+                           llvm::BitstreamCursor &Cursor) {
+  BCOffsetRAII lastRecordOffset(Cursor);
 
-  auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  auto entry = Cursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind != llvm::BitstreamEntry::Record)
     return Nothing;
 
   StringRef blobData;
   SmallVector<uint64_t, 2> scratch;
-  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
-                                                &blobData);
+  unsigned recordID = Cursor.readRecord(entry.ID, scratch,
+                                        &blobData);
   if (recordID != decls_block::BOUND_GENERIC_SUBSTITUTION)
     return Nothing;
 
@@ -416,7 +419,7 @@ Optional<Substitution> ModuleFile::maybeReadSubstitution() {
 
   SmallVector<ProtocolConformance *, 16> conformanceBuf;
   while (numConformances--) {
-    auto conformancePair = maybeReadConformance(replacementTy);
+    auto conformancePair = maybeReadConformance(replacementTy, Cursor);
     assert(conformancePair.hasValue() && "Missing conformance");
     conformanceBuf.push_back(conformancePair->second);
   }
@@ -689,7 +692,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       alias->setImplicit();
 
     SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance(underlyingType.getType()))
+    while (auto conformance = maybeReadConformance(underlyingType.getType(),
+                                                   DeclTypeCursor))
       conformances.push_back(*conformance);
     processConformances(ctx, alias, conformances);
     alias->setCheckedInheritanceClause();
@@ -728,7 +732,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     SmallVector<ConformancePair, 16> conformances;
     while (auto conformance
-           = maybeReadConformance(genericParam->getDeclaredType()))
+           = maybeReadConformance(genericParam->getDeclaredType(),
+                                  DeclTypeCursor))
       conformances.push_back(*conformance);
     processConformances(ctx, genericParam, conformances);
     genericParam->setCheckedInheritanceClause();
@@ -765,7 +770,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     SmallVector<ConformancePair, 16> conformances;
     while (auto conformance
-           = maybeReadConformance(assocType->getDeclaredType()))
+           = maybeReadConformance(assocType->getDeclaredType(), DeclTypeCursor))
       conformances.push_back(*conformance);
     processConformances(ctx, assocType, conformances);
     assocType->setCheckedInheritanceClause();
@@ -805,7 +810,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     CanType canTy = theStruct->getDeclaredTypeInContext()->getCanonicalType();
 
     SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance(canTy))
+    while (auto conformance = maybeReadConformance(canTy, DeclTypeCursor))
       conformances.push_back(*conformance);
     processConformances(ctx, theStruct, conformances);
 
@@ -1167,7 +1172,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     CanType canTy = theClass->getDeclaredTypeInContext()->getCanonicalType();
 
     SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance(canTy))
+    while (auto conformance = maybeReadConformance(canTy, DeclTypeCursor))
       conformances.push_back(*conformance);
     processConformances(ctx, theClass, conformances);
 
@@ -1216,7 +1221,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     CanType canTy = theEnum->getDeclaredTypeInContext()->getCanonicalType();
 
     SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance(canTy))
+    while (auto conformance = maybeReadConformance(canTy, DeclTypeCursor))
       conformances.push_back(*conformance);
     processConformances(ctx, theEnum, conformances);
 
@@ -1329,7 +1334,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     CanType canBaseTy = baseTy.getType()->getCanonicalType();
 
     SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance(canBaseTy))
+    while (auto conformance = maybeReadConformance(canBaseTy, DeclTypeCursor))
       conformances.push_back(*conformance);
     processConformances(ctx, extension, conformances);
 
@@ -1959,7 +1964,7 @@ Type ModuleFile::getType(TypeID TID) {
         break;
       }
     } else {
-      paramList = maybeReadGenericParams(nullptr);
+      paramList = maybeReadGenericParams(ModuleContext);
     }
     assert(paramList && "missing generic params for polymorphic function");
 

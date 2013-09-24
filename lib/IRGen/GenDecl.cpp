@@ -685,6 +685,12 @@ bool LinkEntity::isThunk() const {
   }
 }
 
+bool LinkEntity::isDeserialized() const {
+  if (getKind() == Kind::SILFunction)
+    return getSILFunction()->getLinkage() == SILLinkage::Deserialized;
+  return false;
+}
+
 LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
   LinkInfo result;
 
@@ -702,6 +708,9 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
     result.Visibility = llvm::GlobalValue::HiddenVisibility;
   } else if (entity.isThunk()) {
     // Clang thunks are linkonce_odr and hidden.
+    result.Linkage = llvm::GlobalValue::LinkOnceODRLinkage;
+    result.Visibility = llvm::GlobalValue::HiddenVisibility;
+  } else if (entity.isDeserialized()) {
     result.Linkage = llvm::GlobalValue::LinkOnceODRLinkage;
     result.Visibility = llvm::GlobalValue::HiddenVisibility;
   } else {

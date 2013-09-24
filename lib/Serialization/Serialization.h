@@ -172,9 +172,6 @@ private:
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams);
 
-  /// Writes a list of generic substitutions.
-  void writeSubstitutions(ArrayRef<Substitution> substitutions);
-
   /// Encode the underlying conformance of a generic or specialized
   /// conformance.
   ///
@@ -195,12 +192,14 @@ private:
   /// Writes a protocol conformance.
   void writeConformance(const ProtocolDecl *protocol,
                         const ProtocolConformance *conformance,
-                        const Decl *associatedDecl);
+                        const Decl *associatedDecl,
+                        const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolDecl *> protocols,
                          ArrayRef<ProtocolConformance *> conformances,
-                         const Decl *associatedDecl = nullptr);
+                         const Decl *associatedDecl,
+                         const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes an array of members for a decl context.
   ///
@@ -291,6 +290,11 @@ public:
   /// \returns The ID for the identifier for the module's name, or 0 for the
   ///          builtin module.
   IdentifierID addModuleRef(const Module *M);
+
+  /// Writes a list of generic substitutions. abbrCode is needed to support
+  /// usage out of decl block.
+  void writeSubstitutions(ArrayRef<Substitution> substitutions,
+                          const std::array<unsigned, 256> &abbrCodes);
 };
 } // end namespace serialization
 } // end namespace swift

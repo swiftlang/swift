@@ -493,6 +493,9 @@ static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
   } else if (P.Tok.getText() == "thunk") {
     Result = SILLinkage::Thunk;
     P.consumeToken(tok::identifier);
+  } else if (P.Tok.getText() == "deserialized") {
+    Result = SILLinkage::Deserialized;
+    P.consumeToken(tok::identifier);
   } else {
     P.diagnose(P.Tok, diag::expected_sil_linkage_or_function);
     return true;

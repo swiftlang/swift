@@ -31,6 +31,7 @@ enum class SILLinkage : unsigned char {
   External,
   Thunk,
   Internal,
+  Deserialized // Deserialized from a module.
 };
   
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
