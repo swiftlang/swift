@@ -690,7 +690,7 @@ private:
     if (Mangled.nextIf('b')) {
       NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                                                                                            Node::makeNodePointer(Node::Kind::Structure,"Bool"));
+                            Node::makeNodePointer(Node::Kind::Enum,"Bool"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('c')) {
@@ -720,7 +720,7 @@ private:
     if (Mangled.nextIf('q')) {
       NodePointer type = Node::makeNodePointer(Node::Kind::Path);
       type->push_back_child(Node::makeNodePointer(Node::Kind::Module,"swift"))->setNextNode(
-                                                  Node::makeNodePointer(Node::Kind::Enum,"Optional"));
+                            Node::makeNodePointer(Node::Kind::Enum,"Optional"));
       return { type, IsProtocol::no };
     }
     if (Mangled.nextIf('S')) {
