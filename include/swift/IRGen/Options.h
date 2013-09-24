@@ -69,9 +69,12 @@ public:
   /// \brief Whether we allow dynamic value type layout.
   unsigned EnableDynamicValueTypeLayout : 1;
 
+  /// \brief Whether we should run LLVM optimizations after IRGen.
+  unsigned DisableLLVMOptzns : 1;
+
   Options() : OutputKind(OutputKind::LLVMAssembly), Verify(true), OptLevel(0),
               DebugInfo(false), UseJIT(false),
-              EnableDynamicValueTypeLayout(false) {}
+              EnableDynamicValueTypeLayout(false), DisableLLVMOptzns(false) {}
 };
 
 } // end namespace irgen

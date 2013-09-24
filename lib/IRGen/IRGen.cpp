@@ -159,9 +159,14 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
 
   // Set up a pipeline.
   PassManagerBuilder PMBuilder;
-  PMBuilder.OptLevel = Opts.OptLevel;
-  if (Opts.OptLevel != 0)
-    PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
+
+  if (Opts.DisableLLVMOptzns) {
+    PMBuilder.OptLevel = 0;
+  } else {
+    PMBuilder.OptLevel = Opts.OptLevel;
+    if (Opts.OptLevel != 0)
+      PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
+  }
 
   // If the optimizer is enabled, we run the ARCOpt pass in the scalar optimizer
   // and the Expand pass as late as possible.
