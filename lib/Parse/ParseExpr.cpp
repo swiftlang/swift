@@ -140,6 +140,7 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::DerivedToBase:
   case ExprKind::DotSyntaxBaseIgnored:
   case ExprKind::DotSyntaxCall:
+  case ExprKind::DynamicSubscript:
   case ExprKind::Erasure:
   case ExprKind::ExistentialMemberRef:
   case ExprKind::ExistentialSubscript:

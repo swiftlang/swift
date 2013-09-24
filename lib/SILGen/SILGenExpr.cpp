@@ -192,6 +192,8 @@ namespace {
     RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
     RValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E,
                                        SGFContext C);
+    RValue visitDynamicSubscriptExpr(DynamicSubscriptExpr *E,
+                                     SGFContext C);
     RValue visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E,
                                          SGFContext C);
     RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
@@ -2271,6 +2273,11 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
 
 RValue RValueEmitter::visitArchetypeSubscriptExpr(
                                      ArchetypeSubscriptExpr *E, SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+
+RValue RValueEmitter::visitDynamicSubscriptExpr(
+                                     DynamicSubscriptExpr *E, SGFContext C) {
   llvm_unreachable("not implemented");
 }
 

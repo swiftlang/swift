@@ -221,9 +221,9 @@ namespace {
       return shouldVerify(cast<Expr>(closure));
     }
 
-    bool shouldVerify(DynamicMemberRefExpr *dynamicMember) {
-      OpaqueValues.insert({dynamicMember->getOpaqueFn(), 0});
-      return shouldVerify(cast<Expr>(dynamicMember));
+    bool shouldVerify(DynamicLookupExpr *dynamicLookup) {
+      OpaqueValues.insert({dynamicLookup->getOpaqueValue(), 0});
+      return shouldVerify(cast<Expr>(dynamicLookup));
     }
 
     bool shouldVerify(ConstructorDecl *CD) {
@@ -246,9 +246,9 @@ namespace {
       Functions.pop_back();
     }
 
-    void cleanup(DynamicMemberRefExpr *dynamicMember) {
-      assert(OpaqueValues.count(dynamicMember->getOpaqueFn()));
-      OpaqueValues.erase(dynamicMember->getOpaqueFn());
+    void cleanup(DynamicLookupExpr *dynamicLookup) {
+      assert(OpaqueValues.count(dynamicLookup->getOpaqueValue()));
+      OpaqueValues.erase(dynamicLookup->getOpaqueValue());
     }
 
     void cleanup(ConstructorDecl *CD) {

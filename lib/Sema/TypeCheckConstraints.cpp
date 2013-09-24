@@ -325,8 +325,10 @@ getDynamicResultSignature(ValueDecl *decl,
     // Handle constructors.
     selector = ctor->getObjCSelector(buffer);
     type = decl->getType()->castTo<AnyFunctionType>()->getResult();
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    selector = subscript->getObjCGetterSelector();
+    type = subscript->getType();
   } else {
-    // FIXME: Handle subscripts.
     llvm_unreachable("Dynamic lookup found a non-[objc] result");
   }
 
@@ -907,10 +909,18 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   if (isTypeReference) {
     type = cast<TypeDecl>(value)->getDeclaredType();
   } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
-    auto resultTy = LValueType::get(subscript->getElementType(),
-                                    LValueType::Qual::DefaultForMemberAccess|
-                                    settableQualForDecl(baseTy, subscript),
-                                    TC.Context);
+    // The type of a subscript operation is a function type mapping
+    // from the indices to the element type.
+    // If this is a dynamic lookup, the result type is optional;
+    // otherwise, it's an lvalue.
+    auto resultTy = subscript->getElementType();
+    if (isDynamicResult)
+      resultTy = OptionalType::get(resultTy, TC.Context);
+    else 
+      resultTy = LValueType::get(resultTy,
+                                 LValueType::Qual::DefaultForMemberAccess|
+                                 settableQualForDecl(baseTy, subscript),
+                                 TC.Context);
     type = FunctionType::get(subscript->getIndices()->getType(), resultTy,
                              TC.Context);
   } else {
@@ -2088,10 +2098,15 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
                                    choice.isSpecialized());
 
     if (isDynamicResult) {
-      // For a declaration found via dynamic lookup, strip off the lvalue-ness
-      // (one cannot assign to such declarations) and make a reference to
-      // that declaration be optional.
-      refType = OptionalType::get(refType->getRValueType(), TC.Context);
+      // For a non-subscript declaration found via dynamic lookup,
+      // strip off the lvalue-ness (one cannot assign to such
+      // declarations) and make a reference to that declaration be
+      // optional.
+      //
+      // Subscript declarations are handled within
+      // getTypeOfMemberReference(); their result types are optional.
+      if (!isa<SubscriptDecl>(choice.getDecl()))
+        refType = OptionalType::get(refType->getRValueType(), TC.Context);
     } else {
       // Otherwise, adjust the lvalue type for this reference.
       bool isAssignment = choice.getDecl()->getAttrs().isAssignment();

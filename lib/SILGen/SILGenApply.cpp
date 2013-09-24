@@ -1738,7 +1738,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     // Package up the result in an optional.
     SILValue optResult;
     {
-      OpaqueValueRAII opaqueValue(*this, e->getOpaqueFn(), result);
+      OpaqueValueRAII opaqueValue(*this, e->getOpaqueValue(), result);
 
       optResult = emitRValue(e->getCreateSome()).forwardAsSingleValue(*this, e);
     }

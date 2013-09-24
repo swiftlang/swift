@@ -1055,6 +1055,20 @@ public:
     printRec(E->getIndex());
     OS << ')';
   }
+  void visitDynamicSubscriptExpr(DynamicSubscriptExpr *E) {
+    printCommon(E, "dynamic_subscript_expr")
+      << " decl=";
+    E->getMember().dump(OS);
+    OS << '\n';
+    printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getIndex());
+    OS << '\n';
+    printRec(E->getCreateSome());
+    OS << '\n';
+    printRec(E->getCreateNone());
+    OS << ')';
+  }
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     printCommon(E, "unresolved_dot_expr")
       << " field '" << E->getName().str() << "'";

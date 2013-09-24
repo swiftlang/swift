@@ -695,6 +695,47 @@ public:
   }
 };
 
+/// Common base for expressions that involve dynamic lookup, which
+/// determines at runtime whether a particular method, property, or
+/// subscript is available.
+class DynamicLookupExpr : public Expr {
+  OpaqueValueExpr *OpaqueValue;
+  Expr *CreateSome;
+  Expr *CreateNone;
+
+protected:
+  DynamicLookupExpr(ExprKind kind, OpaqueValueExpr *opaqueValue,
+                    Expr *createSome, Expr *createNone)
+    : Expr(kind), OpaqueValue(opaqueValue), CreateSome(createSome),
+      CreateNone(createNone) { }
+
+public:
+  /// Retrieve the opaque value used to represent the value \c x passed to
+  /// \c .Some(x) when the dynamic member is found.
+  OpaqueValueExpr *getOpaqueValue() const { return OpaqueValue; }
+
+  /// Retrieve the expression used to create the Optional<> result when a
+  /// dynamic member was found.
+  Expr *getCreateSome() const { return CreateSome; }
+
+  void setCreateSome(Expr *createSome) {
+    CreateSome = createSome;
+  }
+
+  /// Expression used to create the empty optional result when the dynamic
+  /// member was not found.
+  Expr *getCreateNone() const { return CreateNone; }
+
+  void setCreateNone(Expr *createNone) {
+    CreateNone = createNone;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() >= ExprKind::First_DynamicLookupExpr &&
+           E->getKind() <= ExprKind::Last_DynamicLookupExpr;
+  }
+};
+
 /// A reference to a member of an object that was found via dynamic lookup.
 ///
 /// A member found via dynamic lookup may not actually be available at runtime.
@@ -704,18 +745,14 @@ public:
 ///
 /// \code
 /// class C {
-///   func foo(i : Int) -> String { ... }
+///   func [objc] foo(i : Int) -> String { ... }
 /// };
 ///
 /// var x : DynamicLookup = <some value>
 /// print(x.foo!(17)) // x.foo has type ((i : Int) -> String)?
 /// \endcode
-class DynamicMemberRefExpr : public Expr {
+class DynamicMemberRefExpr : public DynamicLookupExpr {
   Expr *Base;
-  OpaqueValueExpr *OpaqueFnValue;
-  Expr *CreateSome;
-  Expr *CreateNone;
-
   ConcreteDeclRef Member;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
@@ -727,9 +764,9 @@ public:
                        OpaqueValueExpr *opaqueValue,
                        Expr *createSome,
                        Expr *createNone)
-    : Expr(ExprKind::DynamicMemberRef),
-      Base(base), OpaqueFnValue(opaqueValue), CreateSome(createSome),
-      CreateNone(createNone), Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
+    : DynamicLookupExpr(ExprKind::DynamicMemberRef, opaqueValue,
+                        createSome, createNone),
+      Base(base), Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
     }
 
   /// Retrieve the base of the expression.
@@ -749,26 +786,6 @@ public:
 
   SourceLoc getLoc() const { return NameLoc; }
 
-  /// Retrieve the opaque value used to represent the function \c fn passed
-  /// to \c .Some(fn) when the dynamic member is found.
-  OpaqueValueExpr *getOpaqueFn() const { return OpaqueFnValue; }
-
-  /// Retrieve the expression used to create the Optional<> result when a
-  /// dynamic member was found.
-  Expr *getCreateSome() const { return CreateSome; }
-
-  void setCreateSome(Expr *createSome) {
-    CreateSome = createSome;
-  }
-
-  /// Expression used to create the empty optional result when the dynamic
-  /// member was not found.
-  Expr *getCreateNone() const { return CreateNone; }
-
-  void setCreateNone(Expr *createNone) {
-    CreateNone = createNone;
-  }
-
   SourceRange getSourceRange() const {
     if (Base->isImplicit())
       return SourceRange(NameLoc);
@@ -778,6 +795,65 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DynamicMemberRef;
+  }
+};
+
+/// A subscript on an object with dynamic lookup type.
+///
+/// A subscript found via dynamic lookup may not actually be available
+/// at runtime.  Therefore, the result of performing the subscript
+/// operation always returns an optional instance.Users can then
+/// propagate the optional (via ?) or assert that the member is always
+/// available (via !). For example:
+///
+/// \code
+/// class C {
+///   subscript [objc] (i : Int) -> String { 
+///   get: 
+///     ... 
+///   }
+/// };
+///
+/// var x : DynamicLookup = <some value>
+/// print(x[27]! // x[27] has type String?
+/// \endcode
+class DynamicSubscriptExpr : public DynamicLookupExpr {
+  Expr *Base;
+  Expr *Index;
+  ConcreteDeclRef Member;
+
+public:
+  DynamicSubscriptExpr(Expr *base, Expr *index, 
+                       ConcreteDeclRef member,
+                       OpaqueValueExpr *opaqueValue,
+                       Expr *createSome,
+                       Expr *createNone)
+    : DynamicLookupExpr(ExprKind::DynamicSubscript, opaqueValue,
+                        createSome, createNone),
+      Base(base), Index(index), Member(member) { }
+
+  /// Retrieve the base of the expression.
+  Expr *getBase() const { return Base; }
+
+  /// Replace the base of the expression.
+  void setBase(Expr *base) { Base = base; }
+
+  /// getIndex - Retrieve the index of the subscript expression, i.e., the
+  /// "offset" into the base value.
+  Expr *getIndex() const { return Index; }
+  void setIndex(Expr *E) { Index = E; }
+
+  /// Retrieve the member to which this access refers.
+  ConcreteDeclRef getMember() const { return Member; }
+
+  SourceLoc getLoc() const { return Index->getStartLoc(); }
+
+  SourceRange getSourceRange() const {
+    return SourceRange(Base->getStartLoc(), Index->getEndLoc());
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DynamicSubscript;
   }
 };
 

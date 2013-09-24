@@ -119,6 +119,7 @@ namespace {
         = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptIndex);
       auto resultLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptResult);
+
       // The base type must have a subscript declaration with type
       // I -> [byref] O, where I and O are fresh type variables. The index
       // expression must be convertible to I and the subscript expression
@@ -126,14 +127,6 @@ namespace {
       auto inputTv = CS.createTypeVariable(indexLocator, /*options=*/0);
       auto outputTv = CS.createTypeVariable(resultLocator,
                                             TVO_CanBindToLValue);
-
-      auto outputSuperTv = CS.createTypeVariable(nullptr, TVO_CanBindToLValue);
-      auto outputSuperTy
-        = LValueType::get(outputSuperTv,
-                          LValueType::Qual::DefaultForMemberAccess|
-                          LValueType::Qual::Implicit|
-                          LValueType::Qual::NonSettable,
-                          Context);
 
       // Add the member constraint for a subscript declaration.
       // FIXME: lame name!
@@ -143,11 +136,6 @@ namespace {
                                   fnTy,
                                   CS.getConstraintLocator(expr,
                                     ConstraintLocator::SubscriptMember));
-
-      // Add the subtype constraint that the output type must be some lvalue
-      // subtype.
-      CS.addConstraint(ConstraintKind::Subtype, outputTv, outputSuperTy,
-                       resultLocator);
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
@@ -611,6 +599,10 @@ namespace {
     }
 
     Type visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *expr) {
+      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
+    }
+
+    Type visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
       return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
     }
 
