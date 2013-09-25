@@ -1212,18 +1212,6 @@ namespace {
                         [&]{ D->print(Out); });
     }
 
-    void checkSourceRanges(FuncDecl *FD) {
-      for (auto P : FD->getArgParamPatterns()) {
-        if (!P->isImplicit() && !isGoodSourceRange(P->getSourceRange())) {
-          Out << "bad source range for arg param pattern: ";
-          P->print(Out);
-          Out << "\n";
-          abort();
-        }
-      }
-      checkSourceRanges(cast<Decl>(FD));
-    }
-
     /// \brief Verify that the given source ranges is contained within the
     /// parent's source range.
     void checkSourceRanges(SourceRange Current,
