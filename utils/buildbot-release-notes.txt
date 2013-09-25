@@ -1,6 +1,8 @@
 2013-10-01
 ----------
 
+* The [byref] attribute has been renamed to [inout].
+
 * [inout] arguments can now be captured into closures. The semantics of a
   inout capture are that the captured variable is an independent local variable
   of the callee, and the inout is updated to contain the value of that local
