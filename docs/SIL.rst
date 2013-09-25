@@ -801,7 +801,7 @@ Method Currying
 ```````````````
 
 In SIL, the "self" argument of an Objective-C method is uncurried to the last
-argument of the uncurried type, just like a native Swift method.
+argument of the uncurried type, just like a native Swift method::
 
   class [objc] NSString {
     func stringByPaddingToLength(Int) withString(NSString) startingAtIndex(Int)
@@ -1936,7 +1936,7 @@ and more efficient to reason about aggregate copies than it is to
 reason about copies of the subobjects.
 
 destroy_value
-``````````
+`````````````
 
 ::
 
