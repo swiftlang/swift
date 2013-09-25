@@ -1310,6 +1310,9 @@ public:
     }
 
     TC.validateTypeDecl(PD);
+    if (PD->getSelf()->getArchetype())
+      return;
+    
     checkInheritanceClause(TC, PD);
 
     {
