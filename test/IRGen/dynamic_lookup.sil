@@ -30,6 +30,15 @@ bb0(%0 : $X.metatype):
   return %14 : $()
 }
 
+sil @_TToC14dynamic_lookup1X11__subscriptFT1iSi_Sig : $[cc(objc_method), thin] ((), (i : Int64), X) -> Int64 {
+bb0(%0 : $Int64, %1 : $X):
+  %4 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64 // user: %7
+  %5 = metatype $Int64.metatype                   // user: %7
+  %6 = integer_literal $Builtin.Int64, 5          // user: %7
+  %7 = apply [transparent] %4(%6, %5) : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64 // user: %9
+  return %7 : $Int64
+}
+
 sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64
 
 // [objc] dynamic_lookup.X.value.getter : swift.Int64

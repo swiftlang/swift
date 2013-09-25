@@ -603,7 +603,7 @@ static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
 /// Returns a value of type i8*.
 static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
                                             const Selector &selector,
-                                            VarDecl *property) {
+                                            ValueDecl *property) {
   // FIXME: Explosion level
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   
@@ -626,7 +626,7 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
 /// Returns a value of type i8*.
 static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
                                             const Selector &selector,
-                                            VarDecl *property) {
+                                            ValueDecl *property) {
   assert(property->isSettable() && "property is not settable?!");
   
   // FIXME: Explosion level
@@ -766,6 +766,19 @@ void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
 }
 
 /// Emit the components of an Objective-C method descriptor for a
+/// subscript getter method.
+void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
+                                          SubscriptDecl *subscript,
+                                          llvm::Constant *&selectorRef,
+                                          llvm::Constant *&atEncoding,
+                                          llvm::Constant *&impl) {
+  Selector getterSel(subscript, Selector::ForGetter);
+  selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
+  atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  impl = getObjCGetterPointer(IGM, getterSel, subscript);
+}
+
+/// Emit the components of an Objective-C method descriptor for a
 /// property getter method.
 void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
                                           VarDecl *property,
@@ -782,6 +795,21 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
      ? IGM.getAddrOfGlobalString(SetterMethodSignature)
      : llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   impl = getObjCSetterPointer(IGM, setterSel, property);
+}
+
+/// Emit the components of an Objective-C method descriptor for a
+/// subscript getter method.
+void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
+                                          SubscriptDecl *subscript,
+                                          llvm::Constant *&selectorRef,
+                                          llvm::Constant *&atEncoding,
+                                          llvm::Constant *&impl) {
+  assert(subscript->isSettable() && "not a settable subscript?!");
+
+  Selector setterSel(subscript, Selector::ForSetter);
+  selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
+  atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  impl = getObjCSetterPointer(IGM, setterSel, subscript);
 }
 
 /// Emit an Objective-C method descriptor for the given method.
@@ -818,6 +846,29 @@ irgen::emitObjCPropertyMethodDescriptors(IRGenModule &IGM,
   
   if (property->isSettable()) {
     emitObjCSetterDescriptorParts(IGM, property,
+                                  selectorRef, atEncoding, impl);
+    
+    llvm::Constant *setterFields[] = {selectorRef, atEncoding, impl};
+    setter = llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), setterFields);
+  }
+  
+  return {getter, setter};
+}
+
+std::pair<llvm::Constant *, llvm::Constant *>
+irgen::emitObjCSubscriptMethodDescriptors(IRGenModule &IGM,
+                                          SubscriptDecl *subscript) {
+  llvm::Constant *selectorRef, *atEncoding, *impl;
+  emitObjCGetterDescriptorParts(IGM, subscript,
+                                selectorRef, atEncoding, impl);
+  
+  llvm::Constant *getterFields[] = {selectorRef, atEncoding, impl};
+  llvm::Constant *getter = llvm::ConstantStruct::getAnon(IGM.getLLVMContext(),
+                                                         getterFields);
+  llvm::Constant *setter = nullptr;
+  
+  if (subscript->isSettable()) {
+    emitObjCSetterDescriptorParts(IGM, subscript,
                                   selectorRef, atEncoding, impl);
     
     llvm::Constant *setterFields[] = {selectorRef, atEncoding, impl};
@@ -875,6 +926,26 @@ bool irgen::requiresObjCPropertyDescriptor(VarDecl *property) {
   // Don't expose objc properties for function types. We can't autorelease them,
   // and eventually we want to map them back to blocks.
   if (property->getType()->is<AnyFunctionType>())
+    return false;
+  
+  return true;
+}
+
+bool irgen::requiresObjCSubscriptDescriptor(SubscriptDecl *subscript) {
+  // We don't export generic methods or subclasses to IRGen yet.
+  if (subscript->getDeclContext()->getDeclaredTypeInContext()
+          ->is<BoundGenericType>())
+    return false;
+
+  if (auto override = subscript->getOverriddenDecl())
+    return requiresObjCSubscriptDescriptor(override);
+
+  if (!subscript->isObjC())
+    return false;
+  
+  // Don't expose objc properties for function types. We can't autorelease them,
+  // and eventually we want to map them back to blocks.
+  if (subscript->getElementType()->is<AnyFunctionType>())
     return false;
   
   return true;

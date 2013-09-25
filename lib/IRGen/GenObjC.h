@@ -87,9 +87,25 @@ namespace irgen {
                                      llvm::Constant *&impl);
 
   /// Build the components of an Objective-C method descriptor for the given
+  /// subscript's method implementations.
+  void emitObjCGetterDescriptorParts(IRGenModule &IGM,
+                                     SubscriptDecl *subscript,
+                                     llvm::Constant *&selectorRef,
+                                     llvm::Constant *&atEncoding,
+                                     llvm::Constant *&impl);
+
+  /// Build the components of an Objective-C method descriptor for the given
   /// property's method implementations.
   void emitObjCSetterDescriptorParts(IRGenModule &IGM,
                                      VarDecl *property,
+                                     llvm::Constant *&selectorRef,
+                                     llvm::Constant *&atEncoding,
+                                     llvm::Constant *&impl);
+
+  /// Build the components of an Objective-C method descriptor for the given
+  /// subscript's method implementations.
+  void emitObjCSetterDescriptorParts(IRGenModule &IGM,
+                                     SubscriptDecl *subscript,
                                      llvm::Constant *&selectorRef,
                                      llvm::Constant *&atEncoding,
                                      llvm::Constant *&impl);
@@ -104,6 +120,12 @@ namespace irgen {
   std::pair<llvm::Constant *, llvm::Constant *>
   emitObjCPropertyMethodDescriptors(IRGenModule &IGM, VarDecl *property);
 
+  /// Build an Objective-C method descriptor for the given subscript's
+  /// getter and setter methods.
+  std::pair<llvm::Constant *, llvm::Constant *>
+  emitObjCSubscriptMethodDescriptors(IRGenModule &IGM, 
+                                     SubscriptDecl *subscript);
+
   /// True if the FuncDecl requires an ObjC method descriptor.
   bool requiresObjCMethodDescriptor(FuncDecl *method);
 
@@ -113,6 +135,9 @@ namespace irgen {
   /// True if the VarDecl requires ObjC accessor methods and a property
   /// descriptor.
   bool requiresObjCPropertyDescriptor(VarDecl *property);
+
+  /// True if the SubscriptDecl requires ObjC accessor methods.
+  bool requiresObjCSubscriptDescriptor(SubscriptDecl *subscript);
 
 } // end namespace irgen
 } // end namespace swift

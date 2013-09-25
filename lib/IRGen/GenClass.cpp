@@ -1133,7 +1133,11 @@ namespace {
 
     /// Subscripts should probably be collected in extended metadata.
     void visitSubscriptDecl(SubscriptDecl *subscript) {
-      // TODO
+      if (!requiresObjCSubscriptDescriptor(subscript)) return;
+      auto getter_setter = emitObjCSubscriptMethodDescriptors(IGM, subscript);
+      InstanceMethods.push_back(getter_setter.first);
+      if (getter_setter.second)
+        InstanceMethods.push_back(getter_setter.second);
     }
 
     /// The destructor doesn't really require any special

@@ -221,6 +221,30 @@ public:
 
     // FIXME: register property metadata in addition to the methods.
   }
+
+  void visitSubscriptDecl(SubscriptDecl *subscript) {
+    if (!requiresObjCSubscriptDescriptor(subscript)) return;
+    
+    llvm::Constant *name, *imp, *types;
+    emitObjCGetterDescriptorParts(IGF.IGM, subscript,
+                                  name, types, imp);
+    // When generating JIT'd code, we need to call sel_registerName() to force
+    // the runtime to unique the selector.
+    llvm::Value *sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
+                                              name);
+    llvm::Value *getterArgs[] = {classMetadata, sel, imp, types};
+    IGF.Builder.CreateCall(class_replaceMethod, getterArgs);
+
+    if (subscript->isSettable()) {
+      emitObjCSetterDescriptorParts(IGF.IGM, subscript,
+                                    name, types, imp);
+      sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
+                                   name);
+      llvm::Value *setterArgs[] = {classMetadata, sel, imp, types};
+      
+      IGF.Builder.CreateCall(class_replaceMethod, setterArgs);
+    }
+  }
 };
 
 } // end anonymous namespace
@@ -1565,6 +1589,14 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
 
       if (auto var = dyn_cast<VarDecl>(member)) {
         if (requiresObjCPropertyDescriptor(var)) {
+          needsCategory = true;
+          break;
+        }
+        continue;
+      }
+
+      if (auto subscript = dyn_cast<SubscriptDecl>(member)) {
+        if (requiresObjCSubscriptDescriptor(subscript)) {
           needsCategory = true;
           break;
         }
