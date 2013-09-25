@@ -38,7 +38,7 @@ namespace swift {
     /// it to the user.
     bool PreferTypeRepr = true;
 
-    /// \brief Whether to not print implicit declarations.
+    /// \brief Whether to print implicit parts of the AST.
     bool SkipImplicit = false;
 
     /// \brief Retrieve the set of options that prints everything.

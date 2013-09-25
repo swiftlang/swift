@@ -403,8 +403,7 @@ void PrintAST::printInherited(ArrayRef<TypeLoc> inherited,
     }
     
     interleave(protos, [&](const ProtocolDecl *proto) {
-      Optional<KnownProtocolKind> kind =
-        (*protos.begin())->getKnownProtocolKind();
+      Optional<KnownProtocolKind> kind = proto->getKnownProtocolKind();
       if (!kind || *kind != KnownProtocolKind::DynamicLookup)
         proto->getDeclaredType()->print(OS);
     }, [&]() {
