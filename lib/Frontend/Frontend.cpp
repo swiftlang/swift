@@ -31,7 +31,7 @@
 using namespace swift;
 
 void swift::CompilerInstance::createSILModule() {
-  TheSILModule.reset(SILModule::createEmptyModule(getTU()));
+  TheSILModule.reset(SILModule::createEmptyModule(getASTContext()));
 }
 
 bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
@@ -75,6 +75,9 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   Context->ImportSearchPaths.push_back(Invocation.getRuntimeIncludePath());
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
+
+  if (Invocation.getTUKind() == TranslationUnit::SIL)
+    createSILModule();
 
   auto CodeCompletePoint = Invocation.getCodeCompletionPoint();
   if (CodeCompletePoint.first) {
@@ -124,9 +127,6 @@ void swift::CompilerInstance::doIt() {
 
   TU->HasBuiltinModuleAccess = Invocation.getParseStdlib();
   TU->setLinkLibraries(Invocation.getLinkLibraries());
-
-  if (Invocation.getTUKind() == TranslationUnit::SIL)
-    createSILModule();
 
   // If we're in SIL mode, don't auto import any libraries.
   // Also don't perform auto import if we are not going to do semantic

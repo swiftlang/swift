@@ -1088,7 +1088,8 @@ void SILModule::dump() const {
 }
 
 /// Pretty-print the SILModule to the designated stream.
-void SILModule::print(llvm::raw_ostream &OS, bool Verbose) const {
+void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
+                      TranslationUnit *TU) const {
   OS << "sil_stage ";
   switch (Stage) {
   case SILStage::Raw:
@@ -1101,27 +1102,30 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose) const {
   
   OS << "\n\nimport Builtin\nimport swift\n\n";
 
-  // Compute the list of emitted functions, whose AST Decls we do not need to
-  // print.
-  llvm::DenseSet<const Decl*> emittedFunctions;
-  for (const SILFunction &f : *this)
-    if (f.hasLocation())
-      emittedFunctions.insert(f.getLocation().getAsASTNode<Decl>());
+  // Print the declarations and types from teh translation unit.
+  if (TU) {
+    // Compute the list of emitted functions, whose AST Decls we do not need to
+    // print.
+    llvm::DenseSet<const Decl*> emittedFunctions;
+    for (const SILFunction &f : *this)
+      if (f.hasLocation())
+        emittedFunctions.insert(f.getLocation().getAsASTNode<Decl>());
 
-  PrintOptions Options;
-  Options.FunctionDefinitions = false;
-  Options.TypeDefinitions = true;
-  Options.VarInitializers = true;
-  Options.SkipImplicit = true;
+    PrintOptions Options;
+    Options.FunctionDefinitions = false;
+    Options.TypeDefinitions = true;
+    Options.VarInitializers = true;
+    Options.SkipImplicit = true;
 
-  for (auto ID = ASTTranslUnit->Decls.begin(),
-            ED = ASTTranslUnit->Decls.end(); ID != ED; ++ID) {
-    const Decl *D = *ID;
-    if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
-        !emittedFunctions.count(D) &&
-        !D->isImplicit()) {
-      D->print(OS, Options, nullptr);
-      OS << "\n\n";
+    for (auto ID = TU->Decls.begin(),
+              ED = TU->Decls.end(); ID != ED; ++ID) {
+      const Decl *D = *ID;
+      if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
+          !emittedFunctions.count(D) &&
+          !D->isImplicit()) {
+        D->print(OS, Options, nullptr);
+        OS << "\n\n";
+      }
     }
   }
 

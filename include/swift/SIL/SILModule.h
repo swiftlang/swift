@@ -19,7 +19,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
-#include "swift/AST/Module.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -80,9 +79,10 @@ private:
   mutable llvm::BumpPtrAllocator BPA;
   void *TypeListUniquing;
 
-  /// The AST TranslationUnit that defineds the types used by the functions.
-  TranslationUnit *ASTTranslUnit;
-
+  /// The context that uniques the types used by this
+  /// SILFunction.
+  ASTContext &TheASTContext;
+  
   /// The list of Functions in the module.
   FunctionListType functions;
   
@@ -103,7 +103,7 @@ private:
   
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(TranslationUnit *TU);
+  SILModule(ASTContext &TheASTContext);
   
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -130,11 +130,11 @@ public:
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
-  static SILModule *createEmptyModule(TranslationUnit *TU) {
-    return new SILModule(TU);
+  static SILModule *createEmptyModule(ASTContext &Context) {
+    return new SILModule(Context);
   }
   
-  ASTContext &getASTContext() const { return ASTTranslUnit->getASTContext(); }
+  ASTContext &getASTContext() const { return TheASTContext; }
   
   using global_iterator = decltype(globals)::const_iterator;
   using GlobalRange = Range<global_iterator>;
@@ -185,11 +185,16 @@ public:
   /// Pretty-print the module to the designated stream.
   ///
   /// \param Verbose Dump SIL location information in verbose mode.
-  void print(raw_ostream &OS, bool Verbose = false) const;
+  /// \param TU Passing the optional translation unit will result in the types
+  ///        and the declarations from the corresponding unit to be printed. The
+  ///        TU usually would contain the types and Decls that the SIL Module
+  ///        depends on.
+  void print(raw_ostream &OS, bool Verbose = false,
+             TranslationUnit *TU = nullptr) const;
 
   /// Allocate memory using the module's internal allocator.
   void *allocate(unsigned Size, unsigned Align) const {
-    if (getASTContext().LangOpts.UseMalloc)
+    if (TheASTContext.LangOpts.UseMalloc)
       return AlignedAlloc(Size, Align);
     
     return BPA.Allocate(Size, Align);
