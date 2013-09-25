@@ -72,6 +72,19 @@
   an optional value and handling both the success and failure cases
   concisely. Watch this space.
 
+* Weak references now always have optional type.  If a weak variable
+  has an explicit type, it must be an optional type:
+
+    var [weak] x : NSObject?
+
+  If the variable is not explicitly typed, its type will still be
+  inferred to be an optional type.
+
+  Unfortunately, there is currently no implicitly conversion from T
+  to T?, so programs will have to perform this conversion explicitly:
+
+    x = .Some(obj)
+
 2013-09-17
 ----------
 
