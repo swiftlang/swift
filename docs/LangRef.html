@@ -1513,8 +1513,12 @@ if vec[3] {
 
   <p><tt>inout</tt> differs from traditional pass-by-reference when closures
     are involved. If a closure captures an <tt>inout</tt> parameter, the
-    <em>local value</em> is captured, not the reference. If the closure outlives
-    the lifetime of the byref, the local value lives independent of the byref.
+    <em>local value</em> is captured, not the reference. The local value at
+    the time of function exit is written back to the lvalue.
+    If the closure outlives the lifetime of the call, the local value lives
+    independent of the original lvalue; further mutations within the closure
+    do not affect the lvalue that was passed as the byref argument.
+
     For example, the following code:
 
   <pre class=example>
