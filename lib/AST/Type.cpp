@@ -1206,6 +1206,22 @@ ArrayRef<ArchetypeType *> PolymorphicFunctionType::getAllArchetypes() const {
   return Params->getAllArchetypes();
 }
 
+FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
+                                                        ArrayRef<Type> args) {
+  auto params = getGenericParameters();
+  assert(args.size() <= params.size());
+
+  TypeSubstitutionMap subs;
+  for (size_t i = 0, e = args.size(); i != e; ++i) {
+    subs.insert(std::make_pair(params[i].getAsTypeParam()->getArchetype(),
+                               args[i]));
+  }
+  Type input = getInput().subst(module, subs, true, nullptr);
+  Type result = getResult().subst(module, subs, true, nullptr);
+  return FunctionType::get(input, result, getExtInfo(),
+                           module->getASTContext());
+}
+
 Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
                  bool ignoreMissing, LazyResolver *resolver) const {
   return transform(module->getASTContext(), [&](Type type) -> Type {

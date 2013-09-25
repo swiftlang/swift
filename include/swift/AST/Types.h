@@ -1364,6 +1364,10 @@ public:
 
   GenericParamList &getGenericParams() const { return *Params; }
 
+  /// Substitute the given generic arguments into this polymorphic
+  /// function type and return the resulting non-polymorphic type.
+  FunctionType *substGenericArgs(Module *M, ArrayRef<Type> args);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PolymorphicFunction;
