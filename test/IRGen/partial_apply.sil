@@ -87,7 +87,7 @@ entry(%f : $(Builtin.Int64) -> (), %x : $Builtin.Int64):
 
 sil @objc_partial_apply : $[thin] ObjCClass -> Builtin.Int64 -> () {
 entry(%c : $ObjCClass):
-  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method!1.objc : $[cc(objc_method), thin] ((x:Builtin.Int64), ObjCClass) -> ()
+  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method!1.foreign : $[cc(objc_method), thin] ((x:Builtin.Int64), ObjCClass) -> ()
   %p = partial_apply %m(%c) : $[cc(objc_method), thin] ((x:Builtin.Int64), ObjCClass) -> ()
   return %p : $Builtin.Int64 -> ()
 }
@@ -105,7 +105,7 @@ entry(%x : $Builtin.Int64):
 
 sil @dynamic_lookup_br_partial_apply : $[thin] Builtin.ObjCPointer -> Builtin.Int64 -> () {
 entry(%o : $Builtin.ObjCPointer):
-  dynamic_method_br %o : $Builtin.ObjCPointer, #ObjCClass.method!1.objc, yes, no
+  dynamic_method_br %o : $Builtin.ObjCPointer, #ObjCClass.method!1.foreign, yes, no
 
 yes(%m : $[cc(objc_method), thin] ((x:Builtin.Int64), Builtin.ObjCPointer) -> ()):
   %p = partial_apply %m(%o) : $[cc(objc_method), thin] ((x:Builtin.Int64), Builtin.ObjCPointer) -> ()

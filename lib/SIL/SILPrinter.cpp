@@ -221,11 +221,11 @@ void SILDeclRef::print(raw_ostream &OS) const {
     else
       OS << "!" << uncurryLevel;
   }
-  if (isObjC) {
+  if (isForeign) {
     if (uncurryLevel != 0 || kind != SILDeclRef::Kind::Func)
-      OS << ".objc";
+      OS << ".foreign";
     else
-      OS << "!objc";
+      OS << "!foreign";
   }
 }
 

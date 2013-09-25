@@ -375,7 +375,7 @@ public:
       SILValue methodVal = gen.B.createClassMethod(Loc,
                                                    method.selfValue,
                                                    c, gen.SGM.getConstantType(c),
-                                                   /*volatile*/ c.isObjC);
+                                                   /*volatile*/ c.isForeign);
       
       mv = ManagedValue(methodVal, ManagedValue::Unmanaged);
       break;
@@ -392,7 +392,7 @@ public:
       SILValue methodVal = gen.B.createSuperMethod(Loc,
                                                    method.selfValue,
                                                    c, gen.SGM.getConstantType(c),
-                                                   /*volatile*/ c.isObjC);
+                                                   /*volatile*/ c.isForeign);
       
       mv = ManagedValue(methodVal, ManagedValue::Unmanaged);
       break;
@@ -412,7 +412,7 @@ public:
                            gen.getLoweredType(archetypeType),
                            constant,
                            gen.getLoweredType(genericMethod.origType, level),
-                           /*volatile*/ constant.isObjC);
+                           /*volatile*/ constant.isForeign);
       mv = ManagedValue(method, ManagedValue::Unmanaged);
       ownership = OwnershipConventions::get(gen, constant, method.getType());
       break;
@@ -428,7 +428,7 @@ public:
                             genericMethod.selfValue,
                             constant,
                             gen.getLoweredType(genericMethod.origType, level),
-                            /*volatile*/ constant.isObjC);
+                            /*volatile*/ constant.isForeign);
       mv = ManagedValue(method, ManagedValue::Unmanaged);
       ownership = OwnershipConventions::get(gen, constant, method.getType());
       break;
@@ -444,7 +444,7 @@ public:
                           genericMethod.selfValue,
                           constant,
                           gen.getLoweredType(genericMethod.origType, level),
-                          /*volatile*/ constant.isObjC);
+                          /*volatile*/ constant.isForeign);
       mv = ManagedValue(method, ManagedValue::Unmanaged);
       ownership = OwnershipConventions::get(gen, constant, method.getType());
       break;
@@ -687,7 +687,7 @@ public:
     bool isObjC = proto->isObjC();
     
     setCallee(Callee::forProtocol(gen, existential.getValue(),
-                                  SILDeclRef(fd).asObjC(isObjC),
+                                  SILDeclRef(fd).asForeign(isObjC),
                                   e->getType(), e));
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
@@ -700,7 +700,7 @@ public:
     bool isObjC = cast<ProtocolDecl>(fd->getDeclContext())->isObjC();
     
     setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
-                                   SILDeclRef(fd).asObjC(isObjC),
+                                   SILDeclRef(fd).asForeign(isObjC),
                                    e->getType(), e));
   }
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
@@ -750,7 +750,7 @@ public:
                  apply);
     
     SILValue superMethod;
-    if (constant.isObjC) {
+    if (constant.isForeign) {
       // ObjC super calls require dynamic dispatch.
       setCallee(Callee::forSuperMethod(gen, super.getValue(), constant, fn));
     } else {

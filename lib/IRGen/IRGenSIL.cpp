@@ -2475,7 +2475,7 @@ void IRGenSILFunction::visitProjectExistentialRefInst(
 void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
   // For Objective-C classes we need to arrange for a msgSend
   // to happen when the method is called.
-  if (i->getMember().isObjC) {
+  if (i->getMember().isForeign) {
     setLoweredObjCMethod(SILValue(i, 0), i->getMember());
     return;
   }
@@ -2496,7 +2496,7 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
 }
 
 void IRGenSILFunction::visitDynamicMethodInst(DynamicMethodInst *i) {
-  assert(i->getMember().isObjC && "dynamic_method requires [objc] method");
+  assert(i->getMember().isForeign && "dynamic_method requires [objc] method");
   setLoweredObjCMethod(SILValue(i, 0), i->getMember());
   return;
 }
@@ -2504,7 +2504,7 @@ void IRGenSILFunction::visitDynamicMethodInst(DynamicMethodInst *i) {
 void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
   // For Objective-C classes we need to arrange for a msgSend
   // to happen when the method is called.
-  if (i->getMember().isObjC) {
+  if (i->getMember().isForeign) {
     setLoweredObjCMethod(SILValue(i, 0), i->getMember());
     return;
   }
@@ -2566,7 +2566,7 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
 }
 
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
-  assert(i->getMember().isObjC && "super_method to non_objc callee");
+  assert(i->getMember().isForeign && "super_method to non_objc callee");
   setLoweredObjCMethod(SILValue(i, 0), i->getMember(),
                        i->getOperand().getType());
 }
@@ -2574,7 +2574,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
 void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   // For Objective-C classes we need to arrange for a msgSend
   // to happen when the method is called.
-  if (i->getMember().isObjC) {
+  if (i->getMember().isForeign) {
     setLoweredObjCMethod(SILValue(i, 0), i->getMember());
     return;
   }

@@ -58,7 +58,7 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::Getter:
     // Getter selectors can belong to families if their name begins with the
     // wrong thing.
-    if (c.getDecl()->isObjC() || c.isObjC)
+    if (c.getDecl()->isObjC() || c.isForeign)
       return getSelectorFamily(c.getDecl()->getName());
     
     SWIFT_FALLTHROUGH;
@@ -99,7 +99,7 @@ OwnershipConventions OwnershipConventions::get(SILGenFunction &gen,
                                                SILDeclRef c,
                                                SILType ty) {
   // Native functions use the default Swift convention.
-  if (!c.isObjC)
+  if (!c.isForeign)
     return getDefault(gen, ty);
   
   SILFunctionTypeInfo *ft = ty.getFunctionTypeInfo(gen.SGM.M);

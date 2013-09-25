@@ -445,7 +445,7 @@ Declaration References
   sil-decl-subref-part ::= 'globalaccessor'
   sil-decl-subref-part ::= 'defaultarg' '.' [0-9]+
   sil-decl-uncurry-level ::= [0-9]+
-  sil-decl-lang ::= 'objc'
+  sil-decl-lang ::= 'foreign'
 
 Some SIL instructions need to reference Swift declarations directly. These
 references are introduced with the ``#`` sigil followed by the fully qualified
@@ -463,7 +463,7 @@ entity discriminators:
 - ``globalaccessor``: the addressor function for a global variable
 - ``defaultarg.``\ *n*: the default argument-generating function for
   the *n*\ -th argument of a Swift ``func``
-- ``objc``: a specific entry point for objective-C interoperability
+- ``foreign``: a specific entry point for C/objective-C interoperability
 
 Methods and curried function definitions in Swift also have multiple
 "uncurry levels" in SIL, representing the function at each possible
@@ -1556,8 +1556,8 @@ optimization passes can promote non-``volatile`` dispatch instructions
 into static ``function_ref`` instructions.
 
 If a dynamic dispatch instruction references an Objective-C method
-(indicated by the ``objc`` language marker on a method reference, as in
-``#NSObject.description!1.objc``), then the instruction
+(indicated by the ``foreign`` marker on a method reference, as in
+``#NSObject.description!1.foreign``), then the instruction
 represents an ``objc_msgSend`` invocation. ``objc_msgSend`` invocations can
 only be used as the callee of an ``apply`` instruction or ``partial_apply``
 instruction. They cannot be stored or used as ``apply`` or ``partial_apply``
@@ -1587,9 +1587,9 @@ super_method
   sil-instruction ::= 'super_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
   
-  %1 = super_method %0 : $T, #Super.method!1.objc : $[thin] U -> V
+  %1 = super_method %0 : $T, #Super.method!1.foreign : $[thin] U -> V
   // %0 must be of a non-root class type or class metatype $T
-  // #Super.method!1.objc must be a reference to an ObjC method of T's
+  // #Super.method!1.foreign must be a reference to an ObjC method of T's
   // superclass or ; of one of its ancestor classes, at uncurry level >= 1
   // %1 will be of type $[thin] U -> V
 

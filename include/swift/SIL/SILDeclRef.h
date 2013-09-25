@@ -93,8 +93,8 @@ struct SILDeclRef {
   unsigned uncurryLevel : 16;
   /// True if the SILDeclRef is a curry thunk.
   unsigned isCurried : 1;
-  /// True if this references an ObjC-visible method.
-  unsigned isObjC : 1;
+  /// True if this references a foreign entry point for the referenced decl.
+  unsigned isForeign : 1;
   /// The default argument index for a default argument getter.
   unsigned defaultArgIndex : 10;
   
@@ -104,13 +104,13 @@ struct SILDeclRef {
   
   /// Produces a null SILDeclRef.
   SILDeclRef() : loc(), kind(Kind::Func), uncurryLevel(0),
-                 isCurried(0), isObjC(0),
+                 isCurried(0), isForeign(0),
                  defaultArgIndex(0) {}
   
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(ValueDecl *decl, Kind kind,
                        unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
-                       bool isObjC = false);
+                       bool isForeign = false);
   
   /// Produces the 'natural' SILDeclRef for the given ValueDecl or
   /// AbstractClosureExpr:
@@ -130,7 +130,7 @@ struct SILDeclRef {
   /// used.
   explicit SILDeclRef(Loc loc,
                        unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
-                       bool isObjC = false);
+                       bool isForeign = false);
 
   /// Produce a SIL constant for a default argument generator.
   static SILDeclRef getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);
@@ -186,14 +186,14 @@ struct SILDeclRef {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
       && kind == rhs.kind
       && uncurryLevel == rhs.uncurryLevel
-      && isObjC == rhs.isObjC
+      && isForeign == rhs.isForeign
       && defaultArgIndex == rhs.defaultArgIndex;
   }
   bool operator!=(SILDeclRef rhs) const {
     return loc.getOpaqueValue() != rhs.loc.getOpaqueValue()
       || kind != rhs.kind
       || uncurryLevel != rhs.uncurryLevel
-      || isObjC != rhs.isObjC
+      || isForeign != rhs.isForeign
       || defaultArgIndex != rhs.defaultArgIndex;
   }
   
@@ -205,13 +205,13 @@ struct SILDeclRef {
     assert(level <= uncurryLevel && "can't safely go to deeper uncurry level");
     bool willBeCurried = isCurried || level < uncurryLevel;
     return SILDeclRef(loc.getOpaqueValue(), kind, level,
-                      willBeCurried, isObjC,
+                      willBeCurried, isForeign,
                       defaultArgIndex);
   }
   
-  // Returns the ObjC (or native) entry point corresponding to the same
-  // constant.
-  SILDeclRef asObjC(bool objc = true) const {
+  // Returns the foreign (or native) entry point corresponding to the same
+  // decl.
+  SILDeclRef asForeign(bool objc = true) const {
     return SILDeclRef(loc.getOpaqueValue(), kind, uncurryLevel, isCurried, objc,
                        defaultArgIndex);
   }
@@ -221,11 +221,11 @@ struct SILDeclRef {
                        Kind kind,
                        unsigned uncurryLevel,
                        bool isCurried,
-                       bool isObjC,
+                       bool isForeign,
                        unsigned defaultArgIndex)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)),
       kind(kind), uncurryLevel(uncurryLevel),
-      isCurried(isCurried), isObjC(isObjC),
+      isCurried(isCurried), isForeign(isForeign),
       defaultArgIndex(defaultArgIndex)
   {}
 };
@@ -261,7 +261,7 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
     unsigned h3 = (Val.kind == Kind::DefaultArgGenerator)
                     ? UnsignedInfo::getHashValue(Val.defaultArgIndex)
                     : UnsignedInfo::getHashValue(Val.uncurryLevel);
-    unsigned h4 = UnsignedInfo::getHashValue(Val.isObjC);
+    unsigned h4 = UnsignedInfo::getHashValue(Val.isForeign);
     return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7);
   }
   static bool isEqual(swift::SILDeclRef const &LHS,

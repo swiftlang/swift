@@ -204,7 +204,7 @@ void SILSerializer::handleMethodInst(const MethodInst *MI,
   ListOfValues.push_back(S.addDeclRef(MI->getMember().getDecl()));
   ListOfValues.push_back((unsigned)MI->getMember().kind);
   ListOfValues.push_back(MI->getMember().uncurryLevel);
-  ListOfValues.push_back(MI->getMember().isObjC);
+  ListOfValues.push_back(MI->getMember().isForeign);
   ListOfValues.push_back(
       S.addTypeRef(operand.getType().getSwiftRValueType()));
   ListOfValues.push_back((unsigned)operand.getType().getCategory());
@@ -958,7 +958,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(S.addDeclRef(AMI->getMember().getDecl()));
     ListOfValues.push_back((unsigned)AMI->getMember().kind);
     ListOfValues.push_back(AMI->getMember().uncurryLevel);
-    ListOfValues.push_back(AMI->getMember().isObjC);
+    ListOfValues.push_back(AMI->getMember().isForeign);
     ListOfValues.push_back(S.addTypeRef(Ty2.getSwiftRValueType()));
     ListOfValues.push_back((unsigned)Ty2.getCategory());
 
@@ -1038,7 +1038,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(S.addDeclRef(DMB->getMember().getDecl()));
     ListOfValues.push_back((unsigned)DMB->getMember().kind);
     ListOfValues.push_back(DMB->getMember().uncurryLevel);
-    ListOfValues.push_back(DMB->getMember().isObjC);
+    ListOfValues.push_back(DMB->getMember().isForeign);
     ListOfValues.push_back(BasicBlockMap[DMB->getHasMethodBB()]);
     ListOfValues.push_back(BasicBlockMap[DMB->getNoMethodBB()]);
 

@@ -1209,7 +1209,7 @@ static AbstractCC getAbstractCC(SILDeclRef c) {
     return AbstractCC::Freestanding;
   
   // If this is an ObjC thunk, it always has ObjC calling convention.
-  if (c.isObjC)
+  if (c.isForeign)
     return c.hasDecl() && isClassOrProtocolMethod(c.getDecl())
       ? AbstractCC::ObjCMethod
       : AbstractCC::C;

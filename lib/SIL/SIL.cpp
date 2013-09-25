@@ -40,8 +40,8 @@ static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
                          unsigned atUncurryLevel,
-                         bool isObjC)
-  : loc(vd), kind(kind), isObjC(isObjC), defaultArgIndex(0)
+                         bool isForeign)
+  : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0)
 {
   unsigned naturalUncurryLevel;
 
@@ -119,7 +119,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
                          unsigned atUncurryLevel,
-                         bool asObjC) 
+                         bool asForeign) 
  : defaultArgIndex(0)
 {
   unsigned naturalUncurryLevel;
@@ -159,7 +159,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
       naturalUncurryLevel = 1;
 
       // FIXME: Should we require the caller to think about this?
-      asObjC = false;
+      asForeign = false;
     }
     // Map EnumElementDecls to the EnumElement SILDeclRef of the element.
     else if (EnumElementDecl *ed = dyn_cast<EnumElementDecl>(vd)) {
@@ -198,7 +198,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
     : atUncurryLevel;
   
   isCurried = uncurryLevel != naturalUncurryLevel;  
-  isObjC = asObjC;
+  isForeign = asForeign;
 }
 
 SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,

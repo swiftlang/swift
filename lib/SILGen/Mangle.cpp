@@ -48,7 +48,7 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
   // Almost everything below gets one of the common prefixes:
   //   mangled-name ::= '_T' global     // Native symbol
   //   mangled-name ::= '_TTo' global   // ObjC interop
-  char const *introducer = c.isObjC ? "_TTo" : "_T";
+  char const *introducer = c.isForeign ? "_TTo" : "_T";
   
   switch (c.kind) {
   //   entity ::= declaration                     // other declaration

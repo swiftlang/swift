@@ -105,7 +105,7 @@ sil @_T1t23dynamic_lookup_propertyFT1xPSo13DynamicLookup__T_ : $[thin] (x : Dyna
   strong_retain %6 : $DynamicLookup
   %8 = project_existential_ref %6 : $DynamicLookup to $DynamicLookup.Self // users: %11, %9
   %9 = ref_to_object_pointer %8 : $DynamicLookup.Self to $Builtin.ObjCPointer
-  dynamic_method_br %9 : $Builtin.ObjCPointer, #X.value!getter.1.objc, bb1, bb2
+  dynamic_method_br %9 : $Builtin.ObjCPointer, #X.value!getter.1.foreign, bb1, bb2
 
 bb1(%10 : $[cc(objc_method), thin] ((), Builtin.ObjCPointer) -> Int64):
   br bb3
@@ -133,7 +133,7 @@ bb0(%0 : $DynamicLookup, %1 : $Int64):
   // CHECK-NEXT: [[HAS_SEL:%[0-9]+]] = call i1 @swift_objcRespondsToSelector(%objc_object* %0, i8* [[SEL]]) #0
   // CHECK-NEXT: br i1 [[HAS_SEL]], label [[HAS_METHOD:%[0-9]+]], label [[HAS_METHOD:%[0-9]+]]
 
-  dynamic_method_br %11 : $Builtin.ObjCPointer, #X.__subscript!getter.2.objc, bb1, bb2
+  dynamic_method_br %11 : $Builtin.ObjCPointer, #X.__subscript!getter.2.foreign, bb1, bb2
 
 bb1(%13 : $[cc(objc_method), thin] ((), (i : Int64), Builtin.ObjCPointer) -> Int64): // Preds: bb0
   %14 = partial_apply %13(%11) : $[cc(objc_method), thin] ((), (i : Int64), Builtin.ObjCPointer) -> Int64

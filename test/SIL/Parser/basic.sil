@@ -701,8 +701,8 @@ bb0(%0 : $Bas):
   %16 = load %2#1 : $*Bas
   strong_retain %16 : $Bas
   %18 = upcast %16 : $Bas to $NSObject
-  // CHECK: super_method [volatile] %16 : $Bas, #NSObject.init!initializer.1.objc :
-  %19 = super_method [volatile] %16 : $Bas, #NSObject.init!initializer.1.objc : $[cc(objc_method), thin] ((), NSObject) -> NSObject
+  // CHECK: super_method [volatile] %16 : $Bas, #NSObject.init!initializer.1.foreign :
+  %19 = super_method [volatile] %16 : $Bas, #NSObject.init!initializer.1.foreign : $[cc(objc_method), thin] ((), NSObject) -> NSObject
   %20 = apply %19(%18) : $[cc(objc_method), thin] ((), NSObject) -> NSObject
   strong_retain_autoreleased %20 : $NSObject
   %22 = downcast unconditional %20 : $NSObject to $Bas

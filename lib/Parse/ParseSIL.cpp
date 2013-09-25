@@ -690,7 +690,7 @@ bool SILParser::parseSILType(SILType &Result) {
 ///  sil-decl-subref-part ::= 'destroyer'
 ///  sil-decl-subref-part ::= 'globalaccessor'
 ///  sil-decl-uncurry-level ::= [0-9]+
-///  sil-decl-lang ::= 'objc'
+///  sil-decl-lang ::= 'foreign'
 bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
   if (P.parseToken(tok::sil_pound, diag::expected_sil_constant))
     return true;
@@ -734,8 +734,8 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
   // Handle sil-constant-kind-and-uncurry-level.
   // ParseState indicates the value we just handled.
   // 1 means we just handled Kind, 2 means we just handled uncurryLevel.
-  // We accept func|getter|setter|...|objc or an integer when ParseState is 0;
-  // accept objc or an integer when ParseState is 1; accept objc when ParseState
+  // We accept func|getter|setter|...|foreign or an integer when ParseState is 0;
+  // accept foreign or an integer when ParseState is 1; accept foreign when ParseState
   // is 2.
   unsigned ParseState = 0;
   do {
@@ -766,7 +766,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
       } else if (!ParseState && Id.str() == "globalaccessor") {
         Kind = SILDeclRef::Kind::GlobalAccessor;
         ParseState = 1;
-      } else if (Id.str() == "objc") {
+      } else if (Id.str() == "foreign") {
         IsObjC = true;
         break;
       } else

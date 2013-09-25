@@ -262,7 +262,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
     // If the function is fully uncurried and natively ObjC, reference its ObjC
     // entry point.
     if (!next.isCurried && fd->hasClangNode())
-      next = next.asObjC();
+      next = next.asForeign();
     
     SGM.emitCurryThunk(constant, next, fd);
   }
