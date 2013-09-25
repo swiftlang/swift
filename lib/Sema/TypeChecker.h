@@ -341,19 +341,6 @@ public:
   ///
   /// @{
 private:
-  /// \brief The list of structs that require default constructors
-  /// to be defined.
-  ///
-  /// This vector lists all structs and classes that have
-  /// implicitly-defined default constructors. Those structs not also
-  /// in \c structsNeedingDefaultConstructor still need to heave their
-  /// default constructors defined.
-  std::vector<NominalTypeDecl *> typesWithImplicitDefaultConstructor;
-
-  /// \brief The set of structs or classes that still need a default
-  /// constructor to be implicitly defined.
-  llvm::DenseSet<NominalTypeDecl *> typesNeedingImplicitDefaultConstructor;
-
   Optional<Type> boolType;
   
 public:

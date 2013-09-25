@@ -48,9 +48,8 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
       return result;
 
     // Define implicit default constructor for a struct/class.
-    if (typesNeedingImplicitDefaultConstructor.count(nominalDecl)) {
-      defineDefaultConstructor(nominalDecl);
-    }
+    if (isa<StructDecl>(nominalDecl) || isa<ClassDecl>(nominalDecl))
+      addImplicitConstructors(nominalDecl);
 
     // If we're looking for constructors in an enum, return the enum
     // elements.

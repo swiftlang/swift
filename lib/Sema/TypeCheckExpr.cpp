@@ -329,6 +329,8 @@ static Expr *foldSequence(TypeChecker &TC,
 }
 
 Type TypeChecker::getTypeOfRValue(ValueDecl *value) {
+  validateTypeDecl(value);
+
   Type type = value->getType();
   if (!value->isReferencedAsLValue())
     return type;

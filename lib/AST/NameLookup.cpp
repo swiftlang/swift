@@ -373,6 +373,9 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     }
 
     if (BaseDecl) {
+      if (TypeResolver)
+        TypeResolver->resolveDeclSignature(BaseDecl);
+
       SmallVector<ValueDecl *, 4> Lookup;
       M.lookupQualified(ExtendedType, Name, NL_UnqualifiedDefault,
                         TypeResolver, Lookup);

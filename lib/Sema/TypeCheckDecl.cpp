@@ -1025,7 +1025,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    if (IsSecondPass)
+    if (IsSecondPass || SD->hasType())
       return;
 
     assert(SD->getDeclContext()->isTypeContext()
@@ -1855,7 +1855,7 @@ public:
         TC.definedFunctions.push_back(DD);
     }
 
-    if (IsSecondPass) {
+    if (IsSecondPass || DD->hasType()) {
       return;
     }
 
@@ -1959,9 +1959,6 @@ void TypeChecker::validateTypeDecl(ValueDecl *D, bool resolveTypeParams) {
 
     // Compute the declared type.
     nominal->computeType();
-
-    if (auto SD = dyn_cast<StructDecl>(D))
-      addImplicitConstructors(SD);
 
     validateAttributes(*this, D);
     checkInheritanceClause(*this, D);
@@ -2181,6 +2178,10 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   assert(isa<StructDecl>(decl) || isa<ClassDecl>(decl));
 
+  // Don't add constructors to imported Objective-C classes.
+  if (decl->hasClangNode() && isa<ClassDecl>(decl))
+    return;
+
   // Check whether there is a user-declared constructor or an instance
   // variable.
   bool FoundConstructor = false;
@@ -2225,10 +2226,8 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       return;
   }
 
-  // Note that we need a default constructor.
-  assert(!typesNeedingImplicitDefaultConstructor.count(decl));
-  typesNeedingImplicitDefaultConstructor.insert(decl);
-  typesWithImplicitDefaultConstructor.push_back(decl);
+  // Try to build a default constructor.
+  defineDefaultConstructor(decl);
 }
 
 void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
@@ -2265,9 +2264,6 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc()));
 
   CD->setMembers(Context.AllocateCopy(Members), CD->getBraces());
-
-  // Add this to the list of implicitly-defined functions.
-  implicitlyDefinedFunctions.push_back(DD);
 }
 
 bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer, 
@@ -2443,11 +2439,6 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   PrettyStackTraceDecl stackTrace("defining default constructor for",
                                   decl);
 
-  // Erase this from the set of types that need an implicit default
-  // constructor.
-  assert(typesNeedingImplicitDefaultConstructor.count(decl));
-  typesNeedingImplicitDefaultConstructor.erase(decl);
-
   // Verify that all of the instance variables of this type have default
   // constructors.
   for (auto member : decl->getMembers()) {
@@ -2504,18 +2495,9 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Create an empty body for the default constructor. The type-check of the
   // constructor body will introduce default initializations of the members.
   ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
-
-  // Add this to the list of implicitly-defined functions.
-  implicitlyDefinedFunctions.push_back(ctor);
 }
 
 void TypeChecker::definePendingImplicitDecls() {
-  // Default any implicit default constructors.
-  for (unsigned i = 0; i != typesWithImplicitDefaultConstructor.size(); ++i) {
-    auto decl = typesWithImplicitDefaultConstructor[i];
-    if (typesNeedingImplicitDefaultConstructor.count(decl))
-      defineDefaultConstructor(decl);
-  }
 }
 
 static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
