@@ -357,6 +357,9 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
 }
 
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
+  if (ED->getExtendedTypeLoc().wasValidated())
+    return;
+  
   // FIXME: Should allow bound generics here as well.
   if (TC.validateType(ED->getExtendedTypeLoc(), /*allowUnboundGenerics=*/true)) {
     ED->setInvalid();
@@ -371,6 +374,9 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     ED->getExtendedTypeLoc().setInvalidType(TC.Context);
     return;
   }
+
+  if (auto nominal = ExtendedTy->getAnyNominal())
+    nominal->addExtension(ED);
 }
 
 static void recordKnownProtocol(Module *stdlib, StringRef name,
@@ -413,12 +419,17 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // to work.
   // FIXME: We can have interesting ordering dependencies among the various
   // extensions, so we'll need to be smarter here.
-  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
-    if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(TU->Decls[i])) {
-      bindExtensionDecl(ED, TC);
-      continue;
+  TU->forAllVisibleModules(Module::AccessPathTy(),
+                           [&](Module::ImportedModule import) {
+    auto importTU = dyn_cast<TranslationUnit>(import.second);
+    if (!importTU)
+      return;
+    // FIXME: Respect the access path?
+    for (auto D : importTU->Decls) {
+      if (auto ED = dyn_cast<ExtensionDecl>(D))
+        bindExtensionDecl(ED, TC);
     }
-  }
+  });
 
   // Record compiler-known protocol information in the AST.
   Module *stdlib = TC.getStdlibModule();

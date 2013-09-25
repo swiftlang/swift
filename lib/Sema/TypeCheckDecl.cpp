@@ -1809,11 +1809,6 @@ public:
         ED->setInvalid();
       }
 
-      // Add this extension to the list of extensions for the extended type.
-      if (auto nominal = ExtendedTy->getAnyNominal()) {
-        nominal->addExtension(ED);
-      }
-
       checkInheritanceClause(TC, ED);
     }
 
