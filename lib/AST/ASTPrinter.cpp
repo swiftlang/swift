@@ -387,9 +387,7 @@ void PrintAST::printInherited(ArrayRef<TypeLoc> inherited,
       return;
     // If only conforms to DynamicLookup protocol, nothing to print.
     if (protos.size() == 1) {
-      Optional<KnownProtocolKind> kind =
-        (*protos.begin())->getKnownProtocolKind();
-      if (kind && *kind == KnownProtocolKind::DynamicLookup)
+      if (protos.front()->isSpecificProtocol(KnownProtocolKind::DynamicLookup))
         return;
     }
   }
@@ -403,8 +401,7 @@ void PrintAST::printInherited(ArrayRef<TypeLoc> inherited,
     }
     
     interleave(protos, [&](const ProtocolDecl *proto) {
-      Optional<KnownProtocolKind> kind = proto->getKnownProtocolKind();
-      if (!kind || *kind != KnownProtocolKind::DynamicLookup)
+      if (!proto->isSpecificProtocol(KnownProtocolKind::DynamicLookup))
         proto->getDeclaredType()->print(OS);
     }, [&]() {
       OS << ", ";

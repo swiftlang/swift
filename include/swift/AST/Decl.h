@@ -1829,7 +1829,7 @@ public:
   }
 
   /// Check whether this protocol is of a specific, known protocol kind.
-  bool isSpecificProtocol(KnownProtocolKind kind) {
+  bool isSpecificProtocol(KnownProtocolKind kind) const {
     if (auto knownKind = getKnownProtocolKind())
       return *knownKind == kind;
 
