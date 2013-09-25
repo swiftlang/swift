@@ -30,6 +30,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 
@@ -381,12 +382,58 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     nominal->addExtension(ED);
 }
 
+/// Returns true if the given decl or extension conforms to a protocol whose
+/// name matches a compiler-known protocol. This is a syntactic check; no type
+/// resolution is performed.
+template <typename DeclTy>
+static bool mayConformToKnownProtocol(const DeclTy *D) {
+  for (TypeLoc inherited : D->getInherited()) {
+    auto identRepr = dyn_cast_or_null<IdentTypeRepr>(inherited.getTypeRepr());
+    if (!identRepr)
+      continue;
+
+    const IdentTypeRepr::Component &lastID = identRepr->Components.back();
+    if (!lastID.getGenericArgs().empty())
+      continue;
+
+    bool matchesKnownProtocol =
+      llvm::StringSwitch<bool>(lastID.getIdentifier().str())
+#define PROTOCOL(Name) \
+        .Case(#Name, true)
+#include "swift/AST/KnownProtocols.def"
+        .Default(false);
+    if (matchesKnownProtocol)
+      return true;
+  }
+
+  return false;
+}
+
 static void recordKnownProtocol(Module *stdlib, StringRef name,
                                 KnownProtocolKind kind) {
   Identifier ID = stdlib->Ctx.getIdentifier(name);
   UnqualifiedLookup lookup(ID, stdlib, nullptr, SourceLoc(), /*IsType=*/true);
   if (auto proto = dyn_cast_or_null<ProtocolDecl>(lookup.getSingleTypeResult()))
     proto->setKnownProtocolKind(kind);
+}
+
+static void checkBridgingFunctions(TypeChecker &tc, Module *mod,
+                                   StringRef bridgedTypeName,
+                                   StringRef forwardConversion,
+                                   StringRef reverseConversion) {
+  assert(mod);
+  Module::AccessPathTy unscopedAccess = {};
+  SmallVector<ValueDecl *, 4> results;
+
+  mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(bridgedTypeName),
+                   NLKind::QualifiedLookup, results);
+  mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(forwardConversion),
+                   NLKind::QualifiedLookup, results);
+  mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(reverseConversion),
+                   NLKind::QualifiedLookup, results);
+
+  for (auto D : results)
+    tc.validateTypeDecl(D);
 }
 
 static bool haveDifferentFixity(const ValueDecl *lhs, const ValueDecl *rhs) {
@@ -416,6 +463,12 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   TypeChecker TC(*TU);
   auto &DefinedFunctions = TC.definedFunctions;
 
+  // Record compiler-known protocol information in the AST.
+  Module *stdlib = TC.getStdlibModule();
+#define PROTOCOL(Name) \
+  recordKnownProtocol(stdlib, #Name, KnownProtocolKind::Name);
+#include "swift/AST/KnownProtocols.def"
+
   // Resolve extensions. This has to occur first during type checking,
   // because the extensions need to be wired into the AST for name lookup
   // to work.
@@ -428,16 +481,16 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       return;
     // FIXME: Respect the access path?
     for (auto D : importTU->Decls) {
-      if (auto ED = dyn_cast<ExtensionDecl>(D))
+      if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         bindExtensionDecl(ED, TC);
+        if (mayConformToKnownProtocol(ED))
+          TC.validateTypeDecl(ED->getExtendedType()->getAnyNominal());
+      } else if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
+        if (mayConformToKnownProtocol(nominal))
+          TC.validateTypeDecl(nominal);
+      }
     }
   });
-
-  // Record compiler-known protocol information in the AST.
-  Module *stdlib = TC.getStdlibModule();
-#define PROTOCOL(Name) \
-  recordKnownProtocol(stdlib, #Name, KnownProtocolKind::Name);
-#include "swift/AST/KnownProtocols.def"
 
   // FIXME: Check for cycles in class inheritance here?
 
@@ -537,6 +590,14 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       TC.typeCheckDecl(D, /*isFirstPass*/false);
     }
   }
+
+#define BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE, _, NATIVE_TYPE) \
+  if (Module *module = TU->Ctx.LoadedModules.lookup(#BRIDGED_MODULE)) { \
+    checkBridgingFunctions(TC, module, #BRIDGED_TYPE, \
+                           "convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
+                           "convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
+  }
+#include "swift/SIL/BridgedTypes.def"
 
   // Define any pending implicitly declarations.
   TC.definePendingImplicitDecls();
