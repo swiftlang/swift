@@ -562,7 +562,7 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
 
 SILModule *SILModule::constructSIL(TranslationUnit *tu,
                                    unsigned startElem) {
-  SILModule *m = new SILModule(tu->getASTContext());
+  SILModule *m = new SILModule(tu);
   SILGenModule sgm(*m);
   for (Decl *D : llvm::makeArrayRef(tu->Decls).slice(startElem))
     sgm.visit(D);

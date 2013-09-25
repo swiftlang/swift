@@ -19,6 +19,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -79,10 +80,9 @@ private:
   mutable llvm::BumpPtrAllocator BPA;
   void *TypeListUniquing;
 
-  /// The context that uniques the types used by this
-  /// SILFunction.
-  ASTContext &TheASTContext;
-  
+  /// The AST TranslationUnit that defineds the types used by the functions.
+  TranslationUnit *ASTTranslUnit;
+
   /// The list of Functions in the module.
   FunctionListType functions;
   
@@ -103,7 +103,7 @@ private:
   
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(ASTContext &TheASTContext);
+  SILModule(TranslationUnit *TU);
   
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -130,11 +130,11 @@ public:
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
-  static SILModule *createEmptyModule(ASTContext &Context) {
-    return new SILModule(Context);
+  static SILModule *createEmptyModule(TranslationUnit *TU) {
+    return new SILModule(TU);
   }
   
-  ASTContext &getASTContext() const { return TheASTContext; }
+  ASTContext &getASTContext() const { return ASTTranslUnit->getASTContext(); }
   
   using global_iterator = decltype(globals)::const_iterator;
   using GlobalRange = Range<global_iterator>;
@@ -189,7 +189,7 @@ public:
 
   /// Allocate memory using the module's internal allocator.
   void *allocate(unsigned Size, unsigned Align) const {
-    if (TheASTContext.LangOpts.UseMalloc)
+    if (getASTContext().LangOpts.UseMalloc)
       return AlignedAlloc(Size, Align);
     
     return BPA.Allocate(Size, Align);
