@@ -29,7 +29,7 @@ struct SemanticSourceEntity {
 };
 
 /// A function receiving SemanticSourceEntity objects.
-/// \returns true to continue receiving the next object, false to stop.
+/// Returns true to continue receiving the next object, false to stop.
 typedef std::function<bool(SemanticSourceEntity AnnoTok)>
     SemanticEntityReceiverFn;
 
