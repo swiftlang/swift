@@ -89,7 +89,7 @@ C::
   }
 
 and then introducing the parallel new concepts of payloads and patterns
-together:
+together::
 
   enum Foo { case A, B, C, D, Other(String) }
   
@@ -247,21 +247,21 @@ The 'RawRepresentable' protocol
 In the library, we define a compiler-blessed 'RawRepresentable' protocol that
 models the traditional relationship between a C enum and its raw type::
 
-protocol RawRepresentable {
-  /// The raw representation type.
-  typealias RawType
+  protocol RawRepresentable {
+    /// The raw representation type.
+    typealias RawType
 
-  /// Convert the conforming type to its raw type.
-  /// Every valid value of the conforming type should map to a unique
-  /// raw value.
-  func toRaw() -> RawType
+    /// Convert the conforming type to its raw type.
+    /// Every valid value of the conforming type should map to a unique
+    /// raw value.
+    func toRaw() -> RawType
 
-  /// Convert a value of raw type to the corresponding value of the
-  /// conforming type.
-  /// Returns None if the raw value has no corresponding conforming type
-  /// value.
-  static func fromRaw(_:RawType) -> Self?
-}
+    /// Convert a value of raw type to the corresponding value of the
+    /// conforming type.
+    /// Returns None if the raw value has no corresponding conforming type
+    /// value.
+    static func fromRaw(_:RawType) -> Self?
+  }
 
 Any type may manually conform to the RawRepresentable protocol following the above
 invariants, regardless of whether it supports compiler derivation as underlined
@@ -285,60 +285,60 @@ literals, and must be unique within the enum. If the raw type is
 IntegerLiteralConvertible, then the raw values default to
 auto-incrementing integer literal values starting from '0', as in C. If the
 raw type is not IntegerLiteralConvertible, the raw values must
-all be explicitly declared.
+all be explicitly declared::
 
-enum Color : Int {
-  case Black   // = 0
-  case Cyan    // = 1
-  case Magenta // = 2
-  case White   // = 3
-}
+  enum Color : Int {
+    case Black   // = 0
+    case Cyan    // = 1
+    case Magenta // = 2
+    case White   // = 3
+  }
 
-enum Signal : Int32 {
-  case SIGKILL = 9, SIGSEGV = 11
-}
+  enum Signal : Int32 {
+    case SIGKILL = 9, SIGSEGV = 11
+  }
 
-enum NSChangeDictionaryKey : String {
-  // All raw values are required because String is not
-  // IntegerLiteralConvertible
-  case NSKeyValueChangeKindKey = "NSKeyValueChangeKindKey"
-  case NSKeyValueChangeNewKey = "NSKeyValueChangeNewKey"
-  case NSKeyValueChangeOldKey = "NSKeyValueChangeOldKey"
-}
+  enum NSChangeDictionaryKey : String {
+    // All raw values are required because String is not
+    // IntegerLiteralConvertible
+    case NSKeyValueChangeKindKey = "NSKeyValueChangeKindKey"
+    case NSKeyValueChangeNewKey = "NSKeyValueChangeNewKey"
+    case NSKeyValueChangeOldKey = "NSKeyValueChangeOldKey"
+  }
 
 The compiler, on seeing a valid raw type for an enum, derives a RawRepresentable
 conformance, using 'switch' to implement the fromRaw and toRaw
-methods. The NSChangeDictionaryKey definition behaves as if defined:
+methods. The NSChangeDictionaryKey definition behaves as if defined::
 
-enum NSChangeDictionaryKey : RawRepresentable {
-  typealias RawType = String
+  enum NSChangeDictionaryKey : RawRepresentable {
+    typealias RawType = String
 
-  case NSKeyValueChangeKindKey
-  case NSKeyValueChangeNewKey
-  case NSKeyValueChangeOldKey
+    case NSKeyValueChangeKindKey
+    case NSKeyValueChangeNewKey
+    case NSKeyValueChangeOldKey
 
-  func toRaw() -> String {
-    switch self {
-    case .NSKeyValueChangeKindKey:
-      return "NSKeyValueChangeKindKey"
-    case .NSKeyValueChangeNewKey:
-      return "NSKeyValueChangeNewKey"
-    case .NSKeyValueChangeOldKey:
-      return "NSKeyValueChangeOldKey"
+    func toRaw() -> String {
+      switch self {
+      case .NSKeyValueChangeKindKey:
+        return "NSKeyValueChangeKindKey"
+      case .NSKeyValueChangeNewKey:
+        return "NSKeyValueChangeNewKey"
+      case .NSKeyValueChangeOldKey:
+        return "NSKeyValueChangeOldKey"
+      }
+    }
+
+    static func fromRaw(s:String) -> NSChangeDictionaryKey? {
+      switch s {
+      case "NSKeyValueChangeKindKey":
+        return .NSKeyValueChangeKindKey
+      case "NSKeyValueChangeNewKey":
+        return .NSKeyValueChangeNewKey
+      case "NSKeyValueChangeOldKey":
+        return .NSKeyValueChangeOldKey
+      default:
+        return nil
+      }
     }
   }
-
-  static func fromRaw(s:String) -> NSChangeDictionaryKey? {
-    switch s {
-    case "NSKeyValueChangeKindKey":
-      return .NSKeyValueChangeKindKey
-    case "NSKeyValueChangeNewKey":
-      return .NSKeyValueChangeNewKey
-    case "NSKeyValueChangeOldKey":
-      return .NSKeyValueChangeOldKey
-    default:
-      return nil
-    }
-  }
-}
 
