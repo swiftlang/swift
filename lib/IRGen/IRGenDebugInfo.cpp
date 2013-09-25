@@ -673,7 +673,11 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
   // best we can do.
   for (auto Use : I->getUses()) {
     if (auto Store = dyn_cast<StoreInst>(Use->getUser())) {
-      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, Store->getSrc()))
+      auto Src = Store->getSrc();
+      // Detect the pattern of a byref argument.
+      if (auto Load = dyn_cast<LoadInst>(Src))
+        Src = Load->getOperand();
+      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, Src))
         return;
     } else if (auto CopyAddr = dyn_cast<CopyAddrInst>(Use->getUser())) {
       if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, CopyAddr->getSrc()))
@@ -699,32 +703,6 @@ void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 unsigned ArgNo) {
   emitVariableDeclaration(Builder, Storage, Ty, Name,
                           llvm::dwarf::DW_TAG_arg_variable, ArgNo);
-}
-
-void IRGenDebugInfo::emitByRefArgumentOrNull(IRBuilder& Builder,
-                                             llvm::Value *Storage,
-                                             DebugTypeInfo DTI,
-                                             swift::SILInstruction *I,
-                                             swift::SILValue Op) {
-  if (auto SILArg = dyn_cast<SILArgument>(Op)) {
-    auto Fn = I->getFunction();
-    auto Ty = LValueType::get(DTI.getType(),
-                              LValueType::Qual::QualBits::DefaultForType,
-                              Context);
-    DebugTypeInfo RefTy(Ty, Types.getCompleteTypeInfo(Ty->getCanonicalType()));
-    // Attempt to pull out the name from the location.
-    StringRef Name;
-    auto Loc = I->getLoc();
-    if (LoadExpr* LE = Loc.getAsASTNode<LoadExpr>()) {
-      if (DeclRefExpr* DRE = dyn_cast<DeclRefExpr>(LE->getSubExpr()))
-        Name = DRE->getDecl()->getName().str();
-    } else if (AssignExpr* AE = Loc.getAsASTNode<AssignExpr>()) {
-      if (DeclRefExpr* DRE = dyn_cast<DeclRefExpr>(AE->getDest()))
-        Name = DRE->getDecl()->getName().str();
-    }
-    emitArgVariableDeclaration(Builder, Storage, RefTy, Name,
-                               getArgNo(Fn, SILArg));
-  }
 }
 
 /// Return the DIFile that is the ancestor of Scope.

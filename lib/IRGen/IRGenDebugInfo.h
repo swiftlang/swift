@@ -189,13 +189,6 @@ public:
                                      DebugTypeInfo DebugType,
                                      Optional<SILLocation> Loc);
 
-  /// Check whether Storage is a byref argument and emit debug info for it.
-  void emitByRefArgumentOrNull(IRBuilder& Builder,
-                               llvm::Value *Storage,
-                               DebugTypeInfo Ty,
-                               swift::SILInstruction *I,
-                               swift::SILValue Op);
-
   /// Return the native, absolute path to the main file.
   StringRef getMainFilename() const { return MainFilename; }
 
