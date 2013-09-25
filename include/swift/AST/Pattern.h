@@ -258,8 +258,7 @@ public:
 
   SourceLoc getLParenLoc() const { return LPLoc; }
   SourceLoc getRParenLoc() const { return RPLoc; }
-  SourceRange getSourceRange() const { return SourceRange(LPLoc, RPLoc); }
-  SourceLoc getLoc() const { return LPLoc; }
+  SourceRange getSourceRange() const;
   SourceLoc getEllipsisLoc() const {
     if (hasVararg())
       return *getEllipsisLocPtr();

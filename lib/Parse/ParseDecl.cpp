@@ -1251,6 +1251,11 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Pattern *ValuePattern
         = new (Context) TypedPattern(new (Context) NamedPattern(Value),
                                      ElementTy);
+      // The TypedPattern is always implicit because the ElementTy is not
+      // spelled inside the parameter list.  It comes from elsewhere, and its
+      // source location should be ignored.
+      ValuePattern->setImplicit();
+
       TuplePatternElt ValueElt(ValuePattern);
       Pattern *ValueParamsPattern
         = TuplePattern::create(Context, SetNameParens.Start, ValueElt,

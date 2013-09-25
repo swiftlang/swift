@@ -301,6 +301,8 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
                                     ArrayRef<TuplePatternElt> elements,
                                     SourceLoc rp,
                                     bool hasVararg, SourceLoc ellipsis) {
+  assert(lp.isValid() == rp.isValid());
+
   if (elements.size() == 1 &&
       elements[0].getInit() == nullptr &&
       elements[0].getPattern()->getBoundName().empty() &&
@@ -312,6 +314,22 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
   return create(C, lp, elements, rp, hasVararg, ellipsis);
 }
 
+SourceRange TuplePattern::getSourceRange() const {
+  if (LPLoc.isValid())
+    return { LPLoc, RPLoc };
+  auto Fields = getFields();
+  if (Fields.empty())
+    return {};
+  return { Fields.front().getPattern()->getStartLoc(),
+           Fields.back().getPattern()->getEndLoc() };
+}
+
 SourceRange TypedPattern::getSourceRange() const {
+  if (isImplicit()) {
+    // If a TypedPattern is implicit, then its type is definitely implicit, se
+    // we should ignore its location.  On the other hand, the sub-pattern can
+    // be explicit or implicit.
+    return SubPattern->getSourceRange();
+  }
   return { SubPattern->getSourceRange().Start, PatType.getSourceRange().End };
 }

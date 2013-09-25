@@ -102,6 +102,32 @@ namespace {
       llvm_unreachable("not all cases handled!");
     }
 
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      switch (P->getKind()) {
+#define DISPATCH(ID) \
+        return dispatchVisitPrePattern(static_cast<ID##Pattern*>(P))
+#define PATTERN(ID, PARENT) \
+      case PatternKind::ID: \
+        DISPATCH(ID);
+#include "swift/AST/PatternNodes.def"
+#undef DISPATCH
+      }
+      llvm_unreachable("not all cases handled!");
+    }
+
+    Pattern *walkToPatternPost(Pattern *P) {
+      switch (P->getKind()) {
+#define DISPATCH(ID) \
+        return dispatchVisitPost(static_cast<ID##Pattern*>(P))
+#define PATTERN(ID, PARENT) \
+      case PatternKind::ID: \
+        DISPATCH(ID);
+#include "swift/AST/PatternNodes.def"
+#undef DISPATCH
+      }
+      llvm_unreachable("not all cases handled!");
+    }
+
     bool walkToDeclPre(Decl *D) override {
       switch (D->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPre(static_cast<ID##Decl*>(D))
@@ -149,6 +175,14 @@ namespace {
       return { shouldVerify(node), node };
     }
 
+    /// Helper template for dispatching pre-visitation.
+    /// If we're visiting in pre-order, don't validate the node yet;
+    /// just check whether we should stop further descent.
+    template <class T>
+    std::pair<bool, Pattern *> dispatchVisitPrePattern(T node) {
+      return { shouldVerify(node), node };
+    }
+
     /// Helper template for dispatching post-visitation.
     template <class T> T dispatchVisitPost(T node) {
       // Verify source ranges if the AST node was parsed from source.
@@ -183,16 +217,19 @@ namespace {
     // Default cases for whether we should verify within the given subtree.
     bool shouldVerify(Expr *E) { return true; }
     bool shouldVerify(Stmt *S) { return true; }
+    bool shouldVerify(Pattern *S) { return true; }
     bool shouldVerify(Decl *S) { return true; }
 
     // Default cases for cleaning up as we exit a node.
     void cleanup(Expr *E) { }
     void cleanup(Stmt *S) { }
+    void cleanup(Pattern *P) { }
     void cleanup(Decl *D) { }
     
     // Base cases for the various stages of verification.
     void verifyParsed(Expr *E) {}
     void verifyParsed(Stmt *S) {}
+    void verifyParsed(Pattern *P) {}
     void verifyParsed(Decl *D) {
       if (!D->getDeclContext()) {
         Out << "every Decl should have a DeclContext";
@@ -201,6 +238,7 @@ namespace {
     }
     void verifyBound(Expr *E) {}
     void verifyBound(Stmt *S) {}
+    void verifyBound(Pattern *P) {}
     void verifyBound(Decl *D) {}
 
     /// @{
@@ -208,6 +246,7 @@ namespace {
     /// (even if there were errors).
     void verifyCheckedAlways(Expr *E) {}
     void verifyCheckedAlways(Stmt *S) {}
+    void verifyCheckedAlways(Pattern *P) {}
     void verifyCheckedAlways(Decl *D) {}
     /// @}
 
@@ -216,6 +255,7 @@ namespace {
     /// no errors.
     void verifyChecked(Expr *E) {}
     void verifyChecked(Stmt *S) {}
+    void verifyChecked(Pattern *P) {}
     void verifyChecked(Decl *D) {}
     /// @}
 
@@ -1099,7 +1139,7 @@ namespace {
         // expressions.
         if (E->isImplicit())
           return;
-        
+
         Out << "invalid source range for expression: ";
         E->print(Out);
         Out << "\n";
@@ -1116,11 +1156,11 @@ namespace {
         checkSourceRanges(E->getSourceRange(), Parent,
                           [&]{ E->print(Out); } );
     }
-    
+
     void checkSourceRanges(Stmt *S) {
       if (!S->getSourceRange().isValid()) {
         // We don't care about source ranges on implicitly-generated
-        // expressions.
+        // statements.
         if (S->isImplicit())
           return;
 
@@ -1129,8 +1169,36 @@ namespace {
         Out << "\n";
         abort();
       }
+      if (!isGoodSourceRange(S->getSourceRange())) {
+        Out << "bad source range for statement: ";
+        S->print(Out);
+        Out << "\n";
+        abort();
+      }
       checkSourceRanges(S->getSourceRange(), Parent,
                         [&]{ S->print(Out); });
+    }
+
+    void checkSourceRanges(Pattern *P) {
+      if (!P->getSourceRange().isValid()) {
+        // We don't care about source ranges on implicitly-generated
+        // patterns.
+        if (P->isImplicit())
+          return;
+
+        Out << "invalid source range for pattern: ";
+        P->print(Out);
+        Out << "\n";
+        abort();
+      }
+      if (!isGoodSourceRange(P->getSourceRange())) {
+        Out << "bad source range for pattern: ";
+        P->print(Out);
+        Out << "\n";
+        abort();
+      }
+      checkSourceRanges(P->getSourceRange(), Parent,
+                        [&]{ P->print(Out); });
     }
 
     void checkSourceRanges(Decl *D) {
@@ -1203,6 +1271,7 @@ namespace {
 
     void checkErrors(Expr *E) {}
     void checkErrors(Stmt *S) {}
+    void checkErrors(Pattern *P) {}
     void checkErrors(Decl *D) {}
     void checkErrors(ValueDecl *D) {
       if (!D->hasType())
