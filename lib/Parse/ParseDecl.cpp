@@ -1015,17 +1015,20 @@ namespace {
     DeclContext *CurDeclContext;
     SmallVectorImpl<Decl*> &Decls;
     DeclAttributes &Attributes;
+    PatternBindingDecl *PBD;
     
     AddVarsToScope(Parser &P,
                    ASTContext &Context,
                    DeclContext *CurDeclContext,
                    SmallVectorImpl<Decl*> &Decls,
-                   DeclAttributes &Attributes)
+                   DeclAttributes &Attributes,
+                   PatternBindingDecl *PBD)
       : TheParser(P),
         Context(Context),
         CurDeclContext(CurDeclContext),
         Decls(Decls),
-        Attributes(Attributes)
+        Attributes(Attributes),
+        PBD(PBD)
     {}
     
     Pattern *walkToPatternPost(Pattern *P) override {
@@ -1033,6 +1036,7 @@ namespace {
       if (auto *Named = dyn_cast<NamedPattern>(P)) {
         VarDecl *VD = Named->getDecl();
         VD->setDeclContext(CurDeclContext);
+        VD->setParentPattern(PBD);
         if (Attributes.isValid())
           VD->getMutableAttrs() = Attributes;
         
@@ -1058,9 +1062,10 @@ namespace {
 
 void Parser::addVarsToScope(Pattern *Pat,
                             SmallVectorImpl<Decl*> &Decls,
-                            DeclAttributes &Attributes) {
+                            DeclAttributes &Attributes,
+                            PatternBindingDecl *PBD) {
   Pat->walk(AddVarsToScope(*this, Context, CurDeclContext,
-                           Decls, Attributes));
+                           Decls, Attributes, PBD));
 }
 
 /// \brief Parse a get-set clause, containing a getter and (optionally)
@@ -1418,12 +1423,13 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
       }
     }
 
-    addVarsToScope(pattern.get(), Decls, Attributes);
-
     // In the normal case, just add PatternBindingDecls to our DeclContext.
-    PatternBindingDecl *PBD =
-      new (Context) PatternBindingDecl(VarLoc, pattern.get(),
-                                       Init.getPtrOrNull(), CurDeclContext);
+    auto PBD = new (Context) PatternBindingDecl(VarLoc, pattern.get(),
+                                                Init.getPtrOrNull(),
+                                                CurDeclContext);
+
+    addVarsToScope(pattern.get(), Decls, Attributes, PBD);
+
     Decls.push_back(PBD);
 
     // Propagate back types for simple patterns, like "var A, B : T".

@@ -1878,13 +1878,13 @@ private:
   
   // FIXME: These fields are useless for most of the VarDecls that are created
   // for patterns. We should refactor to a new node.
-  GetSetRecord *GetSet;
-  VarDecl *OverriddenDecl;
+  GetSetRecord *GetSet = nullptr;
+  PatternBindingDecl *ParentPattern = nullptr;
+  VarDecl *OverriddenDecl = nullptr;
 
 public:
   VarDecl(SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
-    : ValueDecl(DeclKind::Var, DC, Name, NameLoc),
-      GetSet(), OverriddenDecl(nullptr) {
+    : ValueDecl(DeclKind::Var, DC, Name, NameLoc) {
     setType(Ty);
   }
 
@@ -1915,6 +1915,13 @@ public:
   }
   void setOverriddenDecl(VarDecl *over) {
     OverriddenDecl = over;
+  }
+  
+  PatternBindingDecl *getParentPattern() const {
+    return ParentPattern;
+  }
+  void setParentPattern(PatternBindingDecl *PBD) {
+    ParentPattern = PBD;
   }
 
   /// Determine whether this declaration is an anonymous closure parameter.

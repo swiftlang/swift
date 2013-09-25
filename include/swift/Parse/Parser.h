@@ -462,7 +462,8 @@ public:
   /// collecting the variables in the vector \c Decls and applying
   /// \c Attributes to each one.
   void addVarsToScope(Pattern *Pat, SmallVectorImpl<Decl*> &Decls,
-                      DeclAttributes &Attributes);
+                      DeclAttributes &Attributes,
+                      PatternBindingDecl *PBD = nullptr);
   bool parseAttributeList(DeclAttributes &Attributes) {
     if (Tok.is(tok::l_square))
       return parseAttributeListPresent(Attributes);
