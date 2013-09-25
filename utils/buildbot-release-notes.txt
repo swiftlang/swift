@@ -4,8 +4,12 @@
 * [byref] arguments can now be captured into closures. The semantics of a
   byref capture are that the captured variable is an independent local variable
   of the callee, and the byref is updated to contain the value of that local
-  variable at function exit. For example, this code:
+  variable at function exit. 
 
+  In the common case, most closure arguments do not outlive the duration of
+  their callee, and the observable behavior is unchanged.  However, if the
+  captured variable outlives the function, you can observe this.  For example, 
+  this code:
 
     func foo(x:[byref] Int) -> () -> Int {
       func bar() -> Int {
@@ -37,8 +41,7 @@
     local x = 223
     global x = 220
 
-  In the common case, most closure arguments do not outlive the duration of
-  their callee, and the observable behavior is unchanged.
+  in no case will you end up with a dangling pointer or other unsafe construct.
 
 2013-09-24
 ----------
