@@ -1637,6 +1637,13 @@ namespace {
           return nullptr;
 
         setterIndices = tuple->getFields()[1].getPattern();
+
+        // The setter must use the same indices as the getter.
+        // FIXME: Adjust C++ references?
+        // FIXME: Special case for NSDictionary, which uses 'id' for the getter
+        // but 'id <NSCopying>' for the setter.
+        if (!setterIndices->getType()->isEqual(getterIndices->getType()))
+          return nullptr;
       }
 
       if (getter && getterIndices)

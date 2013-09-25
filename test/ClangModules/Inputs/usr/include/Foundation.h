@@ -32,3 +32,22 @@ BOOL BOOLtoBOOL(BOOL b);
 typedef struct _NSZone NSZone;
 
 void *allocate(NSZone *zone);
+
+
+@interface BadCollection
+- (id)objectForKeyedSubscript:(id)key;
+- (void)setObject:(id)object forKeyedSubscript:(NSString *)key;
+@end
+
+@interface BadCollectionParent
+- (id)objectForKeyedSubscript:(NSString *)key;
+@end
+
+@interface BadCollectionChild : BadCollectionParent
+- (void)setObject:(id)object forKeyedSubscript:(id)key;
+@end
+
+@interface ReadOnlyCollectionChild : BadCollectionParent
+- (void)setObject:(id)object forKeyedSubscript:(id)key;
+@end
+
