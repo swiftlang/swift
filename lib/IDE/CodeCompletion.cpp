@@ -976,7 +976,7 @@ public:
       }
     }
     if (!Done) {
-      lookupVisibleDecls(*this, ExprType, CurrDeclContext);
+      lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext);
     }
     {
       // Add the special qualified keyword 'metatype' so that, for example,
@@ -1015,8 +1015,8 @@ public:
   void getTypeCompletions(Type BaseType) {
     Kind = LookupKind::Type;
     NeedLeadingDot = !HaveDot;
-    lookupVisibleDecls(*this, MetaTypeType::get(BaseType, SwiftContext),
-                       CurrDeclContext);
+    lookupVisibleMemberDecls(*this, MetaTypeType::get(BaseType, SwiftContext),
+                             CurrDeclContext);
   }
 
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {

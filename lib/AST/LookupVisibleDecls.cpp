@@ -457,8 +457,8 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     }
 
     if (BaseDecl) {
-      lookupVisibleMemberDecls(ExtendedType, Consumer, DC,
-                               LookupKind::Unqualified);
+      ::lookupVisibleMemberDecls(ExtendedType, Consumer, DC,
+                                 LookupKind::Unqualified);
     }
 
     // Check the generic parameters for something with the given name.
@@ -499,7 +499,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
   }
 }
 
-void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
-                               const DeclContext *CurrDC) {
-  lookupVisibleMemberDecls(BaseTy, Consumer, CurrDC, LookupKind::Qualified);
+void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
+                                     const DeclContext *CurrDC) {
+  ::lookupVisibleMemberDecls(BaseTy, Consumer, CurrDC, LookupKind::Qualified);
 }

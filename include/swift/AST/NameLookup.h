@@ -236,9 +236,9 @@ void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 /// VisibleDeclConsumer.
 ///
 /// \param CurrDC the DeclContext from which the lookup is done.
-void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
-                        Type BaseTy,
-                        const DeclContext *CurrDC);
+void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
+                              Type BaseTy,
+                              const DeclContext *CurrDC);
 
 } // end namespace swift
 
