@@ -1,0 +1,8 @@
+// RUN: %swift -parse %s -verify
+
+destructor // expected-error {{'destructor' functions may only be declared within a class}}
+
+subscript (x : Int, y : Int) -> Int // expected-error{{'subscript' functions may only be declared within a type}}
+
+init(i:Int) // expected-error {{initializers may only be declared within a class, struct, or enum}}
+

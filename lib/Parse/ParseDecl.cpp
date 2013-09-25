@@ -2402,57 +2402,45 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
       parseTypeAnnotation(diag::expected_type_subscript);
   if (ElementTy.isNull() || ElementTy.hasCodeCompletion())
     return ElementTy;
-  
-  if (!NeedDefinition) {
-    SubscriptDecl *Subscript
-      = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
-                                    SubscriptLoc, Indices.get(), ArrowLoc,
-                                    ElementTy.get(), SourceRange(),
-                                    0, 0, CurDeclContext);
-    Decls.push_back(Subscript);
-    return makeParserSuccess();
-  }
-  
+
   // '{'
-  if (!Tok.is(tok::l_brace)) {
-    if (isInSILMode()) {
-      SubscriptDecl *Subscript
-      = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
-                                    SubscriptLoc, Indices.get(), ArrowLoc,
-                                    ElementTy.get(), SourceRange(),
-                                    0, 0, CurDeclContext);
-      Decls.push_back(Subscript);
-      return makeParserSuccess();
-    }
-    diagnose(Tok, diag::expected_lbrace_subscript);
-    return makeParserError();
-  }
-  SourceLoc LBLoc = consumeToken();
-  
   // Parse getter and setter.
+  SourceRange DefRange = SourceRange();
   FuncDecl *Get = nullptr;
   FuncDecl *Set = nullptr;
-  SourceLoc LastValidLoc = LBLoc;
-  if (parseGetSet(HasContainerType, Indices.get(), ElementTy.get(),
-                  Get, Set, LastValidLoc))
-    Status.setIsParseError();
+  if (Tok.is(tok::l_brace))  {
+    SourceLoc LBLoc = consumeToken();
+    
+    SourceLoc LastValidLoc = LBLoc;
+    if (parseGetSet(HasContainerType, Indices.get(), ElementTy.get(),
+                    Get, Set, LastValidLoc))
+      Status.setIsParseError();
 
-  // Parse the final '}'.
-  SourceLoc RBLoc;
-  if (Status.isError()) {
-    skipUntilDeclRBrace();
-    RBLoc = LastValidLoc;
-  }
+    // Parse the final '}'.
+    SourceLoc RBLoc;
+    if (Status.isError()) {
+      skipUntilDeclRBrace();
+      RBLoc = LastValidLoc;
+    }
 
-  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
-                         LBLoc)) {
-    RBLoc = LastValidLoc;
-  }
+    if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
+                           LBLoc)) {
+      RBLoc = LastValidLoc;
+    }
 
-  if (!Get) {
-    if (Status.isSuccess())
-      diagnose(SubscriptLoc, diag::subscript_without_get);
-    Status.setIsParseError();
+    if (!Get) {
+      if (Status.isSuccess())
+        diagnose(SubscriptLoc, diag::subscript_without_get);
+      Status.setIsParseError();
+    }
+
+    DefRange = SourceRange(LBLoc, RBLoc);
+
+  } else  {
+    if (NeedDefinition && !isInSILMode()) {
+      diagnose(Tok, diag::expected_lbrace_subscript);
+      return makeParserError();
+    }
   }
 
   // Reject 'subscript' functions outside of type decls
@@ -2468,7 +2456,7 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
     SubscriptDecl *Subscript
       = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
                                     SubscriptLoc, Indices.get(), ArrowLoc,
-                                    ElementTy.get(), SourceRange(LBLoc, RBLoc),
+                                    ElementTy.get(), DefRange,
                                     Get, Set, CurDeclContext);
 
     // FIXME: Order of get/set not preserved.
@@ -2561,28 +2549,28 @@ Parser::parseDeclConstructor(unsigned Flags) {
 
   // '{'
   if (!Tok.is(tok::l_brace)) {
-    if (isInSILMode())
-      return makeParserResult(CD);
+    if (!isInSILMode()) {
+      if (!SignatureStatus.isError()) {
+        // Don't emit this diagnostic if we already complained about this
+        // constructor decl.
+        diagnose(Tok, diag::expected_lbrace_initializer);
+      }
 
-    if (!SignatureStatus.isError()) {
-      // Don't emit this diagnostic if we already complained about this
-      // constructor decl.
-      diagnose(Tok, diag::expected_lbrace_initializer);
+      // FIXME: This is brutal. Can't we at least return the declaration?
+      return nullptr;
     }
-
-    // FIXME: This is brutal. Can't we at least return the declaration?
-    return nullptr;
-  }
-
-  ContextChange CC(*this, CD);
-
-  if (!isDelayedParsingEnabled()) {
-    ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
-
-    if (!Body.isNull())
-      CD->setBody(Body.get());
   } else {
-    consumeAbstractFunctionBody(CD, Attributes);
+    // Parse the body.
+    ContextChange CC(*this, CD);
+
+    if (!isDelayedParsingEnabled()) {
+      ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+
+      if (!Body.isNull())
+        CD->setBody(Body.get());
+    } else {
+      consumeAbstractFunctionBody(CD, Attributes);
+    }
   }
 
   if (Attributes.isValid())
@@ -2598,15 +2586,6 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
 
-  VarDecl *SelfDecl
-  = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
-                          Type(), CurDeclContext);
-
-  Scope S(this, ScopeKind::DestructorBody);
-  DestructorDecl *DD =
-  new (Context) DestructorDecl(Context.getIdentifier("destructor"),
-                               DestructorLoc, SelfDecl, CurDeclContext);
-
   // '{'
   if (!Tok.is(tok::l_brace)) {
     if (Tok.is(tok::l_paren)) {
@@ -2620,25 +2599,35 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
             .fixItRemove(Params.get()->getSourceRange());
       }
     }
-    if (!Tok.is(tok::l_brace)) {
-      if (isInSILMode())
-        return makeParserResult(DD);
+    if (!Tok.is(tok::l_brace) && !isInSILMode()) {
       diagnose(Tok, diag::expected_lbrace_destructor);
       return nullptr;
     }
   }
 
+  VarDecl *SelfDecl
+    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
+                          Type(), CurDeclContext);
+
+  Scope S(this, ScopeKind::DestructorBody);
+  DestructorDecl *DD
+    = new (Context) DestructorDecl(Context.getIdentifier("destructor"),
+                                 DestructorLoc, SelfDecl, CurDeclContext);
+
   SelfDecl->setDeclContext(DD);
   addToScope(SelfDecl);
-  ContextChange CC(*this, DD);
 
-  if (!isDelayedParsingEnabled()) {
-    ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+  // Parse the body.
+  if (Tok.is(tok::l_brace)) {
+    ContextChange CC(*this, DD);
+    if (!isDelayedParsingEnabled()) {
+      ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
 
-    if (!Body.isNull())
-      DD->setBody(Body.get());
-  } else {
-    consumeAbstractFunctionBody(DD, Attributes);
+      if (!Body.isNull())
+        DD->setBody(Body.get());
+    } else {
+      consumeAbstractFunctionBody(DD, Attributes);
+    }
   }
 
   if (Attributes.isValid())

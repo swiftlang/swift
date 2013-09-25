@@ -1068,6 +1068,8 @@ SourceRange ConstructorDecl::getSourceRange() const {
     case DeclContextKind::NominalTypeDecl:
       return cast<NominalTypeDecl>(DC)->getLoc();
     default:
+      if (isInvalid())
+        return getConstructorLoc();
       llvm_unreachable("Unhandled decl kind");
     }
   }
