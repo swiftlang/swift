@@ -251,29 +251,53 @@ public:
   }
 };
   
-/// Initialize the value by binding the variable address to the
-/// incoming address.
-class AddressBindingInitialization : public Initialization {
+/// Cleanup that writes back to a byref argument on function exit.
+class CleanupWriteBackToByref : public Cleanup {
+  VarDecl *var;
+  SILValue byrefAddr;
+
+public:
+  CleanupWriteBackToByref(VarDecl *var, SILValue byrefAddr)
+    : var(var), byrefAddr(byrefAddr) {}
+  
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    // Assign from the local variable to the byref address.
+    gen.getTypeLowering(byrefAddr.getType())
+      .emitCopyInto(gen.B, l, gen.VarLocs[var].address, byrefAddr,
+                    IsNotTake, IsNotInitialization);
+  }
+};
+  
+/// Initialize a writeback buffer that receives the "in" value of a byref
+/// argument on function entry and writes the "out" value back to the byref
+/// address on function exit.
+class ByrefInitialization : public Initialization {
   /// The VarDecl for the byref symbol.
   VarDecl *vd;
 public:
-  AddressBindingInitialization(VarDecl *vd)
-    : Initialization(Initialization::Kind::AddressBinding),
-      vd(vd)
-  {}
+  ByrefInitialization(VarDecl *vd)
+    : Initialization(Initialization::Kind::AddressBinding), vd(vd) {}
   
   SILValue getAddressOrNull() override {
-    llvm_unreachable("byref argument does not have an address to store to");
+    llvm_unreachable("byref argument should be bound by bindAddress");
   }
   ArrayRef<InitializationPtr> getSubInitializations() override {
     return {};
   }
 
-  void bindAddress(SILValue address, SILGenFunction &gen) override {
-    // Use the input address as the var's address.
-    assert(address.getType().isAddress() &&
-           "binding a variable to a non-address argument?!");
-    gen.VarLocs[vd] = {SILValue(), address};
+  void bindAddress(SILValue address, SILGenFunction &gen,
+                   SILLocation loc) override {
+    // Allocate the local variable for the byref.
+    auto initVar = gen.emitLocalVariableWithCleanup(vd);
+    
+    // Initialize with the value from the byref.
+    gen.getTypeLowering(address.getType())
+      .emitCopyInto(gen.B, loc, address, initVar->getAddress(),
+                    IsNotTake, IsInitialization);
+    initVar->finishInitialization(gen);
+    
+    // Set up a cleanup to write back to the byref.
+    gen.Cleanups.pushCleanup<CleanupWriteBackToByref>(vd, address);
   }
 };
   
@@ -315,7 +339,7 @@ struct InitializationForPattern
     // If this is a [byref] argument, bind the argument lvalue as our
     // address.
     if (vd->getType()->is<LValueType>())
-      return InitializationPtr(new AddressBindingInitialization(vd));
+      return InitializationPtr(new ByrefInitialization(vd));
 
     // If this is a global variable, initialize it without allocations or
     // cleanups.
@@ -412,7 +436,7 @@ struct ArgumentInitVisitor :
     if (!I) return;
     switch (I->kind) {
     case Initialization::Kind::AddressBinding:
-      I->bindAddress(arg, gen);
+      I->bindAddress(arg, gen, loc);
       // If this is an address-only non-byref argument, we take ownership
       // of the referenced value.
       if (!ty->is<LValueType>())
@@ -625,7 +649,6 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
     // Add the SILArguments and use them to initialize the local argument
     // values.
     ArgumentInitVisitor(*this, F).visit(p, argInit.get());
-    
   };
   
   // Emit the argument variables in calling convention order.
@@ -976,7 +999,7 @@ void SILGenFunction::emitLocalVariable(VarDecl *vd) {
   assert(!vd->isProperty() &&
          "can't emit a physical local var for a property");
 
-  SILType lType = getLoweredType(vd->getType());
+  SILType lType = getLoweredType(vd->getType()->getRValueType());
 
   // The variable may have its lifetime extended by a closure, heap-allocate it
   // using a box.

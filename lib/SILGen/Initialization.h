@@ -68,7 +68,8 @@ public:
   
   /// Binds an address value to this initialization. Used for [byref] arguments,
   /// but invalid anywhere else.
-  virtual void bindAddress(SILValue address, SILGenFunction &gen) {
+  virtual void bindAddress(SILValue address, SILGenFunction &gen,
+                           SILLocation loc) {
     llvm_unreachable("unexpected address value in initialization!");
   }
   
