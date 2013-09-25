@@ -43,7 +43,7 @@
     local x = 223
     global x = 220
 
-  in no case will you end up with a dangling pointer or other unsafe construct.
+  In no case will you end up with a dangling pointer or other unsafe construct.
 
 2013-09-24
 ----------
