@@ -2355,6 +2355,15 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
   
   // '{'
   if (!Tok.is(tok::l_brace)) {
+    if (isInSILMode()) {
+      SubscriptDecl *Subscript
+      = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
+                                    SubscriptLoc, Indices.get(), ArrowLoc,
+                                    ElementTy.get(), SourceRange(),
+                                    0, 0, CurDeclContext);
+      Decls.push_back(Subscript);
+      return makeParserSuccess();
+    }
     diagnose(Tok, diag::expected_lbrace_subscript);
     return makeParserError();
   }
@@ -2492,6 +2501,9 @@ Parser::parseDeclConstructor(unsigned Flags) {
 
   // '{'
   if (!Tok.is(tok::l_brace)) {
+    if (isInSILMode())
+      return makeParserResult(CD);
+
     if (!SignatureStatus.isError()) {
       // Don't emit this diagnostic if we already complained about this
       // constructor decl.
@@ -2526,6 +2538,15 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
 
+  VarDecl *SelfDecl
+  = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
+                          Type(), CurDeclContext);
+
+  Scope S(this, ScopeKind::DestructorBody);
+  DestructorDecl *DD =
+  new (Context) DestructorDecl(Context.getIdentifier("destructor"),
+                               DestructorLoc, SelfDecl, CurDeclContext);
+
   // '{'
   if (!Tok.is(tok::l_brace)) {
     if (Tok.is(tok::l_paren)) {
@@ -2540,19 +2561,13 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
       }
     }
     if (!Tok.is(tok::l_brace)) {
+      if (isInSILMode())
+        return makeParserResult(DD);
       diagnose(Tok, diag::expected_lbrace_destructor);
       return nullptr;
     }
   }
 
-  VarDecl *SelfDecl
-    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
-                            Type(), CurDeclContext);
-
-  Scope S(this, ScopeKind::DestructorBody);
-  DestructorDecl *DD =
-      new (Context) DestructorDecl(Context.getIdentifier("destructor"),
-                                   DestructorLoc, SelfDecl, CurDeclContext);
   SelfDecl->setDeclContext(DD);
   addToScope(SelfDecl);
   ContextChange CC(*this, DD);
