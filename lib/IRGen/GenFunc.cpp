@@ -614,8 +614,8 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
     assert(numElements >= 2 && "invalid objc method type");
     decomposeTopLevelArg(inputTuple.getElementType(--numElements));
     argTypes.push_back(IGM.Int8PtrTy);
-    while (numElements > 0) {
-      decomposeTopLevelArg(inputTuple.getElementType(--numElements));
+    for (unsigned i = 0; i < numElements; ++i) {
+      decomposeTopLevelArg(inputTuple.getElementType(i));
     }
     break;
   }
@@ -1497,10 +1497,9 @@ void CallEmission::addArg(Explosion &arg) {
       cast<TupleType>(cast<AnyFunctionType>(CurOrigType).getInput());
     unsigned numElements = inputTuple->getNumElements();
     assert(numElements >= 2 && "invalid objc method type");
-    --numElements;
-    while (numElements > 0) {
+    for (unsigned i = 0; i < numElements-1; ++i) {
       externalizeArguments(externalized, arg, newByvals,
-                           inputTuple.getElementType(--numElements));
+                           inputTuple.getElementType(i));
     }
     arg = std::move(externalized);
     break;
