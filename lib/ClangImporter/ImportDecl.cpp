@@ -2088,37 +2088,6 @@ namespace {
       return nullptr;
     }
 
-    /// \brief Given an untyped collection and an element type,
-    /// produce the typed collection (if possible) or return the collection
-    /// itself (if there is no known corresponding typed collection).
-    Type getTypedCollection(Type collectionTy, Type elementTy) {
-      auto classTy = collectionTy->getAs<ClassType>();
-      if (!classTy) {
-        return collectionTy;
-      }
-      
-      // Map known collections to their typed equivalents.
-      // FIXME: This is very hacky.
-      typedef std::pair<StringRef, StringRef> StringRefPair;
-      StringRefPair typedCollection
-        = llvm::StringSwitch<StringRefPair>(classTy->getDecl()->getName().str())
-            .Case("NSArray", StringRefPair("Foundation", "NSTypedArray"))
-            .Default(StringRefPair(StringRef(), StringRef()));
-      if (typedCollection.first.empty()) {
-        return collectionTy;
-      }
-
-      // Form the specialization.
-      if (auto typed = Impl.getNamedSwiftTypeSpecialization(
-                         Impl.getNamedModule(typedCollection.first),
-                         typedCollection.second,
-                         elementTy)) {
-        return typed;
-      }
-
-      return collectionTy;
-    }
-
     Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl) {
       // Properties are imported as variables.
 
@@ -2154,15 +2123,6 @@ namespace {
       auto type = Impl.importType(decl->getType(), ImportTypeKind::Property);
       if (!type)
         return nullptr;
-
-      // Look for an iboutletcollection attribute, which provides additional
-      // typing information for known containers.
-      if (auto collectionAttr = decl->getAttr<clang::IBOutletCollectionAttr>()){
-        if (auto elementType = Impl.importType(collectionAttr->getInterface(),
-                                               ImportTypeKind::Normal)){
-          type = getTypedCollection(type, elementType);
-        }
-      }
 
       // Import the getter.
       auto getter
