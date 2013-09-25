@@ -2714,7 +2714,7 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
       TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute,"assignment");
       VD->getMutableAttrs().Assignment = false;
     } else if (NumArguments < 1) {
-      TC.diagnose(VD->getStartLoc(), diag::assignment_without_byref);
+      TC.diagnose(VD->getStartLoc(), diag::assignment_without_inout);
       VD->getMutableAttrs().Assignment = false;
     } else {
       auto FT = VD->getType()->castTo<AnyFunctionType>();
@@ -2724,7 +2724,7 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
         ParamType = ParamTT->getElementType(0);
 
       if (!ParamType->is<LValueType>()) {
-        TC.diagnose(VD->getStartLoc(), diag::assignment_without_byref);
+        TC.diagnose(VD->getStartLoc(), diag::assignment_without_inout);
         VD->getMutableAttrs().Assignment = false;
       }
     }
@@ -2792,9 +2792,9 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
     }
   }
 
-  if (Attrs.isByref()) {
-    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "byref");
-    VD->getMutableAttrs().Byref = false;
+  if (Attrs.isInOut()) {
+    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "inout");
+    VD->getMutableAttrs().InOut = false;
   }
 
   if (Attrs.isAutoClosure()) {

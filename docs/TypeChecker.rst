@@ -77,7 +77,7 @@ the Swift type system:
     -  Exact equality constraints, or  "binding", written ``T0 := X``
        for some type variable ``T0`` and  type ``X``, which requires
        that ``T0`` be exactly identical to ``X``;
-    - Equality constraints, written ``X == Y`` for types ``X`` and ``Y``, which require ``X`` and ``Y`` to have the same type, ignoring lvalue types in the process. For example, the constraint ``T0 == X`` would be satisfied by assigning ``T0`` the type ``X`` and by assigning ``T0`` the type ``[byref] X``.
+    - Equality constraints, written ``X == Y`` for types ``X`` and ``Y``, which require ``X`` and ``Y`` to have the same type, ignoring lvalue types in the process. For example, the constraint ``T0 == X`` would be satisfied by assigning ``T0`` the type ``X`` and by assigning ``T0`` the type ``[inout] X``.
 
 **Subtyping**
   A subtype constraint requires the first type to be equivalent to or
@@ -150,7 +150,7 @@ and types generated from the primary expression kinds are:
   An expression that refers to a declaration ``x`` is assigned the
   type of a reference to ``x``. For example, if ``x`` is declared as
   ``var x : Int``, the expression ``x`` is assigned the type
-  ``[byref(implicit)] Int``. No constraints are generated.
+  ``[inout(implicit)] Int``. No constraints are generated.
 
   When a name refers to a set of overloaded declarations, the
   selection of the appropriate declaration is handled by the
@@ -256,9 +256,9 @@ and types generated from the primary expression kinds are:
   type.
 
 **Address of**
-  An address-of expression ``&a`` always returns a ``[byref]``
-  type. Therefore, it is assigned the type ``[byref] T0`` for a fresh
-  type variable ``T0``. The subtyping constraint ``[byref] T0 <
+  An address-of expression ``&a`` always returns a ``[inout]``
+  type. Therefore, it is assigned the type ``[inout] T0`` for a fresh
+  type variable ``T0``. The subtyping constraint ``[inout] T0 <
   T(a)`` captures the requirement that input expression be an lvalue
   of some type.
 

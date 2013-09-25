@@ -140,7 +140,7 @@ public:
 
   ResilienceData Resilience;
   StringRef AsmName;
-  bool Byref = false;
+  bool InOut = false;
   bool AutoClosure = false;
   bool Thin = false;
   bool NoReturn = false;
@@ -166,7 +166,7 @@ public:
   bool isValid() const { return LSquareLoc.isValid(); }
 
   ResilienceData getResilienceData() const { return Resilience; }
-  bool isByref() const { return Byref; }
+  bool isInOut() const { return InOut; }
   bool isAutoClosure() const { return AutoClosure; }
   bool isThin() const { return Thin; }
   bool isNoReturn() const { return NoReturn; }
@@ -195,7 +195,7 @@ public:
   AbstractCC getAbstractCC() const { return *cc; }
 
   bool empty() const {
-    return !isInfix() && !getResilienceData().isValid() && !isByref() &&
+    return !isInfix() && !getResilienceData().isValid() && !isInOut() &&
            !isAutoClosure() && !isThin() && !isNoReturn() && !isAssignment() &&
            !isConversion() && !isTransparent() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&

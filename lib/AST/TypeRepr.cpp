@@ -99,7 +99,7 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
   }
   if (!Attrs.AsmName.empty())
     AttrOS << "asmname=\"" << Attrs.AsmName << "\",";
-  if (Attrs.isByref()) AttrOS << "byref,";
+  if (Attrs.isInOut()) AttrOS << "inout,";
   if (Attrs.isAutoClosure()) AttrOS << "auto_closure,";
   if (Attrs.isThin()) AttrOS << "thin,";
   if (Attrs.isNoReturn()) AttrOS << "noreturn,";

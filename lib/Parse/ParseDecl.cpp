@@ -206,28 +206,28 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;
   }
 
-  // 'byref' attribute.
+  // 'inout' attribute.
   // FIXME: only permit this in specific contexts.
-  case AttrName::byref: {
+  case AttrName::inout: {
     SourceLoc TokLoc = Tok.getLoc();
-    if (Attributes.Byref)
+    if (Attributes.InOut)
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
     consumeToken(tok::identifier);
 
-    Attributes.Byref = true;
+    Attributes.InOut = true;
 
-    // Permit "qualifiers" on the byref.
+    // Permit "qualifiers" on the inout.
     SourceLoc beginLoc = Tok.getLoc();
     if (consumeIfNotAtStartOfLine(tok::l_paren)) {
-      diagnose(Tok, diag::byref_attribute_unknown_qualifier);
+      diagnose(Tok, diag::inout_attribute_unknown_qualifier);
       SourceLoc endLoc;
       parseMatchingToken(tok::r_paren, endLoc,
-                         diag::byref_attribute_expected_rparen,
+                         diag::inout_attribute_expected_rparen,
                          beginLoc);
     }
     
     // Verify that we're not combining this attribute incorrectly.  Cannot be
-    // both byref and auto_closure.
+    // both inout and auto_closure.
     if (Attributes.isAutoClosure()) {
       diagnose(TokLoc, diag::cannot_combine_attribute, "auto_closure");
       Attributes.AutoClosure = false;
@@ -295,7 +295,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
   // 'objc_block' attribute.
   // FIXME: only permit this in type contexts.
   case AttrName::objc_block: {
-    if (Attributes.Byref)
+    if (Attributes.InOut)
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
     consumeToken(tok::identifier);
     
@@ -312,9 +312,9 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     consumeToken(tok::identifier);
     
     // Verify that we're not combining this attribute incorrectly.  Cannot be
-    // both byref and auto_closure.
-    if (Attributes.isByref()) {
-      diagnose(TokLoc, diag::cannot_combine_attribute, "byref");
+    // both inout and auto_closure.
+    if (Attributes.isInOut()) {
+      diagnose(TokLoc, diag::cannot_combine_attribute, "inout");
       return false;
     }
     
@@ -1639,8 +1639,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   // container type as an element named 'self'.
   //
   // This turns an instance function "(int)->int" on FooTy into
-  // "(this: [byref] FooTy)->(int)->int", and a static function
-  // "(int)->int" on FooTy into "(this: [byref] FooTy.metatype)->(int)->int".
+  // "(this: [inout] FooTy)->(int)->int", and a static function
+  // "(int)->int" on FooTy into "(this: [inout] FooTy.metatype)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
   if (HasContainerType) {
     Pattern *SelfPattern = buildImplicitSelfParameter();

@@ -2351,7 +2351,7 @@ public:
 /// the lvalue.
 ///
 /// For the function type of an assignment operator, makes the first argument
-/// an implicit byref(settable).
+/// an implicit inout(settable).
 Type adjustLValueForReference(Type type, bool isAssignment,
                               ASTContext &context);
 

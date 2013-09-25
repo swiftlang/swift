@@ -20,10 +20,10 @@ using namespace swift;
 
 STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 
-/// isByRefOrIndirectReturn - Return true if the specified apply/partial_apply
-/// call operand is a [byref] or indirect return, indicating that the call
+/// isInOutOrIndirectReturn - Return true if the specified apply/partial_apply
+/// call operand is a [inout] or indirect return, indicating that the call
 /// doesn't capture the pointer.
-static bool isByRefOrIndirectReturn(SILInstruction *Apply,
+static bool isInOutOrIndirectReturn(SILInstruction *Apply,
                                     unsigned ArgumentNumber) {
   SILType FnTy = Apply->getOperand(0).getType();
   SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(*Apply->getModule());
@@ -32,7 +32,7 @@ static bool isByRefOrIndirectReturn(SILInstruction *Apply,
   if (ArgumentNumber == 0 && FTI->hasIndirectReturn())
     return true;
 
-  // Otherwise, check for [byref].
+  // Otherwise, check for [inout].
   Type ArgTy = FTI->getSwiftArgumentType(ArgumentNumber);
   return ArgTy->is<LValueType>();
 }
@@ -167,9 +167,9 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     }
     
     // apply and partial_apply instructions do not capture the pointer when
-    // it is passed through [byref] arguments or for indirect returns.
+    // it is passed through [inout] arguments or for indirect returns.
     if ((isa<ApplyInst>(User) || isa<PartialApplyInst>(User)) &&
-        isByRefOrIndirectReturn(User, UI->getOperandNumber()-1))
+        isInOutOrIndirectReturn(User, UI->getOperandNumber()-1))
       continue;
 
     // Otherwise, this looks like it escapes.

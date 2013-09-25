@@ -205,7 +205,7 @@ func [transparent] ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 
 // Compound assignments
 @for op in '+', '-', '*', '/', '%', '<<', '>>', '&', '|', '^':
-func [assignment, transparent] ${op}=(lhs: [byref] ${Self}, rhs: ${Self}) {
+func [assignment, transparent] ${op}=(lhs: [inout] ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
 @end

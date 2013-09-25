@@ -213,7 +213,7 @@ public:
 
     switch (I->kind) {
     case Initialization::Kind::AddressBinding:
-      llvm_unreachable("cannot emit into a byref binding");
+      llvm_unreachable("cannot emit into a inout binding");
     case Initialization::Kind::Tuple:
       llvm_unreachable("tuple initialization not destructured?!");
 

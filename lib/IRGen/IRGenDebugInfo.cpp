@@ -674,7 +674,7 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
   for (auto Use : I->getUses()) {
     if (auto Store = dyn_cast<StoreInst>(Use->getUser())) {
       auto Src = Store->getSrc();
-      // Detect the pattern of a byref argument.
+      // Detect the pattern of a inout argument.
       if (auto Load = dyn_cast<LoadInst>(Src))
         Src = Load->getOperand();
       if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, Src))
@@ -1171,7 +1171,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::LValue: {
-    // This is a [byref] type.
+    // This is a [inout] type.
     // FIXME: handle LValueTy->getQualifiers();
     auto LValueTy = BaseTy->castTo<LValueType>();
     auto CanTy = LValueTy->getObjectType()->getCanonicalType();

@@ -675,7 +675,7 @@ are still costs to making them declaration attributes:
   physical variable depend on more than just the type of the variable.
 
 - It automatically enables certain things (like passing the address of
-  a :code:`[unowned]` variable of type :code:`T` to a :code:`[byref] T`
+  a :code:`[unowned]` variable of type :code:`T` to a :code:`[inout] T`
   parameter) that perhaps ought to be more carefully considered.
 
 The first two points can be partly compensated for by adding library

@@ -261,7 +261,7 @@ type of this declaration is
 ``(NSRect, owner : Id, withUserData : Id, assumeInside : Bool) -> Void``.
 This syntax is just sugar to allow giving arguments sane names for
 the implementation and possibly for documentation.  Being able to rename
-for the implementation is particularly important for byref arguments,
+for the implementation is particularly important for inout arguments,
 because they can't easily be renamed with a var decl in the implementation.
 
 The basic weakness here is that it requires a syntax extension to function

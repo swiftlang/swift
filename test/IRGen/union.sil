@@ -174,7 +174,7 @@ dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
 // CHECK:   phi { i64, i64 }* [ [[ADDR]], %[[PREDEST]] ]
 // CHECK:   ret void
 // CHECK: }
-sil @singleton_switch_indirect : $([byref] Singleton) -> () {
+sil @singleton_switch_indirect : $([inout] Singleton) -> () {
 entry(%u : $*Singleton):
   destructive_switch_enum_addr %u : $*Singleton, case #Singleton.val!enumelt.1: dest
 dest(%u2 : $*(Builtin.Int64, Builtin.Int64)):
@@ -204,7 +204,7 @@ entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
 // CHECK:   store i64 %1, i64* [[DATA_1_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @singleton_inject_indirect : $(Builtin.Int64, Builtin.Int64, [byref] Singleton) -> () {
+sil @singleton_inject_indirect : $(Builtin.Int64, Builtin.Int64, [inout] Singleton) -> () {
 entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $*Singleton):
   %t = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
   %a = enum_data_addr %2 : $*Singleton, #Singleton.val!enumelt.1
@@ -272,7 +272,7 @@ end:
 }
 
 // CHECK: define void @no_payload_switch_indirect(%O5union10NoPayloads*) {
-sil @no_payload_switch_indirect : $[thin] ([byref] NoPayloads) -> () {
+sil @no_payload_switch_indirect : $[thin] ([inout] NoPayloads) -> () {
 entry(%u : $*NoPayloads):
 // CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O5union10NoPayloads* %0, i32 0, i32 0
 // CHECK:   [[TAG:%.*]] = load i2* [[TAG_ADDR]]
@@ -326,7 +326,7 @@ entry:
 // CHECK:   store i2 -2, i2* [[TAG_ADDR]], align 1
 // CHECK:   ret void
 // CHECK: }
-sil @no_payload_inject_z_indirect : $([byref] NoPayloads) -> () {
+sil @no_payload_inject_z_indirect : $([inout] NoPayloads) -> () {
 entry(%0 : $*NoPayloads):
   inject_enum_addr %0 : $*NoPayloads, #NoPayloads.z!enumelt
   %v = tuple ()
@@ -506,7 +506,7 @@ entry(%0 : $Builtin.Int64):
 // CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @single_payload_no_xi_inject_x_indirect : $(Builtin.Int64, [byref] SinglePayloadNoXI2) -> () {
+sil @single_payload_no_xi_inject_x_indirect : $(Builtin.Int64, [inout] SinglePayloadNoXI2) -> () {
 entry(%0 : $Builtin.Int64, %1 : $*SinglePayloadNoXI2):
   %a = enum_data_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!enumelt.1
   store %0 to %a : $*Builtin.Int64
@@ -533,7 +533,7 @@ entry:
 // CHECK:   store i1 true, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @single_payload_no_xi_inject_y_indirect : $([byref] SinglePayloadNoXI2) -> () {
+sil @single_payload_no_xi_inject_y_indirect : $([inout] SinglePayloadNoXI2) -> () {
 entry(%0 : $*SinglePayloadNoXI2):
   inject_enum_addr %0 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.y!enumelt
   %v = tuple ()
@@ -742,7 +742,7 @@ end:
   return %x : $()
 }
 
-sil @single_payload_spare_bit_switch_indirect : $[thin] ([byref] SinglePayloadSpareBit) -> () {
+sil @single_payload_spare_bit_switch_indirect : $[thin] ([inout] SinglePayloadSpareBit) -> () {
 entry(%u : $*SinglePayloadSpareBit):
 // CHECK:  [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union21SinglePayloadSpareBit* %0, i32 0, i32 0
 // CHECK:  [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]]
@@ -787,7 +787,7 @@ entry(%0 : $Builtin.Int63):
 // CHECK:   store i63 %0, i63* [[DATA_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @single_payload_spare_bit_inject_x_indirect : $(Builtin.Int63, [byref] SinglePayloadSpareBit) -> () {
+sil @single_payload_spare_bit_inject_x_indirect : $(Builtin.Int63, [inout] SinglePayloadSpareBit) -> () {
 entry(%0 : $Builtin.Int63, %1 : $*SinglePayloadSpareBit):
   %a = enum_data_addr %1 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1
   store %0 to %a : $*Builtin.Int63
@@ -814,7 +814,7 @@ entry:
 // CHECK:   store i64 -9223372036854775808, i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @single_payload_spare_bit_inject_y_indirect : $([byref] SinglePayloadSpareBit) -> () {
+sil @single_payload_spare_bit_inject_y_indirect : $([inout] SinglePayloadSpareBit) -> () {
 entry(%0 : $*SinglePayloadSpareBit):
   inject_enum_addr %0 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.y!enumelt
   %v = tuple ()
@@ -1030,7 +1030,7 @@ end:
 }
 
 // CHECK: define void @multi_payload_no_spare_bits_switch_indirect(%O5union23MultiPayloadNoSpareBits*) {
-sil @multi_payload_no_spare_bits_switch_indirect : $([byref] MultiPayloadNoSpareBits) -> () {
+sil @multi_payload_no_spare_bits_switch_indirect : $([inout] MultiPayloadNoSpareBits) -> () {
 entry(%u : $*MultiPayloadNoSpareBits):
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadNoSpareBits* %0, i32 0, i32 0
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
@@ -1092,7 +1092,7 @@ entry(%0 : $Builtin.Int64):
 // CHECK:   store i2 0, i2* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_no_spare_bit_inject_x_indirect : $(Builtin.Int64, [byref] MultiPayloadNoSpareBits) -> () {
+sil @multi_payload_no_spare_bit_inject_x_indirect : $(Builtin.Int64, [inout] MultiPayloadNoSpareBits) -> () {
 entry(%0 : $Builtin.Int64, %1 : $*MultiPayloadNoSpareBits):
   %a = enum_data_addr %1 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1
   store %0 to %a : $*Builtin.Int64
@@ -1145,7 +1145,7 @@ entry:
 // CHECK:   store i2 -1, i2* [[DATA_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_no_spare_bit_inject_a_indirect : $([byref] MultiPayloadNoSpareBits) -> () {
+sil @multi_payload_no_spare_bit_inject_a_indirect : $([inout] MultiPayloadNoSpareBits) -> () {
 entry(%0 : $*MultiPayloadNoSpareBits):
   inject_enum_addr %0 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.a!enumelt
   %v = tuple ()
@@ -1267,7 +1267,7 @@ end:
   return %v : $()
 }
 
-sil @multi_payload_one_spare_bit_switch_indirect : $([byref] MultiPayloadOneSpareBit) -> () {
+sil @multi_payload_one_spare_bit_switch_indirect : $([inout] MultiPayloadOneSpareBit) -> () {
 entry(%u : $*MultiPayloadOneSpareBit):
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O5union23MultiPayloadOneSpareBit* %0, i32 0, i32 0
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
@@ -1342,7 +1342,7 @@ entry(%0 : $Builtin.Int62):
 // CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_one_spare_bit_inject_x_indirect : $(Builtin.Int62, [byref] MultiPayloadOneSpareBit) -> () {
+sil @multi_payload_one_spare_bit_inject_x_indirect : $(Builtin.Int62, [inout] MultiPayloadOneSpareBit) -> () {
 entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadOneSpareBit):
   %a = enum_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1
   store %0 to %a : $*Builtin.Int62
@@ -1382,7 +1382,7 @@ entry(%0 : $Builtin.Int63):
 // CHECK:   ret void
 // CHECK: }
 
-sil @multi_payload_one_spare_bit_inject_y_indirect : $(Builtin.Int63, [byref] MultiPayloadOneSpareBit) -> () {
+sil @multi_payload_one_spare_bit_inject_y_indirect : $(Builtin.Int63, [inout] MultiPayloadOneSpareBit) -> () {
 entry(%0 : $Builtin.Int63, %1 : $*MultiPayloadOneSpareBit):
   %a = enum_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!enumelt.1
   store %0 to %a : $*Builtin.Int63
@@ -1424,7 +1424,7 @@ entry:
 // CHECK:   store i1 true, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_one_spare_bit_inject_a_indirect : $([byref] MultiPayloadOneSpareBit) -> () {
+sil @multi_payload_one_spare_bit_inject_a_indirect : $([inout] MultiPayloadOneSpareBit) -> () {
 entry(%0 : $*MultiPayloadOneSpareBit):
   inject_enum_addr %0 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.a!enumelt
   %v = tuple ()
@@ -1569,7 +1569,7 @@ entry(%0 : $Builtin.Int62):
 // CHECK:   store i64 [[PAYLOAD_MASKED]], i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_two_spare_bits_inject_x_indirect : $(Builtin.Int62, [byref] MultiPayloadTwoSpareBits) -> () {
+sil @multi_payload_two_spare_bits_inject_x_indirect : $(Builtin.Int62, [inout] MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadTwoSpareBits):
   %a = enum_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!enumelt.1
   store %0 to %a : $*Builtin.Int62
@@ -1604,7 +1604,7 @@ entry(%0 : $Builtin.Int60):
 // CHECK:   store i64 [[PAYLOAD_TAGGED]], i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_two_spare_bits_inject_y_indirect : $(Builtin.Int60, [byref] MultiPayloadTwoSpareBits) -> () {
+sil @multi_payload_two_spare_bits_inject_y_indirect : $(Builtin.Int60, [inout] MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $Builtin.Int60, %1 : $*MultiPayloadTwoSpareBits):
   %a = enum_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!enumelt.1
   store %0 to %a : $*Builtin.Int60
@@ -1644,7 +1644,7 @@ entry:
 // CHECK:   store i64 -4611686018427387904, i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @multi_payload_two_spare_bits_inject_a_indirect : $([byref] MultiPayloadTwoSpareBits) -> () {
+sil @multi_payload_two_spare_bits_inject_a_indirect : $([inout] MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $*MultiPayloadTwoSpareBits):
   inject_enum_addr %0 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.a!enumelt
   %v = tuple ()

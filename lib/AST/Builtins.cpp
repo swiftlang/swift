@@ -428,7 +428,7 @@ static ValueDecl *getObjectPointerCast(ASTContext &Context, Identifier Id,
 }
 
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
-  // <T> ([byref] T) -> RawPointer
+  // <T> ([inout] T) -> RawPointer
   Type GenericTy;
   GenericParamList *ParamList;
   std::tie(GenericTy, ParamList) = getGenericParam(Context);

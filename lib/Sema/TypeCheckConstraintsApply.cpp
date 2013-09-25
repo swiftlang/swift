@@ -2322,8 +2322,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Coercions to an lvalue: materialize the value.
-  // FIXME: When we remember 'implicit' byref bits, sanity check that
-  // toType is an implicit byref.
+  // FIXME: When we remember 'implicit' inout bits, sanity check that
+  // toType is an implicit inout.
   if (auto toLValue = toType->getAs<LValueType>()) {
     // Convert the expression to the expected object type.
     expr = coerceToType(expr, toLValue->getObjectType(), locator);

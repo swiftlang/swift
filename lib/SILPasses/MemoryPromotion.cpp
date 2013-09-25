@@ -328,8 +328,8 @@ namespace {
     // The instruction is a store to a member of a larger struct value.
     PartialStore,
 
-    /// The instruction is an Apply, this is a byref or indirect return.
-    ByrefUse,
+    /// The instruction is an Apply, this is a inout or indirect return.
+    InOutUse,
 
     /// This instruction is a general escape of the value, e.g. a call to a
     /// closure that captures it.
@@ -358,7 +358,7 @@ namespace {
     /// of the function to the end of the block that crosses an escape site.
     EscapeKind EscapeInfo = EscapeKind::Unknown;
 
-    /// Keep track of whether there is a Store, ByrefUse, or Escape locally in
+    /// Keep track of whether there is a Store, InOutUse, or Escape locally in
     /// this block.
     bool HasNonLoadUse = false;
 
@@ -386,7 +386,7 @@ namespace {
     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
 
     /// This is the set of uses that are not loads (i.e., they are Stores,
-    /// ByrefUses, and Escapes).
+    /// InOutUses, and Escapes).
     llvm::SmallPtrSet<SILInstruction*, 16> NonLoadUses;
 
     /// Does this value escape anywhere in the function.
@@ -404,7 +404,7 @@ namespace {
   private:
     void handleLoadUse(SILInstruction *Inst);
     void handleStoreUse(SILInstruction *Inst, bool isPartialStore);
-    void handleByrefUse(SILInstruction *Inst);
+    void handleInOutUse(SILInstruction *Inst);
     void handleEscape(SILInstruction *Inst);
     void handleRelease(SILInstruction *Inst);
 
@@ -510,7 +510,7 @@ void ElementPromotion::doIt() {
     case UseKind::Load:         handleLoadUse(Use.first); break;
     case UseKind::Store:        handleStoreUse(Use.first, false); break;
     case UseKind::PartialStore: handleStoreUse(Use.first, true); break;
-    case UseKind::ByrefUse:     handleByrefUse(Use.first); break;
+    case UseKind::InOutUse:     handleInOutUse(Use.first); break;
     case UseKind::Escape:       handleEscape(Use.first); break;
     case UseKind::Release:      handleRelease(Use.first); break;
     }
@@ -679,15 +679,15 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
 }
 
 
-/// Given a byref use (an Apply), determine whether the loaded
+/// Given a inout use (an Apply), determine whether the loaded
 /// value is definitely assigned or not.  If not, produce a diagnostic.
-void ElementPromotion::handleByrefUse(SILInstruction *Inst) {
+void ElementPromotion::handleInOutUse(SILInstruction *Inst) {
   auto DI = checkDefinitelyInit(Inst);
   if (DI == DI_Yes)
     return;
 
   // Otherwise, this is a use of an uninitialized value.  Emit a diagnostic.
-  diagnoseInitError(Inst, diag::variable_byref_before_initialized);
+  diagnoseInitError(Inst, diag::variable_inout_before_initialized);
 }
 
 void ElementPromotion::handleEscape(SILInstruction *Inst) {
@@ -843,7 +843,7 @@ namespace {
   
 } // end anonymous namespace
 
-/// addElementUses - An operation (e.g. load, store, byref use, etc) on a value
+/// addElementUses - An operation (e.g. load, store, inout use, etc) on a value
 /// acts on all of the aggregate elements in that value.  For example, a load
 /// of $*(Int,Int) is a use of both Int elements of the tuple.  This is a helper
 /// to keep the Uses data structure up to date for aggregate uses.
@@ -960,7 +960,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     }
 
     // The apply instruction does not capture the pointer when it is passed
-    // through [byref] arguments or for indirect returns.  Byref arguments are
+    // through [inout] arguments or for indirect returns.  InOut arguments are
     // treated as uses and may-store's, but an indirect return is treated as a
     // full store.
     //
@@ -978,10 +978,10 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
         continue;
       }
 
-      // Otherwise, check for [byref].
+      // Otherwise, check for [inout].
       Type ArgTy = FTI->getSwiftArgumentType(ArgumentNumber);
       if (ArgTy->is<LValueType>()) {
-        addElementUses(BaseElt, PointeeType, User, UseKind::ByrefUse);
+        addElementUses(BaseElt, PointeeType, User, UseKind::InOutUse);
         continue;
       }
 

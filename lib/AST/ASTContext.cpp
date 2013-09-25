@@ -64,7 +64,7 @@ struct ASTContext::Implementation {
   /// The declaration of swift.Optional<T>.
   NominalTypeDecl *OptionalDecl = nullptr;
 
-  /// func _doesOptionalHaveValue<T>(v : [byref] Optional<T>) -> T
+  /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecl = nullptr;
 
   /// func _getOptionalValue<T>(v : Optional<T>) -> T
@@ -437,9 +437,9 @@ FuncDecl *ASTContext::getDoesOptionalHaveValueDecl() const {
   if (!decl || !isGenericIntrinsic(decl, input, output, param))
     return nullptr;
 
-  // Input must be [byref] Optional<T>.
-  auto inputByref = dyn_cast<LValueType>(input);
-  if (!inputByref || !isOptionalType(*this, inputByref.getObjectType(), param))
+  // Input must be [inout] Optional<T>.
+  auto inputInOut = dyn_cast<LValueType>(input);
+  if (!inputInOut || !isOptionalType(*this, inputInOut.getObjectType(), param))
     return nullptr;
 
   // Output must be Builtin.Int1.

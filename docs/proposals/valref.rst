@@ -260,7 +260,7 @@ argument value is copied.
 
 .. Note::
 
-  We believe that ``[byref]`` is an independent concept and still very
+  We believe that ``[inout]`` is an independent concept and still very
   much needed, even with an explicit ``ref`` keyword.  See also the
   Bikeshed_ discussion at the end of this document.
 
@@ -346,7 +346,7 @@ Why Expand the Type System?
 
 TODO
 
-Why do We Need ``[byref]`` if we have ``ref``?
+Why do We Need ``[inout]`` if we have ``ref``?
 ==============================================
 
 TODO
@@ -560,13 +560,13 @@ example:
   * Should we drop ``let``\ /``var``\ /``auto`` for ivars, because it
     “just feels wrong” there?
 
-* ``ref`` is spelled like ``[byref]``, but they mean very different things
+* ``ref`` is spelled like ``[inout]``, but they mean very different things
 
   * We don't think they can be collapsed into one keyword: ``ref``
     requires shared ownership and is escapable and aliasable, unlike
-    ``[byref]``.
+    ``[inout]``.
 
-  * Should we spell ``[byref]`` differently?  I think at a high level
+  * Should we spell ``[inout]`` differently?  I think at a high level
     it means something like “``[rebind]`` the name to a new value.”
 
 * Do we want to consider replacing ``struct`` and/or ``class`` with

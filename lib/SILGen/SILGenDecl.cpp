@@ -251,35 +251,35 @@ public:
   }
 };
   
-/// Cleanup that writes back to a byref argument on function exit.
-class CleanupWriteBackToByref : public Cleanup {
+/// Cleanup that writes back to a inout argument on function exit.
+class CleanupWriteBackToInOut : public Cleanup {
   VarDecl *var;
-  SILValue byrefAddr;
+  SILValue inoutAddr;
 
 public:
-  CleanupWriteBackToByref(VarDecl *var, SILValue byrefAddr)
-    : var(var), byrefAddr(byrefAddr) {}
+  CleanupWriteBackToInOut(VarDecl *var, SILValue inoutAddr)
+    : var(var), inoutAddr(inoutAddr) {}
   
   void emit(SILGenFunction &gen, CleanupLocation l) override {
-    // Assign from the local variable to the byref address.
-    gen.getTypeLowering(byrefAddr.getType())
-      .emitCopyInto(gen.B, l, gen.VarLocs[var].address, byrefAddr,
+    // Assign from the local variable to the inout address.
+    gen.getTypeLowering(inoutAddr.getType())
+      .emitCopyInto(gen.B, l, gen.VarLocs[var].address, inoutAddr,
                     IsNotTake, IsNotInitialization);
   }
 };
   
-/// Initialize a writeback buffer that receives the "in" value of a byref
-/// argument on function entry and writes the "out" value back to the byref
+/// Initialize a writeback buffer that receives the "in" value of a inout
+/// argument on function entry and writes the "out" value back to the inout
 /// address on function exit.
-class ByrefInitialization : public Initialization {
-  /// The VarDecl for the byref symbol.
+class InOutInitialization : public Initialization {
+  /// The VarDecl for the inout symbol.
   VarDecl *vd;
 public:
-  ByrefInitialization(VarDecl *vd)
+  InOutInitialization(VarDecl *vd)
     : Initialization(Initialization::Kind::AddressBinding), vd(vd) {}
   
   SILValue getAddressOrNull() override {
-    llvm_unreachable("byref argument should be bound by bindAddress");
+    llvm_unreachable("inout argument should be bound by bindAddress");
   }
   ArrayRef<InitializationPtr> getSubInitializations() override {
     return {};
@@ -287,17 +287,17 @@ public:
 
   void bindAddress(SILValue address, SILGenFunction &gen,
                    SILLocation loc) override {
-    // Allocate the local variable for the byref.
+    // Allocate the local variable for the inout.
     auto initVar = gen.emitLocalVariableWithCleanup(vd);
     
-    // Initialize with the value from the byref.
+    // Initialize with the value from the inout.
     gen.getTypeLowering(address.getType())
       .emitCopyInto(gen.B, loc, address, initVar->getAddress(),
                     IsNotTake, IsInitialization);
     initVar->finishInitialization(gen);
     
-    // Set up a cleanup to write back to the byref.
-    gen.Cleanups.pushCleanup<CleanupWriteBackToByref>(vd, address);
+    // Set up a cleanup to write back to the inout.
+    gen.Cleanups.pushCleanup<CleanupWriteBackToInOut>(vd, address);
   }
 };
   
@@ -336,10 +336,10 @@ struct InitializationForPattern
     if (vd->isProperty())
       return InitializationPtr(new BlackHoleInitialization());
 
-    // If this is a [byref] argument, bind the argument lvalue as our
+    // If this is a [inout] argument, bind the argument lvalue as our
     // address.
     if (vd->getType()->is<LValueType>())
-      return InitializationPtr(new ByrefInitialization(vd));
+      return InitializationPtr(new InOutInitialization(vd));
 
     // If this is a global variable, initialize it without allocations or
     // cleanups.
@@ -437,7 +437,7 @@ struct ArgumentInitVisitor :
     switch (I->kind) {
     case Initialization::Kind::AddressBinding:
       I->bindAddress(arg, gen, loc);
-      // If this is an address-only non-byref argument, we take ownership
+      // If this is an address-only non-inout argument, we take ownership
       // of the referenced value.
       if (!ty->is<LValueType>())
         gen.Cleanups.pushCleanup<CleanupAddressOnlyArgument>(arg);
@@ -494,7 +494,7 @@ struct ArgumentInitVisitor :
                "empty tuple pattern with non-empty-tuple initializer?!");
         break;
       case Initialization::Kind::AddressBinding:
-        llvm_unreachable("empty tuple pattern with byref initializer?!");
+        llvm_unreachable("empty tuple pattern with inout initializer?!");
         
       case Initialization::Kind::SingleBuffer:
         assert(I->getAddress().getType().getSwiftRValueType()
@@ -578,7 +578,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   case CaptureKind::Constant: {
     // Constants are captured by value.
     assert(!capture->getType()->is<LValueType>() &&
-           "capturing byref by value?!");
+           "capturing inout by value?!");
     const TypeLowering &ti = gen.getTypeLowering(capture->getType());
     SILValue value = new (gen.SGM.M) SILArgument(ti.getLoweredType(),
                                              gen.F.begin());

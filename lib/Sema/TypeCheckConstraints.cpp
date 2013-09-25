@@ -594,7 +594,7 @@ Type constraints::adjustLValueForReference(Type type, bool isAssignment,
                            context);
   }
 
-  // For an assignment operator, the first parameter is an implicit byref.
+  // For an assignment operator, the first parameter is an implicit inout.
   if (isAssignment) {
     if (auto funcTy = type->getAs<FunctionType>()) {
       Type inputTy;
@@ -3788,7 +3788,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
       // We explicitly took a reference to the result, but didn't use it.
       // Complain and emit a Fix-It to zap the '&'.
       auto addressOf = cast<AddressOfExpr>(result->getSemanticsProvidingExpr());
-      diagnose(addressOf->getLoc(), diag::reference_non_byref,
+      diagnose(addressOf->getLoc(), diag::reference_non_inout,
                lvalueType->getObjectType())
         .highlight(addressOf->getSubExpr()->getSourceRange())
         .fixItRemove(SourceRange(addressOf->getLoc()));
@@ -4026,7 +4026,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   } else if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
     // The destination is a type variable. This type variable must be an
     // lvalue type, which we enforce via a subtyping relationship with
-    // [byref(implicit, settable)] T, where T is a fresh type variable that
+    // [inout(implicit, settable)] T, where T is a fresh type variable that
     // will be the object type of this particular expression type.
     auto objectTv = createTypeVariable(
                       getConstraintLocator(dest,

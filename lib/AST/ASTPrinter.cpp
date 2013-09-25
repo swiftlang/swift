@@ -182,8 +182,8 @@ void PrintAST::printAttributes(const DeclAttributes &Attrs) {
       break;
     }
   }
-  if (Attrs.isByref())
-    AP.next() << "byref";
+  if (Attrs.isInOut())
+    AP.next() << "inout";
   if (Attrs.isAutoClosure())
     AP.next() << "auto_closure";
   if (Attrs.isThin())
@@ -1352,7 +1352,7 @@ public:
   }
 
   void visitLValueType(LValueType *T) {
-    OS << "[byref";
+    OS << "[inout";
 
     LValueType::Qual QS = T->getQualifiers();
     if (QS != LValueType::Qual::DefaultForType) {

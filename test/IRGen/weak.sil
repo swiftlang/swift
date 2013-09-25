@@ -20,7 +20,7 @@ struct A {
   var [weak] x : C?
 }
 
-sil @test_weak_load_store : $[thin] (val : [byref] A, v : C) -> () {
+sil @test_weak_load_store : $[thin] (val : [inout] A, v : C) -> () {
 bb0(%0 : $*A, %1 : $C):
   %2 = struct_element_addr %0 : $*A, #x
   %3 = load_weak %2 : $*[weak] C
@@ -40,7 +40,7 @@ struct B {
   var [weak] x : P?
 }
 
-sil @test_weak_load_store_proto : $[thin] (val : [byref] B, ref : P) -> () {
+sil @test_weak_load_store_proto : $[thin] (val : [inout] B, ref : P) -> () {
 bb0(%0 : $*B, %1 : $P):
   %2 = struct_element_addr %0 : $*B, #x
   %3 = load_weak %2 : $*[weak] P

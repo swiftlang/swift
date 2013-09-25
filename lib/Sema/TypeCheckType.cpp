@@ -545,10 +545,10 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
     if (Ty->is<ErrorType>())
       return Ty;
 
-    if (attrs.isByref()) {
+    if (attrs.isInOut()) {
       LValueType::Qual quals;
       Ty = LValueType::get(Ty, quals, Context);
-      attrs.Byref = false; // so that the empty() check below works
+      attrs.InOut = false; // so that the empty() check below works
     }
 
     // Handle the auto_closure, cc, and objc_block attributes for function types.

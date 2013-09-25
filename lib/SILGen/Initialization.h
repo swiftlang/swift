@@ -45,7 +45,7 @@ public:
     /// This Initialization is for a _ binding or other ignored value; the
     /// corresponding result can be discarded.
     Ignored,
-    /// This Initialization is for a [byref] or address-only argument binding,
+    /// This Initialization is for a [inout] or address-only argument binding,
     /// which is initialized using bindAddress().
     AddressBinding,
     /// This Initialization is for a single buffer with a physical address,
@@ -66,7 +66,7 @@ public:
   /// SILValue of that buffer's address. If not, returns an invalid SILValue.
   virtual SILValue getAddressOrNull() = 0;
   
-  /// Binds an address value to this initialization. Used for [byref] arguments,
+  /// Binds an address value to this initialization. Used for [inout] arguments,
   /// but invalid anywhere else.
   virtual void bindAddress(SILValue address, SILGenFunction &gen,
                            SILLocation loc) {

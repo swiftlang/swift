@@ -177,7 +177,7 @@ Here’s a version of cycle_length that works when state is a mutable
 value type::
 
  func cycle_length<State>(
-   s : State, mutate : ( [byref] State )->() 
+   s : State, mutate : ( [inout] State )->() 
  ) -> Int
    requires State : EqualityComparable
  {
@@ -209,7 +209,7 @@ classes:
  }
 
  func cycle_length<State>(
-   s : State, mutate : ( [byref] State )->() 
+   s : State, mutate : ( [inout] State )->() 
  ) -> Int
    requires State : EqualityComparable, **Clonable**
  {
@@ -221,7 +221,7 @@ classes:
 
  RandomNumberGenerator x = new MersenneTwister()
  println(
-    cycle_length(x, (x : [byref] RandomNumberGenerator) { x.nextValue() })
+    cycle_length(x, (x : [inout] RandomNumberGenerator) { x.nextValue() })
  )
 
 You could also redefine the interface so that it works on both values and
@@ -232,7 +232,7 @@ clonable classes:
  func cycle_length<State>(
    s : State, 
    **next : (x : State)->State,**
-   **equal : ([byref] x : State, [byref] y : State)->Bool**
+   **equal : ([inout] x : State, [inout] y : State)->Bool**
  ) -> Int
    requires State : EqualityComparable
  {
@@ -270,7 +270,7 @@ linked list::
 
 We can measure the length of a cycle in these nodes as follows::
 
- cycle_length( someNode, (x: [byref] Node){ x = x.next } )
+ cycle_length( someNode, (x: [inout] Node){ x = x.next } )
 
 This is why so many generic algorithms seem to work on both 
 ``class``\ es and non-``class``\ es: ``class`` *identities* 
@@ -293,7 +293,7 @@ to observe a difference in behavior:
 Take, for example, `swap`, which uses variable initialization and
 assignment to exchange two values::
 
-  func swap<T>(lhs : [byref] T, rhs : [byref] T)
+  func swap<T>(lhs : [inout] T, rhs : [inout] T)
   {
       var tmp = lhs   // big 3: initialization - ref copy in tmp
       lhs = rhs       // big 3: assignment     - ref copy in lhs
@@ -337,7 +337,7 @@ If we make `X` a `class`, we automatically get reference semantics, so
 its value must be copied before each mutation, which is tedious and
 error-prone.  Its public mutating interface must be in terms of free
 functions (not methods), so that the original reference value can be
-passed `[byref]` and overwritten.  Since there's no user access to the
+passed `[inout]` and overwritten.  Since there's no user access to the
 reference count, we can't determine that we hold the only reference to
 the value, so we can't optimize copy-on-write, even in single-threaded
 programs.  In multi-threaded programs, where each mutation implies

@@ -200,7 +200,7 @@ representation before writing an object to a stream, we provide a
 naturally ::
 
   protocol Streamable : Printable {
-    func writeTo<T: OutputStream>(target: [byref] T)
+    func writeTo<T: OutputStream>(target: [inout] T)
 
     // You'll never want to reimplement this
     func format() -> PrintRepresentation {
@@ -223,7 +223,7 @@ adds surrounding quotes and escapes special characters::
   struct EscapedStringRepresentation : Streamable {
     var _value: String
 
-    func writeTo<T: OutputStream>(target: [byref] T) {
+    func writeTo<T: OutputStream>(target: [inout] T) {
       target.append("\"")
       for c in _value {
         target.append(c.escape())
@@ -236,7 +236,7 @@ Besides modeling ``OutputStream``, ``String`` also conforms to
 ``Streamable``::
 
   extension String : Streamable {
-    func writeTo<T: OutputStream>(target: [byref] T) {
+    func writeTo<T: OutputStream>(target: [inout] T) {
       target.append(self) // Append yourself to the stream
     }
 
@@ -274,13 +274,13 @@ complicated ``format(…)`` might be written::
   struct RadixFormat<T: PrintableInteger> : Streamable {
     var value: T, radix = 10, fill = " ", width = 0
 
-    func writeTo<S: OutputStream>(target: [byref] S) {
+    func writeTo<S: OutputStream>(target: [inout] S) {
       _writeSigned(value, &target)
     }
 
     // Write the given positive value to stream
     func _writePositive<T:PrintableInteger, S: OutputStream>( 
-      value: T, stream: [byref] S
+      value: T, stream: [inout] S
     ) -> Int {
       if value == 0 { return 0 }
       var radix: T = T.fromInt(self.radix)
@@ -293,7 +293,7 @@ complicated ``format(…)`` might be written::
     }
 
     func _writeSigned<T:PrintableInteger, S: OutputStream>(
-      value: T, target: [byref] S
+      value: T, target: [inout] S
     ) {
       var width = 0
       var result = ""
@@ -371,7 +371,7 @@ For every conceivable ``OutputStream`` adaptor there's a corresponding
   struct UpperStreamable<UnderlyingStreamable:Streamable> {
     var base: UnderlyingStreamable
 
-    func writeTo<T: OutputStream>(target: [byref] T) {
+    func writeTo<T: OutputStream>(target: [inout] T) {
       var adaptedStream = UpperStream(target)
       self.base.writeTo(&adaptedStream)
       target = adaptedStream.base
@@ -417,7 +417,7 @@ least until we do, we opt not to trade away any CPU, memory, and
 power.
 
 If we were willing to say that only ``class``\ es can conform to
-``OutputStream``, we could eliminate the explicit ``[byref]`` where
+``OutputStream``, we could eliminate the explicit ``[inout]`` where
 ``OutputStream``\ s are passed around. Then, we'd simply need a
 ``class StringStream`` for creating ``String`` representations. It
 would also make ``OutputStream`` adapters a *bit* simpler to use
@@ -430,7 +430,7 @@ the underlying stream, which can then be “written back.”  :
 
   struct AdaptedStreamable<T:Streamable> {
     ...
-    func writeTo<Target: OutputStream>(target: [byref] Target) {
+    func writeTo<Target: OutputStream>(target: [inout] Target) {
       // create the stream that transforms the representation
       var adaptedTarget = adapt(target, adapter);
       // write the Base object to the target stream

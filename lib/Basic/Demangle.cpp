@@ -1384,12 +1384,12 @@ private:
       return demangleArchetypeType();
     }
     if (c == 'R') {
-      NodePointer byref = Node::makeNodePointer(Node::Kind::ByRef);
+      NodePointer inout = Node::makeNodePointer(Node::Kind::InOut);
       NodePointer type = demangleTypeImpl();
       if (!type)
         return nullptr;
-      byref->push_back_child(type);
-      return byref;
+      inout->push_back_child(type);
+      return inout;
     }
     if (c == 'S') {
       return demangleSubstitutionIndex();
@@ -1737,8 +1737,8 @@ void toString(NodePointer pointer, DemanglerPrinter &printer) {
       printer << "[unowned] ";
       toStringChildren(pointer, printer);
       break;
-    case swift::Demangle::Node::Kind::ByRef:
-      printer << "[byref] ";
+    case swift::Demangle::Node::Kind::InOut:
+      printer << "[inout] ";
       pointer = pointer->child_at(0); continue;
     case swift::Demangle::Node::Kind::ObjCAttribute:
       printer << "[objc] ";

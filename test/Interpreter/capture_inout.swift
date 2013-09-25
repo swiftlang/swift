@@ -1,7 +1,7 @@
 // RUN: %swift -i %s | FileCheck %s
 // REQUIRES: swift_interpreter
 
-func foo(x:[byref] Int) -> () -> Int {
+func foo(x:[inout] Int) -> () -> Int {
   func bar() -> Int {
     x += 1
     return x

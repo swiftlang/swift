@@ -48,7 +48,7 @@ definition. These kinds are:
    compiler rejects) immutable data that is pointing to mutable data. For
    example::
 
-     struct [immutable,byref] IList { data : int, next : List }
+     struct [immutable,inout] IList { data : int, next : List }
      ...
      var a = IList(1, IList(2, IList(3, nil)))
      ...
@@ -57,7 +57,7 @@ definition. These kinds are:
      a = IList(2, IList(3, nil)) // ok, "a" itself is mutable, it now points to something new.
      a = IList(1, a) // ok
 
-  Strings are a very important example of (byref) immutable data.
+  Strings are a very important example of (inout) immutable data.
 
 
 
@@ -68,7 +68,7 @@ definition. These kinds are:
    synchronization or atomic accesses are ever required for any mutable
    data. For example::
 
-     struct [byref] MEntry { x : int, y : int, list : IList }
+     struct [inout] MEntry { x : int, y : int, list : IList }
      ...
      var b = MEntry(4, 2, IList(1, nil))
      b.x = 4 // ok

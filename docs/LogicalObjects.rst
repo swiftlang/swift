@@ -45,9 +45,9 @@ ways.
 For example, methods on value types have a this parameter.  Usually parameters
 are values, but this is actually an object: if I call a method on an object, and
 the method modifies the value of this, I expect it to modify the object I called
-the method on.  This is the high-level perspective of what [byref] really means:
+the method on.  This is the high-level perspective of what [inout] really means:
 that what we're really passing as a parameter is an object, not a value.  With
-one exception, everything that follows applies to any sort of [byref] parameter,
+one exception, everything that follows applies to any sort of [inout] parameter,
 not just this on value types.  More on that exception later.
 
 How do you actually pass an object, though, given that even physical objects
@@ -73,12 +73,12 @@ means materialization: calling the getter, storing the result into temporary
 memory, passing the temporary, and then calling the setter with the new value in
 the temporary when the method call is done.  This last step is called writeback.
 
-(About that one exception to this all applying equally to [byref]: in addition
+(About that one exception to this all applying equally to [inout]: in addition
 to all this stuff about calling methods on different kinds of object, we also
 want to support calling a method on a value.  This is also implemented with a
 form of materialization, which looks just like the logical-object kind except
 without writeback, because there's nothing to write back to.  This is a special
 rule that only applies to passing this, because we assume that most types will
 have lots of useful methods that don't involve writing to this, whereas we
-assume that a function with an explicit [byref] parameter is almost certain to
+assume that a function with an explicit [inout] parameter is almost certain to
 want to write to it.)

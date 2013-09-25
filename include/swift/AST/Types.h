@@ -1551,7 +1551,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 ///     carries an l-value.
 ///
 /// The type of a function argument may carry an l-value.  This
-/// is done by annotating the bound variable with the [byref]
+/// is done by annotating the bound variable with the [inout]
 /// attribute.
 ///
 /// The type of a return value, local variable, or field may not
@@ -1581,14 +1581,14 @@ public:
       /// it is a property with a `get` but no `set` method, a property of a
       /// non-settable lvalue, or a property of an rvalue. Non-settable
       /// lvalues cannot be used as the destination of an assignment or as
-      /// [byref] arguments.
+      /// [inout] arguments.
       NonSettable = 0x2,
       
-      /// The default for a [byref] type.
+      /// The default for a [inout] type.
       DefaultForType = 0,
 
-      /// The default for a [byref] 'self' parameter.
-      DefaultForByrefSelf = 0,
+      /// The default for a [inout] 'self' parameter.
+      DefaultForInOutSelf = 0,
 
       /// The default for a variable reference.
       DefaultForVar = Implicit,
@@ -1650,7 +1650,7 @@ public:
     /// Is one qualifier set 'QL' "smaller than" another set 'QR'?
     /// This corresponds to the subtype relation on lvalue types
     /// for a fixed type T;  that is,
-    ///   'QL <= QR' iff 'T [byref(QL)]' <= 'T [byref(QR)]'.
+    ///   'QL <= QR' iff 'T [inout(QL)]' <= 'T [inout(QR)]'.
     /// Recall that this means that the first is implicitly convertible
     /// to the latter without "coercion", for some sense of that.
     ///

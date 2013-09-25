@@ -435,7 +435,7 @@ Output Parameters
   here: with ARC, the tuple owns the objects in it, and the caller owns the
   tuple.
 
-  Swift currently also has ``[byref]`` arguments. Whether or not these will be
+  Swift currently also has ``[inout]`` arguments. Whether or not these will be
   exposed to users and/or used for Objective-C out parameters is still
   undecided.
 

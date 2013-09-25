@@ -95,7 +95,7 @@ public:
     ArchetypeRef,
     ArchetypeAndProtocol,
     ArchetypeList,
-    ByRef,
+    InOut,
     GenericType,
     Unowned,
     Weak,

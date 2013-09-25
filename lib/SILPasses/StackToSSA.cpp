@@ -20,10 +20,10 @@ using namespace swift;
 
 STATISTIC(NumRegPromoted, "Number of heap allocations promoted to registers");
 
-/// isByRefOrIndirectReturn - Return true if the specified apply/partial_apply
-/// call operand is a [byref] or indirect return, indicating that the call
+/// isInOutOrIndirectReturn - Return true if the specified apply/partial_apply
+/// call operand is a [inout] or indirect return, indicating that the call
 /// doesn't capture the pointer.
-static bool isByRefOrIndirectReturn(SILInstruction *Apply,
+static bool isInOutOrIndirectReturn(SILInstruction *Apply,
                                     unsigned ArgumentNumber) {
   SILType FnTy = Apply->getOperand(0).getType();
   SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(*Apply->getModule());
@@ -32,7 +32,7 @@ static bool isByRefOrIndirectReturn(SILInstruction *Apply,
   if (ArgumentNumber == 0 && FTI->hasIndirectReturn())
     return true;
 
-  // Otherwise, check for [byref].
+  // Otherwise, check for [inout].
   Type ArgTy = FTI->getSwiftArgumentType(ArgumentNumber);
   return ArgTy->is<LValueType>();
 }
@@ -57,7 +57,7 @@ namespace {
 
     /// getLoadedValue - Try to determine the value that will be produced by the
     /// specified load instruction.  This may fail, e.g. when we get to a
-    /// may-store like a byref call.
+    /// may-store like a inout call.
     SILValue getLoadedValue(LoadInst *L);
   };
 } // end anonymous namespace.
@@ -124,7 +124,7 @@ static bool optimizeAllocStack(AllocStackInst *ASI) {
 
   // Scan all of the uses of the alloc_stack to determine if we can promote the
   // uses.  Keep track of loads that we see, along with any (potential) stores
-  // due to stores, byref arguments, etc.
+  // due to stores, inout arguments, etc.
   SmallVector<LoadInst*, 8> LoadsToPromote;
   SmallVector<SILInstruction*, 8> Stores;
 
@@ -144,13 +144,13 @@ static bool optimizeAllocStack(AllocStackInst *ASI) {
     }
 
     // apply and partial_apply instructions do not capture the pointer when
-    // it is passed through [byref] arguments or for indirect returns, but we
+    // it is passed through [inout] arguments or for indirect returns, but we
     // need to treat them as a may-store.
     if ((isa<ApplyInst>(User) || isa<PartialApplyInst>(User)) &&
-        isByRefOrIndirectReturn(User, UI->getOperandNumber()-1)) {
+        isInOutOrIndirectReturn(User, UI->getOperandNumber()-1)) {
       Stores.push_back(User);
 
-      // We can't remove the allocation if there is a byref store to it.
+      // We can't remove the allocation if there is a inout store to it.
       CanRemoveAlloc = false;
       continue;
     }
@@ -193,7 +193,7 @@ static bool optimizeAllocStack(AllocStackInst *ASI) {
   }
 
 
-  // If we promoted all the loads, have no byref uses, and have no debug
+  // If we promoted all the loads, have no inout uses, and have no debug
   // information, we can completely remove the alloca.  The only uses of it left
   // should be the dealloc_stack and stores.
   if (CanRemoveAlloc) {

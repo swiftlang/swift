@@ -778,11 +778,11 @@ ERROR(expected_in_attribute_list,attribute_parsing,none,
 ERROR(import_attributes,attribute_parsing,none,
       "invalid attributes specified for import", ())
 
-// byref
-ERROR(byref_attribute_unknown_qualifier,attribute_parsing,none,
-      "unknown qualifier for byref attribute", ())
-ERROR(byref_attribute_expected_rparen,attribute_parsing,none,
-      "expected ')' at end of byref qualifiers", ())
+// inout
+ERROR(inout_attribute_unknown_qualifier,attribute_parsing,none,
+      "unknown qualifier for inout attribute", ())
+ERROR(inout_attribute_expected_rparen,attribute_parsing,none,
+      "expected ')' at end of inout qualifiers", ())
 
 // auto_closure
 ERROR(attribute_requires_function_type,attribute_parsing,none,
@@ -1022,8 +1022,8 @@ ERROR(prefix_not_an_operator,sema_tcd,none,
       "only operator functions can be declared 'prefix'", ())
 ERROR(invalid_prefix_input,sema_tcd,none,
       "only unary operators can be declared 'prefix'", ())
-ERROR(assignment_without_byref,sema_tcd,none,
-      "assignment operator must have an initial [byref] argument", ())
+ERROR(assignment_without_inout,sema_tcd,none,
+      "assignment operator must have an initial [inout] argument", ())
 ERROR(conversion_not_instance_method,sema_tcd,none,
       "conversion function %0 is not an instance method",
       (Identifier))
@@ -1256,8 +1256,8 @@ ERROR(non_assoc_adjacent,sema_tce,none,
 ERROR(incompatible_assoc,sema_tce,none,
       "operator is adjacent to operator of same precedence"
       " but incompatible associativity", ())
-ERROR(reference_non_byref,sema_tce,none,
-      "reference to %0 not used to initialize a [byref] parameter", (Type))
+ERROR(reference_non_inout,sema_tce,none,
+      "reference to %0 not used to initialize a [inout] parameter", (Type))
 NOTE(subscript_decl_here,sema_tca,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,sema_tce,none,
@@ -1408,7 +1408,7 @@ NOTE(variable_defined_here,sil_analysis,none,
       "variable defined here", ())
 ERROR(variable_used_before_initialized,sil_analysis,none,
       "variable '%0' used before being initialized", (StringRef))
-ERROR(variable_byref_before_initialized,sil_analysis,none,
+ERROR(variable_inout_before_initialized,sil_analysis,none,
       "variable '%0' passed by reference before being initialized", (StringRef))
 ERROR(variable_escape_before_initialized,sil_analysis,none,
       "variable '%0' captured by a closure before being initialized",

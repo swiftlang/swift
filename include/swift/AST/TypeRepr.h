@@ -106,7 +106,7 @@ private:
 
 /// \brief A type with attributes.
 /// \code
-///   [byref] Foo
+///   [inout] Foo
 /// \endcode
 class AttributedTypeRepr : public TypeRepr {
   // FIXME: DeclAttributes wastes space.

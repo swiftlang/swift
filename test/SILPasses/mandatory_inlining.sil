@@ -182,7 +182,7 @@ bb0:
   return %0 : $()
 }
 
-sil @get_logic_value : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+sil @get_logic_value : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
 sil @add_floats : $[thin] (lhs : Float32, rhs : Float32) -> Float32
 sil @convertFromBuiltinFloatLiteral : $[thin] ((value : Builtin.FPIEEE64), Float32.metatype) -> Float32
 sil @sub_floats : $[thin] (lhs : Float32, rhs : Float32) -> Float32
@@ -197,14 +197,14 @@ bb0(%0 : $Float32, %1 : $Float32):
   %3 = alloc_box $Float32
   store %0 to %2#1 : $*Float32
   store %1 to %3#1 : $*Float32
-  %6 = function_ref @get_logic_value : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  %6 = function_ref @get_logic_value : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
   %7 = function_ref @foo : $[thin] (x : Float32, y : Float32) -> Bool
   %8 = load %2#1 : $*Float32
   %9 = load %3#1 : $*Float32
   %10 = apply %7(%8, %9) : $[thin] (x : Float32, y : Float32) -> Bool
   %11 = alloc_stack $Bool
   store %10 to %11#1 : $*Bool
-  %13 = apply %6(%11#1) : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  %13 = apply %6(%11#1) : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
   dealloc_stack %11#0 : $*[local_storage] Bool
   condbranch %13, bb1, bb2
 
@@ -216,13 +216,13 @@ bb2:
   br bb3
 
 bb3:
-  %19 = function_ref @get_logic_value : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  %19 = function_ref @get_logic_value : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
   %20 = function_ref @bar : $[thin] (x : Float32) -> Bool
   %21 = load %3#1 : $*Float32
   %22 = apply %20(%21) : $[thin] (x : Float32) -> Bool
   %23 = alloc_stack $Bool
   store %22 to %23#1 : $*Bool
-  %25 = apply %19(%23#1) : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  %25 = apply %19(%23#1) : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
   dealloc_stack %23#0 : $*[local_storage] Bool
   condbranch %25, bb4, bb5
 
@@ -423,8 +423,8 @@ bb0(%0 : $Bool, %1 : $() -> Bool):
   %3 = alloc_box $() -> Bool
   store %0 to %2#1 : $*Bool
   store %1 to %3#1 : $*() -> Bool
-  %6 = function_ref @get_logic_value : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
-  %7 = apply %6(%2#1) : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  %6 = function_ref @get_logic_value : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
+  %7 = apply %6(%2#1) : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
   condbranch %7, bb1, bb2
 
 bb1:
@@ -445,7 +445,7 @@ bb3(%16 : $Bool):
   return %16 : $Bool
 }
 
-sil internal @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Bool)) -> Bool {
+sil internal @closure0 : $[thin] ((), (Builtin.ObjectPointer, [inout] Bool)) -> Bool {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Bool):
   %2 = tuple ()
   %3 = load %1 : $*Bool
@@ -483,9 +483,9 @@ bb0(%0 : $Bool, %1 : $Bool):
   store %1 to %3#1 : $*Bool
   %6 = function_ref @short_circuit_or : $[thin] (lhs : Bool, rhs : () -> Bool) -> Bool
   %7 = load %2#1 : $*Bool
-  %8 = function_ref @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Bool)) -> Bool
+  %8 = function_ref @closure0 : $[thin] ((), (Builtin.ObjectPointer, [inout] Bool)) -> Bool
   strong_retain %3#0 : $Builtin.ObjectPointer
-  %10 = partial_apply %8(%3#0, %3#1) : $[thin] ((), (Builtin.ObjectPointer, [byref] Bool)) -> Bool
+  %10 = partial_apply %8(%3#0, %3#1) : $[thin] ((), (Builtin.ObjectPointer, [inout] Bool)) -> Bool
   %11 = apply [transparent] %6(%7, %10) : $[thin] (lhs : Bool, rhs : () -> Bool) -> Bool
   strong_release %3#0 : $Builtin.ObjectPointer
   strong_release %2#0 : $Builtin.ObjectPointer

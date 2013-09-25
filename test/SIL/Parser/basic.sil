@@ -106,7 +106,7 @@ sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin
 
 // Parse SIL generated from the following swift program:
 // func x(a : Bool) -> Int { if a { return 4 } else {return 5} }
-sil @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+sil @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
 sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
 
 // CHECK: @_T4test1xFT1aSb_Si
@@ -117,10 +117,10 @@ bb0(%0 : $Bool):
   %1 = alloc_stack $Bool
   // CHECK: store
   %2 = store %0 to %1#1 : $*Bool
-  // CHECK: function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
-  %3 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  // CHECK: function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
+  %3 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
   // CHECK: apply
-  %4 = apply %3(%1#1) : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  %4 = apply %3(%1#1) : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
   // CHECK: condbranch
   %5 = condbranch %4, bb1, bb2
 
@@ -169,9 +169,9 @@ bb0(%0 : $*P):
   %1 = project_existential %0 : $*P to $*P.Self // CHECK: project_existential %0
 
   // CHECK: protocol_method {{.*}} : $*P, #P.doIt!1
-  %2 = protocol_method %0 : $*P, #P.doIt!1 : $[cc(method)] ((), [byref] P.Self) -> ()
+  %2 = protocol_method %0 : $*P, #P.doIt!1 : $[cc(method)] ((), [inout] P.Self) -> ()
   // CHECK: apply
-  %3 = apply %2(%1) : $[cc(method)] ((), [byref] P.Self) -> ()
+  %3 = apply %2(%1) : $[cc(method)] ((), [inout] P.Self) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
   %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
   %6 = return %4 : $()                // CHECK: return 
@@ -234,12 +234,12 @@ protocol Runcible {
 sil @_T4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $[thin] <T : Runcible> (x : T) -> () {
 bb0(%0 : $*T):
   // CHECK: archetype_method $*T, #Runcible.free_method!1
-  %1 = archetype_method $*T, #Runcible.free_method!1 : $[cc(method)] ((), [byref] T) -> Int64
-  %2 = apply %1(%0) : $[cc(method)] ((), [byref] T) -> Int64
+  %1 = archetype_method $*T, #Runcible.free_method!1 : $[cc(method)] ((), [inout] T) -> Int64
+  %2 = apply %1(%0) : $[cc(method)] ((), [inout] T) -> Int64
   %3 = alloc_stack $T.U.metatype
   // CHECK: archetype_method $*T, #Runcible.associated_method!1
-  %4 = archetype_method $*T, #Runcible.associated_method!1 : $[cc(method)] ((), [byref] T) -> T.U.metatype
-  %5 = apply %4(%0) : $[cc(method)] ((), [byref] T) -> T.U.metatype
+  %4 = archetype_method $*T, #Runcible.associated_method!1 : $[cc(method)] ((), [inout] T) -> T.U.metatype
+  %5 = apply %4(%0) : $[cc(method)] ((), [inout] T) -> T.U.metatype
   %6 = store %5 to %3#1 : $*T.U.metatype
   %7 = metatype $T.metatype
   // CHECK: archetype_method [volatile] $*T, #Runcible.static_method!1
@@ -667,10 +667,10 @@ bb0(%0 : $Bas):
   %5 = struct_extract %3 : $String, #str_value
   %6 = struct_extract %5 : $StringByteData, #owner
   strong_retain %6 : $Builtin.ObjectPointer
-  %8 = function_ref @swift_StringToNSString : $[thin] (string : [byref] String) -> NSString
+  %8 = function_ref @swift_StringToNSString : $[thin] (string : [inout] String) -> NSString
   %9 = alloc_stack $String
   store %3 to %9#1 : $*String
-  %11 = apply %8(%9#1) : $[thin] (string : [byref] String) -> NSString
+  %11 = apply %8(%9#1) : $[thin] (string : [inout] String) -> NSString
   dealloc_stack %9#0 : $*[local_storage] String
   %13 = struct_extract %3 : $String, #str_value
   %14 = struct_extract %13 : $StringByteData, #owner
@@ -678,7 +678,7 @@ bb0(%0 : $Bas):
   // CHECK: autorelease_return %11 : $NSString
   autorelease_return %11 : $NSString
 }
-sil @swift_StringToNSString : $[thin] (string : [byref] String) -> NSString
+sil @swift_StringToNSString : $[thin] (string : [inout] String) -> NSString
 
 // CHECK-LABEL: sil @test_super_method
 sil @test_super_method : $[cc(method), thin] ((), Bas) -> Bas {
@@ -757,16 +757,16 @@ bb0:
 
 // CHECK-LABEL: closure_test
 sil @takes_closure : $[thin] (x : () -> ()) -> ()
-sil @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
+sil @closure0 : $[thin] ((), (Builtin.ObjectPointer, [inout] Int64)) -> ()
 
 sil @closure_test : $[thin] () -> () {
 bb0:
   %0 = alloc_box $Int64                           // users: %10, %8, %8, %7, %4
 
   %5 = function_ref @takes_closure : $[thin] (x : () -> ()) -> ()
-  %6 = function_ref @closure0 : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
+  %6 = function_ref @closure0 : $[thin] ((), (Builtin.ObjectPointer, [inout] Int64)) -> ()
   strong_retain %0#0 : $Builtin.ObjectPointer
-  %8 = partial_apply %6(%0#0, %0#1) : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
+  %8 = partial_apply %6(%0#0, %0#1) : $[thin] ((), (Builtin.ObjectPointer, [inout] Int64)) -> ()
   %9 = apply %5(%8) : $[thin] (x : () -> ()) -> ()
   strong_release %0#0 : $Builtin.ObjectPointer
 
@@ -930,7 +930,7 @@ bb0(%0 : $ConcreteClass):
   return %5 : $ClassP
 }
 
-sil @test_assign : $(x : Int64, y : [byref] Int64) -> () {    // CHECK-LABEL: sil @test_assign
+sil @test_assign : $(x : Int64, y : [inout] Int64) -> () {    // CHECK-LABEL: sil @test_assign
 bb0(%0 : $Int64, %1 : $*Int64):
   assign %0 to %1 : $*Int64                   // CHECK:   assign %0 to %1
   unreachable

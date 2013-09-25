@@ -90,15 +90,15 @@ bb1(%0 : $Int64):
 
 
 
-sil @callee : $[thin] (a : [byref] Int64) -> ()
+sil @callee : $[thin] (a : [inout] Int64) -> ()
 
-// CHECK-LABEL: sil @byref_nocapture
-sil @byref_nocapture : $[thin] () -> Int64 {
+// CHECK-LABEL: sil @inout_nocapture
+sil @inout_nocapture : $[thin] () -> Int64 {
 bb0:
   // CHECK: alloc_stack
   %1 = alloc_box $Int64
-  %6 = function_ref @callee : $[thin] (a : [byref] Int64) -> ()
-  %7 = apply %6(%1#1) : $[thin] (a : [byref] Int64) -> ()
+  %6 = function_ref @callee : $[thin] (a : [inout] Int64) -> ()
+  %7 = apply %6(%1#1) : $[thin] (a : [inout] Int64) -> ()
   %8 = load %1#1 : $*Int64
   %9 = strong_release %1#0 : $Builtin.ObjectPointer
   %10 = return %8 : $Int64
@@ -153,8 +153,8 @@ bb0(%0 : $*LogicValue, %1 : $Bool.metatype):
 // CHECK:  %2 = alloc_stack $LogicValue
   copy_addr [take] %0 to [initialization] %2#1 : $*LogicValue
   %6 = project_existential %2#1 : $*LogicValue to $*LogicValue.Self
-  %7 = protocol_method %2#1 : $*LogicValue, #LogicValue.getLogicValue!1 : $[cc(method)] ((), [byref] LogicValue.Self) -> Bool
-  %8 = apply %7(%6) : $[cc(method)] ((), [byref] LogicValue.Self) -> Bool
+  %7 = protocol_method %2#1 : $*LogicValue, #LogicValue.getLogicValue!1 : $[cc(method)] ((), [inout] LogicValue.Self) -> Bool
+  %8 = apply %7(%6) : $[cc(method)] ((), [inout] LogicValue.Self) -> Bool
   strong_release %2#0 : $Builtin.ObjectPointer
 // CHECK:  destroy_addr %2#1 : $*LogicValue
 // CHECK-NEXT:  dealloc_stack %2#0 : $*[local_storage] LogicValue

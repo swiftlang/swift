@@ -543,7 +543,7 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
   case Failure::IsForbiddenLValue:
     if (auto lvalueTy = failure.getSecondType()->getAs<LValueType>()) {
       if (!lvalueTy->getQualifiers().isImplicit()) {
-        tc.diagnose(loc, diag::reference_non_byref, lvalueTy->getObjectType())
+        tc.diagnose(loc, diag::reference_non_inout, lvalueTy->getObjectType())
           .highlight(range1).highlight(range2);
         return true;
       }

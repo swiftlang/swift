@@ -120,7 +120,7 @@ bool irgen::differsByAbstractionAsFunction(IRGenModule &IGM,
 ///   - generic parameters, e.g. T
 ///   - tuples, e.g. (T, Int)
 ///   - functions, e.g. T -> Int
-///   - l-values, e.g. [byref] T
+///   - l-values, e.g. [inout] T
 ///   - generic bindings, e.g. Vector<T>
 ///   - metatypes ?
 ///
@@ -137,7 +137,7 @@ bool irgen::differsByAbstractionAsFunction(IRGenModule &IGM,
 /// More formally, T differs by abstraction under S if:
 ///   - T == (T_1, ..., T_k) and T_i differs by abstraction under S
 ///     for some i;
-///   - T == [byref] U and U differs by abstraction under S;
+///   - T == [inout] U and U differs by abstraction under S;
 ///   - T == U -> V and either
 ///       - U differs by abstraction as an argument under S or
 ///       - V differs by abstraction as a result under S; or
@@ -173,10 +173,10 @@ bool irgen::differsByAbstractionAsFunction(IRGenModule &IGM,
 ///
 /// There is (currently) one way in which a variable can be accessed
 /// indirectly, without knowledge of how it was originally declared,
-/// and that is when it is passed [byref].  A variable cannot be
+/// and that is when it is passed [inout].  A variable cannot be
 /// passed directly by reference when the target l-value type
 /// differs by abstraction from the variable's type.  However, the
-/// mechanics and relatively weak guarantees of [byref] make it
+/// mechanics and relatively weak guarantees of [inout] make it
 /// legal to instead pass a properly-abstracted temporary variable,
 /// thunking the current value as it's passed in and "un-thunking"
 /// it on the way out.  Of course, that ain't free.

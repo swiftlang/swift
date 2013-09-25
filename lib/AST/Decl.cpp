@@ -794,7 +794,7 @@ Type FuncDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
 
   // Otherwise, make an l-value type.
   return LValueType::get(ContainerType,
-                         LValueType::Qual::DefaultForByrefSelf,
+                         LValueType::Qual::DefaultForInOutSelf,
                          getASTContext());
 }
 

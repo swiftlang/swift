@@ -199,7 +199,7 @@ private:
         isThin = true;
       } else {
         selfTy = LValueType::get(selfTy,
-                                 LValueType::Qual::DefaultForByrefSelf,
+                                 LValueType::Qual::DefaultForInOutSelf,
                                  selfTy->getASTContext());
         isThin = false;
       }

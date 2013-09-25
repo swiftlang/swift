@@ -255,7 +255,7 @@ types where the metadata itself has unknown layout.)
   type ::= 'M' type                          // metatype
   type ::= 'P' protocol-list '_'             // protocol type
   type ::= archetype
-  type ::= 'R' type                          // byref
+  type ::= 'R' type                          // inout
   type ::= 'T' tuple-element* '_'            // tuple
   type ::= 't' tuple-element* '_'            // variadic tuple
   type ::= 'U' generics '_' type             // generic type

@@ -13,7 +13,7 @@ struct Triple {
 }
 
 // CHECK-LABEL: sil @TripleTest
-sil @TripleTest : $[cc(method), thin] ((s : Int64), [byref] Triple) -> Triple {
+sil @TripleTest : $[cc(method), thin] ((s : Int64), [inout] Triple) -> Triple {
 bb0(%0 : $Int64, %1 : $*Triple):
   %4 = alloc_box $Triple
   %5 = load %1 : $*Triple
@@ -31,7 +31,7 @@ struct Single {
 }
 
 // CHECK-LABEL: sil @SingleTest
-sil @SingleTest : $[cc(method), thin] (s : [byref]  Single, a : Int64) -> Single {
+sil @SingleTest : $[cc(method), thin] (s : [inout]  Single, a : Int64) -> Single {
 bb0(%0 : $*Single, %1 : $Int64):
   %4 = alloc_box $Single
   %5 = load %0 : $*Single

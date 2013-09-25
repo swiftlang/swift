@@ -650,7 +650,7 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
   // Make an argument on contBB.
   auto result = new (gen.SGM.M) SILArgument(refType, contBB);
 
-  // Materialize the optional value so we can pass it byref to
+  // Materialize the optional value so we can pass it inout to
   // _doesOptionalHaveValue.  Really, we just want to pass it +0.
   auto allocation = gen.B.createAllocStack(loc, optType);
 

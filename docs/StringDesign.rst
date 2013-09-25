@@ -932,7 +932,7 @@ Building
 :Swift:
   .. parsed-literal::
         func **+** (lhs: String, rhs: String) -> String
-        func [infix,assignment] **+=** (lhs: [byref] String, rhs: String)
+        func [infix,assignment] **+=** (lhs: [inout] String, rhs: String)
         func **append**\ (suffix: String)
 
 

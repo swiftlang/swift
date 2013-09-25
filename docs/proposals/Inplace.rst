@@ -231,7 +231,7 @@ boilerplate::
 
       // ...without typing all this
       operator infix ☃= { assignment }
-      func ☃=(x:[byref] Int, y:Int) {
+      func ☃=(x:[inout] Int, y:Int) {
         x = x ☃ y
       }
 
@@ -291,11 +291,11 @@ When an in-place relationship is created, a definition matching either the
 in-place or value-creating form introduces an implicit definition of the other
 form::
 
-      func += (x:[byref] String, y:String) { ... }
+      func += (x:[inout] String, y:String) { ... }
       // Implicitly defines func + (x:String, y:String) -> String
 
       func + (x:Int, y:Int) -> Int { ... }
-      // Implicitly defines func += (x:[byref] Int, y:Int) -> ()
+      // Implicitly defines func += (x:[inout] Int, y:Int) -> ()
 
       struct String {
         func upper() -> String { ... }
@@ -329,7 +329,7 @@ in-place form, as if written::
 The implicit in-place form applies the value-creating form to its arguments and
 assigns the result to its left argument, as if written::
 
-      func += (x:[byref] Int, y:Int) {
+      func += (x:[inout] Int, y:Int) {
         x = x + y
       }
 

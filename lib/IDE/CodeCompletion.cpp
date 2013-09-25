@@ -585,7 +585,7 @@ public:
     // Add a type annotation.
     Type T = VD->getType();
     if (VD->getName() == SelfIdent) {
-      // Strip [byref] from 'self'.  It is useful to show [byref] for function
+      // Strip [inout] from 'self'.  It is useful to show [inout] for function
       // parameters.  But for 'self' it is just noise.
       T = T->getRValueType();
     }

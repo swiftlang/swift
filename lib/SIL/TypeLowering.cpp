@@ -1299,7 +1299,7 @@ Type TypeConverter::getMethodTypeInContext(Type /*nullable*/ contextType,
   return FunctionType::get(selfType, methodType, Context);
 }
 
-/// Get the type of a global variable accessor function, () -> [byref] T.
+/// Get the type of a global variable accessor function, () -> [inout] T.
 static Type getGlobalAccessorType(Type varType, ASTContext &C) {
   return FunctionType::get(TupleType::getEmpty(C),
                            LValueType::get(varType,

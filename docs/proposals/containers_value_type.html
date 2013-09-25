@@ -79,7 +79,7 @@ individual parameter:
 </p>
 
 <blockquote><pre>
-func foo(c : Character, i : [byref] Int)  <font color="#C80000">// define foo</font>
+func foo(c : Character, i : [inout] Int)  <font color="#C80000">// define foo</font>
 
 // ...
 
@@ -118,7 +118,7 @@ to modify its last argument:
 </p>
 
 <blockquote><pre>
-func foo(c : Character, i : <b>[byref]</b> Int)
+func foo(c : Character, i : <b>[inout]</b> Int)
 </pre></blockquote>
 
 <p>

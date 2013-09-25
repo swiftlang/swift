@@ -147,7 +147,7 @@ BUILTIN_SIL_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
 /// Bridging to/from a raw pointer does not imply a retain.
 BUILTIN_SIL_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
 
-/// addressof ([byref] T) -> Builtin.RawPointer.
+/// addressof ([inout] T) -> Builtin.RawPointer.
 /// Returns a RawPointer pointing to an lvalue. The returned pointer is only
 /// valid within the scope of the statement for logical lvalues.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)

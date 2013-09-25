@@ -152,7 +152,7 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
   return fn;
 }
 
-static SILType getByrefStringTy(SILGenModule &SGM) {
+static SILType getInOutStringTy(SILGenModule &SGM) {
   return SGM.getLoweredType(LValueType::get(SGM.Types.getStringType(),
                                             LValueType::Qual::DefaultForType,
                                             SGM.M.getASTContext()));
@@ -173,14 +173,14 @@ static SILType getObjCBoolTy(SILGenModule &SGM) {
 SILDeclRef SILGenModule::getNSStringToStringFn() {
   return getBridgingFn(NSStringToStringFn, *this,
                        "Foundation", "convertNSStringToString",
-                       {getNSStringTy(*this), getByrefStringTy(*this)},
+                       {getNSStringTy(*this), getInOutStringTy(*this)},
                        Types.getEmptyTupleType());
 }
 
 SILDeclRef SILGenModule::getStringToNSStringFn() {
   return getBridgingFn(StringToNSStringFn, *this,
                        "Foundation", "convertStringToNSString",
-                       {getByrefStringTy(*this)},
+                       {getInOutStringTy(*this)},
                        getNSStringTy(*this));
 }
 

@@ -1451,7 +1451,7 @@ if vec[3] {
     
     attribute      ::= attribute-infix
     attribute      ::= attribute-resilience
-    attribute      ::= attribute-byref
+    attribute      ::= attribute-inout
     attribute      ::= attribute-auto_closure
     attribute      ::= attribute-noreturn
   </pre>
@@ -1492,19 +1492,19 @@ if vec[3] {
   <p>See the resilience design.</p>
   
   <!-- _____________________________________________________________________ -->
-  <h4 id="attribute-byref">By-Reference Attribute</h4>
+  <h4 id="attribute-inout">By-Reference Attribute</h4>
 
   <pre class="grammar">
-    attribute-byref ::= 'byref'
+    attribute-inout ::= 'inout'
   </pre>
 
-  <p><tt>byref</tt> is only valid in a <tt>type-annotation</tt> that
+  <p><tt>inout</tt> is only valid in a <tt>type-annotation</tt> that
     appears within either a <a href="#pattern"><tt>pattern</tt></a> of
     a <tt>function-signature</tt> or the input type of a function
     type.
   </p>
 
-  <p><tt>byref</tt> indicates that the argument will be passed "by
+  <p><tt>inout</tt> indicates that the argument will be passed "by
     reference": the bound variable will be an l-value.</p>
 
   <p>The type being annotated must be <a href="#materializable">materializable</a>.
@@ -1649,7 +1649,7 @@ if vec[3] {
 
   <p id="materializable">A type may be <i>materializable</i>.  A type
     is materializable unless it is 1) annotated with
-    a <a href="#attribute-byref"><tt>byref</tt></a> attribute or 2) a
+    a <a href="#attribute-inout"><tt>inout</tt></a> attribute or 2) a
     tuple with a non-materializable element type.  In general, variables
     must have materializable type.</p>
   
@@ -2221,7 +2221,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <p>The type of a bound variable must be
     <a href="#materializable">materializable</a> unless it appears in a
     <a href="#function-signature">function-signature</a> and is directly of
-    a <a href="attribute-byref"><tt>byref</tt></a>-annotated type.</p>
+    a <a href="attribute-inout"><tt>inout</tt></a>-annotated type.</p>
 
   <!-- ********************************************************************* -->
   <h3 id="pattern-tuple">Tuple Patterns</h3>

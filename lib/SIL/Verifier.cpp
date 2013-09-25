@@ -802,7 +802,8 @@ public:
       CanType selfType = getMethodSelfType(methodType);
       if (!operandType.isClassExistentialType()) {
         require(isa<LValueType>(selfType),
-                "protocol_method result must take its this parameter byref");
+                "protocol_method result must take its self parameter "
+                "by address");
       }
       CanType selfObjType = selfType->getRValueType()->getCanonicalType();
       require(isSelfArchetype(selfObjType, proto),
