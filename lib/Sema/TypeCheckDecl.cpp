@@ -569,6 +569,20 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
   llvm_unreachable("bad pattern kind!");
 }
 
+/// Create a fresh archetype building.
+static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC) {
+  return ArchetypeBuilder(
+           TC.TU, TC.Diags,
+           [&](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
+             return TC.getDirectConformsTo(protocol);
+           },
+           [&](AbstractTypeParamDecl *assocType) -> ArrayRef<ProtocolDecl *> {
+             checkInheritanceClause(TC, assocType);
+             return assocType->getProtocols();
+           });
+}
+
+
 namespace {
 
 class DeclChecker : public DeclVisitor<DeclChecker> {
@@ -618,19 +632,6 @@ public:
 
   void checkExplicitConformance(ExtensionDecl *D, Type T) {
     gatherExplicitConformances(D, T);
-  }
-
-  /// Create a fresh archetype building.
-  ArchetypeBuilder createArchetypeBuilder() {
-    return ArchetypeBuilder(
-             TC.TU, TC.Diags,
-             [&](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
-               return TC.getDirectConformsTo(protocol);
-             },
-             [&](AbstractTypeParamDecl *assocType) -> ArrayRef<ProtocolDecl *> {
-               checkInheritanceClause(TC, assocType);
-               return assocType->getProtocols();
-             });
   }
 
   /// Revert the given dependently-typed TypeLoc to a state where generic
@@ -900,7 +901,7 @@ public:
   /// This routine simply creates an archetype builder, then calls both
   /// \c checkGenericParamList and \c finalizeGenericParamList.
   void checkGenericParams(GenericParamList *genericParams, DeclContext *dc) {
-    ArchetypeBuilder builder = createArchetypeBuilder();
+    ArchetypeBuilder builder = createArchetypeBuilder(TC);
     checkGenericParamList(builder, genericParams);
     finalizeGenericParamList(builder, genericParams, dc);
   }
@@ -1310,9 +1311,6 @@ public:
     }
 
     TC.validateTypeDecl(PD);
-    if (PD->getSelf()->getArchetype())
-      return;
-    
     checkInheritanceClause(TC, PD);
 
     {
@@ -1348,40 +1346,6 @@ public:
       }
 
       PD->setIsObjC(isObjC);
-    }
-
-    // Fix the 'Self' associated type.
-    AssociatedTypeDecl *selfDecl = nullptr;
-    for (auto Member : PD->getMembers()) {
-      if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
-        checkInheritanceClause(TC, AssocType);
-
-        if (AssocType->isSelf()) {
-          selfDecl = AssocType;
-          break;
-        }
-      }
-    }
-    assert(selfDecl && "no Self decl?");
-
-    // Build archetypes for this protocol.
-    ArchetypeBuilder builder = createArchetypeBuilder();
-    builder.addGenericParameter(selfDecl, 0);
-    builder.addImplicitConformance(selfDecl, PD);
-    builder.assignArchetypes();
-
-    // Set the underlying type of each of the associated types to the
-    // appropriate archetype.
-    ArchetypeType *selfArchetype = builder.getArchetype(selfDecl);
-    for (auto member : PD->getMembers()) {
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        TypeLoc underlyingTy;
-        if (assocType == selfDecl)
-          assocType->setArchetype(selfArchetype);
-        else
-          assocType->setArchetype(
-            selfArchetype->getNestedType(assocType->getName()));
-      }
     }
 
     // Check the members.
@@ -1624,7 +1588,7 @@ public:
     Optional<ArchetypeBuilder> builder;
     if (auto gp = FD->getGenericParams()) {
       gp->setOuterParameters(outerGenericParams);
-      builder.emplace(createArchetypeBuilder());
+      builder.emplace(createArchetypeBuilder(TC));
       checkGenericParamList(*builder, gp);
     }
 
@@ -1848,7 +1812,7 @@ public:
     if (auto gp = CD->getGenericParams()) {
       // Write up generic parameters and check the generic parameter list.
       gp->setOuterParameters(outerGenericParams);
-      ArchetypeBuilder builder = createArchetypeBuilder();
+      ArchetypeBuilder builder = createArchetypeBuilder(TC);
       checkGenericParamList(builder, gp);
 
       // Type check the constructor parameters.
@@ -2051,10 +2015,40 @@ void TypeChecker::validateTypeDecl(ValueDecl *D, bool resolveTypeParams) {
     auto proto = cast<ProtocolDecl>(D);
     if (proto->hasType())
       return;
-
     proto->computeType();
-    // FIXME: We only want to set the Self type.
-    typeCheckDecl(proto, true);
+
+    // Fix the 'Self' associated type.
+    AssociatedTypeDecl *selfDecl = nullptr;
+    for (auto member : proto->getMembers()) {
+      if (auto AssocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        checkInheritanceClause(*this, AssocType);
+        
+        if (AssocType->isSelf()) {
+          selfDecl = AssocType;
+          break;
+        }
+      }
+    }
+    assert(selfDecl && "no Self decl?");
+    
+    // Build archetypes for this protocol.
+    ArchetypeBuilder builder = createArchetypeBuilder(*this);
+    builder.addGenericParameter(selfDecl, 0);
+    builder.addImplicitConformance(selfDecl, proto);
+    builder.assignArchetypes();
+    
+    // Set the underlying type of each of the associated types to the
+    // appropriate archetype.
+    ArchetypeType *selfArchetype = builder.getArchetype(selfDecl);
+    for (auto member : proto->getMembers()) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        TypeLoc underlyingTy;
+        ArchetypeType *archetype = selfArchetype;
+        if (assocType != selfDecl)
+          archetype = selfArchetype->getNestedType(assocType->getName());
+        assocType->setArchetype(archetype);
+      }
+    }
     break;
   }
       
