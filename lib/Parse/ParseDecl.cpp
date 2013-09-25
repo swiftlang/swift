@@ -1483,6 +1483,30 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
   return Status;
 }
 
+namespace {
+/// Recursively walks a pattern and sets all variables' decl contexts to the
+/// given context.
+class SetVarContext : public ASTWalker {
+  DeclContext *DC;
+
+public:
+  SetVarContext(DeclContext *DC) : DC(DC) {}
+
+  Pattern *walkToPatternPost(Pattern *P) override {
+    // Handle vars.
+    if (auto *Named = dyn_cast<NamedPattern>(P))
+      Named->getDecl()->setDeclContext(DC);
+    return P;
+  }
+};
+} // unnamed namespace
+
+static void setVarContext(ArrayRef<Pattern *> Patterns, DeclContext *DC) {
+  for (auto P : Patterns) {
+    P->walk(SetVarContext(DC));
+  }
+}
+
 /// \brief Build an implicit 'self' parameter for the current DeclContext.
 Pattern *Parser::buildImplicitSelfParameter() {
   VarDecl *D
@@ -1644,6 +1668,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
       CodeCompletion->setDelayedParsedDecl(FD);
 
     addFunctionParametersToScope(FD->getBodyParamPatterns(), FD);
+    setVarContext(FD->getArgParamPatterns(), FD);
 
     // Now that we have a context, update the generic parameters with that
     // context.
@@ -2268,24 +2293,6 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
   }
 
   return makeParserResult(Status, Proto);
-}
-
-namespace {
-  /// Recursively walks a pattern and sets all variables' decl contexts to the
-  /// given context.
-  class SetVarContext : public ASTWalker {
-    DeclContext *CurDeclContext;
-
-  public:
-    SetVarContext(DeclContext *Context) : CurDeclContext(Context) {}
-
-    Pattern *walkToPatternPost(Pattern *P) override {
-      // Handle vars.
-      if (auto *Named = dyn_cast<NamedPattern>(P))
-        Named->getDecl()->setDeclContext(CurDeclContext);
-      return P;
-    }
-  };
 }
 
 /// \brief Parse a 'subscript' declaration.

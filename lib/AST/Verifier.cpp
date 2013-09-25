@@ -193,7 +193,12 @@ namespace {
     // Base cases for the various stages of verification.
     void verifyParsed(Expr *E) {}
     void verifyParsed(Stmt *S) {}
-    void verifyParsed(Decl *D) {}
+    void verifyParsed(Decl *D) {
+      if (!D->getDeclContext()) {
+        Out << "every Decl should have a DeclContext";
+        abort();
+      }
+    }
     void verifyBound(Expr *E) {}
     void verifyBound(Stmt *S) {}
     void verifyBound(Decl *D) {}
@@ -765,6 +770,8 @@ namespace {
         Out << "EnumElementDecl has wrong DeclContext";
         abort();
       }
+
+      return verifyParsed(cast<ValueDecl>(UED));
     }
 
     void verifyParsed(AbstractFunctionDecl *AFD) {
@@ -784,6 +791,8 @@ namespace {
           abort();
         }
       }
+
+      return verifyParsed(cast<ValueDecl>(AFD));
     }
 
     void verifyParsed(ConstructorDecl *CD) {
