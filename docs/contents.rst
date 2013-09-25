@@ -15,6 +15,7 @@ Contents
    Resilience
    LogicalObjects
    Namespace Level Vars and Top Level Code
+   StoredAndComputedVariables
    SIL
    TypeChecker
 
