@@ -2161,6 +2161,7 @@ protected:
   
 public:
   Expr *getBase() const { return getArg(); }
+  void setBase(Expr *E) { setArg(E); }
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_SelfApplyExpr &&

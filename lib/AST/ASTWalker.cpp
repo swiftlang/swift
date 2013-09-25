@@ -371,6 +371,22 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitSelfApplyExpr(SelfApplyExpr *E) {
+    if (E->getBase()) {
+      Expr *E2 = doIt(E->getBase());
+      if (E2 == nullptr) return nullptr;
+      E->setBase(E2);
+    }
+
+    if (E->getFn()) {
+      Expr *E2 = doIt(E->getFn());
+      if (E2 == nullptr) return nullptr;
+      E->setFn(E2);
+    }
+
+    return E;
+  }
+
   Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
     Expr *E2 = doIt(E->getLHS());
     if (E2 == nullptr) return nullptr;
