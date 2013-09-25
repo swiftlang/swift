@@ -190,6 +190,9 @@ static void addImplicitConformances(
   }
 }
 
+/// Check that the func/var declaration attributes are ok.
+static void validateAttributes(TypeChecker &TC, ValueDecl *VD);
+
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine validates all of the types in the parsed inheritance clause,
@@ -604,8 +607,6 @@ public:
   // Helper Functions.
   //===--------------------------------------------------------------------===//
 
-  void validateAttributes(ValueDecl *VD);
-
   template<typename DeclType>
   void gatherExplicitConformances(DeclType *D, Type T) {
     SmallVector<ProtocolConformance *, 4> conformances;
@@ -947,7 +948,7 @@ public:
         VD->setInvalid();
       }
 
-      validateAttributes(VD);
+      validateAttributes(TC, VD);
 
       // The var requires ObjC interop if it has an [objc] or [iboutlet]
       // attribute or if it's a member of an ObjC class.
@@ -1058,7 +1059,7 @@ public:
       }
     }
 
-    validateAttributes(SD);
+    validateAttributes(TC, SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -1116,10 +1117,7 @@ public:
   void visitEnumDecl(EnumDecl *UD) {
     if (!IsSecondPass) {
       TC.validateTypeDecl(UD);
-      validateAttributes(UD);
 
-      checkInheritanceClause(TC, UD);
-      
       {
         // Check for circular inheritance of the raw type.
         SmallVector<EnumDecl *, 8> path;
@@ -1228,12 +1226,8 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-
-    if (!IsSecondPass) {
+    if (!IsSecondPass)
       TC.validateTypeDecl(SD);
-      validateAttributes(SD);
-      checkInheritanceClause(TC, SD);
-    }
 
     // Visit each of the members.
     for (Decl *Member : SD->getMembers()) {
@@ -1274,8 +1268,6 @@ public:
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
       TC.validateTypeDecl(CD);
-      validateAttributes(CD);
-      checkInheritanceClause(TC, CD);
 
       {
         // Check for circular inheritance.
@@ -1283,13 +1275,6 @@ public:
         checkCircularity(TC, CD, diag::circular_class_inheritance,
                          diag::class_here, path);
       }
-
-      ClassDecl *superclassDecl = CD->hasSuperclass()
-        ? CD->getSuperclass()->getClassOrBoundGenericClass()
-        : nullptr;
-
-      CD->setIsObjC(CD->getAttrs().isObjC()
-                    || (superclassDecl && superclassDecl->isObjC()));
     }
 
     for (Decl *Member : CD->getMembers())
@@ -1311,7 +1296,6 @@ public:
     }
 
     TC.validateTypeDecl(PD);
-    checkInheritanceClause(TC, PD);
 
     {
       // Check for circular inheritance within the protocol.
@@ -1320,39 +1304,9 @@ public:
                        diag::protocol_here, path);
     }
 
-    // If the protocol is [objc], it may only refine other [objc] protocols.
-    // FIXME: Revisit this restriction.
-    if (PD->getAttrs().isObjC()) {
-      bool isObjC = true;
-
-      SmallVector<ProtocolDecl*, 2> inheritedProtocols;
-      for (auto inherited : PD->getInherited()) {
-        if (!inherited.getType()->isExistentialType(inheritedProtocols))
-          continue;
-
-        for (auto proto : inheritedProtocols) {
-          if (!proto->getAttrs().isObjC()) {
-            TC.diagnose(PD->getLoc(),
-                        diag::objc_protocol_inherits_non_objc_protocol,
-                        PD->getDeclaredType(), proto->getDeclaredType());
-            TC.diagnose(proto->getLoc(),
-                        diag::protocol_here,
-                        proto->getName());
-            isObjC = false;
-          }
-        }
-
-        inheritedProtocols.clear();
-      }
-
-      PD->setIsObjC(isObjC);
-    }
-
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);
-
-    validateAttributes(PD);
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -1641,7 +1595,7 @@ public:
       assert(!FD->getType()->isDependentType());
     }
 
-    validateAttributes(FD);
+    validateAttributes(TC, FD);
 
     // A method is ObjC-compatible if it's explicitly [objc], a member of an
     // ObjC-compatible class, or an accessor for an ObjC property.
@@ -1887,7 +1841,7 @@ public:
       CD->setIsObjC(isObjC);
     }
 
-    validateAttributes(CD);
+    validateAttributes(TC, CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -1922,7 +1876,7 @@ public:
     DD->setType(FnTy);
     DD->getImplicitSelfDecl()->setType(SelfTy);
 
-    validateAttributes(DD);
+    validateAttributes(TC, DD);
   }
 };
 }; // end anonymous namespace.
@@ -1999,6 +1953,7 @@ void TypeChecker::validateTypeDecl(ValueDecl *D, bool resolveTypeParams) {
     if (auto gp = nominal->getGenericParams()) {
       gp->setOuterParameters(
         nominal->getDeclContext()->getGenericParamsOfContext());
+      // FIXME: Should not have to create a DeclChecker.
       DeclChecker(*this, false, false).checkGenericParams(gp, nominal);
     }
 
@@ -2008,6 +1963,25 @@ void TypeChecker::validateTypeDecl(ValueDecl *D, bool resolveTypeParams) {
     if (auto SD = dyn_cast<StructDecl>(D))
       addImplicitConstructors(SD);
 
+    validateAttributes(*this, D);
+    checkInheritanceClause(*this, D);
+
+    // Mark a class as [objc]. This must happen before checking its members.
+    if (auto CD = dyn_cast<ClassDecl>(nominal)) {
+      ClassDecl *superclassDecl = nullptr;
+      if (CD->hasSuperclass())
+        superclassDecl = CD->getSuperclass()->getClassOrBoundGenericClass();
+
+      CD->setIsObjC(CD->getAttrs().isObjC() ||
+                    (superclassDecl && superclassDecl->isObjC()));
+    }
+
+    // FIXME: Don't validate members so eagerly.
+    if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
+      for (Decl *member : nominal->getMembers())
+        if (auto VD = dyn_cast<ValueDecl>(member))
+          validateTypeDecl(VD, true);
+    }
     break;
   }
 
@@ -2017,12 +1991,15 @@ void TypeChecker::validateTypeDecl(ValueDecl *D, bool resolveTypeParams) {
       return;
     proto->computeType();
 
+    checkInheritanceClause(*this, D);
+    validateAttributes(*this, D);
+
     // Fix the 'Self' associated type.
     AssociatedTypeDecl *selfDecl = nullptr;
     for (auto member : proto->getMembers()) {
       if (auto AssocType = dyn_cast<AssociatedTypeDecl>(member)) {
         checkInheritanceClause(*this, AssocType);
-        
+
         if (AssocType->isSelf()) {
           selfDecl = AssocType;
           break;
@@ -2030,13 +2007,13 @@ void TypeChecker::validateTypeDecl(ValueDecl *D, bool resolveTypeParams) {
       }
     }
     assert(selfDecl && "no Self decl?");
-    
+
     // Build archetypes for this protocol.
     ArchetypeBuilder builder = createArchetypeBuilder(*this);
     builder.addGenericParameter(selfDecl, 0);
     builder.addImplicitConformance(selfDecl, proto);
     builder.assignArchetypes();
-    
+
     // Set the underlying type of each of the associated types to the
     // appropriate archetype.
     ArchetypeType *selfArchetype = builder.getArchetype(selfDecl);
@@ -2048,6 +2025,33 @@ void TypeChecker::validateTypeDecl(ValueDecl *D, bool resolveTypeParams) {
           archetype = selfArchetype->getNestedType(assocType->getName());
         assocType->setArchetype(archetype);
       }
+    }
+
+    // If the protocol is [objc], it may only refine other [objc] protocols.
+    // FIXME: Revisit this restriction.
+    if (proto->getAttrs().isObjC()) {
+      bool isObjC = true;
+
+      SmallVector<ProtocolDecl*, 2> inheritedProtocols;
+      for (auto directInherited : proto->getInherited()) {
+        if (!directInherited.getType()->isExistentialType(inheritedProtocols))
+          continue;
+
+        for (auto inherited : inheritedProtocols) {
+          if (!inherited->getAttrs().isObjC()) {
+            diagnose(proto->getLoc(),
+                     diag::objc_protocol_inherits_non_objc_protocol,
+                     proto->getDeclaredType(), inherited->getDeclaredType());
+            diagnose(inherited->getLoc(), diag::protocol_here,
+                     inherited->getName());
+            isObjC = false;
+          }
+        }
+
+        inheritedProtocols.clear();
+      }
+
+      proto->setIsObjC(isObjC);
     }
     break;
   }
@@ -2514,8 +2518,7 @@ void TypeChecker::definePendingImplicitDecls() {
   }
 }
 
-/// validateAttributes - Check that the func/var declaration attributes are ok.
-void DeclChecker::validateAttributes(ValueDecl *VD) {
+static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
   const DeclAttributes &Attrs = VD->getAttrs();
   Type Ty = VD->getType();
 
