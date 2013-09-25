@@ -3127,8 +3127,8 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   // Form a reference to the builtin method.
   auto openedType
     = builtinMethod->getType()->castTo<AnyFunctionType>()->getResult();
-  auto memberRef = rewriter.buildMemberRef(expr, expr->getStartLoc(),
-                                           builtinMethod, expr->getEndLoc(),
+  auto memberRef = rewriter.buildMemberRef(expr, /*DotLoc=*/SourceLoc(),
+                                           builtinMethod, expr->getLoc(),
                                            openedType, locator,
                                            /*Implicit=*/true);
 

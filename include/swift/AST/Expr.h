@@ -2160,6 +2160,8 @@ protected:
     : ApplyExpr(K, FnExpr, BaseExpr, FnExpr->isImplicit(), Ty) { }
   
 public:
+  Expr *getBase() const { return getArg(); }
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_SelfApplyExpr &&
            E->getKind() <= ExprKind::Last_SelfApplyExpr;
@@ -2179,19 +2181,18 @@ public:
   }
 
   SourceLoc getDotLoc() const { return DotLoc; }
+
   SourceLoc getLoc() const {
-    return DotLoc.isValid() ? getArg()->getStartLoc() : getFn()->getStartLoc();
+    return getFn()->isImplicit() ? getBase()->getStartLoc() : getFn()->getLoc();
+  }
+  SourceLoc getStartLoc() const {
+    return getBase()->getStartLoc();
   }
   SourceLoc getEndLoc() const {
-    return getFn()->getEndLoc();
+    return getFn()->isImplicit() ? getBase()->getEndLoc() : getFn()->getEndLoc();
   }
-  
   SourceRange getSourceRange() const {
-    // Implicit 'self' receivers don't have location info for DotLoc or the
-    // 'arg' expression.
-    if (DotLoc.isValid())
-      return SourceRange(getArg()->getStartLoc(), getEndLoc());
-    return getFn()->getSourceRange();
+    return SourceRange(getStartLoc(), getEndLoc());
   }
   
   static bool classof(const Expr *E) {
@@ -2207,11 +2208,11 @@ public:
   ConstructorRefCallExpr(Expr *FnExpr, Expr *BaseExpr, Type Ty = Type())
     : SelfApplyExpr(ExprKind::ConstructorRefCall, FnExpr, BaseExpr, Ty) {}
 
-  SourceLoc getLoc() const {
-    return getArg()->getLoc();
-  }
+  SourceLoc getLoc() const { return getFn()->getLoc(); }
+  SourceLoc getStartLoc() const { return getBase()->getStartLoc(); }
+  SourceLoc getEndLoc() const { return getFn()->getEndLoc(); }
   SourceRange getSourceRange() const {
-    return SourceRange(getArg()->getSourceRange());
+    return SourceRange(getStartLoc(), getEndLoc());
   }
   
   static bool classof(const Expr *E) {
