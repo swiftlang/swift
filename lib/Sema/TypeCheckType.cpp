@@ -232,7 +232,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *dc,
                             MutableArrayRef<TypeRepr *> genericArgs,
                             bool allowUnboundGenerics) {
-  TC.validateTypeDecl(typeDecl);
+  TC.validateDecl(typeDecl);
 
   Type type;
   if (dc) {

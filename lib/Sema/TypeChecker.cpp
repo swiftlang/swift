@@ -433,7 +433,7 @@ static void checkBridgingFunctions(TypeChecker &tc, Module *mod,
                    NLKind::QualifiedLookup, results);
 
   for (auto D : results)
-    tc.validateTypeDecl(D);
+    tc.validateDecl(D);
 }
 
 static bool haveDifferentFixity(const ValueDecl *lhs, const ValueDecl *rhs) {
@@ -484,10 +484,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         bindExtensionDecl(ED, TC);
         if (mayConformToKnownProtocol(ED))
-          TC.validateTypeDecl(ED->getExtendedType()->getAnyNominal());
+          TC.validateDecl(ED->getExtendedType()->getAnyNominal());
       } else if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
         if (mayConformToKnownProtocol(nominal))
-          TC.validateTypeDecl(nominal);
+          TC.validateDecl(nominal);
       }
     }
   });

@@ -1107,7 +1107,7 @@ public:
   
   void visitEnumDecl(EnumDecl *UD) {
     if (!IsSecondPass) {
-      TC.validateTypeDecl(UD);
+      TC.validateDecl(UD);
 
       {
         // Check for circular inheritance of the raw type.
@@ -1218,7 +1218,7 @@ public:
 
   void visitStructDecl(StructDecl *SD) {
     if (!IsSecondPass)
-      TC.validateTypeDecl(SD);
+      TC.validateDecl(SD);
 
     // Visit each of the members.
     for (Decl *Member : SD->getMembers()) {
@@ -1258,7 +1258,7 @@ public:
 
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
-      TC.validateTypeDecl(CD);
+      TC.validateDecl(CD);
 
       {
         // Check for circular inheritance.
@@ -1286,7 +1286,7 @@ public:
       return;
     }
 
-    TC.validateTypeDecl(PD);
+    TC.validateDecl(PD);
 
     {
       // Check for circular inheritance within the protocol.
@@ -1716,7 +1716,7 @@ public:
 
       checkInheritanceClause(TC, ED);
       if (auto nominal = ExtendedTy->getAnyNominal())
-        TC.validateTypeDecl(nominal);
+        TC.validateDecl(nominal);
     }
 
     for (Decl *Member : ED->getMembers())
@@ -1881,7 +1881,7 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
 }
 
-void TypeChecker::validateTypeDecl(ValueDecl *D, bool resolveTypeParams) {
+void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   switch (D->getKind()) {
   case DeclKind::Import:
   case DeclKind::Extension:
@@ -1975,7 +1975,7 @@ void TypeChecker::validateTypeDecl(ValueDecl *D, bool resolveTypeParams) {
     if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
       for (Decl *member : nominal->getMembers())
         if (auto VD = dyn_cast<ValueDecl>(member))
-          validateTypeDecl(VD, true);
+          validateDecl(VD, true);
     }
     break;
   }
@@ -2121,7 +2121,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       // Properties are computed, not initialized.
       if (var->isProperty())
         continue;
-      tc.validateTypeDecl(var);
+      tc.validateDecl(var);
 
       auto varType = tc.getTypeOfRValue(var);
 

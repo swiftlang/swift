@@ -182,7 +182,7 @@ public:
   /// \returns a well-formed type or an ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR, bool allowUnboundGenerics = false);
 
-  void validateTypeDecl(ValueDecl *D, bool resolveTypeParams = false);
+  void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
 
   /// Resolve a reference to the given type declaration within a particular
   /// context.
@@ -309,7 +309,7 @@ public:
   void typeCheckDecl(Decl *D, bool isFirstPass);
   
   virtual void resolveDeclSignature(ValueDecl *VD) override {
-    validateTypeDecl(VD, true);
+    validateDecl(VD, true);
   }
 
   /// Retrieve the set of protocols to which this nominal type declaration

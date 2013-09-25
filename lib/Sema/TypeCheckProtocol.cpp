@@ -532,7 +532,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     if (!AssociatedType)
       continue;
     
-    TC.validateTypeDecl(AssociatedType, true);
+    TC.validateDecl(AssociatedType, true);
 
     // Bind the implicit 'Self' type to the type T.
     auto archetype = AssociatedType->getArchetype();
@@ -657,7 +657,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     if (isa<AssociatedTypeDecl>(Requirement))
       continue;
     
-    TC.validateTypeDecl(Requirement, true);
+    TC.validateDecl(Requirement, true);
 
     // Determine the type that the requirement is expected to have. If the
     // requirement is for a function, look past the 'self' parameter.
@@ -704,7 +704,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       }
 
       if (!witness->hasType())
-        TC.validateTypeDecl(witness, true);
+        TC.validateDecl(witness, true);
 
       auto match = matchWitness(TC, Proto, Requirement, reqType, T, witness,
                                 unresolvedAssocTypes);
@@ -1163,7 +1163,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   if (Conformance)
     *Conformance = nullptr;
   if (!Proto->hasType())
-    validateTypeDecl(Proto);
+    validateDecl(Proto);
 
   // If we have an archetype, check whether this archetype's requirements
   // include this protocol (or something that inherits from it).
