@@ -1492,7 +1492,7 @@ if vec[3] {
   <p>See the resilience design.</p>
   
   <!-- _____________________________________________________________________ -->
-  <h4 id="attribute-inout">By-Reference Attribute</h4>
+  <h4 id="attribute-inout"><tt>inout</tt> Attribute</h4>
 
   <pre class="grammar">
     attribute-inout ::= 'inout'
@@ -1504,8 +1504,52 @@ if vec[3] {
     type.
   </p>
 
-  <p><tt>inout</tt> indicates that the argument will be passed "by
-    reference": the bound variable will be an l-value.</p>
+  <p><tt>inout</tt> indicates that the argument will be passed as an "in-out"
+    parameter. The caller must pass an lvalue decorated with the <tt>&</tt>
+    prefix operator as the argument. Semantically, the value of the argument
+    is passed "in" to the callee to a local value, and that local value is
+    stored back "out" to the lvalue when the callee exits. This is normally
+    indistinguishable from pass-by-reference semantics.</p>
+
+  <p><tt>inout</tt> differs from traditional pass-by-reference when closures
+    are involved. If a closure captures an <tt>inout</tt> parameter, the
+    <em>local value</em> is captured, not the reference. If the closure outlives
+    the lifetime of the byref, the local value lives independent of the byref.
+    For example, the following code:
+
+  <pre class=example>
+    func foo(x:[inout] Int) -> () -> Int {
+      func bar() -> Int {
+        x += 1
+        return x
+      }
+      // Call 'bar' once while the inout is active.
+      bar()
+      return bar
+    }
+
+    var x = 219
+    var f = foo(&x)
+    // x is updated to the value of foo's local x at function exit.
+    println("global x = \(x)")
+    // These calls only update the captured local 'x', which is now independent
+    // of the inout parameter.
+    println("local x = \(f())")
+    println("local x = \(f())")
+    println("local x = \(f())")
+
+    println("global x = \(x)")
+  </pre>
+
+  will print:
+
+  <pre class=example>
+    global x = 220
+    local x = 221
+    local x = 222
+    local x = 223
+    global x = 220
+  </pre>
 
   <p>The type being annotated must be <a href="#materializable">materializable</a>.
     The type after annotation is never materializable.</tt>
