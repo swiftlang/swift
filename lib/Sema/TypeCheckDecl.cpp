@@ -521,6 +521,54 @@ static void checkCircularity(TypeChecker &tc, T *decl,
   }
 }
 
+static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
+  switch (pattern->getKind()) {
+  case PatternKind::Tuple:
+    for (auto &field : cast<TuplePattern>(pattern)->getFields())
+      setBoundVarsTypeError(field.getPattern(), ctx);
+    return;
+  case PatternKind::Paren:
+    return setBoundVarsTypeError(cast<ParenPattern>(pattern)->getSubPattern(),
+                                 ctx);
+  case PatternKind::Typed:
+    return setBoundVarsTypeError(cast<TypedPattern>(pattern)->getSubPattern(),
+                                 ctx);
+  case PatternKind::NominalType:
+    return setBoundVarsTypeError(cast<NominalTypePattern>(pattern)
+                                   ->getSubPattern(),
+                                 ctx);
+  case PatternKind::Var:
+    return setBoundVarsTypeError(cast<VarPattern>(pattern)->getSubPattern(),
+                                 ctx);
+  case PatternKind::EnumElement:
+    if (auto subpattern = cast<EnumElementPattern>(pattern)->getSubPattern())
+      setBoundVarsTypeError(subpattern, ctx);
+    return;
+
+  // Handle vars.
+  case PatternKind::Named: {
+    // Don't change the type of a variable that we've been able to
+    // compute a type for.
+    VarDecl *var = cast<NamedPattern>(pattern)->getDecl();
+    if (var->hasType()) {
+      if (var->getType()->is<ErrorType>())
+        var->setInvalid();
+    } else {
+      var->setType(ErrorType::get(ctx));
+      var->setInvalid();
+    }
+    return;
+  }
+
+  // Handle non-vars.
+  case PatternKind::Any:
+  case PatternKind::Isa:
+  case PatternKind::Expr:
+    return;
+  }
+  llvm_unreachable("bad pattern kind!");
+}
+
 namespace {
 
 class DeclChecker : public DeclVisitor<DeclChecker> {
@@ -924,61 +972,6 @@ public:
     llvm_unreachable("bad pattern kind!");
   }
 
-  /// Set ErrorType as the type of any variables bound by this pattern
-  /// that don't yet have types.
-  ///
-  /// This method is called when some kind of further checking has
-  /// failed, e.g. when the initializer didn't type-check.  We may
-  /// encounter references to the bound variables later, so for
-  /// sanity's sake, we need to make sure that every variable has a
-  /// type.  At the same time, some of the variables may have explicit
-  /// type annotations, and we don't want to lose those annotations
-  /// unnecessarily because that would impede downstream type-checking
-  /// and code completion.
-  void setBoundVarsTypeError(Pattern *pattern) {
-    switch (pattern->getKind()) {
-    case PatternKind::Tuple:
-      for (auto &field : cast<TuplePattern>(pattern)->getFields())
-        setBoundVarsTypeError(field.getPattern());
-      return;
-    case PatternKind::Paren:
-      return setBoundVarsTypeError(cast<ParenPattern>(pattern)->getSubPattern());
-    case PatternKind::Typed:
-      return setBoundVarsTypeError(cast<TypedPattern>(pattern)->getSubPattern());
-    case PatternKind::NominalType:
-      return setBoundVarsTypeError(cast<NominalTypePattern>(pattern)
-                                     ->getSubPattern());
-    case PatternKind::Var:
-      return setBoundVarsTypeError(cast<VarPattern>(pattern)->getSubPattern());
-    case PatternKind::EnumElement:
-      if (auto subpattern = cast<EnumElementPattern>(pattern)->getSubPattern())
-        setBoundVarsTypeError(subpattern);
-      return;
-
-    // Handle vars.
-    case PatternKind::Named: {
-      // Don't change the type of a variable that we've been able to
-      // compute a type for.
-      VarDecl *var = cast<NamedPattern>(pattern)->getDecl();
-      if (var->hasType()) {
-        if (var->getType()->is<ErrorType>())
-          var->setInvalid();
-      } else {
-        var->setType(ErrorType::get(TC.Context));
-        var->setInvalid();
-      }
-      return;
-    }
-
-    // Handle non-vars.
-    case PatternKind::Any:
-    case PatternKind::Isa:
-    case PatternKind::Expr:
-      return;
-    }
-    llvm_unreachable("bad pattern kind!");
-  }
-
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     bool DelayCheckingPattern =
       TC.TU.Kind != TranslationUnit::Library &&
@@ -1009,19 +1002,19 @@ public:
       if (TC.typeCheckPattern(PBD->getPattern(),
                               PBD->getDeclContext(),
                               /*allowUnknownTypes*/false)) {
-        setBoundVarsTypeError(PBD->getPattern());
+        setBoundVarsTypeError(PBD->getPattern(), TC.Context);
         return;
       }
     } else if (!IsFirstPass && PBD->getInit()) {
       if (TC.typeCheckBinding(PBD)) {
-        setBoundVarsTypeError(PBD->getPattern());
+        setBoundVarsTypeError(PBD->getPattern(), TC.Context);
         return;
       }
     } else if (!IsFirstPass || !DelayCheckingPattern) {
       if (TC.typeCheckPattern(PBD->getPattern(),
                               PBD->getDeclContext(),
                               /*allowUnknownTypes*/false)) {
-        setBoundVarsTypeError(PBD->getPattern());
+        setBoundVarsTypeError(PBD->getPattern(), TC.Context);
         return;
       }
     }
@@ -1974,16 +1967,64 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
 }
 
-void TypeChecker::validateTypeDecl(TypeDecl *D) {
-  // Type aliases may not have an underlying type yet.
-  if (auto typeAlias = dyn_cast<TypeAliasDecl>(D)) {
+void TypeChecker::validateTypeDecl(ValueDecl *D, bool resolveTypeParams) {
+  switch (D->getKind()) {
+  case DeclKind::Import:
+  case DeclKind::Extension:
+  case DeclKind::PatternBinding:
+  case DeclKind::EnumCase:
+  case DeclKind::TopLevelCode:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    llvm_unreachable("not a value decl");
+
+  case DeclKind::TypeAlias: {
+    // Type aliases may not have an underlying type yet.
+    auto typeAlias = cast<TypeAliasDecl>(D);
     if (typeAlias->getUnderlyingTypeLoc().getTypeRepr())
       validateType(typeAlias->getUnderlyingTypeLoc());
-    return;
+    break;
   }
 
-  // Nominal declarations may not have a type yet.
-  if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType: {
+    auto typeParam = cast<AbstractTypeParamDecl>(D);
+    if (!resolveTypeParams || typeParam->getArchetype())
+      break;
+    
+    // FIXME: Avoid full check in these cases?
+    DeclContext *DC = typeParam->getDeclContext();
+    switch (DC->getContextKind()) {
+    case DeclContextKind::Module:
+    case DeclContextKind::TopLevelCodeDecl:
+      llvm_unreachable("cannot have type params");
+
+    case DeclContextKind::NominalTypeDecl:
+      typeCheckDecl(cast<NominalTypeDecl>(DC), true);
+      break;
+
+    case DeclContextKind::ExtensionDecl:
+      llvm_unreachable("not yet implemented");
+    
+    case DeclContextKind::AbstractClosureExpr:
+      llvm_unreachable("cannot have type params");
+
+    case DeclContextKind::AbstractFunctionDecl:
+      if (auto nominal = dyn_cast<NominalTypeDecl>(DC->getParent()))
+        typeCheckDecl(nominal, true);
+      else if (auto extension = dyn_cast<ExtensionDecl>(DC->getParent()))
+        typeCheckDecl(extension, true);
+      typeCheckDecl(cast<AbstractFunctionDecl>(DC), true);
+      break;
+    }
+    break;
+  }
+  
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class: {
+    auto nominal = cast<NominalTypeDecl>(D);
     if (nominal->hasType())
       return;
 
@@ -1997,8 +2038,54 @@ void TypeChecker::validateTypeDecl(TypeDecl *D) {
     // Compute the declared type.
     nominal->computeType();
 
-    return;
+    if (auto SD = dyn_cast<StructDecl>(D))
+      addImplicitConstructors(SD);
+
+    break;
   }
+
+  case DeclKind::Protocol: {
+    auto proto = cast<ProtocolDecl>(D);
+    if (proto->hasType())
+      return;
+
+    proto->computeType();
+    // FIXME: We only want to set the Self type.
+    typeCheckDecl(proto, true);
+    break;
+  }
+      
+  case DeclKind::Var: {
+    if (D->hasType())
+      return;
+    if (PatternBindingDecl *PBD = cast<VarDecl>(D)->getParentPattern()) {
+      if (typeCheckPattern(PBD->getPattern(), PBD->getDeclContext(),
+                           /*allowUnknownTypes*/false)) {
+        setBoundVarsTypeError(PBD->getPattern(), Context);
+        return;
+      }
+    } else {
+      // FIXME: This case is hit when code completion occurs in a function
+      // parameter list. Previous parameters are definitely in scope, but
+      // we don't really know how to type-check them.
+      assert(isa<AbstractFunctionDecl>(D->getDeclContext()));
+      D->setType(ErrorType::get(Context));
+    }
+    break;
+  }
+      
+  case DeclKind::Func:
+  case DeclKind::Subscript:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::EnumElement:
+    if (D->hasType())
+      return;
+    typeCheckDecl(D, true);
+    break;
+  }
+
+  assert(D->hasType());  
 }
 
 ArrayRef<ProtocolDecl *>
@@ -2038,6 +2125,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       // Properties are computed, not initialized.
       if (var->isProperty())
         continue;
+      tc.validateTypeDecl(var);
 
       auto varType = tc.getTypeOfRValue(var);
 
