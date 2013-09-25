@@ -270,15 +270,8 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
     if (var->isProperty())
       return var->isSettable()? CaptureKind::GetterSetter : CaptureKind::Getter;
 
-  if (capture->getType()->is<LValueType>())
-    return CaptureKind::Byref;
-  if (capture->isReferencedAsLValue()) {
-    // FIXME: variables that aren't modified after capture can be
-    // captured by value.
-
-    // Otherwise, we need to pass a box.
+  if (capture->isReferencedAsLValue())
     return CaptureKind::Box;
-  }
   return CaptureKind::Constant;
 }
 
@@ -1349,18 +1342,6 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
              "constant capture is an lvalue?!");
       inputFields.push_back(TupleTypeElt(capture->getType()));
       break;
-    case CaptureKind::Byref: {
-      // Capture the address.
-      assert(capture->getType()->is<LValueType>() &&
-             "byref capture not an lvalue or fixed-lifetime var?!");
-      Type objectType
-        = capture->getType()->getRValueType();
-      LValueType *lvType = LValueType::get(objectType,
-                                           LValueType::Qual::DefaultForType,
-                                           Context);
-      inputFields.push_back(TupleTypeElt(lvType));
-      break;
-    }
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
       Type setterTy = getPropertyType(SILDeclRef::Kind::Setter,
@@ -1380,7 +1361,7 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
       assert(capture->isReferencedAsLValue() &&
              "lvalue capture not an lvalue?!");
       inputFields.push_back(Context.TheObjectPointerType);
-      LValueType *lvType = LValueType::get(capture->getType(),
+      LValueType *lvType = LValueType::get(capture->getType()->getRValueType(),
                                            LValueType::Qual::DefaultForType,
                                            Context);
       inputFields.push_back(TupleTypeElt(lvType));

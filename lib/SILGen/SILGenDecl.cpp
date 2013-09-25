@@ -575,14 +575,6 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
     gen.Cleanups.pushCleanup<CleanupCaptureBox>(box);
     break;
   }
-  case CaptureKind::Byref: {
-    // Byref captures are non-escaping, so it's sufficient to capture only the
-    // address.
-    SILType ty = gen.getLoweredType(capture->getType()).getAddressType();
-    SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin());
-    gen.VarLocs[capture] = {SILValue(), addr};
-    break;
-  }
   case CaptureKind::Constant: {
     // Constants are captured by value.
     assert(!capture->getType()->is<LValueType>() &&

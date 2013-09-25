@@ -1301,13 +1301,6 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         capturedArgs.push_back(vl.address);
         break;
       }
-      case CaptureKind::Byref: {
-        // Byrefs are captured by address only.
-        assert(VarLocs.count(capture) &&
-               "no location for captured byref!");
-        capturedArgs.push_back(VarLocs[capture].address);
-        break;
-      }
       case CaptureKind::Constant: {
         // SILValue is a constant such as a local func. Pass on the reference.
         ManagedValue v = emitReferenceToDecl(loc, capture);
@@ -2067,16 +2060,11 @@ static void forwardCaptureArgs(SILGenFunction &gen,
 
   switch (getDeclCaptureKind(capture)) {
   case CaptureKind::Box: {
-    SILType ty = gen.getLoweredType(capture->getType()).getAddressType();
+    SILType ty = gen.getLoweredType(capture->getType()->getRValueType())
+      .getAddressType();
     // Forward the captured owning ObjectPointer.
     addSILArgument(SILType::getObjectPointerType(c));
     // Forward the captured value address.
-    addSILArgument(ty);
-    break;
-  }
-  case CaptureKind::Byref: {
-    // Forward the captured address.
-    SILType ty = gen.getLoweredType(capture->getType()).getAddressType();
     addSILArgument(ty);
     break;
   }

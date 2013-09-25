@@ -48,8 +48,6 @@ enum class CaptureKind {
   Box,
   /// A local value captured by value.
   Constant,
-  /// A byref argument captured by address.
-  Byref,
   /// A getter-only property.
   Getter,
   /// A settable property.
