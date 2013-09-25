@@ -422,9 +422,12 @@ enum class RequirementKind : unsigned int {
   SameType
 };
 
-/// \brief A single requirement in a where clause, which places additional
+/// \brief A single requirement in a 'where' clause, which places additional
 /// restrictions on the generic parameters or associated types of a generic
 /// function, type, or protocol.
+///
+/// This always represents a requirement spelled in the source code.  It is
+/// never generated implicitly.
 class Requirement {
   SourceLoc SeparatorLoc;
   RequirementKind Kind : 1;
@@ -472,11 +475,6 @@ public:
   /// \brief Mark this requirement invalid.
   void setInvalid() { Invalid = true; }
 
-  /// \brief Determine whether this is an implicitly-generated requirement.
-  bool isImplicit() const {
-    return SeparatorLoc.isInvalid();
-  }
-
   /// \brief For a conformance requirement, return the subject of the
   /// conformance relationship.
   Type getSubject() const {
@@ -515,7 +513,6 @@ public:
   /// conformance requirement.
   SourceLoc getColonLoc() const {
     assert(getKind() == RequirementKind::Conformance);
-    assert(!isImplicit() && "Implicit requirements have no location");
     return SeparatorLoc;
   }
 
@@ -565,7 +562,6 @@ public:
   /// same-type requirement.
   SourceLoc getEqualLoc() const {
     assert(getKind() == RequirementKind::SameType);
-    assert(!isImplicit() && "Implicit requirements have no location");
     return SeparatorLoc;
   }
 };
