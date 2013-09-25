@@ -123,6 +123,14 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     case OPT_link_library:
       addLinkLibrary(InputArg->getValue(), LibraryKind::Library);
       break;
+      
+    case OPT_std_EQ:
+      if (strcmp(InputArg->getValue(), "agp10") == 0)
+        LangOpts.Axle = true;
+      else
+        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                       InputArg->getSpelling(), InputArg->getValue());
+      break;
     }
   }
 

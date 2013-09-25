@@ -2837,4 +2837,22 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
     TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "local_storage");
     VD->getMutableAttrs().LocalStorage = false;
   }
+  
+  if (!isa<FuncDecl>(VD)) {
+    if (Attrs.isKernel()) {
+      TC.diagnose(VD->getStartLoc(), diag::attribute_requires_function_decl,
+                  "kernel");
+      VD->getMutableAttrs().KernelOrShader = KernelOrShaderKind::Default;
+    }
+    if (Attrs.isVertex()) {
+      TC.diagnose(VD->getStartLoc(), diag::attribute_requires_function_decl,
+                  "vertex");
+      VD->getMutableAttrs().KernelOrShader = KernelOrShaderKind::Default;
+    }
+    if (Attrs.isFragment()) {
+      TC.diagnose(VD->getStartLoc(), diag::attribute_requires_function_decl,
+                  "fragment");
+      VD->getMutableAttrs().KernelOrShader = KernelOrShaderKind::Default;
+    }
+  }
 }

@@ -821,6 +821,10 @@ ERROR(invalid_ownership_opaque_type,attribute_parsing,none,
 ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
       "'weak' variable should have Optional type %0", (Type))
 
+// kernel, vertex, fragment
+ERROR(attribute_requires_function_decl,attribute_parsing,none,
+      "%0 attribute only applies to function declarations", (StringRef))
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1472,7 +1476,8 @@ ERROR(error_clang_importer_create_fail,frontend,none,
 ERROR(error_missing_arg_value,frontend,none,
   "missing argument value for '%0', expected %1 argument(s)",
   (StringRef, unsigned))
-
+ERROR(error_invalid_arg_value,frontend,none,
+  "invalid value '%1' in '%0'", (StringRef, StringRef))
 
 #if defined(DIAG)
 #  undef DIAG

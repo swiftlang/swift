@@ -129,7 +129,19 @@ public:
 };
   
 enum class AbstractCC : unsigned char;
-  
+
+/// Marks if a function is a compute kernel, vertex shader, or fragment shader.
+enum class KernelOrShaderKind : unsigned char {
+  /// Not a kernel or shader.
+  Default = 0,
+  /// A compute kernel.
+  Kernel,
+  /// A vertex shader.
+  Vertex,
+  /// A fragment shader.
+  Fragment
+};
+
 /// DeclAttributes - These are attributes that may be applied to declarations.
 class DeclAttributes {
 public:
@@ -160,9 +172,10 @@ public:
   bool LocalStorage = false;
   bool Exported = false;
   Optional<AbstractCC> cc = Nothing;
-  
+  KernelOrShaderKind KernelOrShader = KernelOrShaderKind::Default;
+
   DeclAttributes() {}
-  
+
   bool isValid() const { return LSquareLoc.isValid(); }
 
   ResilienceData getResilienceData() const { return Resilience; }
@@ -193,6 +206,18 @@ public:
   bool isExported() const { return Exported; }
   bool hasCC() const { return cc.hasValue(); }
   AbstractCC getAbstractCC() const { return *cc; }
+  KernelOrShaderKind getKernelOrShaderKind() const {
+    return KernelOrShader;
+  }
+  bool isKernel() const {
+    return KernelOrShader == KernelOrShaderKind::Kernel;
+  }
+  bool isVertex() const {
+    return KernelOrShader == KernelOrShaderKind::Vertex;
+  }
+  bool isFragment() const {
+    return KernelOrShader == KernelOrShaderKind::Fragment;
+  }
 
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isInOut() &&
@@ -200,7 +225,8 @@ public:
            !isConversion() && !isTransparent() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
            !isClassProtocol() && !hasCC() && !hasOwnership() &&
-           !isLocalStorage() && !isExported() && AsmName.empty();
+           !isLocalStorage() && !isExported() && AsmName.empty() &&
+           getKernelOrShaderKind() == KernelOrShaderKind::Default;
   }
 
   void clearOwnership() {

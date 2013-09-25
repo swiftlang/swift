@@ -553,7 +553,8 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
 
     // Handle the auto_closure, cc, and objc_block attributes for function types.
     if (attrs.isAutoClosure() || attrs.hasCC() || attrs.isObjCBlock() ||
-        attrs.isThin() || attrs.isNoReturn()) {
+        attrs.isThin() || attrs.isNoReturn() || 
+        attrs.getKernelOrShaderKind() != KernelOrShaderKind::Default) {
       FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer());
       TupleType *InputTy = 0;
       if (FT) InputTy = dyn_cast<TupleType>(FT->getInput().getPointer());
@@ -574,6 +575,15 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
         if (attrs.isNoReturn())
           diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
                    "noreturn");
+        if (attrs.isKernel())
+          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+                   "kernel");
+        if (attrs.isVertex())
+          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+                   "vertex");
+        if (attrs.isFragment())
+          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+                   "fragment");
       } else if (attrs.isAutoClosure() &&
                  (InputTy == 0 || !InputTy->getFields().empty())) {
         // auto_closures must take () syntactically.
@@ -598,6 +608,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
       attrs.Thin = false;
       attrs.NoReturn = false;
       attrs.cc = Nothing;
+      attrs.KernelOrShader = KernelOrShaderKind::Default;
     }
 
     // In SIL translation units *only*, permit [weak] and [unowned] to

@@ -462,7 +462,62 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     consumeToken(tok::string_literal);
     return false;
   }
+
+  case AttrName::kernel: {
+    if (!Context.LangOpts.Axle) {
+      diagnose(Tok, diag::unknown_attribute, Tok.getText());
+      consumeToken(tok::identifier);
+      return false;
+    }
+    if (Attributes.isKernel())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    if (Attributes.isVertex())
+      diagnose(Tok, diag::cannot_combine_attribute, "vertex");
+    if (Attributes.isFragment())
+      diagnose(Tok, diag::cannot_combine_attribute, "fragment");
+
+    consumeToken(tok::identifier);
+    Attributes.KernelOrShader = KernelOrShaderKind::Kernel;
+    return false;
   }
+  
+  case AttrName::vertex: {
+    if (!Context.LangOpts.Axle) {
+      diagnose(Tok, diag::unknown_attribute, Tok.getText());
+      consumeToken(tok::identifier);
+      return false;
+    }
+    if (Attributes.isVertex())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    if (Attributes.isKernel())
+      diagnose(Tok, diag::cannot_combine_attribute, "kernel");
+    if (Attributes.isFragment())
+      diagnose(Tok, diag::cannot_combine_attribute, "fragment");
+
+    consumeToken(tok::identifier);
+    Attributes.KernelOrShader = KernelOrShaderKind::Vertex;
+    return false;
+  }
+
+  case AttrName::fragment: {
+    if (!Context.LangOpts.Axle) {
+      diagnose(Tok, diag::unknown_attribute, Tok.getText());
+      consumeToken(tok::identifier);
+      return false;
+    }
+    if (Attributes.isFragment())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    if (Attributes.isKernel())
+      diagnose(Tok, diag::cannot_combine_attribute, "kernel");
+    if (Attributes.isVertex())
+      diagnose(Tok, diag::cannot_combine_attribute, "vertex");
+
+    consumeToken(tok::identifier);
+    Attributes.KernelOrShader = KernelOrShaderKind::Fragment;
+    return false;
+  }
+  }
+
   llvm_unreachable("bad attribute kind");
 }
 
