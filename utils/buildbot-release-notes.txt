@@ -1,3 +1,45 @@
+2013-10-01
+----------
+
+* [byref] arguments can now be captured into closures. The semantics of a
+  byref capture are that the captured variable is an independent local variable
+  of the callee, and the byref is updated to contain the value of that local
+  variable at function exit. For example, this code:
+
+
+    func foo(x:[byref] Int) -> () -> Int {
+      func bar() -> Int {
+        x += 1
+        return x
+      }
+      // Call 'bar' once while the byref is active.
+      bar()
+      return bar
+    }
+
+    var x = 219
+    var f = foo(&x)
+    // x is updated to the value of foo's local x at function exit.
+    println("global x = \(x)")
+    // These calls only update the captured local 'x', which is now independent
+    // of the byref.
+    println("local x = \(f())")
+    println("local x = \(f())")
+    println("local x = \(f())")
+
+    println("global x = \(x)")
+
+  will print:
+
+    global x = 220
+    local x = 221
+    local x = 222
+    local x = 223
+    global x = 220
+
+  In the common case, most closure arguments do not outlive the duration of
+  their callee, and the observable behavior is unchanged.
+
 2013-09-24
 ----------
 
