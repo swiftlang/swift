@@ -2091,7 +2091,7 @@ public:
     return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc()); 
   }
   
-  SourceLoc getLoc() const { return getArg()->getStartLoc(); }
+  SourceLoc getLoc() const { return getFn()->getLoc(); }
   
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Call; }
 };
