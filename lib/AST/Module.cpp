@@ -593,6 +593,8 @@ findExplicitConformance(Module *module, NominalTypeDecl *nominal,
       return false;
     };
 
+  resolver->resolveDeclSignature(nominal);
+
   // Walk the stack of types to find a conformance.
   stack.push_back({nominal, nominal, nominal});
   while (!stack.empty()) {

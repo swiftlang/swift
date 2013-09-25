@@ -1715,6 +1715,8 @@ public:
       }
 
       checkInheritanceClause(TC, ED);
+      if (auto nominal = ExtendedTy->getAnyNominal())
+        TC.validateTypeDecl(nominal);
     }
 
     for (Decl *Member : ED->getMembers())
@@ -1937,6 +1939,9 @@ void TypeChecker::validateTypeDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::Struct:
   case DeclKind::Class: {
     auto nominal = cast<NominalTypeDecl>(D);
+    for (auto ext : nominal->getExtensions())
+      checkInheritanceClause(*this, ext);
+
     if (nominal->hasType())
       return;
 
