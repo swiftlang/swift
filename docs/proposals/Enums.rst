@@ -17,7 +17,7 @@ values to be collected into a type and switched over::
     ...
   }
 
-However, they are similar to C unions in that they allow a single type to
+They are also similar to C unions in that they allow a single type to
 contain a value of two or more other types. Unlike C unions, however, ADTs
 remember which type they contain, and can be switched over, guaranteeing that
 only the currently inhabited type is ever used::
@@ -31,11 +31,11 @@ only the currently inhabited type is ever used::
   var p : Pattern = .Checkers(.Black, .White)
   switch p {
   case .Solid(var c):
-    ...
+    println("solid \(c)")
   case .Outline(var c):
-    ...
+    println("outlined \(c)")
   case .Checkers(var a, var b):
-    ...
+    println("checkered \(a) and \(b)")
   }
 
 Given the choice between two familiar keywords, we decided to use 'enum' to
@@ -211,7 +211,7 @@ structs, including nested types, methods, constructors, and properties::
     }
 
     func min(x:IntOrInfinity) -> IntOrInfinity {
-      switch (this, x) {
+      switch (self, x) {
       case (.NegInfinity, _):
       case (_, .NegInfinity):
         return .NegInfinity
