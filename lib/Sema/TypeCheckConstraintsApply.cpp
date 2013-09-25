@@ -2778,7 +2778,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // Form a reference to the constructor or enum declaration.
   Expr *typeBase = new (tc.Context) MetatypeExpr(nullptr, apply->getLoc(),
                                                  metaTy);
-  Expr *declRef = buildMemberRef(typeBase, apply->getLoc(),
+  Expr *declRef = buildMemberRef(typeBase, /*DotLoc=*/SourceLoc(),
                                  decl, apply->getLoc(),
                                  selected->second, locator,
                                  apply->isImplicit());
