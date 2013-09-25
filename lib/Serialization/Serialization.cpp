@@ -1684,6 +1684,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
     registerDeclTypeAbbr<ArraySliceTypeLayout>();
     registerDeclTypeAbbr<ArrayTypeLayout>();
+    registerDeclTypeAbbr<ReferenceStorageTypeLayout>();
     registerDeclTypeAbbr<UnboundGenericTypeLayout>();
     registerDeclTypeAbbr<OptionalTypeLayout>();
 

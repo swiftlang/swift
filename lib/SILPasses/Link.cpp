@@ -64,6 +64,13 @@ void swift::performSILLinking(SILModule *M) {
           if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef()))
             CalleeFunction = FRI->getFunction();
         }
+        else if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(I)) {
+          // When EnableLinkAll is true, we link the function referenced by
+          // FunctionRefInst.
+          CalleeFunction = EnableLinkAll ? FRI->getFunction() : nullptr;
+          TryLinking = EnableLinkAll;
+        }
+
         if (!CalleeFunction)
           continue;
 

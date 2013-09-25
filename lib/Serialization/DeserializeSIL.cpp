@@ -765,12 +765,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::CopyAddrInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
-    auto refType = addrType.getAs<WeakStorageType>();
-    auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType());
     bool isInit = (Attr & 0x2) > 0;
     bool isTake = (Attr & 0x1) > 0;
     ResultVal = Builder.createCopyAddr(Loc,
-                    getLocalValue(ValID, ValResNum, ValType),
+                    getLocalValue(ValID, ValResNum, addrType),
                     getLocalValue(ValID2, ValResNum2, addrType),
                     IsTake_t(isTake),
                     IsInitialization_t(isInit));

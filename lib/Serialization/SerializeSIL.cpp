@@ -639,7 +639,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::ProjectExistentialRefInst: {
     const ProjectExistentialRefInst *PEI = cast<ProjectExistentialRefInst>(&SI);
     SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneOperandLayout::Code],
+        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0,
         S.addTypeRef(PEI->getType().getSwiftRValueType()),
         (unsigned)PEI->getType().getCategory(),
@@ -809,7 +809,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       value = cast<AssignInst>(&SI)->getSrc();
     } else if (SI.getKind() == ValueKind::CopyAddrInst) {
       const CopyAddrInst *CAI = cast<CopyAddrInst>(&SI);
-      Attr = (CAI->isInitializationOfDest() << 1) || CAI->isTakeOfSrc();
+      Attr = (CAI->isInitializationOfDest() << 1) | CAI->isTakeOfSrc();
       operand = cast<CopyAddrInst>(&SI)->getDest();
       value = cast<CopyAddrInst>(&SI)->getSrc();
     } else
