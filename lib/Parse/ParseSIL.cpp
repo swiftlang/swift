@@ -588,7 +588,7 @@ static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
          "Unexpected stage during parsing!");
   llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.TU->ASTStage,
                                                     TranslationUnit::Parsed);
-  UnqualifiedLookup DeclLookup(Name, P.TU);
+  UnqualifiedLookup DeclLookup(Name, P.TU, nullptr);
   assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1);
   if (DeclLookup.Results.back().Kind == UnqualifiedLookupResult::ModuleName) {
     Module *Mod = DeclLookup.Results.back().getNamedModule();
@@ -602,7 +602,7 @@ static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
 /// Find the ValueDecl given a type and a member name.
 static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
   SmallVector<ValueDecl *, 4> Lookup;
-  P.TU->lookupQualified(Ty, Name, NL_QualifiedDefault, Lookup);
+  P.TU->lookupQualified(Ty, Name, NL_QualifiedDefault, nullptr, Lookup);
   assert(Lookup.size() == 1);
   return Lookup[0];
 }

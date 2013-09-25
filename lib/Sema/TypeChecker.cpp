@@ -25,6 +25,8 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/Basic/STLExtras.h"
+#include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
@@ -133,7 +135,7 @@ Module *TypeChecker::getStdlibModule() {
 Type TypeChecker::lookupBoolType() {
   return boolType.cache([&]{
     UnqualifiedLookup boolLookup(Context.getIdentifier("Bool"),
-                                 getStdlibModule(),
+                                 getStdlibModule(), nullptr,
                                  SourceLoc(),
                                  /*IsTypeLookup=*/true);
     if (!boolLookup.isSuccess()) {
@@ -382,7 +384,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 static void recordKnownProtocol(Module *stdlib, StringRef name,
                                 KnownProtocolKind kind) {
   Identifier ID = stdlib->Ctx.getIdentifier(name);
-  UnqualifiedLookup lookup(ID, stdlib, SourceLoc(), /*IsType=*/true);
+  UnqualifiedLookup lookup(ID, stdlib, nullptr, SourceLoc(), /*IsType=*/true);
   if (auto proto = dyn_cast_or_null<ProtocolDecl>(lookup.getSingleTypeResult()))
     proto->setKnownProtocolKind(kind);
 }
@@ -682,5 +684,17 @@ bool swift::typeCheckAbstractFunctionBodyUntil(TranslationUnit *TU,
 
   TypeChecker TC(*TU, Diags);
   return !TC.typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+}
+
+static void deleteTypeCheckerAndDiags(LazyResolver *resolver) {
+  DiagnosticEngine &diags = static_cast<TypeChecker*>(resolver)->Diags;
+  delete resolver;
+  delete &diags;
+}
+
+OwnedResolver swift::createLazyResolver(TranslationUnit *TU) {
+  auto diags = new DiagnosticEngine(TU->Ctx.SourceMgr);
+  return OwnedResolver(new TypeChecker(*TU, *diags),
+                       &deleteTypeCheckerAndDiags);
 }
 

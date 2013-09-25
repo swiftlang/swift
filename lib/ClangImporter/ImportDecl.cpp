@@ -1677,7 +1677,8 @@ namespace {
       auto containerTy = dc->getDeclaredTypeInContext();
       SmallVector<ValueDecl *, 2> lookup;
       Impl.firstClangModule->lookupQualified(containerTy, name,
-                                             NL_QualifiedDefault, lookup);
+                                             NL_QualifiedDefault, nullptr,
+                                             lookup);
       Type unlabeledIndices;
       for (auto result : lookup) {
         auto parentSub = dyn_cast<SubscriptDecl>(result);
@@ -2111,7 +2112,8 @@ namespace {
       VarDecl *overridden = nullptr;
       SmallVector<ValueDecl *, 2> lookup;
       Impl.firstClangModule->lookupQualified(containerTy, name,
-                                             NL_QualifiedDefault, lookup);
+                                             NL_QualifiedDefault, nullptr,
+                                             lookup);
       for (auto result : lookup) {
         if (isa<FuncDecl>(result))
           return nullptr;
@@ -2412,7 +2414,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
     // If it was a negative number, negate the integer literal.
     auto minus = context.getIdentifier("-");
-    UnqualifiedLookup lookup(minus, getSwiftModule());
+    UnqualifiedLookup lookup(minus, getSwiftModule(), nullptr);
     if (!lookup.isSuccess())
       return nullptr;
 

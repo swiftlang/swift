@@ -161,7 +161,7 @@ public:
         for (auto proto : ParentArchetype->getConformsTo()) {
           SmallVector<ValueDecl *, 2> decls;
           if (tu.lookupQualified(proto->getDeclaredType(), Name,
-                                 NL_VisitSupertypes, decls)) {
+                                 NL_VisitSupertypes, nullptr, decls)) {
             for (auto decl : decls) {
               assocType = dyn_cast<AssociatedTypeDecl>(decl);
               if (assocType)

@@ -279,7 +279,7 @@ resolveIdentTypeComponent(TypeChecker &TC,
       assert(dc);
 
       // Perform an unqualified lookup.
-      UnqualifiedLookup Globals(comp.getIdentifier(), dc, comp.getIdLoc(),
+      UnqualifiedLookup Globals(comp.getIdentifier(), dc, &TC, comp.getIdLoc(),
                                 /*TypeLookup*/true);
 
       // Process the names we found.

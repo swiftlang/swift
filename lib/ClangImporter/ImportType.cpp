@@ -763,7 +763,7 @@ Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
     return Type();
 
   // Look for the type.
-  UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), module);
+  UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), module, nullptr);
   if (auto type = lookup.getSingleTypeResult()) {
     return type->getDeclaredType();
   }
@@ -778,7 +778,7 @@ getNamedSwiftTypeSpecialization(Module *module, StringRef name,
   if (!module)
     return Type();
 
-  UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), module);
+  UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), module, nullptr);
   if (TypeDecl *typeDecl = lookup.getSingleTypeResult()) {
     if (auto nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
       if (auto params = nominalDecl->getGenericParams()) {

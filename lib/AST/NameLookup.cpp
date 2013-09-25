@@ -16,6 +16,7 @@
 
 #include "ModuleNameLookup.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
@@ -27,7 +28,8 @@
 using namespace swift;
 
 void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                                const Module *curModule) {
+                                const Module *curModule,
+                                LazyResolver *typeResolver) {
   // Category declarations by their signatures.
   llvm::SmallDenseMap<std::pair<CanType, Identifier>,
                       llvm::TinyPtrVector<ValueDecl *>>
@@ -41,8 +43,13 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     CanType signature;
 
     // FIXME: Egregious hack to avoid failing when there are no declared types.
-    if (!decl->hasType())
-      continue;
+    if (!decl->hasType() || isa<TypeAliasDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) {
+      // FIXME: Pass this down instead of getting it from the ASTContext.
+      if (typeResolver)
+        typeResolver->resolveDeclSignature(decl);
+      if (!decl->hasType())
+        continue;
+    }
 
     signature = decl->getType()->getCanonicalType();
 
@@ -276,6 +283,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
 
 
 UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
+                                     LazyResolver *TypeResolver,
                                      SourceLoc Loc, bool IsTypeLookup) {
   typedef UnqualifiedLookupResult Result;
 
@@ -366,7 +374,8 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
     if (BaseDecl) {
       SmallVector<ValueDecl *, 4> Lookup;
-      M.lookupQualified(ExtendedType, Name, NL_UnqualifiedDefault, Lookup);
+      M.lookupQualified(ExtendedType, Name, NL_UnqualifiedDefault,
+                        TypeResolver, Lookup);
       bool isMetatypeType = ExtendedType->is<MetaTypeType>();
       bool FoundAny = false;
       for (auto Result : Lookup) {
@@ -461,7 +470,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   auto resolutionKind =
     IsTypeLookup ? ResolutionKind::TypesOnly : ResolutionKind::Overloadable;
   lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind, /*topLevel=*/true);
+                 resolutionKind, TypeResolver, /*topLevel=*/true);
 
   for (auto VD : CurModuleResults)
     Results.push_back(Result::getModuleMember(VD));
@@ -494,7 +503,7 @@ UnqualifiedLookup::forModuleAndName(ASTContext &C,
     return Nothing;
 
   Module *m = foundModule->second;
-  return UnqualifiedLookup(C.getIdentifier(Name), m);
+  return UnqualifiedLookup(C.getIdentifier(Name), m, nullptr);
 }
 
 TypeDecl* UnqualifiedLookup::getSingleTypeResult() {
@@ -654,6 +663,7 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(Identifier name) {
 bool Module::lookupQualified(Type type,
                              Identifier name,
                              unsigned options,
+                             LazyResolver *typeResolver,
                              SmallVectorImpl<ValueDecl *> &decls) {
   if (type->is<ErrorType>()) {
     return false;
@@ -661,12 +671,14 @@ bool Module::lookupQualified(Type type,
 
   // Look through lvalue types.
   if (auto lvalueTy = type->getAs<LValueType>()) {
-    return lookupQualified(lvalueTy->getObjectType(), name, options, decls);
+    return lookupQualified(lvalueTy->getObjectType(), name, options,
+                           typeResolver, decls);
   }
 
   // Look through metatypes.
   if (auto metaTy = type->getAs<MetaTypeType>()) {
-    return lookupQualified(metaTy->getInstanceType(), name, options, decls);
+    return lookupQualified(metaTy->getInstanceType(), name, options,
+                           typeResolver, decls);
   }
 
   // Look for module references.
@@ -680,7 +692,7 @@ bool Module::lookupQualified(Type type,
         return true;
       lookupInModule(import.second, import.first, name, decls,
                      NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                     /*topLevel=*/false);
+                     typeResolver, /*topLevel=*/false);
       // If we're able to do an unscoped lookup, we see everything. No need
       // to keep going.
       return !import.first.empty();
@@ -857,7 +869,7 @@ bool Module::lookupQualified(Type type,
 
   // If we're supposed to remove shadowed/hidden declarations, do so now.
   if (options & NL_RemoveNonVisible) {
-    removeShadowedDecls(decls, this);
+    removeShadowedDecls(decls, this, typeResolver);
   }
 
   // We're done. Report success/failure.

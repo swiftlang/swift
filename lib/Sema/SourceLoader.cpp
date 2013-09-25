@@ -136,11 +136,12 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   if (SkipBodies)
     performDelayedParsing(importTU, persistentState, nullptr);
 
-  // We have to do type checking on it to ensure that types are fully resolved.
-  // This should eventually be eliminated by having actual fully resolved binary
-  // dumps of the code instead of reparsing though.
-  // FIXME: We also need to deal with circular imports!
-  performTypeChecking(importTU);
+  // FIXME: Support recursive definitions in immediate modes by making type
+  // checking even lazier.
+  if (SkipBodies)
+    performNameBinding(importTU);
+  else
+    performTypeChecking(importTU);
 
   return importTU;
 }

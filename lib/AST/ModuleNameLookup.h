@@ -49,19 +49,22 @@ enum class ResolutionKind {
 /// \param[out] decls Any found decls will be added to this vector.
 /// \param lookupKind Whether this lookup is qualified or unqualified.
 /// \param resolutionKind What sort of decl is expected.
+/// \param typeResolver The type resolver for decls that need to be
+///        type-checked. This is needed for shadowing resolution.
 /// \param topLevel If \p module should be treated as a top-level source file,
 ///        e.g. its private imports should be included in the search.
 void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                     Identifier name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,
-                    bool topLevel);
+                    LazyResolver *typeResolver, bool topLevel);
 
 /// Performs a qualified lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.
 void lookupVisibleDeclsInModule(Module *module, Module::AccessPathTy accessPath,
                                 SmallVectorImpl<ValueDecl *> &decls,
                                 NLKind lookupKind,
-                                ResolutionKind resolutionKind);
+                                ResolutionKind resolutionKind,
+                                LazyResolver *typeResolver);
 
 } // end namespace namelookup
 } // end namespace swift

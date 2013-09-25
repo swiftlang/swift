@@ -307,6 +307,10 @@ public:
   Identifier getNextResponseVariableName();
 
   void typeCheckDecl(Decl *D, bool isFirstPass);
+  
+  virtual void resolveDeclSignature(ValueDecl *VD) override {
+    typeCheckDecl(VD, true);
+  }
 
   /// Retrieve the set of protocols to which this nominal type declaration
   /// directly conforms, i.e., as specified in its own inheritance clause.

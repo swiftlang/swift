@@ -241,7 +241,7 @@ Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) 
     assert(declPath.size() == 1 && "can't handle sub-decl imports");
     SmallVector<ValueDecl *, 8> decls;
     M->lookupQualified(ModuleType::get(M), declPath.front().first,
-                       NL_QualifiedDefault, decls);
+                       NL_QualifiedDefault, nullptr, decls);
 
     if (decls.empty()) {
       diagnose(ID, diag::no_decl_in_module)

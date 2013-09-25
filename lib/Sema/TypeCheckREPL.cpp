@@ -189,15 +189,15 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
 
   // Dig up Bool, true, and false. We'll need them.
   UnqualifiedLookup lookupBool(context.getIdentifier("Bool"),
-                               TC.getStdlibModule());
+                               TC.getStdlibModule(), nullptr);
   auto boolDecl = lookupBool.getSingleTypeResult();
   UnqualifiedLookup lookupTrue(context.getIdentifier("true"),
-                               TC.getStdlibModule());
+                               TC.getStdlibModule(), nullptr);
   auto trueDecl = lookupTrue.isSuccess()
                     ? dyn_cast<VarDecl>(lookupTrue.Results[0].getValueDecl())
                     : nullptr;
   UnqualifiedLookup lookupFalse(context.getIdentifier("false"),
-                                TC.getStdlibModule());
+                                TC.getStdlibModule(), nullptr);
   auto falseDecl = lookupFalse.isSuccess()
                      ? dyn_cast<VarDecl>(lookupFalse.Results[0].getValueDecl())
                      : nullptr;
@@ -432,7 +432,7 @@ Identifier TypeChecker::getNextResponseVariableName() {
     names << "r" << NextResponseVariableIndex++;
     
     ident = Context.getIdentifier(names.str());
-    UnqualifiedLookup lookup(ident, &TU);
+    UnqualifiedLookup lookup(ident, &TU, this);
     nameUsed = lookup.isSuccess();
   } while (nameUsed);
 
@@ -513,7 +513,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   
   SmallVector<ValueDecl*, 4> PrintDecls;
   UnqualifiedLookup PrintDeclLookup(C.getIdentifier("print"),
-                                    TC->getStdlibModule());
+                                    TC->getStdlibModule(), TC);
   if (!PrintDeclLookup.isSuccess())
     return;
   for (auto Result : PrintDeclLookup.Results)

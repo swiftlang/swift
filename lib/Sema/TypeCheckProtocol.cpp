@@ -668,7 +668,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     SmallVector<ValueDecl *, 4> witnesses;
     if (Requirement->getName().isOperator()) {
       // Operator lookup is always global.
-      UnqualifiedLookup Lookup(Requirement->getName(), &TC.TU);
+      UnqualifiedLookup Lookup(Requirement->getName(), &TC.TU, &TC);
 
       if (Lookup.isSuccess()) {
         for (auto Candidate : Lookup.Results) {
@@ -697,6 +697,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       if (isa<ProtocolDecl>(witness->getDeclContext())) {
         continue;
       }
+
+      if (!witness->hasType())
+        TC.typeCheckDecl(witness, true);
 
       auto match = matchWitness(TC, Proto, Requirement, reqType, T, witness,
                                 unresolvedAssocTypes);

@@ -18,7 +18,6 @@
 #define SWIFT_SUBSYSTEMS_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -34,9 +33,6 @@ namespace swift {
   class TranslationUnit;
   class Component;
   class Decl;
-  class DeclContext;
-  class Expr;
-  class AbstractFunctionDecl;
   class SILModule;
   struct TypeLoc;
   class SILParserTUState;
@@ -124,21 +120,6 @@ namespace swift {
   /// \returns false on success, true on error.
   bool performTypeLocChecking(TranslationUnit *TU, TypeLoc &T,
                               bool ProduceDiagnostics = true);
-
-  /// \brief Typecheck a declaration parsed during code completion.
-  ///
-  /// \returns true on success, false on error.
-  bool typeCheckCompletionDecl(TranslationUnit *TU, Decl *D);
-
-  /// \brief Typecheck an expression parsed during code completion.
-  ///
-  /// \returns true on success, false on error.
-  bool typeCheckCompletionContextExpr(TranslationUnit *TU, Expr *&parsedExpr);
-
-  /// Partially typecheck the specified function body.
-  bool typeCheckAbstractFunctionBodyUntil(TranslationUnit *TU,
-                                          AbstractFunctionDecl *AFD,
-                                          SourceLoc EndTypeCheckLoc);
 
   /// performCaptureAnalysis - Analyse the AST and mark local declarations
   /// and expressions which can capture them so they can be emitted more

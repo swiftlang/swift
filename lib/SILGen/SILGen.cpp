@@ -117,6 +117,9 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
                    moduleName, functionName);
       exit(1);
     }
+
+    assert(fd->hasType() && "bridging functions must be type-checked");
+
     // Check that the function takes the expected arguments and returns the
     // expected result type.
     SILDeclRef c(fd);

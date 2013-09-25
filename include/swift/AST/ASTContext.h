@@ -50,6 +50,7 @@ namespace swift {
   class Decl;
   class ExtensionDecl;
   class FuncDecl;
+  class LazyResolver;
   class SourceLoc;
   class Type;
   class TupleType;

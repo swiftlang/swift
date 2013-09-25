@@ -27,6 +27,7 @@ class NominalTypeDecl;
 class ProtocolConformance;
 class ProtocolDecl;
 class Type;
+class ValueDecl;
 
 /// Abstract interface used to lazily resolve aspects of the AST, such as the
 /// types of declarations or protocol conformance structures.
@@ -60,6 +61,13 @@ public:
   /// \returns the member type, or an empty type if no such type could be
   /// found.
   virtual Type resolveMemberType(Type type, Identifier name) = 0;
+
+  /// Resolve the type and declaration attributes of a value.
+  ///
+  /// This can be called when the type or signature of a value is needed.
+  /// It does not perform full type-checking, only checks for basic
+  /// consistency and provides the value a type.
+  virtual void resolveDeclSignature(ValueDecl *VD) = 0;
 };
 
 }

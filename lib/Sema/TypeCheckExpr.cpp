@@ -372,6 +372,9 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value) {
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType) {
+  if (!value->hasType())
+    typeCheckDecl(value, true);
+  
   if (value->isReferencedAsLValue()) {
     // Determine the qualifiers we want.
     LValueType::Qual quals =
@@ -409,7 +412,7 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
 }
 
 static Type lookupGlobalType(TypeChecker &TC, StringRef name) {
-  UnqualifiedLookup lookup(TC.Context.getIdentifier(name), &TC.TU);
+  UnqualifiedLookup lookup(TC.Context.getIdentifier(name), &TC.TU, nullptr);
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();

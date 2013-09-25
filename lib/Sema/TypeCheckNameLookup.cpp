@@ -70,7 +70,7 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
   }
 
   // Look for the member.
-  if (!TU.lookupQualified(type, name, options, result.Results))
+  if (!TU.lookupQualified(type, name, options, this, result.Results))
     return result;
 
   return result;
@@ -89,7 +89,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
   unsigned options = NL_QualifiedDefault | NL_ProtocolMembers;
-  if (!TU.lookupQualified(type, name, options, decls))
+  if (!TU.lookupQualified(type, name, options, this, decls))
     return result;
 
   // Look through the declarations, keeping only the unique type declarations.

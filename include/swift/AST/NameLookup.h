@@ -27,11 +27,12 @@ namespace swift {
   class ASTContext;
   class DeclContext;
   class Expr;
-  class ValueDecl;
-  class Type;
-  class TypeDecl;
+  class LazyResolver;
   class Module;
   class TupleType;
+  class Type;
+  class TypeDecl;
+  class ValueDecl;
 
 /// UnqualifiedLookupResult - One result of unqualified lookup.
 struct UnqualifiedLookupResult {
@@ -189,10 +190,13 @@ public:
   /// If the current DeclContext is nested in a function body, the SourceLoc
   /// is used to determine which declarations in that body are visible.
   UnqualifiedLookup(Identifier Name, DeclContext *DC,
+                    LazyResolver *TypeResolver,
                     SourceLoc Loc = SourceLoc(),
                     bool IsTypeLookup = false);
 
   /// \brief Look up an identifier \p Name in the module named \p Module.
+  ///
+  /// Note that this will not resolve types.
   static Optional<UnqualifiedLookup> forModuleAndName(ASTContext &C,
                                                       StringRef Module,
                                                       StringRef Name);
@@ -222,15 +226,19 @@ public:
 ///
 /// \param decls The set of declarations being considered.
 /// \param curModule The current module.
+/// \param typeResolver Used to resolve overload types.
 void removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                         const Module *curModule);
+                         const Module *curModule,
+                         LazyResolver *typeResolver);
 
 /// Finds decls visible in the given context and feeds them to the given
 /// VisibleDeclConsumer.  If the current DeclContext is nested in a function,
 /// the SourceLoc is used to determine which declarations in that function
 /// are visible.
 void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
-                        const DeclContext *DC, SourceLoc Loc = SourceLoc());
+                        const DeclContext *DC,
+                        LazyResolver *typeResolver,
+                        SourceLoc Loc = SourceLoc());
 
 /// Finds decls visible as members of the given type and feeds them to the given
 /// VisibleDeclConsumer.
@@ -238,7 +246,8 @@ void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 /// \param CurrDC the DeclContext from which the lookup is done.
 void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               Type BaseTy,
-                              const DeclContext *CurrDC);
+                              const DeclContext *CurrDC,
+                              LazyResolver *typeResolver);
 
 } // end namespace swift
 

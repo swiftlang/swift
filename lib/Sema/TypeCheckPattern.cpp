@@ -80,7 +80,7 @@ public:
     assert(!curScope && "decl ref should be root element of expr");
     
     // Look up the type.
-    UnqualifiedLookup lookup(udre->getName(), rootDC);
+    UnqualifiedLookup lookup(udre->getName(), rootDC, &TC);
     if (!lookup.isSuccess())
       return false;
     

@@ -37,8 +37,11 @@ static CanType getKnownType(Optional<CanType> &cacheSlot,
       = UnqualifiedLookup::forModuleAndName(C, moduleName, typeName);
     if (!lookup)
       return CanType();
-    if (TypeDecl *typeDecl = lookup->getSingleTypeResult())
+    if (TypeDecl *typeDecl = lookup->getSingleTypeResult()) {
+      assert(typeDecl->getDeclaredType() &&
+             "bridged type must be type-checked");
       return typeDecl->getDeclaredType()->getCanonicalType();
+    }
     return CanType();
   });
 

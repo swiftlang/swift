@@ -1603,7 +1603,7 @@ public:
     if (!IsFirstPass && FD->getBody())
       TC.definedFunctions.push_back(FD);
 
-    if (IsSecondPass)
+    if (IsSecondPass || FD->hasType())
       return;
 
     // Bind operator functions to the corresponding operator declaration.
@@ -1837,7 +1837,7 @@ public:
         TC.definedFunctions.push_back(CD);
     }
 
-    if (IsSecondPass) {
+    if (IsSecondPass || CD->hasType()) {
       return;
     }
 

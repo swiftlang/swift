@@ -201,11 +201,14 @@ public:
   /// \param options Options that control name lookup, based on the
   /// \c NL_* constants in \c NameLookupOptions.
   ///
-  /// \param decls Will be populated with the declarations found by name
+  /// \param typeResolver Used to resolve types, usually for overload purposes.
+  ///
+  /// \param[out] decls Will be populated with the declarations found by name
   /// lookup.
   ///
   /// \returns true if anything was found.
   bool lookupQualified(Type type, Identifier name, unsigned options,
+                       LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls);
 
   /// Look up an InfixOperatorDecl for the given operator

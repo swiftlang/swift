@@ -3420,7 +3420,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   SourceLoc Loc = UDRE->getLoc();
 
   // Perform standard value name lookup.
-  UnqualifiedLookup Lookup(Name, Context);
+  UnqualifiedLookup Lookup(Name, Context, &TC);
 
   if (!Lookup.isSuccess()) {
     TC.diagnose(Loc, diag::use_unresolved_identifier, Name);
@@ -4259,7 +4259,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   EP->setMatchVar(matchVar);
   
   // Find '~=' operators for the match.
-  UnqualifiedLookup matchLookup(Context.getIdentifier("~="), DC);
+  UnqualifiedLookup matchLookup(Context.getIdentifier("~="), DC, this);
   if (!matchLookup.isSuccess()) {
     diagnose(EP->getLoc(), diag::no_match_operator);
     return true;

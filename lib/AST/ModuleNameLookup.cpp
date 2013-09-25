@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ModuleNameLookup.h"
+#include "swift/AST/LazyResolver.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -72,6 +73,8 @@ static bool updateOverloadSet(CanTypeSet &overloads,
   for (auto result : decls) {
     if (!isOverloadable(result))
       return false;
+    if (!result->hasType())
+      continue;
     overloads.insert(result->getType()->getCanonicalType());
   }
   return true;
@@ -86,6 +89,8 @@ static bool updateOverloadSet(NamedCanTypeSet &overloads,
     auto &entry = overloads[result->getName()];
     if (!isOverloadable(result))
       entry.first = ResolutionKind::Exact;
+    else if (!result->hasType())
+      continue;
     else
       entry.second.insert(result->getType()->getCanonicalType());
   }
@@ -95,7 +100,8 @@ static bool updateOverloadSet(NamedCanTypeSet &overloads,
 /// After finding decls by name lookup, filter based on the given
 /// resolution kind and existing overload set and add them to \p results.
 template <typename OverloadSetTy>
-static ResolutionKind recordImportDecls(SmallVectorImpl<ValueDecl *> &results,
+static ResolutionKind recordImportDecls(LazyResolver *typeResolver,
+                                        SmallVectorImpl<ValueDecl *> &results,
                                         ArrayRef<ValueDecl *> newDecls,
                                         OverloadSetTy &overloads,
                                         ResolutionKind resolutionKind) {
@@ -104,7 +110,13 @@ static ResolutionKind recordImportDecls(SmallVectorImpl<ValueDecl *> &results,
     // Add new decls if they provide a new overload. Note that the new decls
     // may be ambiguous with respect to each other, just not any existing decls.
     std::copy_if(newDecls.begin(), newDecls.end(), std::back_inserter(results),
-                 [&](const ValueDecl *result) -> bool {
+                 [&](ValueDecl *result) -> bool {
+      if (!result->hasType()) {
+        if (typeResolver)
+          typeResolver->resolveDeclSignature(result);
+        else
+          return true;
+      }
       return isValidOverload(overloads, result);
     });
 
@@ -134,6 +146,7 @@ template <typename OverloadSetTy, typename CallbackTy>
 static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                            SmallVectorImpl<ValueDecl *> &decls,
                            ResolutionKind resolutionKind, bool canReturnEarly,
+                           LazyResolver *typeResolver,
                            ModuleLookupCache &cache, bool topLevel,
                            CallbackTy callback) {
   ModuleLookupCache::MapTy::iterator iter;
@@ -161,8 +174,9 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
   }
 
   OverloadSetTy overloads;
-  resolutionKind = recordImportDecls(decls, localDecls, overloads,
-                                     resolutionKind);
+  // FIXME: Pass TypeResolver down instead of getting it from the AST.
+  resolutionKind = recordImportDecls(typeResolver, decls, localDecls,
+                                     overloads, resolutionKind);
 
   bool foundDecls = decls.size() > initialCount;
   if (!foundDecls || !canReturnEarly ||
@@ -192,19 +206,19 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
       auto &resultSet = next.first.empty() ? unscopedValues : scopedValues;
       lookupInModule<OverloadSetTy>(next.second, combinedAccessPath,
                                     resultSet, resolutionKind, canReturnEarly,
-                                    cache, false, callback);
+                                    typeResolver, cache, false, callback);
     }
 
     // Add the results from scoped imports.
-    resolutionKind = recordImportDecls(decls, scopedValues, overloads,
-                                       resolutionKind);
+    resolutionKind = recordImportDecls(typeResolver, decls, scopedValues,
+                                       overloads, resolutionKind);
 
     // Add the results from unscoped imports.
     foundDecls = decls.size() > initialCount;
     if (!foundDecls || !canReturnEarly ||
         resolutionKind == ResolutionKind::Overloadable) {
-      resolutionKind = recordImportDecls(decls, unscopedValues, overloads,
-                                         resolutionKind);
+      resolutionKind = recordImportDecls(typeResolver, decls, unscopedValues,
+                                         overloads, resolutionKind);
     }
   }
 
@@ -224,11 +238,12 @@ void namelookup::lookupInModule(Module *startModule,
                                 SmallVectorImpl<ValueDecl *> &decls,
                                 NLKind lookupKind,
                                 ResolutionKind resolutionKind,
+                                LazyResolver *typeResolver,
                                 bool topLevel) {
   ModuleLookupCache cache;
   ::lookupInModule<CanTypeSet>(startModule, topAccessPath, decls,
                                resolutionKind, /*canReturnEarly=*/true,
-                               cache, topLevel,
+                               typeResolver, cache, topLevel,
     [=](Module *module, Module::AccessPathTy path,
         SmallVectorImpl<ValueDecl *> &localDecls) {
       module->lookupValue(path, name, lookupKind, localDecls);
@@ -255,11 +270,12 @@ void namelookup::lookupVisibleDeclsInModule(Module *topLevel,
                                             Module::AccessPathTy topAccessPath,
                                             SmallVectorImpl<ValueDecl *> &decls,
                                             NLKind lookupKind,
-                                            ResolutionKind resolutionKind) {
+                                            ResolutionKind resolutionKind,
+                                            LazyResolver *typeResolver) {
   ModuleLookupCache cache;
   ::lookupInModule<NamedCanTypeSet>(topLevel, topAccessPath, decls,
                                     resolutionKind, /*canReturnEarly=*/false,
-                                    cache, /*topLevel=*/true,
+                                    typeResolver, cache, /*topLevel=*/true,
     [=](Module *module, Module::AccessPathTy path,
         SmallVectorImpl<ValueDecl *> &localDecls) {
       VectorDeclConsumer consumer(localDecls);

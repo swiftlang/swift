@@ -1,4 +1,5 @@
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ModuleLoadListener.h"
 #include "swift/Basic/LLVM.h"
@@ -6,6 +7,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -479,7 +481,8 @@ namespace {
 /// Build completions by doing visible decl lookup from a context.
 class CompletionLookup : swift::VisibleDeclConsumer {
   CodeCompletionContext &CompletionContext;
-  ASTContext &SwiftContext;
+  TranslationUnit &TU;
+  OwnedResolver TypeResolver;
   Identifier SelfIdent;
   const DeclContext *CurrDeclContext;
 
@@ -515,10 +518,11 @@ class CompletionLookup : swift::VisibleDeclConsumer {
 
 public:
   CompletionLookup(CodeCompletionContext &CompletionContext,
-                   ASTContext &SwiftContext,
+                   TranslationUnit &TU,
                    const DeclContext *CurrDeclContext)
-      : CompletionContext(CompletionContext), SwiftContext(SwiftContext),
-        SelfIdent(SwiftContext.getIdentifier("self")),
+      : CompletionContext(CompletionContext), TU(TU),
+        TypeResolver(createLazyResolver(&TU)),
+        SelfIdent(TU.Ctx.getIdentifier("self")),
         CurrDeclContext(CurrDeclContext) {
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext->isLocalContext()) {
@@ -540,7 +544,7 @@ public:
 
     CompletionContext.setCacheClangResults([&](bool NeedLeadingDot) {
       llvm::SaveAndRestore<bool> S(this->NeedLeadingDot, NeedLeadingDot);
-      if (auto Importer = SwiftContext.getClangModuleLoader())
+      if (auto Importer = TU.Ctx.getClangModuleLoader())
         static_cast<ClangImporter &>(*Importer).lookupVisibleDecls(*this);
     });
   }
@@ -695,7 +699,7 @@ public:
       }
       TypeStr += ") -> ";
     }
-    Type ResultType = FD->getResultType(SwiftContext);
+    Type ResultType = FD->getResultType(TU.Ctx);
     if (ResultType->isVoid())
       TypeStr += "Void";
     else
@@ -745,7 +749,7 @@ public:
       Builder.addLeadingDot();
     Builder.addTextChunk(NTD->getName().str());
     addTypeAnnotation(Builder,
-                      MetaTypeType::get(NTD->getDeclaredType(), SwiftContext));
+                      MetaTypeType::get(NTD->getDeclaredType(), TU.Ctx));
   }
 
   void addTypeAliasRef(const TypeAliasDecl *TAD) {
@@ -759,10 +763,10 @@ public:
     if (TAD->hasUnderlyingType())
       addTypeAnnotation(Builder,
                         MetaTypeType::get(TAD->getUnderlyingType(),
-                                          SwiftContext));
+                                          TU.Ctx));
     else {
       Builder.addTypeAnnotation(MetaTypeType::get(TAD->getDeclaredType(),
-                                                  SwiftContext)->getString());
+                                                  TU.Ctx)->getString());
     }
   }
 
@@ -775,7 +779,7 @@ public:
       Builder.addLeadingDot();
     Builder.addTextChunk(GP->getName().str());
     Builder.addTypeAnnotation(MetaTypeType::get(GP->getDeclaredType(),
-                                                SwiftContext)->getString());
+                                                TU.Ctx)->getString());
   }
 
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT) {
@@ -787,7 +791,7 @@ public:
       Builder.addLeadingDot();
     Builder.addTextChunk(AT->getName().str());
     Builder.addTypeAnnotation(MetaTypeType::get(AT->getDeclaredType(),
-                                                SwiftContext)->getString());
+                                                TU.Ctx)->getString());
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation) {
@@ -814,6 +818,9 @@ public:
 
   // Implement swift::VisibleDeclConsumer
   void foundDecl(ValueDecl *D) override {
+    if (!D->hasType())
+      TypeResolver->resolveDeclSignature(D);
+    
     switch (Kind) {
     case LookupKind::ValueExpr:
       if (auto *VD = dyn_cast<VarDecl>(D)) {
@@ -976,7 +983,8 @@ public:
       }
     }
     if (!Done) {
-      lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext);
+      lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
+                               TypeResolver.get());
     }
     {
       // Add the special qualified keyword 'metatype' so that, for example,
@@ -989,7 +997,7 @@ public:
         Annotation = LVT->getObjectType();
       }
 
-      Annotation = MetaTypeType::get(Annotation, SwiftContext);
+      Annotation = MetaTypeType::get(Annotation, TU.Ctx);
 
       // Use the canonical type as a type annotation because looking at the
       // '.metatype' in the IDE is a way to understand what type the expression
@@ -1000,7 +1008,7 @@ public:
 
   void getValueCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::ValueInDeclContext;
-    lookupVisibleDecls(*this, CurrDeclContext, Loc);
+    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(), Loc);
 
     // FIXME: The pedantically correct way to find the type is to resolve the
     // swift.StringLiteralType type.
@@ -1015,13 +1023,13 @@ public:
   void getTypeCompletions(Type BaseType) {
     Kind = LookupKind::Type;
     NeedLeadingDot = !HaveDot;
-    lookupVisibleMemberDecls(*this, MetaTypeType::get(BaseType, SwiftContext),
-                             CurrDeclContext);
+    lookupVisibleMemberDecls(*this, MetaTypeType::get(BaseType, TU.Ctx),
+                             CurrDeclContext, TypeResolver.get());
   }
 
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::TypeInDeclContext;
-    lookupVisibleDecls(*this, CurrDeclContext, Loc);
+    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(), Loc);
   }
 };
 
@@ -1105,7 +1113,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (!ParsedTypeLoc.isNull() && !typecheckParsedType())
     return;
 
-  CompletionLookup Lookup(CompletionContext, TU->Ctx, CurDeclContext);
+  CompletionLookup Lookup(CompletionContext, *TU, CurDeclContext);
 
   switch (Kind) {
   case CompletionKind::None:
