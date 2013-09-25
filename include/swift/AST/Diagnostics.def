@@ -1248,10 +1248,6 @@ ERROR(super_not_in_class_method,sema_tce,none,
 ERROR(super_with_no_base_class,sema_tce,none,
       "'super' members cannot be referenced in a root class", ())
 
-// Closures
-ERROR(byref_capture,sema_tce,none,
-      "cannot capture [byref] parameter %0", (Identifier))
-
 // Operators
 ERROR(unknown_binop,sema_tce,none,
        "operator is not a known binary operator", ())

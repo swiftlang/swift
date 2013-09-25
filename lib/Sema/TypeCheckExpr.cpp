@@ -498,14 +498,13 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr) {
 
 namespace {
   class FindCapturedVars : public ASTWalker {
-    TypeChecker &tc;
     llvm::SetVector<ValueDecl*> &captures;
     DeclContext *CurExprAsDC;
 
   public:
-    FindCapturedVars(TypeChecker &tc, llvm::SetVector<ValueDecl*> &captures,
+    FindCapturedVars(llvm::SetVector<ValueDecl*> &captures,
                      AnyFunctionRef AFR)
-        : tc(tc), captures(captures), CurExprAsDC(AFR.getAsDeclContext()) {}
+        : captures(captures), CurExprAsDC(AFR.getAsDeclContext()) {}
 
     void doWalk(Expr *E) {
       E->walk(*this);
@@ -544,14 +543,6 @@ namespace {
           !DRE->getDecl()->getDeclContext()->isLocalContext())
         return { false, DRE };
 
-
-      // A [byref] parameter cannot be captured.
-      // FIXME: As a temporary hack, ignore 'self', which is an implicit
-      // [byref] parameter for instance methods of structs.
-      if (D->getType()->is<LValueType>() &&
-          !D->getName().str().equals("self"))
-        tc.diagnose(DRE->getLoc(), diag::byref_capture, D->getName());
-
       captures.insert(D);
       return { false, DRE };
     }
@@ -561,7 +552,7 @@ namespace {
 
 void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   llvm::SetVector<ValueDecl *> Captures;
-  FindCapturedVars finder(*this, Captures, AFR);
+  FindCapturedVars finder(Captures, AFR);
   finder.doWalk(AFR.getBody());
   ValueDecl **CaptureCopy =
       Context.AllocateCopy<ValueDecl *>(Captures.begin(), Captures.end());
