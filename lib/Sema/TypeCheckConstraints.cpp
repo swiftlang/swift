@@ -1967,7 +1967,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
     // An expression can be converted to an auto-closure function type, creating
     // an implicit closure.
-   if (auto function2 = type2->getAs<FunctionType>()) {
+    if (auto function2 = type2->getAs<FunctionType>()) {
       if (function2->isAutoClosure()) {
         trivial = false;
         return matchTypes(type1, function2->getResult(), kind, subFlags,
@@ -2007,6 +2007,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       trivial = false;
       return addedConstraint? SolutionKind::Solved
                             : SolutionKind::TriviallySolved;
+    }
+  }
+
+  // A value of type T can be converted to type U? if T is convertible to U.
+  BoundGenericType *boundGenericType2;
+  if (concrete && kind >= TypeMatchKind::Conversion &&
+      (boundGenericType2 = type2->getAs<BoundGenericType>())) {
+    if (boundGenericType2->getDecl() == TC.Context.getOptionalDecl()) {
+      assert(boundGenericType2->getGenericArgs().size() == 1);
+      return matchTypes(type1, boundGenericType2->getGenericArgs()[0],
+                        kind, subFlags, locator, trivial);
     }
   }
   

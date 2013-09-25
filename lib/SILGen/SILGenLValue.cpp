@@ -552,24 +552,6 @@ static bool hasDifferentTypeOfRValue(const TypeLowering &srcTL) {
 }
 #endif
 
-/// Apply a substitution to the given type.
-///
-/// TODO: use an AST library for this when it exists.
-static CanType applySubstitution(CanType typeParam, CanType typeArg,
-                                 CanType type, ASTContext &ctx) {
-  auto applySubs = [&ctx, typeParam, typeArg](Type type_) -> Type {
-    auto type = CanType(type_);
-    if (type == typeParam) return typeArg;
-    return type;
-  };
-
-  // Type::transform doesn't call BoundGenericType::setSubstitutions,
-  // but that's okay because, in our narrow use cases, the bound
-  // generic types we create should correspond to bound generic types
-  // that Sema already checked.
-  return CanType(type.transform(ctx, applySubs));
-}
-
 /// Emit a reference to the given generic function.
 static SILValue emitSpecializedFunctionRef(SILGenFunction &gen,
                                            SILLocation loc,
@@ -588,7 +570,6 @@ static SILValue emitSpecializedFunctionRef(SILGenFunction &gen,
   // Make the substitutions.  This is valid by the known constraints
   // on these generic intrinsics.
   auto typeParamDecl = polyFnType->getGenericParameters()[0].getAsTypeParam();
-  auto typeParam = CanType(typeParamDecl->getArchetype());
   Substitution subs[] = {
     Substitution{typeParamDecl->getArchetype(), typeArg, {}}
   };
@@ -596,12 +577,7 @@ static SILValue emitSpecializedFunctionRef(SILGenFunction &gen,
   // Apply the substitutions to the given type.
   ASTContext &ctx = gen.getASTContext();
   auto specializedFnType =
-    FunctionType::get(applySubstitution(typeParam, typeArg,
-                                        polyFnType.getInput(), ctx),
-                      applySubstitution(typeParam, typeArg,
-                                        polyFnType.getResult(), ctx),
-                      polyFnType->getExtInfo(), ctx);
-
+    polyFnType->substGenericArgs(ctx.TheBuiltinModule, typeArg);
   auto specializedType = gen.getLoweredType(specializedFnType, 0);
   return gen.B.createSpecialize(loc, fnRef, subs, specializedType);
 }

@@ -80,10 +80,7 @@
   If the variable is not explicitly typed, its type will still be
   inferred to be an optional type.
 
-  Unfortunately, there is currently no implicitly conversion from T
-  to T?, so programs will have to perform this conversion explicitly:
-
-    x = .Some(obj)
+* There is now an implicit conversion from T to T?.
 
 2013-09-17
 ----------

@@ -2440,6 +2440,36 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // existential of some related kind?
   }
 
+  // Coercion to Optional<T>.
+  if (auto toGenericType = toType->getAs<BoundGenericType>()) {
+    if (toGenericType->getDecl() == tc.Context.getOptionalDecl()) {
+      // Build an implicit call to _injectValueIntoOptional.
+      auto injectFn = tc.Context.getInjectValueIntoOptionalDecl();
+      if (!injectFn) {
+        tc.diagnose(expr->getLoc(), diag::optional_intrinsics_not_found);
+        return nullptr;
+      }
+
+      Type intermediateType = toGenericType->getGenericArgs()[0];
+
+      auto polyFnType = injectFn->getType()->castTo<PolymorphicFunctionType>();
+      auto fnType = polyFnType->substGenericArgs(&tc.TU, intermediateType);
+
+      Expr *intermediateExpr = coerceToType(expr, fnType->getInput(), locator);
+      if (!intermediateExpr) return nullptr;
+
+      Substitution subs[] = {
+        { polyFnType->getAllArchetypes()[0], intermediateType, {} }
+      };
+      Expr *fnExpr = tc.buildCheckedRefExpr(injectFn, expr->getStartLoc(),
+                                            /*implicit*/ true);
+      fnExpr = new (tc.Context) SpecializeExpr(fnExpr, fnType,
+                                               tc.Context.AllocateCopy(subs));
+      return new (tc.Context) CallExpr(fnExpr, intermediateExpr,
+                                       /*implicit*/ true, toType);
+    }
+  }
+
   // Coerce via conversion function or constructor.
   if (fromType->getNominalOrBoundGenericNominal()||
       fromType->is<ArchetypeType>() ||
