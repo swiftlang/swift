@@ -585,6 +585,269 @@ static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC) {
            });
 }
 
+/// Revert the given dependently-typed TypeLoc to a state where generic
+/// parameters have not yet been resolved.
+static void revertDependentTypeLoc(TypeLoc &tl, DeclContext *dc) {
+  // Make sure we validate the type again.
+  tl.setType(Type(), /*validated=*/false);
+
+  // Walker that reverts dependent identifier types.
+  class RevertWalker : public ASTWalker {
+    DeclContext *dc;
+
+  public:
+    explicit RevertWalker(DeclContext *dc) : dc(dc) { }
+
+    // Skip expressions.
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      return { false, expr };
+    }
+
+    // Skip statements.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return { false, stmt };
+    }
+
+    // Skip patterns
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
+      return { false, pattern };
+    }
+
+    bool walkToTypeReprPost(TypeRepr *repr) override {
+      auto identType = dyn_cast<IdentTypeRepr>(repr);
+      if (!identType)
+        return true;
+
+      for (auto &comp : identType->Components) {
+        // If it's not a bound type, we're done.
+        if (!comp.isBoundType())
+          return true;
+
+        // If the bound type isn't dependent, there's nothing to do.
+        auto type = comp.getBoundType();
+        if (!type->isDependentType())
+          return true;
+
+        // Turn a generic parameter type back into a reference to the
+        // generic parameter itself.
+        if (auto genericParamType
+            = dyn_cast<GenericTypeParamType>(type.getPointer())) {
+          // FIXME: Assert that it has a decl.
+          comp.setValue(genericParamType->getDecl());
+        } else {
+          // FIXME: Often, we could revert to a decl here.
+          comp.revertToContext(dc);
+        }
+      }
+
+      return true;
+    }
+  };
+
+  if (tl.isNull())
+    return;
+
+  tl.getTypeRepr()->walk(RevertWalker(dc));
+}
+
+/// Revert the dependently-typed TypeLocs within the given pattern to a
+/// state where generic parameters have not yet been resolved.
+void revertDependentPattern(Pattern *pattern, DeclContext *dc) {
+  // Clear out the pattern's type.
+  if (pattern->hasType())
+    pattern->overwriteType(Type());
+
+  switch (pattern->getKind()) {
+#define PATTERN(Id, Parent)
+#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
+#include "swift/AST/PatternNodes.def"
+    // Do nothing for refutable patterns.
+    break;
+
+  case PatternKind::Any:
+    // Do nothing;
+    break;
+
+  case PatternKind::Named: {
+    // Clear out the type of the variable.
+    auto named = cast<NamedPattern>(pattern);
+    if (named->getDecl()->hasType())
+      named->getDecl()->overwriteType(Type());
+    break;
+  }
+
+  case PatternKind::Paren:
+    // Recurse into parentheses.
+    revertDependentPattern(cast<ParenPattern>(pattern)->getSubPattern(), dc);
+    break;
+
+  case PatternKind::Tuple: {
+    // Recurse into tuple elements.
+    auto tuple = cast<TuplePattern>(pattern);
+    for (auto &field : tuple->getFields()) {
+      revertDependentPattern(field.getPattern(), dc);
+    }
+    break;
+  }
+
+  case PatternKind::Typed: {
+    // Revert the type annotation.
+    auto typed = cast<TypedPattern>(pattern);
+    revertDependentTypeLoc(typed->getTypeLoc(), dc);
+
+    // Revert the subpattern.
+    revertDependentPattern(typed->getSubPattern(), dc);
+    break;
+  }
+  }
+}
+
+/// Check the given generic parameter list, introduce the generic parameters
+/// and requirements into the archetype builder, but don't assign archetypes
+/// yet.
+void checkGenericParamList(ArchetypeBuilder &builder,
+                           GenericParamList *genericParams,
+                           TypeChecker &TC) {
+  assert(genericParams && "Missing generic parameters");
+  unsigned Depth = genericParams->getDepth();
+
+  // Assign archetypes to each of the generic parameters.
+  unsigned Index = 0;
+  for (auto GP : *genericParams) {
+    auto TypeParam = GP.getAsTypeParam();
+
+    // Set the depth of this type parameter.
+    TypeParam->setDepth(Depth);
+
+    // Check the constraints on the type parameter.
+    checkInheritanceClause(TC, TypeParam);
+
+    // Add the generic parameter to the builder.
+    builder.addGenericParameter(TypeParam, Index++);
+
+    // Infer requirements from the "inherited" types.
+    for (auto &inherited : TypeParam->getInherited()) {
+      builder.inferRequirements(inherited.getTypeRepr());
+    }
+  }
+
+  // Add the requirements clause to the builder, validating the types in
+  // the requirements clause along the way.
+  for (auto &Req : genericParams->getRequirements()) {
+    if (Req.isInvalid())
+      continue;
+
+    switch (Req.getKind()) {
+    case RequirementKind::Conformance: {
+      // Validate the types.
+      if (TC.validateType(Req.getSubjectLoc())) {
+        Req.setInvalid();
+        continue;
+      }
+
+      if (TC.validateType(Req.getConstraintLoc())) {
+        Req.setInvalid();
+        continue;
+      }
+
+      // FIXME: Feels too early to perform this check.
+      if (!Req.getConstraint()->isExistentialType() &&
+          !Req.getConstraint()->getClassOrBoundGenericClass()) {
+        TC.diagnose(genericParams->getWhereLoc(),
+                    diag::requires_conformance_nonprotocol,
+                    Req.getSubjectLoc(), Req.getConstraintLoc());
+        Req.getConstraintLoc().setInvalidType(TC.Context);
+        Req.setInvalid();
+        continue;
+      }
+
+      // DynamicLookup cannot be used in a generic constraint.
+      if (auto protoTy = Req.getConstraint()->getAs<ProtocolType>()) {
+        if (protoTy->getDecl()->isSpecificProtocol(
+                                  KnownProtocolKind::DynamicLookup)) {
+          TC.diagnose(Req.getConstraintLoc().getSourceRange().Start,
+                      diag::dynamic_lookup_conformance);
+          continue;
+        }
+      }
+      break;
+    }
+
+    case RequirementKind::SameType:
+      if (TC.validateType(Req.getFirstTypeLoc())) {
+        Req.setInvalid();
+        continue;
+      }
+
+      if (TC.validateType(Req.getSecondTypeLoc())) {
+        Req.setInvalid();
+        continue;
+      }
+      
+      break;
+    }
+    
+    if (builder.addRequirement(Req))
+      Req.setInvalid();
+  }
+}
+
+/// Finalize the given generic parameter list, assigning archetypes to
+/// the generic parameters.
+void finalizeGenericParamList(ArchetypeBuilder &builder,
+                              GenericParamList *genericParams,
+                              DeclContext *dc,
+                              TypeChecker &TC) {
+  // Wire up the archetypes.
+  builder.assignArchetypes();
+  for (auto GP : *genericParams) {
+    auto TypeParam = GP.getAsTypeParam();
+    TypeParam->setArchetype(builder.getArchetype(TypeParam));
+  }
+  genericParams->setAllArchetypes(
+    TC.Context.AllocateCopy(builder.getAllArchetypes()));
+
+  // Replace the generic parameters with their archetypes throughout the
+  // types in the requirements.
+  // FIXME: This should not be necessary at this level; it is a transitional
+  // step.
+  for (auto &Req : genericParams->getRequirements()) {
+    if (Req.isInvalid())
+      continue;
+
+    switch (Req.getKind()) {
+    case RequirementKind::Conformance: {
+      revertDependentTypeLoc(Req.getSubjectLoc(), dc);
+      if (TC.validateType(Req.getSubjectLoc())) {
+        Req.setInvalid();
+        continue;
+      }
+
+      revertDependentTypeLoc(Req.getConstraintLoc(), dc);
+      if (TC.validateType(Req.getConstraintLoc())) {
+        Req.setInvalid();
+        continue;
+      }
+      break;
+    }
+
+    case RequirementKind::SameType:
+      revertDependentTypeLoc(Req.getFirstTypeLoc(), dc);
+      if (TC.validateType(Req.getFirstTypeLoc())) {
+        Req.setInvalid();
+        continue;
+      }
+
+      revertDependentTypeLoc(Req.getSecondTypeLoc(), dc);
+      if (TC.validateType(Req.getSecondTypeLoc())) {
+        Req.setInvalid();
+        continue;
+      }
+      break;
+    }
+  }
+}
+
 
 namespace {
 
@@ -633,278 +896,6 @@ public:
 
   void checkExplicitConformance(ExtensionDecl *D, Type T) {
     gatherExplicitConformances(D, T);
-  }
-
-  /// Revert the given dependently-typed TypeLoc to a state where generic
-  /// parameters have not yet been resolved.
-  void revertDependentTypeLoc(TypeLoc &tl, DeclContext *dc) {
-    // Make sure we validate the type again.
-    tl.setType(Type(), /*validated=*/false);
-
-    // Walker that reverts dependent identifier types.
-    class RevertWalker : public ASTWalker {
-      DeclContext *dc;
-
-    public:
-      explicit RevertWalker(DeclContext *dc) : dc(dc) { }
-
-      // Skip expressions.
-      std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-        return { false, expr };
-      }
-
-      // Skip statements.
-      std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-        return { false, stmt };
-      }
-
-      // Skip patterns
-      std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
-        return { false, pattern };
-      }
-
-      bool walkToTypeReprPost(TypeRepr *repr) override {
-        auto identType = dyn_cast<IdentTypeRepr>(repr);
-        if (!identType)
-          return true;
-
-        for (auto &comp : identType->Components) {
-          // If it's not a bound type, we're done.
-          if (!comp.isBoundType())
-            return true;
-
-          // If the bound type isn't dependent, there's nothing to do.
-          auto type = comp.getBoundType();
-          if (!type->isDependentType())
-            return true;
-
-          // Turn a generic parameter type back into a reference to the
-          // generic parameter itself.
-          if (auto genericParamType
-              = dyn_cast<GenericTypeParamType>(type.getPointer())) {
-            // FIXME: Assert that it has a decl.
-            comp.setValue(genericParamType->getDecl());
-          } else {
-            // FIXME: Often, we could revert to a decl here.
-            comp.revertToContext(dc);
-          }
-        }
-
-        return true;
-      }
-    };
-
-    if (tl.isNull())
-      return;
-
-    tl.getTypeRepr()->walk(RevertWalker(dc));
-  }
-
-  /// Revert the dependently-typed TypeLocs within the given pattern to a
-  /// state where generic parameters have not yet been resolved.
-  void revertDependentPattern(Pattern *pattern, DeclContext *dc) {
-    // Clear out the pattern's type.
-    if (pattern->hasType())
-      pattern->overwriteType(Type());
-
-    switch (pattern->getKind()) {
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-      // Do nothing for refutable patterns.
-      break;
-
-    case PatternKind::Any:
-      // Do nothing;
-      break;
-
-    case PatternKind::Named: {
-      // Clear out the type of the variable.
-      auto named = cast<NamedPattern>(pattern);
-      if (named->getDecl()->hasType())
-        named->getDecl()->overwriteType(Type());
-      break;
-    }
-
-    case PatternKind::Paren:
-      // Recurse into parentheses.
-      revertDependentPattern(cast<ParenPattern>(pattern)->getSubPattern(), dc);
-      break;
-
-    case PatternKind::Tuple: {
-      // Recurse into tuple elements.
-      auto tuple = cast<TuplePattern>(pattern);
-      for (auto &field : tuple->getFields()) {
-        revertDependentPattern(field.getPattern(), dc);
-      }
-      break;
-    }
-
-    case PatternKind::Typed: {
-      // Revert the type annotation.
-      auto typed = cast<TypedPattern>(pattern);
-      revertDependentTypeLoc(typed->getTypeLoc(), dc);
-
-      // Revert the subpattern.
-      revertDependentPattern(typed->getSubPattern(), dc);
-      break;
-    }
-    }
-  }
-
-  /// Check the given generic parameter list, introduce the generic parameters
-  /// and requirements into the archetype builder, but don't assign archetypes
-  /// yet.
-  void checkGenericParamList(ArchetypeBuilder &builder,
-                             GenericParamList *genericParams) {
-    assert(genericParams && "Missing generic parameters");
-    unsigned Depth = genericParams->getDepth();
-
-    // Assign archetypes to each of the generic parameters.
-    unsigned Index = 0;
-    for (auto GP : *genericParams) {
-      auto TypeParam = GP.getAsTypeParam();
-
-      // Set the depth of this type parameter.
-      TypeParam->setDepth(Depth);
-
-      // Check the constraints on the type parameter.
-      checkInheritanceClause(TC, TypeParam);
-
-      // Add the generic parameter to the builder.
-      builder.addGenericParameter(TypeParam, Index++);
-
-      // Infer requirements from the "inherited" types.
-      for (auto &inherited : TypeParam->getInherited()) {
-        builder.inferRequirements(inherited.getTypeRepr());
-      }
-    }
-
-    // Add the requirements clause to the builder, validating the types in
-    // the requirements clause along the way.
-    for (auto &Req : genericParams->getRequirements()) {
-      if (Req.isInvalid())
-        continue;
-
-      switch (Req.getKind()) {
-      case RequirementKind::Conformance: {
-        // Validate the types.
-        if (TC.validateType(Req.getSubjectLoc())) {
-          Req.setInvalid();
-          continue;
-        }
-
-        if (TC.validateType(Req.getConstraintLoc())) {
-          Req.setInvalid();
-          continue;
-        }
-
-        // FIXME: Feels too early to perform this check.
-        if (!Req.getConstraint()->isExistentialType() &&
-            !Req.getConstraint()->getClassOrBoundGenericClass()) {
-          TC.diagnose(genericParams->getWhereLoc(),
-                      diag::requires_conformance_nonprotocol,
-                      Req.getSubjectLoc(), Req.getConstraintLoc());
-          Req.getConstraintLoc().setInvalidType(TC.Context);
-          Req.setInvalid();
-          continue;
-        }
-
-        // DynamicLookup cannot be used in a generic constraint.
-        if (auto protoTy = Req.getConstraint()->getAs<ProtocolType>()) {
-          if (protoTy->getDecl()->isSpecificProtocol(
-                                    KnownProtocolKind::DynamicLookup)) {
-            TC.diagnose(Req.getConstraintLoc().getSourceRange().Start,
-                        diag::dynamic_lookup_conformance);
-            continue;
-          }
-        }
-        break;
-      }
-
-      case RequirementKind::SameType:
-        if (TC.validateType(Req.getFirstTypeLoc())) {
-          Req.setInvalid();
-          continue;
-        }
-
-        if (TC.validateType(Req.getSecondTypeLoc())) {
-          Req.setInvalid();
-          continue;
-        }
-        
-        break;
-      }
-      
-      if (builder.addRequirement(Req))
-        Req.setInvalid();
-    }
-  }
-
-  /// Finalize the given generic parameter list, assigning archetypes to
-  /// the generic parameters.
-  void finalizeGenericParamList(ArchetypeBuilder &builder,
-                                GenericParamList *genericParams,
-                                DeclContext *dc) {
-    // Wire up the archetypes.
-    builder.assignArchetypes();
-    for (auto GP : *genericParams) {
-      auto TypeParam = GP.getAsTypeParam();
-      TypeParam->setArchetype(builder.getArchetype(TypeParam));
-    }
-    genericParams->setAllArchetypes(
-      TC.Context.AllocateCopy(builder.getAllArchetypes()));
-
-    // Replace the generic parameters with their archetypes throughout the
-    // types in the requirements.
-    // FIXME: This should not be necessary at this level; it is a transitional
-    // step.
-    for (auto &Req : genericParams->getRequirements()) {
-      if (Req.isInvalid())
-        continue;
-
-      switch (Req.getKind()) {
-        case RequirementKind::Conformance: {
-          revertDependentTypeLoc(Req.getSubjectLoc(), dc);
-          if (TC.validateType(Req.getSubjectLoc())) {
-            Req.setInvalid();
-            continue;
-          }
-
-          revertDependentTypeLoc(Req.getConstraintLoc(), dc);
-          if (TC.validateType(Req.getConstraintLoc())) {
-            Req.setInvalid();
-            continue;
-          }
-          break;
-        }
-
-        case RequirementKind::SameType:
-          revertDependentTypeLoc(Req.getFirstTypeLoc(), dc);
-          if (TC.validateType(Req.getFirstTypeLoc())) {
-            Req.setInvalid();
-            continue;
-          }
-
-          revertDependentTypeLoc(Req.getSecondTypeLoc(), dc);
-          if (TC.validateType(Req.getSecondTypeLoc())) {
-            Req.setInvalid();
-            continue;
-          }
-          break;
-      }
-    }
-  }
-
-  /// Check the given generic parameter list within the given declaration
-  /// context, assigning archetypes to each of the generic parameters.
-  ///
-  /// This routine simply creates an archetype builder, then calls both
-  /// \c checkGenericParamList and \c finalizeGenericParamList.
-  void checkGenericParams(GenericParamList *genericParams, DeclContext *dc) {
-    ArchetypeBuilder builder = createArchetypeBuilder(TC);
-    checkGenericParamList(builder, genericParams);
-    finalizeGenericParamList(builder, genericParams, dc);
   }
 
   //===--------------------------------------------------------------------===//
@@ -1543,7 +1534,7 @@ public:
     if (auto gp = FD->getGenericParams()) {
       gp->setOuterParameters(outerGenericParams);
       builder.emplace(createArchetypeBuilder(TC));
-      checkGenericParamList(*builder, gp);
+      checkGenericParamList(*builder, gp, TC);
     }
 
     semaFuncDecl(FD, /*consumeAttributes=*/!builder);
@@ -1560,7 +1551,7 @@ public:
         builder->inferRequirements(resultType);
 
       // Assign archetypes.
-      finalizeGenericParamList(*builder, FD->getGenericParams(), FD);
+      finalizeGenericParamList(*builder, FD->getGenericParams(), FD, TC);
 
       // Go through and revert all of the dependent types we computed.
 
@@ -1767,7 +1758,7 @@ public:
       // Write up generic parameters and check the generic parameter list.
       gp->setOuterParameters(outerGenericParams);
       ArchetypeBuilder builder = createArchetypeBuilder(TC);
-      checkGenericParamList(builder, gp);
+      checkGenericParamList(builder, gp, TC);
 
       // Type check the constructor parameters.
       if (TC.typeCheckPattern(CD->getArgParams(),
@@ -1781,7 +1772,7 @@ public:
       builder.inferRequirements(CD->getArgParams());
 
       // Assign archetypes.
-      finalizeGenericParamList(builder, gp, CD);
+      finalizeGenericParamList(builder, gp, CD, TC);
 
       // Reverse the constructor argument parameter pattern; it will be checked
       // again, with archetypes, below.
@@ -1953,8 +1944,10 @@ void TypeChecker::validateTypeDecl(ValueDecl *D, bool resolveTypeParams) {
     if (auto gp = nominal->getGenericParams()) {
       gp->setOuterParameters(
         nominal->getDeclContext()->getGenericParamsOfContext());
-      // FIXME: Should not have to create a DeclChecker.
-      DeclChecker(*this, false, false).checkGenericParams(gp, nominal);
+
+      ArchetypeBuilder builder = createArchetypeBuilder(*this);
+      checkGenericParamList(builder, gp, *this);
+      finalizeGenericParamList(builder, gp, nominal, *this);
     }
 
     // Compute the declared type.
