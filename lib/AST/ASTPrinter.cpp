@@ -358,6 +358,9 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
       if (!member->shouldPrintInContext())
         continue;
 
+      if (Options.SkipImplicit && member->isImplicit())
+        continue;
+
       indent();
       visit(member);
       if (needComma && member != members.back())
@@ -379,8 +382,17 @@ void PrintAST::printNominalDeclName(NominalTypeDecl *decl) {
 void PrintAST::printInherited(ArrayRef<TypeLoc> inherited,
                               ArrayRef<ProtocolDecl *> protos,
                               Type superclass) {
-  if (inherited.empty() && protos.empty() && superclass.isNull())
-    return;
+  if (inherited.empty() && superclass.isNull()) {
+    if (protos.empty())
+      return;
+    // If only conforms to DynamicLookup protocol, nothing to print.
+    if (protos.size() == 1) {
+      Optional<KnownProtocolKind> kind =
+        (*protos.begin())->getKnownProtocolKind();
+      if (kind && *kind == KnownProtocolKind::DynamicLookup)
+        return;
+    }
+  }
 
   OS << " : ";
   
@@ -391,7 +403,10 @@ void PrintAST::printInherited(ArrayRef<TypeLoc> inherited,
     }
     
     interleave(protos, [&](const ProtocolDecl *proto) {
-      proto->getDeclaredType()->print(OS);
+      Optional<KnownProtocolKind> kind =
+        (*protos.begin())->getKnownProtocolKind();
+      if (!kind || *kind != KnownProtocolKind::DynamicLookup)
+        proto->getDeclaredType()->print(OS);
     }, [&]() {
       OS << ", ";
     });

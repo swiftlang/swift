@@ -1704,7 +1704,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
         consumeAbstractFunctionBody(FD, Attributes);
       }
     } else if (Attributes.AsmName.empty() && !(Flags & PD_DisallowFuncDef) &&
-               !SignatureStatus.isError()) {
+               !SignatureStatus.isError() && !isInSILMode()) {
       diagnose(Tok.getLoc(), diag::func_decl_without_brace);
     }
   }

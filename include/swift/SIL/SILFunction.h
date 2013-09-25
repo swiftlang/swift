@@ -120,6 +120,13 @@ public:
   /// Initialize the source location of the function.
   void setLocation(SILLocation L) { Location = L; }
 
+  /// Check if the function has a location.
+  /// FIXME: All functions should have locations, so this method should not be
+  /// necessary.
+  bool hasLocation() const {
+    return Location.hasValue();
+  }
+
   /// Get the source location of the function.
   SILLocation getLocation() const {
     assert(Location.hasValue());

@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PrintOptions.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1100,8 +1101,34 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose) const {
   
   OS << "\n\nimport Builtin\nimport swift\n\n";
 
+  // Compute the list of emitted functions, whose AST Decls we do not need to
+  // print.
+  llvm::DenseSet<const Decl*> emittedFunctions;
+  for (const SILFunction &f : *this)
+    if (f.hasLocation())
+      emittedFunctions.insert(f.getLocation().getAsASTNode<Decl>());
+
+  PrintOptions Options;
+  Options.FunctionDefinitions = false;
+  Options.TypeDefinitions = true;
+  Options.VarInitializers = true;
+  Options.SkipImplicit = true;
+
+  for (auto ID = ASTTranslUnit->Decls.begin(),
+            ED = ASTTranslUnit->Decls.end(); ID != ED; ++ID) {
+    const Decl *D = *ID;
+    if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
+        !emittedFunctions.count(D) &&
+        !D->isImplicit()) {
+      D->print(OS, Options, nullptr);
+      OS << "\n\n";
+    }
+  }
+
   for (const SILFunction &f : *this)
     f.print(OS, Verbose);
+
+  OS << "\n\n";
 }
 
 void ValueBase::dumpInContext() const {

@@ -38,12 +38,16 @@ namespace swift {
     /// it to the user.
     bool PreferTypeRepr = true;
 
+    /// \brief Whether to not print implicit declarations.
+    bool SkipImplicit = false;
+
     /// \brief Retrieve the set of options that prints everything.
     static PrintOptions printEverything() {
       PrintOptions result;
       result.FunctionDefinitions = true;
       result.TypeDefinitions = true;
       result.VarInitializers = true;
+      result.SkipImplicit = false;
       return result;
     }
   };
