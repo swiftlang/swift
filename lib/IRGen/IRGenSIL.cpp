@@ -1003,11 +1003,15 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   for (auto &I : *BB) {
     // Set the debug info location for I, if applicable.
     if (IGM.DebugInfo) {
-      if (SILDebugScope *DS = I.getDebugScope())
+      if (auto DS = I.getDebugScope())
         IGM.DebugInfo->setCurrentLoc(Builder, DS, I.getLoc());
       else {
-        assert( CurSILFn->getDebugScope() && "function without a debug scope");
-        IGM.DebugInfo->setCurrentLoc(Builder, CurSILFn->getDebugScope());
+        if (auto FnDS = CurSILFn->getDebugScope())
+          IGM.DebugInfo->setCurrentLoc(Builder, FnDS);
+        else
+          // We don't expect a scope from transparent functions. They
+          // should be elided during IR generation anyway.
+          assert(CurSILFn->isTransparent() && "function without a debug scope");
       }
     }
     visit(&I);

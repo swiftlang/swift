@@ -439,7 +439,7 @@ private:
   }
 };
 
-/// \brief Used to represent locations coming from the parsed SIL file.
+/// \brief Used to represent locations coming from a parsed SIL file.
 ///
 /// Allowed on any SILInstruction.
 class SILFileLocation : public SILLocation {

@@ -255,7 +255,6 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID, SILFunction *InFunc) {
   // FIXME: use the correct SILLocation from module.
   SourceLoc Loc;
   Fn->setLocation(SILFileLocation(Loc));
-  Fn->setDebugScope(new (SILMod) SILDebugScope(Fn->getLocation()));
   SILBasicBlock *CurrentBB = nullptr;
 
   // Clear up at the beginning of each SILFunction.
