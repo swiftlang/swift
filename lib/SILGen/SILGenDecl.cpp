@@ -736,8 +736,9 @@ bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
 
 bool SILGenModule::requiresObjCPropertyEntryPoints(VarDecl *property) {
   // We don't export generic methods or subclasses to IRGen yet.
-  if (property->getDeclContext()->getDeclaredTypeInContext()
-          ->is<BoundGenericType>())
+  if (property->getDeclContext()->getDeclaredTypeInContext() &&
+      property->getDeclContext()->getDeclaredTypeInContext()
+        ->is<BoundGenericType>())
     return false;
   
   if (auto override = property->getOverriddenDecl())
@@ -767,10 +768,13 @@ bool SILGenModule::requiresObjCSubscriptEntryPoints(SubscriptDecl *subscript) {
 }
 
 bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
-  if (vd->hasClangNode())
-    return true;
-  if (auto *fd = dyn_cast<FuncDecl>(vd))
+  if (auto *fd = dyn_cast<FuncDecl>(vd)) {
+    // If a function has an associated Clang node, it's foreign.
+    if (vd->hasClangNode())
+      return true;
+
     return requiresObjCMethodEntryPoint(fd);
+  }
   if (auto *cd = dyn_cast<ConstructorDecl>(vd))
     return requiresObjCMethodEntryPoint(cd);
   if (auto *pd = dyn_cast<VarDecl>(vd))

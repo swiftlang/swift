@@ -1216,7 +1216,7 @@ namespace {
                                                             dc);
       result->setType(allocType);
       result->setInitializerType(initType);
-      result->getMutableAttrs().ObjC = true;
+      result->setIsObjC(true);
       result->setClangNode(objcMethod);
       
       selfVar->setDeclContext(result);
@@ -1523,9 +1523,7 @@ namespace {
                                    DeclContext *dc) {
       assert(objcMethod->isInstanceMethod() && "Caller must filter");
 
-      // Make sure we have a usable 'alloc' method. Otherwise, we can't
-      // build this constructor anyway.
-      // FIXME: Can we do this for protocol methods as well? Do we want to?
+      // FIXME: Can we do this for protocol methods as well?
       auto interface = objcMethod->getClassInterface();
       if (!interface)
         return nullptr;
