@@ -1556,11 +1556,32 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
   return emission.apply();
 }
 
-Callee emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
-                                          SILLocation loc,
-                                          SILDeclRef constant,
-                                          ArrayRef<Substitution> substitutions,
-                                          Type substPropertyType)
+static Callee getBasePropertyFunctionRef(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         SILDeclRef constant,
+                                         RValue &selfValue) {
+  ValueDecl *decl = constant.getDecl();
+
+  // FIXME: Have a nicely-abstracted way to figure out which kind of
+  // dispatch we're doing.
+  // FIXME: We should do this for any declaration within a class. However,
+  // IRGen doesn't yet have the machinery for handling class_method on
+  // getters and setters.
+  if (decl->isObjC()) {
+    return Callee::forClassMethod(gen, selfValue.peekScalarValue(), constant,
+                                  loc);
+  }
+
+  return Callee::forDirect(gen, constant, loc);
+}
+
+static Callee 
+emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
+                                   SILLocation loc,
+                                   SILDeclRef constant,
+                                   ArrayRef<Substitution> substitutions,
+                                   RValue &selfValue,
+                                   Type substPropertyType)
 {
   // If the accessor is a local constant, use it.
   // FIXME: Can local properties ever be generic?
@@ -1571,8 +1592,8 @@ Callee emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
   
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
-  // FIXME: Dynamic dispatch for class/arch/proto methods.
-  Callee callee = Callee::forDirect(gen, constant, loc);
+  // FIXME: Dynamic dispatch for archetype/existential methods.
+  Callee callee = getBasePropertyFunctionRef(gen, loc, constant, selfValue);
   
   // If there are substitutions, specialize the generic accessor.
   // FIXME: Generic subscript operator could add another layer of
@@ -1609,7 +1630,8 @@ ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
                                          propType);
   
   Callee getter = emitSpecializedPropertyFunctionRef(*this, loc, get,
-                                                     substitutions, propType);
+                                                     substitutions, selfValue,
+                                                     propType);
   
   CallEmission emission(*this, std::move(getter));
   auto *propFnTy = propType->castTo<AnyFunctionType>();
@@ -1650,7 +1672,8 @@ void SILGenFunction::emitSetProperty(SILLocation loc,
                                          propType);
 
   Callee setter = emitSpecializedPropertyFunctionRef(*this, loc, set,
-                                                     substitutions, propType);
+                                                     substitutions, selfValue,
+                                                     propType);
 
   CallEmission emission(*this, std::move(setter));
   auto *propFnTy = propType->castTo<AnyFunctionType>();

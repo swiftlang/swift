@@ -382,8 +382,9 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                               bool isSuper) {
   assert((method.kind == SILDeclRef::Kind::Initializer
           || method.kind == SILDeclRef::Kind::Func
-          || method.kind == SILDeclRef::Kind::Getter)
-         && "objc method call must be to a func, initializer, or getter");
+          || method.kind == SILDeclRef::Kind::Getter
+          || method.kind == SILDeclRef::Kind::Setter)
+         && "objc method call must be to a func/initializer/getter/setter");
   llvm::AttributeSet attrs;
   auto fnTy = IGF.IGM.getFunctionType(AbstractCC::ObjCMethod,
                                       origType.getSwiftRValueType(),

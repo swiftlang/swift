@@ -299,21 +299,25 @@ namespace {
     }
     
   public:
-    GetterSetterComponent(ValueDecl *decl,
+    GetterSetterComponent(SILGenFunction &gen, ValueDecl *decl,
                           ArrayRef<Substitution> substitutions,
                           SILType typeOfRValue)
-      : GetterSetterComponent(decl, substitutions, nullptr, typeOfRValue)
+      : GetterSetterComponent(gen, decl, substitutions, nullptr, typeOfRValue)
     {
     }
 
-    GetterSetterComponent(ValueDecl *decl,
+    GetterSetterComponent(SILGenFunction &gen, ValueDecl *decl,
                           ArrayRef<Substitution> substitutions,
                           Expr *subscriptExpr,
                           SILType typeOfRValue)
       : LogicalPathComponent(typeOfRValue),
-        getter(SILDeclRef(decl, SILDeclRef::Kind::Getter)),
+        getter(SILDeclRef(decl, SILDeclRef::Kind::Getter,
+                          SILDeclRef::ConstructAtNaturalUncurryLevel,
+                          gen.SGM.requiresObjCDispatch(decl))),
         setter(decl->isSettable()
-                 ? SILDeclRef(decl, SILDeclRef::Kind::Setter)
+                 ? SILDeclRef(decl, SILDeclRef::Kind::Setter,
+                              SILDeclRef::ConstructAtNaturalUncurryLevel,
+                              gen.SGM.requiresObjCDispatch(decl))
                  : SILDeclRef()),
         substitutions(substitutions.begin(), substitutions.end()),
         subscriptExpr(subscriptExpr),
@@ -400,7 +404,8 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
   // If it's a property, push a reference to the getter and setter.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     if (var->isProperty()) {
-      lv.add<GetterSetterComponent>(var,
+      lv.add<GetterSetterComponent>(sgl.gen, 
+                                    var,
                                     ArrayRef<Substitution>{},
                                     substTypeOfRValue);
       return ::std::move(lv);
@@ -452,9 +457,10 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
 
   auto substTypeOfRValue = getSubstTypeOfRValue(gen, e->getType());
 
-  // If this is a physical field, access with a fragile element reference.
+  // If this is a physical field not reflected as an Objective-C
+  // property, access with a fragile element reference.
   if (VarDecl *var = dyn_cast<VarDecl>(e->getMember().getDecl())) {
-    if (!var->isProperty()) {
+    if (!var->isProperty() && !gen.SGM.requiresObjCDispatch(var)) {
       // Find the substituted storage type.
       SILType varStorageType =
         gen.SGM.Types.getSubstitutedStorageType(var, e->getType());
@@ -469,7 +475,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   }
 
   // Otherwise, use the property accessors.
-  lv.add<GetterSetterComponent>(e->getMember().getDecl(),
+  lv.add<GetterSetterComponent>(gen,
+                                e->getMember().getDecl(),
                                 e->getMember().getSubstitutions(),
                                 substTypeOfRValue);
   return ::std::move(lv);
@@ -479,7 +486,8 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
   auto substTypeOfRValue = getSubstTypeOfRValue(gen, e->getType());
 
   LValue lv = visitRec(e->getBase());
-  lv.add<GetterSetterComponent>(e->getDecl().getDecl(),
+  lv.add<GetterSetterComponent>(gen, 
+                                e->getDecl().getDecl(),
                                 e->getDecl().getSubstitutions(),
                                 e->getIndex(),
                                 substTypeOfRValue);
