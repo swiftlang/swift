@@ -294,7 +294,9 @@ ERROR(expected_lbrace_initializer,decl_parsing,PointsToFirstBadToken,
 // Destructor
 ERROR(destructor_decl_outside_class,decl_parsing,none,
       "'destructor' functions may only be declared within a class", ())
-ERROR(destructor_parameter_tuple,decl_parsing,none,
+ERROR(expected_lparen_destructor,decl_parsing,none,
+      "expected an empty parameter list for destructor", ())
+ERROR(destructor_parameter_nonempty_tuple,decl_parsing,none,
       "destructors don't have parameters", ())
 ERROR(expected_lbrace_destructor,decl_parsing,PointsToFirstBadToken,
       "expected '{' for destructor", ())

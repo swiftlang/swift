@@ -791,7 +791,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   recordDeclLoc(decl);
-  OS << "destructor ";
+  OS << "destructor() ";
   printAttributes(decl->getAttrs());
 
   if (!Options.FunctionDefinitions || !decl->getBody()) {

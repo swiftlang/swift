@@ -22,7 +22,7 @@ Syntax overview
     constructor() {
       MyVar = 10
     }
-    destructor {
+    destructor() {
       // Misc finalization
     }
   }

@@ -2589,19 +2589,47 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
 
-  // '{'
-  if (!Tok.is(tok::l_brace)) {
-    if (Tok.is(tok::l_paren)) {
-      // Parse the parameter tuple for recovery.
-      SourceLoc LParenLoc = Tok.getLoc();
-      ParserResult<Pattern> Params = parsePatternTuple(/*AllowInitExpr=*/true);
-      if (Params.isParseError()) {
-        diagnose(LParenLoc, diag::destructor_parameter_tuple);
+  ParserResult<Pattern> Params;
+  if (Tok.is(tok::l_paren)) {
+    // Parse the parameter tuple.
+    SourceLoc LParenLoc = Tok.getLoc();
+    ParserResult<Pattern> Params = parsePatternTuple(/*AllowInitExpr=*/true);
+    if (!Params.isParseError()) {
+      // Check that the destructor has zero parameters.
+      SourceRange ElementsRange;
+      SourceLoc RParenLoc;
+      if (auto Tuple = dyn_cast<TuplePattern>(Params.get())) {
+        auto Fields = Tuple->getFields();
+        if (!Fields.empty()) {
+          ElementsRange = { Fields.front().getPattern()->getStartLoc(),
+                            Fields.back().getPattern()->getEndLoc() };
+          RParenLoc = Tuple->getRParenLoc();
+        }
       } else {
-        diagnose(LParenLoc, diag::destructor_parameter_tuple)
-            .fixItRemove(Params.get()->getSourceRange());
+        auto Paren = cast<ParenPattern>(Params.get());
+        ElementsRange = Paren->getSubPattern()->getSourceRange();
+        RParenLoc = Paren->getRParenLoc();
+      }
+      if (ElementsRange.isValid()) {
+        diagnose(LParenLoc, diag::destructor_parameter_nonempty_tuple)
+            .fixItRemove(ElementsRange);
+        Params = makeParserErrorResult(
+            TuplePattern::create(Context, LParenLoc,
+                                 ArrayRef<TuplePatternElt>(), RParenLoc));
       }
     }
+  } else {
+    SourceLoc AfterDestructorKw =
+        Lexer::getLocForEndOfToken(SourceMgr, DestructorLoc);
+    diagnose(AfterDestructorKw, diag::expected_lparen_destructor)
+        .fixItInsert(AfterDestructorKw, "()");
+    Params = makeParserErrorResult(
+        TuplePattern::create(Context, Tok.getLoc(),
+                             ArrayRef<TuplePatternElt>(), Tok.getLoc()));
+  }
+
+  // '{'
+  if (!Tok.is(tok::l_brace)) {
     if (!Tok.is(tok::l_brace) && !isInSILMode()) {
       diagnose(Tok, diag::expected_lbrace_destructor);
       return nullptr;

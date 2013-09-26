@@ -2690,7 +2690,7 @@ public:
 /// \code
 /// struct X {
 ///   var fd : Int
-///   destructor {
+///   destructor() {
 ///      close(fd)
 ///   }
 /// }
