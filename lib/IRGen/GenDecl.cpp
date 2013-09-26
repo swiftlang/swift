@@ -697,7 +697,7 @@ bool LinkEntity::isThunk() const {
     ValueDecl *D = static_cast<ValueDecl *>(Pointer);
     return isa<ClangModule>(D->getDeclContext()->getParentModule()) &&
       (isa<ConstructorDecl>(D) || isa<SubscriptDecl>(D) ||
-       (isa<VarDecl>(D) && cast<VarDecl>(D)->isProperty()));
+       (isa<VarDecl>(D) && cast<VarDecl>(D)->isComputed()));
   } else { // isTypeKind(getKind())
     CanType ty = CanType(static_cast<TypeBase*>(Pointer));
     NominalTypeDecl *decl = ty->getNominalOrBoundGenericNominal();
@@ -1539,7 +1539,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       emitClassDecl(cast<ClassDecl>(member));
       continue;
     case DeclKind::Var:
-      if (cast<VarDecl>(member)->isProperty())
+      if (cast<VarDecl>(member)->isComputed())
         // Getter/setter will be handled separately.
         continue;
       llvm_unreachable("decl not allowed in extension!");

@@ -316,7 +316,7 @@ namespace {
       SmallVector<VarDecl *, 8> params;
       for (auto member : members) {
         if (auto var = dyn_cast<VarDecl>(member)) {
-          if (var->isProperty())
+          if (var->isComputed())
             continue;
           
           auto param = new (context) VarDecl(SourceLoc(), var->getName(),
@@ -360,7 +360,7 @@ namespace {
       unsigned paramIdx = 0;
       for (auto member : members) {
         auto var = dyn_cast<VarDecl>(member);
-        if (!var || var->isProperty())
+        if (!var || var->isComputed())
           continue;
 
         // Construct left-hand side.
@@ -431,33 +431,33 @@ namespace {
         if (!underlyingType)
           return nullptr;
 
-        // Create a field to store the underlying value.
-        auto fieldName = Impl.SwiftContext.getIdentifier("value");
-        auto field = new (Impl.SwiftContext) VarDecl(SourceLoc(), fieldName,
+        // Create a variable to store the underlying value.
+        auto varName = Impl.SwiftContext.getIdentifier("value");
+        auto var = new (Impl.SwiftContext) VarDecl(SourceLoc(), varName,
                                                      underlyingType,
                                                      structDecl);
 
-        // Create a pattern binding to describe the field.
-        Pattern * fieldPattern = new (Impl.SwiftContext) NamedPattern(field);
-        fieldPattern->setType(field->getType());
-        fieldPattern
+        // Create a pattern binding to describe the variable.
+        Pattern * varPattern = new (Impl.SwiftContext) NamedPattern(var);
+        varPattern->setType(var->getType());
+        varPattern
           = new (Impl.SwiftContext) TypedPattern(
-                                      fieldPattern,
-                                      TypeLoc::withoutLoc(field->getType()));
-        fieldPattern->setType(field->getType());
+                                      varPattern,
+                                      TypeLoc::withoutLoc(var->getType()));
+        varPattern->setType(var->getType());
         
         auto patternBinding
           = new (Impl.SwiftContext) PatternBindingDecl(SourceLoc(),
-                                                       fieldPattern,
+                                                       varPattern,
                                                        nullptr, structDecl);
 
         // Create a constructor to initialize that value from a value of the
         // underlying type.
-        Decl *fieldDecl = field;
-        auto constructor = createValueConstructor(structDecl, {&fieldDecl, 1});
+        Decl *varDecl = var;
+        auto constructor = createValueConstructor(structDecl, {&varDecl, 1});
 
         // Set the members of the struct.
-        Decl *members[3] = { constructor, patternBinding, field };
+        Decl *members[3] = { constructor, patternBinding, var };
         structDecl->setMembers(
           Impl.SwiftContext.AllocateCopy(ArrayRef<Decl *>(members, 3)),
           SourceRange());
@@ -2081,11 +2081,11 @@ namespace {
         setterThunk->makeSetter(result);
       }
 
-      // Turn this into a property.
+      // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
-      result->setProperty(Impl.SwiftContext, SourceLoc(),
-                          getterThunk, setterThunk,
-                          SourceLoc());
+      result->setComputedAccessors(Impl.SwiftContext, SourceLoc(),
+                                   getterThunk, setterThunk,
+                                   SourceLoc());
       result->setIsObjC(true);
 
       // Handle attributes.
@@ -2414,7 +2414,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   // Write the function up as the getter.
   func->makeGetter(var);
-  var->setProperty(context, SourceLoc(), func, nullptr, SourceLoc());
+  var->setComputedAccessors(context, SourceLoc(), func, nullptr, SourceLoc());
 
   // Register this thunk as an external definition.
   SwiftContext.addedExternalDecl(func);

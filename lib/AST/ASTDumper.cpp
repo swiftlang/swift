@@ -364,7 +364,7 @@ namespace {
 
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
-      if (VD->isProperty()) {
+      if (VD->isComputed()) {
         if (FuncDecl *Get = VD->getGetter()) {
           OS << "\n";
           OS.indent(Indent + 2);

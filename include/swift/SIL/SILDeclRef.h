@@ -44,7 +44,7 @@ namespace swift {
 /// implementation-level entities associated with a single language-level
 /// declaration, such as uncurry levels of a function, the allocating and
 /// initializing entry points of a constructor, the getter and setter for
-/// a property, etc.
+/// a computed variable, etc.
 struct SILDeclRef {
   typedef llvm::PointerUnion3<ValueDecl *, ClosureExpr *,
                               AutoClosureExpr *> Loc;
@@ -116,7 +116,7 @@ struct SILDeclRef {
   /// AbstractClosureExpr:
   /// - If 'loc' is a func or closure, this returns a Func SILDeclRef.
   /// - If 'loc' is a getter or setter FuncDecl, this returns the Getter or
-  ///   Setter SILDeclRef for the property VarDecl.
+  ///   Setter SILDeclRef for the computed VarDecl.
   /// - If 'loc' is a ConstructorDecl, this returns the Allocator SILDeclRef
   ///   for the constructor.
   /// - If 'loc' is an EnumElementDecl, this returns the EnumElement
@@ -157,8 +157,8 @@ struct SILDeclRef {
   bool isFunc() const {
     return kind == Kind::Func;
   }
-  /// True if the SILDeclRef references a property accessor.
-  bool isProperty() const {
+  /// True if the SILDeclRef references a variable accessor.
+  bool isAccessor() const {
     return kind == Kind::Getter || kind == Kind::Setter;
   }
   /// True if the SILDeclRef references a constructor entry point.

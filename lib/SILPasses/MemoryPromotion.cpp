@@ -155,7 +155,7 @@ static void getScalarizedElementAddresses(SILValue Pointer,
   assert(AggType->is<StructType>() || AggType->is<BoundGenericStructType>());
   StructDecl *SD = cast<StructDecl>(AggType->getAnyNominal());
 
-  for (auto *VD : SD->getPhysicalFields()) {
+  for (auto *VD : SD->getStoredProperties()) {
     auto ResultTy = VD->getType()->getCanonicalType();
     ElementAddrs.push_back(B.createStructElementAddr(PointerInst->getLoc(),
                                                      Pointer, VD,
@@ -199,7 +199,7 @@ static void getScalarizedElements(SILValue V,
   }
 
   StructDecl *SD = cast<StructDecl>(AggType->getAnyNominal());
-  for (auto *VD : SD->getPhysicalFields()) {
+  for (auto *VD : SD->getStoredProperties()) {
     auto ResultTy = VD->getType()->getCanonicalType();
     ElementVals.push_back(B.createStructExtract(Loc, V, VD,
                                     SILType::getPrimitiveObjectType(ResultTy)));

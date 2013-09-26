@@ -345,8 +345,8 @@ public:
   void checkGlobalAddrInst(GlobalAddrInst *GAI) {
     require(GAI->getType().isAddress(),
             "GlobalAddr must have an address result type");
-    require(!GAI->getGlobal()->isProperty(),
-            "GlobalAddr cannot take the address of a property decl");
+    require(!GAI->getGlobal()->isComputed(),
+            "GlobalAddr cannot take the address of a computed variable");
     require(!GAI->getGlobal()->getDeclContext()->isLocalContext(),
             "GlobalAddr cannot take the address of a local var");
   }
@@ -445,10 +445,10 @@ public:
 
     CanType structTy = SI->getType().getSwiftType();
     auto opi = SI->getElements().begin(), opEnd = SI->getElements().end();
-    for (VarDecl *field : structDecl->getPhysicalFields()) {
+    for (VarDecl *field : structDecl->getStoredProperties()) {
       require(opi != opEnd,
-              "number of struct operands does not match number of physical "
-              "fields of struct");
+              "number of struct operands does not match number of stored "
+              "member variables of struct");
       
       Type fieldTy = structTy->getTypeOfMember(structDecl->getModuleContext(),
                                                field, nullptr);
@@ -651,8 +651,8 @@ public:
             "result of struct_extract cannot be address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "must struct_extract from struct");
-    require(!EI->getField()->isProperty(),
-            "cannot load logical property with struct_extract");
+    require(!EI->getField()->isComputed(),
+            "cannot load computed property with struct_extract");
 
     require(EI->getField()->getDeclContext() == sd,
             "struct_extract field is not a member of the struct");
@@ -690,8 +690,8 @@ public:
     require(sd, "struct_element_addr operand must be struct address");
     require(EI->getType(0).isAddress(),
             "result of struct_element_addr must be address");
-    require(!EI->getField()->isProperty(),
-            "cannot get address of logical property with struct_element_addr");
+    require(!EI->getField()->isComputed(),
+            "cannot get address of computed property with struct_element_addr");
 
     require(EI->getField()->getDeclContext() == sd,
             "struct_element_addr field is not a member of the struct");
@@ -706,8 +706,8 @@ public:
     requireReferenceValue(EI->getOperand(), "Operand of ref_element_addr");
     require(EI->getType(0).isAddress(),
             "result of ref_element_addr must be lvalue");
-    require(!EI->getField()->isProperty(),
-            "cannot get address of logical property with ref_element_addr");
+    require(!EI->getField()->isComputed(),
+            "cannot get address of computed property with ref_element_addr");
     SILType operandTy = EI->getOperand().getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_element_addr operand must be a class instance");

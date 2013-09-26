@@ -85,12 +85,12 @@ public:
 /// associated code to be reprocessed.  Different structures are resilient
 /// in different ways.  For example:
 ///   - A resilient type does not have a statically fixed size or layout.
-///   - A resilient field must be accessed with getters and setters, even if
+///   - A resilient variable must be accessed with getters and setters, even if
 ///     none are defined for it now.
 ///   - A resilient function may not be inlined.
 ///
 /// In general, resilience is inherited from the lexical context.  For
-/// example, a field declared in a fragile struct is implicitly fragile.
+/// example, a variable declared in a fragile struct is implicitly fragile.
 ///
 /// Some language structures, like tuples, are never themselves
 /// resilient (although they may be defined in terms of resilient

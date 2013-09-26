@@ -3139,7 +3139,7 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
       emitClassDecl(cast<ClassDecl>(member));
       continue;
     case DeclKind::Var:
-      if (cast<VarDecl>(member)->isProperty())
+      if (cast<VarDecl>(member)->isComputed())
         // Getter/setter will be handled separately.
         continue;
       continue;

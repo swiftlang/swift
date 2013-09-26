@@ -230,7 +230,7 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
   if(isa<ClangModule>(dc) &&
      (isa<ConstructorDecl>(d) ||
       isa<SubscriptDecl>(d) ||
-      (isa<VarDecl>(d) && cast<VarDecl>(d)->isProperty())))
+      (isa<VarDecl>(d) && cast<VarDecl>(d)->isComputed())))
     return SILLinkage::Thunk;
   
   return SILLinkage::External;
@@ -555,7 +555,7 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {
-  if (!vd->isProperty())
+  if (!vd->isComputed())
     addGlobalVariable(vd);
 }
 

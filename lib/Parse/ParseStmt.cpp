@@ -107,7 +107,7 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
   switch (Kind) {
   case BraceItemListKind::Brace:
     return false;
-  case BraceItemListKind::Property:
+  case BraceItemListKind::Variable:
     return Tok.isContextualKeyword("get") || Tok.isContextualKeyword("set");
   case BraceItemListKind::Case:
     return Tok.is(tok::kw_case) || Tok.is(tok::kw_default);

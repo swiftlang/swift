@@ -401,9 +401,9 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
   
   LValue lv;
 
-  // If it's a property, push a reference to the getter and setter.
+  // If it's a computed variable, push a reference to the getter and setter.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
-    if (var->isProperty()) {
+    if (var->isComputed()) {
       lv.add<GetterSetterComponent>(sgl.gen, 
                                     var,
                                     ArrayRef<Substitution>{},
@@ -457,10 +457,10 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
 
   auto substTypeOfRValue = getSubstTypeOfRValue(gen, e->getType());
 
-  // If this is a physical field not reflected as an Objective-C
+  // If this is a stored variable not reflected as an Objective-C
   // property, access with a fragile element reference.
   if (VarDecl *var = dyn_cast<VarDecl>(e->getMember().getDecl())) {
-    if (!var->isProperty() && !gen.SGM.requiresObjCDispatch(var)) {
+    if (!var->isComputed() && !gen.SGM.requiresObjCDispatch(var)) {
       // Find the substituted storage type.
       SILType varStorageType =
         gen.SGM.Types.getSubstitutedStorageType(var, e->getType());

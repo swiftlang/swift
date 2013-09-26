@@ -1578,8 +1578,8 @@ public:
       Implicit = 0x1,
       
       /// A non-settable lvalue is an lvalue that cannot be assigned to because
-      /// it is a property with a `get` but no `set` method, a property of a
-      /// non-settable lvalue, or a property of an rvalue. Non-settable
+      /// it is a variable with a `get` but no `set` method, a variable with a
+      /// non-settable lvalue, or a variable of an rvalue. Non-settable
       /// lvalues cannot be used as the destination of an assignment or as
       /// [inout] arguments.
       NonSettable = 0x2,

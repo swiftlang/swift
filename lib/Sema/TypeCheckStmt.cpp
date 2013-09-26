@@ -810,7 +810,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
 
       // Initialize the variables.
       for (auto var : variables) {
-        if (var->isProperty())
+        if (var->isComputed())
           continue;
 
         // If we already saw an initializer for this member, don't

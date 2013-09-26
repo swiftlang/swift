@@ -38,7 +38,7 @@ class LogicalPathComponent;
 /// This divide between physical/logical is closely related to the
 /// fragile/resilient split, with two primary differences:
 ///   - Any sort of implementation can be fragile.  For example, a
-///     computed field can still be fragile, meaning that it is known
+///     computed variable can still be fragile, meaning that it is known
 ///     to be implemented with a getter/setter.  The known
 ///     implementation must be a direct offset in order to qualify as
 ///     physical.

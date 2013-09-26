@@ -286,7 +286,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
       emitClassDecl(cast<ClassDecl>(member));
       continue;
     case DeclKind::Var:
-      if (cast<VarDecl>(member)->isProperty())
+      if (cast<VarDecl>(member)->isComputed())
         // Getter/setter will be handled separately.
         continue;
       // FIXME: Will need an implementation here for resilience
@@ -307,7 +307,7 @@ const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
   SmallVector<VarDecl*, 8> fields;
   for (Decl *D : D->getMembers())
     if (VarDecl *VD = dyn_cast<VarDecl>(D))
-      if (!VD->isProperty()) {
+      if (!VD->isComputed()) {
         if (!IGM.Opts.EnableDynamicValueTypeLayout &&
             !IGM.getTypeInfo(VD->getType()).isFixedSize()) {
           IGM.unimplemented(VD->getLoc(), "dynamic field layout in structs");

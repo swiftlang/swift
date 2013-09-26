@@ -152,11 +152,11 @@ ERROR(expected_identifier_after_case_comma,decl_parsing,none,
 ERROR(decl_redefinition,decl_parsing,none,
       "%select{declaration|definition}0 conflicts with previous value", 
       (bool))
-ERROR(disallowed_var_decl,decl_parsing,none,
+ERROR(disallowed_stored_var_decl,decl_parsing,none,
       "'var' declarations without getter/setter not allowed here", ())
-ERROR(disallowed_property_decl,decl_parsing,none,
+ERROR(disallowed_computed_var_decl,decl_parsing,none,
       "'var' declarations with getter/setter not allowed here", ())
-ERROR(disallowed_property_multiple_getset,decl_parsing,none,
+ERROR(disallowed_var_multiple_getset,decl_parsing,none,
       "'var' declarations with multiple variables cannot have explicit getters/setters", ())
 ERROR(disallowed_func_def,decl_parsing,none,
       "function body not allowed here", ())
@@ -634,8 +634,8 @@ ERROR(expected_operator_ref,expr_parsing,none,
 ERROR(invalid_postfix_operator,expr_parsing,none,
       "operator with postfix spacing cannot start a subexpression", ())
 
-ERROR(expected_field_name,expr_parsing,PointsToFirstBadToken,
-      "expected field name following '.'", ())
+ERROR(expected_member_name,expr_parsing,PointsToFirstBadToken,
+      "expected member name following '.'", ())
 ERROR(expected_dollar_numeric,expr_parsing,none,
       "expected numeric value following '$'", ())
 ERROR(dollar_numeric_too_large,expr_parsing,none,
@@ -1333,7 +1333,7 @@ ERROR(expression_unused_lvalue,sema_tcs,none,
 ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to the result of this expression", ())
 ERROR(assignment_lhs_not_settable,sema_tcs,none,
-      "cannot assign to a property or subscript without a 'set' method", ())
+      "cannot assign to read-only variable or subscript", ())
 
 // ForEach Stmt
 ERROR(enumerable_protocol_broken,sema_tcs,none,

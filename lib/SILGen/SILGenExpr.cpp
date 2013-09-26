@@ -298,8 +298,8 @@ static ManagedValue emitGlobalVariable(SILGenFunction &gen,
                                        SILLocation loc, VarDecl *var) {
   assert(!var->getDeclContext()->isLocalContext() &&
          "not a global variable!");
-  assert(!var->isProperty() &&
-         "not a physical global variable!");
+  assert(!var->isComputed() &&
+         "not a stored global variable!");
   
   // FIXME: Always emit global variables directly. Eventually we want "true"
   // global variables to be indirectly accessed so that they can be initialized
@@ -332,8 +332,8 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
             || uncurryLevel == 0)
            && "uncurry level doesn't make sense for vars");
 
-    assert(!var->isProperty() &&
-           "property accessors should go through ");
+    assert(!var->isComputed() &&
+           "computed variables should be handled elsewhere");
     
     // For local decls, use the address we allocated.
     auto It = VarLocs.find(decl);
@@ -1536,7 +1536,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   // FIXME: Can a destructor always consider its fields fragile like this?
   for (Decl *member : cd->getMembers()) {
     if (VarDecl *vd = dyn_cast<VarDecl>(member)) {
-      if (vd->isProperty())
+      if (vd->isComputed())
         continue;
       const TypeLowering &ti = getTypeLowering(vd->getType());
       if (!ti.isTrivial()) {
@@ -1673,7 +1673,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   if (resultSlot) {
     
     auto elti = elements.begin(), eltEnd = elements.end();
-    for (VarDecl *field : decl->getPhysicalFields()) {
+    for (VarDecl *field : decl->getStoredProperties()) {
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
       auto fieldTy = selfTy.getSwiftRValueType()
@@ -1693,7 +1693,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   SmallVector<SILValue, 4> eltValues;
   
   auto elti = elements.begin(), eltEnd = elements.end();
-  for (VarDecl *field : decl->getPhysicalFields()) {
+  for (VarDecl *field : decl->getStoredProperties()) {
     assert(elti != eltEnd && "number of args does not match number of fields");
     (void)eltEnd;
     auto fieldTy = selfTy.getSwiftRValueType()

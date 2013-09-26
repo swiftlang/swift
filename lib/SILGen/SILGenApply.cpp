@@ -1739,8 +1739,8 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     auto valueTy =e->getType()->castTo<BoundGenericType>()->getGenericArgs()[0];
     auto methodTy = valueTy;
 
-    // For a property, we want the getter.
-    if (member.isProperty())
+    // For a computed variable, we want the getter.
+    if (member.isAccessor())
       methodTy = FunctionType::get(TupleType::getEmpty(getASTContext()),
                                    methodTy, getASTContext());
 
@@ -1753,7 +1753,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     // Create the result value.
     SILValue result = B.createPartialApply(e, memberArg, operand,
                                            getLoweredType(methodTy));
-    if (member.isProperty()) {
+    if (member.isAccessor()) {
       result = B.createApply(e, result, getLoweredType(valueTy), { });
     }
 

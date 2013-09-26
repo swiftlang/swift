@@ -211,7 +211,7 @@ namespace {
 
         // Skip properties that we have to access logically.
         assert(isClassResilient || !IGM.isResilient(var, Resilience));
-        if (var->isProperty())
+        if (var->isComputed())
           continue;
 
         Fields.push_back(FieldEntry(var, getCurFieldAccess()));
@@ -240,7 +240,7 @@ namespace {
     }
 
     void adjustAccessAfterField(VarDecl *var) {
-      if (var->isProperty()) return;
+      if (var->isComputed()) return;
 
       CanType type = var->getType()->getCanonicalType();
       switch (IGM.classifyTypeSize(type, ResilienceScope::Local)) {
@@ -266,7 +266,7 @@ static unsigned getFieldIndex(ClassDecl *base, VarDecl *target) {
   for (Decl *member : base->getMembers()) {
     if (member == target) return index;
     if (auto var = dyn_cast<VarDecl>(member))
-      if (!var->isProperty())
+      if (!var->isComputed())
         ++index;
   }
   llvm_unreachable("didn't find field in type!");
@@ -314,7 +314,7 @@ namespace {
       assert(LastElements.empty());
       for (Decl *member : theClass->getMembers()) {
         VarDecl *var = dyn_cast<VarDecl>(member);
-        if (!var || var->isProperty()) continue;
+        if (!var || var->isComputed()) continue;
 
         auto &eltType = IGM.getTypeInfo(var->getType());
         // FIXME: Type-parameter-dependent field layout isn't implemented yet.
@@ -531,7 +531,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       emitClassDecl(cast<ClassDecl>(member));
       continue;
     case DeclKind::Var:
-      if (cast<VarDecl>(member)->isProperty())
+      if (cast<VarDecl>(member)->isComputed())
         // Getter/setter will be handled separately.
         continue;
       // FIXME: Will need an implementation here for resilience
@@ -895,19 +895,19 @@ namespace {
     /*** Ivars *************************************************************/
 
   public:
-    /// Variables might be properties or ivars.
+    /// Variables might be stored or computed.
     void visitVarDecl(VarDecl *var) {
-      if (var->isProperty()) {
+      if (var->isComputed()) {
         visitProperty(var);
       } else {
-        visitIvar(var);
+        visitStoredVar(var);
       }
     }
 
   private:
     /// Ivars need to be collected in the ivars list, and they also
     /// affect flags.
-    void visitIvar(VarDecl *var) {
+    void visitStoredVar(VarDecl *var) {
       // FIXME: how to handle ivar extensions in categories?
       if (!Layout && !FieldLayout)
         return;

@@ -1202,7 +1202,7 @@ public:
   }
 };
 
-/// UnresolvedDotExpr - A field access (foo.bar) on an expression with
+/// UnresolvedDotExpr - A member access (foo.bar) on an expression with
 /// unresolved type.
 class UnresolvedDotExpr : public Expr {
   Expr *SubExpr;

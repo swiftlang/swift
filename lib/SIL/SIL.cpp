@@ -74,25 +74,26 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
     
     bool isGlobal = kind == Kind::GlobalAccessor;
     
-    assert(!(isGlobal && var->isProperty())
-           && "can't reference property as global var");
+    assert(!(isGlobal && var->isComputed())
+           && "can't reference computed var as global var");
     assert(!(isGlobal && var->getDeclContext()->isLocalContext())
            && "can't reference local var as global var");
     
     if (isGlobal) {
       naturalUncurryLevel = 0;
     } else {
-      // Instance properties have a 'self' curry.
+      // Member computed vars have a 'self' curry.
+      // FIXME: What about static vars?
       if (var->isInstanceMember())
         naturalUncurryLevel = 1;
-      // Local properties may have captures that affect the natural uncurry
+      // Local computed vars may have captures that affect the natural uncurry
       // level.
       else if (kind == Kind::Getter && var->getGetter())
         naturalUncurryLevel = getFuncNaturalUncurryLevel(var->getGetter());
       else if (kind == Kind::Setter && var->getSetter())
         naturalUncurryLevel = getFuncNaturalUncurryLevel(var->getSetter());
-      // A property accessor for a non-instance variable without getters and
-      // setters must be a resilient property, so it can't have context.
+      // An accessor for a non-instance variable without getters and
+      // setters must be a resilient variable, so it can't have context.
       else
         naturalUncurryLevel = 0;
     }
@@ -126,10 +127,10 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
   if (ValueDecl *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (FuncDecl *fd = dyn_cast<FuncDecl>(vd)) {
       // Map getter or setter FuncDecls to Getter or Setter SILDeclRefs of the
-      // property.
+      // variable.
       if (fd->isGetterOrSetter()) {
-        ValueDecl *property = cast<ValueDecl>(fd->getGetterOrSetterDecl());
-        loc = property;
+        ValueDecl *variable = cast<ValueDecl>(fd->getGetterOrSetterDecl());
+        loc = variable;
         if (fd->getGetterDecl()) {
           kind = Kind::Getter;
         } else if (fd->getSetterDecl()) {
@@ -217,7 +218,7 @@ bool SILDeclRef::isTransparent() const {
 
   if (hasDecl()) {
     const ValueDecl *D = getDecl();
-    if (isProperty()) {
+    if (isAccessor()) {
       if (kind == Kind::Getter) {
         if (const SubscriptDecl *SD = dyn_cast<SubscriptDecl>(getDecl()))
           D = SD->getGetter();
@@ -229,7 +230,7 @@ bool SILDeclRef::isTransparent() const {
         else
           D = cast<VarDecl>(getDecl())->getSetter();
       } else {
-        llvm_unreachable("Property decl is either a getter or a setter.");
+        llvm_unreachable("Accessor is neither a getter nor a setter.");
       }
     }
     

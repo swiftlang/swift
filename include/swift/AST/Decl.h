@@ -1549,15 +1549,17 @@ public:
   void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
 private:
-  /// Predicate used to filter FieldRange.
-  static bool isPhysicalField(VarDecl *vd); // at end of file
+  /// Predicate used to filter StoredPropertyRange.
+  static bool isStoredProperty(VarDecl *vd); // at end of file
   
 public:
-  /// A range for iterating the known "physical" fields of a structure.
-  using FieldRange = DeclFilterRange<VarDecl, isPhysicalField>;
+  /// A range for iterating the stored member variables of a structure.
+  using StoredPropertyRange = DeclFilterRange<VarDecl, isStoredProperty>;
 
-  /// Return a collection of the physical fields of this type.
-  FieldRange getPhysicalFields() const { return FieldRange(getMembers()); }
+  /// Return a collection of the stored member variables of this type.
+  StoredPropertyRange getStoredProperties() const {
+    return StoredPropertyRange(getMembers());
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -1891,14 +1893,15 @@ public:
   SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const { return getNameLoc(); }
 
-  /// \brief Determine whether this variable is actually a property, which
+  /// \brief Determine whether this variable is computed, which means it
   /// has no storage but does have a user-defined getter or setter.
-  bool isProperty() const { return GetSet != nullptr; }
+  ///
+  /// The opposite of "computed" is "stored".
+  bool isComputed() const { return GetSet != nullptr; }
   
-  /// \brief Make this variable into a property, providing a getter and
-  /// setter.
-  void setProperty(ASTContext &Context, SourceLoc LBraceLoc, FuncDecl *Get,
-                   FuncDecl *Set, SourceLoc RBraceLoc);
+  /// \brief Turn this into a computed variable, providing a getter and setter.
+  void setComputedAccessors(ASTContext &Context, SourceLoc LBraceLoc,
+                            FuncDecl *Get, FuncDecl *Set, SourceLoc RBraceLoc);
 
   /// \brief Retrieve the getter used to access the value of this variable.
   FuncDecl *getGetter() const { return GetSet? GetSet->Get : nullptr; }
@@ -1907,7 +1910,7 @@ public:
   FuncDecl *getSetter() const { return GetSet? GetSet->Set : nullptr; }
   
   /// \brief Returns whether the var is settable, either because it is a
-  /// simple var or because it is a property with a setter.
+  /// stored var or because it has a custom setter.
   bool isSettable() const { return !GetSet || GetSet->Set; }
   
   VarDecl *getOverriddenDecl() const {
@@ -2912,8 +2915,8 @@ inline bool ValueDecl::isSettable() const {
     return false;
 }
 
-inline bool NominalTypeDecl::isPhysicalField(VarDecl *vd) {
-  return !vd->isProperty();
+inline bool NominalTypeDecl::isStoredProperty(VarDecl *vd) {
+  return !vd->isComputed();
 }
 
 inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getArgParamBuffer() {

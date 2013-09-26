@@ -353,7 +353,7 @@ public:
   /// Returns the type of the "self" parameter to methods of a type.
   Type getMethodSelfType(Type selfType) const;
   
-  /// Returns the type of a property accessor, () -> T for a getter,
+  /// Returns the type of a variable accessor, () -> T for a getter,
   /// or (value:T) -> () for a setter. 'kind' must be one of the Kind constants
   /// from SILDeclRef, SILDeclRef::Getter or SILDeclRef::Setter.
   Type getPropertyType(SILDeclRef::Kind kind, Type propType) const;

@@ -641,9 +641,10 @@ AssociatedTypeDecl *ProtocolDecl::getSelf() const {
   llvm_unreachable("No 'Self' associated type?");
 }
 
-void VarDecl::setProperty(ASTContext &Context, SourceLoc LBraceLoc,
-                          FuncDecl *Get, FuncDecl *Set, SourceLoc RBraceLoc) {
-  assert(!GetSet && "Variable is already a property?");
+void VarDecl::setComputedAccessors(ASTContext &Context, SourceLoc LBraceLoc,
+                                   FuncDecl *Get, FuncDecl *Set,
+                                   SourceLoc RBraceLoc) {
+  assert(!GetSet && "Variable already has accessors?");
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
   GetSet = new (Mem) GetSetRecord;
   GetSet->Braces = SourceRange(LBraceLoc, RBraceLoc);
@@ -970,7 +971,7 @@ static bool isIntegralType(Type type) {
     VarDecl *singleVar = nullptr;
     for (auto member : structDecl->getMembers()) {
       auto var = dyn_cast<VarDecl>(member);
-      if (!var || var->isProperty())
+      if (!var || var->isComputed())
         continue;
 
       if (singleVar)

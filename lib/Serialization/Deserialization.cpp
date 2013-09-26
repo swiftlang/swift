@@ -911,10 +911,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     declOrOffset = var;
 
     if (getterID || setterID) {
-      var->setProperty(ctx, SourceLoc(),
-                       cast_or_null<FuncDecl>(getDecl(getterID)),
-                       cast_or_null<FuncDecl>(getDecl(setterID)),
-                       SourceLoc());
+      var->setComputedAccessors(ctx, SourceLoc(),
+                                cast_or_null<FuncDecl>(getDecl(getterID)),
+                                cast_or_null<FuncDecl>(getDecl(setterID)),
+                                SourceLoc());
     }
 
     if (isImplicit)

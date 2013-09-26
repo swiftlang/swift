@@ -198,7 +198,7 @@ static SILInstruction *constantFoldInstruction(SILInstruction &I,
       StructDecl *SD =
         cast<StructDecl>(Struct->getType().getSwiftType()->getAnyNominal());
 
-      for (auto MD : SD->getPhysicalFields()) {
+      for (auto MD : SD->getStoredProperties()) {
         if (MD == SEI->getField()) {
           ValueBase *E = Struct->getElements()[FieldNo].getDef();
           // If the element the struct_extract is extracting is const, fold it.

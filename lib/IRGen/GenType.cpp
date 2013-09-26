@@ -972,7 +972,7 @@ namespace {
       // members are actually dependently-sized with the given
       // arguments.
       ObjectSize result = ObjectSize::Fixed;
-      for (auto field : D->getPhysicalFields()) {
+      for (auto field : D->getStoredProperties()) {
         result = std::max(result, visit(field->getType()->getCanonicalType()));
       }
       return result;

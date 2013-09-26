@@ -62,7 +62,7 @@ PrintStruct(TypeChecker &TC, VarDecl *Arg,
   bool isFirstMember = true;
   for (Decl *D : SD->getMembers()) {
     if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
-      if (!VD->isProperty()) {
+      if (!VD->isComputed()) {
         if (isFirstMember)
           isFirstMember = false;
         else
@@ -367,7 +367,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
     return;
   }
 
-  // We print a struct by printing each non-property member variable.
+  // We print a struct by printing each stored member variable.
   if (StructType *ST = dyn_cast<StructType>(T)) {
     PrintStruct(TC, Arg, SugarT, ST->getDecl(), Loc, EndLoc,
                 MemberIndexes, BodyContent, PrintDecls, DC);

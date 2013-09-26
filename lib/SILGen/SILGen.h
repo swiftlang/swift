@@ -164,8 +164,7 @@ public:
   /// Emit the ObjC-compatible entry point for a method.
   void emitObjCMethodThunk(FuncDecl *method);
   
-  /// Emit the ObjC-compatible getter and setter for an instance variable or
-  /// property.
+  /// Emit the ObjC-compatible getter and setter for a property.
   void emitObjCPropertyMethodThunks(VarDecl *prop);
 
   /// Emit the ObjC-compatible entry point for a constructor.

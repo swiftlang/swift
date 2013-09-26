@@ -2118,8 +2118,8 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       if (!var)
         continue;
 
-      // Properties are computed, not initialized.
-      if (var->isProperty())
+      // Computed properties are not initialized.
+      if (var->isComputed())
         continue;
       tc.validateDecl(var);
 
@@ -2191,7 +2191,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     if (auto var = dyn_cast<VarDecl>(member)) {
-      if (!var->isProperty())
+      if (!var->isComputed())
         FoundInstanceVar = true;
     }
   }
@@ -2456,7 +2456,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
     patternBind->getPattern()->collectVariables(variables);
 
     for (auto var : variables) {
-      if (var->isProperty() || var->isInvalid())
+      if (var->isComputed() || var->isInvalid())
         continue;
 
       // If this variable is not default-initializable, we're done: we can't

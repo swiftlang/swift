@@ -918,7 +918,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
           Result.setHasCodeCompletion();
           return Result;
         }
-        diagnose(Tok, diag::expected_field_name);
+        diagnose(Tok, diag::expected_member_name);
         return nullptr;
       }
 

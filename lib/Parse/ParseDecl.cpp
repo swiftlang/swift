@@ -978,7 +978,7 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
     ParserStatus BodyStatus =
         parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/true,
                   diag::expected_rbrace_extension, [&]()->ParserStatus{
-      return parseDecl(MemberDecls, PD_HasContainerType | PD_DisallowVar);
+      return parseDecl(MemberDecls, PD_HasContainerType | PD_DisallowStoredVar);
     });
     // Don't propagate the code completion bit from members: we can not help
     // code completion inside a member decl, and our callers can not do
@@ -1098,7 +1098,7 @@ namespace {
         if (Attributes.isValid())
           VD->getMutableAttrs() = Attributes;
         
-        if (VD->isProperty()) {
+        if (VD->isComputed()) {
           // FIXME: Order of get/set not preserved.
           if (FuncDecl *Get = VD->getGetter()) {
             Get->setDeclContext(CurDeclContext);
@@ -1217,7 +1217,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
       SmallVector<ExprStmtOrDecl, 16> Entries;
       parseBraceItems(Entries, false /*NotTopLevel*/,
-                      BraceItemListKind::Property);
+                      BraceItemListKind::Variable);
       BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
                                           Entries, Tok.getLoc());
       Get->setBody(Body);
@@ -1340,7 +1340,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     // Parse the body.
     SmallVector<ExprStmtOrDecl, 16> Entries;
     parseBraceItems(Entries, false /*NotTopLevel*/,
-                    BraceItemListKind::Property);
+                    BraceItemListKind::Variable);
     BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
                                         Entries, Tok.getLoc());
     Set->setBody(Body);
@@ -1418,9 +1418,9 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
     Invalid = true;
   }
 
-  // If things went well, turn this variable into a property.
+  // If things went well, turn this into a computed variable.
   if (!Invalid && PrimaryVar && (Set || Get))
-    PrimaryVar->setProperty(Context, LBLoc, Get, Set, RBLoc);
+    PrimaryVar->setComputedAccessors(Context, LBLoc, Get, Set, RBLoc);
 }
 
 /// \brief Parse a 'var' declaration, doing no token skipping on error.
@@ -1520,15 +1520,15 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
 
   if (HasGetSet) {
     if (PBDs.size() > 1) {
-      diagnose(VarLoc, diag::disallowed_property_multiple_getset);
+      diagnose(VarLoc, diag::disallowed_var_multiple_getset);
       Status.setIsParseError();
     }
-    if (Flags & PD_DisallowProperty) {
-      diagnose(VarLoc, diag::disallowed_property_decl);
+    if (Flags & PD_DisallowComputedVar) {
+      diagnose(VarLoc, diag::disallowed_computed_var_decl);
       Status.setIsParseError();
     }
-  } else if (Flags & PD_DisallowVar) {
-    diagnose(VarLoc, diag::disallowed_var_decl);
+  } else if (Flags & PD_DisallowStoredVar) {
+    diagnose(VarLoc, diag::disallowed_stored_var_decl);
     Status.setIsParseError();
     return Status;
   }
@@ -1899,7 +1899,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags) {
     if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                 diag::expected_rbrace_enum,
                                 PD_HasContainerType | PD_AllowEnumElement |
-                                PD_DisallowVar))
+                                PD_DisallowStoredVar))
       Status.setIsParseError();
   }
 
@@ -2342,7 +2342,7 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
       // Parse the members.
       if (parseNominalDeclMembers(Members, LBraceLoc, RBraceLoc,
                                   diag::expected_rbrace_protocol,
-                                  PD_HasContainerType | PD_DisallowProperty |
+                                  PD_HasContainerType | PD_DisallowComputedVar |
                                   PD_DisallowFuncDef | PD_DisallowNominalTypes |
                                   PD_DisallowInit | PD_DisallowTypeAliasDef |
                                   PD_InProtocol))

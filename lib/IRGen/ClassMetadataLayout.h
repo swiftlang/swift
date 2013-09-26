@@ -120,16 +120,15 @@ private:
     // offset --- but that's really tricky to guarantee.
     for (auto member : theClass->getMembers()) {
       if (auto field = dyn_cast<VarDecl>(member))
-        if (!field->isProperty())
+        if (!field->isComputed())
           updateForFieldSize(field);
     }
 
     // Add entries for the methods.  TODO: methods from extensions
     for (auto member : theClass->getMembers()) {
-      // Add entries for fields that are not currently declared as
-      // properties.
+      // Add entries for stored fields.
       if (auto field = dyn_cast<VarDecl>(member))
-        if (!field->isProperty())
+        if (!field->isComputed())
           addFieldEntries(field);
 
       // Add entries for methods.
@@ -154,7 +153,7 @@ private:
   }
 
   void updateForFieldSize(VarDecl *field) {
-    assert(!field->isProperty());
+    assert(!field->isComputed());
 
     // Update the class layout based on abstract, globally-known
     // characteristics of the type.

@@ -732,10 +732,10 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
   return false;
 }
 
-// A property or subscript is settable if:
+// A variable or subscript is settable if:
 // - its base type (the type of the 'a' in 'a[n]' or 'a.b') either has
 //   reference semantics or has value semantics and is settable, AND
-// - the 'var' or 'subscript' decl for the property provides a setter
+// - the 'var' or 'subscript' decl provides a setter
 template<typename SomeValueDecl>
 static LValueType::Qual settableQualForDecl(Type baseType,
                                             SomeValueDecl *decl) {
@@ -4018,6 +4018,8 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   if (LValueType *destLV = destTy->getAs<LValueType>()) {
     // If the destination is a settable lvalue, we're good; get its object type.
     if (!destLV->isSettable()) {
+      // FIXME: error message refers to "variable or subscript" instead of
+      // saying which one it is.
       getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_settable)
         .highlight(dest->getSourceRange());
       return Type();

@@ -270,7 +270,7 @@ Type Lowering::getThickFunctionType(Type t) {
 
 CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
   if (VarDecl *var = dyn_cast<VarDecl>(capture))
-    if (var->isProperty())
+    if (var->isComputed())
       return var->isSettable()? CaptureKind::GetterSetter : CaptureKind::Getter;
 
   if (capture->isReferencedAsLValue())
@@ -999,7 +999,7 @@ namespace {
       if (TC.isAnywhereResilient(D))
         return handleAddressOnly(structType);
 
-      for (auto field : D->getPhysicalFields()) {
+      for (auto field : D->getStoredProperties()) {
         auto fieldType = structType->getTypeOfMember(D->getModuleContext(),
                                                      field, nullptr);
         auto &lowering = TC.getTypeLowering(fieldType);
@@ -1245,7 +1245,7 @@ SILType TypeConverter::getConstantType(SILDeclRef constant) {
   return loweredTy;
 }
 
-/// Get the type of a property accessor, () -> T for a getter or (value:T) -> ()
+/// Get the type of a variable accessor, () -> T for a getter or (value:T) -> ()
 /// for a setter.
 Type TypeConverter::getPropertyType(SILDeclRef::Kind kind,
                                     Type valueType) const {
@@ -1428,7 +1428,7 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
     
     // If this is a local variable, its property methods may be closures.
     if (VarDecl *var = dyn_cast<VarDecl>(c.getDecl())) {
-      if (var->isProperty()) {
+      if (var->isComputed()) {
         FuncDecl *property = c.kind == SILDeclRef::Kind::Getter
           ? var->getGetter()
           : var->getSetter();
@@ -1454,7 +1454,7 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
   
   case SILDeclRef::Kind::GlobalAccessor: {
     VarDecl *var = cast<VarDecl>(vd);
-    assert(!var->isProperty() && "constant ref to non-physical global var");
+    assert(!var->isComputed() && "constant ref to computed global var");
     return getGlobalAccessorType(var->getType(), Context);
   }
   case SILDeclRef::Kind::DefaultArgGenerator: {

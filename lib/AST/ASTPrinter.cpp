@@ -571,7 +571,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     decl->getType().print(OS);   
   }
 
-  if (decl->isProperty() && Options.FunctionDefinitions) {
+  if (decl->isComputed() && Options.FunctionDefinitions) {
     OS << " {";
     {
       if (auto getter = decl->getGetter()) {
@@ -970,22 +970,22 @@ void Decl::print(
 }
 
 bool Decl::shouldPrintInContext() const {
-  // Skip getters/setters. They are part of the property or subscript.
+  // Skip getters/setters. They are part of the variable or subscript.
   if (isa<FuncDecl>(this) && cast<FuncDecl>(this)->isGetterOrSetter())
     return false;
 
-  // Skip non-property variables, unless they came from a Clang module.
-  // Non-property variables in Swift source will be picked up by the
+  // Skip stored variables, unless they came from a Clang module.
+  // Stored variables in Swift source will be picked up by the
   // PatternBindingDecl.
   if (isa<VarDecl>(this) && !this->hasClangNode() &&
-      !cast<VarDecl>(this)->isProperty())
+      !cast<VarDecl>(this)->isComputed())
     return false;
 
-  // Skip pattern bindings that consist of just one property.
+  // Skip pattern bindings that consist of just one computed variable.
   if (auto pbd = dyn_cast<PatternBindingDecl>(this)) {
     auto pattern = pbd->getPattern()->getSemanticsProvidingPattern();
     if (auto named = dyn_cast<NamedPattern>(pattern)) {
-      if (named->getDecl()->isProperty()) {
+      if (named->getDecl()->isComputed()) {
         return false;
       }
     }
