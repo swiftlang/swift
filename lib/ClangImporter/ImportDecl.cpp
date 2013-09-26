@@ -1015,6 +1015,15 @@ namespace {
       if (decl->hasAttr<clang::IBActionAttr>())
         result->getMutableAttrs().IBAction = true;
 
+      // Check whether there's some special method to import.
+      result->setClangNode(decl->getCanonicalDecl());
+      if (!Impl.ImportedDecls[decl->getCanonicalDecl()])
+        Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+
+      if (decl->getMethodFamily() != clang::OMF_init ||
+          !isReallyInitMethod(decl)) {
+        importSpecialMethod(result, dc);
+      }
       return result;
     }
 
@@ -1042,12 +1051,13 @@ namespace {
     /// \brief Given an imported method, try to import it as some kind of
     /// special declaration, e.g., a constructor or subscript.
     Decl *importSpecialMethod(Decl *decl, DeclContext *dc) {
-      // Only consider Objective-C methods...
+      // Check whether there's a method associated with this declaration.
       auto objcMethod
         = dyn_cast_or_null<clang::ObjCMethodDecl>(decl->getClangDecl());
       if (!objcMethod)
         return nullptr;
 
+      // Only consider Objective-C methods...
       switch (objcMethod->getMethodFamily()) {
       case clang::OMF_None:
         // Check for one of the subscripting selectors.
@@ -1522,8 +1532,8 @@ namespace {
 
       // Check whether we've already created a subscript operation for
       // this getter/setter pair.
-      if (Impl.Subscripts[{getter, setter}])
-        return nullptr;
+      if (auto subscript = Impl.Subscripts[{getter, setter}])
+        return subscript;
 
       // Compute the element type, looking through the implicit 'self'
       // parameter and the normal function parameters.
@@ -1643,6 +1653,7 @@ namespace {
 
       // Note that we've created this subscript.
       Impl.Subscripts[{getter, setter}] = subscript;
+      Impl.Subscripts[{getterThunk, nullptr}] = subscript;
       return subscript;
     }
 
@@ -1686,6 +1697,7 @@ namespace {
     void importObjCMembers(const clang::ObjCContainerDecl *decl,
                            DeclContext *swiftContext,
                            SmallVectorImpl<Decl *> &members) {
+      llvm::SmallPtrSet<Decl *, 4> knownMembers;
       for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
            m != mEnd; ++m) {
         auto nd = dyn_cast<clang::NamedDecl>(*m);
@@ -1704,13 +1716,14 @@ namespace {
         if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
           if (auto property = objcMethod->findPropertyDecl())
             if (Impl.importDecl(
-                                const_cast<clang::ObjCPropertyDecl *>(property)))
+                  const_cast<clang::ObjCPropertyDecl *>(property)))
               continue;
 
           // If there is a special declaration associated with this member,
           // add it now.
           if (auto special = importSpecialMethod(member, swiftContext)) {
-            members.push_back(special);
+            if (knownMembers.insert(special))
+              members.push_back(special);
 
             // If we imported a constructor, the underlying init method is not
             // visible.

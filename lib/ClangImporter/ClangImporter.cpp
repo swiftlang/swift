@@ -613,8 +613,7 @@ void ClangImporter::getImportedModules(
 }
 
 /// Returns true if the first selector piece matches the given identifier.
-static bool selectorStartsWithName(ASTContext &ctx, clang::Selector sel,
-                                   Identifier name) {
+static bool selectorStartsWithName(clang::Selector sel, Identifier name) {
   return sel.getNameForSlot(0) == name.str();
 }
 
@@ -638,13 +637,68 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
   clang::Sema &S = Impl.Instance->getSema();
   clang::ExternalASTSource *source = S.getExternalSource();
 
+  // When looking for a subscript, we actually look for the getters
+  // and setters.
+  clang::IdentifierInfo *objectAtIndexedSubscriptId = nullptr;
+  clang::IdentifierInfo *objectForKeyedSubscriptId = nullptr;
+  clang::IdentifierInfo *setObjectId = nullptr;
+  clang::IdentifierInfo *atIndexedSubscriptId = nullptr;
+  clang::IdentifierInfo *forKeyedSubscriptId = nullptr;
+  bool isSubscript = !name.empty() && name.str().equals("__subscript");
+  if (isSubscript) {
+    auto &identTable = S.Context.Idents;
+    objectAtIndexedSubscriptId = &identTable.get("objectAtIndexedSubscript");
+    objectForKeyedSubscriptId = &identTable.get("objectForKeyedSubscript");
+    setObjectId = &identTable.get("setObject");
+    atIndexedSubscriptId = &identTable.get("atIndexedSubscript");
+    forKeyedSubscriptId = &identTable.get("forKeyedSubscript");
+  }
+
+  // Function that determines whether the given selector is
+  // acceptable.
+  auto acceptableSelector = [&](clang::Selector sel) -> bool {
+    if (name.empty())
+      return true;
+
+    switch (sel.getNumArgs()) {
+    case 0:
+      if (isSubscript)
+        return false;
+
+      break;
+
+    case 1:
+      if (isSubscript)
+        return sel.getIdentifierInfoForSlot(0) == objectAtIndexedSubscriptId ||
+               sel.getIdentifierInfoForSlot(0) == objectForKeyedSubscriptId;
+
+      break;
+
+    case 2:
+      if (isSubscript)
+        return (sel.getIdentifierInfoForSlot(0) == setObjectId &&
+                (sel.getIdentifierInfoForSlot(1) == atIndexedSubscriptId ||
+                 sel.getIdentifierInfoForSlot(1) == forKeyedSubscriptId));
+
+      break;
+
+    default:
+      if (isSubscript)
+        return false;
+
+      break;
+    }
+
+    return selectorStartsWithName(sel, name);
+  };
+
   // Force load all external methods.
   // FIXME: Copied from Clang's SemaCodeComplete.
   for (uint32_t i = 0, n = source->GetNumExternalSelectors(); i != n; ++i) {
     clang::Selector sel = source->GetExternalSelector(i);
     if (sel.isNull() || S.MethodPool.count(sel))
       continue;
-    if (!name.empty() && !selectorStartsWithName(Impl.SwiftContext, sel, name))
+    if (!acceptableSelector(sel))
       continue;
     
     S.ReadMethodPool(sel);
@@ -658,14 +712,27 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
     for (; list != nullptr; list = list->getNext()) {
       if (list->Method->isUnavailable())
         continue;
-      if (auto VD = cast_or_null<ValueDecl>(Impl.importDecl(list->Method)))
+      if (auto VD = cast_or_null<ValueDecl>(Impl.importDecl(list->Method))) {
+        if (isSubscript) {
+          // When searching for a subscript, we may have found a
+          // getter. If so, use the subscript instead.
+          if (auto func = dyn_cast<FuncDecl>(VD)) {
+            auto known = Impl.Subscripts.find({func, nullptr});
+            if (known != Impl.Subscripts.end())
+              consumer.foundDecl(known->second);
+          }
+
+          // If we were looking for subscripts, hopefully 
+          continue;
+        }
+
         consumer.foundDecl(VD);
+      }
     }
   };
 
   for (auto entry : S.MethodPool) {
-    if (!name.empty() &&
-        !selectorStartsWithName(Impl.SwiftContext, entry.first, name))
+    if (!acceptableSelector(entry.first))
       continue;
   
     auto &methodListPair = entry.second;
