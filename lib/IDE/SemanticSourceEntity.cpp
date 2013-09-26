@@ -24,6 +24,7 @@ namespace {
 
 class SemaAnnotator : public ASTWalker {
   SemanticEntityReceiverFn Receiver;
+  SmallVector<ConstructorRefCallExpr *, 2> CtorRefs;
   bool Cancelled = false;
 
 public:
@@ -38,9 +39,12 @@ private:
   bool walkToTypeReprPre(TypeRepr *T) override;
 
   bool walkToDeclPost(Decl *D) override;
+  Expr *walkToExprPost(Expr *E) override;
   bool walkToTypeReprPost(TypeRepr *T) override;
 
   bool passToReceiver(ValueDecl *D, SourceLoc Loc, bool IsRef);
+
+  TypeDecl *getTypeDecl(Type Ty);
 };
 
 }
@@ -64,6 +68,9 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
 std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (isDone())
     return { false, nullptr };
+
+  if (ConstructorRefCallExpr *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
+    CtorRefs.push_back(CtorRefE);
 
   if (E->isImplicit())
     return { true, E };
@@ -93,16 +100,21 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
     for (auto &Comp : IdT->Components) {
       if (ValueDecl *VD = Comp.getBoundDecl())
         return passToReceiver(VD, Comp.getIdLoc(), /*IsRef=*/true);
-      if (Type Ty = Comp.getBoundType()) {
-        if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
-          return passToReceiver(NAT->getDecl(), Comp.getIdLoc(),/*IsRef=*/true);
-        } else if (NominalTypeDecl *NTD = Ty->getAnyNominal()) {
-          return passToReceiver(NTD, Comp.getIdLoc(), /*IsRef=*/true);
-        }
-      }
+      if (TypeDecl *TyD = getTypeDecl(Comp.getBoundType()))
+        return passToReceiver(TyD, Comp.getIdLoc(),/*IsRef=*/true);
     }
   }
   return true;
+}
+
+Expr *SemaAnnotator::walkToExprPost(Expr *E) {
+  if (isDone())
+    return nullptr;
+
+  if (isa<ConstructorRefCallExpr>(E))
+    CtorRefs.pop_back();
+
+  return E;
 }
 
 bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
@@ -112,11 +124,32 @@ bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
 }
 
 bool SemaAnnotator::passToReceiver(ValueDecl *D, SourceLoc Loc, bool IsRef) {
-  CharSourceRange Range = CharSourceRange(Loc, D->getName().getLength());
-  bool Continue = Receiver({ Range, D, IsRef });
+  TypeDecl *CtorTyRef = nullptr;
+  unsigned NameLen = 0;
+  if (IsRef && isa<ConstructorDecl>(D)) {
+    Type Ty = CtorRefs.back()->getBase()->getType();
+    CtorTyRef = getTypeDecl(
+                        cast<MetaTypeType>(Ty.getPointer())->getInstanceType());
+    NameLen = CtorTyRef->getName().getLength();
+  } else {
+    NameLen = D->getName().getLength();
+  }
+  assert(NameLen != 0);
+
+  CharSourceRange Range = CharSourceRange(Loc, NameLen);
+  bool Continue = Receiver({ Range, D, CtorTyRef, IsRef });
   if (!Continue)
     Cancelled = true;
   return Continue;
+}
+
+TypeDecl *SemaAnnotator::getTypeDecl(Type Ty) {
+  if (Ty.isNull())
+    return nullptr;
+
+  if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
+    return NAT->getDecl();
+  return Ty->getAnyNominal();
 }
 
 bool ide::findSemanticSourceEntities(

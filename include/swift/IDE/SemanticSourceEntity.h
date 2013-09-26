@@ -19,12 +19,16 @@
 namespace swift {
   class Decl;
   class ValueDecl;
+  class TypeDecl;
 
 namespace ide {
 
 struct SemanticSourceEntity {
   CharSourceRange Range;
   ValueDecl *Dcl;
+  /// This is set when the entity is a reference to a \c ConstructorDecl,
+  /// to point to the type declaration that the source refers to.
+  TypeDecl *CtorTyRef;
   bool IsRef;
 };
 
