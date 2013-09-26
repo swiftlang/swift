@@ -439,18 +439,20 @@ macro(add_swift_library name)
   
   handle_swift_sources(SWIFTLIB_SOURCES SWIFTLIB_EXTERNAL_SOURCES ${name}
     ${IS_STDLIB_CORE_arg})
-  add_library( ${name} ${libkind} ${SWIFTLIB_SOURCES} )
+  add_library( ${name} ${libkind}
+    ${SWIFTLIB_SOURCES}
+    ${SWIFTLIB_EXTERNAL_SOURCES})
 
   if( LLVM_COMMON_DEPENDS )
     add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
   endif( LLVM_COMMON_DEPENDS )
 
-  # FIXME: This is a hack to work around CMake's apparent inability to tell Xcode
-  # to rebuild the exe if any of the object files changed.
-  if (SWIFTLIB_EXTERNAL_SOURCES)
-    add_custom_target("${name}-external" DEPENDS ${SWIFTLIB_EXTERNAL_SOURCES})
-    add_dependencies(${name} "${name}-external")
-  endif ()
+  # Add Swift source files to the project.
+  source_group("External Sources" FILES ${SWIFTLIB_EXTERNAL_SOURCES})
+  # ...and for now, mark them as HEADER_FILE_ONLY, so that Xcode doesn't try
+  # to build them itself.
+  set_source_files_properties(${SWIFTLIB_EXTERNAL_SOURCES} PROPERTIES
+    HEADER_FILE_ONLY true)
 
   target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/swift" ${SWIFTLIB_DEPENDS} )
   llvm_config( ${name} ${SWIFTLIB_COMPONENT_DEPENDS} )
@@ -529,22 +531,22 @@ macro(add_swift_executable name)
 
   # Add the executable
   if (${SWIFTEXE_EXCLUDE_FROM_ALL})
-    add_executable(${name} EXCLUDE_FROM_ALL ${SWIFTEXE_DEFAULT_ARGS})
+    add_executable(${name} EXCLUDE_FROM_ALL ${SWIFTEXE_DEFAULT_ARGS} ${SWIFTEXE_EXTERNAL_SOURCES})
   else()
-    add_executable(${name} ${SWIFTEXE_DEFAULT_ARGS})
+    add_executable(${name} ${SWIFTEXE_DEFAULT_ARGS} ${SWIFTEXE_EXTERNAL_SOURCES})
   endif()
+
+  # Add Swift source files to the project.
+  source_group("Swift sources" FILES ${SWIFTEXE_EXTERNAL_SOURCES})
+  # ...and for now, mark them as HEADER_FILE_ONLY, so that Xcode doesn't try
+  # to build them itself.
+  set_source_files_properties(${SWIFTEXE_EXTERNAL_SOURCES} PROPERTIES
+    HEADER_FILE_ONLY true)
 
   # Add appropriate dependencies
   if( LLVM_COMMON_DEPENDS )
     add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
   endif( LLVM_COMMON_DEPENDS )
-
-  # FIXME: This is a hack to work around CMake's apparent inability to tell Xcode
-  # to rebuild the exe if any of the object files changed.
-  if (SWIFTEXE_EXTERNAL_SOURCES)
-    add_custom_target("${name}-external" DEPENDS ${SWIFTEXE_EXTERNAL_SOURCES})
-    add_dependencies(${name} "${name}-external")
-  endif ()
 
   target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/swift" ${SWIFTEXE_DEPENDS} )
   llvm_config( ${name} ${SWIFTEXE_COMPONENT_DEPENDS} )
