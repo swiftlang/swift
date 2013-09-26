@@ -774,6 +774,9 @@ ERROR(cannot_combine_attribute,attribute_parsing,none,
       "attribute '%0' cannot be combined with this attribute", (StringRef))
 ERROR(expected_in_attribute_list,attribute_parsing,none,
       "expected ']' or ',' in attribute list", ())
+ERROR(invalid_attribute_for_lang,attribute_parsing,none,
+      "attribute '%0' is only valid in language mode '%select{axle}1'",
+      (StringRef, unsigned))
 
 ERROR(import_attributes,attribute_parsing,none,
       "invalid attributes specified for import", ())

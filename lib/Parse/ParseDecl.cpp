@@ -465,7 +465,8 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 
   case AttrName::kernel: {
     if (!Context.LangOpts.Axle) {
-      diagnose(Tok, diag::unknown_attribute, Tok.getText());
+      diagnose(Tok, diag::invalid_attribute_for_lang, Tok.getText(), 
+               0 /* axle */);
       consumeToken(tok::identifier);
       return false;
     }
@@ -483,7 +484,8 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
   
   case AttrName::vertex: {
     if (!Context.LangOpts.Axle) {
-      diagnose(Tok, diag::unknown_attribute, Tok.getText());
+      diagnose(Tok, diag::invalid_attribute_for_lang, Tok.getText(),
+               0 /* axle */);
       consumeToken(tok::identifier);
       return false;
     }
@@ -501,7 +503,8 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 
   case AttrName::fragment: {
     if (!Context.LangOpts.Axle) {
-      diagnose(Tok, diag::unknown_attribute, Tok.getText());
+      diagnose(Tok, diag::invalid_attribute_for_lang, Tok.getText(),
+               0 /* axle */);
       consumeToken(tok::identifier);
       return false;
     }
