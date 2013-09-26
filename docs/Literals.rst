@@ -25,6 +25,10 @@ Fortunately, NSString implements StringLiteralConvertible, so the type checker
 will indeed be able to choose NSString as the type of the string literal. All
 is well.
 
+In the case of integers or floating-point literals, the value effectively has
+infinite precision. Once the type has been chosen, the value is checked to see
+if it is in range for that type.
+
 
 The StringLiteralConvertible Protocol
 -------------------------------------
