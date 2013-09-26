@@ -126,10 +126,15 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 }
 
 Module *TypeChecker::getStdlibModule() {
+  if (StdlibModule)
+    return StdlibModule;
+
   if (!StdlibModule)
     StdlibModule = Context.LoadedModules.lookup("swift");
   if (!StdlibModule)
     StdlibModule = &TU;
+
+  Context.recordKnownProtocols(StdlibModule);
   return StdlibModule;
 }
 
@@ -409,14 +414,6 @@ static bool mayConformToKnownProtocol(const DeclTy *D) {
   return false;
 }
 
-static void recordKnownProtocol(Module *stdlib, StringRef name,
-                                KnownProtocolKind kind) {
-  Identifier ID = stdlib->Ctx.getIdentifier(name);
-  UnqualifiedLookup lookup(ID, stdlib, nullptr, SourceLoc(), /*IsType=*/true);
-  if (auto proto = dyn_cast_or_null<ProtocolDecl>(lookup.getSingleTypeResult()))
-    proto->setKnownProtocolKind(kind);
-}
-
 static void checkBridgingFunctions(TypeChecker &tc, Module *mod,
                                    StringRef bridgedTypeName,
                                    StringRef forwardConversion,
@@ -463,11 +460,9 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   TypeChecker TC(*TU);
   auto &DefinedFunctions = TC.definedFunctions;
 
-  // Record compiler-known protocol information in the AST.
-  Module *stdlib = TC.getStdlibModule();
-#define PROTOCOL(Name) \
-  recordKnownProtocol(stdlib, #Name, KnownProtocolKind::Name);
-#include "swift/AST/KnownProtocols.def"
+  // Lookup the swift module.  This ensures that we record all known protocols
+  // in the AST.
+  (void) TC.getStdlibModule();
 
   // Resolve extensions. This has to occur first during type checking,
   // because the extensions need to be wired into the AST for name lookup

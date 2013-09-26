@@ -24,6 +24,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ModuleLoadListener.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/ADT/DenseMap.h"
@@ -608,6 +609,20 @@ llvm::IntrusiveRefCntPtr<ModuleLoader> ASTContext::getClangModuleLoader() const{
   return Impl.ClangModuleLoader;
 }
 
+static void recordKnownProtocol(Module *Stdlib, StringRef Name,
+                                KnownProtocolKind Kind) {
+  Identifier ID = Stdlib->Ctx.getIdentifier(Name);
+  UnqualifiedLookup Lookup(ID, Stdlib, nullptr, SourceLoc(), /*IsType=*/true);
+  if (auto Proto = dyn_cast_or_null<ProtocolDecl>(Lookup.getSingleTypeResult()))
+    Proto->setKnownProtocolKind(Kind);
+}
+
+void ASTContext::recordKnownProtocols(Module *Stdlib) {
+#define PROTOCOL(Name) \
+  recordKnownProtocol(Stdlib, #Name, KnownProtocolKind::Name);
+#include "swift/AST/KnownProtocols.def"
+}
+
 Module *
 ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   assert(!modulePath.empty());
@@ -620,8 +635,12 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   }
 
   for (auto importer : Impl.ModuleLoaders) {
-    if (Module *M = importer->loadModule(moduleID.second, modulePath))
+    if (Module *M = importer->loadModule(moduleID.second, modulePath)) {
+      if (modulePath.size() == 1 &&
+          modulePath[0].first == getIdentifier("swift"))
+        recordKnownProtocols(M);
       return M;
+    }
   }
 
   return nullptr;

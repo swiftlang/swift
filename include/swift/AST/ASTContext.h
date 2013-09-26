@@ -467,6 +467,9 @@ public:
   Optional<ArrayRef<Substitution>>
   createTrivialSubstitutions(BoundGenericType *BGT) const;
 
+  /// Record compiler-known protocol information in the AST.
+  void recordKnownProtocols(Module *Stdlib);
+
 private:
   friend class Decl;
   ClangNode getClangNode(Decl *decl);
