@@ -115,6 +115,10 @@ public:
   ///
   void eraseFromParent();
 
+  /// Unlink this instruction from its current basic block and insert it into
+  /// the basic block that MovePos lives in, right before MovePos.
+  void moveBefore(SILInstruction *MovePos);
+
   /// \brief Drops all uses that belong to this instruction.
   void dropAllReferences();
 

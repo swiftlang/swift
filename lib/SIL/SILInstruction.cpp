@@ -104,6 +104,13 @@ void SILInstruction::eraseFromParent() {
   getParent()->getInstList().erase(this);
 }
 
+/// Unlink this instruction from its current basic block and insert it into
+/// the basic block that MovePos lives in, right before MovePos.
+void SILInstruction::moveBefore(SILInstruction *MovePos) {
+  MovePos->getParent()->getInstList().splice(MovePos,
+                                             getParent()->getInstList(), this);
+}
+
 void SILInstruction::dropAllReferences() {
   MutableArrayRef<Operand> PossiblyDeadOps = getAllOperands();
   for (auto OpI = PossiblyDeadOps.begin(),
