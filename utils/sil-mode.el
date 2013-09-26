@@ -63,7 +63,8 @@
 		    "protocol_metatype") 'words) . font-lock-keyword-face)
    ;; Aggregate Types
    `(,(regexp-opt '("tuple" "tuple_extract" "tuple_element_addr" "struct"
-		    "struct_extract" "struct_element_addr" "ref_element_addr")
+		    "struct_extract" "struct_element_addr" "ref_element_addr"
+                    "destroy_value" "copy_value")
 		  'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential" "upcast_existential" "deinit_existential"
