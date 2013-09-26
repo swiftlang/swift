@@ -35,6 +35,10 @@ namespace swift {
 
   bool runSILDiagnosticPasses(SILModule &Module);
 
+  /// Run all the SIL passes on Module, returning true if any errors were
+  /// produced in the process of running said passes.
+  bool runSILOptimizationPasses(SILModule &Module);
+
 } // namespace swift
 
 #endif
