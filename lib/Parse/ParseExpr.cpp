@@ -302,13 +302,13 @@ ParserResult<Expr> Parser::parseExprAs() {
   SourceLoc bangLoc;
 
   if (!Tok.isContextualPunctuator("!")) {
-    diagnose(Tok, diag::expected_bang_or_question_after_as);
+    diagnose(Tok, diag::expected_bang_after_as);
     return nullptr;
   }
 
   bangLoc = consumeToken();
 
-  ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as);
+  ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as_bang);
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (type.isNull())
