@@ -787,26 +787,40 @@ public:
   /// Emit a dynamic subscript.
   RValue emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, SGFContext c);
 
-  /// \brief Emit the cast instruction appropriate to the kind of checked cast.
+  /// \brief Emit an unconditional checked cast, including any necessary
+  /// abstraction difference between the original and destination types.
   ///
   /// \param loc          The AST location associated with the operation.
-  /// \param originalMV   The value to cast.
+  /// \param original     The value to cast.
   /// \param origTy       The original AST-level type.
   /// \param castTy       The destination type.
   /// \param kind         The semantics of the cast.
-  /// \param mode         Whether to emit an unconditional or conditional cast.
-  /// \param useCastValue If true, the cleanup on the original value will be
-  ///                     disabled, and the callee will be expected to take
-  ///                     ownership of the returned value. If false, the original
-  ///                     value's cleanup is left intact, and an unowned reference
-  ///                     or address is returned.
-  SILValue emitCheckedCast(SILLocation loc,
-                           ManagedValue originalMV,
-                           Type origTy,
-                           Type castTy,
-                           CheckedCastKind kind,
-                           CheckedCastMode mode,
-                           bool useCastValue);
+  ///
+  /// \returns the cast value, at its natural abstraction level.
+  SILValue emitUnconditionalCheckedCast(SILLocation loc,
+                                        SILValue original,
+                                        Type origTy,
+                                        Type castTy,
+                                        CheckedCastKind kind);
+  
+  /// \brief Emit a conditional checked cast branch. Does not re-abstract the
+  /// argument to the success branch. Terminates the current BB.
+  ///
+  /// \param loc          The AST location associated with the operation.
+  /// \param original     The value to cast.
+  /// \param origTy       The original AST-level type.
+  /// \param castTy       The destination type.
+  /// \param kind         The semantics of the cast.
+  ///
+  /// \returns a pair of SILBasicBlocks, representing the success and failure
+  /// branches of the cast. The argument to the success block is not adjusted
+  /// to its natural abstraction level.
+  std::pair<SILBasicBlock*, SILBasicBlock*>
+  emitCheckedCastBranch(SILLocation loc,
+                        SILValue original,
+                        Type origTy,
+                        Type castTy,
+                        CheckedCastKind kind);
 
   //===--------------------------------------------------------------------===//
   // Declarations

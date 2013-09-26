@@ -34,13 +34,13 @@ namespace swift {
   class ProtocolConformance;
   struct SILDeclRef;
   class SILType;
-  enum class CheckedCastMode : unsigned char;
 
 namespace irgen {
   class AbstractCallee;
   class Address;
   class Explosion;
   class CallEmission;
+  enum class CheckedCastMode : unsigned char;
   class IRGenFunction;
   class IRGenModule;
   class TypeInfo;

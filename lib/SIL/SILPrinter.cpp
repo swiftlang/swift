@@ -592,18 +592,37 @@ public:
     OS << name << " " << getIDAndType(operand) << " to " << CI->getType();
   }
 
-  void printCheckedConversionInst(CheckedConversionInst *CI, SILValue operand,
-                                  StringRef name) {
-    OS << name;
-    switch (CI->getMode()) {
-    case CheckedCastMode::Conditional:
-      OS << " conditional ";
-      break;
-    case CheckedCastMode::Unconditional:
-      OS << " unconditional ";
-      break;
+  StringRef getCastKindName(CheckedCastKind kind) const {
+    switch (kind) {
+    case CheckedCastKind::Unresolved:
+    case CheckedCastKind::InvalidCoercible:
+      llvm_unreachable("invalid cast kind for SIL");
+    case CheckedCastKind::Downcast:
+      return "downcast";
+    case CheckedCastKind::SuperToArchetype:
+      return "super_to_archetype";
+    case CheckedCastKind::ArchetypeToArchetype:
+      return "archetype_to_archetype";
+    case CheckedCastKind::ArchetypeToConcrete:
+      return "archetype_to_concrete";
+    case CheckedCastKind::ExistentialToArchetype:
+      return "existential_to_archetype";
+    case CheckedCastKind::ExistentialToConcrete:
+      return "existential_to_concrete";
     }
-    OS << getIDAndType(operand) << " to " << CI->getType();
+  }
+  
+  void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
+    OS << "unconditional_checked_cast " << getCastKindName(CI->getCastKind())
+       << ' ' << getIDAndType(CI->getOperand())
+       << " to " << CI->getType();
+  }
+  
+  void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
+    OS << "checked_cast_br " << getCastKindName(CI->getCastKind()) << ' '
+       << getIDAndType(CI->getOperand())
+       << " to " << CI->getCastType() << ", "
+       << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());
   }
   
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
@@ -654,32 +673,11 @@ public:
   void visitUpcastExistentialRefInst(UpcastExistentialRefInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),"upcast_existential_ref");
   }
-  void visitDowncastInst(DowncastInst *CI) {
-    printCheckedConversionInst(CI, CI->getOperand(), "downcast");
-  }
-  void visitSuperToArchetypeRefInst(SuperToArchetypeRefInst *CI) {
-    printCheckedConversionInst(CI, CI->getOperand(),
-                               "super_to_archetype_ref");
-  }
-  void visitDowncastArchetypeAddrInst(DowncastArchetypeAddrInst *CI) {
-    printCheckedConversionInst(CI, CI->getOperand(), "downcast_archetype_addr");
-  }
-  void visitDowncastArchetypeRefInst(DowncastArchetypeRefInst *CI) {
-    printCheckedConversionInst(CI, CI->getOperand(), "downcast_archetype_ref");
-  }
-  void visitProjectDowncastExistentialAddrInst(
-                                      ProjectDowncastExistentialAddrInst *CI) {
-    printCheckedConversionInst(CI, CI->getOperand(),
-                               "project_downcast_existential_addr");
-  }
-  void visitDowncastExistentialRefInst(DowncastExistentialRefInst *CI) {
-    printCheckedConversionInst(CI, CI->getOperand(), "downcast_existential_ref");
-  }
 
   void visitIsNonnullInst(IsNonnullInst *I) {
     OS << "is_nonnull " << getIDAndType(I->getOperand());
   }
-
+  
   void visitCopyValueInst(CopyValueInst *I) {
     OS << "copy_value " << getIDAndType(I->getOperand());
   }

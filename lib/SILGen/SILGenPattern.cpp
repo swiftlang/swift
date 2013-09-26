@@ -140,29 +140,27 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
 
       std::vector<SILValue> destructured;
       
-      // Perform a conditional cast and branch on whether it succeeded.
-      SILValue cast = gen.emitCheckedCast(Loc,
-                                        ManagedValue(v, ManagedValue::Unmanaged),
+      // Perform a conditional cast branch.
+      SILBasicBlock *trueBB, *falseBB;
+      std::tie(trueBB, falseBB) = gen.emitCheckedCastBranch(Loc,
+                                        v,
                                         ip->getType(),
                                         ip->getCastTypeLoc().getType(),
-                                        ip->getCastKind(),
-                                        CheckedCastMode::Conditional,
-                                        /*useCastValue*/ false);
-      SILValue didMatch = gen.B.createIsNonnull(Loc, cast);
+                                        ip->getCastKind());
       
-      // On the true branch, we can use the cast value.
+      // On the true branch, we can get the cast value from the BB argumnet.
+      SILValue cast = trueBB->bbarg_begin()[0];
       // If the cast result is loadable and we cast a value address, load it.
       if (cast.getType().isAddress()
-          && !cast.getType().isAddressOnly(gen.F.getModule()))
+          && !cast.getType().isAddressOnly(gen.F.getModule())) {
+        gen.B.setInsertionPoint(trueBB);
         cast = gen.B.createLoad(Loc, cast);
+        gen.B.clearInsertionPoint();
+      }
       destructured.push_back(cast);
       
-      // Emit the branch.
-      SILBasicBlock *trueBB = gen.createBasicBlock();
-      SILBasicBlock *falseBB = gen.createBasicBlock();
-      
-      gen.B.createCondBranch(Loc, didMatch,
-                             trueBB, falseBB);
+      // FIXME: If we cast from an opaque existential, we'll continue using its
+      // contained value, but we need to deallocate the existential husk.
       
       // Code matching the pattern goes into the "true" block.
       dispatches.emplace_back(trueBB, std::move(destructured));

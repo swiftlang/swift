@@ -18,6 +18,8 @@
 #define SWIFT_IRGEN_ADDRESS_H
 
 #include "IRGen.h"
+#include "llvm/IR/Value.h"
+#include "llvm/IR/DerivedTypes.h"
 
 namespace swift {
 namespace irgen {
@@ -44,6 +46,10 @@ public:
 
   Alignment getAlignment() const {
     return Align;
+  }
+  
+  llvm::PointerType *getType() const {
+    return cast<llvm::PointerType>(Addr->getType());
   }
 };
 

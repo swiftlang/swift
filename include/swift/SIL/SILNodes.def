@@ -151,9 +151,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(UpcastExistentialRefInst, SILInstruction, None)
   INST(ProjectExistentialRefInst, SILInstruction, None)
 
+  // Conversions
   ABSTRACT_VALUE(ConversionInst, SILInstruction)
-  
-    // Unchecked Conversions
     INST(CoerceInst, ConversionInst, None)
     INST(UpcastInst, ConversionInst, None)
     INST(ArchetypeRefToSuperInst, ConversionInst, None)
@@ -169,17 +168,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(ConvertCCInst, ConversionInst, None)
     INST(BridgeToBlockInst, ConversionInst, None)
     INST(ThinToThickFunctionInst, ConversionInst, None)
-
-    // Checked Conversions
-    ABSTRACT_VALUE(CheckedConversionInst, ConversionInst)
-      INST(DowncastInst, CheckedConversionInst, None)
-      INST(SuperToArchetypeRefInst, CheckedConversionInst, None)
-      INST(DowncastArchetypeRefInst, CheckedConversionInst, None)
-      INST(DowncastArchetypeAddrInst, CheckedConversionInst, None)
-      INST(ProjectDowncastExistentialAddrInst, CheckedConversionInst, None)
-      INST(DowncastExistentialRefInst, CheckedConversionInst, None)
-      VALUE_RANGE(CheckedConversionInst, SuperToArchetypeRefInst, DowncastExistentialRefInst)
-    VALUE_RANGE(ConversionInst, ConvertFunctionInst, DowncastExistentialRefInst)
+    INST(UnconditionalCheckedCastInst, ConversionInst, None)
+    VALUE_RANGE(ConversionInst, CoerceInst, UnconditionalCheckedCastInst)
   INST(IsNonnullInst, SILInstruction, None)
 
   // Terminators
@@ -192,10 +182,11 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     TERMINATOR(SwitchIntInst, TermInst, None)
     TERMINATOR(SwitchEnumInst, TermInst, None)
     TERMINATOR(DestructiveSwitchEnumAddrInst, TermInst, MayWrite)
-   TERMINATOR(DynamicMethodBranchInst, TermInst, None)
-    VALUE_RANGE(TermInst, UnreachableInst, DynamicMethodBranchInst)
+    TERMINATOR(DynamicMethodBranchInst, TermInst, None)
+    TERMINATOR(CheckedCastBranchInst, TermInst, None)
+    VALUE_RANGE(TermInst, UnreachableInst, CheckedCastBranchInst)
 
-  VALUE_RANGE(SILInstruction, AllocStackInst, DynamicMethodBranchInst)
+  VALUE_RANGE(SILInstruction, AllocStackInst, CheckedCastBranchInst)
 
 #undef VALUE_RANGE
 #undef ABSTRACT_VALUE

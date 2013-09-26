@@ -372,50 +372,6 @@ public:
                     ArchetypeRefToSuperInst(Loc, Archetype, BaseTy));
   }
   
-  DowncastInst *createDowncast(SILLocation Loc, SILValue Op, SILType Ty,
-                               CheckedCastMode Mode) {
-    return insert(new (F.getModule())
-                  DowncastInst(Loc, Op, Ty, Mode));
-  }
-  
-  SuperToArchetypeRefInst *createSuperToArchetypeRef(SILLocation Loc,
-                                                     SILValue Archetype,
-                                                     SILType BaseTy,
-                                                     CheckedCastMode Mode) {
-    return insert(new (F.getModule())
-                    SuperToArchetypeRefInst(Loc, Archetype, BaseTy, Mode));
-  }
-  
-  DowncastArchetypeAddrInst *createDowncastArchetypeAddr(SILLocation Loc,
-                                                         SILValue Archetype,
-                                                         SILType Ty,
-                                                         CheckedCastMode Mode) {
-    return insert(new (F.getModule())
-                    DowncastArchetypeAddrInst(Loc, Archetype, Ty, Mode));
-  }
-  DowncastArchetypeRefInst *createDowncastArchetypeRef(SILLocation Loc,
-                                                       SILValue Archetype,
-                                                       SILType Ty,
-                                                       CheckedCastMode Mode) {
-    return insert(new (F.getModule())
-                    DowncastArchetypeRefInst(Loc, Archetype, Ty, Mode));
-  }
-  ProjectDowncastExistentialAddrInst *createProjectDowncastExistentialAddr(
-                                                         SILLocation Loc,
-                                                         SILValue Existential,
-                                                         SILType Ty,
-                                                         CheckedCastMode Mode) {
-    return insert(new (F.getModule())
-              ProjectDowncastExistentialAddrInst(Loc, Existential, Ty, Mode));
-  }
-  DowncastExistentialRefInst *createDowncastExistentialRef(SILLocation Loc,
-                                                       SILValue Existential,
-                                                       SILType Ty,
-                                                       CheckedCastMode Mode) {
-    return insert(new (F.getModule())
-                  DowncastExistentialRefInst(Loc, Existential, Ty, Mode));
-  }
-  
   IsNonnullInst *createIsNonnull(SILLocation loc,
                                  SILValue operand) {
     return insert(new (F.getModule())
@@ -423,6 +379,14 @@ public:
                       SILType::getBuiltinIntegerType(1, F.getASTContext())));
   }
 
+  UnconditionalCheckedCastInst *createUnconditionalCheckedCast(SILLocation loc,
+                                                           CheckedCastKind kind,
+                                                           SILValue op,
+                                                           SILType destTy) {
+    return insert(new (F.getModule())
+                    UnconditionalCheckedCastInst(loc, kind, op, destTy));
+  }
+  
   CopyValueInst *createCopyValue(SILLocation loc, SILValue operand) {
     return insert(new (F.getModule()) CopyValueInst(loc, operand));
   }
@@ -799,6 +763,17 @@ public:
     return insertTerminator(
              DynamicMethodBranchInst::create(Loc, Operand, Member, HasMethodBB,
                                              NoMethodBB, F));
+  }
+  
+  CheckedCastBranchInst *createCheckedCastBranch(SILLocation loc,
+                                                 CheckedCastKind kind,
+                                                 SILValue op,
+                                                 SILType destTy,
+                                                 SILBasicBlock *successBB,
+                                                 SILBasicBlock *failureBB) {
+    return insertTerminator(new (F.getModule())
+                              CheckedCastBranchInst(loc, kind, op, destTy,
+                                                    successBB, failureBB));
   }
 
   //===--------------------------------------------------------------------===//

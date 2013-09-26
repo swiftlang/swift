@@ -1035,7 +1035,7 @@ public:
   ArchetypeRefToSuperInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-
+  
 /// Test that an address or reference type is not null.
 class IsNonnullInst : public UnaryInstructionBase<ValueKind::IsNonnullInst> {
 public:
@@ -1043,100 +1043,24 @@ public:
     : UnaryInstructionBase(Loc, Operand, BoolTy) {}
 };
 
-/// Discriminates checked cast modes.
-enum class CheckedCastMode : unsigned char {
-  // Abort if the cast fails.
-  Unconditional,
-  // Return null if the cast fails.
-  Conditional,
-};
-  
-/// CheckedConversionInst - Abstract base class for checked conversions.
-class CheckedConversionInst : public ConversionInst {
-  CheckedCastMode Mode;
-public:
-  CheckedConversionInst(ValueKind Kind, SILLocation Loc, SILType Ty,
-                        CheckedCastMode Mode)
-    : ConversionInst(Kind, Loc, Ty), Mode(Mode) {}
-  
-  CheckedCastMode getMode() const { return Mode; }
-};
-  
-/// DowncastInst - Perform an unchecked conversion of a class instance to a
-/// subclass type.
-class DowncastInst
-  : public UnaryInstructionBase<ValueKind::DowncastInst, CheckedConversionInst>
+/// Perform an unconditional checked cast that aborts if the cast fails.
+class UnconditionalCheckedCastInst
+  : public UnaryInstructionBase<ValueKind::UnconditionalCheckedCastInst,
+                                ConversionInst>
 {
+  CheckedCastKind CastKind;
 public:
-  DowncastInst(SILLocation Loc, SILValue Operand, SILType Ty,
-               CheckedCastMode Mode)
-    : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
-};
-
-/// SuperToArchetypeRefInst - Given a value of a class type, initializes a
-/// class archetype with a superclass constraint to contain a reference to
-/// the value.
-class SuperToArchetypeRefInst
-  : public UnaryInstructionBase<ValueKind::SuperToArchetypeRefInst,
-                                CheckedConversionInst>
-{
-public:
-  SuperToArchetypeRefInst(SILLocation Loc, SILValue Operand, SILType Ty,
-                          CheckedCastMode Mode)
-    : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
-};
-
-/// Given the address of an opaque archetype value, dynamically checks the
-/// concrete type represented by the archetype and casts the address to the
-/// destination type if successful or crashes if not.
-class DowncastArchetypeAddrInst
-  : public UnaryInstructionBase<ValueKind::DowncastArchetypeAddrInst,
-                                CheckedConversionInst>
-{
-public:
-  DowncastArchetypeAddrInst(SILLocation Loc, SILValue Operand, SILType Ty,
-                            CheckedCastMode Mode)
-    : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
-};
+  UnconditionalCheckedCastInst(SILLocation Loc,
+                               CheckedCastKind Kind,
+                               SILValue Operand,
+                               SILType DestTy)
+    : UnaryInstructionBase(Loc, Operand, DestTy), CastKind(Kind)
+  {
+    assert(CastKind >= CheckedCastKind::First_Resolved &&
+           "cannot create a SIL cast with unresolved cast kind");
+  }
   
-/// Given a value of class archetype type, dynamically checks the concrete
-/// type represented by the archetype and casts to the destination type if
-/// successful or crashes if not.
-class DowncastArchetypeRefInst
-  : public UnaryInstructionBase<ValueKind::DowncastArchetypeRefInst,
-                                CheckedConversionInst>
-{
-public:
-  DowncastArchetypeRefInst(SILLocation Loc, SILValue Operand, SILType Ty,
-                           CheckedCastMode Mode)
-    : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
-};
-  
-/// Given the address of an opaque existential container, dynamically checks the
-/// concrete type contained in the existential and projects and casts the
-/// address of the contained value if successful or crashes if not.
-class ProjectDowncastExistentialAddrInst
-  : public UnaryInstructionBase<ValueKind::ProjectDowncastExistentialAddrInst,
-                                CheckedConversionInst>
-{
-public:
-  ProjectDowncastExistentialAddrInst(SILLocation Loc, SILValue Operand,
-                                     SILType Ty,
-                                     CheckedCastMode Mode)
-    : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
-};
-  
-/// Given a value of class archetype type, dynamically checks the concrete
-/// type contained in the existential and casts the value to the destination
-/// type if successful or crashes if not.
-class DowncastExistentialRefInst
-  : public UnaryInstructionBase<ValueKind::DowncastExistentialRefInst,
-                                CheckedConversionInst>
-{
-public:
-  DowncastExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty,
-                             CheckedCastMode Mode)
-    : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
+  CheckedCastKind getCastKind() const { return CastKind; }
 };
   
 /// StructInst - Represents a constructed loadable struct.
@@ -2311,6 +2235,53 @@ public:
   
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::DynamicMethodBranchInst;
+  }
+};
+  
+/// Perform a checked cast operation and branch on whether the cast succeeds.
+/// The success branch destination block receives the cast result as a BB
+/// argument.
+class CheckedCastBranchInst : public TermInst {
+  SILType DestTy;
+  CheckedCastKind CastKind;
+
+  FixedOperandList<1> Operands;
+  SILSuccessor DestBBs[2];
+
+public:
+  CheckedCastBranchInst(SILLocation Loc,
+                        CheckedCastKind CastKind,
+                        SILValue Operand,
+                        SILType DestTy,
+                        SILBasicBlock *SuccessBB,
+                        SILBasicBlock *FailureBB)
+    : TermInst(ValueKind::CheckedCastBranchInst, Loc),
+      DestTy(DestTy), CastKind(CastKind), Operands{this, Operand},
+      DestBBs{{this, SuccessBB}, {this, FailureBB}}
+  {
+    assert(CastKind >= CheckedCastKind::First_Resolved
+           && "cannot create a cast instruction with an unresolved cast kind");
+  }
+  
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  
+  SILValue getOperand() const { return Operands[0].get(); }
+  
+  SuccessorListTy getSuccessors() {
+    return DestBBs;
+  }
+  
+  CheckedCastKind getCastKind() const { return CastKind; }
+  SILType getCastType() const { return DestTy; }
+  
+  SILBasicBlock *getSuccessBB() { return DestBBs[0]; }
+  const SILBasicBlock *getSuccessBB() const { return DestBBs[0]; }
+  SILBasicBlock *getFailureBB() { return DestBBs[1]; }
+  const SILBasicBlock *getFailureBB() const { return DestBBs[1]; }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::CheckedCastBranchInst;
   }
 };
 

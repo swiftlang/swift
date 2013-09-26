@@ -629,77 +629,72 @@ namespace {
   };
 }
 
-/// \brief Emit the cast instruction appropriate to the kind of checked cast.
-///
-/// \param loc          The AST location associated with the operation.
-/// \param originalMV   The value to cast.
-/// \param origTy       The original AST-level type.
-/// \param castTy       The destination type.
-/// \param kind         The semantics of the cast.
-/// \param mode         Whether to emit an unconditional or conditional cast.
-/// \param useCastValue If true, the cleanup on the original value will be
-///                     disabled, and the callee will be expected to take
-///                     ownership of the returned value. If false, the original
-///                     value's cleanup is left intact, and an unowned reference
-///                     or address is returned.
-SILValue SILGenFunction::emitCheckedCast(SILLocation loc,
-                                         ManagedValue originalMV,
-                                         Type origTy,
-                                         Type castTy,
-                                         CheckedCastKind kind,
-                                         CheckedCastMode mode,
-                                         bool useCastValue) {
-  SILValue original = useCastValue
-    ? originalMV.forward(*this)
-    : originalMV.getValue();
-  
-  switch (kind) {
-  case CheckedCastKind::Unresolved:
-  case CheckedCastKind::InvalidCoercible:
-    llvm_unreachable("invalid checked cast?!");
-      
-  case CheckedCastKind::Downcast:
-    return B.createDowncast(loc, original,
-                            getLoweredLoadableType(castTy), mode);
-  case CheckedCastKind::SuperToArchetype:
-    return B.createSuperToArchetypeRef(loc, original,
-                                       getLoweredLoadableType(castTy), mode);
-  case CheckedCastKind::ArchetypeToArchetype:
-  case CheckedCastKind::ArchetypeToConcrete:
-    if (origTy->castTo<ArchetypeType>()->requiresClass()) {
-      return B.createDowncastArchetypeRef(loc, original,
-                                getLoweredLoadableType(castTy), mode);
-    } else {
-      SILType loweredTy = getLoweredType(castTy);
-      SILValue cast = B.createDowncastArchetypeAddr(loc, original,
-                                             loweredTy.getAddressType(), mode);
-      if (useCastValue && loweredTy.isLoadable(F.getModule()))
-        cast = B.createLoad(loc, cast);
-      return cast;
-    }
-  
-  case CheckedCastKind::ExistentialToArchetype:
-  case CheckedCastKind::ExistentialToConcrete:
-    if (origTy->isClassExistentialType()) {
-      return B.createDowncastExistentialRef(loc, original,
-                                getLoweredLoadableType(castTy), mode);
-    } else {
-      // Project the concrete value address out of the container.
-      SILType loweredTy = getLoweredType(castTy);
-      SILValue cast = B.createProjectDowncastExistentialAddr(loc, original,
-                                             loweredTy.getAddressType(), mode);
-      if (useCastValue) {
-        if (loweredTy.isLoadable(F.getModule()))
-          cast = B.createLoad(loc, cast);
-      
-        // We'll pass on ownership of the contained value, but we still need to
-        // deallocate the existential buffer when we're done.
-        Cleanups.pushCleanup<CleanupUsedExistentialContainer>(original);
-      }
+SILValue SILGenFunction::emitUnconditionalCheckedCast(SILLocation loc,
+                                                      SILValue original,
+                                                      Type origTy,
+                                                      Type castTy,
+                                                      CheckedCastKind kind) {
+  auto &origLowering = getTypeLowering(origTy);
+  auto &castLowering = getTypeLowering(castTy);
 
-      return cast;
-    }
+  // Spill to a temporary if casting from loadable to address-only.
+  if (origLowering.isLoadable() && castLowering.isAddressOnly()) {
+    SILValue temp = emitTemporaryAllocation(loc, origLowering.getLoweredType());
+    B.createStore(loc, original, temp);
+    original = temp;
   }
+  
+  // Get the cast destination type at the least common denominator abstraction
+  // level.
+  SILType destTy = castLowering.getLoweredType();
+  if (origLowering.isAddressOnly())
+    destTy = destTy.getAddressType();
+
+  // Emit the cast.
+  SILValue result = B.createUnconditionalCheckedCast(loc, kind, original,
+                                                     destTy);
+  
+  // Load from the address if casting from address-only to loadable.
+  if (origLowering.isAddressOnly() && castLowering.isLoadable())
+    result = B.createLoad(loc, result);
+  
+  
+  
+  return result;
+}
+
+std::pair<SILBasicBlock*, SILBasicBlock*>
+SILGenFunction::emitCheckedCastBranch(SILLocation loc,
+                                      SILValue original,
+                                      Type origTy,
+                                      Type castTy,
+                                      CheckedCastKind kind) {
+  auto &origLowering = getTypeLowering(origTy);
+  auto &castLowering = getTypeLowering(castTy);
+  
+  // Spill to a temporary if casting from loadable to address-only.
+  if (origLowering.isLoadable() && castLowering.isAddressOnly()) {
+    SILValue temp = emitTemporaryAllocation(loc, origLowering.getLoweredType());
+    B.createStore(loc, original, temp);
+    original = temp;
+  }
+  
+  // Get the cast destination type at the least common denominator abstraction
+  // level.
+  SILType destTy = castLowering.getLoweredType();
+  if (origLowering.isAddressOnly())
+    destTy = destTy.getAddressType();
+
+  // Set up BBs for the cast.
+  auto success = createBasicBlock();
+  new (SGM.M) SILArgument(destTy, success);
+  auto failure = createBasicBlock();
+
+  // Emit the cast.
+  B.createCheckedCastBranch(loc, kind, original, destTy,
+                            success, failure);
+  
+  return {success, failure};
 }
 
 RValue RValueEmitter::visitUnconditionalCheckedCastExpr(
@@ -709,12 +704,18 @@ RValue RValueEmitter::visitUnconditionalCheckedCastExpr(
   // should have a more efficient cleanup.
   ManagedValue original = visit(E->getSubExpr()).getAsSingleValue(SGF,
                                                               E->getSubExpr());
-  SILValue cast = SGF.emitCheckedCast(E, original,
+  SILValue originalVal = original.getValue();
+  SILValue cast = SGF.emitUnconditionalCheckedCast(E, original.forward(SGF),
                                   E->getSubExpr()->getType(),
                                   E->getCastTypeLoc().getType(),
-                                  E->getCastKind(),
-                                  CheckedCastMode::Unconditional,
-                                  /*useCastValue*/ true);
+                                  E->getCastKind());
+  
+  // If casting from an opaque existential, we'll forward the concrete value,
+  // but the existential container husk still needs cleanup.
+  if (originalVal.getType().isExistentialType()
+      && !originalVal.getType().isClassExistentialType())
+    SGF.Cleanups.pushCleanup<CleanupUsedExistentialContainer>(originalVal);
+  
   return RValue(SGF, SGF.emitManagedRValueWithCleanup(cast), E);
 }
 
@@ -722,19 +723,32 @@ RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
   // Cast the value using a conditional cast.
   ManagedValue original = visit(E->getSubExpr()).getAsSingleValue(SGF,
                                                               E->getSubExpr());
-  SILValue cast = SGF.emitCheckedCast(E, original,
-                                  E->getSubExpr()->getType(),
-                                  E->getCastTypeLoc().getType(),
-                                  E->getCastKind(),
-                                  CheckedCastMode::Conditional,
-                                  /*useCastValue*/ false);
-  // Check the result.
-  SILValue is = SGF.B.createIsNonnull(E, cast);
+  SILBasicBlock *success, *failure;
+  std::tie(success, failure)
+    = SGF.emitCheckedCastBranch(E, original.getValue(),
+                                E->getSubExpr()->getType(),
+                                E->getCastTypeLoc().getType(),
+                                E->getCastKind());
 
+  // Join the branches into an i1 value representing the success of the cast.
+  auto contBB = SGF.createBasicBlock();
+  auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+  auto isa = new (SGF.SGM.M) SILArgument(i1Ty, contBB);
+  
+  SGF.B.emitBlock(success);
+  SILValue yes = SGF.B.createIntegerLiteral(E, i1Ty, 1);
+  SGF.B.createBranch(E, contBB, yes);
+  
+  SGF.B.emitBlock(failure);
+  SILValue no = SGF.B.createIntegerLiteral(E, i1Ty, 0);
+  SGF.B.createBranch(E, contBB, no);
+  
+  SGF.B.emitBlock(contBB);
+  
   // Call the _getBool library intrinsic.
   return RValue(SGF, SGF.emitApplyOfLibraryIntrinsic(E,
                                   SGF.SGM.M.getASTContext().getGetBoolDecl(),
-                                  ManagedValue(is, ManagedValue::Unmanaged),
+                                  ManagedValue(isa, ManagedValue::Unmanaged),
                                   E->getType()->getCanonicalType(),
                                   C), E);
 }
@@ -2247,9 +2261,10 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
            newSelf.getType().hasReferenceSemantics() &&
            "delegating ctor type mismatch for non-reference type?!");
     CleanupsDepth newSelfCleanup = newSelf.getCleanup();
-    SILValue newSelfValue = SGF.B.createDowncast(E, newSelf.getValue(),
-                              SGF.getLoweredLoadableType(E->getSelf()->getType()),
-                              CheckedCastMode::Unconditional);
+    SILValue newSelfValue = SGF.B.createUnconditionalCheckedCast(E,
+                           CheckedCastKind::Downcast,
+                           newSelf.getValue(),
+                           SGF.getLoweredLoadableType(E->getSelf()->getType()));
     newSelf = ManagedValue(newSelfValue, newSelfCleanup);
   }
   

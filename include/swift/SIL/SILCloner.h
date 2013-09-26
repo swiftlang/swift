@@ -453,66 +453,18 @@ SILCloner<ImplClass>::visitIsNonnullInst(IsNonnullInst* Inst) {
     Builder.createIsNonnull(getOpLocation(Inst->getLoc()),
                             getOpValue(Inst->getOperand())));
 }
-
+  
 template<typename ImplClass>
 SILValue
-SILCloner<ImplClass>::visitDowncastInst(DowncastInst* Inst) {
+SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
+                                          UnconditionalCheckedCastInst *Inst) {
   return doPostProcess(Inst,
-    Builder.createDowncast(getOpLocation(Inst->getLoc()),
-                           getOpValue(Inst->getOperand()),
-                           getOpType(Inst->getType()), Inst->getMode()));
+         Builder.createUnconditionalCheckedCast(getOpLocation(Inst->getLoc()),
+                                                Inst->getCastKind(),
+                                                getOpValue(Inst->getOperand()),
+                                                getOpType(Inst->getType())));
 }
-
-template<typename ImplClass>
-SILValue
-SILCloner<ImplClass>::visitSuperToArchetypeRefInst(SuperToArchetypeRefInst* Inst) {
-  return doPostProcess(Inst,
-    Builder.createSuperToArchetypeRef(getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getOperand()),
-                                      getOpType(Inst->getType()),
-                                      Inst->getMode()));
-}
-
-template<typename ImplClass>
-SILValue
-SILCloner<ImplClass>::visitDowncastArchetypeAddrInst(DowncastArchetypeAddrInst* Inst) {
-  return doPostProcess(Inst,
-    Builder.createDowncastArchetypeAddr(getOpLocation(Inst->getLoc()),
-                                        getOpValue(Inst->getOperand()),
-                                        getOpType(Inst->getType()),
-                                        Inst->getMode()));
-}
-
-template<typename ImplClass>
-SILValue
-SILCloner<ImplClass>::visitDowncastArchetypeRefInst(DowncastArchetypeRefInst* Inst) {
-  return doPostProcess(Inst,
-    Builder.createDowncastArchetypeRef(getOpLocation(Inst->getLoc()),
-                                       getOpValue(Inst->getOperand()),
-                                       getOpType(Inst->getType()),
-                                       Inst->getMode()));
-}
-
-template<typename ImplClass>
-SILValue
-SILCloner<ImplClass>::visitProjectDowncastExistentialAddrInst(ProjectDowncastExistentialAddrInst* Inst) {
-  return doPostProcess(Inst,
-    Builder.createProjectDowncastExistentialAddr(getOpLocation(Inst->getLoc()),
-                                                 getOpValue(Inst->getOperand()),
-                                                 getOpType(Inst->getType()),
-                                                 Inst->getMode()));
-}
-
-template<typename ImplClass>
-SILValue
-SILCloner<ImplClass>::visitDowncastExistentialRefInst(DowncastExistentialRefInst* Inst) {
-  return doPostProcess(Inst,
-    Builder.createDowncastExistentialRef(getOpLocation(Inst->getLoc()),
-                                         getOpValue(Inst->getOperand()),
-                                         getOpType(Inst->getType()),
-                                         Inst->getMode()));
-}
-
+  
 template<typename ImplClass>
 SILValue
 SILCloner<ImplClass>::visitCopyValueInst(CopyValueInst* Inst) {
@@ -943,6 +895,18 @@ SILCloner<ImplClass>::visitCondBranchInst(CondBranchInst* Inst) {
                              getOpBasicBlock(Inst->getFalseBB()), FalseArgs));
 }
 
+template<typename ImplClass>
+SILValue
+SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
+  return doPostProcess(Inst,
+       Builder.createCheckedCastBranch(getOpLocation(Inst->getLoc()),
+                                       Inst->getCastKind(),
+                                       getOpValue(Inst->getOperand()),
+                                       getOpType(Inst->getCastType()),
+                                       getOpBasicBlock(Inst->getSuccessBB()),
+                                       getOpBasicBlock(Inst->getFailureBB())));
+}
+  
 template<typename ImplClass>
 SILValue
 SILCloner<ImplClass>::visitSwitchIntInst(SwitchIntInst* Inst) {

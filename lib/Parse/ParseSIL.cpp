@@ -873,6 +873,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("bridge_to_block", ValueKind::BridgeToBlockInst)
     .Case("builtin_function_ref", ValueKind::BuiltinFunctionRefInst)
     .Case("builtin_zero", ValueKind::BuiltinZeroInst)
+    .Case("checked_cast_br", ValueKind::CheckedCastBranchInst)
     .Case("class_metatype", ValueKind::ClassMetatypeInst)
     .Case("class_method", ValueKind::ClassMethodInst)
     .Case("coerce", ValueKind::CoerceInst)
@@ -889,12 +890,10 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("destroy_value", ValueKind::DestroyValueInst)
     .Case("destructive_switch_enum_addr",
           ValueKind::DestructiveSwitchEnumAddrInst)
-    .Case("downcast", ValueKind::DowncastInst)
-    .Case("downcast_archetype_addr", ValueKind::DowncastArchetypeAddrInst)
-    .Case("downcast_archetype_ref", ValueKind::DowncastArchetypeRefInst)
-    .Case("downcast_existential_ref", ValueKind::DowncastExistentialRefInst)
     .Case("dynamic_method", ValueKind::DynamicMethodInst)
     .Case("dynamic_method_br", ValueKind::DynamicMethodBranchInst)
+    .Case("enum", ValueKind::EnumInst)
+    .Case("enum_data_addr", ValueKind::EnumDataAddrInst)
     .Case("float_literal", ValueKind::FloatLiteralInst)
     .Case("global_addr", ValueKind::GlobalAddrInst)
     .Case("index_addr", ValueKind::IndexAddrInst)
@@ -915,8 +914,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("object_pointer_to_ref", ValueKind::ObjectPointerToRefInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
     .Case("pointer_to_address", ValueKind::PointerToAddressInst)
-    .Case("project_downcast_existential_addr",
-          ValueKind::ProjectDowncastExistentialAddrInst)
     .Case("project_existential", ValueKind::ProjectExistentialInst)
     .Case("project_existential_ref", ValueKind::ProjectExistentialRefInst)
     .Case("protocol_metatype", ValueKind::ProtocolMetatypeInst)
@@ -939,22 +936,20 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("struct_element_addr", ValueKind::StructElementAddrInst)
     .Case("struct_extract", ValueKind::StructExtractInst)
     .Case("super_method", ValueKind::SuperMethodInst)
-    .Case("super_to_archetype_ref", ValueKind::SuperToArchetypeRefInst)
     .Case("switch_int", ValueKind::SwitchIntInst)
     .Case("switch_enum", ValueKind::SwitchEnumInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
     .Case("tuple", ValueKind::TupleInst)
     .Case("tuple_element_addr", ValueKind::TupleElementAddrInst)
     .Case("tuple_extract", ValueKind::TupleExtractInst)
-    .Case("enum", ValueKind::EnumInst)
-    .Case("enum_data_addr", ValueKind::EnumDataAddrInst)
+    .Case("unconditional_checked_cast", ValueKind::UnconditionalCheckedCastInst)
+    .Case("unowned_retain", ValueKind::UnownedRetainInst)
+    .Case("unowned_release", ValueKind::UnownedReleaseInst)
+    .Case("unowned_to_ref", ValueKind::UnownedToRefInst)
     .Case("unreachable", ValueKind::UnreachableInst)
     .Case("upcast", ValueKind::UpcastInst)
     .Case("upcast_existential", ValueKind::UpcastExistentialInst)
     .Case("upcast_existential_ref", ValueKind::UpcastExistentialRefInst)
-    .Case("unowned_retain", ValueKind::UnownedRetainInst)
-    .Case("unowned_release", ValueKind::UnownedReleaseInst)
-    .Case("unowned_to_ref", ValueKind::UnownedToRefInst)
     .Default(ValueKind::SILArgument);
 
   if (Opcode != ValueKind::SILArgument) {
@@ -1022,6 +1017,22 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
   SILLocation InstLoc = SILFileLocation(OpcodeLoc);
 
+  /// Parse a checked cast kind.
+  auto parseCastKind = [&](Identifier name, SourceLoc loc) -> CheckedCastKind {
+    auto kind = llvm::StringSwitch<CheckedCastKind>(name.str())
+      .Case("downcast", CheckedCastKind::Downcast)
+      .Case("super_to_archetype", CheckedCastKind::SuperToArchetype)
+      .Case("archetype_to_archetype", CheckedCastKind::ArchetypeToArchetype)
+      .Case("archetype_to_concrete", CheckedCastKind::ArchetypeToConcrete)
+      .Case("existential_to_archetype", CheckedCastKind::ExistentialToArchetype)
+      .Case("existential_to_concrete", CheckedCastKind::ExistentialToConcrete)
+      .Default(CheckedCastKind::Unresolved);
+    
+    if (kind == CheckedCastKind::Unresolved)
+      P.diagnose(loc, diag::expected_tok_in_sil_instr, "checked cast kind");
+    return kind;
+  };
+  
   // Validate the opcode name, and do opcode-specific parsing logic based on the
   // opcode we find.
   ValueBase *ResultVal;
@@ -1285,63 +1296,45 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     break;
   }
-    // Checked Conversion instructions.
-  case ValueKind::DowncastInst:
-  case ValueKind::SuperToArchetypeRefInst:
-  case ValueKind::DowncastArchetypeAddrInst:
-  case ValueKind::DowncastArchetypeRefInst:
-  case ValueKind::ProjectDowncastExistentialAddrInst:
-  case ValueKind::DowncastExistentialRefInst: {
+  // Checked Conversion instructions.
+  case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::CheckedCastBranchInst: {
     SILType Ty;
-    Identifier CheckedToken, ToToken;
-    SourceLoc CheckedLoc, ToLoc;
-    if (parseSILIdentifier(CheckedToken, CheckedLoc,
-                           diag::expected_tok_in_sil_instr,
-                           "conditional or unconditional") ||
-        parseTypedValueRef(Val) ||
-        parseSILIdentifier(ToToken, ToLoc,
-                           diag::expected_tok_in_sil_instr, "to") ||
-        parseSILType(Ty))
+    Identifier KindToken, ToToken;
+    SourceLoc KindLoc, ToLoc;
+    
+    if (parseSILIdentifier(KindToken, KindLoc,
+                           diag::expected_tok_in_sil_instr, "checked cast kind")
+        || parseTypedValueRef(Val)
+        || parseSILIdentifier(ToToken, ToLoc,
+                              diag::expected_tok_in_sil_instr, "to")
+        || parseSILType(Ty))
       return true;
-
-    CheckedCastMode Mode;
-    if (CheckedToken.str() == "conditional")
-      Mode = CheckedCastMode::Conditional;
-    else if (CheckedToken.str() == "unconditional")
-      Mode = CheckedCastMode::Unconditional;
-    else {
-      P.diagnose(CheckedLoc, diag::expected_tok_in_sil_instr,
-                 "conditional or unconditional");
+    
+    CheckedCastKind CastKind = parseCastKind(KindToken, KindLoc);
+    if (CastKind == CheckedCastKind::Unresolved)
       return true;
-    }
-
-    if (ToToken.str() != "to") {
-      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
-      return true;
-    }
-
-    switch (Opcode) {
-    default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::DowncastInst:
-      ResultVal = B.createDowncast(InstLoc, Val, Ty, Mode);
-      break;
-    case ValueKind::SuperToArchetypeRefInst:
-      ResultVal = B.createSuperToArchetypeRef(InstLoc, Val, Ty, Mode);
-      break;
-    case ValueKind::DowncastArchetypeAddrInst:
-      ResultVal = B.createDowncastArchetypeAddr(InstLoc, Val, Ty, Mode);
-      break;
-    case ValueKind::DowncastArchetypeRefInst:
-      ResultVal = B.createDowncastArchetypeRef(InstLoc, Val, Ty, Mode);
-      break;
-    case ValueKind::ProjectDowncastExistentialAddrInst:
-      ResultVal = B.createProjectDowncastExistentialAddr(InstLoc,
-                                                         Val, Ty, Mode);
-      break;
-    case ValueKind::DowncastExistentialRefInst:
-      ResultVal = B.createDowncastExistentialRef(InstLoc, Val, Ty, Mode);
+    
+    // An unconditional cast instruction is finished here.
+    if (Opcode == ValueKind::UnconditionalCheckedCastInst) {
+      ResultVal = B.createUnconditionalCheckedCast(InstLoc, CastKind, Val, Ty);
       break;
     }
+    
+    // The conditional cast still needs its branch destinations.
+    Identifier SuccessBBName, FailureBBName;
+    SourceLoc SuccessBBLoc, FailureBBLoc;
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
+        || parseSILIdentifier(SuccessBBName, SuccessBBLoc,
+                              diag::expected_sil_block_name)
+        || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
+        || parseSILIdentifier(FailureBBName, FailureBBLoc,
+                              diag::expected_sil_block_name))
+      return true;
+    
+    ResultVal = B.createCheckedCastBranch(InstLoc, CastKind, Val, Ty,
+                                getBBForReference(SuccessBBName, SuccessBBLoc),
+                                getBBForReference(FailureBBName, FailureBBLoc));
     break;
   }
 

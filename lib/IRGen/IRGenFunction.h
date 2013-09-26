@@ -53,13 +53,13 @@ namespace swift {
   class TranslationUnit;
   class ValueDecl;
   class VarDecl;
-  enum class CheckedCastMode : unsigned char;
   
 namespace Mangle {
   enum class ExplosionKind : unsigned;
 }
 
 namespace irgen {
+  enum class CheckedCastMode : unsigned char;
   class Explosion;
   class FunctionRef;
   class HeapLayout;
@@ -76,6 +76,12 @@ namespace irgen {
 enum class LocalTypeData : unsigned {
   /// A reference to a metatype.
   Metatype = ~0U
+};
+  
+/// Discriminator for checked cast modes.
+enum class CheckedCastMode : unsigned char {
+  Unconditional,
+  Conditional,
 };
 
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
@@ -214,7 +220,7 @@ public:
   llvm::Value *emitSuperToClassArchetypeConversion(llvm::Value *super,
                                                    SILType destType,
                                                    CheckedCastMode mode);
-
+  
   /// \brief Convert the given value to the given destination type, using a
   /// runtime-checked cast.
   llvm::Value *emitDowncast(llvm::Value *from,

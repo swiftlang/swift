@@ -208,7 +208,7 @@ bb0:
   %a = upcast %D : $D to $C
 
 
-  %5 = downcast unconditional %C : $C to $D   // CHECK: downcast unconditional {{.*}} : $C to $D
+  %5 = unconditional_checked_cast downcast %C : $C to $D   // CHECK: unconditional_checked_cast downcast
   %6 = tuple ()
   %7 = return %6 : $()
 }
@@ -460,8 +460,14 @@ bb0(%0 : $B):
   %2 = store %0 to %1#1 : $*B
   %3 = load %1#1 : $*B                        // CHECK: load
   %4 = strong_retain %3 : $B
-  %5 = downcast conditional %3 : $B to $E     // CHECK: downcast
-  %6 = is_nonnull %5 : $E                     // CHECK: is_nonnull {{%.*}} : $E
+  checked_cast_br downcast %3 : $B to $E, yes, no     // CHECK: checked_cast_br downcast
+yes(%5 : $E):
+  %y = integer_literal $Builtin.Int1, 1
+  br isa(%y : $Builtin.Int1)
+no:
+  %n = integer_literal $Builtin.Int1, 0
+  br isa(%n : $Builtin.Int1)
+isa(%6 : $Builtin.Int1):
   %7 = strong_release %3 : $B
   %8 = strong_release %1#0 : $Builtin.ObjectPointer
   %9 = return %6 : $Builtin.Int1
@@ -705,7 +711,7 @@ bb0(%0 : $Bas):
   %19 = super_method [volatile] %16 : $Bas, #NSObject.init!initializer.1.foreign : $[cc(objc_method), thin] ((), NSObject) -> NSObject
   %20 = apply %19(%18) : $[cc(objc_method), thin] ((), NSObject) -> NSObject
   strong_retain_autoreleased %20 : $NSObject
-  %22 = downcast unconditional %20 : $NSObject to $Bas
+  %22 = unconditional_checked_cast downcast %20 : $NSObject to $Bas
   %23 = load %2#1 : $*Bas
   store %22 to %2#1 : $*Bas
   strong_release %23 : $Bas
@@ -776,27 +782,27 @@ bb0:
 
 sil @test_super_to_archetype_ref : $[thin] <T : Class1> (c : Class1) -> T {
 bb0(%c : $Class1):
-  %0 = super_to_archetype_ref unconditional %c : $Class1 to $T
+  %0 = unconditional_checked_cast super_to_archetype %c : $Class1 to $T
   return %0 : $T
 }
 
 sil @test_downcast_archetype_addr : $[thin] <T, U> (t : T) -> () {
 bb0(%t : $*T):
-  %0 = downcast_archetype_addr unconditional %t : $*T to $*U
+  %0 = unconditional_checked_cast archetype_to_archetype %t : $*T to $*U
   %1 = tuple ()
   return %1 : $()
 }
 
 sil @test_downcast_archetype_ref : $[thin] <T:Class1, U:Class1> (t : T) -> () {
 bb0(%t : $T):
-  %0 = downcast_archetype_ref unconditional %t : $T to $U
+  %0 = unconditional_checked_cast archetype_to_archetype %t : $T to $U
   %1 = tuple ()
   return %1 : $()
 }
 
 sil @test_project_downcast_existential_addr : $[thin] <U> (t : P) -> () {
 bb0(%t : $*P):
-  %0 = project_downcast_existential_addr unconditional %t : $*P to $*U
+  %0 = unconditional_checked_cast existential_to_archetype %t : $*P to $*U
   %1 = tuple ()
   return %1 : $()
 }
@@ -805,7 +811,7 @@ protocol [class_protocol] ClassP {}
 
 sil @test_downcast_existential_ref : $[thin] <U : ClassP> (t : ClassP) -> () {
 bb0(%t : $ClassP):
-  %0 = downcast_existential_ref unconditional %t : $ClassP to $U
+  %0 = unconditional_checked_cast existential_to_archetype %t : $ClassP to $U
   %1 = tuple ()
   return %1 : $()
 }

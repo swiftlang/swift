@@ -746,51 +746,19 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   // Checked Conversion instructions.
-  case ValueKind::DowncastInst:
-  case ValueKind::SuperToArchetypeRefInst:
-  case ValueKind::DowncastArchetypeAddrInst:
-  case ValueKind::DowncastArchetypeRefInst:
-  case ValueKind::ProjectDowncastExistentialAddrInst:
-  case ValueKind::DowncastExistentialRefInst: {
-    SILValue operand;
-    const CheckedConversionInst *CI;
-    switch (SI.getKind()) {
-    default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::DowncastInst:
-      operand = cast<DowncastInst>(&SI)->getOperand();
-      CI = cast<DowncastInst>(&SI);
-      break;
-    case ValueKind::SuperToArchetypeRefInst:
-      operand = cast<SuperToArchetypeRefInst>(&SI)->getOperand();
-      CI = cast<SuperToArchetypeRefInst>(&SI);
-      break;
-    case ValueKind::DowncastArchetypeAddrInst:
-      operand = cast<DowncastArchetypeAddrInst>(&SI)->getOperand();
-      CI = cast<DowncastArchetypeAddrInst>(&SI);
-      break;
-    case ValueKind::DowncastArchetypeRefInst:
-      operand = cast<DowncastArchetypeRefInst>(&SI)->getOperand();
-      CI = cast<DowncastArchetypeRefInst>(&SI);
-      break;
-    case ValueKind::ProjectDowncastExistentialAddrInst:
-      operand = cast<ProjectDowncastExistentialAddrInst>(&SI)->getOperand();
-      CI = cast<ProjectDowncastExistentialAddrInst>(&SI);
-      break;
-    case ValueKind::DowncastExistentialRefInst:
-      operand = cast<DowncastExistentialRefInst>(&SI)->getOperand();
-      CI = cast<DowncastExistentialRefInst>(&SI);
-      break;
-    }
+  case ValueKind::UnconditionalCheckedCastInst: {
+    auto CI = cast<UnconditionalCheckedCastInst>(&SI);
     SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
-        (unsigned)SI.getKind(), (unsigned)CI->getMode(),
+        (unsigned)SI.getKind(), (unsigned)CI->getCastKind(),
         S.addTypeRef(CI->getType().getSwiftRValueType()),
         (unsigned)CI->getType().getCategory(),
-        S.addTypeRef(operand.getType().getSwiftRValueType()),
-        (unsigned)operand.getType().getCategory(),
-        addValueRef(operand), operand.getResultNumber());
+        S.addTypeRef(CI->getOperand().getType().getSwiftRValueType()),
+        (unsigned)CI->getOperand().getType().getCategory(),
+        addValueRef(CI->getOperand()), CI->getOperand().getResultNumber());
     break;
   }
+      
   case ValueKind::AssignInst:
   case ValueKind::CopyAddrInst:
   case ValueKind::StoreInst:
@@ -1046,6 +1014,27 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
         S.addTypeRef(DMB->getOperand().getType().getSwiftRValueType()),
         (unsigned)DMB->getOperand().getType().getCategory(), ListOfValues);
+    break;
+  }
+  case ValueKind::CheckedCastBranchInst: {
+    // Format: the cast kind, a typed value, a BasicBlock ID for success,
+    // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
+    const CheckedCastBranchInst *CBI = cast<CheckedCastBranchInst>(&SI);
+    SmallVector<ValueID, 8> ListOfValues;
+    ListOfValues.push_back((unsigned)CBI->getCastKind());
+    ListOfValues.push_back(addValueRef(CBI->getOperand()));
+    ListOfValues.push_back(CBI->getOperand().getResultNumber());
+    ListOfValues.push_back(
+               S.addTypeRef(CBI->getOperand().getType().getSwiftRValueType()));
+    ListOfValues.push_back((unsigned)CBI->getOperand().getType().getCategory());
+    ListOfValues.push_back(BasicBlockMap[CBI->getSuccessBB()]);
+    ListOfValues.push_back(BasicBlockMap[CBI->getFailureBB()]);
+    
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+             S.addTypeRef(CBI->getCastType().getSwiftRValueType()),
+             (unsigned)CBI->getCastType().getCategory(),
+             ListOfValues);
     break;
   }
   case ValueKind::SpecializeInst: {

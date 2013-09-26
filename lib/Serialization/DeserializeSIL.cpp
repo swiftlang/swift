@@ -335,6 +335,20 @@ static SILFunction *getFuncForReference(Identifier Name, SILType Ty,
   return Fn;
 }
 
+static CheckedCastKind getCheckedCastKind(unsigned Attr) {
+  switch (Attr) {
+  case (unsigned)CheckedCastKind::ArchetypeToArchetype:
+  case (unsigned)CheckedCastKind::ArchetypeToConcrete:
+  case (unsigned)CheckedCastKind::Downcast:
+  case (unsigned)CheckedCastKind::ExistentialToArchetype:
+  case (unsigned)CheckedCastKind::ExistentialToConcrete:
+  case (unsigned)CheckedCastKind::SuperToArchetype:
+    return (CheckedCastKind)Attr;
+  default:
+    llvm_unreachable("not a valid CheckedCastKind for SIL");
+  }
+}
+
 bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                           unsigned RecordKind,
                           SmallVectorImpl<uint64_t> &scratch) {
@@ -655,47 +669,28 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   // Checked Conversion instructions.
-  case ValueKind::DowncastInst:
-  case ValueKind::SuperToArchetypeRefInst:
-  case ValueKind::DowncastArchetypeAddrInst:
-  case ValueKind::DowncastArchetypeRefInst:
-  case ValueKind::ProjectDowncastExistentialAddrInst:
-  case ValueKind::DowncastExistentialRefInst: {
+  case ValueKind::UnconditionalCheckedCastInst: {
     SILValue Val = getLocalValue(ValID, ValResNum,
-                       getSILType(MF->getType(TyID2),
-                                  (SILValueCategory)TyCategory2));
+                 getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
     SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
-    CheckedCastMode Mode;
-    if (Attr == (unsigned)CheckedCastMode::Unconditional)
-      Mode = CheckedCastMode::Unconditional;
-    else if (Attr == (unsigned)CheckedCastMode::Conditional)
-      Mode = CheckedCastMode::Conditional;
-    else
-      llvm_unreachable("Not an valid CheckedCastMode");
-    switch ((ValueKind)OpCode) {
-    default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::DowncastInst:
-      ResultVal = Builder.createDowncast(Loc, Val, Ty, Mode);
+    CheckedCastKind Kind;
+    switch (Attr) {
+    case (unsigned)CheckedCastKind::ArchetypeToArchetype:
+    case (unsigned)CheckedCastKind::ArchetypeToConcrete:
+    case (unsigned)CheckedCastKind::Downcast:
+    case (unsigned)CheckedCastKind::ExistentialToArchetype:
+    case (unsigned)CheckedCastKind::ExistentialToConcrete:
+    case (unsigned)CheckedCastKind::SuperToArchetype:
+      Kind = (CheckedCastKind)Attr;
       break;
-    case ValueKind::SuperToArchetypeRefInst:
-      ResultVal = Builder.createSuperToArchetypeRef(Loc, Val, Ty, Mode);
-      break;
-    case ValueKind::DowncastArchetypeAddrInst:
-      ResultVal = Builder.createDowncastArchetypeAddr(Loc, Val, Ty, Mode);
-      break;
-    case ValueKind::DowncastArchetypeRefInst:
-      ResultVal = Builder.createDowncastArchetypeRef(Loc, Val, Ty, Mode);
-      break;
-    case ValueKind::ProjectDowncastExistentialAddrInst:
-      ResultVal = Builder.createProjectDowncastExistentialAddr(Loc,
-                                                         Val, Ty, Mode);
-      break;
-    case ValueKind::DowncastExistentialRefInst:
-      ResultVal = Builder.createDowncastExistentialRef(Loc, Val, Ty, Mode);
-      break;
+        
+    default:
+      llvm_unreachable("not a valid CheckedCastKind for SIL");
     }
+    ResultVal = Builder.createUnconditionalCheckedCast(Loc, Kind, Val, Ty);
     break;
   }
+      
 #define UNARY_INSTRUCTION_HELPER(ID, CREATOR) \
   case ValueKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_OPERAND &&            \
@@ -1069,6 +1064,24 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                              (SILValueCategory)TyCategory)),
                     DRef, getBBForReference(Fn, ListOfValues[6]),
                     getBBForReference(Fn, ListOfValues[7]));
+    break;
+  }
+  case ValueKind::CheckedCastBranchInst: {
+    // Format: the cast kind, a typed value, a BasicBlock ID for success,
+    // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
+    assert(ListOfValues.size() == 7 &&
+           "expect 7 numbers for CheckedCastBranchInst");
+    CheckedCastKind castKind = getCheckedCastKind(ListOfValues[0]);
+    SILType opTy = getSILType(MF->getType(ListOfValues[3]),
+                              (SILValueCategory)ListOfValues[4]);
+    SILValue op = getLocalValue(ListOfValues[1], ListOfValues[2], opTy);
+    SILType castTy = getSILType(MF->getType(TyID),
+                                (SILValueCategory)TyCategory);
+    auto *successBB = getBBForReference(Fn, ListOfValues[5]);
+    auto *failureBB = getBBForReference(Fn, ListOfValues[6]);
+    
+    ResultVal = Builder.createCheckedCastBranch(Loc, castKind, op, castTy,
+                                                successBB, failureBB);
     break;
   }
   case ValueKind::SpecializeInst: {

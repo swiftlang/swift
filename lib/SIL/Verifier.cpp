@@ -994,15 +994,80 @@ public:
             "archetype_ref_to_super must convert to a class type");
   }
   
-  void checkSuperToArchetypeRefInst(SuperToArchetypeRefInst *SAI) {
-    require(SAI->getOperand().getType()
-              .getSwiftType()->getClassOrBoundGenericClass(),
-            "super_to_archetype_ref operand must be a class instance");
-    ArchetypeType *archetype
-      = SAI->getType().getAs<ArchetypeType>();
-    require(archetype, "super_to_archetype_ref must convert to archetype type");
-    require(archetype->requiresClass(),
-            "super_to_archetype_ref must convert to class archetype type");
+  void verifyCheckedCast(CheckedCastKind kind, SILType fromTy, SILType toTy) {
+    // Verify common invariants.
+    require(fromTy != toTy, "can't checked cast to same type");
+    require(fromTy.isAddress() == toTy.isAddress(),
+            "address-ness of checked cast src and dest must match");
+    
+    switch (kind) {
+    case CheckedCastKind::Unresolved:
+    case CheckedCastKind::InvalidCoercible:
+      llvm_unreachable("invalid for SIL");
+    case CheckedCastKind::Downcast:
+      require(fromTy.isObject(),
+              "downcast operand must be an object");
+      require(fromTy.getClassOrBoundGenericClass(),
+              "downcast operand must be a class type");
+      require(toTy.getClassOrBoundGenericClass(),
+              "downcast must convert to a class type");
+      return;
+    case CheckedCastKind::SuperToArchetype: {
+      require(fromTy.isObject(),
+              "super_to_archetype operand must be an object");
+      require(fromTy.getClassOrBoundGenericClass(),
+              "super_to_archetype operand must be a class instance");
+      auto archetype = toTy.getAs<ArchetypeType>();
+      require(archetype, "super_to_archetype must convert to archetype type");
+      require(archetype->requiresClass(),
+              "super_to_archetype must convert to class archetype type");
+      return;
+    }
+    case CheckedCastKind::ArchetypeToConcrete: {
+      require(fromTy.getAs<ArchetypeType>(),
+              "archetype_to_concrete must convert from archetype type");
+      return;
+    }
+    case CheckedCastKind::ArchetypeToArchetype: {
+      require(fromTy.getAs<ArchetypeType>(),
+              "archetype_to_archetype must convert from archetype type");
+      require(toTy.getAs<ArchetypeType>(),
+              "archetype_to_archetype must convert to archetype type");
+      return;
+    }
+    case CheckedCastKind::ExistentialToArchetype: {
+      require(fromTy.isExistentialType(),
+              "existential_to_archetype must convert from protocol type");
+      require(toTy.getAs<ArchetypeType>(),
+              "existential_to_archetype must convert to archetype type");
+      return;
+    }
+    case CheckedCastKind::ExistentialToConcrete: {
+      require(fromTy.isExistentialType(),
+              "existential_to_concrete must convert from protocol type");
+      return;
+    }
+    }
+  }
+  
+  void checkUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
+    verifyCheckedCast(CI->getCastKind(),
+                      CI->getOperand().getType(),
+                      CI->getType());
+  }
+  
+  void checkCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
+    verifyCheckedCast(CBI->getCastKind(),
+                      CBI->getOperand().getType(),
+                      CBI->getCastType());
+    
+    require(CBI->getSuccessBB()->bbarg_size() == 1,
+            "success dest of checked_cast_br must take one argument");
+    require(CBI->getSuccessBB()->bbarg_begin()[0]->getType()
+              == CBI->getCastType(),
+            "success dest block argument of checked_cast_br must match type of cast");
+    require(CBI->getFailureBB()->bbarg_empty(),
+            "failure dest of checked_cast_br must take no arguments");
   }
   
   void checkBridgeToBlockInst(BridgeToBlockInst *BBI) {
@@ -1158,23 +1223,12 @@ public:
     }
   }
   
-  void checkDowncastInst(DowncastInst *DI) {
-    require(DI->getType() != DI->getOperand().getType(),
-            "can't downcast to same type");
-    require(DI->getOperand().getType().getSwiftType()
-              ->getClassOrBoundGenericClass(),
-            "downcast operand must be a class type");
-    require(DI->getType().getSwiftType()->getClassOrBoundGenericClass(),
-            "downcast must convert to a class type");
-  }
-  
   void checkIsNonnullInst(IsNonnullInst *II) {
     require(II->getOperand().getType().getSwiftType()
-              ->mayHaveSuperclass()
-            || II->getOperand().getType().isAddress(),
-            "isa operand must be a class type or address");
+              ->mayHaveSuperclass(),
+            "isa operand must be a class type");
   }
-  
+
   void checkAddressToPointerInst(AddressToPointerInst *AI) {
     require(AI->getOperand().getType().isAddress(),
             "address-to-pointer operand must be an address");
@@ -1183,59 +1237,6 @@ public:
             "address-to-pointer result type must be RawPointer");
   }
 
-  void checkDowncastArchetypeAddrInst(DowncastArchetypeAddrInst *DAAI) {
-    require(DAAI->getOperand().getType().isAddress(),
-            "downcast_archetype_addr operand must be an address");
-    ArchetypeType *archetype = DAAI->getOperand().getType().getAs<ArchetypeType>();
-    require(archetype, "downcast_archetype_addr operand must be an archetype");
-    require(!archetype->requiresClass(),
-            "downcast_archetype_addr operand must be a non-class archetype");
-    
-    require(DAAI->getType().isAddress(),
-            "downcast_archetype_addr result must be an address");
-  }
-  
-  void checkDowncastArchetypeRefInst(DowncastArchetypeRefInst *DARI) {
-    require(DARI->getOperand().getType().isObject(),
-            "downcast_archetype_ref operand must not be an address");
-    ArchetypeType *archetype = DARI->getOperand().getType().getAs<ArchetypeType>();
-    require(archetype, "downcast_archetype_ref operand must be an archetype");
-    require(archetype->requiresClass(),
-            "downcast_archetype_ref operand must be a class archetype");
-    
-    require(DARI->getType().isObject(),
-            "downcast_archetype_ref result must not be an address");
-    require(DARI->getType().getSwiftType()->mayHaveSuperclass(),
-            "downcast_archetype_ref result must be a class type "
-            "or class archetype");
-  }
-  
-  void checkProjectDowncastExistentialAddrInst(ProjectDowncastExistentialAddrInst *DEAI) {
-    require(DEAI->getOperand().getType().isAddress(),
-            "project_downcast_existential_addr operand must be an address");
-    require(DEAI->getOperand().getType().isExistentialType(),
-            "project_downcast_existential_addr operand must be an existential");
-    require(!DEAI->getOperand().getType().isClassExistentialType(),
-            "project_downcast_existential_addr operand must be a non-class "
-            "existential");
-    
-    require(DEAI->getType().isAddress(),
-            "project_downcast_existential_addr result must be an address");
-  }
-  
-  void checkDowncastExistentialRefInst(DowncastExistentialRefInst *DERI) {
-    require(DERI->getOperand().getType().isObject(),
-            "downcast_existential_ref operand must not be an address");
-    require(DERI->getOperand().getType().isClassExistentialType(),
-            "downcast_existential_ref operand must be a class existential");
-    
-    require(DERI->getType().isObject(),
-            "downcast_existential_ref result must not be an address");
-    require(DERI->getType().getSwiftType()->mayHaveSuperclass(),
-            "downcast_existential_ref result must be a class type "
-            "or class archetype");
-  }
-  
   void checkRefToObjectPointerInst(RefToObjectPointerInst *AI) {
     require(AI->getOperand().getType()
               .getSwiftType()->mayHaveSuperclass(),
