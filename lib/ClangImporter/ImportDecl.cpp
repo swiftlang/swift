@@ -1325,8 +1325,7 @@ namespace {
       SmallVector<Pattern *, 3> getterArgs;
 
       // 'self'
-      auto selfVar = addImplicitSelfParameter(dc->getDeclaredTypeOfContext(),
-                                              getterArgs);
+      addImplicitSelfParameter(dc->getDeclaredTypeOfContext(), getterArgs);
 
       // index, for subscript operations.
       if (indices) {
@@ -1363,38 +1362,7 @@ namespace {
 
       setVarDeclContexts(getterArgs, thunk);
 
-      // Create the body of the thunk, which calls the Objective-C getter.
-      auto selfRef = new (context) DeclRefExpr(selfVar, loc, /*Implicit=*/true);
-      auto getterRef = new (context) DeclRefExpr(getter, loc,/*Implicit=*/true);
-
-      // First, bind 'self' to the method.
-      Expr *call = new (context) DotSyntaxCallExpr(getterRef, loc, selfRef);
-
-      // Call the method itself.
-      if (indices) {
-        // For a subscript, pass the index.
-        auto indexVar = getSingleVar(getterArgs[1]);
-        auto indexRef = new (context) DeclRefExpr(indexVar, loc,
-                                                  /*Implicit=*/true);
-        call = new (context) CallExpr(call, indexRef, /*Implicit=*/true);
-      } else {
-        // For a property, call with no arguments.
-        auto emptyTuple = new (context) TupleExpr(loc, { }, nullptr, loc,
-                                                  /*hasTrailingClosure=*/false,
-                                                  /*Implicit=*/true);
-        call = new (context) CallExpr(call, emptyTuple, /*Implicit=*/true);
-      }
-
-      // Create the return statement.
-      auto ret = new (context) ReturnStmt(loc, call);
-
-      // Finally, set the body.
-      thunk->setBody(BraceStmt::create(context, loc,
-                                       BraceStmt::ExprStmtOrDecl(ret), loc));
-
-      // Register this thunk as an external definition.
-      Impl.SwiftContext.addedExternalDecl(thunk);
-
+      thunk->setIsObjC(true);
       return thunk;
     }
 
@@ -1432,8 +1400,7 @@ namespace {
       SmallVector<Pattern *, 3> setterArgs;
 
       // 'self'
-      auto selfVar = addImplicitSelfParameter(dc->getDeclaredTypeOfContext(),
-                                              setterArgs);
+      addImplicitSelfParameter(dc->getDeclaredTypeOfContext(), setterArgs);
 
       // index, for subscript operations.
       if (indices) {
@@ -1475,44 +1442,7 @@ namespace {
 
       setVarDeclContexts(setterArgs, thunk);
 
-      // Create the body of the thunk, which calls the Objective-C setter.
-      auto valueVar = getSingleVar(setterArgs.back());
-
-      auto selfRef = new (context) DeclRefExpr(selfVar, loc, /*Implicit=*/true);
-      auto valueRef = new (context) DeclRefExpr(valueVar,loc,/*Implicit=*/true);
-      auto setterRef = new (context) DeclRefExpr(setter, loc,/*Implicit=*/true);
-
-      // First, bind 'self' to the method.
-      Expr *call = new (context) DotSyntaxCallExpr(setterRef, loc, selfRef);
-
-      // Next, call the Objective-C setter.
-      Expr *callArgs;
-      if (indices) {
-        // For subscript setters, we have both value and index.
-        auto indexVar = getSingleVar(setterArgs[1]);
-        auto indexRef = new (context) DeclRefExpr(indexVar, loc,
-                                                  /*Implicit=*/true);
-
-        Expr *callArgsArray[2] = { valueRef, indexRef };
-        callArgs
-          = new (context) TupleExpr(loc,
-                                    context.AllocateCopy(
-                                      MutableArrayRef<Expr*>(callArgsArray)),
-                                    nullptr, loc,
-                                    /*hasTrailingClosure=*/false,
-                                    /*Implicit=*/true);
-      } else {
-        callArgs = valueRef;
-      }
-      call = new (context) CallExpr(call, callArgs, /*Implicit=*/true);
-
-      // Finally, set the body.
-      thunk->setBody(BraceStmt::create(context, loc,
-                                       BraceStmt::ExprStmtOrDecl(call), loc));
-
-      // Register this thunk as an external definition.
-      Impl.SwiftContext.addedExternalDecl(thunk);
-
+      thunk->setIsObjC(true);
       return thunk;
     }
     
@@ -1667,6 +1597,7 @@ namespace {
       getterThunk->makeGetter(subscript);
       if (setterThunk)
         setterThunk->makeSetter(subscript);
+      subscript->setIsObjC(true);
 
       // Determine whether this subscript operation overrides another subscript
       // operation.
@@ -2155,6 +2086,7 @@ namespace {
       result->setProperty(Impl.SwiftContext, SourceLoc(),
                           getterThunk, setterThunk,
                           SourceLoc());
+      result->setIsObjC(true);
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())

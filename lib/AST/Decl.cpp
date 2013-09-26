@@ -949,7 +949,7 @@ static bool isObjCObjectOrBridgedType(Type type) {
   // [objc] protocols
   if (auto protoTy = type->getAs<ProtocolType>()) {
     auto proto = protoTy->getDecl();
-    return proto->requiresClass() && proto->getAttrs().isObjC();
+    return proto->requiresClass() && proto->isObjC();
   }
 
   return false;
