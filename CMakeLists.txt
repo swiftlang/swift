@@ -537,7 +537,7 @@ macro(add_swift_executable name)
   endif()
 
   # Add Swift source files to the project.
-  source_group("Swift sources" FILES ${SWIFTEXE_EXTERNAL_SOURCES})
+  source_group("External Sources" FILES ${SWIFTEXE_EXTERNAL_SOURCES})
   # ...and for now, mark them as HEADER_FILE_ONLY, so that Xcode doesn't try
   # to build them itself.
   set_source_files_properties(${SWIFTEXE_EXTERNAL_SOURCES} PROPERTIES
