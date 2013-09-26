@@ -1247,7 +1247,7 @@ SILType TypeConverter::getConstantType(SILDeclRef constant) {
 
 /// Get the type of a variable accessor, () -> T for a getter or (value:T) -> ()
 /// for a setter.
-Type TypeConverter::getPropertyType(SILDeclRef::Kind kind,
+Type TypeConverter::getAccessorType(SILDeclRef::Kind kind,
                                     Type valueType) const {
   if (kind == SILDeclRef::Kind::Getter) {
     return FunctionType::get(TupleType::getEmpty(Context), valueType, Context);
@@ -1258,15 +1258,15 @@ Type TypeConverter::getPropertyType(SILDeclRef::Kind kind,
                              TupleType::getEmpty(Context),
                              Context);
   }
-  llvm_unreachable("not a property constant");
+  llvm_unreachable("not an accessor");
 }
 
-/// Get the type of a subscript accessor, Index -> PropertyAccessor.
-Type TypeConverter::getSubscriptPropertyType(SILDeclRef::Kind kind,
+/// Get the type of a subscript accessor, Index -> Accessor.
+Type TypeConverter::getSubscriptAccessorType(SILDeclRef::Kind kind,
                                              Type indexType,
                                              Type elementType) const {
-  Type propertyType = getPropertyType(kind, elementType);
-  return FunctionType::get(indexType, propertyType, Context);
+  Type accessorType = getAccessorType(kind, elementType);
+  return FunctionType::get(indexType, accessorType, Context);
 }
 
 /// Get the type of the 'self' parameter for methods of a type.
@@ -1340,14 +1340,14 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
       break;
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
-      Type setterTy = getPropertyType(SILDeclRef::Kind::Setter,
+      Type setterTy = getAccessorType(SILDeclRef::Kind::Setter,
                                       capture->getType());
       inputFields.push_back(TupleTypeElt(setterTy));
       SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Capture the getter closure.
-      Type getterTy = getPropertyType(SILDeclRef::Kind::Getter,
+      Type getterTy = getAccessorType(SILDeclRef::Kind::Getter,
                                       capture->getType());
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
@@ -1415,15 +1415,15 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
     }
     
     if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd)) {
-      Type subscriptType = getSubscriptPropertyType(c.kind,
+      Type subscriptType = getSubscriptAccessorType(c.kind,
                                                     sd->getIndices()->getType(),
                                                     sd->getElementType());
       return getMethodTypeInContext(contextType, subscriptType, genericParams);
     }
 
-    Type propertyType = getPropertyType(c.kind, vd->getType());
-    Type propertyMethodType = getMethodTypeInContext(contextType,
-                                                     propertyType,
+    Type accessorType = getAccessorType(c.kind, vd->getType());
+    Type accessorMethodType = getMethodTypeInContext(contextType,
+                                                     accessorType,
                                                      genericParams);
     
     // If this is a local variable, its property methods may be closures.
@@ -1432,14 +1432,14 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
         FuncDecl *property = c.kind == SILDeclRef::Kind::Getter
           ? var->getGetter()
           : var->getSetter();
-        auto *propTy = propertyMethodType->castTo<AnyFunctionType>();
+        auto *propTy = accessorMethodType->castTo<AnyFunctionType>();
         SmallVector<ValueDecl*, 4> LocalCaptures;
         property->getCaptureInfo().getLocalCaptures(LocalCaptures);
         return getFunctionTypeWithCaptures(propTy, LocalCaptures,
                                            var->getDeclContext());
       }
     }
-    return propertyMethodType;
+    return accessorMethodType;
   }
       
   case SILDeclRef::Kind::Allocator:

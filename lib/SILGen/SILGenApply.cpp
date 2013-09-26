@@ -1556,7 +1556,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
   return emission.apply();
 }
 
-static Callee getBasePropertyFunctionRef(SILGenFunction &gen,
+static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          SILLocation loc,
                                          SILDeclRef constant,
                                          RValue &selfValue) {
@@ -1576,12 +1576,12 @@ static Callee getBasePropertyFunctionRef(SILGenFunction &gen,
 }
 
 static Callee 
-emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
+emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
                                    SILLocation loc,
                                    SILDeclRef constant,
                                    ArrayRef<Substitution> substitutions,
                                    RValue &selfValue,
-                                   Type substPropertyType)
+                                   Type substAccessorType)
 {
   // If the accessor is a local constant, use it.
   // FIXME: Can local properties ever be generic?
@@ -1593,23 +1593,23 @@ emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
   // FIXME: Dynamic dispatch for archetype/existential methods.
-  Callee callee = getBasePropertyFunctionRef(gen, loc, constant, selfValue);
+  Callee callee = getBaseAccessorFunctionRef(gen, loc, constant, selfValue);
   
   // If there are substitutions, specialize the generic accessor.
   // FIXME: Generic subscript operator could add another layer of
   // substitutions.
   if (!substitutions.empty()) {
-    substPropertyType = getThinFunctionType(substPropertyType,
+    substAccessorType = getThinFunctionType(substAccessorType,
                                             gen.SGM.getConstantCC(constant));
-    
+
     callee.addSubstitutions(gen, loc, substitutions,
-                            substPropertyType->getCanonicalType(), 0);
+                            substAccessorType->getCanonicalType(), 0);
   }
   return callee;
 }
 
 /// Emit a call to a getter.
-ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
+ManagedValue SILGenFunction::emitGetAccessor(SILLocation loc,
                                              SILDeclRef get,
                                              ArrayRef<Substitution> substitutions,
                                              RValue &&selfValue,
@@ -1618,40 +1618,40 @@ ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
                                              SGFContext c) {
   // Derive the specialized type of the accessor.
   auto &tc = SGM.Types;
-  Type propType;
+  Type accessType;
   if (subscripts)
-    propType = tc.getSubscriptPropertyType(SILDeclRef::Kind::Getter,
-                                           subscripts.getType(),
-                                           resultType);
+    accessType = tc.getSubscriptAccessorType(SILDeclRef::Kind::Getter,
+                                             subscripts.getType(),
+                                             resultType);
   else
-    propType = tc.getPropertyType(SILDeclRef::Kind::Getter, resultType);
+    accessType = tc.getAccessorType(SILDeclRef::Kind::Getter, resultType);
   if (selfValue)
-    propType = tc.getMethodTypeInContext(selfValue.getType()->getRValueType(),
-                                         propType);
-  
-  Callee getter = emitSpecializedPropertyFunctionRef(*this, loc, get,
+    accessType = tc.getMethodTypeInContext(selfValue.getType()->getRValueType(),
+                                           accessType);
+
+  Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue,
-                                                     propType);
+                                                     accessType);
   
   CallEmission emission(*this, std::move(getter));
-  auto *propFnTy = propType->castTo<AnyFunctionType>();
+  auto *accessFnTy = accessType->castTo<AnyFunctionType>();
   // Self ->
   if (selfValue) {
-    emission.addCallSite(loc, std::move(selfValue), propFnTy->getResult());
-    propFnTy = propFnTy->getResult()->castTo<AnyFunctionType>();
+    emission.addCallSite(loc, std::move(selfValue), accessFnTy->getResult());
+    accessFnTy = accessFnTy->getResult()->castTo<AnyFunctionType>();
   }
   // Index ->
   if (subscripts) {
-    emission.addCallSite(loc, std::move(subscripts), propFnTy->getResult());
-    propFnTy = propFnTy->getResult()->castTo<AnyFunctionType>();
+    emission.addCallSite(loc, std::move(subscripts), accessFnTy->getResult());
+    accessFnTy = accessFnTy->getResult()->castTo<AnyFunctionType>();
   }
   // () ->
-  emission.addCallSite(loc, emitEmptyTupleRValue(loc), propFnTy->getResult());
+  emission.addCallSite(loc, emitEmptyTupleRValue(loc), accessFnTy->getResult());
   // T
   return emission.apply(c);
 }
 
-void SILGenFunction::emitSetProperty(SILLocation loc,
+void SILGenFunction::emitSetAccessor(SILLocation loc,
                                      SILDeclRef set,
                                      ArrayRef<Substitution> substitutions,
                                      RValue &&selfValue,
@@ -1659,36 +1659,36 @@ void SILGenFunction::emitSetProperty(SILLocation loc,
                                      RValue &&setValue) {
   // Derive the specialized type of the accessor.
   auto &tc = SGM.Types;
-  Type propType;
+  Type accessType;
   if (subscripts)
-    propType = tc.getSubscriptPropertyType(SILDeclRef::Kind::Setter,
-                                           subscripts.getType(),
-                                           setValue.getType());
+    accessType = tc.getSubscriptAccessorType(SILDeclRef::Kind::Setter,
+                                             subscripts.getType(),
+                                             setValue.getType());
   else
-    propType = tc.getPropertyType(SILDeclRef::Kind::Setter,
-                                  setValue.getType());
+    accessType = tc.getAccessorType(SILDeclRef::Kind::Setter,
+                                    setValue.getType());
   if (selfValue)
-    propType = tc.getMethodTypeInContext(selfValue.getType()->getRValueType(),
-                                         propType);
+    accessType = tc.getMethodTypeInContext(selfValue.getType()->getRValueType(),
+                                           accessType);
 
-  Callee setter = emitSpecializedPropertyFunctionRef(*this, loc, set,
+  Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue,
-                                                     propType);
+                                                     accessType);
 
   CallEmission emission(*this, std::move(setter));
-  auto *propFnTy = propType->castTo<AnyFunctionType>();
+  auto *accessFnTy = accessType->castTo<AnyFunctionType>();
   // Self ->
   if (selfValue) {
-    emission.addCallSite(loc, std::move(selfValue), propFnTy->getResult());
-    propFnTy = propFnTy->getResult()->castTo<AnyFunctionType>();
+    emission.addCallSite(loc, std::move(selfValue), accessFnTy->getResult());
+    accessFnTy = accessFnTy->getResult()->castTo<AnyFunctionType>();
   }
   // Index ->
   if (subscripts) {
-    emission.addCallSite(loc, std::move(subscripts), propFnTy->getResult());
-    propFnTy = propFnTy->getResult()->castTo<AnyFunctionType>();
+    emission.addCallSite(loc, std::move(subscripts), accessFnTy->getResult());
+    accessFnTy = accessFnTy->getResult()->castTo<AnyFunctionType>();
   }
   // T ->
-  emission.addCallSite(loc, std::move(setValue), propFnTy->getResult());
+  emission.addCallSite(loc, std::move(setValue), accessFnTy->getResult());
   // ()
   emission.apply();
 }

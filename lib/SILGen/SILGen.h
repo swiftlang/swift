@@ -683,14 +683,14 @@ public:
                                 AnyFunctionRef TheClosure);
   
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
-  ManagedValue emitGetProperty(SILLocation loc,
+  ManagedValue emitGetAccessor(SILLocation loc,
                                SILDeclRef getter,
                                ArrayRef<Substitution> substitutions,
                                RValue &&optionalSelfValue,
                                RValue &&optionalSubscripts,
                                Type resultType,
                                SGFContext C);
-  void emitSetProperty(SILLocation loc,
+  void emitSetAccessor(SILLocation loc,
                        SILDeclRef setter,
                        ArrayRef<Substitution> substitutions,
                        RValue &&optionalSelfValue,

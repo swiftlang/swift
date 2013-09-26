@@ -2090,14 +2090,14 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   }
   case CaptureKind::GetterSetter: {
     // Forward the captured setter.
-    Type setTy = gen.SGM.Types.getPropertyType(SILDeclRef::Kind::Setter,
+    Type setTy = gen.SGM.Types.getAccessorType(SILDeclRef::Kind::Setter,
                                                capture->getType());
     addSILArgument(gen.getLoweredType(setTy));
     SWIFT_FALLTHROUGH;
   }
   case CaptureKind::Getter: {
     // Forward the captured getter.
-    Type getTy = gen.SGM.Types.getPropertyType(SILDeclRef::Kind::Getter,
+    Type getTy = gen.SGM.Types.getAccessorType(SILDeclRef::Kind::Getter,
                                                capture->getType());
     addSILArgument(gen.getLoweredType(getTy));
     break;

@@ -348,7 +348,7 @@ namespace {
       assert(!setter.isNull() && "not settable!");      
       auto args = prepareAccessorArgs(gen, loc, base);
       
-      return gen.emitSetProperty(loc, setter, substitutions,
+      return gen.emitSetAccessor(loc, setter, substitutions,
                                  std::move(args.base),
                                  std::move(args.subscripts),
                                  std::move(rvalue));
@@ -359,7 +359,7 @@ namespace {
     {
       auto args = prepareAccessorArgs(gen, loc, base);
       
-      return gen.emitGetProperty(loc, getter, substitutions,
+      return gen.emitGetAccessor(loc, getter, substitutions,
                                  std::move(args.base),
                                  std::move(args.subscripts),
                                  substType, c);

@@ -356,13 +356,13 @@ public:
   /// Returns the type of a variable accessor, () -> T for a getter,
   /// or (value:T) -> () for a setter. 'kind' must be one of the Kind constants
   /// from SILDeclRef, SILDeclRef::Getter or SILDeclRef::Setter.
-  Type getPropertyType(SILDeclRef::Kind kind, Type propType) const;
+  Type getAccessorType(SILDeclRef::Kind kind, Type propType) const;
   
-  /// Returns the type of a subscript property accessor, Index -> () -> T
+  /// Returns the type of a subscript accessor, Index -> () -> T
   /// for a getter, or Index -> (value:T) -> () for a setter.
   /// 'kind' must be one of the Kind constants
   /// from SILDeclRef, SILDeclRef::Getter or SILDeclRef::Setter.
-  Type getSubscriptPropertyType(SILDeclRef::Kind kind,
+  Type getSubscriptAccessorType(SILDeclRef::Kind kind,
                                 Type indexType,
                                 Type elementType) const;
 

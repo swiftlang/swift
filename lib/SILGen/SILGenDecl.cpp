@@ -588,7 +588,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   }
   case CaptureKind::GetterSetter: {
     // Capture the setter and getter closures by value.
-    Type setTy = gen.SGM.Types.getPropertyType(SILDeclRef::Kind::Setter,
+    Type setTy = gen.SGM.Types.getAccessorType(SILDeclRef::Kind::Setter,
                                                capture->getType());
     SILType lSetTy = gen.getLoweredType(setTy);
     SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin());
@@ -598,7 +598,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   }
   case CaptureKind::Getter: {
     // Capture the getter closure by value.
-    Type getTy = gen.SGM.Types.getPropertyType(SILDeclRef::Kind::Getter,
+    Type getTy = gen.SGM.Types.getAccessorType(SILDeclRef::Kind::Getter,
                                                capture->getType());
     SILType lGetTy = gen.getLoweredType(getTy);
     SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin());
