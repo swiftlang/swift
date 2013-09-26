@@ -950,6 +950,30 @@ namespace {
       return verifyParsed(cast<AbstractTypeParamDecl>(ATD));
     }
 
+    void verifyParsed(TuplePattern *TP) {
+      if (TP->hasVararg()) {
+        auto *LastPattern = TP->getFields().back().getPattern();
+        if (!isa<TypedPattern>(LastPattern)) {
+          Out << "a vararg subpattern of a TuplePattern should be"
+                 "a TypedPattern";
+          abort();
+        }
+      }
+    }
+
+    void verifyChecked(TuplePattern *TP) {
+      if (TP->hasVararg()) {
+        auto *LastPattern = TP->getFields().back().getPattern();
+        Type T = cast<TypedPattern>(LastPattern)->getType()->getCanonicalType();
+        if (auto *BGT = T->getAs<BoundGenericType>()) {
+          if (BGT->getDecl() == Ctx.getSliceDecl())
+            return;
+        }
+        Out << "a vararg subpattern of a TuplePattern has wrong type";
+        abort();
+      }
+    }
+
     /// Look through a possible l-value type, returning true if it was
     /// an l-value.
     bool lookThroughLValue(Type &type, LValueType::Qual &qs) {

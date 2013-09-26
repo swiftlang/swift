@@ -80,19 +80,23 @@ namespace {
     }
 
     void printAttributes(const DeclAttributes &attrs);
+    void printTypedPattern(const TypedPattern *TP,
+                           bool StripOuterSliceType = false);
     void printPattern(const Pattern *pattern);
     void printGenericParams(GenericParamList *params);
     void printMembers(ArrayRef<Decl *> members, bool needComma = false);
     void printNominalDeclName(NominalTypeDecl *decl);
     void printInherited(ArrayRef<TypeLoc> inherited,
                         ArrayRef<ProtocolDecl *> protos,
-                        Type superclass = {});
+                        Type superclass = {},
+                        bool PrintAsProtocolComposition = false);
 
     template <typename DeclWithSuperclass>
     void printInheritedWithSuperclass(DeclWithSuperclass *decl);
     
     void printInherited(const TypeDecl *decl);
     void printInherited(const ExtensionDecl *decl);
+    void printInherited(const GenericTypeParamDecl *D);
     void printBraceStmtElements(BraceStmt *stmt, bool NeedIndent = true);
 
     /// \brief Print the function parameters in curried or selector style,
@@ -210,6 +214,18 @@ void PrintAST::printAttributes(const DeclAttributes &Attrs) {
   AP.finish();
 }
 
+void PrintAST::printTypedPattern(const TypedPattern *TP,
+                                 bool StripOuterSliceType) {
+  printPattern(TP->getSubPattern());
+  OS << " : ";
+  Type T = TP->getTypeLoc().getType();
+  if (StripOuterSliceType) {
+    if (auto *BGT = T->getAs<BoundGenericType>())
+      T = BGT->getGenericArgs()[0];
+  }
+  OS << T;
+}
+
 void PrintAST::printPattern(const Pattern *pattern) {
   switch (pattern->getKind()) {
   case PatternKind::Any:
@@ -231,42 +247,33 @@ void PrintAST::printPattern(const Pattern *pattern) {
 
   case PatternKind::Tuple: {
     OS << "(";
-    auto tuple = cast<TuplePattern>(pattern);
-    bool first = true;
-    for (const auto &elt : tuple->getFields()) {
-      if (first) {
-        first = false;
-      } else {
+    auto TP = cast<TuplePattern>(pattern);
+    auto Fields = TP->getFields();
+    for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
+      const auto &Elt = Fields[i];
+      if (i != 0)
         OS << ", ";
+
+      if (i == e - 1 && TP->hasVararg()) {
+        printTypedPattern(cast<TypedPattern>(Elt.getPattern()),
+                          /*StripOuterSliceType=*/true);
+      } else {
+        printPattern(Elt.getPattern());
       }
-      printPattern(elt.getPattern());
-      if (Options.VarInitializers && elt.getInit()) {
+      if (Options.VarInitializers && Elt.getInit()) {
         // FIXME: Print initializer here.
       }
     }
-    if (tuple->hasVararg()) {
+    if (TP->hasVararg())
       OS << "...";
-    }
     OS << ")";
     break;
   }
-      
-  case PatternKind::Typed: {
-    auto typed = cast<TypedPattern>(pattern);
-    printPattern(typed->getSubPattern());
-    OS << " : ";
-    TypeLoc ty = typed->getTypeLoc();
-    if (!ty.isNull()) {
-      if (ty.getTypeRepr())
-        OS << ty.getTypeRepr();
-      else
-        OS << ty.getType();
-    } else {
-      OS << "<<null type>>";
-    }
+
+  case PatternKind::Typed:
+    printTypedPattern(cast<TypedPattern>(pattern));
     break;
-  }
-      
+
   case PatternKind::Isa: {
     auto isa = cast<IsaPattern>(pattern);
     OS << "is ";
@@ -317,7 +324,7 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
 
     auto TypeParam = GP.getAsTypeParam();
     OS << TypeParam->getName().str();
-    printInheritedWithSuperclass(TypeParam);
+    printInherited(TypeParam);
   }
 
   auto Requirements = Params->getRequirements();
@@ -381,7 +388,8 @@ void PrintAST::printNominalDeclName(NominalTypeDecl *decl) {
 
 void PrintAST::printInherited(ArrayRef<TypeLoc> inherited,
                               ArrayRef<ProtocolDecl *> protos,
-                              Type superclass) {
+                              Type superclass,
+                              bool PrintAsProtocolComposition) {
   if (inherited.empty() && superclass.isNull()) {
     if (protos.empty())
       return;
@@ -393,19 +401,29 @@ void PrintAST::printInherited(ArrayRef<TypeLoc> inherited,
   }
 
   OS << " : ";
-  
+
   if (inherited.empty()) {
+    bool PrintedInherited = false;
+
     if (superclass) {
       superclass.print(OS);
-      OS << ", ";
+      PrintedInherited = true;
     }
-    
-    interleave(protos, [&](const ProtocolDecl *proto) {
-      if (!proto->isSpecificProtocol(KnownProtocolKind::DynamicLookup))
-        proto->getDeclaredType()->print(OS);
-    }, [&]() {
-      OS << ", ";
-    });
+
+    bool UseProtocolCompositionSyntax =
+        PrintAsProtocolComposition && protos.size() > 1;
+    if (UseProtocolCompositionSyntax)
+      OS << "protocol<";
+    for (auto Proto : protos) {
+      if (!Proto->isSpecificProtocol(KnownProtocolKind::DynamicLookup)) {
+        if (PrintedInherited)
+          OS << ", ";
+        Proto->getDeclaredType()->print(OS);
+        PrintedInherited = true;
+      }
+    }
+    if (UseProtocolCompositionSyntax)
+      OS << ">";
   } else {
     interleave(inherited, [&](TypeLoc TL) {
       TL.getType()->print(OS);
@@ -424,10 +442,15 @@ void PrintAST::printInheritedWithSuperclass(DeclWithSuperclass *decl) {
 void PrintAST::printInherited(const TypeDecl *decl) {
   printInherited(decl->getInherited(), decl->getProtocols());
 }
+
 void PrintAST::printInherited(const ExtensionDecl *decl) {
   printInherited(decl->getInherited(), decl->getProtocols());
 }
 
+void PrintAST::printInherited(const GenericTypeParamDecl *D) {
+  printInherited(D->getInherited(), D->getProtocols(), D->getSuperclass(),
+                 true);
+}
 
 void PrintAST::visitImportDecl(ImportDecl *decl) {
   OS << "import ";
@@ -731,11 +754,9 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
 }
 
 void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
-  // Enum elements are printed as part of the EnumCaseDecl, unless they were
-  // imported without source info.
-  if (decl->getSourceRange().isValid())
+  if (!decl->shouldPrintInContext())
     return;
-  
+
   // In cases where there is no parent EnumCaseDecl (such as imported or
   // deserialized elements), print the element independently.
   OS << "case ";
@@ -989,6 +1010,12 @@ bool Decl::shouldPrintInContext() const {
         return false;
       }
     }
+  }
+
+  if (auto EED = dyn_cast<EnumElementDecl>(this)) {
+    // Enum elements are printed as part of the EnumCaseDecl, unless they were
+    // imported without source info.
+    return !EED->getSourceRange().isValid();
   }
 
   // FIXME: Skip implicitly-generated constructors.
