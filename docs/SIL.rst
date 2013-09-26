@@ -209,9 +209,10 @@ type grammar. SIL adds some additional kinds of type of its own:
   cast to ``Builtin.RawPointer`` values using the ``address_to_pointer``
   instruction, which could be stored.) In LLVM terms, all address arguments are
   ``noalias nocapture``. It is undefined behavior for two address arguments to
-  alias or for a captured address value to be dereferenced. (Note that class 
-  values are not considered "addresses". Their instance pointers may be
-  captured and may alias subject to `class aliasing`_ rules.)
+  alias or for a captured address value to be dereferenced. Addresses are
+  never null. (Note that class 
+  values are not considered "addresses". Their instance pointers may be null,
+  may be captured, and may alias subject to `class aliasing`_ rules.)
   
   Functions cannot return an address. If an address-only
   value needs to be returned, it is done so using an indirect return argument
@@ -997,7 +998,8 @@ load
 Loads the value at address ``%0`` from memory. ``T`` must be a loadable type.
 This does not affect the reference count, if any, of the loaded value; the
 value must be retained explicitly if necessary. It is undefined behavior to
-load from uninitialized memory.
+load from uninitialized memory or to load from an address that points to
+deallocated storage.
 
 TODO: Should loading from uninitialized memory instead have the dataflow
 analysis semantics of initialize_var?
@@ -1015,7 +1017,8 @@ Stores the value ``%0`` to memory at address ``%1``.  The type of %1 is ``*T``
 and the type of ``%0 is ``T``, which must be a loadable type. This will
 overwrite the memory at ``%1``. If ``%1`` already references a value that
 requires ``release`` or other cleanup, that value must be loaded before being
-stored over and cleaned up.
+stored over and cleaned up. It is undefined behavior to store to an address
+that points to deallocated storage.
 
 assign
 ``````
@@ -2574,22 +2577,6 @@ Applying the resulting thick function value is equivalent to applying the
 original thin value. The ``thin_to_thick_function`` conversion may be
 eliminated if the context is proven not to be needed.
 
-Checked Conversions
-~~~~~~~~~~~~~~~~~~~
-
-These instructions represent user-level cast operations that can fail and thus
-require runtime checking. All of these instructions take a flag to indicate
-the desired behavior of the runtime check::
-
-  sil-checked-conversion-mode ::= 'conditional'
-  sil-checked-conversion-mode ::= 'unconditional'
-
-- ``conditional`` causes the conversion to return a null address or reference
-  if the cast fails. The success of the conversion be tested with
-  the ``is_nonnull`` instruction.
-- ``unconditional`` requires the conversion to succeed. It is a runtime failure
-  if the cast fails.
-
 is_nonnull
 ``````````
 ::
@@ -2597,105 +2584,70 @@ is_nonnull
   sil-instruction ::= 'is_nonnull' sil-operand
 
   %1 = is_nonnull %0 : $C
-  %1 = is_nonnull %0 : $*T
-  // %0 must be of reference type $C or of address type $*T
+  // %0 must be of reference type $C
   // %1 will be of type Builtin.Int1
 
-Checks whether a reference type or address value is null, returning 1 if
+Checks whether a reference type value is null, returning 1 if
 the value is not null, or 0 if it is null.
 
-downcast
-````````
+Checked Conversions
+~~~~~~~~~~~~~~~~~~~
+
+Some user-level cast operations can fail and thus require runtime checking.
+A special operand to checked conversion operations describes the different
+kinds of cast::
+
+  sil-checked-conversion-kind ::= 'downcast'
+  sil-checked-conversion-kind ::= 'super_to_archetype'
+  sil-checked-conversion-kind ::= 'archetype_to_archetype'
+  sil-checked-conversion-kind ::= 'archetype_to_concrete'
+  sil-checked-conversion-kind ::= 'existential_to_archetype'
+  sil-checked-conversion-kind ::= 'existential_to_concrete'
+
+- ``downcast`` represents a base-to-derived class cast, where the derived type
+  is a concrete class type. The operand type and result type of the cast
+  must both be concrete class types.
+- ``super_to_archetype`` represents a base-to-derived class cast, where the
+  derived type is an archetype with a base class constraint. The operand type
+  must be a concrete class type. The result type must be an archetype with a
+  base class constraint that relates it to the operand's type.
+- ``archetype_to_archetype`` represents a cast from one archetype type to
+  another. The operand type and result type must be both archetype values or
+  both archetype addresses. The types do not need to be statically related.
+- ``archetype_to_concrete`` represents a cast from an archetype type to
+  a concrete type. The operand type must be an archetype. The result type
+  must be a concrete type. The types must be both objects or both addresses.
+  The types do not need to be statically related.
+- ``existential_to_archetype`` represents a cast from a protocol type to
+  an archetype. The operand type must be a protocol type. The result type
+  must be an archetype. The types must be both objects or both addresses.
+  The types do not need to be statically related.
+- ``existential_to_concrete`` represents a cast from a protocol type to
+  a concrete type. The operand type must be a protocol type. The result type
+  must be a concrete type. The types must be both objects or both addresses.
+  The types do not need to be statically related.
+
+The `unconditional_checked_cast`_ instruction performs an unconditional
+checked cast; it is a runtime failure if the cast fails. The `checked_cast_br`_
+terminator instruction performs a conditional checked cast; it branches to one
+of two destinations based on whether the cast succeeds or not.
+
+unconditional_checked_cast
+``````````````````````````
 ::
 
-  sil-instruction ::= 'downcast' sil-checked-conversion-mode 
+  sil-instruction ::= 'unconditional_checked_cast' sil-checked-conversion-kind
                         sil-operand 'to' sil-type
 
-  %1 = downcast conditional conditional %0 : $B to $D
+  %1 = unconditional_checked_cast downcast %0 : $A to $B
+  %1 = unconditional_checked_cast archetype_to_archetype %0 : $*A to $*B
   // %0 must be of a class type $B that is a superclass of $D
-  // $D must be a class type
-  // %1 will be of type $D
+  // $A and $B must be valid operand and result types for the cast kind
+  // $A and $B must be both objects or both addresses
+  // %1 will be of type $B or $*B
 
-Performs a checked downcast conversion of class instance reference ``%0`` to
-a subclass ``D`` of its current static type.
-
-super_to_archetype_ref
-``````````````````````
-::
-
-  sil-instruction :: 'super_to_archetype_ref' sil-checked-conversion-mode
-                       sil-operand 'to' sil-type
-
-  %1 = super_to_archetype_ref conditional %0 : $B to $T
-  // %0 must be of a class type $B that is the superclass constraint of
-  //   archetype $T (or a superclass of its superclass)
-  // %1 will be of type $T
-
-Performs a checked downcast operation on the class instance reference ``%0``
-to an archetype ``T`` constrained by the class type.
-
-downcast_archetype_ref
-``````````````````````
-::
-
-  sil-instruction :: 'downcast_archetype_ref' sil-checked-conversion-mode
-                       sil-operand 'to' sil-type
-
-  %1 = downcast_archetype_ref conditional %0 : $T to $A
-  // %0 must be of a class archetype $T
-  // $A must be a concrete class type or another class archetype
-  // %1 will be of type $A
-
-Performs a checked conversion of a class instance from a class archetype to a
-concrete class type or to another archetype.
-
-downcast_archetype_addr
-```````````````````````
-::
-
-  sil-instruction :: 'downcast_archetype_addr' sil-checked-conversion-mode
-                       sil-operand 'to' sil-type
-
-  %1 = downcast_archetype_ref conditional %0 : $*T to $*A
-  // %0 must be the address of an archetype $*T
-  // $*A must the address of a concrete type or of another archetype
-  // %1 will be of type $*A
-
-Performs a checked conversion of an address from an archetype to a concrete
-class type or to another archetype.
-
-project_downcast_existential_addr
-`````````````````````````````````
-::
-
-  sil-instruction ::= 'project_downcast_existential_addr'
-                        sil-checked-conversion-mode
-                        sil-operand 'to' sil-type
-
-  %1 = project_downcast_existential_addr conditional %0 : $*P to $*A
-  // %0 must be the address of an opaque existential container $*P
-  // $*A must the address of a concrete type or archetype
-  // %1 will be of type $*A
-
-Performs a checked conversion on the value inside of an opaque existential
-container. If the conversion succeeds, the address of the contained value is
-projected out of the existential container.
-
-downcast_existential_ref
-````````````````````````
-::
-
-  sil-instruction ::= 'downcast_existential_ref' sil-checked-conversion-mode
-                        sil-operand 'to' sil-type
-
-  %1 = downcast_existential_ref conditional %0 : $P to $C
-  // %0 must be a class existential container value of type $P
-  // $C must be a concrete class type or class archetype
-  // %1 will be of type $C
-
-Performs a checked conversion on the class instance reference inside of a
-class existential container. If the conversion succeeds, the contained
-class instance is returned.
+Performs a checked conversion, causing a runtime failure if the conversion
+fails.
 
 Terminators
 ~~~~~~~~~~~
@@ -2931,3 +2883,23 @@ If the operand is determined to have the named method, this
 instruction branches to ``bb1``, passing it the uncurried function
 corresponding to the method found. If the operand does not have the
 named method, this instruction branches to ``bb2``.
+
+checked_cast_br
+```````````````
+::
+
+  sil-terminator ::= 'checked_cast_br' sil-checked-conversion-kind
+                      sil-operand 'to' sil-type ','
+                      sil-identifier ',' sil-identifier
+
+  checked_cast_br %0 : $A to $B, bb1, bb2
+  checked_cast_br %0 : $*A to $*B, bb1, bb2
+  // $A and $B must valid operand and result types for the cast kind
+  // $A and $B must be both object types or both address types
+  // bb1 must take a single argument of type $B or $*B
+  // bb2 must take no arguments
+
+Performs a checked conversion from ``$A`` to ``$B``. If the conversion succeeds,
+control is transferred to ``bb1``, and the result of the cast is passed into
+``bb1`` as an argument. If the conversion fails, control is transferred to
+``bb2``.
