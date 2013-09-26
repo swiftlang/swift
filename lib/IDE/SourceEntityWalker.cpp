@@ -1,4 +1,4 @@
-//===- SemanticSourceEntity.cpp - Routines for semantic source info -------===//
+//===- SourceEntityWalker.cpp - Routines for semantic source info ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IDE/SemanticSourceEntity.h"
+#include "swift/IDE/SourceEntityWalker.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/SourceManager.h"
 
 using namespace swift;
 using namespace ide;
@@ -23,13 +25,13 @@ using namespace ide;
 namespace {
 
 class SemaAnnotator : public ASTWalker {
-  SemanticEntityReceiverFn Receiver;
+  SourceEntityWalker &SEWalker;
   SmallVector<ConstructorRefCallExpr *, 2> CtorRefs;
   bool Cancelled = false;
 
 public:
-  explicit SemaAnnotator(SemanticEntityReceiverFn Receiver)
-    : Receiver(std::move(Receiver)) { }
+  explicit SemaAnnotator(SourceEntityWalker &SEWalker)
+    : SEWalker(SEWalker) { }
 
   bool isDone() const { return Cancelled; }
 
@@ -42,7 +44,10 @@ private:
   Expr *walkToExprPost(Expr *E) override;
   bool walkToTypeReprPost(TypeRepr *T) override;
 
-  bool passToReceiver(ValueDecl *D, SourceLoc Loc, bool IsRef);
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override;
+  Stmt *walkToStmtPost(Stmt *S) override;
+
+  bool passReference(ValueDecl *D, SourceLoc Loc);
 
   TypeDecl *getTypeDecl(Type Ty);
 };
@@ -50,19 +55,65 @@ private:
 }
 
 bool SemaAnnotator::walkToDeclPre(Decl *D) {
+  if (isDone())
+    return false;
   if (D->isImplicit())
     return false;
+  if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+    if (FD->isGetterOrSetter())
+      return true;
+  }
 
-  if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-    return passToReceiver(VD, VD->getNameLoc(), /*IsRef=*/false);
+  SourceLoc Loc = D->getLoc();
+  unsigned NameLen = 0;
 
-  return true;
+  if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+    NameLen = VD->getName().getLength();
+
+  } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+    if (TypeRepr *TR = ED->getExtendedTypeLoc().getTypeRepr()) {
+      SourceRange SR = TR->getSourceRange();
+      Loc = SR.Start;
+      NameLen = ED->getASTContext().SourceMgr.getByteDistance(SR.Start, SR.End);
+    } else {
+      Loc = SourceLoc();
+    }
+
+  } else {
+    return true;
+  }
+
+  CharSourceRange Range = (Loc.isValid()) ? CharSourceRange(Loc, NameLen)
+                                          : CharSourceRange();
+  return SEWalker.walkToDeclPre(D, Range);
 }
 
 bool SemaAnnotator::walkToDeclPost(Decl *D) {
   if (isDone())
     return false;
-  return true;
+  if (D->isImplicit())
+    return true;
+  if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+    if (FD->isGetterOrSetter())
+      return true;
+  }
+
+  bool Continue = SEWalker.walkToDeclPost(D);
+  if (!Continue)
+    Cancelled = true;
+  return Continue;
+}
+
+std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
+  bool TraverseChildren = SEWalker.walkToStmtPre(S);
+  return { TraverseChildren, S };
+}
+
+Stmt *SemaAnnotator::walkToStmtPost(Stmt *S) {
+  bool Continue = SEWalker.walkToStmtPost(S);
+  if (!Continue)
+    Cancelled = true;
+  return Continue ? S : nullptr;
 }
 
 std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
@@ -76,17 +127,20 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     return { true, E };
 
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-    if (!passToReceiver(DRE->getDecl(), E->getLoc(), /*IsRef=*/true))
+    if (!passReference(DRE->getDecl(), E->getLoc()))
       return { false, nullptr };
   } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(E)) {
-    if (!passToReceiver(MRE->getMember().getDecl(), E->getLoc(), /*IsRef=*/true))
+    if (!passReference(MRE->getMember().getDecl(), E->getLoc()))
       return { false, nullptr };
 
   } else if (BinaryExpr *BinE = dyn_cast<BinaryExpr>(E)) {
     // Visit in source order.
-    BinE->getArg()->getElement(0)->walk(*this);
-    BinE->getFn()->walk(*this);
-    BinE->getArg()->getElement(1)->walk(*this);
+    if (!BinE->getArg()->getElement(0)->walk(*this))
+      return { false, nullptr };
+    if (!BinE->getFn()->walk(*this))
+      return { false, nullptr };
+    if (!BinE->getArg()->getElement(1)->walk(*this))
+      return { false, nullptr };
 
     // We already visited the children.
     return { false, E };
@@ -96,21 +150,21 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 }
 
 bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
+  if (isDone())
+    return false;
+
   if (IdentTypeRepr *IdT = dyn_cast<IdentTypeRepr>(T)) {
     for (auto &Comp : IdT->Components) {
       if (ValueDecl *VD = Comp.getBoundDecl())
-        return passToReceiver(VD, Comp.getIdLoc(), /*IsRef=*/true);
+        return passReference(VD, Comp.getIdLoc());
       if (TypeDecl *TyD = getTypeDecl(Comp.getBoundType()))
-        return passToReceiver(TyD, Comp.getIdLoc(),/*IsRef=*/true);
+        return passReference(TyD, Comp.getIdLoc());
     }
   }
   return true;
 }
 
 Expr *SemaAnnotator::walkToExprPost(Expr *E) {
-  if (isDone())
-    return nullptr;
-
   if (isa<ConstructorRefCallExpr>(E))
     CtorRefs.pop_back();
 
@@ -123,10 +177,10 @@ bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
   return true;
 }
 
-bool SemaAnnotator::passToReceiver(ValueDecl *D, SourceLoc Loc, bool IsRef) {
+bool SemaAnnotator::passReference(ValueDecl *D, SourceLoc Loc) {
   TypeDecl *CtorTyRef = nullptr;
   unsigned NameLen = 0;
-  if (IsRef && isa<ConstructorDecl>(D)) {
+  if (isa<ConstructorDecl>(D)) {
     Type Ty = CtorRefs.back()->getBase()->getType();
     CtorTyRef = getTypeDecl(
                         cast<MetaTypeType>(Ty.getPointer())->getInstanceType());
@@ -136,8 +190,9 @@ bool SemaAnnotator::passToReceiver(ValueDecl *D, SourceLoc Loc, bool IsRef) {
   }
   assert(NameLen != 0);
 
-  CharSourceRange Range = CharSourceRange(Loc, NameLen);
-  bool Continue = Receiver({ Range, D, CtorTyRef, IsRef });
+  CharSourceRange Range = (Loc.isValid()) ? CharSourceRange(Loc, NameLen)
+                                          : CharSourceRange();
+  bool Continue = SEWalker.visitDeclReference(D, Range, CtorTyRef);
   if (!Continue)
     Cancelled = true;
   return Continue;
@@ -152,16 +207,16 @@ TypeDecl *SemaAnnotator::getTypeDecl(Type Ty) {
   return Ty->getAnyNominal();
 }
 
-bool ide::findSemanticSourceEntities(
-    ArrayRef<Decl*> Decls,
-    std::function<bool(SemanticSourceEntity AnnoTok)> Receiver) {
 
-  SemaAnnotator Annotator(Receiver);
+bool SourceEntityWalker::walk(ArrayRef<Decl*> Decls) {
+  SemaAnnotator Annotator(*this);
   for (Decl *D : Decls) {
-    D->walk(Annotator);
-    if (Annotator.isDone())
-      return false;
+    if (D->walk(Annotator))
+      return true;
   }
 
-  return true;
+  return false;
 }
+
+void SourceEntityWalker::anchor() {}
+
