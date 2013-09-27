@@ -120,7 +120,7 @@ public:
     return ValueAndResultNumber.getPointer();
   }
   ValueBase *operator->() const { return getDef(); }
-  ValueBase *operator*() const { return getDef(); }
+  ValueBase &operator*() const { return *getDef(); }
   unsigned getResultNumber() const { return ValueAndResultNumber.getInt(); }
 
   SILType getType() const {
