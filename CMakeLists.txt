@@ -350,7 +350,6 @@ function(handle_swift_sources sourcesvar externalvar target)
       # We have an assembler file; compile it.
       compile_assembler_file(${src} ${target} "obj")
       list(APPEND result ${obj})
-      list(APPEND asm_sources ${obj})
     else()
       list(APPEND result ${src})
     endif()
@@ -369,7 +368,6 @@ function(handle_swift_sources sourcesvar externalvar target)
   endif()
 
   if(swift_sources)
-
     # Special-case hack to create swift.o for the swift_stdlib_* targets
     if(target STREQUAL swift_stdlib_core)
       set(swift_obj_base "swift")
