@@ -1800,6 +1800,9 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   base = B.createRefToObjectPointer(e, base,
            SILType::getObjCPointerType(getASTContext()));
 
+  // Emit the index.
+  RValue index = emitRValue(e->getIndex());
+
   // Create the has-member block.
   SILBasicBlock *hasMemberBB = new (F.getModule()) SILBasicBlock(&F);
 
@@ -1842,7 +1845,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
 
     // Emit the index.
     llvm::SmallVector<SILValue, 1> indexArgs;
-    emitRValue(e->getIndex(), c).forwardAll(*this, indexArgs);
+    std::move(index).forwardAll(*this, indexArgs);
     result = B.createApply(e, result, getLoweredType(valueTy), indexArgs); 
 
     // Package up the result in an optional.
