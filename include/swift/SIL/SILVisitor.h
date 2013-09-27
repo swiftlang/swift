@@ -82,7 +82,7 @@ ValueRetTy visit##CLASS(CLASS *I) {                         \
 template<typename ImplClass, typename ValueRetTy = void>
 class SILInstructionVisitor : public SILVisitor<ImplClass, ValueRetTy> {
 public:
-  void visitSILArgument(SILArgument *A) {
+  ValueRetTy visitSILArgument(SILArgument *A) {
     llvm_unreachable("should only be visiting instructions");
   }
 
