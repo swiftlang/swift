@@ -548,13 +548,11 @@ namespace {
 } // end anonymous namespace.
 
 void Decl::dump() const {
-  print(llvm::errs());
   PrintDecl(llvm::errs(), 0).visit(const_cast<Decl *>(this));
   llvm::errs() << '\n';
 }
 
 void Decl::dump(unsigned Indent) const {
-  print(llvm::errs());
   PrintDecl(llvm::errs(), Indent).visit(const_cast<Decl *>(this));
   llvm::errs() << '\n';
 }
