@@ -15,6 +15,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
@@ -208,15 +209,26 @@ TypeDecl *SemaAnnotator::getTypeDecl(Type Ty) {
 }
 
 
-bool SourceEntityWalker::walk(ArrayRef<Decl*> Decls) {
+bool SourceEntityWalker::walk(TranslationUnit &TU) {
+  SemaAnnotator Annotator(*this);
+  return TU.walk(Annotator);
+}
+
+bool SourceEntityWalker::walk(Module &Mod) {
+  SmallVector<Decl *, 64> Decls;
+  Mod.getTopLevelDecls(Decls);
+
   SemaAnnotator Annotator(*this);
   for (Decl *D : Decls) {
     if (D->walk(Annotator))
       return true;
   }
-
   return false;
 }
 
-void SourceEntityWalker::anchor() {}
+bool SourceEntityWalker::walk(Decl *D) {
+  SemaAnnotator Annotator(*this);
+  return D->walk(Annotator);
+}
 
+void SourceEntityWalker::anchor() {}

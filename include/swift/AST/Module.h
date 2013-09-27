@@ -34,6 +34,7 @@ namespace clang {
 
 namespace swift {
   class ASTContext;
+  class ASTWalker;
   class BraceStmt;
   class Component;
   class Decl;
@@ -435,6 +436,9 @@ public:
     assert(ImportBufferID == -1 && "Already set!");
     ImportBufferID = BufID;
   }
+
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(ASTWalker &Walker);
 
   void dump() const;
   void dump(raw_ostream &os) const;

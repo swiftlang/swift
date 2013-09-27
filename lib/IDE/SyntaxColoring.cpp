@@ -120,8 +120,7 @@ bool SyntaxColoringContext::walk(SyntaxColorWalker &Walker) {
 void ColorASTWalker::visitTranslationUnit(TranslationUnit &TU,
                                           ArrayRef<SyntaxNode> Tokens) {
   TokenNodes = Tokens;
-  for (Decl *D : TU.Decls)
-    D->walk(*this);
+  TU.walk(*this);
 
   // Pass the rest of the token nodes.
   for (auto &TokNode : TokenNodes)

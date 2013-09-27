@@ -17,6 +17,8 @@
 #include "swift/Basic/SourceLoc.h"
 
 namespace swift {
+  class TranslationUnit;
+  class Module;
   class Decl;
   class ValueDecl;
   class TypeDecl;
@@ -29,9 +31,15 @@ namespace ide {
 /// like implicit declarations, is ignored.
 class SourceEntityWalker {
 public:
-  /// Walks the provided declarations in the order that they are in the array.
+  /// Walks the provided translation unit.
   /// \returns true if traversal was aborted, false otherwise.
-  bool walk(ArrayRef<Decl*> Decls);
+  bool walk(TranslationUnit &TU);
+  /// Walks the provided module.
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(Module &Mod);
+  /// Walks the provided Decl.
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(Decl *D);
 
   /// This method is called when first visiting a decl, before walking into its
   /// children.  If it returns false, the subtree is skipped.

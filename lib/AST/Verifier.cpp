@@ -1294,8 +1294,7 @@ namespace {
 
 void swift::verify(TranslationUnit *TU) {
   Verifier verifier(TU);
-  for (Decl *D : TU->Decls)
-    D->walk(verifier);
+  TU->walk(verifier);
 }
 
 void swift::verify(Decl *D) {

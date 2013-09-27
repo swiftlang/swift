@@ -145,9 +145,7 @@ void swift::performDelayedParsing(
     CodeCompletionCallbacksFactory *CodeCompletionFactory) {
   ParseDelayedFunctionBodies Walker(TU, PersistentState,
                                     CodeCompletionFactory);
-  for (Decl *D : TU->Decls) {
-    D->walk(Walker);
-  }
+  TU->walk(Walker);
 
   if (CodeCompletionFactory)
     parseDelayedDecl(TU, PersistentState, CodeCompletionFactory);

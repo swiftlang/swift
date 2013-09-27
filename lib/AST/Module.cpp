@@ -1079,6 +1079,14 @@ TranslationUnit::getCachedVisibleDecls() const {
   return getTUCachePimpl(LookupCachePimpl, *this).AllVisibleValues;
 }
 
+bool TranslationUnit::walk(ASTWalker &Walker) {
+  for (Decl *D : Decls) {
+    if (D->walk(Walker))
+      return true;
+  }
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // LoadedModule Implementation
 //===----------------------------------------------------------------------===//
