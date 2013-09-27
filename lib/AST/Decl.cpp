@@ -292,53 +292,6 @@ bool ValueDecl::needsCapture() const {
   return true;
 }
 
-std::pair<DefaultArgumentKind, Type>
-ValueDecl::getDefaultArg(unsigned index) const {
-  ArrayRef<const Pattern *> patterns;
-  if (auto func = dyn_cast<FuncDecl>(this)) {
-    patterns = func->getArgParamPatterns();
-
-    // Skip the 'self' parameter; it is not counted.
-    if (func->getDeclContext()->isTypeContext())
-      patterns = patterns.slice(1);
-  } else {
-    auto constructor = dyn_cast<ConstructorDecl>(this);
-    patterns = constructor->getArgParams();
-  }
-
-  // Find the (sub-)pattern for this index.
-  // FIXME: This is O(n), which is lame. We should fix the FuncDecl
-  // representation.
-  const TuplePatternElt *found = nullptr;
-  for (auto origPattern : patterns) {
-    auto pattern = origPattern->getSemanticsProvidingPattern();
-    auto tuplePattern = dyn_cast<TuplePattern>(pattern);
-    if (!tuplePattern) {
-      if (index == 0) {
-        return { DefaultArgumentKind::None, Type() };
-      }
-
-      --index;
-      continue;
-    }
-
-
-    for (auto &elt : tuplePattern->getFields()) {
-      if (index == 0) {
-        found = &elt;
-        break;
-      }
-      --index;
-    }
-
-    if (found)
-      break;
-  }
-
-  assert(found && "No argument with this index");
-  return { found->getDefaultArgKind(), found->getPattern()->getType() };
-}
-
 ValueDecl *ValueDecl::getOverriddenDecl() const {
   if (auto fd = dyn_cast<FuncDecl>(this)) {
     return fd->getOverriddenDecl();
@@ -700,6 +653,47 @@ VarDecl *AbstractFunctionDecl::getImplicitSelfDeclSlow() const {
 
 Type AbstractFunctionDecl::getExtensionType() const {
   return getDeclContext()->getDeclaredTypeInContext();
+}
+
+std::pair<DefaultArgumentKind, Type>
+AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
+  ArrayRef<const Pattern *> Patterns = getArgParamPatterns();
+
+  if (isa<FuncDecl>(this) && getImplicitSelfDecl()) {
+    // Skip the 'self' parameter; it is not counted.
+    Patterns = Patterns.slice(1);
+  }
+
+  // Find the (sub-)pattern for this index.
+  // FIXME: This is O(n), which is lame. We should fix the FuncDecl
+  // representation.
+  const TuplePatternElt *Found = nullptr;
+  for (auto OrigPattern : Patterns) {
+    auto Params =
+        dyn_cast<TuplePattern>(OrigPattern->getSemanticsProvidingPattern());
+    if (!Params) {
+      if (Index == 0) {
+        return { DefaultArgumentKind::None, Type() };
+      }
+
+      --Index;
+      continue;
+    }
+
+    for (auto &Elt : Params->getFields()) {
+      if (Index == 0) {
+        Found = &Elt;
+        break;
+      }
+      --Index;
+    }
+
+    if (Found)
+      break;
+  }
+
+  assert(Found && "No argument with this index");
+  return { Found->getDefaultArgKind(), Found->getPattern()->getType() };
 }
 
 VarDecl *FuncDecl::getImplicitSelfDeclImpl() const {

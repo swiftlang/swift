@@ -1301,9 +1301,10 @@ static Type getGlobalAccessorType(Type varType, ASTContext &C) {
 }
 
 /// Get the type of a default argument generator, () -> T.
-static Type getDefaultArgGeneratorType(ValueDecl *vd, unsigned defaultArgIndex,
+static Type getDefaultArgGeneratorType(AbstractFunctionDecl *AFD,
+                                       unsigned DefaultArgIndex,
                                        ASTContext &context) {
-  auto resultTy = vd->getDefaultArg(defaultArgIndex).second;
+  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second;
   assert(resultTy && "Didn't find default argument?");
   return FunctionType::get(TupleType::getEmpty(context), resultTy, context);
 }
@@ -1458,7 +1459,8 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
     return getGlobalAccessorType(var->getType(), Context);
   }
   case SILDeclRef::Kind::DefaultArgGenerator: {
-    return getDefaultArgGeneratorType(vd, c.defaultArgIndex, Context);
+    return getDefaultArgGeneratorType(cast<AbstractFunctionDecl>(vd),
+                                      c.defaultArgIndex, Context);
   }
   }
 }

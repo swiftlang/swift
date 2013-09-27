@@ -1743,7 +1743,7 @@ namespace {
 
 /// \brief Given a constraint locator, find the owner of default arguments for
 /// that tuple, i.e., a FuncDecl.
-static ValueDecl *
+static AbstractFunctionDecl *
 findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
                      ConstraintLocator *locator) {
   if (locator->getPath().empty() || !locator->getAnchor())
@@ -1766,7 +1766,7 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
       if (known != solution.overloadChoices.end()) {
         auto &choice = known->second.first;
         if (choice.getKind() == OverloadChoiceKind::Decl)
-          return choice.getDecl();
+          return cast<AbstractFunctionDecl>(choice.getDecl());
       }
       return nullptr;
     } else {
@@ -1794,7 +1794,7 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
 
               return known->second.first;
             })) {
-    return resolved.getDecl();
+    return cast<AbstractFunctionDecl>(resolved.getDecl());
   }
 
   return nullptr;
@@ -1803,7 +1803,7 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
 /// Produce the caller-side default argument for this default argument, or
 /// null if the default argument will be provided by the callee.
 static Expr *getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
-                                 SourceLoc loc, ValueDecl *owner,
+                                 SourceLoc loc, AbstractFunctionDecl *owner,
                                  unsigned index) {
   auto defArg = owner->getDefaultArg(index);
   MagicIdentifierLiteralExpr::KindTy magicKind;
@@ -1860,7 +1860,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  fromTuple->getFields().size());
   SmallVector<Expr *, 2> callerDefaultArgs;
-  ValueDecl *defaultArgsOwner = nullptr;
+  AbstractFunctionDecl *defaultArgsOwner = nullptr;
   for (unsigned i = 0, n = toTuple->getFields().size(); i != n; ++i) {
     const auto &toElt = toTuple->getFields()[i];
     auto toEltType = toElt.getType();
@@ -2126,7 +2126,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 
   // Compute the elements of the resulting tuple.
   SmallVector<ScalarToTupleExpr::Element, 4> elements;
-  ValueDecl *defaultArgsOwner = nullptr;
+  AbstractFunctionDecl *defaultArgsOwner = nullptr;
   i = 0;
   for (auto &field : toTuple->getFields()) {
     // Use a null entry to indicate that this is the scalar field.
@@ -2172,7 +2172,8 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   Type destSugarTy = hasInit? toTuple
                             : TupleType::get(sugarFields, tc.Context);
 
-  return new (tc.Context) ScalarToTupleExpr(expr, destSugarTy,                                            tc.Context.AllocateCopy(elements),
+  return new (tc.Context) ScalarToTupleExpr(expr, destSugarTy,
+                                            tc.Context.AllocateCopy(elements),
                                             injectionFn);
 }
 

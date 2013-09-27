@@ -1118,18 +1118,6 @@ public:
   /// Returns true if this decl can be found by id-style dynamic lookup.
   bool canBeAccessedByDynamicLookup() const;
 
-  /// Determine the default argument kind and type for the given argument index
-  /// in this declaration, which must be a function or constructor.
-  ///
-  /// FIXME: When we add AbstractFuncDecl, this should move there.
-  ///
-  /// \param index The index of the argument for which we are querying the
-  /// default argument.
-  ///
-  /// \returns the default argument kind and, if there is a default argument,
-  /// the type of the corresponding parameter.
-  std::pair<DefaultArgumentKind, Type> getDefaultArg(unsigned index) const;
-
   /// Dump a reference to the given declaration.
   void dumpRef(raw_ostream &os) const;
 
@@ -2068,6 +2056,16 @@ public:
   void setHasSelectorStyleSignature() {
     AbstractFunctionDeclBits.HasSelectorStyleSignature = true;
   }
+
+  /// Determine the default argument kind and type for the given argument index
+  /// in this declaration, which must be a function or constructor.
+  ///
+  /// \param Index The index of the argument for which we are querying the
+  /// default argument.
+  ///
+  /// \returns the default argument kind and, if there is a default argument,
+  /// the type of the corresponding parameter.
+  std::pair<DefaultArgumentKind, Type> getDefaultArg(unsigned Index) const;
 
   /// \brief Returns the argument pattern(s) for the function definition
   /// that determine the function type.
