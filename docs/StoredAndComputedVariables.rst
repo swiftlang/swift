@@ -59,7 +59,7 @@ Computed Variables
 A *computed variable* behaves syntactically like a variable, but does not
 actually require storage. Instead, accesses to the variable go through
 "accessors" known as the *getter* and the *setter.* Thus, a computed variable
-is a variable with a custom getter::
+is declared as a variable with a custom getter::
 
   struct Rect {
     // Stored member variables
@@ -74,6 +74,8 @@ is a variable with a custom getter::
     }
     
   // myRect.maxX = 40
+
+In this example, no storage is provided for ``maxX``.
 
 If the getter appears first, the "get:" label may be omitted. If the setter's
 argument is omitted, it is assumed to be named "value"::
