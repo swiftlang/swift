@@ -927,10 +927,13 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
 ///
 /// \verbatim
 ///   extension:
-///    'extension' type-identifier inheritance? '{' decl* '}'
+///    'extension' attribute-list type-identifier inheritance? '{' decl* '}'
 /// \endverbatim
 ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
+
+  DeclAttributes Attr;
+  parseAttributeList(Attr);
 
   ParserResult<TypeRepr> Ty = parseTypeIdentifierWithRecovery(
       diag::expected_type, diag::expected_ident_type_in_extension);
@@ -963,6 +966,8 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
     = new (Context) ExtensionDecl(ExtensionLoc, Ty.get(),
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
+  if (Attr.isValid())
+    ED->getMutableAttrs() = Attr;
 
   SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
@@ -1135,10 +1140,10 @@ void Parser::addVarsToScope(Pattern *Pat,
 ///      set var-get
 ///
 ///   get:
-///     'get:' stmt-brace-item*
+///     'get' attribute-list ':' stmt-brace-item*
 ///
 ///   set:
-///     'set' set-name? ':' stmt-brace-item*
+///     'set' attribute-list set-name? ':' stmt-brace-item*
 ///
 ///   set-name:
 ///     '(' identifier ')'

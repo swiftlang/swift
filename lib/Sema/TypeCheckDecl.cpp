@@ -572,6 +572,18 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
   llvm_unreachable("bad pattern kind!");
 }
 
+static CanType getExtendedType(ExtensionDecl *ED) {
+  CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
+
+  // FIXME: we should require generic parameter clauses here
+  if (auto unbound = dyn_cast<UnboundGenericType>(ExtendedTy)) {
+    auto boundType = unbound->getDecl()->getDeclaredTypeInContext();
+    ED->getExtendedTypeLoc() = TypeLoc::withoutLoc(boundType);
+    ExtendedTy = boundType->getCanonicalType();
+  }
+  return ExtendedTy;
+}
+
 /// Create a fresh archetype building.
 static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC) {
   return ArchetypeBuilder(
@@ -1691,14 +1703,7 @@ public:
     }
 
     if (!IsSecondPass) {
-      CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
-
-      // FIXME: we should require generic parameter clauses here
-      if (auto unbound = dyn_cast<UnboundGenericType>(ExtendedTy)) {
-        auto boundType = unbound->getDecl()->getDeclaredTypeInContext();
-        ED->getExtendedTypeLoc() = TypeLoc::withoutLoc(boundType);
-        ExtendedTy = boundType->getCanonicalType();
-      }
+      CanType ExtendedTy = getExtendedType(ED);
 
       if (!isa<EnumType>(ExtendedTy) &&
           !isa<StructType>(ExtendedTy) &&
@@ -1717,6 +1722,8 @@ public:
       checkInheritanceClause(TC, ED);
       if (auto nominal = ExtendedTy->getAnyNominal())
         TC.validateDecl(nominal);
+
+      validateAttributes(TC, ED);
     }
 
     for (Decl *Member : ED->getMembers())
@@ -2781,14 +2788,21 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   if (Attrs.isTransparent()) {
     // Only abstract functions can be 'transparent'.
     auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
+    auto *ED = dyn_cast<ExtensionDecl>(D);
 
-    if (!AFD) {
+    if (!AFD && !ED) {
       TC.diagnose(D->getStartLoc(), diag::transparent_not_valid);
       D->getMutableAttrs().Transparent = false;
 
-    // FIXME: We currently do not support transparent generics.
+    // Only Struct and Enum extensions can be transparent.
+    } else if (ED) {
+      CanType ExtendedTy = getExtendedType(ED);
+      if (!isa<StructType>(ExtendedTy) && !isa<EnumType>(ExtendedTy)) {
+        TC.diagnose(D->getStartLoc(), diag::transparent_on_invalid_extension);
+        D->getMutableAttrs().Transparent = false;
+      }
     } else if (AFD->getGenericParams()) {
-      // We don't yet support transparent on generic functions.
+      // FIXME: We don't yet support transparent on generic functions.
       TC.diagnose(D->getStartLoc(), diag::transparent_generic_not_supported);
       D->getMutableAttrs().Transparent = false;
 

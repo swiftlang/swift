@@ -90,6 +90,25 @@ void Decl::setClangNode(ClangNode node) {
   getASTContext().setClangNode(this, node);
 }
 
+bool Decl::isTransparent() const {
+  // Check if the declaration had the attribute.
+  if (getAttrs().isTransparent())
+    return true;
+
+  // Check if this is a function declaration which is within a transparent
+  // extension.
+  if (const AbstractFunctionDecl *FD = dyn_cast<AbstractFunctionDecl>(this)) {
+    // FIXME: This is temporary: we do not support transparent on generics.
+    if (FD->getGenericParams())
+      return false;
+
+    if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(FD->getParent()))
+      return ED->isTransparent();
+  }
+
+  return false;
+}
+
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    ArrayRef<GenericParam> Params,
                                    SourceLoc WhereLoc,

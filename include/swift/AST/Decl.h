@@ -333,7 +333,11 @@ public:
   bool shouldPrintInContext() const;
 
   bool walk(ASTWalker &walker);
-  
+
+  /// \brief Should this declaration be treated as if annotated with transparent
+  /// attribute.
+  bool isTransparent() const;
+
   /// \brief Return whether this declaration has been determined invalid.
   bool isInvalid() const { return DeclBits.Invalid; }
   

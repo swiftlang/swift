@@ -234,7 +234,7 @@ bool SILDeclRef::isTransparent() const {
       }
     }
     
-    return D ? D->getAttrs().isTransparent() : false;
+    return D ? D->isTransparent() : false;
   }
   return false;
 }
