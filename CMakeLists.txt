@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 2.8.10)
 set(CMAKE_ASM_COMPILER_ID "Clang")
 enable_language(ASM)
 
@@ -5,7 +6,6 @@ enable_language(ASM)
 # external library.
 if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
   project(Swift)
-  cmake_minimum_required(VERSION 2.8)
 
   set(SWIFT_PATH_TO_LLVM_SOURCE "" CACHE PATH
     "Path to LLVM source code. Not necessary if using an installed LLVM.")
