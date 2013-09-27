@@ -966,6 +966,8 @@ public:
   }
   void visitConstructorDecl(ConstructorDecl *cd) {
     SGM.emitConstructor(cd);
+    if (SGM.requiresObjCMethodEntryPoint(cd))
+      SGM.emitObjCConstructorThunk(cd);
   }
   void visitDestructorDecl(DestructorDecl *dd) {
     llvm_unreachable("destructor in extension?!");
