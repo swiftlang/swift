@@ -2126,11 +2126,11 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   setLoweredExplosion(boxValue, box);
   setLoweredAddress(ptrValue, addr.getAddress());
   if (IGM.DebugInfo)
-    IGM.DebugInfo->emitBoxVariableDeclaration
+    IGM.DebugInfo->emitStackVariableDeclaration
       (Builder,
        addr.getAddress().getAddress(),
        DebugTypeInfo(i->getElementType().getSwiftType(), type),
-       Name);
+       Name, i, /* Boxed */true);
 
 }
 

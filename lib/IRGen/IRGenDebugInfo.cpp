@@ -652,10 +652,12 @@ bool IRGenDebugInfo::emitVarDeclForSILArgOrNull(IRBuilder& Builder,
                                                 DebugTypeInfo Ty,
                                                 StringRef Name,
                                                 SILInstruction *I,
-                                                SILValue Value) {
+                                                SILValue Value,
+                                                bool Boxed) {
   if (auto SILArg = dyn_cast<SILArgument>(Value)) {
     emitArgVariableDeclaration(Builder, Storage, Ty, Name,
-                               getArgNo(I->getFunction(), SILArg));
+                               getArgNo(I->getFunction(), SILArg),
+                               Boxed);
     return true;
   }
   return false;
@@ -665,7 +667,8 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
                                                   llvm::Value *Storage,
                                                   DebugTypeInfo Ty,
                                                   StringRef Name,
-                                                  AllocStackInst *I) {
+                                                  SILInstruction *I,
+                                                  bool Boxed) {
   // Make a best effort to find out if this variable is actually an
   // argument of the current function. This is done by looking at the
   // source of the first store to this alloca.  Unless we start
@@ -677,32 +680,25 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
       // Detect the pattern of a inout argument.
       if (auto Load = dyn_cast<LoadInst>(Src))
         Src = Load->getOperand();
-      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, Src))
+      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, Src, Boxed))
         return;
     } else if (auto CopyAddr = dyn_cast<CopyAddrInst>(Use->getUser())) {
-      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, CopyAddr->getSrc()))
+      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, CopyAddr->getSrc(), Boxed))
         return;
     }
   }
   emitVariableDeclaration(B, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_auto_variable);
-}
-
-void IRGenDebugInfo::emitBoxVariableDeclaration(IRBuilder& Builder,
-                                                llvm::Value *Storage,
-                                                DebugTypeInfo Ty,
-                                                StringRef Name) {
-  emitVariableDeclaration(Builder, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_auto_variable, 0, /*boxed*/true);
+                          llvm::dwarf::DW_TAG_auto_variable, Boxed);
 }
 
 void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 llvm::Value *Storage,
                                                 DebugTypeInfo Ty,
                                                 StringRef Name,
-                                                unsigned ArgNo) {
+                                                unsigned ArgNo,
+                                                bool Boxed) {
   emitVariableDeclaration(Builder, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_arg_variable, ArgNo);
+                          llvm::dwarf::DW_TAG_arg_variable, ArgNo, Boxed);
 }
 
 /// Return the DIFile that is the ancestor of Scope.

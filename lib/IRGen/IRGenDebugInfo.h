@@ -166,21 +166,16 @@ public:
                                     llvm::Value *Storage,
                                     DebugTypeInfo Ty,
                                     StringRef Name,
-                                    swift::AllocStackInst *i);
-
-  /// Convenience function for heap-allocated boxed variables. Calls
-  /// emitVariableDeclaration internally.
-  void emitBoxVariableDeclaration(IRBuilder& Builder,
-                                  llvm::Value *Storage,
-                                  DebugTypeInfo Ty,
-                                  StringRef Name);
+                                    swift::SILInstruction *I,
+                                    bool Boxed = false);
 
   /// Convenience function for variables that are function arguments.
   void emitArgVariableDeclaration(IRBuilder& Builder,
                                   llvm::Value *Storage,
                                   DebugTypeInfo Ty,
                                   StringRef Name,
-                                  unsigned ArgNo);
+                                  unsigned ArgNo,
+                                  bool Boxed = false);
 
   /// Emit debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage,
@@ -253,7 +248,8 @@ private:
                                   DebugTypeInfo Ty,
                                   StringRef Name,
                                   SILInstruction *I,
-                                  SILValue Value);
+                                  SILValue Value,
+                                  bool Boxed);
 };
 
 } // irgen
