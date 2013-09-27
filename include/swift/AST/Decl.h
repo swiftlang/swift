@@ -258,7 +258,13 @@ private:
   void operator=(const Decl&) = delete;
 
 protected:
-  Decl(DeclKind kind, DeclContext *DC) : Context(DC) {
+  // Storage for the declaration attributes.
+  llvm::PointerIntPair<const DeclAttributes *, 1, bool> AttrsAndIsObjC;
+  static const DeclAttributes EmptyAttrs;
+
+  Decl(DeclKind kind, DeclContext *DC)
+    : Context(DC),
+      AttrsAndIsObjC(&EmptyAttrs, false) {
     DeclBits.Kind = unsigned(kind);
     DeclBits.Invalid = false;
     DeclBits.Implicit = false;
@@ -287,6 +293,12 @@ public:
   ASTContext &getASTContext() const {
     assert(Context && "Decl doesn't have an assigned context");
     return Context->getASTContext();
+  }
+
+  DeclAttributes &getMutableAttrs();
+
+  const DeclAttributes &getAttrs() const {
+    return *AttrsAndIsObjC.getPointer();
   }
 
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
@@ -1027,15 +1039,11 @@ public:
 class ValueDecl : public Decl {
   Identifier Name;
   SourceLoc NameLoc;
-  llvm::PointerIntPair<const DeclAttributes *, 1, bool> AttrsAndIsObjC;
-  static const DeclAttributes EmptyAttrs;
   Type Ty;
 
 protected:
   ValueDecl(DeclKind K, DeclContext *DC, Identifier name, SourceLoc NameLoc)
-    : Decl(K, DC), Name(name), NameLoc(NameLoc),
-      AttrsAndIsObjC(&EmptyAttrs, false) {
-  }
+    : Decl(K, DC), Name(name), NameLoc(NameLoc) { }
 
 public:
 
@@ -1050,11 +1058,6 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  DeclAttributes &getMutableAttrs();
-  const DeclAttributes &getAttrs() const {
-    return *AttrsAndIsObjC.getPointer();
-  }
-  
   Resilience getResilienceFrom(Component *C) const;
 
   bool hasType() const { return !Ty.isNull(); }

@@ -191,7 +191,7 @@ static void addImplicitConformances(
 }
 
 /// Check that the func/var declaration attributes are ok.
-static void validateAttributes(TypeChecker &TC, ValueDecl *VD);
+static void validateAttributes(TypeChecker &TC, Decl *VD);
 
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
@@ -2498,14 +2498,20 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
 void TypeChecker::definePendingImplicitDecls() {
 }
 
-static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
-  const DeclAttributes &Attrs = VD->getAttrs();
-  Type Ty = VD->getType();
+static bool isDeclOfOperator(const Decl *D) {
+  if (const ValueDecl *ValD = dyn_cast<ValueDecl>(D))
+    return ValD->isOperator();
+  return false;
+}
+
+static void validateAttributes(TypeChecker &TC, Decl *D) {
+  const DeclAttributes &Attrs = D->getAttrs();
 
   // Get the number of lexical arguments, for semantic checks below.
   int NumArguments = -1;
-  FuncDecl *FDOrNull = dyn_cast<FuncDecl>(VD);
+  FuncDecl *FDOrNull = dyn_cast<FuncDecl>(D);
   if (FDOrNull) {
+    Type Ty = FDOrNull->getType();
     if (AnyFunctionType *FT = Ty->getAs<AnyFunctionType>()) {
       if (FDOrNull->getDeclContext()->isTypeContext() && FDOrNull->isStatic())
         FT = FT->getResult()->castTo<AnyFunctionType>();
@@ -2514,25 +2520,26 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
     }
   }
 
-  bool isOperator = VD->isOperator();
+  // Determine if VD is an operator declaration.
+  bool isOperator = isDeclOfOperator(D);
 
   // Operators must be declared with 'func', not 'var'.
   if (isOperator) {
     if (!FDOrNull) {
-      TC.diagnose(VD->getLoc(), diag::operator_not_func);
+      TC.diagnose(D->getLoc(), diag::operator_not_func);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
 
     // The unary prefix operator '&' is reserved and cannot be overloaded.
-    if (FDOrNull->isUnaryOperator() && VD->getName().str() == "&"
+    if (FDOrNull->isUnaryOperator() && FDOrNull->getName().str() == "&"
         && !Attrs.isPostfix()) {
-      TC.diagnose(VD->getStartLoc(), diag::custom_operator_addressof);
+      TC.diagnose(D->getStartLoc(), diag::custom_operator_addressof);
       return;
     }
   }
 
-  auto isInClassContext = [](ValueDecl *vd) {
+  auto isInClassContext = [](Decl *vd) {
     return bool(vd->getDeclContext()->getDeclaredTypeOfContext()
                   ->getClassOrBoundGenericClass());
   };
@@ -2541,20 +2548,20 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
     // Only classes, class protocols, instance properties, methods,
     // constructors, and subscripts can be ObjC.
     Optional<Diag<>> error;
-    if (isa<ClassDecl>(VD)) {
+    if (isa<ClassDecl>(D)) {
       /* ok */
-    } else if (isa<FuncDecl>(VD) && isInClassContext(VD)) {
+    } else if (isa<FuncDecl>(D) && isInClassContext(D)) {
       if (isOperator)
         error = diag::invalid_objc_decl;
-    } else if (isa<ConstructorDecl>(VD) && isInClassContext(VD)) {
+    } else if (isa<ConstructorDecl>(D) && isInClassContext(D)) {
       /* ok */
-    } else if (isa<SubscriptDecl>(VD) && isInClassContext(VD) &&
-               cast<SubscriptDecl>(VD)->getObjCSubscriptKind() 
+    } else if (isa<SubscriptDecl>(D) && isInClassContext(D) &&
+               cast<SubscriptDecl>(D)->getObjCSubscriptKind() 
                  != ObjCSubscriptKind::None) {
       /* ok */
-    } else if (isa<VarDecl>(VD) && isInClassContext(VD)) {
+    } else if (isa<VarDecl>(D) && isInClassContext(D)) {
       /* ok */
-    } else if (auto *protocol = dyn_cast<ProtocolDecl>(VD)) {
+    } else if (auto *protocol = dyn_cast<ProtocolDecl>(D)) {
       if (!protocol->requiresClass())
         error = diag::objc_protocol_not_class_protocol;
     } else {
@@ -2562,8 +2569,8 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
     }
 
     if (error) {
-      TC.diagnose(VD->getStartLoc(), *error);
-      VD->getMutableAttrs().ObjC = false;
+      TC.diagnose(D->getStartLoc(), *error);
+      D->getMutableAttrs().ObjC = false;
       return;
     }
   }
@@ -2578,14 +2585,15 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
 
     // Only 'var' declarations can have ownership.
     // TODO: captures, consts, etc.
-    if (!isa<VarDecl>(VD)) {
-      TC.diagnose(VD->getStartLoc(), diag::invalid_ownership_decl,
+    VarDecl *VarD = dyn_cast<VarDecl>(D);
+    if (!VarD) {
+      TC.diagnose(D->getStartLoc(), diag::invalid_ownership_decl,
                   ownershipKind);
-      VD->getMutableAttrs().clearOwnership();
+      D->getMutableAttrs().clearOwnership();
       return;
     }
 
-    Type type = VD->getType();
+    Type type = VarD->getType();
 
     // A [weak] variable must have type R? for some ownership-capable type R.
     if (Attrs.isWeak()) {
@@ -2594,9 +2602,10 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
       // Use this special diagnostic if it's actually a reference type
       // but just isn't Optional.
       if (!objType && type->allowsOwnership()) {
-        TC.diagnose(VD->getStartLoc(), diag::invalid_weak_ownership_not_optional,
+        TC.diagnose(VarD->getStartLoc(),
+                    diag::invalid_weak_ownership_not_optional,
                     OptionalType::get(type, TC.Context));
-        VD->getMutableAttrs().clearOwnership();
+        VarD->getMutableAttrs().clearOwnership();
         return;
       } else if (objType) {
         type = objType;
@@ -2607,18 +2616,18 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
       // If we have an opaque type, suggest the possibility of adding
       // a class bound.
       if (type->isExistentialType() || type->getAs<ArchetypeType>()) {
-        TC.diagnose(VD->getStartLoc(), diag::invalid_ownership_opaque_type,
-                    ownershipKind, VD->getType());
+        TC.diagnose(D->getStartLoc(), diag::invalid_ownership_opaque_type,
+                    ownershipKind, type);
       } else {
-        TC.diagnose(VD->getStartLoc(), diag::invalid_ownership_type,
-                    ownershipKind, VD->getType());
+        TC.diagnose(D->getStartLoc(), diag::invalid_ownership_type,
+                    ownershipKind, type);
       }
-      VD->getMutableAttrs().clearOwnership();
+      D->getMutableAttrs().clearOwnership();
       return;
     }
 
     // Change the type to the appropriate reference storage type.
-    VD->overwriteType(ReferenceStorageType::get(type,
+    VarD->overwriteType(ReferenceStorageType::get(type,
                                                 Attrs.getOwnership(),
                                                 TC.Context));
   }
@@ -2627,31 +2636,31 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
     // Only instance properties can be IBOutlets.
     // FIXME: This could do some type validation as well (all IBOutlets refer
     // to objects).
-    if (!(isa<VarDecl>(VD) && isInClassContext(VD))) {
-      TC.diagnose(VD->getStartLoc(), diag::invalid_iboutlet);
-      VD->getMutableAttrs().IBOutlet = false;
+    if (!(isa<VarDecl>(D) && isInClassContext(D))) {
+      TC.diagnose(D->getStartLoc(), diag::invalid_iboutlet);
+      D->getMutableAttrs().IBOutlet = false;
       return;
     }
   }
 
   if (Attrs.isIBAction()) {
     // Only instance methods returning () can be IBActions.
-    const FuncDecl *FD = dyn_cast<FuncDecl>(VD);
-    if (!FD || !isa<ClassDecl>(VD->getDeclContext()) || FD->isStatic() ||
+    const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+    if (!FD || !isa<ClassDecl>(D->getDeclContext()) || FD->isStatic() ||
         FD->isGetterOrSetter()) {
-      TC.diagnose(VD->getStartLoc(), diag::invalid_ibaction_decl);
-      VD->getMutableAttrs().IBAction = false;
+      TC.diagnose(D->getStartLoc(), diag::invalid_ibaction_decl);
+      D->getMutableAttrs().IBAction = false;
       return;
     }
 
     // IBActions instance methods must have type Class -> (...) -> ().
     // FIXME: This could do some argument type validation as well (only certain
     // method signatures are allowed for IBActions).
-    Type CurriedTy = VD->getType()->castTo<AnyFunctionType>()->getResult();
+    Type CurriedTy = FD->getType()->castTo<AnyFunctionType>()->getResult();
     Type ResultTy = CurriedTy->castTo<AnyFunctionType>()->getResult();
     if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context))) {
-      TC.diagnose(VD->getStartLoc(), diag::invalid_ibaction_result, ResultTy);
-      VD->getMutableAttrs().IBAction = false;
+      TC.diagnose(D->getStartLoc(), diag::invalid_ibaction_result, ResultTy);
+      D->getMutableAttrs().IBAction = false;
       return;
     }
   }
@@ -2659,7 +2668,7 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
   if (Attrs.isInfix()) {
     // Only operator functions can be infix.
     if (!isOperator) {
-      TC.diagnose(VD->getStartLoc(), diag::infix_not_an_operator);
+      TC.diagnose(D->getStartLoc(), diag::infix_not_an_operator);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
@@ -2675,16 +2684,16 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
   if (Attrs.isPostfix()) {
     // Only operator functions can be postfix.
     if (!isOperator) {
-      TC.diagnose(VD->getStartLoc(), diag::postfix_not_an_operator);
-      VD->getMutableAttrs().ExplicitPostfix = false;
+      TC.diagnose(D->getStartLoc(), diag::postfix_not_an_operator);
+      D->getMutableAttrs().ExplicitPostfix = false;
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
 
     // Only unary operators can be postfix.
     if (!FDOrNull || !FDOrNull->isUnaryOperator()) {
-      TC.diagnose(VD->getStartLoc(), diag::invalid_postfix_input);
-      VD->getMutableAttrs().ExplicitPostfix = false;
+      TC.diagnose(D->getStartLoc(), diag::invalid_postfix_input);
+      D->getMutableAttrs().ExplicitPostfix = false;
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
@@ -2693,16 +2702,16 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
   if (Attrs.isPrefix()) {
     // Only operator functions can be postfix.
     if (!isOperator) {
-      TC.diagnose(VD->getStartLoc(), diag::prefix_not_an_operator);
-      VD->getMutableAttrs().ExplicitPostfix = false;
+      TC.diagnose(D->getStartLoc(), diag::prefix_not_an_operator);
+      D->getMutableAttrs().ExplicitPostfix = false;
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
 
     // Only unary operators can be postfix.
     if (!FDOrNull || !FDOrNull->isUnaryOperator()) {
-      TC.diagnose(VD->getStartLoc(), diag::invalid_prefix_input);
-      VD->getMutableAttrs().ExplicitPostfix = false;
+      TC.diagnose(D->getStartLoc(), diag::invalid_prefix_input);
+      D->getMutableAttrs().ExplicitPostfix = false;
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
@@ -2710,22 +2719,23 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
 
   if (Attrs.isAssignment()) {
     // Only function declarations can be assignments.
-    if (!isa<FuncDecl>(VD) || !VD->isOperator()) {
-      TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute,"assignment");
-      VD->getMutableAttrs().Assignment = false;
+    FuncDecl *FD = dyn_cast<FuncDecl>(D);
+    if (!FD || !FD->isOperator()) {
+      TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute,"assignment");
+      D->getMutableAttrs().Assignment = false;
     } else if (NumArguments < 1) {
-      TC.diagnose(VD->getStartLoc(), diag::assignment_without_inout);
-      VD->getMutableAttrs().Assignment = false;
+      TC.diagnose(D->getStartLoc(), diag::assignment_without_inout);
+      D->getMutableAttrs().Assignment = false;
     } else {
-      auto FT = VD->getType()->castTo<AnyFunctionType>();
+      auto FT = FD->getType()->castTo<AnyFunctionType>();
       Type ParamType = FT->getInput();
       TupleType *ParamTT = ParamType->getAs<TupleType>();
       if (ParamTT)
         ParamType = ParamTT->getElementType(0);
 
       if (!ParamType->is<LValueType>()) {
-        TC.diagnose(VD->getStartLoc(), diag::assignment_without_inout);
-        VD->getMutableAttrs().Assignment = false;
+        TC.diagnose(D->getStartLoc(), diag::assignment_without_inout);
+        D->getMutableAttrs().Assignment = false;
       }
     }
   }
@@ -2733,13 +2743,17 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
   if (Attrs.isConversion()) {
     // Only instance members with no non-defaulted parameters can be
     // conversions.
-    if (!isa<FuncDecl>(VD) || !VD->isInstanceMember()) {
-      TC.diagnose(VD->getStartLoc(), diag::conversion_not_instance_method,
-                  VD->getName());
-      VD->getMutableAttrs().Conversion = false;
-    } else if (!VD->getType()->is<ErrorType>()) {
+    FuncDecl *FD = dyn_cast<FuncDecl>(D);
+    if (!FD) {
+      TC.diagnose(D->getStartLoc(), diag::conversion_not_function);
+      D->getMutableAttrs().Conversion = false;
+    } else if (!FD->isInstanceMember()) {
+      TC.diagnose(FD->getStartLoc(), diag::conversion_not_instance_method,
+                  FD->getName());
+      FD->getMutableAttrs().Conversion = false;
+    } else if (!FD->getType()->is<ErrorType>()) {
       AnyFunctionType *BoundMethodTy
-        = VD->getType()->castTo<AnyFunctionType>()->getResult()
+        = FD->getType()->castTo<AnyFunctionType>()->getResult()
             ->castTo<AnyFunctionType>();
 
       bool AcceptsEmptyParamList = false;
@@ -2757,102 +2771,102 @@ static void validateAttributes(TypeChecker &TC, ValueDecl *VD) {
       }
 
       if (!AcceptsEmptyParamList) {
-        TC.diagnose(VD->getStartLoc(), diag::conversion_params,
-                    VD->getName());
-        VD->getMutableAttrs().Conversion = false;
+        TC.diagnose(FD->getStartLoc(), diag::conversion_params,
+                    FD->getName());
+        D->getMutableAttrs().Conversion = false;
       }
     }
   }
 
   if (Attrs.isTransparent()) {
     // Only abstract functions can be 'transparent'.
-    auto *AFD = dyn_cast<AbstractFunctionDecl>(VD);
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
 
     if (!AFD) {
-      TC.diagnose(VD->getStartLoc(), diag::transparent_not_valid);
-      VD->getMutableAttrs().Transparent = false;
+      TC.diagnose(D->getStartLoc(), diag::transparent_not_valid);
+      D->getMutableAttrs().Transparent = false;
 
     // FIXME: We currently do not support transparent generics.
     } else if (AFD->getGenericParams()) {
       // We don't yet support transparent on generic functions.
-      TC.diagnose(VD->getStartLoc(), diag::transparent_generic_not_supported);
-      VD->getMutableAttrs().Transparent = false;
+      TC.diagnose(D->getStartLoc(), diag::transparent_generic_not_supported);
+      D->getMutableAttrs().Transparent = false;
 
     // Protocol method declarations cannot be transparent.
     } else if (isa<ProtocolDecl>(AFD->getParent())) {
-      TC.diagnose(VD->getStartLoc(),
+      TC.diagnose(D->getStartLoc(),
                   diag::transparent_in_protocols_not_supported);
-      VD->getMutableAttrs().Transparent = false;
+      D->getMutableAttrs().Transparent = false;
 
     // Class methods cannot be transparent.
     } else if (isa<ClassDecl>(AFD->getParent())) {
-      TC.diagnose(VD->getStartLoc(),
+      TC.diagnose(D->getStartLoc(),
                   diag::transparent_in_classes_not_supported);
-      VD->getMutableAttrs().Transparent = false;
+      D->getMutableAttrs().Transparent = false;
     }
   }
 
   if (Attrs.isInOut()) {
-    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "inout");
-    VD->getMutableAttrs().InOut = false;
+    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "inout");
+    D->getMutableAttrs().InOut = false;
   }
 
   if (Attrs.isAutoClosure()) {
-    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "auto_closure");
-    VD->getMutableAttrs().AutoClosure = false;
+    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "auto_closure");
+    D->getMutableAttrs().AutoClosure = false;
   }
 
   if (Attrs.isExported()) {
-    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "exported");
-    VD->getMutableAttrs().Exported = false;
+    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "exported");
+    D->getMutableAttrs().Exported = false;
   }
 
   if (Attrs.isObjCBlock()) {
-    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "objc_block");
-    VD->getMutableAttrs().ObjCBlock = false;
+    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "objc_block");
+    D->getMutableAttrs().ObjCBlock = false;
   }
 
   // Only protocols can have the [class_protocol] attribute.
-  if (Attrs.isClassProtocol() && !isa<ProtocolDecl>(VD)) {
-    TC.diagnose(VD->getStartLoc(), diag::class_protocol_not_protocol);
-    VD->getMutableAttrs().ClassProtocol = false;
+  if (Attrs.isClassProtocol() && !isa<ProtocolDecl>(D)) {
+    TC.diagnose(D->getStartLoc(), diag::class_protocol_not_protocol);
+    D->getMutableAttrs().ClassProtocol = false;
   }
 
   if (Attrs.hasCC()) {
-    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "cc");
-    VD->getMutableAttrs().cc = {};
+    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "cc");
+    D->getMutableAttrs().cc = {};
   }
 
   if (Attrs.isThin()) {
-    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "thin");
-    VD->getMutableAttrs().Thin = false;
+    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "thin");
+    D->getMutableAttrs().Thin = false;
   }
 
   if (Attrs.isNoReturn()) {
-    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "noreturn");
-    VD->getMutableAttrs().NoReturn = false;
+    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "noreturn");
+    D->getMutableAttrs().NoReturn = false;
   }
 
   if (Attrs.isLocalStorage()) {
-    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "local_storage");
-    VD->getMutableAttrs().LocalStorage = false;
+    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "local_storage");
+    D->getMutableAttrs().LocalStorage = false;
   }
   
-  if (!isa<FuncDecl>(VD)) {
+  if (!isa<FuncDecl>(D)) {
     if (Attrs.isKernel()) {
-      TC.diagnose(VD->getStartLoc(), diag::attribute_requires_function_decl,
+      TC.diagnose(D->getStartLoc(), diag::attribute_requires_function_decl,
                   "kernel");
-      VD->getMutableAttrs().KernelOrShader = KernelOrShaderKind::Default;
+      D->getMutableAttrs().KernelOrShader = KernelOrShaderKind::Default;
     }
     if (Attrs.isVertex()) {
-      TC.diagnose(VD->getStartLoc(), diag::attribute_requires_function_decl,
+      TC.diagnose(D->getStartLoc(), diag::attribute_requires_function_decl,
                   "vertex");
-      VD->getMutableAttrs().KernelOrShader = KernelOrShaderKind::Default;
+      D->getMutableAttrs().KernelOrShader = KernelOrShaderKind::Default;
     }
     if (Attrs.isFragment()) {
-      TC.diagnose(VD->getStartLoc(), diag::attribute_requires_function_decl,
+      TC.diagnose(D->getStartLoc(), diag::attribute_requires_function_decl,
                   "fragment");
-      VD->getMutableAttrs().KernelOrShader = KernelOrShaderKind::Default;
+      D->getMutableAttrs().KernelOrShader = KernelOrShaderKind::Default;
     }
   }
 }

@@ -1033,6 +1033,8 @@ ERROR(invalid_prefix_input,sema_tcd,none,
       "only unary operators can be declared 'prefix'", ())
 ERROR(assignment_without_inout,sema_tcd,none,
       "assignment operator must have an initial [inout] argument", ())
+ERROR(conversion_not_function,sema_tcd,none,
+      "conversion should be applied to an instance method", ())
 ERROR(conversion_not_instance_method,sema_tcd,none,
       "conversion function %0 is not an instance method",
       (Identifier))

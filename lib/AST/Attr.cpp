@@ -24,9 +24,9 @@
 using namespace swift;
 
 /// A statically-allocated empty set of attributes.
-const DeclAttributes ValueDecl::EmptyAttrs;
+const DeclAttributes Decl::EmptyAttrs;
 
-DeclAttributes &ValueDecl::getMutableAttrs() {
+DeclAttributes &Decl::getMutableAttrs() {
   // If we don't have mutable attribute storage yet, allocate some.
   if (&getAttrs() == &EmptyAttrs)
     AttrsAndIsObjC = {getASTContext().Allocate<DeclAttributes>(1),
