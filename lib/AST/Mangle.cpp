@@ -630,12 +630,18 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     // Find the archetype information.
     auto it = Archetypes.find(archetype);
     while (it == Archetypes.end()) {
+      // This should be treated like an error, but we don't want
+      // clients like lldb to crash because of corrupted input.
+      assert(DeclCtx);
+      if (!DeclCtx) return;
+
       // This Archetype comes from an enclosing context -- proceed to
       // bind the generic params form all parent contexts.
       GenericParamList *GenericParams = nullptr;
       do { // Skip over empty parent contexts.
         DeclCtx = DeclCtx->getParent();
         assert(DeclCtx);
+        if (!DeclCtx) return;
         GenericParams = DeclCtx->getGenericParamsOfContext();
       } while (!GenericParams);
 
