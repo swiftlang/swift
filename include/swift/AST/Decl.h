@@ -1604,10 +1604,9 @@ public:
 class EnumDecl : public NominalTypeDecl {
   SourceLoc EnumLoc;
   Type RawType;
-  bool Enum;
 
 public:
-  EnumDecl(SourceLoc EnumLoc, bool Enum, Identifier Name, SourceLoc NameLoc,
+  EnumDecl(SourceLoc EnumLoc, Identifier Name, SourceLoc NameLoc,
             MutableArrayRef<TypeLoc> Inherited,
             GenericParamList *GenericParams, DeclContext *DC);
 
@@ -1615,9 +1614,6 @@ public:
   SourceRange getSourceRange() const {
     return SourceRange(EnumLoc, getBraces().End);
   }
-  
-  /// True if this declaration uses 'enum' syntax.
-  bool isEnum() const { return Enum; }
 
   EnumElementDecl *getElement(Identifier Name) const;
   

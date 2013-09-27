@@ -1864,11 +1864,8 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags) {
     GenericParams = maybeParseGenericParams();
   }
 
-  EnumDecl *UD = new (Context) EnumDecl(EnumLoc,
-                                          /*isEnum*/ false,
-                                          EnumName, EnumNameLoc,
-                                          { },
-                                          GenericParams, CurDeclContext);
+  EnumDecl *UD = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
+                                        { }, GenericParams, CurDeclContext);
 
   if (Attributes.isValid())
     UD->getMutableAttrs() = Attributes;

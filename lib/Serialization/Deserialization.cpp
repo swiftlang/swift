@@ -1205,12 +1205,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto genericParams = maybeReadGenericParams(DC);
 
-    // FIXME Preserve the isEnum bit.
-    auto theEnum = new (ctx) EnumDecl(SourceLoc(),
-                                     /*isEnum*/ false,
-                                     getIdentifier(nameID),
-                                     SourceLoc(), { },
-                                     genericParams, DC);
+    auto theEnum = new (ctx) EnumDecl(SourceLoc(), getIdentifier(nameID),
+                                      SourceLoc(), { }, genericParams, DC);
 
     declOrOffset = theEnum;
     if (DidRecord) {

@@ -508,7 +508,7 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
   return SourceRange(KeywordLoc, endLoc);
 }
 
-EnumDecl::EnumDecl(SourceLoc EnumLoc, bool Enum,
+EnumDecl::EnumDecl(SourceLoc EnumLoc,
                      Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)

@@ -469,7 +469,6 @@ namespace {
       case EnumKind::Enum:
         enumDecl = new (Impl.SwiftContext)
           EnumDecl(Impl.importSourceLoc(decl->getLocStart()),
-                    /*isEnum*/ true,
                     name,
                     Impl.importSourceLoc(decl->getLocation()),
                     { }, nullptr, dc);
