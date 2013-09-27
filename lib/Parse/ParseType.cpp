@@ -465,7 +465,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   }
 
   return makeParserResult(Status, TupleTypeRepr::create(
-      Context, ElementsR, SourceRange(LPLoc, Tok.getLoc()),
+      Context, ElementsR, SourceRange(LPLoc, RPLoc),
       HadEllipsis ? EllipsisLoc : SourceLoc()));
 }
 

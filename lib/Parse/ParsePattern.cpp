@@ -124,7 +124,7 @@ parseSelectorArgument(Parser &P,
 
     if (type.isNull()) {
       type = makeParserErrorResult(
-          new (P.Context) ErrorTypeRepr(P.Tok.getLoc()));
+          new (P.Context) ErrorTypeRepr(P.PreviousLoc));
     }
     if (type.isParseError()) {
       recoverFromBadSelectorArgument(P);
@@ -433,7 +433,7 @@ ParserResult<Pattern> Parser::parsePattern() {
   if (consumeIf(tok::colon)) {
     if (Result.isNull()) {
       // Recover by creating AnyPattern.
-      Result = makeParserErrorResult(new (Context) AnyPattern(Tok.getLoc()));
+      Result = makeParserErrorResult(new (Context) AnyPattern(PreviousLoc));
     }
 
     ParserResult<TypeRepr> Ty = parseTypeAnnotation();
@@ -441,7 +441,7 @@ ParserResult<Pattern> Parser::parsePattern() {
       return makeParserCodeCompletionResult<Pattern>();
 
     if (Ty.isNull())
-      Ty = makeParserResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
+      Ty = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
 
     Result = makeParserResult(Result,
         new (Context) TypedPattern(Result.get(), Ty.get()));

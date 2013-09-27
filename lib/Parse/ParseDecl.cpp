@@ -1541,7 +1541,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
       auto *PBD = dyn_cast<PatternBindingDecl>(Decls[i]);
       if (PBD == 0) continue;
       auto *Brace = BraceStmt::create(Context, PBD->getStartLoc(),
-                                      ExprStmtOrDecl(PBD), PBD->getEndLoc());
+                                      ExprStmtOrDecl(PBD), PreviousLoc);
 
       auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext, Brace);
       PBD->setDeclContext(TLCD);
