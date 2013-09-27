@@ -1195,9 +1195,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
+    TypeID rawTypeID;
 
     decls_block::EnumLayout::readRecord(scratch, nameID, contextID,
-                                         isImplicit);
+                                        isImplicit, rawTypeID);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1216,6 +1217,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     if (isImplicit)
       theEnum->setImplicit();
+    theEnum->setRawType(getType(rawTypeID));
     if (genericParams)
       for (auto &genericParam : *theEnum->getGenericParams())
         genericParam.getAsTypeParam()->setDeclContext(theEnum);

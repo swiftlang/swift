@@ -519,7 +519,16 @@ namespace decls_block {
   >;
 
   using StructLayout = NominalLayout<STRUCT_DECL>;
-  using EnumLayout = NominalLayout<ENUM_DECL>;
+
+  using EnumLayout = BCRecordLayout<
+    ENUM_DECL,
+    IdentifierIDField, // name
+    DeclIDField, // context decl
+    BCFixed<1>,  // implicit flag
+    TypeIDField  // raw type
+    // Trailed by the generic parameters (if any), conformance info (if any),
+    // and finally the decl context record.
+  >;
 
   using ClassLayout = BCRecordLayout<
     CLASS_DECL,

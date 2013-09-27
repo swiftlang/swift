@@ -1075,7 +1075,8 @@ void Serializer::writeDecl(const Decl *D) {
     EnumLayout::emitRecord(Out, ScratchRecord, abbrCode,
                             addIdentifierRef(theEnum->getName()),
                             addDeclRef(DC),
-                            theEnum->isImplicit());
+                            theEnum->isImplicit(),
+                            addTypeRef(theEnum->getRawType()));
 
     writeGenericParams(theEnum->getGenericParams());
     writeConformances(theEnum->getProtocols(), theEnum->getConformances(),
