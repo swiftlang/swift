@@ -1579,8 +1579,10 @@ namespace {
         // FIXME: Adjust C++ references?
         // FIXME: Special case for NSDictionary, which uses 'id' for the getter
         // but 'id <NSCopying>' for the setter.
-        if (!setterIndices->getType()->isEqual(getterIndices->getType()))
-          return nullptr;
+        if (!setterIndices->getType()->isEqual(getterIndices->getType())) {
+          setter = nullptr;
+          setterIndices = nullptr;
+        }
       }
 
       if (getter && getterIndices)
@@ -1607,6 +1609,10 @@ namespace {
       if (setterThunk)
         setterThunk->makeSetter(subscript);
       subscript->setIsObjC(true);
+
+      // Note that we've created this subscript.
+      Impl.Subscripts[{getter, setter}] = subscript;
+      Impl.Subscripts[{getterThunk, nullptr}] = subscript;
 
       // Determine whether this subscript operation overrides another subscript
       // operation.
@@ -1635,6 +1641,9 @@ namespace {
         if (!unlabeledIndices->isEqual(parentUnlabeledIndices))
           continue;
 
+        if (parentSub == subscript)
+          continue;
+
         // The index types match. This is an override, so mark it as such.
         subscript->setOverriddenDecl(parentSub);
         if (auto parentGetter = parentSub->getGetter()) {
@@ -1650,9 +1659,6 @@ namespace {
         break;
       }
 
-      // Note that we've created this subscript.
-      Impl.Subscripts[{getter, setter}] = subscript;
-      Impl.Subscripts[{getterThunk, nullptr}] = subscript;
       return subscript;
     }
 

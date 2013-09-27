@@ -718,8 +718,9 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
           // getter. If so, use the subscript instead.
           if (auto func = dyn_cast<FuncDecl>(VD)) {
             auto known = Impl.Subscripts.find({func, nullptr});
-            if (known != Impl.Subscripts.end())
+            if (known != Impl.Subscripts.end()) {
               consumer.foundDecl(known->second);
+            }
           }
 
           // If we were looking for subscripts, hopefully 
