@@ -391,9 +391,11 @@ private:
 /// \brief Used on the instruction performing auto-generated cleanup such as
 /// deallocs, destructor calls.
 ///
-/// This location wraps the statement representing the enclosing scope, for
-/// example, FuncDecl, ParenExpr. The scope's end location points to
-/// the SourceLoc that shows when the operation is performed at runtime.
+/// The cleanups are performed after completing the evaluztion of the AST Node
+/// wrapped inside the SILLocation. This location wraps the statement
+/// representing the enclosing scope, for example, FuncDecl, ParenExpr. The
+/// scope's end location points to the SourceLoc that shows when the operation
+/// is performed at runtime.
 ///
 /// Allowed on any instruction except for ReturnInst, AutoreleaseReturnInst.
 /// Locations of an inlined destructor should also be represented by this.
