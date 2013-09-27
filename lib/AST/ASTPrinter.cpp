@@ -95,6 +95,7 @@ namespace {
     void printInheritedWithSuperclass(DeclWithSuperclass *decl);
     
     void printInherited(const TypeDecl *decl);
+    void printInherited(const EnumDecl *D);
     void printInherited(const ExtensionDecl *decl);
     void printInherited(const GenericTypeParamDecl *D);
     void printBraceStmtElements(BraceStmt *stmt, bool NeedIndent = true);
@@ -441,6 +442,10 @@ void PrintAST::printInheritedWithSuperclass(DeclWithSuperclass *decl) {
 
 void PrintAST::printInherited(const TypeDecl *decl) {
   printInherited(decl->getInherited(), decl->getProtocols());
+}
+
+void PrintAST::printInherited(const EnumDecl *D) {
+  printInherited(D->getInherited(), D->getProtocols(), D->getRawType());
 }
 
 void PrintAST::printInherited(const ExtensionDecl *decl) {
