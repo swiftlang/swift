@@ -1133,8 +1133,9 @@ copy_addr
   copy_addr [take] %0 to [initialization] %1 : $*T
   // %0 and %1 must be of the same $*T address type
 
-Loads the value at address ``%0`` from memory and assigns a copy of it back
-into memory at address ``%1``. A bare ``copy_addr`` instruction::
+Loads the value at address ``%0`` from memory and assigns a copy of it back into
+memory at address ``%1``. A bare ``copy_addr`` instruction when ``T`` is a
+non-trivial type::
 
   copy_addr %0 to %1 : $*T
 
@@ -1147,7 +1148,7 @@ is equivalent to::
   store %new to %1 : $*T      // Store the new value to the destination
 
 except that ``copy_addr`` may be used even if ``%0`` is of an address-only
-type. The ``copy`` may be given one or both of the ``[take]`` or
+type. The ``copy_addr`` may be given one or both of the ``[take]`` or
 ``[initialization]`` attributes:
 
 * ``[take]`` destroys the value at the source address in the course of the
@@ -1185,6 +1186,9 @@ operations::
     // no load/release of %old!
     store %new to %1 : $*T
 
+If ``T`` is a trivial type, then ``copy_addr`` is always equivalent to its
+take-initialization form.
+
 destroy_addr
 ````````````
 ::
@@ -1194,7 +1198,8 @@ destroy_addr
   destroy_addr %0 : $*T
   // %0 must be of an address $*T type
 
-Destroys the value in memory at address ``%0``. This is equivalent to::
+Destroys the value in memory at address ``%0``. If ``T`` is a non-trivial type,
+This is equivalent to::
 
   %1 = load %0
   strong_release %1
@@ -1202,6 +1207,8 @@ Destroys the value in memory at address ``%0``. This is equivalent to::
 except that ``destroy_addr`` may be used even if ``%0`` is of an
 address-only type.  This does not deallocate memory; it only destroys the
 pointed-to value, leaving the memory uninitialized.
+
+If ``T`` is a trivial type, then ``destroy_addr`` is a no-op.
 
 index_addr
 ``````````
