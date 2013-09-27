@@ -51,16 +51,20 @@ include $(LEVEL)/Makefile.common
 # Paths to Swift tools and files
 
 ifndef SWIFT_COMPILER
-  SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
+  ifeq ($(LLVM_CROSS_COMPILING),1)
+    SWIFT_COMPILER := $(shell xcrun --find swift)
+  else
+    SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
+  endif
 endif
 
 ifndef MODULES_SDK
   ifdef SDKROOT
     MODULES_SDK := $(SDKROOT)
   else ifneq ($(findstring -darwin_ios,$(TARGET_TRIPLE)),)
-      MODULES_SDK := $(shell xcrun --sdk iphoneos --show-sdk-path)
+    MODULES_SDK := $(shell xcrun --sdk iphoneos --show-sdk-path)
   else ifneq ($(findstring -darwin_sim,$(TARGET_TRIPLE)),)
-      MODULES_SDK := $(shell xcrun --sdk iphonesimulator --show-sdk-path)
+    MODULES_SDK := $(shell xcrun --sdk iphonesimulator --show-sdk-path)
   else ifneq ($(findstring -darwin,$(TARGET_TRIPLE)),)
     MODULES_SDK := $(shell xcrun --sdk macosx --show-sdk-path)
   else
