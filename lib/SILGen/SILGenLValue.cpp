@@ -702,6 +702,30 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
   return result;
 }
 
+SILValue SILGenFunction::emitInjectOptionalValue(SILLocation loc, 
+                                                 SILValue value,
+                                                 const TypeLowering &optTL) {
+  SILType optType = optTL.getLoweredType();
+  CanType valueType = optType.getSwiftType()->castTo<BoundGenericType>()
+                        ->getGenericArgs()[0]->getCanonicalType();
+  auto injectValueFn =
+    emitSpecializedFunctionRef(*this, loc, valueType,
+                         getASTContext().getInjectValueIntoOptionalDecl());
+  return B.createApply(loc, injectValueFn, optType, value);
+}
+
+SILValue SILGenFunction::emitInjectOptionalNothing(SILLocation loc, 
+                                                   const TypeLowering &optTL) {
+  SILType optType = optTL.getLoweredType();
+  CanType valueType = optType.getSwiftType()->castTo<BoundGenericType>()
+                        ->getGenericArgs()[0]->getCanonicalType();
+  auto injectNothingFn =
+    emitSpecializedFunctionRef(*this, loc, valueType,
+                       getASTContext().getInjectNothingIntoOptionalDecl());
+  return B.createApply(loc, injectNothingFn, optType, {});
+}
+
+
 /// Given that the type-of-rvalue differs from the type-of-storage,
 /// and given that the type-of-rvalue is loadable, produce a +1 scalar
 /// of the type-of-rvalue.

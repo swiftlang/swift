@@ -714,38 +714,10 @@ public:
 /// determines at runtime whether a particular method, property, or
 /// subscript is available.
 class DynamicLookupExpr : public Expr {
-  OpaqueValueExpr *OpaqueValue;
-  Expr *CreateSome;
-  Expr *CreateNone;
-
 protected:
-  DynamicLookupExpr(ExprKind kind, OpaqueValueExpr *opaqueValue,
-                    Expr *createSome, Expr *createNone)
-    : Expr(kind, /*Implicit=*/false),
-      OpaqueValue(opaqueValue), CreateSome(createSome),
-      CreateNone(createNone) { }
+  explicit DynamicLookupExpr(ExprKind kind) : Expr(kind, /*Implicit=*/false) { }
 
 public:
-  /// Retrieve the opaque value used to represent the value \c x passed to
-  /// \c .Some(x) when the dynamic member is found.
-  OpaqueValueExpr *getOpaqueValue() const { return OpaqueValue; }
-
-  /// Retrieve the expression used to create the Optional<> result when a
-  /// dynamic member was found.
-  Expr *getCreateSome() const { return CreateSome; }
-
-  void setCreateSome(Expr *createSome) {
-    CreateSome = createSome;
-  }
-
-  /// Expression used to create the empty optional result when the dynamic
-  /// member was not found.
-  Expr *getCreateNone() const { return CreateNone; }
-
-  void setCreateNone(Expr *createNone) {
-    CreateNone = createNone;
-  }
-
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_DynamicLookupExpr &&
            E->getKind() <= ExprKind::Last_DynamicLookupExpr;
@@ -776,12 +748,8 @@ class DynamicMemberRefExpr : public DynamicLookupExpr {
 public:
   DynamicMemberRefExpr(Expr *base, SourceLoc dotLoc,
                        ConcreteDeclRef member,
-                       SourceLoc nameLoc,
-                       OpaqueValueExpr *opaqueValue,
-                       Expr *createSome,
-                       Expr *createNone)
-    : DynamicLookupExpr(ExprKind::DynamicMemberRef, opaqueValue,
-                        createSome, createNone),
+                       SourceLoc nameLoc)
+    : DynamicLookupExpr(ExprKind::DynamicMemberRef),
       Base(base), Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
     }
 
@@ -840,12 +808,8 @@ class DynamicSubscriptExpr : public DynamicLookupExpr {
 
 public:
   DynamicSubscriptExpr(Expr *base, Expr *index, 
-                       ConcreteDeclRef member,
-                       OpaqueValueExpr *opaqueValue,
-                       Expr *createSome,
-                       Expr *createNone)
-    : DynamicLookupExpr(ExprKind::DynamicSubscript, opaqueValue,
-                        createSome, createNone),
+                       ConcreteDeclRef member)
+    : DynamicLookupExpr(ExprKind::DynamicSubscript),
       Base(base), Index(index), Member(member) { }
 
   /// Retrieve the base of the expression.

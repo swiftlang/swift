@@ -154,16 +154,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return E;
     }
 
-    if (Expr *createSome = doIt(E->getCreateSome())) {
-      E->setCreateSome(createSome);
-      return E;
-    }
-
-    if (Expr *createNone = doIt(E->getCreateNone())) {
-      E->setCreateNone(createNone);
-      return E;
-    }
-
     return nullptr;
   }
 
@@ -233,17 +223,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       E->setIndex(Index);
     else
       return nullptr;
-   
-    if (Expr *createSome = doIt(E->getCreateSome())) {
-      E->setCreateSome(createSome);
-      return E;
-    }
-
-    if (Expr *createNone = doIt(E->getCreateNone())) {
-      E->setCreateNone(createNone);
-      return E;
-    }
- 
+    
     return E;
   }
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {

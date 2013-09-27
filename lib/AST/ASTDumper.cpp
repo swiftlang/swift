@@ -992,10 +992,6 @@ public:
     E->getMember().dump(OS);
     OS << '\n';
     printRec(E->getBase());
-    OS << '\n';
-    printRec(E->getCreateSome());
-    OS << '\n';
-    printRec(E->getCreateNone());
     OS << ')';
   }
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
@@ -1066,10 +1062,6 @@ public:
     printRec(E->getBase());
     OS << '\n';
     printRec(E->getIndex());
-    OS << '\n';
-    printRec(E->getCreateSome());
-    OS << '\n';
-    printRec(E->getCreateNone());
     OS << ')';
   }
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {

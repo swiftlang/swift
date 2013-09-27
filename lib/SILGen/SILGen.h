@@ -821,6 +821,25 @@ public:
                         Type castTy,
                         CheckedCastKind kind);
 
+  /// Inject a value into an optional.
+  ///
+  /// \param loc The location to use for the resulting optional.
+  /// \param value The value to inject into an optional.
+  /// \param optTL Type lowering information for the optional to create. 
+  ///
+  /// \returns an optional that wraps the given value
+  SILValue emitInjectOptionalValue(SILLocation loc, SILValue value,
+                                   const TypeLowering &optTL);
+
+  /// Create an optional with a "nothing" value.
+  ///
+  /// \param loc The location to use for the resulting optional.
+  /// \param optTL Type lowering information for the optional to create.
+  ///
+  /// \returns An empty optional.
+  SILValue emitInjectOptionalNothing(SILLocation loc, 
+                                     const TypeLowering &optTL);
+
   //===--------------------------------------------------------------------===//
   // Declarations
   //===--------------------------------------------------------------------===//

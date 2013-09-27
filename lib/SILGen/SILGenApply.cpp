@@ -1717,7 +1717,8 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   SILBasicBlock *contBB = new (F.getModule()) SILBasicBlock(&F);
 
   // The continuation block
-  auto loweredOptTy = getLoweredType(e->getType());
+  const TypeLowering &optTL = getTypeLowering(e->getType());
+  auto loweredOptTy = optTL.getLoweredType();
   SILValue optMethodArg = new (F.getModule()) SILArgument(loweredOptTy, contBB);
 
   // Create the branch.
@@ -1733,7 +1734,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   {
     B.emitBlock(hasMemberBB);
 
-    FullExpr hasMemberScope(Cleanups, CleanupLocation(e->getCreateSome()));
+    FullExpr hasMemberScope(Cleanups, CleanupLocation(e));
 
     // The argument to the has-member block is the uncurried method.
     auto valueTy =e->getType()->castTo<BoundGenericType>()->getGenericArgs()[0];
@@ -1758,12 +1759,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     }
 
     // Package up the result in an optional.
-    SILValue optResult;
-    {
-      OpaqueValueRAII opaqueValue(*this, e->getOpaqueValue(), result);
-
-      optResult = emitRValue(e->getCreateSome()).forwardAsSingleValue(*this, e);
-    }
+    SILValue optResult = emitInjectOptionalValue(e, result, optTL);
 
     // Branch to the continuation block.
     B.createBranch(e, contBB, optResult);
@@ -1773,12 +1769,8 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   {
     B.emitBlock(noMemberBB);
 
-    FullExpr noMemberScope(Cleanups, CleanupLocation(e->getCreateNone()));
-
     // Branch to the continuation block.
-    B.createBranch(e, contBB,
-                   emitRValue(e->getCreateNone()).forwardAsSingleValue(*this,
-                                                                       e));
+    B.createBranch(e, contBB, emitInjectOptionalNothing(e, optTL));
   }
 
   // Emit the continuation block.
@@ -1813,7 +1805,8 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   SILBasicBlock *contBB = new (F.getModule()) SILBasicBlock(&F);
 
   // The continuation block
-  auto loweredOptTy = getLoweredType(e->getType());
+  const TypeLowering &optTL = getTypeLowering(e->getType());
+  auto loweredOptTy = optTL.getLoweredType();
   SILValue optMethodArg = new (F.getModule()) SILArgument(loweredOptTy, contBB);
 
   // Create the branch.
@@ -1827,7 +1820,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   {
     B.emitBlock(hasMemberBB);
 
-    FullExpr hasMemberScope(Cleanups, CleanupLocation(e->getCreateSome()));
+    FullExpr hasMemberScope(Cleanups, CleanupLocation(e));
 
     // The argument to the has-member block is the uncurried method.
     auto valueTy =e->getType()->castTo<BoundGenericType>()->getGenericArgs()[0];
@@ -1849,12 +1842,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     result = B.createApply(e, result, getLoweredType(valueTy), indexArgs); 
 
     // Package up the result in an optional.
-    SILValue optResult;
-    {
-      OpaqueValueRAII opaqueValue(*this, e->getOpaqueValue(), result);
-
-      optResult = emitRValue(e->getCreateSome()).forwardAsSingleValue(*this, e);
-    }
+    SILValue optResult = emitInjectOptionalValue(e, result, optTL);
 
     // Branch to the continuation block.
     B.createBranch(e, contBB, optResult);
@@ -1864,12 +1852,8 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   {
     B.emitBlock(noMemberBB);
 
-    FullExpr noMemberScope(Cleanups, CleanupLocation(e->getCreateNone()));
-
     // Branch to the continuation block.
-    B.createBranch(e, contBB,
-                   emitRValue(e->getCreateNone()).forwardAsSingleValue(*this,
-                                                                       e));
+    B.createBranch(e, contBB, emitInjectOptionalNothing(e, optTL));
   }
 
   // Emit the continuation block.

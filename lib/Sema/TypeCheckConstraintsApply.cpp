@@ -447,66 +447,6 @@ namespace {
       return result;
     }
     
-    /// Create the Optional injection functions for a value with the
-    /// given type.
-    ///
-    /// \param type The type of the value to produce.
-    ///
-    /// \param opaqueValue Will receive the opaque value expression
-    /// that acts as the placeholder for the value to be injected.
-    ///
-    /// \param injectValue Will receive the expression that injects a
-    /// given value (represented by the opaque value).
-    ///
-    /// \param injectNone Will receive the expression that creates a
-    /// nothing value.
-    ///
-    /// \returns the optional type produced by the two expressions,
-    /// i.e., type?
-    Type createOptionalInjectionExprs(Type type, 
-                                      SourceLoc loc,
-                                      OpaqueValueExpr *&opaqueValue,
-                                      Expr *&injectValue,
-                                      Expr *&injectNone) {
-      auto &tc = cs.getTypeChecker();
-      auto &context = cs.getASTContext();
-      Type optType = OptionalType::get(type, context);
-
-      // Create the expression to inject a value.
-      opaqueValue = new (context) OpaqueValueExpr(loc, type);
-      opaqueValue->setUniquelyReferenced(true);
-      auto injectValueDecl = context.getInjectValueIntoOptionalDecl();
-      if (!injectValueDecl)
-        return Type();
-
-      auto injectValueRef = new (context) DeclRefExpr(injectValueDecl, loc,
-                                                      /*Implicit=*/true);
-      injectValue = new (context) CallExpr(injectValueRef, opaqueValue,
-                                           /*Implicit=*/true);
-      if (tc.typeCheckExpression(injectValue, dc, optType,
-                                 /*discardedExpr=*/false))
-        return Type();
-
-      // Create the expression to inject no value.
-      auto injectNothingDecl = context.getInjectNothingIntoOptionalDecl();
-      if (!injectNothingDecl)
-        return Type();
-
-      auto injectNothingRef = new (context) DeclRefExpr(injectNothingDecl,
-                                                        loc, /*Implicit=*/true);
-      auto emptyTuple = new (context) TupleExpr(SourceLoc(), { }, nullptr,
-                                                SourceLoc(),
-                                                /*hasTrailingClosure=*/false,
-                                                /*Implicit=*/true);
-      injectNone = new (context) CallExpr(injectNothingRef, emptyTuple,
-                                          /*Implicit=*/true);
-      if (tc.typeCheckExpression(injectNone, dc, optType,
-                                 /*discardedExpr=*/false))
-        return Type();
-
-      return optType;
-    }
-
     /// \brief Build a new dynamic member reference with the given base and
     /// member.
     Expr *buildDynamicMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
@@ -535,20 +475,9 @@ namespace {
       base = cs.getTypeChecker().coerceToRValue(base);
       if (!base) return nullptr;
 
-      auto type = simplifyType(openedType);
-      auto fnType = type->castTo<BoundGenericType>()->getGenericArgs()[0];
-      OpaqueValueExpr *opaqueValue = nullptr;
-      Expr *injectValue = nullptr;
-      Expr *injectNone = nullptr;
-      if (!createOptionalInjectionExprs(fnType, dotLoc, opaqueValue, 
-                                        injectValue, injectNone))
-        return nullptr;
-
       auto result = new (context) DynamicMemberRefExpr(base, dotLoc, *memberRef,
-                                                       memberLoc, opaqueValue,
-                                                       injectValue,
-                                                       injectNone);
-      result->setType(type);
+                                                       memberLoc);
+      result->setType(simplifyType(openedType));
       return result;
     }
 
@@ -724,21 +653,9 @@ namespace {
         if (!base)
           return nullptr;
 
-        auto elementTy = cast<OptionalType>(resultTy.getPointer())
-                           ->getBaseType();
-        OpaqueValueExpr *opaqueValue = nullptr;
-        Expr *injectValue = nullptr;
-        Expr *injectNone = nullptr;
-        if (!createOptionalInjectionExprs(elementTy, index->getStartLoc(),
-                                          opaqueValue, injectValue, injectNone))
-          return nullptr;
-
         auto subscriptExpr = new (tc.Context) DynamicSubscriptExpr(base,
                                                                    index,
-                                                                   subscript,
-                                                                   opaqueValue,
-                                                                   injectValue,
-                                                                   injectNone);
+                                                                   subscript);
         subscriptExpr->setType(resultTy);
         return subscriptExpr;
       }

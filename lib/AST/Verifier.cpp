@@ -266,11 +266,6 @@ namespace {
       return shouldVerify(cast<Expr>(closure));
     }
 
-    bool shouldVerify(DynamicLookupExpr *dynamicLookup) {
-      OpaqueValues.insert({dynamicLookup->getOpaqueValue(), 0});
-      return shouldVerify(cast<Expr>(dynamicLookup));
-    }
-
     bool shouldVerify(ConstructorDecl *CD) {
       Functions.push_back(CD);
       return shouldVerify(cast<Decl>(CD));
@@ -289,11 +284,6 @@ namespace {
     void cleanup(ClosureExpr *closure) {
       assert(Functions.back().get<ClosureExpr*>() == closure);
       Functions.pop_back();
-    }
-
-    void cleanup(DynamicLookupExpr *dynamicLookup) {
-      assert(OpaqueValues.count(dynamicLookup->getOpaqueValue()));
-      OpaqueValues.erase(dynamicLookup->getOpaqueValue());
     }
 
     void cleanup(ConstructorDecl *CD) {
