@@ -712,7 +712,15 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
     for (; list != nullptr; list = list->getNext()) {
       if (list->Method->isUnavailable())
         continue;
-      if (auto VD = cast_or_null<ValueDecl>(Impl.importDecl(list->Method))) {
+
+      // If the method is a property accessor, we want the property.
+      const clang::NamedDecl *searchForDecl = list->Method;
+      if (list->Method->isPropertyAccessor()) {
+        if (auto property = list->Method->findPropertyDecl())
+          searchForDecl = property;
+      }
+
+      if (auto VD = cast_or_null<ValueDecl>(Impl.importDecl(searchForDecl))) {
         if (isSubscript) {
           // When searching for a subscript, we may have found a
           // getter. If so, use the subscript instead.

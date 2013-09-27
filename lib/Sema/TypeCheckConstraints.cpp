@@ -312,11 +312,15 @@ getDynamicResultSignature(ValueDecl *decl,
     selector = func->getObjCSelector(buffer);
     type = decl->getType()->castTo<AnyFunctionType>()->getResult();
 
-    // Append a '+' for static methods.
+    // Append a '+' for static methods, '-' for instance methods. This
+    // distinguishes methods with a given name from properties that
+    // might have the same name.
     if (func->isStatic()) {
       buffer += '+';
-      selector = buffer.str();
+    } else {
+      buffer += '-';
     }
+    selector = buffer.str();
   } else if (auto var = dyn_cast<VarDecl>(decl)) {
     // Handle properties. Only the getter matters.
     selector = var->getObjCGetterSelector(buffer);

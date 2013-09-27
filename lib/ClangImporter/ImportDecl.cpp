@@ -2040,7 +2040,7 @@ namespace {
       // Properties are imported as variables.
 
       // FIXME: For now, don't import properties in protocols, because IRGen
-      // can't handle the thunks we generate.
+      // can't handle them.
       if (isa<clang::ObjCProtocolDecl>(decl->getDeclContext()))
         return nullptr;
 
