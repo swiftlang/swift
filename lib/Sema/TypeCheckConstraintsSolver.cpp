@@ -767,17 +767,22 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // If there are no overload sets, we can't solve this system.
   if (UnresolvedOverloadSets.empty()) {
-    // If the only remaining constraints are conformance constraints, and 
-    // we're allowed to have free variables, we still have a solution. 
-    // FIXME: It seems like this should be easier to detect. Aren't there 
-    // other kinds of constraints that could show up here?
+    // If the only remaining constraints are conformance constraints
+    // or member equality constraints, and we're allowed to have free
+    // variables, we still have a solution.  FIXME: It seems like this
+    // should be easier to detect. Aren't there other kinds of
+    // constraints that could show up here?
     if (allowFreeTypeVariables && hasFreeTypeVariables()) {
       bool anyNonConformanceConstraints = false;
       for (auto constraint : Constraints) {
-        if (constraint->getKind() != ConstraintKind::ConformsTo) {
-          anyNonConformanceConstraints = true;
-          break;
-        }
+        if (constraint->getKind() == ConstraintKind::ConformsTo)
+          continue;
+
+        if (constraint->getKind() == ConstraintKind::TypeMember)
+          continue;
+
+        anyNonConformanceConstraints = true;
+        break;
       }
 
       if (!anyNonConformanceConstraints) {
