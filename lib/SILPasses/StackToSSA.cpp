@@ -20,23 +20,6 @@ using namespace swift;
 
 STATISTIC(NumRegPromoted, "Number of heap allocations promoted to registers");
 
-/// isInOutOrIndirectReturn - Return true if the specified apply/partial_apply
-/// call operand is a [inout] or indirect return, indicating that the call
-/// doesn't capture the pointer.
-static bool isInOutOrIndirectReturn(SILInstruction *Apply,
-                                    unsigned ArgumentNumber) {
-  SILType FnTy = Apply->getOperand(0).getType();
-  SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(*Apply->getModule());
-
-  // If this is an indirect return slot, it isn't captured.
-  if (ArgumentNumber == 0 && FTI->hasIndirectReturn())
-    return true;
-
-  // Otherwise, check for [inout].
-  Type ArgTy = FTI->getSwiftArgumentType(ArgumentNumber);
-  return ArgTy->is<LValueType>();
-}
-
 //===----------------------------------------------------------------------===//
 //                          alloc_stack Promotion
 //===----------------------------------------------------------------------===//
@@ -146,8 +129,13 @@ static bool optimizeAllocStack(AllocStackInst *ASI) {
     // apply and partial_apply instructions do not capture the pointer when
     // it is passed through [inout] arguments or for indirect returns, but we
     // need to treat them as a may-store.
-    if ((isa<ApplyInst>(User) || isa<PartialApplyInst>(User)) &&
-        isInOutOrIndirectReturn(User, UI->getOperandNumber()-1)) {
+    SILFunctionTypeInfo *fti = nullptr;
+    if (auto AI = dyn_cast<ApplyInst>(User))
+      fti = AI->getFunctionTypeInfo(*AI->getModule());
+    else if (auto PAI = dyn_cast<PartialApplyInst>(User))
+      fti = PAI->getFunctionTypeInfo(*PAI->getModule());
+    
+    if (fti && fti->isInOutOrIndirectReturn(UI->getOperandNumber()-1)) {
       Stores.push_back(User);
 
       // We can't remove the allocation if there is a inout store to it.

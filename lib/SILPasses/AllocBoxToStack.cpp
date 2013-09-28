@@ -20,23 +20,6 @@ using namespace swift;
 
 STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 
-/// isInOutOrIndirectReturn - Return true if the specified apply/partial_apply
-/// call operand is a [inout] or indirect return, indicating that the call
-/// doesn't capture the pointer.
-static bool isInOutOrIndirectReturn(SILInstruction *Apply,
-                                    unsigned ArgumentNumber) {
-  SILType FnTy = Apply->getOperand(0).getType();
-  SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(*Apply->getModule());
-
-  // If this is an indirect return slot, it isn't captured.
-  if (ArgumentNumber == 0 && FTI->hasIndirectReturn())
-    return true;
-
-  // Otherwise, check for [inout].
-  Type ArgTy = FTI->getSwiftArgumentType(ArgumentNumber);
-  return ArgTy->is<LValueType>();
-}
-
 //===----------------------------------------------------------------------===//
 //                           alloc_box Promotion
 //===----------------------------------------------------------------------===//
@@ -168,9 +151,17 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     
     // apply and partial_apply instructions do not capture the pointer when
     // it is passed through [inout] arguments or for indirect returns.
-    if ((isa<ApplyInst>(User) || isa<PartialApplyInst>(User)) &&
-        isInOutOrIndirectReturn(User, UI->getOperandNumber()-1))
-      continue;
+    if (auto apply = dyn_cast<ApplyInst>(User)) {
+      if (apply->getFunctionTypeInfo(*User->getModule())
+            ->isInOutOrIndirectReturn(UI->getOperandNumber()-1))
+        continue;
+    }
+    if (auto partialApply = dyn_cast<PartialApplyInst>(User)) {
+      if (partialApply->getFunctionTypeInfo(*User->getModule())
+            ->isInOutOrIndirectReturn(UI->getOperandNumber()-1))
+        continue;
+      
+    }
 
     // Otherwise, this looks like it escapes.
     DEBUG(llvm::errs() << "*** Failed to promote alloc_box: " << *ABI

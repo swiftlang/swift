@@ -120,7 +120,10 @@ namespace sil_block {
     SIL_INST_APPLY,
     BCFixed<1>,           // is partial apply?
     BCFixed<1>,           // transparent
-    TypeIDField,          // callee type
+    BCFixed<31>,          // num substitutions
+    TypeIDField,          // callee unsubstituted type
+    SILTypeCategoryField,
+    TypeIDField,          // callee substituted type
     SILTypeCategoryField,
     ValueIDField,         // callee value
     SILValueResultField,

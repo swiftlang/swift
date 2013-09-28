@@ -252,37 +252,65 @@ AllocArrayInst::AllocArrayInst(SILLocation Loc, SILType ElementType,
 }
 
 ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
-                     SILType Result, ArrayRef<SILValue> Args,
+                     SILType SubstCalleeTy,
+                     SILType Result,
+                     ArrayRef<Substitution> Subs,
+                     ArrayRef<SILValue> Args,
                      bool Transparent)
-  : SILInstruction(ValueKind::ApplyInst, Loc, Result), Transparent(Transparent),
-    Operands(this, Args, Callee) {
+  : SILInstruction(ValueKind::ApplyInst, Loc, Result),
+    NumSubstitutions(Subs.size()), Transparent(Transparent),
+    SubstCalleeType(SubstCalleeTy),
+    Operands(this, Args, Callee)
+{
+  static_assert(std::is_trivially_copyable<Substitution>::value,
+                "assuming Substitution is trivially copyable");
+  memcpy(getSubstitutionsStorage(), Subs.begin(),
+         sizeof(Substitution) * Subs.size());
 }
 
 ApplyInst *ApplyInst::create(SILLocation Loc, SILValue Callee,
-                             SILType Result, ArrayRef<SILValue> Args,
+                             SILType SubstCalleeTy,
+                             SILType Result,
+                             ArrayRef<Substitution> Subs,
+                             ArrayRef<SILValue> Args,
                              bool Transparent, SILFunction &F) {
-  void *Buffer = F.getModule().allocate(sizeof(ApplyInst) +
-                            decltype(Operands)::getExtraSize(Args.size()),
+  void *Buffer = F.getModule().allocate(sizeof(ApplyInst)
+                              + decltype(Operands)::getExtraSize(Args.size())
+                              + sizeof(Substitution) * Subs.size(),
                             alignof(ApplyInst));
-  return ::new(Buffer) ApplyInst(Loc, Callee, Result, Args, Transparent);
+  return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeTy,
+                                 Result, Subs, Args, Transparent);
 }
 
 PartialApplyInst::PartialApplyInst(SILLocation Loc, SILValue Callee,
+                                   SILType SubstCalleeTy,
+                                   ArrayRef<Substitution> Subs,
                                    ArrayRef<SILValue> Args, SILType ClosureType)
 // FIXME: the callee should have a lowered SIL function type, and PartialApplyInst
 // should derive the type of its result by partially applying the callee's type.
   : SILInstruction(ValueKind::PartialApplyInst, Loc, ClosureType),
-    Operands(this, Args, Callee) {
+    SubstCalleeType(SubstCalleeTy),
+    NumSubstitutions(Subs.size()),
+    Operands(this, Args, Callee)
+{
+  static_assert(std::is_trivially_copyable<Substitution>::value,
+                "assuming Substitution is trivial");
+  memcpy(getSubstitutionsStorage(), Subs.begin(),
+         sizeof(Substitution) * Subs.size());
 }
 
 PartialApplyInst *PartialApplyInst::create(SILLocation Loc, SILValue Callee,
+                                           SILType SubstCalleeTy,
+                                           ArrayRef<Substitution> Subs,
                                            ArrayRef<SILValue> Args,
                                            SILType ClosureType,
                                            SILFunction &F) {
-  void *Buffer = F.getModule().allocate(sizeof(PartialApplyInst) +
-                            decltype(Operands)::getExtraSize(Args.size()),
+  void *Buffer = F.getModule().allocate(sizeof(PartialApplyInst)
+                              + decltype(Operands)::getExtraSize(Args.size())
+                              + sizeof(Substitution) * Subs.size(),
                             alignof(PartialApplyInst));
-  return ::new(Buffer) PartialApplyInst(Loc, Callee, Args, ClosureType);
+  return ::new(Buffer) PartialApplyInst(Loc, Callee, SubstCalleeTy,
+                                        Subs, Args, ClosureType);
 }
 
 FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
@@ -477,25 +505,6 @@ CopyAddrInst::CopyAddrInst(SILLocation Loc, SILValue SrcLValue, SILValue DestLVa
     IsTakeOfSrc(isTakeOfSrc), IsInitializationOfDest(isInitializationOfDest),
     Operands(this, SrcLValue, DestLValue)
 {
-}
-
-SpecializeInst *SpecializeInst::create(SILLocation Loc, SILValue Operand,
-                                       ArrayRef<Substitution> Substitutions,
-                                       SILType DestTy, SILFunction &F) {
- void *Buffer = F.getModule().allocate(
-           sizeof(SpecializeInst) + Substitutions.size() * sizeof(Substitution),
-           alignof(SpecializeInst));
-  return ::new(Buffer) SpecializeInst(Loc, Operand, Substitutions, DestTy);
-}
-
-SpecializeInst::SpecializeInst(SILLocation Loc, SILValue Operand,
-                               ArrayRef<Substitution> Substitutions,
-                               SILType DestTy)
-  : SILInstruction(ValueKind::SpecializeInst, Loc, DestTy),
-    Operands(this, Operand), NumSubstitutions(Substitutions.size())
-{
-  memcpy(getSubstitutionsStorage(), Substitutions.data(),
-         Substitutions.size() * sizeof(Substitution));
 }
 
 StructInst *StructInst::create(SILLocation Loc, SILType Ty,

@@ -152,7 +152,7 @@ int main(int argc, char **argv) {
     }
 
     // Verify the module after every pass.
-    CI.getSILModule()->verify();
+    CI.getSILModule()->verify(CI.getTU());
   }
 
   std::string ErrorInfo;

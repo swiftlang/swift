@@ -49,8 +49,8 @@ SILGenFunction::~SILGenFunction() {
 // SILGenModule Class implementation
 //===--------------------------------------------------------------------===//
 
-SILGenModule::SILGenModule(SILModule &M)
-  : M(M), Types(M.Types), TopLevelSGF(nullptr) {
+SILGenModule::SILGenModule(SILModule &M, Module *SM)
+  : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr) {
 
   RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();
   SILFunction *toplevel = emitTopLevelFunction(TopLevelLoc);
@@ -70,8 +70,8 @@ SILGenModule::~SILGenModule() {
   delete TopLevelSGF;
   DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
         toplevel->print(llvm::dbgs()));
-  toplevel->verify();
-  M.verify();
+  toplevel->verify(SwiftModule);
+  M.verify(SwiftModule);
 }
 
 static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
@@ -305,7 +305,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   assert(!F->isExternalDeclaration() && "did not emit any function body?!");
   DEBUG(llvm::dbgs() << "lowered sil:\n";
         F->print(llvm::dbgs()));
-  F->verify();
+  F->verify(SwiftModule);
 }
 
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
@@ -566,7 +566,7 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
 SILModule *SILModule::constructSIL(TranslationUnit *tu,
                                    unsigned startElem) {
   SILModule *m = new SILModule(tu->getASTContext());
-  SILGenModule sgm(*m);
+  SILGenModule sgm(*m, tu);
   for (Decl *D : llvm::makeArrayRef(tu->Decls).slice(startElem))
     sgm.visit(D);
   

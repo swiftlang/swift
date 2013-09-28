@@ -24,6 +24,7 @@ using namespace swift;
 /// (for any reason).
 bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
                                 SILFunction *CalleeFunction,
+                                ArrayRef<Substitution> Subs,
                                 ArrayRef<SILValue> Args) {
   SILFunction &F = getBuilder().getFunction();
   assert(I->getParent()->getParent() && I->getParent()->getParent() == &F &&
@@ -33,6 +34,10 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
          CalleeFunction->getAbstractCC() != AbstractCC::C &&
          "Cannot inline Objective-C method or C function");
 
+  // We can't handle specializations yet.
+  if (!Subs.empty())
+    return false;
+  
   CalleeEntryBB = CalleeFunction->begin();
 
   // Compute the SILLocation which should be used by all the inlined
@@ -95,7 +100,7 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
 
     // Now iterate over the callee BBs and fix up the terminators.
     getBuilder().setInsertionPoint(CallerBB);
-    // We already know that the callee's entry block does not terminiate with a
+    // We already know that the callee's entry block does not terminate with a
     // Return Inst, so it can definitely be cloned with the normal SILCloner
     // visit function.
     visit(CalleeEntryBB->getTerminator());

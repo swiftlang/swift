@@ -56,6 +56,7 @@ namespace {
 /// The SIL verifier walks over a SIL function / basic block / instruction,
 /// checking and enforcing its invariants.
 class SILVerifier : public SILVerifierBase<SILVerifier> {
+  Module *M;
   const SILFunction &F;
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo *Dominance;
@@ -73,7 +74,7 @@ public:
 
     if (CurInstruction) {
       llvm::dbgs() << "Verifying instruction:\n";
-      CurInstruction->print(llvm::dbgs());
+      CurInstruction->printInContext(llvm::dbgs());
       llvm::dbgs() << "In function @" << F.getName() <<" basic block:\n";
       CurInstruction->getParent()->print(llvm::dbgs());
     }
@@ -108,7 +109,7 @@ public:
     });
   }
 
-  SILVerifier(const SILFunction &F) : F(F) {
+  SILVerifier(Module *M, const SILFunction &F) : M(M), F(F) {
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
     for (auto &BB : F) {
@@ -231,50 +232,51 @@ public:
     requireReferenceValue(AI, "Result of alloc_ref");
   }
   
-  void checkApplyInst(ApplyInst *AI) {
-    DEBUG(llvm::dbgs() << "verifying";
-          AI->print(llvm::dbgs()));
-    SILType calleeTy = AI->getCallee().getType();
-    DEBUG(llvm::dbgs() << "callee type: ";
-          AI->getCallee().getType().print(llvm::dbgs());
-          llvm::dbgs() << '\n');
-    require(calleeTy.isObject(), "callee of apply must be a value");
-    require(calleeTy.is<FunctionType>(),
-            "callee of apply must have concrete function type");
-    SILFunctionTypeInfo *ti = calleeTy.getFunctionTypeInfo(F.getModule());
+  /// Check the substitutions passed to an apply or partial_apply.
+  SILType checkApplySubstitutions(ArrayRef<Substitution> subs,
+                                  SILType calleeTy) {
+    // If there are substitutions, verify them and apply them to the callee.
+    auto polyTy = calleeTy.getAs<PolymorphicFunctionType>();
+    if (subs.empty()) {
+      require(!polyTy,
+              "callee of apply without substitutions must not be polymorphic");
+      return calleeTy;
+    }
+    require(polyTy,
+            "callee of apply with substitutions must be polymorphic");
+    require(polyTy->getAllArchetypes().size() == subs.size(),
+            "number of apply substitutions must match number of archetypes "
+            "in the function type");
     
-    DEBUG(llvm::dbgs() << "function input types:\n";
-          for (SILType t : ti->getInputTypes()) {
-            llvm::dbgs() << "  ";
-            t.print(llvm::dbgs());
-            llvm::dbgs() << '\n';
-          });
-    DEBUG(llvm::dbgs() << "function result type ";
-          ti->getResultType().print(llvm::dbgs());
-          llvm::dbgs() << '\n');
-
-    DEBUG(llvm::dbgs() << "argument types:\n";
-          for (SILValue arg : AI->getArguments()) {
-            llvm::dbgs() << "  ";
-            arg.getType().print(llvm::dbgs());
-            llvm::dbgs() << '\n';
-          });
+    // Apply the substitutions.
+    // FIXME: Eventually we want this substitution to apply 1:1 to the
+    // SILFunctionTypeInfo-level calling convention of the type, instead of
+    // hiding the abstraction difference behind the specialization.
+    auto substTy = polyTy->substGenericArgs(M, subs)->getCanonicalType();
+    
+    return SILType::getPrimitiveObjectType(substTy);
+  }
+  
+  void checkApplyInst(ApplyInst *AI) {
+    SILType calleeTy = AI->getCallee().getType();
+    require(calleeTy.isObject(), "callee of apply must be an object");
+    require(calleeTy.is<AnyFunctionType>(),
+            "callee of apply must have any function type");
+    
+    calleeTy = checkApplySubstitutions(AI->getSubstitutions(), calleeTy);
+    
+    require(calleeTy == AI->getSubstCalleeType(),
+            "substituted callee type does not match substitutions");
+    
+    SILFunctionTypeInfo *ti = calleeTy.getFunctionTypeInfo(F.getModule());
     
     // Check that the arguments and result match.
     require(AI->getArguments().size() == ti->getInputTypes().size(),
             "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = AI->getArguments().size(); i < size; ++i) {
-      DEBUG(llvm::dbgs() << "  argument type ";
-            AI->getArguments()[i].getType().print(llvm::dbgs());
-            llvm::dbgs() << " for input type ";
-            ti->getInputTypes()[i].print(llvm::dbgs());
-            llvm::dbgs() << '\n');
       requireSameType(AI->getArguments()[i].getType(), ti->getInputTypes()[i],
                       "operand of 'apply' doesn't match function input type");
     }
-    DEBUG(llvm::dbgs() << "result type ";
-          AI->getType().print(llvm::dbgs());
-          llvm::dbgs() << '\n');
     require(AI->getType() == ti->getResultType(),
             "type of apply instruction doesn't match function result type");
   }
@@ -282,8 +284,9 @@ public:
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     SILType calleeTy = PAI->getCallee().getType();
     require(calleeTy.isObject(), "callee of closure must be an object");
-    require(calleeTy.is<FunctionType>(),
-            "callee of closure must have concrete function type");
+    require(calleeTy.is<AnyFunctionType>(),
+            "callee of closure must have Any function type");
+
     SILType appliedTy = PAI->getType();
     require(appliedTy.isObject(), "result of closure must be an object");
     require(appliedTy.is<FunctionType>(),
@@ -291,6 +294,11 @@ public:
     // FIXME: A "curry" with no arguments could remain thin.
     require(!appliedTy.castTo<FunctionType>()->isThin(),
             "result of closure cannot have a thin function type");
+
+    calleeTy = checkApplySubstitutions(PAI->getSubstitutions(), calleeTy);
+
+    require(calleeTy == PAI->getSubstCalleeType(),
+            "substituted callee type does not match substitutions");
 
     SILFunctionTypeInfo *info
       = calleeTy.getFunctionTypeInfo(F.getModule());
@@ -422,21 +430,6 @@ public:
             "Dest address should be lvalue");
   }
   
-  void checkSpecializeInst(SpecializeInst *SI) {
-    require(SI->getType().is<FunctionType>(),
-            "Specialize result should have a function type");
-    
-    SILType operandTy = SI->getOperand().getType();
-    require((operandTy.is<PolymorphicFunctionType>()
-            || (operandTy.is<FunctionType>()
-                && operandTy.castTo<FunctionType>()->getResult()
-                  ->is<PolymorphicFunctionType>())),
-            "Specialize source should have a polymorphic function type");
-    require(operandTy.castTo<AnyFunctionType>()->isThin() ==
-              SI->getType().castTo<FunctionType>()->isThin(),
-            "Specialize source and result should have the same thinness");
-  }
-
   void checkStructInst(StructInst *SI) {
     auto *structDecl = SI->getType().getStructOrBoundGenericStruct();
     require(structDecl, "StructInst must return a struct");
@@ -450,8 +443,7 @@ public:
               "number of struct operands does not match number of stored "
               "member variables of struct");
       
-      Type fieldTy = structTy->getTypeOfMember(structDecl->getModuleContext(),
-                                               field, nullptr);
+      Type fieldTy = structTy->getTypeOfMember(M, field, nullptr);
       require(fieldTy->isEqual((*opi).getType().getSwiftType()),
               "struct operand type does not match field type");
       ++opi;
@@ -472,7 +464,7 @@ public:
       require(UI->getOperand().getType().isObject(),
               "EnumInst operand must be an object");
       Type caseTy = UI->getType().getSwiftRValueType()
-        ->getTypeOfMember(ud->getModuleContext(), UI->getElement(), nullptr,
+        ->getTypeOfMember(M, UI->getElement(), nullptr,
                           UI->getElement()->getArgumentType());
       require(caseTy->isEqual(UI->getOperand().getType().getSwiftRValueType()),
               "EnumInst operand type does not match type of case");
@@ -492,7 +484,7 @@ public:
             "EnumDataAddrInst must produce an address");
     
     Type caseTy = UI->getOperand().getType().getSwiftRValueType()
-      ->getTypeOfMember(ud->getModuleContext(), UI->getElement(), nullptr,
+      ->getTypeOfMember(M, UI->getElement(), nullptr,
                         UI->getElement()->getArgumentType());
     
     require(caseTy->isEqual(UI->getType().getSwiftRValueType()),
@@ -658,7 +650,7 @@ public:
             "struct_extract field is not a member of the struct");
     
     Type fieldTy = operandTy.getSwiftRValueType()
-      ->getTypeOfMember(sd->getModuleContext(), EI->getField(), nullptr);
+      ->getTypeOfMember(M, EI->getField(), nullptr);
     require(fieldTy->isEqual(EI->getType().getSwiftRValueType()),
             "result of struct_extract does not match type of field");
   }
@@ -697,7 +689,7 @@ public:
             "struct_element_addr field is not a member of the struct");
     
     Type fieldTy = operandTy.getSwiftRValueType()
-      ->getTypeOfMember(sd->getModuleContext(), EI->getField(), nullptr);
+      ->getTypeOfMember(M, EI->getField(), nullptr);
     require(fieldTy->isEqual(EI->getType().getSwiftRValueType()),
             "result of struct_element_addr does not match type of field");
   }
@@ -716,7 +708,7 @@ public:
             "ref_element_addr field must be a member of the class");
     
     Type fieldTy = operandTy.getSwiftRValueType()
-      ->getTypeOfMember(cd->getModuleContext(), EI->getField(), nullptr);
+      ->getTypeOfMember(M, EI->getField(), nullptr);
     require(fieldTy->isEqual(EI->getType().getSwiftRValueType()),
             "result of ref_element_addr does not match type of field");
   }
@@ -1408,8 +1400,7 @@ public:
                 "arguments");
 
         if (dest->getBBArgs().size() == 1) {
-          Type eltArgTy = uTy->getTypeOfMember(uDecl->getModuleContext(),
-                                               elt, nullptr,
+          Type eltArgTy = uTy->getTypeOfMember(M, elt, nullptr,
                                                elt->getArgumentType());
           CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
           require(eltArgTy->isEqual(bbArgTy),
@@ -1469,8 +1460,7 @@ public:
                 "destructive_switch_enum_addr destination for case w/ args "
                 "must take an argument");
         
-        Type eltArgTy = uTy->getTypeOfMember(uDecl->getModuleContext(),
-                                             elt, nullptr,
+        Type eltArgTy = uTy->getTypeOfMember(M, elt, nullptr,
                                              elt->getArgumentType());
         CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
         require(eltArgTy->isEqual(bbArgTy),
@@ -1609,20 +1599,20 @@ public:
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify() const {
+void SILFunction::verify(Module *M) const {
 #ifndef NDEBUG
   if (isExternalDeclaration()) {
     assert(getLinkage() != SILLinkage::Internal &&
            "external declaration of internal SILFunction not allowed");
     return;
   }
-  SILVerifier(*this).verify();
+  SILVerifier(M, *this).verify();
 #endif
 }
 
 
 /// Verify the module.
-void SILModule::verify() const {
+void SILModule::verify(Module *M) const {
 #ifndef NDEBUG
   llvm::StringSet<> functionNames;
   for (SILFunction const &f : *this) {
@@ -1630,7 +1620,7 @@ void SILModule::verify() const {
       llvm::errs() << "Function redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify();
+    f.verify(M);
   }
 #endif
 }

@@ -47,13 +47,15 @@ public:
   /// instruction, or the next instruction after the removed instruction in the
   /// original function, in case the inlined function is completely trivial
   bool inlineFunction(SILBasicBlock::iterator &I, SILFunction *CalleeFunction,
+                      ArrayRef<Substitution> Subs,
                       ArrayRef<SILValue> Args);
 
   bool inlineFunction(SILInstruction *AI, SILFunction *CalleeFunction,
+                      ArrayRef<Substitution> Subs,
                       ArrayRef<SILValue> Args) {
     assert(AI->getParent() && "Inliner called on uninserted instruction");
     SILBasicBlock::iterator I(AI);
-    return inlineFunction(I, CalleeFunction, Args);
+    return inlineFunction(I, CalleeFunction, Subs, Args);
   }
 
 private:

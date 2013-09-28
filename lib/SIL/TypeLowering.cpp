@@ -1369,7 +1369,18 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
   Type capturedInputs = TupleType::get(inputFields, Context);
   
   // Capture generic parameters from the enclosing context.
-  GenericParamList *genericParams = parentContext->getGenericParamsOfContext();
+  GenericParamList *genericParams = nullptr;
+  // FIXME: This is a clunky way of uncurrying nested type parameters from
+  // a function context.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(parentContext)) {
+    if (auto pft = getConstantType(SILDeclRef(func))
+          .getAs<PolymorphicFunctionType>())
+      genericParams = &pft->getGenericParams();
+  } else {
+    genericParams = parentContext->getGenericParamsOfContext();
+  }
+  
+  
   if (genericParams)
     return PolymorphicFunctionType::get(capturedInputs, funcType,
                                         genericParams,

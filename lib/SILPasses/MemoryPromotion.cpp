@@ -967,7 +967,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     // Note that partial_apply instructions always close over their argument.
     //
     if (auto *Apply = dyn_cast<ApplyInst>(User)) {
-      SILType FnTy = Apply->getOperand(0).getType();
+      SILType FnTy = Apply->getSubstCalleeType();
+      
       SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(*Apply->getModule());
       unsigned ArgumentNumber = UI->getOperandNumber()-1;
 

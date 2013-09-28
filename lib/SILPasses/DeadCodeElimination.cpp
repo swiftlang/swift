@@ -275,14 +275,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB) {
 }
 
 static bool isCallToNoReturn(const ApplyInst *AI, SILBasicBlock &BB) {
-  SILType Ty = AI->getCallee().getType();
-  SILModule *M = BB.getParent()->getParent();
-  CanType CalleeTy = Ty.getFunctionTypeInfo(*M)->getSwiftType();
-  if (const AnyFunctionType *FT = CalleeTy->getAs<FunctionType>())
-    return FT->isNoReturn();
-
-  assert(false);
-  return false;
+  return AI->getCallee().getType().castTo<AnyFunctionType>()->isNoReturn();
 }
 
 static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB) {

@@ -83,6 +83,7 @@ public:
   /// value represents the result of an instruction) and followed by its
   /// users.
   void dumpInContext() const;
+  void printInContext(raw_ostream &OS) const;
 
   static bool classof(const ValueBase *V) { return true; }
 };

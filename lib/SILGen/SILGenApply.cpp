@@ -456,12 +456,6 @@ public:
       SILType specializedUncurriedType
         = gen.getLoweredLoadableType(specializedType, level);
       
-      CleanupsDepth cleanup = mv.getCleanup();
-      SILValue spec = gen.B.createSpecialize(specializeLoc.getValue(),
-                                             mv.getValue(),
-                                             substitutions,
-                                             specializedUncurriedType);
-      mv = ManagedValue(spec, cleanup);
       // Recalculate the ownership conventions because the substitutions may
       // have changed the function signature.
       // FIXME: Currently only native methods can be specialized, so always use
@@ -877,6 +871,7 @@ public:
 
 ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                        ManagedValue Fn,
+                                       ArrayRef<Substitution> Subs,
                                        ArrayRef<ManagedValue> Args,
                                        CanType NativeResultTy,
                                        OwnershipConventions const &Ownership,
@@ -891,9 +886,16 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
         ? v.forwardArgument(*this, Loc, cc, destTy.getSwiftType())
         : v.getArgumentValue(*this, Loc, cc, destTy.getSwiftType());
     };
+
+  // Get the substituted function type.
+  SILType calleeTy = Fn.getType();
+  if (!Subs.empty()) {
+    calleeTy = getLoweredLoadableType(calleeTy.castTo<PolymorphicFunctionType>()
+                                    ->substGenericArgs(SGM.SwiftModule, Subs));
+  }
   
   // Get the result type.
-  Type resultTy = Fn.getType().getFunctionResultType();
+  Type resultTy = calleeTy.getFunctionResultType();
   const TypeLowering &resultTI = getTypeLowering(resultTy);
   SILType instructionTy = resultTI.getLoweredType();
   
@@ -913,7 +915,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
   }
   
   ArrayRef<SILType> inputTypes
-    = Fn.getType().getFunctionTypeInfo(SGM.M)
+    = calleeTy.getFunctionTypeInfo(SGM.M)
         ->getInputTypesWithoutIndirectReturnType();
   
   // Gather the arguments.
@@ -925,7 +927,18 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     argValues.push_back(argValue);
   }
   
-  SILValue result = B.createApply(Loc, fnValue, instructionTy, argValues,
+  // Get the substituted type of the callee.
+  SILType substCalleeTy = fnValue.getType();
+  if (!Subs.empty()) {
+    substCalleeTy = getLoweredLoadableType(
+      substCalleeTy.castTo<PolymorphicFunctionType>()
+        ->substGenericArgs(SGM.SwiftModule, Subs));
+  }
+  
+  SILValue result = B.createApply(Loc, fnValue, substCalleeTy,
+                                  instructionTy,
+                                  Subs,
+                                  argValues,
                                   Transparent);
   
   // Take ownership of the return value, if necessary.
@@ -1138,7 +1151,9 @@ namespace {
                                     uncurriedArgs,
                                     uncurriedContext);
       else
-        result = gen.emitApply(uncurriedLoc.getValue(), mv, uncurriedArgs,
+        result = gen.emitApply(uncurriedLoc.getValue(), mv,
+                               callee.getSubstitutions(),
+                               uncurriedArgs,
                                uncurriedResultTy, ownership, transparent,
                                uncurriedContext);
       
@@ -1153,7 +1168,8 @@ namespace {
         SILLocation loc = extraSites[i].loc;
         std::move(extraSites[i]).emit(gen, uncurriedArgs);
         SGFContext context = i == size - 1 ? C : SGFContext();
-        result = gen.emitApply(loc, result, uncurriedArgs,
+        result = gen.emitApply(loc, result, {},
+                               uncurriedArgs,
                                extraSites[i].resultType,
                                ownership, false, context);
       }
@@ -1509,6 +1525,7 @@ RValue SILGenFunction::emitApplyExpr(ApplyExpr *e, SGFContext c) {
 ManagedValue
 SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                             FuncDecl *fn,
+                                            ArrayRef<Substitution> subs,
                                             ArrayRef<ManagedValue> args,
                                             CanType resultType,
                                             SGFContext ctx) {
@@ -1519,7 +1536,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   bool transparent;
   std::tie(mv, ownership, transparent) = callee.getAtUncurryLevel(*this, 0);
 
-  return emitApply(loc, mv, args, resultType, ownership, transparent, ctx);
+  return emitApply(loc, mv, subs, args, resultType, ownership, transparent, ctx);
 }
 
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
@@ -1752,10 +1769,12 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
                                                          hasMemberBB);
 
     // Create the result value.
-    SILValue result = B.createPartialApply(e, memberArg, operand,
+    SILValue result = B.createPartialApply(e, memberArg, memberArg.getType(),
+                                           {}, operand,
                                            getLoweredType(methodTy));
     if (member.isAccessor()) {
-      result = B.createApply(e, result, getLoweredType(valueTy), { });
+      result = B.createApply(e, result, result.getType(),
+                             getLoweredType(valueTy), {}, {});
     }
 
     // Package up the result in an optional.
@@ -1833,13 +1852,15 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     SILValue memberArg = new (F.getModule()) SILArgument(loweredMethodTy,
                                                          hasMemberBB);
     // Emit the application of 'self'.
-    SILValue result = B.createPartialApply(e, memberArg, base, 
+    SILValue result = B.createPartialApply(e, memberArg, memberArg.getType(),
+                                           {}, base,
                                            getLoweredType(methodTy, 1));
 
     // Emit the index.
     llvm::SmallVector<SILValue, 1> indexArgs;
     std::move(index).forwardAll(*this, indexArgs);
-    result = B.createApply(e, result, getLoweredType(valueTy), indexArgs); 
+    result = B.createApply(e, result, result.getType(),
+                           getLoweredType(valueTy), {}, indexArgs);
 
     // Package up the result in an optional.
     SILValue optResult = emitInjectOptionalValue(e, result, optTL);

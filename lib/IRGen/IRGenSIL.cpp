@@ -128,46 +128,16 @@ public:
   }
 };
 
-/// Represents the application of a SpecializeInst to a value.
-class SpecializedValue {
-  // The SILValue of the unspecialized generic function.
-  SILValue unspecializedValue;
-  // The substitutions applied to the value.
-  ArrayRef<Substitution> substitutions;
-
-public:
-  SpecializedValue(SILValue unspecializedValue,
-                   ArrayRef<Substitution> substitutions)
-    : unspecializedValue(unspecializedValue),
-      substitutions(substitutions)
-  {}
-  
-  SILType getUnspecializedType() const {
-    return unspecializedValue.getType();
-  }
-  
-  SILValue getUnspecializedValue() const {
-    return unspecializedValue;
-  }
-  
-  ArrayRef<Substitution> getSubstitutions() const {
-    return substitutions;
-  }
-};
-  
 /// Represents a builtin function.
 class BuiltinValue {
   FuncDecl *decl;
-  ArrayRef<Substitution> substitutions;
   
 public:
-  BuiltinValue(FuncDecl *decl, ArrayRef<Substitution> substitutions)
-    : decl(decl), substitutions(substitutions)
+  BuiltinValue(FuncDecl *decl)
+    : decl(decl)
   {}
   
   FuncDecl *getDecl() const { return decl; }
-  
-  ArrayRef<Substitution> getSubstitutions() const { return substitutions; }
 };
   
 /// Represents a SIL value lowered to IR, in one of these forms:
@@ -196,12 +166,9 @@ public:
       /// A value that represents a metatype.
       MetatypeValue,
     
-      /// A SpecializedValue.
-      SpecializedValue,
-    
       /// A builtin function.
       BuiltinValue,
-    Value_Last = SpecializedValue
+    Value_Last = BuiltinValue
   };
   
   Kind kind;
@@ -218,7 +185,6 @@ private:
     StaticFunction staticFunction;
     ObjCMethod objcMethod;
     MetatypeValue metatypeValue;
-    SpecializedValue specializedValue;
     BuiltinValue builtinValue;
   };
 
@@ -237,10 +203,6 @@ public:
   
   LoweredValue(MetatypeValue &&metatypeValue)
     : kind(Kind::MetatypeValue), metatypeValue(std::move(metatypeValue))
-  {}
-  
-  LoweredValue(SpecializedValue &&specializedValue)
-    : kind(Kind::SpecializedValue), specializedValue(std::move(specializedValue))
   {}
   
   LoweredValue(BuiltinValue &&builtinValue)
@@ -273,9 +235,6 @@ public:
       break;
     case Kind::MetatypeValue:
       ::new (&metatypeValue) MetatypeValue(std::move(lv.metatypeValue));
-      break;
-    case Kind::SpecializedValue:
-      ::new (&specializedValue) SpecializedValue(std::move(lv.specializedValue));
       break;
     case Kind::BuiltinValue:
       ::new (&builtinValue) BuiltinValue(std::move(lv.builtinValue));
@@ -318,11 +277,6 @@ public:
     return metatypeValue;
   }
   
-  SpecializedValue const &getSpecializedValue() const {
-    assert(kind == Kind::SpecializedValue && "not a specialized value");
-    return specializedValue;
-  }
-  
   BuiltinValue const &getBuiltinValue() const {
     assert(kind == Kind::BuiltinValue && "not a builtin");
     return builtinValue;
@@ -344,9 +298,6 @@ public:
       break;
     case Kind::MetatypeValue:
       metatypeValue.~MetatypeValue();
-      break;
-    case Kind::SpecializedValue:
-      specializedValue.~SpecializedValue();
       break;
     case Kind::BuiltinValue:
       builtinValue.~BuiltinValue();
@@ -437,18 +388,11 @@ public:
     setLoweredValue(v, MetatypeValue{swiftMetatype, objcMetatype});
   }
   
-  void setLoweredSpecializedValue(SILValue v,
-                                  SILValue unspecializedValue,
-                                  ArrayRef<Substitution> substitutions) {
-    setLoweredValue(v, SpecializedValue{unspecializedValue, substitutions});
-  }
-  
   void setLoweredBuiltinValue(SILValue v,
-                              FuncDecl *builtin,
-                              ArrayRef<Substitution> substitutions) {
+                              FuncDecl *builtin) {
     assert(isa<BuiltinModule>(builtin->getDeclContext())
            && "not a builtin");
-    setLoweredValue(v, BuiltinValue{builtin, substitutions});
+    setLoweredValue(v, BuiltinValue{builtin});
   }
   
   /// Get the LoweredValue corresponding to the given SIL value, which must
@@ -498,7 +442,6 @@ public:
 
   void visitApplyInst(ApplyInst *i);
   void visitPartialApplyInst(PartialApplyInst *i);
-  void visitSpecializeInst(SpecializeInst *i);
 
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i);
   void visitFunctionRefInst(FunctionRefInst *i);
@@ -644,9 +587,6 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
     ex.add(metatypeValue.getSwiftMetatype());
     break;
   
-  case Kind::SpecializedValue:
-    llvm_unreachable("thunking generic function not yet supported");
-
   case Kind::BuiltinValue:
     llvm_unreachable("reifying builtin function not yet supported");
   }
@@ -661,7 +601,6 @@ ExplosionKind LoweredValue::getExplosionKind() const {
   case Kind::StaticFunction:
   case Kind::ObjCMethod:
   case Kind::MetatypeValue:
-  case Kind::SpecializedValue:
   case Kind::BuiltinValue:
     return ExplosionKind::Minimal;
   }
@@ -685,8 +624,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
                       SILBasicBlock *silBB,
                       llvm::BasicBlock *llBB) {
   std::vector<llvm::PHINode*> phis;
-  unsigned predecessors = std::count_if(silBB->pred_begin(), silBB->pred_end(),
-                                        [](...){ return true; });
+  unsigned predecessors = std::distance(silBB->pred_begin(), silBB->pred_end());
   
   IGF.Builder.SetInsertPoint(llBB);
   for (SILArgument *arg : make_range(silBB->bbarg_begin(), silBB->bbarg_end())) {
@@ -1044,8 +982,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 
 void IRGenSILFunction::visitBuiltinFunctionRefInst(
                                              swift::BuiltinFunctionRefInst *i) {
-  setLoweredBuiltinValue(SILValue(i, 0), cast<FuncDecl>(i->getFunction()),
-                         /*substitutions*/ {});
+  setLoweredBuiltinValue(SILValue(i, 0), cast<FuncDecl>(i->getFunction()));
 }
 
 void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
@@ -1216,7 +1153,7 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
 }
 
 static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
-                                         SILType calleeTy,
+                                         SILType origCalleeTy,
                                          SILType resultTy,
                                          LoweredValue const &lv,
                                          ArrayRef<Substitution> substitutions) {
@@ -1235,7 +1172,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   case LoweredValue::Kind::ObjCMethod: {
     auto &objcMethod = lv.getObjCMethod();
     return prepareObjCMethodRootCall(IGF, objcMethod.getMethod(),
-                                     calleeTy,
+                                     origCalleeTy,
                                      resultTy,
                                      substitutions,
                                      ExplosionKind::Minimal,
@@ -1246,7 +1183,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     Explosion calleeValues = lv.getExplosion(IGF);
     
     calleeFn = calleeValues.claimNext();
-    if (!calleeTy.castTo<AnyFunctionType>()->isThin())
+    if (!origCalleeTy.castTo<AnyFunctionType>()->isThin())
       calleeData = calleeValues.claimNext();
     else
       calleeData = nullptr;
@@ -1267,7 +1204,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
 
     // Cast the callee pointer to the right function type.
     llvm::AttributeSet attrs;
-    auto fnPtrTy = IGF.IGM.getFunctionType(calleeTy, explosionLevel,
+    auto fnPtrTy = IGF.IGM.getFunctionType(origCalleeTy, explosionLevel,
                                            extraData, attrs)->getPointerTo();
     calleeFn = IGF.Builder.CreateBitCast(calleeFn, fnPtrTy);
     break;
@@ -1279,50 +1216,15 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   case LoweredValue::Kind::Address:
     llvm_unreachable("sil address isn't a valid callee");
   
-  case LoweredValue::Kind::SpecializedValue:
-    llvm_unreachable("specialized value should be handled before reaching here");
-      
   case LoweredValue::Kind::BuiltinValue:
     llvm_unreachable("builtins should be handled before reaching here");
   }
   
-  Callee callee = Callee::forKnownFunction(calleeTy,
+  Callee callee = Callee::forKnownFunction(origCalleeTy,
                                            resultTy,
                                            substitutions, calleeFn, calleeData,
                                            explosionLevel);
   return CallEmission(IGF, callee);
-}
-
-static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
-                                                   SILType calleeTy,
-                                                   SILType resultTy,
-                                                   LoweredValue const &lv) {
-  switch (lv.kind) {
-  case LoweredValue::Kind::SpecializedValue: {
-    LoweredValue const &unspecializedValue
-      = IGF.getLoweredValue(lv.getSpecializedValue().getUnspecializedValue());
-    return getCallEmissionForLoweredValue(IGF,
-                              lv.getSpecializedValue().getUnspecializedType(),
-                              resultTy,
-                              unspecializedValue,
-                              lv.getSpecializedValue().getSubstitutions());
-  }
-  case LoweredValue::Kind::ObjCMethod:
-  case LoweredValue::Kind::StaticFunction:
-  case LoweredValue::Kind::Explosion:
-    // No substitutions.
-    return getCallEmissionForLoweredValue(IGF, calleeTy, resultTy, lv,
-                                          /*substitutions=*/ {});
-
-  case LoweredValue::Kind::MetatypeValue:
-    llvm_unreachable("metatype isn't a valid callee");
-    
-  case LoweredValue::Kind::Address:
-    llvm_unreachable("sil address isn't a valid callee");
-      
-  case LoweredValue::Kind::BuiltinValue:
-    llvm_unreachable("builtins should be handled before reaching here");
-  }
 }
 
 static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
@@ -1334,7 +1236,6 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
   
   case LoweredValue::Kind::ObjCMethod:
   case LoweredValue::Kind::StaticFunction:
-  case LoweredValue::Kind::SpecializedValue:
   case LoweredValue::Kind::BuiltinValue:
     llvm_unreachable("function isn't a valid metatype");
   
@@ -1387,16 +1288,17 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   if (calleeLV.kind == LoweredValue::Kind::BuiltinValue) {
     auto &builtin = calleeLV.getBuiltinValue();
     return emitBuiltinApplyInst(*this, builtin.getDecl(), i,
-                                builtin.getSubstitutions());
+                                i->getSubstitutions());
   }
 
-  SILType calleeTy = i->getCallee().getType();
+  SILType calleeTy = i->getSubstCalleeType();
   SILType resultTy
     = calleeTy.getFunctionTypeInfo(*IGM.SILMod)->getSemanticResultType();
   
   CallEmission emission = getCallEmissionForLoweredValue(*this,
                                                      i->getCallee().getType(),
-                                                     resultTy, calleeLV);
+                                                     resultTy, calleeLV,
+                                                     i->getSubstitutions());
   
   // Lower the SIL arguments to IR arguments.
   Explosion llArgs(emission.getCurExplosionLevel());
@@ -1456,7 +1358,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   setLoweredExplosion(SILValue(i, 0), result);
 }
 
-static std::tuple<llvm::Value*, llvm::Value*, SILType, ArrayRef<Substitution>>
+static std::tuple<llvm::Value*, llvm::Value*, SILType>
 getPartialApplicationFunction(IRGenSILFunction &IGF,
                               SILValue v) {
   LoweredValue &lv = IGF.getLoweredValue(v);
@@ -1480,17 +1382,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     }
     return {lv.getStaticFunction().getFunction(),
             nullptr,
-            v.getType(),
-            ArrayRef<Substitution>{}};
-  case LoweredValue::Kind::SpecializedValue: {
-    const SpecializedValue &specialized = lv.getSpecializedValue();
-    SILValue unspecialized = specialized.getUnspecializedValue();
-    auto res = getPartialApplicationFunction(IGF, unspecialized);
-    return {std::get<0>(res),
-            std::get<1>(res),
-            std::get<2>(res),
-            specialized.getSubstitutions()};
-  }
+            v.getType()};
   case LoweredValue::Kind::Explosion:
   case LoweredValue::Kind::MetatypeValue:
   case LoweredValue::Kind::BuiltinValue: {
@@ -1500,7 +1392,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     if (!v.getType().castTo<AnyFunctionType>()->isThin())
       context = ex.claimNext();
     
-    return {fn, context, v.getType(), ArrayRef<Substitution>{}};
+    return {fn, context, v.getType()};
   }
   }
 }
@@ -1549,16 +1441,15 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   llvm::Value *calleeFn = nullptr;
   llvm::Value *innerContext = nullptr;
   SILType origCalleeTy;
-  ArrayRef<Substitution> substitutions;
   
-  std::tie(calleeFn, innerContext, origCalleeTy, substitutions)
+  std::tie(calleeFn, innerContext, origCalleeTy)
     = getPartialApplicationFunction(*this, i->getCallee());
   
   // Create the thunk and function value.
   Explosion function(ExplosionKind::Maximal);
   emitFunctionPartialApplication(*this, calleeFn, innerContext, llArgs,
-                                 argTypes, substitutions,
-                                 origCalleeTy, i->getCallee().getType(),
+                                 argTypes, i->getSubstitutions(),
+                                 origCalleeTy, i->getSubstCalleeType(),
                                  i->getType(), function);
   setLoweredExplosion(v, function);
 }
@@ -1998,28 +1889,12 @@ void IRGenSILFunction::visitStoreWeakInst(swift::StoreWeakInst *i) {
 }
 
 void IRGenSILFunction::visitStrongRetainInst(swift::StrongRetainInst *i) {
-  // FIXME: Specialization thunks may eventually require retaining. For now,
-  // since we don't yet thunk specialized function values, ignore retains
-  // of lowered SpecializedValues.
-  if (getLoweredValue(i->getOperand()).kind
-        == LoweredValue::Kind::SpecializedValue) {
-    return;
-  }
-  
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = cast<ReferenceTypeInfo>(getTypeInfo(i->getOperand().getType()));
   ti.retain(*this, lowered);
 }
 
 void IRGenSILFunction::visitStrongReleaseInst(swift::StrongReleaseInst *i) {
-  // FIXME: Specialization thunks may eventually require retaining. For now,
-  // since we don't yet thunk specialized function values, ignore retains
-  // of lowered SpecializedValues.
-  if (getLoweredValue(i->getOperand()).kind
-        == LoweredValue::Kind::SpecializedValue) {
-    return;
-  }
-  
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = cast<ReferenceTypeInfo>(getTypeInfo(i->getOperand().getType()));
   ti.release(*this, lowered);
@@ -2636,43 +2511,4 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   Explosion e(ExplosionKind::Maximal);
   e.add(fnValue);
   setLoweredExplosion(SILValue(i, 0), e);
-}
-
-void IRGenSILFunction::visitSpecializeInst(swift::SpecializeInst *i) {
-  // If we're specializing a builtin, store the substitutions directly with the
-  // builtin.
-  LoweredValue const &operand = getLoweredValue(i->getOperand());
-  if (operand.kind == LoweredValue::Kind::BuiltinValue) {
-    assert(operand.getBuiltinValue().getSubstitutions().empty() &&
-           "builtin already specialized");
-    return setLoweredBuiltinValue(SILValue(i, 0),
-                                  operand.getBuiltinValue().getDecl(),
-                                  i->getSubstitutions());
-  }
-  
-  // If the specialization is used as a value and not just called, we need to
-  // emit the thunk.
-  for (auto *use : i->getUses())
-    if (!isa<ApplyInst>(use->getUser())
-        && !isa<PartialApplyInst>(use->getUser())) {
-      assert(operand.kind == LoweredValue::Kind::StaticFunction &&
-         "specialization thunks for dynamic function values not yet supported");
-
-      // FIXME: better explosion level, preserve!
-      llvm::Function *thunk = emitFunctionSpecialization(IGM,
-                                 operand.getStaticFunction().getFunction(),
-                                 i->getOperand().getType(),
-                                 i->getType(),
-                                 i->getSubstitutions(),
-                                 ExplosionKind::Minimal);
-      
-      Explosion result(ExplosionKind::Maximal);
-      result.add(Builder.CreateBitCast(thunk, IGM.Int8PtrTy));
-      return setLoweredExplosion(SILValue(i, 0), result);
-    }
-  
-  // If it's only called, we can just emit calls to the generic inline.
-  setLoweredSpecializedValue(SILValue(i, 0),
-                             i->getOperand(),
-                             i->getSubstitutions());
 }

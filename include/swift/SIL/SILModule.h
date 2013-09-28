@@ -177,7 +177,7 @@ public:
 
   /// \brief Run the SIL verifier to make sure that all Functions follow
   /// invariants.
-  void verify() const;
+  void verify(Module *M) const;
   
   /// Pretty-print the module.
   void dump() const;

@@ -928,7 +928,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("strong_retain_autoreleased", ValueKind::StrongRetainAutoreleasedInst)
     .Case("strong_retain_unowned", ValueKind::StrongRetainUnownedInst)
     .Case("return", ValueKind::ReturnInst)
-    .Case("specialize", ValueKind::SpecializeInst)
     .Case("store", ValueKind::StoreInst)
     .Case("store_weak", ValueKind::StoreWeakInst)
     .Case("string_literal", ValueKind::StringLiteralInst)
@@ -977,6 +976,72 @@ bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args) {
                       return false;
                     }))
       return true;
+  }
+  return false;
+}
+
+namespace {
+struct ParsedSubstitution {
+  SourceLoc loc;
+  Identifier name;
+  SILType replacement;
+};
+}
+
+/// Parse the substitution list for an apply instruction.
+bool parseApplySubstitutions(SILParser &SP,
+                             SmallVectorImpl<ParsedSubstitution> &parsed) {
+  // Check for an opening '<' bracket.
+  if (!SP.P.Tok.isContextualPunctuator("<"))
+    return false;
+  
+  SP.P.consumeToken();
+  
+  // Parse a list of Substitutions: Archetype = Replacement.
+  do {
+    SourceLoc Loc = SP.P.Tok.getLoc();
+    Substitution Sub;
+    SILType Replace;
+    Identifier ArcheId;
+    if (SP.parseSILIdentifier(ArcheId, diag::expected_sil_type) ||
+        SP.P.parseToken(tok::equal, diag::expected_tok_in_sil_instr, "=") ||
+        SP.parseSILType(Replace))
+      return true;
+    
+    parsed.push_back({Loc, ArcheId, Replace});
+  } while (SP.P.consumeIf(tok::comma));
+  
+  // Consume the closing '>'.
+  if (!SP.P.Tok.isContextualPunctuator(">")) {
+    SP.P.diagnose(SP.P.Tok, diag::expected_tok_in_sil_instr, ">");
+    return true;
+  }
+  
+  return false;
+}
+
+/// Reconstruct AST substitutions from parsed substitutions using archetypes
+/// from a PolymorphicFunctionType.
+bool getApplySubstitutionsFromParsed(
+                             SILParser &SP,
+                             PolymorphicFunctionType *pft,
+                             ArrayRef<ParsedSubstitution> parses,
+                             SmallVectorImpl<Substitution> &subs) {
+  // Find the corresponding ArchetypeType for ArcheId in PTy.
+  ArrayRef<ArchetypeType *> allArchetypes = pft->getAllArchetypes();
+  for (auto &parsed : parses) {
+    Substitution sub{nullptr, nullptr, nullptr};
+    for (auto archetype : allArchetypes)
+      if (archetype->getName() == parsed.name) {
+        sub.Archetype = archetype;
+        break;
+      }
+    if (!sub.Archetype) {
+      SP.P.diagnose(parsed.loc, diag::sil_apply_archetype_not_found);
+      return true;
+    }
+    sub.Replacement = parsed.replacement.getSwiftType();
+    subs.push_back(sub);
   }
   return false;
 }
@@ -2031,52 +2096,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                     ModuleType::get(Mod)->getCanonicalType()));
     break;
   }
-  case ValueKind::SpecializeInst: {
-    SILType DestTy;
-    SourceLoc Loc;
-    if (parseTypedValueRef(Val, Loc) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(DestTy) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
-      return true;
-
-    // Make sure Type of Val is PolymorphicFunctionType.
-    if (!Val.getType().getSwiftType()->is<PolymorphicFunctionType>()) {
-      P.diagnose(Loc, diag::expected_sil_type_kind,
-                 "be a polymorphic function");
-      return true;
-    }
-    PolymorphicFunctionType *PTy = cast<PolymorphicFunctionType>(
-        Val.getType().getSwiftType().getPointer());
-
-    // Parse a list of Substitutions: Archetype = Replacement.
-    SmallVector<Substitution, 4> Substitutions;
-    do {
-      Substitution Sub;
-      SILType Replace;
-      Identifier ArcheId;
-      if (parseSILIdentifier(ArcheId, diag::expected_sil_type) ||
-          P.parseToken(tok::equal, diag::expected_tok_in_sil_instr, "=") ||
-          parseSILType(Replace))
-        return true;
-
-      // Find the corresponding ArchetypeType for ArcheId in PTy.
-      ArrayRef<ArchetypeType *> AllArchetypes = PTy->getAllArchetypes();
-      for (auto ArcheTy : AllArchetypes)
-        if (ArcheTy->getName() == ArcheId) {
-          Sub.Archetype = ArcheTy;
-          break;
-        }
-
-      Sub.Replacement = Replace.getSwiftType();
-      Substitutions.push_back(Sub);
-    } while (P.consumeIf(tok::comma));
-
-    ResultVal = B.createSpecialize(InstLoc, Val,
-                                   P.Context.AllocateCopy(Substitutions),
-                                   DestTy);
-    break;
-  }
   case ValueKind::DynamicMethodBranchInst: {
     SILDeclRef Member;
     Identifier BBName, BBName2;
@@ -2114,8 +2133,13 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   bool Transparent = false;
   if ((Opcode == ValueKind::ApplyInst &&
        parseSILOptional(Transparent, *this, "transparent")) ||
-      parseValueName(FnName) ||
-      P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
+      parseValueName(FnName))
+    return true;
+  SmallVector<ParsedSubstitution, 4> parsedSubs;
+  if (parseApplySubstitutions(*this, parsedSubs))
+    return true;
+    
+  if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
     return true;
 
   if (P.Tok.isNot(tok::r_paren)) {
@@ -2142,7 +2166,17 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   SILFunctionTypeInfo *FTI = Ty.getFunctionTypeInfo(SILMod);
   
   auto ArgTys = FTI->getInputTypes();
-
+  
+  SmallVector<Substitution, 4> subs;
+  if (!parsedSubs.empty()) {
+    PolymorphicFunctionType *pft = Ty.getAs<PolymorphicFunctionType>();
+    if (!pft) {
+      P.diagnose(TypeLoc, diag::sil_substitutions_on_non_polymorphic_type);
+      return true;
+    }
+    if (getApplySubstitutionsFromParsed(*this, pft, parsedSubs, subs))
+      return true;
+  }
   switch (Opcode) {
   default: assert(0 && "Unexpected case");
   case ValueKind::ApplyInst : {
@@ -2158,7 +2192,15 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     for (auto &ArgName : ArgNames)
       Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc));
 
-    ResultVal = B.createApply(InstLoc, FnVal, FTI->getResultType(), Args,
+    SILType FnTy = FnVal.getType();
+    if (!subs.empty()) {
+      FnTy = SILType::getPrimitiveObjectType(
+         FnTy.castTo<PolymorphicFunctionType>()
+           ->substGenericArgs(P.TU, subs)->getCanonicalType());
+    }
+    
+    ResultVal = B.createApply(InstLoc, FnVal, FnTy,
+                              FTI->getResultType(), subs, Args,
                               Transparent);
     break;
   }
@@ -2177,10 +2219,18 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     for (auto &ArgName : ArgNames)
       Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc));
 
+    SILType FnTy = FnVal.getType();
+    if (!subs.empty()) {
+      FnTy = SILType::getPrimitiveObjectType(
+         FnTy.castTo<PolymorphicFunctionType>()
+           ->substGenericArgs(P.TU, subs)->getCanonicalType());
+    }
+    
     SILType closureTy =
       SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod);
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    ResultVal = B.createPartialApply(InstLoc, FnVal, Args, closureTy);
+    ResultVal = B.createPartialApply(InstLoc, FnVal, FnTy,
+                                     subs, Args, closureTy);
     break;
   }
   }
@@ -2336,8 +2386,7 @@ bool Parser::parseDeclSIL() {
 
   // If SIL prsing succeeded, verify the generated SIL.
   if (!FunctionState.P.Diags.hadAnyError())
-    FunctionState.F->verify();
-  
+    FunctionState.F->verify(TU);
 
   return false;
 }

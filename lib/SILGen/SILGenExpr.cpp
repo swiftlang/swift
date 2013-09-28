@@ -748,6 +748,7 @@ RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
   // Call the _getBool library intrinsic.
   return RValue(SGF, SGF.emitApplyOfLibraryIntrinsic(E,
                                   SGF.SGM.M.getASTContext().getGetBoolDecl(),
+                                  {},
                                   ManagedValue(isa, ManagedValue::Unmanaged),
                                   E->getType()->getCanonicalType(),
                                   C), E);
@@ -818,11 +819,17 @@ RValue RValueEmitter::visitSpecializeExpr(SpecializeExpr *E,
   SILValue unspecialized
     = visit(E->getSubExpr()).getUnmanagedSingleValue(SGF, E->getSubExpr());
   SILType specializedType
+    = SGF.getLoweredLoadableType(E->getType());
+  SILType substType
     = SGF.getLoweredLoadableType(getThinFunctionType(E->getType()));
-  SILValue spec = SGF.B.createSpecialize(E, unspecialized,
-                                         E->getSubstitutions(),
-                                         specializedType);
-  return RValue(SGF, ManagedValue(spec, ManagedValue::Unmanaged), E);
+  
+  // Partially apply to no arguments to create a thunk.
+  SILValue spec = SGF.B.createPartialApply(E, unspecialized,
+                                           substType,
+                                           E->getSubstitutions(),
+                                           {},
+                                           specializedType);
+  return RValue(SGF, SGF.emitManagedRValueWithCleanup(spec), E);
 }
 
 RValue RValueEmitter::visitAddressOfExpr(AddressOfExpr *E,
@@ -830,50 +837,26 @@ RValue RValueEmitter::visitAddressOfExpr(AddressOfExpr *E,
   return SGF.emitLValueAsRValue(E);
 }
 
-ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
-                                           SILValue selfValue,
-                                           SILDeclRef methodConstant,
-                                           ArrayRef<Substitution> innerSubs) {
-  // FIXME: Emit dynamic dispatch instruction (class_method, super_method, etc.)
-  // if needed.
-  
+std::tuple<ManagedValue, SILType, ArrayRef<Substitution>>
+SILGenFunction::emitSiblingMethodRef(SILLocation loc,
+                                     SILValue selfValue,
+                                     SILDeclRef methodConstant,
+                                     ArrayRef<Substitution> innerSubs) {
   SILValue methodValue = B.createFunctionRef(loc,
                                              SGM.getFunction(methodConstant));
-  SILType methodType = SGM.getConstantType(methodConstant.atUncurryLevel(0));
-  
-  /// If the 'self' type is a bound generic, specialize the method ref with
-  /// its substitutions.
-  ArrayRef<Substitution> outerSubs;
-  
-  Type innerMethodTy = methodType.castTo<AnyFunctionType>()->getResult();
-  
-  if (!innerSubs.empty()) {
-    // Specialize the inner method type.
-    // FIXME: This assumes that 'innerSubs' is an identity mapping, which is
-    // true for generic allocating constructors calling initializers but not in
-    // general.
-  
-    PolymorphicFunctionType *innerPFT
-      = innerMethodTy->castTo<PolymorphicFunctionType>();
-    innerMethodTy = FunctionType::get(innerPFT->getInput(),
-                                      innerPFT->getResult(),
-                                      F.getASTContext());
-  }
-  auto Info = FunctionType::ExtInfo()
-                .withCallingConv(methodType.getAbstractCC())
-                .withIsThin(true);
-  Type outerMethodTy = FunctionType::get(selfValue.getType().getSwiftType(),
-                                         innerMethodTy,
-                                         Info,
-                                         F.getASTContext());
 
+  /// If the 'self' type is a bound generic, specialize the method ref with
+  /// its forwarding substitutions.
+  ArrayRef<Substitution> outerSubs;
   if (BoundGenericType *bgt = selfValue.getType().getAs<BoundGenericType>())
     outerSubs = bgt->getSubstitutions(F.getDeclContext()->getParentModule(),
                                       nullptr);
+
+  SILType methodTy = methodValue.getType();
   
+  ArrayRef<Substitution> allSubs;
   if (!innerSubs.empty() || !outerSubs.empty()) {
     // Specialize the generic method.
-    ArrayRef<Substitution> allSubs;
     if (outerSubs.empty())
       allSubs = innerSubs;
     else if (innerSubs.empty())
@@ -882,6 +865,8 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
       Substitution *allSubsBuf
         = F.getASTContext().Allocate<Substitution>(outerSubs.size()
                                                   + innerSubs.size());
+      static_assert(std::is_trivially_copyable<Substitution>::value,
+                    "assuming Substitution is trivially copyable");
       std::memcpy(allSubsBuf,
                   outerSubs.data(), outerSubs.size() * sizeof(Substitution));
       std::memcpy(allSubsBuf + outerSubs.size(),
@@ -889,13 +874,12 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
       allSubs = {allSubsBuf, outerSubs.size()+innerSubs.size()};
     }
     
-    SILType specType = getLoweredLoadableType(outerMethodTy,
-                                              methodConstant.uncurryLevel);
-    
-    methodValue = B.createSpecialize(loc, methodValue, allSubs, specType);
+    methodTy = getLoweredLoadableType(
+                    methodTy.castTo<PolymorphicFunctionType>()
+                      ->substGenericArgs(SGM.SwiftModule, allSubs));
   }
-
-  return ManagedValue(methodValue, ManagedValue::Unmanaged);
+  
+  return {ManagedValue(methodValue, ManagedValue::Unmanaged),methodTy,allSubs};
 }
 
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
@@ -1012,7 +996,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
       auto fnRef = SGF.emitFunctionRef(E, generator);
       auto generatorTy = SGF.SGM.getConstantType(generator);
       auto resultTy = generatorTy.getFunctionResultType();
-      auto apply = SGF.emitApply(E, fnRef, { }, resultTy,
+      auto apply = SGF.emitApply(E, fnRef, {}, {}, resultTy,
                              OwnershipConventions::getDefault(SGF,
                                                               generatorTy),
                                  generator.isTransparent());
@@ -1120,7 +1104,7 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
       auto fnRef = gen.emitFunctionRef(E, generator);
       auto generatorTy = gen.SGM.getConstantType(generator);
       auto resultTy = generatorTy.getFunctionResultType();
-      auto apply = gen.emitApply(E, fnRef, { }, resultTy,
+      auto apply = gen.emitApply(E, fnRef, {}, {}, resultTy,
                                  OwnershipConventions::getDefault(gen,
                                                                   generatorTy),
                                  generator.isTransparent());
@@ -1189,7 +1173,7 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
       auto fnRef = SGF.emitFunctionRef(E, generator);
       auto generatorTy = SGF.SGM.getConstantType(generator);
       auto resultTy = generatorTy.getFunctionResultType();
-      auto apply = SGF.emitApply(E, fnRef, { }, resultTy,
+      auto apply = SGF.emitApply(E, fnRef, {}, {}, resultTy,
                            OwnershipConventions::getDefault(SGF, generatorTy),
                                  generator.isTransparent());
       result.addElement(SGF, apply, E);
@@ -1272,6 +1256,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
          "curried local functions not yet supported");
   
   SILValue functionRef = emitGlobalFunctionRef(loc, constant);
+  SILType functionTy = functionRef.getType();
   
   // Forward substitutions from the outer scope.
   
@@ -1289,8 +1274,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                                   pft->getResult(),
                                                   Info,
                                                   F.getASTContext());
-    functionRef = B.createSpecialize(loc, functionRef, forwardSubs,
-                                     getLoweredLoadableType(specialized));
+    functionTy = getLoweredLoadableType(specialized);
   }
 
   if (!TheClosure.getCaptureInfo().hasLocalCaptures())
@@ -1343,7 +1327,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     SILBuilder::getPartialApplyResultType(functionRef.getType(),
                                           capturedArgs.size(), SGM.M);
   SILInstruction *toClosure =
-    B.createPartialApply(loc, functionRef, capturedArgs, closureTy);
+    B.createPartialApply(loc, functionRef, functionTy,
+                         forwardSubs, capturedArgs, closureTy);
   if (resultTy != closureTy)
     toClosure = B.createConvertFunction(loc, toClosure, resultTy);
   return emitManagedRValueWithCleanup(toClosure);
@@ -1564,11 +1549,15 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
       SILDeclRef(superclass, SILDeclRef::Kind::Destroyer);
     SILType baseSILTy = getLoweredLoadableType(superclassTy);
     SILValue baseSelf = B.createUpcast(Loc, selfValue, baseSILTy);
-    ManagedValue dtorValue = emitMethodRef(Loc, baseSelf, dtorConstant,
-                                           /*innerSubstitutions*/ {});
-    selfValue = B.createApply(Loc, dtorValue.forward(*this),
+    ManagedValue dtorValue;
+    SILType dtorTy;
+    ArrayRef<Substitution> subs;
+    std::tie(dtorValue, dtorTy, subs)
+      = emitSiblingMethodRef(Loc, baseSelf, dtorConstant,
+                             /*innerSubstitutions*/ {});
+    selfValue = B.createApply(Loc, dtorValue.forward(*this), dtorTy,
                               objectPtrTy,
-                              baseSelf);
+                              subs, baseSelf);
   } else {
     selfValue = B.createRefToObjectPointer(Loc, selfValue, objectPtrTy);
   }
@@ -1984,6 +1973,9 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
                /*isObjC=*/ctor->hasClangNode());
 
   ManagedValue initVal;
+  SILType initTy;
+  
+  ArrayRef<Substitution> subs;
   if (ctor->hasClangNode()) {
     // If the constructor was imported from Clang, we perform dynamic dispatch
     // to it because we can't refer directly to the Objective-C method.
@@ -1991,6 +1983,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     SILValue methodRef = B.createClassMethod(Loc, selfValue, initConstant,
                                              methodType);
     initVal = ManagedValue(methodRef, ManagedValue::Unmanaged);
+    initTy = initVal.getType();
 
     // Bridge arguments.
     Scope scope(Cleanups, CleanupLocation::getCleanupLocation(Loc));
@@ -2009,11 +2002,12 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     if (auto genericParams = ctor->getGenericParams())
       archetypes = genericParams->getAllArchetypes();
     auto forwardingSubs = buildForwardingSubstitutions(archetypes);
-    initVal = emitMethodRef(Loc, selfValue, initConstant, forwardingSubs);
+    std::tie(initVal, initTy, subs)
+      = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
   }
 
   SILValue initedSelfValue
-    = B.createApply(Loc, initVal.forward(*this), selfTy, args,
+    = B.createApply(Loc, initVal.forward(*this), initTy, selfTy, subs, args,
                     initConstant.isTransparent());
   
   // Return the initialized 'self'.
@@ -2105,22 +2099,6 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   }
 }
 
-// Reduce a PolymorphicFunctionType to a concrete FunctionType as if in a
-// context with forwarding substitutions. For example, given <T> (T) -> Int,
-// returns the concrete function type (T) -> Int (in a context with T bound).
-static SILType getFunctionTypeWithForwardedSubstitutions(SILGenFunction &gen,
-                                                         SILType ty) {
-  if (auto pft = ty.getAs<PolymorphicFunctionType>()) {
-    auto ft = FunctionType::get(pft->getInput(),
-                                pft->getResult(),
-                                pft->getExtInfo(),
-                                pft->getASTContext());
-    return gen.getLoweredLoadableType(ft);
-  }
-  
-  return ty;
-}
-
 static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
                                        SILLocation loc,
                                        SILDeclRef next,
@@ -2171,12 +2149,14 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
   SILValue toFn = getNextUncurryLevelRef(*this, fd, to, curriedArgs);
   SILType resultTy
     = SGM.getConstantType(from).getFunctionTypeInfo(SGM.M)->getResultType();
-
+  SILType toFnTy = toFn.getType();
+  
   // Forward archetypes and specialize if the function is generic.
-  if (auto pft = toFn.getType().getAs<PolymorphicFunctionType>()) {
-    auto subs = buildForwardingSubstitutions(pft->getAllArchetypes());
-    toFn = B.createSpecialize(fd, toFn, subs,
-              getFunctionTypeWithForwardedSubstitutions(*this, toFn.getType()));
+  ArrayRef<Substitution> subs;
+  if (auto pft = toFnTy.getAs<PolymorphicFunctionType>()) {
+    subs = buildForwardingSubstitutions(pft->getAllArchetypes());
+    toFnTy = getLoweredLoadableType(pft->substGenericArgs(SGM.SwiftModule,
+                                                          subs));
   }
   
   // Partially apply the next uncurry level and return the result closure.
@@ -2184,7 +2164,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
     SILBuilder::getPartialApplyResultType(toFn.getType(), curriedArgs.size(),
                                           SGM.M);
   SILInstruction *toClosure =
-    B.createPartialApply(fd, toFn, curriedArgs, closureTy);
+    B.createPartialApply(fd, toFn, toFnTy, subs, curriedArgs, closureTy);
   if (resultTy != closureTy)
     toClosure = B.createConvertFunction(fd, toClosure, resultTy);
   B.createReturn(fd, toClosure);
@@ -2421,8 +2401,9 @@ static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
   gen.B.createStore(loc, str.getValue(), strTemp);
   
   SILValue nsstr = gen.B.createApply(loc, stringToNSStringFn,
+                           stringToNSStringFn.getType(),
                            gen.getLoweredType(gen.SGM.Types.getNSStringType()),
-                           strTemp);
+                           {}, strTemp);
   return gen.emitManagedRValueWithCleanup(nsstr);
 }
 
@@ -2440,8 +2421,9 @@ static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
   
   SILValue args[2] = {nsstr.forward(gen), strTemp};
   gen.B.createApply(loc, nsstringToStringFn,
+                    nsstringToStringFn.getType(),
                     gen.SGM.Types.getEmptyTupleType(),
-                    args);
+                    {}, args);
   
   // Load the result string, taking ownership of the value. There's no cleanup
   // on the value in the temporary allocation.
@@ -2459,7 +2441,8 @@ static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
   SILType resultTy =gen.getLoweredLoadableType(gen.SGM.Types.getObjCBoolType());
   
   SILValue result = gen.B.createApply(loc, boolToObjCBoolFn,
-                                      resultTy, swiftBool.forward(gen));
+                                      boolToObjCBoolFn.getType(),
+                                      resultTy, {}, swiftBool.forward(gen));
   return gen.emitManagedRValueWithCleanup(result);
 }
 
@@ -2473,7 +2456,8 @@ static ManagedValue emitBridgeObjCBoolToBool(SILGenFunction &gen,
   SILType resultTy = gen.getLoweredLoadableType(gen.SGM.Types.getBoolType());
   
   SILValue result = gen.B.createApply(loc, objcBoolToBoolFn,
-                                      resultTy, objcBool.forward(gen));
+                                      objcBoolToBoolFn.getType(),
+                                      resultTy, {}, objcBool.forward(gen));
   return gen.emitManagedRValueWithCleanup(result);
 }
 

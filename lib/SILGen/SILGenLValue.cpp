@@ -560,34 +560,30 @@ static bool hasDifferentTypeOfRValue(const TypeLowering &srcTL) {
 }
 #endif
 
-/// Emit a reference to the given generic function.
-static SILValue emitSpecializedFunctionRef(SILGenFunction &gen,
-                                           SILLocation loc,
-                                           CanType typeArg,
-                                           FuncDecl *fn) {
+/// Emit a reference to the given generic function and bind its type parameter.
+static std::tuple<SILValue, SILType, Substitution>
+emitSpecializedFunctionRef(SILGenFunction &gen,
+                           SILLocation loc,
+                           CanType typeArg,
+                           FuncDecl *fn) {
   // Sema should have diagnosed this.
   assert(fn && "couldn't find intrinsic function!");
 
   // Build the reference to the function.
   auto fnMV = gen.emitFunctionRef(loc, SILDeclRef(fn, SILDeclRef::Kind::Func));
   assert(!fnMV.hasCleanup());
-  auto fnRef = fnMV.getValue();
+  auto fnVal = fnMV.getValue();
 
-  auto polyFnType = fnRef.getType().castTo<PolymorphicFunctionType>();
-
-  // Make the substitutions.  This is valid by the known constraints
+  auto polyFnType = fnVal.getType().castTo<PolymorphicFunctionType>();
+  auto substType = gen.getLoweredLoadableType(
+                    polyFnType->substGenericArgs(gen.SGM.SwiftModule, typeArg));
+  
+  // Make the substitution.  This is valid by the known constraints
   // on these generic intrinsics.
   auto typeParamDecl = polyFnType->getGenericParameters()[0].getAsTypeParam();
-  Substitution subs[] = {
-    Substitution{typeParamDecl->getArchetype(), typeArg, {}}
-  };
-
-  // Apply the substitutions to the given type.
-  ASTContext &ctx = gen.getASTContext();
-  auto specializedFnType =
-    polyFnType->substGenericArgs(ctx.TheBuiltinModule, typeArg);
-  auto specializedType = gen.getLoweredType(specializedFnType, 0);
-  return gen.B.createSpecialize(loc, fnRef, subs, specializedType);
+  auto sub = Substitution{typeParamDecl->getArchetype(), typeArg, {}};
+  
+  return {fnVal, substType, sub};
 }
 
 /// Emit code to convert the given possibly-null reference value into
@@ -613,19 +609,24 @@ static SILValue emitRefToOptional(SILGenFunction &gen, SILLocation loc,
 
   // If it's non-null, use _injectValueIntoOptional.
   gen.B.emitBlock(isNonNullBB);
-  auto injectValueFn =
+  SILValue injectFn;
+  SILType injectFnTy;
+  Substitution injectSub;
+  std::tie(injectFn, injectFnTy, injectSub) =
     emitSpecializedFunctionRef(gen, loc, refType,
                          gen.getASTContext().getInjectValueIntoOptionalDecl());
-  SILValue injectedValue = gen.B.createApply(loc, injectValueFn, optType, ref);
+  
+  SILValue injectedValue = gen.B.createApply(loc, injectFn, injectFnTy,
+                                             optType, injectSub, ref);
   gen.B.createBranch(loc, contBB, injectedValue);
 
   // If it's null, use _injectValueIntoNothing.
   gen.B.emitBlock(isNullBB);
-  auto injectNothingFn =
+  std::tie(injectFn, injectFnTy, injectSub) =
     emitSpecializedFunctionRef(gen, loc, refType,
                        gen.getASTContext().getInjectNothingIntoOptionalDecl());
   SILValue injectedNothing =
-    gen.B.createApply(loc, injectNothingFn, optType, {});
+    gen.B.createApply(loc, injectFn, injectFnTy, optType, injectSub, {});
   gen.B.createBranch(loc, contBB, injectedNothing);
 
   // Continue.
@@ -671,21 +672,24 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
   ASTContext &ctx = gen.getASTContext();
 
   // Ask whether the value is present.
-  auto isPresentFn =
+  SILValue fn;
+  SILType fnTy;
+  Substitution sub;
+  std::tie(fn, fnTy, sub) =
     emitSpecializedFunctionRef(gen, loc, refType.getSwiftRValueType(),
                                ctx.getDoesOptionalHaveValueDecl());
   auto i1Type = 
     SILType::getPrimitiveObjectType(CanType(BuiltinIntegerType::get(1, ctx)));
-  auto isPresent = gen.B.createApply(loc, isPresentFn, i1Type, optAddr);
+  auto isPresent = gen.B.createApply(loc, fn, fnTy, i1Type, sub, optAddr);
   gen.B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
 
   // If it's present, use _getOptionalValue.
   // Note that we pass 'opt' directly, not indirectly, thus consuming the value.
   gen.B.emitBlock(isPresentBB);
-  auto getValueFn =
+  std::tie(fn, fnTy, sub) =
     emitSpecializedFunctionRef(gen, loc, refType.getSwiftRValueType(),
                                gen.getASTContext().getGetOptionalValueDecl());
-  SILValue refValue = gen.B.createApply(loc, getValueFn, refType, opt);
+  SILValue refValue = gen.B.createApply(loc, fn, fnTy, refType, sub, opt);
   gen.B.createBranch(loc, contBB, refValue);
 
   // If it's not present, just create a null value.
@@ -708,10 +712,15 @@ SILValue SILGenFunction::emitInjectOptionalValue(SILLocation loc,
   SILType optType = optTL.getLoweredType();
   CanType valueType = optType.getSwiftType()->castTo<BoundGenericType>()
                         ->getGenericArgs()[0]->getCanonicalType();
-  auto injectValueFn =
+  SILValue injectValueFn;
+  SILType injectValueTy;
+  Substitution injectValueSub;
+  
+  std::tie(injectValueFn, injectValueTy, injectValueSub) =
     emitSpecializedFunctionRef(*this, loc, valueType,
                          getASTContext().getInjectValueIntoOptionalDecl());
-  return B.createApply(loc, injectValueFn, optType, value);
+  return B.createApply(loc, injectValueFn, injectValueTy, optType,
+                       injectValueSub, value);
 }
 
 SILValue SILGenFunction::emitInjectOptionalNothing(SILLocation loc, 
@@ -719,12 +728,15 @@ SILValue SILGenFunction::emitInjectOptionalNothing(SILLocation loc,
   SILType optType = optTL.getLoweredType();
   CanType valueType = optType.getSwiftType()->castTo<BoundGenericType>()
                         ->getGenericArgs()[0]->getCanonicalType();
-  auto injectNothingFn =
+  SILValue injectNothingFn;
+  SILType injectNothingTy;
+  Substitution injectNothingSub;
+  std::tie(injectNothingFn, injectNothingTy, injectNothingSub) =
     emitSpecializedFunctionRef(*this, loc, valueType,
                        getASTContext().getInjectNothingIntoOptionalDecl());
-  return B.createApply(loc, injectNothingFn, optType, {});
+  return B.createApply(loc, injectNothingFn, injectNothingTy, optType,
+                       injectNothingSub, {});
 }
-
 
 /// Given that the type-of-rvalue differs from the type-of-storage,
 /// and given that the type-of-rvalue is loadable, produce a +1 scalar

@@ -156,7 +156,9 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst* Inst) {
   return doPostProcess(Inst,
     Builder.createApply(getOpLocation(Inst->getLoc()),
                         getOpValue(Inst->getCallee()),
-                        getOpType(Inst->getType()), Args,
+                        getOpType(Inst->getSubstCalleeType()),
+                        getOpType(Inst->getType()),
+                        Inst->getSubstitutions(), Args,
                         Inst->isTransparent()));
 }
 
@@ -166,7 +168,9 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst* Inst) {
   auto Args = getOpValueArray<8>(Inst->getArguments());
   return doPostProcess(Inst,
     Builder.createPartialApply(getOpLocation(Inst->getLoc()),
-                               getOpValue(Inst->getCallee()), Args,
+                               getOpValue(Inst->getCallee()),
+                               getOpType(Inst->getSubstCalleeType()),
+                               Inst->getSubstitutions(), Args,
                                getOpType(Inst->getType())));
 }
 
@@ -300,15 +304,6 @@ SILCloner<ImplClass>::visitCopyAddrInst(CopyAddrInst* Inst) {
                            getOpValue(Inst->getDest()),
                            Inst->isTakeOfSrc(),
                            Inst->isInitializationOfDest()));
-}
-
-template<typename ImplClass>
-SILValue
-SILCloner<ImplClass>::visitSpecializeInst(SpecializeInst* Inst) {
-  return doPostProcess(Inst,
-    Builder.createSpecialize(getOpLocation(Inst->getLoc()),
-                             getOpValue(Inst->getOperand()),
-                             Inst->getSubstitutions(), Inst->getType()));
 }
 
 template<typename ImplClass>

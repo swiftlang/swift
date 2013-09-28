@@ -360,6 +360,15 @@ public:
     return bool(indirectReturn);
   }
   
+  /// True if the nth argument is an indirect return or inout parameter.
+  bool isInOutOrIndirectReturn(unsigned n) const {
+    // If this is an indirect return, it isn't captured.
+    if (n == 0 && hasIndirectReturn())
+      return true;
+    // Otherwise, check for [inout].
+    return getSwiftArgumentType(n)->is<LValueType>();
+  }
+  
   /// Get the indirect return argument type. Always an address.
   SILType getIndirectReturnType() const {
     assert(hasIndirectReturn() && "type doesn't have an indirect return?!");

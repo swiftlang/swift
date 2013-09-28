@@ -52,6 +52,9 @@ public:
   /// The type converter for the module.
   TypeConverter &Types;
   
+  /// The Swift module we are visiting.
+  Module *SwiftModule;
+  
   /// TopLevelSGF - The SILGenFunction used to visit top-level code, or null if
   /// the module is not a main module.
   SILGenFunction /*nullable*/ *TopLevelSGF;
@@ -69,7 +72,7 @@ public:
   Optional<SILDeclRef> ObjCBoolToBoolFn;
   
 public:
-  SILGenModule(SILModule &M);
+  SILGenModule(SILModule &M, Module *SM);
   ~SILGenModule();
   
   SILGenModule(SILGenModule const &) = delete;
@@ -733,10 +736,15 @@ public:
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue const &src);
   ManagedValue emitLoadOfLValue(SILLocation loc, const LValue &src,
                                 SGFContext C);
-  ManagedValue emitMethodRef(SILLocation loc,
-                             SILValue selfValue,
-                             SILDeclRef methodConstant,
-                             ArrayRef<Substitution> innerSubstitutions);
+  
+  /// Emit a reference to a method from within another method of the type, and
+  /// gather all the substitutions necessary to invoke it, without
+  /// dynamic dispatch.
+  std::tuple<ManagedValue, SILType, ArrayRef<Substitution>>
+  emitSiblingMethodRef(SILLocation loc,
+                       SILValue selfValue,
+                       SILDeclRef methodConstant,
+                       ArrayRef<Substitution> innerSubstitutions);
   
   SILValue emitMetatypeOfValue(SILLocation loc, SILValue base);
   
@@ -768,6 +776,7 @@ public:
   RValue emitApplyExpr(ApplyExpr *e, SGFContext c);
 
   ManagedValue emitApply(SILLocation Loc, ManagedValue Fn,
+                         ArrayRef<Substitution> Subs,
                          ArrayRef<ManagedValue> Args,
                          CanType NativeResultTy,
                          OwnershipConventions const &Ownership,
@@ -776,6 +785,7 @@ public:
 
   ManagedValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                            FuncDecl *fn,
+                                           ArrayRef<Substitution> subs,
                                            ArrayRef<ManagedValue> args,
                                            CanType resultType,
                                            SGFContext ctx);

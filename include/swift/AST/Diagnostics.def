@@ -394,6 +394,10 @@ ERROR(sil_integer_literal_not_integer_type,decl_parsing,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
 ERROR(sil_float_literal_not_float_type,decl_parsing,none,
       "float_literal instruction requires a 'Builtin.FP<n>' type", ())
+ERROR(sil_apply_archetype_not_found,decl_parsing,none,
+      "archetype name not found in polymorphic function type of apply instruction", ())
+ERROR(sil_substitutions_on_non_polymorphic_type,decl_parsing,none,
+      "apply of non-polymorphic function cannot have substitutions", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name, decl_parsing,none,

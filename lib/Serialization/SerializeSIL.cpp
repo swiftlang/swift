@@ -311,9 +311,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::ApplyInst: {
-    // Format: attributes such as transparent, the callee's type, a value for
+    // Format: attributes such as transparent and number of substitutions,
+    // the callee's substituted and unsubstituted types, a value for
     // the callee and a list of values for the arguments. Each value in the list
-    // is represented with 2 IDs: ValueID and ValueResultNumber.
+    // is represented with 2 IDs: ValueID and ValueResultNumber. The record
+    // is followed by the substitution list.
     const ApplyInst *AI = cast<ApplyInst>(&SI);
     SmallVector<ValueID, 4> Args;
     for (auto Arg: AI->getArguments()) {
@@ -321,12 +323,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Args.push_back(Arg.getResultNumber());
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code], 0/*Transparent*/,
+        SILAbbrCodes[SILInstApplyLayout::Code], 0/*PartialApply*/,
         (unsigned)AI->isTransparent(),
+        AI->getSubstitutions().size(),
         S.addTypeRef(AI->getCallee().getType().getSwiftRValueType()),
         (unsigned)AI->getCallee().getType().getCategory(),
+        S.addTypeRef(AI->getSubstCalleeType().getSwiftRValueType()),
+        (unsigned)AI->getSubstCalleeType().getCategory(),
         addValueRef(AI->getCallee()), AI->getCallee().getResultNumber(),
         Args);
+    S.writeSubstitutions(AI->getSubstitutions(), SILAbbrCodes);
     break;
   }
   case ValueKind::PartialApplyInst: {
@@ -338,11 +344,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code], 1/*PartialApply*/,
-        0/*Transparent*/,
+        0 /*IsTransparent*/,
+        PAI->getSubstitutions().size(),
         S.addTypeRef(PAI->getCallee().getType().getSwiftRValueType()),
         (unsigned)PAI->getCallee().getType().getCategory(),
+        S.addTypeRef(PAI->getSubstCalleeType().getSwiftRValueType()),
+        (unsigned)PAI->getSubstCalleeType().getCategory(),
         addValueRef(PAI->getCallee()), PAI->getCallee().getResultNumber(),
         Args);
+    S.writeSubstitutions(PAI->getSubstitutions(), SILAbbrCodes);
     break;
   }
   case ValueKind::BuiltinFunctionRefInst: {
@@ -1035,26 +1045,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              S.addTypeRef(CBI->getCastType().getSwiftRValueType()),
              (unsigned)CBI->getCastType().getCategory(),
              ListOfValues);
-    break;
-  }
-  case ValueKind::SpecializeInst: {
-    // Format: a typed value, a type, a list of substitutions (Archetype name,
-    // Replacement type). Use SILOneTypeValuesLayout.
-    const SpecializeInst *SpI = cast<SpecializeInst>(&SI);
-    SmallVector<ValueID, 8> ListOfValues;
-    ListOfValues.push_back(S.addTypeRef(
-        SpI->getOperand().getType().getSwiftRValueType()));
-    ListOfValues.push_back((unsigned)SpI->getOperand().getType().getCategory());
-    ListOfValues.push_back(addValueRef(SpI->getOperand()));
-    ListOfValues.push_back(SpI->getOperand().getResultNumber());
-    ListOfValues.push_back(SpI->getSubstitutions().size());
-
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-        S.addTypeRef(SpI->getType().getSwiftRValueType()),
-        (unsigned)SpI->getType().getCategory(), ListOfValues);
-
-    S.writeSubstitutions(SpI->getSubstitutions(), SILAbbrCodes);
     break;
   }
   }

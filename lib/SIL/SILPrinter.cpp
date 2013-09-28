@@ -474,11 +474,28 @@ public:
        << ", " << getIDAndType(AAI->getNumElements());
   }
   
+  void printSubstitutions(ArrayRef<Substitution> Subs) {
+    if (Subs.empty())
+      return;
+    
+    OS << '<';
+    interleave(Subs,
+               [&](const Substitution &s) {
+                 s.Archetype->print(OS);
+                 OS << " = ";
+                 s.Replacement->print(OS);
+               },
+               [&] { OS << ", "; });
+    OS << '>';
+  }
+  
   void visitApplyInst(ApplyInst *AI) {
     OS << "apply ";
     if (AI->isTransparent())
       OS << "[transparent] ";
-    OS << getID(AI->getCallee()) << '(';
+    OS << getID(AI->getCallee());
+    printSubstitutions(AI->getSubstitutions());
+    OS << '(';
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { OS << getID(arg); },
                [&] { OS << ", "; });
@@ -487,7 +504,9 @@ public:
   
   void visitPartialApplyInst(PartialApplyInst *CI) {
     OS << "partial_apply ";
-    OS << getID(CI->getCallee()) << '(';
+    OS << getID(CI->getCallee());
+    printSubstitutions(CI->getSubstitutions());
+    OS << '(';
     interleave(CI->getArguments(),
                [&](const SILValue &arg) { OS << getID(arg); },
                [&] { OS << ", "; });
@@ -574,17 +593,6 @@ public:
     if (!ZI->canDefaultConstruct())
       OS << "[no_default_construct] ";
     OS << getIDAndType(ZI->getOperand());
-  }
-  void visitSpecializeInst(SpecializeInst *SI) {
-    OS << "specialize " << getIDAndType(SI->getOperand()) << ", "
-       << SI->getType() << ", ";
-    interleave(SI->getSubstitutions(),
-               [&](const Substitution &s) {
-                 s.Archetype->print(OS);
-                 OS << " = ";
-                 s.Replacement->print(OS);
-               },
-               [&] { OS << ", "; });
   }
   
   void printUncheckedConversionInst(ConversionInst *CI, SILValue operand,
@@ -1134,5 +1142,8 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
 }
 
 void ValueBase::dumpInContext() const {
-  SILPrinter(llvm::errs()).printInContext(this);
+  printInContext(llvm::errs());
+}
+void ValueBase::printInContext(llvm::raw_ostream &OS) const {
+  SILPrinter(OS).printInContext(this);
 }

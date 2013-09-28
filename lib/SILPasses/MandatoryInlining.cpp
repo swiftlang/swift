@@ -378,10 +378,11 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       // process the inlined body after inlining, because the inlining may
       // have exposed new inlining opportunities beyond those present in
       // the inlined function when processed independently
-      if (!Inliner.inlineFunction(I, CalleeFunction, FullArgs)) {
+      if (!Inliner.inlineFunction(I, CalleeFunction,
+                                  InnerAI->getSubstitutions(), FullArgs)) {
         // If inlining failed, then I is left unchanged, so increment it
         // before continuing rather than process the same apply instruction
-        // twice
+        // twice.
         ++I;
         continue;
       }

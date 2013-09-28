@@ -177,15 +177,22 @@ public:
   }
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn,
-                         SILType Result, ArrayRef<SILValue> Args,
+                         SILType SubstFnTy,
+                         SILType Result,
+                         ArrayRef<Substitution> Subs,
+                         ArrayRef<SILValue> Args,
                          bool Transparent = false) {
-    return insert(ApplyInst::create(Loc, Fn, Result, Args, Transparent, F));
+    return insert(ApplyInst::create(Loc, Fn, SubstFnTy, Result,
+                                    Subs, Args, Transparent, F));
   }
 
   PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,
+                                       SILType SubstFnTy,
+                                       ArrayRef<Substitution> Subs,
                                        ArrayRef<SILValue> Args,
                                        SILType ClosureTy) {
-    return insert(PartialApplyInst::create(Loc, Fn, Args, ClosureTy, F));
+    return insert(PartialApplyInst::create(Loc, Fn, SubstFnTy,
+                                           Subs, Args, ClosureTy, F));
   }
 
   BuiltinFunctionRefInst *createBuiltinFunctionRef(SILLocation loc,
@@ -279,13 +286,6 @@ public:
                                  isTake, isInitialize));
   }
   
-  SpecializeInst *createSpecialize(SILLocation Loc, SILValue Operand,
-                                   ArrayRef<Substitution> Substitutions,
-                                   SILType DestTy) {
-    return insert(SpecializeInst::create(Loc, Operand, Substitutions, DestTy,
-                                         F));
-  }
-
   ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
     return insert(new (F.getModule())

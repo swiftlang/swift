@@ -1222,6 +1222,29 @@ FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
                            module->getASTContext());
 }
 
+FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
+                                                  ArrayRef<Substitution> subs) {
+  SmallVector<Type, 4> replacements;
+  
+#ifndef NDEBUG
+  // FIXME: The AST sets up substitutions for secondary archetypes that are
+  // strictly unnecessary.
+  auto archetypes = getAllArchetypes();
+  assert(subs.size() == archetypes.size() &&
+         "substitutions don't match archetypes");
+  auto ai = archetypes.begin();
+#endif
+  
+  for (auto &sub : subs) {
+    assert(*ai++ == sub.Archetype && "substitution doesn't match archetype");
+    replacements.push_back(sub.Replacement);
+  }
+  
+  // FIXME: Only substitute the primary archetypes.
+  return substGenericArgs(module,
+      llvm::makeArrayRef(replacements).slice(0, getGenericParameters().size()));
+}
+
 Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
                  bool ignoreMissing, LazyResolver *resolver) const {
   return transform(module->getASTContext(), [&](Type type) -> Type {

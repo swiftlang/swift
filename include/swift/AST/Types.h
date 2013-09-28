@@ -1368,6 +1368,12 @@ public:
   /// function type and return the resulting non-polymorphic type.
   FunctionType *substGenericArgs(Module *M, ArrayRef<Type> args);
 
+  /// Substitute the given generic arguments into this polymorphic
+  /// function type and return the resulting non-polymorphic type.
+  ///
+  /// The order of Substitutions must match the order of generic archetypes.
+  FunctionType *substGenericArgs(Module *M, ArrayRef<Substitution> subs);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PolymorphicFunction;

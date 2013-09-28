@@ -357,7 +357,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     return true;
 
   SILBuilder Builder(BB);
-  unsigned OpCode, TyCategory, TyCategory2, ValResNum, ValResNum2, Attr;
+  unsigned OpCode, TyCategory, TyCategory2, ValResNum, ValResNum2, Attr,
+          IsTransparent, NumSubs;
   ValueID ValID, ValID2;
   TypeID TyID, TyID2;
   SourceLoc SLoc;
@@ -396,7 +397,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   case SIL_INST_APPLY: {
     unsigned IsPartial;
-    SILInstApplyLayout::readRecord(scratch, IsPartial, Attr, TyID, TyCategory,
+    SILInstApplyLayout::readRecord(scratch, IsPartial, IsTransparent, NumSubs,
+                                   TyID, TyCategory, TyID2, TyCategory2,
                                    ValID, ValResNum, ListOfValues);
     OpCode = (unsigned)(IsPartial ? ValueKind::PartialApplyInst :
                                     ValueKind::ApplyInst);
@@ -496,8 +498,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // the callee and a list of values for the arguments. Each value in the list
     // is represented with 2 IDs: ValueID and ValueResultNumber.
     auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
     SILType FnTy = getSILType(Ty, (SILValueCategory)TyCategory);
-    SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(SILMod);
+    SILType SubstFnTy = getSILType(Ty2, (SILValueCategory)TyCategory);
+    SILFunctionTypeInfo *FTI = SubstFnTy.getFunctionTypeInfo(SILMod);
     auto ArgTys = FTI->getInputTypes();
 
     assert((ArgTys.size() << 1) == ListOfValues.size() &&
@@ -506,15 +510,28 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2)
       Args.push_back(getLocalValue(ListOfValues[I], ListOfValues[I+1],
                                    ArgTys[I>>1]));
-    bool Transparent = (Attr == 1);
+    bool Transparent = (bool)IsTransparent;
+    unsigned NumSub = NumSubs;
+    
+    SmallVector<Substitution, 4> Substitutions;
+    while (NumSub--) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      assert(sub.hasValue() && "missing substitution");
+      Substitutions.push_back(*sub);
+    }
+    
     ResultVal = Builder.createApply(Loc, getLocalValue(ValID, ValResNum, FnTy),
-                                    FTI->getResultType(), Args, Transparent);
+                                    SubstFnTy,
+                                    FTI->getResultType(),
+                                    Substitutions, Args, Transparent);
     break;
   }
   case ValueKind::PartialApplyInst: {
     auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
     SILType FnTy = getSILType(Ty, (SILValueCategory)TyCategory);
-    SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(SILMod);
+    SILType SubstFnTy = getSILType(Ty2, (SILValueCategory)TyCategory2);
+    SILFunctionTypeInfo *FTI = SubstFnTy.getFunctionTypeInfo(SILMod);
     auto ArgTys = FTI->getInputTypes();
 
     assert((ArgTys.size() << 1) >= ListOfValues.size() &&
@@ -537,8 +554,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     Type ResTy = FunctionType::get(ArgTy, FTI->getResultType().getSwiftType(),
                                    Ctx);
 
+    unsigned NumSub = NumSubs;
+    SmallVector<Substitution, 4> Substitutions;
+    while (NumSub--) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      assert(sub.hasValue() && "missing substitution");
+      Substitutions.push_back(*sub);
+    }
+    
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    ResultVal = Builder.createPartialApply(Loc, FnVal, Args,
+    ResultVal = Builder.createPartialApply(Loc, FnVal, SubstFnTy,
+                                           Substitutions, Args,
                                            SILMod.Types.getLoweredType(ResTy));
     break;
   }
@@ -1082,30 +1108,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     
     ResultVal = Builder.createCheckedCastBranch(Loc, castKind, op, castTy,
                                                 successBB, failureBB);
-    break;
-  }
-  case ValueKind::SpecializeInst: {
-    // Format: a typed value, a type, a list of substitutions (Archetype name,
-    // Replacement type). Use SILOneTypeValuesLayout.
-    assert(ListOfValues.size() == 5 && "Expect 5 numbers for SpecializeInst");
-    unsigned NumSub = ListOfValues[4];
-    // Read the substitutions.
-    SmallVector<Substitution, 4> Substitutions;
-    while (NumSub--) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      assert(sub.hasValue() && "Missing substitution?");
-      Substitutions.push_back(*sub);
-    }
-
-    auto ValTy = MF->getType(ListOfValues[0]);
-    assert(ValTy->is<PolymorphicFunctionType>() &&
-           "Should be a polymorphic function");
-    ResultVal = Builder.createSpecialize(Loc,
-                  getLocalValue(ListOfValues[2], ListOfValues[3],
-                                getSILType(ValTy,
-                                           (SILValueCategory)ListOfValues[1])),
-                  Ctx.AllocateCopy(Substitutions),
-                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
     break;
   }
   case ValueKind::UnreachableInst: {

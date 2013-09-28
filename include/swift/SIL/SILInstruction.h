@@ -315,27 +315,60 @@ class ApplyInst : public SILInstruction {
     Callee
   };
 
-  // Whether the callee had the attribute [transparent].
-  // FIXME: pack this somewhere
-  bool Transparent;
+  /// The number of tail-allocated substitutions, allocated after the operand
+  /// list's tail allocation.
+  unsigned NumSubstitutions : 31;
+  
+  /// Whether the callee had the attribute [transparent].
+  unsigned Transparent : 1;
+  
+  /// The type of the callee with our substitutions applied.
+  SILType SubstCalleeType;
 
   /// The fixed operand is the callee;  the rest are arguments.
   TailAllocatedOperandList<1> Operands;
-
-  ApplyInst(SILLocation Loc, SILValue Callee, SILType ReturnType,
+  
+  Substitution *getSubstitutionsStorage() {
+    return reinterpret_cast<Substitution*>(Operands.asArray().end());
+  }
+  const Substitution *getSubstitutionsStorage() const {
+    return reinterpret_cast<const Substitution*>(Operands.asArray().end());
+  }
+  
+  ApplyInst(SILLocation Loc, SILValue Callee,
+            SILType SubstCalleeType,
+            SILType ReturnType,
+            ArrayRef<Substitution> Substitutions,
             ArrayRef<SILValue> Args, bool Transparent);
 
 public:
   static ApplyInst *create(SILLocation Loc, SILValue Callee,
+                           SILType SubstCalleeType,
                            SILType ReturnType,
+                           ArrayRef<Substitution> Substitutions,
                            ArrayRef<SILValue> Args,
                            bool Transparent,
                            SILFunction &F);
+  
   SILValue getCallee() const { return Operands[Callee].get(); }
+  
+  // Get the type of the callee with the applied substitutions.
+  SILType getSubstCalleeType() const { return SubstCalleeType; }
   SILFunctionTypeInfo *getFunctionTypeInfo(SILModule &M) const {
-    return getCallee().getType().getFunctionTypeInfo(M);
+    return getSubstCalleeType().getFunctionTypeInfo(M);
   }
+  
+  /// True if this application has generic substitutions.
+  bool hasSubstitutions() const { return NumSubstitutions != 0; }
 
+  /// The substitutions used to bind the generic arguments of this function.
+  MutableArrayRef<Substitution> getSubstitutions() {
+    return {getSubstitutionsStorage(), NumSubstitutions};
+  }
+  ArrayRef<Substitution> getSubstitutions() const {
+    return {getSubstitutionsStorage(), NumSubstitutions};
+  }
+  
   /// The arguments passed to this instruction.
   MutableArrayRef<Operand> getArgumentOperands() {
     return Operands.getDynamicAsArray();
@@ -377,23 +410,58 @@ public:
 /// PartialApplyInst - Represents the creation of a closure object by partial
 /// application of a function value.
 class PartialApplyInst : public SILInstruction {
-   enum {
+  enum {
     Callee
   };
+  
+  SILType SubstCalleeType;
 
+  /// The number of tail-allocated substitutions, allocated after the operand
+  /// list's tail allocation.
+  unsigned NumSubstitutions;
+  
   /// The fixed operand is the callee;  the rest are arguments.
   TailAllocatedOperandList<1> Operands;
+  
+  Substitution *getSubstitutionsStorage() {
+    return reinterpret_cast<Substitution*>(Operands.asArray().end());
+  }
+  const Substitution *getSubstitutionsStorage() const {
+    return reinterpret_cast<const Substitution*>(Operands.asArray().end());
+  }
 
-  PartialApplyInst(SILLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
+  PartialApplyInst(SILLocation Loc, SILValue Callee,
+                   SILType SubstCalleeType,
+                   ArrayRef<Substitution> Substitutions,
+                   ArrayRef<SILValue> Args,
                    SILType ClosureType);
 public:
   static PartialApplyInst *create(SILLocation Loc, SILValue Callee,
+                                  SILType SubstCalleeType,
+                                  ArrayRef<Substitution> Substitutions,
                                   ArrayRef<SILValue> Args,
                                   SILType ClosureType,
                                   SILFunction &F);
 
   SILValue getCallee() const { return Operands[Callee].get(); }
 
+  // Get the type of the callee with the applied substitutions.
+  SILType getSubstCalleeType() const { return SubstCalleeType; }
+  SILFunctionTypeInfo *getFunctionTypeInfo(SILModule &M) const {
+    return getSubstCalleeType().getFunctionTypeInfo(M);
+  }
+
+  /// True if this application has generic substitutions.
+  bool hasSubstitutions() const { return NumSubstitutions != 0; }
+  
+  /// The substitutions used to bind the generic arguments of this function.
+  MutableArrayRef<Substitution> getSubstitutions() {
+    return {getSubstitutionsStorage(), NumSubstitutions};
+  }
+  ArrayRef<Substitution> getSubstitutions() const {
+    return {getSubstitutionsStorage(), NumSubstitutions};
+  }
+  
   /// The arguments passed to this instruction.
   MutableArrayRef<Operand> getArgumentOperands() {
     return Operands.getDynamicAsArray();
@@ -814,56 +882,6 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::CopyAddrInst;
-  }
-};
-
-/// SpecializeInst - Specializes a reference to a generic entity by binding
-/// each of its type parameters to a specific type.
-///
-/// This instruction takes an arbitrary value of generic type and returns a new
-/// closure that takes concrete types for its archetypes.  This is commonly used
-/// in call sequences to generic functions, but can occur in arbitrarily general
-/// cases as well.
-///
-class SpecializeInst : public SILInstruction {
-  enum {
-    /// The value being specialized.  It always has PolymorphicFunctionType.
-    Function
-  };
-  FixedOperandList<1> Operands;
-
-  unsigned NumSubstitutions;
-  Substitution *getSubstitutionsStorage() {
-    return reinterpret_cast<Substitution *>(this + 1);
-  }
-  Substitution const *getSubstitutionsStorage() const {
-    return reinterpret_cast<Substitution const *>(this + 1);
-  }
-
-  SpecializeInst(SILLocation Loc, SILValue Operand,
-                 ArrayRef<Substitution> Substitutions,
-                 SILType DestTy);
-
-public:
-  static SpecializeInst *create(SILLocation Loc, SILValue Operand,
-                                ArrayRef<Substitution> Substitutions,
-                                SILType DestTy,
-                                SILFunction &F);
-
-  SILValue getOperand() const { return Operands[Function].get(); }
-  
-  ArrayRef<Substitution> getSubstitutions() const {
-    return ArrayRef<Substitution>(getSubstitutionsStorage(), NumSubstitutions);
-  }
-  
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::SpecializeInst;
   }
 };
 
