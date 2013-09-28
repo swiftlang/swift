@@ -1036,7 +1036,7 @@ bool Decl::shouldPrintInContext() const {
 namespace {
 class TypePrinter : public TypeVisitor<TypePrinter> {
   raw_ostream &OS;
-  Type::PrintOptions Options;
+  const PrintOptions &Options;
 
   void printDeclContext(DeclContext *DC) {
     switch (DC->getContextKind()) {
@@ -1162,7 +1162,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
 
 public:
-  TypePrinter(raw_ostream &OS, const Type::PrintOptions &PO)
+  TypePrinter(raw_ostream &OS, const PrintOptions &PO)
       : OS(OS), Options(PO) {}
 
   void visitErrorType(ErrorType *T) {
@@ -1213,7 +1213,7 @@ public:
   }
 
   void visitNameAliasType(NameAliasType *T) {
-    if (Options.PrintFullyQualifiedNames) {
+    if (Options.FullyQualifiedTypes) {
       if (auto ParentDC = T->getDecl()->getDeclContext()) {
         printDeclContext(ParentDC);
         OS << '.';
@@ -1252,7 +1252,7 @@ public:
     if (auto ParentType = T->getParent()) {
       visit(ParentType);
       OS << ".";
-    } else if (Options.PrintFullyQualifiedNames) {
+    } else if (Options.FullyQualifiedTypes) {
       OS << T->getDecl()->getModuleContext()->Name << ".";
     }
     OS << T->getDecl()->getName().get();
@@ -1262,7 +1262,7 @@ public:
     if (auto ParentType = T->getParent()) {
       visit(ParentType);
       OS << ".";
-    } else if (Options.PrintFullyQualifiedNames) {
+    } else if (Options.FullyQualifiedTypes) {
       OS << T->getDecl()->getModuleContext()->Name << ".";
     }
 
@@ -1274,7 +1274,7 @@ public:
     if (auto ParentType = T->getParent()) {
       visit(ParentType);
       OS << ".";
-    } else if (Options.PrintFullyQualifiedNames) {
+    } else if (Options.FullyQualifiedTypes) {
       OS << T->getDecl()->getModuleContext()->Name << ".";
     }
 
@@ -1285,7 +1285,7 @@ public:
     if (auto ParentType = T->getParent()) {
       visit(ParentType);
       OS << ".";
-    } else if (Options.PrintFullyQualifiedNames) {
+    } else if (Options.FullyQualifiedTypes) {
       OS << T->getDecl()->getModuleContext()->Name << ".";
     }
 
@@ -1296,7 +1296,7 @@ public:
     if (auto ParentType = T->getParent()) {
       visit(ParentType);
       OS << ".";
-    } else if (Options.PrintFullyQualifiedNames) {
+    } else if (Options.FullyQualifiedTypes) {
       OS << T->getDecl()->getModuleContext()->Name << ".";
     }
 
@@ -1456,21 +1456,21 @@ void Type::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
-void Type::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
+void Type::print(raw_ostream &OS, const PrintOptions &PO) const {
   if (isNull())
     OS << "<null>";
   else
     TypePrinter(OS, PO).visit(*this);
 }
 
-std::string Type::getString(const Type::PrintOptions &PO) const {
+std::string Type::getString(const PrintOptions &PO) const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
   print(OS, PO);
   return OS.str();
 }
 
-std::string TypeBase::getString(const Type::PrintOptions &PO) const {
+std::string TypeBase::getString(const PrintOptions &PO) const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
   print(OS, PO);
@@ -1482,7 +1482,7 @@ void TypeBase::dump() const {
   llvm::errs() << '\n';
 }
 
-void TypeBase::print(raw_ostream &OS, const Type::PrintOptions &PO) const {
+void TypeBase::print(raw_ostream &OS, const PrintOptions &PO) const {
   Type(const_cast<TypeBase *>(this)).print(OS, PO);
 }
 

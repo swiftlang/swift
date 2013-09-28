@@ -49,7 +49,7 @@ using llvm::SmallPtrSet;
 #pragma mark Type variable implementation
 
 void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
-  getTypeVariable()->print(OS, Type::PrintOptions());
+  getTypeVariable()->print(OS, PrintOptions());
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)

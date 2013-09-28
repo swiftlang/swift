@@ -20,6 +20,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/PrintOptions.h"
 #include <string>
 
 namespace swift {
@@ -103,14 +104,6 @@ public:
 
   void dump() const;
 
-  struct PrintOptions {
-    bool PrintFullyQualifiedNames = false;
-
-    PrintOptions() {}
-    PrintOptions(const PrintOptions &) = default;
-    PrintOptions(bool PrintFullyQualifiedNames)
-        : PrintFullyQualifiedNames(PrintFullyQualifiedNames) {}
-  };
   void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
 
   /// Return the name of the type as a string, for use in diagnostics only.

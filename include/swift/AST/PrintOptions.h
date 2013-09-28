@@ -38,6 +38,9 @@ namespace swift {
     /// it to the user.
     bool PreferTypeRepr = true;
 
+    /// \brief Whether to print fully qualified Types.
+    bool FullyQualifiedTypes = false;
+
     /// \brief Whether to print implicit parts of the AST.
     bool SkipImplicit = false;
 

@@ -342,11 +342,10 @@ public:
 
   void dump() const;
   void print(raw_ostream &OS,
-             const Type::PrintOptions &PO = Type::PrintOptions()) const;
+             const PrintOptions &PO = PrintOptions()) const;
 
   /// Return the name of the type as a string, for use in diagnostics only.
-  std::string getString(const Type::PrintOptions &PO =
-                            Type::PrintOptions()) const;
+  std::string getString(const PrintOptions &PO = PrintOptions()) const;
 
 private:
   // Make vanilla new/delete illegal for Types.
