@@ -231,9 +231,6 @@ type grammar. SIL adds some additional kinds of type of its own:
 - Values of *generic function type* such as
   ``$<T...> (A...) -> R`` can be expressed in SIL.  Accessing a generic
   function with ``function_ref`` will give a value of a generic function type.
-  Its type variables can be bound with a ``specialize`` instruction to
-  give a value of a *concrete function type* ``$(A...) -> R``, which can then
-  be applied. A generic function type value cannot be applied directly.
 
 SIL classifies types into additional subgroups based on ABI stability and
 generic constraints:
@@ -1712,14 +1709,24 @@ apply
 ::
 
   sil-instruction ::= 'apply' sil-value
+                        sil-apply-substitution-list?
                         '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
+
+  sil-apply-substitution-list ::= '<' sil-substitution
+                                      (',' sil-substitution)* '>'
+  sil-substitution ::= type '=' type
 
   %r = apply %0(%1, %2, ...) : $(A, B, ...) -> R
   // Note that the type of the callee '%0' is specified *after* the arguments
   // %0 must be of a concrete function type $(A, B, ...) -> R
   // %1, %2, etc. must be of the argument types $A, $B, etc.
   // %r will be of the return type $R
+
+  %r = apply %0<T = A, U = B>(%1, %2, ...) : $<T, U>(T, U, ...) -> R
+  // %0 must be of a polymorphic function type $<T, U>(T, U, ...) -> R
+  // %1, %2, etc. must be of the argument types after substitution $A, $B, etc.
+  // %r will be of the substituted return type $R'
 
 Transfers control to function ``%0``, passing it the given arguments. In
 the instruction syntax, the type of the callee is specified after the argument
@@ -1729,12 +1736,19 @@ and each element is passed as an individual argument. The ``apply``
 instruction does no retaining or releasing of its arguments by itself; the
 `calling convention`_'s retain/release policy must be handled by separate
 explicit ``retain`` and ``release`` instructions. The return value will
-likewise not be implicitly retained or released. ``%0`` must be an object of a
-concrete function type; generic functions must have all of their generic
-parameters bound with a ``specialize`` instruction before they can be applied.
+likewise not be implicitly retained or released.
 
 NB: If the callee value is of a thick function type, ``apply`` currently
 consumes the callee value at +1 strong retain count.
+
+If the callee is generic, all of its generic parameters must be bound by the
+given substitution list. The arguments and return value is
+given with these generic substitutions applied.
+
+TODO: The instruction, when applied to a generic function,
+currently implicitly performs abstraction difference transformations enabled
+by the given substitutions, such as promoting address-only arguments and returns
+to register arguments. This should be fixed.
 
 TODO: should have normal/unwind branch targets, like LLVM ``invoke``.
 
@@ -1743,15 +1757,22 @@ partial_apply
 ::
 
   sil-instruction ::= 'partial_apply' sil-value
+                        sil-apply-substitution-list?
                         '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
 
-  %c = partial_apply %0(%1, %2, ...) : $[thin] (T..., A, B, ...) -> R
+  %c = partial_apply %0(%1, %2, ...) : $(Z..., A, B, ...) -> R
   // Note that the type of the callee '%0' is specified *after* the arguments
-  // %0 must be of a thin concrete function type $[thin] (T..., A, B, ...) -> R
+  // %0 must be of a concrete function type $(Z..., A, B, ...) -> R
   // %1, %2, etc. must be of the argument types $A, $B, etc.,
   //   of the tail part of the argument tuple of %0
-  // %c will be of the partially-applied thick function type (T...) -> R
+  // %c will be of the partially-applied thick function type (Z...) -> R
+
+  %c = partial_apply %0<T = A, U = B>(%1, %2, ...) : $(Z..., T, U, ...) -> R
+  // %0 must be of a polymorphic function type $<T, U>(T, U, ...) -> R
+  // %1, %2, etc. must be of the argument types after substitution $A, $B, etc.
+  //   of the tail part of the argument tuple of %0
+  // %r will be of the substituted thick function type $(Z'...) -> R'
 
 Creates a closure by partially applying the function ``%0`` to a partial
 sequence of its arguments. In the instruction syntax, the type of the callee is
@@ -1759,9 +1780,21 @@ specified after the argument list; the types of the argument and of the defined
 value are derived from the function type of the callee. The closure context will
 be allocated with retain count 1 and initialized to contain the values ``%1``,
 ``%2``, etc.  The closed-over values will not be retained; that must be done
-separately before the ``partial_apply``. The closure does take ownership of the
-partially applied arguments; when the closure reference count reaches zero,
-the contained values will be destroyed.
+separately before the ``partial_apply``. The closure does however take
+ownership of the partially applied arguments; when the closure reference
+count reaches zero, the contained values will be destroyed.
+
+If the callee is generic, all of its generic parameters must be bound by the
+given substitution list. The arguments are given with these generic
+substitutions applied, and the resulting closure is of concrete function
+type with the given substitutions applied. The generic parameters themselves
+cannot be partially applied; all of them must be bound. The result is always
+a concrete function.
+
+TODO: The instruction, when applied to a generic function,
+currently implicitly performs abstraction difference transformations enabled
+by the given substitutions, such as promoting address-only arguments and returns
+to register arguments. This should be fixed.
 
 This instruction is used to implement both curry thunks and closures. A
 curried function in Swift::
@@ -1833,28 +1866,6 @@ lowers to an uncurried entry point and is curried in the enclosing function::
     release %bar : $(Int) -> Int
     return %ret : $Int
   }
-
-TODO: Partial application of already thick functions should be supported but
-is not implemented.
-
-specialize
-``````````
-::
-  
-  sil-instruction ::= 'specialize' sil-operand ',' sil-type
-                        (',' sil-substitution)+
-  sil-substitution ::= type '=' type
-  
-  %1 = specialize %0 : $[thin] <A, B, C> T -> U, $T1 -> U1, A = A1, B = B1, ...
-  // %0 must be of a thin generic function type $[thin] <A, B, C> T -> U
-  // $T1 -> U1 must be the thick concrete function type $T1 -> U1, where
-  //   T1 == T and U1 == U after substitutions A == A1, B == B1, etc.
-
-Specializes a generic function ``%0`` to a concrete function type
-by binding its generic type variables with the given substitutions. The
-conversion thunk includes loading non-address-only concrete arguments from
-address-only arguments (in other words, an address-only argument of type $*T
-will be mapped to a loadable value argument of type $U).
 
 Metatypes
 ~~~~~~~~~
