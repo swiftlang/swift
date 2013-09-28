@@ -83,7 +83,11 @@ namespace {
     void printTypedPattern(const TypedPattern *TP,
                            bool StripOuterSliceType = false);
     void printPattern(const Pattern *pattern);
+
+public:
     void printGenericParams(GenericParamList *params);
+
+private:
     void printMembers(ArrayRef<Decl *> members, bool needComma = false);
     void printNominalDeclName(NominalTypeDecl *decl);
     void printInherited(ArrayRef<TypeLoc> inherited,
@@ -1111,55 +1115,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     }
   }
 
-  void printGenericParams(ArrayRef<GenericParam> Params) {
-    OS << '<';
-    for (unsigned i = 0, e = Params.size(); i != e; ++i) {
-      if (i)
-        OS << ", ";
-
-      auto ParamTy = Params[i].getAsTypeParam();
-      OS << ParamTy->getName().str();
-      auto inherited = ParamTy->getInherited();
-      if (inherited.empty()) {
-        if (unsigned PrintSize = (ParamTy->getSuperclass() ? 1 : 0) +
-                                 ParamTy->getProtocols().size()) {
-          OS << " : ";
-          if (PrintSize > 1)
-            OS << "protocol<";
-          bool PrintedFirst = false;
-          if (auto Superclass = ParamTy->getSuperclass()) {
-            PrintedFirst = true;
-            visit(Superclass);
-          }
-          for (auto Proto : ParamTy->getProtocols()) {
-            if (PrintedFirst) {
-              OS << ", ";
-            } else {
-              PrintedFirst = true;
-            }
-
-            visit(Proto->getDeclaredType());
-          }
-          if (PrintSize > 1)
-            OS << ">";
-        }
-      } else {
-        OS << " : ";
-        if (inherited.size() > 1)
-          OS << "protocol<";
-        for (unsigned ii = 0, ie = inherited.size(); ii != ie; ++ii) {
-          if (ii)
-            OS << ", ";
-
-          OS << inherited[ii].getType();
-        }
-        if (inherited.size() > 1)
-          OS << ">";
-      }
-    }
-    OS << '>';
+  void printGenericParams(GenericParamList *Params) {
+    PrintAST(OS, Options, nullptr).printGenericParams(Params);
   }
-
 
 public:
   TypePrinter(raw_ostream &OS, const PrintOptions &PO)
@@ -1341,7 +1299,7 @@ public:
 
     Attrs.finish();
 
-    printGenericParams(T->getGenericParameters());
+    printGenericParams(&T->getGenericParams());
     OS << ' ';
     printWithParensIfNotSimple(T->getInput());
 
