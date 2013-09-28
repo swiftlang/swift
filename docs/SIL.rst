@@ -2087,7 +2087,7 @@ variable inside the instance. It is undefined behavior if the class value
 is null.
 
 Enums
-~~~~~~
+~~~~~
 
 These instructions construct values of enum type. Loadable enum values are
 created with the ``enum`` instruction. Address-only enums require two-step
@@ -2138,7 +2138,7 @@ Creates a loadable enum value in the given ``case``. If the ``case`` has a
 data type, the enum value will contain the operand value.
 
 enum_data_addr
-```````````````
+``````````````
 ::
 
   sil-instruction ::= 'enum_data_addr' sil-operand ',' sil-decl-ref
@@ -2155,6 +2155,9 @@ the ``enum_data_addr`` for a case followed by ``inject_enum_addr`` with that
 same case is guaranteed to result in a fully-initialized enum value of that
 case being stored. Loading from the ``enum_data_addr`` of an initialized
 enum value or injecting a mismatched case tag is undefined behavior.
+
+The address is invalidated as soon as the operand enum is fully initialized by
+an ``inject_enum_addr``.
 
 inject_enum_addr
 `````````````````
@@ -2843,6 +2846,20 @@ original enum value.  For example::
     return %result : $Int
   }
 
+On a path dominated by a destination block of ``switch_enum``, copying or
+destroying the basic block argument has equivalent reference counting semantics
+to copying or destroying the ``switch_enum`` operand::
+
+    // This copy_value...
+    %e2 = copy_value %e1 : $Enum
+    switch_enum %e2, case #Enum.A: a, case #Enum.B: b
+  a(%a : $A):
+    // ...is balanced by this destroy_value
+    destroy_value %a
+  b(%b : $B):
+    // ...and this one
+    destroy_value %b
+
 destructive_switch_enum_addr
 ````````````````````````````
 ::
@@ -2877,6 +2894,9 @@ Unlike ``switch_int``, ``switch_enum`` requires coverage of the operand type:
 If the ``enum`` type is resilient, the ``default`` branch is required; if the
 ``enum`` type is fragile, the ``default`` branch is required unless a
 destination is assigned to every ``case`` of the ``enum``.
+
+The addresses passed into the destination blocks are invalidated if the
+``destructive_switch_enum_addr`` operand is reinitialized.
 
 dynamic_method_br
 `````````````````
