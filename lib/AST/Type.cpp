@@ -984,6 +984,19 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
                             resolver);
 }
 
+bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
+  // For there to be a superclass relationship, we must be a superclass, and
+  // the potential subtype must be a class or superclass-bounded archetype.
+  if (!getClassOrBoundGenericClass() || !ty->mayHaveSuperclass())
+    return false;
+
+  do {
+    if (ty->isEqual(this))
+      return true;
+  } while ((ty = ty->getSuperclass(nullptr)));
+  return false;
+}
+
 TupleType::TupleType(ArrayRef<TupleTypeElt> fields, const ASTContext *CanCtx,
                      bool hasTypeVariable)
   : TypeBase(TypeKind::Tuple, CanCtx, hasTypeVariable), Fields(fields) { }

@@ -270,11 +270,21 @@ public:
 
   /// \brief Retrieve the superclass of this type.
   ///
-  /// \param resolver The resolver for lazy type checking.
+  /// \param resolver The resolver for lazy type checking, or null if the
+  ///                 AST is already type-checked.
   ///
   /// \returns The superclass of this type, or a null type if it has no
-  /// superclass.
+  ///          superclass.
   Type getSuperclass(LazyResolver *resolver);
+  
+  /// \brief True if this type is a superclass of another type.
+  ///
+  /// \param ty       The potential subclass.
+  /// \param resolver The resolver for lazy type checking, or null if the
+  ///                 AST is already type-checked.
+  ///
+  /// \returns True if this type is \c ty or a superclass of \c ty.
+  bool isSuperclassOf(Type ty, LazyResolver *resolver);
 
   /// \brief If this is a nominal type or a bound generic nominal type,
   /// returns the (possibly generic) nominal type declaration.
