@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
@@ -30,6 +31,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 
@@ -1080,6 +1082,7 @@ TranslationUnit::getCachedVisibleDecls() const {
 }
 
 bool TranslationUnit::walk(ASTWalker &Walker) {
+  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(Walker.Parent, this);
   for (Decl *D : Decls) {
     if (D->walk(Walker))
       return true;

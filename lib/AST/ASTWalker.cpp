@@ -500,6 +500,9 @@ public:
     if (!Walker.walkToDeclPre(D))
       return false;
 
+    auto PrevParent = Walker.Parent;
+    Walker.Parent = D;
+
     if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D)) {      
       if (Pattern *Pat = doIt(PBD->getPattern()))
         PBD->setPattern(Pat);
@@ -572,7 +575,7 @@ public:
       // Visit arguments.
       auto *argParams = doIt(CD->getArgParams());
       if (!argParams)
-        return nullptr;
+        return true;
 
       CD->setArgParams(argParams);
 
@@ -591,6 +594,7 @@ public:
       }
     }
 
+    Walker.Parent = PrevParent;
     return !Walker.walkToDeclPost(D);
   }
   

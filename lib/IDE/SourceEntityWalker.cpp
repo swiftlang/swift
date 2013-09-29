@@ -219,6 +219,7 @@ bool SourceEntityWalker::walk(Module &Mod) {
   Mod.getTopLevelDecls(Decls);
 
   SemaAnnotator Annotator(*this);
+  Annotator.Parent = &Mod;
   for (Decl *D : Decls) {
     if (D->walk(Annotator))
       return true;

@@ -1234,14 +1234,22 @@ namespace {
       SourceRange Enclosing;
       if (Parent.isNull())
           return;
-          
-      if (Stmt *S = Parent.dyn_cast<Stmt*>()) {
+
+      if (Parent.getAsModule()) {
+        return;
+      } else if (Decl *D = Parent.getAsDecl()) {
+        Enclosing = D->getSourceRange();
+        if (D->isImplicit())
+          return;
+        // FIXME: This is not working well for decl parents.
+        return;
+      } else if (Stmt *S = Parent.getAsStmt()) {
         Enclosing = S->getSourceRange();
         if (S->isImplicit())
           return;
-      } else if (Pattern *P = Parent.dyn_cast<Pattern*>()) {
+      } else if (Pattern *P = Parent.getAsPattern()) {
         Enclosing = P->getSourceRange();
-      } else if (Expr *E = Parent.dyn_cast<Expr*>()) {
+      } else if (Expr *E = Parent.getAsExpr()) {
         // FIXME: This hack is required because the inclusion check below
         // doesn't compares the *start* of the ranges, not the end of the
         // ranges.  In the case of an interpolated string literal expr, the

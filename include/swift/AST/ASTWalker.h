@@ -20,6 +20,7 @@ namespace swift {
 
 class Decl;
 class Expr;
+class Module;
 class Stmt;
 class Pattern;
 class TypeRepr;
@@ -27,7 +28,55 @@ class TypeRepr;
 /// \brief An abstract class used to traverse an AST.
 class ASTWalker {
 public:
-  typedef llvm::PointerUnion4<Expr *, Stmt *, Pattern *, TypeRepr *> ParentTy;
+  enum class ParentKind {
+    Module, Decl, Stmt, Expr, Pattern, TypeRepr
+  };
+
+  class ParentTy {
+    ParentKind Kind;
+    void *Ptr = nullptr;
+
+  public:
+    ParentTy(Module *Mod) : Kind(ParentKind::Module), Ptr(Mod) {}
+    ParentTy(Decl *D) : Kind(ParentKind::Decl), Ptr(D) {}
+    ParentTy(Stmt *S) : Kind(ParentKind::Stmt), Ptr(S) {}
+    ParentTy(Expr *E) : Kind(ParentKind::Expr), Ptr(E) {}
+    ParentTy(Pattern *P) : Kind(ParentKind::Pattern), Ptr(P) {}
+    ParentTy(TypeRepr *T) : Kind(ParentKind::TypeRepr), Ptr(T) {}
+    ParentTy() = default;
+
+    bool isNull() const { return Ptr == nullptr; }
+    ParentKind getKind() const {
+      assert(!isNull());
+      return Kind;
+    }
+
+    Module *getAsModule() const {
+      return (Ptr && Kind == ParentKind::Module)
+          ? static_cast<Module*>(Ptr) : nullptr;
+    }
+    Decl *getAsDecl() const {
+      return (Ptr && Kind == ParentKind::Decl)
+          ? static_cast<Decl*>(Ptr) : nullptr;
+    }
+    Stmt *getAsStmt() const {
+      return (Ptr && Kind == ParentKind::Stmt)
+          ? static_cast<Stmt*>(Ptr) : nullptr;
+    }
+    Expr *getAsExpr() const {
+      return (Ptr && Kind == ParentKind::Expr)
+          ? static_cast<Expr*>(Ptr) : nullptr;
+    }
+    Pattern *getAsPattern() const {
+      return (Ptr && Kind == ParentKind::Pattern)
+          ? static_cast<Pattern*>(Ptr) : nullptr;
+    }
+    TypeRepr *getAsTypeRepr() const {
+      return (Ptr && Kind == ParentKind::TypeRepr)
+          ? static_cast<TypeRepr*>(Ptr) : nullptr;
+    }
+  };
+
   /// \brief The parent of the node we are visiting.
   ParentTy Parent;
 
