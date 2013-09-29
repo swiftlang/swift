@@ -1071,15 +1071,10 @@ public:
   }
 
   /// Set the type of this declaration for the first time.
-  void setType(Type T) {
-    assert(Ty.isNull() && "changing type of declaration");
-    Ty = T;
-  }
+  void setType(Type T);
 
   /// Overwrite the type of this declaration.
-  void overwriteType(Type T) {
-    Ty = T;
-  }
+  void overwriteType(Type T);
 
   /// isReferencedAsLValue - Returns 'true' if references to this
   /// declaration are l-values.

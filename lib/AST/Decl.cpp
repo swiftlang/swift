@@ -332,6 +332,20 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   return false;
 }
 
+void ValueDecl::setType(Type T) {
+  assert(Ty.isNull() && "changing type of declaration");
+  Ty = T;
+  if (!T.isNull() && T->is<ErrorType>())
+    setInvalid();
+}
+
+/// Overwrite the type of this declaration.
+void ValueDecl::overwriteType(Type T) {
+  Ty = T;
+  if (!T.isNull() && T->is<ErrorType>())
+    setInvalid();
+}
+
 Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this))
     return TAD->getAliasType();
