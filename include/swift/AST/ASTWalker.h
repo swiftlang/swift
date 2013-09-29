@@ -52,28 +52,22 @@ public:
     }
 
     Module *getAsModule() const {
-      return (Ptr && Kind == ParentKind::Module)
-          ? static_cast<Module*>(Ptr) : nullptr;
+      return Kind == ParentKind::Module ? static_cast<Module*>(Ptr) : nullptr;
     }
     Decl *getAsDecl() const {
-      return (Ptr && Kind == ParentKind::Decl)
-          ? static_cast<Decl*>(Ptr) : nullptr;
+      return Kind == ParentKind::Decl ? static_cast<Decl*>(Ptr) : nullptr;
     }
     Stmt *getAsStmt() const {
-      return (Ptr && Kind == ParentKind::Stmt)
-          ? static_cast<Stmt*>(Ptr) : nullptr;
+      return Kind == ParentKind::Stmt ? static_cast<Stmt*>(Ptr) : nullptr;
     }
     Expr *getAsExpr() const {
-      return (Ptr && Kind == ParentKind::Expr)
-          ? static_cast<Expr*>(Ptr) : nullptr;
+      return Kind == ParentKind::Expr ? static_cast<Expr*>(Ptr) : nullptr;
     }
     Pattern *getAsPattern() const {
-      return (Ptr && Kind == ParentKind::Pattern)
-          ? static_cast<Pattern*>(Ptr) : nullptr;
+      return Kind == ParentKind::Pattern ? static_cast<Pattern*>(Ptr) : nullptr;
     }
     TypeRepr *getAsTypeRepr() const {
-      return (Ptr && Kind == ParentKind::TypeRepr)
-          ? static_cast<TypeRepr*>(Ptr) : nullptr;
+      return Kind==ParentKind::TypeRepr ? static_cast<TypeRepr*>(Ptr) : nullptr;
     }
   };
 
