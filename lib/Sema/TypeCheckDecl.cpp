@@ -2114,6 +2114,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
                                                   NominalTypeDecl *decl,
                                                   ImplicitConstructorKind ICK) {
   ASTContext &context = tc.Context;
+  SourceLoc Loc = decl->getLoc();
   // Determine the parameter type of the implicit constructor.
   SmallVector<TuplePatternElt, 8> patternElts;
   SmallVector<VarDecl *, 8> allArgs;
@@ -2133,7 +2134,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       auto varType = tc.getTypeOfRValue(var);
 
       // Create the parameter.
-      auto *arg = new (context) VarDecl(SourceLoc(),
+      auto *arg = new (context) VarDecl(Loc,
                                         var->getName(),
                                         varType, decl);
       allArgs.push_back(arg);
@@ -2147,11 +2148,11 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   // Create the constructor.
   auto constructorID = context.getIdentifier("init");
   VarDecl *selfDecl
-    = new (context) VarDecl(SourceLoc(),
+    = new (context) VarDecl(Loc,
                             context.getIdentifier("self"),
                             Type(), decl);
   ConstructorDecl *ctor
-    = new (context) ConstructorDecl(constructorID, decl->getLoc(),
+    = new (context) ConstructorDecl(constructorID, Loc,
                                     nullptr, nullptr, selfDecl, nullptr,
                                     decl);
   selfDecl->setDeclContext(ctor);
@@ -2160,8 +2161,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   }
 
   // Set its arguments.
-  auto pattern = TuplePattern::create(context, decl->getLoc(),
-                                      patternElts, decl->getLoc());
+  auto pattern = TuplePattern::create(context, Loc, patternElts, Loc);
   ctor->setArgParams(pattern);
   ctor->setBodyParams(pattern);
 

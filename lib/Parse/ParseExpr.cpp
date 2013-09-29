@@ -1392,7 +1392,7 @@ Expr *Parser::parseExprAnonClosureArg() {
     SmallVector<char, 4> StrBuf;
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
-    SourceLoc varLoc; // FIXME: Location?
+    SourceLoc varLoc = Loc;
     VarDecl *var = new (Context) VarDecl(varLoc, ident, Type(), closure);
     decls.push_back(var);
   }
