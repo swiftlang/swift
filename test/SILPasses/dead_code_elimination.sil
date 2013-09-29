@@ -1,6 +1,4 @@
 // RUN: %sil-opt %s -dead-code-elimination | FileCheck %s
-// XFAIL: *
-// FIXME - DCE for new checked cast instructions
 
 import Builtin
 import swift
@@ -144,11 +142,12 @@ bb0(%0 : $B):
   %2 = store %0 to %1#1 : $*B                 // CHECK: store
   %3 = load %1#1 : $*B                        
   %4 = strong_retain %3 : $B                         // CHECK: strong_retain
-  %5 = unconditional_checked_cast downcast %3 : $B to $E     // CHECK-NOT: unconditional_checked_cast
+  %5 = ref_to_object_pointer %3 : $B to $Builtin.ObjectPointer     // CHECK-NOT: ref_to_object_pointer
   %7 = strong_release %3 : $B                        // CHECK: strong_release
   %8 = strong_release %1#0 : $Builtin.ObjectPointer  // CHECK-NEXT: strong_release
   %9 = function_ref @exit : $[thin, noreturn] () -> () // ret.exit : () -> ()
   %10 = apply %9() : $[thin, noreturn] () -> ()
+  %6 = object_pointer_to_ref %5 : $Builtin.ObjectPointer to $B // CHECK-NOT: object_pointer_to_ref
   %11 = tuple()
   %12 = return %11 : $()                      
 }                                             
@@ -156,10 +155,11 @@ bb0(%0 : $B):
 // CHECK-LABEL: sil @removeTriviallyDeadButUsedByUnreachableBlock
 sil @removeTriviallyDeadButUsedByUnreachableBlock : $[thin] (b : B) -> () {
 bb0(%0 : $B):
-  %5 = unconditional_checked_cast downcast %0 : $B to $E     // CHECK-NOT: unconditional_checked_cast
+  %5 = ref_to_object_pointer %0 : $B to $Builtin.ObjectPointer  // CHECK-NOT: ref_to_object_pointer
   %11 = integer_literal $Builtin.Int1, 0          // CHECK-NOT: integer_literal
   %13 = condbranch %11, bb1, bb2                  // CHECK: br
 bb1:                                              
+  %21 = object_pointer_to_ref %5 : $Builtin.ObjectPointer to $B // CHECK-NOT: object_pointer_to_ref
   %22 = br bb2
 bb2:                                              
   %32 = tuple ()                                
@@ -169,13 +169,14 @@ bb2:
 // CHECK-LABEL: sil @removeTriviallyDeadCrossBasicBlocks
 sil @removeTriviallyDeadCrossBasicBlocks : $[thin] (b : B, m : Builtin.Int1) -> () {
 bb0(%0:  $B, %1: $Builtin.Int1):
-  %5 = unconditional_checked_cast downcast %0 : $B to $E     // CHECK-NOT: unconditional_checked_cast
+  %5 = ref_to_object_pointer %0 : $B to $Builtin.ObjectPointer     // CHECK-NOT: ref_to_object_pointer
   %13 = condbranch %1, bb1, bb2                   // CHECK: condbranch
 bb1:                                              
   %22 = br bb2
 bb2:                                              
   %9 = function_ref @exit : $[thin, noreturn] () -> () // ret.exit : () -> ()
   %10 = apply %9() : $[thin, noreturn] () -> ()
+  %21 = object_pointer_to_ref %5 : $Builtin.ObjectPointer to $B // CHECK-NOT: object_pointer_to_ref
   %32 = tuple ()                                
   %33 = return %32 : $()
 }                                                 // CHECK: }
