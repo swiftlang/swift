@@ -488,7 +488,7 @@ public:
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc);
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
   
-  Pattern *buildImplicitSelfParameter();
+  Pattern *buildImplicitSelfParameter(SourceLoc Loc);
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                    const DeclAttributes &Attrs);
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc, unsigned Flags);

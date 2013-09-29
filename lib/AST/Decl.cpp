@@ -706,9 +706,9 @@ VarDecl *FuncDecl::getImplicitSelfDeclImpl() const {
   if (!TP)
     return nullptr;
 
-  // The decl should be named 'self' and have no location information.
+  // The decl should be named 'self' and be implicit.
   auto NP = dyn_cast<NamedPattern>(TP->getSubPattern());
-  if (NP && NP->getBoundName().str() == "self" && !NP->getLoc().isValid())
+  if (NP && NP->getBoundName().str() == "self" && NP->isImplicit())
     return NP->getDecl();
   return nullptr;
 }

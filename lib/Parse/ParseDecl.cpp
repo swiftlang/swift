@@ -1196,7 +1196,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       
       // Add the implicit 'self' to Params, if needed.
       if (HasContainerType)
-        Params.push_back(buildImplicitSelfParameter());
+        Params.push_back(buildImplicitSelfParameter(GetLoc));
 
       // Add the index clause if necessary.
       if (Indices) {
@@ -1290,7 +1290,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     
     // Add the implicit 'self' to Params, if needed.
     if (HasContainerType)
-      Params.push_back(buildImplicitSelfParameter());
+      Params.push_back(buildImplicitSelfParameter(SetLoc));
 
     // Add the index parameters, if necessary.
     if (Indices) {
@@ -1582,11 +1582,12 @@ static void setVarContext(ArrayRef<Pattern *> Patterns, DeclContext *DC) {
 }
 
 /// \brief Build an implicit 'self' parameter for the current DeclContext.
-Pattern *Parser::buildImplicitSelfParameter() {
+Pattern *Parser::buildImplicitSelfParameter(SourceLoc Loc) {
   VarDecl *D
-    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("self"),
+    = new (Context) VarDecl(Loc, Context.getIdentifier("self"),
                             Type(), CurDeclContext);
-  Pattern *P = new (Context) NamedPattern(D);
+  D->setImplicit();
+  Pattern *P = new (Context) NamedPattern(D, /*Implicit=*/true);
   return new (Context) TypedPattern(P, TypeLoc());
 }
 
@@ -1706,7 +1707,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   // "(int)->int" on FooTy into "(this: [inout] FooTy.metatype)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
   if (HasContainerType) {
-    Pattern *SelfPattern = buildImplicitSelfParameter();
+    Pattern *SelfPattern = buildImplicitSelfParameter(NameLoc);
     ArgParams.push_back(SelfPattern);
     BodyParams.push_back(SelfPattern);
   }
