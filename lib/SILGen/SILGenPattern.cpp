@@ -148,7 +148,7 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
                                         ip->getCastTypeLoc().getType(),
                                         ip->getCastKind());
       
-      // On the true branch, we can get the cast value from the BB argumnet.
+      // On the true branch, we can get the cast value from the BB argument.
       SILValue cast = trueBB->bbarg_begin()[0];
       // If the cast result is loadable and we cast a value address, load it.
       if (cast.getType().isAddress()
@@ -346,6 +346,15 @@ void destructurePattern(SILGenFunction &gen,
       destructured.push_back(nullptr);
       return;
     }
+    
+    // If the cast pattern casts to a superclass, it reduces to a wildcard.
+    // FIXME: 'is' patterns should have a subpattern, in which case they
+    // destructure to that pattern in this case. We'd need to arrange for the
+    // value to be upcast.
+    if (newToType->isSuperclassOf(newFromType, nullptr)) {
+      destructured.push_back(nullptr);
+      return;
+    }
 
     // If a cast pattern is non-orthogonal and not to the same type, then
     // we have a cast to a superclass, subclass, or archetype. Produce a
@@ -368,11 +377,7 @@ void destructurePattern(SILGenFunction &gen,
         newKind = CheckedCastKind::SuperToArchetype;
       }
     } else {
-      // TODO: For now, we conservatively treat all class-to-class
-      // destructurings as downcasts. When SILGen gains the ability to query
-      // super/subclass relationships, then superclass patterns should be
-      // destructured, and subclass patterns should be turned into downcast
-      // patterns as below.
+      // We have a class-to-class downcast.
       assert(newFromType->getClassOrBoundGenericClass() &&
              newToType->getClassOrBoundGenericClass() &&
              "non-class, non-archetype cast patterns should be orthogonal!");
@@ -437,8 +442,6 @@ bool isPatternSubsumed(const Pattern *sub, const Pattern *super) {
   case PatternKind::Tuple: {
     // Tuples should only match wildcard or same-shaped tuple patterns, which
     // are exhaustive so always subsume other tuple patterns of the same type.
-    // Tuples should only match wildcard or same-shaped tuple patterns, to
-    // which they are never orthogonal.
     auto *tsub = cast<TuplePattern>(sub);
     // Wildcard 'super' should have been handled above.
     auto *tsup = cast<TuplePattern>(super);
@@ -463,23 +466,18 @@ bool isPatternSubsumed(const Pattern *sub, const Pattern *super) {
 
     auto *isup = cast<IsaPattern>(super);
     
-    // Casts to the same type subsume each other.
     Type subTy = isub->getCastTypeLoc().getType();
     Type supTy = isup->getCastTypeLoc().getType();
     
+    // Casts to the same type subsume each other.
     if (subTy->isEqual(supTy))
       return true;
 
-    // TODO: Archetype casts are never subsumed; the archetype could substitute
-    // for any other type.
-    // TODO: Casts to archetypes with unrelated superclass constraints could
-    // be orthogonal. We could also treat casts to types that don't fit the
-    // archetype's constraints as orthogonal.
-    // TODO: Class casts are never subsumed by non-class casts.
-    // TODO: Class casts subsume casts to subclasses.
-    // TODO: We can't check super/subclass relationships in SILGen yet.
-    // For now we conservatively assume all class casts may overlap but don't
-    // subsume each other.
+    // Superclass casts subsume casts to subclasses or archetypes bounded by the
+    // superclass.
+    if (supTy->isSuperclassOf(subTy, nullptr))
+      return true;
+    
     return false;
   }
 
@@ -557,15 +555,35 @@ bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
     if (aTy->isEqual(bTy))
       return false;
       
-    // Archetype casts are never orthogonal; the archetype could substitute
-    // for any other type.
-    // TODO: Casts to archetypes with unrelated superclass constraints could
-    // be orthogonal. We could also treat casts to types that don't fit the
-    // archetype's constraints as orthogonal.
-    if (aTy->is<ArchetypeType>())
+    ArchetypeType *aArchety = aTy->getAs<ArchetypeType>();
+    ArchetypeType *bArchety = bTy->getAs<ArchetypeType>();
+    if (aArchety && bArchety) {
+      // Two archetypes are only conclusively orthogonal if they have unrelated
+      // superclass constraints.
+      if (aArchety->getSuperclass() && bArchety->getSuperclass())
+        return !aArchety->getSuperclass()->isSuperclassOf(bArchety->getSuperclass(),
+                                                         nullptr)
+          && !bArchety->getSuperclass()->isSuperclassOf(bArchety->getSuperclass(),
+                                                       nullptr);
       return false;
-    if (bTy->is<ArchetypeType>())
+    }
+    
+    // An archetype cast is orthogonal if it's class-constrained and the other
+    // type is not a class or a class unrelated to its superclass constraint.
+    auto isOrthogonalToArchetype = [&](ArchetypeType *arch, Type ty) -> bool {
+      if (arch->requiresClass()) {
+        if (!ty->getClassOrBoundGenericClass())
+          return true;
+        if (Type sup = arch->getSuperclass())
+          return !sup->isSuperclassOf(ty, nullptr);
+      }
       return false;
+    };
+
+    if (aArchety)
+      return isOrthogonalToArchetype(aArchety, bTy);
+    if (bArchety)
+      return isOrthogonalToArchetype(bArchety, aTy);
     
     // Class casts are orthogonal to non-class casts.
     bool aClass = aTy->getClassOrBoundGenericClass();
@@ -576,9 +594,8 @@ bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
       
     // Class casts are orthogonal to casts to a class without a subtype or
     // supertype relationship.
-    // TODO: We can't check super/subclass relationships in SILGen yet.
-    // For now we conservatively assume all class casts may overlap.
-    return false;
+    return !aTy->isSuperclassOf(bTy, nullptr)
+      && !bTy->isSuperclassOf(aTy, nullptr);
   }
       
   case PatternKind::EnumElement: {
