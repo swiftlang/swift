@@ -301,6 +301,14 @@ namespace {
       Functions.pop_back();
     }
 
+    void verifyCheckedAlways(ValueDecl *D) {
+      if (D->hasType() && D->getType()->hasTypeVariable()) {
+        Out << "a type variable escaped the type checker";
+        D->dump();
+        abort();
+      }
+    }
+
     void verifyChecked(ReturnStmt *S) {
       auto func = Functions.back();
       Type resultType;
