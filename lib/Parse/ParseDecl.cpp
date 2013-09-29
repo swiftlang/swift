@@ -1302,6 +1302,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     // 'value'.
     if (SetName.empty()) {
       SetName = Context.getIdentifier("value");
+      SetNameLoc = SetLoc;
       IsNameImplicit = true;
     }
 
