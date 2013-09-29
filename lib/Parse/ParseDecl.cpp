@@ -1104,14 +1104,18 @@ namespace {
           VD->getMutableAttrs() = Attributes;
         
         if (VD->isComputed()) {
-          // FIXME: Order of get/set not preserved.
-          if (FuncDecl *Get = VD->getGetter()) {
-            Get->setDeclContext(CurDeclContext);
-            Decls.push_back(Get);
+          // Add getter & setter in source order.
+          FuncDecl* Accessors[2] = {VD->getGetter(), VD->getSetter()};
+          if (Accessors[0] && Accessors[1] &&
+              !Context.SourceMgr.isBeforeInBuffer(
+                  Accessors[0]->getFuncLoc(), Accessors[1]->getFuncLoc())) {
+            std::swap(Accessors[0], Accessors[1]);
           }
-          if (FuncDecl *Set = VD->getSetter()) {
-            Set->setDeclContext(CurDeclContext);
-            Decls.push_back(Set);
+          for (auto FD : Accessors) {
+            if (FD) {
+              FD->setDeclContext(CurDeclContext);
+              Decls.push_back(FD);
+            }
           }
         }
         
@@ -1496,10 +1500,9 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
     auto PBD = new (Context) PatternBindingDecl(VarLoc, pattern.get(),
                                                 Init.getPtrOrNull(),
                                                 CurDeclContext);
+    Decls.push_back(PBD);
 
     addVarsToScope(pattern.get(), Decls, Attributes, PBD);
-
-    Decls.push_back(PBD);
 
     // Propagate back types for simple patterns, like "var A, B : T".
     if (TypedPattern *TP = dyn_cast<TypedPattern>(PBD->getPattern())) {
