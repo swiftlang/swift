@@ -3642,6 +3642,16 @@ static Expr *cleanupIllFormedExpression(ASTContext &context,
       // but do not walk into the body. That will be type-checked after
       // we've determine the complete function type.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+        SmallVector<VarDecl *, 6> Params;
+        closure->getParams()->collectVariables(Params);
+        for (auto VD : Params) {
+          Type T = VD->getType();
+          if (cs)
+            T = cs->simplifyType(T);
+          if (T->hasTypeVariable())
+            T = ErrorType::get(context);
+          VD->overwriteType(T);
+        }
         if (!closure->hasSingleExpressionBody()) {
           return { false, walkToExprPost(expr) };
         }
