@@ -493,8 +493,26 @@ public:
     return S;
   }
   
+  bool shouldSkip(Decl *D) {
+    if (isa<VarDecl>(D)) {
+      // VarDecls are walked via their NamedPattern, ignore them if we encounter
+      // then in the few cases where they are also pushed outside as members.
+      // In all those cases we can walk them via the pattern binding decl.
+      if (Walker.Parent.getAsModule())
+        return true;
+      if (Decl *ParentD = Walker.Parent.getAsDecl())
+        return (isa<NominalTypeDecl>(ParentD) || isa<ExtensionDecl>(ParentD));
+      if (dyn_cast_or_null<BraceStmt>(Walker.Parent.getAsStmt()))
+        return true;
+    }
+    return false;
+  }
+
   /// Returns true on failure.
   bool doIt(Decl *D) {
+    if (shouldSkip(D))
+      return false;
+
     // Do the pre-order visitation.  If it returns false, we just
     // skip entering subnodes of this tree.
     if (!Walker.walkToDeclPre(D))
@@ -849,6 +867,8 @@ Pattern *Traversal::visitTuplePattern(TuplePattern *P) {
 }
 
 Pattern *Traversal::visitNamedPattern(NamedPattern *P) {
+  if (doIt(P->getDecl()))
+    return nullptr;
   return P;
 }
 
