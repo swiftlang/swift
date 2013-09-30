@@ -99,132 +99,10 @@ static void DoGlobalExtensionLookup(Type BaseType,
     Consumer.foundDecl(decl);
 }
 
-namespace {
-  typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
-}
-
-static void doMemberLookup(Type BaseTy,
-                           VisibleDeclConsumer &Consumer,
-                           const DeclContext *CurrDC,
-                           LookupKind LK,
-                           LazyResolver *TypeResolver,
-                           VisitedSet &Visited);
-static void lookupTypeMembers(Type BaseType,
-                              VisibleDeclConsumer &Consumer,
-                              const DeclContext *CurrDC,
-                              LookupKind LK,
-                              LazyResolver *TypeResolver);
-
-static void lookupVisibleMemberDecls(Type BaseTy,
-                                     VisibleDeclConsumer &Consumer,
-                                     const DeclContext *CurrDC,
-                                     LookupKind LK,
-                                     LazyResolver *TypeResolver) {
-  VisitedSet Visited;
-  doMemberLookup(BaseTy, Consumer, CurrDC, LK, TypeResolver, Visited);
-}
-
-/// \brief Lookup all members in \c BaseTy as seen from the context \c CurrDC.
+/// \brief Enumerate immediate members of the type \c BaseType and its
+/// extensions, as seen from the context \c CurrDC.
 ///
-/// This operation corresponds to a standard "dot" lookup operation like "a.b"
-/// where 'self' is the type of 'a'.  This operation is only valid after name
-/// binding.
-static void doMemberLookup(Type BaseTy,
-                           VisibleDeclConsumer &Consumer,
-                           const DeclContext *CurrDC,
-                           LookupKind LK,
-                           LazyResolver *TypeResolver,
-                           VisitedSet &Visited) {
-  // Just look through l-valueness.  It doesn't affect name lookup.
-  BaseTy = BaseTy->getRValueType();
-
-  // Type check metatype references, as in "some_type.some_member".  These are
-  // special and can't have extensions.
-  if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
-    // The metatype represents an arbitrary named type: dig through to the
-    // declared type to see what we're dealing with.
-    Type Ty = MTT->getInstanceType();
-
-    // Just perform normal dot lookup on the type see if we find extensions or
-    // anything else.  For example, type SomeTy.SomeMember can look up static
-    // functions, and can even look up non-static functions as well (thus
-    // getting the address of the member).
-    doMemberLookup(Ty, Consumer, CurrDC, LookupKind::QualifiedOnMetatype,
-                   TypeResolver, Visited);
-    return;
-  }
-  
-  // Lookup module references, as on some_module.some_member.  These are
-  // special and can't have extensions.
-  if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
-    MT->getModule()->lookupVisibleDecls(Module::AccessPathTy(), Consumer,
-                                        NLKind::QualifiedLookup);
-    return;
-  }
-
-  // If the base is a protocol, see if this is a reference to a declared
-  // protocol member.
-  if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
-    if (!Visited.insert(PT->getDecl()))
-      return;
-      
-    for (auto Proto : PT->getDecl()->getProtocols())
-      doMemberLookup(Proto->getDeclaredType(), Consumer, CurrDC, LK,
-                     TypeResolver, Visited);
-
-    lookupTypeMembers(PT, Consumer, CurrDC, LK, TypeResolver);
-    return;
-  }
-  
-  // If the base is a protocol composition, see if this is a reference to a
-  // declared protocol member in any of the protocols.
-  if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
-    for (auto Proto : PC->getProtocols())
-      doMemberLookup(Proto, Consumer, CurrDC, LK, TypeResolver, Visited);
-    return;
-  }
-
-  // Check to see if any of an archetype's requirements have the member.
-  if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
-    for (auto Proto : Archetype->getConformsTo())
-      doMemberLookup(Proto->getDeclaredType(), Consumer, CurrDC, LK,
-                     TypeResolver, Visited);
-
-    if (auto superclass = Archetype->getSuperclass())
-      doMemberLookup(superclass, Consumer, CurrDC, LK, TypeResolver, Visited);
-    return;
-  }
-
-  do {
-    // Look in for members of a nominal type.
-    SmallVector<ValueDecl*, 8> ExtensionMethods;
-    lookupTypeMembers(BaseTy, Consumer, CurrDC, LK, TypeResolver);
-
-    for (ValueDecl *VD : ExtensionMethods) {
-      assert((isa<VarDecl>(VD) || isa<SubscriptDecl>(VD)) &&
-             "Unexpected extension member");
-      Consumer.foundDecl(VD);
-    }
-
-    // If we have a class type, look into its superclass.
-    ClassDecl *CurClass = nullptr;
-    if (auto CT = BaseTy->getAs<ClassType>())
-      CurClass = CT->getDecl();
-    else if (auto BGT = BaseTy->getAs<BoundGenericType>())
-      CurClass = dyn_cast<ClassDecl>(BGT->getDecl());
-    else if (UnboundGenericType *UGT = BaseTy->getAs<UnboundGenericType>())
-      CurClass = dyn_cast<ClassDecl>(UGT->getDecl());
-
-    if (CurClass && CurClass->hasSuperclass()) {
-      BaseTy = CurClass->getSuperclass();
-    } else {
-      break;
-    }
-  } while (1);
-
-  // FIXME: Weed out overridden methods.
-}
-
+/// Don't do lookup into superclasses or implemented protocols.
 static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
                               const DeclContext *CurrDC,
                               LookupKind LK, LazyResolver *TypeResolver) {
@@ -266,6 +144,119 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
   }
   DoGlobalExtensionLookup(BaseType, Consumer, BaseMembers,
                           CurrDC->getParentModule(), LK, TypeResolver);
+}
+
+namespace {
+  typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
+}
+
+/// \brief Enumerate all members in \c BaseTy (including members of extensions,
+/// superclasses and implemented protocols), as seen from the context \c CurrDC.
+///
+/// This operation corresponds to a standard "dot" lookup operation like "a.b"
+/// where 'self' is the type of 'a'.  This operation is only valid after name
+/// binding.
+static void doMemberLookup(Type BaseTy,
+                           VisibleDeclConsumer &Consumer,
+                           const DeclContext *CurrDC,
+                           LookupKind LK,
+                           LazyResolver *TypeResolver,
+                           VisitedSet &Visited) {
+  // Just look through l-valueness.  It doesn't affect name lookup.
+  BaseTy = BaseTy->getRValueType();
+
+  // Type check metatype references, as in "some_type.some_member".  These are
+  // special and can't have extensions.
+  if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
+    // The metatype represents an arbitrary named type: dig through to the
+    // declared type to see what we're dealing with.
+    Type Ty = MTT->getInstanceType();
+
+    // Just perform normal dot lookup on the type see if we find extensions or
+    // anything else.  For example, type SomeTy.SomeMember can look up static
+    // functions, and can even look up non-static functions as well (thus
+    // getting the address of the member).
+    doMemberLookup(Ty, Consumer, CurrDC, LookupKind::QualifiedOnMetatype,
+                   TypeResolver, Visited);
+    return;
+  }
+  
+  // Lookup module references, as on some_module.some_member.  These are
+  // special and can't have extensions.
+  if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
+    MT->getModule()->lookupVisibleDecls(Module::AccessPathTy(), Consumer,
+                                        NLKind::QualifiedLookup);
+    return;
+  }
+
+  // If the base is a protocol, enumerate its members.
+  if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
+    if (!Visited.insert(PT->getDecl()))
+      return;
+      
+    for (auto Proto : PT->getDecl()->getProtocols())
+      doMemberLookup(Proto->getDeclaredType(), Consumer, CurrDC, LK,
+                     TypeResolver, Visited);
+
+    lookupTypeMembers(PT, Consumer, CurrDC, LK, TypeResolver);
+    return;
+  }
+
+  // If the base is a protocol composition, enumerate members of the protocols.
+  if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
+    for (auto Proto : PC->getProtocols())
+      doMemberLookup(Proto, Consumer, CurrDC, LK, TypeResolver, Visited);
+    return;
+  }
+
+  // Enumerate members of archetype's requirements.
+  if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
+    for (auto Proto : Archetype->getConformsTo())
+      doMemberLookup(Proto->getDeclaredType(), Consumer, CurrDC, LK,
+                     TypeResolver, Visited);
+
+    if (auto superclass = Archetype->getSuperclass())
+      doMemberLookup(superclass, Consumer, CurrDC, LK, TypeResolver, Visited);
+    return;
+  }
+
+  do {
+    // Look in for members of a nominal type.
+    SmallVector<ValueDecl*, 8> ExtensionMethods;
+    lookupTypeMembers(BaseTy, Consumer, CurrDC, LK, TypeResolver);
+
+    for (ValueDecl *VD : ExtensionMethods) {
+      assert((isa<VarDecl>(VD) || isa<SubscriptDecl>(VD)) &&
+             "Unexpected extension member");
+      Consumer.foundDecl(VD);
+    }
+
+    // If we have a class type, look into its superclass.
+    ClassDecl *CurClass = nullptr;
+    if (auto CT = BaseTy->getAs<ClassType>())
+      CurClass = CT->getDecl();
+    else if (auto BGT = BaseTy->getAs<BoundGenericType>())
+      CurClass = dyn_cast<ClassDecl>(BGT->getDecl());
+    else if (UnboundGenericType *UGT = BaseTy->getAs<UnboundGenericType>())
+      CurClass = dyn_cast<ClassDecl>(UGT->getDecl());
+
+    if (CurClass && CurClass->hasSuperclass()) {
+      BaseTy = CurClass->getSuperclass();
+    } else {
+      break;
+    }
+  } while (1);
+
+  // FIXME: Weed out overridden methods.
+}
+
+static void lookupVisibleMemberDecls(Type BaseTy,
+                                     VisibleDeclConsumer &Consumer,
+                                     const DeclContext *CurrDC,
+                                     LookupKind LK,
+                                     LazyResolver *TypeResolver) {
+  VisitedSet Visited;
+  doMemberLookup(BaseTy, Consumer, CurrDC, LK, TypeResolver, Visited);
 }
 
 namespace {
