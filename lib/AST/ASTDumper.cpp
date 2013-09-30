@@ -74,6 +74,9 @@ namespace {
       if (ShowColors)
         OS << llvm::sys::Process::ResetColor();
 
+      if (P->isImplicit())
+        OS << " implicit";
+
       if (P->hasType()) {
         OS << " type='";
         P->getType().print(OS);
