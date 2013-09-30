@@ -83,6 +83,9 @@ namespace {
 
 class ColorASTWalker : public ASTWalker {
   const SourceManager &SM;
+#ifndef NDEBUG
+  SourceLoc LastLoc;
+#endif
 
 public:
   SyntaxColorWalker &SCWalker;
@@ -93,6 +96,7 @@ public:
 
   void visitTranslationUnit(TranslationUnit &TU, ArrayRef<SyntaxNode> Tokens);
 
+  bool walkToDeclPre(Decl *D) override;
   bool walkToTypeReprPre(TypeRepr *T) override;
 
 private:
@@ -125,6 +129,21 @@ void ColorASTWalker::visitTranslationUnit(TranslationUnit &TU,
   // Pass the rest of the token nodes.
   for (auto &TokNode : TokenNodes)
     passNode(TokNode);
+}
+
+bool ColorASTWalker::walkToDeclPre(Decl *D) {
+  if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+    if (FD->isGetterOrSetter()) {
+      // Pass get / set context sensitive keyword token.
+      SourceLoc SL = FD->getFuncLoc();
+      if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
+                              CharSourceRange(SL, 3)
+                            }))
+        return false;
+    }
+  }
+
+  return true;
 }
 
 bool ColorASTWalker::walkToTypeReprPre(TypeRepr *T) {
@@ -174,6 +193,10 @@ bool ColorASTWalker::passNonTokenNode(const SyntaxNode &Node) {
 }
 
 bool ColorASTWalker::passNode(const SyntaxNode &Node) {
+#ifndef NDEBUG
+  assert(!SM.isBeforeInBuffer(Node.Range.getStart(), LastLoc));
+  LastLoc = Node.Range.getStart();
+#endif
   SCWalker.walkToNodePre(Node);
   if (!SCWalker.walkToNodePost(Node))
     return false;

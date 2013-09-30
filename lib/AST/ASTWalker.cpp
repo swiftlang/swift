@@ -546,7 +546,7 @@ public:
           return true;
       }
 
-      if (FD->getBodyResultTypeLoc().getTypeRepr())
+      if (!FD->isGetterOrSetter() && FD->getBodyResultTypeLoc().getTypeRepr())
         if (doIt(FD->getBodyResultTypeLoc().getTypeRepr()))
           return true;
 
@@ -881,7 +881,7 @@ Pattern *Traversal::visitTypedPattern(TypedPattern *P) {
     P->setSubPattern(newSub);
   else
     return nullptr;
-  if (P->getTypeLoc().getTypeRepr())
+  if (!P->isImplicit() && P->getTypeLoc().getTypeRepr())
     if (doIt(P->getTypeLoc().getTypeRepr()))
       return nullptr;
   return P;
