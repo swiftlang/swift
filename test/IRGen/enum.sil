@@ -124,6 +124,12 @@ import Builtin
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum20DynamicSinglePayload to i8*),
 // CHECK:   i8* null
 
+enum Empty {}
+
+enum EmptySingleton {
+  case foo
+}
+
 enum Singleton {
   case val(Builtin.Int64, Builtin.Int64)
 }
@@ -1699,6 +1705,8 @@ end:
 
 // Force the storage types to all be generated.
 typealias AllConcreteTestEnums = (
+  Empty,
+  EmptySingleton,
   Singleton,
   NoPayloads,
   NoPayloads2,

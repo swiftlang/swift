@@ -2599,9 +2599,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
         tik = Fixed;
     }
   }
-  
-  assert(numElements != 0);
-  
+
   // FIXME recursive enums
   if (!elementsWithRecursivePayload.empty()) {
     TC.IGM.unimplemented(theEnum->getLoc(), "recursive enum layout");
@@ -2613,7 +2611,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
            + elementsWithNoPayload.size()
          && "not all elements accounted for");
   
-  if (numElements == 1)
+  if (numElements <= 1)
     return new SingletonEnumImplStrategy(tik, numElements,
                                     std::move(elementsWithPayload),
                                     std::move(elementsWithRecursivePayload),
