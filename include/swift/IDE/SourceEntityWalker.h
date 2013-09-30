@@ -17,6 +17,7 @@
 #include "swift/Basic/SourceLoc.h"
 
 namespace swift {
+  class DeclContext;
   class TranslationUnit;
   class Module;
   class Decl;
@@ -40,6 +41,9 @@ public:
   /// Walks the provided Decl.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(Decl *D);
+  /// Walks the provided DeclContext.
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(DeclContext *DC);
 
   /// This method is called when first visiting a decl, before walking into its
   /// children.  If it returns false, the subtree is skipped.

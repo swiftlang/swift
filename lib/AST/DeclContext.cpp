@@ -12,7 +12,9 @@
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTWalker.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
 // Only allow allocation of DeclContext using the allocator in ASTContext.
@@ -147,6 +149,35 @@ bool DeclContext::isGenericContext() const {
         return true;
       break;
     }
+  }
+}
+
+bool DeclContext::walkContext(ASTWalker &Walker) {
+  switch (getContextKind()) {
+  case DeclContextKind::Module: {
+    Module *Mod = cast<Module>(this);
+    if (TranslationUnit *TU = dyn_cast<TranslationUnit>(Mod))
+      return TU->walk(Walker);
+
+    SmallVector<Decl *, 64> Decls;
+    Mod->getTopLevelDecls(Decls);
+    llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(Walker.Parent, Mod);
+    for (Decl *D : Decls) {
+      if (D->walk(Walker))
+        return true;
+    }
+    return false;
+  }
+  case DeclContextKind::AbstractClosureExpr:
+    return cast<AbstractClosureExpr>(this)->walk(Walker);
+  case DeclContextKind::NominalTypeDecl:
+    return cast<NominalTypeDecl>(this)->walk(Walker);
+  case DeclContextKind::ExtensionDecl:
+    return cast<ExtensionDecl>(this)->walk(Walker);
+  case DeclContextKind::TopLevelCodeDecl:
+    return cast<TopLevelCodeDecl>(this)->walk(Walker);
+  case DeclContextKind::AbstractFunctionDecl:
+    return cast<AbstractFunctionDecl>(this)->walk(Walker);
   }
 }
 

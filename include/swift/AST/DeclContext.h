@@ -24,6 +24,7 @@
 
 namespace swift {
   class ASTContext;
+  class ASTWalker;
   class DeclContext;
   class GenericParamList;
   class Type;
@@ -172,6 +173,9 @@ public:
   const ASTContext &getASTContext() const {
     return const_cast<DeclContext *>(this)->getASTContext();
   }
+
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walkContext(ASTWalker &Walker);
 
   void dumpContext() const;
   unsigned printContext(llvm::raw_ostream &OS) const;

@@ -232,4 +232,9 @@ bool SourceEntityWalker::walk(Decl *D) {
   return D->walk(Annotator);
 }
 
+bool SourceEntityWalker::walk(DeclContext *DC) {
+  SemaAnnotator Annotator(*this);
+  return DC->walkContext(Annotator);
+}
+
 void SourceEntityWalker::anchor() {}
