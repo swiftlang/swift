@@ -667,12 +667,8 @@ void TranslationUnit::dump(llvm::raw_ostream &OS) const {
   llvm::errs() << '\n';
 }
 
-void Pattern::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  PrintPattern(OS, Indent).visit(const_cast<Pattern*>(this));
-}
-
 void Pattern::dump() const {
-  print(llvm::errs());
+  PrintPattern(llvm::errs(), 0).visit(const_cast<Pattern*>(this));
   llvm::errs() << '\n';
 }
 
@@ -868,7 +864,9 @@ public:
 
   void printRec(Decl *D) { D->dump(Indent+2); }
   void printRec(Stmt *S) { S->print(OS, Indent+2); }
-  void printRec(Pattern *P) { P->print(OS, Indent+2); }
+  void printRec(Pattern *P) {
+    PrintPattern(OS, Indent+2).visit(P);
+  }
 
   void printSubstitutions(ArrayRef<Substitution> Substitutions) {
     for (auto S : Substitutions) {

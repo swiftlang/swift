@@ -82,9 +82,9 @@ namespace {
     void printAttributes(const DeclAttributes &attrs);
     void printTypedPattern(const TypedPattern *TP,
                            bool StripOuterSliceType = false);
+public:
     void printPattern(const Pattern *pattern);
 
-public:
     void printGenericParams(GenericParamList *params);
 
 private:
@@ -222,7 +222,7 @@ void PrintAST::printAttributes(const DeclAttributes &Attrs) {
 void PrintAST::printTypedPattern(const TypedPattern *TP,
                                  bool StripOuterSliceType) {
   printPattern(TP->getSubPattern());
-  OS << " : ";
+  OS << ": ";
   Type T = TP->getTypeLoc().getType();
   if (StripOuterSliceType) {
     if (auto *BGT = T->getAs<BoundGenericType>())
@@ -605,7 +605,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   recordDeclLoc(decl);
   OS << decl->getName().str();
   if (decl->hasType()) {
-    OS << " : ";
+    OS << ": ";
     decl->getType().print(OS);   
   }
 
@@ -1039,6 +1039,11 @@ bool Decl::shouldPrintInContext() const {
   return true;
 }
 
+void Pattern::print(llvm::raw_ostream &OS, const PrintOptions &Options) const {
+  PrintAST Printer(OS, Options, nullptr);
+  Printer.printPattern(this);
+}
+
 //===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//
@@ -1202,7 +1207,7 @@ public:
       const TupleTypeElt &TD = Fields[i];
 
       if (TD.hasName())
-        OS << TD.getName() << " : ";
+        OS << TD.getName() << ": ";
 
       if (TD.isVararg())
         OS <<  TD.getVarargBaseTy() << "...";

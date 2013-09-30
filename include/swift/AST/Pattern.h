@@ -133,7 +133,8 @@ public:
   void operator delete(void *data) = delete;
   void *operator new(size_t bytes, void *data) = delete;
   
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(llvm::raw_ostream &OS,
+             const PrintOptions &Options = PrintOptions()) const;
   void dump() const;
   
   /// walk - This recursively walks the AST rooted at this pattern.

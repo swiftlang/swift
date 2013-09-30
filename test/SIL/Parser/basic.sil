@@ -24,7 +24,7 @@ bb0:
 class Class1 { var a : Class2 }
 class Class2 { var b : Class1 }
 
-sil @type_ref1 : $(a : Class1, b : Int) -> ()  // CHECK: $(a : Class1, b : Int64)
+sil @type_ref1 : $(a : Class1, b: Int) -> ()  // CHECK: $(a: Class1, b: Int64)
 
 
 // Instructions
@@ -42,7 +42,7 @@ bb1:
 }
 
 // Forward referenced values.
-sil @test2 : $(x : Int64) -> () {              // CHECK-LABEL: sil @test2 : $(x : Int64) -> ()
+sil @test2 : $(x: Int64) -> () {               // CHECK-LABEL: sil @test2 : $(x: Int64) -> ()
 bb0(%0 : $Int64):
   br bb2
 bb1:
@@ -57,13 +57,13 @@ bb2:
   br bb1                                       // CHECK:   br bb1
 }
 
-sil @named_tuple : $() -> (x : Builtin.Int64, Builtin.Int64) {
+sil @named_tuple : $() -> (x: Builtin.Int64, Builtin.Int64) {
   %0 = integer_literal $Builtin.Int64, 42      // CHECK: integer_literal $Builtin.Int64, 42
-  %9 = tuple $(x : Builtin.Int64, Builtin.Int64) (%0, %0)
-  %10 = return %9 : $(x : Builtin.Int64, Builtin.Int64)
+  %9 = tuple $(x: Builtin.Int64, Builtin.Int64) (%0, %0)
+  %10 = return %9 : $(x: Builtin.Int64, Builtin.Int64)
 }
 
-sil @return_int : $[thin] (a : Int64) -> Int64 { // CHECK: $[thin] (a : Int64) -> Int64 {
+sil @return_int : $[thin] (a: Int64) -> Int64 { // CHECK: $[thin] (a: Int64) -> Int64 {
 bb0(%0 : $Int64):                          // CHECK: bb0(%0 : $Int64):
   %1 = alloc_stack $Int64                  // CHECK: alloc_stack $Int64
   store %0 to %1#1 : $*Int64               // CHECK: store %0 to %1#1 : $*Int64
@@ -87,8 +87,8 @@ bb0(%0 : $() -> Int64):
 
 sil @return_constant : $[thin] () -> Int64 {  // CHECK: @return_constant
 bb0:                                         // CHECK: bb0:
-  // CHECK: function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64
-  %1 = function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64
+  // CHECK: function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val: Builtin.Int64), Int64.metatype) -> Int64
+  %1 = function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val: Builtin.Int64), Int64.metatype) -> Int64
 
   // CHECK: metatype $Int64.metatype
   %2 = metatype $Int64.metatype
@@ -97,17 +97,17 @@ bb0:                                         // CHECK: bb0:
   %3 = integer_literal $Builtin.Int64, 1
   
   // CHECK: apply
-  %4 = apply %1(%3, %2) : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64
+  %4 = apply %1(%3, %2) : $[thin] ((val: Builtin.Int64), Int64.metatype) -> Int64
   // CHECK: return
   %5 = return %4 : $Int64
 }
 
-sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64
+sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val: Builtin.Int64), Int64.metatype) -> Int64
 
 // Parse SIL generated from the following swift program:
 // func x(a : Bool) -> Int { if a { return 4 } else {return 5} }
 sil @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
-sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
 
 // CHECK: @_T4test1xFT1aSb_Si
 sil @_T4test1xFT1aSb_Si : $[thin] (a : Bool) -> Int64 {
@@ -126,14 +126,14 @@ bb0(%0 : $Bool):
 
 // CHECK: bb1:
 bb1:
-  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
-  %6 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
+  %6 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: metatype $Int64.metatype
   %7 = metatype $Int64.metatype
   // CHECK: integer_literal $Builtin.Int128, 4
   %8 = integer_literal $Builtin.Int128, 4
   // CHECK: apply
-  %9 = apply %6(%8, %7) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %9 = apply %6(%8, %7) : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: dealloc_stack
   %10 = dealloc_stack %1#0 : $*[local_storage] Bool
   // CHECK: br
@@ -141,14 +141,14 @@ bb1:
 
 // CHECK: bb2:
 bb2:
-  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
-  %12 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
+  %12 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: metatype $Int64.metatype
   %13 = metatype $Int64.metatype
   // CHECK: integer_literal $Builtin.Int128, 5
   %14 = integer_literal $Builtin.Int128, 5
   // CHECK: apply
-  %15 = apply %12(%14, %13) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %15 = apply %12(%14, %13) : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: dealloc_stack
   %16 = dealloc_stack %1#0 : $*[local_storage] Bool
   // CHECK: br
@@ -230,8 +230,8 @@ protocol Runcible {
   static func static_method()
 }
 
-// CHECK: $[thin] <T : Runcible> (x : T) -> ()
-sil @_T4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $[thin] <T : Runcible> (x : T) -> () {
+// CHECK: $[thin] <T : Runcible> (x: T) -> ()
+sil @_T4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $[thin] <T : Runcible> (x: T) -> () {
 bb0(%0 : $*T):
   // CHECK: archetype_method $*T, #Runcible.free_method!1
   %1 = archetype_method $*T, #Runcible.free_method!1 : $[cc(method)] ((), [inout] T) -> Int64
@@ -253,8 +253,8 @@ bb0(%0 : $*T):
 
 protocol Bendable { }
 
-// CHECK: $[thin] (x : protocol<Bendable, Runcible>) -> Runcible
-sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $[thin] (x : protocol<Bendable, Runcible>) -> Runcible {
+// CHECK: $[thin] (x: protocol<Bendable, Runcible>) -> Runcible
+sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $[thin] (x: protocol<Bendable, Runcible>) -> Runcible {
 bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   // CHECK: alloc_box
   %2 = alloc_box $protocol<Bendable, Runcible>
@@ -281,8 +281,8 @@ protocol [class_protocol] ClassBound {
   func classBoundMethod()
 }
 
-// CHECK: $[thin] (x : ClassBound) -> ()
-sil @_T4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $[thin] (x : ClassBound) -> () {
+// CHECK: $[thin] (x: ClassBound) -> ()
+sil @_T4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $[thin] (x: ClassBound) -> () {
 bb0(%0 : $ClassBound):
   %1 = alloc_box $ClassBound                // CHECK: alloc_box
   %2 = store %0 to %1#1 : $*ClassBound      // CHECK: store
@@ -318,8 +318,8 @@ struct Aleph {
   var b:Val
 }
 
-// CHECK: $[thin] ((a : Ref, b : Val), Aleph.metatype) -> Aleph
-sil @_TV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $[thin] ((a : Ref, b : Val), Aleph.metatype) -> Aleph {
+// CHECK: $[thin] ((a: Ref, b: Val), Aleph.metatype) -> Aleph
+sil @_TV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $[thin] ((a: Ref, b: Val), Aleph.metatype) -> Aleph {
 bb0(%0 : $Ref, %1 : $Val, %2 : $Aleph.metatype):
   // CHECK: struct $Aleph ({{%.*}} : $Ref, {{%.*}} : $Val)
   %3 = struct $Aleph (%0 : $Ref, %1 : $Val)
@@ -396,8 +396,8 @@ bb0(%0 : $*Gimel, %1 : $*Q):
 sil @_T5tuple5floatFT1xSf_T_ : $[thin] (x : Float32) -> ()
 sil @_T5tuple5tupleFT_TSiSf_ : $[thin] () -> (Int64, Float32)
 
-// CHECK: $[thin] (x : (Int64, Float32)) -> ()
-sil @_T5tuple13tuple_elementFT1xTSiSf__T_ : $[thin] (x : (Int64, Float32)) -> () {
+// CHECK: $[thin] (x: (Int64, Float32)) -> ()
+sil @_T5tuple13tuple_elementFT1xTSiSf__T_ : $[thin] (x: (Int64, Float32)) -> () {
 bb0(%0 : $Int64, %1 : $Float32):
   %2 = alloc_box $(Int64, Float32)
   // CHECK: tuple ({{%.*}} : $Int64, {{%.*}} : $Float32)
@@ -427,11 +427,11 @@ bb0(%0 : $Int64, %1 : $Float32):
 }
 
 class M {
-  var member : Int
+  var member: Int
 }
 
-// CHECK: $[cc(method), thin] ((x : Int64), M) -> ()
-sil @_TC3ref1C3foofS0_FT1xSi_T_ : $[cc(method), thin] ((x : Int64), M) -> () {
+// CHECK: $[cc(method), thin] ((x: Int64), M) -> ()
+sil @_TC3ref1C3foofS0_FT1xSi_T_ : $[cc(method), thin] ((x: Int64), M) -> () {
 bb0(%0 : $Int64, %1 : $M):
   %2 = alloc_box $Int64     // CHECK: alloc_box $Int64
   %3 = store %0 to %2#1 : $*Int64
@@ -453,8 +453,8 @@ bb0(%0 : $Int64, %1 : $M):
 class B { }
 class E : B { }
 
-// CHECK: $[thin] (b : B) -> Builtin.Int1
-sil @_T4null3isaFT1bCS_1B_Sb : $[thin] (b : B) -> Builtin.Int1 {
+// CHECK: $[thin] (b: B) -> Builtin.Int1
+sil @_T4null3isaFT1bCS_1B_Sb : $[thin] (b: B) -> Builtin.Int1 {
 bb0(%0 : $B):
   %1 = alloc_box $B                           // CHECK: alloc_box
   %2 = store %0 to %1#1 : $*B
@@ -473,22 +473,22 @@ isa(%6 : $Builtin.Int1):
   %9 = return %6 : $Builtin.Int1
 }
 
-sil @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $[thin] ((value : Builtin.FPIEEE64), Float64.metatype) -> Float64
-sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $[thin] ((value : Builtin.RawPointer, byteSize : Builtin.Int64, isASCII : Builtin.Int1), String.metatype) -> String
+sil @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $[thin] ((value: Builtin.FPIEEE64), Float64.metatype) -> Float64
+sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $[thin] ((value: Builtin.RawPointer, byteSize: Builtin.Int64, isASCII: Builtin.Int1), String.metatype) -> String
 
 // CHECK: $[thin] () -> ()
 sil @_T7literal8literalsFT_T_ : $[thin] () -> () {
 bb0:
   %0 = tuple ()
   %1 = alloc_stack $Float64                 // CHECK: alloc_stack $Float64
-  %2 = function_ref @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $[thin] ((value : Builtin.FPIEEE64), Float64.metatype) -> Float64
+  %2 = function_ref @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $[thin] ((value: Builtin.FPIEEE64), Float64.metatype) -> Float64
   %3 = metatype $Float64.metatype
   // CHECK: float_literal $Builtin.FPIEEE64, 0x3FFAB4ACADAB4AAA
   %4 = float_literal $Builtin.FPIEEE64, 0x3FFAB4ACADAB4AAA
-  %5 = apply %2(%4, %3) : $[thin] ((value : Builtin.FPIEEE64), Float64.metatype) -> Float64
+  %5 = apply %2(%4, %3) : $[thin] ((value: Builtin.FPIEEE64), Float64.metatype) -> Float64
   %6 = store %5 to %1#1 : $*Float64
   %7 = alloc_stack $String                 // CHECK: alloc_stack $String
-  %8 = function_ref @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $[thin] ((value : Builtin.RawPointer, byteSize : Builtin.Int64, isASCII : Builtin.Int1), String.metatype) -> String
+  %8 = function_ref @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $[thin] ((value: Builtin.RawPointer, byteSize: Builtin.Int64, isASCII: Builtin.Int1), String.metatype) -> String
   %9 = metatype $String.metatype
   // CHECK: string_literal $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), "foo"
   %10 = string_literal $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), "foo"
@@ -497,7 +497,7 @@ bb0:
   %12 = tuple_extract %11 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 0
   %13 = tuple_extract %11 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 1
   %14 = tuple_extract %11 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 2
-  %15 = apply %8(%12, %13, %14, %9) : $[thin] ((value : Builtin.RawPointer, byteSize : Builtin.Int64, isASCII : Builtin.Int1), String.metatype) -> String
+  %15 = apply %8(%12, %13, %14, %9) : $[thin] ((value: Builtin.RawPointer, byteSize: Builtin.Int64, isASCII: Builtin.Int1), String.metatype) -> String
   %16 = store %15 to %7#1 : $*String
   %17 = load %7#1 : $*String                        // CHECK: load {{%.*}} : $*String
   %18 = struct_extract %17 : $String, #str_value  // CHECK: struct_extract
@@ -509,7 +509,7 @@ bb0:
   %24 = return %23 : $()
 }
 
-sil @_T5index5gep64FT1pBp1iBi64__Bp : $[thin] (p : Builtin.RawPointer, i : Builtin.Int64) -> Builtin.RawPointer {
+sil @_T5index5gep64FT1pBp1iBi64__Bp : $[thin] (p: Builtin.RawPointer, i: Builtin.Int64) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Int64):
   %2 = alloc_box $Builtin.RawPointer              // CHECK: alloc_box
   %3 = alloc_box $Builtin.Int64                   // CHECK: alloc_box
@@ -525,18 +525,18 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Int64):
   %12 = return %9 : $Builtin.RawPointer
 }
 
-var x : Int = 0
-sil @global_callee : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+var x: Int = 0
+sil @global_callee : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
 
 // CHECK: $() -> ()
 sil internal @global_code : $() -> () {
 bb0:
   // CHECK: global_addr #x : $*Int64
   %0 = global_addr #x : $*Int64
-  %1 = function_ref @global_callee : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %1 = function_ref @global_callee : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
   %2 = metatype $Int64.metatype
   %3 = integer_literal $Builtin.Int128, 0 // CHECK: integer_literal $Builtin.Int128, 0
-  %4 = apply %1(%3, %2) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %4 = apply %1(%3, %2) : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
   %5 = store %4 to %0 : $*Int64
   %6 = tuple ()
   %7 = return %6 : $()
@@ -623,7 +623,7 @@ bb0(%0 : $SomeClass):
 }
 
 // CHECK-LABEL: sil @test_basic_block_arguments
-sil @test_basic_block_arguments : $[thin] (i : Builtin.Int1) -> Builtin.Int64 {
+sil @test_basic_block_arguments : $[thin] (i: Builtin.Int1) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int1):
   condbranch %0, bb1, bb2
 bb1:                                        
@@ -640,7 +640,7 @@ bb3(%6 : $Builtin.Int64):
 }
 
 // CHECK-LABEL: sil @test_cond_branch_basic_block_args
-sil @test_cond_branch_basic_block_args : $[thin] (i : Int64, b : Builtin.Int1) -> Int64 {
+sil @test_cond_branch_basic_block_args : $[thin] (i: Int64, b: Builtin.Int1) -> Int64 {
 bb0(%0 : $Int64, %1 : $Builtin.Int1):
   condbranch %1, bb1(%0 : $Int64), bb2(%0 : $Int64)
 // CHECK: condbranch %1, bb1(%0 : $Int64), bb2(%0 : $Int64)
@@ -673,10 +673,10 @@ bb0(%0 : $Bas):
   %5 = struct_extract %3 : $String, #str_value
   %6 = struct_extract %5 : $StringByteData, #owner
   strong_retain %6 : $Builtin.ObjectPointer
-  %8 = function_ref @swift_StringToNSString : $[thin] (string : [inout] String) -> NSString
+  %8 = function_ref @swift_StringToNSString : $[thin] (string: [inout] String) -> NSString
   %9 = alloc_stack $String
   store %3 to %9#1 : $*String
-  %11 = apply %8(%9#1) : $[thin] (string : [inout] String) -> NSString
+  %11 = apply %8(%9#1) : $[thin] (string: [inout] String) -> NSString
   dealloc_stack %9#0 : $*[local_storage] String
   %13 = struct_extract %3 : $String, #str_value
   %14 = struct_extract %13 : $StringByteData, #owner
@@ -684,7 +684,7 @@ bb0(%0 : $Bas):
   // CHECK: autorelease_return %11 : $NSString
   autorelease_return %11 : $NSString
 }
-sil @swift_StringToNSString : $[thin] (string : [inout] String) -> NSString
+sil @swift_StringToNSString : $[thin] (string: [inout] String) -> NSString
 
 // CHECK-LABEL: sil @test_super_method
 sil @test_super_method : $[cc(method), thin] ((), Bas) -> Bas {
@@ -724,7 +724,7 @@ bb0(%0 : $Bas):
 sil @_TSSCfMSSFT_SS : $[thin] ((), String.metatype) -> String
 
 // CHECK-LABEL: sil @test_builtin_func_ref
-sil @test_builtin_func_ref : $[thin] (x : Builtin.Int1, y : Builtin.Int1) -> Builtin.Int1 {
+sil @test_builtin_func_ref : $[thin] (x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %2 = alloc_box $Builtin.Int1
   %3 = alloc_box $Builtin.Int1
@@ -825,8 +825,8 @@ sil @_T6switch1aFT_T_ : $[thin] () -> ()
 sil @_T6switch1bFT_T_ : $[thin] () -> ()
 sil @_T6switch1cFT_T_ : $[thin] () -> ()
 
-// CHECK-LABEL: sil @test_switch_union : $[thin] (u : MaybePair) -> ()
-sil @test_switch_union : $[thin] (u : MaybePair) -> () {
+// CHECK-LABEL: sil @test_switch_union : $[thin] (u: MaybePair) -> ()
+sil @test_switch_union : $[thin] (u: MaybePair) -> () {
 bb0(%0 : $MaybePair):
   %1 = alloc_box $MaybePair
   store %0 to %1#1 : $*MaybePair
@@ -864,8 +864,8 @@ enum MaybeAddressOnlyPair {
   case Left(Q)
 }
 
-// CHECK-LABEL: sil @test_switch_union_addr : $[thin] (u : MaybeAddressOnlyPair) -> ()
-sil @test_switch_union_addr : $[thin] (u : MaybeAddressOnlyPair) -> () {
+// CHECK-LABEL: sil @test_switch_union_addr : $[thin] (u: MaybeAddressOnlyPair) -> ()
+sil @test_switch_union_addr : $[thin] (u: MaybeAddressOnlyPair) -> () {
 bb0(%0 : $*MaybeAddressOnlyPair):
   // CHECK: destructive_switch_enum_addr %{{.*}} : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt.1: bb
   destructive_switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt.1: bb2
@@ -881,8 +881,8 @@ bb3:
   return %t : $()
 }
 
-// CHECK-LABEL: sil @test_switch_int : $[thin] (u : Builtin.Int64) -> ()
-sil @test_switch_int : $[thin] (u : Builtin.Int64) -> () {
+// CHECK-LABEL: sil @test_switch_int : $[thin] (u: Builtin.Int64) -> ()
+sil @test_switch_int : $[thin] (u: Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):
   // CHECK: switch_int %{{.*}} : $Builtin.Int64, case 1: bb1, case 2: bb2
   switch_int %0 : $Builtin.Int64, case 1: bb1, case 2: bb2
@@ -907,8 +907,8 @@ class ConcreteClass : ClassP {
 struct Spoon : Bendable {
 }
 
-// CHECK-LABEL: sil @test_init_existential : $[thin] (x : Spoon) -> Bendable
-sil @test_init_existential : $[thin] (x : Spoon) -> Bendable {
+// CHECK-LABEL: sil @test_init_existential : $[thin] (x: Spoon) -> Bendable
+sil @test_init_existential : $[thin] (x: Spoon) -> Bendable {
 bb0(%0 : $*Bendable, %1 : $Spoon):
   %2 = alloc_box $Spoon
   store %1 to %2#1 : $*Spoon
@@ -923,7 +923,7 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
   return %8 : $()
 }
 
-// CHECK-LABEL: sil @test_existential_ref : $[thin] (x : ConcreteClass) -> ClassP
+// CHECK-LABEL: sil @test_existential_ref : $[thin] (x: ConcreteClass) -> ClassP
 sil @test_existential_ref : $[thin] (x : ConcreteClass) -> ClassP {
 bb0(%0 : $ConcreteClass):
   %1 = alloc_box $ConcreteClass
@@ -936,7 +936,7 @@ bb0(%0 : $ConcreteClass):
   return %5 : $ClassP
 }
 
-sil @test_assign : $(x : Int64, y : [inout] Int64) -> () {    // CHECK-LABEL: sil @test_assign
+sil @test_assign : $(x: Int64, y: [inout] Int64) -> () {    // CHECK-LABEL: sil @test_assign
 bb0(%0 : $Int64, %1 : $*Int64):
   assign %0 to %1 : $*Int64                   // CHECK:   assign %0 to %1
   unreachable
@@ -970,8 +970,8 @@ class X {
   func [objc] f() { }
 }
 
-// CHECK-LABEL: sil @test_dynamic_lookup_br : $[thin] (obj : DynamicLookup) -> ()
-sil @test_dynamic_lookup_br : $[thin] (obj : DynamicLookup) -> () {
+// CHECK-LABEL: sil @test_dynamic_lookup_br : $[thin] (obj: DynamicLookup) -> ()
+sil @test_dynamic_lookup_br : $[thin] (obj: DynamicLookup) -> () {
 bb0(%0 : $DynamicLookup):
   %1 = alloc_box $DynamicLookup
   store %0 to %1#1 : $*DynamicLookup
@@ -984,7 +984,7 @@ bb0(%0 : $DynamicLookup):
 bb1:
   br bb3
 
-bb2:                                              
+bb2:
   br bb3
 
 bb3:
