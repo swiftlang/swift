@@ -31,7 +31,7 @@ int64_t
 _TSS4sizefRSSFT_Si(void *swiftString);
 
 uint32_t
-_TSS11__subscriptFT3idxSi_Scg(uint64_t idx, void *swiftString);
+_TSS9subscriptFT3idxSi_Scg(uint64_t idx, void *swiftString);
 
 void
 swift_NSStringToString(NSString *nsstring, SwiftString *string);
@@ -69,7 +69,7 @@ struct _NSSwiftString_s {
   // XXX FIXME
   // Become bug-for-bug compatible with NSString being UTF16.
   // In practice, this API is oblivious to UTF16 surrogate pairs.
-  return _TSS11__subscriptFT3idxSi_Scg(idx, &swiftString);
+  return _TSS9subscriptFT3idxSi_Scg(idx, &swiftString);
 }
 
 - (NSUInteger)length {

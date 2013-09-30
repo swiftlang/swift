@@ -132,7 +132,7 @@ namespace {
       // FIXME: lame name!
       auto baseTy = base->getType();
       auto fnTy = FunctionType::get(inputTv, outputTv, Context);
-      CS.addValueMemberConstraint(baseTy, Context.getIdentifier("__subscript"),
+      CS.addValueMemberConstraint(baseTy, Context.getIdentifier("subscript"),
                                   fnTy,
                                   CS.getConstraintLocator(expr,
                                     ConstraintLocator::SubscriptMember));

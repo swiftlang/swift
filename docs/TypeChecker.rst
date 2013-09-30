@@ -211,7 +211,7 @@ and types generated from the primary expression kinds are:
 
 **Subscripting**
   A subscript operation ``a[b]`` is similar to function
-  application. A value member constraint ``T(a).__subscript == T0 -> T1``
+  application. A value member constraint ``T(a).subscript == T0 -> T1``
   treats the subscript as a function from the key type to the
   value type, represented by fresh type variables ``T0`` and ``T1``,
   respectively. The constraint ``T(b) <c T0`` requires the key

@@ -195,19 +195,22 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
   switch (P.Tok.getKind()) {
   case tok::identifier:
     Result = P.Context.getIdentifier(P.Tok.getText());
-    Loc = P.Tok.getLoc();
-    P.consumeToken();
-    return false;
+    break;
   case tok::kw_constructor:
   case tok::kw_init:
     Result = P.Context.getIdentifier("init");
-    Loc = P.Tok.getLoc();
-    P.consumeToken();
-    return false;
+    break;
+  case tok::kw_subscript:
+    Result = P.Context.getIdentifier("subscript");
+    break;
   default:
     P.diagnose(P.Tok, D);
     return true;
   }
+
+  Loc = P.Tok.getLoc();
+  P.consumeToken();
+  return false;
 }
 
 /// diagnoseProblems - After a function is fully parse, emit any diagnostics

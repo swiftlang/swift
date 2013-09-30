@@ -1295,7 +1295,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto getter = cast_or_null<FuncDecl>(getDecl(getterID));
     auto setter = cast_or_null<FuncDecl>(getDecl(setterID));
 
-    auto subscript = new (ctx) SubscriptDecl(ctx.getIdentifier("__subscript"),
+    auto subscript = new (ctx) SubscriptDecl(ctx.getIdentifier("subscript"),
                                              SourceLoc(), indices, SourceLoc(),
                                              elemTy, SourceRange(),
                                              getter, setter, DC);

@@ -2469,7 +2469,7 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
 
     // Build an AST for the subscript declaration.
     SubscriptDecl *Subscript
-      = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
+      = new (Context) SubscriptDecl(Context.getIdentifier("subscript"),
                                     SubscriptLoc, Indices.get(), ArrowLoc,
                                     ElementTy.get(), DefRange,
                                     Get, Set, CurDeclContext);

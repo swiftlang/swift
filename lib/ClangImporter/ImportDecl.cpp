@@ -1593,7 +1593,7 @@ namespace {
       // Build the subscript declaration.
       auto argPatterns =
           getterThunk->getArgParamPatterns()[1]->clone(context);
-      auto name = context.getIdentifier("__subscript");
+      auto name = context.getIdentifier("subscript");
       auto subscript
         = new (context) SubscriptDecl(name, decl->getLoc(), argPatterns,
                                       decl->getLoc(),
