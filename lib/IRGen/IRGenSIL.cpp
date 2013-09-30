@@ -29,6 +29,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
+#include "swift/IRGen/Options.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
@@ -2000,10 +2001,22 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   box.add(addr.getOwner());
   setLoweredExplosion(boxValue, box);
   setLoweredAddress(ptrValue, addr.getAddress());
+  auto AddrIR = addr.getAddress().getAddress();
+  if (IGM.Opts.OptLevel == 0) {
+    // Emit a shadow copy in an alloca, so the register allocator
+    // doesn't elide the dbg.value intrinsic when register pressure is
+    // high.
+    auto Alloca = createAlloca(AddrIR->getType(),
+                               addr.getAlignment(), Name+".addr");
+    Builder.CreateAlignedStore(AddrIR, Alloca.getAddress(),
+                               addr.getAlignment().getValue());
+    AddrIR = Alloca.getAddress();
+  }
+
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitStackVariableDeclaration
       (Builder,
-       addr.getAddress().getAddress(),
+       AddrIR,
        DebugTypeInfo(i->getElementType().getSwiftType(), type),
        Name, i, /* Boxed */true);
 

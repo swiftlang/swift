@@ -679,7 +679,7 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
   for (auto Use : I->getUses()) {
     if (auto Store = dyn_cast<StoreInst>(Use->getUser())) {
       auto Src = Store->getSrc();
-      // Detect the pattern of a inout argument.
+      // Detect the pattern of an inout argument.
       if (auto Load = dyn_cast<LoadInst>(Src))
         Src = Load->getOperand();
       if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, Src, Boxed))
