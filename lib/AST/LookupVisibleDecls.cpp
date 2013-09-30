@@ -156,12 +156,9 @@ namespace {
 /// This operation corresponds to a standard "dot" lookup operation like "a.b"
 /// where 'self' is the type of 'a'.  This operation is only valid after name
 /// binding.
-static void doMemberLookup(Type BaseTy,
-                           VisibleDeclConsumer &Consumer,
-                           const DeclContext *CurrDC,
-                           LookupKind LK,
-                           LazyResolver *TypeResolver,
-                           VisitedSet &Visited) {
+static void lookupVisibleMemberDeclsImpl(
+    Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
+    LookupKind LK, LazyResolver *TypeResolver, VisitedSet &Visited) {
   // Just look through l-valueness.  It doesn't affect name lookup.
   BaseTy = BaseTy->getRValueType();
 
@@ -176,8 +173,9 @@ static void doMemberLookup(Type BaseTy,
     // anything else.  For example, type SomeTy.SomeMember can look up static
     // functions, and can even look up non-static functions as well (thus
     // getting the address of the member).
-    doMemberLookup(Ty, Consumer, CurrDC, LookupKind::QualifiedOnMetatype,
-                   TypeResolver, Visited);
+    lookupVisibleMemberDeclsImpl(Ty, Consumer, CurrDC,
+                                 LookupKind::QualifiedOnMetatype,
+                                 TypeResolver, Visited);
     return;
   }
   
@@ -195,8 +193,8 @@ static void doMemberLookup(Type BaseTy,
       return;
       
     for (auto Proto : PT->getDecl()->getProtocols())
-      doMemberLookup(Proto->getDeclaredType(), Consumer, CurrDC, LK,
-                     TypeResolver, Visited);
+      lookupVisibleMemberDeclsImpl(Proto->getDeclaredType(), Consumer, CurrDC,
+                                   LK, TypeResolver, Visited);
 
     lookupTypeMembers(PT, Consumer, CurrDC, LK, TypeResolver);
     return;
@@ -205,18 +203,20 @@ static void doMemberLookup(Type BaseTy,
   // If the base is a protocol composition, enumerate members of the protocols.
   if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
     for (auto Proto : PC->getProtocols())
-      doMemberLookup(Proto, Consumer, CurrDC, LK, TypeResolver, Visited);
+      lookupVisibleMemberDeclsImpl(Proto, Consumer, CurrDC, LK, TypeResolver,
+                                   Visited);
     return;
   }
 
   // Enumerate members of archetype's requirements.
   if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
     for (auto Proto : Archetype->getConformsTo())
-      doMemberLookup(Proto->getDeclaredType(), Consumer, CurrDC, LK,
-                     TypeResolver, Visited);
+      lookupVisibleMemberDeclsImpl(Proto->getDeclaredType(), Consumer, CurrDC,
+                                   LK, TypeResolver, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
-      doMemberLookup(superclass, Consumer, CurrDC, LK, TypeResolver, Visited);
+      lookupVisibleMemberDeclsImpl(superclass, Consumer, CurrDC, LK,
+                                   TypeResolver, Visited);
     return;
   }
 
@@ -256,7 +256,8 @@ static void lookupVisibleMemberDecls(Type BaseTy,
                                      LookupKind LK,
                                      LazyResolver *TypeResolver) {
   VisitedSet Visited;
-  doMemberLookup(BaseTy, Consumer, CurrDC, LK, TypeResolver, Visited);
+  lookupVisibleMemberDeclsImpl(BaseTy, Consumer, CurrDC, LK, TypeResolver,
+                               Visited);
 }
 
 namespace {
