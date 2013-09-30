@@ -308,7 +308,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   llvm::EngineBuilder builder(&Module);
   std::string ErrorMsg;
   llvm::TargetOptions TargetOpt;
-  //TargetOpt.NoFramePointerElimNonLeaf = true;
+  TargetOpt.NoFramePointerElim = true;
   builder.setTargetOptions(TargetOpt);
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(llvm::EngineKind::JIT);
@@ -1019,7 +1019,7 @@ public:
     llvm::EngineBuilder builder(&Module);
     std::string ErrorMsg;
     llvm::TargetOptions TargetOpt;
-    //TargetOpt.NoFramePointerElimNonLeaf = true;
+    TargetOpt.NoFramePointerElim = true;
     builder.setTargetOptions(TargetOpt);
     builder.setErrorStr(&ErrorMsg);
     builder.setEngineKind(llvm::EngineKind::JIT);
