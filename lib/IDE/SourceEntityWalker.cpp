@@ -212,12 +212,6 @@ bool SemaAnnotator::shouldIgnore(Decl *D, bool &ShouldVisitChildren) {
     ShouldVisitChildren = false;
     return true;
   }
-  if (Pattern *P = Parent.getAsPattern()) {
-    if (P->isImplicit()) {
-      ShouldVisitChildren = false;
-      return true;
-    }
-  }
   if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
     if (FD->isGetterOrSetter()) {
       ShouldVisitChildren = true;

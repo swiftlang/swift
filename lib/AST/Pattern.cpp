@@ -181,6 +181,8 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
                                            ? named->getDecl()->getType()
                                            : Type(),
                                          named->getDecl()->getDeclContext());
+    if (Implicit || var->isImplicit())
+      var->setImplicit();
     result = new (context) NamedPattern(var);
     break;
   }
