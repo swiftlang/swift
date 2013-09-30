@@ -466,7 +466,26 @@ namespace {
       }
     }
 
+    void printPatterns(StringRef Text, ArrayRef<Pattern*> Pats) {
+      if (Pats.empty())
+        return;
+      OS << '\n';
+      Indent += 2;
+      OS.indent(Indent) << '(' << Text;
+      {
+        for (auto P : Pats) {
+          OS << '\n';
+          printRec(P);
+        }
+        OS << ')';
+      }
+      Indent -= 2;
+    }
+
     void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
+      printPatterns("arg_params", D->getArgParamPatterns());
+      printPatterns("body_params", D->getBodyParamPatterns());
+
       if (auto Body = D->getBody()) {
         OS << '\n';
         printRec(Body);
@@ -486,11 +505,6 @@ namespace {
         if (ValueDecl *vd = dyn_cast<ValueDecl>(FD->getGetterOrSetterDecl())) {
           OS << "_for=" << vd->getName();
         }
-      }
-      
-      for (auto P : FD->getArgParamPatterns()) {
-        OS << '\n';
-        printRec(P);
       }
       
       printAbstractFunctionDecl(FD);
