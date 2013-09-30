@@ -120,7 +120,7 @@ public:
   /// \brief Collect the set of variables referenced in the given pattern.
   void collectVariables(SmallVectorImpl<VarDecl *> &variables) const;
 
-  Pattern *clone(ASTContext &context) const;
+  Pattern *clone(ASTContext &context, bool Implicit = false) const;
   
   static bool classof(const Pattern *P) { return true; }
   

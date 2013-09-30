@@ -166,7 +166,7 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
   }
 }
 
-Pattern *Pattern::clone(ASTContext &context) const {
+Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
   Pattern *result;
   switch (getKind()) {
   case PatternKind::Any:
@@ -187,9 +187,11 @@ Pattern *Pattern::clone(ASTContext &context) const {
 
   case PatternKind::Paren: {
     auto paren = cast<ParenPattern>(this);
-    return new (context) ParenPattern(paren->getLParenLoc(),
-                                      paren->getSubPattern()->clone(context),
-                                      paren->getRParenLoc());
+    result = new (context) ParenPattern(paren->getLParenLoc(),
+                                        paren->getSubPattern()->clone(context,
+                                                                      Implicit),
+                                        paren->getRParenLoc());
+    break;
   }
 
   case PatternKind::Tuple: {
@@ -197,7 +199,7 @@ Pattern *Pattern::clone(ASTContext &context) const {
     SmallVector<TuplePatternElt, 2> elts;
     elts.reserve(tuple->getNumFields());
     for (const auto &elt : tuple->getFields())
-      elts.push_back(TuplePatternElt(elt.getPattern()->clone(context),
+      elts.push_back(TuplePatternElt(elt.getPattern()->clone(context, Implicit),
                                      elt.getInit(),
                                      elt.getDefaultArgKind()));
     result = TuplePattern::create(context, tuple->getLParenLoc(), elts,
@@ -209,7 +211,8 @@ Pattern *Pattern::clone(ASTContext &context) const {
 
   case PatternKind::Typed: {
     auto typed = cast<TypedPattern>(this);
-    result = new(context) TypedPattern(typed->getSubPattern()->clone(context),
+    result = new(context) TypedPattern(typed->getSubPattern()->clone(context,
+                                                                     Implicit),
                                        typed->getTypeLoc());
     break;
   }
@@ -230,7 +233,8 @@ Pattern *Pattern::clone(ASTContext &context) const {
                                          elt.getPropertyName(),
                                          elt.getProperty(),
                                          elt.getColonLoc(),
-                                         elt.getSubPattern()->clone(context)));
+                                         elt.getSubPattern()->clone(context,
+                                                                    Implicit)));
     }
     
     result = NominalTypePattern::create(nom->getCastTypeLoc(),
@@ -244,7 +248,7 @@ Pattern *Pattern::clone(ASTContext &context) const {
     auto oof = cast<EnumElementPattern>(this);
     Pattern *sub = nullptr;
     if (oof->hasSubPattern())
-      sub = oof->getSubPattern()->clone(context);
+      sub = oof->getSubPattern()->clone(context, Implicit);
     result = new(context) EnumElementPattern(oof->getParentType(),
                                               oof->getLoc(),
                                               oof->getNameLoc(),
@@ -266,12 +270,15 @@ Pattern *Pattern::clone(ASTContext &context) const {
   case PatternKind::Var: {
     auto var = cast<VarPattern>(this);
     result = new(context) VarPattern(var->getLoc(),
-                                     var->getSubPattern()->clone(context));
+                                     var->getSubPattern()->clone(context,
+                                                                 Implicit));
   }
   }
 
   if (hasType())
     result->setType(getType());
+  if (Implicit || isImplicit())
+    result->setImplicit();
 
   return result;
 }

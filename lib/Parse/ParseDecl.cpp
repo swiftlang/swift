@@ -1204,13 +1204,14 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
       // Add the index clause if necessary.
       if (Indices) {
-        Params.push_back(Indices->clone(Context));
+        Params.push_back(Indices->clone(Context, /*Implicit=*/true));
       }
       
       // Add a no-parameters clause.
       Params.push_back(TuplePattern::create(Context, SourceLoc(),
                                             ArrayRef<TuplePatternElt>(),
-                                            SourceLoc()));
+                                            SourceLoc(), /*hasVararg=*/false,
+                                            SourceLoc(), /*Implicit=*/true));
 
       Scope S(this, ScopeKind::FunctionBody);
 
@@ -1298,7 +1299,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
     // Add the index parameters, if necessary.
     if (Indices) {
-      Params.push_back(Indices->clone(Context));
+      Params.push_back(Indices->clone(Context, /*Implicit=*/true));
     }
 
     bool IsNameImplicit = false;
