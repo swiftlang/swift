@@ -522,9 +522,9 @@ namespace {
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
         return walkToDeclRefExpr(DRE);
 
-      // Don't recurse into child closures, they should already have a capture
-      // list computed, we just propagate it (filtering out stuff that they
-      // capture from us).
+      // Don't recur into child closures. They should already have a capture
+      // list computed; we just propagate it, filtering out stuff that they
+      // capture from us.
       if (auto *SubCE = dyn_cast<AbstractClosureExpr>(E)) {
         for (auto D : SubCE->getCaptureInfo().getCaptures())
           if (D->getDeclContext() != CurExprAsDC)
