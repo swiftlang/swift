@@ -116,7 +116,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
       LValueTypes;
     llvm::DenseMap<std::pair<Type, Type>, SubstitutedType *> SubstitutedTypes;
-    llvm::DenseMap<std::pair<Type, Identifier>, DependentMemberType *>
+    llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
     llvm::FoldingSet<EnumType> EnumTypes;
     llvm::FoldingSet<StructType> StructTypes;
@@ -1269,10 +1269,29 @@ DependentMemberType *DependentMemberType::get(Type base, Identifier name,
   bool hasTypeVariable = base->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
-  auto *&known = ctx.Impl.getArena(arena).DependentMemberTypes[{base, name}];
+  llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(name);
+  auto *&known = ctx.Impl.getArena(arena).DependentMemberTypes[
+                                            {base, stored.getOpaqueValue()}];
   if (!known) {
     const ASTContext *canonicalCtx = base->isCanonical() ? &ctx : nullptr;
     known = new (ctx, arena) DependentMemberType(base, name, canonicalCtx,
+                                                 hasTypeVariable);
+  }
+  return known;
+}
+
+DependentMemberType *DependentMemberType::get(Type base,
+                                              AssociatedTypeDecl *assocType,
+                                              const ASTContext &ctx) {
+  bool hasTypeVariable = base->hasTypeVariable();
+  auto arena = getArena(hasTypeVariable);
+
+  llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(assocType);
+  auto *&known = ctx.Impl.getArena(arena).DependentMemberTypes[
+                                            {base, stored.getOpaqueValue()}];
+  if (!known) {
+    const ASTContext *canonicalCtx = base->isCanonical() ? &ctx : nullptr;
+    known = new (ctx, arena) DependentMemberType(base, assocType, canonicalCtx,
                                                  hasTypeVariable);
   }
   return known;

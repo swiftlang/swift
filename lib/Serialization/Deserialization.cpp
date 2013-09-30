@@ -1898,12 +1898,14 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::DEPENDENT_MEMBER_TYPE: {
     TypeID baseID;
-    IdentifierID nameID;
+    DeclID assocTypeID;
 
-    decls_block::DependentMemberTypeLayout::readRecord(scratch, baseID, nameID);
-    typeOrOffset = DependentMemberType::get(getType(baseID),
-                                            getIdentifier(nameID),
-                                            ctx);
+    decls_block::DependentMemberTypeLayout::readRecord(scratch, baseID,
+                                                       assocTypeID);
+    typeOrOffset = DependentMemberType::get(
+                     getType(baseID),
+                     cast<AssociatedTypeDecl>(getDecl(assocTypeID)),
+                     ctx);
     break;
   }
 

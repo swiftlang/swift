@@ -29,6 +29,7 @@
 
 namespace swift {
 
+class GenericTypeResolver;
 class TypeChecker;
 
 /// \brief A mapping from substitutable types to the protocol-conformance
@@ -171,16 +172,28 @@ public:
   /// in places where the generic arguments will be deduced, e.g., within an
   /// expression.
   ///
+  /// \param resolver A resolver for generic types. If none is supplied, this
+  /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
+  ///
   /// \returns true if type validation failed, or false otherwise.
-  bool validateType(TypeLoc &Loc, bool allowUnboundGenerics = false);
+  bool validateType(TypeLoc &Loc, bool allowUnboundGenerics = false,
+                    GenericTypeResolver *resolver = nullptr);
 
   /// \brief Resolves a TypeRepr to a type.
   ///
   /// Performs name binding, checking of generic arguments, and so on in order
   /// to create a well-formed type.
   ///
+  /// \param TyR The type representation to check.
+  ///
+  /// \param allowUnboundGenerics Whether to allow unbound generic types.
+  ///
+  /// \param resolver A resolver for generic types. If none is supplied, this
+  /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
+  ///
   /// \returns a well-formed type or an ErrorType in case of an error.
-  Type resolveType(TypeRepr *TyR, bool allowUnboundGenerics = false);
+  Type resolveType(TypeRepr *TyR, bool allowUnboundGenerics = false,
+                   GenericTypeResolver *resolver = nullptr);
 
   void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
 
@@ -440,8 +453,10 @@ public:
   
   bool typeCheckPattern(Pattern *P, DeclContext *dc,
                         bool allowUnknownTypes,
-                        bool isVararg = false);
-  bool coerceToType(Pattern *P, DeclContext *dc, Type Ty, bool isVararg =false);
+                        bool isVararg = false,
+                        GenericTypeResolver *resolver = nullptr);
+  bool coerceToType(Pattern *P, DeclContext *dc, Type Ty, bool isVararg = false,
+                    GenericTypeResolver *resolver = nullptr);
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);
 

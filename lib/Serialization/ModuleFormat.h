@@ -346,7 +346,7 @@ namespace decls_block {
   using DependentMemberTypeLayout = BCRecordLayout<
     DEPENDENT_MEMBER_TYPE,
     TypeIDField,      // base type
-    IdentifierIDField // member name
+    DeclIDField       // associated type decl
   >;
   using NominalTypeLayout = BCRecordLayout<
     NOMINAL_TYPE,

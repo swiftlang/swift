@@ -1405,4 +1405,10 @@ Type TypeBase::getTypeOfMember(Module *module, ValueDecl *member,
                           resolver);
 }
 
+Identifier DependentMemberType::getName() const {
+  if (NameOrAssocType.is<Identifier>())
+    return NameOrAssocType.get<Identifier>();
+
+  return NameOrAssocType.get<AssociatedTypeDecl *>()->getName();
+}
 

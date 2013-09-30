@@ -2003,22 +2003,36 @@ public:
 /// generic parameter.
 class DependentMemberType : public TypeBase {
   Type Base;
-  Identifier Name;
+  llvm::PointerUnion<Identifier, AssociatedTypeDecl *> NameOrAssocType;
 
   DependentMemberType(Type base, Identifier name, const ASTContext *ctx,
                       bool hasTypeVariable)
     : TypeBase(TypeKind::DependentMember, ctx, hasTypeVariable),
-      Base(base), Name(name) { }
+      Base(base), NameOrAssocType(name) { }
+
+  DependentMemberType(Type base, AssociatedTypeDecl *assocType,
+                      const ASTContext *ctx, bool hasTypeVariable)
+    : TypeBase(TypeKind::DependentMember, ctx, hasTypeVariable),
+      Base(base), NameOrAssocType(assocType) { }
 
 public:
   static DependentMemberType *get(Type base, Identifier name,
+                                  const ASTContext &ctx);
+  static DependentMemberType *get(Type base, AssociatedTypeDecl *assocType,
                                   const ASTContext &ctx);
 
   /// Retrieve the base type.
   Type getBase() const { return Base; }
 
   /// Retrieve the name of the member type.
-  Identifier getName() const { return Name; }
+  Identifier getName() const;
+
+  /// Retrieve the associated type referenced as a member.
+  ///
+  /// The associated type will only be available after successful type checking.
+  AssociatedTypeDecl *getAssocType() const {
+    return NameOrAssocType.dyn_cast<AssociatedTypeDecl *>();
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

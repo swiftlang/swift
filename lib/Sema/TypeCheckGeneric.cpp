@@ -14,7 +14,54 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "GenericTypeResolver.h"
+
 using namespace swift;
+
+Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
+                                       GenericTypeParamType *gp) {
+  auto gpDecl = gp->getDecl();
+  assert(gpDecl && "Missing generic parameter declaration");
+
+  auto archetype = gpDecl->getArchetype();
+  assert(archetype && "Missing archetype for generic parameter");
+
+  return archetype;
+}
+
+
+AssociatedTypeDecl *
+GenericTypeToArchetypeResolver::resolveDependentMemberType(
+                                  Type baseTy,
+                                  SourceRange baseRange,
+                                  Identifier name,
+                                  SourceLoc nameLoc) {
+  llvm_unreachable("Dependent type after archetype substitution");
+}
+
+Type PartialGenericTypeToArchetypeResolver::resolveGenericTypeParamType(
+                                              GenericTypeParamType *gp) {
+  auto gpDecl = gp->getDecl();
+  if (!gpDecl)
+    return Type(gp);
+
+  auto archetype = gpDecl->getArchetype();
+  if (!archetype)
+    return Type(gp);
+
+  return archetype;
+}
+
+
+AssociatedTypeDecl *
+PartialGenericTypeToArchetypeResolver::resolveDependentMemberType(
+                                         Type baseTy,
+                                         SourceRange baseRange,
+                                         Identifier name,
+                                         SourceLoc nameLoc) {
+  // We don't have enough information to find the associated type.
+  return nullptr;
+}
 
 SpecializeExpr *
 TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,

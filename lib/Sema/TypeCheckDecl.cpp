@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "GenericTypeResolver.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -1320,12 +1321,13 @@ public:
   }
 
   bool semaFuncParamPatterns(DeclContext *dc,
-                             ArrayRef<Pattern*> paramPatterns) {
+                             ArrayRef<Pattern*> paramPatterns,
+                             GenericTypeResolver *resolver) {
     bool badType = false;
     for (Pattern *P : paramPatterns) {
       if (P->hasType())
         continue;
-      if (TC.typeCheckPattern(P, dc, false)) {
+      if (TC.typeCheckPattern(P, dc, false, false, resolver)) {
         badType = true;
         continue;
       }
@@ -1375,21 +1377,26 @@ public:
     return Info;
   }
 
-  void semaFuncDecl(FuncDecl *FD, bool consumeAttributes) {
+  void semaFuncDecl(FuncDecl *FD, bool consumeAttributes,
+                    GenericTypeResolver *resolver) {
     if (FD->hasType())
       return;
 
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
-      if (TC.validateType(FD->getBodyResultTypeLoc())) {
+      if (TC.validateType(FD->getBodyResultTypeLoc(),
+                          /*allowUnboundGenerics=*/false,
+                          resolver)) {
         badType = true;
       }
     }
 
     badType =
-        badType || semaFuncParamPatterns(FD, FD->getArgParamPatterns());
+        badType || semaFuncParamPatterns(FD, FD->getArgParamPatterns(),
+                                         resolver);
     badType =
-        badType || semaFuncParamPatterns(FD, FD->getBodyParamPatterns());
+        badType || semaFuncParamPatterns(FD, FD->getBodyParamPatterns(),
+                                         resolver);
 
     if (badType) {
       FD->setType(ErrorType::get(TC.Context));
@@ -1551,10 +1558,12 @@ public:
       checkGenericParamList(*builder, gp, TC);
     }
 
-    semaFuncDecl(FD, /*consumeAttributes=*/!builder);
-
     // If we have generic parameters, create archetypes now.
     if (builder) {
+      // Type check the function declaration.
+      PartialGenericTypeToArchetypeResolver resolver;
+      semaFuncDecl(FD, /*consumeAttributes=*/false, &resolver);
+
       // Infer requirements from the parameters of the function.
       for (auto pattern : FD->getArgParamPatterns()) {
         builder->inferRequirements(pattern);
@@ -1564,41 +1573,46 @@ public:
       if (auto resultType = FD->getBodyResultTypeLoc().getTypeRepr())
         builder->inferRequirements(resultType);
 
-      // Assign archetypes.
-      finalizeGenericParamList(*builder, FD->getGenericParams(), FD, TC);
+      // Revert all of the types within the signature of the
+      auto revertSignature = [&]() {
+        // Revert the result type.
+        if (!FD->getBodyResultTypeLoc().isNull()) {
+          revertDependentTypeLoc(FD->getBodyResultTypeLoc(), FD);
+        }
+
+        // Revert the argument patterns.
+        ArrayRef<Pattern *> argPatterns = FD->getArgParamPatterns();
+        if (FD->getDeclContext()->isTypeContext())
+          argPatterns = argPatterns.slice(1);
+        for (auto argPattern : argPatterns) {
+          revertDependentPattern(argPattern, FD);
+        }
+
+        // Revert the body patterns.
+        ArrayRef<Pattern *> bodyPatterns = FD->getBodyParamPatterns();
+        if (FD->getDeclContext()->isTypeContext())
+          bodyPatterns = bodyPatterns.slice(1);
+        for (auto bodyPattern : bodyPatterns) {
+          revertDependentPattern(bodyPattern, FD);
+        }
+
+        // Clear out the types.
+        FD->revertType();
+      };
 
       // Go through and revert all of the dependent types we computed.
+      revertSignature();
 
-      // Revert the result type.
-      if (!FD->getBodyResultTypeLoc().isNull()) {
-        revertDependentTypeLoc(FD->getBodyResultTypeLoc(), FD);
-      }
-
-      // Revert the argument patterns.
-      ArrayRef<Pattern *> argPatterns = FD->getArgParamPatterns();
-      if (FD->getDeclContext()->isTypeContext())
-        argPatterns = argPatterns.slice(1);
-      for (auto argPattern : argPatterns) {
-        revertDependentPattern(argPattern, FD);
-      }
-
-      // Revert the body patterns.
-      ArrayRef<Pattern *> bodyPatterns = FD->getBodyParamPatterns();
-      if (FD->getDeclContext()->isTypeContext())
-        bodyPatterns = bodyPatterns.slice(1);
-      for (auto bodyPattern : bodyPatterns) {
-        revertDependentPattern(bodyPattern, FD);
-      }
-
-      // Clear out the types.
-      FD->revertType();
-
-      // Type check the parameters and return type again, now with archetypes.
-      semaFuncDecl(FD, /*consumeAttributes=*/true);
-
-      // The second type check should have created a non-dependent type.
-      assert(!FD->getType()->isDependentType());
+      // Assign archetypes.
+      finalizeGenericParamList(*builder, FD->getGenericParams(), FD, TC);
     }
+
+    // Type check the parameters and return type again, now with archetypes.
+    GenericTypeToArchetypeResolver resolver;
+    semaFuncDecl(FD, /*consumeAttributes=*/true, &resolver);
+
+    // This type check should have created a non-dependent type.
+    assert(!FD->getType()->isDependentType());
 
     validateAttributes(TC, FD);
 

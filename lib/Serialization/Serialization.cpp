@@ -1525,10 +1525,11 @@ void Serializer::writeType(Type ty) {
     auto dependent = cast<DependentMemberType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[DependentMemberTypeLayout::Code];
+    assert(dependent->getAssocType() && "Unchecked dependent member type");
     DependentMemberTypeLayout::emitRecord(
       Out, ScratchRecord, abbrCode,
       addTypeRef(dependent->getBase()),
-      addIdentifierRef(dependent->getName()));
+      addDeclRef(dependent->getAssocType()));
     break;
   }
 
