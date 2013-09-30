@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
@@ -51,6 +52,8 @@ private:
   bool passReference(ValueDecl *D, SourceLoc Loc);
 
   TypeDecl *getTypeDecl(Type Ty);
+
+  bool shouldIgnore(Decl *D, bool &ShouldVisitChildren);
 };
 
 }
@@ -58,12 +61,10 @@ private:
 bool SemaAnnotator::walkToDeclPre(Decl *D) {
   if (isDone())
     return false;
-  if (D->isImplicit())
-    return false;
-  if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-    if (FD->isGetterOrSetter())
-      return true;
-  }
+
+  bool ShouldVisitChildren;
+  if (shouldIgnore(D, ShouldVisitChildren))
+    return ShouldVisitChildren;
 
   SourceLoc Loc = D->getLoc();
   unsigned NameLen = 0;
@@ -92,12 +93,10 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
 bool SemaAnnotator::walkToDeclPost(Decl *D) {
   if (isDone())
     return false;
-  if (D->isImplicit())
+
+  bool ShouldVisitChildren;
+  if (shouldIgnore(D, ShouldVisitChildren))
     return true;
-  if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-    if (FD->isGetterOrSetter())
-      return true;
-  }
 
   bool Continue = SEWalker.walkToDeclPost(D);
   if (!Continue)
@@ -206,6 +205,26 @@ TypeDecl *SemaAnnotator::getTypeDecl(Type Ty) {
   if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
     return NAT->getDecl();
   return Ty->getAnyNominal();
+}
+
+bool SemaAnnotator::shouldIgnore(Decl *D, bool &ShouldVisitChildren) {
+  if (D->isImplicit()) {
+    ShouldVisitChildren = false;
+    return true;
+  }
+  if (Pattern *P = Parent.getAsPattern()) {
+    if (P->isImplicit()) {
+      ShouldVisitChildren = false;
+      return true;
+    }
+  }
+  if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+    if (FD->isGetterOrSetter()) {
+      ShouldVisitChildren = true;
+      return true;
+    }
+  }
+  return false;
 }
 
 
