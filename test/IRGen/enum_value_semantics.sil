@@ -2,7 +2,7 @@
 
 import Builtin
 
-// CHECK: @_TWVO21union_value_semantics20SinglePayloadTrivial = constant [16 x i8*] [
+// CHECK: @_TWVO20enum_value_semantics20SinglePayloadTrivial = constant [16 x i8*] [
 // CHECK:   i8* bitcast (void (i8*, %swift.type*)* @__swift_noop_void_return to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, %swift.type*)* @__swift_noop_self_return to i8*),
@@ -21,25 +21,25 @@ import Builtin
 // CHECK:   i8* inttoptr (i64 16 to i8*)
 // CHECK: ]
 
-// CHECK: @_TMdO21union_value_semantics20SinglePayloadTrivial = constant { i8**, i64, i8*, %swift.type* } {
-// CHECK:   i8** getelementptr inbounds ([16 x i8*]* @_TWVO21union_value_semantics20SinglePayloadTrivial, i32 0, i32 0),
+// CHECK: @_TMdO20enum_value_semantics20SinglePayloadTrivial = constant { i8**, i64, i8*, %swift.type* } {
+// CHECK:   i8** getelementptr inbounds ([16 x i8*]* @_TWVO20enum_value_semantics20SinglePayloadTrivial, i32 0, i32 0),
 // CHECK:   i64 2,
 // CHECK:   i8* null,
 // CHECK:   %swift.type* null
 // CHECK: }
 
-// CHECK: @_TWVO21union_value_semantics23SinglePayloadNontrivial = constant [16 x i8*] [
-// CHECK:   i8* bitcast (void ([24 x i8]*, %swift.type*)* @_TwXXO21union_value_semantics23SinglePayloadNontrivial to i8*),
-// CHECK:   i8* bitcast (%swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)* @_TwCPO21union_value_semantics23SinglePayloadNontrivial to i8*),
+// CHECK: @_TWVO20enum_value_semantics23SinglePayloadNontrivial = constant [16 x i8*] [
+// CHECK:   i8* bitcast (void ([24 x i8]*, %swift.type*)* @_TwXXO20enum_value_semantics23SinglePayloadNontrivial to i8*),
+// CHECK:   i8* bitcast (%swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)* @_TwCPO20enum_value_semantics23SinglePayloadNontrivial to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, %swift.type*)* @__swift_noop_self_return to i8*),
 // CHECK:   i8* bitcast (void (i8*, %swift.type*)* @__swift_noop_void_return to i8*),
-// CHECK:   i8* bitcast (void (%swift.opaque*, %swift.type*)* @_TwxxO21union_value_semantics23SinglePayloadNontrivial to i8*),
-// CHECK:   i8* bitcast (%swift.opaque* ([24 x i8]*, %swift.opaque*, %swift.type*)* @_TwCpO21union_value_semantics23SinglePayloadNontrivial to i8*),
-// CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)* @_TwcpO21union_value_semantics23SinglePayloadNontrivial to i8*),
-// CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)* @_TwcaO21union_value_semantics23SinglePayloadNontrivial to i8*),
+// CHECK:   i8* bitcast (void (%swift.opaque*, %swift.type*)* @_TwxxO20enum_value_semantics23SinglePayloadNontrivial to i8*),
+// CHECK:   i8* bitcast (%swift.opaque* ([24 x i8]*, %swift.opaque*, %swift.type*)* @_TwCpO20enum_value_semantics23SinglePayloadNontrivial to i8*),
+// CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)* @_TwcpO20enum_value_semantics23SinglePayloadNontrivial to i8*),
+// CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)* @_TwcaO20enum_value_semantics23SinglePayloadNontrivial to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
-// CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)* @_TwtaO21union_value_semantics23SinglePayloadNontrivial to i8*),
+// CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)* @_TwtaO20enum_value_semantics23SinglePayloadNontrivial to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, %swift.type*)* @__swift_noop_self_return to i8*),
 // CHECK:   i8* bitcast (%swift.type* (%swift.opaque*, %swift.type*)* @swift_staticTypeof to i8*),
 // CHECK:   i8* inttoptr (i64 9 to i8*),
@@ -47,18 +47,18 @@ import Builtin
 // CHECK:   i8* inttoptr (i64 16 to i8*)
 // CHECK: ]
 
-// CHECK: @_TMdO21union_value_semantics23SinglePayloadNontrivial = constant { i8**, i64, i8*, %swift.type* } {
-// CHECK:   i8** getelementptr inbounds ([16 x i8*]* @_TWVO21union_value_semantics23SinglePayloadNontrivial, i32 0, i32 0),
+// CHECK: @_TMdO20enum_value_semantics23SinglePayloadNontrivial = constant { i8**, i64, i8*, %swift.type* } {
+// CHECK:   i8** getelementptr inbounds ([16 x i8*]* @_TWVO20enum_value_semantics23SinglePayloadNontrivial, i32 0, i32 0),
 // CHECK:   i64 2,
 // CHECK:   i8* null,
 // CHECK:   %swift.type* null
 // CHECK: }
 
-// CHECK: @_TMPdO21union_value_semantics18GenericFixedLayout = global {{[{].*\* [}]}} {
+// CHECK: @_TMPdO20enum_value_semantics18GenericFixedLayout = global {{[{].*\* [}]}} {
 // CHECK:   void (i8*, i8*)* @{{[a-z0-9_]+}},
 // CHECK:   i32 40, i16 1, i16 8,
 // CHECK:   [8 x i8*] zeroinitializer,
-// CHECK:   i8** getelementptr inbounds ([16 x i8*]* @_TWVO21union_value_semantics18GenericFixedLayout, i32 0, i32 0),
+// CHECK:   i8** getelementptr inbounds ([16 x i8*]* @_TWVO20enum_value_semantics18GenericFixedLayout, i32 0, i32 0),
 // CHECK:   i64 2,
 // CHECK:   i8* null,
 // CHECK:   %swift.type* null,
@@ -100,17 +100,17 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK:      ret void
 
 // -- SinglePayloadNontrivial destroyBuffer
-// CHECK: define linkonce_odr hidden void @_TwxxO21union_value_semantics23SinglePayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {
+// CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics23SinglePayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {
 // CHECK: entry:
-// CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O21union_value_semantics23SinglePayloadNontrivial*
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics23SinglePayloadNontrivial* [[ADDR]], i32 0, i32 0
+// CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics23SinglePayloadNontrivial*
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O20enum_value_semantics23SinglePayloadNontrivial* [[ADDR]], i32 0, i32 0
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics23SinglePayloadNontrivial* [[ADDR]], i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O20enum_value_semantics23SinglePayloadNontrivial* [[ADDR]], i32 0, i32 1
 // CHECK:   [[TAG:%.*]] = load i1* [[TAG_ADDR]], align 8
 // CHECK:   [[HAS_PAYLOAD:%.*]] = icmp eq i1 [[TAG]], false
 // CHECK:   br i1 [[HAS_PAYLOAD]], label %[[RELEASE_PAYLOAD:[0-9]+]], label %[[DONE:[0-9]+]]
 // CHECK: ; <label>:[[RELEASE_PAYLOAD]]
-// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O21union_value_semantics23SinglePayloadNontrivial* [[ADDR]] to %swift.refcounted**
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O20enum_value_semantics23SinglePayloadNontrivial* [[ADDR]] to %swift.refcounted**
 // CHECK:   [[DATA:%.*]] = load %swift.refcounted** [[DATA_ADDR]], align 8
 // CHECK:   call void @swift_release(%swift.refcounted* [[DATA]])
 // CHECK:   br label %[[DONE]]
@@ -136,12 +136,12 @@ enum MultiPayloadNontrivial {
 }
 
 // -- MultiPayloadNontrivial destroyBuffer
-// CHECK: define linkonce_odr hidden void @_TwxxO21union_value_semantics22MultiPayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {
+// CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics22MultiPayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {
 // CHECK: entry:
-// CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O21union_value_semantics22MultiPayloadNontrivial*
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics22MultiPayloadNontrivial* [[ADDR]], i32 0, i32 0
+// CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics22MultiPayloadNontrivial*
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O20enum_value_semantics22MultiPayloadNontrivial* [[ADDR]], i32 0, i32 0
 // CHECK:   [[PAYLOAD:%.*]] = load i128* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O21union_value_semantics22MultiPayloadNontrivial* [[ADDR]], i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O20enum_value_semantics22MultiPayloadNontrivial* [[ADDR]], i32 0, i32 1
 // CHECK:   [[TAG:%.*]] = load i2* [[TAG_ADDR]], align 8
 // CHECK:   switch i2 [[TAG]], label %[[END:[0-9]+]] [
 // CHECK:     i2 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
