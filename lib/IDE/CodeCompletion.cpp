@@ -676,34 +676,21 @@ public:
       FirstIndex = 1;
     addPatternParameters(Builder, Patterns[FirstIndex]);
     Builder.addRightParen();
-    // FIXME: Pattern should pretty-print itself.
+
+    // Build type annotation.
     llvm::SmallString<32> TypeStr;
-    for (unsigned i = FirstIndex + 1, e = Patterns.size(); i != e; ++i) {
-      TypeStr += "(";
-      bool NeedComma = false;
-      if (auto *PP = dyn_cast<ParenPattern>(Patterns[i])) {
-        TypeStr += PP->getType().getString();
-      } else {
-        auto *TP = cast<TuplePattern>(Patterns[i]);
-        for (auto TupleElt : TP->getFields()) {
-          if (NeedComma)
-            TypeStr += ", ";
-          Identifier BoundName = TupleElt.getPattern()->getBoundName();
-          if (!BoundName.empty()) {
-            TypeStr += BoundName.str();
-            TypeStr += ": ";
-          }
-          TypeStr += TupleElt.getPattern()->getType().getString();
-          NeedComma = true;
-        }
+    {
+      llvm::raw_svector_ostream OS(TypeStr);
+      for (unsigned i = FirstIndex + 1, e = Patterns.size(); i != e; ++i) {
+        Patterns[i]->print(OS);
+        OS << " -> ";
       }
-      TypeStr += ") -> ";
+      Type ResultType = FD->getResultType(TU.Ctx);
+      if (ResultType->isVoid())
+        OS << "Void";
+      else
+        ResultType.print(OS);
     }
-    Type ResultType = FD->getResultType(TU.Ctx);
-    if (ResultType->isVoid())
-      TypeStr += "Void";
-    else
-      TypeStr += ResultType.getString();
     Builder.addTypeAnnotation(TypeStr);
 
     // TODO: skip arguments with default parameters?
