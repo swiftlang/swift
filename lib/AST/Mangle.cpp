@@ -58,10 +58,6 @@ static char mangleOperatorChar(char op) {
   }
 }
 
-static bool isSwiftModule(Module *module) {
-  return (!module->getParent() && module->Name.str() == "swift");
-}
-
 namespace {
   /// A helpful little wrapper for a value that should be mangled
   /// in a particular, compressed value.
@@ -194,7 +190,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
 
     // Try the special 'swift' substitution.
     // context ::= 'Ss'
-    if (isSwiftModule(module)) {
+    if (module->isStdlibModule()) {
       Buffer << "Ss";
       return;
     }
@@ -761,7 +757,8 @@ void Mangler::mangleNominalType(NominalTypeDecl *decl,
 bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
   // Bail out if our parent isn't the swift standard library.
   Module *parent = dyn_cast<Module>(decl->getDeclContext());
-  if (!parent || !isSwiftModule(parent)) return false;
+  if (!parent || !parent->isStdlibModule())
+    return false;
 
   // Standard substitutions shouldn't start with 's' (because that's
   // reserved for the swift module itself) or a digit or '_'.

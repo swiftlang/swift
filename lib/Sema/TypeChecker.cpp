@@ -130,7 +130,7 @@ Module *TypeChecker::getStdlibModule() {
     return StdlibModule;
 
   if (!StdlibModule)
-    StdlibModule = Context.LoadedModules.lookup("swift");
+    StdlibModule = Context.LoadedModules.lookup(Context.StdlibModuleName.str());
   if (!StdlibModule)
     StdlibModule = &TU;
 

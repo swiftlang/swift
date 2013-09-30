@@ -974,6 +974,10 @@ StringRef Module::getModuleFilename() const {
   return Owner.getModuleFilename(this);
 }
 
+bool Module::isStdlibModule() const {
+  return !getParent() && Name == Ctx.StdlibModuleName;
+}
+
 template<bool respectVisibility, typename Callback>
 static void forAllImportedModules(Module *topLevel,
                                   Optional<Module::AccessPathTy> thisPath,

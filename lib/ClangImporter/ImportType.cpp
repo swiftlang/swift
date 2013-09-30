@@ -741,7 +741,8 @@ Module *ClangImporter::Implementation::getSwiftModule() {
   if (swiftModule)
     return swiftModule;
 
-  auto known = SwiftContext.LoadedModules.find("swift");
+  auto known =
+      SwiftContext.LoadedModules.find(SwiftContext.StdlibModuleName.str());
   if (known == SwiftContext.LoadedModules.end())
     return nullptr;
 

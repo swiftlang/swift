@@ -957,7 +957,7 @@ static bool isObjCObjectOrBridgedType(Type type) {
   if (auto structTy = type->getAs<StructType>()) {
     auto structDecl = structTy->getDecl();
     if (auto module = dyn_cast<Module>(structDecl->getDeclContext())) {
-      if (module->Name.str().equals("swift") &&
+      if (module->isStdlibModule() &&
           !structDecl->getName().empty() &&
           structDecl->getName().str().equals("String"))
         return true;
@@ -991,7 +991,7 @@ static bool isIntegralType(Type type) {
   if (auto structTy = type->getAs<StructType>()) {
     auto structDecl = structTy->getDecl();
     auto module = dyn_cast<Module>(structDecl->getDeclContext());
-    if (!module || !module->Name.str().equals("swift"))
+    if (!module || !module->isStdlibModule())
       return false;
 
     // Find the single ivar.

@@ -284,8 +284,8 @@ void swift::performAutoImport(TranslationUnit *TU) {
   if (TU->HasBuiltinModuleAccess)
     M = TU->Ctx.TheBuiltinModule;
   else
-    M = TU->Ctx.getModule(std::make_pair(TU->Ctx.getIdentifier("swift"),
-                                         SourceLoc()));
+    M = TU->Ctx.getModule(
+        std::make_pair(TU->Ctx.StdlibModuleName, SourceLoc()));
 
   auto Import = std::make_pair(ImportedModule({}, M), false);
   TU->setImports(TU->Ctx.AllocateCopy(llvm::makeArrayRef(Import)));

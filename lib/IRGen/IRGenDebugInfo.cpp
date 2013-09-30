@@ -546,8 +546,10 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
       auto Component = elt.first.str();
 
       // We model each component of the access path as a namespace.
-      if (first && Component == "swift") MS << "S";
-      else mangleIdent(MS, Component);
+      if (first && Component == D->getASTContext().StdlibModuleName.str())
+        MS << "S";
+      else
+        mangleIdent(MS, Component);
       Namespace = getOrCreateNamespace(Namespace, Component, MainFile, 1);
 
       if (first) first = false;

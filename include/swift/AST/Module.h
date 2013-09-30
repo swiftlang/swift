@@ -339,6 +339,9 @@ public:
   /// string if this is not applicable.
   StringRef getModuleFilename() const;
 
+  /// \returns true if this module is the "swift" standard library module.
+  bool isStdlibModule() const;
+
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::Module;
   }

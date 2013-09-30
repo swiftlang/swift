@@ -18,6 +18,7 @@
 #define SWIFT_AST_ASTCONTEXT_H
 
 #include "llvm/Support/DataTypes.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LangOptions.h"
@@ -164,6 +165,9 @@ public:
 
   /// TheBuiltinModule - The builtin module.
   Module * const TheBuiltinModule;
+
+  /// The name of the standard library module "swift".
+  Identifier StdlibModuleName;
 
   /// ImportSearchPaths - The paths to search for imports in.
   std::vector<std::string> ImportSearchPaths;

@@ -211,6 +211,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SourceManager &SourceMgr,
     SourceMgr(SourceMgr),
     Diags(Diags),
     TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"), *this)),
+    StdlibModuleName(getIdentifier("swift")),
     TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheObjectPointerType(new (*this, AllocationArena::Permanent)
@@ -267,7 +268,7 @@ static void lookupInSwiftModule(const ASTContext &ctx,
                                 StringRef name,
                                 SmallVectorImpl<ValueDecl *> &results) {
   // Find the "swift" module.
-  auto module = ctx.LoadedModules.find("swift");
+  auto module = ctx.LoadedModules.find(ctx.StdlibModuleName.str());
   if (module == ctx.LoadedModules.end())
     return;
 
@@ -636,8 +637,7 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
 
   for (auto importer : Impl.ModuleLoaders) {
     if (Module *M = importer->loadModule(moduleID.second, modulePath)) {
-      if (modulePath.size() == 1 &&
-          modulePath[0].first == getIdentifier("swift"))
+      if (modulePath.size() == 1 && modulePath[0].first == StdlibModuleName)
         recordKnownProtocols(M);
       return M;
     }

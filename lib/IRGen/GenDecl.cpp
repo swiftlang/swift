@@ -414,8 +414,8 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
       llvm::Value* fnParameter = args++;
       fnParameter->setName(fnParameterName);
 
-      auto lookup = UnqualifiedLookup::forModuleAndName(tunit->Ctx, "swift",
-                                                        swiftVarName);
+      auto lookup = UnqualifiedLookup::forModuleAndName(
+          tunit->Ctx, tunit->Ctx.StdlibModuleName.str(), swiftVarName);
       if (!lookup.hasValue())
         continue;
 
@@ -580,8 +580,7 @@ void IRGenModule::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) {
   // Emit the implicit import of the swift standard libary.
   if (DebugInfo) {
     std::vector<std::pair<swift::Identifier, swift::SourceLoc> > AccessPath;
-    AccessPath.push_back({ Context.getIdentifier("swift"),
-                           swift::SourceLoc() });
+    AccessPath.push_back({ Context.StdlibModuleName, swift::SourceLoc() });
 
     auto Imp = ImportDecl::create(Context,
                                   Context.getOptionalDecl()->getDeclContext(),

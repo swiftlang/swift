@@ -816,7 +816,7 @@ public:
 
     // Must be defined in the 'swift' module.
     auto fnDeclOwner = dyn_cast<Module>(fnDecl->getDeclContext());
-    if (!fnDeclOwner || !fnDeclOwner->Name.str().equals("swift")) {
+    if (!fnDeclOwner || !fnDeclOwner->isStdlibModule()) {
       return false;
     }
 
