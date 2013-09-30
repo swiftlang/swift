@@ -124,10 +124,11 @@ static void lookupVisibleMemberDecls(Type BaseTy,
   doMemberLookup(BaseTy, Consumer, CurrDC, LK, TypeResolver, Visited);
 }
 
-/// \brief Lookup a member 'Name' in 'BaseTy' within the context
-/// of a given module 'M'.  This operation corresponds to a standard "dot"
-/// lookup operation like "a.b" where 'self' is the type of 'a'.  This
-/// operation is only valid after name binding.
+/// \brief Lookup all members in \c BaseTy as seen from the context \c CurrDC.
+///
+/// This operation corresponds to a standard "dot" lookup operation like "a.b"
+/// where 'self' is the type of 'a'.  This operation is only valid after name
+/// binding.
 static void doMemberLookup(Type BaseTy,
                            VisibleDeclConsumer &Consumer,
                            const DeclContext *CurrDC,
@@ -144,10 +145,10 @@ static void doMemberLookup(Type BaseTy,
     // declared type to see what we're dealing with.
     Type Ty = MTT->getInstanceType();
 
-    // Just perform normal dot lookup on the type with the specified
-    // member name to see if we find extensions or anything else.  For example,
-    // type SomeTy.SomeMember can look up static functions, and can even look
-    // up non-static functions as well (thus getting the address of the member).
+    // Just perform normal dot lookup on the type see if we find extensions or
+    // anything else.  For example, type SomeTy.SomeMember can look up static
+    // functions, and can even look up non-static functions as well (thus
+    // getting the address of the member).
     doMemberLookup(Ty, Consumer, CurrDC, LookupKind::QualifiedOnMetatype,
                    TypeResolver, Visited);
     return;
