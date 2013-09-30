@@ -1023,11 +1023,11 @@ an lvalue unless it has a <code>var-get</code> clause but not
     decl-enum ::= 'enum' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? enum-body
     enum-body ::= '{' decl* '}'
     
-    decl-enum-element ::= 'case' enum-case (',' enum-case)*
+    decl-enum-element ::= 'case' <a href="#attribute-list">attribute-list</a> enum-case (',' enum-case)*
     enum-case ::= <a href="#identifier">identifier</a> <a href="#type-tuple">type-tuple</a>? ('->' <a href="#type">type</a>)?
   </pre>
   
-  <p>an enum declaration creates a <a href="#type-enum">enum type</a>.
+  <p>An <tt>enum</tt> declaration creates a <a href="#type-enum">enum type</a>.
   Here are some examples of enum declarations:</p>
   
   <pre class="example">

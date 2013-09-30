@@ -1930,18 +1930,21 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags) {
 ///   enum-case:
 ///      identifier type-tuple? ('->' type)?
 ///   decl-enum-element:
-///      'case' enum-case (',' enum-case)*
+///      'case' attribute-list enum-case (',' enum-case)*
 /// \endverbatim
 ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
                                        llvm::SmallVectorImpl<Decl *> &Decls) {
+  ParserStatus Status;
   SourceLoc CaseLoc = consumeToken(tok::kw_case);
-  
-  // TODO: Accept attributes here?
+
+  DeclAttributes Attributes;
+  if (parseAttributeList(Attributes)) {
+    Status.setIsParseError();
+    return Status;
+  }
   
   // Parse comma-separated enum elements.
   SmallVector<EnumElementDecl*, 4> Elements;
-  
-  ParserStatus Status;
   
   SourceLoc CommaLoc;
   for (;;) {
@@ -2049,6 +2052,7 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
                                                  EqualsLoc,
                                                  LiteralRawValueExpr,
                                                  CurDeclContext);
+    result->getMutableAttrs() = Attributes;
     Elements.push_back(result);
     
     // Continue through the comma-separated list.
