@@ -2473,25 +2473,31 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
                                     SubscriptLoc, Indices.get(), ArrowLoc,
                                     ElementTy.get(), DefRange,
                                     Get, Set, CurDeclContext);
-
-    // FIXME: Order of get/set not preserved.
-    if (Set) {
-      Set->setDeclContext(CurDeclContext);
-      Set->makeSetter(Subscript);
-      Decls.push_back(Set);
-    }
-
-    if (Get) {
-      Get->setDeclContext(CurDeclContext);
-      Get->makeGetter(Subscript);
-      Decls.push_back(Get);
-    }
-
     if (Attributes.isValid())
       Subscript->getMutableAttrs() = Attributes;
 
     Decls.push_back(Subscript);
+
+    if (Set)
+      Set->makeSetter(Subscript);
+    if (Get)
+      Get->makeGetter(Subscript);
+
+    // Add get/set in source order.
+    FuncDecl* Accessors[2] = {Get, Set};
+    if (Accessors[0] && Accessors[1] &&
+        !SourceMgr.isBeforeInBuffer(Accessors[0]->getFuncLoc(),
+                                    Accessors[1]->getFuncLoc())) {
+      std::swap(Accessors[0], Accessors[1]);
+    }
+    for (auto FD : Accessors) {
+      if (FD) {
+        FD->setDeclContext(CurDeclContext);
+        Decls.push_back(FD);
+      }
+    }
   }
+
   return Status;
 }
 
