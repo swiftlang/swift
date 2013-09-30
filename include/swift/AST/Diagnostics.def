@@ -507,6 +507,8 @@ ERROR(non_func_decl_pattern_init,pattern_parsing,none,
       "default argument is only permitted for a non-curried function parameter",())
 ERROR(var_pattern_in_var,pattern_parsing,none,
       "'var' cannot appear nested inside another 'var' pattern", ())
+ERROR(nominal_type_subpattern_without_property_name,pattern_parsing,none,
+      "subpattern of a struct or class pattern must have a keyword name", ())
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
@@ -1378,6 +1380,15 @@ ERROR(tuple_pattern_length_mismatch,sema_tcp,none,
       "tuple pattern has the wrong length for tuple type %0", (Type))
 ERROR(enum_element_pattern_member_not_found,sema_tcp,none,
       "enum case '%0' not found in type %1", (StringRef, Type))
+ERROR(nominal_type_pattern_type_mismatch,sema_tcp,none,
+      "type %0 of pattern does not match deduced type %1", (Type, Type))
+ERROR(nominal_type_pattern_property_not_found,sema_tcp,none,
+      "property '%0' not found in type %1", (StringRef, Type))
+ERROR(nominal_type_pattern_property_ambiguous,sema_tcp,none,
+      "property name '%0' in type %1 is ambiguous", (StringRef, Type))
+ERROR(nominal_type_pattern_not_property,sema_tcp,none,
+      "member '%0' of type %1 is not a property", (StringRef, Type))
+
 
 //------------------------------------------------------------------------------
 // Type Check Types

@@ -84,6 +84,8 @@ public:
     if (!lookup.isSuccess())
       return false;
     
+    bool foundComponent = false;
+    
     // Prefer a type result if we find one, but accept a module too.
     for (auto &result : lookup.Results) {
       switch (result.Kind) {
@@ -95,6 +97,7 @@ public:
         if (curScope.is<TypeDecl*>())
           continue;
 
+        foundComponent = true;
         curScope = result.getNamedModule();
         break;
       
@@ -117,14 +120,18 @@ public:
         if (curScope.is<TypeDecl*>())
           continue;
         
+        foundComponent = true;
         curScope = td;
         curType = td->getDeclaredType();
         break;
       }
       }
     }
+
+    if (!foundComponent)
+      return false;
     
-    assert(curScope && "shouldn't have got past the loop without a curType");
+    assert(curScope && "shouldn't have got past the loop without a curScope");
     
     // Track the AST location of the component.
     components.push_back({udre->getLoc(), udre->getName(), {}, nullptr});
@@ -375,9 +382,13 @@ public:
     return nullptr;
   }
   
-  // Call syntax 'T.Element(x...)' or '.Element(x...)' forms a pattern if
-  // the callee references an enum element. The arguments then form a tuple
-  // pattern matching the element's data.
+  // Call syntax forms a pattern if:
+  // - the callee in 'T.Element(x...)' or '.Element(x...)'
+  //   references an enum element. The arguments then form a tuple
+  //   pattern matching the element's data.
+  // - the callee in 'T(...)' is a struct or class type. The argument tuple is
+  //   then required to have keywords for every argument that name properties
+  //   of the type.
   Pattern *visitCallExpr(CallExpr *ce) {
     // '.Element(x...)' is always treated as an EnumElementPattern.
     if (auto *ume = dyn_cast<UnresolvedMemberExpr>(ce->getFn())) {
@@ -389,8 +400,54 @@ public:
                                          subPattern);
     }
     
-    // 'T.Element(x...)' is treated as an EnumElementPattern if the dotted path
-    // references an enum element.
+    // 'T(x...)' is treated as a NominalTypePattern if 'T' references a type
+    // by name.
+    SmallVector<IdentTypeRepr::Component, 2> components;
+    if (Type ty = ResolveTypeReference(TC, components, DC).doIt(ce->getFn())) {
+      // Validate the argument tuple elements as nominal type pattern fields.
+      // They must all have keywords. For recovery, we still form the pattern
+      // even if one or more elements are missing keywords.
+      auto *argTuple = dyn_cast<TupleExpr>(ce->getArg());
+      SmallVector<NominalTypePattern::Element, 4> elements;
+
+      if (!argTuple) {
+        TC.diagnose(ce->getArg()->getLoc(),
+                    diag::nominal_type_subpattern_without_property_name);
+        elements.push_back({SourceLoc(), Identifier(), nullptr,
+                            SourceLoc(), getSubExprPattern(ce->getArg())});
+      } else for (unsigned i = 0, e = argTuple->getNumElements(); i < e; ++i) {
+        if (argTuple->getElementName(i).empty()) {
+          TC.diagnose(argTuple->getElement(i)->getLoc(),
+                      diag::nominal_type_subpattern_without_property_name);
+        }
+        
+        // FIXME: TupleExpr doesn't preserve location of keyword name or colon.
+        elements.push_back({SourceLoc(),
+                            argTuple->getElementName(i),
+                            nullptr,
+                            SourceLoc(),
+                            getSubExprPattern(argTuple->getElement(i))});
+      }
+      
+      // Build a TypeLoc to preserve AST location info for the reference chain.
+      TypeRepr *repr
+        = new (TC.Context) IdentTypeRepr(TC.Context.AllocateCopy(components));
+      TypeLoc loc(repr);
+      loc.setType(ty);
+
+      return NominalTypePattern::create(loc,
+                                        ce->getArg()->getStartLoc(),
+                                        elements,
+                                        ce->getArg()->getEndLoc(),
+                                        TC.Context);
+    }
+    
+    // 'T.Element(...)' is treated as an EnumElementPattern if
+    // the dotted path references an enum element, or a NominalTypePattern if it
+    // references a type.
+    
+    // FIXME: This redundantly resolves the left side of the dot and should be
+    // integrated with the NominalTypePattern resolution above.
     
     if (auto *ude = dyn_cast<UnresolvedDotExpr>(ce->getFn())) {
       TypeLoc referencedType;
@@ -722,10 +779,75 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
     return false;
   }
       
-  case PatternKind::NominalType:
-    // TODO: Check the type against the coerced type, then coerce the
-    // subpatterns to the field types.
-    llvm_unreachable("not implemented");
+  case PatternKind::NominalType: {
+    auto NP = cast<NominalTypePattern>(P);
+    
+    // Type-check the type.
+    if (validateType(NP->getCastTypeLoc()))
+      return nullptr;
+    
+    Type patTy = NP->getCastTypeLoc().getType();
+
+    // Check that the type matches the pattern type.
+    // FIXME: We could insert an IsaPattern if a checked cast can do the
+    // conversion.
+    if (!patTy->isEqual(type)) {
+      diagnose(NP->getLoc(), diag::nominal_type_pattern_type_mismatch,
+               patTy, type);
+      return nullptr;
+    }
+    
+    // Coerce each subpattern to its corresponding property's type, or raise an
+    // error if the property doesn't exist.
+    for (auto &elt : NP->getMutableElements()) {
+      // Resolve the property reference.
+      if (!elt.getProperty()) {
+        // For recovery, skip elements that didn't have a name attached.
+        if (elt.getPropertyName().empty())
+          continue;
+        VarDecl *prop = nullptr;
+        SmallVector<ValueDecl *, 4> members;
+        if (!dc->getParentModule()->lookupQualified(patTy,
+                                                    elt.getPropertyName(),
+                                                    NL_QualifiedDefault,
+                                                    this,
+                                                    members)) {
+          diagnose(elt.getSubPattern()->getLoc(),
+                   diag::nominal_type_pattern_property_not_found,
+                   elt.getPropertyName().str(), patTy);
+          return true;
+        }
+        
+        for (auto member : members) {
+          auto vd = dyn_cast<VarDecl>(member);
+          if (!vd) continue;
+          // FIXME: can this happen?
+          if (prop) {
+            diagnose(elt.getSubPattern()->getLoc(),
+                     diag::nominal_type_pattern_property_ambiguous,
+                     elt.getPropertyName().str(), patTy);
+            return true;
+          }
+          prop = vd;
+        }
+        
+        if (!prop) {
+          diagnose(elt.getSubPattern()->getLoc(),
+                   diag::nominal_type_pattern_not_property,
+                   elt.getPropertyName().str(), patTy);
+          return true;
+        }
+        
+        elt.setProperty(prop);
+      }
+      
+      // Coerce the subpattern.
+      if (coerceToType(elt.getSubPattern(), dc, elt.getProperty()->getType()))
+        return true;
+    }
+    NP->setType(patTy);
+    return false;
+  }
   }
   llvm_unreachable("bad pattern kind!");
 }
