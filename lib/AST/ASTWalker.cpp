@@ -556,6 +556,15 @@ public:
         else
           return true;
       }
+    } else if (SubscriptDecl *SD = dyn_cast<SubscriptDecl>(D)) {
+      if (Pattern *NewPattern = doIt(SD->getIndices()))
+        SD->setIndices(NewPattern);
+      else
+        return true;
+      if (SD->getElementTypeLoc().getTypeRepr())
+        if (doIt(SD->getElementTypeLoc().getTypeRepr()))
+          return true;
+
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
       for (Decl *M : ED->getMembers()) {
         if (doIt(M))
