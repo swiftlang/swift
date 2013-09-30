@@ -537,9 +537,9 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
     return setBoundVarsTypeError(cast<TypedPattern>(pattern)->getSubPattern(),
                                  ctx);
   case PatternKind::NominalType:
-    return setBoundVarsTypeError(cast<NominalTypePattern>(pattern)
-                                   ->getSubPattern(),
-                                 ctx);
+    for (auto &elt : cast<NominalTypePattern>(pattern)->getMutableElements())
+      setBoundVarsTypeError(elt.getSubPattern(), ctx);
+    return;
   case PatternKind::Var:
     return setBoundVarsTypeError(cast<VarPattern>(pattern)->getSubPattern(),
                                  ctx);
@@ -930,7 +930,9 @@ public:
     case PatternKind::Typed:
       return visitBoundVars(cast<TypedPattern>(P)->getSubPattern());
     case PatternKind::NominalType:
-      return visitBoundVars(cast<NominalTypePattern>(P)->getSubPattern());
+      for (auto &elt : cast<NominalTypePattern>(P)->getMutableElements())
+        visitBoundVars(elt.getSubPattern());
+      return;
     case PatternKind::EnumElement: {
       auto *OP = cast<EnumElementPattern>(P);
       if (OP->hasSubPattern())

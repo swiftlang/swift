@@ -387,34 +387,95 @@ public:
 
   
 /// A pattern that matches a nominal type and destructures elements out of it.
-/// The match succeeds if the matched value is dynamically of the specified
-/// type and the subpattern matches the the value cast to the match type.
+/// The match succeeds if the loaded property values all match their associated
+/// subpatterns.
 class NominalTypePattern : public Pattern {
-  TypeLoc CastType;
-  Pattern *SubPattern;
-  CheckedCastKind Kind;
 public:
-  NominalTypePattern(TypeLoc CastTy, Pattern *Sub, CheckedCastKind Kind,
+  /// A nominal type subpattern record.
+  class Element {
+    /// The location of the property name.
+    SourceLoc PropertyLoc;
+    /// The location of the colon.
+    SourceLoc ColonLoc;
+    /// The referenced property name.
+    Identifier PropertyName;
+    /// The referenced property.
+    VarDecl *Property;
+    /// The subpattern.
+    Pattern *SubPattern;
+  public:
+    Element(SourceLoc PropLoc, Identifier PropName, VarDecl *Prop,
+            SourceLoc ColonLoc,
+            Pattern *SubP)
+      : PropertyLoc(PropLoc), ColonLoc(ColonLoc),
+        PropertyName(PropName), Property(Prop),
+        SubPattern(SubP)
+    {}
+    
+    SourceLoc getPropertyLoc() const { return PropertyLoc; }
+    SourceLoc getColonLoc() const { return ColonLoc; }
+    
+    VarDecl *getProperty() const { return Property; }
+    void setProperty(VarDecl *v) { Property = v; }
+    
+    Identifier getPropertyName() const { return PropertyName; }
+    
+    const Pattern *getSubPattern() const { return SubPattern; }
+    Pattern *getSubPattern() { return SubPattern; }
+    void setSubPattern(Pattern *p) { SubPattern = p; }
+  };
+  
+private:
+  TypeLoc CastType;
+  SourceLoc LParenLoc, RParenLoc;
+  
+  unsigned NumElements;
+  
+  Element *getElementStorage() {
+    return reinterpret_cast<Element *>(this + 1);
+  }
+  const Element *getElementStorage() const {
+    return reinterpret_cast<const Element *>(this + 1);
+  }
+  
+  NominalTypePattern(TypeLoc CastTy, SourceLoc LParenLoc,
+                     ArrayRef<Element> Elements,
+                     SourceLoc RParenLoc,
                      Optional<bool> implicit = {})
-    : Pattern(PatternKind::NominalType), CastType(CastTy), SubPattern(Sub),
-      Kind(Kind) {
+    : Pattern(PatternKind::NominalType), CastType(CastTy),
+      LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+      NumElements(Elements.size())
+  {
     if (implicit.hasValue() ? *implicit : !CastTy.hasLocation())
       setImplicit();
+    static_assert(std::is_trivially_copyable<Element>::value,
+                  "assuming Element is trivially copyable");
+    memcpy(getElementStorage(), Elements.begin(),
+           Elements.size() * sizeof(Element));
   }
-
-  const Pattern *getSubPattern() const { return SubPattern; }
-  Pattern *getSubPattern() { return SubPattern; }
-  void setSubPattern(Pattern *p) { SubPattern = p; }
   
+public:
+  static NominalTypePattern *create(TypeLoc CastTy, SourceLoc LParenLoc,
+                                    ArrayRef<Element> Elements,
+                                    SourceLoc RParenLoc,
+                                    ASTContext &C,
+                                    Optional<bool> implicit = {});
+
   TypeLoc &getCastTypeLoc() { return CastType; }
   TypeLoc getCastTypeLoc() const { return CastType; }
   
-  CheckedCastKind getCastKind() const { return Kind; }
-  void setCastKind(CheckedCastKind kind) { Kind = kind; }
+  ArrayRef<Element> getElements() const {
+    return {getElementStorage(), NumElements};
+  }
+  MutableArrayRef<Element> getMutableElements() {
+    return {getElementStorage(), NumElements};
+  }
   
-  SourceLoc getLoc() const { return SubPattern->getLoc(); }
+  SourceLoc getLoc() const { return CastType.getSourceRange().Start; }
+  SourceLoc getLParenLoc() const { return LParenLoc; }
+  SourceLoc getRParenLoc() const { return RParenLoc; }
   SourceRange getSourceRange() const {
-    return {CastType.getSourceRange().Start, SubPattern->getSourceRange().End};
+    return {getLoc(), RParenLoc};
   }
   
   static bool classof(const Pattern *P) {

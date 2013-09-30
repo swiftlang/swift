@@ -288,8 +288,14 @@ void PrintAST::printPattern(const Pattern *pattern) {
       
   case PatternKind::NominalType: {
     auto type = cast<NominalTypePattern>(pattern);
-    OS << type->getCastTypeLoc().getType();
-    printPattern(type->getSubPattern());
+    OS << type->getCastTypeLoc().getType() << '(';
+    interleave(type->getElements().begin(), type->getElements().end(),
+               [&](const NominalTypePattern::Element &elt) {
+                 OS << elt.getPropertyName().str() << ':';
+                 printPattern(elt.getSubPattern());
+               }, [&] {
+                 OS << ", ";
+               });
     break;
   }
       
@@ -307,7 +313,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
   }
       
   case PatternKind::Var: {
-    auto var = cast<NominalTypePattern>(pattern);
+    auto var = cast<VarPattern>(pattern);
     OS << "var ";
     printPattern(var->getSubPattern());
   }

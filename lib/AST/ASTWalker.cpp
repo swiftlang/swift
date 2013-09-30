@@ -892,10 +892,12 @@ Pattern *Traversal::visitIsaPattern(IsaPattern *P) {
 }
 
 Pattern *Traversal::visitNominalTypePattern(NominalTypePattern *P) {
-  if (Pattern *newSub = doIt(P->getSubPattern()))
-    P->setSubPattern(newSub);
-  else
-    return nullptr;
+  for (auto &elt : P->getMutableElements()) {
+    if (Pattern *newSub = doIt(elt.getSubPattern()))
+      elt.setSubPattern(newSub);
+    else
+      return nullptr;
+  }
   return P;
 }
 

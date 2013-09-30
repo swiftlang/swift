@@ -142,9 +142,14 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
   case PatternKind::Isa:
     return;
   
-  case PatternKind::NominalType:
-    return cast<NominalTypePattern>(this)->getSubPattern()
-             ->collectVariables(variables);
+  case PatternKind::NominalType: {
+    auto ntp = cast<NominalTypePattern>(this);
+      
+    for (auto elt : ntp->getElements()) {
+      elt.getSubPattern()->collectVariables(variables);
+    }
+    return;
+  }
       
   case PatternKind::EnumElement: {
     auto *OP = cast<EnumElementPattern>(this);
@@ -219,9 +224,19 @@ Pattern *Pattern::clone(ASTContext &context) const {
       
   case PatternKind::NominalType: {
     auto nom = cast<NominalTypePattern>(this);
-    result = new(context) NominalTypePattern(nom->getCastTypeLoc(),
-                                           nom->getSubPattern()->clone(context),
-                                           nom->getCastKind());
+    SmallVector<NominalTypePattern::Element, 4> elts;
+    for (const auto &elt : nom->getElements()) {
+      elts.push_back(NominalTypePattern::Element(elt.getPropertyLoc(),
+                                         elt.getPropertyName(),
+                                         elt.getProperty(),
+                                         elt.getColonLoc(),
+                                         elt.getSubPattern()->clone(context)));
+    }
+    
+    result = NominalTypePattern::create(nom->getCastTypeLoc(),
+                                        nom->getLParenLoc(),
+                                        elts,
+                                        nom->getRParenLoc(), context);
     break;
   }
       
@@ -332,4 +347,17 @@ SourceRange TypedPattern::getSourceRange() const {
     return SubPattern->getSourceRange();
   }
   return { SubPattern->getSourceRange().Start, PatType.getSourceRange().End };
+}
+
+NominalTypePattern *NominalTypePattern::create(TypeLoc CastTy,
+                                               SourceLoc LParenLoc,
+                                               ArrayRef<Element> Elements,
+                                               SourceLoc RParenLoc,
+                                               ASTContext &C,
+                                               Optional<bool> implicit) {
+  void *buf = C.Allocate(sizeof(NominalTypePattern)
+                           + sizeof(Element) * Elements.size(),
+                         alignof(Element));
+  return ::new (buf) NominalTypePattern(CastTy, LParenLoc, Elements, RParenLoc,
+                                        implicit);
 }

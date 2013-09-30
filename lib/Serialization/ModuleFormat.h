@@ -313,6 +313,7 @@ namespace decls_block {
     TYPED_PATTERN,
     ISA_PATTERN,
     NOMINAL_TYPE_PATTERN,
+    NOMINAL_TYPE_PATTERN_ELT,
     VAR_PATTERN,
 
     GENERIC_PARAM_LIST = 240,
@@ -711,9 +712,16 @@ namespace decls_block {
   
   using NominalTypePatternLayout = BCRecordLayout<
     NOMINAL_TYPE_PATTERN,
-    TypeIDField,
+    TypeIDField, // type
+    BCVBR<5>, // number of elements
     BCFixed<1>  // implicit?
-    // The sub-pattern trails the record.
+    // The elements trail the record.
+  >;
+  
+  using NominalTypePatternEltLayout = BCRecordLayout<
+    NOMINAL_TYPE_PATTERN_ELT,
+    DeclIDField // property
+    // The element pattern trails the record.
   >;
 
   using VarPatternLayout = BCRecordLayout<

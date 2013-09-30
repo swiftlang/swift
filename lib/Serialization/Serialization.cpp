@@ -487,8 +487,15 @@ void Serializer::writePattern(const Pattern *pattern) {
     unsigned abbrCode = DeclTypeAbbrCodes[NominalTypePatternLayout::Code];
     auto castTy = nom->getCastTypeLoc().getType();
     NominalTypePatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                         addTypeRef(castTy), nom->isImplicit());
-    writePattern(nom->getSubPattern());
+                                         addTypeRef(castTy),
+                                         nom->getElements().size(),
+                                         nom->isImplicit());
+    abbrCode = DeclTypeAbbrCodes[NominalTypePatternEltLayout::Code];
+    for (auto &elt : nom->getElements()) {
+      NominalTypePatternEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                              addDeclRef(elt.getProperty()));
+      writePattern(elt.getSubPattern());
+    }
     break;
   }
   case PatternKind::EnumElement:
