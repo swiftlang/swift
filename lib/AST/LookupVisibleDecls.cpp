@@ -228,18 +228,7 @@ static void doMemberLookup(Type BaseTy,
 static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
                               const DeclContext *CurrDC,
                               LookupKind LK, LazyResolver *TypeResolver) {
-  NominalTypeDecl *D;
-  SmallVector<ValueDecl*, 2> BaseMembers;
-  if (BoundGenericType *BGT = BaseType->getAs<BoundGenericType>()) {
-    BaseType = BGT->getDecl()->getDeclaredType();
-    D = BGT->getDecl();
-  } else if (UnboundGenericType *UGT = BaseType->getAs<UnboundGenericType>()) {
-    D = UGT->getDecl();
-  } else if (NominalType *NT = BaseType->getAs<NominalType>()) {
-    D = NT->getDecl();
-  } else {
-    return;
-  }
+  NominalTypeDecl *D = BaseType->getAnyNominal();
 
   bool LookupFromChildDeclContext = false;
   const DeclContext *TempDC = CurrDC;
@@ -250,6 +239,8 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
     }
     TempDC = TempDC->getParent();
   }
+
+  SmallVector<ValueDecl*, 2> BaseMembers;
 
   if (LookupFromChildDeclContext) {
     // Current decl context is contained inside 'D', so generic parameters
