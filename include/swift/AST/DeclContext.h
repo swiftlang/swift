@@ -135,6 +135,13 @@ public:
   /// directly dependent on any generic parameters.
   GenericParamList *getGenericParamsOfContext() const;
 
+  /// Returns this or the first local parent context, or nullptr if it is not
+  /// contained in one.
+  DeclContext *getLocalContext();
+  const DeclContext *getLocalContext() const {
+    return const_cast<DeclContext*>(this)->getLocalContext();
+  }
+
   /// Returns the semantic parent of this context.  A context has a
   /// parent if and only if it is not a module context.
   DeclContext *getParent() const {

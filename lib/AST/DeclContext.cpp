@@ -106,6 +106,14 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
   llvm_unreachable("Unhandled declaration context kind");
 }
 
+DeclContext *DeclContext::getLocalContext() {
+  if (isLocalContext())
+    return this;
+  if (isModuleContext() || isExtensionContext())
+    return nullptr;
+  return getParent()->getLocalContext();
+}
+
 Module *DeclContext::getParentModule() const {
   const DeclContext *DC = this;
   while (!DC->isModuleContext())
