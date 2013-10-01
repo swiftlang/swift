@@ -2497,7 +2497,7 @@ ill-formed if the type does not conform to the protocol.</p>
     op-binary-or-ternary ::= '?' <a href="#expr">expr-sequence</a> ':'
 
     expr-cast ::= 'is' <a href="#type">type</a>
-    expr-cast ::= 'as' '!' <a href="#type">type</a>
+    expr-cast ::= 'as' '!'? <a href="#type">type</a>
   </pre>
 
   <p>Infix binary expressions are not formed during parsing.  Instead,
@@ -2622,6 +2622,20 @@ ill-formed if the type does not conform to the protocol.</p>
   <p>The right operand of all operators is parsed as a type.</p>
 
   <ul>
+  <li><tt>x as T</tt> will try to cast the value of the expression
+    <tt>x</tt> to a subtype of its compile-time type. The result of the
+    expression is <tt>T?</tt>. The type of the operand is checked at runtime,
+    and if it is castable to <tt>T</tt>, the <tt>Optional</tt> result contains
+    the result of the cast. If the cast fails, the result contains
+    <tt>.None</tt>.
+    <tt>T</tt> must be a subtype of the compile-time type of <tt>x</tt>.
+    An example:
+
+  <pre class="example">
+    var b:B = new D
+    var d:D? = b as D
+  </pre>
+
   <li><tt>x as! T</tt> will try to cast the value of the expression
     <tt>x</tt> to a subtype of its compile-time type. The type of the value is
     checked at runtime, and if the cast cannot succeed, the program terminates.
@@ -2645,7 +2659,7 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
   </ul>
 
-  <p><tt>as!</tt> and <tt>is</tt> all parse a type for their
+  <p><tt>as</tt>, <tt>as!</tt>, and <tt>is</tt> all parse a type for their
   right-hand argument. They must be parenthesized if followed by subsequent
   operators:
 
