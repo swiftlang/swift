@@ -167,6 +167,7 @@ declaration keyword::
 - ``import class``, ``struct``, and ``enum`` will succeed even if the
   name given is a typealias for a type of the appropriate kind.
 - ``import func`` will bring in all overloads of the named function.
+- Using a keyword that doesn't match the named declaration is an error.
 
 .. note::
 
@@ -382,9 +383,9 @@ Objective-C will be visible.
 
 .. admonition:: TODO
 
-  We need to actually do this, but it requires forking Clang, so we're pushing
-  back in the schedule as far as possible. The workaround is to manually write
-  header files for imported Swift classes.
+  We need to actually do this, but it requires working on a branch of Clang, so 
+  we're pushing it back in the schedule as far as possible. The workaround is 
+  to manually write header files for imported Swift classes.
 
 .. admonition:: TODO
 
