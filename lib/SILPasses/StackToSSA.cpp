@@ -203,6 +203,9 @@ static bool optimizeAllocStack(AllocStackInst *ASI) {
 void swift::performSILStackToSSAPromotion(SILModule *M) {
   
   for (auto &Fn : *M) {
+    DEBUG(llvm::errs() << "*** SIL Stack to SSA promotion: "
+          << Fn.getName() << "\n");
+
     for (auto &BB : Fn) {
       auto I = BB.begin(), E = BB.end();
       while (I != E) {

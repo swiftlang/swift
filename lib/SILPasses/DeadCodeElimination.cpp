@@ -384,6 +384,8 @@ static bool removeUnreachableBlocks(SILFunction &F) {
 
 void swift::performSILDeadCodeElimination(SILModule *M) {
   for (auto &Fn : *M) {
+    DEBUG(llvm::errs() << "*** Dead Code Elimination processing: "
+          << Fn.getName() << "\n");
 
     for (auto &BB : Fn) {
       // Simplify the blocks with terminators that rely on constant conditions.
