@@ -1,4 +1,4 @@
-//===--- ObjCBridge.mm - Swift <-> Objective-C Bridging -------------------===//
+//===--- BridgeNSString.mm - String <-> NSString Bridging -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -38,9 +38,6 @@ swift_NSStringToString(NSString *nsstring, SwiftString *string);
 
 NSString *
 swift_StringToNSString(SwiftString *string);
-
-NSDate *
-swift_createDate(void);
 
 }; // extern "C"
 
@@ -196,23 +193,6 @@ swift_StringToNSString(SwiftString *string) {
   r->swiftString = *string;
   _swift_retain(r->swiftString.owner);
   return r;
-}
-
-// FIXME: Just a hack for testing!
-NSDate *swift_createDate(void) {
-  return [NSDate date];
-}
-
-extern "C" bool swift_compareObjects(id x, id y) {
-  [x release];
-  [y release];
-  return x == y;
-}
-
-// FIXME: Assumes Int is 64-bit.
-extern "C" int64_t swift_hashObject(id obj) {
-  [obj release];
-  return (int64_t)obj;
 }
 
 /// (String, UnsafePointer<BOOL>) -> () block shim
