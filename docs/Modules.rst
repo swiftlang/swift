@@ -308,7 +308,8 @@ Submodules
 .. admonition:: FIXME
 
   Write this section. Submodules are basically like hierarchical modules except
-  that they live in the top-level module's file.
+  that they live in the top-level module's file. Swift submodules are not in
+  scope for 1.0.
 
 
 Import Search Paths
@@ -325,15 +326,74 @@ Import Search Paths
 Interoperability with Objective-C via Clang
 ===========================================
 
-.. admonition:: FIXME
+The compiler has the ability to interoperate with C and Objective-C by
+importing `Clang modules <Clang module>`. This feature of the Clang compiler
+was developed to provide a "semantic import" extension to the C family of
+languages. The Swift compiler uses this to expose declarations from C and
+Objective-C as if they used native Swift types.
 
-  Write this section. Objective-C modules can already be imported into Swift.
-  We definitely want to be able to import individual Objective-C headers into
-  Swift. We probably need to be able to import Swift sources into Objective-C,
-  and we probably need that to work even within a single target (for
-  migration/coexistence purposes). We could do the latter with header files,
-  but that would be pretty kludgy. We potentially have a real problem with
-  mutual dependencies that cross language boundaries.
+In all the examples above, ``import AppKit`` has been using this mechanism:
+the module found with the name "AppKit" is generated from the Objective-C
+AppKit framework.
+
+
+Module Overlays
+---------------
+
+If a source file in module A includes ``import A``, this indicates that the
+source file is providing a replacement or overlay for an external module.
+In most cases, the source file will `re-export` the underlying module, but
+add some convenience APIs to make the existing interface more Swift-friendly.
+
+This replacement syntax (using the current module name in an import) cannot
+be used to overlay a Swift module, because `Modules are uniquely identified by 
+their full name`_.
+
+
+Multiple source files, part 2
+-----------------------------
+
+In migrating from Objective-C to Swift, it is expected that a single program
+will contain a mix of sources. The compiler therefore allows importing a single
+Objective-C header, exposing its declarations to the main source file by
+constructing a sort of "ad hoc" module. These can then be used like any
+other declarations imported from C or Objective-C.
+
+.. admonition:: TODO
+
+  What happens if a user's header file happens to match the name of a real 
+  module? What if the header name is not an identifier? Do we need an
+  ``import [objc]``?
+
+  Or, since it's in the same target, is this something that should happen 
+  implicitly, like with other Swift sources?
+  
+  This doesn't actually work yet.
+
+
+Accessing Swift declarations from Objective-C
+---------------------------------------------
+
+Using the new ``@import`` syntax, Objective-C translation units can import
+Swift modules as well. Swift declarations will be mirrored into Objective-C
+and can be called natively, just as Objective-C declarations are mirrored into
+Swift for `Clang modules`. In this case, only the declarations compatible with
+Objective-C will be visible.
+
+.. admonition:: TODO
+
+  We need to actually do this, but it requires forking Clang, so we're pushing
+  back in the schedule as far as possible. The workaround is to manually write
+  header files for imported Swift classes.
+
+.. admonition:: TODO
+
+  Importing Swift sources from within the same target is a goal, but there are
+  many difficulties. How do you name a file to be imported? What if the file
+  itself depends on another Objective-C header? What if there's a mutual
+  dependency across the language boundary? (That's a problem in both directions,
+  since both Clang modules and Swift modules are only supposed to be exposed
+  once they've been type-checked.)
 
 
 Glossary
