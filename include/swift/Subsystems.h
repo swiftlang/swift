@@ -121,12 +121,6 @@ namespace swift {
   bool performTypeLocChecking(TranslationUnit *TU, TypeLoc &T,
                               bool ProduceDiagnostics = true);
 
-  /// performCaptureAnalysis - Analyse the AST and mark local declarations
-  /// and expressions which can capture them so they can be emitted more
-  /// efficiently.  StartElem indicates where to start for incremental capture
-  /// analysis in the main module.
-  void performCaptureAnalysis(TranslationUnit *TU, unsigned StartElem = 0);
-
   /// Turn the given translation unit into SIL IR. The returned SILModule must
   /// be deleted by the caller.
   SILModule *performSILGeneration(TranslationUnit *TU,
