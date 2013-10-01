@@ -748,12 +748,10 @@ ERROR(expected_type_after_is,expr_parsing,none,
       "expected type after 'is'", ())
 ERROR(expected_type_after_as_bang,expr_parsing,none,
       "expected type after 'as!'", ())
-ERROR(expected_type_after_as_question,expr_parsing,none,
-      "expected type after 'as?'", ())
+ERROR(expected_type_after_as,expr_parsing,none,
+      "expected type after 'as'", ())
 ERROR(bool_type_broken,expr_parsing,none,
       "could not find a Bool type defined for 'is'", ())
-ERROR(expected_bang_or_question_after_as,expr_parsing,none,
-      "expected 'as!' or 'as?'", ())
 
 // Generic disambiguation
 NOTE(while_parsing_as_left_angle_bracket,expr_parsing,none,

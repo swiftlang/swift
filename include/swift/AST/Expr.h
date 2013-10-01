@@ -2334,22 +2334,17 @@ public:
 /// \brief Represents an explicit conditional checked cast, which converts
 /// from a type to some subtype and produces an Optional value, which will be
 /// .Some(x) if the cast succeeds, or .None if the cast fails.
-/// Spelled 'a as? T' and produces a value of type 'T?'.
+/// Spelled 'a as T' and produces a value of type 'T?'.
 class ConditionalCheckedCastExpr : public CheckedCastExpr {
-  SourceLoc QuestionLoc;
-  
 public:
-  ConditionalCheckedCastExpr(Expr *sub, SourceLoc asLoc, SourceLoc questLoc,
-                             TypeLoc type)
+  ConditionalCheckedCastExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
     : CheckedCastExpr(ExprKind::ConditionalCheckedCast,
-                      sub, asLoc, type, type.getType()),
-      QuestionLoc(questLoc) { }
+                      sub, asLoc, type, type.getType())
+  { }
   
-  ConditionalCheckedCastExpr(SourceLoc asLoc, SourceLoc questLoc, TypeLoc type)
-    : ConditionalCheckedCastExpr(nullptr, asLoc, questLoc, type)
+  ConditionalCheckedCastExpr(SourceLoc asLoc, TypeLoc type)
+    : ConditionalCheckedCastExpr(nullptr, asLoc, type)
   {}
-  
-  SourceLoc getQuestionLoc() const { return QuestionLoc; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ConditionalCheckedCast;
