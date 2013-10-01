@@ -741,7 +741,15 @@ public:
     Builder.addLeftBracket();
     addPatternParameters(Builder, SD->getIndices());
     Builder.addRightBracket();
-    addTypeAnnotation(Builder, SD->getElementType());
+
+    // Add a type annotation.
+    Type T = SD->getElementType();
+    if (IsDynamicLookup) {
+      // Values of properties that were found on a DynamicLookup have
+      // Optional<T> type.
+      T = OptionalType::get(T, TU.Ctx);
+    }
+    addTypeAnnotation(Builder, T);
   }
 
   void addNominalTypeRef(const NominalTypeDecl *NTD) {
