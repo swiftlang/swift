@@ -49,6 +49,7 @@ std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
+    case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
       return Str;
     }

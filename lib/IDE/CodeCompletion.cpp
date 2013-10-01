@@ -83,10 +83,14 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::CallParameterBegin:
       OS << "{#";
       break;
+    case Chunk::ChunkKind::DynamicLookupMethodCallTail:
+      OS << "{#" << C.getText() << "#}";
+      break;
     case Chunk::ChunkKind::TypeAnnotation:
       OS << "[#";
       OS << C.getText();
       OS << "#]";
+      break;
     }
     PrevNestingLevel = C.getNestingLevel();
   }
@@ -285,6 +289,7 @@ StringRef getFirstTextChunk(CodeCompletionResult *R) {
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
+    case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
       continue;
     }
@@ -505,6 +510,7 @@ class CompletionLookup : swift::VisibleDeclConsumer {
   bool HaveDot = false;
   bool NeedLeadingDot = false;
   bool IsSuperRefExpr = false;
+  bool IsDynamicLookup = false;
 
   /// \brief True if we are code completing inside a static method.
   bool InsideStaticMethod = false;
@@ -555,6 +561,10 @@ public:
 
   void setIsSuperRefExpr() {
     IsSuperRefExpr = true;
+  }
+
+  void setIsDynamicLookup() {
+    IsDynamicLookup = true;
   }
 
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
@@ -669,6 +679,8 @@ public:
     if (needDot())
       Builder.addLeadingDot();
     Builder.addTextChunk(Name);
+    if (IsDynamicLookup)
+      Builder.addDynamicLookupMethodCallTail();
     Builder.addLeftParen();
     auto Patterns = FD->getArgParamPatterns();
     unsigned FirstIndex = 0;
@@ -1079,6 +1091,12 @@ void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot(
   CurDeclContext = P.CurDeclContext;
 }
 
+static bool isDynamicLookup(Type T) {
+  if (auto *PT = T->getRValueType()->getAs<ProtocolType>())
+    return PT->getDecl()->isSpecificProtocol(KnownProtocolKind::DynamicLookup);
+  return false;
+}
+
 void CodeCompletionCallbacksImpl::doneParsing() {
   if (Kind == CompletionKind::None) {
     DEBUG(llvm::dbgs() << "did not get a completion callback");
@@ -1109,7 +1127,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::DotExpr: {
     Lookup.setHaveDot();
-    Lookup.getValueExprCompletions(ParsedExpr->getType());
+    Type ExprType = ParsedExpr->getType();
+    if (isDynamicLookup(ExprType))
+      Lookup.setIsDynamicLookup();
+    Lookup.getValueExprCompletions(ExprType);
     break;
   }
 
@@ -1120,7 +1141,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::PostfixExpr: {
-    Lookup.getValueExprCompletions(ParsedExpr->getType());
+    Type ExprType = ParsedExpr->getType();
+    if (isDynamicLookup(ExprType))
+      Lookup.setIsDynamicLookup();
+    Lookup.getValueExprCompletions(ExprType);
     break;
   }
 

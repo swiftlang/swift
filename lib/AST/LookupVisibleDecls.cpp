@@ -41,17 +41,15 @@ enum class LookupKind {
 };
 } // unnamed namespace
 
-static void
-GlobalExtensionLookupFoundMember(SmallVectorImpl<ValueDecl *> &Found,
-                                 ValueDecl *Member, LookupKind LK) {
+static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupKind LK) {
   if (auto *FD = dyn_cast<FuncDecl>(Member)) {
     // Can not call static functions on non-metatypes.
     if (LK != LookupKind::QualifiedOnMetatype && FD->isStatic())
-      return;
+      return false;
   }
   if (LK == LookupKind::QualifiedOnMetatype && isa<VarDecl>(Member)) {
     // FIXME: static variables
-    return;
+    return false;
   }
   if (LK == LookupKind::Qualified &&
       (isa<TypeAliasDecl>(Member) || isa<AssociatedTypeDecl>(Member) ||
@@ -59,9 +57,10 @@ GlobalExtensionLookupFoundMember(SmallVectorImpl<ValueDecl *> &Found,
     // Can only access nested typealiases with unqualified lookup or on
     // metatypes.
     // FIXME: other nominal types?  rdar://14489286
-    return;
+    return false;
   }
-  Found.push_back(Member);
+
+  return true;
 }
 
 static void DoGlobalExtensionLookup(Type BaseType,
@@ -78,16 +77,16 @@ static void DoGlobalExtensionLookup(Type BaseType,
 
   // Add the members from the type itself to the list of results.
   for (auto member : BaseMembers) {
-    GlobalExtensionLookupFoundMember(found, member, LK);
+    if (isDeclVisibleInLookupMode(member, LK))
+      found.push_back(member);
   }
 
   // Look in each extension of this type.
   for (auto extension : nominal->getExtensions()) {
     for (auto member : extension->getMembers()) {
-      auto vd = dyn_cast<ValueDecl>(member);
-      if (!vd)
-        continue;
-      GlobalExtensionLookupFoundMember(found, vd, LK);
+      if (auto VD = dyn_cast<ValueDecl>(member))
+        if (isDeclVisibleInLookupMode(VD, LK))
+          found.push_back(VD);
     }
   }
 
@@ -146,16 +145,43 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
                           CurrDC->getParentModule(), LK, TypeResolver);
 }
 
+/// Enumerate DynamicLookup declarations as seen from context \c CurrDC.
+static void doDynamicLookup(VisibleDeclConsumer &Consumer,
+                            const DeclContext *CurrDC,
+                            LookupKind LK) {
+  class DynamicLookupConsumer : public VisibleDeclConsumer {
+    VisibleDeclConsumer &ChainedConsumer;
+    LookupKind LK;
+
+  public:
+    explicit DynamicLookupConsumer(VisibleDeclConsumer &ChainedConsumer,
+                                   LookupKind LK)
+        : ChainedConsumer(ChainedConsumer), LK(LK) {}
+
+    void foundDecl(ValueDecl *D) override {
+      // If the declaration has an override, name lookup will also have found
+      // the overridden method.  Skip this declaration, because we prefer the
+      // overridden method.
+      if (D->getOverriddenDecl())
+        return;
+
+      if (isDeclVisibleInLookupMode(D, LK))
+        ChainedConsumer.foundDecl(D);
+    }
+  };
+
+  DynamicLookupConsumer ConsumerWrapper(Consumer, LK);
+
+  CurrDC->getParentModule()->forAllVisibleModules(
+      Module::AccessPathTy(), [&](Module::ImportedModule Import) {
+        Import.second->lookupClassMembers(Import.first, ConsumerWrapper);
+      });
+}
+
 namespace {
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
 }
 
-/// \brief Enumerate all members in \c BaseTy (including members of extensions,
-/// superclasses and implemented protocols), as seen from the context \c CurrDC.
-///
-/// This operation corresponds to a standard "dot" lookup operation like "a.b"
-/// where 'self' is the type of 'a'.  This operation is only valid after name
-/// binding.
 static void lookupVisibleMemberDeclsImpl(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
     LookupKind LK, LazyResolver *TypeResolver, VisitedSet &Visited) {
@@ -189,6 +215,11 @@ static void lookupVisibleMemberDeclsImpl(
 
   // If the base is a protocol, enumerate its members.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
+    if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::DynamicLookup)) {
+      // Handle DynamicLookup in a special way.
+      doDynamicLookup(Consumer, CurrDC, LK);
+      return;
+    }
     if (!Visited.insert(PT->getDecl()))
       return;
       
@@ -250,6 +281,12 @@ static void lookupVisibleMemberDeclsImpl(
   // FIXME: Weed out overridden methods.
 }
 
+/// \brief Enumerate all members in \c BaseTy (including members of extensions,
+/// superclasses and implemented protocols), as seen from the context \c CurrDC.
+///
+/// This operation corresponds to a standard "dot" lookup operation like "a.b"
+/// where 'self' is the type of 'a'.  This operation is only valid after name
+/// binding.
 static void lookupVisibleMemberDecls(Type BaseTy,
                                      VisibleDeclConsumer &Consumer,
                                      const DeclContext *CurrDC,

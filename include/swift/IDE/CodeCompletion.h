@@ -89,6 +89,13 @@ public:
       /// Required parameter type.
       CallParameterType,
 
+      /// A placeholder for \c ! or \c ? in a call to a method found by dynamic
+      /// lookup.
+      ///
+      /// Note that the IDE should not insert any of these characters by
+      /// default.
+      DynamicLookupMethodCallTail,
+
       /// Specifies the type of the whole entity that is returned in this code
       /// completion result.  For example, for variable references it is the
       /// variable type, for function calls it is the return type.
@@ -108,6 +115,7 @@ public:
              Kind == ChunkKind::CallParameterName ||
              Kind == ChunkKind::CallParameterColon ||
              Kind == ChunkKind::CallParameterType ||
+             Kind == ChunkKind::DynamicLookupMethodCallTail ||
              Kind == ChunkKind::TypeAnnotation;
     }
 
@@ -323,6 +331,13 @@ public:
     addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::CallParameterType, Type);
     CurrentNestingLevel--;
+  }
+
+  void addDynamicLookupMethodCallTail() {
+    addChunkWithText(
+        CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail,
+        "?|!");
+    getLastChunk().setIsAnnotation();
   }
 
   void addTypeAnnotation(StringRef Type) {
