@@ -83,13 +83,14 @@ parseSelectorArgument(Parser &P,
                       SmallVectorImpl<TuplePatternElt> &bodyElts,
                       llvm::StringMap<VarDecl *> &selectorNames,
                       SourceLoc &rp) {
-  ParserResult<Pattern> argPattern = P.parsePatternIdentifier();
-  assert(argPattern.isNonNull() &&
+  ParserResult<Pattern> ArgPatternRes = P.parsePatternIdentifier();
+  assert(ArgPatternRes.isNonNull() &&
          "selector argument did not start with an identifier!");
+  Pattern *ArgPattern = ArgPatternRes.get();
   
   // Check that a selector name isn't used multiple times, which would
   // lead to the function type having multiple arguments with the same name.
-  if (NamedPattern *name = dyn_cast<NamedPattern>(argPattern.get())) {
+  if (NamedPattern *name = dyn_cast<NamedPattern>(ArgPattern)) {
     VarDecl *decl = name->getDecl();
     StringRef id = decl->getName().str();
     auto prevName = selectorNames.find(id);
@@ -112,11 +113,12 @@ parseSelectorArgument(Parser &P,
     return makeParserError();
   }
 
-  ParserResult<Pattern> bodyPattern = P.parsePatternAtom();
-  if (bodyPattern.isNull()) {
+  ParserResult<Pattern> BodyPatternRes = P.parsePatternAtom();
+  if (BodyPatternRes.isNull()) {
     recoverFromBadSelectorArgument(P);
     return makeParserError();
   }
+  Pattern *BodyPattern = BodyPatternRes.get();
   
   if (P.consumeIf(tok::colon)) {
     ParserResult<TypeRepr> type = P.parseTypeAnnotation();
@@ -130,10 +132,8 @@ parseSelectorArgument(Parser &P,
       recoverFromBadSelectorArgument(P);
     }
 
-    argPattern = makeParserResult(
-        new (P.Context) TypedPattern(argPattern.get(), type.get()));
-    bodyPattern = makeParserResult(
-        new (P.Context) TypedPattern(bodyPattern.get(), type.get()));
+    ArgPattern = new (P.Context) TypedPattern(ArgPattern, type.get());
+    BodyPattern = new (P.Context) TypedPattern(BodyPattern, type.get());
     if (Status.isError())
       return Status;
   }
@@ -165,9 +165,9 @@ parseSelectorArgument(Parser &P,
   }
   
   rp = P.consumeToken(tok::r_paren);
-  argElts.push_back(TuplePatternElt(argPattern.get(), init,
+  argElts.push_back(TuplePatternElt(ArgPattern, init,
                                     getDefaultArgKind(init)));
-  bodyElts.push_back(TuplePatternElt(bodyPattern.get(), init,
+  bodyElts.push_back(TuplePatternElt(BodyPattern, init,
                                      getDefaultArgKind(init)));
   return makeParserSuccess();
 }
