@@ -48,6 +48,10 @@
 
   In no case will you end up with a dangling pointer or other unsafe construct.
 
+* 'x as T' now performs a checked cast to 'T?', producing '.Some(t)' if the
+  cast succeeds, or '.None' if the cast fails.
+
+
 2013-09-24
 ----------
 
