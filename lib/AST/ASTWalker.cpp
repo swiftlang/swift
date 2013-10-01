@@ -289,6 +289,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (!newValue) return nullptr;
       bound.Value = newValue;
     }
+    if (E->hasConstructionFunction()) {
+      Expr *newConstructionFn = doIt(E->getConstructionFunction());
+      if (!newConstructionFn) return nullptr;
+      E->setConstructionFunction(newConstructionFn);
+    }
     return E;
   }
 

@@ -1533,6 +1533,8 @@ namespace {
         sliceType = cast<ArraySliceType>(resultType.getPointer());
       }
       expr->setType(resultType);
+      
+      
 
       // Find the appropriate injection function.
       Expr* injectionFn = tc.buildArrayInjectionFnRef(dc, sliceType,
@@ -1542,6 +1544,52 @@ namespace {
         return nullptr;
       expr->setInjectionFunction(injectionFn);
 
+      // If we gave an explicit construction closure, it should have
+      // IndexType -> ElementType type.
+      if (expr->hasConstructionFunction()) {
+        // FIXME: Assume the index type is DefaultIntegerLiteralType for now.
+        auto intProto = tc.getProtocol(expr->getConstructionFunction()->getLoc(),
+                                 KnownProtocolKind::IntegerLiteralConvertible);
+        Type intTy = tc.getDefaultType(intProto);
+        
+        Expr *constructionFn = expr->getConstructionFunction();
+        Type constructionTy = FunctionType::get(intTy,
+                                                elementType,
+                                                tc.Context);
+        if (tc.typeCheckExpression(constructionFn, dc,
+                                   constructionTy,
+                                   /*discarded*/false))
+          return nullptr;
+        expr->setConstructionFunction(constructionFn);
+      } else {
+        // If the element type is default constructible, form a partial
+        // application of it.
+        auto choice = getOverloadChoice(cs.getConstraintLocator(expr,
+                                          ConstraintLocator::NewArrayElement));
+        
+        auto baseElementType = elementType;
+        while (true) {
+          if (auto arrayTy = baseElementType->getAs<ArrayType>())
+            baseElementType = arrayTy->getBaseType();
+          else if (auto sliceTy =
+                     dyn_cast<ArraySliceType>(baseElementType.getPointer()))
+            baseElementType = sliceTy->getBaseType();
+          else
+            break;
+        }
+        
+        Expr *ctor = tc.buildRefExpr(choice.first.getDecl(),
+                               SourceLoc(),
+                               /*implicit*/ true);
+        Expr *metaty = new (tc.Context) MetatypeExpr(nullptr, SourceLoc(),
+                               MetaTypeType::get(baseElementType, tc.Context));
+        Expr *applyExpr = new(tc.Context) ConstructorRefCallExpr(ctor, metaty);
+        if (tc.typeCheckExpression(applyExpr, dc, Type(), /*discarded*/ false))
+          llvm_unreachable("should not fail");
+      
+        expr->setConstructionFunction(applyExpr);
+      }
+      
       return expr;
     }
 

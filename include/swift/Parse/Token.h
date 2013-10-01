@@ -106,6 +106,11 @@ public:
     return !isAtStartOfLine() && Kind == tok::l_square;
   }
 
+  /// True if the token is an l_brace token that does not start a new line.
+  bool isFollowingLBrace() const {
+    return !isAtStartOfLine() && Kind == tok::l_brace;
+  }
+
   /// True if the token is any keyword.
   bool isKeyword() const {
     switch (Kind) {

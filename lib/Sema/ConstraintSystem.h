@@ -434,7 +434,9 @@ public:
     /// \brief The source of an assignment.
     AssignSource,
     /// \brief The destination of an assignment
-    AssignDest
+    AssignDest,
+    /// \brief The array element type of a 'new' expression.
+    NewArrayElement,
   };
 
   /// \brief Determine whether the given path element kind has an associated
@@ -468,6 +470,7 @@ public:
     case IfElse:
     case AssignSource:
     case AssignDest:
+    case NewArrayElement:
       return false;
 
     case GenericArgument:
@@ -626,6 +629,7 @@ public:
       case IfElse:
       case AssignSource:
       case AssignDest:
+      case NewArrayElement:
         continue;
 
       case Archetype:

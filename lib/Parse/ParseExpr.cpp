@@ -529,7 +529,7 @@ Expr *Parser::parseExprOperator() {
 /// parseExprNew
 ///
 ///   expr-new:
-///     'new' type-simple expr-new-bounds
+///     'new' type-simple expr-new-bounds expr-closure?
 ///   expr-new-bounds:
 ///     expr-new-bound
 ///     expr-new-bounds expr-new-bound
@@ -581,6 +581,13 @@ ParserResult<Expr> Parser::parseExprNew() {
 
   if (hadInvalid)
     return nullptr;
+  
+  // Check for an initialization closure.
+  Expr *constructExpr = nullptr;
+  if (Tok.isFollowingLBrace()) {
+    constructExpr = parseExprClosure();
+    assert(constructExpr);
+  }
 
   if (bounds.empty()) {
     diagnose(newLoc, diag::expected_bracket_array_new);
@@ -590,7 +597,8 @@ ParserResult<Expr> Parser::parseExprNew() {
   }
 
   return makeParserResult(
-      NewArrayExpr::create(Context, newLoc, elementTy.get(), bounds));
+      NewArrayExpr::create(Context, newLoc, elementTy.get(), bounds,
+                           constructExpr));
 }
 
 static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
@@ -614,7 +622,6 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 ///     'super' '.' identifier
 ///   expr-super-constructor:
 ///     'super' '.' 'constructor' 
-///     'super' '.' 'constructor' '.' selector-args
 ///   expr-super-subscript:
 ///     'super' '[' expr ']'
 ParserResult<Expr> Parser::parseExprSuper() {

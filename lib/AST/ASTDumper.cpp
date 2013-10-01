@@ -1219,6 +1219,10 @@ public:
       else
         OS.indent(Indent + 2) << "(empty bound)";
     }
+    if (E->hasConstructionFunction()) {
+      OS << '\n';
+      printRec(E->getConstructionFunction());
+    }
     OS << ')';
   }
 

@@ -762,7 +762,8 @@ namespace {
 
     Type visitNewArrayExpr(NewArrayExpr *expr) {
       // Open up the element type.
-      auto resultTy = CS.openType(expr->getElementTypeLoc().getType());
+      auto elementTy = CS.openType(expr->getElementTypeLoc().getType());
+      auto resultTy = elementTy;
       auto &tc = CS.getTypeChecker();
       for (unsigned i = expr->getBounds().size(); i != 1; --i) {
         auto &bound = expr->getBounds()[i-1];
@@ -778,8 +779,20 @@ namespace {
         resultTy = ArrayType::get(resultTy, literal->getValue().getZExtValue(),
                                   tc.Context);
       }
-
+      
       auto &outerBound = expr->getBounds()[0];
+
+      // Either we have an explicit constructor closure or else ElementType must
+      // be default constructible.
+      if (!expr->hasConstructionFunction()) {
+        Type defaultCtorTy = FunctionType::get(TupleType::getEmpty(tc.Context),
+                                               elementTy,
+                                               tc.Context);
+        CS.addValueMemberConstraint(elementTy, tc.Context.getIdentifier("init"),
+            defaultCtorTy,
+            CS.getConstraintLocator(expr, ConstraintLocator::NewArrayElement));
+      }
+      
       return tc.getArraySliceType(outerBound.Brackets.Start, resultTy);
     }
 

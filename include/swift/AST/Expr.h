@@ -1869,7 +1869,7 @@ public:
   }
 };
 
-/// NewArrayExpr - The allocation of an array.  Allocates and constructs
+/// The allocation of an array.  Allocates and constructs
 /// the array, then injects that into the corresponding slice type.
 class NewArrayExpr : public Expr {
 public:
@@ -1888,12 +1888,15 @@ private:
   unsigned NumBounds;
   SourceLoc NewLoc;
   Expr *InjectionFn;
+  Expr *ConstructionFn;
 
   NewArrayExpr(SourceLoc newLoc, TypeLoc elementTy,
-               unsigned numBounds)
+               unsigned numBounds,
+               Expr *constructionFn)
     : Expr(ExprKind::NewArray, /*Implicit=*/false, Type()),
       ElementTyAsWritten(elementTy),
-      NumBounds(numBounds), NewLoc(newLoc), InjectionFn(nullptr) {}
+      NumBounds(numBounds), NewLoc(newLoc),
+      InjectionFn(nullptr), ConstructionFn(constructionFn) {}
 
   Bound *getBoundsBuffer() {
     return reinterpret_cast<Bound*>(this + 1);
@@ -1904,7 +1907,8 @@ private:
 
 public:
   static NewArrayExpr *create(ASTContext &Context, SourceLoc newLoc,
-                              TypeLoc elementTy, ArrayRef<Bound> bounds);
+                              TypeLoc elementTy, ArrayRef<Bound> bounds,
+                              Expr *constructionFn);
 
   unsigned getNumBounds() const { return NumBounds; }
 
@@ -1919,19 +1923,32 @@ public:
   SourceLoc getNewLoc() const { return NewLoc; }
 
   SourceRange getSourceRange() const {
-    return SourceRange(NewLoc, getBounds().back().Brackets.End);
+    auto endLoc = ConstructionFn && !ConstructionFn->isImplicit()
+      ? ConstructionFn->getEndLoc()
+      : getBounds().back().Brackets.End;
+    return SourceRange(NewLoc, endLoc);
   }
   SourceLoc getLoc() const { return NewLoc; }
 
-  /// Set the injection function expression to use.
+  /// Set the injection function expression to use to form the array value.
   void setInjectionFunction(Expr *fn) { InjectionFn = fn; }
   Expr *getInjectionFunction() const {
     assert(InjectionFn != nullptr);
     return InjectionFn;
   }
-
+  
   bool hasInjectionFunction() const { return InjectionFn != nullptr; }
 
+  /// Set the construction function expression to use to initialize the array
+  /// elements. This should have function type (IndexType) -> ElementType.
+  void setConstructionFunction(Expr *fn) { ConstructionFn = fn; }
+  Expr *getConstructionFunction() const {
+    assert(ConstructionFn != nullptr);
+    return ConstructionFn;
+  }
+  
+  bool hasConstructionFunction() const { return ConstructionFn != nullptr; }
+  
   bool hasElementType() const { return !ElementTy.isNull(); }
 
   Type getElementType() const {

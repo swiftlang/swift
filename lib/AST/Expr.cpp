@@ -197,12 +197,14 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
 }
 
 NewArrayExpr *NewArrayExpr::create(ASTContext &ctx, SourceLoc newLoc,
-                                   TypeLoc elementTy, ArrayRef<Bound> bounds) {
+                                   TypeLoc elementTy, ArrayRef<Bound> bounds,
+                                   Expr *constructionFn) {
   void *buffer = ctx.Allocate(sizeof(NewArrayExpr) +
                               bounds.size() * sizeof(Bound),
                               alignof(NewArrayExpr));
   NewArrayExpr *E =
-    ::new (buffer) NewArrayExpr(newLoc, elementTy, bounds.size());
+    ::new (buffer) NewArrayExpr(newLoc, elementTy, bounds.size(),
+                                constructionFn);
   memcpy(E->getBoundsBuffer(), bounds.data(), bounds.size() * sizeof(Bound));
   return E;
 }

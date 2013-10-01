@@ -213,6 +213,9 @@ void ConstraintLocator::dump(SourceManager *sm) {
     case TupleElement:
       out << "tuple element #" << llvm::utostr(elt.getValue());
       break;
+        
+    case NewArrayElement:
+      out << "new array element type";
     }
   }
 }
