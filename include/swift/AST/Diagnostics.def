@@ -1328,6 +1328,9 @@ ERROR(ambiguous_decl_ref,tce_sema,none,
 ERROR(ambiguous_operator_ref,tce_sema,none,
       "ambiguous use of operator %0", (Identifier))
 
+ERROR(partial_application_of_value_type_method,tce_sema,none,
+      "partial application of struct or enum method is not allowed", ())
+
 //------------------------------------------------------------------------------
 // Type Check Statements
 //------------------------------------------------------------------------------

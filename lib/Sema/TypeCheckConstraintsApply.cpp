@@ -1287,7 +1287,15 @@ namespace {
                             cs.getConstraintLocator(expr, { }),
                             expr->isImplicit());
     }
-
+    
+  private:
+    // A map used to track partial applications of value type methods to
+    // require that they be fully applied. Partial applications of value types
+    // would capture 'self' as an [inout] and hide any mutation of 'self',
+    // which is surprising.
+    llvm::DenseMap<Expr*, unsigned> ValueTypeMemberApplications;
+    
+  public:
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
       // Determine the declaration selected for this overloaded reference.
       auto selected = getOverloadChoice(
@@ -1296,12 +1304,34 @@ namespace {
                           ConstraintLocator::MemberRefBase));
 
       switch (selected.first.getKind()) {
-      case OverloadChoiceKind::Decl:
-        return buildMemberRef(expr->getBase(), expr->getDotLoc(),
+      case OverloadChoiceKind::Decl: {
+        auto member = buildMemberRef(expr->getBase(), expr->getDotLoc(),
                               selected.first.getDecl(), expr->getNameLoc(),
                               selected.second,
                               cs.getConstraintLocator(expr, { }),
                               expr->isImplicit());
+        // If this is an application of a value type method, arrange for us to
+        // check that it gets fully applied.
+        if (auto apply = dyn_cast<ApplyExpr>(member)) {
+          auto selfLVT = apply->getArg()->getType()->getAs<LValueType>();
+          if (!selfLVT)
+            goto not_value_type_member;
+          auto fnDeclRef = dyn_cast<DeclRefExpr>(apply->getFn());
+          if (!fnDeclRef)
+            goto not_value_type_member;
+          auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
+          if (!fn)
+            goto not_value_type_member;
+          if (fn->isInstanceMember())
+            ValueTypeMemberApplications.insert({
+              member,
+              // We need to apply all of the non-self argument clauses.
+              fn->getNaturalArgumentCount() - 1
+            });
+        }
+      not_value_type_member:
+        return member;
+      }
 
       case OverloadChoiceKind::DeclViaDynamic:
         return buildDynamicMemberRef(expr->getBase(), expr->getDotLoc(),
@@ -1619,9 +1649,23 @@ namespace {
     }
 
     Expr *visitApplyExpr(ApplyExpr *expr) {
-      return finishApply(expr, expr->getType(),
+      
+      auto result = finishApply(expr, expr->getType(),
                          ConstraintLocatorBuilder(
                            cs.getConstraintLocator(expr, { })));
+
+      // See if this application advanced a partial value type application.
+      auto foundApplication = ValueTypeMemberApplications.find(
+                                   expr->getFn()->getSemanticsProvidingExpr());
+      if (foundApplication != ValueTypeMemberApplications.end()) {
+        unsigned count = foundApplication->second;
+        assert(count > 0);
+        ValueTypeMemberApplications.erase(foundApplication);
+        if (count > 1)
+          ValueTypeMemberApplications.insert({result, count - 1});
+      }
+      
+      return result;
     }
 
     Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
@@ -1801,6 +1845,14 @@ namespace {
     
     Expr *visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
       llvm_unreachable("should have been eliminated during name binding");
+    }
+    
+    void finalize() {
+      // Check that all value type methods were fully applied.
+      for (auto &unapplied : ValueTypeMemberApplications) {
+        cs.getTypeChecker().diagnose(unapplied.first->getLoc(),
+                               diag::partial_application_of_value_type_method);
+      }
     }
   };
 }
@@ -2937,7 +2989,9 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
 
   ExprRewriter rewriter(*this, solution);
   ExprWalker walker(rewriter);
-  return expr->walk(walker);
+  auto result = expr->walk(walker);
+  rewriter.finalize();
+  return result;
 }
 
 Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
