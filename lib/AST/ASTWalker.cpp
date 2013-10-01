@@ -544,11 +544,29 @@ public:
 #ifndef NDEBUG
       PrettyStackTraceDecl debugStack("walking into body of", FD);
 #endif
-      for (auto &P : FD->getArgParamPatterns()) {
-        if (Pattern *NewPattern = doIt(P))
-          P = NewPattern;
-        else
-          return true;
+      if (FD->hasSelectorStyleSignature()) {
+        for (auto &P : FD->getBodyParamPatterns()) {
+          if (Pattern *NewPattern = doIt(P))
+            P = NewPattern;
+          else
+            return true;
+        }
+        for (auto &P : FD->getArgParamPatterns()) {
+          if (Pattern *NewPattern = doIt(P))
+            P = NewPattern;
+          else
+            return true;
+        }
+      } else {
+        // Body params are same as argument params.
+        auto BodyPatterns = FD->getBodyParamPatterns();
+        auto ArgPatterns = FD->getArgParamPatterns();
+        for (unsigned i = 0, e = BodyPatterns.size(); i != e; ++i) {
+          if (Pattern *NewPattern = doIt(BodyPatterns[i]))
+            BodyPatterns[i] = ArgPatterns[i] = NewPattern;
+          else
+            return true;
+        }
       }
 
       if (!FD->isGetterOrSetter() && FD->getBodyResultTypeLoc().getTypeRepr())
@@ -605,10 +623,19 @@ public:
         TLCD->setBody(S);
     } else if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D)) {
       // Visit arguments.
-      auto *argParams = doIt(CD->getArgParams());
-      if (!argParams)
+      auto *bodyParams = doIt(CD->getBodyParams());
+      if (!bodyParams)
         return true;
 
+      Pattern *argParams;
+      if (CD->hasSelectorStyleSignature()) {
+        argParams = doIt(CD->getArgParams());
+        if (!argParams)
+          return true;
+      } else {
+        argParams = bodyParams;
+      }
+      CD->setBodyParams(bodyParams);
       CD->setArgParams(argParams);
 
       if (CD->getBody()) {
