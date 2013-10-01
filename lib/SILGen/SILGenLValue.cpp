@@ -709,6 +709,9 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
 SILValue SILGenFunction::emitInjectOptionalValue(SILLocation loc, 
                                                  SILValue value,
                                                  const TypeLowering &optTL) {
+  assert(!optTL.isAddressOnly() &&
+         "use emitInjectAddressOnlyOptional to emit address-only optionals");
+  
   SILType optType = optTL.getLoweredType();
   CanType valueType = optType.getSwiftType()->castTo<BoundGenericType>()
                         ->getGenericArgs()[0]->getCanonicalType();
@@ -725,6 +728,9 @@ SILValue SILGenFunction::emitInjectOptionalValue(SILLocation loc,
 
 SILValue SILGenFunction::emitInjectOptionalNothing(SILLocation loc, 
                                                    const TypeLowering &optTL) {
+  assert(!optTL.isAddressOnly() &&
+         "use emitInjectAddressOnlyOptional to emit address-only optionals");
+
   SILType optType = optTL.getLoweredType();
   CanType valueType = optType.getSwiftType()->castTo<BoundGenericType>()
                         ->getGenericArgs()[0]->getCanonicalType();
@@ -736,6 +742,49 @@ SILValue SILGenFunction::emitInjectOptionalNothing(SILLocation loc,
                        getASTContext().getInjectNothingIntoOptionalDecl());
   return B.createApply(loc, injectNothingFn, injectNothingTy, optType,
                        injectNothingSub, {});
+}
+
+void SILGenFunction::emitInjectAddressOnlyOptionalValue(SILLocation loc,
+                                                 SILValue result,
+                                                 SILValue value,
+                                                 const TypeLowering &optTL) {
+  assert(optTL.isAddressOnly() &&
+         "use emitInjectOptional to emit loadable optionals");
+  
+  SILType optType = optTL.getLoweredType();
+  CanType valueType = optType.getSwiftType()->castTo<BoundGenericType>()
+                        ->getGenericArgs()[0]->getCanonicalType();
+  SILValue injectValueFn;
+  SILType injectValueTy;
+  Substitution injectValueSub;
+  
+  std::tie(injectValueFn, injectValueTy, injectValueSub) =
+    emitSpecializedFunctionRef(*this, loc, valueType,
+                         getASTContext().getInjectValueIntoOptionalDecl());
+  
+  SILValue args[] = {result, value};
+  
+  B.createApply(loc, injectValueFn, injectValueTy, optType,
+                injectValueSub, args);
+}
+
+void SILGenFunction::emitInjectAddressOnlyOptionalNothing(SILLocation loc,
+                                                SILValue result,
+                                                const TypeLowering &optTL) {
+  assert(optTL.isAddressOnly() &&
+         "use emitInjectOptional to emit loadable optionals");
+
+  SILType optType = optTL.getLoweredType();
+  CanType valueType = optType.getSwiftType()->castTo<BoundGenericType>()
+                        ->getGenericArgs()[0]->getCanonicalType();
+  SILValue injectNothingFn;
+  SILType injectNothingTy;
+  Substitution injectNothingSub;
+  std::tie(injectNothingFn, injectNothingTy, injectNothingSub) =
+    emitSpecializedFunctionRef(*this, loc, valueType,
+                       getASTContext().getInjectNothingIntoOptionalDecl());
+  B.createApply(loc, injectNothingFn, injectNothingTy, optType,
+                injectNothingSub, result);
 }
 
 /// Given that the type-of-rvalue differs from the type-of-storage,

@@ -702,18 +702,92 @@ SILGenFunction::emitCheckedCastBranch(SILLocation loc,
 RValue RValueEmitter::visitConditionalCheckedCastExpr(
                                                   ConditionalCheckedCastExpr *E,
                                                   SGFContext C) {
-  llvm_unreachable("not implemented");
+  ManagedValue original = visit(E->getSubExpr()).getAsSingleValue(SGF,
+                                                              E->getSubExpr());
+
+  SILBasicBlock *contBB = SGF.createBasicBlock();
+  // If the result is loadable, forward it as an argument of the
+  // continuation block. Otherwise, emit it into memory.
+  SILValue result;
+  auto &resultTL = SGF.getTypeLowering(E->getType());
+  bool isIndirect = resultTL.isAddressOnly();
+  if (isIndirect)
+    result = SGF.getBufferForExprResult(E,resultTL.getLoweredType(),C);
+  else
+    result = new (SGF.SGM.M) SILArgument(resultTL.getLoweredType(), contBB);
+  
+  // Keep the original cleanup because the cast-to result, while more specific,
+  // is conditionally wrapped up in an optional.
+  SILValue originalVal = original.getValue();
+  CleanupsDepth resultCleanup = original.getCleanup();
+  SILBasicBlock *success, *failure;
+  std::tie(success, failure) = SGF.emitCheckedCastBranch(E, originalVal,
+                                                 E->getSubExpr()->getType(),
+                                                 E->getCastTypeLoc().getType(),
+                                                 E->getCastKind());
+  
+  // Handle the cast success case.
+  SGF.B.emitBlock(success);
+  SILValue castResult = success->bbarg_begin()[0];
+
+  // If casting from an opaque existential, we need to copy the result from out
+  // of its existential container, so that it can still be cleaned up and won't
+  // be left in a partially initialized state after the optional injection
+  // function.
+  AllocStackInst *copyBuf = nullptr;
+  if (originalVal.getType().isExistentialType()
+      && !originalVal.getType().isClassExistentialType()) {
+    copyBuf = SGF.B.createAllocStack(E, castResult.getType());
+    SGF.B.createCopyAddr(E, castResult, SILValue(copyBuf, 1),
+                         IsNotTake, IsInitialization);
+  }
+
+  // Load the BB argument if casting from address-only to loadable type.
+  if (castResult.getType().isAddress()
+      && !castResult.getType().isAddressOnly(SGF.SGM.M))
+    castResult = SGF.B.createLoad(E, castResult);
+  // Wrap it in an Optional.
+  if (isIndirect) {
+    SGF.emitInjectAddressOnlyOptionalValue(E, result, castResult,
+                                           resultTL);
+    if (copyBuf)
+      SGF.B.createDeallocStack(E, SILValue(copyBuf, 0));
+    SGF.B.createBranch(E, contBB);
+  } else {
+    SILValue someResult = SGF.emitInjectOptionalValue(E, castResult, resultTL);
+    if (copyBuf)
+      SGF.B.createDeallocStack(E, SILValue(copyBuf, 0));
+    SGF.B.createBranch(E, contBB, someResult);
+  }
+  
+  // Handle the cast failure case.
+  SGF.B.emitBlock(failure);
+  // Create an empty Optional.
+  if (isIndirect) {
+    SGF.emitInjectAddressOnlyOptionalNothing(E, result, resultTL);
+    SGF.B.createBranch(E, contBB);
+  } else {
+    SILValue noneResult = SGF.emitInjectOptionalNothing(E, resultTL);
+    SGF.B.createBranch(E, contBB, noneResult);
+  }
+  
+  SGF.B.emitBlock(contBB);
+  // If an independent copy of the result was made, it gets its own cleanup.
+  if (copyBuf)
+    return RValue(SGF, SGF.emitManagedRValueWithCleanup(result, resultTL), E);
+  // Otherwise, we can carry the original independent (and un-enum-ed) cleanup.
+  return RValue(SGF, ManagedValue(result, resultCleanup), E);
 }
 
 RValue RValueEmitter::visitUnconditionalCheckedCastExpr(
                                                UnconditionalCheckedCastExpr *E,
                                                SGFContext C) {
-  // Disable the original cleanup because the cast-to type is more specific and
-  // should have a more efficient cleanup.
   ManagedValue original = visit(E->getSubExpr()).getAsSingleValue(SGF,
                                                               E->getSubExpr());
-  SILValue originalVal = original.getValue();
-  SILValue cast = SGF.emitUnconditionalCheckedCast(E, original.forward(SGF),
+  // Disable the original cleanup because the cast-to type is more specific and
+  // should have a more efficient cleanup.
+  SILValue originalVal = original.forward(SGF);
+  SILValue cast = SGF.emitUnconditionalCheckedCast(E, originalVal,
                                   E->getSubExpr()->getType(),
                                   E->getCastTypeLoc().getType(),
                                   E->getCastKind());

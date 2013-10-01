@@ -831,24 +831,49 @@ public:
                         Type castTy,
                         CheckedCastKind kind);
 
-  /// Inject a value into an optional.
+  /// Inject a loadable value into an optional.
   ///
-  /// \param loc The location to use for the resulting optional.
-  /// \param value The value to inject into an optional.
+  /// \param loc   The location to use for the resulting optional.
+  /// \param value The value to inject into an optional, which must be of a
+  ///              loadable type.
   /// \param optTL Type lowering information for the optional to create. 
   ///
   /// \returns an optional that wraps the given value
   SILValue emitInjectOptionalValue(SILLocation loc, SILValue value,
                                    const TypeLowering &optTL);
-
-  /// Create an optional with a "nothing" value.
+  
+  /// Create a loadable optional with a "nothing" value.
   ///
   /// \param loc The location to use for the resulting optional.
-  /// \param optTL Type lowering information for the optional to create.
+  /// \param optTL Type lowering information for the optional to create, which
+  ///              must be for a loadable type.
   ///
   /// \returns An empty optional.
-  SILValue emitInjectOptionalNothing(SILLocation loc, 
+  SILValue emitInjectOptionalNothing(SILLocation loc,
                                      const TypeLowering &optTL);
+
+  /// Initialize a memory location with an address-only optional.
+  ///
+  /// \param loc   The location to use for the resulting optional.
+  /// \param dest  The uninitialized memory in which to store the result value.
+  /// \param value The value to inject into an optional, which must be of an
+  ///              address-only type.
+  /// \param optTL Type lowering information for the optional to create.
+  void emitInjectAddressOnlyOptionalValue(SILLocation loc,
+                                          SILValue dest,
+                                          SILValue value,
+                                          const TypeLowering &optTL);
+
+  /// Initialize a memory location with an address-only optional "nothing"
+  /// value.
+  ///
+  /// \param loc   The location to use for the resulting optional.
+  /// \param dest  The uninitialized memory in which to store the result value.
+  /// \param optTL Type lowering information for the optional to create, which
+  ///              must be loadable.
+  void emitInjectAddressOnlyOptionalNothing(SILLocation loc,
+                                            SILValue dest,
+                                            const TypeLowering &optTL);
 
   //===--------------------------------------------------------------------===//
   // Declarations
