@@ -599,6 +599,11 @@ public:
       // parameters.  But for 'self' it is just noise.
       T = T->getRValueType();
     }
+    if (IsDynamicLookup) {
+      // Values of properties that were found on a DynamicLookup have
+      // Optional<T> type.
+      T = OptionalType::get(T, TU.Ctx);
+    }
     addTypeAnnotation(Builder, T);
   }
 
