@@ -1712,10 +1712,9 @@ namespace {
       return expr;
     }
     
-    Expr *visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *expr){
+    Expr *checkAsCastExpr(CheckedCastExpr *expr) {
       Type toType = expr->getCastTypeLoc().getType();
-      expr->setType(toType);
-
+      
       CheckedCastKind castKind = checkCheckedCastExpr(expr);
       switch (castKind) {
       /// Invalid cast.
@@ -1734,19 +1733,19 @@ namespace {
                                        expr->getCastTypeLoc().getType())
             .highlight(expr->getSubExpr()->getSourceRange())
             .highlight(expr->getCastTypeLoc().getSourceRange())
-            .fixItRemove(SourceRange(expr->getBangLoc()));
+            .fixItRemove(SourceRange(expr->getLoc(), expr->getEndLoc()));
         }
-
-        // If the types are equivalent, we don't need the 'as!' at all.
+        
+        // If the types are equivalent, we don't need the 'as' at all.
         if (expr->getType()->isEqual(expr->getSubExpr()->getType()))
           return expr->getSubExpr();
-
+        
         // Just perform the coercion directly.
         return coerceToType(expr->getSubExpr(), toType,
                             cs.getConstraintLocator(expr, { }));
       }
-
-      // Valid casts.
+        
+        // Valid casts.
       case CheckedCastKind::Downcast:
       case CheckedCastKind::SuperToArchetype:
       case CheckedCastKind::ArchetypeToArchetype:
@@ -1757,6 +1756,23 @@ namespace {
         break;
       }
       return expr;
+    }
+    
+    Expr *visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *expr){
+      expr->setType(expr->getCastTypeLoc().getType());
+      Expr *result = checkAsCastExpr(expr);
+      if (!result)
+        return nullptr;
+      return result;
+    }
+    
+    Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
+      expr->setType(cs.getTypeChecker().getOptionalType(expr->getLoc(),
+                                            expr->getCastTypeLoc().getType()));
+      Expr *result = checkAsCastExpr(expr);
+      if (!result)
+        return nullptr;
+      return result;
     }
     
     Expr *visitAssignExpr(AssignExpr *expr) {

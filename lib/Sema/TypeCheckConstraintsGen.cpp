@@ -936,6 +936,12 @@ namespace {
       return expr->getCastTypeLoc().getType();
     }
 
+    Type visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
+      // FIXME: Open this type.
+      return CS.getTypeChecker().getOptionalType(expr->getLoc(),
+                                             expr->getCastTypeLoc().getType());
+    }
+    
     Type visitIsaExpr(IsaExpr *expr) {
       // The result is Bool.
       return CS.getTypeChecker().lookupBoolType();

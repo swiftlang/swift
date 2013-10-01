@@ -1292,7 +1292,9 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-
+  void visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E) {
+    printExplicitCastExpr(E, "conditional_checked_cast_expr");
+  }
   void visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *E) {
     printExplicitCastExpr(E, "unconditional_checked_cast_expr");
   }

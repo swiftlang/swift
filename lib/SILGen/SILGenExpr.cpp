@@ -171,6 +171,8 @@ namespace {
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                        SGFContext C);
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
+    RValue visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
+                                           SGFContext C);
     RValue visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *E,
                                              SGFContext C);
     RValue visitIsaExpr(IsaExpr *E, SGFContext C);
@@ -695,6 +697,12 @@ SILGenFunction::emitCheckedCastBranch(SILLocation loc,
                             success, failure);
   
   return {success, failure};
+}
+
+RValue RValueEmitter::visitConditionalCheckedCastExpr(
+                                                  ConditionalCheckedCastExpr *E,
+                                                  SGFContext C) {
+  llvm_unreachable("not implemented");
 }
 
 RValue RValueEmitter::visitUnconditionalCheckedCastExpr(

@@ -2331,11 +2331,34 @@ public:
   }
 };
 
+/// \brief Represents an explicit conditional checked cast, which converts
+/// from a type to some subtype and produces an Optional value, which will be
+/// .Some(x) if the cast succeeds, or .None if the cast fails.
+/// Spelled 'a as? T' and produces a value of type 'T?'.
+class ConditionalCheckedCastExpr : public CheckedCastExpr {
+  SourceLoc QuestionLoc;
+  
+public:
+  ConditionalCheckedCastExpr(Expr *sub, SourceLoc asLoc, SourceLoc questLoc,
+                             TypeLoc type)
+    : CheckedCastExpr(ExprKind::ConditionalCheckedCast,
+                      sub, asLoc, type, type.getType()),
+      QuestionLoc(questLoc) { }
+  
+  ConditionalCheckedCastExpr(SourceLoc asLoc, SourceLoc questLoc, TypeLoc type)
+    : ConditionalCheckedCastExpr(nullptr, asLoc, questLoc, type)
+  {}
+  
+  SourceLoc getQuestionLoc() const { return QuestionLoc; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ConditionalCheckedCast;
+  }
+};
+  
 /// \brief Represents an explicit unconditional checked cast, which converts
 /// from a type to some subtype or aborts if the cast is not possible,
 /// spelled 'a as! T' and producing a value of type T.
-///
-/// FIXME: All downcasts are currently unconditional, which is horrible.
 class UnconditionalCheckedCastExpr : public CheckedCastExpr {
   SourceLoc BangLoc;
   

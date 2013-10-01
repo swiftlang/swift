@@ -748,10 +748,12 @@ ERROR(expected_type_after_is,expr_parsing,none,
       "expected type after 'is'", ())
 ERROR(expected_type_after_as_bang,expr_parsing,none,
       "expected type after 'as!'", ())
+ERROR(expected_type_after_as_question,expr_parsing,none,
+      "expected type after 'as?'", ())
 ERROR(bool_type_broken,expr_parsing,none,
       "could not find a Bool type defined for 'is'", ())
-ERROR(expected_bang_after_as,expr_parsing,none,
-      "expected 'as!'", ())
+ERROR(expected_bang_or_question_after_as,expr_parsing,none,
+      "expected 'as!' or 'as?'", ())
 
 // Generic disambiguation
 NOTE(while_parsing_as_left_angle_bracket,expr_parsing,none,
@@ -979,7 +981,7 @@ ERROR(does_not_have_member,sema_tcc,none,
   "%0 does not have a member named %1",
   (Type, Identifier))
 ERROR(downcast_to_supertype,sema_tcc,none,
-      "downcast from %0 to supertype %1 is a coercion; remove the '!'", 
+      "conversion from %0 to supertype %1 is implicit; remove the cast",
       (Type, Type))
 ERROR(isa_is_always_true,sema_tcc,none,
       "'is' test is always true",

@@ -95,6 +95,7 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::PrefixUnary:
   case ExprKind::Sequence:
   case ExprKind::Isa:
+  case ExprKind::ConditionalCheckedCast:
   case ExprKind::UnconditionalCheckedCast:
   case ExprKind::Assign:
   case ExprKind::UnresolvedPattern:
@@ -297,25 +298,35 @@ ParserResult<Expr> Parser::parseExprIs() {
 /// parseExprAs
 ///   expr-as:
 ///     'as' '!' type
+///     'as' '?' type
 ParserResult<Expr> Parser::parseExprAs() {
   SourceLoc asLoc = consumeToken(tok::kw_as);
-  SourceLoc bangLoc;
 
-  if (!Tok.isContextualPunctuator("!")) {
-    diagnose(Tok, diag::expected_bang_after_as);
+  bool conditional = Tok.is(tok::question);
+  if (!conditional && !Tok.isContextualPunctuator("!")) {
+    diagnose(Tok, diag::expected_bang_or_question_after_as);
     return nullptr;
   }
 
-  bangLoc = consumeToken();
+  SourceLoc puncLoc = consumeToken();
 
-  ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as_bang);
+  ParserResult<TypeRepr> type = parseType(conditional
+                                        ? diag::expected_type_after_as_question
+                                        : diag::expected_type_after_as_bang);
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (type.isNull())
     return nullptr;
   
-  return makeParserResult(new (Context)
-      UnconditionalCheckedCastExpr(asLoc, bangLoc, type.get()));
+  Expr *parsed;
+  if (conditional)
+    parsed
+      = new (Context) ConditionalCheckedCastExpr(asLoc, puncLoc, type.get());
+  else
+    parsed
+      = new (Context) UnconditionalCheckedCastExpr(asLoc, puncLoc, type.get());
+  
+  return makeParserResult(parsed);
 }
 
 /// parseExprSequence
