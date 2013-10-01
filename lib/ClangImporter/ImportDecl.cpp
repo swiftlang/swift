@@ -940,6 +940,7 @@ namespace {
       selfPat->setType(selfVar->getType());
       argPatterns.push_back(selfPat);
       bodyPatterns.push_back(selfPat);
+      bool hasSelectorStyleSignature;
       
       // Import the type that this method will have.
       auto type = Impl.importFunctionType(decl->getResultType(),
@@ -948,6 +949,7 @@ namespace {
                                           decl->isVariadic(),
                                           argPatterns,
                                           bodyPatterns,
+                                          &hasSelectorStyleSignature,
                                           decl->getSelector());
       if (!type)
         return nullptr;
@@ -966,6 +968,9 @@ namespace {
           /*GenericParams=*/nullptr, type, argPatterns, bodyPatterns,
           TypeLoc::withoutLoc(resultTy), dc);
       result->setBodyResultType(resultTy);
+      
+      if (hasSelectorStyleSignature)
+        result->setHasSelectorStyleSignature();
 
       setVarDeclContexts(argPatterns, result);
       setVarDeclContexts(bodyPatterns, result);
@@ -1191,6 +1196,7 @@ namespace {
 
       argPatterns.push_back(selfPat);
       bodyPatterns.push_back(selfPat);
+      bool hasSelectorStyleSignature;
 
       // Import the type that this method will have.
       auto type = Impl.importFunctionType(objcMethod->getResultType(),
@@ -1199,6 +1205,7 @@ namespace {
                                           objcMethod->isVariadic(),
                                           argPatterns,
                                           bodyPatterns,
+                                          &hasSelectorStyleSignature,
                                           objcMethod->getSelector(),
                                           /*isConstructor=*/true);
       assert(type && "Type has already been successfully converted?");
@@ -1216,6 +1223,7 @@ namespace {
 
       VarDecl *selfVar = new (Impl.SwiftContext) VarDecl(SourceLoc(),
                                                           selfName, selfTy, dc);
+      selfVar->isImplicit();
 
       // Create the actual constructor.
       auto result = new (Impl.SwiftContext) ConstructorDecl(name, loc,
@@ -1228,6 +1236,9 @@ namespace {
       result->setInitializerType(initType);
       result->setIsObjC(true);
       result->setClangNode(objcMethod);
+      
+      if (hasSelectorStyleSignature)
+        result->setHasSelectorStyleSignature();
       
       selfVar->setDeclContext(result);
       setVarDeclContexts(argPatterns, result);

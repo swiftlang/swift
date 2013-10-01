@@ -598,8 +598,13 @@ Type ClangImporter::Implementation::importFunctionType(
        bool isVariadic,
        SmallVectorImpl<Pattern*> &argPatterns,
        SmallVectorImpl<Pattern*> &bodyPatterns,
+       bool *pHasSelectorStyleSignature,
        clang::Selector selector,
        bool isConstructor) {
+
+  if (pHasSelectorStyleSignature)
+    *pHasSelectorStyleSignature = false;
+
   // Cannot import variadic types.
   if (isVariadic)
     return Type();
@@ -672,11 +677,13 @@ Type ClangImporter::Implementation::importFunctionType(
     Pattern *argPattern = bodyPattern;
     if (bodyName != name) {
       if (name.empty()) {
-        argPattern = new (SwiftContext) AnyPattern(SourceLoc());
+        argPattern = new (SwiftContext) AnyPattern(SourceLoc(),
+                                                   /*Implicit=*/true);
       } else {
         auto argVar = new (SwiftContext) VarDecl(SourceLoc(), name,
                                                  swiftParamTy,
                                                  firstClangModule);
+        argVar->setImplicit();
         argVar->setClangNode(param);
         argPattern = new (SwiftContext) NamedPattern(argVar);
       }
@@ -684,10 +691,14 @@ Type ClangImporter::Implementation::importFunctionType(
 
       argPattern
         = new (SwiftContext) TypedPattern(argPattern,
-                                          TypeLoc::withoutLoc(swiftParamTy));
+                                          TypeLoc::withoutLoc(swiftParamTy),
+                                          /*Implicit=*/true);
       argPattern->setType(swiftParamTy);
     }
     argPatternElts.push_back(TuplePatternElt(argPattern));
+    
+    if (argPattern != bodyPattern && pHasSelectorStyleSignature)
+      *pHasSelectorStyleSignature = true;
 
     // Add the tuple elements for the function types.
     swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name));
@@ -730,7 +741,9 @@ Type ClangImporter::Implementation::importFunctionType(
                                               bodyPatternElts, SourceLoc()));
   bodyPatterns.back()->setType(bodyParamsTy);
   argPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
-                                             argPatternElts, SourceLoc()));
+                                             argPatternElts, SourceLoc(),
+                                             false, SourceLoc(),
+                                             /*Implicit=*/true));
   argPatterns.back()->setType(argParamsTy);
 
   // Form the function type.

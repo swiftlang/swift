@@ -384,6 +384,8 @@ public:
   /// \param isVariadic Whether the function is variadic.
   /// \param argPatterns The externally-visible patterns for the parameters.
   /// \param bodyPatterns The patterns visible inside the function body.
+  /// \param pHasSelectorStyleSignature if non-null it accepts a boolean for
+  ///   whether the created arg/body patterns are different (selector-style).
   /// \param selector The Objective-C method selector to use for the names.
   /// \param isConstructor Whether we're building a function type for a
   /// constructor.
@@ -395,6 +397,7 @@ public:
                           bool isVariadic,
                           SmallVectorImpl<Pattern*> &argPatterns,
                           SmallVectorImpl<Pattern*> &bodyPatterns,
+                          bool *pHasSelectorStyleSignature = nullptr,
                           clang::Selector selector = clang::Selector(),
                           bool isConstructor = false);
 

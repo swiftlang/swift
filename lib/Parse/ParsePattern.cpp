@@ -87,11 +87,13 @@ parseSelectorArgument(Parser &P,
   assert(ArgPatternRes.isNonNull() &&
          "selector argument did not start with an identifier!");
   Pattern *ArgPattern = ArgPatternRes.get();
+  ArgPattern->setImplicit();
   
   // Check that a selector name isn't used multiple times, which would
   // lead to the function type having multiple arguments with the same name.
   if (NamedPattern *name = dyn_cast<NamedPattern>(ArgPattern)) {
     VarDecl *decl = name->getDecl();
+    decl->setImplicit();
     StringRef id = decl->getName().str();
     auto prevName = selectorNames.find(id);
     if (prevName != selectorNames.end()) {
@@ -132,7 +134,8 @@ parseSelectorArgument(Parser &P,
       recoverFromBadSelectorArgument(P);
     }
 
-    ArgPattern = new (P.Context) TypedPattern(ArgPattern, type.get());
+    ArgPattern = new (P.Context) TypedPattern(ArgPattern, type.get(),
+                                              /*Implicit=*/true);
     BodyPattern = new (P.Context) TypedPattern(BodyPattern, type.get());
     if (Status.isError())
       return Status;
@@ -176,9 +179,10 @@ static Pattern *getFirstSelectorPattern(ASTContext &Context,
                                         const Pattern *argPattern,
                                         SourceLoc loc)
 {
-  Pattern *pattern = new (Context) AnyPattern(loc);
+  Pattern *pattern = new (Context) AnyPattern(loc, /*Implicit=*/true);
   if (auto typed = dyn_cast<TypedPattern>(argPattern)) {
-    pattern = new (Context) TypedPattern(pattern, typed->getTypeLoc());
+    pattern = new (Context) TypedPattern(pattern, typed->getTypeLoc(),
+                                         /*Implicit=*/true);
   }
   return pattern;
 }
@@ -256,7 +260,8 @@ parseSelectorFunctionArguments(Parser &P,
   }
 
   ArgPatterns.push_back(
-      TuplePattern::create(P.Context, LParenLoc, ArgElts, RParenLoc));
+      TuplePattern::create(P.Context, LParenLoc, ArgElts, RParenLoc,
+                           /*hasVarArg=*/false,SourceLoc(), /*Implicit=*/true));
   BodyPatterns.push_back(
       TuplePattern::create(P.Context, LParenLoc, BodyElts, RParenLoc));
   return Status;
