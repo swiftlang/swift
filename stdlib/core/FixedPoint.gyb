@@ -135,15 +135,15 @@ else:
   }
 
   typealias DistanceType = ${Self}
-  static func sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
+  static func [transparent] sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
     var tmp = Builtin.int_${sign}sub_with_overflow_Int${bits}(lhs.value, rhs.value)
     return (${Self}(tmp.0), _getBool(tmp.1))
   }
-  static func add(lhs: ${Self}, rhs: DistanceType) -> (${Self}, Bool) {
+  static func [transparent] add(lhs: ${Self}, rhs: DistanceType) -> (${Self}, Bool) {
     var tmp = Builtin.int_${sign}add_with_overflow_Int${bits}(lhs.value, rhs.value)
     return (${Self}(tmp.0), _getBool(tmp.1))
   }
-  static func mul(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
+  static func [transparent] mul(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
     var tmp = Builtin.int_${sign}mul_with_overflow_Int${bits}(lhs.value, rhs.value)
     return (${Self}(tmp.0), _getBool(tmp.1))
   }

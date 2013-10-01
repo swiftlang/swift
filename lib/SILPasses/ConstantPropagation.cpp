@@ -240,7 +240,17 @@ static bool CCPFunctionBody(SILFunction &F, SILModule &M) {
         // The users could be constant propagatable now.
         for (auto UseI = I->use_begin(),
                   UseE = I->use_end(); UseI != UseE; ++UseI) {
-          WorkList.insert(cast<SILInstruction>(UseI.getUser()));
+          SILInstruction *User = cast<SILInstruction>(UseI.getUser());
+          WorkList.insert(User);
+
+          // Some constant users may indirectly cause folding of their users.
+          if (isa<StructInst>(User) || isa<TupleInst>(User)) {
+            for (auto UseUseI = User->use_begin(),
+                 UseUseE = User->use_end(); UseUseI != UseUseE; ++UseUseI) {
+              WorkList.insert(cast<SILInstruction>(UseUseI.getUser()));
+
+            }
+          }
         }
 
         // We were able to fold, so all users should use the new folded value.
