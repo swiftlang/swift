@@ -307,6 +307,14 @@ namespace {
         D->dump();
         abort();
       }
+      if (auto Overridden = D->getOverriddenDecl()) {
+        if (D->getDeclContext() == Overridden->getDeclContext()) {
+          Out << "can not override a decl in the same DeclContext";
+          D->dump();
+          Overridden->dump();
+          abort();
+        }
+      }
     }
 
     void verifyChecked(ReturnStmt *S) {

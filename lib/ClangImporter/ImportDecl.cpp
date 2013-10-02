@@ -908,6 +908,12 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // While importing the DeclContext, we might have imported the decl
+      // itself.
+      auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
+      if (known != Impl.ImportedDecls.end())
+        return known->second;
+
       return VisitObjCMethodDecl(decl, dc);
     }
 
@@ -1008,6 +1014,9 @@ namespace {
               }
               
               if (superMethod) {
+                assert(result->getDeclContext() !=
+                       superMethod->getDeclContext() &&
+                       "can not override method in the same DeclContext");
                 // FIXME: Proper type checking here!
                 result->setOverriddenDecl(superMethod);
               }
@@ -1655,6 +1664,9 @@ namespace {
 
         if (parentSub == subscript)
           continue;
+
+        assert(subscript->getDeclContext() != parentSub->getDeclContext() &&
+               "can not override method in the same DeclContext");
 
         // The index types match. This is an override, so mark it as such.
         subscript->setOverriddenDecl(parentSub);
