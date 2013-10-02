@@ -654,8 +654,7 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
     forKeyedSubscriptId = &identTable.get("forKeyedSubscript");
   }
 
-  // Function that determines whether the given selector is
-  // acceptable.
+  // Function that determines whether the given selector is acceptable.
   auto acceptableSelector = [&](clang::Selector sel) -> bool {
     if (name.empty())
       return true;
@@ -700,10 +699,10 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
       continue;
     if (!acceptableSelector(sel))
       continue;
-    
+
     S.ReadMethodPool(sel);
   }
-                                       
+
   // FIXME: Does not include methods from protocols.
   // FIXME: Do we really have to import every single method?
   // FIXME: Need a more efficient table in Clang to find "all selectors whose
@@ -721,9 +720,9 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
       }
 
       if (auto VD = cast_or_null<ValueDecl>(Impl.importDecl(searchForDecl))) {
-        if (isSubscript) {
-          // When searching for a subscript, we may have found a
-          // getter. If so, use the subscript instead.
+        if (isSubscript || name.empty()) {
+          // When searching for a subscript, we may have found a getter.  If so,
+          // use the subscript instead.
           if (auto func = dyn_cast<FuncDecl>(VD)) {
             auto known = Impl.Subscripts.find({func, nullptr});
             if (known != Impl.Subscripts.end()) {
@@ -731,8 +730,9 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
             }
           }
 
-          // If we were looking for subscripts, hopefully 
-          continue;
+          // If we were looking only for subscripts, don't report the getter.
+          if (isSubscript)
+            continue;
         }
 
         consumer.foundDecl(VD);

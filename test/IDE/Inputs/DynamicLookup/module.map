@@ -1,0 +1,1 @@
+module baz_clang_module { header "baz_clang_module.h" }
