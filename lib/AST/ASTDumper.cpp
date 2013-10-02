@@ -494,7 +494,17 @@ namespace {
       } else {
         printPatterns(StringRef(), D->getBodyParamPatterns());
       }
-
+      if (auto FD = dyn_cast<FuncDecl>(D)) {
+        if (FD->getBodyResultTypeLoc().getTypeRepr()) {
+          OS << '\n';
+          Indent += 2;
+          OS.indent(Indent);
+          OS << "(result\n";
+          printRec(FD->getBodyResultTypeLoc().getTypeRepr());
+          OS << ')';
+          Indent -= 2;
+        }
+      }
       if (auto Body = D->getBody()) {
         OS << '\n';
         printRec(Body);
