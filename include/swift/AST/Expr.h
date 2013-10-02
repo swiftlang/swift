@@ -357,6 +357,22 @@ public:
   }
 };
 
+/// DiscardAssignmentExpr - A '_' in the left-hand side of an assignment, which
+/// discards the corresponding tuple element on the right-hand side.
+class DiscardAssignmentExpr : public Expr {
+  SourceLoc Loc;
+
+public:
+  DiscardAssignmentExpr(SourceLoc Loc, bool Implicit)
+    : Expr(ExprKind::DiscardAssignment, Implicit), Loc(Loc) {}
+  
+  SourceRange getSourceRange() const { return Loc; }
+  SourceLoc getLoc() const { return Loc; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DiscardAssignment;
+  }
+};
 
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {

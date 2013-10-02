@@ -947,6 +947,14 @@ namespace {
       return CS.getTypeChecker().lookupBoolType();
     }
     
+    Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
+      // '_' is only allowed in assignments, so give it an AssignDest locator.
+      return CS.createTypeVariable(
+         CS.getConstraintLocator(expr,
+                                 ConstraintLocator::AssignDest),
+         TVO_CanBindToLValue);
+    }
+    
     Type visitAssignExpr(AssignExpr *expr) {
       // Compute the type to which the source must be converted to allow
       // assignment to the destination.

@@ -330,6 +330,11 @@ public:
     return visit(E->getSubPattern());
   }
   
+  // Convert a '_' expression to an AnyPattern.
+  Pattern *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
+    return new (TC.Context) AnyPattern(E->getLoc(), E->isImplicit());
+  }
+  
   // Convert a paren expr to a pattern if it contains a pattern.
   Pattern *visitParenExpr(ParenExpr *E) {
     if (Pattern *subPattern = visit(E->getSubExpr()))

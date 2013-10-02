@@ -1843,6 +1843,10 @@ namespace {
       return expr;
     }
     
+    Expr *visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
+      return simplifyExprType(expr);
+    }
+    
     Expr *visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
       llvm_unreachable("should have been eliminated during name binding");
     }
@@ -2916,6 +2920,7 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
 
   class ExprWalker : public ASTWalker {
     ExprRewriter &Rewriter;
+    unsigned LeftSideOfAssignment = 0;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
@@ -2991,7 +2996,32 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         tc.computeCaptures(closure);
         return { false, closure };
       }
-
+      
+      // Track whether we're in the left-hand side of an assignment...
+      if (auto assign = dyn_cast<AssignExpr>(expr)) {
+        ++LeftSideOfAssignment;
+        
+        if (auto dest = assign->getDest()->walk(*this))
+          assign->setDest(dest);
+        else
+          return { false, nullptr };
+        
+        --LeftSideOfAssignment;
+        
+        if (auto src = assign->getSrc()->walk(*this))
+          assign->setSrc(src);
+        else
+          return { false, nullptr };
+        
+        expr = Rewriter.visitAssignExpr(assign);
+        return { false, expr };
+      }
+      
+      // ...so we can verify that '_' only appears there.
+      if (isa<DiscardAssignmentExpr>(expr) && LeftSideOfAssignment == 0)
+        Rewriter.getConstraintSystem().getTypeChecker()
+          .diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment);
+      
       return { true, expr };
     }
 

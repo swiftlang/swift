@@ -301,6 +301,9 @@ done:
 ///     expr-new
 ///     operator-prefix expr-unary(Mode)
 ///     '&' expr-unary(Mode)
+///     expr-discard
+///
+///   expr-discard: '_'
 ///
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   Expr *Operator;
@@ -308,6 +311,13 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
     return parseExprPostfix(Message, isExprBasic);
+      
+  // If the next token is '_', parse a discard expression.
+  case tok::kw__: {
+    SourceLoc loc = consumeToken();
+    auto result = new (Context) DiscardAssignmentExpr(loc, /*implicit*/false);
+    return makeParserResult(result);
+  }
       
   // If the next token is the keyword 'new', this must be expr-new.
   case tok::kw_new:

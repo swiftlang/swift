@@ -938,6 +938,10 @@ public:
     OS << ')';
   }
 
+  void visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
+    printCommon(E, "discard_assignment_expr") << ')';
+  }
+  
   void visitDeclRefExpr(DeclRefExpr *E) {
     printCommon(E, "declref_expr")
       << " decl=";

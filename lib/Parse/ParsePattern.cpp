@@ -641,10 +641,6 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
   if (Tok.is(tok::kw_var)) {
     return parseMatchingPatternVar();
   }
-  // matching-pattern ::= '_'
-  if (Tok.is(tok::kw__)) {
-    return makeParserResult(new (Context) AnyPattern(consumeToken()));
-  }
   // matching-pattern ::= 'is' type
   if (Tok.is(tok::kw_is)) {
     return parseMatchingPatternIsa();
@@ -686,6 +682,5 @@ ParserResult<Pattern> Parser::parseMatchingPatternIsa() {
 
 bool Parser::isOnlyStartOfMatchingPattern() {
   return Tok.is(tok::kw_var)
-    || Tok.is(tok::kw__)
     || Tok.is(tok::kw_is);
 }

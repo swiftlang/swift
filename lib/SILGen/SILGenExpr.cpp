@@ -149,6 +149,7 @@ namespace {
 
     RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
 
+    RValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *E, SGFContext C);
     RValue visitDeclRefExpr(DeclRefExpr *E, SGFContext C);
     RValue visitSuperRefExpr(SuperRefExpr *E, SGFContext C);
     RValue visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E,
@@ -362,6 +363,11 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   }
 
   return emitFunctionRef(loc, SILDeclRef(decl, uncurryLevel));
+}
+
+RValue RValueEmitter::visitDiscardAssignmentExpr(DiscardAssignmentExpr *E,
+                                                 SGFContext C) {
+  llvm_unreachable("cannot appear in rvalue");
 }
 
 RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
@@ -2662,7 +2668,7 @@ RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc) {
 static void emitAssignExprRecursive(AssignExpr *S, RValue &&Src, Expr *Dest,
                                     SILGenFunction &Gen) {
   // If the destination is a tuple, recursively destructure.
-  if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
+  if (auto *TE = dyn_cast<TupleExpr>(Dest)) {
     SmallVector<RValue, 4> elements;
     std::move(Src).extractElements(elements);
     unsigned EltNo = 0;
@@ -2674,11 +2680,14 @@ static void emitAssignExprRecursive(AssignExpr *S, RValue &&Src, Expr *Dest,
     return;
   }
   
+  // If the destination is '_', do nothing.
+  if (isa<DiscardAssignmentExpr>(Dest))
+    return;
+  
   // Otherwise, emit the scalar assignment.
   LValue DstLV = Gen.emitLValue(Dest);
   Gen.emitAssignToLValue(S, std::move(Src), DstLV);
 }
-
 
 RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   FullExpr scope(SGF.Cleanups, CleanupLocation(E));
