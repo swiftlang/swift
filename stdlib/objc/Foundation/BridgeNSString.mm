@@ -111,6 +111,7 @@ _swift_NSStringToString_slow(NSString *nsstring, SwiftString *string) {
                   remainingRange:&unencodedRange];
 
     // The operation should have encoded the entire string.
+    (void)ok;
     assert(ok  &&  "NSString encoding failed");
     assert(unencodedRange.length == 0  &&  "NSString encoding failed");
   } 
