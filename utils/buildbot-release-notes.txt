@@ -85,7 +85,7 @@
   result is of optional type. For example, for a variable 'obj' of
   type 'id', the expression
 
-    id[0]
+    obj[0]
 
   will produce a value of type 'id', which will either contain the
   result of the message send objectAtIndexedSubscript(0) (wrapped in an
