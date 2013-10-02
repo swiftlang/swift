@@ -130,15 +130,15 @@ public:
 /// Abstract base class for single-buffer initializations.
 class TemporaryInitialization : public SingleBufferInitialization {
   SILValue Addr;
-  CleanupsDepth Cleanup;
+  CleanupHandle Cleanup;
 public:
-  TemporaryInitialization(SILValue addr, CleanupsDepth cleanup)
+  TemporaryInitialization(SILValue addr, CleanupHandle cleanup)
     : Addr(addr), Cleanup(cleanup) {}
 
   void finishInitialization(SILGenFunction &gen) override;
 
   /// Returns the cleanup corresponding to the value of the temporary.
-  CleanupsDepth getInitializedCleanup() const { return Cleanup; }
+  CleanupHandle getInitializedCleanup() const { return Cleanup; }
 };
 
 } // end namespace Lowering

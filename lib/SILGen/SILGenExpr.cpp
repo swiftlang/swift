@@ -117,10 +117,10 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
     return ManagedValue(v, ManagedValue::Unmanaged);
   } else if (lowering.isAddressOnly()) {
     Cleanups.pushCleanup<CleanupMaterializedAddressOnlyValue>(v);
-    return ManagedValue(v, getCleanupsDepth());
+    return ManagedValue(v, getTopCleanup());
   } else {
     Cleanups.pushCleanup<CleanupRValue>(lowering, v);
-    return ManagedValue(v, getCleanupsDepth());
+    return ManagedValue(v, getTopCleanup());
   }
 }
 
@@ -464,10 +464,10 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   SILValue tmpMem = emitTemporaryAllocation(loc, v.getType());
   v.forwardInto(*this, loc, tmpMem);
   
-  CleanupsDepth valueCleanup = CleanupsDepth::invalid();
+  CleanupHandle valueCleanup = CleanupHandle::invalid();
   if (!lowering.isTrivial()) {
     Cleanups.pushCleanup<CleanupMaterializedValue>(lowering, tmpMem);
-    valueCleanup = getCleanupsDepth();
+    valueCleanup = getTopCleanup();
   }
   
   return Materialize{tmpMem, valueCleanup};
@@ -2321,7 +2321,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     assert(newSelf.getType().isObject() &&
            newSelf.getType().hasReferenceSemantics() &&
            "delegating ctor type mismatch for non-reference type?!");
-    CleanupsDepth newSelfCleanup = newSelf.getCleanup();
+    CleanupHandle newSelfCleanup = newSelf.getCleanup();
     SILValue newSelfValue = SGF.B.createUnconditionalCheckedCast(E,
                            CheckedCastKind::Downcast,
                            newSelf.getValue(),

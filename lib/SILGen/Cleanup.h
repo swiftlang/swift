@@ -17,7 +17,7 @@
 #ifndef CLEANUP_H
 #define CLEANUP_H
 
-#include "JumpDest.h"
+#include "swift/Basic/DiverseStack.h"
 #include "swift/SIL/SILLocation.h"
 
 namespace swift {
@@ -26,8 +26,8 @@ namespace swift {
   class SILValue;
   
 namespace Lowering {
+  class JumpDest;
   class SILGenFunction;
-  class CleanupOutflows;
 
 /// The valid states that a cleanup can be in.
 enum class CleanupState {
@@ -63,6 +63,20 @@ public:
   virtual void emit(SILGenFunction &Gen, CleanupLocation L) = 0;
 };
 
+/// A cleanup depth is generally used to denote the set of cleanups
+/// between the given cleanup (and not including it) and the top of
+/// the stack.
+///
+/// Cleanup depths can be the stack's stable_end(), but generally
+/// cannot be invalid.
+typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
+
+/// A cleanup handle is a stable pointer to a single cleanup.
+///
+/// Cleanup handles can be invalid() (if no cleanup was required), but
+/// generally cannot be the stack's stable_end().
+typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupHandle;
+
 class LLVM_LIBRARY_VISIBILITY CleanupManager {
   friend class Scope;
 
@@ -70,7 +84,17 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   
   /// Stack - Currently active cleanups in this scope tree.
   DiverseStack<Cleanup, 128> Stack;
-  
+
+  /// The shallowest depth held by an active Scope object.
+  ///
+  /// Generally, the rule is that a CleanupHandle is invalidated as
+  /// soon as the underlying cleanup is marked dead, meaning that
+  /// further uses of that handle are free to misbehave, and therefore
+  /// that we're free to actually pop the cleanup.  But doing so might
+  /// break any outstanding CleanupsDepths we've vended, of which we
+  /// only really care about those held by the Scope RAII objects.  So
+  /// we can only reap the cleanup stack up to the innermost depth
+  /// that we've handed out as a Scope.
   CleanupsDepth InnermostScope;
   
   void popAndEmitTopCleanup(CleanupLocation *l);
@@ -86,11 +110,17 @@ public:
     : Gen(Gen), InnermostScope(Stack.stable_end()) {
   }
   
-  /// Return a stable reference to the current cleanup.
+  /// Return a stable reference to the last cleanup pushed.
   CleanupsDepth getCleanupsDepth() const {
     return Stack.stable_begin();
   }
-  
+
+  /// Return a stable reference to the last cleanup pushed.
+  CleanupHandle getTopCleanup() const {
+    assert(!Stack.empty());
+    return Stack.stable_begin();
+  }
+
   /// \brief Emit a branch to the given jump destination,
   /// threading out through any cleanups we need to run. This does not pop the
   /// cleanup stack.
@@ -133,7 +163,7 @@ public:
 
   /// Set the state of the cleanup at the given depth.
   /// The transition must be non-trivial and legal.
-  void setCleanupState(CleanupsDepth depth, CleanupState state);
+  void setCleanupState(CleanupHandle depth, CleanupState state);
 };
 
 } // end namespace Lowering

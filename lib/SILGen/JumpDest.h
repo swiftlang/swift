@@ -17,18 +17,15 @@
 #ifndef JUMPDEST_H
 #define JUMPDEST_H
 
-#include "swift/Basic/DiverseStack.h"
 #include "swift/SIL/SILLocation.h"
 #include "llvm/Support/Compiler.h"
+#include "Cleanup.h"
 
 namespace swift {
   class SILBasicBlock;
   class CaseStmt;
   
 namespace Lowering {
-
-class Cleanup;
-typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
 
 /// The destination of a direct jump.  Swift currently does not
 /// support indirect branches or goto, so the jump mechanism only

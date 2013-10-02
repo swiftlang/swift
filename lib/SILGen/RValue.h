@@ -39,8 +39,8 @@ class ManagedValue {
   /// whether it represents an lvalue.
   llvm::PointerIntPair<SILValue, 1, bool> valueAndIsLValue;
   /// A handle to the cleanup that destroys this value, or
-  /// CleanupsDepth::invalid if the value has no cleanup.
-  CleanupsDepth cleanup;
+  /// CleanupHandle::invalid() if the value has no cleanup.
+  CleanupHandle cleanup;
 
 public:
   enum Unmanaged_t { Unmanaged };
@@ -49,13 +49,13 @@ public:
   ManagedValue() = default;
   explicit ManagedValue(SILValue value, LValue_t)
     : valueAndIsLValue(value, true),
-      cleanup(CleanupsDepth::invalid())
+      cleanup(CleanupHandle::invalid())
   {}
   explicit ManagedValue(SILValue value, Unmanaged_t)
     : valueAndIsLValue(value, false),
-      cleanup(CleanupsDepth::invalid())
+      cleanup(CleanupHandle::invalid())
   {}
-  ManagedValue(SILValue value, CleanupsDepth cleanup)
+  ManagedValue(SILValue value, CleanupHandle cleanup)
     : valueAndIsLValue(value, false),
       cleanup(cleanup)
   {}
@@ -110,7 +110,7 @@ public:
   }
   
   bool hasCleanup() const { return cleanup.isValid(); }
-  CleanupsDepth getCleanup() const { return cleanup; }
+  CleanupHandle getCleanup() const { return cleanup; }
 
   /// Disable the cleanup for this value.
   void forwardCleanup(SILGenFunction &gen) {

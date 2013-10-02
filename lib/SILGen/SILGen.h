@@ -16,6 +16,7 @@
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "Condition.h"
+#include "JumpDest.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -225,9 +226,10 @@ public:
 struct Materialize {
   /// The address of the allocation.
   SILValue address;
+
   /// The cleanup to dispose of the value before deallocating the buffer.
   /// This cleanup can be killed by calling the consume method.
-  CleanupsDepth valueCleanup;
+  CleanupHandle valueCleanup;
   
   /// Load and claim ownership of the value in the buffer. Does not deallocate
   /// the buffer.
@@ -412,6 +414,9 @@ public:
   /// Return a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {
     return Cleanups.getCleanupsDepth();
+  }
+  CleanupHandle getTopCleanup() const {
+    return Cleanups.getTopCleanup();
   }
   
   SILFunction &getFunction() { return F; }
@@ -919,7 +924,7 @@ public:
   void deallocateUninitializedLocalVariable(SILLocation L, VarDecl *D);
 
   /// Enter a cleanup to deallocate a stack variable.
-  CleanupsDepth enterDeallocStackCleanup(SILLocation loc, SILValue address);
+  CleanupHandle enterDeallocStackCleanup(SILLocation loc, SILValue address);
   
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E);

@@ -220,10 +220,10 @@ class LocalVariableInitialization : public SingleBufferInitialization {
 
   /// The cleanup we pushed to deallocate the local variable before it
   /// gets initialized.
-  CleanupsDepth DeallocCleanup;
+  CleanupHandle DeallocCleanup;
 
   /// The cleanup we pushed to destroy and deallocate the local variable.
-  CleanupsDepth ReleaseCleanup;
+  CleanupHandle ReleaseCleanup;
   
   bool DidFinish = false;
 public:
@@ -236,11 +236,11 @@ public:
     // inactive until the variable is initialized.
     gen.Cleanups.pushCleanupInState<DestroyLocalVariable>(CleanupState::Dormant,
                                                           var);
-    ReleaseCleanup = gen.Cleanups.getCleanupsDepth();
+    ReleaseCleanup = gen.Cleanups.getTopCleanup();
 
     // Push a cleanup to deallocate the local variable.
     gen.Cleanups.pushCleanup<DeallocateUninitializedLocalVariable>(var);
-    DeallocCleanup = gen.Cleanups.getCleanupsDepth();
+    DeallocCleanup = gen.Cleanups.getTopCleanup();
   }
   
   ~LocalVariableInitialization() override {
@@ -428,12 +428,12 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
 }
 
 /// Enter a cleanup to deallocate the given location.
-CleanupsDepth SILGenFunction::enterDeallocStackCleanup(SILLocation loc,
+CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILLocation loc,
                                                        SILValue temp) {
   assert(temp.getType().isLocalStorage() &&
          "must deallocate container operand, not address operand!");
   Cleanups.pushCleanup<DeallocStack>(loc, temp);
-  return Cleanups.getCleanupsDepth();
+  return Cleanups.getTopCleanup();
 }
 
 namespace {
