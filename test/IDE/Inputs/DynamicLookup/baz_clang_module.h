@@ -13,3 +13,14 @@
 
 @end
 
+@protocol Baz_Protocol
+
+- (void)baz_Protocol_InstanceFunc1;
++ (void)baz_Protocol_ClassFunc1;
+
+- (id)objectForKeyedSubscript:(id)key;
+
+@property NSString *baz_Protocol_Property1;
+
+@end
+

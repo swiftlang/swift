@@ -1483,17 +1483,25 @@ namespace {
                                    DeclContext *dc) {
       assert(objcMethod->isInstanceMethod() && "Caller must filter");
 
-      // FIXME: Can we do this for protocol methods as well?
-      auto interface = objcMethod->getClassInterface();
-      if (!interface)
-        return nullptr;
+      const clang::ObjCInterfaceDecl *interface = nullptr;
+      const clang::ObjCProtocolDecl *protocol =
+          dyn_cast<clang::ObjCProtocolDecl>(objcMethod->getDeclContext());
+      if (!protocol)
+        interface = objcMethod->getClassInterface();
+      auto lookupInstanceMethod = [&](clang::Selector Sel) ->
+          clang::ObjCMethodDecl * {
+        if (interface)
+          return interface->lookupInstanceMethod(Sel);
+        else
+          return protocol->lookupInstanceMethod(Sel);
+      };
 
       FuncDecl *getter = nullptr, *setter = nullptr;
       if (objcMethod->getSelector() == Impl.objectAtIndexedSubscript) {
         getter = cast<FuncDecl>(decl);
 
         // Find the setter
-        if (auto objcSetter = interface->lookupInstanceMethod(
+        if (auto objcSetter = lookupInstanceMethod(
                                 Impl.setObjectAtIndexedSubscript)) {
           setter = cast_or_null<FuncDecl>(Impl.importDecl(objcSetter));
 
@@ -1505,7 +1513,7 @@ namespace {
         setter = cast<FuncDecl>(decl);
 
         // Find the getter.
-        if (auto objcGetter = interface->lookupInstanceMethod(
+        if (auto objcGetter = lookupInstanceMethod(
                                 Impl.objectAtIndexedSubscript)) {
           getter = cast_or_null<FuncDecl>(Impl.importDecl(objcGetter));
 
@@ -1521,7 +1529,7 @@ namespace {
         getter = cast<FuncDecl>(decl);
 
         // Find the setter
-        if (auto objcSetter = interface->lookupInstanceMethod(
+        if (auto objcSetter = lookupInstanceMethod(
                                 Impl.setObjectForKeyedSubscript)) {
           setter = cast_or_null<FuncDecl>(Impl.importDecl(objcSetter));
 
@@ -1533,7 +1541,7 @@ namespace {
         setter = cast<FuncDecl>(decl);
 
         // Find the getter.
-        if (auto objcGetter = interface->lookupInstanceMethod(
+        if (auto objcGetter = lookupInstanceMethod(
                                 Impl.objectForKeyedSubscript)) {
           getter = cast_or_null<FuncDecl>(Impl.importDecl(objcGetter));
 
@@ -1568,8 +1576,7 @@ namespace {
 
       // Find the getter indices and make sure they match.
       {
-        auto tuple =
-            dyn_cast<TuplePattern>(getter -> getArgParamPatterns()[1]);
+        auto tuple = dyn_cast<TuplePattern>(getter->getArgParamPatterns()[1]);
         if (tuple && tuple->getFields().size() != 1)
           return nullptr;
 
