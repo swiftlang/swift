@@ -720,7 +720,7 @@ bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
   // Set up a diagnostics engine that swallows diagnostics.
   DiagnosticEngine diags(TU->Ctx.SourceMgr);
   
-  TypeChecker TC(*TU, diags);
+  TypeChecker TC(*TU/*, diags*/);
   TC.typeCheckExpression(parsedExpr, TU, Type(), /*discardedExpr=*/true);
   TU->ASTStage = TranslationUnit::TypeChecked;
   
