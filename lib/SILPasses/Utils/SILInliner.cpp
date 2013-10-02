@@ -62,6 +62,8 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
 
   InstructionMap.clear();
   BBMap.clear();
+  // Do not allow the entry block to be cloned again
+  BBMap.insert(std::make_pair(CalleeEntryBB, nullptr));
   SILBasicBlock::iterator InsertPoint = llvm::next(I);
   getBuilder().setInsertionPoint(InsertPoint);
   // Recursively visit callee's BB in depth-first preorder, starting with the
@@ -105,6 +107,10 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
     // visit function.
     visit(CalleeEntryBB->getTerminator());
     for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
+      // Ignore entry block
+      if (BI->first == CalleeEntryBB)
+        continue;
+
       getBuilder().setInsertionPoint(BI->second);
 
       // Modify return terminators to branch to the return-to BB, rather than

@@ -32,7 +32,7 @@ public:
   friend class SILCloner<SILInliner>;
 
   explicit SILInliner(SILFunction &F)
-    : SILCloner<SILInliner>(F), DebugScope(nullptr) {
+    : SILCloner<SILInliner>(F), CalleeEntryBB(nullptr), DebugScope(nullptr) {
   }
 
   /// inlineFunction - This method inlines a callee function, assuming that it
@@ -61,51 +61,19 @@ public:
 private:
   void visitSILBasicBlock(SILBasicBlock* BB);
 
-  SILValue remapValue(SILValue Value) {
-    if (SILArgument* A = dyn_cast<SILArgument>(Value.getDef())) {
-      assert(Value.getResultNumber() == 0 &&
-             "Non-zero result number of argument used?");
-      SILValue MappedValue = ArgumentMap[A];
-      assert (MappedValue && "Unmapped argument while inlining");
-      return MappedValue;
-    }
-
-    if (SILInstruction* I = dyn_cast<SILInstruction>(Value.getDef())) {
-      ValueBase* V = InstructionMap[I];
-      assert(V && "Unmapped instruction while inlining?");
-      return SILValue(V, Value.getResultNumber());
-    }
-
-    llvm_unreachable("Unknown value type while inlining?");
-  }
-
-  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) {
-    SILBasicBlock* MappedBB = BBMap[BB];
-    assert(MappedBB && "Unmapped basic block while inlining?");
-    return MappedBB;
-  }
-
   SILValue postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     if (DebugScope)
       Cloned->setDebugScope(DebugScope);
-    InstructionMap.insert(std::make_pair(Orig, Cloned));
-    return Cloned;
+    return SILCloner<SILInliner>::postProcess(Orig, Cloned);
   }
 
   SILLocation remapLocation(SILLocation InLoc) {
     // Inlined location wraps the call site that is being inlined, regardless
     // of the input location.
-    if (Loc.hasValue())
-      return Loc.getValue();
-    else
-      return InLoc;
+    return Loc.hasValue() ? Loc.getValue() : InLoc;
   }
 
-  SILBasicBlock* CalleeEntryBB;
-  SILBasicBlock* InsertBeforeBB;
-  llvm::DenseMap<SILArgument*, SILValue> ArgumentMap;
-  llvm::DenseMap<SILInstruction*, SILInstruction*> InstructionMap;
-  llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;
+  SILBasicBlock *CalleeEntryBB;
 
   /// \brief The location representing the inlined instructions.
   ///
@@ -113,7 +81,7 @@ private:
   /// Alternatively, it can be the SIL file location of the call site (in case
   /// of SIL-to-SIL transformations).
   Optional<SILLocation> Loc;
-  SILDebugScope* DebugScope;
+  SILDebugScope *DebugScope;
 };
 
 } // end namespace swift

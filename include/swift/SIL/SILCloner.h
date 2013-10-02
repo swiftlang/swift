@@ -36,7 +36,8 @@ class SILCloner : protected SILVisitor<ImplClass, SILValue> {
   friend class SILVisitor<ImplClass, SILValue>;
 
 public:
-  explicit SILCloner(SILFunction &F) : Builder(F) { }
+  explicit SILCloner(SILFunction &F)
+    : Builder(F), InsertBeforeBB(nullptr) { }
 
 protected:
 #define VALUE(CLASS, PARENT) \
@@ -47,6 +48,8 @@ protected:
   SILValue visit##CLASS(CLASS *I);
 #include "swift/SIL/SILNodes.def"
 
+  void visitSILBasicBlock(SILBasicBlock* BB);
+
   SILBuilder &getBuilder() { return Builder; }
 
   // Derived classes of SILCloner using the CRTP can implement the following
@@ -55,12 +58,10 @@ protected:
   // called afterwards on the result.
   SILLocation remapLocation(SILLocation Loc) { return Loc; }
   SILType remapType(SILType Ty) { return Ty; }
-  SILValue remapValue(SILValue Value) { return Value; }
+  SILValue remapValue(SILValue Value);
   SILFunction *remapFunction(SILFunction *Func) { return Func; }
-  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
-  SILValue postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    return Cloned;
-  }
+  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB);
+  SILValue postProcess(SILInstruction *Orig, SILInstruction *Cloned);
 
   SILLocation getOpLocation(SILLocation Loc) {
     return static_cast<ImplClass*>(this)->remapLocation(Loc);
@@ -89,7 +90,84 @@ protected:
   }
 
   SILBuilder Builder;
+  SILBasicBlock* InsertBeforeBB;
+  llvm::DenseMap<SILArgument*, SILValue> ArgumentMap;
+  llvm::DenseMap<SILInstruction*, SILInstruction*> InstructionMap;
+  llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;
 };
+
+template<typename ImplClass>
+SILValue
+SILCloner<ImplClass>::remapValue(SILValue Value) {
+  if (SILArgument* A = dyn_cast<SILArgument>(Value.getDef())) {
+    assert(Value.getResultNumber() == 0 &&
+           "Non-zero result number of argument used?");
+    SILValue MappedValue = ArgumentMap[A];
+    assert (MappedValue && "Unmapped argument while cloning");
+    return MappedValue;
+  }
+
+  if (SILInstruction* I = dyn_cast<SILInstruction>(Value.getDef())) {
+    ValueBase* V = InstructionMap[I];
+    assert(V && "Unmapped instruction while cloning?");
+    return SILValue(V, Value.getResultNumber());
+  }
+
+  llvm_unreachable("Unknown value type while cloning?");
+}
+
+template<typename ImplClass>
+SILBasicBlock*
+SILCloner<ImplClass>::remapBasicBlock(SILBasicBlock *BB) {
+  SILBasicBlock* MappedBB = BBMap[BB];
+  assert(MappedBB && "Unmapped basic block while cloning?");
+  return MappedBB;
+}
+
+template<typename ImplClass>
+SILValue
+SILCloner<ImplClass>::postProcess(SILInstruction *Orig,
+                                  SILInstruction *Cloned) {
+  InstructionMap.insert(std::make_pair(Orig, Cloned));
+  return Cloned;
+}
+
+// \brief Recursively visit a callee's BBs in depth-first preorder (only
+/// processing blocks on the first visit), mapping newly visited BBs to new BBs
+/// in the caller and cloning all instructions into the caller other than
+/// terminators which should be handled separately later by subclasses
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
+  SILFunction &F = getBuilder().getFunction();
+  // Iterate over and visit all instructions other than the terminator to clone.
+  for (auto I = BB->begin(), E = --BB->end(); I != E; ++I)
+    static_cast<ImplClass*>(this)->visit(I);
+  // Iterate over successors to do the depth-first search.
+  for (auto &Succ : BB->getSuccs()) {
+    auto BBI = BBMap.find(Succ);
+    // Only visit a successor that has not already been visisted.
+    if (BBI == BBMap.end()) {
+      // Map the successor to a new BB.
+      auto MappedBB = new (F.getModule()) SILBasicBlock(&F);
+      BBMap.insert(std::make_pair(Succ, MappedBB));
+      // Create new arguments for each of the original block's arguments.
+      for (auto &Arg : Succ.getBB()->getBBArgs()) {
+        SILValue MappedArg = new (F.getModule()) SILArgument(Arg->getType(),
+                                                             MappedBB);
+        ArgumentMap.insert(std::make_pair(Arg, MappedArg));
+      }
+      // Also, move the new mapped BB to the right position in the caller
+      if (InsertBeforeBB)
+        F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB),
+                             F.getBlocks(), SILFunction::iterator(MappedBB));
+      // Set the insertion point to the new mapped BB
+      getBuilder().setInsertionPoint(MappedBB);
+      // Recurse into the successor
+      visitSILBasicBlock(Succ.getBB());
+    }
+  }
+}
 
 /// SILInstructionCloner - Concrete SILCloner subclass which can only be called
 /// directly on instructions and clones them without any remapping of locations,
