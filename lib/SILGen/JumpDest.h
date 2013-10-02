@@ -46,6 +46,11 @@ public:
   SILBasicBlock *getBlock() const { return Block; }
   CleanupsDepth getDepth() const { return Depth; }
   CleanupLocation getCleanupLocation() const { return CleanupLoc; }
+
+  bool isValid() const { return Block != nullptr; }
+  static JumpDest invalid() {
+    return JumpDest(CleanupLocation((Expr*) nullptr));
+  }
 };
   
 } // end namespace Lowering

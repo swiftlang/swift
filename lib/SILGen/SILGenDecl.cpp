@@ -44,16 +44,16 @@ namespace {
   
 
   /// An Initialization subclass used to destructure tuple initializations.
-  class TupleElementInitialization : public SingleInitializationBase {
+  class TupleElementInitialization : public SingleBufferInitialization {
   public:
-    SILValue elementAddr;
+    SILValue ElementAddr;
     
     TupleElementInitialization(SILValue addr)
-      : elementAddr(addr)
+      : ElementAddr(addr)
     {}
     
-    SILValue getAddressOrNull() override { return elementAddr; }
-    
+    SILValue getAddressOrNull() override { return ElementAddr; }
+
     void finishInitialization(SILGenFunction &gen) override {}
   };
 }
@@ -128,6 +128,16 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   }
 }
 
+ArrayRef<InitializationPtr>
+SingleBufferInitialization::getSubInitializations() {
+  return {};
+}
+
+void TemporaryInitialization::finishInitialization(SILGenFunction &gen) {
+  if (Cleanup.isValid())
+    gen.Cleanups.setCleanupState(Cleanup, CleanupState::Active);
+};
+
 namespace {
 
 /// An Initialization of a tuple pattern, such as "var (a,b)".
@@ -138,8 +148,7 @@ public:
   /// here.
   SmallVector<InitializationPtr, 4> subInitializations;
 
-  TupleInitialization() : Initialization(Initialization::Kind::Tuple)
-  {}
+  TupleInitialization() : Initialization(Initialization::Kind::Tuple) {}
   
   SILValue getAddressOrNull() override {
     if (subInitializations.size() == 1)
@@ -171,70 +180,89 @@ public:
 };
 
 /// Cleanup to destroy an initialized variable.
-class CleanupLocalVariable : public Cleanup {
-  VarDecl *var;
+class DestroyLocalVariable : public Cleanup {
+  VarDecl *Var;
 public:
-  CleanupLocalVariable(VarDecl *var)
-    : var(var) {}
+  DestroyLocalVariable(VarDecl *var) : Var(var) {}
   
   void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.destroyLocalVariable(l, var);
+    gen.destroyLocalVariable(l, Var);
+  }
+};
+
+/// Cleanup to destroy an uninitialized local variable.
+class DeallocateUninitializedLocalVariable : public Cleanup {
+  VarDecl *Var;
+public:
+  DeallocateUninitializedLocalVariable(VarDecl *var) : Var(var) {}
+  
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.deallocateUninitializedLocalVariable(l, Var);
   }
 };
   
-/// Cleanup to destroy an address-only argument. We destroy the value without
-/// deallocating the storage.
-class CleanupAddressOnlyArgument : public Cleanup {
-  SILValue addr;
+/// Cleanup to perform a destroy address.
+class DestroyAddr : public Cleanup {
+  SILValue Addr;
 public:
-  CleanupAddressOnlyArgument(SILValue addr)
-    : addr(addr) {}
+  DestroyAddr(SILValue addr) : Addr(addr) {}
   
   void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.createDestroyAddr(l, addr);
+    gen.B.createDestroyAddr(l, Addr);
   }
 };
 
 /// An initialization of a local variable.
-class LocalVariableInitialization : public SingleInitializationBase {
-  // FIXME: We should install a deallocation cleanup then deactivate it and
-  // activate a destroying cleanup when the value is initialized.
-  
+class LocalVariableInitialization : public SingleBufferInitialization {
   /// The local variable decl being initialized.
-  VarDecl *var;
-  SILGenFunction &gen;
+  VarDecl *Var;
+  SILGenFunction &Gen;
+
+  /// The cleanup we pushed to deallocate the local variable before it
+  /// gets initialized.
+  CleanupsDepth DeallocCleanup;
+
+  /// The cleanup we pushed to destroy and deallocate the local variable.
+  CleanupsDepth ReleaseCleanup;
   
-  bool didFinish;
+  bool DidFinish = false;
 public:
   /// Sets up an initialization for the allocated box. This pushes a
   /// CleanupUninitializedBox cleanup that will be replaced when
   /// initialization is completed.
   LocalVariableInitialization(VarDecl *var, SILGenFunction &gen)
-    : var(var), gen(gen), didFinish(false)
-  {
-    gen.Cleanups.pushCleanup<CleanupLocalVariable>(var);
+    : Var(var), Gen(gen) {
+    // Push a cleanup to destroy the local variable.  This has to be
+    // inactive until the variable is initialized.
+    gen.Cleanups.pushCleanupInState<DestroyLocalVariable>(CleanupState::Dormant,
+                                                          var);
+    ReleaseCleanup = gen.Cleanups.getCleanupsDepth();
+
+    // Push a cleanup to deallocate the local variable.
+    gen.Cleanups.pushCleanup<DeallocateUninitializedLocalVariable>(var);
+    DeallocCleanup = gen.Cleanups.getCleanupsDepth();
   }
   
   ~LocalVariableInitialization() override {
-    assert(didFinish && "did not call VarInit::finishInitialization!");
+    assert(DidFinish && "did not call VarInit::finishInitialization!");
   }
   
   SILValue getAddressOrNull() override {
-    assert(gen.VarLocs.count(var) && "did not emit var?!");
-    return gen.VarLocs[var].address;
+    assert(Gen.VarLocs.count(Var) && "did not emit var?!");
+    return Gen.VarLocs[Var].address;
   }
-  
+
   void finishInitialization(SILGenFunction &gen) override {
-    assert(!didFinish &&
+    assert(!DidFinish &&
            "called LocalVariableInitialization::finishInitialization twice!");
-    // FIXME: deactivate the deallocating cleanup and activate the
-    // destroying one.
-    didFinish = true;
+    Gen.Cleanups.setCleanupState(DeallocCleanup, CleanupState::Dead);
+    Gen.Cleanups.setCleanupState(ReleaseCleanup, CleanupState::Active);
+    DidFinish = true;
   }
 };
   
 /// An initialization for a global variable.
-class GlobalInitialization : public SingleInitializationBase {
+class GlobalInitialization : public SingleBufferInitialization {
   /// The physical address of the global.
   SILValue address;
   
@@ -440,7 +468,7 @@ struct ArgumentInitVisitor :
       // If this is an address-only non-inout argument, we take ownership
       // of the referenced value.
       if (!ty->is<LValueType>())
-        gen.Cleanups.pushCleanup<CleanupAddressOnlyArgument>(arg);
+        gen.Cleanups.pushCleanup<DestroyAddr>(arg);
       break;
 
     case Initialization::Kind::SingleBuffer:

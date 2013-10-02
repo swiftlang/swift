@@ -118,17 +118,28 @@ private:
 };
 
 /// Abstract base class for single-buffer initializations.
-class SingleInitializationBase : public Initialization {
+class SingleBufferInitialization : public Initialization {
 public:
-  SingleInitializationBase()
+  SingleBufferInitialization()
     : Initialization(Initialization::Kind::SingleBuffer)
   {}
   
-  ArrayRef<InitializationPtr> getSubInitializations() override {
-    return {};
-  }
+  ArrayRef<InitializationPtr> getSubInitializations() override;
 };
 
+/// Abstract base class for single-buffer initializations.
+class TemporaryInitialization : public SingleBufferInitialization {
+  SILValue Addr;
+  CleanupsDepth Cleanup;
+public:
+  TemporaryInitialization(SILValue addr, CleanupsDepth cleanup)
+    : Addr(addr), Cleanup(cleanup) {}
+
+  void finishInitialization(SILGenFunction &gen) override;
+
+  /// Returns the cleanup corresponding to the value of the temporary.
+  CleanupsDepth getInitializedCleanup() const { return Cleanup; }
+};
 
 } // end namespace Lowering
 } // end namespace swift

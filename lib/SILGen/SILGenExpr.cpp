@@ -535,7 +535,7 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
 namespace {
   /// An Initialization representing the concrete value buffer inside an
   /// existential container.
-  class ExistentialValueInitialization : public SingleInitializationBase {
+  class ExistentialValueInitialization : public SingleBufferInitialization {
     SILValue valueAddr;
   public:
     ExistentialValueInitialization(SILValue valueAddr)
@@ -1675,11 +1675,10 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
 }
 
 namespace {
-  class ImplicitValueInitialization : public SingleInitializationBase {
+  class ImplicitValueInitialization : public SingleBufferInitialization {
     SILValue slot;
   public:
-    ImplicitValueInitialization(SILValue slot) : slot(slot)
-    {}
+    ImplicitValueInitialization(SILValue slot) : slot(slot) {}
     
     SILValue getAddressOrNull() override {
       return slot;
@@ -2368,7 +2367,7 @@ RValue RValueEmitter::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
 
 namespace {
   /// An Initialization representing the result of an address-only ternary.
-  class TernaryInitialization : public SingleInitializationBase {
+  class TernaryInitialization : public SingleBufferInitialization {
     SILValue valueAddr;
   public:
     TernaryInitialization(SILValue valueAddr)

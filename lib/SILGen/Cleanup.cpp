@@ -131,19 +131,18 @@ void CleanupManager::setCleanupState(CleanupsDepth depth, CleanupState state) {
 }
 
 void CleanupManager::setCleanupState(Cleanup &cleanup, CleanupState state) {
-  assert((state != CleanupState::Active || Gen.B.hasValidInsertionPoint()) &&
-         "activating cleanup at invalid IP");
+  assert(Gen.B.hasValidInsertionPoint() &&
+         "changing cleanup state at invalid IP");
 
   // Do the transition now to avoid doing it in N places below.
   CleanupState oldState = cleanup.getState();
   (void)oldState;
   cleanup.setState(state);
-  
-  assert(state != oldState && "cleanup state is already active");
-  
-  // TODO: port the full transition logic from irgen here. For now, we only
-  // handle active and dead cleanups and only support transitions from active to
-  // dead.
-  assert(state == CleanupState::Dead && oldState == CleanupState::Active &&
-         "only active to dead transition currently supported");
+
+  assert(state != oldState && "trivial cleanup state change");
+  assert(oldState != CleanupState::Dead && "changing state of dead cleanup");
+
+  // Our current cleanup emission logic, where we don't try to re-use
+  // cleanup emissions between various branches, doesn't require any
+  // code to be emitted at transition points.
 }

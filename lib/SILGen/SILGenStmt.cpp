@@ -109,7 +109,7 @@ namespace {
 
 /// IndirectReturnInitialization - represents initializing an indirect return
 /// value.
-class IndirectReturnInitialization : public SingleInitializationBase {
+class IndirectReturnInitialization : public SingleBufferInitialization {
   SILValue address;
 public:
   IndirectReturnInitialization(SILValue address)
