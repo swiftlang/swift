@@ -472,22 +472,28 @@ namespace {
     void printPatterns(StringRef Text, ArrayRef<Pattern*> Pats) {
       if (Pats.empty())
         return;
-      OS << '\n';
-      Indent += 2;
-      OS.indent(Indent) << '(' << Text;
-      {
-        for (auto P : Pats) {
-          OS << '\n';
-          printRec(P);
-        }
-        OS << ')';
+      if (!Text.empty()) {
+        OS << '\n';
+        Indent += 2;
+        OS.indent(Indent) << '(' << Text;
       }
-      Indent -= 2;
+      for (auto P : Pats) {
+        OS << '\n';
+        printRec(P);
+      }
+      if (!Text.empty()) {
+        OS << ')';
+        Indent -= 2;
+      }
     }
 
     void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
-      printPatterns("arg_params", D->getArgParamPatterns());
-      printPatterns("body_params", D->getBodyParamPatterns());
+      if (D->hasSelectorStyleSignature()) {
+        printPatterns("arg_params", D->getArgParamPatterns());
+        printPatterns("body_params", D->getBodyParamPatterns());
+      } else {
+        printPatterns(StringRef(), D->getBodyParamPatterns());
+      }
 
       if (auto Body = D->getBody()) {
         OS << '\n';
