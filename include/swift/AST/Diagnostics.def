@@ -1278,6 +1278,8 @@ NOTE(subscript_decl_here,sema_tca,none,
 ERROR(condition_broken_proto,sema_tce,none,
       "protocol 'LogicValue' is broken", ())
 ERROR(broken_bool,sema_tce,none, "type 'Bool' is broken", ())
+ERROR(binding_injected_optional,sema_tce,none,
+      "operand of postfix '?' should have optional type; type is %0", (Type))
 
 ERROR(new_array_bound_zero,sema_tce,none,
       "array type cannot have zero length", ())

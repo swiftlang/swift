@@ -1857,6 +1857,18 @@ namespace {
                                    cs.getConstraintLocator(expr, { }));
       if (!subExpr) return nullptr;
 
+      // Complain if the sub-expression was converted to T? via the
+      // inject-into-optional implicit conversion.
+      //
+      // It should be the case that that's always the last conversion applied.
+      if (isa<InjectIntoOptionalExpr>(subExpr)) {
+        cs.getTypeChecker().diagnose(subExpr->getLoc(),
+                                     diag::binding_injected_optional,
+                               expr->getSubExpr()->getType()->getRValueType())
+          .highlight(subExpr->getSourceRange())
+          .fixItRemove(expr->getQuestionLoc());
+      }
+
       expr->setSubExpr(subExpr);
       expr->setType(valueType);
       return expr;
