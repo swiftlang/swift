@@ -51,6 +51,35 @@
 * 'x as T' now performs a checked cast to 'T?', producing '.Some(t)' if the
   cast succeeds, or '.None' if the cast fails.
 
+* The ternary expression ('x ? y : z') now requires whitespace between the
+  first expression and the question mark.  This permits '?' to be used
+  as a postfix operator.
+
+* A significant new piece of syntactic sugar has been added to ease working
+  with optional values.  The '?' postfix operator is analogous to '!', but
+  instead of asserting on None, it causes all the following postfix
+  operators to get skipped and return None.
+
+  In a sense, this generalizes (and makes explicit) the Objective-C behavior
+  where message sends to nil silently produce the zero value of the result.
+
+  For example, this code
+
+    object?.parent.notifyChildEvent?(object!, .didExplode)
+
+  first checks whether 'object' has a value; if so, it drills to its
+  parent and checks whether that object implements the 'notifyChildEvent'
+  method; if so, it calls that method.  (Note that we do not yet have
+  generalized optional methods.)
+
+  This code:
+
+    var titleLength = object?.title.length
+
+  checks whether 'object' has a value and, if so, asks for the length of
+  its title.  'titleLength' wil have type 'Int?', and if 'object' was
+  missing, the variable will be initialized to None.
+
 
 2013-09-24
 ----------
