@@ -80,6 +80,18 @@
   its title.  'titleLength' wil have type 'Int?', and if 'object' was
   missing, the variable will be initialized to None.
 
+* Objects with type 'id' can now be used as the receiver of property
+  accesses and subscript operations to get (but not set) values. The
+  result is of optional type. For example, for a variable 'obj' of
+  type 'id', the expression
+
+    id[0]
+
+  will produce a value of type 'id', which will either contain the
+  result of the message send objectAtIndexedSubscript(0) (wrapped in an
+  optional type) or, if the object does not respond to
+  objectAtIndexedSubscript:, an empty optional. The same approach
+  applies to property accesses.
 
 2013-09-24
 ----------
