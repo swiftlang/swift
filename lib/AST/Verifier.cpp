@@ -751,6 +751,19 @@ namespace {
       }
     }
 
+    void verifyChecked(InjectIntoOptionalExpr *expr) {
+      auto valueType = expr->getType()->getOptionalObjectType(Ctx);
+      if (!valueType) {
+        Out << "InjectIntoOptionalExpr is not of Optional type";
+        abort();
+      }
+
+      if (!expr->getSubExpr()->getType()->isEqual(valueType)) {
+        Out << "InjectIntoOptionalExpr operand is not of the value type";
+        abort();
+      }
+    }
+
     void verifyChecked(IfExpr *expr) {
       auto condTy
         = expr->getCondExpr()->getType()->getAs<BuiltinIntegerType>();

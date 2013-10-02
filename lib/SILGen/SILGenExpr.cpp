@@ -207,6 +207,7 @@ namespace {
     RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
     RValue visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E,
                                             SGFContext C);
+    RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
     RValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
     RValue visitIfExpr(IfExpr *E, SGFContext C);
     RValue visitZeroValueExpr(ZeroValueExpr *E, SGFContext C);
@@ -2382,6 +2383,32 @@ RValue RValueEmitter::visitDynamicSubscriptExpr(
 RValue RValueEmitter::visitExistentialSubscriptExpr(
                                    ExistentialSubscriptExpr *E, SGFContext C) {
   llvm_unreachable("not implemented");
+}
+
+RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
+                                                  SGFContext C) {
+  // Emit the sub-expression.
+  RValue valueRV = visit(E->getSubExpr());
+
+  // Create a buffer for the result.  Abstraction difference will
+  // force this to be returned indirectly from
+  // _injectValueIntoOptional anyway, so there's not much point
+  // avoiding that.
+  auto &optTL = SGF.getTypeLowering(E->getType());
+  SILValue optAddr =
+    SGF.getBufferForExprResult(E, optTL.getLoweredType(), C);
+
+  SGF.emitInjectOptionalValueInto(E, std::move(valueRV), optAddr, optTL);
+
+  ManagedValue result = SGF.manageBufferForExprResult(optAddr, optTL, C);
+  if (!result) return RValue();
+
+  // If we're not address-only, the caller will expect a non-address value.
+  if (!optTL.isAddressOnly()) {
+    auto optValue = optTL.emitLoadOfCopy(SGF.B, E, result.forward(SGF), IsTake);
+    result = SGF.emitManagedRValueWithCleanup(optValue, optTL);
+  }
+  return RValue(SGF, result, E);
 }
 
 RValue RValueEmitter::visitBridgeToBlockExpr(BridgeToBlockExpr *E,

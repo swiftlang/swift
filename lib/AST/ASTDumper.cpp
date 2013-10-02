@@ -1167,6 +1167,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E) {
+    printCommon(E, "inject_into_optional") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
 
   void visitAddressOfExpr(AddressOfExpr *E) {
     printCommon(E, "address_of_expr") << '\n';

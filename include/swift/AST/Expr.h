@@ -1329,6 +1329,17 @@ public:
            E->getKind() <= ExprKind::Last_ImplicitConversionExpr;
   }
 };
+
+/// InjectIntoOptionalExpr - The implicit conversion from T to T?.
+class InjectIntoOptionalExpr : public ImplicitConversionExpr {
+public:
+  InjectIntoOptionalExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::InjectIntoOptional, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::InjectIntoOptional;
+  }
+};
   
 /// BridgeToBlockExpr - FIXME: A hack to represent limited Swift closure to
 /// ObjC block conversion.

@@ -138,6 +138,7 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::ArchetypeMemberRef:
   case ExprKind::ArchetypeSubscript:
   case ExprKind::Binary:
+  case ExprKind::InjectIntoOptional:
   case ExprKind::BridgeToBlock:
   case ExprKind::ConstructorRefCall:
   case ExprKind::DefaultValue:
