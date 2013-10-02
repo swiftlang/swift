@@ -491,8 +491,10 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       // Type check the expression.
       bool isDiscarded
         = TC.TU.Kind != TranslationUnit::REPL || !isa<TopLevelCodeDecl>(DC);
-      if (TC.typeCheckExpression(SubExpr, DC, Type(), isDiscarded))
+      if (TC.typeCheckExpression(SubExpr, DC, Type(), isDiscarded)) {
+        elem = SubExpr;
         continue;
+      }
       
       if (isDiscarded)
         TC.typeCheckIgnoredExpr(SubExpr);
