@@ -25,21 +25,14 @@ using namespace swift;
 
 struct SwiftString;
 
-extern "C" {
-
-int64_t
+// String.size()
+extern "C" int64_t
 _TSS4sizefRSSFT_Si(void *swiftString);
 
-uint32_t
+// String[] getter
+extern "C" uint32_t
 _TSS9subscriptFT3idxSi_Scg(uint64_t idx, void *swiftString);
 
-void
-swift_NSStringToString(NSString *nsstring, SwiftString *string);
-
-NSString *
-swift_StringToNSString(SwiftString *string);
-
-}; // extern "C"
 
 struct SwiftString {
   const char *base;
@@ -48,19 +41,20 @@ struct SwiftString {
 };
 
 struct _NSSwiftString_s {
-  Class isa;
+  Class isa  __attribute__((unavailable));
   SwiftString swiftString;
 };
 
-@interface _NSSwiftString : NSString {
-@public
-  SwiftString swiftString;
-}
+__attribute__((visibility("hidden")))
+@interface _NSSwiftString : NSString 
 - (unichar)characterAtIndex: (NSUInteger)index;
 - (NSUInteger)length;
 @end
 
-@implementation _NSSwiftString
+@implementation _NSSwiftString {
+  SwiftString swiftString;
+}
+
 - (unichar)characterAtIndex: (NSUInteger)idx {
   static_assert(sizeof(unichar) == 2, "NSString is no longer UTF16?");
   // XXX FIXME
@@ -82,117 +76,80 @@ struct _NSSwiftString_s {
   objc_destructInstance(self); // fixup weak references
   swift_rawDealloc(self, 4);
 }
-@end
 #pragma clang diagnostic pop
 
 // FIXME: This causes static constructors, which isn't awesome.  It would be
 // spiffier to use ifunc's if possible.
-static const Class stringClasses[] = {
-  [_NSSwiftString self],
-  objc_lookUpClass("__NSCFConstantString"),
-  objc_lookUpClass("__NSCFString"),
-};
-
-/// Helper function to grow the allocated heap object for
-/// swift_NSStringToString in the case where the initial allocation is
-/// insufficient.
-static BoxPair _swift_NSStringToString_realloc(BoxPair oldBox,
-                                               size_t oldBufSize,
-                                               size_t newBufSize) {
-  // Allocate the new box.
-  BoxPair newBox = swift_allocPOD(newBufSize, alignof(void*) - 1);
-
-  // Copy the data from the old box.
-  memcpy(newBox.value, oldBox.value, oldBufSize);
-  
-  // Deallocate the old box. We know the box is POD and hasn't escaped, so we
-  // can use the swift_deallocPOD fast path.
-  swift_deallocPOD(oldBox.heapObject);
-  
-  return newBox;
-}
+static Class NSSwiftStringClass = [_NSSwiftString class];
+static Class NSCFConstantStringClass = objc_getClass("__NSCFConstantString");
 
 /// Convert an NSString to a Swift String in the worst case, where we have to
 /// use -[NSString getBytes:...:] to reencode the string value.
 __attribute__((noinline,used))
 static void
 _swift_NSStringToString_slow(NSString *nsstring, SwiftString *string) {
-  size_t len = [nsstring length];
-  size_t bufSize = len * 2 + 1;
+  // FIXME: Measure trade-off of memory overhead vs two-pass encoding 
+  // 1 UTF-16 unit becomes at most 3 bytes of UTF-8, plus the null terminator.
+  NSUInteger utf16Length = [nsstring length];
+  assert(utf16Length < NSIntegerMax / 3  &&  "NSString too long");
+  NSUInteger bufSize = utf16Length * 3 + 1;
   
   // Allocate a POD heap object to hold the data.
   BoxPair box = swift_allocPOD(bufSize, alignof(void*) - 1);
   char *buf = reinterpret_cast<char *>(box.value);
-  char *p = buf;
 
-  NSRange rangeToEncode = NSMakeRange(0, len);
-  
-  if (rangeToEncode.length != 0) {
-    size_t pSize = bufSize - 1;
-    for (;;) {
-      NSUInteger usedLength = 0;
-      // Copy the encoded string to our buffer.
-      BOOL ok = [nsstring getBytes:p
-                         maxLength:pSize
-                        usedLength:&usedLength
-                          encoding:NSUTF8StringEncoding
-                           options:0
-                             range:rangeToEncode
-                    remainingRange:&rangeToEncode];
-      // The operation should have encoded some bytes.
-      if (!ok)
-        __builtin_trap();
+  NSUInteger utf8Length = 0;
+  if (utf16Length != 0) {
+    // Copy the encoded string to our buffer.
+    NSRange unencodedRange;
+    BOOL ok = [nsstring getBytes:buf 
+                       maxLength:bufSize - 1
+                      usedLength:&utf8Length
+                        encoding:NSUTF8StringEncoding
+                         options:0
+                           range:NSMakeRange(0, utf16Length)
+                  remainingRange:&unencodedRange];
 
-      p += usedLength;
-      
-      // If we encoded the entire string, we're done.
-      if (rangeToEncode.length == 0)
-        break;
-      
-      // Otherwise, grow the buffer and try again.
-      size_t newBufSize = bufSize + pSize;
-      box = _swift_NSStringToString_realloc(box, bufSize, newBufSize);
-      bufSize = newBufSize;
-      buf = reinterpret_cast<char *>(box.value);
-    }
-  }
-  
-  // getBytes:...: doesn't add a null terminator.
-  *p = '\0';
+    // The operation should have encoded the entire string.
+    assert(ok  &&  "NSString encoding failed");
+    assert(unencodedRange.length == 0  &&  "NSString encoding failed");
+  } 
+
+  buf[utf8Length] = '\0';
 
   string->base  = buf;
-  string->len   = p - buf;
+  string->len   = utf8Length;
   string->owner = box.heapObject;
 }
 
-void
+extern "C" void
 swift_NSStringToString(NSString *nsstring, SwiftString *string) {
-  auto boxedString = reinterpret_cast<_NSSwiftString_s *>(nsstring);
-  if (boxedString->isa == stringClasses[0]) {
+  Class cls = object_getClass(nsstring);
+  if (cls == NSSwiftStringClass) {
+    // Swift boxed string
+    auto boxedString = reinterpret_cast<_NSSwiftString_s *>(nsstring);
     string->base  = boxedString->swiftString.base;
     string->len   = boxedString->swiftString.len;
     string->owner = boxedString->swiftString.owner;
     _swift_retain(string->owner);
-    return;
-  } else if (*(Class *)nsstring == stringClasses[1]) {
-    // constant string
+  } else if (cls == NSCFConstantStringClass) {
+    // Constant string
     string->base  = ((char **)nsstring)[2];
     string->len   = ((size_t *)nsstring)[3];
     string->owner = NULL;
-    return;
-  }
-  _swift_NSStringToString_slow(nsstring, string);
+  } else {
+    // String that needs to be copied or re-encoded.
+    _swift_NSStringToString_slow(nsstring, string);
+  } 
 }
 
-
-NSString *
+extern "C" NSString *
 swift_StringToNSString(SwiftString *string) {
   // sizeof(_NSSwiftString) is not allowed
   auto r = static_cast<_NSSwiftString *>(swift_rawAlloc(4));
-  *((Class *)r) = stringClasses[0];
   r->swiftString = *string;
   _swift_retain(r->swiftString.owner);
-  return r;
+  return objc_constructInstance(NSSwiftStringClass, r);
 }
 
 /// (String, UnsafePointer<BOOL>) -> () block shim
@@ -212,3 +169,4 @@ block_type _TTbbTSSGVSs13UnsafePointerV10ObjectiveC8ObjCBool__T_(
   });
 }
 
+@end
