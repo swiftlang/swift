@@ -677,13 +677,6 @@ ERROR(super_initializer_not_in_initializer,expr_parsing,none,
 ERROR(super_initializer_must_be_called,expr_parsing,none,
       "'super.init' cannot be referenced without arguments", ())
 
-ERROR(trailing_closure_not_postfix,expr_parsing,none,
-      "trailing closure can only follow a postfix expression", ())
-NOTE(trailing_closure_full_expr_parentheses,expr_parsing,none,
-     "add parentheses around complete expression", ())
-NOTE(trailing_closure_postfix_parentheses,expr_parsing,none,
-     "add parentheses around last postfix expression", ())
-
 // New expressions
 ERROR(array_new_missing_first_bound,expr_parsing,none,
       "must specify length of array to allocate", ())

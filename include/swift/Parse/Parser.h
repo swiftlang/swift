@@ -648,9 +648,9 @@ public:
   }
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
-  ParserResult<Expr> parseExprSequence(Diag<> ID);
-  ParserResult<Expr> parseExprPostfix(Diag<> ID);
-  ParserResult<Expr> parseExprUnary(Diag<> ID);
+  ParserResult<Expr> parseExprSequence(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprNew();
   ParserResult<Expr> parseExprSuper();
   Expr *parseExprStringLiteral();

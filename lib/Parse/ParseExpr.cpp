@@ -172,14 +172,7 @@ static bool isExprPostfix(Expr *expr) {
 /// parseExpr
 ///
 ///   expr:
-///     expr-basic
-///     expr-trailing-closure
-///
-///   expr-basic:
-///     expr-sequence
-///
-///   expr-trailing-closure:
-///     expr-postfix expr-closure+
+///     expr-sequence(basic | trailing-closure)
 ///
 /// \param isExprBasic Whether we're only parsing an expr-basic.
 ParserResult<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
@@ -194,7 +187,7 @@ ParserResult<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
     return makeParserResult(new (Context) UnresolvedPatternExpr(pattern.get()));
   }
   
-  ParserResult<Expr> expr = parseExprSequence(Message);
+  ParserResult<Expr> expr = parseExprSequence(Message, isExprBasic);
   if (expr.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (expr.isNull())
@@ -218,62 +211,6 @@ ParserResult<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
       auto pattern = createBindingFromPattern(udre->getLoc(),
                                               udre->getName());
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
-    }
-  }
-
-  // Parse trailing closure, if we're allowed to.
-  while (!isExprBasic && Tok.is(tok::l_brace)) {
-    // Parse the closure.
-    Expr *closure = parseExprClosure();
-
-    // The grammar only permits a postfix-expression. However, we've
-    // parsed a expr-sequence, so diagnose cases where we didn't get a
-    // trailing closure.
-    if (!isExprPostfix(expr.get())) {
-      diagnose(closure->getStartLoc(), diag::trailing_closure_not_postfix)
-        .highlight(expr.get()->getSourceRange());
-
-      // Suggest parentheses around the complete expression.
-      SourceLoc afterExprLoc
-        = Lexer::getLocForEndOfToken(SourceMgr, expr.get()->getEndLoc());
-      diagnose(expr.get()->getStartLoc(),
-               diag::trailing_closure_full_expr_parentheses)
-        .fixItInsert(expr.get()->getStartLoc(), "(")
-        .fixItInsert(afterExprLoc, ")");
-
-      // Suggest parentheses around the smallest postfix-expression and the
-      // closure, if we can find it.
-      if (auto seq = dyn_cast<SequenceExpr>(expr.get())) {
-        Expr *last = seq->getElements().back();
-        if (isExprPostfix(last)) {
-          SourceLoc afterClosureLoc
-            = Lexer::getLocForEndOfToken(SourceMgr, closure->getEndLoc());
-          diagnose(last->getStartLoc(),
-                   diag::trailing_closure_postfix_parentheses)
-            .fixItInsert(last->getStartLoc(), "(")
-            .fixItInsert(afterClosureLoc, ")");
-        }
-      }
-
-      // FIXME: We have no idea which of the two options above, if any,
-      // will actually type-check, which causes cascading failures. Should we
-      // simply mark the result expression as erroneous?
-    }
-
-    // Introduce the trailing closure into the call, or form a call, as
-    // necessary.
-    if (auto call = dyn_cast<CallExpr>(expr.get())) {
-      // When a closure follows a call, it becomes the last argument of
-      // that call.
-      Expr *arg = addTrailingClosureToArgument(Context, call->getArg(),
-                                               closure);
-      call->setArg(arg);
-    } else {
-      // Otherwise, the closure implicitly forms a call.
-      Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
-                                               nullptr, SourceLoc(), closure);
-      expr = makeParserResult(new (Context) CallExpr(expr.get(), arg,
-                                                     /*Implicit=*/true));
     }
   }
 
@@ -327,11 +264,11 @@ ParserResult<Expr> Parser::parseExprAs() {
 
 /// parseExprSequence
 ///
-///   expr-sequence:
-///     expr-unary expr-binary* expr-cast?
-///   expr-binary:
-///     operator-binary expr-unary
-///     '?' expr-sequence ':' expr-unary
+///   expr-sequence(Mode):
+///     expr-unary(Mode) expr-binary(Mode)* expr-cast?
+///   expr-binary(Mode):
+///     operator-binary expr-unary(Mode)
+///     '?' expr-sequence(Mode) ':' expr-unary(Mode)
 ///     '=' expr-unary
 ///   expr-cast:
 ///     expr-is
@@ -340,7 +277,7 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// The sequencing for binary exprs is not structural, i.e., binary operators
 /// are not inherently right-associative. If present, '?' and ':' tokens must
 /// match.
-ParserResult<Expr> Parser::parseExprSequence(Diag<> Message) {
+ParserResult<Expr> Parser::parseExprSequence(Diag<> Message, bool isExprBasic) {
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
   
@@ -348,7 +285,7 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message) {
 
   while (true) {
     // Parse a unary expression.
-    ParserResult<Expr> Primary = parseExprUnary(Message);
+    ParserResult<Expr> Primary = parseExprUnary(Message, isExprBasic);
     if (Primary.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
     if (Primary.isNull())
@@ -372,7 +309,7 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message) {
       
       // Parse the middle expression of the ternary.
       ParserResult<Expr> middle =
-          parseExprSequence(diag::expected_expr_after_if_question);
+          parseExprSequence(diag::expected_expr_after_if_question, isExprBasic);
       if (middle.hasCodeCompletion())
         return makeParserCodeCompletionResult<Expr>();
       if (middle.isNull())
@@ -446,18 +383,18 @@ done:
 
 /// parseExprUnary
 ///
-///   expr-unary:
-///     expr-postfix
+///   expr-unary(Mode):
+///     expr-postfix(Mode)
 ///     expr-new
-///     operator-prefix expr-unary
-///     '&' expr-unary
+///     operator-prefix expr-unary(Mode)
+///     '&' expr-unary(Mode)
 ///
-ParserResult<Expr> Parser::parseExprUnary(Diag<> Message) {
+ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   Expr *Operator;
   switch (Tok.getKind()) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
-    return parseExprPostfix(Message);
+    return parseExprPostfix(Message, isExprBasic);
       
   // If the next token is the keyword 'new', this must be expr-new.
   case tok::kw_new:
@@ -466,7 +403,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message) {
   case tok::amp_prefix: {
     SourceLoc Loc = consumeToken(tok::amp_prefix);
 
-    ParserResult<Expr> SubExpr = parseExprUnary(Message);
+    ParserResult<Expr> SubExpr = parseExprUnary(Message, isExprBasic);
     if (SubExpr.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
     if (SubExpr.isNull())
@@ -500,7 +437,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message) {
   }
   }
 
-  ParserResult<Expr> SubExpr = parseExprUnary(Message);
+  ParserResult<Expr> SubExpr = parseExprUnary(Message, isExprBasic);
   if (SubExpr.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (SubExpr.isNull())
@@ -765,13 +702,22 @@ ParserResult<Expr> Parser::parseExprSuper() {
 ///   expr-call:
 ///     expr-postfix expr-paren
 ///
-///   expr-postfix:
+///   expr-trailing-closure:
+///     expr-postfix(trailing-closure) expr-closure
+///
+///   expr-postfix(Mode):
+///     expr-postfix(Mode) operator-postfix
+///
+///   expr-postfix(basic):
 ///     expr-primary
 ///     expr-dot
 ///     expr-metatype
 ///     expr-subscript
 ///     expr-call
-///     expr-postfix operator-postfix
+///
+///   expr-postfix(trailing-closure):
+///     expr-postfix(basic)
+///     expr-trailing-closure
 
 /// Copy a numeric literal value into AST-owned memory, stripping underscores
 /// so the semantic part of the value can be parsed by APInt/APFloat parsers.
@@ -786,7 +732,7 @@ static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
   return StringRef(start, p - start);
 }
 
-ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
+ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   ParserResult<Expr> Result;
   switch (Tok.getKind()) {
   case tok::integer_literal: {
@@ -904,13 +850,15 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     // Check for a .foo suffix.
     SourceLoc TokLoc = Tok.getLoc();
     bool IsPeriod = false;
-    // Look ahead to see if we have '.foo(', '.foo[', '.foo.1(' or '.foo.1['.
+    // Look ahead to see if we have '.foo(', '.foo[', '.foo{',
+    //   '.foo.1(', '.foo.1[', or '.foo.1{'.
     if (Tok.is(tok::period_prefix) && (peekToken().is(tok::identifier) ||
                                        peekToken().is(tok::integer_literal))) {
       BacktrackingScope BS(*this);
       consumeToken(tok::period_prefix);
       IsPeriod = peekToken().isFollowingLParen() ||
-                 peekToken().isFollowingLSquare();
+                 peekToken().isFollowingLSquare() ||
+                 peekToken().isFollowingLBrace();
     }
     if (consumeIf(tok::period) || (IsPeriod && consumeIf(tok::period_prefix))) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
@@ -998,6 +946,29 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
         return nullptr;
       Result = makeParserResult(
           new (Context) SubscriptExpr(Result.get(), Idx.get()));
+      continue;
+    }
+    
+    // Check for a trailing closure, if allowed.
+    if (!isExprBasic && Tok.isFollowingLBrace()) {
+      // Parse the closure.
+      Expr *closure = parseExprClosure();
+      
+      // Introduce the trailing closure into the call, or form a call, as
+      // necessary.
+      if (auto call = dyn_cast<CallExpr>(Result.get())) {
+        // When a closure follows a call, it becomes the last argument of
+        // that call.
+        Expr *arg = addTrailingClosureToArgument(Context, call->getArg(),
+                                                 closure);
+        call->setArg(arg);
+      } else {
+        // Otherwise, the closure implicitly forms a call.
+        Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
+                                                 nullptr, SourceLoc(), closure);
+        Result = makeParserResult(new (Context) CallExpr(Result.get(), arg,
+                                                       /*Implicit=*/true));
+      }
       continue;
     }
 
