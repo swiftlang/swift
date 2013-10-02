@@ -41,7 +41,8 @@
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Accessing Memory.
    `(,(regexp-opt '("load" "store" "assign" "initialize_var" "copy_addr"
-		    "destroy_addr" "index_addr" "index_raw_pointer" "to")
+		    "destroy_addr" "index_addr" "index_raw_pointer" "to"
+                    "copy_value")
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Reference Counting.
    `(,(regexp-opt '("strong_retain" "strong_retain_autoreleased" "strong_release"
