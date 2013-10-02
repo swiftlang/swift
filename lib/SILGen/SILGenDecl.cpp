@@ -598,7 +598,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
     SILType ty = gen.getLoweredType(capture->getType()).getAddressType();
     SILValue box = new (gen.SGM.M) SILArgument(SILType::getObjectPointerType(c),
                                                gen.F.begin());
-    SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin());
+    SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin(), capture);
     gen.VarLocs[capture] = {box, addr};
     gen.Cleanups.pushCleanup<CleanupCaptureBox>(box);
     break;
@@ -609,7 +609,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
            "capturing inout by value?!");
     const TypeLowering &ti = gen.getTypeLowering(capture->getType());
     SILValue value = new (gen.SGM.M) SILArgument(ti.getLoweredType(),
-                                             gen.F.begin());
+                                                 gen.F.begin(), capture);
     gen.LocalConstants[SILDeclRef(capture)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;
@@ -619,7 +619,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
     Type setTy = gen.SGM.Types.getAccessorType(SILDeclRef::Kind::Setter,
                                                capture->getType());
     SILType lSetTy = gen.getLoweredType(setTy);
-    SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin());
+    SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin(), capture);
     gen.LocalConstants[SILDeclRef(capture, SILDeclRef::Kind::Setter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     SWIFT_FALLTHROUGH;
@@ -629,7 +629,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
     Type getTy = gen.SGM.Types.getAccessorType(SILDeclRef::Kind::Getter,
                                                capture->getType());
     SILType lGetTy = gen.getLoweredType(getTy);
-    SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin());
+    SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin(), capture);
     gen.LocalConstants[SILDeclRef(capture, SILDeclRef::Kind::Getter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;

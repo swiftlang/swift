@@ -61,6 +61,8 @@ typedef struct {
   const char* Filename;
 } Location;
 
+enum IndirectionKind: bool { DirectValue = false, IndirectValue = true };
+
 /// IRGenDebugInfo - Helper object that keeps track of the current
 /// CompileUnit, File, LexicalScope, and translates SILLocations into
 /// <llvm::DebugLoc>s.
@@ -158,7 +160,7 @@ public:
                                StringRef Name,
                                unsigned Tag,
                                unsigned ArgNo = 0,
-                               bool Boxed = false);
+                               bool Indirect = false);
 
   /// Convenience function for stack-allocated variables. Calls
   /// emitVariableDeclaration internally.
@@ -167,7 +169,7 @@ public:
                                     DebugTypeInfo Ty,
                                     StringRef Name,
                                     swift::SILInstruction *I,
-                                    bool Boxed = false);
+                                    bool Indirect = false);
 
   /// Convenience function for variables that are function arguments.
   void emitArgVariableDeclaration(IRBuilder& Builder,
@@ -175,7 +177,7 @@ public:
                                   DebugTypeInfo Ty,
                                   StringRef Name,
                                   unsigned ArgNo,
-                                  bool Boxed = false);
+                                  bool Indirect = false);
 
   /// Emit debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage,
@@ -247,9 +249,9 @@ private:
                                   llvm::Value *Storage,
                                   DebugTypeInfo Ty,
                                   StringRef Name,
-                                  SILInstruction *I,
+                                  SILFunction *Fn,
                                   SILValue Value,
-                                  bool Boxed);
+                                  bool Indirect);
 };
 
 } // irgen

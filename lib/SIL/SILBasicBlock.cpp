@@ -26,8 +26,8 @@ using namespace swift;
 // SILArgument Implementation
 //===----------------------------------------------------------------------===//
 
-SILArgument::SILArgument(SILType Ty, SILBasicBlock *ParentBB)
-  : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB) {
+SILArgument::SILArgument(SILType Ty, SILBasicBlock *ParentBB, ValueDecl *D)
+  : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB), Decl(D) {
   ParentBB->addArgument(this);
 }
 

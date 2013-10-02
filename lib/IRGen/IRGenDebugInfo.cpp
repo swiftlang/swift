@@ -653,13 +653,13 @@ bool IRGenDebugInfo::emitVarDeclForSILArgOrNull(IRBuilder& Builder,
                                                 llvm::Value *Storage,
                                                 DebugTypeInfo Ty,
                                                 StringRef Name,
-                                                SILInstruction *I,
+                                                SILFunction *Fn,
                                                 SILValue Value,
-                                                bool Boxed) {
+                                                bool Indirect) {
   if (auto SILArg = dyn_cast<SILArgument>(Value)) {
     emitArgVariableDeclaration(Builder, Storage, Ty, Name,
-                               getArgNo(I->getFunction(), SILArg),
-                               Boxed);
+                               getArgNo(Fn, SILArg),
+                               Indirect);
     return true;
   }
   return false;
@@ -670,7 +670,7 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
                                                   DebugTypeInfo Ty,
                                                   StringRef Name,
                                                   SILInstruction *I,
-                                                  bool Boxed) {
+                                                  bool Indirect) {
   // Make a best effort to find out if this variable is actually an
   // argument of the current function. This is done by looking at the
   // source of the first store to this alloca.  Unless we start
@@ -682,15 +682,15 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
       // Detect the pattern of an inout argument.
       if (auto Load = dyn_cast<LoadInst>(Src))
         Src = Load->getOperand();
-      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, Src, Boxed))
-        return;
+      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I->getFunction(),
+                                     Src, Indirect)) return;
     } else if (auto CopyAddr = dyn_cast<CopyAddrInst>(Use->getUser())) {
-      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I, CopyAddr->getSrc(), Boxed))
-        return;
+      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I->getFunction(),
+                                     CopyAddr->getSrc(), Indirect)) return;
     }
   }
   emitVariableDeclaration(B, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_auto_variable, Boxed);
+                          llvm::dwarf::DW_TAG_auto_variable, Indirect);
 }
 
 void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
@@ -698,9 +698,9 @@ void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 DebugTypeInfo Ty,
                                                 StringRef Name,
                                                 unsigned ArgNo,
-                                                bool Boxed) {
+                                                bool Indirect) {
   emitVariableDeclaration(Builder, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_arg_variable, ArgNo, Boxed);
+                          llvm::dwarf::DW_TAG_arg_variable, ArgNo, Indirect);
 }
 
 /// Return the DIFile that is the ancestor of Scope.
@@ -730,7 +730,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              StringRef Name,
                                              unsigned Tag,
                                              unsigned ArgNo,
-                                             bool Boxed) {
+                                             bool Indirect) {
   llvm::DebugLoc DL = Builder.getCurrentDebugLocation();
   llvm::DIDescriptor Scope(DL.getScope(Builder.getContext()));
   // If this is an argument, attach it to the current function scope.
@@ -755,7 +755,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
 
   // Create the descriptor for the variable.
   llvm::DIVariable Descriptor;
-  if (Boxed) {
+  if (Indirect) {
     // Classes are always passed by reference.
     llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
     SmallVector<llvm::Value *, 1> Addr;

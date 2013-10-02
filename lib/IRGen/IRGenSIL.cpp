@@ -429,6 +429,22 @@ public:
     assert(foundBB != LoweredBBs.end() && "no llvm bb for sil bb?!");
     return foundBB->second;
   }
+
+  /// Emit a shadow copy in an alloca, so the register allocator
+  /// doesn't elide the dbg.value intrinsic when register pressure is
+  /// high.
+  llvm::Value *emitShadowCopy(const Address &Source, StringRef Name) {
+    if (IGM.Opts.OptLevel == 0) {
+      auto Alloca = createAlloca(Source->getType(),
+                                 Source.getAlignment(),
+                                 Name+".addr");
+      Builder.CreateAlignedStore(Source.getAddress(),
+                                 Alloca.getAddress(),
+                                 Source.getAlignment().getValue());
+      return Alloca.getAddress();
+    } else
+      return Source.getAddress();
+  }
   
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
@@ -929,6 +945,22 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
   Builder.SetInsertPoint(llBB);
+
+  if (IGM.DebugInfo && BB->pred_empty()) {
+    // Function start. Emit debug info for any captured variables.
+    int ArgNo = 0;
+    for (auto Arg : BB->getBBArgs()) {
+      ++ArgNo;
+      if (Arg->getDecl()) {
+        auto Name = Arg->getDecl()->getName().str();
+        auto AddrIR = emitShadowCopy(getLoweredAddress(Arg), Name);
+        DebugTypeInfo DTI(Arg->getType().getSwiftType(),
+                          getTypeInfo(Arg->getType()));
+        IGM.DebugInfo->emitArgVariableDeclaration
+          (Builder, AddrIR, DTI, Name, ArgNo, IndirectValue);
+      }
+    }
+  }
 
   // FIXME: emit a phi node to bind the bb arguments from all the predecessor
   // branches.
@@ -1956,7 +1988,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
                                                 addr.getAddressPointer(),
                                                 DebugTypeInfo(Decl, type),
                                                 Decl->getName().str(),
-                                                i);
+                                                i, DirectValue);
 
   setLoweredAddress(i->getContainerResult(), addr.getContainer());
   setLoweredAddress(i->getAddressResult(), addr.getAddress());
@@ -2001,25 +2033,13 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   box.add(addr.getOwner());
   setLoweredExplosion(boxValue, box);
   setLoweredAddress(ptrValue, addr.getAddress());
-  auto AddrIR = addr.getAddress().getAddress();
-  if (IGM.Opts.OptLevel == 0) {
-    // Emit a shadow copy in an alloca, so the register allocator
-    // doesn't elide the dbg.value intrinsic when register pressure is
-    // high.
-    auto Alloca = createAlloca(AddrIR->getType(),
-                               addr.getAlignment(), Name+".addr");
-    Builder.CreateAlignedStore(AddrIR, Alloca.getAddress(),
-                               addr.getAlignment().getValue());
-    AddrIR = Alloca.getAddress();
-  }
 
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitStackVariableDeclaration
       (Builder,
-       AddrIR,
+       emitShadowCopy(addr.getAddress(), Name),
        DebugTypeInfo(i->getElementType().getSwiftType(), type),
-       Name, i, /* Boxed */true);
-
+       Name, i, IndirectValue);
 }
 
 void IRGenSILFunction::visitAllocArrayInst(swift::AllocArrayInst *i) {
