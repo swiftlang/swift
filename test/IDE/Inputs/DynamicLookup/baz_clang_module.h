@@ -1,5 +1,3 @@
-@class NSString;
-
 @interface Baz_Class {
   int baz_Ivar1;
 }
@@ -9,7 +7,7 @@
 
 - (id)objectAtIndexedSubscript:(int)idx;
 
-@property NSString *baz_Class_Property1;
+@property Baz_Class *baz_Class_Property1;
 
 @end
 
@@ -20,7 +18,7 @@
 
 - (id)objectForKeyedSubscript:(id)key;
 
-@property NSString *baz_Protocol_Property1;
+@property Baz_Class *baz_Protocol_Property1;
 
 @end
 

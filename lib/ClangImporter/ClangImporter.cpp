@@ -715,8 +715,15 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
       // If the method is a property accessor, we want the property.
       const clang::NamedDecl *searchForDecl = list->Method;
       if (list->Method->isPropertyAccessor()) {
-        if (auto property = list->Method->findPropertyDecl())
+        if (auto property = list->Method->findPropertyDecl()) {
+          // ... unless we are enumerating all decls.  In this case, if we see
+          // a getter, return a property.  If we see a setter, we know that
+          // there is a getter, and we will visit it and return a property at
+          // that time.
+          if (name.empty() && list->Method->param_size() != 0)
+            continue;
           searchForDecl = property;
+        }
       }
 
       if (auto VD = cast_or_null<ValueDecl>(Impl.importDecl(searchForDecl))) {

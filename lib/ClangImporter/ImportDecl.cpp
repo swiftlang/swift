@@ -2079,6 +2079,11 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // We might have imported this decl while importing the DeclContext.
+      auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
+      if (known != Impl.ImportedDecls.end())
+        return known->second;
+
       auto name = Impl.importName(decl->getDeclName());
       if (name.empty())
         return nullptr;
