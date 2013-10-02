@@ -826,7 +826,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
 
 ///
 ///    stmt-switch:
-///      'switch' expr-basic '{' stmt-case* '}'
+///      'switch' expr-basic '{' stmt-case+ '}'
 ParserResult<Stmt> Parser::parseStmtSwitch() {
   SourceLoc SwitchLoc = consumeToken(tok::kw_switch);
 
@@ -867,6 +867,10 @@ ParserResult<Stmt> Parser::parseStmtSwitch() {
 
   SourceLoc lBraceLoc = consumeToken(tok::l_brace);
   SourceLoc rBraceLoc;
+  
+  // Reject an empty 'switch'.
+  if (Tok.is(tok::r_brace))
+    diagnose(Tok.getLoc(), diag::empty_switch_stmt);
 
   ParserStatus Status;
 

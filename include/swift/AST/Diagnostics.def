@@ -602,6 +602,9 @@ ERROR(stmt_in_switch_not_covered_by_case,stmt_parsing,none,
 ERROR(case_after_default,stmt_parsing,none,
       "additional 'case' blocks cannot appear after the 'default' block of a 'switch'",
       ())
+ERROR(empty_switch_stmt,stmt_parsing,none,
+      "'switch' statement body must have at least one 'case' or 'default' block",
+      ())
 
 // Case Stmt
 ERROR(expected_case_where_expr,stmt_parsing,PointsToFirstBadToken,
