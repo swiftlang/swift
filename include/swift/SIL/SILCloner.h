@@ -90,7 +90,7 @@ protected:
   }
 
   SILBuilder Builder;
-  SILBasicBlock* InsertBeforeBB;
+  SILBasicBlock *InsertBeforeBB;
   llvm::DenseMap<SILArgument*, SILValue> ArgumentMap;
   llvm::DenseMap<SILInstruction*, SILInstruction*> InstructionMap;
   llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;
