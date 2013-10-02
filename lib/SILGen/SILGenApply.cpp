@@ -1780,7 +1780,9 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     }
 
     // Package up the result in an optional.
-    SILValue optResult = emitInjectOptionalValue(e, result, optTL);
+    RValue resultRV = RValue(*this, emitManagedRValueWithCleanup(result), e);
+    SILValue optResult =
+      emitInjectOptionalValue(e, std::move(resultRV), optTL).forward(*this);
 
     // Branch to the continuation block.
     B.createBranch(e, contBB, optResult);
@@ -1791,7 +1793,8 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     B.emitBlock(noMemberBB);
 
     // Branch to the continuation block.
-    B.createBranch(e, contBB, emitInjectOptionalNothing(e, optTL));
+    B.createBranch(e, contBB,
+                   emitInjectOptionalNothing(e, optTL).forward(*this));
   }
 
   // Emit the continuation block.
@@ -1861,11 +1864,15 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     // Emit the index.
     llvm::SmallVector<SILValue, 1> indexArgs;
     std::move(index).forwardAll(*this, indexArgs);
+    auto &valueTL = getTypeLowering(valueTy);
     result = B.createApply(e, result, result.getType(),
-                           getLoweredType(valueTy), {}, indexArgs);
+                           valueTL.getLoweredType(), {}, indexArgs);
 
     // Package up the result in an optional.
-    SILValue optResult = emitInjectOptionalValue(e, result, optTL);
+    RValue resultRV =
+      RValue(*this, emitManagedRValueWithCleanup(result, valueTL), e);
+    SILValue optResult =
+      emitInjectOptionalValue(e, std::move(resultRV), optTL).forward(*this);
 
     // Branch to the continuation block.
     B.createBranch(e, contBB, optResult);
@@ -1876,7 +1883,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     B.emitBlock(noMemberBB);
 
     // Branch to the continuation block.
-    B.createBranch(e, contBB, emitInjectOptionalNothing(e, optTL));
+    B.createBranch(e, contBB, emitInjectOptionalNothing(e, optTL).forward(*this));
   }
 
   // Emit the continuation block.

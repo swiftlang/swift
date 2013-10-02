@@ -866,8 +866,9 @@ public:
   /// \param optTL Type lowering information for the optional to create. 
   ///
   /// \returns an optional that wraps the given value
-  SILValue emitInjectOptionalValue(SILLocation loc, SILValue value,
-                                   const TypeLowering &optTL);
+  ManagedValue emitInjectOptionalValue(SILLocation loc,
+                                       RValue &&value,
+                                       const TypeLowering &optTL);
 
   /// Create a loadable optional with a "nothing" value.
   ///
@@ -876,8 +877,8 @@ public:
   ///              must be for a loadable type.
   ///
   /// \returns An empty optional.
-  SILValue emitInjectOptionalNothing(SILLocation loc,
-                                     const TypeLowering &optTL);
+  ManagedValue emitInjectOptionalNothing(SILLocation loc,
+                                         const TypeLowering &optTL);
 
   /// Initialize a memory location with an optional value.
   ///
@@ -886,7 +887,7 @@ public:
   /// \param dest  The uninitialized memory in which to store the result value.
   /// \param optTL Type lowering information for the optional to create.
   void emitInjectOptionalValueInto(SILLocation loc,
-                                   SILValue value,
+                                   RValue &&value,
                                    SILValue dest,
                                    const TypeLowering &optTL);
 

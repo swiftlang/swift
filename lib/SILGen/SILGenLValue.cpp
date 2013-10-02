@@ -727,9 +727,9 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
   return result;
 }
 
-SILValue SILGenFunction::emitInjectOptionalValue(SILLocation loc, 
-                                                 SILValue value,
-                                                 const TypeLowering &optTL) {
+ManagedValue SILGenFunction::emitInjectOptionalValue(SILLocation loc,
+                                                     RValue &&value,
+                                               const TypeLowering &optTL) {
   assert(!optTL.isAddressOnly() &&
          "use emitInjectOptionalValueInto to emit address-only optionals");
 
@@ -740,19 +740,21 @@ SILValue SILGenFunction::emitInjectOptionalValue(SILLocation loc,
   auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
   Substitution sub = getSimpleSubstitution(fnType, valueType);
 
-  auto arg = ManagedValue::forUnmanaged(value);
+  SmallVector<ManagedValue, 4> args;
+  std::move(value).getAll(args);
 
-  return emitApplyOfLibraryIntrinsic(loc, fn, sub, arg, valueType, SGFContext())
-    .forward(*this);
+  return emitApplyOfLibraryIntrinsic(loc, fn, sub, args,
+                                     optType.getSwiftRValueType(),
+                                     SGFContext());
 }
 
 void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
-                                                 SILValue value,
+                                                 RValue &&value,
                                                  SILValue dest,
                                                  const TypeLowering &optTL) {
   if (!optTL.isAddressOnly()) {
-    SILValue result = emitInjectOptionalValue(loc, value, optTL);
-    optTL.emitStoreOfCopy(B, loc, result, dest, IsInitialization);
+    auto result = emitInjectOptionalValue(loc, std::move(value), optTL);
+    result.forwardInto(*this, loc, dest);
     return;
   }
 
@@ -763,15 +765,17 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
   auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
   Substitution sub = getSimpleSubstitution(fnType, valueType);
 
-  auto arg = ManagedValue::forUnmanaged(value);
+  SmallVector<ManagedValue, 4> args;
+  std::move(value).getAll(args);
 
   TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
-  emitApplyOfLibraryIntrinsic(loc, fn, sub, arg, valueType,
+  emitApplyOfLibraryIntrinsic(loc, fn, sub, args,
+                              optType.getSwiftRValueType(),
                               SGFContext(&emitInto));
 }
 
-SILValue SILGenFunction::emitInjectOptionalNothing(SILLocation loc, 
-                                                   const TypeLowering &optTL) {
+ManagedValue SILGenFunction::emitInjectOptionalNothing(SILLocation loc,
+                                                 const TypeLowering &optTL) {
   assert(!optTL.isAddressOnly() &&
          "use emitInjectOptionalNothingInto to emit address-only optionals");
 
@@ -782,16 +786,17 @@ SILValue SILGenFunction::emitInjectOptionalNothing(SILLocation loc,
   auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
   Substitution sub = getSimpleSubstitution(fnType, valueType);
 
-  return emitApplyOfLibraryIntrinsic(loc, fn, sub, {}, valueType, SGFContext())
-    .forward(*this);
+  return emitApplyOfLibraryIntrinsic(loc, fn, sub, {},
+                                     optType.getSwiftRValueType(),
+                                     SGFContext());
 }
 
 void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc, 
                                                    SILValue dest,
                                                    const TypeLowering &optTL) {
   if (!optTL.isAddressOnly()) {
-    SILValue result = emitInjectOptionalNothing(loc, optTL);
-    optTL.emitStoreOfCopy(B, loc, result, dest, IsInitialization);
+    auto result = emitInjectOptionalNothing(loc, optTL);
+    result.forwardInto(*this, loc, dest);
     return;
   }
 
@@ -803,7 +808,7 @@ void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
   Substitution sub = getSimpleSubstitution(fnType, valueType);
 
   TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
-  emitApplyOfLibraryIntrinsic(loc, fn, sub, {}, valueType,
+  emitApplyOfLibraryIntrinsic(loc, fn, sub, {}, optType.getSwiftRValueType(),
                               SGFContext(&emitInto));
 }
 

@@ -470,7 +470,12 @@ ManagedValue SILGenFunction::manageBufferForExprResult(SILValue buffer,
   }
 
   // Add a cleanup for the temporary we allocated.
-  return emitManagedRValueWithCleanup(buffer, bufferTL);
+  if (bufferTL.isTrivial()) {
+    return ManagedValue::forUnmanaged(buffer);
+  } else {
+    Cleanups.pushCleanup<CleanupMaterializedAddressOnlyValue>(buffer);
+    return ManagedValue(buffer, getTopCleanup());
+  }
 }
 
 Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
@@ -768,17 +773,20 @@ RValue RValueEmitter::visitConditionalCheckedCastExpr(
   }
 
   // Load the BB argument if casting from address-only to loadable type.
-  if (castResult.getType().isAddress()
-      && !castResult.getType().isAddressOnly(SGF.SGM.M))
+  auto &castTL = SGF.getTypeLowering(castResult.getType());
+  if (castResult.getType().isAddress() && !castTL.isAddressOnly())
     castResult = SGF.B.createLoad(E, castResult);
+
+  RValue castRV(SGF, SGF.emitManagedRValueWithCleanup(castResult, castTL), E);
   // Wrap it in an Optional.
   if (isIndirect) {
-    SGF.emitInjectOptionalValueInto(E, castResult, result, resultTL);
+    SGF.emitInjectOptionalValueInto(E, std::move(castRV), result, resultTL);
     if (copyBuf)
       SGF.B.createDeallocStack(E, SILValue(copyBuf, 0));
     SGF.B.createBranch(E, contBB);
   } else {
-    SILValue someResult = SGF.emitInjectOptionalValue(E, castResult, resultTL);
+    SILValue someResult =
+      SGF.emitInjectOptionalValue(E, std::move(castRV), resultTL).forward(SGF);
     if (copyBuf)
       SGF.B.createDeallocStack(E, SILValue(copyBuf, 0));
     SGF.B.createBranch(E, contBB, someResult);
@@ -791,7 +799,8 @@ RValue RValueEmitter::visitConditionalCheckedCastExpr(
     SGF.emitInjectOptionalNothingInto(E, result, resultTL);
     SGF.B.createBranch(E, contBB);
   } else {
-    SILValue noneResult = SGF.emitInjectOptionalNothing(E, resultTL);
+    SILValue noneResult =
+      SGF.emitInjectOptionalNothing(E, resultTL).forward(SGF);
     SGF.B.createBranch(E, contBB, noneResult);
   }
   
@@ -2758,7 +2767,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   // result type.
   SGF.B.emitBlock(failureBB);
   if (!optInit) {
-    auto nothing = SGF.emitInjectOptionalNothing(E, optTL);
+    auto nothing = SGF.emitInjectOptionalNothing(E, optTL).forward(SGF);
     SGF.B.createBranch(E, contBB, nothing);
   } else {
     // FIXME: reset optInit here?
