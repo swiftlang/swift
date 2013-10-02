@@ -519,7 +519,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
                                    bool isVararg,
                                    GenericTypeResolver *resolver) {
   // Make sure we always have a resolver to use.
-  PartialGenericTypeToArchetypeResolver defaultResolver;
+  PartialGenericTypeToArchetypeResolver defaultResolver(*this);
   if (!resolver)
     resolver = &defaultResolver;
 

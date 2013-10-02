@@ -372,34 +372,26 @@ resolveIdentTypeComponent(TypeChecker &TC,
                                            resolver);
       // If the last resolved component is a type, perform member type lookup.
       if (parent.is<Type>()) {
+        // FIXME: Want the end of the back range.
+        SourceRange parentRange(parentComps.front().getIdLoc(),
+                                parentComps.back().getIdLoc());
+
         auto parentTy = parent.get<Type>();
         if (parentTy->is<ErrorType>())
           return parent.get<Type>();
 
         // If the parent is a dependent type, the member is a dependent member.
         if (parentTy->isDependentType()) {
-          Type memberType;
-
           // Try to resolve the dependent member type to a specific associated
           // type.
-          // FIXME: Want the end of the back range.
-          SourceRange parentRange(parentComps.front().getIdLoc(),
-                                  parentComps.back().getIdLoc());
-          if (auto assocType = resolver->resolveDependentMemberType(
-                                           parentTy,
-                                           parentRange,
-                                           comp.getIdentifier(),
-                                           comp.getIdLoc())) {
-            memberType = DependentMemberType::get(parentTy,
-                                                  assocType,
-                                                  TC.Context);
-          } else {
-            memberType = DependentMemberType::get(parentTy,
-                                                  comp.getIdentifier(),
-                                                  TC.Context);
-          }
+          Type memberType = resolver->resolveDependentMemberType(
+                                        parentTy,
+                                        parentRange,
+                                        comp.getIdentifier(),
+                                        comp.getIdLoc());
+          assert(memberType && "Received null dependent member type");
 
-          if (!comp.getGenericArgs().empty()) {
+          if (!comp.getGenericArgs().empty() && !memberType->is<ErrorType>()) {
             // FIXME: Highlight generic arguments and introduce a Fix-It to
             // remove them.
             TC.diagnose(comp.getIdLoc(), diag::not_a_generic_type, memberType);
@@ -417,9 +409,9 @@ resolveIdentTypeComponent(TypeChecker &TC,
         // If we didn't find anything, complain.
         // FIXME: Typo correction!
         if (!memberTypes) {
-          // FIXME: Highlight base range.
           TC.diagnose(comp.getIdLoc(), diag::invalid_member_type,
-                      comp.getIdentifier(), parent.get<Type>());
+                      comp.getIdentifier(), parent.get<Type>())
+            .highlight(parentRange);
           Type ty = ErrorType::get(TC.Context);
           comp.setValue(ty);
           return ty;
@@ -429,12 +421,11 @@ resolveIdentTypeComponent(TypeChecker &TC,
         // FIXME: Could try to apply generic arguments first, and see whether
         // that resolves things. But do we really want that to succeed?
         if (memberTypes.size() > 1) {
-          TC.diagnose(comp.getIdLoc(), diag::ambiguous_member_type,
-                      comp.getIdentifier(), parent.get<Type>());
-          for (const auto &member : memberTypes) {
-            TC.diagnose(member.first, diag::found_candidate_type,
-                        member.second);
-          }
+          TC.diagnoseAmbiguousMemberType(parent.get<Type>(),
+                                         parentRange,
+                                         comp.getIdentifier(),
+                                         comp.getIdLoc(),
+                                         memberTypes);
           Type ty = ErrorType::get(TC.Context);
           comp.setValue(ty);
           return ty;
@@ -562,7 +553,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics,
   PrettyStackTraceTypeRepr stackTrace(Context, "resolving", TyR);
 
   // Make sure we always have a resolver to use.
-  PartialGenericTypeToArchetypeResolver defaultResolver;
+  PartialGenericTypeToArchetypeResolver defaultResolver(*this);
   if (!resolver)
     resolver = &defaultResolver;
 

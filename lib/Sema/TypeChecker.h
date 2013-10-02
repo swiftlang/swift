@@ -610,7 +610,12 @@ public:
 
   /// \brief Look up the Bool type in the standard library.
   Type lookupBoolType();
-  
+
+  /// Diagnose an ambiguous member type lookup result.
+  void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
+                                   Identifier name, SourceLoc nameLoc,
+                                   LookupTypeResult &lookup);
+
   /// @}
 
   /// \name Overload resolution

@@ -754,3 +754,15 @@ OwnedResolver swift::createLazyResolver(TranslationUnit *TU) {
                        &deleteTypeCheckerAndDiags);
 }
 
+void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
+                                              SourceRange baseRange,
+                                              Identifier name,
+                                              SourceLoc nameLoc,
+                                              LookupTypeResult &lookup) {
+  diagnose(nameLoc, diag::ambiguous_member_type, name, baseTy)
+    .highlight(baseRange);
+  for (const auto &member : lookup) {
+    diagnose(member.first, diag::found_candidate_type,
+             member.second);
+  }
+}

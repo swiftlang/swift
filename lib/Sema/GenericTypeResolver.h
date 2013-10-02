@@ -22,6 +22,7 @@
 
 namespace swift {
 
+class ArchetypeBuilder;
 class AssociatedTypeDecl;
 class Identifier;
 
@@ -42,20 +43,19 @@ public:
   /// \returns The resolved generic type parameter type, which may be \c gp.
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp) = 0;
 
-  /// Resolve a reference to a member within a dependent type to an associated
-  /// type.
+  /// Resolve a reference to a member within a dependent type.
   ///
   /// \param baseTy The base of the member access.
   /// \param baseRange The source range covering the base type.
   /// \param name The name of the member type.
   /// \param nameLoc The location of the member name.
   ///
-  /// \returns The associated type to which the member refers, or null if
-  /// no such associated type exists.
-  virtual AssociatedTypeDecl *resolveDependentMemberType(Type baseTy,
-                                                         SourceRange baseRange,
-                                                         Identifier name,
-                                                         SourceLoc nameLoc) = 0;
+  /// \returns A type that refers to the dependent member type, or an error
+  /// type if such a reference is ill-formed.
+  virtual Type resolveDependentMemberType(Type baseTy,
+                                          SourceRange baseRange,
+                                          Identifier name,
+                                          SourceLoc nameLoc) = 0;
 };
 
 /// Generic type resolver that maps a generic type parameter type to its
@@ -66,10 +66,10 @@ public:
 class GenericTypeToArchetypeResolver : public GenericTypeResolver {
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
-  virtual AssociatedTypeDecl *resolveDependentMemberType(Type baseTy,
-                                                         SourceRange baseRange,
-                                                         Identifier name,
-                                                         SourceLoc nameLoc);
+  virtual Type resolveDependentMemberType(Type baseTy,
+                                          SourceRange baseRange,
+                                          Identifier name,
+                                          SourceLoc nameLoc);
 };
 
 /// Generic type resolver that maps any generic type parameter type that
@@ -82,12 +82,40 @@ class GenericTypeToArchetypeResolver : public GenericTypeResolver {
 ///
 /// FIXME: This is not a long-term solution.
 class PartialGenericTypeToArchetypeResolver : public GenericTypeResolver {
+  TypeChecker &TC;
+
+public:
+  PartialGenericTypeToArchetypeResolver(TypeChecker &tc) : TC(tc) { }
+
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
-  virtual AssociatedTypeDecl *resolveDependentMemberType(Type baseTy,
-                                                         SourceRange baseRange,
-                                                         Identifier name,
-                                                         SourceLoc nameLoc);
+  virtual Type resolveDependentMemberType(Type baseTy,
+                                          SourceRange baseRange,
+                                          Identifier name,
+                                          SourceLoc nameLoc);
+};
+
+/// Generic type resolver that performs complete resolution of dependent
+/// types based on a given archetype builder.
+///
+/// This generic type resolver should be used after all requirements have been
+/// introduced into the archetype builder, including inferred requirements,
+/// to check the signature of a generic declaration and resolve (for example)
+/// all dependent member refers to archetype members.
+class CompleteGenericTypeResolver : public GenericTypeResolver {
+  TypeChecker &TC;
+  ArchetypeBuilder &Builder;
+
+public:
+  CompleteGenericTypeResolver(TypeChecker &tc, ArchetypeBuilder &builder)
+    : TC(tc), Builder(builder) { }
+
+  virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
+
+  virtual Type resolveDependentMemberType(Type baseTy,
+                                          SourceRange baseRange,
+                                          Identifier name,
+                                          SourceLoc nameLoc);
 };
 
 } // end namespace swift

@@ -27,221 +27,178 @@
 using namespace swift;
 using llvm::DenseMap;
 
-/// \brief A type that will be mapped down to some archetype, which gathers
-/// all of the requirements and nested types of that archetype.
-struct ArchetypeBuilder::PotentialArchetype {
-  PotentialArchetype(PotentialArchetype *Parent, Identifier Name,
-                     Optional<unsigned> Index = Nothing)
-    : Parent(Parent), Name(Name), Index(Index), Representative(this),
-      Archetype(nullptr) { }
-
-  ~PotentialArchetype() {
-    for (auto Nested : NestedTypes) {
-      if (Nested.second != this) {
-        delete Nested.second;
-      }
+ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
+  for (auto Nested : NestedTypes) {
+    if (Nested.second != this) {
+      delete Nested.second;
     }
   }
+}
 
-  /// \brief The parent of this potential archetype, which will be non-null
-  /// when this potential archetype is an associated type.
-  PotentialArchetype *Parent;
+void ArchetypeBuilder::PotentialArchetype::buildFullName(
+       SmallVectorImpl<char> &Result) const {
+  if (Parent) {
+    Parent->buildFullName(Result);
+    Result.push_back('.');
+  }
+  Result.append(getName().begin(), getName().end());
+}
 
-  /// \brief The name of this potential archetype.
-  Identifier Name;
+std::string ArchetypeBuilder::PotentialArchetype::getFullName() const {
+  llvm::SmallString<64> Result;
+  buildFullName(Result);
+  return Result.str().str();
+}
 
-  /// \brief The index of the computed archetype.
-  Optional<unsigned> Index;
+unsigned ArchetypeBuilder::PotentialArchetype::getNestingDepth() const {
+  unsigned Depth = 0;
+  for (auto P = Parent; P; P = P->Parent)
+    ++Depth;
+  return Depth;
+}
 
-  /// \brief The representative of the equivalent class of potential archetypes
-  /// to which this potential archetype belongs.
-  PotentialArchetype *Representative;
+auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
+                                             -> PotentialArchetype *{
+  // Find the representative.
+  PotentialArchetype *Result = Representative;
+  while (Result != Result->Representative)
+    Result = Result->Representative;
 
-  /// \brief The superclass of this archetype, if specified.
-  Type Superclass;
+  // Perform (full) path compression.
+  PotentialArchetype *FixUp = this;
+  while (FixUp != FixUp->Representative) {
+    PotentialArchetype *Next = FixUp->Representative;
+    FixUp->Representative = Result;
+    FixUp = Next;
+  }
 
-  /// \brief The list of protocols to which this archetype will conform.
-  llvm::SetVector<ProtocolDecl *> ConformsTo;
+  return Result;
+}
 
-  /// \brief The set of nested typed stores within this archetype.
-  DenseMap<Identifier, PotentialArchetype *> NestedTypes;
+auto ArchetypeBuilder::PotentialArchetype::getNestedType(Identifier Name)
+                                             -> PotentialArchetype * {
+  // Retrieve the nested type from the representation of this set.
+  if (Representative != this)
+    return getRepresentative()->getNestedType(Name);
 
-  /// \brief The actual archetype, once it has been assigned.
-  ArchetypeType *Archetype;
+  PotentialArchetype *&Result = NestedTypes[Name];
+  if (!Result) {
+    // FIXME: The 'Self' hack is pretty ugly.
+    if (Name.str() == "Self")
+      Result = this;
+    else
+      Result = new PotentialArchetype(this, Name);
+  }
 
-  /// \brief Retrieve the name of this potential archetype.
-  StringRef getName() const { return Name.str(); }
+  return Result;
+}
 
-private:
-  /// \brief Recursively build the full name.
-  void buildFullName(SmallVectorImpl<char> &Result) const {
+auto ArchetypeBuilder::PotentialArchetype::getArchetype(
+                                             AssociatedTypeDecl *rootAssocTy,
+                                             TranslationUnit &tu)
+                                                -> ArchetypeType * {
+  // Retrieve the archetype from the representation of this set.
+  if (Representative != this)
+    return getRepresentative()->getArchetype(rootAssocTy, tu);
+
+  AssociatedTypeDecl *assocType = rootAssocTy;
+  if (!Archetype) {
+    // Allocate a new archetype.
+    ArchetypeType *ParentArchetype = nullptr;
     if (Parent) {
-      Parent->buildFullName(Result);
-      Result.push_back('.');
-    }
-    Result.append(getName().begin(), getName().end());
-  }
+      assert(!rootAssocTy &&
+             "root associated type given for non-root archetype");
+      ParentArchetype = Parent->getArchetype(nullptr, tu);
 
-public:
-  /// \brief Retrieve the full display name of this potential archetype.
-  std::string getFullName() const {
-    llvm::SmallString<64> Result;
-    buildFullName(Result);
-    return Result.str().str();
-  }
+      if (!ParentArchetype)
+        return nullptr;
 
-  /// \brief Determine the nesting depth of this potential archetype, e.g.,
-  /// the number of associated type references.
-  unsigned getNestingDepth() const {
-    unsigned Depth = 0;
-    for (auto P = Parent; P; P = P->Parent)
-      ++Depth;
-    return Depth;
-  }
-
-  /// \brief Retrieve the representative for this archetype, performing
-  /// path compression on the way.
-  PotentialArchetype *getRepresentative() {
-    // Find the representative.
-    PotentialArchetype *Result = Representative;
-    while (Result != Result->Representative)
-      Result = Result->Representative;
-
-    // Perform (full) path compression.
-    PotentialArchetype *FixUp = this;
-    while (FixUp != FixUp->Representative) {
-      PotentialArchetype *Next = FixUp->Representative;
-      FixUp->Representative = Result;
-      FixUp = Next;
-    }
-
-    return Result;
-  }
-
-  /// \brief Retrieve (or create) a nested type with the given name.
-  PotentialArchetype *getNestedType(Identifier Name) {
-    // Retrieve the nested type from the representation of this set.
-    if (Representative != this)
-      return getRepresentative()->getNestedType(Name);
-
-    PotentialArchetype *&Result = NestedTypes[Name];
-    if (!Result) {
-      // FIXME: The 'Self' hack is pretty ugly.
-      if (Name.str() == "Self")
-        Result = this;
-      else
-        Result = new PotentialArchetype(this, Name);
-    }
-
-    return Result;
-  }
-
-  /// \brief Retrieve (or build) the archetype corresponding to the potential
-  /// archetype.
-  ArchetypeType *getArchetype(AssociatedTypeDecl * /*nullable*/ rootAssocTy,
-                              TranslationUnit &tu) {
-    // Retrieve the archetype from the representation of this set.
-    if (Representative != this)
-      return getRepresentative()->getArchetype(rootAssocTy, tu);
-
-    AssociatedTypeDecl *assocType = rootAssocTy;
-    if (!Archetype) {
-      // Allocate a new archetype.
-      ArchetypeType *ParentArchetype = nullptr;
-      if (Parent) {
-        assert(!rootAssocTy &&
-               "root associated type given for non-root archetype");
-        ParentArchetype = Parent->getArchetype(nullptr, tu);
-
-        if (!ParentArchetype)
-          return nullptr;
-
-        // Find the protocol that has an associated type with this name.
-        llvm::SmallSetVector<AssociatedTypeDecl *, 2> assocTypes;
-        for (auto proto : ParentArchetype->getConformsTo()) {
-          SmallVector<ValueDecl *, 2> decls;
-          if (tu.lookupQualified(proto->getDeclaredType(), Name,
-                                 NL_VisitSupertypes, nullptr, decls)) {
-            for (auto decl : decls) {
-              assocType = dyn_cast<AssociatedTypeDecl>(decl);
-              if (assocType)
-                break;
-            }
+      // Find the protocol that has an associated type with this name.
+      llvm::SmallSetVector<AssociatedTypeDecl *, 2> assocTypes;
+      for (auto proto : ParentArchetype->getConformsTo()) {
+        SmallVector<ValueDecl *, 2> decls;
+        if (tu.lookupQualified(proto->getDeclaredType(), Name,
+                               NL_VisitSupertypes, nullptr, decls)) {
+          for (auto decl : decls) {
+            assocType = dyn_cast<AssociatedTypeDecl>(decl);
+            if (assocType)
+              break;
           }
         }
-
-        // FIXME: If assocType is null, we will diagnose it later.
-        // It would be far nicer to know now, and be able to recover, e.g.,
-        // via typo correction.
       }
 
-      // If we ended up building our parent archetype, then we'll have
-      // already filled in our own archetype.
-      if (Archetype)
-        return Archetype;
-
-      SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
-                                            ConformsTo.end());
-      Archetype = ArchetypeType::getNew(tu.getASTContext(), ParentArchetype,
-                                        assocType, Name, Protos, Superclass,
-                                        Index);
-
-      // Collect the set of nested types of this archetype, and put them into
-      // the archetype itself.
-      SmallVector<std::pair<Identifier, ArchetypeType *>, 4> FlatNestedTypes;
-      for (auto Nested : NestedTypes) {
-        FlatNestedTypes.push_back({ Nested.first,
-                                    Nested.second->getArchetype(nullptr, tu) });
-      }
-      Archetype->setNestedTypes(tu.getASTContext(), FlatNestedTypes);
+      // FIXME: If assocType is null, we will diagnose it later.
+      // It would be far nicer to know now, and be able to recover, e.g.,
+      // via typo correction.
     }
 
-    return Archetype;
+    // If we ended up building our parent archetype, then we'll have
+    // already filled in our own archetype.
+    if (Archetype)
+      return Archetype;
+
+    SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
+                                          ConformsTo.end());
+    Archetype = ArchetypeType::getNew(tu.getASTContext(), ParentArchetype,
+                                      assocType, Name, Protos, Superclass,
+                                      Index);
+
+    // Collect the set of nested types of this archetype, and put them into
+    // the archetype itself.
+    SmallVector<std::pair<Identifier, ArchetypeType *>, 4> FlatNestedTypes;
+    for (auto Nested : NestedTypes) {
+      FlatNestedTypes.push_back({ Nested.first,
+                                  Nested.second->getArchetype(nullptr, tu) });
+    }
+    Archetype->setNestedTypes(tu.getASTContext(), FlatNestedTypes);
   }
 
-  void dump(llvm::raw_ostream &Out, unsigned Indent) {
-    // Print name.
-    Out.indent(Indent) << getName();
+  return Archetype;
+}
 
-    // Print superclass.
-    if (Superclass) {
-      Out << " : ";
-      Superclass.print(Out);
-    }
+void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
+                                                unsigned Indent) {
+  // Print name.
+  Out.indent(Indent) << getName();
 
-    // Print requirements.
-    if (!ConformsTo.empty()) {
-      Out << " : ";
-
-      if (ConformsTo.size() != 1)
-        Out << "protocol<";
-
-      bool First = true;
-      for (auto Proto : ConformsTo) {
-        if (First)
-          First = false;
-        else
-          Out << ", ";
-
-        Out << Proto->getName().str();
-      }
-
-      if (ConformsTo.size() != 1)
-        Out << ">";
-    }
-
-    if (Representative != this) {
-      Out << " [represented by " << getRepresentative()->getFullName() << "]";
-    }
-
-    Out << "\n";
-
-    // Print nested types.
-    for (const auto &Nested : NestedTypes) {
-      Nested.second->dump(Out, Indent + 2);
-    }
+  // Print superclass.
+  if (Superclass) {
+    Out << " : ";
+    Superclass.print(Out);
   }
-};
+
+  // Print requirements.
+  if (!ConformsTo.empty()) {
+    Out << " : ";
+
+    if (ConformsTo.size() != 1)
+      Out << "protocol<";
+
+    bool First = true;
+    for (auto Proto : ConformsTo) {
+      if (First)
+        First = false;
+      else
+        Out << ", ";
+
+      Out << Proto->getName().str();
+    }
+
+    if (ConformsTo.size() != 1)
+      Out << ">";
+  }
+
+  if (Representative != this) {
+    Out << " [represented by " << getRepresentative()->getFullName() << "]";
+  }
+
+  Out << "\n";
+
+  // Print nested types.
+  for (const auto &Nested : NestedTypes) {
+    Nested.second->dump(Out, Indent + 2);
+  }
+}
 
 struct ArchetypeBuilder::Implementation {
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols;

@@ -1559,9 +1559,10 @@ public:
     }
 
     // If we have generic parameters, create archetypes now.
+    bool isInvalid = false;
     if (builder) {
       // Type check the function declaration.
-      PartialGenericTypeToArchetypeResolver resolver;
+      PartialGenericTypeToArchetypeResolver resolver(TC);
       semaFuncDecl(FD, /*consumeAttributes=*/false, &resolver);
 
       // Infer requirements from the parameters of the function.
@@ -1603,8 +1604,17 @@ public:
       // Go through and revert all of the dependent types we computed.
       revertSignature();
 
-      // Assign archetypes.
-      finalizeGenericParamList(*builder, FD->getGenericParams(), FD, TC);
+      // Completely resolve the generic signature.
+      CompleteGenericTypeResolver completeResolver(TC, *builder);
+      semaFuncDecl(FD, /*consumeAttributes=*/false, &completeResolver);
+
+      if (FD->getType()->is<ErrorType>()) {
+        isInvalid = true;
+      } else {
+        // Assign archetypes... after reverting the signature once again.
+        revertSignature();
+        finalizeGenericParamList(*builder, FD->getGenericParams(), FD, TC);
+      }
     }
 
     // Type check the parameters and return type again, now with archetypes.

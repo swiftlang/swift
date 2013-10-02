@@ -16,9 +16,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Identifier.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SetVector.h"
 #include <functional>
 #include <memory>
 
@@ -26,6 +29,7 @@ namespace swift {
 
 class AbstractTypeParamDecl;
 class ArchetypeType;
+class AssociatedTypeDecl;
 class Pattern;
 class ProtocolDecl;
 class Requirement;
@@ -40,7 +44,12 @@ class DiagnosticEngine;
 /// stated and inferred, and determines the set of archetypes for each of
 /// the generic parameters.
 class ArchetypeBuilder {
-  struct PotentialArchetype;
+public:
+  /// Describes a potential archetype, which stands in for a generic parameter
+  /// type or some type derived from it.
+  class PotentialArchetype;
+
+private:
   class InferRequirementsWalker;
   friend class InferRequirementsWalker;
 
@@ -52,17 +61,6 @@ class ArchetypeBuilder {
 
   ArchetypeBuilder(const ArchetypeBuilder &) = delete;
   ArchetypeBuilder &operator=(const ArchetypeBuilder &) = delete;
-
-  /// \brief Resolve the given type to the potential archetype it names.
-  ///
-  /// This routine will synthesize nested types as required to refer to a
-  /// potential archetype, even in cases where no requirement specifies the
-  /// requirement for such an archetype. FIXME: The failure to include such a
-  /// requirement will be diagnosed at some point later (when the types in the
-  /// signature are fully resolved).
-  ///
-  /// For any type that cannot refer to an archetype, this routine returns null.
-  PotentialArchetype *resolveType(Type type);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype conforms to the given protocol.
@@ -155,6 +153,17 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool inferRequirements(Pattern *pattern);
 
+  /// \brief Resolve the given type to the potential archetype it names.
+  ///
+  /// This routine will synthesize nested types as required to refer to a
+  /// potential archetype, even in cases where no requirement specifies the
+  /// requirement for such an archetype. FIXME: The failure to include such a
+  /// requirement will be diagnosed at some point later (when the types in the
+  /// signature are fully resolved).
+  ///
+  /// For any type that cannot refer to an archetype, this routine returns null.
+  PotentialArchetype *resolveType(Type type);
+
   /// \brief Assign archetypes to each of the generic parameters and all
   /// of their associated types, recursively.
   ///
@@ -177,6 +186,80 @@ public:
 
   /// \brief Dump all of the requirements, both specified and inferred.
   void dump();
+};
+
+class ArchetypeBuilder::PotentialArchetype {
+  /// \brief The parent of this potential archetype, which will be non-null
+  /// when this potential archetype is an associated type.
+  PotentialArchetype *Parent;
+
+  /// \brief The name of this potential archetype.
+  Identifier Name;
+
+  /// \brief The index of the computed archetype.
+  Optional<unsigned> Index;
+
+  /// \brief The representative of the equivalent class of potential archetypes
+  /// to which this potential archetype belongs.
+  PotentialArchetype *Representative;
+
+  /// \brief The superclass of this archetype, if specified.
+  Type Superclass;
+
+  /// \brief The list of protocols to which this archetype will conform.
+  llvm::SetVector<ProtocolDecl *, SmallVector<ProtocolDecl *, 4>> ConformsTo;
+
+  /// \brief The set of nested typed stores within this archetype.
+  llvm::DenseMap<Identifier, PotentialArchetype *> NestedTypes;
+
+  /// \brief The actual archetype, once it has been assigned.
+  ArchetypeType *Archetype;
+
+  /// \brief Construct a new potential archetype.
+  PotentialArchetype(PotentialArchetype *Parent, Identifier Name,
+                     Optional<unsigned> Index = Nothing)
+    : Parent(Parent), Name(Name), Index(Index), Representative(this),
+      Archetype(nullptr) { }
+
+  /// \brief Recursively build the full name.
+  void buildFullName(SmallVectorImpl<char> &Result) const;
+
+public:
+  ~PotentialArchetype();
+
+  /// \brief Retrieve the name of this potential archetype.
+  StringRef getName() const { return Name.str(); }
+
+  /// \brief Retrieve the full display name of this potential archetype.
+  std::string getFullName() const;
+
+  /// Retrieve the set of protocols to which this type conforms.
+  ArrayRef<ProtocolDecl *> getConformsTo() const {
+    return llvm::makeArrayRef(ConformsTo.begin(), ConformsTo.end());
+  }
+
+  /// Retrieve the superclass of this archetype.
+  Type getSuperclass() const { return Superclass; }
+
+  /// \brief Determine the nesting depth of this potential archetype, e.g.,
+  /// the number of associated type references.
+  unsigned getNestingDepth() const;
+
+  /// \brief Retrieve the representative for this archetype, performing
+  /// path compression on the way.
+  PotentialArchetype *getRepresentative();
+
+  /// \brief Retrieve (or create) a nested type with the given name.
+  PotentialArchetype *getNestedType(Identifier Name);
+
+  /// \brief Retrieve (or build) the archetype corresponding to the potential
+  /// archetype.
+  ArchetypeType *getArchetype(AssociatedTypeDecl * /*nullable*/ rootAssocTy,
+                              TranslationUnit &tu);
+
+  void dump(llvm::raw_ostream &Out, unsigned Indent);
+
+  friend class ArchetypeBuilder;
 };
 
 } // end namespace swift

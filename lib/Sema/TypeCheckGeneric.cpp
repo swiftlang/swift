@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
+#include "swift/AST/ArchetypeBuilder.h"
 
 using namespace swift;
 
@@ -30,8 +31,7 @@ Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
 }
 
 
-AssociatedTypeDecl *
-GenericTypeToArchetypeResolver::resolveDependentMemberType(
+Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
                                   Type baseTy,
                                   SourceRange baseRange,
                                   Identifier name,
@@ -53,14 +53,81 @@ Type PartialGenericTypeToArchetypeResolver::resolveGenericTypeParamType(
 }
 
 
-AssociatedTypeDecl *
-PartialGenericTypeToArchetypeResolver::resolveDependentMemberType(
-                                         Type baseTy,
-                                         SourceRange baseRange,
-                                         Identifier name,
-                                         SourceLoc nameLoc) {
+Type PartialGenericTypeToArchetypeResolver::resolveDependentMemberType(
+                                              Type baseTy,
+                                              SourceRange baseRange,
+                                              Identifier name,
+                                              SourceLoc nameLoc) {
   // We don't have enough information to find the associated type.
-  return nullptr;
+  return DependentMemberType::get(baseTy, name, TC.Context);
+}
+
+Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
+                                              GenericTypeParamType *gp) {
+  // If there is an archetype corresponding to this generic parameter, use it.
+  // FIXME: This is a hack for nested generics. It should go away eventually.
+  if (auto gpDecl = gp->getDecl()) {
+    if (auto archetype = gpDecl->getArchetype()) {
+      return archetype;
+    }
+  }
+
+  // Retrieve the potential archetype corresponding to this generic type
+  // parameter.
+  // FIXME: When generic parameters can map down to specific types, do so
+  // here.
+  auto pa = Builder.resolveType(gp);
+  assert(pa && "Missing archetype for generic type parameter");
+
+  return gp;
+}
+
+
+Type CompleteGenericTypeResolver::resolveDependentMemberType(
+                                    Type baseTy,
+                                    SourceRange baseRange,
+                                    Identifier name,
+                                    SourceLoc nameLoc) {
+  // Resolve the base to a potential archetype.
+  auto basePA = Builder.resolveType(baseTy);
+  assert(basePA && "Missing potential archetype for base");
+  basePA = basePA->getRepresentative();
+
+  // Find the associated type declaration for this name.
+  for (auto proto : basePA->getConformsTo()) {
+    SmallVector<ValueDecl *, 2> decls;
+    if (TC.TU.lookupQualified(proto->getDeclaredType(), name,
+                              NL_VisitSupertypes, nullptr, decls)) {
+      for (auto decl : decls) {
+        // Note: once we find any associated type, we have our answer, because
+        // the archetype builder is supposed to ensure that all associated
+        // types with the same name are equivalent.
+        auto assocType = dyn_cast<AssociatedTypeDecl>(decl);
+        if (assocType) {
+          return DependentMemberType::get(baseTy, assocType, TC.Context);
+        }
+      }
+    }
+  }
+
+  // Check whether the name can be found in the superclass.
+  if (auto superclassTy = basePA->getSuperclass()) {
+    if (auto lookup = TC.lookupMemberType(superclassTy, name)) {
+      if (lookup.isAmbiguous()) {
+        TC.diagnoseAmbiguousMemberType(baseTy, baseRange, name, nameLoc,
+                                       lookup);
+        return ErrorType::get(TC.Context);
+      }
+
+      // FIXME: Record (via type sugar) that this was referenced via baseTy.
+      return lookup.front().second;
+    }
+  }
+
+  // Complain that there is no suitable type.
+  TC.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
+    .highlight(baseRange);
+  return ErrorType::get(TC.Context);
 }
 
 SpecializeExpr *
