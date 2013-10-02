@@ -125,9 +125,6 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
 }
 
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
-  // FIXME: actually emit into the initialization. The initialization should
-  // be passed down in the context argument to visit, and it should be the
-  // visit*Expr method's responsibility to store to it if possible.
   RValue result = emitRValue(E, SGFContext(I));
   if (result)
     std::move(result).forwardInto(*this, I, E);
@@ -215,6 +212,10 @@ namespace {
     RValue visitZeroValueExpr(ZeroValueExpr *E, SGFContext C);
     RValue visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C);
     RValue visitAssignExpr(AssignExpr *E, SGFContext C);
+
+    RValue visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C);
+    RValue visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
+                                       SGFContext C);
 
     RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
   };
@@ -408,7 +409,8 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   LValue lv = SGF.emitLValue(E->getSubExpr());
-  return RValue(SGF, SGF.emitLoadOfLValue(E, lv, C), E);
+  auto result = SGF.emitLoadOfLValue(E, lv, C);
+  return (result ? RValue(SGF, result, E) : RValue());
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
@@ -421,6 +423,8 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
 
 SILValue SILGenFunction::getBufferForExprResult(
                                     SILLocation loc, SILType ty, SGFContext C) {
+  // If you change this, change manageBufferForExprResult below as well.
+
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
   if (Initialization *I = C.getEmitInto()) {
@@ -447,6 +451,26 @@ SILValue SILGenFunction::getBufferForExprResult(
   // If we couldn't emit into an Initialization, emit into a temporary
   // allocation.
   return emitTemporaryAllocation(loc, ty.getObjectType());
+}
+
+ManagedValue SILGenFunction::manageBufferForExprResult(SILValue buffer,
+                                                 const TypeLowering &bufferTL,
+                                                       SGFContext C) {
+  if (Initialization *I = C.getEmitInto()) {
+    switch (I->kind) {
+    case Initialization::Kind::AddressBinding:
+      llvm_unreachable("can't emit into address binding");
+    case Initialization::Kind::Ignored:
+    case Initialization::Kind::Tuple:
+      break;
+    case Initialization::Kind::SingleBuffer:
+      I->finishInitialization(*this);
+      return ManagedValue();
+    }
+  }
+
+  // Add a cleanup for the temporary we allocated.
+  return emitManagedRValueWithCleanup(buffer, bufferTL);
 }
 
 Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
@@ -581,9 +605,9 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
   // DeinitExistential.
   
   // Allocate the existential.
-  SILValue existential = gen.getBufferForExprResult(E,
-                                              gen.getLoweredType(E->getType()),
-                                              C);
+  auto &existentialTL = gen.getTypeLowering(E->getType());
+  SILValue existential =
+    gen.getBufferForExprResult(E, existentialTL.getLoweredType(), C);
   
   if (E->getSubExpr()->getType()->isExistentialType()) {
     // If the source value is already of a protocol type, we can use
@@ -608,8 +632,9 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
     InitializationPtr init(new ExistentialValueInitialization(valueAddr));
     gen.emitExprInto(E->getSubExpr(), init.get());
   }
-  
-  return RValue(gen, gen.emitManagedRValueWithCleanup(existential), E);
+
+  auto result = gen.manageBufferForExprResult(existential, existentialTL, C);
+  return (result ? RValue(gen, result, E) : RValue());
 }
 
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
@@ -748,8 +773,7 @@ RValue RValueEmitter::visitConditionalCheckedCastExpr(
     castResult = SGF.B.createLoad(E, castResult);
   // Wrap it in an Optional.
   if (isIndirect) {
-    SGF.emitInjectAddressOnlyOptionalValue(E, result, castResult,
-                                           resultTL);
+    SGF.emitInjectOptionalValueInto(E, castResult, result, resultTL);
     if (copyBuf)
       SGF.B.createDeallocStack(E, SILValue(copyBuf, 0));
     SGF.B.createBranch(E, contBB);
@@ -764,7 +788,7 @@ RValue RValueEmitter::visitConditionalCheckedCastExpr(
   SGF.B.emitBlock(failure);
   // Create an empty Optional.
   if (isIndirect) {
-    SGF.emitInjectAddressOnlyOptionalNothing(E, result, resultTL);
+    SGF.emitInjectOptionalNothingInto(E, result, resultTL);
     SGF.B.createBranch(E, contBB);
   } else {
     SILValue noneResult = SGF.emitInjectOptionalNothing(E, resultTL);
@@ -828,12 +852,13 @@ RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
   SGF.B.emitBlock(contBB);
   
   // Call the _getBool library intrinsic.
-  return RValue(SGF, SGF.emitApplyOfLibraryIntrinsic(E,
+  auto result = SGF.emitApplyOfLibraryIntrinsic(E,
                                   SGF.SGM.M.getASTContext().getGetBoolDecl(),
                                   {},
                                   ManagedValue(isa, ManagedValue::Unmanaged),
                                   E->getType()->getCanonicalType(),
-                                  C), E);
+                                  C);
+  return (result ? RValue(SGF, result, E) : RValue());
 }
 
 RValue RValueEmitter::visitParenExpr(ParenExpr *E, SGFContext C) {
@@ -2433,8 +2458,8 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     {
       auto TE = E->getThenExpr();
       FullExpr trueScope(SGF.Cleanups, CleanupLocation(TE));
-      InitializationPtr initialization(new TernaryInitialization(resultAddr));
-      SGF.emitExprInto(TE, initialization.get());
+      TernaryInitialization init(resultAddr);
+      SGF.emitExprInto(TE, &init);
     }
     cond.exitTrue(SGF.B);
     
@@ -2442,14 +2467,15 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     {
       auto EE = E->getElseExpr();
       FullExpr trueScope(SGF.Cleanups, CleanupLocation(EE));
-      InitializationPtr initialization(new TernaryInitialization(resultAddr));
-      SGF.emitExprInto(EE, initialization.get());
+      TernaryInitialization init(resultAddr);
+      SGF.emitExprInto(EE, &init);
     }
     cond.exitFalse(SGF.B);
     
     cond.complete(SGF.B);
-    
-    return RValue(SGF, SGF.emitManagedRValueWithCleanup(resultAddr, lowering), E);
+
+    auto result = SGF.manageBufferForExprResult(resultAddr, lowering, C);
+    return (result ? RValue(SGF, result, E) : RValue());
   }
 }
 
@@ -2625,6 +2651,149 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   emitAssignExprRecursive(E, visit(E->getSrc()), E->getDest(), SGF);
   
   return SGF.emitEmptyTupleRValue(E);
+}
+
+RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
+  assert(SGF.BindOptionalFailureDest.isValid());
+
+  // Create a temporary of type Optional<T>.
+  auto &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
+  auto temp = SGF.emitTemporary(E, optTL);
+
+  // Emit the operand into the temporary.
+  SGF.emitExprInto(E->getSubExpr(), temp.get());
+
+  SILValue addr = temp->getAddress();
+
+  // Check whether the optional has a value.
+  SILBasicBlock *hasValueBB = SGF.createBasicBlock();
+  SILBasicBlock *hasNoValueBB = SGF.createBasicBlock();
+  SILValue hasValue = SGF.emitDoesOptionalHaveValue(E, addr);
+  SGF.B.createCondBranch(E, hasValue, hasValueBB, hasNoValueBB);
+
+  // If not, thread out through a bunch of cleanups.
+  SGF.B.emitBlock(hasNoValueBB);
+  SGF.Cleanups.emitBranchAndCleanups(SGF.BindOptionalFailureDest, E);
+
+  // If so, get that value as the result of our expression.
+  SGF.B.emitBlock(hasValueBB);
+
+  auto result = ManagedValue(addr, temp->getInitializedCleanup());
+
+  // Forward the cleanup.
+  return RValue(SGF, SGF.emitGetOptionalValueFrom(E, result, optTL, C), E);
+}
+
+namespace {
+  /// A RAII object to save and restore BindOptionalFailureDest.
+  class RestoreOptionalFailureDest {
+    SILGenFunction &SGF;
+    JumpDest Prev;
+  public:
+    RestoreOptionalFailureDest(SILGenFunction &SGF)
+      : SGF(SGF), Prev(SGF.BindOptionalFailureDest) {
+    }
+    ~RestoreOptionalFailureDest() {
+      SGF.BindOptionalFailureDest = Prev;
+    }
+  };
+}
+
+RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
+                                                  SGFContext C) {
+  // Allocate a temporary for the Optional<T> if it's address-only and
+  // we don't have a larger initialization.  This needs to happen
+  // outside of the cleanups scope we're about to push.
+  auto &optTL = SGF.getTypeLowering(E->getType());
+  std::unique_ptr<TemporaryInitialization> optTemp;
+  Initialization *optInit = C.getEmitInto();
+  if (!optInit && optTL.isAddressOnly()) {
+    optTemp = SGF.emitTemporary(E, optTL);
+    optInit = optTemp.get();
+  }
+
+  // The emission rules here are:
+  //   - optInit is non-null if (but not only if) the result is address-only
+  //   - the continuation block will have an argument iff optInit is null
+
+  // Enter a cleanups scope.
+  FullExpr scope(SGF.Cleanups, E);
+
+  // Install a new optional-failure destination just outside of the
+  // cleanups scope.
+  RestoreOptionalFailureDest restoreFailureDest(SGF);
+  SILBasicBlock *failureBB = SGF.createBasicBlock();
+  SGF.BindOptionalFailureDest =
+    JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(), E);
+
+  // Emit the operand into the temporary.
+  RValue subResult;
+  if (optInit) {
+    SGF.emitExprInto(E->getSubExpr(), optInit);
+  } else {
+    subResult = SGF.emitRValue(E->getSubExpr(), SGFContext());
+  }
+
+  // We fell out of the normal result, which generated a T? as either
+  // a scalar in subResult or directly into optInit.
+
+  // This concludes the conditional scope.
+  scope.pop();
+
+  // Branch to the continuation block.
+  SILBasicBlock *contBB = SGF.createBasicBlock();
+  SILArgument *contBBArg = nullptr;
+  if (!optInit) {
+    assert(subResult);
+    assert(!optTL.isAddressOnly());
+    contBBArg = new (SGF.SGM.M) SILArgument(optTL.getLoweredType(), contBB);
+    SGF.B.createBranch(E, contBB,
+                       std::move(subResult).forwardAsSingleValue(SGF, E));
+  } else {
+    assert(!subResult);
+    SGF.B.createBranch(E, contBB);
+  }
+
+  // If control branched to the failure block, inject .None into the
+  // result type.
+  SGF.B.emitBlock(failureBB);
+  if (!optInit) {
+    auto nothing = SGF.emitInjectOptionalNothing(E, optTL);
+    SGF.B.createBranch(E, contBB, nothing);
+  } else {
+    // FIXME: reset optInit here?
+
+    SILValue resultAddr = optInit->getAddressOrNull();
+    assert(resultAddr || optInit->kind == Initialization::Kind::Ignored);
+    if (resultAddr) {
+      SGF.emitInjectOptionalNothingInto(E, resultAddr, optTL);
+    }
+    // FIXME: finish optInit within a conditional scope.
+    SGF.B.createBranch(E, contBB);
+  }
+
+  // Emit the continuation block.
+  SGF.B.emitBlock(contBB);
+
+  // If the result is scalar, just enter a cleanup for it.
+  if (!optInit) {
+    assert(!optTemp);
+    return RValue(SGF, SGF.emitManagedRValueWithCleanup(contBBArg, optTL), E);
+
+  // Okay, we emitted into an Initialization.  If it was externally
+  // requested, we're done.
+  } else if (!optTemp) {
+    assert(C.getEmitInto());
+    return RValue();
+
+  // Otherwise, we must have created a temporary.
+  } else {
+    assert(optTemp.get() == optInit);
+    assert(optTL.isAddressOnly());
+    auto result = ManagedValue(optTemp->getAddress(),
+                               optTemp->getInitializedCleanup());
+    return RValue(SGF, result, E);
+  }
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {

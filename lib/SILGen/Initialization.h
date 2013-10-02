@@ -39,6 +39,9 @@ using InitializationPtr = std::unique_ptr<Initialization>;
 /// box with an uninitialized value must be deallocated with `dealloc_ref`, but
 /// once the box is fully initialized, both the box and the contained value can
 /// be cleaned up together with `release`.
+///
+/// FIXME: provide a reset() operation to support multiple
+/// initialization paths.
 class Initialization {
 public:
   enum class Kind {
@@ -136,6 +139,14 @@ public:
     : Addr(addr), Cleanup(cleanup) {}
 
   void finishInitialization(SILGenFunction &gen) override;
+
+  SILValue getAddressOrNull() override {
+    return Addr;
+  }
+
+  SILValue getAddress() const {
+    return Addr;
+  }
 
   /// Returns the cleanup corresponding to the value of the temporary.
   CleanupHandle getInitializedCleanup() const { return Cleanup; }

@@ -1248,6 +1248,66 @@ public:
   }
 };
 
+/// \brief Describes a monadic bind from T? to T.
+///
+/// In a ?-chain expression, this is the part that's spelled with a
+/// postfix ?.
+///
+/// A BindOptionalExpr must always appear within a
+/// OptionalEvaluationExpr.  If the operand of the BindOptionalExpr
+/// evaluates to a missing value, the OptionalEvaluationExpr
+/// immediately completes and produces a missing value in the result
+/// type.
+class BindOptionalExpr : public Expr {
+  Expr *SubExpr;
+  SourceLoc QuestionLoc;
+
+public:
+  BindOptionalExpr(Expr *subExpr, SourceLoc questionLoc, Type ty = Type())
+    : Expr(ExprKind::BindOptional, /*Implicit=*/ false, ty),
+      SubExpr(subExpr), QuestionLoc(questionLoc) {}
+
+  SourceRange getSourceRange() const {
+    return SourceRange(SubExpr->getStartLoc(), QuestionLoc);
+  }
+  SourceLoc getLoc() const { return getQuestionLoc(); }
+  SourceLoc getQuestionLoc() const { return QuestionLoc; }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *expr) { SubExpr = expr; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::BindOptional;
+  }
+};
+
+/// \brief Describes the outer limits of an operation containing
+/// monadic binds of T? to T.
+///
+/// In a ?-chain expression, this is implicitly formed at the outer
+/// limits of the chain.  For example, in (foo?.bar?().baz).fred,
+/// this is nested immediately within the parens.
+///
+/// This expression will always have optional type.
+class OptionalEvaluationExpr : public Expr {
+  Expr *SubExpr;
+
+public:
+  OptionalEvaluationExpr(Expr *subExpr, Type ty = Type())
+    : Expr(ExprKind::OptionalEvaluation, /*Implicit=*/ true, ty),
+      SubExpr(subExpr) {}
+
+  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *expr) { SubExpr = expr; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::OptionalEvaluation;
+  }
+};
+
 /// ImplicitConversionExpr - An abstract class for expressions which
 /// implicitly convert the value of an expression in some way.
 class ImplicitConversionExpr : public Expr {

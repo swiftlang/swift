@@ -454,6 +454,22 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitBindOptionalExpr(BindOptionalExpr *E) {
+    Expr *sub = doIt(E->getSubExpr());
+    if (!sub) return nullptr;
+
+    E->setSubExpr(sub);
+    return E;
+  }
+
+  Expr *visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
+    Expr *sub = doIt(E->getSubExpr());
+    if (!sub) return nullptr;
+
+    E->setSubExpr(sub);
+    return E;
+  }
+
 #define STMT(Id, Parent) Stmt *visit##Id##Stmt(Id##Stmt *S);
 #include "swift/AST/StmtNodes.def"
 

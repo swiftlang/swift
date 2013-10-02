@@ -1847,6 +1847,32 @@ namespace {
       llvm_unreachable("should have been eliminated during name binding");
     }
     
+    Expr *visitBindOptionalExpr(BindOptionalExpr *expr) {
+      Type valueType = simplifyType(expr->getType());
+      Type optType =
+        cs.getTypeChecker().getOptionalType(expr->getQuestionLoc(), valueType);
+      if (!optType) return nullptr;
+
+      Expr *subExpr = coerceToType(expr->getSubExpr(), optType,
+                                   cs.getConstraintLocator(expr, { }));
+      if (!subExpr) return nullptr;
+
+      expr->setSubExpr(subExpr);
+      expr->setType(valueType);
+      return expr;
+    }
+
+    Expr *visitOptionalEvaluationExpr(OptionalEvaluationExpr *expr) {
+      Type optType = simplifyType(expr->getType());
+      Expr *subExpr = coerceToType(expr->getSubExpr(), optType,
+                                   cs.getConstraintLocator(expr, { }));
+      if (!subExpr) return nullptr;
+
+      expr->setSubExpr(subExpr);
+      expr->setType(optType);
+      return expr;
+    }
+
     void finalize() {
       // Check that all value type methods were fully applied.
       for (auto &unapplied : ValueTypeMemberApplications) {

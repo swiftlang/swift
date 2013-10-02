@@ -948,7 +948,8 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     /// Do we need to copy here if the return value is Unretained?
     assert(Ownership.getReturn() == OwnershipConventions::Return::Retained
            && "address-only result with non-Retained ownership not implemented");
-    bridgedResult = emitManagedRValueWithCleanup(indirectReturn, resultTI);
+    bridgedResult = manageBufferForExprResult(indirectReturn, resultTI, C);
+    if (!bridgedResult) return ManagedValue();
   } else {
     switch (Ownership.getReturn()) {
     case OwnershipConventions::Return::Retained:
@@ -1519,7 +1520,8 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
 }
 
 RValue SILGenFunction::emitApplyExpr(ApplyExpr *e, SGFContext c) {
-  return RValue(*this, prepareApplyExpr(*this, e).apply(c), e);
+  ManagedValue result = prepareApplyExpr(*this, e).apply(c);
+  return (result ? RValue(*this, result, e) : RValue());
 }
 
 ManagedValue

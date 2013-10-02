@@ -42,6 +42,7 @@ namespace Lowering {
   class SILGenFunction;
   class Initialization;
   class OwnershipConventions;
+  class TemporaryInitialization;
 
 /// SILGenModule - an ASTVisitor for generating SIL from top-level declarations
 /// in a translation unit.
@@ -237,6 +238,12 @@ struct Materialize {
 };
   
 /// SGFContext - Internal context information for the SILGenFunction visitor.
+///
+/// In general, emission methods which take an SGFContext indicate
+/// that they've initialized the emit-into buffer (if they have) by
+/// returning a null value of whatever type (typically an RValue or
+/// ManagedValue).  Callers who propagate down an SGFContext that
+/// might have a emit-into buffer must be aware of this.
 struct SGFContext {
 private:
   using State =
@@ -306,6 +313,10 @@ public:
   std::vector<SwitchContext *> SwitchStack;
   /// Keep track of our current nested scope.
   std::vector<SILDebugScope*> DebugScopeStack;
+
+  /// The cleanup depth and BB for when the operand of a
+  /// BindOptionalExpr is a missing value.
+  JumpDest BindOptionalFailureDest = JumpDest::invalid();
 
   /// The cleanup depth and epilog BB for "return" instructions.
   JumpDest ReturnDest;
@@ -599,7 +610,18 @@ public:
   /// Prepares a buffer to receive the result of an expression, either using the
   /// 'emit into' initialization buffer if available, or allocating a temporary
   /// allocation if not.
+  ///
+  /// The caller should call manageBufferForExprResult at the instant
+  /// that the buffer has been initialized.
   SILValue getBufferForExprResult(SILLocation loc, SILType ty, SGFContext C);
+
+  /// Flag that the buffer for an expression result has been properly
+  /// initialized.
+  ///
+  /// Returns an empty value if the buffer was taken from the context.
+  ManagedValue manageBufferForExprResult(SILValue buffer,
+                                         const TypeLowering &bufferTL,
+                                         SGFContext C);
   
   //===--------------------------------------------------------------------===//
   // Recursive entry points
@@ -653,6 +675,7 @@ public:
   /// the result would be allocated into temporary memory normally.
   void emitExprInto(Expr *E, Initialization *I);
 
+  /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
   
   ManagedValue emitArrayInjectionCall(ManagedValue ObjectPtr,
@@ -739,8 +762,7 @@ public:
   void emitAssignToLValue(SILLocation loc, RValue &&src,
                           LValue const &dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue const &src);
-  ManagedValue emitLoadOfLValue(SILLocation loc, const LValue &src,
-                                SGFContext C);
+  ManagedValue emitLoadOfLValue(SILLocation loc, const LValue &src, SGFContext C);
   
   /// Emit a reference to a method from within another method of the type, and
   /// gather all the substitutions necessary to invoke it, without
@@ -846,7 +868,7 @@ public:
   /// \returns an optional that wraps the given value
   SILValue emitInjectOptionalValue(SILLocation loc, SILValue value,
                                    const TypeLowering &optTL);
-  
+
   /// Create a loadable optional with a "nothing" value.
   ///
   /// \param loc The location to use for the resulting optional.
@@ -857,28 +879,36 @@ public:
   SILValue emitInjectOptionalNothing(SILLocation loc,
                                      const TypeLowering &optTL);
 
-  /// Initialize a memory location with an address-only optional.
+  /// Initialize a memory location with an optional value.
   ///
   /// \param loc   The location to use for the resulting optional.
+  /// \param value The value to inject into an optional.
   /// \param dest  The uninitialized memory in which to store the result value.
-  /// \param value The value to inject into an optional, which must be of an
-  ///              address-only type.
   /// \param optTL Type lowering information for the optional to create.
-  void emitInjectAddressOnlyOptionalValue(SILLocation loc,
-                                          SILValue dest,
-                                          SILValue value,
-                                          const TypeLowering &optTL);
+  void emitInjectOptionalValueInto(SILLocation loc,
+                                   SILValue value,
+                                   SILValue dest,
+                                   const TypeLowering &optTL);
 
-  /// Initialize a memory location with an address-only optional "nothing"
+  /// Initialize a memory location with an optional "nothing"
   /// value.
   ///
   /// \param loc   The location to use for the resulting optional.
   /// \param dest  The uninitialized memory in which to store the result value.
-  /// \param optTL Type lowering information for the optional to create, which
-  ///              must be loadable.
-  void emitInjectAddressOnlyOptionalNothing(SILLocation loc,
-                                            SILValue dest,
-                                            const TypeLowering &optTL);
+  /// \param optTL Type lowering information for the optional to create.
+  void emitInjectOptionalNothingInto(SILLocation loc,
+                                     SILValue dest,
+                                     const TypeLowering &optTL);
+
+  /// \brief Emit a call to the library intrinsic _doesOptionalHaveValue.
+  ///
+  /// The result is a Builtin.Int1.
+  SILValue emitDoesOptionalHaveValue(SILLocation loc, SILValue addr);
+
+  /// \brief Emit a call to the library intrinsic _getOptionalValue.
+  ManagedValue emitGetOptionalValueFrom(SILLocation loc, ManagedValue addr,
+                                        const TypeLowering &optTL,
+                                        SGFContext C);
 
   //===--------------------------------------------------------------------===//
   // Declarations
@@ -916,7 +946,15 @@ public:
   /// that can be used to initialize it, and registers cleanups in the active
   /// scope.
   std::unique_ptr<Initialization> emitLocalVariableWithCleanup(VarDecl *D);
-  
+
+  /// Emit the allocation for a local temporary, provides an
+  /// Initialization that can be used to initialize it, and registers
+  /// cleanups in the active scope.
+  ///
+  /// The initialization is guaranteed to be a single buffer.
+  std::unique_ptr<TemporaryInitialization>
+  emitTemporary(SILLocation loc, const TypeLowering &tempTL);
+
   /// Destroy and deallocate an initialized local variable.
   void destroyLocalVariable(SILLocation L, VarDecl *D);
   

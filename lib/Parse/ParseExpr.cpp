@@ -99,6 +99,8 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::UnconditionalCheckedCast:
   case ExprKind::Assign:
   case ExprKind::UnresolvedPattern:
+  case ExprKind::BindOptional:
+  case ExprKind::OptionalEvaluation:
     return false;
 
   // Postfix expressions.
@@ -303,7 +305,7 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message, bool isExprBasic) {
       break;
     }
     
-    case tok::question: {
+    case tok::question_infix: {
       // Save the '?'.
       SourceLoc questionLoc = consumeToken();
       
@@ -844,6 +846,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   // If we had a parse error, don't attempt to parse suffixes.
   if (Result.isNull())
     return nullptr;
+
+  bool hasBindOptional = false;
     
   // Handle suffix expressions.
   while (1) {
@@ -972,6 +976,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       continue;
     }
 
+    // Check for a ? suffix.
+    if (consumeIf(tok::question_postfix)) {
+      Result = makeParserResult(
+          new (Context) BindOptionalExpr(Result.get(), TokLoc));
+      hasBindOptional = true;
+      continue;
+    }
+
     // Check for a postfix-operator suffix.
     if (Tok.is(tok::oper_postfix)) {
       Expr *oper = parseExprOperator();
@@ -993,6 +1005,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       return makeParserCodeCompletionResult<Expr>();
     }
     break;
+  }
+
+  // If we had a ? suffix expression, bind the entire postfix chain
+  // within an OptionalEvaluationExpr.
+  if (hasBindOptional) {
+    Result = makeParserResult(
+               new (Context) OptionalEvaluationExpr(Result.get()));
   }
   
   return Result;

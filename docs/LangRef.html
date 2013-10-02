@@ -559,14 +559,19 @@
     other two cases.
   </p>
 
-  <p>As an exception to the above rule, an operator immediately followed by a
-    dot ('.') is only considered right-bound if not already left-bound. This
-    allows <code>a@.prop</code> to be parsed as <code>(a@).prop</code> rather
-    than as <code>a @ .prop</code>. Similarly, because the '!' operator is
-    defined by the standard library to destructure
-    <a href="#type-optional">optional types</a> and is thus expected to be used
-    ubiquitously, it is also only considered right-bound if not already
-    left-bound.</p>
+  <p>As an exception, an operator immediately followed by a dot ('.')
+    is only considered right-bound if not already left-bound. This
+    allows <code>a@.prop</code> to be parsed as <code>(a@).prop</code>
+    rather than as <code>a @ .prop</code>.</p>
+
+  <p>As another exception, because the '!' operator is defined by the
+    standard library to destructure <a href="#type-optional">optional
+    types</a> and is thus expected to be used ubiquitously, it is also
+    only considered right-bound if not already left-bound.</p>
+
+  <p>The '?' operator is postfix (and therefore not the ternary
+    operator) if it is left-bound.  The sugar form for <tt>Optional</tt>
+    types must be left-bound.</p>
 
   <p>When parsing certain grammatical constructs that involve '&lt;' and
   '&gt;' (such as <a href="#type-composition">protocol composition
@@ -1999,7 +2004,7 @@ if vec[3] {
     </div>
 
     <pre class="grammar">
-      type-optional ::= type-simple '?'
+      type-optional ::= type-simple '?'-postfix
     </pre>
 
     <p>An optional type is syntactic sugar for the library type 
@@ -2007,13 +2012,28 @@ if vec[3] {
     cases: None and Some, used to represent a value that may or may not be 
     present.</p>
 
-    <p>FIXME: The current implementation of Optional is a hack and None and 
-    Some are currently both globals rather than members.</p>
-
-    <p>Optional types are different from other enums in that any value 
-    <code>x</code> is implicitly convertible to Some(<code>x</code>). This is
-    part of the language, not the library; therefore, the libary type Optional
-    is required to have a constructor that accepts a single argument.</p>
+    <p>Swift provides a number of special, builtin behaviors involving
+      this library type:
+      <ul>
+        <li>There is an implicit conversion from any type <code>T</code> to the
+          corresponding optional type <code>T?</code>.</li>
+        <li><code>[weak]</code> variables must have type <code>T?</code>
+          and automatically become <code>None</code> when the referent begins
+          deallocation.</li>
+        <li>The <a href="#expr-optional">optional-chaining operator</a> works
+          on values of type <code>T?</code>.</li>
+        <li>Several other expressions generate values of type
+          <code>T?</code>.</li>
+      </ul>
+      To support these intrinsic use cases, the library is required to
+      provide four functions with these exact signatures:
+      <ul>
+        <li><code>func _doesOptionalHaveValue<T>(v : [inout] T?) -> Builtin.Int1</code></li>
+        <li><code>func _getOptionalValue<T>(v : T?) -> T</code></li>
+        <li><code>func _injectValueIntoOptional<T>(v : T) -> T?</code></li>
+        <li><code>func _injectNothingIntoOptional<T>() -> T?</code></li>
+      </ul>
+    </p>
 
     <p>Since optional types are part of the
     <a href="#type-simple">type-simple</a> grammar, it is not possible to write
@@ -2458,6 +2478,7 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-postfix  ::= <a href="#expr-metatype">expr-metatype</a>
     expr-postfix  ::= <a href="#expr-subscript">expr-subscript</a>
     expr-postfix  ::= <a href="#expr-call">expr-call</a>
+    expr-postfix  ::= <a href="#expr-optional">expr-optional</a>
 
   </pre>
 
@@ -2494,7 +2515,7 @@ ill-formed if the type does not conform to the protocol.</p>
     
     op-binary-or-ternary ::= <a href="#operator">operator-binary</a>
     op-binary-or-ternary ::= '='
-    op-binary-or-ternary ::= '?' <a href="#expr">expr-sequence</a> ':'
+    op-binary-or-ternary ::= '?'-infix <a href="#expr">expr-sequence</a> ':'
 
     expr-cast ::= 'is' <a href="#type">type</a>
     expr-cast ::= 'as' '!'? <a href="#type">type</a>
@@ -3182,6 +3203,60 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
     print("Whenever you get around to it\n")
   }
   </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-optional">Optional Chaining</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    expr-optional ::= <a href="#expr-postfix">expr-postfix</a> '?'-postfix
+  </pre>
+
+  <p>The optional-chaining operator provides a convenient syntax for
+    dereferencing, calling, or subscripting optional values.</p>
+
+  <p>Informally, the operator attempts to strip one level
+    of <code>Optional</code> from its operand, and if that fails, all
+    the following postfix operators are skipped and just evaluate
+    to <code>None</code>.</p>
+
+  <p>More formally:
+    <ul>
+      <li>The operand must be convertible to type <code>T?</code> for
+        some type <code>T</code>.  As a special rule, the expression
+        is ill-formed if the operand is converted to optional type by
+        the implicit conversion from <code>T</code>
+        to <code>T?</code>.</li>
+
+      <li>The expression itself then has type <code>T</code> (and is
+      an r-value).</li>
+
+      <li>A <code>postfix-expression</code> <i>E1</i> is said to
+        <i>directly chain</i> to a <code>postfix-expression</code>
+        <i>E2</i> if <i>E1</i> is syntactically
+        the <code>postfix-expression</code> base of <code>E2</code>;
+        note that this does not include any syntactic nesting,
+        e.g. via parentheses. <i>E1</i> <i>chains</i> to <i>E2</i>
+        if they are the same expression or <i>E1</i> directly chains
+        to an expression which chains to <i>E2</i>.  This relation has
+        a maximum, called the <i>largest chained expression</i>.</li>
+
+      <li>The largest chained expression of an <code>expr-optional</code>
+        must be convertible to an r-value of type <code>U?</code> for
+        some type <code>U</code>.  Note that a single expression may
+        be the largest chained expression of multiple
+        <code>expr-optional</code>s.</li>
+
+      <li>If the operand evaluates to <code>Some(x) : T?</code> for some
+        value <code>x : T</code>, the expression yields
+        <code>x</code>.</li>
+
+      <li>If the operand evaluates to <code>None : T?</code>, evaluation
+        of all the chained expressions immediately terminates, and
+        the largest chained expression yields the value
+        <code>None : U?</code>.</li>
+    </ul></p>
+
   
   <!-- ********************************************************************* -->
   <h2 id = "stmt">Statements</h2>

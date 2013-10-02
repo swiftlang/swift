@@ -1332,6 +1332,16 @@ public:
     E->getSubPattern()->print(OS);
     OS << ')';
   }
+  void visitBindOptionalExpr(BindOptionalExpr *E) {
+    OS.indent(Indent) << "(bind_optional_expr\n";
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+  void visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
+    OS.indent(Indent) << "(optional_evaluation_expr\n";
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.

@@ -60,6 +60,10 @@ public:
       cleanup(cleanup)
   {}
 
+  static ManagedValue forUnmanaged(SILValue value) {
+    return ManagedValue(value, Unmanaged);
+  }
+
   SILValue getUnmanagedValue() const {
     assert(!hasCleanup());
     return getValue();

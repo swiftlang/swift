@@ -1045,6 +1045,19 @@ InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(VarDecl *vd) {
   return InitializationPtr(new LocalVariableInitialization(vd, *this));
 }
 
+/// Create an Initialization for an uninitialized temporary.
+std::unique_ptr<TemporaryInitialization>
+SILGenFunction::emitTemporary(SILLocation loc, const TypeLowering &tempTL) {
+  SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
+  CleanupsDepth cleanup = CleanupsDepth::invalid();
+  if (!tempTL.isTrivial()) {
+    Cleanups.pushCleanupInState<DestroyAddr>(CleanupState::Dormant, addr);
+    cleanup = Cleanups.getCleanupsDepth();
+  }
+  return std::unique_ptr<TemporaryInitialization>(
+                                   new TemporaryInitialization(addr, cleanup));
+}
+
 void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   assert(vd->getDeclContext()->isLocalContext() &&
          "can't emit a local var for a non-local var decl");

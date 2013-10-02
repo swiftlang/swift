@@ -112,7 +112,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
           new (Context) MetaTypeTypeRepr(ty.get(), metatypeLoc));
       continue;
     }
-    if (!Tok.isAtStartOfLine() && Tok.is(tok::question)) {
+    if (!Tok.isAtStartOfLine() && Tok.is(tok::question_postfix)) {
       ty = parseTypeOptional(ty.get());
       continue;
     }
@@ -160,7 +160,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
   while (ty.isNonNull() && !Tok.isAtStartOfLine()) {
     if (Tok.is(tok::l_square)) {
       ty = parseTypeArray(ty.get());
-    } else if (Tok.is(tok::question)) {
+    } else if (Tok.is(tok::question_postfix)) {
       if (isa<ArrayTypeRepr>(ty.get())) {
         diagnose(Tok, diag::unsupported_unparenthesized_array_optional)
             .fixItInsert(ty.get()->getStartLoc(), "(")
@@ -537,7 +537,7 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
 /// Parse a single optional suffix, given that we are looking at the
 /// question mark.
 ParserResult<OptionalTypeRepr> Parser::parseTypeOptional(TypeRepr *base) {
-  assert(Tok.is(tok::question));
+  assert(Tok.is(tok::question_postfix));
   SourceLoc questionLoc = consumeToken();
   return makeParserResult(new (Context) OptionalTypeRepr(base, questionLoc));
 }
@@ -633,7 +633,7 @@ bool Parser::canParseType() {
       consumeToken(tok::kw_metatype);
       continue;
     }
-    if (!Tok.isAtStartOfLine() && Tok.is(tok::question)) {
+    if (Tok.is(tok::question_postfix)) {
       consumeToken();
       continue;
     }
@@ -654,7 +654,7 @@ bool Parser::canParseType() {
     if (Tok.is(tok::l_square)) {
       if (!canParseTypeArray())
         return false;
-    } else if (Tok.is(tok::question)) {
+    } else if (Tok.is(tok::question_postfix)) {
       consumeToken();
     } else {
       break;

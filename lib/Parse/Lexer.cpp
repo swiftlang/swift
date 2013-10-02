@@ -1375,7 +1375,9 @@ Restart:
   case ',': return formToken(tok::comma,    TokStart);
   case ';': return formToken(tok::semi,     TokStart);
   case ':': return formToken(tok::colon,    TokStart);
-  case '?': return formToken(tok::question, TokStart);
+  case '?': return formToken(isLeftBound(TokStart, BufferStart)
+                               ? tok::question_postfix : tok::question_infix,
+                             TokStart);
 
   case '@':
     // @ is only a token in SIL mode.

@@ -18,6 +18,7 @@
 #include "SILGen.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "Initialization.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
@@ -560,6 +561,22 @@ static bool hasDifferentTypeOfRValue(const TypeLowering &srcTL) {
 }
 #endif
 
+/// Create the correct substitution for calling a function with the
+/// given polymorphic type at the given type.
+static Substitution getSimpleSubstitution(PolymorphicFunctionType *fnType,
+                                          CanType typeArg) {
+  assert(fnType->getGenericParameters().size() == 1);
+  auto typeParamDecl = fnType->getGenericParameters()[0].getAsTypeParam();
+  return Substitution{typeParamDecl->getArchetype(), typeArg, {}};
+}
+
+/// Create the correct substitution for calling the given function at
+/// the given type.
+static Substitution getSimpleSubstitution(FuncDecl *fn, CanType typeArg) {
+  auto polyFnType = fn->getType()->castTo<PolymorphicFunctionType>();
+  return getSimpleSubstitution(polyFnType, typeArg);
+}
+
 /// Emit a reference to the given generic function and bind its type parameter.
 static std::tuple<SILValue, SILType, Substitution>
 emitSpecializedFunctionRef(SILGenFunction &gen,
@@ -580,10 +597,14 @@ emitSpecializedFunctionRef(SILGenFunction &gen,
   
   // Make the substitution.  This is valid by the known constraints
   // on these generic intrinsics.
-  auto typeParamDecl = polyFnType->getGenericParameters()[0].getAsTypeParam();
-  auto sub = Substitution{typeParamDecl->getArchetype(), typeArg, {}};
+  auto sub = getSimpleSubstitution(polyFnType, typeArg);
   
   return {fnVal, substType, sub};
+}
+
+static CanType getOptionalValueType(SILType optType) {
+  return cast<BoundGenericType>(optType.getSwiftRValueType())
+           .getGenericArgs()[0];
 }
 
 /// Emit code to convert the given possibly-null reference value into
@@ -710,81 +731,118 @@ SILValue SILGenFunction::emitInjectOptionalValue(SILLocation loc,
                                                  SILValue value,
                                                  const TypeLowering &optTL) {
   assert(!optTL.isAddressOnly() &&
-         "use emitInjectAddressOnlyOptional to emit address-only optionals");
-  
+         "use emitInjectOptionalValueInto to emit address-only optionals");
+
   SILType optType = optTL.getLoweredType();
-  CanType valueType = optType.getSwiftType()->castTo<BoundGenericType>()
-                        ->getGenericArgs()[0]->getCanonicalType();
-  SILValue injectValueFn;
-  SILType injectValueTy;
-  Substitution injectValueSub;
-  
-  std::tie(injectValueFn, injectValueTy, injectValueSub) =
-    emitSpecializedFunctionRef(*this, loc, valueType,
-                         getASTContext().getInjectValueIntoOptionalDecl());
-  return B.createApply(loc, injectValueFn, injectValueTy, optType,
-                       injectValueSub, value);
+  CanType valueType = getOptionalValueType(optType);
+
+  FuncDecl *fn = getASTContext().getInjectValueIntoOptionalDecl();
+  auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
+  Substitution sub = getSimpleSubstitution(fnType, valueType);
+
+  auto arg = ManagedValue::forUnmanaged(value);
+
+  return emitApplyOfLibraryIntrinsic(loc, fn, sub, arg, valueType, SGFContext())
+    .forward(*this);
+}
+
+void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
+                                                 SILValue value,
+                                                 SILValue dest,
+                                                 const TypeLowering &optTL) {
+  if (!optTL.isAddressOnly()) {
+    SILValue result = emitInjectOptionalValue(loc, value, optTL);
+    optTL.emitStoreOfCopy(B, loc, result, dest, IsInitialization);
+    return;
+  }
+
+  SILType optType = dest.getType().getObjectType();
+  CanType valueType = getOptionalValueType(optType);
+
+  FuncDecl *fn = getASTContext().getInjectValueIntoOptionalDecl();
+  auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
+  Substitution sub = getSimpleSubstitution(fnType, valueType);
+
+  auto arg = ManagedValue::forUnmanaged(value);
+
+  TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
+  emitApplyOfLibraryIntrinsic(loc, fn, sub, arg, valueType,
+                              SGFContext(&emitInto));
 }
 
 SILValue SILGenFunction::emitInjectOptionalNothing(SILLocation loc, 
                                                    const TypeLowering &optTL) {
   assert(!optTL.isAddressOnly() &&
-         "use emitInjectAddressOnlyOptional to emit address-only optionals");
+         "use emitInjectOptionalNothingInto to emit address-only optionals");
 
   SILType optType = optTL.getLoweredType();
-  CanType valueType = optType.getSwiftType()->castTo<BoundGenericType>()
-                        ->getGenericArgs()[0]->getCanonicalType();
-  SILValue injectNothingFn;
-  SILType injectNothingTy;
-  Substitution injectNothingSub;
-  std::tie(injectNothingFn, injectNothingTy, injectNothingSub) =
-    emitSpecializedFunctionRef(*this, loc, valueType,
-                       getASTContext().getInjectNothingIntoOptionalDecl());
-  return B.createApply(loc, injectNothingFn, injectNothingTy, optType,
-                       injectNothingSub, {});
+  CanType valueType = getOptionalValueType(optType);
+
+  FuncDecl *fn = getASTContext().getInjectNothingIntoOptionalDecl();
+  auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
+  Substitution sub = getSimpleSubstitution(fnType, valueType);
+
+  return emitApplyOfLibraryIntrinsic(loc, fn, sub, {}, valueType, SGFContext())
+    .forward(*this);
 }
 
-void SILGenFunction::emitInjectAddressOnlyOptionalValue(SILLocation loc,
-                                                 SILValue result,
-                                                 SILValue value,
-                                                 const TypeLowering &optTL) {
-  assert(optTL.isAddressOnly() &&
-         "use emitInjectOptional to emit loadable optionals");
-  
-  SILType optType = optTL.getLoweredType();
-  CanType valueType = optType.getSwiftType()->castTo<BoundGenericType>()
-                        ->getGenericArgs()[0]->getCanonicalType();
-  SILValue injectValueFn;
-  SILType injectValueTy;
-  Substitution injectValueSub;
-  
-  std::tie(injectValueFn, injectValueTy, injectValueSub) =
-    emitSpecializedFunctionRef(*this, loc, valueType,
-                         getASTContext().getInjectValueIntoOptionalDecl());
-  
-  SILValue args[] = {result, value};
-  
-  B.createApply(loc, injectValueFn, injectValueTy, optType,
-                injectValueSub, args);
+void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc, 
+                                                   SILValue dest,
+                                                   const TypeLowering &optTL) {
+  if (!optTL.isAddressOnly()) {
+    SILValue result = emitInjectOptionalNothing(loc, optTL);
+    optTL.emitStoreOfCopy(B, loc, result, dest, IsInitialization);
+    return;
+  }
+
+  SILType optType = dest.getType().getObjectType();
+  CanType valueType = getOptionalValueType(optType);
+
+  FuncDecl *fn = getASTContext().getInjectNothingIntoOptionalDecl();
+  auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
+  Substitution sub = getSimpleSubstitution(fnType, valueType);
+
+  TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
+  emitApplyOfLibraryIntrinsic(loc, fn, sub, {}, valueType,
+                              SGFContext(&emitInto));
 }
 
-void SILGenFunction::emitInjectAddressOnlyOptionalNothing(SILLocation loc,
-                                                SILValue result,
-                                                const TypeLowering &optTL) {
-  assert(optTL.isAddressOnly() &&
-         "use emitInjectOptional to emit loadable optionals");
+SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc, 
+                                                   SILValue addr) {
+  SILType optType = addr.getType().getObjectType();
+  CanType valueType = getOptionalValueType(optType);
 
-  SILType optType = optTL.getLoweredType();
-  CanType valueType = optType.getSwiftType()->castTo<BoundGenericType>()
-                        ->getGenericArgs()[0]->getCanonicalType();
-  SILValue injectNothingFn;
-  SILType injectNothingTy;
-  Substitution injectNothingSub;
-  std::tie(injectNothingFn, injectNothingTy, injectNothingSub) =
-    emitSpecializedFunctionRef(*this, loc, valueType,
-                       getASTContext().getInjectNothingIntoOptionalDecl());
-  B.createApply(loc, injectNothingFn, injectNothingTy, optType,
-                injectNothingSub, result);
+  FuncDecl *fn = getASTContext().getDoesOptionalHaveValueDecl();
+  auto fnType = cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
+  Substitution sub = getSimpleSubstitution(fnType, valueType);
+
+  CanType resultType = fnType.getResult();
+  assert(resultType->isBuiltinIntegerType(1));
+
+  // The argument to _doesOptionalHaveValue is passed by reference.
+  return emitApplyOfLibraryIntrinsic(loc, fn, sub,
+                                     ManagedValue::forUnmanaged(addr),
+                                     resultType, SGFContext())
+    .getUnmanagedValue();
+}
+
+ManagedValue SILGenFunction::emitGetOptionalValueFrom(SILLocation loc,
+                                                      ManagedValue src,
+                                                      const TypeLowering &optTL,
+                                                      SGFContext C) {
+  SILType optType = src.getType().getObjectType();
+  CanType valueType = getOptionalValueType(optType);
+
+  FuncDecl *fn = getASTContext().getGetOptionalValueDecl();
+  Substitution sub = getSimpleSubstitution(fn, valueType);
+
+  ManagedValue arg = src;
+  if (!optTL.isAddressOnly()) {
+    SILValue value = optTL.emitLoadOfCopy(B, loc, arg.forward(*this), IsTake);
+    arg = emitManagedRValueWithCleanup(value, optTL);
+  }
+
+  return emitApplyOfLibraryIntrinsic(loc, fn, sub, arg, valueType, C);
 }
 
 /// Given that the type-of-rvalue differs from the type-of-storage,

@@ -357,9 +357,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value) {
 
     // Check that we can do intrinsic operations on Optional<T> before
     // returning.
-    if (!Context.hasOptionalIntrinsics()) {
-      diagnose(value->getLoc(), diag::optional_intrinsics_not_found);
-    }
+    requireOptionalIntrinsics(value->getLoc());
 
     return optTy;
 
@@ -371,6 +369,13 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value) {
   } else {
     return type;
   }
+}
+
+bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
+  if (Context.hasOptionalIntrinsics()) return false;
+
+  diagnose(loc, diag::optional_intrinsics_not_found);
+  return true;
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType) {
