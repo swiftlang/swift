@@ -93,6 +93,15 @@
   objectAtIndexedSubscript:, an empty optional. The same approach
   applies to property accesses.
 
+* '_' can now be used not only in 'var' bindings, but in assignments as well,
+  to ignore elements of a tuple assignment, or to explicitly ignore values.
+
+    var a = (1, 2.0, 3)
+    var x = 0, y = 0
+    _ = a           // explicitly load and discard 'a'
+    (x, _, y) = a   // assign a.0 to x and a.2 to y
+
+
 2013-09-24
 ----------
 
