@@ -54,6 +54,14 @@ private:
   TypeDecl *getTypeDecl(Type Ty);
 
   bool shouldIgnore(Decl *D, bool &ShouldVisitChildren);
+
+  ValueDecl *extractDecl(Expr *Fn) const {
+    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(Fn))
+      return DRE->getDecl();
+    if (SpecializeExpr *SpecE = dyn_cast<SpecializeExpr>(Fn))
+      return extractDecl(SpecE->getSubExpr());
+    return nullptr;
+  }
 };
 
 }
@@ -165,8 +173,10 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
 }
 
 Expr *SemaAnnotator::walkToExprPost(Expr *E) {
-  if (isa<ConstructorRefCallExpr>(E))
+  if (isa<ConstructorRefCallExpr>(E)) {
+    assert(CtorRefs.back() == E);
     CtorRefs.pop_back();
+  }
 
   return E;
 }
@@ -178,17 +188,18 @@ bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
 }
 
 bool SemaAnnotator::passReference(ValueDecl *D, SourceLoc Loc) {
+  unsigned NameLen = D->getName().getLength();
   TypeDecl *CtorTyRef = nullptr;
-  unsigned NameLen = 0;
-  if (isa<ConstructorDecl>(D)) {
-    Type Ty = CtorRefs.back()->getBase()->getType();
-    CtorTyRef = getTypeDecl(
-                        cast<MetaTypeType>(Ty.getPointer())->getInstanceType());
-    NameLen = CtorTyRef->getName().getLength();
-  } else {
-    NameLen = D->getName().getLength();
+
+  if (TypeDecl *TD = dyn_cast<TypeDecl>(D)) {
+    if (!CtorRefs.empty() && Loc.isValid()) {
+      Expr *Fn = CtorRefs.back()->getFn();
+      if (Fn->getLoc() == Loc) {
+        D = extractDecl(Fn);
+        CtorTyRef = TD;
+      }
+    }
   }
-  assert(NameLen != 0);
 
   CharSourceRange Range = (Loc.isValid()) ? CharSourceRange(Loc, NameLen)
                                           : CharSourceRange();

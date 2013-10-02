@@ -2834,13 +2834,13 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto choice = selected->first;
   auto decl = choice.getDecl();
 
-  // Form a reference to the constructor or enum declaration.
-  Expr *typeBase = new (tc.Context) MetatypeExpr(nullptr, apply->getLoc(),
-                                                 metaTy);
-  Expr *declRef = buildMemberRef(typeBase, /*DotLoc=*/SourceLoc(),
-                                 decl, apply->getLoc(),
+  // Consider the constructor decl reference expr 'implicit', but the
+  // constructor call expr itself has the apply's 'implicitness'.
+  Expr *declRef = buildMemberRef(fn, /*DotLoc=*/SourceLoc(),
+                                 decl, fn->getEndLoc(),
                                  selected->second, locator,
-                                 apply->isImplicit());
+                                 /*Implicit=*/true);
+  declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
 
   // Tail-recurse to actually call the constructor.
