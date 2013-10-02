@@ -169,31 +169,6 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
   }
 }
 
-/// SILInstructionCloner - Concrete SILCloner subclass which can only be called
-/// directly on instructions and clones them without any remapping of locations,
-/// types, values, etc.
-class SILInstructionCloner : public SILCloner<SILInstructionCloner> {
-public:
-  SILInstructionCloner(SILFunction &F)
-    : SILCloner<SILInstructionCloner>(F) { }
-
-#define INST(CLASS, PARENT, MEMBEHAVIOR)                              \
-  CLASS *clone(CLASS *I) {                                            \
-    SILValue clone = SILCloner<SILInstructionCloner>::visit##CLASS(I);\
-    assert(clone->getKind() == I->getKind() &&                        \
-           clone.getResultNumber() == 0);                             \
-    return static_cast<CLASS *>(clone.getDef());                      \
-  }
-#include "swift/SIL/SILNodes.def"
-
-  SILInstruction *clone(SILInstruction *I) {
-    SILValue clone = SILCloner<SILInstructionCloner>::visit(I);
-    assert(clone->getKind() == I->getKind() &&
-           clone.getResultNumber() == 0);
-    return static_cast<SILInstruction *>(clone.getDef());
-  }
-};
-
 template<typename ImplClass>
 SILValue
 SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst* Inst) {
