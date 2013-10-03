@@ -143,7 +143,7 @@ CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
   // The uncurried generic parameter list components.
   bool isPolymorphic = false;
   SmallVector<GenericParam, 4> genericParams;
-  SmallVector<Requirement, 4> requirements;
+  SmallVector<RequirementRepr, 4> requirements;
   SmallVector<ArchetypeType *, 4> allArchetypes;
   GenericParamList *outerParameters = nullptr;
 

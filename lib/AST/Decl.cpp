@@ -112,7 +112,7 @@ bool Decl::isTransparent() const {
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    ArrayRef<GenericParam> Params,
                                    SourceLoc WhereLoc,
-                                   MutableArrayRef<Requirement> Requirements,
+                                   MutableArrayRef<RequirementRepr> Requirements,
                                    SourceLoc RAngleLoc)
   : Brackets(LAngleLoc, RAngleLoc), NumParams(Params.size()),
     WhereLoc(WhereLoc), Requirements(Requirements),
@@ -129,7 +129,7 @@ GenericParamList *GenericParamList::create(ASTContext &Context,
                 + sizeof(GenericParam) * Params.size();
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
   return new (Mem) GenericParamList(LAngleLoc, Params, SourceLoc(),
-                                    MutableArrayRef<Requirement>(),
+                                    MutableArrayRef<RequirementRepr>(),
                                     RAngleLoc);
 }
 
@@ -138,7 +138,7 @@ GenericParamList::create(const ASTContext &Context,
                          SourceLoc LAngleLoc,
                          ArrayRef<GenericParam> Params,
                          SourceLoc WhereLoc,
-                         MutableArrayRef<Requirement> Requirements,
+                         MutableArrayRef<RequirementRepr> Requirements,
                          SourceLoc RAngleLoc) {
   unsigned Size = sizeof(GenericParamList)
                 + sizeof(GenericParam) * Params.size();

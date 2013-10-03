@@ -455,7 +455,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
     archetypes.push_back(getType(next)->castTo<ArchetypeType>());
 
   SmallVector<GenericParam, 8> params;
-  SmallVector<Requirement, 8> requirements;
+  SmallVector<RequirementRepr, 8> requirements;
   while (true) {
     lastRecordOffset.reset();
     bool shouldContinue = true;
@@ -486,7 +486,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
         auto subject = TypeLoc::withoutLoc(getType(rawTypeIDs[0]));
         auto constraint = TypeLoc::withoutLoc(getType(rawTypeIDs[1]));
 
-        requirements.push_back(Requirement::getConformance(subject,
+        requirements.push_back(RequirementRepr::getConformance(subject,
                                                            SourceLoc(),
                                                            constraint));
         break;
@@ -496,7 +496,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
         auto first = TypeLoc::withoutLoc(getType(rawTypeIDs[0]));
         auto second = TypeLoc::withoutLoc(getType(rawTypeIDs[1]));
 
-        requirements.push_back(Requirement::getSameType(first,
+        requirements.push_back(RequirementRepr::getSameType(first,
                                                         SourceLoc(),
                                                         second));
         break;

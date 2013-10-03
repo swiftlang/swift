@@ -20,6 +20,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/Ownership.h"
+#include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/ArrayRefView.h"
@@ -40,6 +41,7 @@ namespace swift {
   class ClassDecl;
   class ExprHandle;
   class GenericTypeParamDecl;
+  class GenericTypeParamType;
   class GenericParam;
   class GenericParamList;
   class Identifier;
@@ -361,12 +363,12 @@ private:
   // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;
   void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
 public:
   // Only allow allocation of Types using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t bytes, const ASTContext &ctx,
                      AllocationArena arena, unsigned alignment = 8);
+  void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
 };
 
 /// ErrorType - This represents a type that was erroneously constructed.  This
@@ -1394,7 +1396,83 @@ private:
                           const ASTContext &C);
 };  
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
-  
+
+/// Describes a generic function type.
+///
+/// A generic function type describes a function that is polymorphic with
+/// respect to some set of generic parameters and the requirements placed
+/// on those parameters and dependent member types thereof. The input and
+/// output types of the generic function can be expressed in terms of those
+/// generic parameters.
+///
+/// FIXME: \c GenericFunctionType is meant as a replacement for
+/// \c PolymorphicFunctionType.
+class GenericFunctionType : public AnyFunctionType,
+                            public llvm::FoldingSetNode {
+  unsigned NumGenericParams;
+  unsigned NumRequirements;
+
+  /// Retrieve a mutable version of the generic parameters.
+  MutableArrayRef<GenericTypeParamType *> getGenericParamsBuffer() {
+    return { reinterpret_cast<GenericTypeParamType **>(this + 1),
+             NumGenericParams };
+  }
+
+  /// Retrieve a mutable verison of the requirements.
+  MutableArrayRef<Requirement> getRequirementsBuffer() {
+    void *genericParams = getGenericParamsBuffer().end();
+    return { reinterpret_cast<Requirement *>(genericParams),
+             NumRequirements };
+  }
+
+  /// Construct a new generic function type.
+  GenericFunctionType(ArrayRef<GenericTypeParamType *> genericParams,
+                      ArrayRef<Requirement> requirements,
+                      Type input,
+                      Type result,
+                      const ExtInfo &info,
+                      const ASTContext *ctx);
+public:
+  /// Create a new generic function type.
+  static GenericFunctionType *get(ArrayRef<GenericTypeParamType *> params,
+                                  ArrayRef<Requirement> requirements,
+                                  Type input,
+                                  Type result,
+                                  const ExtInfo &info,
+                                  const ASTContext &ctx);
+
+  /// Retrieve the generic parameters of this polymorphic function type.
+  ArrayRef<GenericTypeParamType *> getGenericParams() const {
+    return { reinterpret_cast<GenericTypeParamType * const *>(this + 1),
+             NumGenericParams };
+  }
+
+  /// Retrieve the requirements of this polymorphic function type.
+  ArrayRef<Requirement> getRequirements() const {
+    const void *genericParams = getGenericParams().end();
+    return { reinterpret_cast<const Requirement *>(genericParams),
+             NumRequirements };
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getGenericParams(), getRequirements(), getInput(), getResult(),
+            getExtInfo());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      ArrayRef<GenericTypeParamType *> params,
+                      ArrayRef<Requirement> requirements,
+                      Type input,
+                      Type result,
+                      const ExtInfo &info);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::GenericFunction;
+  }
+};
+
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
+
 /// ArrayType - An array type has a base type and either an unspecified or a
 /// constant size.  For example "int[]" and "int[4]".  Array types cannot have
 /// size = 0.
@@ -2274,6 +2352,19 @@ case TypeKind::Id:
              function->getResult().findIf(pred);
     }
 
+    case TypeKind::GenericFunction: {
+      auto function = cast<GenericFunctionType>(base);
+      for (auto param : function->getGenericParams())
+        if (Type(param).findIf(pred))
+          return true;
+      for (const auto &req : function->getRequirements())
+        if (req.getFirstType().findIf(pred) ||
+            req.getSecondType().findIf(pred))
+          return true;
+      return function->getInput().findIf(pred) ||
+             function->getResult().findIf(pred);
+    }
+
     case TypeKind::Array:
       return cast<ArrayType>(base)->getBaseType().findIf(pred);
 
@@ -2533,6 +2624,72 @@ case TypeKind::Id:
     return FunctionType::get(inputTy, resultTy,
                              function->getExtInfo(),
                              ctx);
+  }
+
+  case TypeKind::GenericFunction: {
+    GenericFunctionType *function = cast<GenericFunctionType>(base);
+    bool anyChanges = false;
+
+    // Transform generic parameters.
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    for (auto param : function->getGenericParams()) {
+      Type paramTy = Type(param).transform(ctx, fn);
+      if (!paramTy)
+        return Type();
+
+      if (auto newParam = paramTy->getAs<GenericTypeParamType>()) {
+        if (newParam != param)
+          anyChanges = true;
+
+        genericParams.push_back(newParam);
+      }
+    }
+
+    // Transform requirements.
+    SmallVector<Requirement, 4> requirements;
+    for (const auto &req : function->getRequirements()) {
+      auto firstType = req.getFirstType().transform(ctx, fn);
+      if (!firstType)
+        return Type();
+
+      auto secondType = req.getSecondType().transform(ctx, fn);
+      if (!secondType)
+        return Type();
+
+      if (firstType->isDependentType() || secondType->isDependentType()) {
+        if (firstType.getPointer() != req.getFirstType().getPointer() ||
+            secondType.getPointer() != req.getSecondType().getPointer())
+          anyChanges = true;
+
+        requirements.push_back(Requirement(req.getKind(), firstType,
+                                           secondType));
+      } else
+        anyChanges = true;
+    }
+
+    // Transform input type.
+    auto inputTy = function->getInput().transform(ctx, fn);
+    if (!inputTy)
+      return Type();
+
+    // Transform result type.
+    auto resultTy = function->getResult().transform(ctx, fn);
+    if (!resultTy)
+      return Type();
+
+    // Check whether anything changed.
+    if (!anyChanges &&
+        inputTy.getPointer() == function->getInput().getPointer() &&
+        resultTy.getPointer() == function->getResult().getPointer())
+      return *this;
+
+    // If no generic parameters remain, this is a non-generic function type.
+    if (genericParams.empty())
+      return FunctionType::get(inputTy, resultTy, function->getExtInfo(), ctx);
+
+    // Produce the new generic function type.
+    return GenericFunctionType::get(genericParams, requirements, inputTy,
+                                    resultTy, function->getExtInfo(), ctx);
   }
 
   case TypeKind::Array: {

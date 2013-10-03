@@ -126,6 +126,7 @@ struct ASTContext::Implementation {
   };
   
   llvm::DenseMap<Module*, ModuleType*> ModuleTypes;
+  llvm::FoldingSet<GenericFunctionType> GenericFunctionTypes;
   llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -1184,6 +1185,96 @@ PolymorphicFunctionType::PolymorphicFunctionType(Type input, Type output,
     Params(params)
 {
   assert(!input->hasTypeVariable() && !output->hasTypeVariable());
+}
+
+void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
+                                  ArrayRef<GenericTypeParamType *> params,
+                                  ArrayRef<Requirement> requirements,
+                                  Type input,
+                                  Type result,
+                                  const ExtInfo &info) {
+  ID.AddInteger(params.size());
+  for (auto param : params)
+    ID.AddPointer(param);
+  ID.AddInteger(requirements.size());
+  for (const auto &req : requirements) {
+    ID.AddInteger(static_cast<unsigned>(req.getKind()));
+    ID.AddPointer(req.getFirstType().getPointer());
+    ID.AddPointer(req.getSecondType().getPointer());
+  }
+  ID.AddPointer(input.getPointer());
+  ID.AddPointer(result.getPointer());
+  ID.AddInteger(info.getFuncAttrKey());
+}
+
+GenericFunctionType *
+GenericFunctionType::get(ArrayRef<GenericTypeParamType *> params,
+                         ArrayRef<Requirement> requirements,
+                         Type input,
+                         Type output,
+                         const ExtInfo &info,
+                         const ASTContext &ctx) {
+  assert(!input->hasTypeVariable() && !output->hasTypeVariable());
+
+  llvm::FoldingSetNodeID id;
+  GenericFunctionType::Profile(id, params, requirements, input, output, info);
+
+  // Do we already have this generic function type?
+  void *insertPos;
+  if (auto result
+        = ctx.Impl.GenericFunctionTypes.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // We have to construct this generic function type. Determine whether
+  // it's canonical.
+  bool isCanonical = input->isCanonical() && output->isCanonical();
+  if (isCanonical) {
+    for (auto param : params) {
+      if (!param->isCanonical()) {
+        isCanonical = false;
+        break;
+      }
+    }
+  }
+  if (isCanonical ) {
+    for (const auto &req : requirements) {
+      if (!req.getFirstType()->isCanonical() ||
+          !req.getSecondType()->isCanonical()) {
+        isCanonical = false;
+        break;
+      }
+    }
+  }
+
+  // Allocate storage for the object.
+  size_t bytes = sizeof(GenericFunctionType)
+               + sizeof(GenericTypeParamType *) * params.size()
+               + sizeof(Requirement) * requirements.size();
+  void *mem = ctx.Allocate(bytes, alignof(GenericFunctionType));
+
+  auto result = new (mem) GenericFunctionType(params, requirements, input,
+                                              output, info,
+                                              isCanonical? &ctx : nullptr);
+  ctx.Impl.GenericFunctionTypes.InsertNode(result, insertPos);
+  return result;
+}
+
+GenericFunctionType::GenericFunctionType(
+                       ArrayRef<GenericTypeParamType *> genericParams,
+                       ArrayRef<Requirement> requirements,
+                       Type input,
+                       Type result,
+                       const ExtInfo &info,
+                       const ASTContext *ctx)
+  : AnyFunctionType(TypeKind::GenericFunction, ctx, input, result,
+                    /*hasTypeVariable=*/false, info),
+    NumGenericParams(genericParams.size()),
+    NumRequirements(requirements.size())
+{
+  std::copy(genericParams.begin(), genericParams.end(),
+            getGenericParamsBuffer().data());
+  std::copy(requirements.begin(), requirements.end(),
+            getRequirementsBuffer().data());
 }
 
 /// Return a uniqued array type with the specified base type and the

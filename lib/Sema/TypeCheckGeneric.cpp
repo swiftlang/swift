@@ -130,6 +130,356 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   return ErrorType::get(TC.Context);
 }
 
+/// Create a fresh archetype builder.
+static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC) {
+  return ArchetypeBuilder(
+           TC.TU, TC.Diags,
+           [&](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
+             return TC.getDirectConformsTo(protocol);
+           },
+           [&](AbstractTypeParamDecl *assocType) -> ArrayRef<ProtocolDecl *> {
+             TC.checkInheritanceClause(assocType);
+             return assocType->getProtocols();
+           });
+}
+
+/// Check the generic parameters in the given generic parameter list (and its
+/// parent generic parameter lists) according to the given resolver.
+static void checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
+                                   GenericParamList *genericParams,
+                                   GenericTypeResolver &resolver,
+                                   bool innermost = true) {
+  // If there are outer generic parameters, visit them (so that the archetype
+  // builder knows about them) but don't modify them in any way.
+  // FIXME: Rather than crawling the generic outer parameters, it would be far
+  // better to simply grab the generic parameters and requirements for the
+  // outer context directly. However, we don't currently store those anywhere.
+  if (auto outerGenericParams = genericParams->getOuterParameters())
+    checkGenericParameters(tc, builder, outerGenericParams, resolver,
+                           /*innermost=*/false);
+
+  // Visit each of the generic parameters.
+  unsigned depth = genericParams->getDepth();
+  unsigned index = 0;
+  for (auto param : *genericParams) {
+    auto typeParam = param.getAsTypeParam();
+
+    // Check the generic type parameter.
+    if (innermost) {
+      // Set the depth of this type parameter.
+      typeParam->setDepth(depth);
+
+      // Check the inheritance clause of this type parameter.
+      tc.checkInheritanceClause(typeParam, &resolver);
+    }
+
+    if (builder) {
+      // Add the generic parameter to the builder.
+      builder->addGenericParameter(typeParam, index++);
+
+      // Infer requirements from the inherited types.
+      // FIXME: This doesn't actually do what we want for outer generic
+      // parameters, because they've been resolved to archetypes too eagerly.
+      for (const auto &inherited : typeParam->getInherited()) {
+        builder->inferRequirements(inherited.getTypeRepr());
+      }
+    }
+  }
+
+  // Visit each of the requirements, adding them to the builder.
+  // Add the requirements clause to the builder, validating the types in
+  // the requirements clause along the way.
+  for (auto &req : genericParams->getRequirements()) {
+    if (req.isInvalid())
+      continue;
+
+    switch (req.getKind()) {
+    case RequirementKind::Conformance: {
+      // Validate the types.
+      if (tc.validateType(req.getSubjectLoc(),
+                          /*allowUnboundGenerics=*/false,
+                          &resolver)) {
+        req.setInvalid();
+        continue;
+      }
+
+      if (tc.validateType(req.getConstraintLoc(),
+                          /*allowUnboundGenerics=*/false,
+                          &resolver)) {
+        req.setInvalid();
+        continue;
+      }
+
+      // FIXME: Feels too early to perform this check.
+      if (!req.getConstraint()->isExistentialType() &&
+          !req.getConstraint()->getClassOrBoundGenericClass()) {
+        tc.diagnose(genericParams->getWhereLoc(),
+                    diag::requires_conformance_nonprotocol,
+                    req.getSubjectLoc(), req.getConstraintLoc());
+        req.getConstraintLoc().setInvalidType(tc.Context);
+        req.setInvalid();
+        continue;
+      }
+
+      // DynamicLookup cannot be used in a generic constraint.
+      if (auto protoTy = req.getConstraint()->getAs<ProtocolType>()) {
+        if (protoTy->getDecl()->isSpecificProtocol(
+                                  KnownProtocolKind::DynamicLookup)) {
+          tc.diagnose(req.getConstraintLoc().getSourceRange().Start,
+                      diag::dynamic_lookup_conformance);
+          continue;
+        }
+      }
+      break;
+    }
+
+    case RequirementKind::SameType:
+      if (tc.validateType(req.getFirstTypeLoc(),
+                          /*allowUnboundGenerics=*/false,
+                          &resolver)) {
+        req.setInvalid();
+        continue;
+      }
+
+      if (tc.validateType(req.getSecondTypeLoc(),
+                          /*allowUnboundGenerics=*/false,
+                          &resolver)) {
+        req.setInvalid();
+        continue;
+      }
+      
+      break;
+    }
+    
+    if (builder && builder->addRequirement(req))
+      req.setInvalid();
+  }
+}
+
+/// Collect all of the generic parameter types at every level in the generic
+/// parameter list.
+static void collectGenericParamTypes(
+              GenericParamList *genericParams,
+              SmallVectorImpl<GenericTypeParamType *> &allParams) {
+  if (!genericParams)
+    return;
+
+  // Collect outer generic parameters first.
+  collectGenericParamTypes(genericParams->getOuterParameters(), allParams);
+
+  // Add our parameters.
+  for (auto param : *genericParams) {
+    allParams.push_back(param.getAsTypeParam()->getDeclaredType()
+                        ->castTo<GenericTypeParamType>());
+  }
+}
+
+namespace {
+  /// \brief Function object that orders potential archetypes by name.
+  struct OrderPotentialArchetypeByName {
+    using PotentialArchetype = ArchetypeBuilder::PotentialArchetype;
+
+    bool operator()(std::pair<Identifier, PotentialArchetype *> X,
+                    std::pair<Identifier, PotentialArchetype *> Y) const {
+      return X.first.str() < Y.second->getName().str();
+    }
+
+    bool operator()(std::pair<Identifier, PotentialArchetype *> X,
+                    Identifier Y) const {
+      return X.first.str() < Y.str();
+    }
+
+    bool operator()(Identifier X,
+                    std::pair<Identifier, PotentialArchetype *> Y) const {
+      return X.str() < Y.first.str();
+    }
+
+    bool operator()(Identifier X, Identifier Y) const {
+      return X.str() < Y.str();
+    }
+  };
+}
+
+/// Add the requirements for the given potential archetype and its nested
+/// potential archetypes to the set of requirements.
+static void
+addRequirements(
+    TranslationUnit &tu, Type type,
+    ArchetypeBuilder::PotentialArchetype *pa,
+    llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> &knownPAs,
+    SmallVectorImpl<Requirement> &requirements) {
+  using PotentialArchetype = ArchetypeBuilder::PotentialArchetype;
+
+  // Add superclass requirement, if needed.
+  if (auto superclass = pa->getSuperclass()) {
+    // FIXME: Distinguish superclass from conformance?
+    // FIXME: What if the superclass type involves a type parameter?
+    requirements.push_back(Requirement(RequirementKind::Conformance,
+                                       type, superclass));
+  }
+
+  // Add conformance requirements.
+  for (auto proto : pa->getConformsTo()) {
+    requirements.push_back(Requirement(RequirementKind::Conformance,
+                                       type, proto->getDeclaredType()));
+  }
+
+  // Collect the nested types, sorted by name.
+  // FIXME: Could collect these from the conformance requirements, above.
+  SmallVector<std::pair<Identifier, PotentialArchetype*>, 16>
+  nestedTypes(pa->getNestedTypes().begin(), pa->getNestedTypes().end());
+  std::sort(nestedTypes.begin(), nestedTypes.end(),
+            OrderPotentialArchetypeByName());
+
+  // Add requirements for associated types.
+  for (const auto &nested : nestedTypes) {
+    auto rep = nested.second->getRepresentative();
+    if (knownPAs.insert(rep)) {
+      // Form the dependent type that refers to this archetype.
+      auto assocType = pa->getAssociatedType(tu, nested.first);
+      if (!assocType)
+        continue; // FIXME: If we do this late enough, there will be no failure.
+
+      auto nestedType = DependentMemberType::get(type, assocType,
+                                                 tu.getASTContext());
+      addRequirements(tu, nestedType, rep, knownPAs, requirements);
+    }
+  }
+}
+
+/// Collect the set of requirements placed on the given generic parameters and
+/// their associated types.
+static void collectRequirements(ArchetypeBuilder &builder,
+                                ArrayRef<GenericTypeParamType *> params,
+                                SmallVectorImpl<Requirement> &requirements) {
+  // Find the "primary" potential archetypes, from which we'll collect all
+  // of the requirements.
+  llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> knownPAs;
+  llvm::SmallVector<GenericTypeParamType *, 8> primary;
+  for (auto param : params) {
+    auto pa = builder.resolveType(param);
+    assert(pa && "Missing potential archetype for generic parameter");
+
+    // We only care about the representative.
+    pa = pa->getRepresentative();
+
+    // If the potential archetype has a parent, it isn't primary.
+    if (pa->getRepresentative()->getParent())
+      continue;
+
+    if (knownPAs.insert(pa))
+      primary.push_back(param);
+  }
+
+  // For each of the primary potential archetypes, add the requirements,
+  // along with the requirements of its nested types.
+  for (auto param : primary) {
+    auto pa = builder.resolveType(param)->getRepresentative();
+    addRequirements(builder.getTranslationUnit(), param, pa, knownPAs,
+                    requirements);
+  }
+}
+
+/// Check the signature of a generic function.
+static bool checkGenericFuncSignature(TypeChecker &tc,
+                                      ArchetypeBuilder *builder,
+                                      FuncDecl *func,
+                                      GenericTypeResolver &resolver) {
+  bool badType = false;
+
+  // Check the generic parameter list.
+  checkGenericParameters(tc, builder, func->getGenericParams(), resolver);
+
+  // Check the parameter patterns.
+  for (auto pattern : func->getArgParamPatterns()) {
+    // Check the pattern.
+    if (tc.typeCheckPattern(pattern, func, /*allowUnboundGenerics=*/false,
+                         &resolver))
+      badType = true;
+
+    // Infer requirements from the pattern.
+    if (builder) {
+      builder->inferRequirements(pattern);
+    }
+  }
+
+  // If there is a declared result type, check that as well.
+  if (!func->getBodyResultTypeLoc().isNull()) {
+    // Check the result type of the function.
+    if (tc.validateType(func->getBodyResultTypeLoc(),
+                        /*allowUnboundGenerics=*/false,
+                        &resolver)) {
+      badType = true;
+    }
+
+    // Infer requirements from it.
+    if (builder) {
+      builder->inferRequirements(func->getBodyResultTypeLoc().getTypeRepr());
+    }
+  }
+
+  return badType;
+}
+
+bool TypeChecker::validateGenericFuncSignature(FuncDecl *func) {
+  // Create the archetype builder.
+  ArchetypeBuilder builder = createArchetypeBuilder(*this);
+
+  // Type check the function declaration, treating all generic type
+  // parameters as dependent, unresolved.
+  PartialGenericTypeToArchetypeResolver partialResolver(*this);
+  if (checkGenericFuncSignature(*this, &builder, func, partialResolver)) {
+    func->setType(ErrorType::get(Context));
+    return true;
+  }
+
+  // The archetype builder now has all of the requirements, although there might
+  // still be errors that have not yet been diagnosed. Revert the generic
+  // function signature and type-check it again, completely.
+  revertGenericFuncSignature(func);
+  CompleteGenericTypeResolver completeResolver(*this, builder);
+  if (checkGenericFuncSignature(*this, nullptr, func, completeResolver)) {
+    func->setType(ErrorType::get(Context));
+    return true;
+  }
+
+  // The generic function signature is complete and well-formed. Determine
+  // the type of the generic function.
+
+  // Collect the complete set of generic parameter types.
+  SmallVector<GenericTypeParamType *, 4> allGenericParams;
+  collectGenericParamTypes(func->getGenericParams(), allGenericParams);
+
+  // Collect the requirements placed on the generic parameter types.
+  SmallVector<Requirement, 4> requirements;
+  collectRequirements(builder, allGenericParams, requirements);
+
+  // Compute the function type.
+  auto funcTy = func->getBodyResultTypeLoc().getType();
+  if (!funcTy) {
+    funcTy = TupleType::getEmpty(Context);
+  }
+
+  auto patterns = func->getArgParamPatterns();
+  for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
+    Type argTy = patterns[e - i - 1]->getType();
+
+    // Validate and consume the function type attributes.
+    // FIXME: Hacked up form of validateAndConsumeFunctionTypeAttributes().
+    auto info = AnyFunctionType::ExtInfo()
+                  .withIsNoReturn(func->getAttrs().isNoReturn());
+
+    if (i == e-1) {
+      funcTy = GenericFunctionType::get(allGenericParams, requirements,
+                                        argTy, funcTy, info, Context);
+    } else {
+      funcTy = FunctionType::get(argTy, funcTy, info, Context);
+    }
+  }
+
+  return false;
+}
+
 SpecializeExpr *
 TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
                                  const TypeSubstitutionMap &Substitutions,

@@ -114,7 +114,6 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetype(
         return nullptr;
 
       // Find the protocol that has an associated type with this name.
-      llvm::SmallSetVector<AssociatedTypeDecl *, 2> assocTypes;
       for (auto proto : ParentArchetype->getConformsTo()) {
         SmallVector<ValueDecl *, 2> decls;
         if (tu.lookupQualified(proto->getDeclaredType(), Name,
@@ -154,6 +153,23 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetype(
   }
 
   return Archetype;
+}
+
+AssociatedTypeDecl *
+ArchetypeBuilder::PotentialArchetype::getAssociatedType(TranslationUnit &tu,
+                                                        Identifier name) {
+  for (auto proto : getRepresentative()->getConformsTo()) {
+    SmallVector<ValueDecl *, 2> decls;
+    if (tu.lookupQualified(proto->getDeclaredType(), name,
+                           NL_VisitSupertypes, nullptr, decls)) {
+      for (auto decl : decls) {
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
+          return assocType;
+      }
+    }
+  }
+
+  return nullptr;
 }
 
 void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
@@ -397,7 +413,7 @@ bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
   return false;
 }
 
-bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
+bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
   switch (Req.getKind()) {
   case RequirementKind::Conformance: {
     PotentialArchetype *PA = resolveType(Req.getSubject());

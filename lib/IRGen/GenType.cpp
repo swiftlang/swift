@@ -648,6 +648,7 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
     return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
+  case TypeKind::GenericFunction:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     llvm_unreachable("can't convert dependent type");

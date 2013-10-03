@@ -29,6 +29,7 @@
 
 namespace swift {
 
+class ArchetypeBuilder;
 class GenericTypeResolver;
 class TypeChecker;
 
@@ -324,6 +325,22 @@ public:
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDecl(VD, true);
   }
+
+  /// Validate the signature of a generic function.
+  ///
+  /// \param func The generic function.
+  ///
+  /// \returns true if an error occurred, or false otherwise.
+  bool validateGenericFuncSignature(FuncDecl *func);
+
+  /// Revert the signature of a generic function to its pre-type-checked state,
+  /// so that it can be type checked again when we have resolved its generic
+  /// parameters.
+  void revertGenericFuncSignature(FuncDecl *func);
+
+  /// Check the inheritance clause of the given declaration.
+  void checkInheritanceClause(Decl *decl,
+                              GenericTypeResolver *resolver = nullptr);
 
   /// Retrieve the set of protocols to which this nominal type declaration
   /// directly conforms, i.e., as specified in its own inheritance clause.

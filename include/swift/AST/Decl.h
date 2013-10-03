@@ -23,6 +23,7 @@
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Requirement.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
@@ -427,30 +428,19 @@ public:
   void setDeclContext(DeclContext *DC);
 };
 
-/// \brief Describes the kind of a requirement that occurs within a requirements
-/// clause.
-enum class RequirementKind : unsigned int {
-  /// \brief A conformance requirement T : P, where T is a type that depends
-  /// on a generic parameter and P is a protocol to which T must conform.
-  Conformance,
-  /// \brief A same-type requirement T == U, where T and U are types that
-  /// shall be equivalent.
-  SameType
-};
-
 /// \brief A single requirement in a 'where' clause, which places additional
 /// restrictions on the generic parameters or associated types of a generic
 /// function, type, or protocol.
 ///
 /// This always represents a requirement spelled in the source code.  It is
 /// never generated implicitly.
-class Requirement {
+class RequirementRepr {
   SourceLoc SeparatorLoc;
   RequirementKind Kind : 1;
   bool Invalid : 1;
   TypeLoc Types[2];
 
-  Requirement(SourceLoc SeparatorLoc, RequirementKind Kind, TypeLoc FirstType,
+  RequirementRepr(SourceLoc SeparatorLoc, RequirementKind Kind, TypeLoc FirstType,
               TypeLoc SecondType)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       Types{FirstType, SecondType} { }
@@ -464,7 +454,7 @@ public:
   /// this requirement was implied.
   /// \param Constraint The protocol or protocol composition to which the
   /// subject must conform, or superclass from which the subject must inherit.
-  static Requirement getConformance(TypeLoc Subject,
+  static RequirementRepr getConformance(TypeLoc Subject,
                                     SourceLoc ColonLoc,
                                     TypeLoc Constraint) {
     return { ColonLoc, RequirementKind::Conformance, Subject, Constraint };
@@ -476,7 +466,7 @@ public:
   /// \param EqualLoc The location of the '==' in the same-type constraint, or
   /// an invalid location if this requirement was implied.
   /// \param SecondType The second type.
-  static Requirement getSameType(TypeLoc FirstType,
+  static RequirementRepr getSameType(TypeLoc FirstType,
                                  SourceLoc EqualLoc,
                                  TypeLoc SecondType) {
     return { EqualLoc, RequirementKind::SameType, FirstType, SecondType };
@@ -589,7 +579,7 @@ class GenericParamList {
   SourceRange Brackets;
   unsigned NumParams;
   SourceLoc WhereLoc;
-  MutableArrayRef<Requirement> Requirements;
+  MutableArrayRef<RequirementRepr> Requirements;
   ArrayRef<ArchetypeType *> AllArchetypes;
 
   GenericParamList *OuterParameters;
@@ -597,7 +587,7 @@ class GenericParamList {
   GenericParamList(SourceLoc LAngleLoc,
                    ArrayRef<GenericParam> Params,
                    SourceLoc WhereLoc,
-                   MutableArrayRef<Requirement> Requirements,
+                   MutableArrayRef<RequirementRepr> Requirements,
                    SourceLoc RAngleLoc);
 
 public:
@@ -630,7 +620,7 @@ public:
                                   SourceLoc LAngleLoc,
                                   ArrayRef<GenericParam> Params,
                                   SourceLoc WhereLoc,
-                                  MutableArrayRef<Requirement> Requirements,
+                                  MutableArrayRef<RequirementRepr> Requirements,
                                   SourceLoc RAngleLoc);
 
   MutableArrayRef<GenericParam> getParams() {
@@ -659,7 +649,7 @@ public:
   /// This list may contain both explicitly-written requirements as well as
   /// implicitly-generated requirements, and may be non-empty even if no
   /// 'where' keyword is present.
-  MutableArrayRef<Requirement> getRequirements() { return Requirements; }
+  MutableArrayRef<RequirementRepr> getRequirements() { return Requirements; }
 
   /// \brief Retrieve the set of additional requirements placed on these
   /// generic parameters and types derived from them.
@@ -667,7 +657,7 @@ public:
   /// This list may contain both explicitly-written requirements as well as
   /// implicitly-generated requirements, and may be non-empty even if no
   /// 'where' keyword is present.
-  ArrayRef<Requirement> getRequirements() const { return Requirements; }
+  ArrayRef<RequirementRepr> getRequirements() const { return Requirements; }
 
   /// \brief Override the set of requirements associated with this generic
   /// parameter list.
@@ -676,7 +666,7 @@ public:
   /// to be a superset of the existing set of requirements (although this
   /// property is not checked here). It is assumed that the array reference
   /// refers to ASTContext-allocated memory.
-  void overrideRequirements(MutableArrayRef<Requirement> NewRequirements) {
+  void overrideRequirements(MutableArrayRef<RequirementRepr> NewRequirements) {
     Requirements = NewRequirements;
   }
 
@@ -887,8 +877,8 @@ public:
   }
 
   /// Note that we have already type-checked the inheritance clause.
-  void setCheckedInheritanceClause() {
-    ExtensionDeclBits.CheckedInheritanceClause = true;
+  void setCheckedInheritanceClause(bool checked = true) {
+    ExtensionDeclBits.CheckedInheritanceClause = checked;
   }
 
   /// \brief Retrieve the set of protocols to which this extension conforms.
@@ -1158,8 +1148,8 @@ public:
   }
 
   /// Note that we have already type-checked the inheritance clause.
-  void setCheckedInheritanceClause() {
-    TypeDeclBits.CheckedInheritanceClause = true;
+  void setCheckedInheritanceClause(bool checked = true) {
+    TypeDeclBits.CheckedInheritanceClause = checked;
   }
 
   /// \brief Retrieve the set of protocols to which this type conforms.

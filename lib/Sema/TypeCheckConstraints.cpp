@@ -1715,6 +1715,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
 
     case TypeKind::PolymorphicFunction:
+    case TypeKind::GenericFunction:
       llvm_unreachable("Polymorphic function type should have been opened");
 
     case TypeKind::Array: {
@@ -2239,6 +2240,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::Error:
     return SolutionKind::Error;
 
+  case TypeKind::GenericFunction:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     llvm_unreachable("unmapped dependent type");

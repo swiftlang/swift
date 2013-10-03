@@ -429,6 +429,12 @@ namespace {
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
 
+    llvm::Value *visitGenericFunctionType(CanGenericFunctionType type) {
+      IGF.unimplemented(SourceLoc(),
+                        "metadata ref for generic function type");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
+
     llvm::Value *visitFunctionType(CanFunctionType type) {
       if (auto metatype = tryGetLocal(type))
         return metatype;

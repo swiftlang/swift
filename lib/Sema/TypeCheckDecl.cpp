@@ -199,7 +199,13 @@ static void validateAttributes(TypeChecker &TC, Decl *VD);
 /// This routine validates all of the types in the parsed inheritance clause,
 /// recording the superclass (if any and if allowed) as well as the protocols
 /// to which this type declaration conforms.
-static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
+void TypeChecker::checkInheritanceClause(Decl *decl,
+                                         GenericTypeResolver *resolver) {
+  // Establish a default generic type resolver.
+  PartialGenericTypeToArchetypeResolver defaultResolver(*this);
+  if (!resolver)
+    resolver = &defaultResolver;
+
   MutableArrayRef<TypeLoc> inheritedClause;
 
   // If we already checked the inheritance clause, don't do so again.
@@ -225,13 +231,13 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
   SourceRange superclassRange;
   llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
   llvm::SmallDenseMap<CanType, SourceRange> inheritedTypes;
-  addImplicitConformances(tc, decl, allProtocols);
+  addImplicitConformances(*this, decl, allProtocols);
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
 
     // Validate the type.
-    if (tc.validateType(inherited)) {
-      inherited.setInvalidType(tc.Context);
+    if (validateType(inherited, /*allowUnboundGenerics=*/false, resolver)) {
+      inherited.setInvalidType(Context);
       continue;
     }
 
@@ -242,14 +248,14 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
     auto knownType = inheritedTypes.find(inheritedCanTy);
     if (knownType != inheritedTypes.end()) {
       SourceLoc afterPriorLoc
-        = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+        = Lexer::getLocForEndOfToken(Context.SourceMgr,
                                      inheritedClause[i-1].getSourceRange().End);
       SourceLoc afterMyEndLoc
-        = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+        = Lexer::getLocForEndOfToken(Context.SourceMgr,
                                      inherited.getSourceRange().End);
 
-      tc.diagnose(inherited.getSourceRange().Start,
-                  diag::duplicate_inheritance, inheritedTy)
+      diagnose(inherited.getSourceRange().Start,
+               diag::duplicate_inheritance, inheritedTy)
         .fixItRemoveChars(afterPriorLoc, afterMyEndLoc)
         .highlight(knownType->second);
       continue;
@@ -263,8 +269,8 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
       if (auto protoTy = inheritedTy->getAs<ProtocolType>()) {
         if (protoTy->getDecl()->isSpecificProtocol(
                                    KnownProtocolKind::DynamicLookup)) {
-          tc.diagnose(inheritedClause[i].getSourceRange().Start,
-                      diag::dynamic_lookup_conformance);
+          diagnose(inheritedClause[i].getSourceRange().Start,
+                   diag::dynamic_lookup_conformance);
           continue;
         }
       }
@@ -279,8 +285,8 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
     if (isa<EnumDecl>(decl)) {
       // Check if we already had a raw type.
       if (superclassTy) {
-        tc.diagnose(inherited.getSourceRange().Start,
-                    diag::multiple_enum_raw_types, superclassTy, inheritedTy)
+        diagnose(inherited.getSourceRange().Start,
+                 diag::multiple_enum_raw_types, superclassTy, inheritedTy)
           .highlight(superclassRange);
         continue;
       }
@@ -289,14 +295,14 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
       if (i > 0) {
         SourceLoc afterPriorLoc
           = Lexer::getLocForEndOfToken(
-              tc.Context.SourceMgr,
+              Context.SourceMgr,
               inheritedClause[i-1].getSourceRange().End);
         SourceLoc afterMyEndLoc
-          = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+          = Lexer::getLocForEndOfToken(Context.SourceMgr,
                                        inherited.getSourceRange().End);
 
-        tc.diagnose(inherited.getSourceRange().Start,
-                    diag::raw_type_not_first, inheritedTy)
+        diagnose(inherited.getSourceRange().Start,
+                 diag::raw_type_not_first, inheritedTy)
           .fixItRemoveChars(afterPriorLoc, afterMyEndLoc)
           .fixItInsert(inheritedClause[0].getSourceRange().Start,
                        inheritedTy.getString() + ", ");
@@ -318,8 +324,8 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
 
         // Complain about multiple inheritance.
         // Don't emit a Fix-It here. The user has to think harder about this.
-        tc.diagnose(inherited.getSourceRange().Start,
-                    diag::multiple_inheritance, superclassTy, inheritedTy)
+        diagnose(inherited.getSourceRange().Start,
+                 diag::multiple_inheritance, superclassTy, inheritedTy)
           .highlight(superclassRange);
         continue;
       }
@@ -330,11 +336,11 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
       // FIXME: Allow type aliases to 'inherit' from classes, as an additional
       // kind of requirement?
       if (!canInheritClass(decl)) {
-        tc.diagnose(decl->getLoc(),
-                    isa<ExtensionDecl>(decl)
-                      ? diag::extension_class_inheritance
-                      : diag::non_class_inheritance,
-                    getDeclaredType(decl), inheritedTy)
+        diagnose(decl->getLoc(),
+                 isa<ExtensionDecl>(decl)
+                   ? diag::extension_class_inheritance
+                   : diag::non_class_inheritance,
+                 getDeclaredType(decl), inheritedTy)
           .highlight(inherited.getSourceRange());
         continue;
       }
@@ -343,14 +349,14 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
       if (i > 0) {
         SourceLoc afterPriorLoc
           = Lexer::getLocForEndOfToken(
-              tc.Context.SourceMgr,
+              Context.SourceMgr,
               inheritedClause[i-1].getSourceRange().End);
         SourceLoc afterMyEndLoc
-          = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+          = Lexer::getLocForEndOfToken(Context.SourceMgr,
                                        inherited.getSourceRange().End);
 
-        tc.diagnose(inherited.getSourceRange().Start,
-                    diag::superclass_not_first, inheritedTy)
+        diagnose(inherited.getSourceRange().Start,
+                 diag::superclass_not_first, inheritedTy)
           .fixItRemoveChars(afterPriorLoc, afterMyEndLoc)
           .fixItInsert(inheritedClause[0].getSourceRange().Start,
                        inheritedTy.getString() + ", ");
@@ -369,11 +375,11 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
       continue;
 
     // We can't inherit from a non-class, non-protocol type.
-    tc.diagnose(decl->getLoc(),
-                canInheritClass(decl)
-                  ? diag::inheritance_from_non_protocol_or_class
-                  : diag::inheritance_from_non_protocol,
-                inheritedTy);
+    diagnose(decl->getLoc(),
+             canInheritClass(decl)
+               ? diag::inheritance_from_non_protocol_or_class
+               : diag::inheritance_from_non_protocol,
+             inheritedTy);
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
   }
 
@@ -382,7 +388,7 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
   if (allProtocols.empty() && !superclassTy)
     return;
 
-  auto allProtocolsCopy = tc.Context.AllocateCopy(allProtocols);
+  auto allProtocolsCopy = Context.AllocateCopy(allProtocols);
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     assert(!superclassTy && "Extensions can't add superclasses");
     ext->setProtocols(allProtocolsCopy);
@@ -407,7 +413,7 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
      unsigned conformancesSize
          = sizeof(ProtocolConformance *) * allProtocols.size();
      ProtocolConformance **conformances
-         = (ProtocolConformance **)tc.Context.Allocate(
+         = (ProtocolConformance **)Context.Allocate(
              conformancesSize,
              alignof(ProtocolConformance *));
      memset(conformances, 0, conformancesSize);
@@ -427,7 +433,7 @@ static ArrayRef<ProtocolDecl *> getInheritedForCycleCheck(TypeChecker &tc,
 static ArrayRef<ClassDecl *> getInheritedForCycleCheck(TypeChecker &tc,
                                                        ClassDecl *classDecl,
                                                        ClassDecl **scratch) {
-  checkInheritanceClause(tc, classDecl);
+  tc.checkInheritanceClause(classDecl);
 
   if (classDecl->hasSuperclass()) {
     *scratch = classDecl->getSuperclass()->getClassOrBoundGenericClass();
@@ -440,7 +446,7 @@ static ArrayRef<ClassDecl *> getInheritedForCycleCheck(TypeChecker &tc,
 static ArrayRef<EnumDecl *> getInheritedForCycleCheck(TypeChecker &tc,
                                                       EnumDecl *enumDecl,
                                                       EnumDecl **scratch) {
-  checkInheritanceClause(tc, enumDecl);
+  tc.checkInheritanceClause(enumDecl);
   
   if (enumDecl->hasRawType()) {
     *scratch = enumDecl->getRawType()->getEnumOrBoundGenericEnum();
@@ -585,7 +591,8 @@ static CanType getExtendedType(ExtensionDecl *ED) {
   return ExtendedTy;
 }
 
-/// Create a fresh archetype building.
+/// Create a fresh archetype builder.
+/// FIXME: Duplicated with TypeCheckGeneric.cpp; this one should go away.
 static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC) {
   return ArchetypeBuilder(
            TC.TU, TC.Diags,
@@ -593,13 +600,11 @@ static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC) {
              return TC.getDirectConformsTo(protocol);
            },
            [&](AbstractTypeParamDecl *assocType) -> ArrayRef<ProtocolDecl *> {
-             checkInheritanceClause(TC, assocType);
+             TC.checkInheritanceClause(assocType);
              return assocType->getProtocols();
            });
 }
 
-/// Revert the given dependently-typed TypeLoc to a state where generic
-/// parameters have not yet been resolved.
 static void revertDependentTypeLoc(TypeLoc &tl, DeclContext *dc) {
   // Make sure we validate the type again.
   tl.setType(Type(), /*validated=*/false);
@@ -663,9 +668,7 @@ static void revertDependentTypeLoc(TypeLoc &tl, DeclContext *dc) {
   tl.getTypeRepr()->walk(RevertWalker(dc));
 }
 
-/// Revert the dependently-typed TypeLocs within the given pattern to a
-/// state where generic parameters have not yet been resolved.
-void revertDependentPattern(Pattern *pattern, DeclContext *dc) {
+static void revertDependentPattern(Pattern *pattern, DeclContext *dc) {
   // Clear out the pattern's type.
   if (pattern->hasType())
     pattern->overwriteType(Type());
@@ -718,9 +721,9 @@ void revertDependentPattern(Pattern *pattern, DeclContext *dc) {
 /// Check the given generic parameter list, introduce the generic parameters
 /// and requirements into the archetype builder, but don't assign archetypes
 /// yet.
-void checkGenericParamList(ArchetypeBuilder &builder,
-                           GenericParamList *genericParams,
-                           TypeChecker &TC) {
+static void checkGenericParamList(ArchetypeBuilder &builder,
+                                  GenericParamList *genericParams,
+                                  TypeChecker &TC) {
   assert(genericParams && "Missing generic parameters");
   unsigned Depth = genericParams->getDepth();
 
@@ -733,7 +736,7 @@ void checkGenericParamList(ArchetypeBuilder &builder,
     TypeParam->setDepth(Depth);
 
     // Check the constraints on the type parameter.
-    checkInheritanceClause(TC, TypeParam);
+    TC.checkInheritanceClause(TypeParam);
 
     // Add the generic parameter to the builder.
     builder.addGenericParameter(TypeParam, Index++);
@@ -805,12 +808,46 @@ void checkGenericParamList(ArchetypeBuilder &builder,
   }
 }
 
+/// Revert the dependent types within the given generic parameter list.
+static void revertGenericParamList(GenericParamList *genericParams,
+                                   DeclContext *dc) {
+  // FIXME: Revert the inherited clause of the generic parameter list.
+#if 0
+  for (auto param : *genericParams) {
+    auto typeParam = param.getAsTypeParam();
+
+    typeParam->setCheckedInheritanceClause(false);
+    for (auto &inherited : typeParam->getInherited())
+      revertDependentTypeLoc(inherited, dc);
+  }
+#endif
+
+  // Revert the requirements of the generic parameter list.
+  for (auto &req : genericParams->getRequirements()) {
+    if (req.isInvalid())
+      continue;
+
+    switch (req.getKind()) {
+    case RequirementKind::Conformance: {
+      revertDependentTypeLoc(req.getSubjectLoc(), dc);
+      revertDependentTypeLoc(req.getConstraintLoc(), dc);
+      break;
+    }
+
+    case RequirementKind::SameType:
+      revertDependentTypeLoc(req.getFirstTypeLoc(), dc);
+      revertDependentTypeLoc(req.getSecondTypeLoc(), dc);
+      break;
+    }
+  }
+}
+
 /// Finalize the given generic parameter list, assigning archetypes to
 /// the generic parameters.
-void finalizeGenericParamList(ArchetypeBuilder &builder,
-                              GenericParamList *genericParams,
-                              DeclContext *dc,
-                              TypeChecker &TC) {
+static void finalizeGenericParamList(ArchetypeBuilder &builder,
+                                     GenericParamList *genericParams,
+                                     DeclContext *dc,
+                                     TypeChecker &TC) {
   // Wire up the archetypes.
   builder.assignArchetypes();
   for (auto GP : *genericParams) {
@@ -861,6 +898,34 @@ void finalizeGenericParamList(ArchetypeBuilder &builder,
   }
 }
 
+void TypeChecker::revertGenericFuncSignature(FuncDecl *func) {
+  // Revert the result type.
+  if (!func->getBodyResultTypeLoc().isNull()) {
+    revertDependentTypeLoc(func->getBodyResultTypeLoc(), func);
+  }
+
+  // Revert the argument patterns.
+  ArrayRef<Pattern *> argPatterns = func->getArgParamPatterns();
+  if (func->getDeclContext()->isTypeContext())
+    argPatterns = argPatterns.slice(1);
+  for (auto argPattern : argPatterns) {
+    revertDependentPattern(argPattern, func);
+  }
+
+  // Revert the body patterns.
+  ArrayRef<Pattern *> bodyPatterns = func->getBodyParamPatterns();
+  if (func->getDeclContext()->isTypeContext())
+    bodyPatterns = bodyPatterns.slice(1);
+  for (auto bodyPattern : bodyPatterns) {
+    revertDependentPattern(bodyPattern, func);
+  }
+
+  // Revert the generic parameter list.
+  revertGenericParamList(func->getGenericParams(), func);
+
+  // Clear out the types.
+  func->revertType();
+}
 
 namespace {
 
@@ -1077,7 +1142,7 @@ public:
       }
 
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
-        checkInheritanceClause(TC, TAD);
+        TC.checkInheritanceClause(TAD);
     }
 
     if (!IsFirstPass)
@@ -1551,69 +1616,33 @@ public:
       }
     }
 
-    Optional<ArchetypeBuilder> builder;
+    bool isInvalid = false;
+
+    // If we have generic parameters, check the generic signature now.
     if (auto gp = FD->getGenericParams()) {
       gp->setOuterParameters(outerGenericParams);
-      builder.emplace(createArchetypeBuilder(TC));
-      checkGenericParamList(*builder, gp, TC);
-    }
 
-    // If we have generic parameters, create archetypes now.
-    bool isInvalid = false;
-    if (builder) {
-      // Type check the function declaration.
-      PartialGenericTypeToArchetypeResolver resolver(TC);
-      semaFuncDecl(FD, /*consumeAttributes=*/false, &resolver);
-
-      // Infer requirements from the parameters of the function.
-      for (auto pattern : FD->getArgParamPatterns()) {
-        builder->inferRequirements(pattern);
-      }
-
-      // Infer requirements from the result type.
-      if (auto resultType = FD->getBodyResultTypeLoc().getTypeRepr())
-        builder->inferRequirements(resultType);
-
-      // Revert all of the types within the signature of the
-      auto revertSignature = [&]() {
-        // Revert the result type.
-        if (!FD->getBodyResultTypeLoc().isNull()) {
-          revertDependentTypeLoc(FD->getBodyResultTypeLoc(), FD);
-        }
-
-        // Revert the argument patterns.
-        ArrayRef<Pattern *> argPatterns = FD->getArgParamPatterns();
-        if (FD->getDeclContext()->isTypeContext())
-          argPatterns = argPatterns.slice(1);
-        for (auto argPattern : argPatterns) {
-          revertDependentPattern(argPattern, FD);
-        }
-
-        // Revert the body patterns.
-        ArrayRef<Pattern *> bodyPatterns = FD->getBodyParamPatterns();
-        if (FD->getDeclContext()->isTypeContext())
-          bodyPatterns = bodyPatterns.slice(1);
-        for (auto bodyPattern : bodyPatterns) {
-          revertDependentPattern(bodyPattern, FD);
-        }
-
-        // Clear out the types.
-        FD->revertType();
-      };
-
-      // Go through and revert all of the dependent types we computed.
-      revertSignature();
-
-      // Completely resolve the generic signature.
-      CompleteGenericTypeResolver completeResolver(TC, *builder);
-      semaFuncDecl(FD, /*consumeAttributes=*/false, &completeResolver);
-
-      if (FD->getType()->is<ErrorType>()) {
+      if (TC.validateGenericFuncSignature(FD))
         isInvalid = true;
-      } else {
-        // Assign archetypes... after reverting the signature once again.
-        revertSignature();
-        finalizeGenericParamList(*builder, FD->getGenericParams(), FD, TC);
+      else {
+        // Create a fresh archetype builder.
+        ArchetypeBuilder builder = createArchetypeBuilder(TC);
+        checkGenericParamList(builder, gp, TC);
+
+        // Infer requirements from parameter patterns.
+        for (auto pattern : FD->getArgParamPatterns()) {
+          builder.inferRequirements(pattern);
+        }
+
+        // Infer requirements from the result type.
+        if (!FD->getBodyResultTypeLoc().isNull()) {
+          builder.inferRequirements(FD->getBodyResultTypeLoc().getTypeRepr());
+        }
+
+        // Revert all of the types within the signature of the function.
+        TC.revertGenericFuncSignature(FD);
+
+        finalizeGenericParamList(builder, FD->getGenericParams(), FD, TC);
       }
     }
 
@@ -1745,7 +1774,7 @@ public:
         ED->setInvalid();
       }
 
-      checkInheritanceClause(TC, ED);
+      TC.checkInheritanceClause(ED);
       if (auto nominal = ExtendedTy->getAnyNominal())
         TC.validateDecl(nominal);
 
@@ -1973,7 +2002,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::Class: {
     auto nominal = cast<NominalTypeDecl>(D);
     for (auto ext : nominal->getExtensions())
-      checkInheritanceClause(*this, ext);
+      checkInheritanceClause(ext);
 
     if (nominal->hasType())
       return;
@@ -1992,7 +2021,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     nominal->computeType();
 
     validateAttributes(*this, D);
-    checkInheritanceClause(*this, D);
+    checkInheritanceClause(D);
 
     // Mark a class as [objc]. This must happen before checking its members.
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
@@ -2019,14 +2048,14 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       return;
     proto->computeType();
 
-    checkInheritanceClause(*this, D);
+    checkInheritanceClause(D);
     validateAttributes(*this, D);
 
     // Fix the 'Self' associated type.
     AssociatedTypeDecl *selfDecl = nullptr;
     for (auto member : proto->getMembers()) {
       if (auto AssocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        checkInheritanceClause(*this, AssocType);
+        checkInheritanceClause(AssocType);
 
         if (AssocType->isSelf()) {
           selfDecl = AssocType;
@@ -2119,13 +2148,13 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
 ArrayRef<ProtocolDecl *>
 TypeChecker::getDirectConformsTo(NominalTypeDecl *nominal) {
-  checkInheritanceClause(*this, nominal);
+  checkInheritanceClause(nominal);
   return nominal->getProtocols();
 }
 
 ArrayRef<ProtocolDecl *>
 TypeChecker::getDirectConformsTo(ExtensionDecl *ext) {
-  checkInheritanceClause(*this, ext);
+  checkInheritanceClause(ext);
   return ext->getProtocols();
 }
 
@@ -2388,6 +2417,7 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer,
     return true;
   }
 
+  case TypeKind::GenericFunction:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     llvm_unreachable("Should never ask about dependent types");

@@ -1116,6 +1116,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     case TypeKind::ArraySlice:
     case TypeKind::Function:
     case TypeKind::PolymorphicFunction:
+    case TypeKind::GenericFunction:
       OS << '(';
       visit(T);
       OS << ')';
@@ -1311,6 +1312,58 @@ public:
     Attrs.finish();
 
     printGenericParams(&T->getGenericParams());
+    OS << ' ';
+    printWithParensIfNotSimple(T->getInput());
+
+    OS << " -> " << T->getResult();
+  }
+
+  void visitGenericFunctionType(GenericFunctionType *T) {
+    AttributePrinter Attrs(OS);
+    Attrs.printCC(T->getAbstractCC());
+    if (T->isThin())
+      Attrs.next() << "thin";
+    if (T->isNoReturn())
+      Attrs.next() << "noreturn";
+
+    Attrs.finish();
+
+    // Print the generic parameters.
+    OS << '<';
+    bool isFirstParam = true;
+    for (auto param : T->getGenericParams()) {
+      if (isFirstParam)
+        isFirstParam = false;
+      else
+        OS << ", ";
+
+      visit(param);
+    }
+
+    // Print the requirements.
+    bool isFirstReq = true;
+    for (const auto &req : T->getRequirements()) {
+      if (isFirstReq) {
+        OS << " where ";
+        isFirstReq = false;
+      } else {
+        OS << ", ";
+      }
+
+      visit(req.getFirstType());
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+        OS << " : ";
+        break;
+
+      case RequirementKind::SameType:
+        OS << " == ";
+        break;
+      }
+      visit(req.getSecondType());
+    }
+    OS << '>';
+
     OS << ' ';
     printWithParensIfNotSimple(T->getInput());
 

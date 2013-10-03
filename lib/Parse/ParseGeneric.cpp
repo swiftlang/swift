@@ -89,7 +89,7 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
 
   // Parse the optional where-clause.
   SourceLoc WhereLoc;
-  SmallVector<Requirement, 4> Requirements;
+  SmallVector<RequirementRepr, 4> Requirements;
   if (Tok.is(tok::kw_where) &&
       parseGenericWhereClause(WhereLoc, Requirements)) {
     Invalid = true;
@@ -146,8 +146,8 @@ GenericParamList *Parser::maybeParseGenericParams() {
 ///   same-type-requirement:
 ///     type-identifier '==' type-identifier
 bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
-                                     SmallVectorImpl<Requirement> &Requirements) {
-  // Parse the 'requires'.
+                                     SmallVectorImpl<RequirementRepr> &Requirements) {
+  // Parse the 'where'.
   WhereLoc = consumeToken(tok::kw_where);
   bool Invalid = false;
   do {
@@ -176,7 +176,7 @@ bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
       }
 
       // Add the requirement.
-      Requirements.push_back(Requirement::getConformance(FirstType.get(),
+      Requirements.push_back(RequirementRepr::getConformance(FirstType.get(),
                                                          ColonLoc,
                                                          Protocol.get()));
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
@@ -196,7 +196,7 @@ bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
       }
 
       // Add the requirement
-      Requirements.push_back(Requirement::getSameType(FirstType.get(),
+      Requirements.push_back(RequirementRepr::getSameType(FirstType.get(),
                                                       EqualLoc,
                                                       SecondType.get()));
     } else {

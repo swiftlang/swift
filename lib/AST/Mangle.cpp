@@ -655,6 +655,10 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     return;
   }
 
+  case TypeKind::GenericFunction: {
+    llvm_unreachable("cannot mangle generic function types yet");
+  }
+
   case TypeKind::GenericTypeParam: {
     llvm_unreachable("cannot mangle generic type parameters yet");
   }

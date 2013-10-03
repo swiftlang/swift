@@ -32,7 +32,7 @@ class ArchetypeType;
 class AssociatedTypeDecl;
 class Pattern;
 class ProtocolDecl;
-class Requirement;
+class RequirementRepr;
 class SourceLoc;
 class TranslationUnit;
 class Type;
@@ -104,6 +104,9 @@ public:
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
 
+  /// Retrieve the translation unit.
+  TranslationUnit &getTranslationUnit() const { return TU; }
+
   /// \brief Add a new generic parameter for which there may be requirements.
   ///
   /// \returns true if an error occurred, false otherwise.
@@ -114,7 +117,7 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const Requirement &Req);
+  bool addRequirement(const RequirementRepr &Req);
 
   /// \brief Add a new, implicit conformance requirement for one of the
   /// parameters.
@@ -180,7 +183,6 @@ public:
   /// list.
   ArrayRef<ArchetypeType *> getAllArchetypes();
 
-  // FIXME: Infer requirements from signatures
   // FIXME: Compute the set of 'extra' witness tables needed to express this
   // requirement set.
 
@@ -233,6 +235,10 @@ public:
   /// \brief Retrieve the full display name of this potential archetype.
   std::string getFullName() const;
 
+  /// Retrieve the parent of this potential archetype, which will be non-null
+  /// when this potential archetype is an associated type.
+  PotentialArchetype *getParent() const { return Parent; }
+
   /// Retrieve the set of protocols to which this type conforms.
   ArrayRef<ProtocolDecl *> getConformsTo() const {
     return llvm::makeArrayRef(ConformsTo.begin(), ConformsTo.end());
@@ -240,6 +246,11 @@ public:
 
   /// Retrieve the superclass of this archetype.
   Type getSuperclass() const { return Superclass; }
+
+  /// Retrieve the set of nested types.
+  const llvm::DenseMap<Identifier, PotentialArchetype*> &getNestedTypes() const{
+    return NestedTypes;
+  }
 
   /// \brief Determine the nesting depth of this potential archetype, e.g.,
   /// the number of associated type references.
@@ -256,6 +267,9 @@ public:
   /// archetype.
   ArchetypeType *getArchetype(AssociatedTypeDecl * /*nullable*/ rootAssocTy,
                               TranslationUnit &tu);
+
+  /// Retrieve the associated type declaration for a given nested type.
+  AssociatedTypeDecl *getAssociatedType(TranslationUnit &tu, Identifier name);
 
   void dump(llvm::raw_ostream &Out, unsigned Indent);
 

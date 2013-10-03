@@ -1,0 +1,63 @@
+//===--- Requirement.h - Swift Requirement ASTs -----------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the Requirement class and subclasses.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_AST_REQUIREMENT_H
+#define SWIFT_AST_REQUIREMENT_H
+
+#include "swift/AST/Type.h"
+#include "llvm/ADT/PointerIntPair.h"
+
+namespace swift {
+
+/// \brief Describes the kind of a requirement that occurs within a requirements
+/// clause.
+enum class RequirementKind : unsigned int {
+  /// \brief A conformance requirement T : P, where T is a type that depends
+  /// on a generic parameter and P is a protocol to which T must conform.
+  Conformance,
+  /// \brief A same-type requirement T == U, where T and U are types that
+  /// shall be equivalent.
+  SameType
+};
+
+/// \brief A single requirement placed on the type parameters (or associated
+/// types thereof) of a
+class Requirement {
+  llvm::PointerIntPair<Type, 1, RequirementKind> FirstTypeAndKind;
+  Type SecondType;
+
+public:
+  /// Create a conformance or same-type requirement.
+  Requirement(RequirementKind kind, Type first, Type second)
+  : FirstTypeAndKind(first, kind), SecondType(second) { }
+
+  /// \brief Determine the kind of requirement.
+  RequirementKind getKind() const { return FirstTypeAndKind.getInt(); }
+
+  /// \brief Retrieve the first type.
+  Type getFirstType() const {
+    return FirstTypeAndKind.getPointer();
+  }
+
+  /// \brief Retrieve the second type.
+  Type getSecondType() const {
+    return SecondType;
+  }
+};
+
+} // end namespace swift
+
+#endif

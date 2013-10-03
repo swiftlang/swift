@@ -130,6 +130,7 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::BoundGenericClass:
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
+  case TypeKind::GenericFunction:
     return true;
 
   case TypeKind::UnboundGeneric:
@@ -219,6 +220,9 @@ bool TypeBase::isUnspecializedGeneric() {
     return funcTy->getInput()->isUnspecializedGeneric() ||
            funcTy->getResult()->isUnspecializedGeneric();
   }
+
+  case TypeKind::GenericFunction:
+    return true;
 
   case TypeKind::Class:
   case TypeKind::Struct:
@@ -623,6 +627,34 @@ CanType TypeBase::getCanonicalType() {
                                           In->getASTContext());
     break;
   }
+  case TypeKind::GenericFunction: {
+    // Canonicalize generic parameters.
+    GenericFunctionType *function = cast<GenericFunctionType>(this);
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    for (auto param : function->getGenericParams()) {
+      auto newParam = param->getCanonicalType()->castTo<GenericTypeParamType>();
+      genericParams.push_back(newParam);
+    }
+
+    // Transform requirements.
+    SmallVector<Requirement, 4> requirements;
+    for (const auto &req : function->getRequirements()) {
+      auto firstType = req.getFirstType()->getCanonicalType();
+      auto secondType = req.getSecondType()->getCanonicalType();
+      requirements.push_back(Requirement(req.getKind(), firstType,
+                                         secondType));
+    }
+
+    // Transform input type.
+    auto inputTy = function->getInput()->getCanonicalType();
+    auto resultTy = function->getResult()->getCanonicalType();
+
+    Result = GenericFunctionType::get(genericParams, requirements, inputTy,
+                                      resultTy, function->getExtInfo(),
+                                      inputTy->getASTContext());
+    break;
+  }
+
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->getInput()->getCanonicalType();
@@ -693,6 +725,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Tuple:
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
+  case TypeKind::GenericFunction:
   case TypeKind::Array:
   case TypeKind::LValue:
   case TypeKind::ProtocolComposition:
@@ -849,7 +882,8 @@ bool TypeBase::isSpelledLike(Type other) {
     return true;
   }
 
-  case TypeKind::PolymorphicFunction: {
+  case TypeKind::PolymorphicFunction:
+  case TypeKind::GenericFunction: {
     // Polymorphic function types should never be explicitly spelled.
     return false;
   }

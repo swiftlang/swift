@@ -108,6 +108,7 @@ public:
         ->visitArchetypeType(cast<ArchetypeType>(origTy),
                              substTy);
 
+    case TypeKind::GenericFunction:
     case TypeKind::GenericTypeParam:
     case TypeKind::DependentMember:
       // FIXME: This should duplicate, then subsume, the archetype path?
