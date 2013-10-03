@@ -241,11 +241,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (!E->getSubExpr())
       return E;
     
-    if (Expr *Sub = doIt(E->getSubExpr())) {
+    if (Expr *Sub = doIt(E->getSubExpr()))
       E->setSubExpr(Sub);
-      return E;
+    else
+      return nullptr;
+
+    for (auto &TyLoc : E->getUnresolvedParams()) {
+      if (TyLoc.getTypeRepr())
+        if (doIt(TyLoc.getTypeRepr()))
+          return nullptr;
     }
-    return nullptr;
+
+    return E;
   }
   
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
