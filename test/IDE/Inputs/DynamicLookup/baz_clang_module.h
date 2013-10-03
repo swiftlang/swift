@@ -5,6 +5,8 @@
 - (void)baz_Class_InstanceFunc1;
 + (void)baz_Class_ClassFunc1;
 
+- (void)baz_Class_InstanceFunc_Unavailable __attribute__((unavailable));
+
 - (id)objectAtIndexedSubscript:(int)idx;
 
 @property Baz_Class *baz_Class_Property1;
