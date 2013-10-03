@@ -992,11 +992,14 @@ Expr *Parser::parseExprStringLiteral() {
       // FIXME: This seems like a hack, there must be a better way..
       Lexer::State EndState = BeginState.advance(Segment.Length-1);
       Lexer LocalLex(*L, BeginState, EndState);
-      
+
       // Temporarily swap out the parser's current lexer with our new one.
-      llvm::SaveAndRestore<Lexer*> T(L, &LocalLex);
-      
+      llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
+
       // Prime the new lexer with a '(' as the first token.
+      // We might be at tok::eof now, so ensure that consumeToken() does not
+      // assert about lexing past eof.
+      Tok.setKind(tok::unknown);
       consumeToken();
       assert(Tok.is(tok::l_paren));
       
