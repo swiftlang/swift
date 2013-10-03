@@ -283,6 +283,8 @@ namespace {
         else
           result = new (context) ArchetypeMemberRefExpr(base, dotLoc,
                                                         member, memberLoc);
+        if (base->isImplicit())
+          result->setImplicit();
 
         // If we have a function declaration, determine whether it is
         // polymorphic. If so, we need to specialize the result.
