@@ -91,7 +91,7 @@ protected:
 
   SILBuilder Builder;
   SILBasicBlock *InsertBeforeBB;
-  llvm::DenseMap<SILArgument*, SILValue> ArgumentMap;
+  llvm::DenseMap<ValueBase*, SILValue> ValueMap;
   llvm::DenseMap<SILInstruction*, SILInstruction*> InstructionMap;
   llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;
 };
@@ -99,21 +99,21 @@ protected:
 template<typename ImplClass>
 SILValue
 SILCloner<ImplClass>::remapValue(SILValue Value) {
-  if (SILArgument* A = dyn_cast<SILArgument>(Value.getDef())) {
+  auto VI = ValueMap.find(Value.getDef());
+  if (VI != ValueMap.end()) {
     assert(Value.getResultNumber() == 0 &&
-           "Non-zero result number of argument used?");
-    SILValue MappedValue = ArgumentMap[A];
-    assert (MappedValue && "Unmapped argument while cloning");
-    return MappedValue;
+           "Non-zero result number of mapped value used?");
+    return VI->second;
   }
 
   if (SILInstruction* I = dyn_cast<SILInstruction>(Value.getDef())) {
-    ValueBase* V = InstructionMap[I];
-    assert(V && "Unmapped instruction while cloning?");
-    return SILValue(V, Value.getResultNumber());
+    auto II = InstructionMap.find(I);
+    if (II != InstructionMap.end())
+      return SILValue(II->second, Value.getResultNumber());
+    llvm_unreachable("Unmapped instruction while cloning?");
   }
 
-  llvm_unreachable("Unknown value type while cloning?");
+  llvm_unreachable("Unmapped value while cloning?");
 }
 
 template<typename ImplClass>
@@ -157,7 +157,7 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
       for (auto &Arg : Succ.getBB()->getBBArgs()) {
         SILValue MappedArg = new (F.getModule()) SILArgument(Arg->getType(),
                                                              MappedBB);
-        ArgumentMap.insert(std::make_pair(Arg, MappedArg));
+        ValueMap.insert(std::make_pair(Arg, MappedArg));
       }
       // Also, move the new mapped BB to the right position in the caller
       if (InsertBeforeBB)

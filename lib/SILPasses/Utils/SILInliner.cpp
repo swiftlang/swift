@@ -53,12 +53,12 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
 
   // Clear argument map and map ApplyInst arguments to the arguments of the
   // callee's entry block.
-  ArgumentMap.clear();
+  ValueMap.clear();
   assert(CalleeEntryBB->bbarg_size() == Args.size() &&
          "Unexpected number of arguments to entry block of function?");
   auto BAI = CalleeEntryBB->bbarg_begin();
   for (auto AI = Args.begin(), AE = Args.end(); AI != AE; ++AI, ++BAI)
-    ArgumentMap.insert(std::make_pair(*BAI, *AI));
+    ValueMap.insert(std::make_pair(*BAI, *AI));
 
   InstructionMap.clear();
   BBMap.clear();
@@ -155,7 +155,7 @@ void SILInliner::visitSILBasicBlock(SILBasicBlock* BB) {
       for (auto &Arg : Succ.getBB()->getBBArgs()) {
         SILValue MappedArg = new (F.getModule()) SILArgument(Arg->getType(),
                                                              MappedBB);
-        ArgumentMap.insert(std::make_pair(Arg, MappedArg));
+        ValueMap.insert(std::make_pair(Arg, MappedArg));
       }
       // Also, move the new mapped BB to the right position in the caller
       if (InsertBeforeBB)
