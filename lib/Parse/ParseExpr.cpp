@@ -508,7 +508,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
 
     SourceLoc dotLoc = consumeToken(tok::period);
     
-    if (Tok.is(tok::kw_constructor) || Tok.is(tok::kw_init)) {
+    if (Tok.is(tok::kw_init)) {
       // super.init
       SourceLoc ctorLoc = consumeToken();
       

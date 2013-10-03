@@ -32,7 +32,6 @@
 
 // Keywords that start decls.
 KEYWORD(class)
-KEYWORD(constructor)
 KEYWORD(destructor)
 KEYWORD(enum)
 KEYWORD(extension)

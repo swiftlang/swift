@@ -196,7 +196,6 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
   case tok::identifier:
     Result = P.Context.getIdentifier(P.Tok.getText());
     break;
-  case tok::kw_constructor:
   case tok::kw_init:
     Result = P.Context.getIdentifier("init");
     break;
