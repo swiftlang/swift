@@ -1,6 +1,6 @@
-* Autorelease pools can now be created using the autoreleasepool() function. 
+* Autorelease pools can now be created using the 'autoreleasepool' function. 
 
-    autoreleasepool() {
+    autoreleasepool {
       // code
     }
 
