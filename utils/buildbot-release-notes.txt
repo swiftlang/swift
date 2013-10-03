@@ -1,3 +1,6 @@
+2013-10-09
+----------
+
 * Autorelease pools can now be created using the 'autoreleasepool' function. 
 
     autoreleasepool {
@@ -8,6 +11,60 @@
   'continue' and 'return' do not behave as they would inside an Objective-C 
   @autoreleasepool statement.
 
+* Enums can now declare a "raw type", and cases can declare "raw values",
+  similar to the integer underlying type of C enums:
+
+    // Declare the underlying type as in Objective-C or C++11, with
+    // ': Type'
+    enum AreaCode : Int {
+      // Assign explicit values to cases with '='
+      case SanFrancisco = 415
+      case EastBay = 510
+      case Peninsula = 650
+      case SanJose = 408
+      // Values are also assignable by implicit auto-increment
+      case Galveston // = 409
+      case Baltimore // = 410
+    }
+
+  This introduces 'fromRaw' and 'toRaw' methods on the enum to perform
+  conversions from and to the raw type:
+
+    /* As if declared:
+        extension AreaCode {
+          // Take a raw value, and produce the corresponding enum value,
+          // or None if there is no corresponding enum value
+          static func fromRaw(raw:Int) -> AreaCode?
+
+          // Return the corresponding raw value for 'self'
+          func toRaw() -> Int
+        }
+     */
+
+    AreaCode.fromRaw(415) // => .Some(.SanFrancisco)
+    AreaCode.fromRaw(111) // => .None
+    AreaCode.SanJose.toRaw() // => 408
+
+  Raw types are not limited to integer types--they can additionally be
+  character, floating-point, or string values:
+
+    enum State : String {
+      case CA = "California"
+      case OR = "Oregon"
+      case WA = "Washington"
+    }
+
+    enum SquareRootOfInteger : Float {
+      case One = 1.0
+      case Two = 1.414
+      case Three = 1.732
+      case Four = 2.0
+    }
+
+  Raw types are currently limited to simple C-like enums with no payload cases.
+  The raw values are currently restricted to simple literal values; expressions
+  such as "1 + 1" or references to other enum cases are not yet supported.
+  Raw values are also currently required to be unique for each case in an enum.
 
 2013-10-02
 ----------
