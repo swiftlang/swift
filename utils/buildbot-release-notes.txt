@@ -1,3 +1,14 @@
+* Autorelease pools can now be created using the autoreleasepool() function. 
+
+    autoreleasepool() {
+      // code
+    }
+
+  Note that the wrapped code is a closure, so constructs like 'break' and 
+  'continue' and 'return' do not behave as they would inside an Objective-C 
+  @autoreleasepool statement.
+
+
 2013-10-02
 ----------
 
