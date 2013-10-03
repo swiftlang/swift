@@ -877,6 +877,7 @@ public:
   void printRec(Pattern *P) {
     PrintPattern(OS, Indent+2).visit(P);
   }
+  void printRec(TypeRepr *T);
 
   void printSubstitutions(ArrayRef<Substitution> Substitutions) {
     for (auto S : Substitutions) {
@@ -940,7 +941,13 @@ public:
     printCommon(E, "declref_expr")
       << " decl=";
     E->getDecl()->dumpRef(OS);
-    OS << " specialized=" << (E->isSpecialized()? "yes" : "no") << ")";
+    OS << " specialized=" << (E->isSpecialized()? "yes" : "no");
+
+    for (auto TR : E->getGenericArgs()) {
+      OS << '\n';
+      printRec(TR);
+    }
+    OS << ')';
   }
   void visitSuperRefExpr(SuperRefExpr *E) {
     printCommon(E, "super_ref_expr") << ')';
@@ -987,8 +994,7 @@ public:
     printRec(E->getSubExpr());
     for (TypeLoc T : E->getUnresolvedParams()) {
       OS << '\n';
-      OS.indent(Indent+2);
-      T.getTypeRepr()->print(OS);
+      printRec(T.getTypeRepr());
     }
     OS << ')';
   }
@@ -1503,6 +1509,10 @@ public:
 } // end anonymous namespace.
 
 void PrintDecl::printRec(TypeRepr *T) {
+  PrintTypeRepr(OS, Indent+2).visit(T);
+}
+
+void PrintExpr::printRec(TypeRepr *T) {
   PrintTypeRepr(OS, Indent+2).visit(T);
 }
 

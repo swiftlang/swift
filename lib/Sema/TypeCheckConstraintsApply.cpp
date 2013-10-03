@@ -1221,7 +1221,12 @@ namespace {
 
     Expr *visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       // Our specializations should have resolved the subexpr to the right type.
-      // FIXME: Should preserve generic argument list for source fidelity
+      if (auto DRE = dyn_cast<DeclRefExpr>(expr->getSubExpr())) {
+        SmallVector<TypeRepr *, 8> GenArgs;
+        for (auto TL : expr->getUnresolvedParams())
+          GenArgs.push_back(TL.getTypeRepr());
+        DRE->setGenericArgs(GenArgs);
+      }
       return expr->getSubExpr();
     }
 

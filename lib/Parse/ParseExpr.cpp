@@ -1369,7 +1369,7 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
     E = unresolved;
   } else {
     auto declRef = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
-    declRef->setSpecialized(hasGenericArgumentList);
+    declRef->setGenericArgs(args);
     E = declRef;
   }
   

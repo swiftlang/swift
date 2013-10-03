@@ -137,6 +137,27 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
                   getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
 }
 
+void DeclRefExpr::setSpecialized() {
+  if (isSpecialized())
+    return;
+
+  ValueDecl *D = getDecl();
+  assert(D);
+  void *Mem = D->getASTContext().Allocate(sizeof(SpecializeInfo),
+                                          alignof(SpecializeInfo));
+  auto Spec = new (Mem) SpecializeInfo;
+  Spec->D = D;
+  DAndSpecialized = Spec;
+}
+
+void DeclRefExpr::setGenericArgs(ArrayRef<TypeRepr*> GenericArgs) {
+  ValueDecl *D = getDecl();
+  assert(D);
+  setSpecialized();
+  getSpecInfo()->GenericArgs = D->getASTContext().AllocateCopy(GenericArgs);
+}
+
+
 MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
                              ConcreteDeclRef member, SourceLoc nameLoc,
                              bool Implicit)

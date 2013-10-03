@@ -376,23 +376,53 @@ public:
 
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {
-  /// \brief The declaration pointer and a bit specifying whether it was
+  /// This is used when the reference is specialized, e.g "GenCls<Int>", to
+  /// hold information about the generic arguments.
+  struct SpecializeInfo {
+    ValueDecl *D = nullptr;
+    MutableArrayRef<TypeRepr*> GenericArgs;
+  };
+
+  /// \brief The declaration pointer or SpecializeInfo pointer if it was
   /// explicitly specialized with <...>.
-  llvm::PointerIntPair<ValueDecl *, 1, bool> DAndSpecialized;
+  llvm::PointerUnion<ValueDecl *, SpecializeInfo *> DAndSpecialized;
   SourceLoc Loc;
+
+  SpecializeInfo *getSpecInfo() const {
+    return DAndSpecialized.dyn_cast<SpecializeInfo*>();
+  }
 
 public:
   DeclRefExpr(ValueDecl *D, SourceLoc Loc, bool Implicit, Type Ty = Type())
-    : Expr(ExprKind::DeclRef, Implicit, Ty), DAndSpecialized(D, false), Loc(Loc) {}
+    : Expr(ExprKind::DeclRef, Implicit, Ty), DAndSpecialized(D), Loc(Loc) {}
 
-  ValueDecl *getDecl() const { return DAndSpecialized.getPointer(); }
+  ValueDecl *getDecl() const {
+    if (auto Spec = getSpecInfo())
+      return Spec->D;
+    return DAndSpecialized.get<ValueDecl*>();
+  }
 
-  void setSpecialized(bool specialized) { DAndSpecialized.setInt(specialized); }
+  void setSpecialized();
 
   /// \brief Determine whether this declaration reference was immediately
   /// specialized by <...>.
-  bool isSpecialized() const { return DAndSpecialized.getInt(); }
+  bool isSpecialized() const { return getSpecInfo() != nullptr; }
 
+  /// Set the generic arguments.
+  ///
+  /// This copies the array using ASTContext's allocator.
+  void setGenericArgs(ArrayRef<TypeRepr*> GenericArgs);
+
+  /// Returns the generic arguments if it was specialized or an empty array
+  /// otherwise.
+  ArrayRef<TypeRepr *> getGenericArgs() const {
+    return const_cast<DeclRefExpr*>(this)->getGenericArgs();
+  }
+  MutableArrayRef<TypeRepr *> getGenericArgs() {
+    if (auto Spec = getSpecInfo())
+      return Spec->GenericArgs;
+    return MutableArrayRef<TypeRepr *>();
+  }
   SourceRange getSourceRange() const { return Loc; }
   
   static bool classof(const Expr *E) {

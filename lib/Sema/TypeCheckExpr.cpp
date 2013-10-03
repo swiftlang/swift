@@ -408,7 +408,8 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
 
   if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
     auto result = new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit);
-    result->setSpecialized(isSpecialized);
+    if (isSpecialized)
+      result->setSpecialized();
     return result;
   }
 
