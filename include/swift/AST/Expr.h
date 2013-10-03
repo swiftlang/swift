@@ -2247,18 +2247,19 @@ public:
                     Type Ty = Type())
     : SelfApplyExpr(ExprKind::DotSyntaxCall, FnExpr, BaseExpr, Ty),
       DotLoc(DotLoc) {
+    setImplicit(DotLoc.isInvalid());
   }
 
   SourceLoc getDotLoc() const { return DotLoc; }
 
   SourceLoc getLoc() const {
-    return getFn()->isImplicit() ? getBase()->getStartLoc() : getFn()->getLoc();
+    return isImplicit() ? getBase()->getStartLoc() : getFn()->getLoc();
   }
   SourceLoc getStartLoc() const {
     return getBase()->getStartLoc();
   }
   SourceLoc getEndLoc() const {
-    return getFn()->isImplicit() ? getBase()->getEndLoc() : getFn()->getEndLoc();
+    return isImplicit() ? getBase()->getEndLoc() : getFn()->getEndLoc();
   }
   SourceRange getSourceRange() const {
     return SourceRange(getStartLoc(), getEndLoc());
