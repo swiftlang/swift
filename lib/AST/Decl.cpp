@@ -458,11 +458,8 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
   : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc),
     Depth(depth), Index(index)
 {
-  // FIXME: Arbitrarily consider this generic type parameter type to be
-  // canonical. In the long run, it won't be.
   auto &ctx = dc->getASTContext();
-  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this,
-                                                                         &ctx);
+  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
   setType(MetaTypeType::get(type, ctx));
 }
 

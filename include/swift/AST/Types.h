@@ -24,6 +24,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/Fixnum.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -1968,12 +1969,19 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(AbstractTypeParamType, SubstitutableType)
 ///
 /// \sa GenericTypeParamDecl
 class GenericTypeParamType : public AbstractTypeParamType {
-  /// The generic type parameter.
-  GenericTypeParamDecl *Param;
+  /// The generic type parameter or depth/index.
+  llvm::PointerUnion<GenericTypeParamDecl *, Fixnum<31>> ParamOrDepthIndex;
 
 public:
-  /// Retrieve the declaration of the generic type parameter.
-  GenericTypeParamDecl *getDecl() const { return Param; }
+  /// Retrieve a generic type parameter at the given depth and index.
+  static GenericTypeParamType *get(unsigned depth, unsigned index,
+                                   const ASTContext &ctx);
+
+  /// Retrieve the declaration of the generic type parameter, or null if
+  /// there is no such declaration.
+  GenericTypeParamDecl *getDecl() const {
+    return ParamOrDepthIndex.dyn_cast<GenericTypeParamDecl *>();
+  }
 
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
@@ -2007,10 +2015,15 @@ public:
 private:
   friend class GenericTypeParamDecl;
 
-  explicit GenericTypeParamType(GenericTypeParamDecl *param,
-                                const ASTContext *context)
-    : AbstractTypeParamType(TypeKind::GenericTypeParam, context),
-      Param(param) { }
+  explicit GenericTypeParamType(GenericTypeParamDecl *param)
+    : AbstractTypeParamType(TypeKind::GenericTypeParam, nullptr),
+      ParamOrDepthIndex(param) { }
+
+  explicit GenericTypeParamType(unsigned depth,
+                                unsigned index,
+                                const ASTContext &ctx)
+    : AbstractTypeParamType(TypeKind::GenericTypeParam, &ctx),
+      ParamOrDepthIndex(depth << 16 | index) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(GenericTypeParamType, AbstractTypeParamType)
 

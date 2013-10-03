@@ -1434,11 +1434,16 @@ public:
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
-    auto Name = T->getDecl()->getName();
-    if (Name.empty())
-      OS << "<anonymous>";
-    else
-      OS << Name.str();
+    if (auto decl = T->getDecl()) {
+      auto Name = decl->getName();
+      if (Name.empty())
+        OS << "<anonymous>";
+      else
+        OS << Name.str();
+      return;
+    }
+
+    OS << "$T_" << T->getDepth() << "_" << T->getIndex();
   }
 
   void visitAssociatedTypeType(AssociatedTypeType *T) {

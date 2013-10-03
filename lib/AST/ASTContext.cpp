@@ -126,6 +126,8 @@ struct ASTContext::Implementation {
   };
   
   llvm::DenseMap<Module*, ModuleType*> ModuleTypes;
+  llvm::DenseMap<std::pair<unsigned, unsigned>, GenericTypeParamType *>
+    GenericParamTypes;
   llvm::FoldingSet<GenericFunctionType> GenericFunctionTypes;
   llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
@@ -1275,6 +1277,18 @@ GenericFunctionType::GenericFunctionType(
             getGenericParamsBuffer().data());
   std::copy(requirements.begin(), requirements.end(),
             getRequirementsBuffer().data());
+}
+
+GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
+                                                const ASTContext &ctx) {
+  auto known = ctx.Impl.GenericParamTypes.find({ depth, index });
+  if (known != ctx.Impl.GenericParamTypes.end())
+    return known->second;
+
+  auto result = new (ctx, AllocationArena::Permanent)
+                  GenericTypeParamType(depth, index, ctx);
+  ctx.Impl.GenericParamTypes[{depth, index}] = result;
+  return result;
 }
 
 /// Return a uniqued array type with the specified base type and the

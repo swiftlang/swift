@@ -583,9 +583,11 @@ CanType TypeBase::getCanonicalType() {
   }
 
   case TypeKind::GenericTypeParam: {
-    // FIXME: Actually canonicalize to a sensible representation that doesn't
-    // contain the declaration.
-    Result = this;
+    GenericTypeParamType *gp = cast<GenericTypeParamType>(this);
+    auto gpDecl = gp->getDecl();
+
+    Result = GenericTypeParamType::get(gpDecl->getDepth(), gpDecl->getIndex(),
+                                       gpDecl->getASTContext());
     break;
   }
 
@@ -797,11 +799,21 @@ TypeBase *SubstitutedType::getDesugaredType() {
 }
 
 unsigned GenericTypeParamType::getDepth() const {
-  return Param->getDepth();
+  if (auto param = getDecl()) {
+    return param->getDepth();
+  }
+
+  auto fixedNum = ParamOrDepthIndex.get<Fixnum<31>>();
+  return fixedNum >> 16;
 }
 
 unsigned GenericTypeParamType::getIndex() const {
-  return Param->getIndex();
+  if (auto param = getDecl()) {
+    return param->getIndex();
+  }
+
+  auto fixedNum = ParamOrDepthIndex.get<Fixnum<31>>();
+  return fixedNum & 0xFFFF;
 }
 
 TypeBase *AssociatedTypeType::getDesugaredType() {

@@ -1496,7 +1496,7 @@ void Serializer::writeType(Type ty) {
   case TypeKind::GenericFunction: {
     llvm_unreachable("Cannot serialize generic function types yet");
   }
-      
+
   case TypeKind::GenericTypeParam: {
     auto genericParam = cast<GenericTypeParamType>(ty.getPointer());
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
