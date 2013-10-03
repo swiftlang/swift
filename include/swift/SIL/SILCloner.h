@@ -152,7 +152,7 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
     if (BBI == BBMap.end()) {
       // Map the successor to a new BB.
       auto MappedBB = new (F.getModule()) SILBasicBlock(&F);
-      BBMap.insert(std::make_pair(Succ, MappedBB));
+      BBMap.insert(std::make_pair(Succ.getBB(), MappedBB));
       // Create new arguments for each of the original block's arguments.
       for (auto &Arg : Succ.getBB()->getBBArgs()) {
         SILValue MappedArg = new (F.getModule()) SILArgument(Arg->getType(),
