@@ -311,14 +311,14 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
     return parseExprPostfix(Message, isExprBasic);
-      
+
   // If the next token is '_', parse a discard expression.
   case tok::kw__: {
-    SourceLoc loc = consumeToken();
-    auto result = new (Context) DiscardAssignmentExpr(loc, /*implicit*/false);
-    return makeParserResult(result);
+    SourceLoc Loc = consumeToken();
+    return makeParserResult(
+        new (Context) DiscardAssignmentExpr(Loc, /*Implicit=*/false));
   }
-      
+
   // If the next token is the keyword 'new', this must be expr-new.
   case tok::kw_new:
     return parseExprNew();
