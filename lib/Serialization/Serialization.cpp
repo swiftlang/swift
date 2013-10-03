@@ -1280,8 +1280,6 @@ void Serializer::writeDecl(const Decl *D) {
 
     assert(remainingAttrs.empty() && "unhandled constructor attrs");
 
-    assert(!ctor->getAllocSelfExpr() && "allocating constructors not handled");
-
     const Decl *DC = getDeclForContext(ctor->getDeclContext());
     auto implicitSelf = ctor->getImplicitSelfDecl();
 

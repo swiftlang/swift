@@ -19,6 +19,7 @@
 
 namespace llvm {
   class Type;
+  class Value;
 }
 
 namespace swift {
@@ -138,6 +139,11 @@ namespace irgen {
 
   /// True if the SubscriptDecl requires ObjC accessor methods.
   bool requiresObjCSubscriptDescriptor(SubscriptDecl *subscript);
+
+  /// Allocate an Objective-C object.
+  llvm::Value *emitObjCAllocObjectCall(IRGenFunction &IGF,
+                                       llvm::Value *classPtr,
+                                       CanType resultType);
 
 } // end namespace irgen
 } // end namespace swift

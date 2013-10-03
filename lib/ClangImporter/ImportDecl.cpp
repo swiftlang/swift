@@ -1253,41 +1253,6 @@ namespace {
       setVarDeclContexts(argPatterns, result);
       setVarDeclContexts(bodyPatterns, result);
 
-      // Create the call to alloc that allocates 'self'.
-      {
-        // FIXME: Use the 'self' of metaclass type rather than a metatype
-        // expression.
-        Expr* initExpr = new (Impl.SwiftContext) MetatypeExpr(nullptr, loc,
-                                                              selfMetaTy);
-
-        // For an 'init' method, we need to call alloc first.
-        Expr *allocRef = new (Impl.SwiftContext) DeclRefExpr(alloc, loc,
-                                                             /*Implicit=*/true);
-
-        auto allocCall = new (Impl.SwiftContext) DotSyntaxCallExpr(allocRef,
-                                                                   loc,
-                                                                   initExpr);
-        auto emptyTuple
-          = new (Impl.SwiftContext) TupleExpr(loc, {}, nullptr, loc,
-                                              /*hasTrailingClosure=*/false,
-                                              /*Implicit=*/true);
-        initExpr = new (Impl.SwiftContext) CallExpr(allocCall, emptyTuple,
-                                                    /*Implicit=*/true);
-
-        // Cast the result of the alloc call to the (metatype) 'self'.
-        // FIXME: instancetype should make this unnecessary.
-        auto cast = new (Impl.SwiftContext) UnconditionalCheckedCastExpr(
-                                             initExpr,
-                                             SourceLoc(),
-                                             SourceLoc(),
-                                             TypeLoc::withoutLoc(selfTy));
-        cast->setImplicit();
-        cast->setCastKind(CheckedCastKind::Downcast);
-        initExpr = cast;
-
-        result->setAllocSelfExpr(initExpr);
-      }
-      
       // Inform the context that we have external definitions.
       Impl.SwiftContext.addedExternalDecl(result);
 

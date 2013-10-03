@@ -448,6 +448,57 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
   args.add(IGF.emitObjCSelectorRefLoad(selector.str()));
 }
 
+/// Return the formal type that we would use for +allocWithZone:.
+static CanType getAllocObjectFormalType(ASTContext &ctx, CanType classType) {
+  TupleTypeElt argElts[] = {
+    { ctx.TheRawPointerType },
+    { MetaTypeType::get(classType, ctx) }
+  };
+  Type argTy = TupleType::get(argElts, ctx);
+  return FunctionType::get(argTy, classType, ctx)->getCanonicalType();
+}
+
+/// Call [self allocWithZone: nil].
+llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
+                                            llvm::Value *self,
+                                            CanType classType) {
+  // Compute the formal type that we expect +allocWithZone: to have.
+  CanType formalType = getAllocObjectFormalType(IGF.IGM.Context, classType);
+  auto explosionLevel = ExplosionKind::Minimal;
+  unsigned uncurryLevel = 0;
+
+  // Compute the appropriate LLVM type for the function.
+  llvm::AttributeSet attrs;
+  auto fnTy = IGF.IGM.getFunctionType(AbstractCC::ObjCMethod, formalType,
+                                      explosionLevel, uncurryLevel,
+                                      ExtraData::None, attrs);
+
+  // Get the messenger function.
+  llvm::Constant *messenger = IGF.IGM.getObjCMsgSendFn();
+  messenger = llvm::ConstantExpr::getBitCast(messenger, fnTy->getPointerTo());
+
+  // Prepare the call.
+  CallEmission emission(IGF, Callee::forKnownFunction(AbstractCC::ObjCMethod,
+                                                      formalType, classType, {},
+                                                      messenger, nullptr,
+                                                      explosionLevel,
+                                                      uncurryLevel));
+
+  // Emit the arguments.
+  {
+    Explosion args(ExplosionKind::Minimal);
+    args.add(self);
+    args.add(IGF.emitObjCSelectorRefLoad("allocWithZone:"));
+    args.add(llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy));
+    emission.addArg(args);
+  }
+
+  // Emit the call.
+  Explosion out(explosionLevel);
+  emission.emitToExplosion(out);
+  return out.claimNext();
+}
+
 static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
                                                      SILDeclRef method,
                                                      SILType origMethodType,

@@ -1839,7 +1839,6 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   SILType selfTy = lowering.getLoweredType();
   (void)selfTy;
   assert(!selfTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
-  assert(!ctor->getAllocSelfExpr() && "alloc_this expr for value type?!");
 
   // Emit a local variable for 'self'.
   // FIXME: The (potentially partially initialized) variable would need to be
@@ -2072,20 +2071,11 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   SILType selfTy = getLoweredType(selfDecl->getType());
   assert(selfTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
-  SILValue selfValue;
-  if (ctor->getAllocSelfExpr()) {
-    FullExpr allocSelfScope(Cleanups,CleanupLocation(ctor->getAllocSelfExpr()));
-    // If the constructor has an alloc-this expr, emit it to get "self".
-    auto e = ctor->getAllocSelfExpr();
-    selfValue = emitRValue(e).forwardAsSingleValue(*this, e);
-    assert(selfValue.getType() == selfTy &&
-           "alloc-this expr type did not match this type?!");
-  } else {
-    // Otherwise, just emit an alloc_ref instruction for the default allocation
-    // path.
-    // FIXME: should have a cleanup in case of exception
-    selfValue = B.createAllocRef(Loc, selfTy);
-  }
+
+  // Use alloc_ref to allocate the constructor.
+  // TODO: allow custom allocation?
+  // FIXME: should have a cleanup in case of exception
+  SILValue selfValue = B.createAllocRef(Loc, selfTy);
   args.push_back(selfValue);
 
   // Call the initializer.

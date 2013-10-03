@@ -2618,10 +2618,6 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// The type of the initializing constructor.
   Type InitializerType = Type();
 
-  /// \brief When non-null, the expression that should be used to
-  /// allocate 'self'.
-  Expr *AllocSelf = nullptr;
-  
 public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
                   Pattern *ArgParams, Pattern *BodyParams,
@@ -2659,17 +2655,6 @@ public:
 
   /// \brief Get the type of the constructed object.
   Type getResultType() const;
-
-  /// \brief Retrieve the expression that should be evaluated to allocate
-  /// 'self', or null if 'self' should be allocated via the normal path.
-  ///
-  /// There is no way to describe this expression in the Swift language.
-  /// However, the \c ClangImporter synthesizes 'self'-allocation expressions
-  /// for "constructors" of Objective-C classes (which call 'alloc').
-  Expr *getAllocSelfExpr() const { return AllocSelf; }
-
-  /// \brief Set the expression used to allocate 'self'.
-  void setAllocSelfExpr(Expr *E) { AllocSelf = E; }
 
   /// Given that this is an Objective-C method declaration, produce
   /// its selector in the given buffer (as UTF-8).

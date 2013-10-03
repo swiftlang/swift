@@ -533,12 +533,6 @@ namespace {
 
     void visitConstructorDecl(ConstructorDecl *CD) {
       printCommonAFD(CD, "constructor_decl");
-      if (CD->getAllocSelfExpr()) {
-        OS << "\n";
-        OS.indent(Indent+2);
-        OS << "this = ";
-        CD->getAllocSelfExpr()->print(OS, 0);
-      }
       printAbstractFunctionDecl(CD);
       OS << ')';
     }
