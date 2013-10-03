@@ -503,16 +503,6 @@ ParserResult<Pattern> Parser::parsePatternAtom() {
   case tok::kw__:
     return parsePatternIdentifier();
 
-  case tok::kw_super:
-  case tok::kw_metatype:
-  case tok::kw_self:
-  case tok::kw_Self:
-  case tok::kw_weak:
-  case tok::kw_unowned:
-    diagnose(Tok, diag::expected_pattern_is_keyword, Tok.getText());
-    consumeToken();
-    return nullptr;
-
   case tok::code_complete:
     // Just eat the token and return an error status, *not* the code completion
     // status.  We can not code complete anything here -- we expect an
@@ -521,6 +511,13 @@ ParserResult<Pattern> Parser::parsePatternAtom() {
     return nullptr;
 
   default:
+    if (Tok.isKeyword() &&
+        (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
+      diagnose(Tok, diag::expected_pattern_is_keyword, Tok.getText());
+      SourceLoc Loc = Tok.getLoc();
+      consumeToken();
+      return makeParserErrorResult(new (Context) AnyPattern(Loc));
+    }
     diagnose(Tok, diag::expected_pattern);
     return nullptr;
   }
