@@ -1222,10 +1222,14 @@ namespace {
     Expr *visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       // Our specializations should have resolved the subexpr to the right type.
       if (auto DRE = dyn_cast<DeclRefExpr>(expr->getSubExpr())) {
-        SmallVector<TypeRepr *, 8> GenArgs;
-        for (auto TL : expr->getUnresolvedParams())
-          GenArgs.push_back(TL.getTypeRepr());
-        DRE->setGenericArgs(GenArgs);
+        assert(DRE->getGenericArgs().empty() ||
+            DRE->getGenericArgs().size() == expr->getUnresolvedParams().size());
+        if (DRE->getGenericArgs().empty()) {
+          SmallVector<TypeRepr *, 8> GenArgs;
+          for (auto TL : expr->getUnresolvedParams())
+            GenArgs.push_back(TL.getTypeRepr());
+          DRE->setGenericArgs(GenArgs);
+        }
       }
       return expr->getSubExpr();
     }
