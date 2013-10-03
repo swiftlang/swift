@@ -144,6 +144,7 @@ swift_NSStringToString(NSString *nsstring, SwiftString *string) {
     // String that needs to be copied or re-encoded.
     _swift_NSStringToString_slow(nsstring, string);
   } 
+  [nsstring release];
 }
 
 extern "C" NSString *
