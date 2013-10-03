@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -43,12 +44,22 @@ class alignas(8) Stmt {
   void operator=(const Stmt&) = delete;
 
   /// Kind - The subclass of Stmt that this is.
-  const StmtKind Kind;
+  unsigned Kind : 31;
+  /// Implicit - Whether this statement is implicit.
+  unsigned Implicit : 1;
+
+protected:
+  /// Return the given value for the 'implicit' flag if present, or if Nothing,
+  /// return true if the location is invalid.
+  bool getDefaultImplicitFlag(Optional<bool> implicit, SourceLoc keyLoc) {
+    return implicit.hasValue() ? *implicit : keyLoc.isInvalid();
+  }
   
 public:
-  Stmt(StmtKind kind) : Kind(kind) {}
+  Stmt(StmtKind kind, bool implicit)
+    : Kind(unsigned(kind)), Implicit(unsigned(implicit)) {}
 
-  StmtKind getKind() const { return Kind; }
+  StmtKind getKind() const { return StmtKind(Kind); }
 
   /// \brief Retrieve the name of the given statement kind.
   ///
@@ -68,12 +79,11 @@ public:
   
   /// isImplicit - Determines whether this statement was implicitly-generated,
   /// rather than explicitly written in the AST.
-  bool isImplicit() const;
+  bool isImplicit() const { return bool(Implicit); }
 
   /// walk - This recursively walks the AST rooted at this statement.
   Stmt *walk(ASTWalker &walker);
   Stmt *walk(ASTWalker &&walker) { return walk(walker); }
-  
   
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
@@ -101,7 +111,8 @@ private:
   SourceLoc LBLoc;
   SourceLoc RBLoc;
 
-  BraceStmt(SourceLoc lbloc, ArrayRef<ExprStmtOrDecl> elements,SourceLoc rbloc);
+  BraceStmt(SourceLoc lbloc, ArrayRef<ExprStmtOrDecl> elements,SourceLoc rbloc,
+            Optional<bool> implicit);
   ExprStmtOrDecl *getElementsStorage() {
     return reinterpret_cast<ExprStmtOrDecl*>(this + 1);
   }
@@ -109,7 +120,8 @@ private:
 public:
   static BraceStmt *create(ASTContext &ctx, SourceLoc lbloc,
                            ArrayRef<ExprStmtOrDecl> elements,
-                           SourceLoc rbloc);
+                           SourceLoc rbloc,
+                           Optional<bool> implicit = {});
 
   SourceLoc getLBraceLoc() const { return LBLoc; }
   SourceLoc getRBraceLoc() const { return RBLoc; }
@@ -137,8 +149,10 @@ class ReturnStmt : public Stmt {
   Expr *Result;
   
 public:
-  ReturnStmt(SourceLoc ReturnLoc, Expr *Result)
-    : Stmt(StmtKind::Return), ReturnLoc(ReturnLoc), Result(Result) {}
+  ReturnStmt(SourceLoc ReturnLoc, Expr *Result,
+             Optional<bool> implicit = {})
+    : Stmt(StmtKind::Return, getDefaultImplicitFlag(implicit, ReturnLoc)),
+      ReturnLoc(ReturnLoc), Result(Result) {}
 
   SourceRange getSourceRange() const;
   SourceLoc getReturnLoc() const { return ReturnLoc; }
@@ -165,8 +179,8 @@ class IfStmt : public Stmt {
   
 public:
   IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
-         Stmt *Else)
-  : Stmt(StmtKind::If),
+         Stmt *Else, Optional<bool> implicit = {})
+  : Stmt(StmtKind::If, getDefaultImplicitFlag(implicit, IfLoc)),
     IfLoc(IfLoc), ElseLoc(ElseLoc), Cond(Cond), Then(Then), Else(Else) {}
 
   SourceLoc getIfLoc() const { return IfLoc; }
@@ -195,8 +209,9 @@ class WhileStmt : public Stmt {
   Stmt *Body;
   
 public:
-  WhileStmt(SourceLoc WhileLoc, Expr *Cond, Stmt *Body)
-  : Stmt(StmtKind::While),
+  WhileStmt(SourceLoc WhileLoc, Expr *Cond, Stmt *Body,
+            Optional<bool> implicit = {})
+  : Stmt(StmtKind::While, getDefaultImplicitFlag(implicit, WhileLoc)),
     WhileLoc(WhileLoc), Cond(Cond), Body(Body) {}
 
   SourceRange getSourceRange() const;
@@ -218,9 +233,10 @@ class DoWhileStmt : public Stmt {
   Expr *Cond;
   
 public:
-  DoWhileStmt(SourceLoc DoLoc, Expr *Cond, SourceLoc WhileLoc, Stmt *Body)
-    : Stmt(StmtKind::DoWhile),
-    DoLoc(DoLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
+  DoWhileStmt(SourceLoc DoLoc, Expr *Cond, SourceLoc WhileLoc, Stmt *Body,
+              Optional<bool> implicit = {})
+    : Stmt(StmtKind::DoWhile, getDefaultImplicitFlag(implicit, DoLoc)),
+      DoLoc(DoLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
   
   SourceRange getSourceRange() const;
   
@@ -251,8 +267,10 @@ public:
           ArrayRef<Decl*> InitializerVarDecls,
           SourceLoc Semi1Loc, NullablePtr<Expr> Cond, SourceLoc Semi2Loc,
           NullablePtr<Expr> Increment,
-          Stmt *Body)
-  : Stmt(StmtKind::For), ForLoc(ForLoc), Semi1Loc(Semi1Loc),
+          Stmt *Body,
+          Optional<bool> implicit = {})
+  : Stmt(StmtKind::For, getDefaultImplicitFlag(implicit, ForLoc)),
+    ForLoc(ForLoc), Semi1Loc(Semi1Loc),
     Semi2Loc(Semi2Loc), Initializer(Initializer),
     InitializerVarDecls(InitializerVarDecls),
     Cond(Cond), Increment(Increment), Body(Body) {
@@ -304,8 +322,10 @@ class ForEachStmt : public Stmt {
   
 public:
   ForEachStmt(SourceLoc ForLoc, Pattern *Pat, SourceLoc InLoc,
-              Expr *Container, BraceStmt *Body)
-    : Stmt(StmtKind::ForEach), ForLoc(ForLoc), InLoc(InLoc), Pat(Pat),
+              Expr *Container, BraceStmt *Body,
+              Optional<bool> implicit = {})
+    : Stmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc)),
+      ForLoc(ForLoc), InLoc(InLoc), Pat(Pat),
       Container(Container), Body(Body), Range(), RangeEmpty() { }
   
   /// getForLoc - Retrieve the location of the 'for' keyword.
@@ -438,13 +458,15 @@ class CaseStmt : public Stmt {
     return reinterpret_cast<CaseLabel **>(this + 1);
   }
   
-  CaseStmt(ArrayRef<CaseLabel*> Labels, bool hasBoundDecls, Stmt *Body);
+  CaseStmt(ArrayRef<CaseLabel*> Labels, bool hasBoundDecls, Stmt *Body,
+           Optional<bool> Implicit);
   
 public:
   static CaseStmt *create(ASTContext &C,
                           ArrayRef<CaseLabel*> Labels,
                           bool hasBoundDecls,
-                          Stmt *Body);
+                          Stmt *Body,
+                          Optional<bool> Implicit = {});
   
   ArrayRef<CaseLabel *> getCaseLabels() const {
     return {getCaseLabelsBuffer(), NumCaseLabels};
@@ -492,8 +514,9 @@ class SwitchStmt : public Stmt {
              Expr *SubjectExpr,
              SourceLoc LBraceLoc,
              unsigned CaseCount,
-             SourceLoc RBraceLoc)
-    : Stmt(StmtKind::Switch),
+             SourceLoc RBraceLoc,
+             Optional<bool> implicit = {})
+    : Stmt(StmtKind::Switch, getDefaultImplicitFlag(implicit, SwitchLoc)),
       SwitchLoc(SwitchLoc), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
       SubjectExpr(SubjectExpr), CaseCount(CaseCount)
   {}
@@ -536,7 +559,9 @@ class BreakStmt : public Stmt {
   SourceLoc Loc;
   
 public:
-  BreakStmt(SourceLoc Loc) : Stmt(StmtKind::Break), Loc(Loc) {}
+  BreakStmt(SourceLoc Loc, Optional<bool> implicit = {})
+    : Stmt(StmtKind::Break, getDefaultImplicitFlag(implicit, Loc)), Loc(Loc)
+  {}
 
   SourceLoc getLoc() const { return Loc; }
   
@@ -552,7 +577,9 @@ class ContinueStmt : public Stmt {
   SourceLoc Loc;
   
 public:
-  ContinueStmt(SourceLoc Loc) : Stmt(StmtKind::Continue), Loc(Loc) {}
+  ContinueStmt(SourceLoc Loc, Optional<bool> implicit = {})
+    : Stmt(StmtKind::Continue, getDefaultImplicitFlag(implicit, Loc)), Loc(Loc)
+  {}
 
   SourceLoc getLoc() const { return Loc; }
   
@@ -569,8 +596,9 @@ class FallthroughStmt : public Stmt {
   CaseStmt *FallthroughDest;
   
 public:
-  FallthroughStmt(SourceLoc Loc)
-    : Stmt(StmtKind::Fallthrough), Loc(Loc), FallthroughDest(nullptr)
+  FallthroughStmt(SourceLoc Loc, Optional<bool> implicit = {})
+    : Stmt(StmtKind::Fallthrough, getDefaultImplicitFlag(implicit, Loc)),
+      Loc(Loc), FallthroughDest(nullptr)
   {}
   
   SourceLoc getLoc() const { return Loc; }

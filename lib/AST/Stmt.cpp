@@ -48,7 +48,7 @@ inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Stmt::*)() const);
 
 SourceRange Stmt::getSourceRange() const {
-  switch (Kind) {
+  switch (getKind()) {
 #define STMT(ID, PARENT) \
 case StmtKind::ID: \
 static_assert(sizeof(checkSourceRangeType(&ID##Stmt::getSourceRange)) == 1, \
@@ -60,45 +60,22 @@ return cast<ID##Stmt>(this)->getSourceRange();
   llvm_unreachable("statement type not handled!");
 }
 
-bool Stmt::isImplicit() const {
-  if (auto brace = dyn_cast<BraceStmt>(this)) {
-    for (auto element : brace->getElements()) {
-      if (auto expr = element.dyn_cast<Expr *>()) {
-        if (!expr->isImplicit())
-          return false;
-        continue;
-      }
-
-      if (auto stmt = element.dyn_cast<Stmt *>()) {
-        if (!stmt->isImplicit())
-          return false;
-        continue;
-      }
-
-      if (!element.get<Decl *>()->isImplicit())
-        return false;
-    }
-    if (brace->getLBraceLoc().isInvalid() &&
-        brace->getRBraceLoc().isInvalid())
-      return true;
-  }
-
-  return false;
-}
-
 BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ExprStmtOrDecl> elts,
-                     SourceLoc rbloc)
-  : Stmt(StmtKind::Brace), NumElements(elts.size()), LBLoc(lbloc), RBLoc(rbloc){
+                     SourceLoc rbloc, Optional<bool> implicit)
+  : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
+    NumElements(elts.size()), LBLoc(lbloc), RBLoc(rbloc)
+{
   memcpy(getElementsStorage(), elts.data(),
          elts.size() * sizeof(ExprStmtOrDecl));
 }
 
 BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
-                             ArrayRef<ExprStmtOrDecl> elts, SourceLoc rbloc) {
+                             ArrayRef<ExprStmtOrDecl> elts, SourceLoc rbloc,
+                             Optional<bool> implicit) {
   void *Buffer = ctx.Allocate(sizeof(BraceStmt)
                                 + elts.size() * sizeof(ExprStmtOrDecl),
                               alignof(BraceStmt));
-  return ::new(Buffer) BraceStmt(lbloc, elts, rbloc);
+  return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
 }
 
 SourceRange ReturnStmt::getSourceRange() const {
@@ -161,8 +138,11 @@ CaseLabel *CaseLabel::create(ASTContext &C, bool isDefault,
                                whereLoc, guardExpr, colonLoc);
 }
 
-CaseStmt::CaseStmt(ArrayRef<CaseLabel*> Labels, bool HasBoundDecls, Stmt *Body)
-  : Stmt(StmtKind::Case), BodyAndHasBoundDecls(Body, HasBoundDecls),
+CaseStmt::CaseStmt(ArrayRef<CaseLabel*> Labels, bool HasBoundDecls, Stmt *Body,
+                   Optional<bool> implicit)
+  : Stmt(StmtKind::Case,
+         getDefaultImplicitFlag(implicit, Labels[0]->getCaseLoc())),
+    BodyAndHasBoundDecls(Body, HasBoundDecls),
     NumCaseLabels(Labels.size())
 {
   assert(NumCaseLabels > 0 && "case block must have at least one label");
@@ -176,10 +156,11 @@ CaseStmt::CaseStmt(ArrayRef<CaseLabel*> Labels, bool HasBoundDecls, Stmt *Body)
 CaseStmt *CaseStmt::create(ASTContext &C,
                            ArrayRef<CaseLabel*> Labels,
                            bool HasBoundDecls,
-                           Stmt *Body) {
+                           Stmt *Body,
+                           Optional<bool> implicit) {
   void *p = C.Allocate(sizeof(CaseStmt) + Labels.size() * sizeof(CaseLabel*),
                        alignof(CaseStmt));
-  return ::new (p) CaseStmt(Labels, HasBoundDecls, Body);
+  return ::new (p) CaseStmt(Labels, HasBoundDecls, Body, implicit);
 }
 
 SwitchStmt *SwitchStmt::create(SourceLoc SwitchLoc,
