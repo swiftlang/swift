@@ -128,6 +128,9 @@ template<typename ImplClass>
 SILValue
 SILCloner<ImplClass>::postProcess(SILInstruction *Orig,
                                   SILInstruction *Cloned) {
+  SILDebugScope* DebugScope = Orig->getDebugScope();
+  if (DebugScope && !Cloned->getDebugScope())
+    Cloned->setDebugScope(DebugScope);
   InstructionMap.insert(std::make_pair(Orig, Cloned));
   return Cloned;
 }
