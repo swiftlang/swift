@@ -149,6 +149,8 @@ public:
   // Direct comparison is allowed for CanTypes - they are known canonical.
   bool operator==(CanType T) const { return getPointer() == T.getPointer(); }
   bool operator!=(CanType T) const { return !operator==(T); }
+
+  bool operator<(CanType T) const { return getPointer() < T.getPointer(); }
 };
 
 template <class Proxied> class CanTypeWrapper;

@@ -147,11 +147,13 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
 
 /// Enumerate DynamicLookup declarations as seen from context \c CurrDC.
 static void doDynamicLookup(VisibleDeclConsumer &Consumer,
-                            const DeclContext *CurrDC,
-                            LookupKind LK) {
+                            const DeclContext *CurrDC, LookupKind LK) {
   class DynamicLookupConsumer : public VisibleDeclConsumer {
     VisibleDeclConsumer &ChainedConsumer;
     LookupKind LK;
+    std::set<std::pair<Identifier, CanType>> FunctionsReported;
+    std::set<CanType> SubscriptsReported;
+    std::set<std::pair<Identifier, CanType>> PropertiesReported;
 
   public:
     explicit DynamicLookupConsumer(VisibleDeclConsumer &ChainedConsumer,
@@ -164,6 +166,35 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       // overridden method.
       if (D->getOverriddenDecl())
         return;
+
+      // Check if we already reported a decl with the same signature.
+      if (auto *FD = dyn_cast<FuncDecl>(D)) {
+        assert(FD->getImplicitSelfDecl() && "should not find free functions");
+
+        // Get the type without the first uncurry level with 'self'.
+        CanType T = D->getType()
+                        ->castTo<FunctionType>()
+                        ->getResult()
+                        ->getCanonicalType();
+
+        auto Signature = std::make_pair(D->getName(), T);
+        if (FunctionsReported.count(Signature))
+          return;
+        FunctionsReported.insert(Signature);
+      } else if (isa<SubscriptDecl>(D)) {
+        auto Signature = D->getType()->getCanonicalType();
+        if (SubscriptsReported.count(Signature))
+          return;
+        SubscriptsReported.insert(Signature);
+      } else if (isa<VarDecl>(D)) {
+        auto Signature =
+            std::make_pair(D->getName(), D->getType()->getCanonicalType());
+        if (PropertiesReported.count(Signature))
+          return;
+        PropertiesReported.insert(Signature);
+      } else {
+        llvm_unreachable("unhandled decl kind");
+      }
 
       if (isDeclVisibleInLookupMode(D, LK))
         ChainedConsumer.foundDecl(D);

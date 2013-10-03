@@ -133,6 +133,8 @@ public:
   
   bool operator==(Identifier RHS) const { return Pointer == RHS.Pointer; }
   bool operator!=(Identifier RHS) const { return Pointer != RHS.Pointer; }
+
+  bool operator<(Identifier RHS) const { return Pointer < RHS.Pointer; }
   
   static Identifier getEmptyKey() {
     return Identifier((const char*)
