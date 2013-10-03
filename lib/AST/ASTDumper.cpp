@@ -988,7 +988,7 @@ public:
     for (TypeLoc T : E->getUnresolvedParams()) {
       OS << '\n';
       OS.indent(Indent+2);
-      T.getType().print(OS);
+      T.getTypeRepr()->print(OS);
     }
     OS << ')';
   }
