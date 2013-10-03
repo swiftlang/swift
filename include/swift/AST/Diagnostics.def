@@ -1210,6 +1210,8 @@ ERROR(raw_type_not_literal_convertible,sema_tcd,none,
       (Type))
 NOTE(enum_here,sema_tcd,none,
      "enum %0 declared here", (Identifier))
+ERROR(empty_enum_raw_type,sema_tcd,none,
+      "an enum with no cases cannot declare a raw type", ())
 ERROR(enum_raw_value_without_raw_type,sema_tcd,none,
       "enum case cannot have a raw value if the enum does not have a raw type", ())
 ERROR(enum_with_raw_type_case_with_argument,sema_tcd,none,

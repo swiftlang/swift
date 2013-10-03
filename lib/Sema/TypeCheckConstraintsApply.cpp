@@ -2993,7 +2993,7 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
                                            closure,
                                            ConstraintLocator::ClosureResult));
           if (!body)
-            return { false, nullptr} ;
+            return { false, nullptr } ;
 
           closure->setSingleExpressionBody(body);
         } else {

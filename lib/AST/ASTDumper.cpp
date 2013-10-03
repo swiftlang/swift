@@ -821,8 +821,7 @@ public:
       OS.indent(Indent+2) << "(case_label";
       for (Pattern *p : label->getPatterns()) {
         OS << '\n';
-        OS.indent(Indent+4);
-        p->print(OS);
+        printRec(p);
       }
       if (Expr *guard = label->getGuardExpr()) {
         OS << '\n';

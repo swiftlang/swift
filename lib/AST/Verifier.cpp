@@ -1246,6 +1246,11 @@ namespace {
 
     void checkSourceRanges(Decl *D) {
       if (!D->getSourceRange().isValid()) {
+        // We don't care about source ranges on implicitly-generated
+        // decls.
+        if (D->isImplicit())
+          return;
+        
         Out << "invalid source range for decl: ";
         D->print(Out);
         Out << "\n";

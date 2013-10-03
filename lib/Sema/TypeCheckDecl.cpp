@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
 #include "swift/AST/ArchetypeBuilder.h"
@@ -1185,26 +1186,26 @@ public:
     return nullptr;
   }
   
-  void visitEnumDecl(EnumDecl *UD) {
+  void visitEnumDecl(EnumDecl *ED) {
     if (!IsSecondPass) {
-      TC.validateDecl(UD);
+      TC.validateDecl(ED);
 
       {
         // Check for circular inheritance of the raw type.
         SmallVector<EnumDecl *, 8> path;
-        checkCircularity(TC, UD, diag::circular_enum_inheritance,
+        checkCircularity(TC, ED, diag::circular_enum_inheritance,
                          diag::enum_here, path);
       }
     }
 
-    for (Decl *member : UD->getMembers())
+    for (Decl *member : ED->getMembers())
       visit(member);
 
     if (!IsFirstPass) {
-      checkExplicitConformance(UD, UD->getDeclaredTypeInContext());
+      checkExplicitConformance(ED, ED->getDeclaredTypeInContext());
       
       // If we have a raw type, check it and the cases' raw values.
-      if (auto rawTy = UD->getRawType()) {
+      if (auto rawTy = ED->getRawType()) {
         // Check that the raw type is convertible from one of the primitive
         // literal protocols.
         bool literalConvertible = false;
@@ -1215,30 +1216,35 @@ public:
                                 KnownProtocolKind::CharacterLiteralConvertible})
         {
           if (TC.conformsToProtocol(rawTy,
-                              TC.getProtocol(UD->getLoc(), literalProtocol))) {
+                              TC.getProtocol(ED->getLoc(), literalProtocol))) {
             literalConvertible = true;
             break;
           }
         }
         
         if (!literalConvertible) {
-          TC.diagnose(UD->getInherited()[0].getSourceRange().Start,
+          TC.diagnose(ED->getInherited()[0].getSourceRange().Start,
                       diag::raw_type_not_literal_convertible,
                       rawTy);
         }
         
+        // We need at least one case to have a raw value.
+        if (ED->getAllElements().empty())
+          TC.diagnose(ED->getInherited()[0].getSourceRange().Start,
+                      diag::empty_enum_raw_type);
+          
         // Check the raw values of the cases.
         LiteralExpr *prevValue = nullptr;
         EnumElementDecl *lastExplicitValueElt = nullptr;
         // Keep a map we can use to check for duplicate case values.
         llvm::DenseMap<RawValueKey, RawValueSource> uniqueRawValues;
         
-        for (auto elt : UD->getAllElements()) {
+        for (auto elt : ED->getAllElements()) {
           // We don't yet support raw values on payload cases.
           if (elt->hasArgumentType()) {
             TC.diagnose(elt->getLoc(),
                         diag::enum_with_raw_type_case_with_argument);
-            TC.diagnose(UD->getInherited()[0].getSourceRange().Start,
+            TC.diagnose(ED->getInherited()[0].getSourceRange().Start,
                         diag::enum_raw_type_here, rawTy);
           }
           
@@ -1252,7 +1258,7 @@ public:
             }
             elt->setRawValueExpr(nextValue);
             Expr *typeChecked = nextValue;
-            if (!TC.typeCheckExpression(typeChecked, UD, rawTy, false))
+            if (!TC.typeCheckExpression(typeChecked, ED, rawTy, false))
               elt->setTypeCheckedRawValueExpr(typeChecked);
           } else {
             lastExplicitValueElt = elt;
@@ -1284,7 +1290,7 @@ public:
                               ->getRawValueExpr()->getLoc(),
                             diag::enum_raw_value_incrementing_from_here);
               else
-                TC.diagnose(UD->getAllElements().front()->getLoc(),
+                TC.diagnose(ED->getAllElements().front()->getLoc(),
                             diag::enum_raw_value_incrementing_from_zero);
             }
           } else {
@@ -1292,6 +1298,9 @@ public:
                                     RawValueSource{elt, lastExplicitValueElt}});
           }
         }
+        
+        // Synthesize the RawRepresentable conformance.
+        DerivedConformance::deriveRawRepresentable(TC, ED);
       }
     }
   }

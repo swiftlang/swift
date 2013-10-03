@@ -1573,14 +1573,6 @@ public:
 ///
 /// The type of the decl itself is a MetaTypeType; use getDeclaredType()
 /// to get the declared type ("Bool" or "Optional" in the above example).
-///
-/// Enum declarations are syntactic sugar for enums consisting only of
-/// simple cases with no associated data or member methods or properties.
-/// For example, the Bool declaration above could be written equivalently as:
-///
-/// \code
-///   enum Bool { false, true }
-/// \endcode
 class EnumDecl : public NominalTypeDecl {
   SourceLoc EnumLoc;
   Type RawType;

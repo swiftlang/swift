@@ -1264,7 +1264,7 @@ public:
 
 
 /// TupleElementExpr - Refer to an element of a tuple,
-/// e.g. "(1,field=2).field".
+/// e.g. "(1,field:2).field".
 class TupleElementExpr : public Expr {
   Expr *SubExpr;
   SourceLoc NameLoc;
@@ -2079,7 +2079,7 @@ public:
     return E->getKind() == ExprKind::NewArray;
   }
 };
-
+  
 /// MetatypeExpr - Evaluates an (optional) expression and produces a
 /// metatype value.  If there's no base expression, this isn't really
 /// a parsed form.

@@ -2,6 +2,7 @@ add_swift_library(swiftSema
   ArchetypeBuilder.cpp
   NameBinding.cpp
   SourceLoader.cpp
+  DerivedConformanceRawRepresentable.cpp
   TypeChecker.cpp
   TypeCheckConstraints.cpp
   TypeCheckConstraintsApply.cpp
