@@ -25,10 +25,7 @@ namespace swift {
 
 class SILInliner : public SILCloner<SILInliner> {
 public:
-  // It's kind of hack that we need to know about and explicitly befriend the
-  // base class of a base class, but I don't want to make visitApplyInst public
-  // as it really isn't part of the public interface of the class
-  friend class SILVisitor<SILInliner, SILValue>;
+  friend class SILVisitor<SILInliner>;
   friend class SILCloner<SILInliner>;
 
   explicit SILInliner(SILFunction &F)
@@ -61,10 +58,10 @@ public:
 private:
   void visitSILBasicBlock(SILBasicBlock* BB);
 
-  SILValue postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     if (DebugScope)
       Cloned->setDebugScope(DebugScope);
-    return SILCloner<SILInliner>::postProcess(Orig, Cloned);
+    SILCloner<SILInliner>::postProcess(Orig, Cloned);
   }
 
   SILLocation remapLocation(SILLocation InLoc) {
