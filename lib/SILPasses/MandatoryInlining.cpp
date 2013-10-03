@@ -71,8 +71,10 @@ fixupReferenceCounts(SILBuilder &B, SILBasicBlock::iterator I, SILLocation Loc,
   // consumed by the closure body
   SILModule &M = B.getFunction().getModule();
   for (auto &CaptureArg : CaptureArgs) {
-    if (!CaptureArg.getType().isAddress())
-      M.getTypeLowering(CaptureArg.getType()).emitCopyValue(B, Loc, CaptureArg);
+    if (!CaptureArg.getType().isAddress()) {
+      auto &typeLowering = M.getTypeLowering(CaptureArg.getType());
+      typeLowering.emitCopyValue(B, Loc, CaptureArg);
+    }
   }
 }
 
@@ -159,9 +161,10 @@ cleanupCalleeValue(SILBuilder &B, SILBasicBlock::iterator &I,
       B.setInsertionPoint(SRI);
       SILModule &M = B.getFunction().getModule();
       for (auto &CaptureArg : CaptureArgs) {
-        if (!CaptureArg.getType().isAddress())
-          M.getTypeLowering(CaptureArg.getType()).emitDestroyValue(B, SRI->getLoc(),
-                                                                   CaptureArg);
+        if (!CaptureArg.getType().isAddress()) {
+          auto &typeLowering = M.getTypeLowering(CaptureArg.getType());
+          typeLowering.emitDestroyValue(B, SRI->getLoc(), CaptureArg);
+        }
       }
       eraseInstruction(SRI);
     }
