@@ -58,8 +58,8 @@ sil @named_tuple : $[thin] () -> (x: Builtin.Int64, Builtin.Int64) {
 
 sil @return_int : $[thin] (a: Int64) -> Int64 { // CHECK-LABEL: $[thin] (a: Int64) -> Int64 {
 bb0(%0 : $Int64):                          // CHECK: bb0(%0 : $Int64):
-  // CHECK: struct_extract %0 : $Int64, #value
-  // CHECK: struct $Int64 (%1 : $Builtin.Int64)
+  // CHECK: alloc_stack $Int64
+  // CHECK: store
   %1 = alloc_stack $Int64
   store %0 to %1#1 : $*Int64
   %3 = load %1#1 : $*Int64
@@ -252,7 +252,7 @@ protocol Bendable { }
 // CHECK-LABEL: $[thin] (x: protocol<Bendable, Runcible>) -> Runcible
 sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $[thin] (x: protocol<Bendable, Runcible>) -> Runcible {
 bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
-  // CHECK: alloc_stack $protocol<Bendable, Runcible>
+  // CHECK: alloc_box
   %2 = alloc_box $protocol<Bendable, Runcible>
   // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*protocol<Bendable, Runcible>
   %3 = copy_addr [take] %1 to [initialization] %2#1 : $*protocol<Bendable, Runcible>
@@ -323,7 +323,7 @@ bb0(%0 : $Ref, %1 : $Val, %2 : $Aleph.metatype):
 sil @_TV6struct5AlephCfMS0_FT_S0_ : $[thin] ((), Aleph.metatype) -> Aleph {
 bb0(%0 : $Aleph.metatype):
   %1 = tuple ()
-  %2 = alloc_box $Aleph       // CHECK: alloc_stack
+  %2 = alloc_box $Aleph       // CHECK: alloc_box
   // CHECK: initialize_var [no_default_construct]
   %3 = initialize_var [no_default_construct] %2#1 : $*Aleph
   %4 = builtin_zero $Ref      // CHECK: builtin_zero $Ref
@@ -401,7 +401,6 @@ bb0(%0 : $Int64, %1 : $Float32):
   %6 = tuple_element_addr %2#1 : $*(Int64, Float32), 0
   %7 = load %6 : $*Int64
   // CHECK: tuple_element_addr {{%.*}}#{{.*}} : $*(Int64, Float32), 1
-  // CHECK: tuple ({{%.*}} : $Int64, {{%.*}} : $Float32)
   %10 = tuple_element_addr %2#1 : $*(Int64, Float32), 1
   %11 = load %10 : $*Float32
   // CHECK: function_ref
@@ -892,21 +891,15 @@ bb0(%0 : $ConcreteClass):
 
 sil @test_assign : $[thin] (x: Int64, y: [inout] Int64) -> () {    // CHECK-LABEL: sil deserialized @test_assign
 bb0(%0 : $Int64, %1 : $*Int64):
-  assign %0 to %1 : $*Int64                   // CHECK:   store %0 to %1
+  assign %0 to %1 : $*Int64                   // CHECK: assign
   unreachable
 }
 
 // CHECK-LABEL: sil deserialized @test_transparent : $[thin] () -> () {
 sil @test_transparent : $[thin] () -> () {
 bb0:
-  // Inlined callee:
-  // CHECK: %0 = alloc_ref $C
-  // CHECK: ref_to_object_pointer %0 : $C to $Builtin.ObjectPointer
-  // CHECK: ref_to_object_pointer %0 : $C to $Builtin.ObjCPointer
-  // CHECK: class_method {{.*}} : $C, #C.doIt!1
-  // CHECK: alloc_ref $D
-  // CHECK: upcast {{.*}} : $D to $C
-  // CHECK: unconditional_checked_cast downcast {{.*}} : $C to $D
+  // CHECK: function_ref
+  // CHECK: apply [transparent]
   %0 = function_ref @classes : $[thin] () -> ()
   %1 = apply [transparent] %0() : $[thin] () -> ()
   %2 = tuple ()
