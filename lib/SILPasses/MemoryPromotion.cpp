@@ -1000,8 +1000,10 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       // Otherwise, it is an escape.
     }
 
-    // init_existential and enum_data_addr are modeled as an initialization
-    // store, where the uses are treated as subelement accesses.
+    // enum_data_addr is treated like a tuple_element_addr or other instruction
+    // that is looking into the memory object (i.e., the memory object needs to
+    // be explicitly initialized by a copy_addr or some other use of the
+    // projected address).
     if (isa<EnumDataAddrInst>(User)) {
       assert(!InStructSubElement && !InEnumSubElement &&
              "enum_data_addr shouldn't apply to subelements");
