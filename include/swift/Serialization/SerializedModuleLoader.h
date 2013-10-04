@@ -27,6 +27,20 @@ class ModuleFile;
 /// \brief Imports serialized Swift modules into an ASTContext.
 class SerializedModuleLoader : public ModuleLoader {
 private:
+  /// This is only used to pass as owner of FailedImportModules so that the
+  /// rest of SerializedModuleLoader can assume that it is receiving valid
+  /// modules.
+  class FailedImportModuleLoader : public ModuleLoader {
+    Module *loadModule(SourceLoc importLoc,
+                     ArrayRef<std::pair<Identifier, SourceLoc>> path) override {
+      return nullptr;
+    }
+
+    StringRef getModuleFilename(const Module *Module) override;
+  };
+
+  FailedImportModuleLoader FailedImportLoader;
+
   ASTContext &Ctx;
   std::map<std::string, std::unique_ptr<llvm::MemoryBuffer> > MemoryBuffers;
   /// A { module, generation # } pair.
@@ -57,7 +71,7 @@ public:
   /// the dotted module name to load, e.g., AppKit.NSWindow.
   ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
-  /// emits a diagnostic and returns NULL.
+  /// emits a diagnostic and returns a FailedImportModule object.
   virtual Module *
   loadModule(SourceLoc importLoc, Module::AccessPathTy path) override;
 
@@ -131,6 +145,45 @@ public:
                                SmallVectorImpl<Decl*> &results) override;
 
   StringRef getModuleFilename(const Module *Module) override;
+};
+
+/// Describes whether a loaded module can be used.
+enum class ModuleStatus {
+  /// The module is valid.
+  Valid,
+
+  /// The module file format is too new to be used by this version of the
+  /// compiler.
+  FormatTooNew,
+
+  /// The module file depends on another module that can't be loaded.
+  MissingDependency,
+
+  /// The module file is malformed in some way.
+  Malformed
+};
+
+/// Represents a module that failed to get imported.
+class FailedImportModule : public LoadedModule {
+public:
+  ModuleStatus Status;
+  std::string ModuleFilename;
+
+  FailedImportModule(Identifier Name, ModuleStatus Status,
+                     StringRef ModuleFilename,
+                     ASTContext &Ctx, ModuleLoader &Owner, Component *Comp)
+    : LoadedModule(ModuleKind::FailedImport, Name, std::string(),
+                   Comp, Ctx, Owner),
+      Status(Status) {
+    assert(Status != ModuleStatus::Valid && "module is valid ?");
+  }
+
+  static bool classof(const Module *M) {
+    return M->getKind() == ModuleKind::FailedImport;
+  }
+  static bool classof(const DeclContext *DC) {
+    return isa<Module>(DC) && classof(cast<Module>(DC));
+  }
 };
 
 } // end namespace swift

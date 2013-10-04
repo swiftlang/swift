@@ -45,22 +45,6 @@ namespace swift {
 class Pattern;
 class ProtocolConformance;
 
-/// Describes whether a loaded module can be used.
-enum class ModuleStatus {
-  /// The module is valid.
-  Valid,
-
-  /// The module file format is too new to be used by this version of the
-  /// compiler.
-  FormatTooNew,
-
-  /// The module file depends on another module that can't be loaded.
-  MissingDependency,
-
-  /// The module file is malformed in some way.
-  Malformed
-};
-
 /// A serialized module, along with the tools to access it.
 class ModuleFile {
   /// A reference back to the AST representation of the module.
@@ -397,11 +381,11 @@ public:
 
 class SerializedModule : public LoadedModule {
 public:
-  ModuleFile *File;
+  ModuleFile &File;
 
   SerializedModule(ASTContext &ctx, SerializedModuleLoader &owner,
                    Identifier name, std::string DebugModuleName,
-                   Component *comp, ModuleFile *file)
+                   Component *comp, ModuleFile &file)
     : LoadedModule(ModuleKind::Serialized, name, DebugModuleName,
                    comp, ctx, owner),
       File(file) {}

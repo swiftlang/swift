@@ -1481,8 +1481,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       // FIXME: Yuck. The concept of a shadowed module needs to be moved up
       // higher, and it needs to be clear whether they are always reexported.
       if (auto loadedModule = dyn_cast<SerializedModule>(baseModule)) {
-        if (loadedModule->File && loadedModule->File->ShadowedModule) {
-          Module *shadowed = loadedModule->File->ShadowedModule;
+        if (loadedModule->File.ShadowedModule) {
+          Module *shadowed = loadedModule->File.ShadowedModule;
           shadowed->lookupValue(Module::AccessPathTy(),
                                 getIdentifier(rawAccessPath.front()),
                                 NLKind::QualifiedLookup, values);

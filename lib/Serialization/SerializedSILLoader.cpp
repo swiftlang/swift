@@ -22,7 +22,7 @@ SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
   // Get a list of SerializedModules from ASTContext.
   for (auto &CtxM : Ctx.LoadedModules) {
     if (SerializedModule *LM = dyn_cast<SerializedModule>(CtxM.getValue())) {
-      auto Des = new SILDeserializer(LM->File, *SILMod, Ctx);
+      auto Des = new SILDeserializer(&LM->File, *SILMod, Ctx);
       LoadedSILSections.emplace_back(std::unique_ptr<SILDeserializer>(Des));
     }
   }

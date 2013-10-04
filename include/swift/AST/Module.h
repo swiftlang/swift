@@ -69,7 +69,9 @@ namespace swift {
     TranslationUnit,
     Builtin,
     Serialized,
-    Clang
+    Clang,
+    /// A 'module' placeholder for failed imports.
+    FailedImport
   };
 
 /// Constants used to customize name lookup.
@@ -528,7 +530,8 @@ public:
 
   static bool classof(const Module *M) {
     return M->getKind() == ModuleKind::Serialized ||
-           M->getKind() == ModuleKind::Clang;
+           M->getKind() == ModuleKind::Clang ||
+           M->getKind() == ModuleKind::FailedImport;
   }
   static bool classof(const DeclContext *DC) {
     return isa<Module>(DC) && classof(cast<Module>(DC));

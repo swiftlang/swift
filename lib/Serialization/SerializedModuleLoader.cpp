@@ -34,6 +34,11 @@ typedef std::pair<Identifier, SourceLoc> AccessPathElem;
 SerializedModuleLoader::SerializedModuleLoader(ASTContext &ctx) : Ctx(ctx) {}
 SerializedModuleLoader::~SerializedModuleLoader() = default;
 
+StringRef SerializedModuleLoader::FailedImportModuleLoader::getModuleFilename(
+    const Module *Module) {
+  return cast<FailedImportModule>(Module)->ModuleFilename;
+}
+
 // FIXME: Copied from SourceLoader. Not bothering to fix until we decide that
 // the source loader search path should be the same as the module loader search
 // path.
@@ -125,25 +130,31 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
     break;
   case ModuleStatus::FormatTooNew:
     Ctx.Diags.diagnose(moduleID.second, diag::serialization_module_too_new);
-    loadedModuleFile.reset();
     break;
   case ModuleStatus::Malformed:
     Ctx.Diags.diagnose(moduleID.second, diag::serialization_malformed_module);
-    loadedModuleFile.reset();
     break;
   case ModuleStatus::MissingDependency:
     llvm_unreachable("dependencies haven't been loaded yet");
   }
 
-  auto comp = new (Ctx.Allocate<Component>(1)) Component();
-  auto module = new (Ctx) SerializedModule(Ctx, *this, moduleID.first,
-                                           DebugModuleName,
-                                           comp, loadedModuleFile.get());
-
   // Whether we succeed or fail, don't try to load this module again.
-  Ctx.LoadedModules[moduleID.first.str()] = module;
+  Module *&module = Ctx.LoadedModules[moduleID.first.str()];
+  auto comp = new (Ctx.Allocate<Component>(1)) Component();
+
+  if (err == ModuleStatus::Valid) {
+    module = new (Ctx) SerializedModule(Ctx, *this, moduleID.first,
+                                        DebugModuleName,
+                                        comp, *loadedModuleFile);
+  } else {
+    module = new (Ctx) FailedImportModule(moduleID.first, err,
+                                          loadedModuleFile->getModuleFilename(),
+                                          Ctx, FailedImportLoader, comp);
+    loadedModuleFile.reset();
+  }
 
   if (loadedModuleFile) {
+    assert(err == ModuleStatus::Valid);
     bool success = loadedModuleFile->associateWithModule(module);
     if (success) {
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
@@ -180,7 +191,10 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
                            missingNames);
       }
 
-      module->File = nullptr;
+      module = new (Ctx) FailedImportModule(moduleID.first,
+                                            loadedModuleFile->getStatus(),
+                                          loadedModuleFile->getModuleFilename(),
+                                            Ctx, FailedImportLoader, comp);
     }
   }
 
@@ -198,21 +212,15 @@ void SerializedModuleLoader::lookupValue(Module *module,
   if (accessPath.size() == 1 && accessPath.front().first != name)
     return;
 
-  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
-  if (!moduleFile)
-    return;
-
-  moduleFile->lookupValue(name, results);
+  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
+  moduleFile.lookupValue(name, results);
 }
 
 OperatorDecl *SerializedModuleLoader::lookupOperator(Module *module,
                                                      Identifier name,
                                                      DeclKind fixity) {
-  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
-  if (!moduleFile)
-    return nullptr;
-
-  return moduleFile->lookupOperator(name, fixity);
+  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
+  return moduleFile.lookupOperator(name, fixity);
 }
 
 void SerializedModuleLoader::getImportedModules(
@@ -220,11 +228,8 @@ void SerializedModuleLoader::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &imports,
     bool includePrivate) {
 
-  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
-  if (!moduleFile)
-    return;
-
-  moduleFile->getImportedModules(imports, includePrivate);
+  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
+  moduleFile.getImportedModules(imports, includePrivate);
 }
 
 void
@@ -233,11 +238,8 @@ SerializedModuleLoader::lookupVisibleDecls(const Module *module,
                                            VisibleDeclConsumer &consumer,
                                            NLKind lookupKind) {
 
-  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
-  if (!moduleFile)
-    return;
-
-  moduleFile->lookupVisibleDecls(accessPath, consumer, lookupKind);
+  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
+  moduleFile.lookupVisibleDecls(accessPath, consumer, lookupKind);
 }
 
 void SerializedModuleLoader::loadExtensions(NominalTypeDecl *nominal,
@@ -262,10 +264,8 @@ SerializedModuleLoader::loadDeclsConformingTo(KnownProtocolKind kind,
 void SerializedModuleLoader::lookupClassMembers(const Module *module,
                                                 Module::AccessPathTy accessPath,
                                                 VisibleDeclConsumer &consumer) {
-  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
-  if (!moduleFile)
-    return;
-  moduleFile->lookupClassMembers(accessPath, consumer);
+  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
+  moduleFile.lookupClassMembers(accessPath, consumer);
 }
 
 void
@@ -273,38 +273,30 @@ SerializedModuleLoader::lookupClassMember(const Module *module,
                                           Module::AccessPathTy accessPath,
                                           Identifier name,
                                           SmallVectorImpl<ValueDecl*> &decls) {
-  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
-  if (!moduleFile)
-    return;
-  moduleFile->lookupClassMember(accessPath, name, decls);
+  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
+  moduleFile.lookupClassMember(accessPath, name, decls);
 }
 
 void
 SerializedModuleLoader::getLinkLibraries(const Module *module,
                                          Module::LinkLibraryCallback callback) {
-  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
-  if (!moduleFile)
-    return;
-  moduleFile->getLinkLibraries(callback);
+  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
+  moduleFile.getLinkLibraries(callback);
 }
 
 void SerializedModuleLoader::getTopLevelDecls(const Module *Module,
                                               SmallVectorImpl<Decl*> &Results) {
-  ModuleFile *ModuleFile = cast<SerializedModule>(Module)->File;
-  if (!ModuleFile)
-    return;
-  ModuleFile->getTopLevelDecls(Results);
+  ModuleFile &ModuleFile = cast<SerializedModule>(Module)->File;
+  ModuleFile.getTopLevelDecls(Results);
 }
 
 void SerializedModuleLoader::getDisplayDecls(const Module *module,
                                              SmallVectorImpl<Decl*> &results) {
-  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
-  if (!moduleFile)
-    return;
-  moduleFile->getDisplayDecls(results);
+  ModuleFile &moduleFile = cast<SerializedModule>(module)->File;
+  moduleFile.getDisplayDecls(results);
 }
 
 StringRef SerializedModuleLoader::getModuleFilename(const Module *Module) {
-  ModuleFile *Mod = cast<SerializedModule>(Module)->File;
-  return Mod->getModuleFilename();
+  ModuleFile &Mod = cast<SerializedModule>(Module)->File;
+  return Mod.getModuleFilename();
 }

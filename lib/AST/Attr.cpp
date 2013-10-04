@@ -62,6 +62,9 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
           return explicitResilience;
         return C->isResilient(cast<Module>(DC))
                     ? Resilience::Resilient : Resilience::Fragile;
+
+      case ModuleKind::FailedImport:
+        llvm_unreachable("can't get resilience for failed import");
       }
       assert(0 && "All cases should be covered");
 
