@@ -595,7 +595,9 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
     } else if (auto SW = dyn_cast<StoreWeakInst>(Inst)) {
       if (SW->isInitializationOfDest()) return;
     } else if (isa<InitExistentialInst>(Inst) ||
-               isa<UpcastExistentialInst>(Inst)) {
+               isa<UpcastExistentialInst>(Inst) ||
+               isa<EnumDataAddrInst>(Inst) ||
+               isa<InjectEnumAddrInst>(Inst)) {
       // These instructions *on a box* are only formed by direct initialization
       // like "var x : Proto = foo".
       return;
@@ -826,6 +828,10 @@ namespace {
     /// of this, so that any indexes into tuple subelements don't affect the
     /// element we attribute an access to.
     bool InStructSubElement = false;
+
+    /// When walking the use list, if we index into an enum slice, keep track
+    /// of this.
+    bool InEnumSubElement = false;
   public:
     ElementUseCollector(SmallVectorImpl<ElementUses> &Uses)
       : Uses(Uses) {
@@ -849,8 +855,13 @@ namespace {
 /// to keep the Uses data structure up to date for aggregate uses.
 void ElementUseCollector::addElementUses(unsigned BaseElt, SILType UseTy,
                                          SILInstruction *User, UseKind Kind) {
-  for (unsigned i = 0, e = getElementCount(UseTy.getSwiftRValueType());
-       i != e; ++i)
+  // If we're in a subelement of a struct or enum, just mark the struct, not
+  // things that come after it in a parent tuple.
+  unsigned Slots = 1;
+  if (!InStructSubElement && !InEnumSubElement)
+    Slots = getElementCount(UseTy.getSwiftRValueType());
+  
+  for (unsigned i = 0; i != Slots; ++i)
     Uses[BaseElt+i].push_back({ User, Kind });
 }
 
@@ -989,17 +1000,37 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
       // Otherwise, it is an escape.
     }
 
-    // init_existential is modeled as a initialization store, where the uses are
-    // treated as subelement accesses.
-    if (auto *IE = dyn_cast<InitExistentialInst>(User)) {
-      assert(!InStructSubElement &&
-             "init_existential the subelement of a struct unless in a ctor");
-      Uses[BaseElt].push_back({ User, UseKind::Store });
+    // init_existential and enum_data_addr are modeled as an initialization
+    // store, where the uses are treated as subelement accesses.
+    if (isa<EnumDataAddrInst>(User)) {
+      assert(!InStructSubElement && !InEnumSubElement &&
+             "enum_data_addr shouldn't apply to subelements");
+      // Keep track of the fact that we're inside of an enum.  This informs our
+      // recursion that tuple
+      llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
+      collectUses(SILValue(User, 0), BaseElt);
+      continue;
+    }
 
+    // init_existential is modeled as an initialization store, where the uses
+    // are treated as subelement accesses.
+    if (isa<InitExistentialInst>(User)) {
+      assert(!InStructSubElement && !InEnumSubElement &&
+             "init_existential should not apply to subelements");
+      Uses[BaseElt].push_back({ User, UseKind::Store });
+      
       // Set the "InStructSubElement" flag (so we don't consider stores to be
       // full definitions) and recursively process the uses.
       llvm::SaveAndRestore<bool> X(InStructSubElement, true);
-      collectUses(SILValue(IE, 0), BaseElt);
+      collectUses(SILValue(User, 0), BaseElt);
+      continue;
+    }
+
+    // inject_enum_addr is treated as a store unconditionally.
+    if (isa<InjectEnumAddrInst>(User)) {
+      assert(!InStructSubElement &&
+             "inject_enum_addr the subelement of a struct unless in a ctor");
+      Uses[BaseElt].push_back({ User, UseKind::Store });
       continue;
     }
 
@@ -1112,12 +1143,6 @@ static void processAllocBox(AllocBoxInst *ABI) {
 }
 
 static void processAllocStack(AllocStackInst *ASI) {
-  // FIXME: HACK: work around SILGen enum issue.
-  if (!ASI->getLoc().is<SILFileLocation>())
-    if (ASI->getLoc().getAsASTNode<Decl>() == nullptr ||
-        !isa<ValueDecl>(ASI->getLoc().getAsASTNode<Decl>()))
-      return;
-  
   DEBUG(llvm::errs() << "*** MemPromotion looking at: " << *ASI << "\n");
 
   // Set up the datastructure used to collect the uses of the alloc_box.  The
