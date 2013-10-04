@@ -208,11 +208,13 @@ public:
   /// \param typeDecl The type declaration found by name lookup.
   /// \param fromDC The declaration context in which the name lookup occurred.
   /// \param isSpecialized Whether this type is immediately specialized.
+  /// \param resolver The resolver for generic types.
   ///
   /// \returns the resolved type, or emits a diagnostic and returns null if the
   /// type cannot be resolved.
   Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *fromDC,
-                            bool isSpecialized);
+                            bool isSpecialized,
+                            GenericTypeResolver *resolver = nullptr);
 
   /// \brief Transform the given type by applying the given function to
   /// each type node. If the function returns null, the transformation aborts.

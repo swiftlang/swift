@@ -1486,7 +1486,9 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
 
   friend class MemberLookupTable;
   friend class ExtensionDecl;
-  
+
+  Type InterfaceTy;
+
 protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
@@ -1515,6 +1517,13 @@ public:
   void computeType();
 
   Type getDeclaredTypeInContext();
+
+  /// Get the "interface" type of the given nominal type, which is the
+  /// type used to refer to the nominal type externally.
+  ///
+  /// For a generic type, or a member thereof, this is the a specialization
+  /// of the type using its own generic parameters.
+  Type getInterfaceType();
 
   /// \brief Add a new extension to this nominal type.
   void addExtension(ExtensionDecl *extension);

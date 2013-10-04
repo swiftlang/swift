@@ -401,6 +401,33 @@ Type NominalTypeDecl::getDeclaredTypeInContext() {
   return DeclaredTyInContext;
 }
 
+Type NominalTypeDecl::getInterfaceType() {
+  if (InterfaceTy)
+    return InterfaceTy;
+
+  // Figure out the interface type of the parent.
+  Type parentType;
+  if (auto typeOfParentContext = getDeclContext()->getDeclaredTypeOfContext())
+    parentType = typeOfParentContext->getAnyNominal()->getInterfaceType();
+
+  Type type;
+  if (auto params = getGenericParams()) {
+    // If we have a generic type, bind the type to the archetypes
+    // in the type's definition.
+    SmallVector<Type, 4> genericArgs;
+    for (auto param : *params)
+      genericArgs.push_back(param.getAsTypeParam()->getDeclaredType());
+
+    type = BoundGenericType::get(this, parentType, genericArgs);
+  } else {
+    type = NominalType::get(this, parentType, getASTContext());
+  }
+
+  InterfaceTy = type;
+  return InterfaceTy;
+
+}
+
 ExtensionRange NominalTypeDecl::getExtensions() {
   auto &context = Decl::getASTContext();
 

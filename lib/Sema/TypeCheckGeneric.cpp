@@ -19,6 +19,20 @@
 
 using namespace swift;
 
+Type DependentGenericTypeResolver::resolveGenericTypeParamType(
+                                     GenericTypeParamType *gp) {
+  // Don't resolve generic parameters.
+  return gp;
+}
+
+Type DependentGenericTypeResolver::resolveDependentMemberType(
+                                     Type baseTy,
+                                     SourceRange baseRange,
+                                     Identifier name,
+                                     SourceLoc nameLoc) {
+  return DependentMemberType::get(baseTy, name, baseTy->getASTContext());
+}
+
 Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
                                        GenericTypeParamType *gp) {
   auto gpDecl = gp->getDecl();
@@ -64,14 +78,6 @@ Type PartialGenericTypeToArchetypeResolver::resolveDependentMemberType(
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
                                               GenericTypeParamType *gp) {
-  // If there is an archetype corresponding to this generic parameter, use it.
-  // FIXME: This is a hack for nested generics. It should go away eventually.
-  if (auto gpDecl = gp->getDecl()) {
-    if (auto archetype = gpDecl->getArchetype()) {
-      return archetype;
-    }
-  }
-
   // Retrieve the potential archetype corresponding to this generic type
   // parameter.
   // FIXME: When generic parameters can map down to specific types, do so
@@ -391,7 +397,12 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   checkGenericParameters(tc, builder, func->getGenericParams(), resolver);
 
   // Check the parameter patterns.
-  for (auto pattern : func->getArgParamPatterns()) {
+  // Skip the 'self' pattern, if we have one.
+  auto argPatterns = func->getArgParamPatterns();
+  if (func->getExtensionType())
+    argPatterns = argPatterns.slice(1);
+
+  for (auto pattern : argPatterns) {
     // Check the pattern.
     if (tc.typeCheckPattern(pattern, func, /*allowUnboundGenerics=*/false,
                             /*isVararg=*/false, &resolver))
@@ -421,14 +432,50 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   return badType;
 }
 
+/// Replace the type of 'self' in the given function declaration's argument
+/// patterns.
+///
+/// FIXME: This almost duplicates FuncDecl::computeSelfType(), which should
+/// migrate into the type checker anyway.
+static Type computeSelfType(FuncDecl *func) {
+  // Figure out the type we're in.
+  Type containerTy = func->getExtensionType();
+  if (!containerTy)
+    return nullptr;
+
+  // For a protocol, the container type is the 'Self' type.
+  // FIXME: This is temporary.
+  Type selfTy;
+  if (auto protoTy = containerTy->getAs<ProtocolType>()) {
+    auto self = protoTy->getDecl()->getSelf();
+    selfTy = self->getDeclaredType();
+  } else {
+    // For any other nominal type, the self type is the interface type.
+    selfTy = containerTy->getAnyNominal()->getInterfaceType();
+  }
+
+  // For a static function, 'self' has type T.metatype.
+  if (func->isStatic())
+    return MetaTypeType::get(selfTy, func->getASTContext());
+
+  // For a type with reference semantics, 'self' is passed by value.
+  if (containerTy->hasReferenceSemantics())
+    return selfTy;
+
+  // Otherwise, 'self' is passed inout.
+  return LValueType::get(selfTy,
+                         LValueType::Qual::DefaultForInOutSelf,
+                         func->getASTContext());
+}
+
 bool TypeChecker::validateGenericFuncSignature(FuncDecl *func) {
   // Create the archetype builder.
   ArchetypeBuilder builder = createArchetypeBuilder(*this);
 
   // Type check the function declaration, treating all generic type
   // parameters as dependent, unresolved.
-  PartialGenericTypeToArchetypeResolver partialResolver(*this);
-  if (checkGenericFuncSignature(*this, &builder, func, partialResolver)) {
+  DependentGenericTypeResolver dependentResolver;
+  if (checkGenericFuncSignature(*this, &builder, func, dependentResolver)) {
     func->setType(ErrorType::get(Context));
     return true;
   }
@@ -462,7 +509,18 @@ bool TypeChecker::validateGenericFuncSignature(FuncDecl *func) {
 
   auto patterns = func->getArgParamPatterns();
   for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
-    Type argTy = patterns[e - i - 1]->getType();
+    Type argTy;
+
+    Type selfTy;
+    if (i == e-1 && (selfTy = computeSelfType(func))) {
+      // Substitute in our own 'self' parameter.
+      assert(selfTy && "Missing self type?");
+
+      TupleTypeElt elt(selfTy, Context.getIdentifier("self"));
+      argTy = TupleType::get(elt, Context);
+    } else {
+      argTy = patterns[e - i - 1]->getType();
+    }
 
     // Validate and consume the function type attributes.
     // FIXME: Hacked up form of validateAndConsumeFunctionTypeAttributes().

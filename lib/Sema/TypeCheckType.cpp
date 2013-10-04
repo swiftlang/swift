@@ -49,14 +49,16 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
 
 Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
                                        DeclContext *fromDC,
-                                       bool isSpecialized) {
+                                       bool isSpecialized,
+                                       GenericTypeResolver *resolver) {
+  PartialGenericTypeToArchetypeResolver defaultResolver(*this);
+  if (!resolver)
+    resolver = &defaultResolver;
+
   // If we found a generic parameter, map to the archetype if there is one.
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
-    if (auto archetype = genericParam->getArchetype()) {
-      return archetype;
-    }
-
-    return genericParam->getDeclaredType();
+    return resolver->resolveGenericTypeParamType(
+             genericParam->getDeclaredType()->castTo<GenericTypeParamType>());
   }
 
   // If we're referring to a generic type and no generic arguments have been
@@ -251,7 +253,8 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   if (dc) {
     // Resolve the type declaration to a specific type. How this occurs
     // depends on the current context and where the type was found.
-    type = TC.resolveTypeInContext(typeDecl, dc, !genericArgs.empty());
+    type = TC.resolveTypeInContext(typeDecl, dc, !genericArgs.empty(),
+                                   resolver);
   } else {
     type = typeDecl->getDeclaredType();
   }

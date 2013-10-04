@@ -58,6 +58,19 @@ public:
                                           SourceLoc nameLoc) = 0;
 };
 
+/// Generic type resolver that leaves all generic types dependent.
+///
+/// This generic type resolver leaves generic type parameter types alone
+/// and only trivially resolves dependent member types.
+class DependentGenericTypeResolver : public GenericTypeResolver {
+  virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
+
+  virtual Type resolveDependentMemberType(Type baseTy,
+                                          SourceRange baseRange,
+                                          Identifier name,
+                                          SourceLoc nameLoc);
+};
+
 /// Generic type resolver that maps a generic type parameter type to its
 /// archetype.
 ///
