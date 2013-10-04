@@ -191,7 +191,8 @@ public:
     // validation and source tracking purposes.
     
     curType = TC.applyGenericArguments(curType, use->getLoc(),
-                                       use->getUnresolvedParams());
+                                       use->getUnresolvedParams(),
+                                       nullptr);
     if (!curType)
       return false;
     

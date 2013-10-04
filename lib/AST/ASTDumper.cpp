@@ -462,10 +462,15 @@ namespace {
     
     void printCommonAFD(AbstractFunctionDecl *D, const char *Type) {
       printCommon(D, Type, FuncColor);
-
       if (!D->getCaptureInfo().empty()) {
         OS << " ";
         D->getCaptureInfo().print(OS);
+      }
+      if (D->getInterfaceType()) {
+        OS << "\n";
+        OS.indent(Indent + 2);
+        OS << "interface type = ";
+        D->getInterfaceType().print(OS);
       }
     }
 

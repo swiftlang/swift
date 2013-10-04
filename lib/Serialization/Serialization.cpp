@@ -247,6 +247,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, BOUND_GENERIC_TYPE);
   RECORD(decls_block, BOUND_GENERIC_SUBSTITUTION);
   RECORD(decls_block, POLYMORPHIC_FUNCTION_TYPE);
+  RECORD(decls_block, GENERIC_FUNCTION_TYPE);
   RECORD(decls_block, ARRAY_SLICE_TYPE);
   RECORD(decls_block, ARRAY_TYPE);
   RECORD(decls_block, REFERENCE_STORAGE_TYPE);
@@ -539,16 +540,18 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
   for (auto next : genericParams->getRequirements()) {
     switch (next.getKind()) {
     case RequirementKind::Conformance:
-      GenericRequirementLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                           GenericRequirementKind::Conformance,
-                                           addTypeRef(next.getSubject()),
-                                           addTypeRef(next.getConstraint()));
+      GenericRequirementLayout::emitRecord(
+                                      Out, ScratchRecord, abbrCode,
+                                      GenericRequirementKind::Conformance,
+                                      addTypeRef(next.getSubject()),
+                                      addTypeRef(next.getConstraint()));
       break;
     case RequirementKind::SameType:
-      GenericRequirementLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                           GenericRequirementKind::SameType,
-                                           addTypeRef(next.getFirstType()),
-                                           addTypeRef(next.getSecondType()));
+      GenericRequirementLayout::emitRecord(
+                                      Out, ScratchRecord, abbrCode,
+                                      GenericRequirementKind::SameType,
+                                      addTypeRef(next.getFirstType()),
+                                      addTypeRef(next.getSecondType()));
       break;
     }
   }
@@ -1208,6 +1211,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->getAttrs().isTransparent(),
                            fn->getArgParamPatterns().size(),
                            addTypeRef(fn->getType()),
+                           addTypeRef(fn->getInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
                            fn->getAttrs().AsmName);
@@ -1348,6 +1352,20 @@ static uint8_t getRawStableOwnership(swift::Ownership ownership) {
     return serialization::Ownership::Unowned;
   }
   llvm_unreachable("bad ownership kind");
+}
+
+/// Translate from the requirement kind to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableRequirementKind(RequirementKind kind) {
+#define CASE(KIND)            \
+  case RequirementKind::KIND: \
+    return GenericRequirementKind::KIND;
+
+  switch (kind) {
+  CASE(Conformance)
+  CASE(SameType)
+  }
+#undef CASE
 }
 
 /// Find the typealias given a builtin type.
@@ -1493,15 +1511,20 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::GenericFunction: {
-    llvm_unreachable("Cannot serialize generic function types yet");
-  }
-
   case TypeKind::GenericTypeParam: {
     auto genericParam = cast<GenericTypeParamType>(ty.getPointer());
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
+    DeclID declIDOrDepth;
+    unsigned indexPlusOne;
+    if (genericParam->getDecl()) {
+      declIDOrDepth = addDeclRef(genericParam->getDecl());
+      indexPlusOne = 0;
+    } else {
+      declIDOrDepth = genericParam->getDepth();
+      indexPlusOne = genericParam->getIndex() + 1;
+    }
     GenericTypeParamTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                           addDeclRef(genericParam->getDecl()));
+                                           declIDOrDepth, indexPlusOne);
     break;
   }
 
@@ -1566,6 +1589,33 @@ void Serializer::writeType(Type ty) {
                                               fnTy->isNoReturn());
     if (!genericContext)
       writeGenericParams(&fnTy->getGenericParams());
+    break;
+  }
+
+  case TypeKind::GenericFunction: {
+    auto fnTy = cast<GenericFunctionType>(ty.getPointer());
+    unsigned abbrCode = DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
+    auto callingConvention = fnTy->getAbstractCC();
+    SmallVector<TypeID, 4> genericParams;
+    for (auto param : fnTy->getGenericParams())
+      genericParams.push_back(addTypeRef(param));
+    GenericFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                          addTypeRef(fnTy->getInput()),
+                                          addTypeRef(fnTy->getResult()),
+                                          getRawStableCC(callingConvention),
+                                          fnTy->isThin(),
+                                          fnTy->isNoReturn(),
+                                          genericParams);
+
+    // Write requirements.
+    auto reqAbbrCode = DeclTypeAbbrCodes[GenericRequirementLayout::Code];
+    for (const auto &req : fnTy->getRequirements()) {
+      GenericRequirementLayout::emitRecord(
+                                  Out, ScratchRecord, reqAbbrCode,
+                                  getRawStableRequirementKind(req.getKind()),
+                                  addTypeRef(req.getFirstType()),
+                                  addTypeRef(req.getSecondType()));
+    }
     break;
   }
 
@@ -1693,6 +1743,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<BoundGenericTypeLayout>();
     registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
     registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
+    registerDeclTypeAbbr<GenericFunctionTypeLayout>();
     registerDeclTypeAbbr<ArraySliceTypeLayout>();
     registerDeclTypeAbbr<ArrayTypeLayout>();
     registerDeclTypeAbbr<ReferenceStorageTypeLayout>();

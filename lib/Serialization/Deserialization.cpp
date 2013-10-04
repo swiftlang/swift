@@ -528,6 +528,68 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   return paramList;
 }
 
+void ModuleFile::readGenericRequirements(
+                   SmallVectorImpl<Requirement> &requirements) {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+
+  while (true) {
+    lastRecordOffset.reset();
+    bool shouldContinue = true;
+
+    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                  &blobData);
+    switch (recordID) {
+    case GENERIC_REQUIREMENT: {
+      uint8_t rawKind;
+      ArrayRef<uint64_t> rawTypeIDs;
+      GenericRequirementLayout::readRecord(scratch, rawKind, rawTypeIDs);
+
+      switch (rawKind) {
+      case GenericRequirementKind::Conformance: {
+        assert(rawTypeIDs.size() == 2);
+        auto subject = getType(rawTypeIDs[0]);
+        auto constraint = getType(rawTypeIDs[1]);
+
+        requirements.push_back(Requirement(RequirementKind::Conformance,
+                                           subject, constraint));
+        break;
+      }
+      case GenericRequirementKind::SameType: {
+        assert(rawTypeIDs.size() == 2);
+        auto first = getType(rawTypeIDs[0]);
+        auto second = getType(rawTypeIDs[1]);
+
+        requirements.push_back(Requirement(RequirementKind::SameType,
+                                           first, second));
+        break;
+      }
+      default:
+        // Unknown requirement kind. Drop the requirement and continue, but log
+        // an error so that we don't actually try to generate code.
+        error();
+      }
+      break;
+      }
+    default:
+      // This record is not part of the GenericParamList.
+      shouldContinue = false;
+      break;
+    }
+    
+    if (!shouldContinue)
+      break;
+  }
+}
+
 Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
   using namespace decls_block;
 
@@ -937,6 +999,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool isObjC, isIBAction, isTransparent;
     unsigned numParamPatterns;
     TypeID signatureID;
+    TypeID interfaceID;
     DeclID associatedDeclID;
     DeclID overriddenID;
 
@@ -945,7 +1008,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         isClassMethod, isAssignmentOrConversion,
                                         isObjC, isIBAction, isTransparent,
                                         numParamPatterns, signatureID,
-                                        associatedDeclID, overriddenID);
+                                        interfaceID, associatedDeclID,
+                                        overriddenID);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -966,6 +1030,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     // its generic parameters.
     auto signature = getType(signatureID)->castTo<AnyFunctionType>();
     fn->setType(signature);
+
+    // Set the interface type.
+    fn->setInterfaceType(getType(interfaceID));
 
     SmallVector<Pattern *, 16> patternBuf;
     while (Pattern *pattern = maybeReadPattern())
@@ -1835,21 +1902,30 @@ Type ModuleFile::getType(TypeID TID) {
   }
 
   case decls_block::GENERIC_TYPE_PARAM_TYPE: {
-    DeclID declID;
+    DeclID declIDOrDepth;
+    unsigned indexPlusOne;
 
-    decls_block::GenericTypeParamTypeLayout::readRecord(scratch, declID);
+    decls_block::GenericTypeParamTypeLayout::readRecord(scratch, declIDOrDepth,
+                                                        indexPlusOne);
 
-    auto genericParam = dyn_cast_or_null<GenericTypeParamDecl>(getDecl(declID));
-    if (!genericParam) {
-      error();
-      return nullptr;
+    if (indexPlusOne == 0) {
+      auto genericParam
+        = dyn_cast_or_null<GenericTypeParamDecl>(getDecl(declIDOrDepth));
+
+      if (!genericParam) {
+        error();
+        return nullptr;
+      }
+
+      // See if we triggered deserialization through our conformances.
+      if (typeOrOffset.isComplete())
+        break;
+
+      typeOrOffset = genericParam->getDeclaredType();
+      break;
     }
 
-    // See if we triggered deserialization through our conformances.
-    if (typeOrOffset.isComplete())
-      break;
-
-    typeOrOffset = genericParam->getDeclaredType();
+    typeOrOffset = GenericTypeParamType::get(declIDOrDepth,indexPlusOne-1,ctx);
     break;
   }
 
@@ -1984,6 +2060,57 @@ Type ModuleFile::getType(TypeID TID) {
                                                 paramList,
                                                 Info,
                                                 ctx);
+    break;
+  }
+
+  case decls_block::GENERIC_FUNCTION_TYPE: {
+    TypeID inputID;
+    TypeID resultID;
+    uint8_t rawCallingConvention;
+    bool thin;
+    bool noreturn = false;
+    ArrayRef<uint64_t> genericParamIDs;
+
+    //todo add noreturn serialization.
+    decls_block::GenericFunctionTypeLayout::readRecord(scratch,
+                                                       inputID,
+                                                       resultID,
+                                                       rawCallingConvention,
+                                                       thin,
+                                                       noreturn,
+                                                       genericParamIDs);
+    auto callingConvention = getActualCC(rawCallingConvention);
+    if (!callingConvention.hasValue()) {
+      error();
+      return nullptr;
+    }
+
+    // Read the generic parameters.
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    for (auto paramID : genericParamIDs) {
+      auto param = dyn_cast_or_null<GenericTypeParamType>(
+                     getType(paramID).getPointer());
+      if (!param) {
+        error();
+        break;
+      }
+
+      genericParams.push_back(param);
+    }
+
+    // Read the generic requirements.
+    SmallVector<Requirement, 4> requirements;
+    readGenericRequirements(requirements);
+    auto info = GenericFunctionType::ExtInfo(callingConvention.getValue(),
+                                             thin,
+                                             noreturn);
+
+    typeOrOffset = GenericFunctionType::get(genericParams,
+                                            requirements,
+                                            getType(inputID),
+                                            getType(resultID),
+                                            info,
+                                            ctx);
     break;
   }
 

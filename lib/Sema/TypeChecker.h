@@ -240,12 +240,14 @@ public:
   /// \param type         The unbound generic type to which to apply arguments.
   /// \param loc          The source location for diagnostic reporting.
   /// \param genericArgs  The list of generic arguments to apply to the type.
+  /// \param resolver     The generic type resolver.
   ///
   /// \returns A BoundGenericType bound to the given arguments, or null on
   /// error.
   Type applyGenericArguments(Type type,
                              SourceLoc loc,
-                             MutableArrayRef<TypeLoc> genericArgs);
+                             MutableArrayRef<TypeLoc> genericArgs,
+                             GenericTypeResolver *resolver);
 
   /// \brief Replace the type \c T of a protocol member \c Member given the
   /// type of the base of a member access, \c BaseTy.

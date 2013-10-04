@@ -150,7 +150,13 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
 /// Apply generic arguments to the given type.
 Type TypeChecker::applyGenericArguments(Type type,
                                         SourceLoc loc,
-                                        MutableArrayRef<TypeLoc> genericArgs) {
+                                        MutableArrayRef<TypeLoc> genericArgs,
+                                        GenericTypeResolver *resolver) {
+  // Make sure we always have a resolver to use.
+  PartialGenericTypeToArchetypeResolver defaultResolver(*this);
+  if (!resolver)
+    resolver = &defaultResolver;
+
   auto unbound = type->getAs<UnboundGenericType>();
   if (!unbound) {
     // FIXME: Highlight generic arguments and introduce a Fix-It to remove
@@ -180,7 +186,8 @@ Type TypeChecker::applyGenericArguments(Type type,
   SmallVector<Type, 4> genericArgTypes;
   for (auto &genericArg : genericArgs) {
     // Validate the generic argument.
-    if (validateType(genericArg))
+    if (validateType(genericArg, /*allowUnboundGenerics=*/false,
+                     resolver))
       return nullptr;
 
     genericArgTypes.push_back(genericArg.getType());
@@ -212,11 +219,12 @@ Type TypeChecker::applyGenericArguments(Type type,
 }
 
 static Type applyGenericTypeReprArgs(TypeChecker &TC, Type type, SourceLoc loc,
-                                     MutableArrayRef<TypeRepr *> genericArgs) {
+                                     MutableArrayRef<TypeRepr *> genericArgs,
+                                     GenericTypeResolver *resolver) {
   SmallVector<TypeLoc, 8> args;
   for (auto tyR : genericArgs)
     args.push_back(tyR);
-  Type ty = TC.applyGenericArguments(type, loc, args);
+  Type ty = TC.applyGenericArguments(type, loc, args, resolver);
   if (!ty)
     return ErrorType::get(TC.Context);
   return ty;
@@ -261,7 +269,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
   if (!genericArgs.empty()) {
     // Apply the generic arguments to the type.
-    type = applyGenericTypeReprArgs(TC, type, loc, genericArgs);
+    type = applyGenericTypeReprArgs(TC, type, loc, genericArgs, resolver);
   }
 
   assert(type);
@@ -436,7 +444,8 @@ resolveIdentTypeComponent(TypeChecker &TC,
         // If there are generic arguments, apply them now.
         if (!comp.getGenericArgs().empty())
           memberType = applyGenericTypeReprArgs(TC, memberType, comp.getIdLoc(),
-                                                comp.getGenericArgs());
+                                                comp.getGenericArgs(),
+                                                resolver);
 
         comp.setValue(memberType);
         return memberType;
@@ -479,7 +488,7 @@ resolveIdentTypeComponent(TypeChecker &TC,
       // If there are generic arguments, apply them now.
       if (!comp.getGenericArgs().empty()) {
         foundType = applyGenericTypeReprArgs(TC, foundType, comp.getIdLoc(),
-                                          comp.getGenericArgs());
+                                          comp.getGenericArgs(), resolver);
       }
 
       comp.setValue(foundType);

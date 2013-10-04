@@ -1040,7 +1040,6 @@ protected:
     : Decl(K, DC), Name(name), NameLoc(NameLoc) { }
 
 public:
-
   /// \brief Return true if this is a definition of a decl, not a forward
   /// declaration (e.g. of a function) that is implemented outside of the
   /// swift code.
@@ -1952,6 +1951,8 @@ protected:
 
   CaptureInfo Captures;
 
+  Type InterfaceTy;
+
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, Identifier Name,
                        SourceLoc NameLoc,
                        VarDecl *ImplicitSelfDecl,
@@ -2032,6 +2033,19 @@ public:
 
   void setHasSelectorStyleSignature() {
     AbstractFunctionDeclBits.HasSelectorStyleSignature = true;
+  }
+
+  /// Retrieve the "interface" type of the function, which is the type of
+  /// the declaration as viewed from an outside. For a polymorphic function,
+  /// this will have generic function type using generic parameters rather than
+  /// archetypes.
+  ///
+  /// FIXME: Eventually, this will simply become the type of the function.
+  Type getInterfaceType() const { return InterfaceTy; }
+
+  void setInterfaceType(Type type) {
+    assert(InterfaceTy.isNull() && "Already have an interface type");
+    InterfaceTy = type;
   }
 
   /// Determine the default argument kind and type for the given argument index

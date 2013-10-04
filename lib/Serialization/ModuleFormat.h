@@ -279,6 +279,7 @@ namespace decls_block {
     BOUND_GENERIC_TYPE,
     BOUND_GENERIC_SUBSTITUTION,
     POLYMORPHIC_FUNCTION_TYPE,
+    GENERIC_FUNCTION_TYPE,
     ARRAY_SLICE_TYPE,
     ARRAY_TYPE,
     REFERENCE_STORAGE_TYPE,
@@ -335,7 +336,8 @@ namespace decls_block {
 
   using GenericTypeParamTypeLayout = BCRecordLayout<
     GENERIC_TYPE_PARAM_TYPE,
-    DeclIDField // generic type parameter decl
+    DeclIDField, // generic type parameter decl or depth
+    BCVBR<4>     // index + 1, or zero if we have a generic type parameter decl
   >;
 
   using AssociatedTypeTypeLayout = BCRecordLayout<
@@ -450,6 +452,17 @@ namespace decls_block {
     BCFixed<1>,  // thin?
     BCFixed<1>   // noreturn?
     // Trailed by its generic parameters, if the owning decl ID is 0.
+  >;
+
+  using GenericFunctionTypeLayout = BCRecordLayout<
+    GENERIC_FUNCTION_TYPE,
+    TypeIDField,         // input
+    TypeIDField,         // output
+    AbstractCCField,     // calling convention
+    BCFixed<1>,          // thin?
+    BCFixed<1>,          // noreturn?
+    BCArray<TypeIDField> // generic parameters
+                         // followed by requirements
   >;
 
   template <unsigned Code>
@@ -590,6 +603,7 @@ namespace decls_block {
     BCFixed<1>,   // transparent?
     BCVBR<5>,     // number of parameter patterns
     TypeIDField,  // type (signature)
+    TypeIDField,  // interface type
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
     BCBlob        // asmname, if any

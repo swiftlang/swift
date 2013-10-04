@@ -241,6 +241,9 @@ private:
   /// without moving the cursor.
   GenericParamList *maybeReadGenericParams(DeclContext *DC);
 
+  /// Reads a set of requirements from \c DeclTypeCursor.
+  void readGenericRequirements(SmallVectorImpl<Requirement> &requirements);
+
   /// Reads members of a DeclContext from \c DeclTypeCursor.
   ///
   /// The returned array is owned by the ASTContext.
