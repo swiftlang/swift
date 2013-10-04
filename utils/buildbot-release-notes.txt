@@ -66,6 +66,22 @@
   such as "1 + 1" or references to other enum cases are not yet supported.
   Raw values are also currently required to be unique for each case in an enum.
 
+* Attribute syntax has been redesigned (see rdar://10700853 and rdar://14462729)
+  so that attributes now preceed the declaration and use the @ character to
+  signify them.  Where before you might have written:
+  
+    func [someattribute=42] foo(a : Int) {}
+  
+  you now write:
+  
+    @someattribute=42
+    func foo(a : Int) {}
+
+  This flows a lot better (attributes don't push the name for declarations away,
+  and means that square brackets are only used for array types, collection
+  literals, and subscripting operations.
+
+
 2013-10-02
 ----------
 
