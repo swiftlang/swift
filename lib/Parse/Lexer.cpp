@@ -559,8 +559,8 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound) {
     return false;
 
   case '.':
-    // Prefer the '@' in "x@.y" to be a postfix op, not binary, but the '@' in
-    // "@.y" to be a prefix op, not binary.
+    // Prefer the '^' in "x^.y" to be a postfix op, not binary, but the '^' in
+    // "^.y" to be a prefix op, not binary.
     return !isLeftBound;
 
   default:
@@ -1364,6 +1364,7 @@ Restart:
     // Return EOF.
     return formToken(tok::eof, TokStart);
 
+  case '@': return formToken(tok::at_sign, TokStart);
   case '{': return formToken(tok::l_brace, TokStart);
   case '[': return formToken(tok::l_square, TokStart);
   case '(': return formToken(tok::l_paren, TokStart);
@@ -1378,13 +1379,6 @@ Restart:
   case '?': return formToken(isLeftBound(TokStart, BufferStart)
                                ? tok::question_postfix : tok::question_infix,
                              TokStart);
-
-  case '@':
-    // @ is only a token in SIL mode.
-    if (InSILMode)
-      return formToken(tok::sil_at_sign, TokStart);
-    diagnose(CurPtr-1, diag::lex_invalid_character);
-    goto Restart;
 
   case '#':
     // # is only a token in SIL mode.

@@ -95,6 +95,7 @@ PUNCTUATOR(comma,         ",")
 PUNCTUATOR(colon,         ":")
 PUNCTUATOR(semi,          ";")
 PUNCTUATOR(equal,         "=")
+PUNCTUATOR(at_sign,       "@")
 PUNCTUATOR(ellipsis,      "...")
 
 PUNCTUATOR(amp_prefix,    "&")
@@ -103,7 +104,6 @@ PUNCTUATOR(arrow,         "->")
 PUNCTUATOR(question_postfix, "?") // if left-bound
 PUNCTUATOR(question_infix,"?")    // if not left-bound
 
-PUNCTUATOR(sil_at_sign,   "@")    // Only in SIL mode.
 PUNCTUATOR(sil_dollar,    "$")    // Only in SIL mode.
 PUNCTUATOR(sil_pound,     "#")    // Only in SIL mode.
 PUNCTUATOR(sil_exclamation, "!")    // Only in SIL mode.

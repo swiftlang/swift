@@ -348,7 +348,7 @@ SILBasicBlock *SILParser::getBBForReference(Identifier Name, SourceLoc Loc) {
 ///   sil-global-name:
 ///     '@' identifier
 bool SILParser::parseGlobalName(Identifier &Name) {
-  return P.parseToken(tok::sil_at_sign, diag::expected_sil_value_name) ||
+  return P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
          parseSILIdentifier(Name, diag::expected_sil_value_name);
 }
 
@@ -2349,7 +2349,7 @@ bool Parser::parseDeclSIL() {
   bool isTransparent = false;
   if (parseSILLinkage(FnLinkage, *this) ||
       parseSILOptional(isTransparent, FunctionState, "transparent") ||
-      parseToken(tok::sil_at_sign, diag::expected_sil_function_name) ||
+      parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
     return true;
