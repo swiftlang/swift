@@ -66,6 +66,15 @@
   such as "1 + 1" or references to other enum cases are not yet supported.
   Raw values are also currently required to be unique for each case in an enum.
 
+  Enums with raw types implicitly conform to the 'RawRepresentable' protocol,
+  which exposes the fromRaw and toRaw methods to generics:
+
+    protocol RawRepresentable {
+      typealias RawType
+      static func fromRaw(raw: RawType) -> Self?
+      func toRaw() -> RawType
+    }
+
 * Attribute syntax has been redesigned (see rdar://10700853 and rdar://14462729)
   so that attributes now preceed the declaration and use the @ character to
   signify them.  Where before you might have written:
