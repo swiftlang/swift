@@ -260,28 +260,12 @@ public:
                                  Container->getLoc()))
         return nullptr;
 
-      for (auto Member : EnumerableProto->getMembers()) {
-        auto Value = dyn_cast<ValueDecl>(Member);
-        if (!Value)
-          continue;
-        
-        StringRef Name = Value->getName().str();
-        if (Name.equals("EnumeratorType") && isa<TypeDecl>(Value)) {
-          if (Conformance) {
-            RangeTy
-              = Conformance->getTypeWitness(cast<AssociatedTypeDecl>(Value))
-                  .Replacement;
-          } else {
-            RangeTy = cast<TypeDecl>(Value)->getDeclaredType();
-          }
-          RangeTy = TC.substMemberTypeWithBase(RangeTy, Value, ContainerType);
-        }
-      }
-
-      if (!RangeTy) {
-        TC.diagnose(EnumerableProto->getLoc(), diag::enumerable_protocol_broken);
+      RangeTy = TC.getWitnessType(ContainerType, EnumerableProto,
+                                  Conformance,
+                                  TC.Context.getIdentifier("EnumeratorType"),
+                                  diag::enumerable_protocol_broken);
+      if (!RangeTy)
         return nullptr;
-      }
 
       Expr *GetElements
         = TC.callWitness(Container, DC, EnumerableProto, Conformance,
@@ -313,37 +297,11 @@ public:
     
     // Gather the witnesses from the Range protocol conformance. These are
     // the functions we'll call.
-    FuncDecl *nextFn = 0;
-    Type ElementTy;
-    
-    for (auto Member : EnumeratorProto->getMembers()) {
-      auto Value = dyn_cast<ValueDecl>(Member);
-      if (!Value)
-        continue;
-      
-      StringRef Name = Value->getName().str();
-      if (Name.equals("Element") && isa<TypeDecl>(Value)) {
-        if (Conformance) {
-          ElementTy
-            = Conformance->getTypeWitness(cast<AssociatedTypeDecl>(Value))
-                .Replacement;
-        } else {
-          ElementTy = cast<TypeDecl>(Value)->getDeclaredType();
-        }
-        ElementTy = TC.substMemberTypeWithBase(ElementTy, Value, RangeTy);
-      } else if (Name.equals("next") && isa<FuncDecl>(Value)) {
-        if (Conformance) {
-          // FIXME: Ignoring substitutions here (?).
-          nextFn = cast<FuncDecl>(Conformance->getWitness(Value).getDecl());
-        } else
-          nextFn = cast<FuncDecl>(Value);
-      }
-    }
-    
-    if (!nextFn || !ElementTy) {
-      TC.diagnose(EnumeratorProto->getLoc(), diag::range_protocol_broken);
+    Type ElementTy = TC.getWitnessType(RangeTy, EnumeratorProto, Conformance,
+                                       TC.Context.getIdentifier("Element"),
+                                       diag::range_protocol_broken);
+    if (!ElementTy)
       return nullptr;
-    }
     
     // Compute the expression that determines whether the range is empty.
     Expr *Empty
