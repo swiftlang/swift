@@ -73,7 +73,6 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
   ASSERT_IMPLEMENTS_STATIC(CLASS, PARENT, classof, bool(const ValueBase*));
 #include "swift/SIL/SILNodes.def"
 
-
 SILFunction *SILInstruction::getFunction() {
   return getParent()->getParent();
 }
@@ -87,7 +86,6 @@ SILModule *SILInstruction::getModule() {
 const SILModule *SILInstruction::getModule() const {
   return getFunction()->getParent();
 }
-
 
 /// removeFromParent - This method unlinks 'self' from the containing basic
 /// block, but does not delete it.

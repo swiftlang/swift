@@ -328,7 +328,8 @@ public:
   void print(SILValue V) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(V))
       OS << "  // function_ref "
-         << demangleSymbolAsString(FRI->getFunction()->getName()) << "\n";
+         << demangleSymbolAsString(FRI->getReferencedFunction()->getName())
+         << "\n";
 
     OS << "  ";
 
@@ -515,12 +516,12 @@ public:
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
     OS << "function_ref ";
-    FRI->getFunction()->printName(OS);
+    FRI->getReferencedFunction()->printName(OS);
     OS << " : " << FRI->getType();
   }
   
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
-    OS << "builtin_function_ref " << SILDeclRef(BFI->getFunction())
+    OS << "builtin_function_ref " << SILDeclRef(BFI->getReferencedFunction())
        << " : " << BFI->getType();
   }
   

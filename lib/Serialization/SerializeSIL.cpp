@@ -363,7 +363,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(), 0,
         S.addTypeRef(BFR->getType().getSwiftRValueType()),
         (unsigned)BFR->getType().getCategory(),
-        S.addDeclRef(BFR->getFunction()), 0);
+        S.addDeclRef(BFR->getReferencedFunction()), 0);
     break;
   }
   case ValueKind::GlobalAddrInst: {
@@ -528,12 +528,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Use SILOneOperandLayout to specify the function type and the function
     // name (IdentifierID).
     const FunctionRefInst *FRI = cast<FunctionRefInst>(&SI);
+    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
         (unsigned)SI.getKind(), 0,
         S.addTypeRef(FRI->getType().getSwiftRValueType()),
         (unsigned)FRI->getType().getCategory(),
-        S.addIdentifierRef(Ctx.getIdentifier(FRI->getFunction()->getName())),
+        S.addIdentifierRef(Ctx.getIdentifier(ReferencedFunction->getName())),
         0);
     break;
   }

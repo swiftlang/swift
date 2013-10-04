@@ -290,7 +290,7 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
     return nullptr;
   assert(CalleeValue.getResultNumber() == 0);
 
-  SILFunction *CalleeFunction = FRI->getFunction();
+  SILFunction *CalleeFunction = FRI->getReferencedFunction();
   if (!CalleeFunction || CalleeFunction->empty() ||
       (CalleeFunction->getAbstractCC() != AbstractCC::Freestanding &&
        CalleeFunction->getAbstractCC() != AbstractCC::Method))

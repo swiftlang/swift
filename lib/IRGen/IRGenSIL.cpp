@@ -1015,20 +1015,21 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 
 void IRGenSILFunction::visitBuiltinFunctionRefInst(
                                              swift::BuiltinFunctionRefInst *i) {
-  setLoweredBuiltinValue(SILValue(i, 0), cast<FuncDecl>(i->getFunction()));
+  setLoweredBuiltinValue(SILValue(i, 0),
+                         cast<FuncDecl>(i->getReferencedFunction()));
 }
 
 void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
   // FIXME: pick the best available explosion level
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   llvm::Function *fnptr =
-    IGM.getAddrOfSILFunction(i->getFunction(), explosionLevel);
+    IGM.getAddrOfSILFunction(i->getReferencedFunction(), explosionLevel);
   
   // Store the function constant and calling
   // convention as a StaticFunction so we can avoid bitcasting or thunking if
   // we don't need to.
   setLoweredStaticFunction(SILValue(i, 0), fnptr,
-                           i->getFunction()->getAbstractCC(),
+                           i->getReferencedFunction()->getAbstractCC(),
                            explosionLevel);
 }
 

@@ -335,7 +335,7 @@ public:
   }
 
   void checkBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
-    require(isa<BuiltinModule>(BFI->getFunction()->getDeclContext()),
+    require(isa<BuiltinModule>(BFI->getReferencedFunction()->getDeclContext()),
          "builtin_function_ref must refer to a function in the Builtin module");
     require(BFI->getType().is<AnyFunctionType>(),
             "builtin_function_ref should have a function result");

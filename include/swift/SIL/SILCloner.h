@@ -234,7 +234,7 @@ void
 SILCloner<ImplClass>::visitBuiltinFunctionRefInst(BuiltinFunctionRefInst* Inst) {
   doPostProcess(Inst,
     Builder.createBuiltinFunctionRef(getOpLocation(Inst->getLoc()),
-                                     Inst->getFunction(),
+                                     Inst->getReferencedFunction(),
                                      getOpType(Inst->getType())));
 }
 
@@ -243,7 +243,7 @@ void
 SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst* Inst) {
   doPostProcess(Inst,
     Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
-                              getOpFunction(Inst->getFunction())));
+                              getOpFunction(Inst->getReferencedFunction())));
 }
 
 template<typename ImplClass>

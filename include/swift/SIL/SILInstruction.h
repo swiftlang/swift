@@ -493,7 +493,8 @@ public:
       Function(Function)
   {}
   
-  FuncDecl *getFunction() const { return Function; }
+  /// Return the referenced function.
+  FuncDecl *getReferencedFunction() const { return Function; }
   
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
@@ -526,7 +527,7 @@ public:
   FunctionRefInst(SILLocation Loc, SILFunction *F);
 
   /// Return the referenced function.
-  SILFunction *getFunction() const { return Function; }
+  SILFunction *getReferencedFunction() const { return Function; }
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }

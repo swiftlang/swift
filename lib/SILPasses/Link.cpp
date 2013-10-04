@@ -53,7 +53,7 @@ void swift::performSILLinking(SILModule *M) {
           SILValue Callee = AI->getCallee();
           // Handles FunctionRefInst only.
           if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef()))
-            CalleeFunction = FRI->getFunction();
+            CalleeFunction = FRI->getReferencedFunction();
 
           // When EnableLinkAll is true, we always link the Callee.
           TryLinking = EnableLinkAll ? true : AI->isTransparent();
@@ -61,7 +61,8 @@ void swift::performSILLinking(SILModule *M) {
         else if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(I)) {
           // When EnableLinkAll is true, we link the function referenced by
           // FunctionRefInst.
-          CalleeFunction = EnableLinkAll ? FRI->getFunction() : nullptr;
+          CalleeFunction = EnableLinkAll ? FRI->getReferencedFunction() :
+                                           nullptr;
           TryLinking = EnableLinkAll;
         }
 
