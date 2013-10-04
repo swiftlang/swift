@@ -480,17 +480,6 @@ bool TypeChecker::validateGenericFuncSignature(FuncDecl *func) {
   // Record the interface type.
   func->setInterfaceType(funcTy);
 
-  // FIXME: This should go into the AST verifier somehow.
-  assert(!funcTy.findIf([](Type type) -> bool {
-    if (auto dependent = type->getAs<DependentMemberType>()) {
-      if (!dependent->getAssocType()) {
-        dependent->dump();
-      }
-      return dependent->getAssocType() == nullptr;
-    }
-    return false;
-  }) && "Unresolved dependent member type");
-
   return false;
 }
 

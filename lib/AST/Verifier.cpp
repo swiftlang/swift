@@ -910,6 +910,30 @@ namespace {
       return verifyParsed(cast<AbstractFunctionDecl>(DD));
     }
 
+    void verifyChecked(AbstractFunctionDecl *AFD) {
+      // If there is an interface type, it shouldn't have any unresolved
+      // dependent member types.
+      // FIXME: This is a general property of the type system.
+      if (auto interfaceTy = AFD->getInterfaceType()) {
+        Type unresolvedDependentTy;
+        interfaceTy.findIf([&](Type type) -> bool {
+          if (auto dependent = type->getAs<DependentMemberType>()) {
+            if (dependent->getAssocType() == nullptr) {
+              unresolvedDependentTy = dependent;
+              return true;
+            }
+          }
+          return false;
+        });
+
+        if (unresolvedDependentTy) {
+          Out << "Unresolved dependent member type ";
+          unresolvedDependentTy->print(Out);
+          abort();
+        }
+      }
+    }
+
     void verifyChecked(DestructorDecl *DD) {
       auto *ND = DD->getExtensionType()->getNominalOrBoundGenericNominal();
       if (!isa<ClassDecl>(ND) && !DD->isInvalid()) {
