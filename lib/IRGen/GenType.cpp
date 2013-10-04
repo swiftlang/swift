@@ -892,7 +892,7 @@ llvm::PointerType *IRGenModule::requiresIndirectResult(CanType type,
                                                        ExplosionKind kind) {
   auto &ti = getTypeInfo(type);
   ExplosionSchema schema = ti.getSchema(kind);
-  if (schema.requiresIndirectResult())
+  if (schema.requiresIndirectResult(*this))
     return ti.getStorageType()->getPointerTo();
   return nullptr;
 }

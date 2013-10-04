@@ -2519,7 +2519,7 @@ namespace {
       // Peel off the result address if necessary.
       auto &sigResultTI = IGF.getTypeInfo(argSite.getSigResultType());
       llvm::Value *sigResultAddr = nullptr;
-      if (sigResultTI.getSchema(ExplosionLevel).requiresIndirectResult()) {
+      if (sigResultTI.getSchema(ExplosionLevel).requiresIndirectResult(IGF.IGM)) {
         sigResultAddr = sigParams.claimNext();
       }
 

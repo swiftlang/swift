@@ -184,9 +184,6 @@ public:
 /// An explosion schema is essentially the type of an Explosion.
 class ExplosionSchema {
 public:
-  /// The maximum number of scalars that we allow to be returned
-  /// directly.
-  enum { MaxScalarsForDirectResult = 3 };
 
   /// The schema for one atom of the explosion.
   class Element {
@@ -246,9 +243,7 @@ public:
     return size() == 1 && containsAggregate();
   }
 
-  bool requiresIndirectResult() const {
-    return containsAggregate() || size() > MaxScalarsForDirectResult;
-  }
+  bool requiresIndirectResult(IRGenModule &IGM) const;
 
   typedef SmallVectorImpl<Element>::iterator iterator;
   typedef SmallVectorImpl<Element>::const_iterator const_iterator;

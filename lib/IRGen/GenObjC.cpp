@@ -540,7 +540,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     = origMethodType.getFunctionTypeInfo(*IGM.SILMod)->getSemanticResultType();
   auto &appliedResultTI = IGM.getTypeInfo(appliedResultTy);
   if (appliedResultTI.getSchema(ExplosionKind::Minimal)
-        .requiresIndirectResult()) {
+        .requiresIndirectResult(IGM)) {
     indirectReturn = params.claimNext();
   }
 

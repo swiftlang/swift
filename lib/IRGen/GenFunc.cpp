@@ -91,13 +91,18 @@
 using namespace swift;
 using namespace irgen;
 
+bool ExplosionSchema::requiresIndirectResult(IRGenModule &IGM) const {
+  return containsAggregate() ||
+         size() > IGM.TargetInfo.MaxScalarsForDirectResult;
+}
+
 llvm::Type *ExplosionSchema::getScalarResultType(IRGenModule &IGM) const {
   if (size() == 0) {
     return IGM.VoidTy;
   } else if (size() == 1) {
     return begin()->getScalarType();
   } else {
-    SmallVector<llvm::Type*, MaxScalarsForDirectResult> elts;
+    SmallVector<llvm::Type*, 16> elts;
     for (auto &elt : *this) elts.push_back(elt.getScalarType());
     return llvm::StructType::get(IGM.getLLVMContext(), elts);
   }
@@ -662,7 +667,7 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
     ExplosionSchema schema(explosionKind);
     IGM.getSchema(formalResultType, schema);
 
-    hasAggregateResult = schema.requiresIndirectResult();
+    hasAggregateResult = schema.requiresIndirectResult(IGM);
     if (hasAggregateResult) {
       const TypeInfo &info = IGM.getTypeInfo(formalResultType);
       argTypes[0] = info.StorageType->getPointerTo();
