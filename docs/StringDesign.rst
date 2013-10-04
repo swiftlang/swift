@@ -307,19 +307,15 @@ Strings are **Indexable**
 Strings are Composed of ``Character``\ s
 ----------------------------------------
 
-``Character``, the element type of ``String``, represents a **Unicode
-extended grapheme cluster**.  This term is `precisely defined`__ by
-the Unicode specification, but it roughly means `what the user thinks
-of when she hears “character”`__. For example, the pair of code points
-“LATIN SMALL LETTER N, COMBINING TILDE” forms a single grapheme
-cluster, “ñ”.  The ``Character``\ s that make up a Swift string are
-determined by Unicode's `Default Grapheme Cluster Boundary
-Specification`__. [#char]_
+``Character``, the element type of ``String``, represents a **grapheme
+cluster**, as specified by a default or tailored Unicode segmentation
+algorithm.  This term is `precisely defined`__ by the Unicode
+specification, but it roughly means `what the user thinks of when she
+hears “character”`__. For example, the pair of code points “LATIN
+SMALL LETTER N, COMBINING TILDE” forms a single grapheme cluster, “ñ”.
 
-__ http://www.unicode.org/glossary/#extended_grapheme_cluster
+__ http://www.unicode.org/glossary/#grapheme_cluster
 __ http://useless-factor.blogspot.com/2007/08/unicode-implementers-guide-part-4.html
-
-__ http://www.unicode.org/reports/tr29/#Default_Grapheme_Cluster_Table
 
 Access to lower-level elements is still possible by explicit request:
 
@@ -328,6 +324,54 @@ Access to lower-level elements is still possible by explicit request:
    `// r1 : CodePoint = CodePoint(83) /* S */`
    |swift| s.bytes[s.bytes.start]
    `// r2 : UInt8 = UInt8(83)`
+
+Strings Support Flexible Segmentation
+=====================================
+
+The ``Character``\ s enumerated when simply looping over elements of a
+Swift string are `extended grapheme clusters`__ as determined by
+Unicode's `Default Grapheme Cluster Boundary
+Specification`__. [#char]_
+
+__ http://www.unicode.org/glossary/#extended_grapheme_cluster
+__ http://www.unicode.org/reports/tr29/#Default_Grapheme_Cluster_Table
+
+This segmentation offers naïve users of English, Chinese, French, and
+probably a few other languages what we think of as the “expected
+results.”  However, not every script_ can be segmented uniformly for
+all purposes.  For example, searching and collation require different
+segmentations in order to handle Indic scripts correctly.  To that
+end, strings support properties for more-specific segmentations:
+
+.. Note:: The following example needs a more interesting string in
+          order to demonstrate anything interesting.  Hopefully Aki
+          has some advice for us.
+
+.. parsed-literal::
+   |swift| for c in s { println("Extended Grapheme Cluster: \(c)") }
+   `Extended Grapheme Cluster: f`
+   `Extended Grapheme Cluster: o`
+   `Extended Grapheme Cluster: o`
+   |swift| for c in s.collationCharacters { 
+             println("Collation Grapheme Cluster: \(c)")
+           }
+   `Collation Grapheme Cluster: f`
+   `Collation Grapheme Cluster: o`
+   `Collation Grapheme Cluster: o`
+   |swift| for c in s.searchCharacters { 
+             println("Search Grapheme Cluster: \(c)")
+           }
+   `Search Grapheme Cluster: f`
+   `Search Grapheme Cluster: o`
+   `Search Grapheme Cluster: o`
+
+Also, each such segmentation provides a unique ``IndexType``, allowing
+a string to be indexed directly with different indexing schemes::
+
+   |swift| var i = s.searchCharacters.startIndex
+   `// r2 : UInt8 = UInt8(83)`
+
+.. _script: http://www.unicode.org/glossary/#script
 
 .. _sliceable:
 
