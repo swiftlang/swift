@@ -220,7 +220,7 @@ static bool CCPFunctionBody(SILFunction &F, SILModule &M) {
         << "\n");
 
   // Initialize the worklist to all of the instructions ready to process...
-  std::set<SILInstruction*> WorkList;
+  llvm::SetVector<SILInstruction*> WorkList;
   for (auto &BB : F) {
     for(auto &I : BB) {
       WorkList.insert(&I);
@@ -231,7 +231,7 @@ static bool CCPFunctionBody(SILFunction &F, SILModule &M) {
   bool Folded = false;
   while (!WorkList.empty()) {
     SILInstruction *I = *WorkList.begin();
-    WorkList.erase(WorkList.begin());
+    WorkList.remove(I);
 
     if (!I->use_empty())
 
@@ -259,7 +259,7 @@ static bool CCPFunctionBody(SILFunction &F, SILModule &M) {
         SILValue(I).replaceAllUsesWith(C);
 
         // Remove the unused instruction.
-        WorkList.erase(I);
+        WorkList.remove(I);
 
         // Eagerly DCE.
         recursivelyDeleteTriviallyDeadInstructions(I);
