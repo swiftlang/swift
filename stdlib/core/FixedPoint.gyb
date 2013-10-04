@@ -61,16 +61,19 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
     value = ${'maxWidthZero.value' if bits == maxBits else ('Builtin.trunc_Int%d_Int%d(maxWidthZero.value)' % (maxBits, bits) )}
   }
 
-  init [transparent] (v : Builtin.Int${bits}) {
+  @@transparent
+  init (v : Builtin.Int${bits}) {
     value = v
   }
 
-  static func [transparent] _convertFromBuiltinIntegerLiteral(val : Builtin.Int${maxBits}) -> ${Self} {
+  @@transparent 
+  static func _convertFromBuiltinIntegerLiteral(val : Builtin.Int${maxBits}) -> ${Self} {
     return ${Self}(${'val' if bits == maxBits else ('Builtin.trunc_Int%d_Int%d(val)' % (maxBits, bits) )})
   }
 
   typealias IntegerLiteralType = ${Self}
-  static func [transparent] convertFromIntegerLiteral(value : ${Self}) -> ${Self} {
+  @@transparent 
+  static func convertFromIntegerLiteral(value : ${Self}) -> ${Self} {
     return value
   }
 @if ArrayBound:
@@ -135,15 +138,18 @@ else:
   }
 
   typealias DistanceType = ${Self}
-  static func [transparent] sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
+  @@transparent 
+  static func sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
     var tmp = Builtin.int_${sign}sub_with_overflow_Int${bits}(lhs.value, rhs.value)
     return (${Self}(tmp.0), _getBool(tmp.1))
   }
-  static func [transparent] add(lhs: ${Self}, rhs: DistanceType) -> (${Self}, Bool) {
+  @@transparent 
+  static func add(lhs: ${Self}, rhs: DistanceType) -> (${Self}, Bool) {
     var tmp = Builtin.int_${sign}add_with_overflow_Int${bits}(lhs.value, rhs.value)
     return (${Self}(tmp.0), _getBool(tmp.1))
   }
-  static func [transparent] mul(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
+  @@transparent 
+  static func mul(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
     var tmp = Builtin.int_${sign}mul_with_overflow_Int${bits}(lhs.value, rhs.value)
     return (${Self}(tmp.0), _getBool(tmp.1))
   }
@@ -177,20 +183,25 @@ extension ${Self} {
 }
 
 // Unary plus
-func [prefix, transparent] +(rhs: ${Self}) -> ${Self} { return rhs }
+@@transparent @@prefix
+func +(rhs: ${Self}) -> ${Self} { return rhs }
 
 // Operations with masking and non-masking versions
 @for op,method in ('+','add'), ('*','mul'), ('-','sub'):
-func [transparent] &${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+
+@@transparent
+func &${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}.${method}(lhs, rhs).0
 }
-func [transparent] ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+@@transparent
+func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return overflowCheck(${Self}.${method}(lhs, rhs))
 }
 @end
 
 // Bitwise negate
-func [prefix, transparent] ~(rhs: ${Self}) -> ${Self} {
+@@transparent @@prefix
+func ~(rhs: ${Self}) -> ${Self} {
   return rhs ^ ${maskBits(bits)}
 }
 
@@ -198,14 +209,18 @@ func [prefix, transparent] ~(rhs: ${Self}) -> ${Self} {
 @  ('/',sign+'div'), ('%',sign+'rem'),
 @  ('<<','shl'), ('>>','ashr' if signed else 'lshr'),
 @  ('&','and'), ('^','xor'), ('|','or')):
-func [transparent] ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+
+@@transparent
+func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_Int${bits}(lhs.value, rhs.value))
 }
 @end
 
 // Compound assignments
 @for op in '+', '-', '*', '/', '%', '<<', '>>', '&', '|', '^':
-func [assignment, transparent] ${op}=(lhs: [inout] ${Self}, rhs: ${Self}) {
+
+@@transparent @@assignment
+func ${op}=(lhs: @@inout ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
 @end
