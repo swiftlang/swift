@@ -6,7 +6,7 @@ add_swift_library(swiftSILPasses
   DeadCodeElimination.cpp
   Link.cpp
   MandatoryInlining.cpp
-  MemoryPromotion.cpp
+  DefiniteInitialization.cpp
   StackToSSA.cpp
   DEPENDS swiftSILPassesUtils)
 
