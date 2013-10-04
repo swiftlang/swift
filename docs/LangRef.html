@@ -656,7 +656,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-import ::= 'import' <a href="#attribute-list">attribute-list</a> import-kind? import-path
+    decl-import ::=  <a href="#attribute-list">attribute-list</a> 'import' import-kind? import-path
     
     import-kind ::= 'typealias'
     import-kind ::= 'struct'
@@ -751,11 +751,11 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
+    decl-var        ::= <a href="#attribute-list">attribute-list</a> 'var' <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
 
-    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> <a href="#brace-item-list">brace-item-list</a>
+    decl-var        ::= <a href="#attribute-list">attribute-list</a> 'var' <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> <a href="#brace-item-list">brace-item-list</a>
 
-    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> '{' get-set '}'
+    decl-var        ::= <a href="#attribute-list">attribute-list</a> 'var' <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> '{' get-set '}'
   
    initializer     ::= '=' <a href="#expr">expr</a>
 
@@ -842,7 +842,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func        ::= 'static'? 'func' <a href="#attribute-list">attribute-list</a> <a href="#any-identifier">any-identifier</a> <a href="#generic-params">generic-params</a>? <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
+    decl-func        ::= <a href="#attribute-list">attribute-list</a> 'static'? 'func' <a href="#any-identifier">any-identifier</a> <a href="#generic-params">generic-params</a>? <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
   </pre>
   
   <p>'func' is a declaration for a function.  The argument list and
@@ -1025,10 +1025,10 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-enum ::= 'enum' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? enum-body
+    decl-enum ::= <a href="#attribute-list">attribute-list</a> 'enum' <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? enum-body
     enum-body ::= '{' decl* '}'
     
-    decl-enum-element ::= 'case' <a href="#attribute-list">attribute-list</a> enum-case (',' enum-case)*
+    decl-enum-element ::= <a href="#attribute-list">attribute-list</a> 'case' enum-case (',' enum-case)*
     enum-case ::= <a href="#identifier">identifier</a> <a href="#type-tuple">type-tuple</a>? ('->' <a href="#type">type</a>)?
   </pre>
   
@@ -1094,7 +1094,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? '{' decl-struct-body '}'
+    decl-struct ::= <a href="#attribute-list">attribute-list</a> 'struct' <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? '{' decl-struct-body '}'
     decl-struct-body ::= <a href="#decl">decl</a>*
   </pre>
 
@@ -1169,7 +1169,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-class ::= 'class' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? '{' decl-class-body '}'
+    decl-class ::= <a href="#attribute-list">attribute-list</a> 'class' <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? '{' decl-class-body '}'
     decl-class-body ::= <a href="#decl">decl</a>*
   </pre>
 
@@ -1207,7 +1207,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <!-- ===================================================================== -->
   
  <pre class="grammar">
-    decl-protocol ::= 'protocol' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? '{' protocol-member* '}'
+    decl-protocol ::= <a href="#attribute-list">attribute-list</a> 'protocol' <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? '{' protocol-member* '}'
   </pre>
   
   <p>A protocol declaration describes an abstract interface implemented by
@@ -1295,7 +1295,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   
   <pre class="grammar">
     decl-subscript        ::= subscript-head '{' <a href="#get-set">get-set<a/> '}'
-    <a id="subscript-head"></a>subscript-head        ::= 'subscript' <a href="#attribute-list">attribute-list</a> <a href="#pattern-tuple">pattern-tuple</a> '->' <a href="#type">type</a>
+    <a id="subscript-head"></a>subscript-head        ::= <a href="#attribute-list">attribute-list</a> 'subscript' <a href="#pattern-tuple">pattern-tuple</a> '->' <a href="#type">type</a>
   </pre>
 
   <p>A subscript declaration provides support for <a
@@ -1360,7 +1360,7 @@ if vec[3] {
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-constructor ::= 'init' <a href="#attribute-list">attribute-list</a> <a href="#generic-params">generic-params</a>? constructor-signature <a href="#brace-item-list">brace-item-list</a>
+    decl-constructor ::= <a href="#attribute-list">attribute-list</a> 'init' <a href="#generic-params">generic-params</a>? constructor-signature <a href="#brace-item-list">brace-item-list</a>
 
     constructor-signature ::= <a href="#pattern-tuple">pattern-tuple</a>
     constructor-signature ::= <a href="#identifier">identifier-or-any</a> <a href="#selector-tuple">selector-tuple</a>
@@ -1418,7 +1418,7 @@ if vec[3] {
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-constructor ::= 'destructor' '(' ')' <a href="#attribute-list">attribute-list</a> <a href="#brace-item-list">brace-item-list</a>
+    decl-constructor ::= <a href="#attribute-list">attribute-list</a> 'destructor' '(' ')' <a href="#brace-item-list">brace-item-list</a>
   </pre>
 
   <p>'destructor' declares a destructor for a class.  This function is called
@@ -1451,9 +1451,9 @@ if vec[3] {
   <pre class="grammar">
     attribute-list        ::= /*empty*/
     attribute-list        ::= attribute-list-clause attribute-list
-    attribute-list-clause ::= '[' ']'
-    attribute-list-clause ::= '[' attribute (',' attribute)* ']'
-    
+    attribute-list-clause ::= '@' attribute
+    attribute-list-clause ::= '@' attribute ','? attribute-list-clause
+
     attribute      ::= attribute-infix
     attribute      ::= attribute-resilience
     attribute      ::= attribute-inout
@@ -1461,12 +1461,9 @@ if vec[3] {
     attribute      ::= attribute-noreturn
   </pre>
   
-  <p>An attribute list is written as a sequence of clauses delimited
-    by square brackets, each of which contains a (possibly empty)
-    comma-separated list of attributes.  Neither the ordering of
-    attributes nor the grouping of attributes into separate clauses
-    has any semantic effect.  Attributes may not be repeated within a
-    list.</p>
+  <p>An attribute list is written as a sequence of attributes, each of which has
+     a leading '@' sign.  Attributes can be optionally comma separated.
+     Attributes may not be repeated within a list.</p>
   
   <!-- _____________________________________________________________________ -->
   <h4 id="attribute-infix">Infix Attributes</h4>
