@@ -314,6 +314,10 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       // Record the raw type.
       superclassTy = inheritedTy;
       superclassRange = inherited.getSourceRange();
+      
+      // Add the RawRepresentable conformance implied by the raw type.
+      allProtocols.insert(getProtocol(decl->getLoc(),
+                                      KnownProtocolKind::RawRepresentable));
       continue;
     }
 
@@ -1202,8 +1206,6 @@ public:
       visit(member);
 
     if (!IsFirstPass) {
-      checkExplicitConformance(ED, ED->getDeclaredTypeInContext());
-      
       // If we have a raw type, check it and the cases' raw values.
       if (auto rawTy = ED->getRawType()) {
         // Check that the raw type is convertible from one of the primitive
@@ -1298,10 +1300,11 @@ public:
                                     RawValueSource{elt, lastExplicitValueElt}});
           }
         }
-        
-        // Synthesize the RawRepresentable conformance.
-        DerivedConformance::deriveRawRepresentable(TC, ED);
       }
+      
+      // NB: Explicit conformance checking must happen *after* raw value
+      // validation for RawRepresentable conformance derivation to work.
+      checkExplicitConformance(ED, ED->getDeclaredTypeInContext());
     }
   }
 

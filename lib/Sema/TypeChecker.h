@@ -591,6 +591,18 @@ public:
                           SourceLoc ComplainLoc = SourceLoc(),
                           Decl *ExplicitConformance = nullptr);
 
+  /// Derive an implicit declaration to satisfy a requirement of a derived
+  /// protocol conformance.
+  ///
+  /// \param TypeDecl     The type for which the requirement is being derived.
+  /// \param Requirement  The protocol requirement.
+  ///
+  /// \returns nullptr if the derivation failed, or the derived declaration
+  ///          if it succeeded. If successful, the derived declaration is added
+  ///          to TypeDecl's body.
+  ValueDecl *deriveProtocolRequirement(NominalTypeDecl *TypeDecl,
+                                       ValueDecl *Requirement);
+  
   /// \brief Given a set of archetype substitutions, verify and record all of
   /// the required protocol-conformance relationships.
   bool checkSubstitutions(TypeSubstitutionMap &Substitutions,

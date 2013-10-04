@@ -21,17 +21,17 @@
 namespace swift {
   class NominalTypeDecl;
   class TypeChecker;
+  class ValueDecl;
   
 namespace DerivedConformance {
 
-// Synthesize a RawRepresentable conformance for an enum, if it has a valid
+// Derive a RawRepresentable requirement for an enum, if it has a valid
 // raw type and raw values for all of its cases.
 //
-// \returns false if the derivation was successful, in which case the needed
-//          implicit declarations will be added to the type AST. True if the
-//          derivation failed, in which case the type AST is unchanged.
-bool deriveRawRepresentable(TypeChecker &tc,
-                            NominalTypeDecl *type);
+// \returns the derived member, which will also be added to the type,
+ValueDecl *deriveRawRepresentable(TypeChecker &tc,
+                                  NominalTypeDecl *type,
+                                  ValueDecl *requirement);
 
 }
 }

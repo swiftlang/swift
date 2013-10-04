@@ -354,6 +354,16 @@ Type TypeDecl::getDeclaredType() const {
   return cast<NominalTypeDecl>(this)->getDeclaredType();
 }
 
+bool TypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
+  // Enums with raw types can derive their RawRepresentable conformance.
+  if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
+    auto rawRepresentable
+      = getASTContext().getProtocol(KnownProtocolKind::RawRepresentable);
+    return enumDecl->hasRawType() && protocol == rawRepresentable;
+  }
+  return false;
+}
+
 void NominalTypeDecl::computeType() {
   assert(!hasType() && "Nominal type declaration already has a type");
 

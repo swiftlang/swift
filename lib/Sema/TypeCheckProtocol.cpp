@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/ASTContext.h"
@@ -490,6 +491,13 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   TypeWitnessMap TypeWitnesses;
   TypeSubstitutionMap TypeMapping;
   InheritedConformanceMap InheritedMapping;
+  
+  // See whether we can derive members of this conformance.
+  NominalTypeDecl *DerivingTypeDecl = nullptr;
+  if (auto *NT = T->getAnyNominal()) {
+    if (NT->derivesProtocolConformance(Proto))
+      DerivingTypeDecl = NT;
+  }
 
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getProtocols()) {
@@ -537,13 +545,28 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     // Bind the implicit 'Self' type to the type T.
     auto archetype = AssociatedType->getArchetype();
     if (AssociatedType->isSelf()) {
-      TypeMapping[archetype]= T;
+      TypeMapping[archetype] = T;
       continue;
     }
 
     auto candidates = TC.lookupMemberType(metaT, AssociatedType->getName());
+    bool didDerive = false;
 
-    // If we didn't find any matches, consider this associated type to be
+    // If we didn't find any matches, try to derive the conformance.
+    if (!candidates && DerivingTypeDecl) {
+      if (auto derived = TC.deriveProtocolRequirement(DerivingTypeDecl,
+                                                      AssociatedType)) {
+        auto derivedType = cast<TypeDecl>(derived);
+        candidates.addResult({derivedType, derivedType->getDeclaredType()});
+        didDerive = true;
+      } else {
+        // Don't complain if derivation failed; derivation should have diagnosed
+        // the issue.
+        ComplainLoc = SourceLoc();
+      }
+    }
+
+    // If there are still no matches, consider this associated type to be
     // unresolved.
     if (!candidates) {
       unresolvedAssocTypes.push_back(AssociatedType);
@@ -584,9 +607,15 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     if (ComplainLoc.isInvalid())
       return nullptr;
     
+    // Don't blame the user if the compiler or stdlib is busted and derived
+    // conformance failed.
+    auto didNotConform = didDerive ? diag::protocol_derivation_is_broken
+                                   : diag::type_does_not_conform;
+    
+    
     if (!Viable.empty()) {
       if (!Complained) {
-        TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+        TC.diagnose(ComplainLoc, didNotConform,
                     T, Proto->getDeclaredType());
         Complained = true;
       }
@@ -594,6 +623,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       TC.diagnose(AssociatedType,
                   diag::ambiguous_witnesses_type,
                   AssociatedType->getName());
+
+      if (didDerive)
+        continue;
       
       for (auto Candidate : Viable)
         TC.diagnose(Candidate.first, diag::protocol_witness_type);
@@ -604,13 +636,15 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
     if (!NonViable.empty()) {
       if (!Complained) {
-        TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+        TC.diagnose(ComplainLoc, didNotConform,
                     T, Proto->getDeclaredType());
         Complained = true;
       }
-
       TC.diagnose(AssociatedType, diag::no_witnesses_type,
                   AssociatedType->getName());
+      
+      if (didDerive)
+        continue;
 
       for (auto Candidate : NonViable) {
         TC.diagnose(Candidate.first,
@@ -625,13 +659,16 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     
     if (ComplainLoc.isValid()) {
       if (!Complained) {
-        TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+        TC.diagnose(ComplainLoc, didNotConform,
                     T, Proto->getDeclaredType());
         Complained = true;
       }
-      
       TC.diagnose(AssociatedType, diag::no_witnesses_type,
                   AssociatedType->getName());
+      
+      if (didDerive)
+        continue;
+      
       for (auto candidate : candidates)
         TC.diagnose(candidate.first, diag::protocol_witness_type);
       
@@ -694,6 +731,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     unsigned numViable = 0;
     unsigned bestIdx = 0;
     bool invalidWitness = false;
+    bool didDerive = false;
     for (auto witness : witnesses) {
       // Don't match anything in a protocol.
       // FIXME: When default implementations come along, we can try to match
@@ -798,6 +836,26 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       // We have an ambiguity; diagnose it below.
     }
 
+    // If there were no viable witnesses, try to derive one.
+    if (numViable == 0 && DerivingTypeDecl) {
+      if (auto derived = TC.deriveProtocolRequirement(DerivingTypeDecl,
+                                                      Requirement)) {
+        witnesses.push_back(derived);
+        // If the compiler or stdlib is broken, the derived witness may not be
+        // viable.
+        if (matchWitness(TC, Proto, Requirement, reqType, T, derived,
+                         unresolvedAssocTypes).isViable()) {
+          numViable = 1;
+          continue;
+        }
+        didDerive = true;
+      } else {
+        // Don't complain if derivation failed; derivation should have diagnosed
+        // the issue.
+        ComplainLoc = SourceLoc();
+      }
+    }
+    
     // We have either no matches or an ambiguous match. Diagnose it.
 
     // If we're not supposed to complain, don't; just return null to indicate
@@ -812,10 +870,16 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       invalid = true;
       continue;
     }
-
+    
+    // Don't blame the user if the compiler or stdlib are broken and a
+    // derived conformance didn't work.
+    auto didNotConform = didDerive
+      ? diag::protocol_derivation_is_broken
+      : diag::type_does_not_conform;
+    
     // Complain that this type does not conform to this protocol.
     if (!Complained) {
-      TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+      TC.diagnose(ComplainLoc, didNotConform,
                   T, Proto->getDeclaredType());
       Complained = true;
     }
@@ -827,6 +891,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                 getRequirementKind(Requirement),
                 Requirement->getName(),
                 reqType);
+    
+    if (didDerive)
+      continue;
 
     // Diagnose each of the matches.
     for (const auto &match : matches)
@@ -1320,4 +1387,14 @@ void TypeChecker::resolveExistentialConformsToItself(ProtocolDecl *proto) {
                               SourceLoc(), checking);
 }
 
+ValueDecl *TypeChecker::deriveProtocolRequirement(NominalTypeDecl *TypeDecl,
+                                                  ValueDecl *Requirement) {
+  auto *protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
 
+  if (protocol == Context.getProtocol(KnownProtocolKind::RawRepresentable)) {
+    return DerivedConformance::deriveRawRepresentable(*this,
+                                                      TypeDecl, Requirement);
+  }
+  
+  return nullptr;
+}

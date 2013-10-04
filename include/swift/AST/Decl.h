@@ -1160,6 +1160,14 @@ public:
   void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
     Protocols = protocols;
   }
+  
+  /// \brief True if the type can implicitly derive a conformance for the given
+  /// protocol.
+  ///
+  /// If true, explicit conformance checking will synthesize implicit
+  /// declarations for requirements of the protocol that are not satisfied by
+  /// the type's explicit members.
+  bool derivesProtocolConformance(ProtocolDecl *protocol) const;
 
   /// \brief Retrieve the set of protocol conformance mappings for this type.
   ///

@@ -90,7 +90,8 @@ public:
 private:
     void printMembers(ArrayRef<Decl *> members, bool needComma = false);
     void printNominalDeclName(NominalTypeDecl *decl);
-    void printInherited(ArrayRef<TypeLoc> inherited,
+    void printInherited(const Decl *decl,
+                        ArrayRef<TypeLoc> inherited,
                         ArrayRef<ProtocolDecl *> protos,
                         Type superclass = {},
                         bool PrintAsProtocolComposition = false);
@@ -397,7 +398,8 @@ void PrintAST::printNominalDeclName(NominalTypeDecl *decl) {
   }
 }
 
-void PrintAST::printInherited(ArrayRef<TypeLoc> inherited,
+void PrintAST::printInherited(const Decl *decl,
+                              ArrayRef<TypeLoc> inherited,
                               ArrayRef<ProtocolDecl *> protos,
                               Type superclass,
                               bool PrintAsProtocolComposition) {
@@ -426,12 +428,17 @@ void PrintAST::printInherited(ArrayRef<TypeLoc> inherited,
     if (UseProtocolCompositionSyntax)
       OS << "protocol<";
     for (auto Proto : protos) {
-      if (!Proto->isSpecificProtocol(KnownProtocolKind::DynamicLookup)) {
-        if (PrintedInherited)
-          OS << ", ";
-        Proto->getDeclaredType()->print(OS);
-        PrintedInherited = true;
-      }
+      if (Proto->isSpecificProtocol(KnownProtocolKind::DynamicLookup))
+        continue;
+      if (isa<EnumDecl>(decl)
+          && cast<EnumDecl>(decl)->hasRawType()
+          && Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable))
+        continue;
+      
+      if (PrintedInherited)
+        OS << ", ";
+      Proto->getDeclaredType()->print(OS);
+      PrintedInherited = true;
     }
     if (UseProtocolCompositionSyntax)
       OS << ">";
@@ -446,24 +453,24 @@ void PrintAST::printInherited(ArrayRef<TypeLoc> inherited,
 
 template <typename DeclWithSuperclass>
 void PrintAST::printInheritedWithSuperclass(DeclWithSuperclass *decl) {
-  printInherited(decl->getInherited(), decl->getProtocols(),
+  printInherited(decl, decl->getInherited(), decl->getProtocols(),
                  decl->getSuperclass());
 }
 
 void PrintAST::printInherited(const TypeDecl *decl) {
-  printInherited(decl->getInherited(), decl->getProtocols());
+  printInherited(decl, decl->getInherited(), decl->getProtocols());
 }
 
 void PrintAST::printInherited(const EnumDecl *D) {
-  printInherited(D->getInherited(), D->getProtocols(), D->getRawType());
+  printInherited(D, D->getInherited(), D->getProtocols(), D->getRawType());
 }
 
 void PrintAST::printInherited(const ExtensionDecl *decl) {
-  printInherited(decl->getInherited(), decl->getProtocols());
+  printInherited(decl, decl->getInherited(), decl->getProtocols());
 }
 
 void PrintAST::printInherited(const GenericTypeParamDecl *D) {
-  printInherited(D->getInherited(), D->getProtocols(), D->getSuperclass(),
+  printInherited(D, D->getInherited(), D->getProtocols(), D->getSuperclass(),
                  true);
 }
 
