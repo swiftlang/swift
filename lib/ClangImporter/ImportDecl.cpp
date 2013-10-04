@@ -1575,6 +1575,11 @@ namespace {
         if (!setterIndices->getType()->isEqual(getterIndices->getType())) {
           setter = nullptr;
           setterIndices = nullptr;
+
+          // Check whether we've already created a subscript operation for
+          // this getter.
+          if (auto subscript = Impl.Subscripts[{getter, nullptr}])
+            return subscript;
         }
       }
 
