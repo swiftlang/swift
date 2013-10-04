@@ -2747,7 +2747,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
     // Only binary operators can be infix.
     if (!FDOrNull || !FDOrNull->isBinaryOperator()) {
-      TC.diagnose(Attrs.LSquareLoc, diag::invalid_infix_input);
+      TC.diagnose(Attrs.AtLoc, diag::invalid_infix_input);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }

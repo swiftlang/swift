@@ -145,10 +145,9 @@ enum class KernelOrShaderKind : unsigned char {
 /// DeclAttributes - These are attributes that may be applied to declarations.
 class DeclAttributes {
 public:
-  /// LSquareLoc/RSquareLoc - This is the location of the '[' and ']' in the
-  /// attribute specifier.  If this is an empty attribute specifier, then these
-  /// will be invalid locs.
-  SourceLoc LSquareLoc, RSquareLoc;
+  /// AtLoc - This is the location of the first '@' in the attribute specifier.
+  /// If this is an empty attribute specifier, then this will be an invalid loc.
+  SourceLoc AtLoc;
 
   ResilienceData Resilience;
   StringRef AsmName;
@@ -176,7 +175,7 @@ public:
 
   DeclAttributes() {}
 
-  bool isValid() const { return LSquareLoc.isValid(); }
+  bool isValid() const { return AtLoc.isValid(); }
 
   ResilienceData getResilienceData() const { return Resilience; }
   bool isInOut() const { return InOut; }

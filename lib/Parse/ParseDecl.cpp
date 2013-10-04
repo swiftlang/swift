@@ -125,8 +125,7 @@ static Resilience getResilience(AttrName attr) {
 
 /// \verbatim
 ///   attribute:
-///     'asmname' '=' identifier  (FIXME: This is a temporary hack until we
-///                                       can import C modules.)
+///     'asmname' '=' identifier
 ///     'infix' '=' numeric_constant
 ///     'infix_left' '=' numeric_constant
 ///     'infix_right' '=' numeric_constant
@@ -530,31 +529,43 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 ///
 /// \verbatim
 ///   attribute-list:
-///     attribute-list-clause*
-///   attribute-list-clause
-///     '[' ']'
-///     '[' attribute (',' attribute)* ']'
+///     /*empty*/
+///     attribute-list-clause attribute-list
+///   attribute-list-clause:
+///     '@' attribute
+///     '@' attribute ','? attribute-list-clause
 /// \endverbatim
-bool Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
-  SourceLoc leftLoc = consumeToken(tok::l_square);
-  Attributes.LSquareLoc = leftLoc;
+bool Parser::parseAttributeListPresent(DeclAttributes &Attributes,
+                                       bool OldStyle) {
+  if (OldStyle) {
+    Attributes.AtLoc = consumeToken(tok::l_square);
+    
+    do {
+      SourceLoc RightLoc;
+      if (parseList(tok::r_square, Attributes.AtLoc, RightLoc,
+                    tok::comma, /*OptionalSep=*/false,
+                    diag::expected_in_attribute_list,
+                    [&] () -> bool {
+            return parseAttribute(Attributes);
+          }))
+        return true;
 
-  do {
-    if (parseList(tok::r_square, leftLoc, Attributes.RSquareLoc,
-                  tok::comma, /*OptionalSep=*/false,
-                  diag::expected_in_attribute_list,
-                  [&] () -> bool {
-          return parseAttribute(Attributes);
-        }))
-      return true;
+      // A square bracket here begins another attribute-list-clause;
+      // consume it and continue.  Note that we'll overwrite
+      // Attributes.RSquareLoc so that it encompasses the entire range.
+    } while (consumeIf(tok::l_square));
 
-    leftLoc = Tok.getLoc();
-
-    // A square bracket here begins another attribute-list-clause;
-    // consume it and continue.  Note that we'll overwrite
-    // Attributes.RSquareLoc so that it encompasses the entire range.
-  } while (consumeIf(tok::l_square));
-
+  } else {
+    Attributes.AtLoc = Tok.getLoc();
+    do {
+      if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
+          parseAttribute(Attributes))
+        return true;
+   
+      // Attribute lists don't require separating commas.
+    } while (Tok.is(tok::at_sign) || consumeIf(tok::comma));
+  }
+  
   return false;
 }
 
@@ -769,12 +780,12 @@ ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags) {
   bool Exported;
   {
     DeclAttributes Attributes;
-    parseAttributeList(Attributes);
+    parseAttributeList(Attributes, true);
 
     Exported = Attributes.isExported();
     Attributes.Exported = false;
     if (!Attributes.empty())
-      diagnose(Attributes.LSquareLoc, diag::import_attributes);
+      diagnose(Attributes.AtLoc, diag::import_attributes);
   }
 
   if (!(Flags & PD_AllowTopLevel)) {
@@ -932,7 +943,7 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
   DeclAttributes Attr;
-  parseAttributeList(Attr);
+  parseAttributeList(Attr, true);
 
   ParserResult<TypeRepr> Ty = parseTypeIdentifierWithRecovery(
       diag::expected_type, diag::expected_ident_type_in_extension);
@@ -1182,7 +1193,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
         GetLoc = consumeToken();
 
         // FIXME: Implicitly add immutable attribute.
-        parseAttributeList(GetAttributes);
+        parseAttributeList(GetAttributes, true);
 
         if (Tok.isNot(tok::colon)) {
           diagnose(Tok, diag::expected_colon_get);
@@ -1254,7 +1265,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     DeclAttributes SetAttributes;
 
     // FIXME: Implicitly add immutable attribute.
-    parseAttributeList(SetAttributes);
+    parseAttributeList(SetAttributes, true);
 
     //   var-set-name    ::= '(' identifier ')'
     Identifier SetName;
@@ -1452,7 +1463,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
 
   do {
     DeclAttributes Attributes;
-    parseAttributeList(Attributes);
+    parseAttributeList(Attributes, true);
 
     ParserResult<Pattern> pattern = parsePattern();
     if (pattern.hasCodeCompletion())
@@ -1665,7 +1676,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
 
   DeclAttributes Attributes;
   // FIXME: Implicitly add immutable attribute.
-  parseAttributeList(Attributes);
+  parseAttributeList(Attributes, true);
 
   Identifier Name;
   SourceLoc NameLoc = Tok.getLoc();
@@ -1854,7 +1865,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags) {
   SourceLoc EnumLoc = consumeToken(tok::kw_enum);
 
   DeclAttributes Attributes;
-  parseAttributeList(Attributes);
+  parseAttributeList(Attributes, true);
   
   Identifier EnumName;
   SourceLoc EnumNameLoc;
@@ -1938,7 +1949,7 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
   SourceLoc CaseLoc = consumeToken(tok::kw_case);
 
   DeclAttributes Attributes;
-  if (parseAttributeList(Attributes)) {
+  if (parseAttributeList(Attributes, true)) {
     Status.setIsParseError();
     return Status;
   }
@@ -2124,7 +2135,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
   
   DeclAttributes Attributes;
-  parseAttributeList(Attributes);
+  parseAttributeList(Attributes, true);
 
   Identifier StructName;
   SourceLoc StructNameLoc;
@@ -2212,7 +2223,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
   SourceLoc ClassLoc = consumeToken(tok::kw_class);
   
   DeclAttributes Attributes;
-  parseAttributeList(Attributes);
+  parseAttributeList(Attributes, true);
 
   Identifier ClassName;
   SourceLoc ClassNameLoc;
@@ -2301,7 +2312,7 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
   DeclAttributes Attributes;
-  parseAttributeList(Attributes);
+  parseAttributeList(Attributes, true);
   
   SourceLoc NameLoc;
   Identifier ProtocolName;
@@ -2391,7 +2402,7 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
 
   // attribute-list
   DeclAttributes Attributes;
-  parseAttributeList(Attributes);
+  parseAttributeList(Attributes, true);
   
   // pattern-tuple
   if (Tok.isNot(tok::l_paren)) {
@@ -2515,7 +2526,7 @@ Parser::parseDeclConstructor(unsigned Flags) {
 
   // attribute-list
   DeclAttributes Attributes;
-  parseAttributeList(Attributes);
+  parseAttributeList(Attributes, true);
 
   // Parse the generic-params, if present.
   Scope S(this, ScopeKind::Generics);
@@ -2604,7 +2615,7 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
 
   // attribute-list
   DeclAttributes Attributes;
-  parseAttributeList(Attributes);
+  parseAttributeList(Attributes, true);
 
   ParserResult<Pattern> Params;
   if (Tok.is(tok::l_paren)) {

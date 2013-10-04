@@ -36,7 +36,7 @@ ParserResult<TypeRepr> Parser::parseTypeAnnotation() {
 ParserResult<TypeRepr> Parser::parseTypeAnnotation(Diag<> message) {
   // Parse attributes.
   DeclAttributes attrs;
-  parseAttributeList(attrs);
+  parseAttributeList(attrs, true);
 
   // Parse the type.
   ParserResult<TypeRepr> Ty = parseType(message);

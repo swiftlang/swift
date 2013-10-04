@@ -625,13 +625,14 @@ bool SILParser::parseSILType(SILType &Result) {
 
   // Parse attributes.
   DeclAttributes attrs;
-  P.parseAttributeList(attrs);
+  P.parseAttributeList(attrs, true);
+  P.parseAttributeList(attrs, false);
 
   // Handle [local_storage], which changes the SIL value category.
   if (attrs.isLocalStorage()) {
     // Require '*' on local_storage values.
     if (category != SILValueCategory::Address)
-      P.diagnose(attrs.LSquareLoc, diag::sil_local_storage_non_address);
+      P.diagnose(attrs.AtLoc, diag::sil_local_storage_non_address);
     category = SILValueCategory::LocalStorage;
     attrs.LocalStorage = false;
   }

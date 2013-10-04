@@ -598,33 +598,33 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics,
       if (FT == 0) {
         // auto_closures and objc_blocks require a syntactic function type.
         if (attrs.isAutoClosure())
-          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
                    "auto_closure");
         if (attrs.isObjCBlock())
-          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
                    "objc_block");
         if (attrs.hasCC())
-          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
                    "cc");
         if (attrs.isThin())
-          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
                    "thin");
         if (attrs.isNoReturn())
-          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
                    "noreturn");
         if (attrs.isKernel())
-          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
                    "kernel");
         if (attrs.isVertex())
-          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
                    "vertex");
         if (attrs.isFragment())
-          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
                    "fragment");
       } else if (attrs.isAutoClosure() &&
                  (InputTy == 0 || !InputTy->getFields().empty())) {
         // auto_closures must take () syntactically.
-        diagnose(attrs.LSquareLoc, diag::autoclosure_function_input_nonunit,
+        diagnose(attrs.AtLoc, diag::autoclosure_function_input_nonunit,
                  FT->getInput());
       } else {
         // Otherwise, we're ok, rebuild type, adding the AutoClosure and ObjcBlock
@@ -659,13 +659,13 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics,
     // Diagnose [local_storage] in nested positions.
     if (attrs.isLocalStorage()) {
       assert(TU.Kind == TranslationUnit::SIL);
-      diagnose(attrs.LSquareLoc, diag::sil_local_storage_nested);
+      diagnose(attrs.AtLoc, diag::sil_local_storage_nested);
       attrs.LocalStorage = false;
     }
 
     // FIXME: this is lame.
     if (!attrs.empty())
-      diagnose(attrs.LSquareLoc, diag::attribute_does_not_apply_to_type);
+      diagnose(attrs.AtLoc, diag::attribute_does_not_apply_to_type);
 
     return Ty;
   }

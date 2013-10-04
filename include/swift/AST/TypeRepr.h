@@ -129,7 +129,7 @@ public:
   static bool classof(const AttributedTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return Attrs.LSquareLoc; }
+  SourceLoc getStartLocImpl() const { return Attrs.AtLoc; }
   SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
   void printImpl(llvm::raw_ostream &OS) const;
   friend class TypeRepr;

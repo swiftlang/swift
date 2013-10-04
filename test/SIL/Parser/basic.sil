@@ -65,16 +65,16 @@ sil @named_tuple : $() -> (x: Builtin.Int64, Builtin.Int64) {
   %10 = return %9 : $(x: Builtin.Int64, Builtin.Int64)
 }
 
-sil @return_int : $[thin] (a: Int64) -> Int64 { // CHECK: $[thin] (a: Int64) -> Int64 {
+sil @return_int : $@thin (a: Int64) -> Int64 { // CHECK: $[thin] (a: Int64) -> Int64 {
 bb0(%0 : $Int64):                          // CHECK: bb0(%0 : $Int64):
   %1 = alloc_stack $Int64                  // CHECK: alloc_stack $Int64
   store %0 to %1#1 : $*Int64               // CHECK: store %0 to %1#1 : $*Int64
   %3 = load %1#1 : $*Int64                 // CHECK: load {{.*}} : $*Int64
-  dealloc_stack %1#0 : $*[local_storage] Int64 // CHECK: dealloc_stack {{.*}} : $*[local_storage] Int64
+  dealloc_stack %1#0 : $*@local_storage Int64 // CHECK: dealloc_stack {{.*}} : $*[local_storage] Int64
   return %3 : $Int64                       // CHECK: return {{.*}} : $Int64
 }
 
-sil @call_fn_pointer : $[thin] (a : () -> Int64) -> Int64 {
+sil @call_fn_pointer : $@thin (a : () -> Int64) -> Int64 {
 bb0(%0 : $() -> Int64):
   %1 = alloc_stack $() -> Int64            // CHECK: alloc_stack $() -> Int64
   store %0 to %1#1 : $*() -> Int64         // CHECK: store %0 to %1#1 : $*() -> Int64
@@ -83,14 +83,14 @@ bb0(%0 : $() -> Int64):
   %5 = apply %3() : $() -> Int64           // CHECK: apply %3() : $() -> Int64
   %6 = load %1#1 : $*() -> Int64             // CHECK: load %1#1 : $*() -> Int64
   strong_release %3 : $() -> Int64                // CHECK: release {{.*}} : $() -> Int64
-  dealloc_stack %1#0 : $*[local_storage] () -> Int64 // CHECK: dealloc_stack %1#0 : $*[local_storage] () -> Int64
+  dealloc_stack %1#0 : $*@local_storage () -> Int64 // CHECK: dealloc_stack %1#0 : $*[local_storage] () -> Int64
   return %5 : $Int64                       // CHECK: return %5 : $Int64
 }
 
-sil @return_constant : $[thin] () -> Int64 {  // CHECK: @return_constant
+sil @return_constant : $@thin () -> Int64 {  // CHECK-LABEL: @return_constant
 bb0:                                         // CHECK: bb0:
   // CHECK: function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val: Builtin.Int64), Int64.metatype) -> Int64
-  %1 = function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val: Builtin.Int64), Int64.metatype) -> Int64
+  %1 = function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin ((val: Builtin.Int64), Int64.metatype) -> Int64
 
   // CHECK: metatype $Int64.metatype
   %2 = metatype $Int64.metatype
@@ -99,20 +99,20 @@ bb0:                                         // CHECK: bb0:
   %3 = integer_literal $Builtin.Int64, 1
   
   // CHECK: apply
-  %4 = apply %1(%3, %2) : $[thin] ((val: Builtin.Int64), Int64.metatype) -> Int64
+  %4 = apply %1(%3, %2) : $@thin ((val: Builtin.Int64), Int64.metatype) -> Int64
   // CHECK: return
   %5 = return %4 : $Int64
 }
 
-sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val: Builtin.Int64), Int64.metatype) -> Int64
+sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin ((val: Builtin.Int64), Int64.metatype) -> Int64
 
 // Parse SIL generated from the following swift program:
 // func x(a : Bool) -> Int { if a { return 4 } else {return 5} }
-sil @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
-sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
+sil @_TSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin ((), [inout] Bool) -> Builtin.Int1
+sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
 
-// CHECK: @_T4test1xFT1aSb_Si
-sil @_T4test1xFT1aSb_Si : $[thin] (a : Bool) -> Int64 {
+// CHECK-LABEL: @_T4test1xFT1aSb_Si
+sil @_T4test1xFT1aSb_Si : $@thin (a : Bool) -> Int64 {
 // CHECK: bb0(%0 : $Bool):
 bb0(%0 : $Bool):
   // CHECK: alloc_stack $Bool
@@ -120,9 +120,9 @@ bb0(%0 : $Bool):
   // CHECK: store
   %2 = store %0 to %1#1 : $*Bool
   // CHECK: function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
-  %3 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
+  %3 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin ((), [inout] Bool) -> Builtin.Int1
   // CHECK: apply
-  %4 = apply %3(%1#1) : $[cc(method), thin] ((), [inout] Bool) -> Builtin.Int1
+  %4 = apply %3(%1#1) : $@cc(method) @thin ((), [inout] Bool) -> Builtin.Int1
   // CHECK: condbranch
   %5 = condbranch %4, bb1, bb2
 
@@ -135,24 +135,24 @@ bb1:
   // CHECK: integer_literal $Builtin.Int128, 4
   %8 = integer_literal $Builtin.Int128, 4
   // CHECK: apply
-  %9 = apply %6(%8, %7) : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
+  %9 = apply %6(%8, %7) : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: dealloc_stack
-  %10 = dealloc_stack %1#0 : $*[local_storage] Bool
+  %10 = dealloc_stack %1#0 : $*@local_storage Bool
   // CHECK: br
   br bb3(%9 : $Int64)
 
 // CHECK: bb2:
 bb2:
   // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
-  %12 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
+  %12 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: metatype $Int64.metatype
   %13 = metatype $Int64.metatype
   // CHECK: integer_literal $Builtin.Int128, 5
   %14 = integer_literal $Builtin.Int128, 5
   // CHECK: apply
-  %15 = apply %12(%14, %13) : $[thin] ((val: Builtin.Int128), Int64.metatype) -> Int64
+  %15 = apply %12(%14, %13) : $@thin ((val: Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: dealloc_stack
-  %16 = dealloc_stack %1#0 : $*[local_storage] Bool
+  %16 = dealloc_stack %1#0 : $*@local_storage Bool
   // CHECK: br
   br bb3(%15 : $Int64)
 
@@ -166,12 +166,12 @@ protocol P {
   func doIt()
 }
 
-sil @existentials : $[thin] (n : P) -> () {
+sil @existentials : $@thin (n : P) -> () {
 bb0(%0 : $*P):
   %1 = project_existential %0 : $*P to $*P.Self // CHECK: project_existential %0
 
   // CHECK: protocol_method {{.*}} : $*P, #P.doIt!1
-  %2 = protocol_method %0 : $*P, #P.doIt!1 : $[cc(method)] ((), [inout] P.Self) -> ()
+  %2 = protocol_method %0 : $*P, #P.doIt!1 : $@cc(method) ((), [inout] P.Self) -> ()
   // CHECK: apply
   %3 = apply %2(%1) : $[cc(method)] ((), [inout] P.Self) -> ()
   %4 = tuple ()                       // CHECK: tuple ()

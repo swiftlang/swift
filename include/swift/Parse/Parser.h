@@ -464,12 +464,17 @@ public:
   void addVarsToScope(Pattern *Pat, SmallVectorImpl<Decl*> &Decls,
                       DeclAttributes &Attributes,
                       PatternBindingDecl *PBD = nullptr);
-  bool parseAttributeList(DeclAttributes &Attributes) {
-    if (Tok.is(tok::l_square))
-      return parseAttributeListPresent(Attributes);
+  bool parseAttributeList(DeclAttributes &Attributes, bool OldStyle) {
+    if (OldStyle) {
+      if (Tok.is(tok::l_square))
+        return parseAttributeListPresent(Attributes, OldStyle);
+    } else {
+      if (Tok.is(tok::at_sign))
+        return parseAttributeListPresent(Attributes, OldStyle);
+    }
     return false;
   }
-  bool parseAttributeListPresent(DeclAttributes &Attributes);
+  bool parseAttributeListPresent(DeclAttributes &Attributes, bool OldStyle);
   bool parseAttribute(DeclAttributes &Attributes);
   
   ParserResult<ImportDecl> parseDeclImport(unsigned Flags);
