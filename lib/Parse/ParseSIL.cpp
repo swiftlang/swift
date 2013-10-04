@@ -625,8 +625,8 @@ bool SILParser::parseSILType(SILType &Result) {
 
   // Parse attributes.
   DeclAttributes attrs;
-  P.parseAttributeList(attrs, true);
   P.parseAttributeList(attrs, false);
+  P.parseAttributeList(attrs, true);
 
   // Handle [local_storage], which changes the SIL value category.
   if (attrs.isLocalStorage()) {
