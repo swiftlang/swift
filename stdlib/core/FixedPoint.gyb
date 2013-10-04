@@ -47,7 +47,7 @@ def int_name(bits, signed):
     return ('' if signed else 'U') + 'Int' + str(bits)
 }@
 
-@for (bits, signed) in all_ints():
+@ for (bits, signed) in all_ints():
 @   sign = 's' if signed else 'u'
 @   Self = int_name(bits, signed)
 @   ArrayBound = 'ArrayBound, ' if bits > 8 and bits < 128 else ''
@@ -76,7 +76,7 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
   static func convertFromIntegerLiteral(value : ${Self}) -> ${Self} {
     return value
   }
-@if ArrayBound:
+@ if ArrayBound:
   func _getBuiltinArrayBoundValue() -> Builtin.Int${bits} {
     return value
   }
@@ -85,16 +85,16 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
   func getArrayBoundValue() -> ${Self} {
     return self
   }
-@else:
+@ else:
 
-@end
+@ end
   func replPrint() {
     print(${
       'self' if bits == 64
       else (('String' if bits > 64 else 'Int64' if signed else 'UInt64') + '(self)')})
   }
 
-@max = maskBits((bits - 1) if signed else bits)
+@ max = maskBits((bits - 1) if signed else bits)
   // FIXME: these should be static vars when supported
   static func max() -> ${Self} { return ${max} }
   static func min() -> ${Self} { return ${'-%s-1' % max if signed else '0'} }
@@ -155,31 +155,31 @@ else:
   }
 }
 
-@if signed:
+@ if signed:
 extension ${Self} : SignedNumber {
   static func negate(rhs: ${Self}) -> (${Self}, Bool) { return ${Self}.sub(0, rhs) }
   func isNegative() -> Bool { return self < 0 }
 }
-@end
+@ end
 
 // construction from other integer types
 extension ${Self} {
-@for (src_bits, src_signed) in all_ints():
+@ for (src_bits, src_signed) in all_ints():
 @    That = int_name(src_bits, src_signed)
 @    if Self != That:
   init(v: ${That}) {
-         @if bits == src_bits:
+@      if bits == src_bits:
     value = v.value
-         @else:
+@      else:
     value = Builtin.${
     ('trunc' if src_bits > bits
     else 'sext' if src_signed
     else 'zext')
     }_Int${src_bits}_Int${bits}(v.value)
-         @end
+@      end
   }
 @    end
-@end
+@ end
 }
 
 // Unary plus
@@ -187,8 +187,7 @@ extension ${Self} {
 func +(rhs: ${Self}) -> ${Self} { return rhs }
 
 // Operations with masking and non-masking versions
-@for op,method in ('+','add'), ('*','mul'), ('-','sub'):
-
+@ for op,method in ('+','add'), ('*','mul'), ('-','sub'):
 @@transparent
 func &${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}.${method}(lhs, rhs).0
@@ -197,7 +196,7 @@ func &${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return overflowCheck(${Self}.${method}(lhs, rhs))
 }
-@end
+@ end
 
 // Bitwise negate
 @@transparent @@prefix
@@ -205,26 +204,24 @@ func ~(rhs: ${Self}) -> ${Self} {
   return rhs ^ ${maskBits(bits)}
 }
 
-@for op, name in (
+@ for op, name in (
 @  ('/',sign+'div'), ('%',sign+'rem'),
 @  ('<<','shl'), ('>>','ashr' if signed else 'lshr'),
 @  ('&','and'), ('^','xor'), ('|','or')):
-
 @@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_Int${bits}(lhs.value, rhs.value))
 }
-@end
+@ end
 
 // Compound assignments
-@for op in '+', '-', '*', '/', '%', '<<', '>>', '&', '|', '^':
-
+@ for op in '+', '-', '*', '/', '%', '<<', '>>', '&', '|', '^':
 @@transparent @@assignment
 func ${op}=(lhs: @@inout ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
-@end
-@end  # for bits in all_ints
+@ end
+@ end  # for bits in all_ints
 
 // FIXME: rdar://14897572 
 // hack to make non-x86 architectures build at a reasonable speed
