@@ -41,6 +41,7 @@ PROTOCOL(Enumerable)
 PROTOCOL(Enumerator)
 PROTOCOL(LogicValue)
 PROTOCOL(DynamicLookup)
+PROTOCOL(RawRepresentable)
 
 LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible)
 LITERAL_CONVERTIBLE_PROTOCOL(CharacterLiteralConvertible)

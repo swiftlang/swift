@@ -927,7 +927,8 @@ namespace index_block {
     BuiltinIntegerLiteralConvertible,
     BuiltinStringLiteralConvertible,
     
-    DynamicLookup
+    DynamicLookup,
+    RawRepresentable,
   };
 
   using KnownProtocolLayout = BCGenericRecordLayout<
