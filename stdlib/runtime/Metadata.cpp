@@ -190,13 +190,14 @@ instantiateGenericMetadata(GenericMetadata *pattern,
 
 /// The primary entrypoint.
 const void *
-swift::swift_dynamicCastClass(const void *object, const ClassMetadata *targetType) {
-  // FIXME: This is the wrong check; really we want to ask if the object is
-  // a Swift object, not if the target type is a Swift type.
-  // FIXME: This should also be conditionally compiled based on whether
-  // Objective-C support is enabled.
-  if (!targetType->isTypeMetadata())
-    return swift_dynamicCastObjCClass(object, targetType);
+swift::swift_dynamicCastClass(const void *object, 
+                              const ClassMetadata *targetType) {
+#if SWIFT_OBJC_INTEROP
+  // If the object is an Objective-C object then we 
+  // must not dereference it or its isa field directly.
+  // FIXME: optimize this for objects that have no ObjC inheritance.
+  return swift_dynamicCastObjCClass(object, targetType);      
+#endif
 
   const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
   do {
@@ -211,14 +212,12 @@ swift::swift_dynamicCastClass(const void *object, const ClassMetadata *targetTyp
 /// The primary entrypoint.
 const void *
 swift::swift_dynamicCastClassUnconditional(const void *object,
-                                      const ClassMetadata *targetType) {
-  // FIXME: This is the wrong check; really we want to ask if the object is
-  // a Swift object, not if the target type is a Swift type.
-  // FIXME: This should also be conditionally compiled based on whether
-  // Objective-C support is enabled.
+                                           const ClassMetadata *targetType) {
 #if SWIFT_OBJC_INTEROP
-  if (!targetType->isTypeMetadata())
-    return swift_dynamicCastObjCClassUnconditional(object, targetType);
+  // If the object is an Objective-C object then we 
+  // must not dereference it or its isa field directly.
+  // FIXME: optimize this for objects that have no ObjC inheritance.
+  return swift_dynamicCastObjCClassUnconditional(object, targetType);      
 #endif
 
   const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
