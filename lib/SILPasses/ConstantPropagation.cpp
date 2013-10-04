@@ -184,8 +184,8 @@ static SILInstruction *constantFoldInstruction(SILInstruction &I,
     if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand().getDef())) {
       unsigned FieldNo = TEI->getFieldNo();
       ValueBase *Elem = TheTuple->getElements()[FieldNo].getDef();
-      if (IntegerLiteralInst *ConstElem = dyn_cast<IntegerLiteralInst>(Elem)) {
-        return ConstElem;
+      if (SILInstruction *SILInstElem = dyn_cast<SILInstruction>(Elem)) {
+        return SILInstElem;
       }
     }
   }
@@ -202,8 +202,8 @@ static SILInstruction *constantFoldInstruction(SILInstruction &I,
         if (MD == SEI->getField()) {
           ValueBase *E = Struct->getElements()[FieldNo].getDef();
           // If the element the struct_extract is extracting is const, fold it.
-          if (IntegerLiteralInst *ConstE = dyn_cast<IntegerLiteralInst>(E)) {
-            return ConstE;
+          if (SILInstruction *SILInstElem = dyn_cast<SILInstruction>(E)) {
+            return SILInstElem;
           }
           break;
         }

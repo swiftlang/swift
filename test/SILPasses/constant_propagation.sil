@@ -107,6 +107,21 @@ bb0:
 // CHECK-NEXT: }
 }
 
+sil @test_struct_extract_folding_third : $() -> Bool {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 200
+  %1 = enum $Bool, #Bool.true!enumelt
+  %2 = tuple (%0 : $Builtin.Int64, %1 : $Bool)
+  %3 = tuple_extract %2 : $(Builtin.Int64, Bool), 1
+  return %3 : $Bool
+
+// CHECK-LABEL: sil @test_struct_extract_folding_third
+// CHECK: bb0:
+// CHECK-NEXT: %0 = enum $Bool, #Bool.true!enumelt
+// CHECK-NEXT: return %0 : $Bool
+// CHECK-NEXT: }
+}
+
 sil @testChainingCCP : $[thin] () -> Builtin.Int1 {
 bb0:
   %1 = builtin_function_ref #Builtin.trunc_Int64_Int1 : $[thin] Builtin.Int64 -> Builtin.Int1
