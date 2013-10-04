@@ -611,6 +611,9 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   ParserPosition BeginParserPosition;
   if (isCodeCompletionFirstPass())
     BeginParserPosition = getParserPosition();
+  
+  DeclAttributes Attributes;
+  parseAttributeList(Attributes, false);
 
   // If we see the 'static' keyword, parse it now.
   SourceLoc StaticLoc;
@@ -619,16 +622,16 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     StaticLoc = consumeToken();
     UnhandledStatic = true;
   }
-
+  
   ParserResult<Decl> DeclResult;
   ParserStatus Status;
   switch (Tok.getKind()) {
   case tok::kw_import:
-    DeclResult = parseDeclImport(Flags);
+    DeclResult = parseDeclImport(Flags, Attributes);
     Status = DeclResult;
     break;
   case tok::kw_extension:
-    DeclResult = parseDeclExtension(Flags);
+    DeclResult = parseDeclExtension(Flags, Attributes);
     Status = DeclResult;
     break;
   case tok::kw_var:
@@ -637,43 +640,43 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         .highlight(SourceRange(StaticLoc));
       UnhandledStatic = false;
     }
-    Status = parseDeclVar(Flags, Entries);
+    Status = parseDeclVar(Flags, Attributes, Entries);
     break;
   case tok::kw_typealias:
     DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
-                                     Flags & PD_InProtocol);
+                                     Flags & PD_InProtocol, Attributes);
     Status = DeclResult;
     break;
   case tok::kw_enum:
-    DeclResult = parseDeclEnum(Flags);
+    DeclResult = parseDeclEnum(Flags, Attributes);
     Status = DeclResult;
     break;
   case tok::kw_case:
-    Status = parseDeclEnumCase(Flags, Entries);
+    Status = parseDeclEnumCase(Flags, Attributes, Entries);
     break;
   case tok::kw_struct:
-    DeclResult = parseDeclStruct(Flags);
+    DeclResult = parseDeclStruct(Flags, Attributes);
     Status = DeclResult;
     break;
   case tok::kw_class:
-    DeclResult = parseDeclClass(Flags);
+    DeclResult = parseDeclClass(Flags, Attributes);
     Status = DeclResult;
     break;
   case tok::kw_init:
-    DeclResult = parseDeclConstructor(Flags);
+    DeclResult = parseDeclConstructor(Flags, Attributes);
     Status = DeclResult;
     break;
   case tok::kw_destructor:
-    DeclResult = parseDeclDestructor(Flags);
+    DeclResult = parseDeclDestructor(Flags, Attributes);
     Status = DeclResult;
     break;
   case tok::kw_protocol:
-    DeclResult = parseDeclProtocol(Flags);
+    DeclResult = parseDeclProtocol(Flags, Attributes);
     Status = DeclResult;
     break;
 
   case tok::kw_func:
-    DeclResult = parseDeclFunc(StaticLoc, Flags);
+    DeclResult = parseDeclFunc(StaticLoc, Flags, Attributes);
     Status = DeclResult;
     UnhandledStatic = false;
     break;
@@ -686,12 +689,12 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     }
     Status = parseDeclSubscript(Flags & PD_HasContainerType,
                                 !(Flags & PD_DisallowFuncDef),
-                                Entries);
+                                Attributes, Entries);
     break;
   
   case tok::identifier:
     if (isStartOfOperatorDecl(Tok, peekToken())) {
-      DeclResult = parseDeclOperator(Flags & PD_AllowTopLevel);
+      DeclResult = parseDeclOperator(Flags & PD_AllowTopLevel, Attributes);
       break;
     }
     SWIFT_FALLTHROUGH;
@@ -774,12 +777,12 @@ void Parser::parseDeclDelayed() {
 ///   import-path:
 ///     any-identifier ('.' any-identifier)*
 /// \endverbatim
-ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags) {
+ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags,
+                                                 DeclAttributes &Attributes) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
   
   bool Exported;
   {
-    DeclAttributes Attributes;
     parseAttributeList(Attributes, true);
 
     Exported = Attributes.isExported();
@@ -939,10 +942,10 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
 ///   extension:
 ///    'extension' attribute-list type-identifier inheritance? '{' decl* '}'
 /// \endverbatim
-ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
+ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags,
+                                                       DeclAttributes &Attr) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
-  DeclAttributes Attr;
   parseAttributeList(Attr, true);
 
   ParserResult<TypeRepr> Ty = parseTypeIdentifierWithRecovery(
@@ -1025,12 +1028,17 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags) {
 ///     'typealias' identifier inheritance? '=' type
 /// \endverbatim
 ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
-                                                  bool isAssociatedType) {
+                                                  bool isAssociatedType,
+                                                  DeclAttributes &Attributes) {
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
   Identifier Id;
   SourceLoc IdLoc;
   ParserStatus Status;
+  
+  if (!Attributes.empty())
+    diagnose(Attributes.AtLoc, diag::typealias_attributes);
+  
 
   Status |=
       parseIdentifierDeclName(*this, Id, IdLoc, tok::colon, tok::equal,
@@ -1194,6 +1202,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
         // FIXME: Implicitly add immutable attribute.
         parseAttributeList(GetAttributes, true);
+        parseAttributeList(GetAttributes, false);
 
         if (Tok.isNot(tok::colon)) {
           diagnose(Tok, diag::expected_colon_get);
@@ -1266,6 +1275,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
     // FIXME: Implicitly add immutable attribute.
     parseAttributeList(SetAttributes, true);
+    parseAttributeList(SetAttributes, false);
 
     //   var-set-name    ::= '(' identifier ')'
     Identifier SetName;
@@ -1451,7 +1461,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
 ///      'var' attribute-list pattern initializer? (',' pattern initializer? )*
 ///      'var' attribute-list identifier : type-annotation { get-set }
 /// \endverbatim
-ParserStatus Parser::parseDeclVar(unsigned Flags,
+ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls) {
   SourceLoc VarLoc = consumeToken(tok::kw_var);
 
@@ -1461,10 +1471,9 @@ ParserStatus Parser::parseDeclVar(unsigned Flags,
 
   unsigned FirstDecl = Decls.size();
 
+  parseAttributeList(Attributes, true);
+  
   do {
-    DeclAttributes Attributes;
-    parseAttributeList(Attributes, true);
-
     ParserResult<Pattern> pattern = parsePattern();
     if (pattern.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
@@ -1662,7 +1671,8 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 ///
 /// \note The caller of this method must ensure that the next token is 'func'.
 ParserResult<FuncDecl>
-Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
+Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
+                      DeclAttributes &Attributes) {
   bool HasContainerType = Flags & PD_HasContainerType;
 
   // Reject 'static' functions at global scope.
@@ -1674,7 +1684,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
-  DeclAttributes Attributes;
   // FIXME: Implicitly add immutable attribute.
   parseAttributeList(Attributes, true);
 
@@ -1861,10 +1870,10 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
 ///   decl-enum-body:
 ///      decl*
 /// \endverbatim
-ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags) {
+ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags,
+                                             DeclAttributes &Attributes) {
   SourceLoc EnumLoc = consumeToken(tok::kw_enum);
 
-  DeclAttributes Attributes;
   parseAttributeList(Attributes, true);
   
   Identifier EnumName;
@@ -1944,11 +1953,11 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags) {
 ///      'case' attribute-list enum-case (',' enum-case)*
 /// \endverbatim
 ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
+                                       DeclAttributes &Attributes,
                                        llvm::SmallVectorImpl<Decl *> &Decls) {
   ParserStatus Status;
   SourceLoc CaseLoc = consumeToken(tok::kw_case);
 
-  DeclAttributes Attributes;
   if (parseAttributeList(Attributes, true)) {
     Status.setIsParseError();
     return Status;
@@ -2131,10 +2140,10 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
 ///   decl-struct-body:
 ///      decl*
 /// \endverbatim
-ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
+ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags,
+                                                 DeclAttributes &Attributes) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
   
-  DeclAttributes Attributes;
   parseAttributeList(Attributes, true);
 
   Identifier StructName;
@@ -2219,10 +2228,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags) {
 ///   decl-class-body:
 ///      decl*
 /// \endverbatim
-ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
+ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags,
+                                               DeclAttributes &Attributes) {
   SourceLoc ClassLoc = consumeToken(tok::kw_class);
   
-  DeclAttributes Attributes;
   parseAttributeList(Attributes, true);
 
   Identifier ClassName;
@@ -2308,10 +2317,10 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags) {
 ///      decl-var-simple
 ///      decl-typealias
 /// \endverbatim
-ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
+ParserResult<ProtocolDecl> Parser::
+parseDeclProtocol(unsigned Flags, DeclAttributes &Attributes) {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
-  DeclAttributes Attributes;
   parseAttributeList(Attributes, true);
   
   SourceLoc NameLoc;
@@ -2396,12 +2405,12 @@ ParserResult<ProtocolDecl> Parser::parseDeclProtocol(unsigned Flags) {
 /// \endverbatim
 ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
                                         bool NeedDefinition,
+                                        DeclAttributes &Attributes,
                                         SmallVectorImpl<Decl *> &Decls) {
   ParserStatus Status;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
 
   // attribute-list
-  DeclAttributes Attributes;
   parseAttributeList(Attributes, true);
   
   // pattern-tuple
@@ -2512,7 +2521,7 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
 }
 
 ParserResult<ConstructorDecl>
-Parser::parseDeclConstructor(unsigned Flags) {
+Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
   assert(Tok.is(tok::kw_init));
   SourceLoc ConstructorLoc = consumeToken();
 
@@ -2525,7 +2534,6 @@ Parser::parseDeclConstructor(unsigned Flags) {
   }
 
   // attribute-list
-  DeclAttributes Attributes;
   parseAttributeList(Attributes, true);
 
   // Parse the generic-params, if present.
@@ -2610,11 +2618,11 @@ Parser::parseDeclConstructor(unsigned Flags) {
   return makeParserResult(CD);
 }
 
-ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
+ParserResult<DestructorDecl> Parser::
+parseDeclDestructor(unsigned Flags, DeclAttributes &Attributes) {
   SourceLoc DestructorLoc = consumeToken(tok::kw_destructor);
 
   // attribute-list
-  DeclAttributes Attributes;
   parseAttributeList(Attributes, true);
 
   ParserResult<Pattern> Params;
@@ -2703,12 +2711,16 @@ ParserResult<DestructorDecl> Parser::parseDeclDestructor(unsigned Flags) {
   return makeParserResult(DD);
 }
 
-ParserResult<OperatorDecl> Parser::parseDeclOperator(bool AllowTopLevel) {
+ParserResult<OperatorDecl> Parser::parseDeclOperator(bool AllowTopLevel,
+                                                  DeclAttributes &Attributes) {
   assert(Tok.isContextualKeyword("operator") &&
          "no 'operator' at start of operator decl?!");
 
   SourceLoc OperatorLoc = consumeToken(tok::identifier);
 
+  if (!Attributes.empty())
+    diagnose(Attributes.AtLoc, diag::operator_attributes);
+  
   auto kind = llvm::StringSwitch<Optional<DeclKind>>(Tok.getText())
     .Case("prefix", DeclKind::PrefixOperator)
     .Case("postfix", DeclKind::PostfixOperator)

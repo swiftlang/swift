@@ -456,7 +456,8 @@ public:
   };
   
   ParserResult<TypeDecl> parseDeclTypeAlias(bool WantDefinition,
-                                            bool isAssociatedType);
+                                            bool isAssociatedType,
+                                            DeclAttributes &Attributes);
 
   /// \brief Add the variables in the given pattern to the current scope,
   /// collecting the variables in the vector \c Decls and applying
@@ -477,18 +478,24 @@ public:
   bool parseAttributeListPresent(DeclAttributes &Attributes, bool OldStyle);
   bool parseAttribute(DeclAttributes &Attributes);
   
-  ParserResult<ImportDecl> parseDeclImport(unsigned Flags);
+  ParserResult<ImportDecl> parseDeclImport(unsigned Flags,
+                                           DeclAttributes &Attributes);
   ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
-  ParserResult<ExtensionDecl> parseDeclExtension(unsigned Flags);
-  ParserResult<EnumDecl> parseDeclEnum(unsigned Flags);
-  ParserStatus parseDeclEnumCase(unsigned Flags,
+  ParserResult<ExtensionDecl> parseDeclExtension(unsigned Flags,
+                                                 DeclAttributes &Attributes);
+  ParserResult<EnumDecl> parseDeclEnum(unsigned Flags,
+                                       DeclAttributes &Attributes);
+  ParserStatus parseDeclEnumCase(unsigned Flags, DeclAttributes &Attributes,
                                  SmallVectorImpl<Decl *> &decls);
   bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
                                SourceLoc LBLoc, SourceLoc &RBLoc,
                                Diag<> ErrorDiag, unsigned flags);
-  ParserResult<StructDecl> parseDeclStruct(unsigned Flags);
-  ParserResult<ClassDecl> parseDeclClass(unsigned Flags);
-  ParserStatus parseDeclVar(unsigned Flags, SmallVectorImpl<Decl *> &Decls);
+  ParserResult<StructDecl>
+  parseDeclStruct(unsigned Flags, DeclAttributes &Attributes);
+  ParserResult<ClassDecl>
+  parseDeclClass(unsigned Flags, DeclAttributes &Attributes);
+  ParserStatus parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
+                            SmallVectorImpl<Decl *> &Decls);
   bool parseGetSet(bool HasContainerType, Pattern *Indices, TypeLoc ElementTy,
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc);
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
@@ -496,21 +503,27 @@ public:
   Pattern *buildImplicitSelfParameter(SourceLoc Loc);
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                    const DeclAttributes &Attrs);
-  ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc, unsigned Flags);
+  ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
+                                       DeclAttributes &Attributes);
   bool parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
-  ParserResult<ProtocolDecl> parseDeclProtocol(unsigned Flags);
+  ParserResult<ProtocolDecl> parseDeclProtocol(unsigned Flags,
+                                               DeclAttributes &Attributes);
   
   ParserStatus parseDeclSubscript(bool HasContainerType,
                                   bool NeedDefinition,
+                                  DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls);
 
-  ParserResult<ConstructorDecl> parseDeclConstructor(unsigned Flags);
-  ParserResult<DestructorDecl> parseDeclDestructor(unsigned Flags);
+  ParserResult<ConstructorDecl>
+  parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes);
+  ParserResult<DestructorDecl>
+  parseDeclDestructor(unsigned Flags, DeclAttributes &Attributes);
 
   void addFunctionParametersToScope(ArrayRef<Pattern *> BodyPatterns,
                                     DeclContext *DC);
 
-  ParserResult<OperatorDecl> parseDeclOperator(bool AllowTopLevel);
+  ParserResult<OperatorDecl> parseDeclOperator(bool AllowTopLevel,
+                                               DeclAttributes &Attributes);
   ParserResult<OperatorDecl> parseDeclPrefixOperator(SourceLoc OperatorLoc,
                                                      SourceLoc PrefixLoc,
                                                      Identifier Name,

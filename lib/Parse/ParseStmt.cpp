@@ -49,6 +49,7 @@ bool Parser::isStartOfStmt(const Token &Tok) {
 /// isStartOfDecl - Return true if this is the start of a decl or decl-import.
 bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   switch (Tok.getKind()) {
+  case tok::at_sign:
   case tok::kw_static:
   case tok::kw_extension:
   case tok::kw_var:
@@ -635,8 +636,10 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     LPLocConsumed = true;
   }
   // Parse the first part, either a var, expr, or stmt-assign.
-  if (Tok.is(tok::kw_var)) {
-    ParserStatus VarDeclStatus = parseDeclVar(false, FirstDecls);
+  if (Tok.is(tok::kw_var) || Tok.is(tok::at_sign)) {
+    DeclAttributes Attributes;
+    parseAttributeList(Attributes, false);
+    ParserStatus VarDeclStatus = parseDeclVar(false, Attributes, FirstDecls);
     if (VarDeclStatus.isError())
       return VarDeclStatus; // FIXME: better recovery
   } else if (Tok.isNot(tok::semi)) {

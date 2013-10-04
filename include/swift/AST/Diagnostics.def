@@ -784,6 +784,10 @@ ERROR(invalid_attribute_for_lang,attribute_parsing,none,
 
 ERROR(import_attributes,attribute_parsing,none,
       "invalid attributes specified for import", ())
+ERROR(typealias_attributes,attribute_parsing,none,
+      "invalid attributes specified for typealias", ())
+ERROR(operator_attributes,attribute_parsing,none,
+      "invalid attributes specified for operator", ())
 
 // inout
 ERROR(inout_attribute_unknown_qualifier,attribute_parsing,none,
@@ -1034,7 +1038,7 @@ ERROR(prefix_not_an_operator,sema_tcd,none,
 ERROR(invalid_prefix_input,sema_tcd,none,
       "only unary operators can be declared 'prefix'", ())
 ERROR(assignment_without_inout,sema_tcd,none,
-      "assignment operator must have an initial [inout] argument", ())
+      "assignment operator must have an initial @inout argument", ())
 ERROR(conversion_not_function,sema_tcd,none,
       "conversion should be applied to an instance method", ())
 ERROR(conversion_not_instance_method,sema_tcd,none,
@@ -1274,7 +1278,7 @@ ERROR(incompatible_assoc,sema_tce,none,
       "operator is adjacent to operator of same precedence"
       " but incompatible associativity", ())
 ERROR(reference_non_inout,sema_tce,none,
-      "reference to %0 not used to initialize a [inout] parameter", (Type))
+      "reference to %0 not used to initialize a @inout parameter", (Type))
 NOTE(subscript_decl_here,sema_tca,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,sema_tce,none,
