@@ -27,7 +27,7 @@ using namespace swift;
 enum class PassKind {
   AllocBoxToStack,
   StackToSSA,
-  MemoryPromotion,
+  DefiniteInit,
   CCP,
   DCE,
   DataflowDiagnostics,
@@ -50,8 +50,8 @@ Passes(llvm::cl::desc("Passes:"),
                                    "allocbox-to-stack", "Promote memory"),
                         clEnumValN(PassKind::StackToSSA,
                                    "stack-to-ssa", "alloc_stack to SSA"),
-                        clEnumValN(PassKind::MemoryPromotion,
-                                   "memory-promotion", "Promote memory"),
+                        clEnumValN(PassKind::DefiniteInit,
+                                   "definite-init","definitive initialization"),
                         clEnumValN(PassKind::CCP,
                                    "constant-propagation",
                                    "Propagate constants"),
@@ -134,8 +134,8 @@ int main(int argc, char **argv) {
     case PassKind::StackToSSA:
       performSILStackToSSAPromotion(CI.getSILModule());
       break;
-    case PassKind::MemoryPromotion:
-      performSILMemoryPromotion(CI.getSILModule());
+    case PassKind::DefiniteInit:
+      performSILDefiniteInitialization(CI.getSILModule());
       break;
     case PassKind::CCP:
       performSILConstantPropagation(CI.getSILModule());

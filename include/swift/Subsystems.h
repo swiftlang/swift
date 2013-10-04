@@ -126,9 +126,10 @@ namespace swift {
   SILModule *performSILGeneration(TranslationUnit *TU,
                                   unsigned StartElem = 0);
 
-  /// performSILMemoryPromotion - Promote alloc_box uses into SSA registers and
-  /// perform definitive initialization analysis.
-  void performSILMemoryPromotion(SILModule *M);
+  /// performSILDefiniteInitialization - Perform definitive initialization
+  /// analysis and promote alloc_box uses into SSA registers for later SSA-based
+  /// dataflow passes.
+  void performSILDefiniteInitialization(SILModule *M);
 
   /// performSILAllocBoxToStackPromotion - Promote alloc_box into stack
   /// allocations.

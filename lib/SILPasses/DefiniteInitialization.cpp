@@ -1,4 +1,4 @@
-//===--- MemoryPromotion.cpp - Promote memory to SSA registers ------------===//
+//===--- DefiniteInitialization.cpp - Perform definite init analysis ------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -1259,9 +1259,10 @@ static void lowerRawSILOperations(SILFunction &Fn) {
 }
 
 
-/// performSILMemoryPromotion - Promote alloc_box uses into SSA registers and
-/// perform definitive initialization analysis.
-void swift::performSILMemoryPromotion(SILModule *M) {
+/// performSILDefiniteInitialization - Perform definitive initialization
+/// analysis and promote alloc_box uses into SSA registers for later SSA-based
+/// dataflow passes.
+void swift::performSILDefiniteInitialization(SILModule *M) {
   for (auto &Fn : *M) {
     // Walk through an promote all of the alloc_box's that we can.
     checkDefiniteInitialization(Fn);
