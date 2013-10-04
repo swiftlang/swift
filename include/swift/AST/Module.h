@@ -67,9 +67,9 @@ namespace swift {
 
   enum class ModuleKind {
     TranslationUnit,
-    BuiltinModule,
-    SerializedModule,
-    ClangModule
+    Builtin,
+    Serialized,
+    Clang
   };
 
 /// Constants used to customize name lookup.
@@ -156,7 +156,7 @@ protected:
   : DeclContext(DeclContextKind::Module, nullptr),
     Kind(Kind), LookupCachePimpl(0),
     Comp(C), Ctx(Ctx), Name(Name), ASTStage(Parsing) {
-    assert(Comp != nullptr || Kind == ModuleKind::BuiltinModule);
+    assert(Comp != nullptr || Kind == ModuleKind::Builtin);
   }
 
 public:
@@ -473,13 +473,13 @@ public:
 class BuiltinModule : public Module {
 public:
   BuiltinModule(Identifier Name, ASTContext &Ctx)
-    : Module(ModuleKind::BuiltinModule, Name, nullptr, Ctx) {
+    : Module(ModuleKind::Builtin, Name, nullptr, Ctx) {
     // The Builtin module is always well formed.
     ASTStage = TypeChecked;
   }
 
   static bool classof(const Module *M) {
-    return M->getKind() == ModuleKind::BuiltinModule;
+    return M->getKind() == ModuleKind::Builtin;
   }
   static bool classof(const DeclContext *DC) {
     return isa<Module>(DC) && classof(cast<Module>(DC));
@@ -527,8 +527,8 @@ public:
   }
 
   static bool classof(const Module *M) {
-    return M->getKind() == ModuleKind::SerializedModule ||
-           M->getKind() == ModuleKind::ClangModule;
+    return M->getKind() == ModuleKind::Serialized ||
+           M->getKind() == ModuleKind::Clang;
   }
   static bool classof(const DeclContext *DC) {
     return isa<Module>(DC) && classof(cast<Module>(DC));

@@ -55,7 +55,7 @@ public:
   StringRef getTopLevelModuleName() const;
 
   static bool classof(const Module *M) {
-    return M->getKind() == ModuleKind::ClangModule;
+    return M->getKind() == ModuleKind::Clang;
   }
 
   static bool classof(const DeclContext *DC) {

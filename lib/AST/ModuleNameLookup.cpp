@@ -164,7 +164,7 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
   // for us.
   bool isClangModule = false;
   if (accessPath.empty())
-    isClangModule = module->getKind() == ModuleKind::ClangModule;
+    isClangModule = module->getKind() == ModuleKind::Clang;
 
   SmallVector<ValueDecl *, 4> localDecls;
   if (!isClangModule || !cache.SearchedClangModule) {

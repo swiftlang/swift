@@ -46,18 +46,18 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
     switch (DC->getContextKind()) {
     case DeclContextKind::Module:
       switch (cast<Module>(DC)->getKind()) {
-      case ModuleKind::BuiltinModule:
+      case ModuleKind::Builtin:
         // All the builtin declarations are inherently fragile.
         return Resilience::InherentlyFragile;
 
-      case ModuleKind::ClangModule:
+      case ModuleKind::Clang:
         // Anything from a Clang module is inherently fragile.
         return Resilience::InherentlyFragile;
 
       // Global declarations are resilient according to whether the module
       // is resilient in this translation unit.
       case ModuleKind::TranslationUnit:
-      case ModuleKind::SerializedModule:
+      case ModuleKind::Serialized:
         if (explicitResilience != invalidResilience)
           return explicitResilience;
         return C->isResilient(cast<Module>(DC))
