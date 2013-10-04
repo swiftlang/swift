@@ -131,9 +131,9 @@ static bool optimizeAllocStack(AllocStackInst *ASI) {
     // need to treat them as a may-store.
     SILFunctionTypeInfo *fti = nullptr;
     if (auto AI = dyn_cast<ApplyInst>(User))
-      fti = AI->getFunctionTypeInfo(*AI->getModule());
+      fti = AI->getFunctionTypeInfo(AI->getModule());
     else if (auto PAI = dyn_cast<PartialApplyInst>(User))
-      fti = PAI->getFunctionTypeInfo(*PAI->getModule());
+      fti = PAI->getFunctionTypeInfo(PAI->getModule());
     
     if (fti && fti->isInOutOrIndirectReturn(UI->getOperandNumber()-1)) {
       Stores.push_back(User);

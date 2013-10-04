@@ -152,12 +152,12 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     // apply and partial_apply instructions do not capture the pointer when
     // it is passed through [inout] arguments or for indirect returns.
     if (auto apply = dyn_cast<ApplyInst>(User)) {
-      if (apply->getFunctionTypeInfo(*User->getModule())
+      if (apply->getFunctionTypeInfo(User->getModule())
             ->isInOutOrIndirectReturn(UI->getOperandNumber()-1))
         continue;
     }
     if (auto partialApply = dyn_cast<PartialApplyInst>(User)) {
-      if (partialApply->getFunctionTypeInfo(*User->getModule())
+      if (partialApply->getFunctionTypeInfo(User->getModule())
             ->isInOutOrIndirectReturn(UI->getOperandNumber()-1))
         continue;
       
@@ -195,7 +195,8 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   // mattering in the future, this can be generalized.
   SILInstruction *LastRelease = getLastRelease(ABI, Users, Releases, PDI);
 
-  auto &lowering = ABI->getModule()->Types.getTypeLowering(ABI->getElementType());
+  auto &lowering =
+    ABI->getModule().Types.getTypeLowering(ABI->getElementType());
   if (LastRelease == nullptr && !lowering.isTrivial()) {
     // If we can't tell where the last release is, we don't know where to insert
     // the destroy_addr for this box.

@@ -26,8 +26,8 @@ STATISTIC(NumLoadPromoted, "Number of loads promoted");
 STATISTIC(NumAssignRewritten, "Number of assigns rewritten");
 
 template<typename ...ArgTypes>
-static void diagnose(SILModule *M, SILLocation loc, ArgTypes... args) {
-  M->getASTContext().Diags.diagnose(loc.getSourceLoc(), Diagnostic(args...));
+static void diagnose(SILModule &M, SILLocation loc, ArgTypes... args) {
+  M.getASTContext().Diags.diagnose(loc.getSourceLoc(), Diagnostic(args...));
 }
 
 /// Emit the sequence that an assign instruction lowers to once we know
@@ -41,10 +41,10 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
 
   ++NumAssignRewritten;
 
-  auto *M = Inst->getModule();
+  auto &M = Inst->getModule();
   SILValue Src = Inst->getSrc();
 
-  auto &destTL = M->getTypeLowering(Inst->getDest().getType());
+  auto &destTL = M.getTypeLowering(Inst->getDest().getType());
 
   // If this is an initialization, or the storage type is trivial, we
   // can just replace the assignment with a store.
@@ -615,7 +615,7 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
   bool WantsValue = false;
   AccessPathTy AccessPath;
   if (isa<AssignInst>(Inst)) {
-    HasTrivialType = Inst->getModule()->
+    HasTrivialType = Inst->getModule().
       Types.getTypeLowering(StoredType).isTrivial();
 
     // Only compute the live-in type if we have a complete store of a
@@ -980,7 +980,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     if (auto *Apply = dyn_cast<ApplyInst>(User)) {
       SILType FnTy = Apply->getSubstCalleeType();
       
-      SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(*Apply->getModule());
+      SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(Apply->getModule());
       unsigned ArgumentNumber = UI->getOperandNumber()-1;
 
       // If this is an indirect return slot, it is a store.

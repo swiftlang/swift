@@ -98,8 +98,7 @@ public:
   SILFunction *getFunction();
   const SILFunction *getFunction() const;
   
-  SILModule *getModule();
-  const SILModule *getModule() const;
+  SILModule &getModule() const;
 
   SILLocation getLoc() const { return Loc; }
   SILDebugScope *getDebugScope() const { return DebugScope; }

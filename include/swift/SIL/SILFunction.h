@@ -84,10 +84,8 @@ public:
 
   ~SILFunction();
 
-  SILModule *getParent() { return ModuleAndLinkage.getPointer(); }
-  const SILModule *getParent() const { return ModuleAndLinkage.getPointer(); }
-    
   SILModule &getModule() const { return *ModuleAndLinkage.getPointer(); }
+
   SILType getLoweredType() const { return LoweredType; }
   SILFunctionTypeInfo *getFunctionTypeInfo() const {
     return LoweredType.getFunctionTypeInfo(getModule());

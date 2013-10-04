@@ -361,8 +361,8 @@ public:
     if (Verbose) {
       if (SILInstruction *I = dyn_cast<SILInstruction>(V.getDef())) {
         SILLocation L = I->getLoc();
-        SILModule *M = I->getParent()->getParent()->getParent();
-        if (M && !L.isNull()) {
+        SILModule &M = I->getModule();
+        if (!L.isNull()) {
           if (!printedSlashes) {
             OS.PadToColumn(50);
             OS << "//";
@@ -371,7 +371,7 @@ public:
 
           // To minimize output, only print the line and column number for
           // everything but the first instruction.
-          L.getSourceLoc().printLineAndColumn(OS, M->getASTContext().SourceMgr);
+          L.getSourceLoc().printLineAndColumn(OS, M.getASTContext().SourceMgr);
 
           // Print the type of location.
           switch (L.getKind()) {
@@ -397,7 +397,7 @@ public:
             OS << ":auto_gen";
 
         }
-        if (M && L.isNull()) {
+        if (L.isNull()) {
           if (!printedSlashes) {
             OS.PadToColumn(50);
             OS << "//";

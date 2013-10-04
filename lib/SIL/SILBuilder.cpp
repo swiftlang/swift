@@ -113,7 +113,7 @@ void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
 SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   // If we are concatenating, just create and return a new block.
   if (insertingAtEndOfBlock())
-    return new (*F.getParent()) SILBasicBlock(&F);
+    return new (F.getModule()) SILBasicBlock(&F);
 
   // Otherwise we need to split the current block at the insertion point.
   auto *NewBB = BB->splitBasicBlock(InsertPt);
@@ -131,7 +131,7 @@ SILValue SILBuilder::emitGeneralizedValue(SILLocation loc, SILValue v) {
         Lowering::getThinFunctionType(v.getType().getSwiftType(),
                                       AbstractCC::Freestanding);
       SILType freestandingSILType =
-        F.getParent()->Types.getLoweredLoadableType(freestandingType, 0);
+        F.getModule().Types.getLoweredLoadableType(freestandingType, 0);
       v = createConvertCC(loc, v, freestandingSILType);
     }
 
@@ -139,7 +139,7 @@ SILValue SILBuilder::emitGeneralizedValue(SILLocation loc, SILValue v) {
                                                   AbstractCC::Freestanding);
 
     v = createThinToThickFunction(loc, v,
-                       F.getParent()->Types.getLoweredLoadableType(thickTy));
+                           F.getModule().Types.getLoweredLoadableType(thickTy));
   }
 
   return v;

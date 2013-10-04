@@ -80,11 +80,8 @@ const SILFunction *SILInstruction::getFunction() const {
   return getParent()->getParent();
 }
 
-SILModule *SILInstruction::getModule() {
-  return getFunction()->getParent();
-}
-const SILModule *SILInstruction::getModule() const {
-  return getFunction()->getParent();
+SILModule &SILInstruction::getModule() const {
+  return getFunction()->getModule();
 }
 
 /// removeFromParent - This method unlinks 'self' from the containing basic
@@ -317,13 +314,11 @@ FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
 }
 
 const IntrinsicInfo &BuiltinFunctionRefInst::getIntrinsicInfo() {
-  SILModule *M = getParent()->getParent()->getParent();
-  return M->getIntrinsicInfo(Function);
+  return getModule().getIntrinsicInfo(Function);
 }
 
 const BuiltinInfo &BuiltinFunctionRefInst::getBuiltinInfo() {
-  SILModule *M = getParent()->getParent()->getParent();
-  return M->getBuiltinInfo(Function);
+  return getModule().getBuiltinInfo(Function);
 }
 
 static unsigned getWordsForBitWidth(unsigned bits) {

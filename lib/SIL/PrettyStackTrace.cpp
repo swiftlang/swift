@@ -57,6 +57,6 @@ void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
   if (!TheFn->getLocation().isNull()) {
     out << " for ";
     printSILLocation(out, TheFn->getLocation(),
-                     TheFn->getParent()->getASTContext());
+                     TheFn->getModule().getASTContext());
   }
 }

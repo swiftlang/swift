@@ -39,13 +39,9 @@ const SILFunction *SILArgument::getFunction() const {
   return getParent()->getParent();
 }
 
-SILModule *SILArgument::getModule() {
-  return getFunction()->getParent();
+SILModule &SILArgument::getModule() const {
+  return getFunction()->getModule();
 }
-const SILModule *SILArgument::getModule() const {
-  return getFunction()->getParent();
-}
-
 
 //===----------------------------------------------------------------------===//
 // SILBasicBlock Implementation
@@ -59,11 +55,8 @@ SILBasicBlock::~SILBasicBlock() {
   // iplist's destructor is going to destroy the InstList.
 }
 
-SILModule *SILBasicBlock::getModule() {
-  return getParent()->getParent();
-}
-const SILModule *SILBasicBlock::getModule() const {
-  return getParent()->getParent();
+SILModule &SILBasicBlock::getModule() const {
+  return getParent()->getModule();
 }
 
 /// eraseFromParent - This method unlinks 'self' from the containing SIL and

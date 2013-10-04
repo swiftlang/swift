@@ -382,7 +382,7 @@ public:
 
   void checkAssignInst(AssignInst *AI) {
     SILValue Src = AI->getSrc(), Dest = AI->getDest();
-    require(AI->getModule()->getStage() == SILStage::Raw,
+    require(AI->getModule().getStage() == SILStage::Raw,
             "assign instruction can only exist in raw SIL");
     require(Src.getType().isObject(), "Can't assign from an address source");
     require(Dest.getType().isAddress(), "Must store to an address dest");
@@ -392,13 +392,13 @@ public:
 
   void checkMarkUninitializedInst(MarkUninitializedInst *MU) {
     SILValue Src = MU->getOperand();
-    require(MU->getModule()->getStage() == SILStage::Raw,
+    require(MU->getModule().getStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
     require(Src.getType().isAddress(), "Must store to an address dest");
     require(Src.getType() == MU->getType(0),"operand and result type mismatch");
   }
   void checkMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
-    require(MFE->getModule()->getStage() == SILStage::Raw,
+    require(MFE->getModule().getStage() == SILStage::Raw,
             "mark_function_escape instruction can only exist in raw SIL");
     for (auto Elt : MFE->getElements())
       require(Elt.getType().isAddress(), "MFE must refer to variable addrs");

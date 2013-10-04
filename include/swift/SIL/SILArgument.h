@@ -39,8 +39,7 @@ public:
   SILFunction *getFunction();
   const SILFunction *getFunction() const;
 
-  SILModule *getModule();
-  const SILModule *getModule() const;
+  SILModule &getModule() const;
 
   const ValueDecl *getDecl() const { return Decl; }
 
