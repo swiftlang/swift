@@ -627,6 +627,15 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC) {
 /// into the REPL, process it by generating code to print it out.
 static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
                                               TypeChecker *TC) {
+  // If there is no initializer for the new variable, don't auto-print it.
+  // This would just cause a confusing definite initialization error.  Some
+  // day we will do some high level analysis of uninitialized variables
+  // (rdar://15157729) but until then, output a specialized error.
+  if (!PBD->getInit()) {
+    TC->diagnose(PBD->getStartLoc(), diag::repl_must_be_initialized);
+    return;
+  }
+  
   llvm::SmallString<16> PatternString;
   PatternBindingPrintLHS(PatternString).visit(PBD->getPattern());
   
@@ -651,6 +660,7 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   
   // Remove PBD from the list of Decls so we can insert before it.
   TopLevelCodeDecl *PBTLCD = cast<TopLevelCodeDecl>(TC->TU.Decls.back());
+  
   TC->TU.Decls.pop_back();
 
   // Create the meta-variable, let the typechecker name it.

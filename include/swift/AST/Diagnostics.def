@@ -1469,6 +1469,11 @@ ERROR(struct_not_fully_initialized,sil_analysis,none,
       "struct '%0' must be completely initialized before a member is stored to",
       (StringRef))
 
+ERROR(repl_must_be_initialized,sil_analysis,none,
+      "variables currently must have an initial value when entered at the "
+      "top level of the REPL", ())
+
+
 // Control flow diagnostics.
 ERROR(arithmetic_operation_overflow,sil_analysis,none,
       "arithmetic operation results in an overflow", ())
