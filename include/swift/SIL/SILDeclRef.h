@@ -136,6 +136,7 @@ struct SILDeclRef {
   static SILDeclRef getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);
 
   bool isNull() const { return loc.isNull(); }
+  explicit operator bool() const { return !isNull(); }
   
   bool hasDecl() const { return loc.is<ValueDecl *>(); }
   bool hasClosureExpr() const {

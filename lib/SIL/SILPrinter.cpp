@@ -18,6 +18,7 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/SILVTable.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
@@ -1139,6 +1140,9 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
   for (const SILFunction &f : *this)
     f.print(OS, Verbose);
 
+  for (const SILVTable &vt : getVTables())
+    vt.print(OS, Verbose);
+  
   OS << "\n\n";
 }
 
@@ -1147,4 +1151,18 @@ void ValueBase::dumpInContext() const {
 }
 void ValueBase::printInContext(llvm::raw_ostream &OS) const {
   SILPrinter(OS).printInContext(this);
+}
+
+void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
+  OS << "sil_vtable " << getClass()->getName() << " {\n";
+  for (auto &entry : getEntries()) {
+    OS << "  ";
+    entry.first.print(OS);
+    OS << ": " << entry.second->getName() << "\n";
+  }
+  OS << "}\n\n";
+}
+
+void SILVTable::dump() const {
+  print(llvm::errs());
 }

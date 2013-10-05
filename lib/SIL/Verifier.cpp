@@ -13,6 +13,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/SILVTable.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -1595,6 +1596,8 @@ public:
 };
 } // end anonymous namespace
 
+#undef require
+#undef requireObjectType
 #endif //NDEBUG
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
@@ -1610,17 +1613,59 @@ void SILFunction::verify(Module *M) const {
 #endif
 }
 
+/// Verify that a vtable follows invariants.
+void SILVTable::verify(const SILModule &M) const {
+#ifndef NDEBUG
+  for (auto &entry : getEntries()) {
+    // All vtable entries must be decls in a class context.
+    assert(entry.first.hasDecl() && "vtable entry is not a decl");
+    ValueDecl *decl = entry.first.getDecl();
+    auto theClass = dyn_cast_or_null<ClassDecl>(decl->getDeclContext());
+    assert(theClass && "vtable entry must refer to a class member");
+    
+    // The class context must be the vtable's class, or a superclass thereof.
+    auto c = theClass;
+    do {
+      if (c == getClass())
+        break;
+      if (auto ty = c->getSuperclass())
+        c = ty->getClassOrBoundGenericClass();
+      else
+        c = nullptr;
+    } while (c);
+    assert(c && "vtable entry must refer to a member of the vtable's class");
+    
+    // All function vtable entries must be at their natural uncurry level.
+    // FIXME: We should change this to uncurry level 1.
+    assert(!entry.first.isCurried && "vtable entry must not be curried");
+    
+    // TODO: Verify that property entries are dynamically dispatched under our
+    // finalized property dynamic dispatch rules.
+  }
+#endif
+}
 
 /// Verify the module.
 void SILModule::verify(Module *M) const {
 #ifndef NDEBUG
+  // Check all functions.
   llvm::StringSet<> functionNames;
-  for (SILFunction const &f : *this) {
+  for (const SILFunction &f : *this) {
     if (!functionNames.insert(f.getName())) {
       llvm::errs() << "Function redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
     f.verify(M);
+  }
+  
+  // Check all vtables.
+  llvm::DenseSet<ClassDecl*> vtableClasses;
+  for (const SILVTable &vt : getVTables()) {
+    if (!vtableClasses.insert(vt.getClass()).second) {
+      llvm::errs() << "Vtable redefined: " << vt.getClass()->getName() << "!\n";
+      assert(false && "triggering standard assertion failure routine");
+    }
+    vt.verify(*this);
   }
 #endif
 }

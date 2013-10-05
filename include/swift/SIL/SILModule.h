@@ -24,6 +24,7 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILType.h"
+#include "swift/SIL/SILVTable.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SetVector.h"
@@ -37,6 +38,7 @@ namespace swift {
   class ASTContext;
   class FuncDecl;
   class SILFunction;
+  class SILVTable;
   class SILTypeList;
   class AnyFunctionType;
   
@@ -66,7 +68,8 @@ enum class SILStage {
 /// when a Shily module is lowered to SIL.
 class SILModule {
 public:
-  typedef llvm::ilist<SILFunction> FunctionListType;
+  using FunctionListType = llvm::ilist<SILFunction>;
+  using VTableListType = llvm::ilist<SILVTable>;
   
 private:
   friend class SILBasicBlock;
@@ -83,8 +86,11 @@ private:
   /// SILFunction.
   ASTContext &TheASTContext;
   
-  /// The list of Functions in the module.
+  /// The list of SILFunctions in the module.
   FunctionListType functions;
+  
+  /// The list of SILVTables in the module.
+  VTableListType vtables;
   
   /// The collection of global variables used in the module.
   llvm::SetVector<VarDecl*> globals;
@@ -150,13 +156,29 @@ public:
     return globals.end();
   }
   
-  typedef FunctionListType::iterator iterator;
-  typedef FunctionListType::const_iterator const_iterator;
-  
+  using iterator = FunctionListType::iterator;
+  using const_iterator = FunctionListType::const_iterator;
+
   iterator begin() { return functions.begin(); }
   iterator end() { return functions.end(); }
   const_iterator begin() const { return functions.begin(); }
   const_iterator end() const { return functions.end(); }
+
+  using vtable_iterator = VTableListType::iterator;
+  using vtable_const_iterator = VTableListType::const_iterator;
+  
+  vtable_iterator vtable_begin() { return vtables.begin(); }
+  vtable_iterator vtable_end() { return vtables.end(); }
+
+  vtable_const_iterator vtable_begin() const { return vtables.begin(); }
+  vtable_const_iterator vtable_end() const { return vtables.end(); }
+  
+  Range<vtable_iterator> getVTables() {
+    return {vtables.begin(), vtables.end()};
+  }
+  Range<vtable_const_iterator> getVTables() const {
+    return {vtables.begin(), vtables.end()};
+  }
 
   SILFunction *lookup(StringRef Name) {
     // FIXME: Linear lookup is ridiculous here.
