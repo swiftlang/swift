@@ -1025,7 +1025,6 @@ void Lexer::lexCharacterLiteral() {
   }
 
   if (*CurPtr != '\'') {
-    diagnose(TokStart, diag::lex_unterminated_character_literal);
     // Skip until we see a single quote, newline, or EOF, whatever comes first.
     while (true) {
       const char C = *CurPtr;
@@ -1036,8 +1035,12 @@ void Lexer::lexCharacterLiteral() {
 
     // If we successfully skipped to the single quote, assume that it
     // terminates the character literal and eat it now.
-    if (*CurPtr == '\'')
+    if (*CurPtr == '\'') {
+      diagnose(TokStart, diag::lex_invalid_multi_code_point_character_literal);
       ++CurPtr;
+    } else {
+      diagnose(TokStart, diag::lex_unterminated_character_literal);
+    }
     return formToken(tok::unknown, TokStart);
   }
   ++CurPtr;
