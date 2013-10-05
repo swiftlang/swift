@@ -198,6 +198,9 @@ BUILTIN_MISC_OPERATION(ExtractElement, "extractelement", "n", Special)
 /// InsertElement has type (Vector<N, T>, T, Int32) -> Vector<N, T>.
 BUILTIN_MISC_OPERATION(InsertElement, "insertelement", "n", Special)
 
+/// StaticReport has type (Builtin.Int1, Builtin.Int1, Builtin.RawPointer) -> ()
+BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
+
 // FIXME: shufflevector
 
 #undef BUILTIN_MISC_OPERATION

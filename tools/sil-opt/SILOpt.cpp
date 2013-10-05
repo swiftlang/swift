@@ -31,7 +31,8 @@ enum class PassKind {
   CCP,
   DCE,
   DataflowDiagnostics,
-  MandatoryInlining
+  MandatoryInlining,
+  SILCleanup
 };
 
 static llvm::cl::opt<std::string>
@@ -63,6 +64,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::MandatoryInlining,
                                    "mandatory-inlining",
                                    "Inline transparent functions"),
+                        clEnumValN(PassKind::SILCleanup,
+                                   "cleanup",
+                                   "Cleanup SIL in preparation for IRGen"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -148,6 +152,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::MandatoryInlining:
       performSILMandatoryInlining(CI.getSILModule());
+      break;
+    case PassKind::SILCleanup:
+      performSILCleanup(CI.getSILModule());
       break;
     }
 

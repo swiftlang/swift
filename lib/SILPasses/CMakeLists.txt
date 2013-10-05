@@ -7,6 +7,7 @@ add_swift_library(swiftSILPasses
   Link.cpp
   MandatoryInlining.cpp
   DefiniteInitialization.cpp
+  SILCleanup.cpp
   StackToSSA.cpp
   DEPENDS swiftSILPassesUtils)
 

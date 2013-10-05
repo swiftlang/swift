@@ -78,14 +78,6 @@ static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
             break;
           }
 
-          // Diagnose the overflow.
-          if (Overflow) {
-            diagnose(M.getASTContext(),
-                     AI->getLoc().getSourceLoc(),
-                     diag::arithmetic_operation_overflow);
-            return nullptr;
-          }
-
           // Get the SIL subtypes of the returned tuple type.
           SILType FuncResType = AI->getFunctionTypeInfo(M)->getResultType();
           TupleType *T = FuncResType.castTo<TupleType>();

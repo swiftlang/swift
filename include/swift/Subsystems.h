@@ -153,7 +153,7 @@ namespace swift {
 
   /// \brief Analyze the SIL module for correcntess and generate user
   /// diagnostics if any.
-  void emitSILDataflowDiagnostics(const SILModule *M);
+  void emitSILDataflowDiagnostics(SILModule *M);
 
   /// \brief Inline functions marked transparent. Diagnose attempts to
   /// circularly inline
@@ -173,6 +173,8 @@ namespace swift {
                          ArrayRef<unsigned> inputFileBufferIDs = {},
                          StringRef moduleLinkName = {});
 
+  /// \brief Cleanup instructions/builtin calls not suitable for IRGen.
+  void performSILCleanup(SILModule *M);
 
   /// Turn the given translation unit into either LLVM IR or native code.
   ///

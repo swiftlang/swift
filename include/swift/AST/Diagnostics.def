@@ -1489,6 +1489,11 @@ ERROR(circular_transparent,sil_analysis,none,
 NOTE(note_while_inlining,sil_analysis,none,
      "while inlining here", ())
 
+// FIXME: We won't need this as it will be replaced with user-generated strings.
+// staticReport diagnostics.
+ERROR(static_report_error, sil_analysis, none,
+      "static report error", ())
+
 //==============================================================================
 // IR Generation Diagnostics
 //==============================================================================

@@ -488,6 +488,16 @@ static ValueDecl *getInsertElementOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
 }
 
+static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
+  auto BoolTy = BuiltinIntegerType::get(1, Context);
+  auto MessageTy = Context.TheRawPointerType;
+
+  TupleTypeElt ArgElts[] = { BoolTy, BoolTy, MessageTy };
+  Type ResultTy = TupleType::getEmpty(Context);
+  
+  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -859,6 +869,10 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InsertElement:
     if (Types.size() != 3) return nullptr;
     return getInsertElementOperation(Context, Id, Types[0], Types[1], Types[2]);
+
+  case BuiltinValueKind::StaticReport:
+    if (!Types.empty()) return nullptr;
+    return getStaticReportOperation(Context, Id);
   }
   llvm_unreachable("bad builtin value!");
 }

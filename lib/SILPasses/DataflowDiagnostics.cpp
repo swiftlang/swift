@@ -16,6 +16,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
@@ -119,11 +120,37 @@ static void diagnoseReturn(const SILInstruction *I, ASTContext &Context) {
   }
 }
 
-void swift::emitSILDataflowDiagnostics(const SILModule *M) {
+/// \brief Issue diagnostics whenever we see Builtin.static_report(1, ...).
+static void diagnoseStaticReports(const SILInstruction *I,
+                                  SILModule &M) {
+
+  // Find out if we are dealing with Builtin.staticReport().
+  if (const ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
+    if (const BuiltinFunctionRefInst *FR =
+        dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
+      const BuiltinInfo &B = M.getBuiltinInfo(FR->getReferencedFunction());
+      if (B.ID == BuiltinValueKind::StaticReport) {
+
+        // Report diagnostic if the first argument has been folded to '1'.
+        OperandValueArrayRef Args = AI->getArguments();
+        IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+        if (!V || V->getValue() != 1)
+          return;
+
+        diagnose(M.getASTContext(),
+                 I->getLoc().getSourceLoc(),
+                 diag::static_report_error);
+      }
+    }
+  }
+}
+
+void swift::emitSILDataflowDiagnostics(SILModule *M) {
   for (auto &Fn : *M)
     for (auto &BB : Fn)
       for (auto &I : BB) {
         diagnoseUnreachable(&I, M->getASTContext());
         diagnoseReturn(&I, M->getASTContext());
+        diagnoseStaticReports(&I, *M);
       }
 }

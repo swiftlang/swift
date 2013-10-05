@@ -57,10 +57,14 @@ static bool isInstructionTriviallyDead(SILInstruction *I) {
 /// \brief If the given instruction is dead, delete it along with its dead
 /// operands.
 ///
+/// \param I The instruction to be deleted.
+/// \param Force If Force is set, don't check if the top level instruction is
+///        considered dead - delete it regardless.
 /// \return Returns true if any instructions were deleted.
-bool swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I) {
+bool swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
+                                                       bool Force) {
   // If the instruction is not dead, there is nothing to do.
-  if (!I || !isInstructionTriviallyDead(I))
+  if (!I || (!Force && !isInstructionTriviallyDead(I)))
     return false;
 
   // Delete this instruction and others that become dead after it's deleted.
