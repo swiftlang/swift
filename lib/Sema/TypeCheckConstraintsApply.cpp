@@ -1906,6 +1906,18 @@ namespace {
       Expr *subExpr = coerceToType(expr->getSubExpr(), optType,
                                    cs.getConstraintLocator(expr, { }));
       if (!subExpr) return nullptr;
+
+      // Complain if the sub-expression was converted to T? via the
+      // inject-into-optional implicit conversion.
+      //
+      // It should be the case that that's always the last conversion applied.
+      if (isa<InjectIntoOptionalExpr>(subExpr)) {
+        cs.getTypeChecker().diagnose(subExpr->getLoc(),
+                                     diag::forcing_injected_optional,
+                               expr->getSubExpr()->getType()->getRValueType())
+          .highlight(subExpr->getSourceRange())
+          .fixItRemove(expr->getExclaimLoc());
+      }
       
       expr->setSubExpr(subExpr);
       expr->setType(valueType);
