@@ -564,10 +564,7 @@
     allows <code>a@.prop</code> to be parsed as <code>(a@).prop</code>
     rather than as <code>a @ .prop</code>.</p>
 
-  <p>As another exception, because the '!' operator is defined by the
-    standard library to destructure <a href="#type-optional">optional
-    types</a> and is thus expected to be used ubiquitously, it is also
-    only considered right-bound if not already left-bound.</p>
+  <p>The '!' operator is postfix if it is left-bound.</p>
 
   <p>The '?' operator is postfix (and therefore not the ternary
     operator) if it is left-bound.  The sugar form for <tt>Optional</tt>
@@ -2476,6 +2473,7 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-postfix  ::= <a href="#expr-subscript">expr-subscript</a>
     expr-postfix  ::= <a href="#expr-call">expr-call</a>
     expr-postfix  ::= <a href="#expr-optional">expr-optional</a>
+    expr-force-value  ::= <a href="#expr-force-value">expr-force-value</a>
 
   </pre>
 
@@ -3254,6 +3252,18 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
         <code>None : U?</code>.</li>
     </ul></p>
 
+    <!-- ===================================================================== -->
+  <h3 id="expr-force-value">Forcing an expression's value</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    expr-force-value ::= <a href="#expr-postfix">expr-postfix</a> '!'
+  </pre>
+
+  <p>The postfix '!' forces an optional value to its stored value
+  (i.e., the <code>x</code> in <code>.Some(x)</code>), failing at
+  runtime if the optional is <code>.None</code>. It is shorthand for
+  <code>.get()</code></p>
   
   <!-- ********************************************************************* -->
   <h2 id = "stmt">Statements</h2>

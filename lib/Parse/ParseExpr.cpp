@@ -151,7 +151,7 @@ ParserResult<Expr> Parser::parseExprIs() {
 ParserResult<Expr> Parser::parseExprAs() {
   SourceLoc asLoc = consumeToken(tok::kw_as);
 
-  bool unconditional = Tok.isContextualPunctuator("!");
+  bool unconditional = Tok.is(tok::exclaim_postfix);
   SourceLoc puncLoc;
   if (unconditional)
     puncLoc = consumeToken();
@@ -625,6 +625,9 @@ ParserResult<Expr> Parser::parseExprSuper() {
 ///   expr-call:
 ///     expr-postfix expr-paren
 ///
+///   expr-force-value:
+///     expr-postfix '!'
+///
 ///   expr-trailing-closure:
 ///     expr-postfix(trailing-closure) expr-closure
 ///
@@ -637,6 +640,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
 ///     expr-metatype
 ///     expr-subscript
 ///     expr-call
+///     expr-force-value
 ///
 ///   expr-postfix(trailing-closure):
 ///     expr-postfix(basic)
@@ -902,6 +906,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       Result = makeParserResult(
           new (Context) BindOptionalExpr(Result.get(), TokLoc));
       hasBindOptional = true;
+      continue;
+    }
+
+    // Check for a ! suffix.
+    if (consumeIf(tok::exclaim_postfix)) {
+      Result = makeParserResult(new (Context) ForceValueExpr(Result.get(), 
+                                                             TokLoc));
       continue;
     }
 

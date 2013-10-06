@@ -101,6 +101,8 @@ PUNCTUATOR(ellipsis,      "...")
 PUNCTUATOR(amp_prefix,    "&")
 PUNCTUATOR(arrow,         "->")
 
+PUNCTUATOR(exclaim_postfix, "!") // if left-bound
+
 PUNCTUATOR(question_postfix, "?") // if left-bound
 PUNCTUATOR(question_infix,"?")    // if not left-bound
 

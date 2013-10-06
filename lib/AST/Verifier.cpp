@@ -792,6 +792,12 @@ namespace {
       }
     }
 
+    void verifyChecked(ForceValueExpr *E) {
+      auto valueTy = E->getType();
+      auto optTy = OptionalType::get(valueTy, Ctx);
+      checkSameType(optTy, E->getSubExpr()->getType(), "optional type");
+    }
+
     void verifyChecked(OpaqueValueExpr *expr) {
       if (!OpaqueValues.count(expr)) {
         Out << "OpaqueValueExpr not introduced at this point in AST\n";

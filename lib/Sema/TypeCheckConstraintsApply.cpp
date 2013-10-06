@@ -1900,6 +1900,18 @@ namespace {
       return expr;
     }
 
+    Expr *visitForceValueExpr(ForceValueExpr *expr) {
+      Type valueType = simplifyType(expr->getType());
+      Type optType = OptionalType::get(valueType, cs.getASTContext());
+      Expr *subExpr = coerceToType(expr->getSubExpr(), optType,
+                                   cs.getConstraintLocator(expr, { }));
+      if (!subExpr) return nullptr;
+      
+      expr->setSubExpr(subExpr);
+      expr->setType(valueType);
+      return expr;
+    }
+
     void finalize() {
       // Check that all value type methods were fully applied.
       for (auto &unapplied : ValueTypeMemberApplications) {

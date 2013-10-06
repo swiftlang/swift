@@ -616,13 +616,6 @@ void Lexer::lexOperatorIdentifier() {
       diagnose(TokStart, diag::lex_unary_postfix_dot_is_reserved);
       // always emit 'tok::period' to avoid trickle down parse errors
       return formToken(tok::period, TokStart);
-    case '!':
-      // '!' is a normal operator except that it is treated as a postfix
-      // operator in cases where it is both left- and right-bound. To be
-      // interpreted as an infix operator, there must be space on both sides.
-      if (leftBound)
-        rightBound = false;
-      break;
     }
   } else if (CurPtr-TokStart == 2) {
     switch ((TokStart[0] << 8) | TokStart[1]) {
@@ -1427,6 +1420,8 @@ Restart:
   case '!':
     if (InSILBody)
       return formToken(tok::sil_exclamation, TokStart);
+    if (isLeftBound(TokStart, BufferStart))
+      return formToken(tok::exclaim_postfix, TokStart);
     return lexOperatorIdentifier();
       
   case '=': case '-': case '+': case '*': case '<': case '>':

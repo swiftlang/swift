@@ -568,12 +568,6 @@ public:
   
   /// Add a call site to the curry.
   void visitApplyExpr(ApplyExpr *e) {
-    // If this application is a dynamic member reference that is forced to
-    // succeed with the '!' operator, emit it as a direct invocation of the
-    // method we found.
-    if (emitForcedDynamicMemberRef(e))
-      return;
-
     if (e->isSuper()) {
       applySuper(e);
     } else {
@@ -779,11 +773,21 @@ public:
     }
   }
   
+  void visitForceValueExpr(ForceValueExpr *e) {
+    // If this application is a dynamic member reference that is forced to
+    // succeed with the '!' operator, emit it as a direct invocation of the
+    // method we found.
+    if (emitForcedDynamicMemberRef(e))
+      return;
+
+    visitExpr(e);
+  }
+
   /// If this application forces a dynamic member reference with !, emit
   /// a direct reference to the member.
-  bool emitForcedDynamicMemberRef(ApplyExpr *apply) {
+  bool emitForcedDynamicMemberRef(ForceValueExpr *e) {
     // Check whether the argument is a dynamic member reference.
-    auto arg = ignoreParensAndImpConversions(apply->getArg());
+    auto arg = ignoreParensAndImpConversions(e->getSubExpr());
     auto dynamicMemberRef = dyn_cast<DynamicMemberRefExpr>(arg);
     if (!dynamicMemberRef)
       return false;
@@ -798,27 +802,6 @@ public:
     // call site that will actually perform the invocation.
     if (callSites.empty())
       return false;
-
-    // Check whether the function we're calling is the postfix '!'.
-    auto fn = ignoreParensAndImpConversions(apply->getFn());
-    auto fnRef = dyn_cast<DeclRefExpr>(fn);
-    if (!fnRef)
-      return false;
-
-    auto fnDecl = dyn_cast<FuncDecl>(fnRef->getDecl());
-    if (!fnDecl)
-      return nullptr;
-
-    // We want the postfix '!' operator.
-    if (!fnDecl->isOperator() || !fnDecl->getName().str().equals("!") ||
-        !fnDecl->getAttrs().isPostfix())
-      return false;
-
-    // Must be defined in the 'swift' module.
-    auto fnDeclOwner = dyn_cast<Module>(fnDecl->getDeclContext());
-    if (!fnDeclOwner || !fnDeclOwner->isStdlibModule()) {
-      return false;
-    }
 
     // Only methods can be forced.
     auto *fd = dyn_cast<FuncDecl>(dynamicMemberRef->getMember().getDecl());
@@ -858,11 +841,9 @@ public:
     SILDeclRef member(fd, SILDeclRef::ConstructAtNaturalUncurryLevel,
                       /*isObjC=*/true);
 
-    auto methodTy = apply->getType();
+    auto methodTy = e->getType();
 
-    setCallee(Callee::forDynamic(gen, val, member, methodTy, apply));
-
-    // FIXME: Add substitutions if the dynamic member reference has them.
+    setCallee(Callee::forDynamic(gen, val, member, methodTy, e));
     return true;
   }
 };

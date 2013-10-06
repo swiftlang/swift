@@ -906,10 +906,16 @@ public:
   /// The result is a Builtin.Int1.
   SILValue emitDoesOptionalHaveValue(SILLocation loc, SILValue addr);
 
-  /// \brief Emit a call to the library intrinsic _getOptionalValue.
+  /// \brief Emit a call to the library intrinsic _getOptionalValue
+  /// given the address of the optional.
   ManagedValue emitGetOptionalValueFrom(SILLocation loc, ManagedValue addr,
                                         const TypeLowering &optTL,
                                         SGFContext C);
+
+  /// \brief Emit a call to the library intrinsic _getOptionalValue.
+  ManagedValue emitGetOptionalValue(SILLocation loc, ManagedValue value,
+                                    const TypeLowering &optTL,
+                                    SGFContext C);
 
   //===--------------------------------------------------------------------===//
   // Declarations

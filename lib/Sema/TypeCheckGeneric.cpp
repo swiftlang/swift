@@ -84,6 +84,7 @@ Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
   // here.
   auto pa = Builder.resolveType(gp);
   assert(pa && "Missing archetype for generic type parameter");
+  (void)pa;
 
   return gp;
 }

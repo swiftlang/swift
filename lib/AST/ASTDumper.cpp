@@ -1371,6 +1371,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitForceValueExpr(ForceValueExpr *E) {
+    OS.indent(Indent) << "(force_value_expr\n";
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.

@@ -831,6 +831,19 @@ SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
     .getUnmanagedValue();
 }
 
+ManagedValue SILGenFunction::emitGetOptionalValue(SILLocation loc,
+                                                  ManagedValue value,
+                                                  const TypeLowering &optTL,
+                                                  SGFContext C) {
+  SILType optType = value.getType().getObjectType();
+  CanType valueType = getOptionalValueType(optType);
+
+  FuncDecl *fn = getASTContext().getGetOptionalValueDecl();
+  Substitution sub = getSimpleSubstitution(fn, valueType);
+
+  return emitApplyOfLibraryIntrinsic(loc, fn, sub, value, valueType, C);
+}
+
 ManagedValue SILGenFunction::emitGetOptionalValueFrom(SILLocation loc,
                                                       ManagedValue src,
                                                       const TypeLowering &optTL,

@@ -1354,6 +1354,38 @@ public:
   }
 };
 
+/// \brief An expression that forces an optional to its underlying value.
+///
+/// \code
+/// func parseInt(s : String) -> Int? { ... }
+///
+/// var maybeInt = parseInt("5"); // returns an Int?
+/// var forcedInt = parseInt("5")!; // returns an Int; fails on empty optional
+/// \endcode
+///
+class ForceValueExpr : public Expr {
+  Expr *SubExpr;
+  SourceLoc ExclaimLoc;
+
+public:
+  ForceValueExpr(Expr *subExpr, SourceLoc exclaimLoc)
+    : Expr(ExprKind::ForceValue, /*Implicit=*/ false, Type()),
+      SubExpr(subExpr), ExclaimLoc(exclaimLoc) {}
+
+  SourceRange getSourceRange() const {
+    return SourceRange(SubExpr->getStartLoc(), ExclaimLoc);
+  }
+  SourceLoc getLoc() const { return getExclaimLoc(); }
+  SourceLoc getExclaimLoc() const { return ExclaimLoc; }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *expr) { SubExpr = expr; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ForceValue;
+  }
+};
+
 /// ImplicitConversionExpr - An abstract class for expressions which
 /// implicitly convert the value of an expression in some way.
 class ImplicitConversionExpr : public Expr {

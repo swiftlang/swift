@@ -981,22 +981,34 @@ namespace {
       return Type();
     }
 
+    /// Get the type T?
+    ///
+    ///  This is not the ideal source location, but it's only used for
+    /// diagnosing ill-formed standard libraries, so it really isn't
+    /// worth QoI efforts.
+    Type getOptionalType(SourceLoc optLoc, Type valueTy) {
+      auto optTy = CS.getTypeChecker().getOptionalType(optLoc, valueTy);
+      if (!optTy || CS.getTypeChecker().requireOptionalIntrinsics(optLoc))
+        return Type();
+
+      return optTy;
+    }
+
     Type visitBindOptionalExpr(BindOptionalExpr *expr) {
       // The operand must be coercible to T?, and we will have type T.
-      auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
                                             /*options*/ 0);
 
-      auto optLoc = expr->getQuestionLoc();
-      auto optTy = CS.getTypeChecker().getOptionalType(optLoc, resultTy);
-      if (!optTy || CS.getTypeChecker().requireOptionalIntrinsics(optLoc))
+      Type optTy = getOptionalType(expr->getQuestionLoc(), valueTy);
+      if (!optTy)
         return Type();
 
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSubExpr()->getType(), optTy,
                        CS.getConstraintLocator(expr, {}));
-      return resultTy;
+      return valueTy;
     }
-
+    
     Type visitOptionalEvaluationExpr(OptionalEvaluationExpr *expr) {
       // The operand must be coercible to T? for some type T.  We'd
       // like this to be the smallest possible nesting level of
@@ -1005,18 +1017,31 @@ namespace {
       auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
                                            TVO_PrefersSubtypeBinding);
 
-      // Get the type T?.  (This is not the ideal source location, but
-      // it's only used for diagnosing ill-formed standard libraries,
-      // so it really isn't worth QoI efforts.)
-      SourceLoc optLoc = expr->getSubExpr()->getLoc();
-      auto optTy = CS.getTypeChecker().getOptionalType(optLoc, valueTy);
-      if (!optTy || CS.getTypeChecker().requireOptionalIntrinsics(optLoc))
+      Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
+      if (!optTy)
         return Type();
 
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSubExpr()->getType(), optTy,
                        CS.getConstraintLocator(expr, {}));
       return optTy;
+    }
+
+    Type visitForceValueExpr(ForceValueExpr *expr) {
+      // The operand must be coercible to T? for some type T.
+      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+                                           TVO_PrefersSubtypeBinding);
+
+      Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
+      if (!optTy)
+        return Type();
+
+      CS.addConstraint(ConstraintKind::Conversion,
+                       expr->getSubExpr()->getType(), optTy,
+                       CS.getConstraintLocator(expr, {}));
+
+      // The result is of type T.
+      return valueTy;
     }
   };
 

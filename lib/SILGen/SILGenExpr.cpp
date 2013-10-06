@@ -218,6 +218,7 @@ namespace {
     RValue visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C);
     RValue visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
                                        SGFContext C);
+    RValue visitForceValueExpr(ForceValueExpr *E, SGFContext C);
 
     RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
   };
@@ -2829,6 +2830,17 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
                                optTemp->getInitializedCleanup());
     return RValue(SGF, result, E);
   }
+}
+
+RValue RValueEmitter::visitForceValueExpr(ForceValueExpr *E, SGFContext C) {
+  RValue optValue = SGF.emitRValue(E->getSubExpr(), SGFContext());
+  const TypeLowering &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
+  return RValue(SGF,
+                SGF.emitGetOptionalValue(
+                  E, 
+                  std::move(optValue).getAsSingleValue(SGF, E),
+                  optTL, C),
+                E);
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
