@@ -229,6 +229,17 @@ struct SILDeclRef {
       isCurried(isCurried), isForeign(isForeign),
       defaultArgIndex(defaultArgIndex)
   {}
+  
+  /// Return a SILDeclRef to the declaration overridden by this one, or
+  /// a null SILDeclRef if there is no override.
+  SILDeclRef getOverridden() const {
+    if (!hasDecl())
+      return SILDeclRef();
+    auto overridden = getDecl()->getOverriddenDecl();
+    if (!overridden)
+      return SILDeclRef();
+    return SILDeclRef(overridden, kind, uncurryLevel);
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILDeclRef C) {

@@ -75,6 +75,7 @@ private:
   friend class SILBasicBlock;
   friend class SILFunction;
   friend class SILType;
+  friend class SILVTable;
   friend class Lowering::SILGenModule;
   friend class Lowering::TypeConverter;
 

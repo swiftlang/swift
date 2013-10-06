@@ -822,6 +822,94 @@ bool SILGenModule::requiresObjCSuperDispatch(ValueDecl *vd) {
   return requiresObjCDispatch(vd);
 }
 
+/// An ASTVisitor for populating SILVTable entries from ClassDecl members.
+class SILGenVTable : public Lowering::ASTVisitor<SILGenVTable> {
+public:
+  SILGenModule &SGM;
+  ClassDecl *theClass;
+  std::vector<SILVTable::Pair> vtableEntries;
+  
+  SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
+    : SGM(SGM), theClass(theClass)
+  {
+    // Populate the superclass members, if any.
+    Type super = theClass->getSuperclass();
+    if (super && super->getClassOrBoundGenericClass())
+      visitAncestor(super->getClassOrBoundGenericClass());
+  }
+
+  ~SILGenVTable() {
+    // Create the vtable.
+    SILVTable::create(SGM.M, theClass, vtableEntries);
+  }
+  
+  void visitAncestor(ClassDecl *ancestor) {
+    // Recursively visit all our ancestors.
+    Type super = ancestor->getSuperclass();
+    if (super && super->getClassOrBoundGenericClass())
+      visitAncestor(super->getClassOrBoundGenericClass());
+    
+    for (auto member : ancestor->getMembers())
+      visit(member);
+  }
+  
+  // Add an entry to the vtable.
+  void addEntry(SILDeclRef member) {
+    // Try to find an overridden entry.
+    // NB: Mutates vtableEntries in-place
+    // FIXME: O(n^2)
+    if (auto overridden = member.getOverridden()) {
+      // If we overrode an ObjC decl, it won't be in a vtable; create a new
+      // entry.
+      if (overridden.getDecl()->hasClangNode())
+        goto not_overridden;
+
+      for (SILVTable::Pair &entry : vtableEntries) {
+        SILDeclRef ref = overridden;
+        
+        do {
+          // Replace the overridden member.
+          if (entry.first == ref) {
+            entry = {member, SGM.getFunction(member)};
+            return;
+          }
+        } while ((ref = ref.getOverridden()));
+      }
+      llvm_unreachable("no overridden vtable entry?!");
+    }
+    
+  not_overridden:
+    // Otherwise, introduce a new vtable entry.
+    vtableEntries.emplace_back(member, SGM.getFunction(member));
+  }
+  
+  // Default for members that don't require vtable entries.
+  void visitDecl(Decl*) {}
+  
+  void visitFuncDecl(FuncDecl *fd) {
+    // ObjC decls don't go in vtables.
+    if (fd->hasClangNode())
+      return;
+    
+    addEntry(SILDeclRef(fd));
+  }
+  
+  void visitConstructorDecl(ConstructorDecl *cd) {
+    // FIXME: If this is a dynamically-dispatched constructor, add its
+    // initializing entry point to the vtable.
+  }
+  
+  void visitVarDecl(VarDecl *vd) {
+    // FIXME: If this is a dynamically-dispatched property, add its getter and
+    // setter to the vtable.
+  }
+  
+  void visitSubscriptDecl(SubscriptDecl *sd) {
+    // FIXME: If this is a dynamically-dispatched property, add its getter and
+    // setter to the vtable.
+  }
+};
+
 /// An ASTVisitor for generating SIL from method declarations
 /// inside nominal types.
 class SILGenType : public Lowering::ASTVisitor<SILGenType> {
@@ -829,6 +917,7 @@ public:
   SILGenModule &SGM;
   NominalTypeDecl *theType;
   DestructorDecl *explicitDestructor;
+  Optional<SILGenVTable> genVTable;
   
   SILGenType(SILGenModule &SGM, NominalTypeDecl *theType)
     : SGM(SGM), theType(theType), explicitDestructor(nullptr) {}
@@ -844,8 +933,16 @@ public:
   
   /// Emit SIL functions for all the members of the type.
   void emitType() {
-    for (Decl *member : theType->getMembers())
+    // Start building a vtable if this is a class.
+    if (auto theClass = dyn_cast<ClassDecl>(theType))
+      genVTable.emplace(SGM, theClass);
+    
+    for (Decl *member : theType->getMembers()) {
+      if (genVTable)
+        genVTable->visit(member);
+      
       visit(member);
+    }
   }
   
   //===--------------------------------------------------------------------===//

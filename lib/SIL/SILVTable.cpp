@@ -27,14 +27,9 @@ SILVTable *SILVTable::create(SILModule &M, ClassDecl *Class,
                              ArrayRef<Pair> Entries) {
   void *buf = M.allocate(sizeof(SILVTable) + sizeof(Pair) * (Entries.size()-1),
                          alignof(SILVTable));
-  return ::new (buf) SILVTable(Class, Entries);
-}
-
-static SILDeclRef getOverriddenDeclRef(SILDeclRef m) {
-  if (auto overridden = m.getDecl()->getOverriddenDecl()) {
-    return SILDeclRef(overridden, m.kind, m.uncurryLevel, m.isForeign);
-  }
-  return SILDeclRef();
+  SILVTable *vt = ::new (buf) SILVTable(Class, Entries);
+  M.vtables.push_back(vt);
+  return vt;
 }
 
 SILFunction *
@@ -49,7 +44,7 @@ SILVTable::getImplementation(SILModule &M, SILDeclRef method) const {
     do {
       if (entry.first == m)
         return entry.second;
-    } while ((m = getOverriddenDeclRef(m)));
+    } while ((m = m.getOverridden()));
   }
   
   return nullptr;

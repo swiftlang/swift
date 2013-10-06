@@ -59,7 +59,8 @@ public:
   /// Create a new SILVTable with the given method-to-implementation mapping.
   /// The SILDeclRef keys should reference the most-overridden members available
   /// through the class.
-  SILVTable *create(SILModule &M, ClassDecl *Class, ArrayRef<Pair> Entries);
+  static SILVTable *create(SILModule &M, ClassDecl *Class,
+                           ArrayRef<Pair> Entries);
   
   /// Return the class that the vtable represents.
   ClassDecl *getClass() const { return Class; }

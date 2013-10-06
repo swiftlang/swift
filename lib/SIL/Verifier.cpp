@@ -1624,9 +1624,9 @@ void SILVTable::verify(const SILModule &M) const {
     assert(theClass && "vtable entry must refer to a class member");
     
     // The class context must be the vtable's class, or a superclass thereof.
-    auto c = theClass;
+    auto c = getClass();
     do {
-      if (c == getClass())
+      if (c == theClass)
         break;
       if (auto ty = c->getSuperclass())
         c = ty->getClassOrBoundGenericClass();
@@ -1638,6 +1638,9 @@ void SILVTable::verify(const SILModule &M) const {
     // All function vtable entries must be at their natural uncurry level.
     // FIXME: We should change this to uncurry level 1.
     assert(!entry.first.isCurried && "vtable entry must not be curried");
+    
+    // Foreign entry points shouldn't appear in vtables.
+    assert(!entry.first.isForeign && "vtable entry must not be foreign");
     
     // TODO: Verify that property entries are dynamically dispatched under our
     // finalized property dynamic dispatch rules.
