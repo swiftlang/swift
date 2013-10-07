@@ -196,7 +196,7 @@ cleanupCalleeValue(SILBuilder &B, SILBasicBlock::iterator &I,
     eraseInstruction(TTTFI);
   }
 
-  if (FunctionRefInst *FRI = cast<FunctionRefInst>(CalleeValue)) {
+  if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
     if (FRI->use_empty())
       eraseInstruction(FRI);
