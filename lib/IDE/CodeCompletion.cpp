@@ -774,11 +774,10 @@ public:
     Builder.addTextChunk(TAD->getName().str());
     if (TAD->hasUnderlyingType())
       addTypeAnnotation(Builder,
-                        MetaTypeType::get(TAD->getUnderlyingType(),
-                                          TU.Ctx));
+                        MetaTypeType::get(TAD->getUnderlyingType(), TU.Ctx));
     else {
-      Builder.addTypeAnnotation(MetaTypeType::get(TAD->getDeclaredType(),
-                                                  TU.Ctx)->getString());
+      addTypeAnnotation(Builder,
+                        MetaTypeType::get(TAD->getDeclaredType(), TU.Ctx));
     }
   }
 
@@ -790,8 +789,8 @@ public:
     if (needDot())
       Builder.addLeadingDot();
     Builder.addTextChunk(GP->getName().str());
-    Builder.addTypeAnnotation(MetaTypeType::get(GP->getDeclaredType(),
-                                                TU.Ctx)->getString());
+    addTypeAnnotation(Builder,
+                      MetaTypeType::get(GP->getDeclaredType(), TU.Ctx));
   }
 
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT) {
@@ -802,8 +801,8 @@ public:
     if (needDot())
       Builder.addLeadingDot();
     Builder.addTextChunk(AT->getName().str());
-    Builder.addTypeAnnotation(MetaTypeType::get(AT->getDeclaredType(),
-                                                TU.Ctx)->getString());
+    addTypeAnnotation(Builder,
+                      MetaTypeType::get(AT->getDeclaredType(), TU.Ctx));
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation) {
