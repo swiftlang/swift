@@ -794,7 +794,6 @@ bool Module::lookupQualified(Type type,
         if (auto superclassDecl = superclassType->getClassOrBoundGenericClass())
           if (visited.insert(superclassDecl))
             stack.push_back(superclassDecl);
-      continue;
     }
 
     // If we're not looking at a protocol and we don't we're not supposed to
