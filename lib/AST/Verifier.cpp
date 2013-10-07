@@ -917,6 +917,17 @@ namespace {
     }
 
     void verifyChecked(AbstractFunctionDecl *AFD) {
+      // If this function is generic or is within a generic type, it should
+      // have an interface type.
+      if ((AFD->getGenericParams() ||
+           (AFD->getDeclContext()->isTypeContext() &&
+            AFD->getDeclContext()->getGenericParamsOfContext()))
+          && !AFD->getInterfaceType()) {
+        Out << "Missing interface type for generic function\n";
+        AFD->dump();
+        abort();
+      }
+
       // If there is an interface type, it shouldn't have any unresolved
       // dependent member types.
       // FIXME: This is a general property of the type system.
