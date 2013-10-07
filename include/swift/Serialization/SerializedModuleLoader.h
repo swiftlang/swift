@@ -166,7 +166,7 @@ enum class ModuleStatus {
 /// Represents a module that failed to get imported.
 class FailedImportModule : public LoadedModule {
 public:
-  ModuleStatus Status;
+  const ModuleStatus Status;
   std::string ModuleFilename;
 
   FailedImportModule(Identifier Name, ModuleStatus Status,
