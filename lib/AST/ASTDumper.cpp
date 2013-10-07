@@ -223,6 +223,10 @@ namespace {
         if (!value->getName().empty()) {
           OS << " \"" << value->getName().str() << "\"";
         }
+        if (auto Overridden = value->getOverriddenDecl()) {
+          OS << " override=";
+          Overridden->dumpRef(OS);
+        }
       }
     }
 
