@@ -959,19 +959,15 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
                  return type;
                });
-    } else if (!baseObjTy->isExistentialType()) {
-      // When the base nominal type conforms to the protocol, dig out the
-      // witness.
-      if (auto baseNominal = baseObjTy->getAnyNominal()) {
-        // Retrieve the type witness from the protocol conformance.
-        ProtocolConformance *conformance = nullptr;
-        if (TC.conformsToProtocol(baseNominal->getDeclaredTypeInContext(),
-                                  ownerProtoTy->getDecl(),
-                                  &conformance)) {
-          // FIXME: Eventually, deal with default function/property definitions.
-          if (auto assocType = dyn_cast<AssociatedTypeDecl>(value)) {
-            type = conformance->getTypeWitness(assocType).Replacement;
-          }
+    } else if (!baseObjTy->isExistentialType() &&
+               !baseObjTy->hasTypeVariable()) {
+      //
+      ProtocolConformance *conformance = nullptr;
+      if (TC.conformsToProtocol(baseObjTy, ownerProtoTy->getDecl(),
+                                &conformance)) {
+        // FIXME: Eventually, deal with default function/property definitions.
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(value)) {
+          type = conformance->getTypeWitness(assocType).Replacement;
         }
       }
     }
