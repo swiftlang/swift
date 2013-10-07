@@ -973,7 +973,8 @@ void SILGenFunction::emitSemanticLoadInto(SILLocation loc,
   // Easy case: the types match.
   if (srcTL.getLoweredType() == destTL.getLoweredType()) {
     assert(!hasDifferentTypeOfRValue(srcTL));
-    return srcTL.emitCopyInto(B, loc, src, dest, isTake, isInit);
+    B.createCopyAddr(loc, src, dest, isTake, isInit);
+    return;
   }
 
   auto rvalue =
@@ -994,7 +995,7 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
     assert(!hasDifferentTypeOfRValue(destTL));
     assert(destTL.isAddressOnly() == rvalue.getType().isAddress());
     if (rvalue.getType().isAddress()) {
-      destTL.emitCopyInto(B, loc, rvalue, dest, IsTake, isInit);
+      B.createCopyAddr(loc, rvalue, dest, IsTake, isInit);
     } else {
       emitUnloweredStoreOfCopy(B, loc, rvalue, dest, isInit);
     }

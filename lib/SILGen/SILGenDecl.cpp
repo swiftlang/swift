@@ -290,9 +290,8 @@ public:
   
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     // Assign from the local variable to the inout address.
-    gen.getTypeLowering(inoutAddr.getType())
-      .emitCopyInto(gen.B, l, gen.VarLocs[var].address, inoutAddr,
-                    IsNotTake, IsNotInitialization);
+    gen.B.createCopyAddr(l, gen.VarLocs[var].address, inoutAddr,
+                         IsNotTake, IsNotInitialization);
   }
 };
   
@@ -319,9 +318,8 @@ public:
     auto initVar = gen.emitLocalVariableWithCleanup(vd);
     
     // Initialize with the value from the inout.
-    gen.getTypeLowering(address.getType())
-      .emitCopyInto(gen.B, loc, address, initVar->getAddress(),
-                    IsNotTake, IsInitialization);
+    gen.B.createCopyAddr(loc, address, initVar->getAddress(),
+                         IsNotTake, IsInitialization);
     initVar->finishInitialization(gen);
     
     // Set up a cleanup to write back to the inout.
