@@ -506,8 +506,8 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       GenericParams = AFD->getGenericParams();
     } else if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
       if (Loc.isValid()) {
-        if (auto CE = cast<ClosureExpr>(ACE))
-          FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());
+        auto CE = cast<ClosureExpr>(ACE);
+        FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());
       }
     } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getExtendedType();
