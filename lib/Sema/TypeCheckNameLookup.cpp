@@ -30,6 +30,7 @@ void LookupResult::filter(const std::function<bool(ValueDecl *)> &pred) {
 }
 
 LookupResult TypeChecker::lookupMember(Type type, Identifier name,
+                                       DeclContext *dc,
                                        bool allowDynamicLookup) {
   LookupResult result;
   unsigned options = NL_QualifiedDefault;
@@ -69,13 +70,15 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
   }
 
   // Look for the member.
-  if (!TU.lookupQualified(type, name, options, this, result.Results))
+  if (!dc->getParentModule()->lookupQualified(type, name, options, this,
+                                              result.Results))
     return result;
 
   return result;
 }
 
-LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
+LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
+                                               DeclContext *dc) {
   LookupTypeResult result;
 
   // Look through the metatype.
@@ -88,7 +91,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
   unsigned options = NL_QualifiedDefault | NL_ProtocolMembers;
-  if (!TU.lookupQualified(type, name, options, this, decls))
+  if (!dc->getParentModule()->lookupQualified(type, name, options, this, decls))
     return result;
 
   // Look through the declarations, keeping only the unique type declarations.
@@ -120,7 +123,8 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
         // member entirely.
         // FIXME: This is an error path. Should we try to recover?
         ProtocolConformance *conformance = nullptr;
-        if (!conformsToProtocol(type, protocol, &conformance) || !conformance)
+        if (!conformsToProtocol(type, protocol, dc, &conformance) ||
+            !conformance)
           continue;
 
         // Use the type witness.
@@ -134,7 +138,8 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
     // type of the declaration.
     if (!memberType) {
       // Substitute the the base into the member's type.
-      memberType = substMemberTypeWithBase(typeDecl->getDeclaredType(),
+      memberType = substMemberTypeWithBase(dc->getParentModule(),
+                                           typeDecl->getDeclaredType(),
                                            typeDecl, type);
     }
     if (!memberType)
@@ -148,8 +153,8 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
   return result;
 }
 
-LookupResult TypeChecker::lookupConstructors(Type type) {
+LookupResult TypeChecker::lookupConstructors(Type type, DeclContext *dc) {
   // FIXME: Use of string literal here is lame.
-  return lookupMember(type, Context.getIdentifier("init"),
+  return lookupMember(type, Context.getIdentifier("init"), dc,
                       /*allowDynamicLookup=*/false);
 }

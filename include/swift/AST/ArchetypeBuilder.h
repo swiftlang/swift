@@ -30,12 +30,12 @@ namespace swift {
 class AbstractTypeParamDecl;
 class ArchetypeType;
 class AssociatedTypeDecl;
+class Module;
 class Pattern;
 class ProtocolDecl;
 class Requirement;
 class RequirementRepr;
 class SourceLoc;
-class TranslationUnit;
 class Type;
 class TypeRepr;
 class ASTContext;
@@ -54,7 +54,7 @@ private:
   class InferRequirementsWalker;
   friend class InferRequirementsWalker;
 
-  TranslationUnit &TU;
+  Module &Mod;
   ASTContext &Context;
   DiagnosticEngine &Diags;
   struct Implementation;
@@ -80,12 +80,11 @@ private:
                               PotentialArchetype *T2);
 
 public:
-  ArchetypeBuilder(TranslationUnit &tu, DiagnosticEngine &diags);
+  ArchetypeBuilder(Module &mod, DiagnosticEngine &diags);
 
   /// Construct a new archtype builder.
   ///
-  /// \param tu The translation unit in which the builder will create
-  /// archetypes.
+  /// \param mod The module in which the builder will create archetypes.
   ///
   /// \param diags The diagnostics entity to use.
   ///
@@ -97,7 +96,7 @@ public:
   /// to which the given type parameter conforms. The produces the final
   /// results of AbstractTypeParamDecl::getProtocols() for an associated type.
   ArchetypeBuilder(
-    TranslationUnit &tu, DiagnosticEngine &diags,
+    Module &mod, DiagnosticEngine &diags,
     std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
       getInheritedProtocols,
     std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)>
@@ -105,8 +104,8 @@ public:
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
 
-  /// Retrieve the translation unit.
-  TranslationUnit &getTranslationUnit() const { return TU; }
+  /// Retrieve the module.
+  Module &getModule() const { return Mod; }
 
   /// \brief Add a new generic parameter for which there may be requirements.
   ///
@@ -273,10 +272,10 @@ public:
   /// \brief Retrieve (or build) the archetype corresponding to the potential
   /// archetype.
   ArchetypeType *getArchetype(AssociatedTypeDecl * /*nullable*/ rootAssocTy,
-                              TranslationUnit &tu);
+                              Module &mod);
 
   /// Retrieve the associated type declaration for a given nested type.
-  AssociatedTypeDecl *getAssociatedType(TranslationUnit &tu, Identifier name);
+  AssociatedTypeDecl *getAssociatedType(Module &mod, Identifier name);
 
   void dump(llvm::raw_ostream &Out, unsigned Indent);
 

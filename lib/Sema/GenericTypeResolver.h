@@ -53,6 +53,7 @@ public:
   /// \returns A type that refers to the dependent member type, or an error
   /// type if such a reference is ill-formed.
   virtual Type resolveDependentMemberType(Type baseTy,
+                                          DeclContext *DC,
                                           SourceRange baseRange,
                                           Identifier name,
                                           SourceLoc nameLoc) = 0;
@@ -66,6 +67,7 @@ class DependentGenericTypeResolver : public GenericTypeResolver {
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
   virtual Type resolveDependentMemberType(Type baseTy,
+                                          DeclContext *DC,
                                           SourceRange baseRange,
                                           Identifier name,
                                           SourceLoc nameLoc);
@@ -80,6 +82,7 @@ class GenericTypeToArchetypeResolver : public GenericTypeResolver {
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
   virtual Type resolveDependentMemberType(Type baseTy,
+                                          DeclContext *DC,
                                           SourceRange baseRange,
                                           Identifier name,
                                           SourceLoc nameLoc);
@@ -103,6 +106,7 @@ public:
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
   virtual Type resolveDependentMemberType(Type baseTy,
+                                          DeclContext *DC,
                                           SourceRange baseRange,
                                           Identifier name,
                                           SourceLoc nameLoc);
@@ -126,6 +130,7 @@ public:
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
   virtual Type resolveDependentMemberType(Type baseTy,
+                                          DeclContext *DC,
                                           SourceRange baseRange,
                                           Identifier name,
                                           SourceLoc nameLoc);

@@ -71,7 +71,8 @@ PrintStruct(TypeChecker &TC, VarDecl *Arg,
         MemberIndexes.push_back(idx);
         
         Type SubstType = VD->getType();
-        SubstType = TC.substMemberTypeWithBase(SubstType, VD, SugarT);
+        SubstType = TC.substMemberTypeWithBase(DC->getParentModule(),
+                                               SubstType, VD, SugarT);
         
         PrintReplExpr(TC, Arg, SubstType, SubstType->getCanonicalType(),
                       Loc, EndLoc, MemberIndexes,
@@ -94,7 +95,7 @@ getArgRefExpr(TypeChecker &TC,
   Expr *ArgRef = TC.buildCheckedRefExpr(Arg, Loc, /*Implicit=*/true);
   ArgRef = TC.coerceToRValue(ArgRef);
   for (unsigned i : MemberIndexes) {
-    bool failed = TC.typeCheckExpression(ArgRef, &TC.TU, Type(),
+    bool failed = TC.typeCheckExpression(ArgRef, Arg->getDeclContext(), Type(),
                                          /*discardedExpr=*/false);
     assert(!failed);
     (void)failed;
@@ -109,11 +110,11 @@ getArgRefExpr(TypeChecker &TC,
     }
     if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(CurT)) {
       VarDecl *VD = cast<VarDecl>(BGST->getDecl()->getMembers()[i]);
+      Module *M = Arg->getDeclContext()->getParentModule();
       ArgRef = new (Context) MemberRefExpr(
                                ArgRef, Loc,
                                ConcreteDeclRef(Context, VD,
-                                               BGST->getSubstitutions(&TC.TU,
-                                                                      &TC)),
+                                               BGST->getSubstitutions(M, &TC)),
                                Loc, /*Implicit=*/true);
       continue;
     }
@@ -141,7 +142,8 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
   bool showedDynamicType = false;
   Identifier MemberName = Context.getIdentifier("className");
   Type MetaT = MetaTypeType::get(SugarT, Context);
-  if (TC.lookupMember(MetaT,MemberName, /*allowDynamicLookup=*/false)){
+  if (TC.lookupMember(MetaT, MemberName, CD,
+                      /*allowDynamicLookup=*/false)){
     Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
     MetatypeExpr *Meta = new (Context) MetatypeExpr(ArgRef,
                                                     Loc,
@@ -218,7 +220,7 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
 
     Expr *init = TC.buildCheckedRefExpr(trueDecl, Loc, /*Implicit=*/true);
     BodyContent.push_back(new (context) PatternBindingDecl(Loc, pattern, init,
-                                                           &TC.TU));
+                                                           DC));
   }
 
   // Add opening bracket '['.
@@ -349,7 +351,8 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
   }
 
   Identifier MemberName = Context.getIdentifier("replPrint");
-  if (TC.lookupMember(T, MemberName, /*allowDynamicLookup=*/false)) {
+  if (TC.lookupMember(T, MemberName, DC,
+                      /*allowDynamicLookup=*/false)) {
     Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
     Expr *Res = new (TC.Context) UnresolvedDotExpr(ArgRef, Loc, MemberName, 
                                                    EndLoc, /*Implicit=*/true);
@@ -419,7 +422,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
                      BodyContent);
 }
 
-Identifier TypeChecker::getNextResponseVariableName() {
+Identifier TypeChecker::getNextResponseVariableName(DeclContext *DC) {
   llvm::SmallString<4> namebuf;
   llvm::raw_svector_ostream names(namebuf);
   Identifier ident;
@@ -432,7 +435,7 @@ Identifier TypeChecker::getNextResponseVariableName() {
     names << "r" << NextResponseVariableIndex++;
     
     ident = Context.getIdentifier(names.str());
-    UnqualifiedLookup lookup(ident, &TU, this);
+    UnqualifiedLookup lookup(ident, DC, this);
     nameUsed = lookup.isSuccess();
   } while (nameUsed);
 
@@ -501,7 +504,7 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
 /// generatePrintOfExpression - Emit logic to print the specified expression
 /// value with the given description of the pattern involved.
 static void generatePrintOfExpression(StringRef NameStr, Expr *E,
-                                      TypeChecker *TC) {
+                                      TypeChecker *TC, TranslationUnit *TU) {
   ASTContext &C = TC->Context;
 
   // Always print rvalues, not lvalues.
@@ -533,7 +536,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
                        Arg->getDeclContext(),
                        /*allowUnknownTypes*/false);
   ClosureExpr *CE =
-      new (C) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(), &TC->TU);
+      new (C) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(), TU);
   Type FuncTy = FunctionType::get(ParamPat->getType(), TupleType::getEmpty(C),
                                   C);
   CE->setType(FuncTy);
@@ -573,7 +576,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   // Inject the call into the top level stream by wrapping it with a TLCD.
   auto *BS = BraceStmt::create(C, Loc, BraceStmt::ExprStmtOrDecl(TheCall),
                                EndLoc);
-  TC->TU.Decls.push_back(new (C) TopLevelCodeDecl(&TC->TU, BS));
+  TU->Decls.push_back(new (C) TopLevelCodeDecl(TU, BS));
 }
 
 
@@ -581,7 +584,8 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
 /// processREPLTopLevelExpr - When we see an Expression in a TopLevelCodeDecl
 /// in the REPL, process it, adding the proper decls back to the top level of
 /// the TranslationUnit.
-static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC) {
+static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC,
+                                    TranslationUnit *TU) {
   CanType T = E->getType()->getCanonicalType();
   
   // Don't try to print invalid expressions, module exprs, or void expressions.
@@ -594,39 +598,39 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC) {
   // in the future.  However, if this is a direct reference to a decl (e.g. "x")
   // then don't create a repl metavariable.
   if (VarDecl *d = getObviousDECLFromExpr(E)) {
-    generatePrintOfExpression(d->getName().str(), E, TC);
+    generatePrintOfExpression(d->getName().str(), E, TC, TU);
     return;
   }
   
   // Remove the expression from being in the list of decls to execute, we're
   // going to reparent it.
-  TC->TU.Decls.pop_back();
+  TU->Decls.pop_back();
 
   E = TC->coerceToMaterializable(E);
 
   // Create the meta-variable, let the typechecker name it.
-  VarDecl *vd = new (TC->Context) VarDecl(E->getStartLoc(),
-                                          TC->getNextResponseVariableName(),
-                                          E->getType(), &TC->TU);
-  TC->TU.Decls.push_back(vd);
-  
+  Identifier name = TC->getNextResponseVariableName(TU);
+  VarDecl *vd = new (TC->Context) VarDecl(E->getStartLoc(), name,
+                                          E->getType(), TU);
+  TU->Decls.push_back(vd);
+
   // Create a PatternBindingDecl to bind the expression into the decl.
   Pattern *metavarPat = new (TC->Context) NamedPattern(vd);
   metavarPat->setType(E->getType());
   PatternBindingDecl *metavarBinding
-    = new (TC->Context) PatternBindingDecl(E->getStartLoc(), metavarPat, E,
-                                           &TC->TU);
-  TC->TU.Decls.push_back(metavarBinding);
+    = new (TC->Context) PatternBindingDecl(E->getStartLoc(), metavarPat, E, TU);
+  TU->Decls.push_back(metavarBinding);
 
   // Finally, print the variable's value.
   E = TC->buildCheckedRefExpr(vd, E->getStartLoc(), /*Implicit=*/true);
-  generatePrintOfExpression(vd->getName().str(), E, TC);
+  generatePrintOfExpression(vd->getName().str(), E, TC, TU);
 }
 
 /// processREPLTopLevelPatternBinding - When we see a new PatternBinding parsed
 /// into the REPL, process it by generating code to print it out.
 static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
-                                              TypeChecker *TC) {
+                                              TypeChecker *TC,
+                                              TranslationUnit *TU) {
   // If there is no initializer for the new variable, don't auto-print it.
   // This would just cause a confusing definite initialization error.  Some
   // day we will do some high level analysis of uninitialized variables
@@ -645,7 +649,7 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
                                            getSemanticsProvidingPattern())) {
     Expr *E = TC->buildCheckedRefExpr(NP->getDecl(), PBD->getStartLoc(),
                                       /*Implicit=*/true);
-    generatePrintOfExpression(PatternString, E, TC);
+    generatePrintOfExpression(PatternString, E, TC, TU);
     return;
   }
 
@@ -659,15 +663,14 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   //   replPrint(r123)
   
   // Remove PBD from the list of Decls so we can insert before it.
-  TopLevelCodeDecl *PBTLCD = cast<TopLevelCodeDecl>(TC->TU.Decls.back());
-  
-  TC->TU.Decls.pop_back();
+  TopLevelCodeDecl *PBTLCD = cast<TopLevelCodeDecl>(TU->Decls.back());
+  TU->Decls.pop_back();
 
   // Create the meta-variable, let the typechecker name it.
   VarDecl *vd = new (TC->Context) VarDecl(PBD->getStartLoc(),
-                                          TC->getNextResponseVariableName(),
-                                          PBD->getPattern()->getType(),&TC->TU);
-  TC->TU.Decls.push_back(vd);
+                                          TC->getNextResponseVariableName(TU),
+                                          PBD->getPattern()->getType(), TU);
+  TU->Decls.push_back(vd);
 
   
   // Create a PatternBindingDecl to bind the expression into the decl.
@@ -675,25 +678,25 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   metavarPat->setType(vd->getType());
   PatternBindingDecl *metavarBinding
     = new (TC->Context) PatternBindingDecl(PBD->getStartLoc(), metavarPat,
-                                           PBD->getInit(), &TC->TU);
+                                           PBD->getInit(), TU);
 
   auto MVBrace = BraceStmt::create(TC->Context, metavarBinding->getStartLoc(),
                                    BraceStmt::ExprStmtOrDecl(metavarBinding),
                                    metavarBinding->getEndLoc());
 
-  auto *MVTLCD = new (TC->Context) TopLevelCodeDecl(&TC->TU, MVBrace);
-  TC->TU.Decls.push_back(MVTLCD);
+  auto *MVTLCD = new (TC->Context) TopLevelCodeDecl(TU, MVBrace);
+  TU->Decls.push_back(MVTLCD);
 
   
   // Replace the initializer of PBD with a reference to our repl temporary.
   Expr *E = TC->buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
   E = TC->coerceToMaterializable(E);
   PBD->setInit(E);
-  TC->TU.Decls.push_back(PBTLCD);
+  TU->Decls.push_back(PBTLCD);
 
   // Finally, print out the result, by referring to the repl temp.
   E = TC->buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
-  generatePrintOfExpression(PatternString, E, TC);
+  generatePrintOfExpression(PatternString, E, TC, TU);
 }
 
 
@@ -701,17 +704,17 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
 /// processREPLTopLevel - This is called after we've parsed and typechecked some
 /// new decls at the top level.  We inject code to print out expressions and
 /// pattern bindings the are evaluated.
-void TypeChecker::processREPLTopLevel(unsigned FirstDecl) {
+void TypeChecker::processREPLTopLevel(TranslationUnit *TU, unsigned FirstDecl) {
   // Loop over all of the new decls, moving them out of the Decls list, then
   // adding them back (with modifications) one at a time.
-  std::vector<Decl*> NewDecls(TU.Decls.begin()+FirstDecl, TU.Decls.end());
-  TU.Decls.resize(FirstDecl);
-  
+  std::vector<Decl*> NewDecls(TU->Decls.begin()+FirstDecl, TU->Decls.end());
+  TU->Decls.resize(FirstDecl);
+
   // Loop over each of the new decls, processing them, adding them back to
   // the TU->Decls list.
   for (Decl *D : NewDecls) {
-    TU.Decls.push_back(D);
-    
+    TU->Decls.push_back(D);
+
     TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D);
     if (TLCD == 0) continue;
 
@@ -719,10 +722,10 @@ void TypeChecker::processREPLTopLevel(unsigned FirstDecl) {
 
     // Check to see if the TLCD has an expression that we have to transform.
     if (Expr *E = Entry.dyn_cast<Expr*>())
-      processREPLTopLevelExpr(E, this);
+      processREPLTopLevelExpr(E, this, TU);
     else if (Decl *D = Entry.dyn_cast<Decl*>())
       if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
-        processREPLTopLevelPatternBinding(PBD, this);
+        processREPLTopLevelPatternBinding(PBD, this, TU);
   }
 }
 

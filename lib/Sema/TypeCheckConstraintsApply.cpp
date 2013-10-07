@@ -61,7 +61,8 @@ Expr *Solution::specialize(Expr *expr,
   // FIXME: We'd like the type checker to ensure that this always
   // succeeds.
   ConformanceMap conformances;
-  if (tc.checkSubstitutions(substitutions, conformances, expr->getLoc(),
+  if (tc.checkSubstitutions(substitutions, conformances,
+                            getConstraintSystem().DC, expr->getLoc(),
                             &substitutions))
     return nullptr;
   
@@ -99,7 +100,8 @@ Type Solution::computeSubstitutions(
   // FIXME: We'd like the type checker to ensure that this always
   // succeeds.
   ConformanceMap conformances;
-  if (tc.checkSubstitutions(typeSubstitutions, conformances, SourceLoc(),
+  if (tc.checkSubstitutions(typeSubstitutions, conformances,
+                            getConstraintSystem().DC, SourceLoc(),
                             &typeSubstitutions))
     return Type();
 
@@ -116,6 +118,8 @@ Type Solution::computeSubstitutions(
 ///
 /// \param tc The type check we're using.
 ///
+/// \param dc The context in which we need a witness.
+///
 /// \param type The type whose witness to find.
 ///
 /// \param proto The protocol to which the type conforms.
@@ -126,8 +130,8 @@ Type Solution::computeSubstitutions(
 /// have a requirement with the given name.
 ///
 /// \returns The named witness.
-static FuncDecl *findNamedWitness(TypeChecker &tc, Type type,
-                                  ProtocolDecl *proto,
+static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc,
+                                  Type type, ProtocolDecl *proto,
                                   Identifier name,
                                   Diag<> diag) {
   // Find the named requirement.
@@ -150,7 +154,7 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, Type type,
 
   // Find the member used to satisfy the named requirement.
   ProtocolConformance *conformance = 0;
-  bool conforms = tc.conformsToProtocol(type, proto, &conformance);
+  bool conforms = tc.conformsToProtocol(type, proto, dc, &conformance);
   (void)conforms;
   assert(conforms && "Protocol conformance broken?");
 
@@ -171,6 +175,7 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, Type type,
 /// as a result.
 ///
 /// \param tc The type checker we're using to perform the substitution.
+/// \param dc The context in which we're performing the substitution.
 /// \param member The member we will be accessing after performing the
 /// conversion.
 /// \param objectTy The type of object in which we want to access the member,
@@ -184,8 +189,8 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, Type type,
 /// conversion.
 /// \param genericParams Will be set to the generic parameter list used for
 /// substitution.
-static void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
-                                   Type objectTy,
+static void substForBaseConversion(TypeChecker &tc, DeclContext *dc,
+                                   ValueDecl *member, Type objectTy,
                                    MutableArrayRef<Type> otherTypes,
                                    SourceLoc loc,
                                    TypeSubstitutionMap &substitutions,
@@ -304,7 +309,8 @@ namespace {
                       ->castTo<ArchetypeType>();
                 TypeSubstitutionMap substitutions;
                 substitutions[selfArchetype] = baseTy;
-                resultTy = tc.substType(resultTy, substitutions);
+                resultTy = tc.substType(dc->getParentModule(), resultTy,
+                                        substitutions);
                 if (!resultTy)
                   return nullptr;
               }
@@ -332,7 +338,7 @@ namespace {
           member->getDeclContext()->getDeclaredTypeInContext()
         };
 
-        substForBaseConversion(tc, member, baseTy, otherTypes, memberLoc,
+        substForBaseConversion(tc, dc, member, baseTy, otherTypes, memberLoc,
                                substitutions, conformances, genericParams);
         Type substTy = otherTypes[0];
         containerTy = otherTypes[1];
@@ -690,7 +696,7 @@ namespace {
         TypeSubstitutionMap substitutions;
         ConformanceMap conformances;
         containerTy = subscript->getDeclContext()->getDeclaredTypeInContext();
-        substForBaseConversion(tc, subscript, baseTy, containerTy,
+        substForBaseConversion(tc, dc, subscript, baseTy, containerTy,
                                index->getStartLoc(), substitutions,
                                conformances, genericParams);
 
@@ -808,14 +814,14 @@ namespace {
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(expr->getType());
-      if (auto defaultType = tc.getDefaultType(protocol)) {
+      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
       if (auto floatProtocol
             = tc.getProtocol(expr->getLoc(),
                              KnownProtocolKind::FloatLiteralConvertible)) {
-        if (auto defaultFloatType = tc.getDefaultType(floatProtocol)) {
+        if (auto defaultFloatType = tc.getDefaultType(floatProtocol, dc)) {
           if (defaultFloatType->isEqual(type))
             type = defaultFloatType;
         }
@@ -865,7 +871,7 @@ namespace {
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(expr->getType());
-      if (auto defaultType = tc.getDefaultType(protocol)) {
+      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -910,7 +916,7 @@ namespace {
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(expr->getType());
-      if (auto defaultType = tc.getDefaultType(protocol)) {
+      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -947,7 +953,7 @@ namespace {
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(expr->getType());
-      if (auto defaultType = tc.getDefaultType(protocol)) {
+      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -992,7 +998,7 @@ namespace {
 
       // FIXME: Cache name,
       auto name = tc.Context.getIdentifier("convertFromStringInterpolation");
-      auto member = findNamedWitness(tc, type, interpolationProto, name,
+      auto member = findNamedWitness(tc, dc, type, interpolationProto, name,
                                      diag::interpolation_broken_proto);
 
       // Build a reference to the convertFromStringInterpolation member.
@@ -1410,7 +1416,8 @@ namespace {
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
       ProtocolConformance *conformance = nullptr;
-      bool conforms = tc.conformsToProtocol(arrayTy, arrayProto, &conformance);
+      bool conforms = tc.conformsToProtocol(arrayTy, arrayProto,
+                                            cs.DC, &conformance);
       (void)conforms;
       assert(conforms && "Type does not conform to protocol?");
 
@@ -1446,7 +1453,7 @@ namespace {
 
       ProtocolConformance *conformance = nullptr;
       bool conforms = tc.conformsToProtocol(dictionaryTy, dictionaryProto,
-                                            &conformance);
+                                            cs.DC, &conformance);
       (void)conforms;
       assert(conforms && "Type does not conform to protocol?");
 
@@ -1591,7 +1598,7 @@ namespace {
         // FIXME: Assume the index type is DefaultIntegerLiteralType for now.
         auto intProto = tc.getProtocol(expr->getConstructionFunction()->getLoc(),
                                  KnownProtocolKind::IntegerLiteralConvertible);
-        Type intTy = tc.getDefaultType(intProto);
+        Type intTy = tc.getDefaultType(intProto, dc);
         
         Expr *constructionFn = expr->getConstructionFunction();
         Type constructionTy = FunctionType::get(intTy,
@@ -1725,7 +1732,7 @@ namespace {
 
       Type fromType = sub->getType();
       
-      return tc.typeCheckCheckedCast(fromType, toType,
+      return tc.typeCheckCheckedCast(fromType, toType, dc,
                               expr->getLoc(),
                               sub->getSourceRange(),
                               expr->getCastTypeLoc().getSourceRange(),
@@ -2408,7 +2415,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // so we don't insert a DerivedToBase conversion later.
     if (auto superRef = dyn_cast<SuperRefExpr>(expr)) {
       assert(tc.isSubtypeOf(fromLValue->getObjectType(),
-                            toType->getRValueType())
+                            toType->getRValueType(), dc)
              && "coercing super expr to non-supertype?!");
       fromLValue = LValueType::get(toType->getRValueType(),
                                    fromLValue->getQualifiers(),
@@ -2529,7 +2536,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     bool failed = false;
     for (auto proto : protocols) {
       ProtocolConformance *conformance = nullptr;
-      if (!tc.conformsToProtocol(fromType, proto, &conformance)) {
+      if (!tc.conformsToProtocol(fromType, proto, cs.DC, &conformance)) {
         failed = true;
         break;
       }
@@ -2713,7 +2720,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 
   // Check whether this literal type conforms to the builtin protocol.
   ProtocolConformance *builtinConformance = nullptr;
-  if (tc.conformsToProtocol(type, builtinProtocol, &builtinConformance)) {
+  if (tc.conformsToProtocol(type, builtinProtocol, cs.DC, &builtinConformance)){
     // Find the builtin argument type we'll use.
     Type argType;
     if (builtinLiteralType.is<Type>())
@@ -2752,7 +2759,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   // This literal type must conform to the (non-builtin) protocol.
   assert(protocol && "requirements should have stopped recursion");
   ProtocolConformance *conformance = nullptr;
-  bool conforms = tc.conformsToProtocol(type, protocol, &conformance);
+  bool conforms = tc.conformsToProtocol(type, protocol, cs.DC, &conformance);
   assert(conforms && "must conform to literal protocol");
   (void)conforms;
 
@@ -2882,14 +2889,14 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   return finishApply(apply, openedType, locator);
 }
 
-static void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
-                                   Type objectTy,
+static void substForBaseConversion(TypeChecker &tc, DeclContext *dc,
+                                   ValueDecl *member, Type objectTy,
                                    MutableArrayRef<Type> otherTypes,
                                    SourceLoc loc,
                                    TypeSubstitutionMap &substitutions,
                                    ConformanceMap &conformances,
                                    GenericParamList *&genericParams) {
-  ConstraintSystem cs(tc, nullptr);
+  ConstraintSystem cs(tc, dc);
 
   // The archetypes that have been opened up and replaced with type variables.
   llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
@@ -2917,7 +2924,7 @@ static void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
   }
 
   // Finalize the set of protocol conformances.
-  failed = tc.checkSubstitutions(substitutions, conformances, loc,
+  failed = tc.checkSubstitutions(substitutions, conformances, dc, loc,
                                  &substitutions);
   assert(!failed && "Substitutions cannot fail?");
 
@@ -2925,7 +2932,7 @@ static void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
   for (auto &otherType : otherTypes) {
     // Replace the already-opened archetypes in the requested "other" type with
     // their replacements.
-    otherType = tc.substType(otherType, substitutions);
+    otherType = tc.substType(dc->getParentModule(), otherType, substitutions);
 
     // If we have a polymorphic function type for which all of the generic
     // parameters have been replaced, make it monomorphic.
@@ -3107,7 +3114,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   if (auto metaType = type->getAs<MetaTypeType>())
     type = metaType->getInstanceType();
   
-  auto witness = findNamedWitness(*this, type->getRValueType(), protocol,
+  auto witness = findNamedWitness(*this, dc, type->getRValueType(), protocol,
                                   name, brokenProtocolDiag);
   if (!witness)
     return nullptr;
@@ -3198,10 +3205,10 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
 
   // Look for the builtin name. If we don't have it, we need to call the
   // general name via the witness table.
-  auto witnesses = tc.lookupMember(type->getRValueType(), builtinName);
+  auto witnesses = tc.lookupMember(type->getRValueType(), builtinName, cs.DC);
   if (!witnesses) {
     // Find the witness we need to use.
-    auto witness = findNamedWitness(tc, type->getRValueType(), protocol,
+    auto witness = findNamedWitness(tc, cs.DC, type->getRValueType(), protocol,
                                     generalName, brokenProtocolDiag);
 
     // Form a reference to the general name.
@@ -3227,7 +3234,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
 
     // At this point, we must have a type with the builtin member.
     type = expr->getType();
-    witnesses = tc.lookupMember(type->getRValueType(), builtinName);
+    witnesses = tc.lookupMember(type->getRValueType(), builtinName, cs.DC);
     if (!witnesses) {
       tc.diagnose(protocol->getLoc(), brokenProtocolDiag);
       return nullptr;
@@ -3346,7 +3353,8 @@ int Solution::getFixedScore() const {
       continue;
 
     // Retrieve the default type for this literal protocol, if there is one.
-    auto defaultType = tc.getDefaultType(literalProtocol);
+    auto defaultType = tc.getDefaultType(literalProtocol,
+                                         getConstraintSystem().DC);
     if (!defaultType)
       continue;
 

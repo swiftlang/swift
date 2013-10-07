@@ -137,7 +137,7 @@ Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
 
 /// getInfixData - If the specified expression is an infix binary
 /// operator, return its infix operator attributes.
-static InfixData getInfixData(TypeChecker &TC, Expr *E) {
+static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
   if (auto *ifExpr = dyn_cast<IfExpr>(E)) {
     // Ternary has fixed precedence.
     assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
@@ -154,16 +154,20 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
     (void)as;
     return InfixData(95, Associativity::None);
   } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-    if (Optional<InfixOperatorDecl*> maybeOp
-      = TC.TU.lookupInfixOperator(DRE->getDecl()->getName(), E->getLoc())) {
+    Module *mod = DC->getParentModule();
+    Optional<InfixOperatorDecl *> maybeOp
+      = mod->lookupInfixOperator(DRE->getDecl()->getName(), E->getLoc());
+    if (maybeOp) {
       if (auto *op = *maybeOp)
         return op->getInfixData();
       TC.diagnose(DRE->getLoc(), diag::unknown_binop);
     }
   } else if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
+    Module *mod = DC->getParentModule();
     Identifier name = OO->getDecls()[0]->getName();
-    if (Optional<InfixOperatorDecl*> maybeOp
-        = TC.TU.lookupInfixOperator(name, E->getLoc())) {
+    Optional<InfixOperatorDecl*> maybeOp
+      = mod->lookupInfixOperator(name, E->getLoc());
+    if (maybeOp) {
       if (auto *op = *maybeOp)
         return op->getInfixData();
       TC.diagnose(OO->getLoc(), diag::unknown_binop);
@@ -219,7 +223,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
 
 /// foldSequence - Take a sequence of expressions and fold a prefix of
 /// it into a tree of BinaryExprs using precedence parsing.
-static Expr *foldSequence(TypeChecker &TC,
+static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
                           Expr *LHS,
                           ArrayRef<Expr*> &S,
                           unsigned MinPrecedence) {
@@ -240,7 +244,7 @@ static Expr *foldSequence(TypeChecker &TC,
     Expr *op = S[0];
 
     // If the operator's precedence is lower than the minimum, stop here.
-    InfixData opInfo = getInfixData(TC, op);
+    InfixData opInfo = getInfixData(TC, DC, op);
     if (opInfo.getPrecedence() < MinPrecedence) return {nullptr, {}};
     return {op, opInfo};
   };
@@ -262,7 +266,7 @@ static Expr *foldSequence(TypeChecker &TC,
     // Pull out the next binary operator.
     Expr *Op2 = S[0];
   
-    InfixData Op2Info = getInfixData(TC, Op2);
+    InfixData Op2Info = getInfixData(TC, DC, Op2);
     // If the second operator's precedence is lower than the min
     // precedence, break out of the loop.
     if (Op2Info.getPrecedence() < MinPrecedence) break;
@@ -285,7 +289,7 @@ static Expr *foldSequence(TypeChecker &TC,
     // higher-precedence operators starting from this point, then
     // repeat.
     if (Op1.infixData.getPrecedence() < Op2Info.getPrecedence()) {
-      RHS = foldSequence(TC, RHS, S, Op1.infixData.getPrecedence() + 1);
+      RHS = foldSequence(TC, DC, RHS, S, Op1.infixData.getPrecedence() + 1);
       continue;
     }
 
@@ -294,14 +298,14 @@ static Expr *foldSequence(TypeChecker &TC,
     // recursively fold operators starting from this point, then
     // immediately fold LHS and RHS.
     if (Op1.infixData == Op2Info && Op1.infixData.isRightAssociative()) {
-      RHS = foldSequence(TC, RHS, S, Op1.infixData.getPrecedence());
+      RHS = foldSequence(TC, DC, RHS, S, Op1.infixData.getPrecedence());
       LHS = makeBinOp(TC, Op1.op, LHS, RHS);
 
       // If we've drained the entire sequence, we're done.
       if (S.empty()) return LHS;
 
       // Otherwise, start all over with our new LHS.
-      return foldSequence(TC, LHS, S, MinPrecedence);
+      return foldSequence(TC, DC, LHS, S, MinPrecedence);
     }
 
     // If we ended up here, it's because we have two operators
@@ -321,7 +325,7 @@ static Expr *foldSequence(TypeChecker &TC,
     
     // Recover by arbitrarily binding the first two.
     LHS = makeBinOp(TC, Op1.op, LHS, RHS);
-    return foldSequence(TC, LHS, S, MinPrecedence);
+    return foldSequence(TC, DC, LHS, S, MinPrecedence);
   }
 
   // Fold LHS and RHS together and declare completion.
@@ -419,8 +423,10 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
   return result;
 }
 
-static Type lookupGlobalType(TypeChecker &TC, StringRef name) {
-  UnqualifiedLookup lookup(TC.Context.getIdentifier(name), &TC.TU, nullptr);
+static Type lookupGlobalType(TypeChecker &TC, DeclContext *dc, StringRef name) {
+  UnqualifiedLookup lookup(TC.Context.getIdentifier(name),
+                           dc->getParentModule(),
+                           nullptr);
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
@@ -428,7 +434,7 @@ static Type lookupGlobalType(TypeChecker &TC, StringRef name) {
 }
 
 
-Type TypeChecker::getDefaultType(ProtocolDecl *protocol) {
+Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   Type *type = nullptr;
   const char *name = nullptr;
 
@@ -481,7 +487,10 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol) {
 
   // If we haven't found the type yet, look for it now.
   if (!*type) {
-    *type = lookupGlobalType(*this, name);
+    *type = lookupGlobalType(*this, dc, name);
+
+    if (!*type)
+      *type = lookupGlobalType(*this, getStdlibModule(), name);
 
     // Strip off one level of sugar; we don't actually want to print
     // the name of the typealias itself anywhere.
@@ -494,7 +503,7 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol) {
   return *type;
 }
 
-Expr *TypeChecker::foldSequence(SequenceExpr *expr) {
+Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   ArrayRef<Expr*> Elts = expr->getElements();
   assert(Elts.size() > 1 && "inadequate number of elements in sequence");
   assert((Elts.size() & 1) == 1 && "even number of elements in sequence");
@@ -502,7 +511,7 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr) {
   Expr *LHS = Elts[0];
   Elts = Elts.slice(1);
 
-  Expr *Result = ::foldSequence(*this, LHS, Elts, /*min precedence*/ 0);
+  Expr *Result = ::foldSequence(*this, dc, LHS, Elts, /*min precedence*/ 0);
   assert(Elts.empty());
   return Result;
 }

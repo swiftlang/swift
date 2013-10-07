@@ -285,8 +285,8 @@ OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
 }
 
 ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc)
-  : TC(tc), DC(dc), Arena(tc.Context, Allocator)
-{
+  : TC(tc), DC(dc), Arena(tc.Context, Allocator) {
+  assert(DC && "context required");
 }
 
 ConstraintSystem::~ConstraintSystem() { }
@@ -354,7 +354,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, Identifier name) {
   base = base->getCanonicalType();
   auto &result = MemberLookups[{base, name}];
   if (!result) {
-    result = TC.lookupMember(base, name);
+    result = TC.lookupMember(base, name, DC);
 
     // If we aren't performing dynamic lookup, we're done.
     auto instanceTy = base->getRValueType();
@@ -825,7 +825,8 @@ getTypeForArchetype(ConstraintSystem &cs, ArchetypeType *archetype,
   // Look for this member type.
   // FIXME: Ambiguity check.
   auto &tc = cs.getTypeChecker();
-  LookupTypeResult lookup = tc.lookupMemberType(parentTy, archetype->getName());
+  LookupTypeResult lookup = tc.lookupMemberType(parentTy, archetype->getName(),
+                                                cs.DC);
   assert(lookup.size() == 1 && "Couldn't find archetype for member lookup");
   auto type = lookup.front().second;
   mappedTypes[archetype] = type;
@@ -964,7 +965,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       // When we have an associated type and the base type conforms to the
       // given protocol, use the type witness directly.
       ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(baseObjTy, ownerProtoTy->getDecl(),
+      if (TC.conformsToProtocol(baseObjTy, ownerProtoTy->getDecl(), DC,
                                 &conformance)) {
         // FIXME: Eventually, deal with default function/property definitions.
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(value)) {
@@ -2287,7 +2288,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
     return SolutionKind::Error;
   }
 
-  auto ctors = TC.lookupConstructors(valueType);
+  auto ctors = TC.lookupConstructors(valueType, DC);
   if (!ctors) {
     // If we are supposed to record failures, do so.
     if (shouldRecordFailures()) {
@@ -2346,7 +2347,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   }
 
   // Check whether this type conforms to the protocol.
-  if (TC.conformsToProtocol(type, protocol))
+  if (TC.conformsToProtocol(type, protocol, DC))
     return SolutionKind::TriviallySolved;
 
   // FIXME: If we're dealing with _Nil, allow user conversions. This should be
@@ -2458,7 +2459,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   bool isExistential = instanceTy->isExistentialType();
   if (name.str() == "init") {
     // Constructors have their own approach to name lookup.
-    auto ctors = TC.lookupConstructors(baseObjTy);
+    auto ctors = TC.lookupConstructors(baseObjTy, DC);
     if (!ctors) {
       recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                     baseObjTy, name);
@@ -2536,7 +2537,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   // If we want member types only, use member type lookup.
   if (constraint.getKind() == ConstraintKind::TypeMember) {
-    auto lookup = TC.lookupMemberType(baseObjTy, name);
+    auto lookup = TC.lookupMemberType(baseObjTy, name, DC);
     if (!lookup) {
       // FIXME: Customize diagnostic to mention types.
       recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
@@ -2898,7 +2899,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
 }
 
 /// Compare two declarations to determine whether one is a witness of the other.
-static Comparison compareWitnessAndRequirement(TypeChecker &tc,
+static Comparison compareWitnessAndRequirement(TypeChecker &tc, DeclContext *dc,
                                                ValueDecl *decl1,
                                                ValueDecl *decl2) {
   // We only have a witness/requirement pair if exactly one of the declarations
@@ -2935,7 +2936,7 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc,
   auto owningType
     = potentialWitness->getDeclContext()->getDeclaredTypeInContext();
   ProtocolConformance *conformance = nullptr;
-  if (!tc.conformsToProtocol(owningType, proto, &conformance))
+  if (!tc.conformsToProtocol(owningType, proto, dc, &conformance))
     return Comparison::Unordered;
 
   // If the witness and the potential witness are not the same, there's no
@@ -2951,7 +2952,7 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc,
 /// the second declaration.
 ///
 /// "Specialized" is essentially a form of subtyping, defined below.
-static bool isDeclAsSpecializedAs(TypeChecker &tc,
+static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
                                   ValueDecl *decl1, ValueDecl *decl2) {
   // If the kinds are different, there's nothing we can do.
   // FIXME: This is wrong for type declarations.
@@ -2959,7 +2960,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc,
     return false;
 
   // A witness is always more specialized than the requirement it satisfies.
-  switch (compareWitnessAndRequirement(tc, decl1, decl2)) {
+  switch (compareWitnessAndRequirement(tc, dc, decl1, decl2)) {
   case Comparison::Unordered:
     break;
 
@@ -3020,15 +3021,17 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc,
   auto funcTy1 = type1->castTo<FunctionType>();
   auto funcTy2 = type2->castTo<FunctionType>();
   auto &context = tc.Context;
-  return tc.isSubtypeOf(funcTy1->getInput(), funcTy2->getInput()) ||
+  return tc.isSubtypeOf(funcTy1->getInput(), funcTy2->getInput(), dc) ||
         (funcTy1->getInput()->getUnlabeledType(context)->isEqual(
            funcTy2->getInput()->getUnlabeledType(context)) &&
-          tc.isSubtypeOf(funcTy1->getResult(), funcTy2->getResult()));
+          tc.isSubtypeOf(funcTy1->getResult(), funcTy2->getResult(), dc));
 }
 
-Comparison TypeChecker::compareDeclarations(ValueDecl *decl1, ValueDecl *decl2){
-  bool decl1Better = isDeclAsSpecializedAs(*this, decl1, decl2);
-  bool decl2Better = isDeclAsSpecializedAs(*this, decl2, decl1);
+Comparison TypeChecker::compareDeclarations(DeclContext *dc,
+                                            ValueDecl *decl1,
+                                            ValueDecl *decl2){
+  bool decl1Better = isDeclAsSpecializedAs(*this, dc, decl1, decl2);
+  bool decl2Better = isDeclAsSpecializedAs(*this, dc, decl2, decl1);
 
   if (decl1Better == decl2Better)
     return Comparison::Unordered;
@@ -3110,9 +3113,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::Decl:
       // Determine whether one declaration is more specialized than the other.
-      if (isDeclAsSpecializedAs(tc, choice1.getDecl(), choice2.getDecl()))
+      if (isDeclAsSpecializedAs(tc, cs.DC,
+                                choice1.getDecl(), choice2.getDecl()))
         ++score1;
-      if (isDeclAsSpecializedAs(tc, choice2.getDecl(), choice1.getDecl()))
+      if (isDeclAsSpecializedAs(tc, cs.DC,
+                                choice2.getDecl(), choice1.getDecl()))
         ++score2;
       break;
     }
@@ -3549,7 +3554,7 @@ namespace {
 
         // Validate the result type, if present.
         if (closure->hasExplicitResultType() &&
-            TC.validateType(closure->getExplicitResultTypeLoc())) {
+            TC.validateType(closure->getExplicitResultTypeLoc(), DC)) {
           expr->setType(ErrorType::get(TC.Context));
           return { false, expr };
         }
@@ -3567,14 +3572,14 @@ namespace {
     Expr *walkToExprPost(Expr *expr) override {
       // Fold sequence expressions.
       if (auto seqExpr = dyn_cast<SequenceExpr>(expr)) {
-        return TC.foldSequence(seqExpr);
+        return TC.foldSequence(seqExpr, DC);
       }
 
       // Type check the type in an array new expression.
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
         // FIXME: Check that the element type has a default constructor.
         
-        if (TC.validateType(newArray->getElementTypeLoc(),
+        if (TC.validateType(newArray->getElementTypeLoc(), DC,
                             /*allowUnboundGenerics=*/true))
           return nullptr;
 
@@ -3601,7 +3606,7 @@ namespace {
       // Type check the type parameters in an UnresolvedSpecializeExpr.
       if (auto us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
         for (TypeLoc &type : us->getUnresolvedParams()) {
-          if (TC.validateType(type)) {
+          if (TC.validateType(type, DC)) {
             TC.diagnose(us->getLAngleLoc(),
                         diag::while_parsing_as_left_angle_bracket);
             return nullptr;
@@ -3612,7 +3617,7 @@ namespace {
 
       // Type check the type parameters in cast expressions.
       if (auto cast = dyn_cast<ExplicitCastExpr>(expr)) {
-        if (TC.validateType(cast->getCastTypeLoc()))
+        if (TC.validateType(cast->getCastTypeLoc(), DC))
           return nullptr;
         return expr;
       }
@@ -4323,19 +4328,21 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   return false;
 }
 
-bool TypeChecker::isSubtypeOf(Type type1, Type type2, bool &isTrivial) {
-  ConstraintSystem cs(*this, nullptr);
+bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc,
+                              bool &isTrivial) {
+  ConstraintSystem cs(*this, dc);
   return cs.isSubtypeOf(type1, type2, isTrivial);
 }
 
-bool TypeChecker::isConvertibleTo(Type type1, Type type2) {
-  ConstraintSystem cs(*this, nullptr);
+bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
+  ConstraintSystem cs(*this, dc);
   bool isTrivial;
   return cs.isConvertibleTo(type1, type2, isTrivial);
 }
 
-bool TypeChecker::isSubstitutableFor(Type type1, ArchetypeType *type2) {
-  ConstraintSystem cs(*this, nullptr);
+bool TypeChecker::isSubstitutableFor(Type type1, ArchetypeType *type2,
+                                     DeclContext *dc) {
+  ConstraintSystem cs(*this, dc);
   
   llvm::DenseMap<ArchetypeType*, TypeVariableType*> replacements;
   Type type2var = cs.openType(type2, type2, replacements);
@@ -4652,6 +4659,7 @@ void ConstraintSystem::dump() {
 /// Determine the semantics of a checked cast operation.
 CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  Type toType,
+                                 DeclContext *dc,
                                  SourceLoc diagLoc,
                                  SourceRange diagFromRange,
                                  SourceRange diagToRange,
@@ -4665,7 +4673,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // If the from/to types are equivalent or implicitly convertible,
   // this should have been a coercion expression (b as A) rather than a
   // checked cast (a as! B). Complain.
-  if (fromType->isEqual(toType) || isConvertibleTo(fromType, toType)) {
+  if (fromType->isEqual(toType) || isConvertibleTo(fromType, toType, dc)) {
     return CheckedCastKind::InvalidCoercible;
   }
   
@@ -4689,7 +4697,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (fromExistential) {
     if (toArchetype) {
       return CheckedCastKind::ExistentialToArchetype;
-    } else if (isConvertibleTo(toType, fromType)) {
+    } else if (isConvertibleTo(toType, fromType, dc)) {
       return CheckedCastKind::ExistentialToConcrete;
     } else {
       diagnose(diagLoc,
@@ -4703,7 +4711,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   
   //   - convert an archetype to a concrete type fulfilling its constraints.
   if (fromArchetype) {
-    if (!isSubstitutableFor(toType, fromType->castTo<ArchetypeType>())) {
+    if (!isSubstitutableFor(toType, fromType->castTo<ArchetypeType>(), dc)) {
       diagnose(diagLoc,
                diag::downcast_from_archetype_to_unrelated,
                origFromType, toType)
@@ -4733,7 +4741,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   assert(!toExistential && "existentials should have been handled above");
 
   // The destination type must be a subtype of the source type.
-  if (!isSubtypeOf(toType, fromType)) {
+  if (!isSubtypeOf(toType, fromType, dc)) {
     diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, toType)
       .highlight(diagFromRange)
       .highlight(diagToRange);

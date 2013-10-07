@@ -159,10 +159,11 @@ public:
         return false;
       
       // Find a type member by the given name.
-      lookup = TC.lookupMemberType(td->getDeclaredType(), ude->getName());
+      lookup = TC.lookupMemberType(td->getDeclaredType(), ude->getName(),
+                                   rootDC);
     } else if (Module *m = curScope.dyn_cast<Module*>()) {
       // Look into the module.
-      lookup = TC.lookupMemberType(ModuleType::get(m), ude->getName());
+      lookup = TC.lookupMemberType(ModuleType::get(m), ude->getName(), rootDC);
     } else
       llvm_unreachable("invalid curType");
     
@@ -190,7 +191,7 @@ public:
     // constrained extensions would change this), but apply the parameters for
     // validation and source tracking purposes.
     
-    curType = TC.applyGenericArguments(curType, use->getLoc(),
+    curType = TC.applyGenericArguments(curType, use->getLoc(), rootDC,
                                        use->getUnresolvedParams(),
                                        nullptr);
     if (!curType)
@@ -220,7 +221,7 @@ lookupEnumMemberElement(TypeChecker &TC, Type ty, Identifier name) {
     return nullptr;
   
   // Look up the case inside the enum.
-  LookupResult foundElements = TC.lookupMember(ty, name,
+  LookupResult foundElements = TC.lookupMember(ty, name, oof,
                                                /*allowDynamicLookup=*/false);
   if (!foundElements)
     return nullptr;
@@ -490,14 +491,15 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC) {
   return ResolvePattern(*this, DC).visit(P);
 }
 
-static bool validateTypedPattern(TypeChecker &TC, TypedPattern *TP,
-                                 bool isVararg, GenericTypeResolver *resolver) {
+static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
+                                 TypedPattern *TP, bool isVararg,
+                                 GenericTypeResolver *resolver) {
   if (TP->hasType())
     return TP->getType()->is<ErrorType>();
 
   bool hadError = false;
   TypeLoc &TL = TP->getTypeLoc();
-  if (TC.validateType(TL, /*allowUnboundGenerics=*/false, resolver))
+  if (TC.validateType(TL, DC, /*allowUnboundGenerics=*/false, resolver))
     hadError = true;
   Type Ty = TL.getType();
 
@@ -547,7 +549,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = validateTypedPattern(*this, TP, isVararg, resolver);
+    bool hadError = validateTypedPattern(*this, dc, TP, isVararg, resolver);
     hadError |= coerceToType(TP->getSubPattern(), dc, P->getType(), false,
                              resolver);
     return hadError;
@@ -633,7 +635,7 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = validateTypedPattern(*this, TP, isVararg, resolver);
+    bool hadError = validateTypedPattern(*this, dc, TP, isVararg, resolver);
     if (!hadError) {
       if (!type->isEqual(TP->getType()) && !type->is<ErrorType>()) {
         // Complain if the types don't match exactly.
@@ -732,11 +734,11 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
     auto IP = cast<IsaPattern>(P);
 
     // Type-check the type parameter.
-    if (validateType(IP->getCastTypeLoc()))
+    if (validateType(IP->getCastTypeLoc(), dc))
       return nullptr;
     
     CheckedCastKind castKind
-      = typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(),
+      = typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(), dc,
                              IP->getLoc(),
                              IP->getLoc(),IP->getCastTypeLoc().getSourceRange(),
                              [](Type) { return false; });
@@ -800,7 +802,7 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
     auto NP = cast<NominalTypePattern>(P);
     
     // Type-check the type.
-    if (validateType(NP->getCastTypeLoc()))
+    if (validateType(NP->getCastTypeLoc(), dc))
       return nullptr;
     
     Type patTy = NP->getCastTypeLoc().getType();

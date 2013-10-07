@@ -117,7 +117,6 @@ enum class Comparison {
 
 class TypeChecker : public ASTMutationListener, public LazyResolver {
 public:
-  TranslationUnit &TU;
   ASTContext &Context;
   DiagnosticEngine &Diags;
 
@@ -142,8 +141,8 @@ private:
   unsigned NextResponseVariableIndex = 0;
 
 public:
-  TypeChecker(TranslationUnit &TU) : TypeChecker(TU, TU.Ctx.Diags) { }
-  TypeChecker(TranslationUnit &TU, DiagnosticEngine &Diags);
+  TypeChecker(ASTContext &Ctx) : TypeChecker(Ctx, Ctx.Diags) { }
+  TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags);
   ~TypeChecker();
 
   LangOptions &getLangOpts() const { return Context.LangOpts; }
@@ -168,6 +167,8 @@ public:
   /// \param Loc The type (with source location information) to validate.
   /// If the type has already been validated, returns immediately.
   ///
+  /// \param DC The context that the type appears in.
+  ///
   /// \param allowUnboundGenerics Whether the allow unbound generics at the
   /// top level of the type. Defaults to 'false', and should only be enabled
   /// in places where the generic arguments will be deduced, e.g., within an
@@ -177,7 +178,8 @@ public:
   /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
   ///
   /// \returns true if type validation failed, or false otherwise.
-  bool validateType(TypeLoc &Loc, bool allowUnboundGenerics = false,
+  bool validateType(TypeLoc &Loc, DeclContext *DC,
+                    bool allowUnboundGenerics = false,
                     GenericTypeResolver *resolver = nullptr);
 
   /// \brief Resolves a TypeRepr to a type.
@@ -187,13 +189,16 @@ public:
   ///
   /// \param TyR The type representation to check.
   ///
+  /// \param DC The context that the type appears in.
+  ///
   /// \param allowUnboundGenerics Whether to allow unbound generic types.
   ///
   /// \param resolver A resolver for generic types. If none is supplied, this
   /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
   ///
   /// \returns a well-formed type or an ErrorType in case of an error.
-  Type resolveType(TypeRepr *TyR, bool allowUnboundGenerics = false,
+  Type resolveType(TypeRepr *TyR, DeclContext *DC,
+                   bool allowUnboundGenerics = false,
                    GenericTypeResolver *resolver = nullptr);
 
   void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
@@ -234,13 +239,14 @@ public:
   /// FIXME: We probably want to have both silent and loud failure modes. However,
   /// the only possible failure now is from array slice types, which occur
   /// simply because we don't have Slice<T> yet.
-  Type substType(Type T, TypeSubstitutionMap &Substitutions,
+  Type substType(Module *module, Type T, TypeSubstitutionMap &Substitutions,
                  bool IgnoreMissing = false);
 
   /// \brief Apply generic arguments to the given type.
   ///
   /// \param type         The unbound generic type to which to apply arguments.
   /// \param loc          The source location for diagnostic reporting.
+  /// \param dc           The context where the arguments are applied.
   /// \param genericArgs  The list of generic arguments to apply to the type.
   /// \param resolver     The generic type resolver.
   ///
@@ -248,12 +254,14 @@ public:
   /// error.
   Type applyGenericArguments(Type type,
                              SourceLoc loc,
+                             DeclContext *dc,
                              MutableArrayRef<TypeLoc> genericArgs,
                              GenericTypeResolver *resolver);
 
   /// \brief Replace the type \c T of a protocol member \c Member given the
   /// type of the base of a member access, \c BaseTy.
-  Type substMemberTypeWithBase(Type T, ValueDecl *Member, Type BaseTy);
+  Type substMemberTypeWithBase(Module *module, Type T, ValueDecl *Member,
+                               Type BaseTy);
 
   /// \brief Retrieve the superclass type of the given type, or a null type if
   /// the type has no supertype.
@@ -263,11 +271,12 @@ public:
   ///
   /// \param t1 The potential subtype.
   /// \param t2 The potential supertype.
+  /// \param dc The context of the check.
   ///
   /// \returns true if \c t1 is a subtype of \c t2.
-  bool isSubtypeOf(Type t1, Type t2) {
+  bool isSubtypeOf(Type t1, Type t2, DeclContext *dc) {
     bool isTrivial;
-    return isSubtypeOf(t1, t2, isTrivial);
+    return isSubtypeOf(t1, t2, dc, isTrivial);
   }
 
   /// \brief Determine whether one type is a subtype of another.
@@ -276,11 +285,13 @@ public:
   ///
   /// \param t2 The potential supertype.
   ///
+  /// \param dc The context of the check.
+  ///
   /// \param isTrivial Will indicate whether this is a trivial subtyping
   /// relationship.
   ///
   /// \returns true if \c t1 is a subtype of \c t2.
-  bool isSubtypeOf(Type t1, Type t2, bool &isTrivial);
+  bool isSubtypeOf(Type t1, Type t2, DeclContext *dc, bool &isTrivial);
   
   /// \brief Determine whether one type is implicitly convertible to another.
   ///
@@ -288,8 +299,10 @@ public:
   ///
   /// \param t2 The potential destination type of the conversion.
   ///
+  /// \param dc The context of the conversion.
+  ///
   /// \returns true if \c t1 can be implicitly converted to \c t2.
-  bool isConvertibleTo(Type t1, Type t2);
+  bool isConvertibleTo(Type t1, Type t2, DeclContext *dc);
   
   /// \brief Determine whether one type would be a valid substitution for an
   /// archetype.
@@ -298,8 +311,10 @@ public:
   ///
   /// \param t2 The potential substituted archetype.
   ///
+  /// \param dc The context of the check.
+  ///
   /// \returns true if \c t1 is a valid substitution for \c t2.
-  bool isSubstitutableFor(Type t1, ArchetypeType *t2);
+  bool isSubstitutableFor(Type t1, ArchetypeType *t2, DeclContext *dc);
 
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
@@ -321,8 +336,8 @@ public:
 
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  void processREPLTopLevel(unsigned StartElem);
-  Identifier getNextResponseVariableName();
+  void processREPLTopLevel(TranslationUnit *TU, unsigned StartElem);
+  Identifier getNextResponseVariableName(DeclContext *DC);
 
   void typeCheckDecl(Decl *D, bool isFirstPass);
   
@@ -355,7 +370,7 @@ public:
   bool validateGenericTypeSignature(NominalTypeDecl *nominal);
 
   /// Check the inheritance clause of the given declaration.
-  void checkInheritanceClause(Decl *decl,
+  void checkInheritanceClause(Decl *decl, DeclContext *DC = nullptr,
                               GenericTypeResolver *resolver = nullptr);
 
   /// Retrieve the set of protocols to which this nominal type declaration
@@ -397,9 +412,11 @@ public:
   /// \param initializer If non-null, we will assigned an initializer expression
   /// that performs the default initialization.
   ///
+  /// \param dc The context in which default-initialization is needed.
+  ///
   /// \param useConstructor Whether we must use a constructor for a class
   /// (rather than default-initializing to zero).
-  bool isDefaultInitializable(Type ty, Expr **initializer, 
+  bool isDefaultInitializable(Type ty, Expr **initializer, DeclContext *dc,
                               bool useConstructor = false);
 
   /// \brief Define the default constructor for the given struct or class.
@@ -410,7 +427,7 @@ public:
 
   /// \brief Fold the given sequence expression into an (unchecked) expression
   /// tree.
-  Expr *foldSequence(SequenceExpr *expr);
+  Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
   
   /// Pre-check an expression, validating any types that occur in the
   /// expression and folding sequence expressions.
@@ -457,6 +474,7 @@ public:
   ///
   /// \param fromType       The source type of the cast.
   /// \param toType         The destination type of the cast.
+  /// \param dc             The context of the cast.
   /// \param diagLoc        The location at which to report diagnostics.
   /// \param diagFromRange  The source range of the input operand of the cast.
   /// \param diagToRange    The source range of the destination type.
@@ -468,6 +486,7 @@ public:
   /// conversion, InvalidCoercible is returned.
   CheckedCastKind typeCheckCheckedCast(Type fromType,
                                        Type toType,
+                                       DeclContext *dc,
                                        SourceLoc diagLoc,
                                        SourceRange diagFromRange,
                                        SourceRange diagToRange,
@@ -517,7 +536,7 @@ public:
   ///
   /// \returns the default type, or null if there is no default type for
   /// this protocol.
-  Type getDefaultType(ProtocolDecl *protocol);
+  Type getDefaultType(ProtocolDecl *protocol, DeclContext *dc);
 
   /// \brief Convert the given expression to the given type.
   ///
@@ -580,8 +599,10 @@ public:
                     MutableArrayRef<Expr *> arguments,
                     Diag<> brokenProtocolDiag);
 
-  /// conformsToProtocol - Determine whether the given type conforms to the
-  /// given protocol.
+  /// \brief Determine whether the given type conforms to the given protocol.
+  ///
+  /// \param DC The context in which to check conformance. This affects, for
+  /// example, extension visibility.
   ///
   /// \param Conformance If non-NULL, and the type does conform to the given
   /// protocol, this will be set to the protocol conformance mapping that
@@ -600,7 +621,7 @@ public:
   /// be checked and diagnosed as a fallback.
   ///
   /// \returns true if T conforms to the protocol Proto, false otherwise.
-  bool conformsToProtocol(Type T, ProtocolDecl *Proto,
+  bool conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
                           ProtocolConformance **Conformance = 0,
                           SourceLoc ComplainLoc = SourceLoc(),
                           Decl *ExplicitConformance = nullptr);
@@ -621,6 +642,7 @@ public:
   /// the required protocol-conformance relationships.
   bool checkSubstitutions(TypeSubstitutionMap &Substitutions,
                           ConformanceMap &Conformance,
+                          DeclContext *DC,
                           SourceLoc ComplainLoc,
                           TypeSubstitutionMap *RecordSubstitutions = nullptr);
 
@@ -628,10 +650,11 @@ public:
   ///
   /// \param type The type in which we will look for a member.
   /// \param name The name of the member to look for.
+  /// \param dc The context that needs the member.
   /// \param allowDynamicLookup Whether to allow dynamic lookup.
   ///
   /// \returns The result of name lookup.
-  LookupResult lookupMember(Type type, Identifier name,
+  LookupResult lookupMember(Type type, Identifier name, DeclContext *dc,
                             bool allowDynamicLookup = true);
 
   /// \brief Look up a member type within the given type.
@@ -640,18 +663,20 @@ public:
   /// given type. 
   ///
   /// \param type The type in which we will look for a member type.
-  ///
   /// \param name The name of the member to look for.
+  /// \param dc The context that needs the member.
   ///
   /// \returns The result of name lookup.
-  LookupTypeResult lookupMemberType(Type type, Identifier name);
+  LookupTypeResult lookupMemberType(Type type, Identifier name,
+                                    DeclContext *dc);
 
   /// \brief Look up the constructors of the given type.
   ///
   /// \param type The type for which we will look for constructors.
+  /// \param dc The context that needs the constructor.
   ///
   /// \returns the constructors found for this type.
-  LookupResult lookupConstructors(Type type);
+  LookupResult lookupConstructors(Type type, DeclContext *dc);
 
   /// \brief Look up the Bool type in the standard library.
   Type lookupBoolType();
@@ -675,7 +700,9 @@ public:
   /// A declaration is more specialized than another declaration if its type
   /// is a subtype of the other declaration's type (ignoring the 'self'
   /// parameter of function declarations) and if
-  Comparison compareDeclarations(ValueDecl *decl1, ValueDecl *decl2);
+  Comparison compareDeclarations(DeclContext *dc,
+                                 ValueDecl *decl1,
+                                 ValueDecl *decl2);
 
   /// \brief Encode the provided substitutions in the form used by
   /// SpecializeExpr (and another other AST nodes that require specialization).
@@ -777,9 +804,10 @@ public:
   /// @{
   virtual ProtocolConformance *resolveConformance(NominalTypeDecl *type,
                                                   ProtocolDecl *protocol,
-                                                  ExtensionDecl *ext);
-  virtual void resolveExistentialConformsToItself(ProtocolDecl *proto);
-  virtual Type resolveMemberType(Type type, Identifier name);
+                                                  ExtensionDecl *ext) override;
+  virtual void resolveExistentialConformsToItself(ProtocolDecl *proto) override;
+  virtual Type resolveMemberType(DeclContext *dc, Type type,
+                                 Identifier name) override;
 };
 
 } // end namespace swift

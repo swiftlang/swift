@@ -151,7 +151,7 @@ static SmallVector<TupleTypeElt, 4> decomposeIntoTupleElements(Type type) {
 ///
 /// \returns the result of performing the match.
 static RequirementMatch
-matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
+matchWitness(TypeChecker &tc, ProtocolDecl *protocol, DeclContext *dc,
              ValueDecl *req, Type reqType,
              Type model, ValueDecl *witness,
              ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) {
@@ -198,7 +198,8 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
     // base type and ignore 'self'.
     if (witness->getDeclContext()->isTypeContext()) {
       witnessType = witness->getType()->castTo<AnyFunctionType>()->getResult();
-      witnessType = tc.substMemberTypeWithBase(witnessType, witness, model);
+      witnessType = tc.substMemberTypeWithBase(dc->getParentModule(),
+                                               witnessType, witness, model);
       assert(witnessType && "Cannot refer to witness?");
     }
 
@@ -209,7 +210,8 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
 
     // The witness type is the type of the declaration with the base
     // substituted.
-    witnessType = tc.substMemberTypeWithBase(witness->getType(), witness,
+    witnessType = tc.substMemberTypeWithBase(dc->getParentModule(),
+                                             witness->getType(), witness,
                                              model);
     assert(witnessType && "Cannot refer to witness?");
 
@@ -219,8 +221,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
 
   // Construct a constraint system to use to solve the equality between
   // the required type and the witness type.
-  // FIXME: Pass the nominal/extension context in as the DeclContext?
-  constraints::ConstraintSystem cs(tc, &tc.TU);
+  constraints::ConstraintSystem cs(tc, dc);
 
   // Open up the type of the requirement and witness, replacing any unresolved
   // archetypes with type variables.
@@ -343,7 +344,8 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
     SmallVector<ProtocolConformance*, 2> conformances;
     for (auto archetypeProto : archetype->getConformsTo()) {
       ProtocolConformance *conformance = nullptr;
-      bool conformed = tc.conformsToProtocol(sub, archetypeProto, &conformance);
+      bool conformed = tc.conformsToProtocol(sub, archetypeProto, dc,
+                                             &conformance);
       assert(conformed &&
              "archetype substitution did not conform to requirement?");
       (void)conformed;
@@ -358,10 +360,11 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
 }
 
 /// \brief Determine whether one requirement match is better than the other.
-static bool isBetterMatch(TypeChecker &tc, const RequirementMatch &match1,
+static bool isBetterMatch(TypeChecker &tc, DeclContext *dc,
+                          const RequirementMatch &match1,
                           const RequirementMatch &match2) {
   // Check whether one declaration is better than the other.
-  switch (tc.compareDeclarations(match1.Witness, match2.Witness)) {
+  switch (tc.compareDeclarations(dc, match1.Witness, match2.Witness)) {
   case Comparison::Better:
     return true;
 
@@ -461,6 +464,7 @@ diagnoseMatch(TypeChecker &tc, ValueDecl *req,
 /// Compute the substitution for the given archetype and its replacement
 /// type.
 static Substitution getArchetypeSubstitution(TypeChecker &tc,
+                                             DeclContext *dc,
                                              ArchetypeType *archetype,
                                              Type replacement) {
   Substitution result;
@@ -471,7 +475,7 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
 
   for (auto proto : archetype->getConformsTo()) {
     ProtocolConformance *conformance = nullptr;
-    bool conforms = tc.conformsToProtocol(replacement, proto, &conformance);
+    bool conforms = tc.conformsToProtocol(replacement, proto, dc, &conformance);
     assert(conforms && "Conformance should already have been verified");
     (void)conforms;
     conformances.push_back(conformance);
@@ -485,6 +489,7 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
 /// recording the complete witness table if it does.
 static ProtocolConformance *
 checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
+                        DeclContext *DC,
                         Decl *ExplicitConformance,
                         SourceLoc ComplainLoc) {
   WitnessMap Mapping;
@@ -502,7 +507,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getProtocols()) {
     ProtocolConformance *InheritedConformance = nullptr;
-    if (TC.conformsToProtocol(T, InheritedProto, &InheritedConformance,
+    if (TC.conformsToProtocol(T, InheritedProto, DC, &InheritedConformance,
                               ComplainLoc, ExplicitConformance)) {
       InheritedMapping[InheritedProto] = InheritedConformance;
       TypeMapping[InheritedProto->getSelf()->getArchetype()] = T;
@@ -549,7 +554,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       continue;
     }
 
-    auto candidates = TC.lookupMemberType(metaT, AssociatedType->getName());
+    auto candidates = TC.lookupMemberType(metaT, AssociatedType->getName(), DC);
     bool didDerive = false;
 
     // If we didn't find any matches, try to derive the conformance.
@@ -581,7 +586,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       // FIXME: Check superclass requirement as well.
       bool SatisfiesRequirements = true;
       for (auto ReqProto : AssociatedType->getProtocols()) {
-        if (!TC.conformsToProtocol(candidate.second, ReqProto)){
+        if (!TC.conformsToProtocol(candidate.second, ReqProto, DC)){
           SatisfiesRequirements = false;
 
           NonViable.push_back({candidate.first, ReqProto});
@@ -600,7 +605,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       auto archetype = AssociatedType->getArchetype();
       TypeMapping[archetype] = Viable.front().second;
       TypeWitnesses[AssociatedType]
-        = getArchetypeSubstitution(TC, archetype, Viable.front().second);
+        = getArchetypeSubstitution(TC, DC, archetype, Viable.front().second);
       continue;
     }
     
@@ -703,14 +708,16 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       reqType = reqType->castTo<AnyFunctionType>()->getResult();
 
     // Substitute the type mappings we have into the requirement type.
-    reqType = TC.substType(reqType, TypeMapping, /*IgnoreMissing=*/true);
+    reqType = TC.substType(DC->getParentModule(), reqType, TypeMapping,
+                           /*IgnoreMissing=*/true);
     assert(reqType && "We didn't check our type mappings?");
 
     // Gather the witnesses.
     SmallVector<ValueDecl *, 4> witnesses;
     if (Requirement->getName().isOperator()) {
       // Operator lookup is always global.
-      UnqualifiedLookup Lookup(Requirement->getName(), &TC.TU, &TC);
+      UnqualifiedLookup Lookup(Requirement->getName(), DC->getParentModule(),
+                               &TC);
 
       if (Lookup.isSuccess()) {
         for (auto Candidate : Lookup.Results) {
@@ -720,7 +727,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       }
     } else {
       // Variable/function/subscript requirements.
-      for (auto candidate : TC.lookupMember(metaT, Requirement->getName())) {
+      for (auto candidate : TC.lookupMember(metaT, Requirement->getName(), DC)){
         witnesses.push_back(candidate);
       }
     }
@@ -744,7 +751,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       if (!witness->hasType())
         TC.validateDecl(witness, true);
 
-      auto match = matchWitness(TC, Proto, Requirement, reqType, T, witness,
+      auto match = matchWitness(TC, Proto, DC, Requirement, reqType, T, witness,
                                 unresolvedAssocTypes);
       if (match.isViable()) {
         ++numViable;
@@ -771,7 +778,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         // Find the best match.
         bestIdx = 0;
         for (unsigned i = 1, n = matches.size(); i != n; ++i) {
-          if (isBetterMatch(TC, matches[i], matches[bestIdx]))
+          if (isBetterMatch(TC, DC, matches[i], matches[bestIdx]))
             bestIdx = i;
         }
 
@@ -780,7 +787,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
           if (i == bestIdx)
             continue;
 
-          if (!isBetterMatch(TC, matches[bestIdx], matches[i])) {
+          if (!isBetterMatch(TC, DC, matches[bestIdx], matches[i])) {
             isReallyBest = false;
             break;
           }
@@ -808,7 +815,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
             // Compute the archetype substitution.
             TypeWitnesses[assocType]
-              = getArchetypeSubstitution(TC, archetype, deduction.second);
+              = getArchetypeSubstitution(TC, DC, archetype, deduction.second);
           }
 
           // Remove the now-resolved associated types from the set of
@@ -843,7 +850,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         witnesses.push_back(derived);
         // If the compiler or stdlib is broken, the derived witness may not be
         // viable.
-        if (matchWitness(TC, Proto, Requirement, reqType, T, derived,
+        if (matchWitness(TC, Proto, DC, Requirement, reqType, T, derived,
                          unresolvedAssocTypes).isViable()) {
           numViable = 1;
           continue;
@@ -1112,7 +1119,8 @@ static void suggestExplicitConformance(TypeChecker &tc,
 
     // If the witness owner is not this translation unit, then we don't want
     // to suggest it as a place to hang the explicit conformance.
-    if (witnessOwner->getDeclContext()->getParentModule() != &tc.TU)
+    // FIXME: Distinguish user source files from imported source files.
+    if (!isa<TranslationUnit>(witnessOwner->getModuleContext()))
       continue;
 
     // We have an owner.
@@ -1224,6 +1232,7 @@ static bool existentialConformsToProtocol(TypeChecker &tc, Type type,
 }
 
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
+                                     DeclContext *DC,
                                      ProtocolConformance **Conformance,
                                      SourceLoc ComplainLoc, 
                                      Decl *ExplicitConformance) {
@@ -1298,7 +1307,8 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       return false;
     }
 
-    auto lookupResult = TU.lookupConformance(T, Proto, this);
+    Module *M = DC->getParentModule();
+    auto lookupResult = M->lookupConformance(T, Proto, this);
     switch (lookupResult.getInt()) {
     case ConformanceKind::Conforms:
       Context.ConformsTo[Key] = ConformanceEntry(lookupResult.getPointer(),
@@ -1326,7 +1336,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
 
     // Check whether the type *implicitly* conforms to the protocol.
-    if (auto *result = checkConformsToProtocol(*this, T, Proto, nullptr,
+    if (auto *result = checkConformsToProtocol(*this, T, Proto, DC, nullptr,
                                                SourceLoc())) {
       // Success! Record the conformance in the cache.
       Context.ConformsTo[Key].setPointer(result);
@@ -1356,8 +1366,8 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   // whether it does in fact conform. This eliminates both infinite recursion
   // (if the protocol hierarchies are circular) as well as tautologies.
   Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
-  auto result = checkConformsToProtocol(*this, T, Proto, ExplicitConformance,
-                                        ComplainLoc);
+  auto result = checkConformsToProtocol(*this, T, Proto, DC,
+                                        ExplicitConformance, ComplainLoc);
   if (!result)
     return false;
 
@@ -1372,10 +1382,11 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
 ProtocolConformance *TypeChecker::resolveConformance(NominalTypeDecl *type,
                                                      ProtocolDecl *protocol,
                                                      ExtensionDecl *ext) {
-  Decl *explicitConformance = ext? (Decl *)ext : (Decl *)type;
+  auto explicitConformance = ext ? (Decl *)ext : (Decl *)type;
+  auto conformanceContext = ext ? (DeclContext *)ext : (DeclContext *)type;
   ProtocolConformance *conformance = nullptr;
   bool conforms = conformsToProtocol(type->getDeclaredTypeInContext(), protocol,
-                                     &conformance,
+                                     conformanceContext, &conformance,
                                      explicitConformance->getLoc(),
                                      explicitConformance);
   return conforms? conformance : nullptr;

@@ -534,6 +534,7 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
     tc.conformsToProtocol(failure.getFirstType(),
                           failure.getSecondType()->castTo<ProtocolType>()
                             ->getDecl(),
+                          cs.DC,
                           nullptr,
                           loc);
     if (targetLocator)

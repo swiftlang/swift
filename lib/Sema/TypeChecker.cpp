@@ -36,9 +36,8 @@
 
 using namespace swift;
 
-TypeChecker::TypeChecker(TranslationUnit &TU, DiagnosticEngine &Diags)
-  : TU(TU), Context(TU.Ctx),
-    Diags(Diags)
+TypeChecker::TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags)
+  : Context(Ctx), Diags(Diags)
 {
   Context.addMutationListener(*this);
 
@@ -131,8 +130,16 @@ Module *TypeChecker::getStdlibModule() {
 
   if (!StdlibModule)
     StdlibModule = Context.LoadedModules.lookup(Context.StdlibModuleName.str());
-  if (!StdlibModule)
-    StdlibModule = &TU;
+  if (!StdlibModule) {
+    // FIXME: Hack. There should just be a pointer on ASTContext to the main
+    // module.
+    for (auto &entry : Context.LoadedModules) {
+      if (auto TU = dyn_cast_or_null<TranslationUnit>(entry.getValue()))
+        if (TU->getImportBufferID() == -1)
+          StdlibModule = TU;
+    }
+    assert(StdlibModule && "no main module found");
+  }
 
   Context.recordKnownProtocols(StdlibModule);
   return StdlibModule;
@@ -193,7 +200,8 @@ static Type getBaseMemberDeclType(TypeChecker &TC,
       ->getClassOrBoundGenericClass();
   while (Base->getClassOrBoundGenericClass() != BaseDecl)
     Base = TC.getSuperClassOf(Base);
-  return TC.substMemberTypeWithBase(D->getType(), D, Base);
+  return TC.substMemberTypeWithBase(D->getModuleContext(),
+                                    D->getType(), D, Base);
 }
 
 /// \brief Check the given set of members for any members that override a member
@@ -238,6 +246,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
     if (FoundDeclResult.second) {
       for (auto BaseMember : TC.lookupMember(superclassMetaTy,
                                              MemberVD->getName(),
+                                             CD->getDeclContext(),
                                              /*allowDynamicLookup=*/false))
         CurDecls.push_back(BaseMember);
     }
@@ -319,12 +328,14 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
           bool Trivial;
           isSubtype = TC.isSubtypeOf(MemberFTy->getResult(),
                                      OtherFTy->getResult(),
+                                     CD->getDeclContext(),
                                      Trivial) && Trivial;
         }
       } else {
         bool Trivial;
         isSubtype = TC.isSubtypeOf(MemberVD->getType(),
                                    BaseMemberTy,
+                                   CD->getDeclContext(),
                                    Trivial) && Trivial;
       }
       if (isSubtype) {
@@ -369,7 +380,8 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     return;
   
   // FIXME: Should allow bound generics here as well.
-  if (TC.validateType(ED->getExtendedTypeLoc(), /*allowUnboundGenerics=*/true)) {
+  if (TC.validateType(ED->getExtendedTypeLoc(), ED->getDeclContext(),
+                      /*allowUnboundGenerics=*/true)) {
     ED->setInvalid();
     return;
   }
@@ -457,7 +469,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // checking.
   performNameBinding(TU, StartElem);
   
-  TypeChecker TC(*TU);
+  TypeChecker TC(TU->Ctx);
   auto &DefinedFunctions = TC.definedFunctions;
 
   // Lookup the swift module.  This ensures that we record all known protocols
@@ -604,7 +616,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // If we're in REPL mode, inject temporary result variables and other stuff
   // that the REPL needs to synthesize.
   if (TU->Kind == TranslationUnit::REPL && !TC.Context.hadError())
-    TC.processREPLTopLevel(StartElem);
+    TC.processREPLTopLevel(TU, StartElem);
   
   // Check overloaded vars/funcs.
   // FIXME: This is quadratic time for TUs with multiple chunks.
@@ -697,20 +709,21 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 }
 
 bool swift::performTypeLocChecking(TranslationUnit *TU, TypeLoc &T,
+                                   DeclContext *DC,
                                    bool ProduceDiagnostics) {
   if (ProduceDiagnostics) {
-    return TypeChecker(*TU).validateType(T);
+    return TypeChecker(TU->Ctx).validateType(T, DC);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine Diags(TU->Ctx.SourceMgr);
-    return TypeChecker(*TU, Diags).validateType(T);
+    return TypeChecker(TU->Ctx, Diags).validateType(T, DC);
   }
 }
 
 bool swift::typeCheckCompletionDecl(TranslationUnit *TU, Decl *D) {
   // Set up a diagnostics engine that swallows diagnostics.
   DiagnosticEngine Diags(TU->Ctx.SourceMgr);
-  TypeChecker TC(*TU, Diags);
+  TypeChecker TC(TU->Ctx, Diags);
   TC.typeCheckDecl(D, true);
   return true;
 }
@@ -720,7 +733,7 @@ bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
   // Set up a diagnostics engine that swallows diagnostics.
   DiagnosticEngine diags(TU->Ctx.SourceMgr);
   
-  TypeChecker TC(*TU, diags);
+  TypeChecker TC(TU->Ctx, diags);
   TC.typeCheckExpression(parsedExpr, TU, Type(), /*discardedExpr=*/true);
   TU->ASTStage = TranslationUnit::TypeChecked;
   
@@ -738,7 +751,7 @@ bool swift::typeCheckAbstractFunctionBodyUntil(TranslationUnit *TU,
   // Set up a diagnostics engine that swallows diagnostics.
   DiagnosticEngine Diags(TU->Ctx.SourceMgr);
 
-  TypeChecker TC(*TU, Diags);
+  TypeChecker TC(TU->Ctx, Diags);
   return !TC.typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
 }
 
@@ -750,7 +763,7 @@ static void deleteTypeCheckerAndDiags(LazyResolver *resolver) {
 
 OwnedResolver swift::createLazyResolver(TranslationUnit *TU) {
   auto diags = new DiagnosticEngine(TU->Ctx.SourceMgr);
-  return OwnedResolver(new TypeChecker(*TU, *diags),
+  return OwnedResolver(new TypeChecker(TU->Ctx, *diags),
                        &deleteTypeCheckerAndDiags);
 }
 

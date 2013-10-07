@@ -1369,7 +1369,7 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
     // FIXME: This is a fallback. We want the above, conformance-based
     // result to be the only viable path.
     if (resolver) {
-      if (Type memberType = resolver->resolveMemberType(substParent,
+      if (Type memberType = resolver->resolveMemberType(module, substParent,
                                                         substOrig->getName())) {
         return memberType;
       }

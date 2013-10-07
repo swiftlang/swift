@@ -27,6 +27,7 @@ Type DependentGenericTypeResolver::resolveGenericTypeParamType(
 
 Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      Type baseTy,
+                                     DeclContext *DC,
                                      SourceRange baseRange,
                                      Identifier name,
                                      SourceLoc nameLoc) {
@@ -47,6 +48,7 @@ Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
 
 Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
                                   Type baseTy,
+                                  DeclContext *DC,
                                   SourceRange baseRange,
                                   Identifier name,
                                   SourceLoc nameLoc) {
@@ -69,6 +71,7 @@ Type PartialGenericTypeToArchetypeResolver::resolveGenericTypeParamType(
 
 Type PartialGenericTypeToArchetypeResolver::resolveDependentMemberType(
                                               Type baseTy,
+                                              DeclContext *DC,
                                               SourceRange baseRange,
                                               Identifier name,
                                               SourceLoc nameLoc) {
@@ -92,6 +95,7 @@ Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
 
 Type CompleteGenericTypeResolver::resolveDependentMemberType(
                                     Type baseTy,
+                                    DeclContext *DC,
                                     SourceRange baseRange,
                                     Identifier name,
                                     SourceLoc nameLoc) {
@@ -103,8 +107,9 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // Find the associated type declaration for this name.
   for (auto proto : basePA->getConformsTo()) {
     SmallVector<ValueDecl *, 2> decls;
-    if (TC.TU.lookupQualified(proto->getDeclaredType(), name,
-                              NL_VisitSupertypes, nullptr, decls)) {
+    if (Builder.getModule().lookupQualified(proto->getDeclaredType(), name,
+                                            NL_VisitSupertypes, nullptr,
+                                            decls)) {
       for (auto decl : decls) {
         // Note: once we find any associated type, we have our answer, because
         // the archetype builder is supposed to ensure that all associated
@@ -119,7 +124,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 
   // Check whether the name can be found in the superclass.
   if (auto superclassTy = basePA->getSuperclass()) {
-    if (auto lookup = TC.lookupMemberType(superclassTy, name)) {
+    if (auto lookup = TC.lookupMemberType(superclassTy, name, DC)) {
       if (lookup.isAmbiguous()) {
         TC.diagnoseAmbiguousMemberType(baseTy, baseRange, name, nameLoc,
                                        lookup);
@@ -138,9 +143,9 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 }
 
 /// Create a fresh archetype builder.
-static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC) {
+static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC, Module *mod) {
   return ArchetypeBuilder(
-           TC.TU, TC.Diags,
+           *mod, TC.Diags,
            [&](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
              return TC.getDirectConformsTo(protocol);
            },
@@ -203,7 +208,7 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     typeParam->setDepth(depth);
 
     // Check the inheritance clause of this type parameter.
-    tc.checkInheritanceClause(typeParam, &resolver);
+    tc.checkInheritanceClause(typeParam, parentDC, &resolver);
 
     if (builder) {
       // Add the generic parameter to the builder.
@@ -230,7 +235,7 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     switch (req.getKind()) {
     case RequirementKind::Conformance: {
       // Validate the types.
-      if (tc.validateType(req.getSubjectLoc(),
+      if (tc.validateType(req.getSubjectLoc(), parentDC,
                           /*allowUnboundGenerics=*/false,
                           &resolver)) {
         invalid = true;
@@ -238,7 +243,7 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
         continue;
       }
 
-      if (tc.validateType(req.getConstraintLoc(),
+      if (tc.validateType(req.getConstraintLoc(), parentDC,
                           /*allowUnboundGenerics=*/false,
                           &resolver)) {
         invalid = true;
@@ -272,7 +277,7 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     }
 
     case RequirementKind::SameType:
-      if (tc.validateType(req.getFirstTypeLoc(),
+      if (tc.validateType(req.getFirstTypeLoc(), parentDC,
                           /*allowUnboundGenerics=*/false,
                           &resolver)) {
         invalid = true;
@@ -280,7 +285,7 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
         continue;
       }
 
-      if (tc.validateType(req.getSecondTypeLoc(),
+      if (tc.validateType(req.getSecondTypeLoc(), parentDC,
                           /*allowUnboundGenerics=*/false,
                           &resolver)) {
         invalid = true;
@@ -368,7 +373,7 @@ namespace {
 /// potential archetypes to the set of requirements.
 static void
 addRequirements(
-    TranslationUnit &tu, Type type,
+    Module &mod, Type type,
     ArchetypeBuilder::PotentialArchetype *pa,
     llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> &knownPAs,
     SmallVectorImpl<Requirement> &requirements) {
@@ -400,13 +405,13 @@ addRequirements(
     auto rep = nested.second->getRepresentative();
     if (knownPAs.insert(rep)) {
       // Form the dependent type that refers to this archetype.
-      auto assocType = pa->getAssociatedType(tu, nested.first);
+      auto assocType = pa->getAssociatedType(mod, nested.first);
       if (!assocType)
         continue; // FIXME: If we do this late enough, there will be no failure.
 
       auto nestedType = DependentMemberType::get(type, assocType,
-                                                 tu.getASTContext());
-      addRequirements(tu, nestedType, rep, knownPAs, requirements);
+                                                 mod.getASTContext());
+      addRequirements(mod, nestedType, rep, knownPAs, requirements);
     }
   }
 }
@@ -439,7 +444,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
   // along with the requirements of its nested types.
   for (auto param : primary) {
     auto pa = builder.resolveType(param)->getRepresentative();
-    addRequirements(builder.getTranslationUnit(), param, pa, knownPAs,
+    addRequirements(builder.getModule(), param, pa, knownPAs,
                     requirements);
   }
 }
@@ -477,7 +482,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     if (!fn->getBodyResultTypeLoc().isNull()) {
       // Check the result type of the function.
-      if (tc.validateType(fn->getBodyResultTypeLoc(),
+      if (tc.validateType(fn->getBodyResultTypeLoc(), fn,
                           /*allowUnboundGenerics=*/false,
                           &resolver)) {
         badType = true;
@@ -533,7 +538,8 @@ static Type computeSelfType(AbstractFunctionDecl *func,
 
 bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   // Create the archetype builder.
-  ArchetypeBuilder builder = createArchetypeBuilder(*this);
+  ArchetypeBuilder builder = createArchetypeBuilder(*this,
+                                                    func->getParentModule());
 
   // Type check the function declaration, treating all generic type
   // parameters as dependent, unresolved.
@@ -654,7 +660,8 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
   assert(nominal->getGenericParams() && "Missing generic parameters?");
 
   // Create the archetype builder.
-  ArchetypeBuilder builder = createArchetypeBuilder(*this);
+  Module *module = nominal->getModuleContext();
+  ArchetypeBuilder builder = createArchetypeBuilder(*this, module);
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
@@ -761,6 +768,7 @@ void TypeChecker::encodeSubstitutions(const GenericParamList *GenericParams,
 
 bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
                                      ConformanceMap &Conformance,
+                                     DeclContext *DC,
                                      SourceLoc ComplainLoc,
                                      TypeSubstitutionMap *RecordSubstitutions) {
   // FIXME: We want to migrate to a world where we don't need ComplainLoc, and
@@ -786,7 +794,7 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
 
     // Substitute our deductions into the archetype type to produce the
     // concrete type we need to evaluate.
-    Type T = substType(archetype, Substitutions);
+    Type T = substType(DC->getParentModule(), archetype, Substitutions);
     if (!T)
       return true;
 
@@ -796,7 +804,7 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
 
     // If the archetype has a superclass requirement, check that now.
     if (auto superclass = archetype->getSuperclass()) {
-      if (!isSubtypeOf(T, superclass)) {
+      if (!isSubtypeOf(T, superclass, DC)) {
         if (ComplainLoc.isValid()) {
           diagnose(ComplainLoc, diag::type_does_not_inherit, T, superclass);
           // FIXME: Show where the requirement came from?
@@ -810,7 +818,7 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
     if (Conformances.empty()) {
       for (auto Proto : archetype->getConformsTo()) {
         ProtocolConformance *Conformance = nullptr;
-        if (conformsToProtocol(T, Proto, &Conformance, ComplainLoc)) {
+        if (conformsToProtocol(T, Proto, DC, &Conformance, ComplainLoc)) {
           Conformances.push_back(Conformance);
         } else {
           return true;

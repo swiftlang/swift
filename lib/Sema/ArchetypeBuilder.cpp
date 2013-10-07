@@ -95,11 +95,11 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(Identifier Name)
 
 auto ArchetypeBuilder::PotentialArchetype::getArchetype(
                                              AssociatedTypeDecl *rootAssocTy,
-                                             TranslationUnit &tu)
+                                             Module &mod)
                                                 -> ArchetypeType * {
   // Retrieve the archetype from the representation of this set.
   if (Representative != this)
-    return getRepresentative()->getArchetype(rootAssocTy, tu);
+    return getRepresentative()->getArchetype(rootAssocTy, mod);
 
   AssociatedTypeDecl *assocType = rootAssocTy;
   if (!Archetype) {
@@ -108,7 +108,7 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetype(
     if (Parent) {
       assert(!rootAssocTy &&
              "root associated type given for non-root archetype");
-      ParentArchetype = Parent->getArchetype(nullptr, tu);
+      ParentArchetype = Parent->getArchetype(nullptr, mod);
 
       if (!ParentArchetype)
         return nullptr;
@@ -116,7 +116,7 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetype(
       // Find the protocol that has an associated type with this name.
       for (auto proto : ParentArchetype->getConformsTo()) {
         SmallVector<ValueDecl *, 2> decls;
-        if (tu.lookupQualified(proto->getDeclaredType(), Name,
+        if (mod.lookupQualified(proto->getDeclaredType(), Name,
                                NL_VisitSupertypes, nullptr, decls)) {
           for (auto decl : decls) {
             assocType = dyn_cast<AssociatedTypeDecl>(decl);
@@ -138,7 +138,7 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetype(
 
     SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
                                           ConformsTo.end());
-    Archetype = ArchetypeType::getNew(tu.getASTContext(), ParentArchetype,
+    Archetype = ArchetypeType::getNew(mod.getASTContext(), ParentArchetype,
                                       assocType, Name, Protos, Superclass,
                                       Index);
 
@@ -147,20 +147,20 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetype(
     SmallVector<std::pair<Identifier, ArchetypeType *>, 4> FlatNestedTypes;
     for (auto Nested : NestedTypes) {
       FlatNestedTypes.push_back({ Nested.first,
-                                  Nested.second->getArchetype(nullptr, tu) });
+                                  Nested.second->getArchetype(nullptr, mod) });
     }
-    Archetype->setNestedTypes(tu.getASTContext(), FlatNestedTypes);
+    Archetype->setNestedTypes(mod.getASTContext(), FlatNestedTypes);
   }
 
   return Archetype;
 }
 
 AssociatedTypeDecl *
-ArchetypeBuilder::PotentialArchetype::getAssociatedType(TranslationUnit &tu,
+ArchetypeBuilder::PotentialArchetype::getAssociatedType(Module &mod,
                                                         Identifier name) {
   for (auto proto : getRepresentative()->getConformsTo()) {
     SmallVector<ValueDecl *, 2> decls;
-    if (tu.lookupQualified(proto->getDeclaredType(), name,
+    if (mod.lookupQualified(proto->getDeclaredType(), name,
                            NL_VisitSupertypes, nullptr, decls)) {
       for (auto decl : decls) {
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
@@ -225,8 +225,9 @@ struct ArchetypeBuilder::Implementation {
   SmallVector<ArchetypeType *, 4> AllArchetypes;
 };
 
-ArchetypeBuilder::ArchetypeBuilder(TranslationUnit &tu, DiagnosticEngine &diags)
-  : TU(tu), Context(tu.getASTContext()), Diags(diags), Impl(new Implementation)
+ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
+  : Mod(mod), Context(mod.getASTContext()), Diags(diags),
+    Impl(new Implementation)
 {
   Impl->getInheritedProtocols = [](ProtocolDecl *protocol) {
     return protocol->getProtocols();
@@ -237,10 +238,11 @@ ArchetypeBuilder::ArchetypeBuilder(TranslationUnit &tu, DiagnosticEngine &diags)
 }
 
 ArchetypeBuilder::ArchetypeBuilder(
-  TranslationUnit &tu, DiagnosticEngine &diags,
+  Module &mod, DiagnosticEngine &diags,
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols,
-  std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)> getConformsTo)
-  : TU(tu), Context(tu.getASTContext()), Diags(diags), Impl(new Implementation)
+  std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl*)> getConformsTo)
+  : Mod(mod), Context(mod.getASTContext()), Diags(diags),
+    Impl(new Implementation)
 {
   Impl->getInheritedProtocols = std::move(getInheritedProtocols);
   Impl->getConformsTo = std::move(getConformsTo);
@@ -611,7 +613,7 @@ void ArchetypeBuilder::assignArchetypes() {
   // generic parameters).
   for (const auto& PA : Impl->PotentialArchetypes) {
     auto Archetype
-      = PA.second->getArchetype(dyn_cast<AssociatedTypeDecl>(PA.first), TU);
+      = PA.second->getArchetype(dyn_cast<AssociatedTypeDecl>(PA.first), Mod);
     Impl->PrimaryArchetypeMap[PA.first] = Archetype;
   }
 }

@@ -21,6 +21,7 @@
 
 namespace swift {
 
+class DeclContext;
 class ExtensionDecl;
 class Identifier;
 class NominalTypeDecl;
@@ -55,12 +56,14 @@ public:
 
   /// Resolve a member type.
   ///
+  /// \param dc The context in which to resolve the type.
   /// \param type The type in which we will search for the member type.
   /// \param name The name of the member type.
   ///
   /// \returns the member type, or an empty type if no such type could be
   /// found.
-  virtual Type resolveMemberType(Type type, Identifier name) = 0;
+  virtual Type resolveMemberType(DeclContext *dc, Type type,
+                                 Identifier name) = 0;
 
   /// Resolve the type and declaration attributes of a value.
   ///

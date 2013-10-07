@@ -560,8 +560,8 @@ specializeTypeWitnesses(ASTContext &ctx,
 /// Retrieve the explicit conformance of the given nominal type declaration
 /// to the given protocol.
 static std::tuple<NominalTypeDecl *, Decl *, ProtocolConformance *>
-findExplicitConformance(Module *module, NominalTypeDecl *nominal,
-                        ProtocolDecl *protocol, LazyResolver *resolver) {
+findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
+                        LazyResolver *resolver) {
   // FIXME: Introduce a cache/lazy lookup structure to make this more efficient?
 
   // Walk the nominal type, its extensions, superclasses, and so on.
@@ -726,7 +726,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
   Decl *declaresConformance = nullptr;
   ProtocolConformance *nominalConformance = nullptr;
   std::tie(owningNominal, declaresConformance, nominalConformance)
-    = findExplicitConformance(this, nominal, protocol, resolver);
+    = findExplicitConformance(nominal, protocol, resolver);
 
   // If we didn't find an owning nominal, we don't conform. Cache the negative
   // result and return.

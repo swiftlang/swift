@@ -53,16 +53,20 @@ public:
   
   /// The level of loop nesting. 'break' and 'continue' are valid only in scopes
   /// where this is greater than one.
-  unsigned LoopNestLevel;
+  unsigned LoopNestLevel = 0;
   /// The level of 'switch' nesting. 'fallthrough' is valid only in scopes where
   /// this is greater than one.
-  unsigned SwitchLevel;
+  unsigned SwitchLevel = 0;
   /// The destination block for a 'fallthrough' statement. Null if the switch
   /// scope depth is zero or if we are checking the final 'case' of the current
   /// switch.
-  CaseStmt /*nullable*/ *FallthroughDest;
+  CaseStmt /*nullable*/ *FallthroughDest = nullptr;
 
   SourceLoc EndTypeCheckLoc;
+
+  /// Used to check for discarded expression values: in the REPL top-level
+  /// expressions are not discarded.
+  bool IsREPL;
 
   struct AddLoopNest {
     StmtChecker &SC;
@@ -91,26 +95,17 @@ public:
   };
 
   StmtChecker(TypeChecker &TC, AbstractFunctionDecl *AFD)
-    : TC(TC), TheFunc(AFD),
-      LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) {
-    if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
-      DC = CD;
-      return;
-    }
-    if (auto *DD = dyn_cast<DestructorDecl>(AFD)) {
-      DC = DD;
-      return;
-    }
-    DC = cast<FuncDecl>(AFD);
-  }
+    : TC(TC), TheFunc(AFD), DC(AFD), IsREPL(false) { }
 
   StmtChecker(TypeChecker &TC, ClosureExpr *TheClosure)
-    : TC(TC), TheFunc(TheClosure), DC(TheClosure),
-      LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
+    : TC(TC), TheFunc(TheClosure), DC(TheClosure), IsREPL(false) { }
 
   StmtChecker(TypeChecker &TC, DeclContext *DC)
-    : TC(TC), TheFunc(), DC(DC),
-      LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
+    : TC(TC), TheFunc(), DC(DC), IsREPL(false) {
+    if (auto TU = dyn_cast<TranslationUnit>(DC->getParentModule()))
+      if (TU->Kind == TranslationUnit::REPL)
+        IsREPL = true;
+  }
 
   //===--------------------------------------------------------------------===//
   // Helper Functions.
@@ -263,8 +258,8 @@ public:
       Type ContainerType = Container->getType()->getRValueType();
 
       ProtocolConformance *Conformance = nullptr;
-      if (!TC.conformsToProtocol(ContainerType, EnumerableProto, &Conformance,
-                                 Container->getLoc()))
+      if (!TC.conformsToProtocol(ContainerType, EnumerableProto, DC,
+                                 &Conformance, Container->getLoc()))
         return nullptr;
 
       RangeTy = TC.getWitnessType(ContainerType, EnumerableProto,
@@ -324,7 +319,7 @@ public:
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
     ProtocolConformance *RangeConformance = nullptr;
-    if (!TC.conformsToProtocol(RangeTy, EnumeratorProto, &RangeConformance,
+    if (!TC.conformsToProtocol(RangeTy, EnumeratorProto, DC, &RangeConformance,
                                Container->getLoc()))
       return nullptr;
     
@@ -366,7 +361,7 @@ public:
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
     ProtocolConformance *GenConformance = nullptr;
-    if (!TC.conformsToProtocol(GeneratorTy, GeneratorProto, &GenConformance,
+    if (!TC.conformsToProtocol(GeneratorTy, GeneratorProto, DC, &GenConformance,
                                Container->getLoc()))
       return nullptr;
 
@@ -497,8 +492,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         break;
 
       // Type check the expression.
-      bool isDiscarded
-        = TC.TU.Kind != TranslationUnit::REPL || !isa<TopLevelCodeDecl>(DC);
+      bool isDiscarded = !(IsREPL && isa<TopLevelCodeDecl>(DC));
       if (TC.typeCheckExpression(SubExpr, DC, Type(), isDiscarded)) {
         elem = SubExpr;
         continue;
@@ -739,7 +733,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
           // Look for the member within this type.
           auto memberDecls
             = lookupMember(nominalDecl->getDeclaredTypeInContext(),
-                           memberRef->getName(),
+                           memberRef->getName(), ctor,
                            /*allowDynamicLookup=*/false);
           if (memberDecls.size() == 1)
             member = dyn_cast<VarDecl>(memberDecls[0]);
@@ -833,7 +827,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
           continue;
 
         Expr *initializer = nullptr;
-        if (!isDefaultInitializable(varType, &initializer)) {
+        if (!isDefaultInitializable(varType, &initializer, ctor)) {
           diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar,
                    var->getName(), varType);
           diagnose(var->getLoc(), diag::decl_declared_here, var->getName());

@@ -200,8 +200,15 @@ static void validateAttributes(TypeChecker &TC, Decl *VD);
 /// This routine validates all of the types in the parsed inheritance clause,
 /// recording the superclass (if any and if allowed) as well as the protocols
 /// to which this type declaration conforms.
-void TypeChecker::checkInheritanceClause(Decl *decl,
+void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
                                          GenericTypeResolver *resolver) {
+  if (!DC) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
+      DC = nominal;
+    else
+      DC = decl->getDeclContext();
+  }
+
   // Establish a default generic type resolver.
   PartialGenericTypeToArchetypeResolver defaultResolver(*this);
   if (!resolver)
@@ -237,7 +244,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     auto &inherited = inheritedClause[i];
 
     // Validate the type.
-    if (validateType(inherited, /*allowUnboundGenerics=*/false, resolver)) {
+    if (validateType(inherited, DC, /*allowUnboundGenerics=*/false, resolver)) {
       inherited.setInvalidType(Context);
       continue;
     }
@@ -598,9 +605,9 @@ static CanType getExtendedType(ExtensionDecl *ED) {
 
 /// Create a fresh archetype builder.
 /// FIXME: Duplicated with TypeCheckGeneric.cpp; this one should go away.
-static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC) {
+static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC, Module *mod) {
   return ArchetypeBuilder(
-           TC.TU, TC.Diags,
+           *mod, TC.Diags,
            [&](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
              return TC.getDirectConformsTo(protocol);
            },
@@ -732,7 +739,7 @@ static void revertDependentPattern(Pattern *pattern, DeclContext *dc) {
 /// yet.
 static void checkGenericParamList(ArchetypeBuilder &builder,
                                   GenericParamList *genericParams,
-                                  TypeChecker &TC) {
+                                  TypeChecker &TC, DeclContext *DC) {
   assert(genericParams && "Missing generic parameters");
   unsigned Depth = genericParams->getDepth();
 
@@ -745,7 +752,7 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
     TypeParam->setDepth(Depth);
 
     // Check the constraints on the type parameter.
-    TC.checkInheritanceClause(TypeParam);
+    TC.checkInheritanceClause(TypeParam, DC);
 
     // Add the generic parameter to the builder.
     builder.addGenericParameter(TypeParam, Index++);
@@ -765,12 +772,12 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
     switch (Req.getKind()) {
     case RequirementKind::Conformance: {
       // Validate the types.
-      if (TC.validateType(Req.getSubjectLoc())) {
+      if (TC.validateType(Req.getSubjectLoc(), DC)) {
         Req.setInvalid();
         continue;
       }
 
-      if (TC.validateType(Req.getConstraintLoc())) {
+      if (TC.validateType(Req.getConstraintLoc(), DC)) {
         Req.setInvalid();
         continue;
       }
@@ -800,12 +807,12 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
     }
 
     case RequirementKind::SameType:
-      if (TC.validateType(Req.getFirstTypeLoc())) {
+      if (TC.validateType(Req.getFirstTypeLoc(), DC)) {
         Req.setInvalid();
         continue;
       }
 
-      if (TC.validateType(Req.getSecondTypeLoc())) {
+      if (TC.validateType(Req.getSecondTypeLoc(), DC)) {
         Req.setInvalid();
         continue;
       }
@@ -878,13 +885,13 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
     switch (Req.getKind()) {
     case RequirementKind::Conformance: {
       revertDependentTypeLoc(Req.getSubjectLoc(), dc);
-      if (TC.validateType(Req.getSubjectLoc())) {
+      if (TC.validateType(Req.getSubjectLoc(), dc)) {
         Req.setInvalid();
         continue;
       }
 
       revertDependentTypeLoc(Req.getConstraintLoc(), dc);
-      if (TC.validateType(Req.getConstraintLoc())) {
+      if (TC.validateType(Req.getConstraintLoc(), dc)) {
         Req.setInvalid();
         continue;
       }
@@ -893,13 +900,13 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
 
     case RequirementKind::SameType:
       revertDependentTypeLoc(Req.getFirstTypeLoc(), dc);
-      if (TC.validateType(Req.getFirstTypeLoc())) {
+      if (TC.validateType(Req.getFirstTypeLoc(), dc)) {
         Req.setInvalid();
         continue;
       }
 
       revertDependentTypeLoc(Req.getSecondTypeLoc(), dc);
-      if (TC.validateType(Req.getSecondTypeLoc())) {
+      if (TC.validateType(Req.getSecondTypeLoc(), dc)) {
         Req.setInvalid();
         continue;
       }
@@ -965,17 +972,17 @@ public:
   //===--------------------------------------------------------------------===//
 
   template<typename DeclType>
-  void gatherExplicitConformances(DeclType *D, Type T) {
+  void gatherExplicitConformances(DeclType *D, DeclContext *DC, Type T) {
     SmallVector<ProtocolConformance *, 4> conformances;
     for (auto proto : D->getProtocols()) {
       ProtocolConformance *conformance = nullptr;
       // FIXME: Better location info
-      if (TC.conformsToProtocol(T, proto, &conformance,
+      if (TC.conformsToProtocol(T, proto, DC, &conformance,
                                 D->getStartLoc(), D)) {
         // For nominal types and extensions thereof, record conformance
         // to known protocols.
         if (auto kind = proto->getKnownProtocolKind())
-          if (isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D))
+          if (isa<NominalTypeDecl>((Decl *)D) || isa<ExtensionDecl>((Decl *)D))
             TC.Context.recordConformance(kind.getValue(), D);
       }
       conformances.push_back(conformance);
@@ -984,12 +991,16 @@ public:
     D->setConformances(D->getASTContext().AllocateCopy(conformances));
   }
 
+  void checkExplicitConformance(NominalTypeDecl *D, Type T) {
+    gatherExplicitConformances(D, D, T);
+  }
+
   void checkExplicitConformance(TypeDecl *D, Type T) {
-    gatherExplicitConformances(D, T);
+    gatherExplicitConformances(D, D->getDeclContext(), T);
   }
 
   void checkExplicitConformance(ExtensionDecl *D, Type T) {
-    gatherExplicitConformances(D, T);
+    gatherExplicitConformances(D, D, T);
   }
 
   //===--------------------------------------------------------------------===//
@@ -1062,11 +1073,7 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    bool DelayCheckingPattern =
-      TC.TU.Kind != TranslationUnit::Library &&
-      TC.TU.Kind != TranslationUnit::SIL &&
-      PBD->getDeclContext()->isModuleContext();
-    if (IsSecondPass && !DelayCheckingPattern) {
+    if (IsSecondPass) {
       if (PBD->getInit() && PBD->getPattern()->hasType()) {
         Expr *Init = PBD->getInit();
         Type DestTy = PBD->getPattern()->getType();
@@ -1099,7 +1106,7 @@ public:
         setBoundVarsTypeError(PBD->getPattern(), TC.Context);
         return;
       }
-    } else if (!IsFirstPass || !DelayCheckingPattern) {
+    } else {
       if (TC.typeCheckPattern(PBD->getPattern(),
                               PBD->getDeclContext(),
                               /*allowUnknownTypes*/false)) {
@@ -1118,7 +1125,8 @@ public:
     assert(SD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent subscripts outside of types!");
 
-    bool isInvalid = TC.validateType(SD->getElementTypeLoc());
+    bool isInvalid = TC.validateType(SD->getElementTypeLoc(),
+                                     SD->getDeclContext());
     isInvalid |= TC.typeCheckPattern(SD->getIndices(),
                                      SD->getDeclContext(),
                                      /*allowUnknownTypes*/false);
@@ -1151,7 +1159,7 @@ public:
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (!IsSecondPass) {
-      if (TC.validateType(TAD->getUnderlyingTypeLoc())) {
+      if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD->getDeclContext())) {
         TAD->setInvalid();
         TAD->overwriteType(ErrorType::get(TC.Context));
         TAD->getUnderlyingTypeLoc().setType(ErrorType::get(TC.Context));
@@ -1174,10 +1182,10 @@ public:
     // If there was no previous value, start from zero.
     if (!prevValue) {
       // The raw type must be integer literal convertible for this to work.
-      if (!TC.conformsToProtocol(rawTy,
-                 TC.getProtocol(forElt->getLoc(),
-                                KnownProtocolKind::IntegerLiteralConvertible)))
-      {
+      ProtocolDecl *ilcProto =
+        TC.getProtocol(forElt->getLoc(),
+                       KnownProtocolKind::IntegerLiteralConvertible);
+      if (!TC.conformsToProtocol(rawTy, ilcProto, forElt->getDeclContext())) {
         TC.diagnose(forElt->getLoc(),
                     diag::enum_non_integer_convertible_raw_type_no_value);
         return nullptr;
@@ -1222,14 +1230,15 @@ public:
         // Check that the raw type is convertible from one of the primitive
         // literal protocols.
         bool literalConvertible = false;
-        for (auto literalProtocol : {
+        for (auto literalProtoKind : {
                                 KnownProtocolKind::IntegerLiteralConvertible,
                                 KnownProtocolKind::StringLiteralConvertible,
                                 KnownProtocolKind::FloatLiteralConvertible,
                                 KnownProtocolKind::CharacterLiteralConvertible})
         {
-          if (TC.conformsToProtocol(rawTy,
-                              TC.getProtocol(ED->getLoc(), literalProtocol))) {
+          ProtocolDecl *literalProto =
+            TC.getProtocol(ED->getLoc(), literalProtoKind);
+          if (TC.conformsToProtocol(rawTy, literalProto, ED->getDeclContext())){
             literalConvertible = true;
             break;
           }
@@ -1472,7 +1481,7 @@ public:
 
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
-      if (TC.validateType(FD->getBodyResultTypeLoc(),
+      if (TC.validateType(FD->getBodyResultTypeLoc(), FD->getDeclContext(),
                           /*allowUnboundGenerics=*/false,
                           resolver)) {
         badType = true;
@@ -1535,21 +1544,25 @@ public:
   /// the corresponding operator declaration.
   void bindFuncDeclToOperator(FuncDecl *FD) {
     OperatorDecl *op = nullptr;
-    auto &TU = TC.TU;
+    auto &module = *FD->getModuleContext();
     if (FD->isUnaryOperator()) {
       if (FD->getAttrs().isPrefix()) {
-        if (auto maybeOp = TU.lookupPrefixOperator(FD->getName(), FD->getLoc()))
+        if (auto maybeOp = module.lookupPrefixOperator(FD->getName(),
+                                                       FD->getLoc()))
           op = *maybeOp;
         else
           return;
       } else if (FD->getAttrs().isPostfix()) {
-        if (auto maybeOp = TU.lookupPostfixOperator(FD->getName(),FD->getLoc()))
+        if (auto maybeOp = module.lookupPostfixOperator(FD->getName(),
+                                                        FD->getLoc()))
           op = *maybeOp;
         else
           return;
       } else {
-        auto prefixOp = TU.lookupPrefixOperator(FD->getName(), FD->getLoc());
-        auto postfixOp = TU.lookupPostfixOperator(FD->getName(), FD->getLoc());
+        auto prefixOp = module.lookupPrefixOperator(FD->getName(),
+                                                    FD->getLoc());
+        auto postfixOp = module.lookupPostfixOperator(FD->getName(),
+                                                      FD->getLoc());
 
         // If we found both prefix and postfix, or neither prefix nor postfix,
         // complain. We can't fix this situation.
@@ -1597,7 +1610,7 @@ public:
                     static_cast<bool>(postfixOp));
       }
     } else if (FD->isBinaryOperator()) {
-      if (auto maybeOp = TU.lookupInfixOperator(FD->getName(), FD->getLoc()))
+      if (auto maybeOp = module.lookupInfixOperator(FD->getName(), FD->getLoc()))
         op = *maybeOp;
       else {
         // FIXME: Add Fix-It introducing an operator declaration?
@@ -1649,8 +1662,9 @@ public:
         isInvalid = true;
       else {
         // Create a fresh archetype builder.
-        ArchetypeBuilder builder = createArchetypeBuilder(TC);
-        checkGenericParamList(builder, gp, TC);
+        ArchetypeBuilder builder =
+          createArchetypeBuilder(TC, FD->getModuleContext());
+        checkGenericParamList(builder, gp, TC, FD->getDeclContext());
 
         // Infer requirements from parameter patterns.
         for (auto pattern : FD->getArgParamPatterns()) {
@@ -1718,13 +1732,13 @@ public:
     Type ElemTy = UD->getDeclaredTypeInContext();
 
     if (!ED->getArgumentTypeLoc().isNull())
-      if (TC.validateType(ED->getArgumentTypeLoc())) {
+      if (TC.validateType(ED->getArgumentTypeLoc(), ED->getDeclContext())) {
         ED->overwriteType(ErrorType::get(TC.Context));
         ED->setInvalid();
         return;
       }
     if (!ED->getResultTypeLoc().isNull()) {
-      if (TC.validateType(ED->getResultTypeLoc())) {
+      if (TC.validateType(ED->getResultTypeLoc(), ED->getDeclContext())) {
         ED->overwriteType(ErrorType::get(TC.Context));
         ED->setInvalid();
         return;
@@ -1856,8 +1870,10 @@ public:
         CD->overwriteType(ErrorType::get(TC.Context));
         CD->setInvalid();
       } else {
-        ArchetypeBuilder builder = createArchetypeBuilder(TC);
-        checkGenericParamList(builder, gp, TC);
+        ArchetypeBuilder builder =
+          createArchetypeBuilder(TC,
+                                                          CD->getModuleContext());
+        checkGenericParamList(builder, gp, TC, CD->getDeclContext());
 
         // Type check the constructor parameters.
         if (TC.typeCheckPattern(CD->getArgParams(),
@@ -2008,7 +2024,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // Type aliases may not have an underlying type yet.
     auto typeAlias = cast<TypeAliasDecl>(D);
     if (typeAlias->getUnderlyingTypeLoc().getTypeRepr())
-      validateType(typeAlias->getUnderlyingTypeLoc());
+      validateType(typeAlias->getUnderlyingTypeLoc(),
+                   typeAlias->getDeclContext());
     break;
   }
 
@@ -2066,8 +2083,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       revertGenericParamList(nominal->getGenericParams(), nominal);
 
-      ArchetypeBuilder builder = createArchetypeBuilder(*this);
-      checkGenericParamList(builder, gp, *this);
+      ArchetypeBuilder builder =
+        createArchetypeBuilder(*this, nominal->getModuleContext());
+      checkGenericParamList(builder, gp, *this, nominal->getDeclContext());
       finalizeGenericParamList(builder, gp, nominal, *this);
     }
 
@@ -2120,7 +2138,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     assert(selfDecl && "no Self decl?");
 
     // Build archetypes for this protocol.
-    ArchetypeBuilder builder = createArchetypeBuilder(*this);
+    ArchetypeBuilder builder = createArchetypeBuilder(*this,
+                                                      D->getModuleContext());
     builder.addGenericParameter(selfDecl, 0);
     builder.addImplicitConformance(selfDecl, proto);
     builder.assignArchetypes();
@@ -2380,7 +2399,8 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   CD->setMembers(Context.AllocateCopy(Members), CD->getBraces());
 }
 
-bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer, 
+bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer,
+                                         DeclContext *dc,
                                          bool useConstructor) {
   CanType canTy = ty->getCanonicalType();
   switch (canTy->getKind()) {
@@ -2443,7 +2463,8 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer,
       // Check whether the element is default-initializable.
       Expr *eltInit = nullptr;
       if (!isDefaultInitializable(elt.getType(),
-                                  initializer? &eltInit : nullptr))
+                                  initializer? &eltInit : nullptr,
+                                  dc))
         return false;
 
       // If we need to produce an initializer, add this element.
@@ -2497,7 +2518,7 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer,
   }
 
   // We need to look for a default constructor.
-  auto ctors = lookupConstructors(ty);
+  auto ctors = lookupConstructors(ty, dc);
   if (!ctors)
     return false;
 
@@ -2578,7 +2599,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
 
       // If this variable is not default-initializable, we're done: we can't
       // add the default constructor because it will be ill-formed.
-      if (!isDefaultInitializable(getTypeOfRValue(var), nullptr))
+      if (!isDefaultInitializable(getTypeOfRValue(var), nullptr, decl))
         return;
     }
   }
@@ -2587,7 +2608,8 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // default-initializable.
   if (isa<ClassDecl>(decl)) {
     if (auto superTy = getSuperClassOf(decl->getDeclaredTypeInContext())) {
-      if (!isDefaultInitializable(superTy, nullptr, /*useConstructor=*/true))
+      if (!isDefaultInitializable(superTy, nullptr, decl,
+                                  /*useConstructor=*/true))
         return;
     }
   }

@@ -498,7 +498,7 @@ getPotentialBindings(ConstraintSystem &cs,
   // that protocol.
   auto &tc = cs.getTypeChecker();
   for (auto constraint : tvc.ConformsToConstraints) {
-    if (auto type = tc.getDefaultType(constraint->getProtocol())) {
+    if (auto type = tc.getDefaultType(constraint->getProtocol(), cs.DC)) {
       // For non-generic literal types, just check for exact types.
       if (!type->isUnspecializedGeneric()) {
         if (exactTypes.insert(type->getCanonicalType())) {
@@ -613,7 +613,7 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
 
         // Only do this for protocols that have default types, i.e., protocols
         // for literals.
-        if (!tc.getDefaultType(proto))
+        if (!tc.getDefaultType(proto, cs.DC))
           continue;
 
         KnownProtocolKind knownKind = *proto->getKnownProtocolKind();

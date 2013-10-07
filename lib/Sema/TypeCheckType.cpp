@@ -115,7 +115,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
   if (isa<AssociatedTypeDecl>(typeDecl) &&
       typeDecl->getDeclContext() != fromDC) {
     if (auto fromProto = dyn_cast<ProtocolDecl>(fromDC)) {
-      return substMemberTypeWithBase(typeDecl->getDeclaredType(), typeDecl,
+      return substMemberTypeWithBase(fromDC->getParentModule(),
+                                     typeDecl->getDeclaredType(), typeDecl,
                                      fromProto->getSelf()->getDeclaredType());
     }
   }
@@ -140,7 +141,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
       // the member type declaration. Substitute the type we're coming from as
       // the base of the member type to produce the projected type result.
       if (fromType->getAnyNominal() == ownerNominal) {
-        return substMemberTypeWithBase(typeDecl->getDeclaredType(), typeDecl,
+        return substMemberTypeWithBase(fromDC->getParentModule(),
+                                       typeDecl->getDeclaredType(), typeDecl,
                                        fromType);
       }
     }
@@ -152,6 +154,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
 /// Apply generic arguments to the given type.
 Type TypeChecker::applyGenericArguments(Type type,
                                         SourceLoc loc,
+                                        DeclContext *dc,
                                         MutableArrayRef<TypeLoc> genericArgs,
                                         GenericTypeResolver *resolver) {
   // Make sure we always have a resolver to use.
@@ -188,7 +191,7 @@ Type TypeChecker::applyGenericArguments(Type type,
   SmallVector<Type, 4> genericArgTypes;
   for (auto &genericArg : genericArgs) {
     // Validate the generic argument.
-    if (validateType(genericArg, /*allowUnboundGenerics=*/false,
+    if (validateType(genericArg, dc, /*allowUnboundGenerics=*/false,
                      resolver))
       return nullptr;
 
@@ -213,7 +216,7 @@ Type TypeChecker::applyGenericArguments(Type type,
       Substitutions[Archetype] = Arg;
     }
 
-    if (checkSubstitutions(Substitutions, Conformance, loc))
+    if (checkSubstitutions(Substitutions, Conformance, dc, loc))
       return nullptr;
   }
 
@@ -221,12 +224,13 @@ Type TypeChecker::applyGenericArguments(Type type,
 }
 
 static Type applyGenericTypeReprArgs(TypeChecker &TC, Type type, SourceLoc loc,
+                                     DeclContext *dc,
                                      MutableArrayRef<TypeRepr *> genericArgs,
                                      GenericTypeResolver *resolver) {
   SmallVector<TypeLoc, 8> args;
   for (auto tyR : genericArgs)
     args.push_back(tyR);
-  Type ty = TC.applyGenericArguments(type, loc, args, resolver);
+  Type ty = TC.applyGenericArguments(type, loc, dc, args, resolver);
   if (!ty)
     return ErrorType::get(TC.Context);
   return ty;
@@ -272,7 +276,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
   if (!genericArgs.empty()) {
     // Apply the generic arguments to the type.
-    type = applyGenericTypeReprArgs(TC, type, loc, genericArgs, resolver);
+    type = applyGenericTypeReprArgs(TC, type, loc, dc, genericArgs, resolver);
   }
 
   assert(type);
@@ -280,7 +284,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 }
 
 static llvm::PointerUnion<Type, Module *>
-resolveIdentTypeComponent(TypeChecker &TC,
+resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                           MutableArrayRef<IdentTypeRepr::Component> components,
                           bool allowUnboundGenerics,
                           GenericTypeResolver *resolver) {
@@ -290,11 +294,7 @@ resolveIdentTypeComponent(TypeChecker &TC,
     if (parentComps.empty()) {
       // Resolve the first component, which is the only one that requires
       // unqualified name lookup.
-      DeclContext *dc = comp.getUnboundContext();
-      assert(dc);
-
-      // Perform an unqualified lookup.
-      UnqualifiedLookup Globals(comp.getIdentifier(), dc, &TC, comp.getIdLoc(),
+      UnqualifiedLookup Globals(comp.getIdentifier(), DC, &TC, comp.getIdLoc(),
                                 /*TypeLookup*/true);
 
       // Process the names we found.
@@ -321,7 +321,7 @@ resolveIdentTypeComponent(TypeChecker &TC,
           continue;
 
         Type type = resolveTypeDecl(TC, typeDecl, comp.getIdLoc(),
-                                    dc, comp.getGenericArgs(),
+                                    DC, comp.getGenericArgs(),
                                     allowUnboundGenerics,
                                     resolver);
         if (type->is<ErrorType>()) {
@@ -378,7 +378,7 @@ resolveIdentTypeComponent(TypeChecker &TC,
 
     } else {
       llvm::PointerUnion<Type, Module *>
-        parent = resolveIdentTypeComponent(TC, parentComps,
+        parent = resolveIdentTypeComponent(TC, DC, parentComps,
                                            allowUnboundGenerics,
                                            resolver);
       // If the last resolved component is a type, perform member type lookup.
@@ -396,7 +396,7 @@ resolveIdentTypeComponent(TypeChecker &TC,
           // Try to resolve the dependent member type to a specific associated
           // type.
           Type memberType = resolver->resolveDependentMemberType(
-                                        parentTy,
+                                        parentTy, DC,
                                         parentRange,
                                         comp.getIdentifier(),
                                         comp.getIdLoc());
@@ -415,7 +415,8 @@ resolveIdentTypeComponent(TypeChecker &TC,
         }
 
         // Look for member types with the given name.
-        auto memberTypes = TC.lookupMemberType(parentTy, comp.getIdentifier());
+        auto memberTypes = TC.lookupMemberType(parentTy, comp.getIdentifier(),
+                                               DC);
 
         // If we didn't find anything, complain.
         // FIXME: Typo correction!
@@ -447,7 +448,7 @@ resolveIdentTypeComponent(TypeChecker &TC,
         // If there are generic arguments, apply them now.
         if (!comp.getGenericArgs().empty())
           memberType = applyGenericTypeReprArgs(TC, memberType, comp.getIdLoc(),
-                                                comp.getGenericArgs(),
+                                                DC, comp.getGenericArgs(),
                                                 resolver);
 
         comp.setValue(memberType);
@@ -457,7 +458,7 @@ resolveIdentTypeComponent(TypeChecker &TC,
       // Lookup into a module.
       auto module = parent.get<Module *>();
       LookupTypeResult foundModuleTypes =
-        TC.lookupMemberType(ModuleType::get(module), comp.getIdentifier());
+        TC.lookupMemberType(ModuleType::get(module), comp.getIdentifier(), DC);
 
       // If we didn't find a type, complain.
       if (!foundModuleTypes) {
@@ -491,7 +492,8 @@ resolveIdentTypeComponent(TypeChecker &TC,
       // If there are generic arguments, apply them now.
       if (!comp.getGenericArgs().empty()) {
         foundType = applyGenericTypeReprArgs(TC, foundType, comp.getIdLoc(),
-                                          comp.getGenericArgs(), resolver);
+                                             DC, comp.getGenericArgs(),
+                                             resolver);
       }
 
       comp.setValue(foundType);
@@ -522,13 +524,14 @@ resolveIdentTypeComponent(TypeChecker &TC,
 }
 
 /// \brief Returns a valid type or ErrorType in case of an error.
-static Type resolveIdentifierType(TypeChecker &TC, IdentTypeRepr* IdType,
+static Type resolveIdentifierType(TypeChecker &TC, DeclContext *DC,
+                                  IdentTypeRepr *IdType,
                                   bool allowUnboundGenerics,
                                   GenericTypeResolver *resolver) {
   assert(resolver && "Missing generic type resolver");
 
   llvm::PointerUnion<Type, Module *>
-    result = resolveIdentTypeComponent(TC, IdType->Components,
+    result = resolveIdentTypeComponent(TC, DC, IdType->Components,
                                        allowUnboundGenerics,
                                        resolver);
   if (auto mod = result.dyn_cast<Module*>()) {
@@ -542,7 +545,8 @@ static Type resolveIdentifierType(TypeChecker &TC, IdentTypeRepr* IdType,
   return result.get<Type>();
 }
 
-bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics,
+bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
+                               bool allowUnboundGenerics,
                                GenericTypeResolver *resolver) {
   // FIXME: Verify that these aren't circular and infinite size.
   
@@ -551,7 +555,8 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics,
     return Loc.isError();
 
   if (Loc.getType().isNull()) {
-    Loc.setType(resolveType(Loc.getTypeRepr(), allowUnboundGenerics, resolver),
+    Loc.setType(resolveType(Loc.getTypeRepr(), DC, allowUnboundGenerics,
+                            resolver),
                 true);
     return Loc.isError();
   }
@@ -560,7 +565,8 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics,
   return Loc.isError();
 }
 
-Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics,
+Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
+                              bool allowUnboundGenerics,
                               GenericTypeResolver *resolver) {
   PrettyStackTraceTypeRepr stackTrace(Context, "resolving", TyR);
 
@@ -579,7 +585,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics,
     auto AttrTyR = cast<AttributedTypeRepr>(TyR);
     DeclAttributes attrs = AttrTyR->getAttrs();
     assert(!attrs.empty());
-    Ty = resolveType(AttrTyR->getTypeRepr(),
+    Ty = resolveType(AttrTyR->getTypeRepr(), DC,
                      /*FIXME:allowUnboundGenerics=*/false,
                      resolver);
     if (Ty->is<ErrorType>())
@@ -653,15 +659,18 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics,
 
     // In SIL translation units *only*, permit [weak] and [unowned] to
     // apply directly to types.
-    if (attrs.hasOwnership() && TU.Kind == TranslationUnit::SIL &&
-        Ty->hasReferenceSemantics()) {
-      Ty = ReferenceStorageType::get(Ty, attrs.getOwnership(), Context);
-      attrs.clearOwnership();
+    if (attrs.hasOwnership() && Ty->hasReferenceSemantics()) {
+      auto TU = dyn_cast<TranslationUnit>(DC->getParentModule());
+      if (TU && TU->Kind == TranslationUnit::SIL) {
+        Ty = ReferenceStorageType::get(Ty, attrs.getOwnership(), Context);
+        attrs.clearOwnership();
+      }
     }
 
     // Diagnose [local_storage] in nested positions.
     if (attrs.isLocalStorage()) {
-      assert(TU.Kind == TranslationUnit::SIL);
+      assert(cast<TranslationUnit>(DC->getParentModule())->Kind ==
+             TranslationUnit::SIL);
       diagnose(attrs.AtLoc, diag::sil_local_storage_nested);
       attrs.LocalStorage = false;
     }
@@ -674,18 +683,18 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics,
   }
 
   case TypeReprKind::Ident:
-    return resolveIdentifierType(*this, cast<IdentTypeRepr>(TyR),
+    return resolveIdentifierType(*this, DC, cast<IdentTypeRepr>(TyR),
                                  allowUnboundGenerics,
                                  resolver);
 
   case TypeReprKind::Function: {
     auto FnTyR = cast<FunctionTypeRepr>(TyR);
-    Type inputTy = resolveType(FnTyR->getArgsTypeRepr(),
+    Type inputTy = resolveType(FnTyR->getArgsTypeRepr(), DC,
                                /*FIXME:allowUnboundGenerics=*/false,
                                resolver);
     if (inputTy->is<ErrorType>())
       return inputTy;
-    Type outputTy = resolveType(FnTyR->getResultTypeRepr(),
+    Type outputTy = resolveType(FnTyR->getResultTypeRepr(), DC,
                                 /*FIXME:allowUnboundGenerics=*/false,
                                 resolver);
     if (outputTy->is<ErrorType>())
@@ -696,7 +705,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics,
   case TypeReprKind::Array: {
     // FIXME: diagnose non-materializability of element type!
     auto ArrTyR = cast<ArrayTypeRepr>(TyR);
-    Type baseTy = resolveType(ArrTyR->getBase(),
+    Type baseTy = resolveType(ArrTyR->getBase(), DC,
                               /*FIXME:allowUnboundGenerics=*/false,
                               resolver);
     if (baseTy->is<ErrorType>())
@@ -720,7 +729,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics,
   case TypeReprKind::Optional: {
     // FIXME: diagnose non-materializability of element type!
     auto optTyR = cast<OptionalTypeRepr>(TyR);
-    Type baseTy = resolveType(optTyR->getBase(),
+    Type baseTy = resolveType(optTyR->getBase(), DC,
                               /*FIXME:allowUnboundGenerics=*/false,
                               resolver);
     if (baseTy->is<ErrorType>())
@@ -738,14 +747,14 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics,
     SmallVector<TupleTypeElt, 8> Elements;
     for (auto tyR : TupTyR->getElements()) {
       if (NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR)) {
-        Type ty = resolveType(namedTyR->getTypeRepr(),
+        Type ty = resolveType(namedTyR->getTypeRepr(), DC,
                               /*FIXME:allowUnboundGenerics=*/false,
                               resolver);
         if (ty->is<ErrorType>())
           return ty;
         Elements.push_back(TupleTypeElt(ty, namedTyR->getName()));
       } else {
-        Type ty = resolveType(tyR,
+        Type ty = resolveType(tyR, DC,
                               /*FIXME:allowUnboundGenerics=*/false,
                               resolver);
         if (ty->is<ErrorType>())
@@ -774,7 +783,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics,
     auto ProtTyR = cast<ProtocolCompositionTypeRepr>(TyR);
     SmallVector<Type, 4> ProtocolTypes;
     for (auto tyR : ProtTyR->getProtocols()) {
-      Type ty = resolveType(tyR, /*FIXME:allowUnboundGenerics=*/false,
+      Type ty = resolveType(tyR, DC, /*FIXME:allowUnboundGenerics=*/false,
                             resolver);
       if (ty->is<ErrorType>())
         return ty;
@@ -801,7 +810,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics,
   }
 
   case TypeReprKind::MetaType: {
-    Type ty = resolveType(cast<MetaTypeTypeRepr>(TyR)->getBase(),
+    Type ty = resolveType(cast<MetaTypeTypeRepr>(TyR)->getBase(), DC,
                           /*FIXME:allowUnboundGenerics=*/false,
                           resolver);
     if (ty->is<ErrorType>())
@@ -818,28 +827,29 @@ Type TypeChecker::transformType(Type type,
   return type.transform(Context, fn);
 }
 
-Type TypeChecker::substType(Type type, TypeSubstitutionMap &Substitutions,
+Type TypeChecker::substType(Module *module, Type type,
+                            TypeSubstitutionMap &Substitutions,
                             bool IgnoreMissing) {
-  return type.subst(&TU, Substitutions, IgnoreMissing, this);
+  return type.subst(module, Substitutions, IgnoreMissing, this);
 }
 
-Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
-                                          Type BaseTy) {
+Type TypeChecker::substMemberTypeWithBase(Module *module, Type T,
+                                          ValueDecl *Member, Type BaseTy) {
   if (!BaseTy)
     return T;
 
-  return BaseTy->getTypeOfMember(&TU, Member, this, T);
+  return BaseTy->getTypeOfMember(module, Member, this, T);
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {
   return type->getSuperclass(this);
 }
 
-Type TypeChecker::resolveMemberType(Type type, Identifier name) {
-  LookupTypeResult memberTypes = lookupMemberType(type, name);
+Type TypeChecker::resolveMemberType(DeclContext *dc, Type type,
+                                    Identifier name) {
+  LookupTypeResult memberTypes = lookupMemberType(type, name, dc);
   if (!memberTypes)
     return Type();
-
 
   // FIXME: Detect ambiguities here?
   return memberTypes.back().second;
