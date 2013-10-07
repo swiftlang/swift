@@ -497,8 +497,8 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
         auto second = TypeLoc::withoutLoc(getType(rawTypeIDs[1]));
 
         requirements.push_back(RequirementRepr::getSameType(first,
-                                                        SourceLoc(),
-                                                        second));
+                                                            SourceLoc(),
+                                                            second));
         break;
       }
       default:
@@ -509,6 +509,14 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
 
       break;
     }
+    case LAST_GENERIC_REQUIREMENT:
+      // Read the end-of-requirements record.
+      uint8_t dummy;
+      LastGenericRequirementLayout::readRecord(scratch, dummy);
+      lastRecordOffset.reset();
+      shouldContinue = false;
+      break;
+
     default:
       // This record is not part of the GenericParamList.
       shouldContinue = false;
@@ -863,9 +871,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     if (isImplicit)
       theStruct->setImplicit();
-    if (genericParams)
-      for (auto &genericParam : *theStruct->getGenericParams())
+    if (genericParams) {
+      SmallVector<GenericTypeParamType *, 4> paramTypes;
+      for (auto &genericParam : *theStruct->getGenericParams()) {
         genericParam.getAsTypeParam()->setDeclContext(theStruct);
+        paramTypes.push_back(genericParam.getAsTypeParam()->getDeclaredType()
+                               ->castTo<GenericTypeParamType>());
+      }
+
+      // Read the generic requirements.
+      SmallVector<Requirement, 4> requirements;
+      readGenericRequirements(requirements);
+
+      theStruct->setGenericSignature(paramTypes, requirements);
+    }
 
     theStruct->computeType();
 
@@ -1237,9 +1256,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       theClass->setImplicit();
     if (superclassID)
       theClass->setSuperclass(getType(superclassID));
-    if (genericParams)
-      for (auto &genericParam : *theClass->getGenericParams())
+    if (genericParams) {
+      SmallVector<GenericTypeParamType *, 4> paramTypes;
+      for (auto &genericParam : *theClass->getGenericParams()) {
         genericParam.getAsTypeParam()->setDeclContext(theClass);
+        paramTypes.push_back(genericParam.getAsTypeParam()->getDeclaredType()
+                               ->castTo<GenericTypeParamType>());
+      }
+
+      // Read the generic requirements.
+      SmallVector<Requirement, 4> requirements;
+      readGenericRequirements(requirements);
+
+      theClass->setGenericSignature(paramTypes, requirements);
+    }
     theClass->setIsObjC(isObjC);
     theClass->computeType();
 
@@ -1285,9 +1315,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setRawType(getType(rawTypeID));
-    if (genericParams)
-      for (auto &genericParam : *theEnum->getGenericParams())
+    if (genericParams) {
+      SmallVector<GenericTypeParamType *, 4> paramTypes;
+      for (auto &genericParam : *theEnum->getGenericParams()) {
         genericParam.getAsTypeParam()->setDeclContext(theEnum);
+        paramTypes.push_back(genericParam.getAsTypeParam()->getDeclaredType()
+                               ->castTo<GenericTypeParamType>());
+      }
+
+      // Read the generic requirements.
+      SmallVector<Requirement, 4> requirements;
+      readGenericRequirements(requirements);
+
+      theEnum->setGenericSignature(paramTypes, requirements);
+    }
 
     theEnum->computeType();
     CanType canTy = theEnum->getDeclaredTypeInContext()->getCanonicalType();

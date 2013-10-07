@@ -364,6 +364,34 @@ bool TypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   return false;
 }
 
+GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
+                                   ArrayRef<Requirement> requirements)
+  : NumGenericParams(params.size()), NumRequirements(requirements.size())
+{
+  std::copy(params.begin(), params.end(),
+            getGenericParamsBuffer().data());
+  std::copy(requirements.begin(), requirements.end(),
+            getRequirementsBuffer().data());
+}
+
+GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
+                                        ArrayRef<Requirement> requirements,
+                                        ASTContext &ctx) {
+  // Allocate storage for the object.
+  size_t bytes = sizeof(GenericSignature)
+               + sizeof(GenericTypeParamType *) * params.size()
+               + sizeof(Requirement) * requirements.size();
+  void *mem = ctx.Allocate(bytes, alignof(GenericSignature));
+  return new (mem) GenericSignature(params, requirements);
+}
+
+void NominalTypeDecl::setGenericSignature(
+                        ArrayRef<GenericTypeParamType *> params,
+                        ArrayRef<Requirement> requirements) {
+  assert(!GenericSig && "Already have generic signature");
+  GenericSig = GenericSignature::get(params, requirements, getASTContext());
+}
+
 void NominalTypeDecl::computeType() {
   assert(!hasType() && "Nominal type declaration already has a type");
 

@@ -472,6 +472,45 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
   llvm_unreachable("Unhandled requirement?");
 }
 
+void ArchetypeBuilder::addRequirement(const Requirement &req) {
+  switch (req.getKind()) {
+  case RequirementKind::Conformance: {
+    PotentialArchetype *pa = resolveType(req.getFirstType());
+    assert(pa && "Re-introducing invalid requirement");
+
+    if (req.getSecondType()->getClassOrBoundGenericClass()) {
+      addSuperclassRequirement(pa, SourceLoc(), req.getSecondType());
+      return;
+    }
+
+    SmallVector<ProtocolDecl *, 4> conformsTo;
+    bool existential = req.getSecondType()->isExistentialType(conformsTo);
+    assert(existential && "Re-introducing invalid requirement");
+    (void)existential;
+
+    // Add each of the protocols.
+    for (auto proto : conformsTo) {
+      bool invalid = addConformanceRequirement(pa, proto);
+      assert(!invalid && "Re-introducing invalid requirement");
+      (void)invalid;
+    }
+
+    return;
+  }
+
+  case RequirementKind::SameType: {
+    PotentialArchetype *firstPA = resolveType(req.getFirstType());
+    assert(firstPA && "Re-introducing invalid requirement");
+
+    PotentialArchetype *secondPA = resolveType(req.getSecondType());
+    assert(secondPA && "Re-introducing invalid requirement");
+    addSameTypeRequirement(firstPA, SourceLoc(), secondPA);
+  }
+  }
+  
+  llvm_unreachable("Unhandled requirement?");
+}
+
 bool ArchetypeBuilder::addImplicitConformance(AbstractTypeParamDecl *Param,
                                               ProtocolDecl *Proto) {
   assert(Impl->PotentialArchetypes[Param] != nullptr && "Unknown parameter");

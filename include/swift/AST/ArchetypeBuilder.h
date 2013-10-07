@@ -32,6 +32,7 @@ class ArchetypeType;
 class AssociatedTypeDecl;
 class Pattern;
 class ProtocolDecl;
+class Requirement;
 class RequirementRepr;
 class SourceLoc;
 class TranslationUnit;
@@ -118,6 +119,12 @@ public:
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
   bool addRequirement(const RequirementRepr &Req);
+
+  /// \brief Add an already-checked requirement.
+  ///
+  /// Adding an already-checked requirement cannot fail. This is used to
+  /// re-inject requirements from outer contexts.
+  void addRequirement(const Requirement &req);
 
   /// \brief Add a new, implicit conformance requirement for one of the
   /// parameters.

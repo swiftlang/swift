@@ -788,6 +788,7 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
                                   KnownProtocolKind::DynamicLookup)) {
           TC.diagnose(Req.getConstraintLoc().getSourceRange().Start,
                       diag::dynamic_lookup_conformance);
+          Req.setInvalid();
           continue;
         }
       }
@@ -814,8 +815,8 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
 }
 
 /// Revert the dependent types within the given generic parameter list.
-static void revertGenericParamList(GenericParamList *genericParams,
-                                   DeclContext *dc) {
+void TypeChecker::revertGenericParamList(GenericParamList *genericParams,
+                                         DeclContext *dc) {
   // FIXME: Revert the inherited clause of the generic parameter list.
 #if 0
   for (auto param : *genericParams) {
@@ -2023,6 +2024,11 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (auto gp = nominal->getGenericParams()) {
       gp->setOuterParameters(
         nominal->getDeclContext()->getGenericParamsOfContext());
+
+      // Validate the generic type parameters.
+      validateGenericTypeSignature(nominal);
+
+      revertGenericParamList(nominal->getGenericParams(), nominal);
 
       ArchetypeBuilder builder = createArchetypeBuilder(*this);
       checkGenericParamList(builder, gp, *this);

@@ -52,6 +52,7 @@ namespace swift {
   class Component;
   class DeclAttributes;
   class GenericTypeParamDecl;
+  class GenericTypeParamType;
   class Module;
   class NameAliasType;
   class EnumElementDecl;
@@ -1459,13 +1460,76 @@ public:
   FilterDeclType *front() const { return *begin(); }
 };
 
-  
+/// Describes the generic signature of a particular declaration, including
+/// both the generic type parameters and the requirements placed on those
+/// generic parameters.
+class GenericSignature {
+  unsigned NumGenericParams;
+  unsigned NumRequirements;
+
+  // Make vanilla new/delete illegal.
+  void *operator new(size_t Bytes) = delete;
+  void operator delete(void *Data) = delete;
+
+  /// Retrieve a mutable version of the generic parameters.
+  MutableArrayRef<GenericTypeParamType *> getGenericParamsBuffer() {
+    return { reinterpret_cast<GenericTypeParamType **>(this + 1),
+             NumGenericParams };
+  }
+
+  /// Retrieve a mutable verison of the requirements.
+  MutableArrayRef<Requirement> getRequirementsBuffer() {
+    void *genericParams = getGenericParamsBuffer().end();
+    return { reinterpret_cast<Requirement *>(genericParams),
+      NumRequirements };
+  }
+
+  GenericSignature(ArrayRef<GenericTypeParamType *> params,
+                   ArrayRef<Requirement> requirements);
+
+public:
+  /// Create a new generic signature with hte given type parameters and
+  /// requirements.
+  static GenericSignature *get(ArrayRef<GenericTypeParamType *> params,
+                               ArrayRef<Requirement> requirements,
+                               ASTContext &ctx);
+
+  /// Retrieve the generic parameters.
+  ArrayRef<GenericTypeParamType *> getGenericParams() const {
+    return { reinterpret_cast<GenericTypeParamType * const *>(this + 1),
+             NumGenericParams };
+  }
+
+  /// Retrieve the requirements.
+  ArrayRef<Requirement> getRequirements() const {
+    const void *genericParams = getGenericParams().end();
+    return { reinterpret_cast<const Requirement *>(genericParams),
+             NumRequirements };
+  }
+
+  // Only allow allocation by doing a placement new.
+  void *operator new(size_t Bytes, void *Mem) {
+    assert(Mem);
+    return Mem;
+  }
+};
+
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.  This
 /// decl is always a DeclContext.
 class NominalTypeDecl : public TypeDecl, public DeclContext {
   SourceRange Braces;
   ArrayRef<Decl*> Members;
   GenericParamList *GenericParams;
+
+  /// \brief The generic signature of this type.
+  ///
+  /// This is the semantic representation of a generic parameters and the
+  /// requirements placed on them.
+  ///
+  /// FIXME: The generic parameters here are also derivable from
+  /// \c GenericParams. However, we likely want to make \c GenericParams
+  /// the parsed representation, and not part of the module file.
+  GenericSignature *GenericSig = nullptr;
 
   /// \brief The first extension of this type.
   ExtensionDecl *FirstExtension = nullptr;
@@ -1509,6 +1573,26 @@ public:
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
 
   GenericParamList *getGenericParams() const { return GenericParams; }
+
+  /// Set the generic signature of this type.
+  void setGenericSignature(ArrayRef<GenericTypeParamType *> params,
+                           ArrayRef<Requirement> requirements);
+
+  /// Retrieve the generic parameter types.
+  ArrayRef<GenericTypeParamType *> getGenericParamTypes() const {
+    if (!GenericSig)
+      return { };
+
+    return GenericSig->getGenericParams();
+  }
+
+  /// Retrieve the generic requirements.
+  ArrayRef<Requirement> getGenericRequirements() const {
+    if (!GenericSig)
+      return { };
+
+    return GenericSig->getRequirements();
+  }
 
   /// getDeclaredType - Retrieve the type declared by this entity.
   Type getDeclaredType() const { return DeclaredTy; }

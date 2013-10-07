@@ -283,6 +283,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, GENERIC_PARAM_LIST);
   RECORD(decls_block, GENERIC_PARAM);
   RECORD(decls_block, GENERIC_REQUIREMENT);
+  RECORD(decls_block, LAST_GENERIC_REQUIREMENT);
 
   RECORD(decls_block, NO_CONFORMANCE);
   RECORD(decls_block, NORMAL_PROTOCOL_CONFORMANCE);
@@ -515,6 +516,36 @@ void Serializer::writePattern(const Pattern *pattern) {
   }
 }
 
+/// Translate from the requirement kind to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableRequirementKind(RequirementKind kind) {
+#define CASE(KIND)            \
+  case RequirementKind::KIND: \
+    return GenericRequirementKind::KIND;
+
+  switch (kind) {
+  CASE(Conformance)
+  CASE(SameType)
+  }
+#undef CASE
+}
+
+void Serializer::writeRequirements(ArrayRef<Requirement> requirements) {
+  using namespace decls_block;
+
+  if (requirements.empty())
+    return;
+
+  auto reqAbbrCode = DeclTypeAbbrCodes[GenericRequirementLayout::Code];
+  for (const auto &req : requirements) {
+    GenericRequirementLayout::emitRecord(
+                                Out, ScratchRecord, reqAbbrCode,
+                                getRawStableRequirementKind(req.getKind()),
+                                addTypeRef(req.getFirstType()),
+                                addTypeRef(req.getSecondType()));
+  }
+}
+
 bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
   using namespace decls_block;
 
@@ -556,6 +587,9 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
     }
   }
 
+  abbrCode = DeclTypeAbbrCodes[LastGenericRequirementLayout::Code];
+  uint8_t dummy = 0;
+  LastGenericRequirementLayout::emitRecord(Out, ScratchRecord, abbrCode, dummy);
   return true;
 }
 
@@ -1067,6 +1101,7 @@ void Serializer::writeDecl(const Decl *D) {
                              theStruct->isImplicit());
 
     writeGenericParams(theStruct->getGenericParams());
+    writeRequirements(theStruct->getGenericRequirements());
     writeConformances(theStruct->getProtocols(), theStruct->getConformances(),
                       theStruct, DeclTypeAbbrCodes);
     writeMembers(theStruct->getMembers(), false);
@@ -1089,6 +1124,7 @@ void Serializer::writeDecl(const Decl *D) {
                             addTypeRef(theEnum->getRawType()));
 
     writeGenericParams(theEnum->getGenericParams());
+    writeRequirements(theEnum->getGenericRequirements());
     writeConformances(theEnum->getProtocols(), theEnum->getConformances(),
                       theEnum, DeclTypeAbbrCodes);
     writeMembers(theEnum->getMembers(), false);
@@ -1113,6 +1149,7 @@ void Serializer::writeDecl(const Decl *D) {
                             addTypeRef(theClass->getSuperclass()));
 
     writeGenericParams(theClass->getGenericParams());
+    writeRequirements(theClass->getGenericRequirements());
     writeConformances(theClass->getProtocols(), theClass->getConformances(),
                       theClass, DeclTypeAbbrCodes);
     writeMembers(theClass->getMembers(), true);
@@ -1352,20 +1389,6 @@ static uint8_t getRawStableOwnership(swift::Ownership ownership) {
     return serialization::Ownership::Unowned;
   }
   llvm_unreachable("bad ownership kind");
-}
-
-/// Translate from the requirement kind to the Serialization enum
-/// values, which are guaranteed to be stable.
-static uint8_t getRawStableRequirementKind(RequirementKind kind) {
-#define CASE(KIND)            \
-  case RequirementKind::KIND: \
-    return GenericRequirementKind::KIND;
-
-  switch (kind) {
-  CASE(Conformance)
-  CASE(SameType)
-  }
-#undef CASE
 }
 
 /// Find the typealias given a builtin type.
@@ -1608,14 +1631,7 @@ void Serializer::writeType(Type ty) {
                                           genericParams);
 
     // Write requirements.
-    auto reqAbbrCode = DeclTypeAbbrCodes[GenericRequirementLayout::Code];
-    for (const auto &req : fnTy->getRequirements()) {
-      GenericRequirementLayout::emitRecord(
-                                  Out, ScratchRecord, reqAbbrCode,
-                                  getRawStableRequirementKind(req.getKind()),
-                                  addTypeRef(req.getFirstType()),
-                                  addTypeRef(req.getSecondType()));
-    }
+    writeRequirements(fnTy->getRequirements());
     break;
   }
 
@@ -1780,6 +1796,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<GenericParamListLayout>();
     registerDeclTypeAbbr<GenericParamLayout>();
     registerDeclTypeAbbr<GenericRequirementLayout>();
+    registerDeclTypeAbbr<LastGenericRequirementLayout>();
 
     registerDeclTypeAbbr<NoConformanceLayout>();
     registerDeclTypeAbbr<NormalProtocolConformanceLayout>();

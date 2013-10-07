@@ -150,20 +150,43 @@ static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC) {
            });
 }
 
+/// Add the generic parameters and requirements from the parent context to the
+/// archetype builder.
+static void addContextParamsAndRequirements(ArchetypeBuilder &builder,
+                                            DeclContext *dc) {
+  auto type = dc->getDeclaredTypeOfContext();
+  if (!type || type->is<ErrorType>())
+    return;
+
+  auto nominal = type->getAnyNominal();
+  assert(nominal && "Parent context is not a nominal type?");
+
+  // Recurse to outer contexts.
+  if (auto parentDC = dc->getParent())
+    addContextParamsAndRequirements(builder, parentDC);
+
+  for (auto param : nominal->getGenericParamTypes()) {
+    assert(param->getDecl() && "Missing generic parameter declaration?");
+    builder.addGenericParameter(param->getDecl());
+  }
+
+  for (const auto &req : nominal->getGenericRequirements()) {
+    builder.addRequirement(req);
+  }
+}
+
 /// Check the generic parameters in the given generic parameter list (and its
 /// parent generic parameter lists) according to the given resolver.
-static void checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
+static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
                                    GenericParamList *genericParams,
-                                   GenericTypeResolver &resolver,
-                                   bool innermost = true) {
-  // If there are outer generic parameters, visit them (so that the archetype
-  // builder knows about them) but don't modify them in any way.
-  // FIXME: Rather than crawling the generic outer parameters, it would be far
-  // better to simply grab the generic parameters and requirements for the
-  // outer context directly. However, we don't currently store those anywhere.
-  if (auto outerGenericParams = genericParams->getOuterParameters())
-    checkGenericParameters(tc, builder, outerGenericParams, resolver,
-                           /*innermost=*/false);
+                                   DeclContext *parentDC,
+                                   GenericTypeResolver &resolver) {
+  bool invalid = false;
+
+  // If there is a parent context, add the generic parameters and requirements
+  // from that context.
+  if (builder && parentDC)
+    addContextParamsAndRequirements(*builder, parentDC);
 
   // Visit each of the generic parameters.
   unsigned depth = genericParams->getDepth();
@@ -172,23 +195,23 @@ static void checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     auto typeParam = param.getAsTypeParam();
 
     // Check the generic type parameter.
-    if (innermost) {
-      // Set the depth of this type parameter.
-      typeParam->setDepth(depth);
+    // Set the depth of this type parameter.
+    typeParam->setDepth(depth);
 
-      // Check the inheritance clause of this type parameter.
-      tc.checkInheritanceClause(typeParam, &resolver);
-    }
+    // Check the inheritance clause of this type parameter.
+    tc.checkInheritanceClause(typeParam, &resolver);
 
     if (builder) {
       // Add the generic parameter to the builder.
-      builder->addGenericParameter(typeParam, index++);
+      if (builder->addGenericParameter(typeParam, index++))
+        invalid = true;
 
       // Infer requirements from the inherited types.
       // FIXME: This doesn't actually do what we want for outer generic
       // parameters, because they've been resolved to archetypes too eagerly.
       for (const auto &inherited : typeParam->getInherited()) {
-        builder->inferRequirements(inherited.getTypeRepr());
+        if (builder->inferRequirements(inherited.getTypeRepr()))
+          invalid = true;
       }
     }
   }
@@ -206,6 +229,7 @@ static void checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
       if (tc.validateType(req.getSubjectLoc(),
                           /*allowUnboundGenerics=*/false,
                           &resolver)) {
+        invalid = true;
         req.setInvalid();
         continue;
       }
@@ -213,6 +237,7 @@ static void checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
       if (tc.validateType(req.getConstraintLoc(),
                           /*allowUnboundGenerics=*/false,
                           &resolver)) {
+        invalid = true;
         req.setInvalid();
         continue;
       }
@@ -224,6 +249,7 @@ static void checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
                     diag::requires_conformance_nonprotocol,
                     req.getSubjectLoc(), req.getConstraintLoc());
         req.getConstraintLoc().setInvalidType(tc.Context);
+        invalid = true;
         req.setInvalid();
         continue;
       }
@@ -234,6 +260,7 @@ static void checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
                                   KnownProtocolKind::DynamicLookup)) {
           tc.diagnose(req.getConstraintLoc().getSourceRange().Start,
                       diag::dynamic_lookup_conformance);
+          req.setInvalid();
           continue;
         }
       }
@@ -244,6 +271,7 @@ static void checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
       if (tc.validateType(req.getFirstTypeLoc(),
                           /*allowUnboundGenerics=*/false,
                           &resolver)) {
+        invalid = true;
         req.setInvalid();
         continue;
       }
@@ -251,6 +279,7 @@ static void checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
       if (tc.validateType(req.getSecondTypeLoc(),
                           /*allowUnboundGenerics=*/false,
                           &resolver)) {
+        invalid = true;
         req.setInvalid();
         continue;
       }
@@ -258,21 +287,28 @@ static void checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
       break;
     }
     
-    if (builder && builder->addRequirement(req))
+    if (builder && builder->addRequirement(req)) {
+      invalid = true;
       req.setInvalid();
+    }
   }
+
+  return invalid;
 }
 
 /// Collect all of the generic parameter types at every level in the generic
 /// parameter list.
 static void collectGenericParamTypes(
               GenericParamList *genericParams,
-              SmallVectorImpl<GenericTypeParamType *> &allParams) {
+              SmallVectorImpl<GenericTypeParamType *> &allParams,
+              bool recursive) {
   if (!genericParams)
     return;
 
   // Collect outer generic parameters first.
-  collectGenericParamTypes(genericParams->getOuterParameters(), allParams);
+  if (recursive)
+    collectGenericParamTypes(genericParams->getOuterParameters(), allParams,
+                             recursive);
 
   // Add our parameters.
   for (auto param : *genericParams) {
@@ -395,7 +431,8 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   bool badType = false;
 
   // Check the generic parameter list.
-  checkGenericParameters(tc, builder, func->getGenericParams(), resolver);
+  checkGenericParameters(tc, builder, func->getGenericParams(),
+                         func->getDeclContext(), resolver);
 
   // Check the parameter patterns.
   // Skip the 'self' pattern, if we have one.
@@ -496,7 +533,8 @@ bool TypeChecker::validateGenericFuncSignature(FuncDecl *func) {
 
   // Collect the complete set of generic parameter types.
   SmallVector<GenericTypeParamType *, 4> allGenericParams;
-  collectGenericParamTypes(func->getGenericParams(), allGenericParams);
+  collectGenericParamTypes(func->getGenericParams(), allGenericParams,
+                           /*recursive=*/true);
 
   // Collect the requirements placed on the generic parameter types.
   SmallVector<Requirement, 4> requirements;
@@ -538,8 +576,50 @@ bool TypeChecker::validateGenericFuncSignature(FuncDecl *func) {
 
   // Record the interface type.
   func->setInterfaceType(funcTy);
-
   return false;
+}
+
+bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
+  assert(nominal->getGenericParams() && "Missing generic parameters?");
+
+  // Create the archetype builder.
+  ArchetypeBuilder builder = createArchetypeBuilder(*this);
+
+  // Type check the generic parameters, treating all generic type
+  // parameters as dependent, unresolved.
+  DependentGenericTypeResolver dependentResolver;
+  bool invalid = false;
+  if (checkGenericParameters(*this, &builder, nominal->getGenericParams(),
+                             nominal->getDeclContext(), dependentResolver)) {
+    invalid = true;
+  }
+
+  // The archetype builder now has all of the requirements, although there might
+  // still be errors that have not yet been diagnosed. Revert the signature
+  // and type-check it again, completely.
+  revertGenericParamList(nominal->getGenericParams(), nominal);
+  CompleteGenericTypeResolver completeResolver(*this, builder);
+  if (checkGenericParameters(*this, nullptr, nominal->getGenericParams(),
+                             nominal->getDeclContext(), completeResolver)) {
+    invalid = true;
+  }
+
+  // The generic function signature is complete and well-formed. Gather
+  // the generic parameter types at this level.
+  SmallVector<GenericTypeParamType *, 4> allGenericParams;
+  collectGenericParamTypes(nominal->getGenericParams(), allGenericParams,
+                           /*recursive=*/false);
+
+  // Collect the requirements placed on the generic parameter types.
+  // FIXME: This ends up copying all of the requirements from outer scopes,
+  // which is mostly harmless (but quite annoying).
+  SmallVector<Requirement, 4> requirements;
+  collectRequirements(builder, allGenericParams, requirements);
+
+  // Record the generic type parameter types and the requirements.
+  nominal->setGenericSignature(allGenericParams, requirements);
+
+  return invalid;
 }
 
 SpecializeExpr *

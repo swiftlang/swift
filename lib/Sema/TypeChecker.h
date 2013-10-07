@@ -342,6 +342,17 @@ public:
   /// parameters.
   void revertGenericFuncSignature(FuncDecl *func);
 
+  /// Revert the dependent types within the given generic parameter list.
+  void revertGenericParamList(GenericParamList *genericParams,
+                              DeclContext *dc);
+
+  /// Validate the signature of a generic type.
+  ///
+  /// \param nominal The generic type.
+  ///
+  /// \returns true if an error occurred, or false otherwise.
+  bool validateGenericTypeSignature(NominalTypeDecl *nominal);
+
   /// Check the inheritance clause of the given declaration.
   void checkInheritanceClause(Decl *decl,
                               GenericTypeResolver *resolver = nullptr);

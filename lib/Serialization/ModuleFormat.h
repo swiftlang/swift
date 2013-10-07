@@ -320,6 +320,7 @@ namespace decls_block {
     GENERIC_PARAM_LIST = 240,
     GENERIC_PARAM,
     GENERIC_REQUIREMENT,
+    LAST_GENERIC_REQUIREMENT,
 
     NO_CONFORMANCE = 250,
     NORMAL_PROTOCOL_CONFORMANCE = 251,
@@ -760,6 +761,17 @@ namespace decls_block {
     GENERIC_REQUIREMENT,
     GenericRequirementKindField, // requirement kind
     BCArray<TypeIDField>         // types involved (currently always two)
+  >;
+
+  /// Placeholder that marks the last generic requirement in the generic
+  /// parameters list.
+  ///
+  /// Used as a buffer between the generic parameter list's requirements and
+  /// the generic signature's requirements for nominal type declarations.
+  /// FIXME: Expected to go away once the latter is no longer serialized.
+  using LastGenericRequirementLayout = BCRecordLayout<
+    LAST_GENERIC_REQUIREMENT,
+    BCFixed<1>                 // dummy
   >;
 
   /// A placeholder for lack of conformance information. Conformances are

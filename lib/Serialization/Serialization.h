@@ -169,6 +169,9 @@ private:
   /// Writes the given pattern, recursively.
   void writePattern(const Pattern *pattern);
 
+  /// Writes a set of generic requirements.
+  void writeRequirements(ArrayRef<Requirement> requirements);
+
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams);
 
