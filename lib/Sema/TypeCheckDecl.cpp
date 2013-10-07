@@ -1963,6 +1963,11 @@ public:
 
     GenericParamList *outerGenericParams = nullptr;
     Type SelfTy = DD->computeSelfType(&outerGenericParams);
+
+    if (outerGenericParams) {
+      TC.validateGenericFuncSignature(DD);
+    }
+
     Type FnTy;
     if (outerGenericParams)
       FnTy = PolymorphicFunctionType::get(SelfTy,
