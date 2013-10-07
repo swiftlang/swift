@@ -75,6 +75,8 @@ public:
   inline ValueBaseUseIterator use_end();
   inline Range<ValueBaseUseIterator> getUses();
 
+  inline bool hasOneUse();
+
   /// Pretty-print the value.
   void dump() const;
   void print(raw_ostream &OS) const;
@@ -143,6 +145,9 @@ public:
   inline ValueUseIterator use_begin();
   inline ValueUseIterator use_end();
   inline Range<ValueUseIterator> getUses();
+
+  inline bool hasOneUse();
+
   
   void replaceAllUsesWith(SILValue V);
 
@@ -331,6 +336,12 @@ inline ValueBaseUseIterator ValueBase::use_end() {
 inline Range<ValueBaseUseIterator> ValueBase::getUses() {
   return { use_begin(), use_end() };
 }
+inline bool ValueBase::hasOneUse() {
+  auto I = use_begin(), E = use_end();
+  if (I == E) return false;
+  return ++I == E;
+}
+
 
 /// An iterator over all uses of a specific result of a ValueBase.
 class ValueUseIterator  : public std::iterator<std::forward_iterator_tag,
@@ -394,6 +405,12 @@ inline bool SILValue::use_empty() const {
   SILValue *mthis = const_cast<SILValue*>(this);
   return mthis->use_begin() == mthis->use_end();
 }
+inline bool SILValue::hasOneUse() {
+  auto I = use_begin(), E = use_end();
+  if (I == E) return false;
+  return ++I == E;
+}
+
 
 /// A constant-size list of the operands of an instruction.
 template <unsigned N> class FixedOperandList {
@@ -566,6 +583,7 @@ public:
   Operand &operator[](unsigned i) { return asArray()[i]; }
   const Operand &operator[](unsigned i) const { return asArray()[i]; }
 };
+
 
 } // end namespace swift
 
