@@ -188,6 +188,10 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
   if (builder && parentDC)
     addContextParamsAndRequirements(*builder, parentDC);
 
+  // If there aren't any generic parameters at this level, we're done.
+  if (!genericParams)
+    return false;
+
   // Visit each of the generic parameters.
   unsigned depth = genericParams->getDepth();
   unsigned index = 0;
@@ -296,24 +300,41 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
   return invalid;
 }
 
+/// Add the generic parameters and requirements from the parent context to the
+/// archetype builder.
+static void collectParentGenericParamTypes(
+              DeclContext *dc,
+              SmallVectorImpl<GenericTypeParamType *> &allParams) {
+  auto type = dc->getDeclaredTypeOfContext();
+  if (!type || type->is<ErrorType>())
+    return;
+
+  auto nominal = type->getAnyNominal();
+  assert(nominal && "Parent context is not a nominal type?");
+
+  // Recurse to outer contexts.
+  if (auto parentDC = dc->getParent())
+    collectParentGenericParamTypes(parentDC, allParams);
+
+  allParams.append(nominal->getGenericParamTypes().begin(),
+                   nominal->getGenericParamTypes().end());
+}
+
 /// Collect all of the generic parameter types at every level in the generic
 /// parameter list.
 static void collectGenericParamTypes(
               GenericParamList *genericParams,
-              SmallVectorImpl<GenericTypeParamType *> &allParams,
-              bool recursive) {
-  if (!genericParams)
-    return;
+              DeclContext *parentDC,
+              SmallVectorImpl<GenericTypeParamType *> &allParams) {
+  if (parentDC)
+    collectParentGenericParamTypes(parentDC, allParams);
 
-  // Collect outer generic parameters first.
-  if (recursive)
-    collectGenericParamTypes(genericParams->getOuterParameters(), allParams,
-                             recursive);
-
-  // Add our parameters.
-  for (auto param : *genericParams) {
-    allParams.push_back(param.getAsTypeParam()->getDeclaredType()
-                        ->castTo<GenericTypeParamType>());
+  if (genericParams ) {
+    // Add our parameters.
+    for (auto param : *genericParams) {
+      allParams.push_back(param.getAsTypeParam()->getDeclaredType()
+                          ->castTo<GenericTypeParamType>());
+    }
   }
 }
 
@@ -462,7 +483,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
     }
 
     // Infer requirements from it.
-    if (builder) {
+    if (builder && func->getBodyResultTypeLoc().getTypeRepr()) {
       builder->inferRequirements(func->getBodyResultTypeLoc().getTypeRepr());
     }
   }
@@ -533,8 +554,9 @@ bool TypeChecker::validateGenericFuncSignature(FuncDecl *func) {
 
   // Collect the complete set of generic parameter types.
   SmallVector<GenericTypeParamType *, 4> allGenericParams;
-  collectGenericParamTypes(func->getGenericParams(), allGenericParams,
-                           /*recursive=*/true);
+  collectGenericParamTypes(func->getGenericParams(),
+                           func->getDeclContext(),
+                           allGenericParams);
 
   // Collect the requirements placed on the generic parameter types.
   SmallVector<Requirement, 4> requirements;
@@ -607,8 +629,8 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
   // The generic function signature is complete and well-formed. Gather
   // the generic parameter types at this level.
   SmallVector<GenericTypeParamType *, 4> allGenericParams;
-  collectGenericParamTypes(nominal->getGenericParams(), allGenericParams,
-                           /*recursive=*/false);
+  collectGenericParamTypes(nominal->getGenericParams(), nullptr,
+                           allGenericParams);
 
   // Collect the requirements placed on the generic parameter types.
   // FIXME: This ends up copying all of the requirements from outer scopes,

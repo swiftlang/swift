@@ -611,6 +611,10 @@ static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC) {
 }
 
 static void revertDependentTypeLoc(TypeLoc &tl, DeclContext *dc) {
+  // If there's no type representation, there's nothing to revert.
+  if (!tl.getTypeRepr())
+    return;
+
   // Make sure we validate the type again.
   tl.setType(Type(), /*validated=*/false);
 
@@ -927,7 +931,8 @@ void TypeChecker::revertGenericFuncSignature(FuncDecl *func) {
   }
 
   // Revert the generic parameter list.
-  revertGenericParamList(func->getGenericParams(), func);
+  if (func->getGenericParams())
+    revertGenericParamList(func->getGenericParams(), func);
 
   // Clear out the types.
   func->revertType();
@@ -1656,6 +1661,13 @@ public:
         TC.revertGenericFuncSignature(FD);
 
         finalizeGenericParamList(builder, FD->getGenericParams(), FD, TC);
+      }
+    } else if (outerGenericParams) {
+      if (TC.validateGenericFuncSignature(FD))
+        isInvalid = true;
+      else {
+        // Revert all of the types within the signature of the function.
+        TC.revertGenericFuncSignature(FD);
       }
     }
 

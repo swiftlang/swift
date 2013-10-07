@@ -197,18 +197,27 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   rawParam = new (C) ParenPattern(SourceLoc(), rawParam, SourceLoc());
   rawParam->setImplicit();
   
-  Pattern *params[] = {selfParam, rawParam};
+  Pattern *argParams[] = {selfParam->clone(C, /*Implicit=*/true),
+                          rawParam->clone(C, /*Implicit=*/true)};
+  Pattern *bodyParams[] = {selfParam, rawParam};
   auto retTy = OptionalType::get(enumType, C);
   auto fromRawDecl = FuncDecl::create(C, SourceLoc(), SourceLoc(),
                                  C.getIdentifier("fromRaw"),
                                  SourceLoc(), nullptr, Type(),
-                                 params, params, TypeLoc::withoutLoc(retTy),
+                                 argParams,
+                                 bodyParams,
+                                 TypeLoc::withoutLoc(retTy),
                                  enumDecl);
   fromRawDecl->setStatic();
   fromRawDecl->setImplicit();
   selfDecl->setDeclContext(fromRawDecl);
   rawDecl->setDeclContext(fromRawDecl);
-  
+  cast<NamedPattern>(bodyParams[0]->getSemanticsProvidingPattern())
+    ->getDecl()->setDeclContext(fromRawDecl);
+  cast<NamedPattern>(bodyParams[1]->getSemanticsProvidingPattern())
+    ->getDecl()->setDeclContext(fromRawDecl);
+
+
   SmallVector<CaseStmt*, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     auto litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
