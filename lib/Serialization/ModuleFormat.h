@@ -573,6 +573,7 @@ namespace decls_block {
     BCFixed<1>,  // has selector-style signature?
     BCFixed<1>,  // objc?
     TypeIDField, // type (signature)
+    TypeIDField, // type (interface)
     DeclIDField  // implicit this decl
     // Trailed by its generic parameters, if any, followed by the parameter
     // pattern.

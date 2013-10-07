@@ -447,7 +447,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
 /// Check the signature of a generic function.
 static bool checkGenericFuncSignature(TypeChecker &tc,
                                       ArchetypeBuilder *builder,
-                                      FuncDecl *func,
+                                      AbstractFunctionDecl *func,
                                       GenericTypeResolver &resolver) {
   bool badType = false;
 
@@ -458,7 +458,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   // Check the parameter patterns.
   // Skip the 'self' pattern, if we have one.
   auto argPatterns = func->getArgParamPatterns();
-  if (func->getExtensionType())
+  if (func->getExtensionType() && isa<FuncDecl>(func))
     argPatterns = argPatterns.slice(1);
 
   for (auto pattern : argPatterns) {
@@ -474,17 +474,19 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   }
 
   // If there is a declared result type, check that as well.
-  if (!func->getBodyResultTypeLoc().isNull()) {
-    // Check the result type of the function.
-    if (tc.validateType(func->getBodyResultTypeLoc(),
-                        /*allowUnboundGenerics=*/false,
-                        &resolver)) {
-      badType = true;
-    }
+  if (auto fn = dyn_cast<FuncDecl>(func)) {
+    if (!fn->getBodyResultTypeLoc().isNull()) {
+      // Check the result type of the function.
+      if (tc.validateType(fn->getBodyResultTypeLoc(),
+                          /*allowUnboundGenerics=*/false,
+                          &resolver)) {
+        badType = true;
+      }
 
-    // Infer requirements from it.
-    if (builder && func->getBodyResultTypeLoc().getTypeRepr()) {
-      builder->inferRequirements(func->getBodyResultTypeLoc().getTypeRepr());
+      // Infer requirements from it.
+      if (builder && fn->getBodyResultTypeLoc().getTypeRepr()) {
+        builder->inferRequirements(fn->getBodyResultTypeLoc().getTypeRepr());
+      }
     }
   }
 
@@ -496,7 +498,8 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
 ///
 /// FIXME: This almost duplicates FuncDecl::computeSelfType(), which should
 /// migrate into the type checker anyway.
-static Type computeSelfType(FuncDecl *func) {
+static Type computeSelfType(AbstractFunctionDecl *func,
+                            bool isInitializing = false) {
   // Figure out the type we're in.
   Type containerTy = func->getExtensionType();
   if (!containerTy)
@@ -513,8 +516,9 @@ static Type computeSelfType(FuncDecl *func) {
     selfTy = containerTy->getAnyNominal()->getInterfaceType();
   }
 
-  // For a static function, 'self' has type T.metatype.
-  if (func->isStatic())
+  // For a static function or constructor, 'self' has type T.metatype.
+  if ((!isInitializing && isa<ConstructorDecl>(func)) ||
+      (isa<FuncDecl>(func) && cast<FuncDecl>(func)->isStatic()))
     return MetaTypeType::get(selfTy, func->getASTContext());
 
   // For a type with reference semantics, 'self' is passed by value.
@@ -527,7 +531,7 @@ static Type computeSelfType(FuncDecl *func) {
                          func->getASTContext());
 }
 
-bool TypeChecker::validateGenericFuncSignature(FuncDecl *func) {
+bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   // Create the archetype builder.
   ArchetypeBuilder builder = createArchetypeBuilder(*this);
 
@@ -563,24 +567,51 @@ bool TypeChecker::validateGenericFuncSignature(FuncDecl *func) {
   collectRequirements(builder, allGenericParams, requirements);
 
   // Compute the function type.
-  auto funcTy = func->getBodyResultTypeLoc().getType();
-  if (!funcTy) {
+  Type funcTy;
+  Type initFuncTy;
+  if (auto fn = dyn_cast<FuncDecl>(func)) {
+    funcTy = fn->getBodyResultTypeLoc().getType();
+    if (!funcTy) {
+      funcTy = TupleType::getEmpty(Context);
+    }
+  } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
+    funcTy = ctor->getExtensionType()->getAnyNominal()->getInterfaceType();
+    initFuncTy = funcTy;
+  } else {
+    assert(isa<DestructorDecl>(func));
     funcTy = TupleType::getEmpty(Context);
   }
 
   auto patterns = func->getArgParamPatterns();
+  SmallVector<Pattern *, 4> storedPatterns;
+
+  // FIXME: Constructors and destructors don't have the curried 'self' parameter
+  // in their signature, so paste it there.
+  if (isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) {
+    storedPatterns.push_back(nullptr);
+    storedPatterns.append(patterns.begin(), patterns.end());
+    patterns = storedPatterns;
+  }
   for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
     Type argTy;
+    Type initArgTy;
 
     Type selfTy;
     if (i == e-1 && (selfTy = computeSelfType(func))) {
       // Substitute in our own 'self' parameter.
       assert(selfTy && "Missing self type?");
 
-      TupleTypeElt elt(selfTy, Context.getIdentifier("self"));
-      argTy = TupleType::get(elt, Context);
+      if (initFuncTy) {
+        argTy = selfTy;
+        initArgTy = computeSelfType(func, /*isInitializing=*/true);
+      } else {
+        TupleTypeElt elt(selfTy, Context.getIdentifier("self"));
+        argTy = TupleType::get(elt, Context);
+      }
     } else {
       argTy = patterns[e - i - 1]->getType();
+      if (initFuncTy)
+        initArgTy = argTy;
     }
 
     // Validate and consume the function type attributes.
@@ -591,13 +622,22 @@ bool TypeChecker::validateGenericFuncSignature(FuncDecl *func) {
     if (i == e-1) {
       funcTy = GenericFunctionType::get(allGenericParams, requirements,
                                         argTy, funcTy, info, Context);
+      if (initFuncTy)
+        initFuncTy = GenericFunctionType::get(allGenericParams, requirements,
+                                              initArgTy, initFuncTy, info,
+                                              Context);
     } else {
       funcTy = FunctionType::get(argTy, funcTy, info, Context);
+
+      if (initFuncTy)
+        initFuncTy = FunctionType::get(initArgTy, initFuncTy, info, Context);
     }
   }
 
   // Record the interface type.
   func->setInterfaceType(funcTy);
+  if (initFuncTy)
+    cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
   return false;
 }
 

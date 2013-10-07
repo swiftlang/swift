@@ -473,7 +473,7 @@ namespace {
       if (D->getInterfaceType()) {
         OS << "\n";
         OS.indent(Indent + 2);
-        OS << "interface type = ";
+        OS << "interface type=";
         D->getInterfaceType().print(OS);
       }
     }

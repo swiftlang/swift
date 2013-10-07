@@ -1331,6 +1331,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->hasSelectorStyleSignature(),
                                   ctor->isObjC(),
                                   addTypeRef(ctor->getType()),
+                                  addTypeRef(ctor->getInterfaceType()),
                                   addDeclRef(implicitSelf));
 
     writeGenericParams(ctor->getGenericParams());

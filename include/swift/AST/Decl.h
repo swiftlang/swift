@@ -2713,7 +2713,10 @@ class ConstructorDecl : public AbstractFunctionDecl {
   Pattern *BodyParams;
   
   /// The type of the initializing constructor.
-  Type InitializerType = Type();
+  Type InitializerType;
+
+  /// The integerface type of the initializing constructor.
+  Type InitializerInterfaceType;
 
 public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
@@ -2760,6 +2763,10 @@ public:
   /// Get the type of the initializing constructor.
   Type getInitializerType() const { return InitializerType; }
   void setInitializerType(Type t) { InitializerType = t; }
+
+  /// Get the interface type of the initializing constructor.
+  Type getInitializerInterfaceType() const { return InitializerInterfaceType; }
+  void setInitializerInterfaceType(Type t) { InitializerInterfaceType = t; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;

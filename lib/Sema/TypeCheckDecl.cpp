@@ -908,15 +908,17 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
   }
 }
 
-void TypeChecker::revertGenericFuncSignature(FuncDecl *func) {
+void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
   // Revert the result type.
-  if (!func->getBodyResultTypeLoc().isNull()) {
-    revertDependentTypeLoc(func->getBodyResultTypeLoc(), func);
+  if (auto fn = dyn_cast<FuncDecl>(func)) {
+    if (!fn->getBodyResultTypeLoc().isNull()) {
+      revertDependentTypeLoc(fn->getBodyResultTypeLoc(), func);
+    }
   }
 
   // Revert the argument patterns.
   ArrayRef<Pattern *> argPatterns = func->getArgParamPatterns();
-  if (func->getDeclContext()->isTypeContext())
+  if (func->getDeclContext()->isTypeContext() && isa<FuncDecl>(func))
     argPatterns = argPatterns.slice(1);
   for (auto argPattern : argPatterns) {
     revertDependentPattern(argPattern, func);
@@ -924,7 +926,7 @@ void TypeChecker::revertGenericFuncSignature(FuncDecl *func) {
 
   // Revert the body patterns.
   ArrayRef<Pattern *> bodyPatterns = func->getBodyParamPatterns();
-  if (func->getDeclContext()->isTypeContext())
+  if (func->getDeclContext()->isTypeContext() && isa<FuncDecl>(func))
     bodyPatterns = bodyPatterns.slice(1);
   for (auto bodyPattern : bodyPatterns) {
     revertDependentPattern(bodyPattern, func);
@@ -935,7 +937,10 @@ void TypeChecker::revertGenericFuncSignature(FuncDecl *func) {
     revertGenericParamList(func->getGenericParams(), func);
 
   // Clear out the types.
-  func->revertType();
+  if (auto fn = dyn_cast<FuncDecl>(func))
+    fn->revertType();
+  else
+    func->overwriteType(Type());
 }
 
 namespace {
@@ -1846,26 +1851,40 @@ public:
     if (auto gp = CD->getGenericParams()) {
       // Write up generic parameters and check the generic parameter list.
       gp->setOuterParameters(outerGenericParams);
-      ArchetypeBuilder builder = createArchetypeBuilder(TC);
-      checkGenericParamList(builder, gp, TC);
 
-      // Type check the constructor parameters.
-      if (TC.typeCheckPattern(CD->getArgParams(),
-                              CD,
-                              /*allowUnknownTypes*/false)) {
+      if (TC.validateGenericFuncSignature(CD)) {
         CD->overwriteType(ErrorType::get(TC.Context));
         CD->setInvalid();
+      } else {
+        ArchetypeBuilder builder = createArchetypeBuilder(TC);
+        checkGenericParamList(builder, gp, TC);
+
+        // Type check the constructor parameters.
+        if (TC.typeCheckPattern(CD->getArgParams(),
+                                CD,
+                                /*allowUnknownTypes*/false)) {
+          CD->overwriteType(ErrorType::get(TC.Context));
+          CD->setInvalid();
+        }
+
+        // Infer requirements from the parameters of the constructor.
+        builder.inferRequirements(CD->getArgParams());
+
+        // Assign archetypes.
+        finalizeGenericParamList(builder, gp, CD, TC);
+
+        // Revert the constructor signature so it can be type-checked with
+        // archetypes below.
+        TC.revertGenericFuncSignature(CD);
       }
-
-      // Infer requirements from the parameters of the constructor.
-      builder.inferRequirements(CD->getArgParams());
-
-      // Assign archetypes.
-      finalizeGenericParamList(builder, gp, CD, TC);
-
-      // Reverse the constructor argument parameter pattern; it will be checked
-      // again, with archetypes, below.
-      revertDependentPattern(CD->getArgParams(), CD);
+    } else if (outerGenericParams) {
+      if (TC.validateGenericFuncSignature(CD)) {
+        CD->overwriteType(ErrorType::get(TC.Context));
+        CD->setInvalid();
+      } else {
+        // Revert all of the types within the signature of the constructor.
+        TC.revertGenericFuncSignature(CD);
+      }
     }
 
     // Type check the constructor parameters.

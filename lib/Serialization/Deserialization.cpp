@@ -906,11 +906,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID parentID;
     bool isImplicit, hasSelectorStyleSignature, isObjC;
     TypeID signatureID;
+    TypeID interfaceID;
     DeclID implicitSelfID;
 
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
                                                hasSelectorStyleSignature,
                                                isObjC, signatureID,
+                                               interfaceID,
                                                implicitSelfID);
     auto parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
@@ -938,6 +940,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     // A polymorphic constructor type needs to refer to the constructor to get
     // its generic parameters.
     ctor->setType(getType(signatureID));
+    ctor->setInterfaceType(getType(interfaceID));
 
     // Set the initializer type of the constructor.
     auto allocType = ctor->getType();
@@ -955,6 +958,27 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                                  fn->getResult(),
                                                  fn->getExtInfo(),
                                                  ctx));
+    }
+
+    // Set the initializer interface type of the constructor.
+    allocType = ctor->getInterfaceType();
+    if (allocType) {
+      selfTy = allocType->castTo<AnyFunctionType>()->getInput()
+                 ->castTo<MetaTypeType>()->getInstanceType();
+      if (auto polyFn = allocType->getAs<GenericFunctionType>()) {
+        ctor->setInitializerInterfaceType(
+                GenericFunctionType::get(polyFn->getGenericParams(),
+                                         polyFn->getRequirements(),
+                                         selfTy, polyFn->getResult(),
+                                         polyFn->getExtInfo(),
+                                         ctx));
+      } else {
+        auto fn = allocType->castTo<FunctionType>();
+        ctor->setInitializerInterfaceType(FunctionType::get(selfTy,
+                                                            fn->getResult(),
+                                                            fn->getExtInfo(),
+                                                            ctx));
+      }
     }
 
     if (isImplicit)

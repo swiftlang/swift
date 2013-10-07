@@ -335,12 +335,12 @@ public:
   /// \param func The generic function.
   ///
   /// \returns true if an error occurred, or false otherwise.
-  bool validateGenericFuncSignature(FuncDecl *func);
+  bool validateGenericFuncSignature(AbstractFunctionDecl *func);
 
   /// Revert the signature of a generic function to its pre-type-checked state,
   /// so that it can be type checked again when we have resolved its generic
   /// parameters.
-  void revertGenericFuncSignature(FuncDecl *func);
+  void revertGenericFuncSignature(AbstractFunctionDecl *func);
 
   /// Revert the dependent types within the given generic parameter list.
   void revertGenericParamList(GenericParamList *genericParams,
@@ -348,6 +348,7 @@ public:
 
   /// Validate the signature of a generic type.
   ///
+
   /// \param nominal The generic type.
   ///
   /// \returns true if an error occurred, or false otherwise.
