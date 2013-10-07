@@ -780,8 +780,8 @@ public:
   // Memory management helpers
   //===--------------------------------------------------------------------===//
 
-  /// emitDestroyAddr - Try to fold a destroy_addr operation into the previous
-  /// instructions, or generate an explicit one if that fails.
+  /// Try to fold a destroy_addr operation into the previous instructions, or
+  /// generate an explicit one if that fails.
   void emitDestroyAddr(SILLocation Loc, SILValue Operand);
 
   /// Convenience function for calling emitRetain on the type lowering
