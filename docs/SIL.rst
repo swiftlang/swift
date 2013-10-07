@@ -943,9 +943,13 @@ The second result of the instruction is the address of the allocated memory.
 
 ``alloc_stack`` marks the start of the lifetime of the value; the
 allocation must be balanced with a ``dealloc_stack`` instruction to
-mark the end of its lifetime.
+mark the end of its lifetime. All ``alloc_stack`` allocations must be
+deallocated prior to returning from a function. If a block has multiple
+predecessors, the stack height and order of allocations must be consistent
+coming from all predecessor blocks. ``alloc_stack`` allocations must be
+deallocated in last-in, first-out stack order.
 
-The memory is not retainable; to allocate a retainable box for a value
+The memory is not retainable. To allocate a retainable box for a value
 type, use ``alloc_box``.
 
 alloc_ref
@@ -1015,13 +1019,16 @@ dealloc_stack
 
   sil-instruction ::= 'dealloc_stack' sil-operand
 
-  dealloc_stack %0 : $*[local_storage] T
-  // %0 must be of a local-storage $*[local_storage] T type
+  dealloc_stack %0 : $*@local_storage T
+  // %0 must be of a local-storage $*@local_storage T type
 
 Deallocates memory previously allocated by ``alloc_stack``. The
 allocated value in memory must be uninitialized or destroyed prior to
 being deallocated. This instruction marks the end of the lifetime for
-the value created by the corresponding ``alloc_stack`` instruction.
+the value created by the corresponding ``alloc_stack`` instruction. The operand
+must be the ``@local_storage`` of the shallowest live ``alloc_stack``
+allocation preceding the deallocation. In other words, deallocations must be
+in last-in, first-out stack order.
 
 dealloc_box
 ```````````
