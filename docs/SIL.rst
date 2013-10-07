@@ -36,13 +36,13 @@ At a high level, the Swift compiler follows a strict pipeline architecture:
 - The *Sema* module type-checks the AST and annotates it with type information.
 - The *SILGen* module generates *raw SIL* from an AST.
 - A series of *Guaranteed Optimization Passes* and *Diagnostic Passes* are run
-  over the raw SIL to both perform optimizations, but also to emit
+  over the raw SIL both to perform optimizations and to emit
   language-specific diagnostics.  These are always run, even at -O0, and produce
   *canonical SIL*.
 - General SIL *Optimization Passes* optionally run over the canonical SIL to
   improve performance of the resultant executable.  These are enabled and
   controlled by the optimization level and are not run at -O0.
-- *IRGen* lowers optimized SIL to LLVM IR.
+- *IRGen* lowers canonical SIL to LLVM IR.
 - The LLVM backend (optionally) applies LLVM optimizations, runs the LLVM code
   generator and emits binary code.
 
@@ -61,8 +61,7 @@ The form of SIL emitted by SILGen has the following properties:
   which can be retained, released, and captured into closures.
 - Dataflow requirements, such as definitive assignment, function returns,
   switch coverage (TBD), etc. have not yet been enforced.
-- ``always_inline``, ``always_instantiate``, and other function optimization
-  attributes have not yet been honored.
+- ``transparent`` function optimization has not yet been honored.
 
 These properties are addressed by subsequent guaranteed optimization and
 diagnostic passes which are always run against the raw SIL.
@@ -121,10 +120,17 @@ Here is an example of a ``.sil`` file::
 
   import swift
 
-  // Define a type used by the SIL function.
+  // Define types used by the SIL function.
+
   struct Point {
     var x : Double
     var y : Double
+  }
+
+  class Button {
+    func onClick()
+    func onMouseDown()
+    func onMouseUp()
   }
 
   // Declare a Swift function. The body is ignored by SIL.
@@ -145,10 +151,19 @@ Here is an example of a ``.sil`` file::
     %5 = return %4 : Double
   }
 
+  // Define a SIL vtable. This matches dynamically-dispatched method
+  // identifiers to their implementations for a known static class type.
+  sil_vtable Button {
+    #Button.onClick!1: @_TC5norms6Button7onClickfS0_FT_T_
+    #Button.onMouseDown!1: @_TC5norms6Button11onMouseDownfS0_FT_T_
+    #Button.onMouseUp!1: @_TC5norms6Button9onMouseUpfS0_FT_T_
+  }
+
 SIL Stage
 ~~~~~~~~~
 ::
 
+  decl ::= sil-stage-decl
   sil-stage-decl ::= 'sil_stage' sil-stage
 
   sil-stage ::= 'raw'
@@ -349,6 +364,7 @@ Functions
 ~~~~~~~~~
 ::
 
+  decl ::= sil-function
   sil-function ::= 'sil' sil-linkage? sil-function-name ':' sil-type
                      '{' sil-basic-block+ '}'
   sil-function-name ::= '@' [A-Za-z_0-9]+
@@ -489,6 +505,69 @@ both the "self" argument and the method arguments), because uncurry level zero
 represents the application of the method to its "self" argument, as in
 ``foo.method``, which is where the dynamic dispatch semantically occurs
 in Swift.
+
+VTables
+~~~~~~~
+::
+
+  decl ::= sil-vtable
+  sil-vtable ::= 'sil_vtable' identifier '{' sil-vtable-entry* '}'
+
+  sil-vtable-entry ::= sil-decl-ref ':' sil-function-name
+
+SIL represents dynamic dispatch for class methods using the `class_method`_,
+`super_method`_, and `dynamic_method`_ instructions. The potential destinations
+for these dispatch operations are tracked in ``sil_vtable`` declarations for
+every class type. The declaration contains a mapping from every method of the
+class (including those inherited from its base class) to the SIL function that
+implements the method for that class::
+
+  class A {
+    func foo()
+    func bar()
+    func bas()
+  }
+
+  sil @A_foo : $((), A) -> ()
+  sil @A_bar : $((), A) -> ()
+  sil @A_bas : $((), A) -> ()
+
+  sil_vtable A {
+    #A.foo!1: @A_foo
+    #A.bar!1: @A_bar
+    #A.bas!1: @A_bas
+  }
+
+  class B : A {
+    func bar()
+  }
+
+  sil @B_bar : $((), B) -> ()
+
+  sil_vtable B {
+    #A.foo!1: @A_foo
+    #B.bar!1: @B_bar
+    #A.bas!1: @A_bas
+  }
+
+  class C : B {
+    func bas()
+  }
+
+  sil @C_bas : $((), C) -> ()
+
+  sil_vtable B {
+    #A.foo!1: @A_foo
+    #B.bar!1: @B_bar
+    #C.bas!1: @C_bas
+  }
+
+Note that the declaration reference in the vtable is to the most-derived method
+visible through that class (in the example above, ``B``'s vtable references
+``B.bar`` and not ``A.bar``, and ``C``'s vtable references ``C.bas`` and not
+``A.bas``). The Swift AST maintains override relationships between declarations
+that can be used to look up overridden methods in the SIL vtable for a derived
+class (such as ``A.bas`` in ``C``'s vtable).
 
 Dataflow Errors
 ---------------
@@ -1586,6 +1665,18 @@ class_method
 Looks up a method based on the dynamic type of a class or class metatype
 instance. It is undefined behavior if the class value is null and the
 method is not an Objective-C method.
+
+If:
+
+- the instruction is not ``[volatile]``,
+- the referenced method is not a ``foreign`` method,
+- and the static type of the class instance is known, or the method is known
+  to be final,
+  
+then the instruction is a candidate for devirtualization optimization. A
+devirtualization pass can consult the module's `VTables`_ to find the
+SIL function that implements the method and promote the instruction to a
+static `function_ref`_.
 
 super_method
 ````````````
