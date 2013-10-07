@@ -130,19 +130,19 @@ void CodeCompletionResultBuilder::addChunkWithText(
 }
 
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
-  void *Mem = Context.Allocator
-      .Allocate(sizeof(CodeCompletionResult) +
+  void *CCSMem = Context.Allocator
+      .Allocate(sizeof(CodeCompletionString) +
                     Chunks.size() * sizeof(CodeCompletionString::Chunk),
                 llvm::alignOf<CodeCompletionString>());
+  auto *CCS = new (CCSMem) CodeCompletionString(Chunks);
+
   switch (Kind) {
   case CodeCompletionResult::ResultKind::Declaration:
-    return new (Context.Allocator)
-        CodeCompletionResult(new (Mem) CodeCompletionString(Chunks),
-                             AssociatedDecl);
+    return new (Context.Allocator) CodeCompletionResult(CCS, AssociatedDecl);
+
   case CodeCompletionResult::ResultKind::Keyword:
   case CodeCompletionResult::ResultKind::Pattern:
-    return new (Context.Allocator)
-        CodeCompletionResult(Kind, new (Mem) CodeCompletionString(Chunks));
+    return new (Context.Allocator) CodeCompletionResult(Kind, CCS);
   }
 }
 
