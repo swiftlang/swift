@@ -63,7 +63,7 @@ namespace {
     CleanupMaterializedAddressOnlyValue(SILValue address) : address(address) {}
     
     void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.createDestroyAddr(l, address);
+      gen.B.emitDestroyAddr(l, address);
     }
   };
 } // end anonymous namespace
@@ -1651,7 +1651,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
       if (!ti.isTrivial()) {
         SILValue addr = B.createRefElementAddr(Loc, selfValue, vd,
                                           ti.getLoweredType().getAddressType());
-        B.createDestroyAddr(Loc, addr);
+        B.emitDestroyAddr(Loc, addr);
       }
     }
   }

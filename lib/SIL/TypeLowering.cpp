@@ -912,12 +912,12 @@ namespace {
 
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
-      B.createDestroyAddr(loc, addr);
+      B.emitDestroyAddr(loc, addr);
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      B.createDestroyAddr(loc, value);
+      B.emitDestroyAddr(loc, value);
     }
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,

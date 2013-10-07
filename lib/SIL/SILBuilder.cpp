@@ -145,3 +145,26 @@ SILValue SILBuilder::emitGeneralizedValue(SILLocation loc, SILValue v) {
   return v;
 }
 
+
+/// emitDestroyAddr - Try to fold a destroy_addr operation into the previous
+/// instructions, or generate an explicit one if that fails.
+void SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
+  // Check to see if the instruction immediately before the insertion point is a
+  // copy_addr from the specified operand.  If so, we can fold this into the
+  // copy_addr as a take.
+  auto I = getInsertionPoint();
+  if (I != getInsertionBB()->begin()) {
+    if (auto CA = dyn_cast<CopyAddrInst>(--I)) {
+      if (CA->getSrc() == Operand && !CA->isTakeOfSrc()) {
+        CA->setIsTakeOfSrc(IsTake);
+        return;
+      }
+    }
+  }
+
+
+
+  createDestroyAddr(Loc, Operand);
+}
+
+

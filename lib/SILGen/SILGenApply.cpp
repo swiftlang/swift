@@ -1235,12 +1235,13 @@ namespace {
     SILType destroyType = ti.getLoweredType();
 
     // Convert the pointer argument to a SIL address.
-    SILValue addr = gen.B.createPointerToAddress(loc, args[1].getUnmanagedValue(),
-                                                 destroyType.getAddressType());
+    SILValue addr =
+      gen.B.createPointerToAddress(loc, args[1].getUnmanagedValue(),
+                                   destroyType.getAddressType());
     
     // Destroy the value indirectly. Canonicalization will promote to loads
     // and releases if appropriate.
-    gen.B.createDestroyAddr(loc, addr);
+    gen.B.emitDestroyAddr(loc, addr);
     
     return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
   }

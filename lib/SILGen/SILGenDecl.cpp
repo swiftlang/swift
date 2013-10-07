@@ -208,7 +208,7 @@ public:
   DestroyAddr(SILValue addr) : Addr(addr) {}
   
   void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.createDestroyAddr(l, Addr);
+    gen.B.emitDestroyAddr(l, Addr);
   }
 };
 
