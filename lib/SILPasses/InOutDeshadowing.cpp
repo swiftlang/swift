@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "inout-deshadowing"
+#define DEBUG_TYPE "inout-deshadow"
 #include "swift/Subsystems.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -23,18 +23,28 @@
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
-//STATISTIC(NumShadowsRemoved, "Number of inout shadow variables removed");
+STATISTIC(NumShadowsRemoved, "Number of inout shadow variables removed");
 
 //===----------------------------------------------------------------------===//
 //                          inout Deshadowing
 //===----------------------------------------------------------------------===//
 
-/// processAllocation - Given an AllocStackInst that is stored to from an inout
-/// argument,
-static void processAllocation(AllocStackInst *Alloc, SILArgument *InOutArg) {
+/// processAllocation - Given an AllocStackInst that is copy_addr's to/from an
+/// inout argument, check to see if it can be completely replaced by that inout
+/// argument.  For this to be ok, it cannot escape and must only be initialized
+/// and destroyed by copies from/to the inout argument.
+static bool processAllocation(AllocStackInst *Alloc, SILArgument *InOutArg) {
 
-  //++NumShadowsRemoved;
+  for (auto UI : Alloc->getUses()) {
+    // We can't promote inout arguments used by basic blocks.
+    auto *ArgUser = dyn_cast<SILInstruction>(UI->getUser());
+    if (!ArgUser) return false;
 
+    
+
+  }
+
+  return false;
 }
 
 
@@ -43,14 +53,15 @@ static void processAllocation(AllocStackInst *Alloc, SILArgument *InOutArg) {
 //===----------------------------------------------------------------------===//
 
 /// processInOutValue - Walk the use-def list of the inout argument to find uses
-/// of it.  We should only have stores and loads of the argument itself.  The
-/// load should be a copy into a stack value, which is the shadow we're trying
-/// to eliminate.
+/// of it.  We should only have copy_addr's into and out of it.  This
+/// specifically only matches one pattern that SILGen is producing to simplify
+/// the legality checks we'd otherwise need.
 static void processInOutValue(SILArgument *InOutArg) {
   assert(InOutArg->getType().isAddress() &&
          "inout arguments should always be addresses");
 
-  llvm::SmallSetVector<AllocStackInst*, 4> StackShadows;
+  AllocStackInst *TheShadow = nullptr;
+  bool FoundInit = false;
 
   for (auto UI : InOutArg->getUses()) {
     // We can't promote inout arguments used by basic blocks.
@@ -60,18 +71,66 @@ static void processInOutValue(SILArgument *InOutArg) {
       return;
     }
 
-    // Take a look at copy_addrs that initialize alloc_stacks.
-    if (auto CAI = dyn_cast<CopyAddrInst>(ArgUser))
-      if (CAI->isInitializationOfDest())
-        if (auto *ASI = dyn_cast<AllocStackInst>(CAI->getDest()))
-          StackShadows.insert(ASI);
+    // TODO: We should eventually support extraneous loads, which will occur
+    // in the future (e.g. when rdar://15170149 is implemented).
+    auto CAI = dyn_cast<CopyAddrInst>(ArgUser);
+    if (!CAI) {
+      DEBUG(llvm::errs() << "  unknown inout variable user: " << *ArgUser);
+      return;
+    }
+
+    if (UI->getOperandNumber() == 0) {
+      // This is a copy out of the argument into an alloc_stack.  We only
+      // support a single copy out of the argument into the stack, and it must
+      // be the initialization of that stack location.
+      auto *DestAlloc = dyn_cast<AllocStackInst>(CAI->getDest());
+      // TODO: init/take flags don't matter for trivial types.
+      if (!CAI->isInitializationOfDest() || CAI->isTakeOfSrc() || !DestAlloc) {
+        DEBUG(llvm::errs() << "  unknown copy from inout: " << *ArgUser);
+        return;
+      }
+
+      if (FoundInit || (TheShadow && TheShadow != DestAlloc)) {
+        DEBUG(llvm::errs() << "  multiple copies from inout: " << *ArgUser);
+        return;
+      }
+
+      TheShadow = DestAlloc;
+      FoundInit = true;
+      continue;
+    }
+
+    // We allow multiple copies out of the shadow variable which can happen due
+    // to multiple return paths.
+    assert(UI->getOperandNumber() == 1);
+
+    // This should be a take from the source.
+    // TODO: init/take flags don't matter for trivial types.
+    auto *SrcAlloc = dyn_cast<AllocStackInst>(CAI->getSrc());
+    if (CAI->isInitializationOfDest() || !CAI->isTakeOfSrc() || !SrcAlloc) {
+      DEBUG(llvm::errs() << "  unknown copy back to inout: " << *ArgUser);
+      return;
+    }
+
+    // Verify that it is a copy from the one true shadow for this argument.
+    if (TheShadow && TheShadow != SrcAlloc) {
+      DEBUG(llvm::errs() << "  copies from multiple inout shadows: "<<*ArgUser);
+      return;
+    }
+
+    TheShadow = SrcAlloc;
   }
 
-  // Now that we have identified and uniqued any candidate variables, try to
-  // eliminate each one.  We do this as a post-pass to avoid iterator
-  // invalidation complications.
-  for (auto *Alloc : StackShadows)
-    processAllocation(Alloc, InOutArg);
+  // Now that we identified the candidate alloc_stack to remove, check to see if
+  // we can legally do so.
+  if (TheShadow) {
+    DEBUG(llvm::errs() << "  Attempting to promote shadow variable "
+                       << *TheShadow);
+    if (processAllocation(TheShadow, InOutArg))
+      ++NumShadowsRemoved;
+    else
+      DEBUG(llvm::errs() << "  promotion failed for: " << *TheShadow);
+  }
 }
 
 //===----------------------------------------------------------------------===//
