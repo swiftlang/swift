@@ -1829,24 +1829,24 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // If there's no body, this is the implicit elementwise constructor.
   if (!ctor->getBody())
     return emitImplicitValueConstructor(*this, ctor);
-  
-  // Emit the prolog.
-  emitProlog(ctor->getBodyParams(), ctor->getImplicitSelfDecl()->getType());
-  emitConstructorMetatypeArg(*this, ctor);
-  
+
   // Get the 'self' decl and type.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
   auto &lowering = getTypeLowering(selfDecl->getType());
   SILType selfTy = lowering.getLoweredType();
   (void)selfTy;
   assert(!selfTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
-
+  
   // Emit a local variable for 'self'.
   // FIXME: The (potentially partially initialized) variable would need to be
   // cleaned up on an error unwind.
   emitLocalVariable(selfDecl);
-
+  
   SILValue selfLV = VarLocs[selfDecl].address;
+
+  // Emit the prolog.
+  emitProlog(ctor->getBodyParams(), ctor->getImplicitSelfDecl()->getType());
+  emitConstructorMetatypeArg(*this, ctor);
   
   // Emit a default initialization of the this value.
   // Note that this initialization *cannot* be lowered to a
@@ -2133,20 +2133,21 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // If there's no body, this is the implicit constructor.
   assert(ctor->getBody() && "Class constructor without a body?");
 
+  // Emit the 'self' argument and make an lvalue for it.
+  // FIXME: The (potentially partially initialized) value here would need to be
+  // cleaned up on a constructor failure unwinding.
+  VarDecl *selfDecl = ctor->getImplicitSelfDecl();
+  emitLocalVariable(selfDecl);
+  SILValue selfLV = VarLocs[selfDecl].address;
+
   // Emit the prolog for the non-this arguments.
   emitProlog(ctor->getBodyParams(), TupleType::getEmpty(F.getASTContext()));
-  
-  // Emit the 'self' argument and make an lvalue for it.
-  VarDecl *selfDecl = ctor->getImplicitSelfDecl();
+
+  // Emit the 'self' argument and store it to the lvalue.
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   SILValue selfArg = new (SGM.M) SILArgument(selfTy, F.begin());
   assert(selfTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
-
-  // FIXME: The (potentially partially initialized) value here would need to be
-  // cleaned up on a constructor failure unwinding.
-  emitLocalVariable(selfDecl);
-  SILValue selfLV = VarLocs[selfDecl].address;
   B.createStore(ctor, selfArg, selfLV);
   
   // Create a basic block to jump to for the implicit 'self' return.
