@@ -1590,10 +1590,55 @@ public:
     }
   }
   
-  void visitSILFunction(SILFunction *F) {
+  void verifyStackHeight(SILBasicBlock *BB,
+       llvm::DenseMap<SILBasicBlock*, std::vector<AllocStackInst*>> &visitedBBs,
+       std::vector<AllocStackInst*> stack) {
     
+    auto found = visitedBBs.find(BB);
+    if (found != visitedBBs.end()) {
+      // Check that the stack height is consistent coming from all entry points
+      // into this BB.
+      require(stack == found->second,
+             "inconsistent stack heights entering basic block");
+      return;
+    } else {
+      visitedBBs.insert({BB, stack});
+    }
+    
+    for (SILInstruction &i : *BB) {
+      CurInstruction = &i;
+      
+      if (auto alloc = dyn_cast<AllocStackInst>(&i)) {
+        stack.push_back(alloc);
+      }
+      if (auto dealloc = dyn_cast<DeallocStackInst>(&i)) {
+        SILValue op = dealloc->getOperand();
+        require(op.getResultNumber() == 0,
+               "dealloc_stack operand is not local storage of alloc_inst");
+        require(!stack.empty(),
+               "dealloc_stack with empty stack");
+        require(op.getDef() == stack.back(),
+               "dealloc_stack does not match most recent alloc_stack");
+        stack.pop_back();
+      }
+      if (isa<ReturnInst>(&i) || isa<AutoreleaseReturnInst>(&i)) {
+        require(stack.empty(),
+                "return with alloc_stacks that haven't been deallocated");
+      }
+      if (auto term = dyn_cast<TermInst>(&i)) {
+        for (auto &successor : term->getSuccessors()) {
+          verifyStackHeight(successor.getBB(), visitedBBs, stack);
+        }
+      }
+    }
+  }
+  
+  void visitSILFunction(SILFunction *F) {
     verifyEntryPointArguments(F->getBlocks().begin());
     verifyEpilogBlock(F);
+    
+    llvm::DenseMap<SILBasicBlock*, std::vector<AllocStackInst*>> visitedBBs;
+    verifyStackHeight(F->begin(), visitedBBs, {});
 
     SILVisitor::visitSILFunction(F);
   }
