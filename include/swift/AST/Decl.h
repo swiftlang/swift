@@ -1488,7 +1488,7 @@ class GenericSignature {
                    ArrayRef<Requirement> requirements);
 
 public:
-  /// Create a new generic signature with hte given type parameters and
+  /// Create a new generic signature with the given type parameters and
   /// requirements.
   static GenericSignature *get(ArrayRef<GenericTypeParamType *> params,
                                ArrayRef<Requirement> requirements,
