@@ -23,7 +23,7 @@
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
-STATISTIC(NumShadowsRemoved, "Number of inout shadow variables removed");
+//STATISTIC(NumShadowsRemoved, "Number of inout shadow variables removed");
 
 //===----------------------------------------------------------------------===//
 //                          inout Deshadowing
@@ -33,7 +33,7 @@ STATISTIC(NumShadowsRemoved, "Number of inout shadow variables removed");
 /// argument,
 static void processAllocation(AllocStackInst *Alloc, SILArgument *InOutArg) {
 
-++NumShadowsRemoved;
+  //++NumShadowsRemoved;
 
 }
 
@@ -41,26 +41,6 @@ static void processAllocation(AllocStackInst *Alloc, SILArgument *InOutArg) {
 //===----------------------------------------------------------------------===//
 //                     Candidate Variable Identification
 //===----------------------------------------------------------------------===//
-
-/// getStoredAllocStacks - Walk the use list of the specified value, looking for
-/// stores of the whole value (or copy_value'd versions of it) to an
-/// alloc_stack.
-static void getStoredAllocStacks(SILValue V,
-                       llvm::SmallSetVector<AllocStackInst*, 4> &StackShadows) {
-  for (auto UI : V.getUses()) {
-    // We don't care about analyzing uses by basic blocks.
-    auto *User = dyn_cast<SILInstruction>(UI->getUser());
-    if (!User) continue;
-
-    if (auto *SI = dyn_cast<StoreInst>(User))
-      if (auto *ASI = dyn_cast<AllocStackInst>(SI->getDest()))
-        StackShadows.insert(ASI);
-
-    if (auto *CV = dyn_cast<CopyValueInst>(User))
-      getStoredAllocStacks(CV, StackShadows);
-  }
-}
-
 
 /// processInOutValue - Walk the use-def list of the inout argument to find uses
 /// of it.  We should only have stores and loads of the argument itself.  The
@@ -80,24 +60,11 @@ static void processInOutValue(SILArgument *InOutArg) {
       return;
     }
 
-    // Ignore any stores that write-back the new value.  These happen before
-    // returning from the function.
-    if (isa<StoreInst>(ArgUser))
-      continue;
-
-    // Otherwise, we can only have loads from the argument, which come in
-    // multiple forms.
-    // TODO: Support address-only types.
-    if (!isa<LoadInst>(ArgUser)) {
-      DEBUG(llvm::errs() << "  Unexpected use of inout variable: "
-                         << *ArgUser << "\n");
-      return;
-    }
-
-    // The load may be used by arbitrary user code since we've done some
-    // store->load forwarding already.  Look for stores of the loaded value into
-    // alloc_stacks.
-    getStoredAllocStacks(ArgUser, StackShadows);
+    // Take a look at copy_addrs that initialize alloc_stacks.
+    if (auto CAI = dyn_cast<CopyAddrInst>(ArgUser))
+      if (CAI->isInitializationOfDest())
+        if (auto *ASI = dyn_cast<AllocStackInst>(CAI->getDest()))
+          StackShadows.insert(ASI);
   }
 
   // Now that we have identified and uniqued any candidate variables, try to
