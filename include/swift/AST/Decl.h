@@ -2715,7 +2715,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// The type of the initializing constructor.
   Type InitializerType;
 
-  /// The integerface type of the initializing constructor.
+  /// The interface type of the initializing constructor.
   Type InitializerInterfaceType;
 
 public:
