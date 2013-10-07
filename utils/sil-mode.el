@@ -87,7 +87,7 @@
 		  'words) . font-lock-keyword-face)
    ;; Terminators
    `(,(regexp-opt '("unreachable" "return" "autorelease_return" "br"
-		    "condbranch" "switch_int" "switch_enum")
+		    "cond_br" "switch_int" "switch_enum")
 		  'words) . font-lock-keyword-face)
    ;; SIL Value
    '("\\b[%][A-Za-z_0-9]+\\([#][0-9]+\\)?\\b" . font-lock-variable-name-face)

@@ -416,7 +416,7 @@ block::
 
   sil @iif : $(Builtin.Int1, Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
   bb0(%cond : $Builtin.Int1, %ifTrue : $Builtin.Int64, %ifFalse : $Builtin.Int64):
-    condbranch %cond : $Builtin.Int1, then, else
+    cond_br %cond : $Builtin.Int1, then, else
   then:
     br finish(%ifTrue : $Builtin.Int64)
   else:
@@ -2828,15 +2828,15 @@ Unconditionally transfers control from the current basic block to the block
 labeled ``label``, binding the given values to the arguments of the destination
 basic block.
 
-condbranch
+cond_br
 ``````````
 ::
 
-  sil-terminator ::= 'condbranch' sil-operand ','
+  sil-terminator ::= 'cond_br' sil-operand ','
                        sil-identifier '(' (sil-operand (',' sil-operand)*)? ')' ','
                        sil-identifier '(' (sil-operand (',' sil-operand)*)? ')'
 
-  condbranch %0 : $Builtin.Int1, true_label (%a : $A, %b : $B, ...), \
+  cond_br %0 : $Builtin.Int1, true_label (%a : $A, %b : $B, ...), \
                                  false_label (%x : $X, %y : $Y, ...)
   // %0 must be of $Builtin.Int1 type
   // `true_label` and `false_label` must refer to block labels within the

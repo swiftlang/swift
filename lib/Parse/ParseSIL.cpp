@@ -880,7 +880,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("class_metatype", ValueKind::ClassMetatypeInst)
     .Case("class_method", ValueKind::ClassMethodInst)
     .Case("coerce", ValueKind::CoerceInst)
-    .Case("condbranch", ValueKind::CondBranchInst)
+    .Case("cond_br", ValueKind::CondBranchInst)
     .Case("convert_cc", ValueKind::ConvertCCInst)
     .Case("convert_function", ValueKind::ConvertFunctionInst)
     .Case("copy_addr", ValueKind::CopyAddrInst)

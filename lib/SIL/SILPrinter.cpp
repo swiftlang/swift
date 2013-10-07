@@ -968,7 +968,7 @@ public:
   }
 
   void visitCondBranchInst(CondBranchInst *CBI) {
-    OS << "condbranch " << getID(CBI->getCondition()) << ", "
+    OS << "cond_br " << getID(CBI->getCondition()) << ", "
        << getID(CBI->getTrueBB());
     printBranchArgs(CBI->getTrueArgs());
     OS << ", " << getID(CBI->getFalseBB());
