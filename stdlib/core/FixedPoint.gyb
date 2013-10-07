@@ -71,7 +71,6 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
     return ${Self}(${'val' if bits == maxBits else ('Builtin.trunc_Int%d_Int%d(val)' % (maxBits, bits) )})
   }
 
-  typealias IntegerLiteralType = ${Self}
   @@transparent 
   static func convertFromIntegerLiteral(value : ${Self}) -> ${Self} {
     return value
