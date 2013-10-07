@@ -310,6 +310,7 @@ bb0(%0 : $Val.metatype):
   // CHECK: initialize_var [no_default_construct] {{%.*}} : $*Val
   %2 = initialize_var [no_default_construct] %1#1 : $*Val
   %3 = load %1#1 : $*Val
+  dealloc_stack %1#0 : $*@local_storage Val
   %4 = return %3 : $Val
 }
 
