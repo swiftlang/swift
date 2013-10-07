@@ -2182,9 +2182,10 @@ Enums
 
 These instructions construct values of enum type. Loadable enum values are
 created with the ``enum`` instruction. Address-only enums require two-step
-initialization: first, if the case requires data, that data is stored into
-the enum at the address projected by ``enum_data_addr``, then the tag for
-the enum is overlaid with an ``inject_enum_addr`` instruction::
+initialization. First, if the case requires data, that data is stored into
+the enum at the address projected by ``enum_data_addr``. This step is skipped
+for cases without data. Finally, the tag for
+the enum is injected with an ``inject_enum_addr`` instruction::
 
   enum AddressOnlyEnum {
     case HasData(AddressOnlyType)
@@ -2207,8 +2208,8 @@ the enum is overlaid with an ``inject_enum_addr`` instruction::
     return
   }
 
-Accessing the value of an enum is tied to dispatching on its discriminator,
-which is done with the ``switch_enum`` and
+Accessing the value of an enum is inseparable from dispatching on its
+discriminator, which is done with the ``switch_enum`` and
 ``destructive_switch_enum_addr`` `terminators`_.
 
 enum
