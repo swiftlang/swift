@@ -1922,6 +1922,7 @@ static void emitAddressOnlyEnumConstructor(SILGenFunction &gen,
   
   // Apply the tag.
   gen.B.createInjectEnumAddr(Loc, resultSlot, element);
+  gen.Cleanups.emitCleanupsForReturn(CleanupLocation::getCleanupLocation(Loc));
   gen.B.createReturn(Loc, gen.emitEmptyTuple(element));
 }
 
@@ -1943,6 +1944,7 @@ static void emitLoadableEnumConstructor(SILGenFunction &gen,
   
   // Create and return the enum value.
   SILValue result = gen.B.createEnum(Loc, argValue, element, enumTy);
+  gen.Cleanups.emitCleanupsForReturn(CleanupLocation::getCleanupLocation(Loc));
   gen.B.createReturn(Loc, result);
 }
 
