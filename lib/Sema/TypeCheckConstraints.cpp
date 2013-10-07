@@ -961,7 +961,8 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                });
     } else if (!baseObjTy->isExistentialType() &&
                !baseObjTy->hasTypeVariable()) {
-      //
+      // When we have an associated type and the base type conforms to the
+      // given protocol, use the type witness directly.
       ProtocolConformance *conformance = nullptr;
       if (TC.conformsToProtocol(baseObjTy, ownerProtoTy->getDecl(),
                                 &conformance)) {
