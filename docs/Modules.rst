@@ -30,8 +30,8 @@ code.
 
 You can also selectively import certain declarations from a module::
 
-  import func ChessAIs.createGreedyPlayer
-  import class AVFoundation.AVPlayer
+  import func Chess.createGreedyPlayer
+  import class Foundation.NSRegularExpression
 
 .. admonition:: Comparison with Other Languages
 
@@ -41,7 +41,7 @@ You can also selectively import certain declarations from a module::
   programs on their own, and may not be in a textual format at all. Unlike Java,
   declarations in a module are not visible at all until imported. And unlike the
   dynamic languages mentioned, importing a module cannot automatically cause
-  cause any code to be run.
+  any code to be run.
 
 
 Imported declarations can be accessed with qualified or unqualified lookup
@@ -108,7 +108,7 @@ implementation. The module implementer may also choose to `re-export` these
 modules, meaning that anyone who imports the first module will also have access
 to the declarations in the re-exported modules. ::
 
-  import [exported] ChessAIs
+  import [exported] AmericanCheckers
 
 As an example, the "Cocoa" `framework` on OS X exists only to re-export three
 other frameworks: AppKit, Foundation, and CoreData.
@@ -116,7 +116,7 @@ other frameworks: AppKit, Foundation, and CoreData.
 Just as certain declarations can be selectively imported from a module, so too
 can they be selectively re-exported, using the same syntax::
 
-  import [exported] func ChessAIs.createGreedyPlayer
+  import [exported] class AmericanCheckers.Board
 
 .. admonition:: TODO
 
@@ -125,24 +125,47 @@ can they be selectively re-exported, using the same syntax::
   regular declarations.
 
 
-Modules are uniquely identified by their full name
---------------------------------------------------
+.. _module-naming:
 
-Module names exist in a global namespace and must be unique. To this end,
-third-party library vendors are encouraged to name modules using a 
-`reverse-DNS`__ scheme. For example, if you work for a company named "Frantic"
-with the website "frantic.com" and you are releasing a library called 
-"Epilogue", your module name should be "Com.Frantic.Epilogue". This helps
-ensure that your module name will not conflict with any others on the system.
+Modules are uniquely identified by their name
+---------------------------------------------
 
-__ http://goto.apple.com/?http://en.wikipedia.org/wiki/Reverse_domain_name_notation
-
-Like type names, module names are conventionally capitalized.
+Module names exist in a global namespace and must be unique. Like type names,
+module names are conventionally capitalized.
 
 .. admonition:: TODO
 
-  Hierarchical module names don't actually work yet, and may not work at all 
-  for Swift 1.0, since building and shipping frameworks will not be supported.
+  While this matches the general convention for Clang, there are advantages to
+  being able to rename a module for lookup purposes, even if the ABI name stays
+  the same. It would also be nice to avoid having people stick prefixes on their
+  module names the way they currently do for Objective-C classes.
+
+.. note::
+
+  Because access into a module and access into a type look the same, it is bad
+  style to declare a type with the same name as a top-level module used in your
+  program::
+
+    // Example 1:
+    import Foundation
+    import struct BuildingConstruction.Foundation
+
+    var firstSupport = Foundation.SupportType() // from the struct or from the module?
+
+
+    // Example 2:
+    import Foundation
+    import BuildingConstruction
+
+    Foundation.SupportType() // from the class or from the module?
+
+  In both cases, the type takes priority over the module, but this should still 
+  be avoided.
+
+  .. admonition:: TODO
+
+    Can we enforce this in the compiler? It seems like there's no way around
+    Example 2, and indeed Example 2 is probably doing the wrong thing.
 
 
 ``import``
@@ -168,14 +191,6 @@ declaration keyword::
   name given is a typealias for a type of the appropriate kind.
 - ``import func`` will bring in all overloads of the named function.
 - Using a keyword that doesn't match the named declaration is an error.
-
-.. note::
-
-  The best way to think about the declaration keyword used with ``import`` is
-  that it specifies how *you* want to use the declaration you are importing,
-  rather than how the module writer declared it. This also provides some amount
-  of API stability, though at the ABI level changing the canonical name or kind
-  for a type is still a binary-incompatible change.
 
 .. admonition:: TODO
 
@@ -204,8 +219,9 @@ loaded with ``import``, but with a few important differences:
   compilation process would pass all source files to the compiler in a single
   invocation; parallelism nice-to-have.
   
-  The more complicated process feeds a list of all files in a target to the
-  compiler. These files are parsed but not type-checked; "lazy" type-checking
+  The more complicated process has the compiler derive a list of all files in
+  a module, either by some structural inference or by explicitly being given a
+  list. These files are parsed but not type-checked; "lazy" type-checking
   will be used when the compiler needs to refer to declarations in these files.
   Once compiled, a serialized form of the source file could be used to avoid
   having to reparse that particular file, but this is just an optimization.
@@ -215,7 +231,7 @@ loaded with ``import``, but with a few important differences:
 
 .. admonition:: TODO
 
-  None of this works yet, and indeed has not yet been agreed upon.
+  None of this works yet.
 
 .. admonition:: FIXME
 
@@ -244,14 +260,12 @@ the appropriate module.
 
 These are the rules for resolving name lookup ambiguities:
 
-1. Declarations in the current source file are better than imported 
-   declarations.
-2. Declarations from selective imports are better than declarations from
+1. Declarations in the current source file are best.
+2. Declarations from other files in the same module [#]_ are better than
+   declarations from imports.
+3. Declarations from selective imports are better than declarations from
    non-selective imports. (This may be used to give priority to a particular
    module for a given name.)
-3. Declarations from other files in the same module [#]_ are better than
-   declarations from non-selective imports, but worse than declarations from
-   selective imports.
 4. Every source file implicitly imports the core standard library as a
    non-selective import.
 5. If the name refers to a function, normal overload resolution may resolve
@@ -260,57 +274,63 @@ These are the rules for resolving name lookup ambiguities:
 .. [#] FIXME: not implemented yet, since the main feature hasn't been
        implemented either.
 
-
-Hierarchical Module Names
--------------------------
-
-The purpose of modules is to provide declarations for source code to use; it
-does so by introducing names into the source file's context. In addition to
-the contents of a module or a particular selectively-imported decl, the name
-of the module itself is also introduced into the translation unit. This is
-how qualified names are resolved by the compiler.
-
-In the case of a hierarchical module name (like "Com.Frantic.Epilogue"),
-the compiler will introduce *two* names into the current scope: the full 
-three-part name, and the last component of the module. Therefore, a class
-Com.Frantic.Epilogue.EditController can be referred to as "EditController",
-"Epilogue.EditController", or "Com.Frantic.Epilogue.EditController".
-
-Note that an import must always use the fully qualified name; that is,
-this is not allowed::
-
-  import Com.Frantic.Epilogue
-  import class Epilogue.EditController // error: "'Epilogue' module not found"
-
-Because access into a module and access into a type look the same, it is bad
-style to declare a type with the same name as a top-level module used in your
-program, or with the same fully-qualified name as a separate module::
-
-  // Example 1:
-  import Foundation
-  import struct BuildingConstruction.Foundation
-  
-  var firstSupport = Foundation.SupportType() // from the struct or from the module?
-
-
-  // Example 2:
-  import /*module*/ Com.Frantic.Epilogue.Console
-  import class Com.Frantic.Epilogue.Console
-  
-  Com.Frantic.Epilogue.Console.requireXTerm() // from the class or from the module?
-
-In both cases, the type takes priority over the module, but this should still 
-be avoided.
-
+.. _submodules:
 
 Submodules
 ----------
 
+For large projects, it is usually desirable to break a single application or
+framework into subsystems, which Swift calls "submodules". A submodule is a
+development-time construct used for grouping within a module. By default, 
+declarations within a submodule are considered "submodule-private", which 
+means they are only visible within that submodule (rather than across the
+entire module). These declarations will not conflict with declarations in other
+submodules that may have the same name. 
+
+Declarations explicitly marked "whole-module" or "API" are still visible
+across the entire module (even if declared within a submodule), and must have a
+unique name within that space.
+
+The `qualified name` of a declaration within a submodule consists of the
+top-level module name, followed by the submodule name, followed by the 
+declaration.
+
+.. note::
+
+  Submodules are an opportunity feature for Swift 1.0.
+
+.. admonition:: TODO
+
+  We need to decide once and for all whether implicit visibility applies across
+  submodule boundaries, i.e. "can I access the public Swift.AST.Module from
+  Swift.Sema without an import, or do I have to say ``import Swift.AST``?"
+  
+  Advantages of module-wide implicit visibility:
+  
+  - Better name conflict checking. (The alternative is a linker error, or worse
+    *no* linker error if the names have different manglings.)
+  - Less work if things move around.
+  - Build time performance is consistent whether or not you use this feature.
+  
+  Advantages of submodule-only implicit visibility:
+  
+  - Code completion will include names of public things you don't care about.
+  - We haven't actually tested the build time performance of any large Swift
+    projects, so we don't know if we can actually handle targets that contain
+    hundreds of files.
+  - Could be considered desirable to force declaring your internal dependencies
+    explicitly.
+  - In this mode, we could allow two "whole-module" declarations to have the
+    same name, since they won't. (We could allow this in the other mode too
+    but then the qualified name would always be required.)
+  
+  Both cases still use "submodule-only" as the default access control, so this
+  only affects the implicit visibility of whole-module and public declarations.
+
 .. admonition:: FIXME
 
-  Write this section. Submodules are basically like hierarchical modules except
-  that they live in the top-level module's file. Swift submodules are not in
-  scope for 1.0.
+  Cross-reference with access control design doc once we have an access control
+  design doc.
 
 
 Import Search Paths
@@ -338,6 +358,18 @@ the module found with the name "AppKit" is generated from the Objective-C
 AppKit framework.
 
 
+Clang Submodules
+----------------
+
+Clang also has a concept of "submodules", which are essentially hierarchically-
+named modules. Unlike Swift's :ref:`submodules`, Clang submodules are visible 
+from outside the module. It is conventional for a top-level Clang module to
+re-export all of its submodules, but sometimes certain submodules are specified
+to require an explicit import::
+
+  import OpenGL.GL3
+
+
 Module Overlays
 ---------------
 
@@ -347,8 +379,7 @@ In most cases, the source file will `re-export` the underlying module, but
 add some convenience APIs to make the existing interface more Swift-friendly.
 
 This replacement syntax (using the current module name in an import) cannot
-be used to overlay a Swift module, because `Modules are uniquely identified by 
-their full name`_.
+be used to overlay a Swift module, because :ref:`module-naming`.
 
 
 Multiple source files, part 2
@@ -378,8 +409,8 @@ Accessing Swift declarations from Objective-C
 Using the new ``@import`` syntax, Objective-C translation units can import
 Swift modules as well. Swift declarations will be mirrored into Objective-C
 and can be called natively, just as Objective-C declarations are mirrored into
-Swift for `Clang modules`. In this case, only the declarations compatible with
-Objective-C will be visible.
+Swift for `Clang modules <Clang module>`. In this case, only the declarations 
+compatible with Objective-C will be visible.
 
 .. admonition:: TODO
 
@@ -461,3 +492,8 @@ Glossary
     "Swift Intermediate Language", a stable IR for the distribution of
     inlineable code.
   
+  
+  target
+    A dynamic library, framework, plug-in, or application to be built.
+    A natural LTO boundary, and roughly the same as what Xcode requires
+    separate targets to build.
