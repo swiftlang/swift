@@ -152,18 +152,29 @@ void SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
   // Check to see if the instruction immediately before the insertion point is a
   // copy_addr from the specified operand.  If so, we can fold this into the
   // copy_addr as a take.
-  auto I = getInsertionPoint();
-  if (I != getInsertionBB()->begin()) {
-    if (auto CA = dyn_cast<CopyAddrInst>(--I)) {
+  auto I = getInsertionPoint(), BBStart = getInsertionBB()->begin();
+  while (I != BBStart) {
+    auto *Inst = &*--I;
+
+    if (auto CA = dyn_cast<CopyAddrInst>(Inst)) {
       if (CA->getSrc() == Operand && !CA->isTakeOfSrc()) {
         CA->setIsTakeOfSrc(IsTake);
         return;
       }
     }
+
+    // destroy_addrs commonly exist in a block of dealloc_stack's, which don't
+    // affect take-ability.
+    if (isa<DeallocStackInst>(Inst))
+      continue;
+
+    // This code doesn't try to prove tricky validity constraints about whether
+    // it is safe to push the destroy_addr past interesting instructions.
+    if (Inst->mayHaveSideEffects())
+      break;
   }
 
-
-
+  // If we didn't find a copy_addr to fold this into, emit the destroy_addr.
   createDestroyAddr(Loc, Operand);
 }
 
