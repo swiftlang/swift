@@ -135,10 +135,6 @@ namespace swift {
   /// allocations.
   void performSILAllocBoxToStackPromotion(SILModule *M);
 
-  /// performSILStackToSSAPromotion - Promote alloc_stack instructions into SSA
-  /// registers.
-  void performSILStackToSSAPromotion(SILModule *M);
-
   /// \brief Fold instructions with constant operands. Diagnose overflows when
   /// possible.
   void performSILConstantPropagation(SILModule *M);

@@ -26,7 +26,6 @@ using namespace swift;
 
 enum class PassKind {
   AllocBoxToStack,
-  StackToSSA,
   DefiniteInit,
   CCP,
   DCE,
@@ -50,8 +49,6 @@ static llvm::cl::list<PassKind>
 Passes(llvm::cl::desc("Passes:"),
        llvm::cl::values(clEnumValN(PassKind::AllocBoxToStack,
                                    "allocbox-to-stack", "Promote memory"),
-                        clEnumValN(PassKind::StackToSSA,
-                                   "stack-to-ssa", "alloc_stack to SSA"),
                         clEnumValN(PassKind::DefiniteInit,
                                    "definite-init","definitive initialization"),
                         clEnumValN(PassKind::CCP,
@@ -138,9 +135,6 @@ int main(int argc, char **argv) {
     switch (Pass) {
     case PassKind::AllocBoxToStack:
       performSILAllocBoxToStackPromotion(CI.getSILModule());
-      break;
-    case PassKind::StackToSSA:
-      performSILStackToSSAPromotion(CI.getSILModule());
       break;
     case PassKind::DefiniteInit:
       performSILDefiniteInitialization(CI.getSILModule());
