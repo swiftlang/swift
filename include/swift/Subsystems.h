@@ -155,6 +155,10 @@ namespace swift {
   /// diagnostics if any.
   void emitSILDataflowDiagnostics(SILModule *M);
 
+  /// \brief Optimize away shadow variables for any inout arguments that don't
+  /// escape.
+  void performInOutDeshadowing(SILModule *M);
+
   /// \brief Inline functions marked transparent. Diagnose attempts to
   /// circularly inline
   void performSILMandatoryInlining(SILModule *M);

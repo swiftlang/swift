@@ -990,7 +990,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
         continue;
       }
 
-      // Otherwise, check for [inout].
+      // Otherwise, check for @inout.
       Type ArgTy = FTI->getSwiftArgumentType(ArgumentNumber);
       if (ArgTy->is<LValueType>()) {
         addElementUses(BaseElt, PointeeType, User, UseKind::InOutUse);
