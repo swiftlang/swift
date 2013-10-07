@@ -69,7 +69,7 @@ $(SWIFT_HEADER_DIR)/swift.swiftmodule: $(ObjDir)/swift.o $(SWIFT_HEADER_DIR)
 
 $(ObjDir)/swift.o: $(PATH_TO_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $@) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -o $@ -c -emit-module -module-link-name $(LIBRARYNAME) -parse-stdlib -parse-as-library $(PATH_TO_SWIFT_SOURCES) 
+	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -module-name=swift -emit-module -module-link-name $(LIBRARYNAME) -parse-stdlib -parse-as-library $(PATH_TO_SWIFT_SOURCES) -c -o $@ 
 	@mv $(ObjDir)/swift.swiftmodule $(SWIFT_HEADER_DIR)
 
 $(SharedLibDir)/swift/%.$(SHLIBEXT): $(SharedLibDir)/swift/.dir
