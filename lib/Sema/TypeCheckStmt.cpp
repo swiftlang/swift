@@ -248,10 +248,17 @@ public:
       return nullptr;
     }
     
+    // Retrieve the 'Enumerator' protocol.
+    ProtocolDecl *GeneratorProto
+      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Generator);
+    if (!GeneratorProto) {
+      return nullptr;
+    }
+    
     // Verify that the container conforms to the Enumerable protocol, and
     // invoke getElements() on it container to retrieve the range of elements.
-    Type RangeTy;
-    VarDecl *Range;
+    Type RangeTy, GeneratorTy;
+    VarDecl *Range, *Generator;
     {
       Type ContainerType = Container->getType()->getRValueType();
 
@@ -286,18 +293,44 @@ public:
       S->setRange(new (TC.Context) PatternBindingDecl(S->getForLoc(),
                                                       RangePat, GetElements,
                                                       DC));
+      
+      GeneratorTy = TC.getWitnessType(ContainerType, EnumerableProto,
+                                      Conformance,
+                                      TC.Context.getIdentifier("GeneratorType"),
+                                      diag::enumerable_protocol_broken);
+      
+      Expr *GetGenerator
+        = TC.callWitness(Container, DC, EnumerableProto, Conformance,
+                         TC.Context.getIdentifier("enumerate"),
+                         {}, diag::enumerable_protocol_broken);
+      if (!GetGenerator) return nullptr;
+      
+      // Create a local variable to capture the generator.
+      Generator = new (TC.Context) VarDecl(S->getInLoc(),
+                                     TC.Context.getIdentifier("$generator"),
+                                     GeneratorTy, DC);
+      Generator->setImplicit();
+      
+      // Create a pattern binding to initialize the generator.
+      auto GenPat = new (TC.Context) NamedPattern(Range);
+      GenPat->setImplicit();
+      auto GenBinding = new (TC.Context) PatternBindingDecl(S->getForLoc(),
+                                                            GenPat, GetElements,
+                                                            DC);
+      GenBinding->setImplicit();
+      S->setGenerator(GenBinding);
     }
     
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
-    ProtocolConformance *Conformance = nullptr;
-    if (!TC.conformsToProtocol(RangeTy, EnumeratorProto, &Conformance,
+    ProtocolConformance *RangeConformance = nullptr;
+    if (!TC.conformsToProtocol(RangeTy, EnumeratorProto, &RangeConformance,
                                Container->getLoc()))
       return nullptr;
     
     // Gather the witnesses from the Range protocol conformance. These are
     // the functions we'll call.
-    Type ElementTy = TC.getWitnessType(RangeTy, EnumeratorProto, Conformance,
+    Type ElementTy = TC.getWitnessType(RangeTy, EnumeratorProto, RangeConformance,
                                        TC.Context.getIdentifier("Element"),
                                        diag::range_protocol_broken);
     if (!ElementTy)
@@ -307,7 +340,7 @@ public:
     Expr *Empty
       = TC.callWitness(TC.buildCheckedRefExpr(Range, S->getInLoc(),
                                               /*Implicit=*/true),
-                       DC, EnumeratorProto, Conformance,
+                       DC, EnumeratorProto, RangeConformance,
                        TC.Context.getIdentifier("isEmpty"),
                        { },
                        diag::range_protocol_broken);
@@ -319,7 +352,7 @@ public:
     Expr *GetFirstAndAdvance
       = TC.callWitness(TC.buildCheckedRefExpr(Range, S->getInLoc(),
                                               /*Implicit=*/true),
-                       DC, EnumeratorProto, Conformance,
+                       DC, EnumeratorProto, RangeConformance,
                        TC.Context.getIdentifier("next"),
                        { },
                        diag::range_protocol_broken);
@@ -329,6 +362,23 @@ public:
                                                           S->getPattern(),
                                                           GetFirstAndAdvance,
                                                           DC));
+
+    // FIXME: Would like to customize the diagnostic emitted in
+    // conformsToProtocol().
+    ProtocolConformance *GenConformance = nullptr;
+    if (!TC.conformsToProtocol(GeneratorTy, GeneratorProto, &GenConformance,
+                               Container->getLoc()))
+      return nullptr;
+
+    // Compute the expression that advances the generator.
+    Expr *GenNext
+      = TC.callWitness(TC.buildCheckedRefExpr(Generator, S->getInLoc(),
+                                              /*implicit*/true),
+                       DC, GeneratorProto, GenConformance,
+                       TC.Context.getIdentifier("next"),
+                       {}, diag::generator_protocol_broken);
+    if (!GenNext) return nullptr;
+    S->setGeneratorNext(GenNext);
 
     // Coerce the pattern to the element type, now that we know the element
     // type.

@@ -1370,6 +1370,8 @@ ERROR(enumerable_protocol_broken,sema_tcs,none,
       "Enumerable protocol definition is broken", ())
 ERROR(range_protocol_broken,sema_tcs,none,
       "Enumerator protocol definition is broken", ())
+ERROR(generator_protocol_broken,sema_tcs,none,
+      "Generator protocol definition is broken", ())
 
 ERROR(break_outside_loop,sema_tcs,none,
       "'break' is only allowed inside a loop", ())

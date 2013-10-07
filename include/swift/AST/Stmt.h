@@ -315,18 +315,23 @@ class ForEachStmt : public Stmt {
   BraceStmt *Body;
   
   /// Range - The range variable along with its initializer.
-  PatternBindingDecl *Range;
-    
+  PatternBindingDecl *Range = nullptr;
   /// RangeEmpty - The expression that determines whether the range is empty.
-  Expr *RangeEmpty;
+  Expr *RangeEmpty = nullptr;
   
+  /// The generator variable along with its initializer.
+  PatternBindingDecl *Generator = nullptr;
+  /// The expression that advances the generator and returns an Optional with
+  /// the next value or None to signal end-of-stream.
+  Expr *GeneratorNext = nullptr;
+
 public:
   ForEachStmt(SourceLoc ForLoc, Pattern *Pat, SourceLoc InLoc,
               Expr *Container, BraceStmt *Body,
               Optional<bool> implicit = {})
     : Stmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc)),
       ForLoc(ForLoc), InLoc(InLoc), Pat(Pat),
-      Container(Container), Body(Body), Range(), RangeEmpty() { }
+      Container(Container), Body(Body) { }
   
   /// getForLoc - Retrieve the location of the 'for' keyword.
   SourceLoc getForLoc() const { return ForLoc; }
@@ -362,6 +367,15 @@ public:
     return Pat.dyn_cast<PatternBindingDecl *>();
   }
   void setElementInit(PatternBindingDecl *EI) { Pat = EI; }
+  
+  /// Retrieve the pattern binding that contains the (implicit) generator
+  /// variable and its initialization from the container.
+  PatternBindingDecl *getGenerator() const { return Generator; }
+  void setGenerator(PatternBindingDecl *G) { Generator = G; }
+  
+  /// Retrieve the expression that advances the generator.
+  Expr *getGeneratorNext() const { return GeneratorNext; }
+  void setGeneratorNext(Expr *E) { GeneratorNext = E; }
 
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }
