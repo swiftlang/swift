@@ -265,38 +265,6 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
   }
 }
 
-/// Return the number of columns a destructured pattern constructor produces.
-unsigned getDestructuredWidth(const Pattern *specializer) {
-  specializer = specializer->getSemanticsProvidingPattern();
-  switch (specializer->getKind()) {
-  case PatternKind::Any:
-  case PatternKind::Named:
-  case PatternKind::Expr:
-    llvm_unreachable("shouldn't specialize on a wildcard pattern");
-
-  // Tuples destructure into the component tuple fields.
-  case PatternKind::Tuple:
-    return cast<TuplePattern>(specializer)->getFields().size();
-      
-  // 'is' patterns destructure to the pattern as the cast type.
-  case PatternKind::Isa:
-    return 1;
-  
-  case PatternKind::EnumElement:
-    // The pattern destructures to a single tuple value. Even if the element has
-    // no argument, we still model its value as having empty tuple type.
-    return 1;
-
-  case PatternKind::NominalType:
-    llvm_unreachable("not implemented");
-      
-  case PatternKind::Paren:
-  case PatternKind::Typed:
-  case PatternKind::Var:
-    llvm_unreachable("not semantic");
-  }
-}
-
 /// Destructure a pattern parallel to the specializing pattern of a clause
 /// matrix.
 /// Destructured wildcards are represented with null Pattern* pointers.
@@ -954,9 +922,7 @@ public:
     assert(columnCount >= 1 && "can't specialize a matrix with no columns");
     assert(skipRows < rowCount && "can't skip more rows than we have");
     
-    unsigned specializedWidth = getDestructuredWidth(specializer);
-    assert(specOccurrences.size() == specializedWidth &&
-           "new occurrences don't match pattern for specialization");
+    unsigned specializedWidth = specOccurrences.size();
     
     // Gather the new occurrences with those of the remaining columns.
     SmallVector<SILValue, 4> newOccurrences(specOccurrences.begin(),
@@ -999,8 +965,8 @@ public:
           }
       }
       assert(newPatterns.size() == specializedWidth &&
-             "destructurePattern did not produce number of columns reported "
-             "by getDestructuredWidth");
+             "destructurePattern did not produce number of columns consistent "
+             "with emitDispatchAndDestructure");
       
       // Forward the remaining pattern columns from the row.
       std::copy(columns.begin() + 1, columns.end(),
