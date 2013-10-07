@@ -233,7 +233,7 @@ type grammar. SIL adds some additional kinds of type of its own:
   value needs to be returned, it is done so using an indirect return argument
   according to the `calling convention`_ of the function.
 
-- The *address of local storage for T* ``$*[local_storage] T``, a
+- The *address of local storage for T* ``$*@local_storage T``, a
   handle to a stack allocation of a variable of type ``$T``.
 
   For many types, the handle for a stack allocation is simply the
@@ -278,7 +278,7 @@ generic constraints:
 
   * Runtime-sized types
   * Non-class protocol types
-  * [weak] types
+  * @weak types
 
   Values of address-only type (“address-only values”) must reside in
   memory and can only be referenced in SIL by address. Addresses of
@@ -307,16 +307,16 @@ types. Function types are transformed in order to encode additional attributes:
 
   .. parsed-literal::
 
-    [cc(*convention*)]
+    @cc(*convention*)
 
   attribute—where *convention* can currently be ``swift``, ``method``,
   ``cdecl``, or ``objc``\ —describing a machine-level calling convention
   below the concern of SIL.
 
-- The **thinness** of the function reference, indicated by the ``[thin]``
+- The **thinness** of the function reference, indicated by the ``@thin``
   attribute, which tracks whether a function reference requires a context value
   to reference captured closure state. Standalone functions and methods are
-  always ``[thin]``, but function-local functions or closure expressions that
+  always ``@thin``, but function-local functions or closure expressions that
   capture context are thick. Partial applications of curried functions or
   methods are also thick.
 
@@ -489,14 +489,14 @@ partial application level. For a curried function declaration::
 The declaration references and types for the different uncurry levels are as
 follows::
 
-  #example.foo!0 : $[thin] (x:A) -> (y:B) -> (z:C) -> D
-  #example.foo!1 : $[thin] ((y:B), (x:A)) -> (z:C) -> D
-  #example.foo!2 : $[thin] ((z:C), (y:B), (x:A)) -> D
+  #example.foo!0 : $@thin (x:A) -> (y:B) -> (z:C) -> D
+  #example.foo!1 : $@thin ((y:B), (x:A)) -> (z:C) -> D
+  #example.foo!2 : $@thin ((z:C), (y:B), (x:A)) -> D
 
 The deepest uncurry level is referred to as the **natural uncurry level**.
 Note that the uncurried argument clauses are composed right-to-left, as
 specified in the `calling convention`_. For uncurry levels less than the
-uncurry level, the entry point itself is ``[thin]`` but returns a thick
+uncurry level, the entry point itself is ``@thin`` but returns a thick
 function value carrying the partially applied arguments for its context.
 
 `Dynamic dispatch`_ instructions such as ``class method`` require their method
@@ -597,8 +597,8 @@ flow, such as a non-``Void`` function failing to ``return`` a value, or a
 ``switch`` statement failing to cover all possible values of its subject.
 The guaranteed dead code elimination pass can eliminate truly unreachable
 basic blocks, or ``unreachable`` instructions may be dominated by applications
-of ``[noreturn]`` functions. An ``unreachable`` instruction that survives
-guaranteed DCE and is not immediately preceded by a ``[noreturn]``
+of ``@noreturn`` functions. An ``unreachable`` instruction that survives
+guaranteed DCE and is not immediately preceded by a ``@noreturn``
 application is a dataflow error.
 
 Runtime Failure
@@ -640,7 +640,7 @@ Calling Convention
 
 This section describes how Swift functions are emitted in SIL.
 
-Swift Calling Convention [cc(swift)]
+Swift Calling Convention @cc(swift)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Swift calling convention is the one used by default for native Swift
@@ -808,35 +808,35 @@ The types of the SIL entry points are as follows::
   sil @curried_2 : $((z:C), (y:B), (x:A)) -> (w:D) -> Int { ... }
   sil @curried_3 : $((w:D), (z:C), (y:B), (x:A)) -> Int { ... }
 
-[inout] Arguments
-`````````````````
+@inout Arguments
+````````````````
 
-``[inout]`` arguments are passed into the entry point by address. The callee
+``@inout`` arguments are passed into the entry point by address. The callee
 does not take ownership of the referenced memory. The referenced memory must
-be initialized upon function entry and exit. If the ``[inout]`` argument
+be initialized upon function entry and exit. If the ``@inout`` argument
 refers to a fragile physical variable, then the argument is the address of that
-variable. If the ``[inout]`` argument refers to a logical property, then the
+variable. If the ``@inout`` argument refers to a logical property, then the
 argument is the address of a caller-owner writeback buffer. it is the caller's
 responsibility to initialize the buffer by storing the result of the property
 getter prior to calling the function and to write back to the property
 on return by loading from the buffer and invoking the setter with the final
 value. This Swift function::
 
-  func inout(x:[inout] Int) {
+  func inout(x:@inout Int) {
     x = 1
   }
 
 gets lowered to SIL as::
 
-  sil @inout : $([inout] Int) -> () {
+  sil @inout : $(@inout Int) -> () {
   entry(%x : $*Int):
     %1 = integer_literal 1 : $Int
     store %1 to %x
     return
   }
 
-Swift Method Calling Convention [cc(method)]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Swift Method Calling Convention @cc(method)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The method calling convention is currently identical to the freestanding
 function convention. Methods are considered to be curried functions, taking
@@ -848,10 +848,10 @@ passed last::
     func method(x:Int) -> Int {}
   }
 
-  sil @Foo_method_1 : $((x : Int), [inout] Foo) -> Int { ... }
+  sil @Foo_method_1 : $((x : Int), @inout Foo) -> Int { ... }
 
-C Calling Convention [cc(cdecl)]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C Calling Convention @cc(cdecl)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In Swift's C module importer, C types are always mapped to Swift types
 considered trivial by SIL. SIL does not concern itself with platform
@@ -861,8 +861,8 @@ platform calling convention.
 
 SIL (and therefore Swift) cannot currently invoke variadic C functions.
 
-Objective-C Calling Convention [cc(objc)]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective-C Calling Convention @cc(objc)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Reference Counts
 ````````````````
@@ -872,7 +872,7 @@ ARC Objective-C. Selector families and the ``ns_consumed``,
 ``ns_returns_retained``, etc. attributes from imported Objective-C definitions
 are honored.
 
-Applying an ``[objc_block]`` value does not consume the block.
+Applying an ``@objc_block`` value does not consume the block.
 
 Method Currying
 ```````````````
@@ -880,7 +880,7 @@ Method Currying
 In SIL, the "self" argument of an Objective-C method is uncurried to the last
 argument of the uncurried type, just like a native Swift method::
 
-  class [objc] NSString {
+  @objc class NSString {
     func stringByPaddingToLength(Int) withString(NSString) startingAtIndex(Int)
   }
 
@@ -933,7 +933,7 @@ alloc_stack
   sil-instruction ::= 'alloc_stack' sil-type
 
   %1 = alloc_stack $T
-  // %1#0 has type $*[local_storage] T
+  // %1#0 has type $*@local_storage T
   // %1#1 has type $*T
 
 Allocates uninitialized memory that is sufficiently aligned on the stack
@@ -1349,7 +1349,7 @@ system also fully represents strength of reference.  This is useful
 for several reasons:
 
 1. Type-safety: it is impossible to erroneously emit SIL that naively
-   uses a ``[weak]`` or ``[unowned]`` reference as if it were a strong
+   uses a ``@weak`` or ``@unowned`` reference as if it were a strong
    reference.
 
 2. Consistency: when a reference is kept in memory, instructions like
@@ -1401,7 +1401,7 @@ strong_release
 
 Decrements the strong reference count of the heap object referenced by ``%0``.
 If the release operation brings the strong reference count of the object to
-zero, the object is destroyed and ``[weak]`` references are cleared.  When both
+zero, the object is destroyed and ``@weak`` references are cleared.  When both
 its strong and unowned reference counts reach zero, the object's memory is
 deallocated.
 
@@ -1411,7 +1411,7 @@ strong_retain_unowned
   
   sil-instruction ::= 'strong_retain_unowned' sil-operand
 
-  strong_retain_unowned %0 : $[unowned] T
+  strong_retain_unowned %0 : $@unowned T
   // $T must be a reference type
 
 Asserts that the strong reference count of the heap object referenced by ``%0``
@@ -1426,9 +1426,9 @@ ref_to_unowned
 
   %1 = unowned_to_ref %0 : T
   // $T must be a reference type
-  // %1 will have type $[unowned] T
+  // %1 will have type $@unowned T
 
-Adds the ``[unowned]`` qualifier to the type of a reference to a heap
+Adds the ``@unowned`` qualifier to the type of a reference to a heap
 object.  No runtime effect.
 
 unowned_to_ref
@@ -1438,11 +1438,11 @@ unowned_to_ref
 
   sil-instruction ::= 'unowned_to_ref' sil-operand
 
-  %1 = unowned_to_ref %0 : $[unowned] T
+  %1 = unowned_to_ref %0 : $@unowned T
   // $T must be a reference type
   // %1 will have type $T
 
-Strips the ``[unowned]`` qualifier off the type of a reference to a
+Strips the ``@unowned`` qualifier off the type of a reference to a
 heap object.  No runtime effect.
 
 unowned_retain
@@ -1451,7 +1451,7 @@ unowned_retain
   
   sil-instruction ::= 'unowned_retain' sil-operand
 
-  unowned_retain %0 : $[unowned] T
+  unowned_retain %0 : $@unowned T
   // $T must be a reference type
 
 Increments the unowned reference count of the heap object underlying ``%0``.
@@ -1462,7 +1462,7 @@ unowned_release
   
   sil-instruction ::= 'unowned_release' sil-operand
 
-  unowned_release %0 : $[unowned] T
+  unowned_release %0 : $@unowned T
   // $T must be a reference type
 
 Decrements the unowned reference count of the heap object refereced by
@@ -1476,7 +1476,7 @@ load_weak
 
   sil-instruction ::= 'load_weak' '[take]'? sil-operand
 
-  load_weak [take] %0 : $*[weak] T
+  load_weak [take] %0 : $*@weak T
   // $T must be a reference type
 
 Increments the strong reference count of the heap object held in the operand,
@@ -1494,7 +1494,7 @@ store_weak
 
   sil-instruction ::= 'store_weak' sil-value 'to' '[initialization]'? sil-operand
 
-  store_weak %0 to [initialization] %1 : $*[weak] T
+  store_weak %0 to [initialization] %1 : $*@weak T
   // $T must be a reference type
 
 Initializes or reassigns a weak reference.  The operand may be ``null``.
@@ -1519,8 +1519,8 @@ function_ref
 
   sil-instruction ::= 'function_ref' sil-function-name ':' sil-type
 
-  %1 = function_ref @function : $[thin] T -> U
-  // $[thin] T -> U must be a thin function type
+  %1 = function_ref @function : $@thin T -> U
+  // $@thin T -> U must be a thin function type
   // %1 has type $T -> U
 
 Creates a reference to a SIL function.
@@ -1531,10 +1531,10 @@ builtin_function_ref
 
   sil-instruction ::= 'builtin_function_ref' sil-decl-ref ':' sil-type
 
-  %1 = builtin_function_ref #Builtin.foo : $[thin] T -> U
+  %1 = builtin_function_ref #Builtin.foo : $@thin T -> U
   // #Builtin.foo must name a function in the Builtin module
-  // $[thin] T -> U must be a thin function type
-  // %1 has type $[thin] T -> U
+  // $@thin T -> U must be a thin function type
+  // %1 has type $@thin T -> U
 
 Creates a reference to a compiler builtin function.
 
@@ -1663,7 +1663,7 @@ class_method
   sil-instruction ::= 'class_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = class_method %0 : $T, #T.method!1 : $[thin] U -> V
+  %1 = class_method %0 : $T, #T.method!1 : $@thin U -> V
   // %0 must be of a class type or class metatype $T
   // #T.method!1 must be a reference to a dynamically-dispatched method of T or
   // of one of its superclasses, at uncurry level >= 1
@@ -1692,11 +1692,11 @@ super_method
   sil-instruction ::= 'super_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
   
-  %1 = super_method %0 : $T, #Super.method!1.foreign : $[thin] U -> V
+  %1 = super_method %0 : $T, #Super.method!1.foreign : $@thin U -> V
   // %0 must be of a non-root class type or class metatype $T
   // #Super.method!1.foreign must be a reference to an ObjC method of T's
   // superclass or ; of one of its ancestor classes, at uncurry level >= 1
-  // %1 will be of type $[thin] U -> V
+  // %1 will be of type $@thin U -> V
 
 Looks up a method in the superclass of a class or class metatype instance.
 Note that for native Swift methods, ``super.method`` calls are statically
@@ -1711,13 +1711,13 @@ archetype_method
   sil-instruction ::= 'archetype_method' sil-method-attributes?
                         sil-type ',' sil-decl-ref ':' sil-type
 
-  %1 = archetype_method $T, #Proto.method!1 : $[thin] U -> V
+  %1 = archetype_method $T, #Proto.method!1 : $@thin U -> V
   // $T must be an archetype
   // #Proto.method!1 must be a reference to a method of one of the protocol
   // constraints on T
   // $U -> V must be the type of the referenced method with "Self == T"
   // substitution applied
-  // %1 will be of type $[thin] U -> V
+  // %1 will be of type $@thin U -> V
 
 Looks up the implementation of a protocol method for a generic type variable
 constrained by that protocol.
@@ -1729,18 +1729,18 @@ protocol_method
   sil-instruction ::= 'protocol_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = protocol_method %0 : $P, #P.method!1 : $[thin] U -> V
+  %1 = protocol_method %0 : $P, #P.method!1 : $@thin U -> V
   // %0 must be of a protocol or protocol composition type $P,
   //   address of address-only protocol type $*P,
   //   or metatype of protocol type $P.metatype
   // #P.method!1 must be a reference to a method of one of the protocols of P
   //
   // If %0 is an address-only protocol address, then the "self" argument of
-  //   the method type $[thin] U -> V must be $*P.Self, the Self archetype of P
+  //   the method type $@thin U -> V must be $*P.Self, the Self archetype of P
   // If %0 is a class protocol value, then the "self" argument of
-  //   the method type $[thin] U -> V must be $P.Self, the Self archetype of P
+  //   the method type $@thin U -> V must be $P.Self, the Self archetype of P
   // If %0 is a protocol metatype, then the "self" argument of
-  //   the method type $[thin] U -> V must be P.metatype
+  //   the method type $@thin U -> V must be P.metatype
 
 Looks up the implementation of a protocol method for the dynamic type of the
 value inside an existential container. The "self" operand of the result
@@ -1769,13 +1769,13 @@ dynamic_method
   sil-instruction ::= 'dynamic_method' sil-method-attributes?
                       sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = dynamic_method %0 : $P, #X.method!1 : $[thin] U -> V
+  %1 = dynamic_method %0 : $P, #X.method!1 : $@thin U -> V
   // %0 must be of a protocol or protocol composition type $P,
   // where $P contains the swift.DynamicLookup protocol
-  // #X.method!1 must be a reference to an [objc] method of any class
+  // #X.method!1 must be a reference to an @objc method of any class
   // or protocol type
   //
-  // The "self" argument of the method type $[thin] U -> V must be 
+  // The "self" argument of the method type $@thin U -> V must be 
   //   Builtin.ObjCPointer
 
 Looks up the implementation of an Objective-C method with the same
@@ -1902,28 +1902,28 @@ curried function in Swift::
 emits curry thunks in SIL as follows (retains and releases omitted for
 clarity)::
 
-  func @foo : $[thin] A -> B -> C -> D -> E {
+  func @foo : $@thin A -> B -> C -> D -> E {
   entry(%a : $A):
-    %foo_1 = function_ref @foo_1 : $[thin] (B, A) -> C -> D -> E
-    %thunk = partial_apply %foo_1(%a) : $[thin] (B, A) -> C -> D -> E
+    %foo_1 = function_ref @foo_1 : $@thin (B, A) -> C -> D -> E
+    %thunk = partial_apply %foo_1(%a) : $@thin (B, A) -> C -> D -> E
     return %thunk : $B -> C -> D -> E
   }
 
-  func @foo_1 : $[thin] (B, A) -> C -> D -> E {
+  func @foo_1 : $@thin (B, A) -> C -> D -> E {
   entry(%b : $B, %a : $A):
-    %foo_2 = function_ref @foo_2 : $[thin] (C, B, A) -> D -> E
-    %thunk = partial_apply %foo_2(%b, %a) : $[thin] (C, B, A) -> D -> E
+    %foo_2 = function_ref @foo_2 : $@thin (C, B, A) -> D -> E
+    %thunk = partial_apply %foo_2(%b, %a) : $@thin (C, B, A) -> D -> E
     return %thunk : $(B, A) -> C -> D -> E
   }
 
-  func @foo_2 : $[thin] (C, B, A) -> D -> E {
+  func @foo_2 : $@thin (C, B, A) -> D -> E {
   entry(%c : $C, %b : $B, %a : $A):
-    %foo_3 = function_ref @foo_3 : $[thin] (D, C, B, A) -> E
-    %thunk = partial_apply %foo_3(%c, %b, %a) : $[thin] (D, C, B, A) -> E
+    %foo_3 = function_ref @foo_3 : $@thin (D, C, B, A) -> E
+    %thunk = partial_apply %foo_3(%c, %b, %a) : $@thin (D, C, B, A) -> E
     return %thunk : $(C, B, A) -> D -> E
   }
 
-  func @foo_3 : $[thin] (D, C, B, A) -> E {
+  func @foo_3 : $@thin (D, C, B, A) -> E {
   entry(%d : $D, %c : $C, %b : $B, %a : $A):
     // ... body of foo ...
   }
@@ -1940,12 +1940,12 @@ following example::
 
 lowers to an uncurried entry point and is curried in the enclosing function::
   
-  func @bar : $[thin] (Int, Builtin.ObjectPointer, *Int) -> Int {
+  func @bar : $@thin (Int, Builtin.ObjectPointer, *Int) -> Int {
   entry(%y : $Int, %x_box : $Builtin.ObjectPointer, %x_address : $*Int):
     // ... body of bar ...
   }
 
-  func @foo : $[thin] Int -> Int {
+  func @foo : $@thin Int -> Int {
   entry(%x : $Int):
     // Create a box for the 'x' variable
     %x_box = alloc_box $Int
@@ -2046,7 +2046,7 @@ allocation, and then loading from the new allocation.
 
 For trivial types, this is equivalent to returning the operand.  For
 reference types, this is equivalent to a ``strong_retain`` and
-returning the operand.  For ``[unowned]`` types, this is equivalent to
+returning the operand.  For ``@unowned`` types, this is equivalent to
 an ``unowned_retain`` and returning the operand.  In each of these
 cases, those are the preferred forms.
 
@@ -2069,7 +2069,7 @@ This is defined to be equivalent to storing the operand into a stack
 allocation and using 'destroy_addr' to destroy the object there.
 
 For trivial types, this is a no-op.  For reference types, this is
-equivalent to a ``strong_release``.  For ``[unowned]`` types, this is
+equivalent to a ``strong_release``.  For ``@unowned`` types, this is
 equivalent to an ``unowned_release``.  In each of these cases, those
 are the preferred forms.
 
@@ -2451,7 +2451,7 @@ This value can be passed to protocol instance methods obtained by
 ``protocol_method`` from the same existential container. A method call on a
 class-protocol-type value in Swift::
 
-  protocol [class_protocol] Foo {
+  @class_protocol protocol Foo {
     func bar(x:Int)
   }
 
@@ -2645,9 +2645,9 @@ The function types may also differ in attributes, with the following
 exceptions:
 
 - The ``cc``, ``thin``, and ``objc_block`` attributes cannot be changed.
-- A ``[noreturn]`` function may be converted to a non-``[noreturn]``
-  type, but a non-``[noreturn]`` function may not be converted to a
-  ``[noreturn]`` function.
+- A ``@noreturn`` function may be converted to a non-``@noreturn``
+  type, but a non-``@noreturn`` function may not be converted to a
+  ``@noreturn`` function.
 
 convert_cc
 ``````````
@@ -2655,14 +2655,14 @@ convert_cc
 
   sil-instruction ::= 'convert_cc' sil-operand 'to' sil-type
 
-  %1 = convert_cc %0 : $[cc(X)] T -> U to $[cc(Y)] T -> U
+  %1 = convert_cc %0 : $@cc(X) T -> U to $@cc(Y) T -> U
   // %0 must be of a function type
   // The destination must be the same function type, differing only in
   //   calling convention
-  // %1 will be of type $[cc(Y)] T -> U
+  // %1 will be of type $@cc(Y) T -> U
 
 Thunks the calling convention of a function. If the input operand is statically
-a ``function_ref`` instruction, the result can be ``[thin]``; otherwise, the
+a ``function_ref`` instruction, the result can be ``@thin``; otherwise, the
 result must be thick.
 
 bridge_to_block
@@ -2671,11 +2671,11 @@ bridge_to_block
 
   sil-instruction ::= 'bridge_to_block' sil-operand 'to' sil-type
 
-  %1 = bridge_to_block %0 : $T -> U to $[cc(cdecl), objc_block] T -> U
+  %1 = bridge_to_block %0 : $T -> U to $@cc(cdecl), @objc_block T -> U
   // %0 must be of a function type
   // The destination must be of the same function type, with the 
-  //   [objc_block] attribute
-  // %1 will be of type $[cc(cdecl), objc_block] T -> U
+  //   @objc_block attribute
+  // %1 will be of type $@cc(cdecl), @objc_block T -> U
 
 Converts a function value from Swift representation to Objective-C block
 representation.
@@ -2686,8 +2686,8 @@ thin_to_thick_function
 
   sil-instruction ::= 'thin_to_thick_function' sil-operand 'to' sil-type
 
-  %1 = thin_to_thick_function %0 : $[thin] T -> U to $T -> U
-  // %0 must be of a thin function type $[thin] T -> U
+  %1 = thin_to_thick_function %0 : $@thin T -> U to $T -> U
+  // %0 must be of a thin function type $@thin T -> U
   // The destination type must be the corresponding thick function type
   // %1 will be of type $T -> U
 
@@ -2787,7 +2787,7 @@ unreachable
 Indicates that control flow must not reach the end of the current basic block.
 It is a dataflow error if an unreachable terminator is reachable from the entry
 point of a function and is not immediately preceded by an ``apply`` of a
-``[noreturn]`` function.
+``@noreturn`` function.
 
 return
 ``````
@@ -2817,7 +2817,7 @@ Exits the current function and returns control to the calling function. The
 result of the ``apply`` instruction that invoked the current function will be
 the operand of this ``return`` instruction. The return value is autoreleased
 into the active Objective-C autorelease pool using the "autoreleased return
-value" optimization. The current function must use the ``[cc(objc)]`` calling
+value" optimization. The current function must use the ``@cc(objc)`` calling
 convention.
 
 br
@@ -3007,7 +3007,7 @@ dynamic_method_br
   dynamic_method_br %0 : $P, #X.method!1, bb1, bb2
   // %0 must be of type Builtin.ObjCPointer 
   // where $P contains the swift.DynamicLookup protocol
-  // #X.method!1 must be a reference to an [objc] method of any class
+  // #X.method!1 must be a reference to an @objc method of any class
   // or protocol type
 
 Looks up the implementation of an Objective-C method with the same
