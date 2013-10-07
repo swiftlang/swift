@@ -39,6 +39,7 @@
 PROTOCOL(ArrayBound)
 PROTOCOL(Enumerable)
 PROTOCOL(Enumerator)
+PROTOCOL(Generator)
 PROTOCOL(LogicValue)
 PROTOCOL(DynamicLookup)
 PROTOCOL(RawRepresentable)
