@@ -66,6 +66,28 @@ BUILTIN_BINARY_OPERATION(URem,    "urem",     "n", Integer)
 BUILTIN_BINARY_OPERATION(Xor,     "xor",      "n", IntegerOrVector)
 #undef BUILTIN_BINARY_OPERATION
 
+/// These builtins are analogous the similarly named llvm intrinsics. The 
+/// difference between the two is that these are not expected to overflow,
+/// so we should produce a compile time error if we can statically prove
+/// that they do.
+#ifndef BUILTIN_BINARY_OPERATION_WITH_OVERFLOW
+#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(Id, Name, Attrs, Overload) \
+          BUILTIN(Id, Name, Attrs)
+#endif
+BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(SAddOver,
+                                       "sadd_with_overflow", "n", Integer)
+BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(UAddOver,
+                                       "uadd_with_overflow", "n", Integer)
+BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(SSubOver,
+                                       "ssub_with_overflow", "n", Integer)
+BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(USubOver,
+                                       "usub_with_overflow", "n", Integer)
+BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(SMulOver,
+                                       "smul_with_overflow", "n", Integer)
+BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(UMulOver,
+                                       "umul_with_overflow", "n", Integer)
+#undef BUILTIN_BINARY_OPERATION_WITH_OVERFLOW
+
 /// Unary operations have type (T) -> T.
 #ifndef BUILTIN_UNARY_OPERATION
 #define BUILTIN_UNARY_OPERATION(Id, Name, Attrs, Overload) \

@@ -170,6 +170,18 @@ static ValueDecl *getBinaryOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
 }
 
+/// Build a declaration for a binary operation with overflow.
+static ValueDecl *getBinaryOperationWithOverflow(ASTContext &Context,
+                                                 Identifier Id,
+                                                 Type ArgType) {
+  Type ShouldCheckForOverflowTy = BuiltinIntegerType::get(1, Context);
+  TupleTypeElt ArgElts[] = { ArgType, ArgType, ShouldCheckForOverflowTy };
+  Type OverflowBitTy = BuiltinIntegerType::get(1, Context);
+  TupleTypeElt ResultElts[] = { ArgType, OverflowBitTy };
+  Type ResultTy = TupleType::get(ResultElts, Context);
+  return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
+}
+
 static ValueDecl *getUnaryOperation(ASTContext &Context, Identifier Id,
                                     Type ArgType) {
   TupleTypeElt ArgElts[] = { ArgType };
@@ -507,6 +519,8 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 #define BUILTIN_CAST_OPERATION(id, attrs, name) OverloadedBuiltinKind::Special,
 #define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
    OverloadedBuiltinKind::overload,
+#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
+   OverloadedBuiltinKind::overload,
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
    OverloadedBuiltinKind::overload,
 #define BUILTIN_UNARY_OPERATION(id, name, attrs, overload) \
@@ -575,6 +589,26 @@ unsigned swift::getLLVMIntrinsicID(StringRef InName, bool hasArgTypes) {
 #include "llvm/IR/Intrinsics.gen"
 #undef GET_FUNCTION_RECOGNIZER
   return llvm::Intrinsic::not_intrinsic;
+}
+
+llvm::Intrinsic::ID
+swift::getLLVMIntrinsicIDForBuiltinWithOverflow(BuiltinValueKind ID) {
+  switch (ID) {
+    default: break;
+    case BuiltinValueKind::SAddOver:
+      return llvm::Intrinsic::sadd_with_overflow;
+    case BuiltinValueKind::UAddOver:
+      return llvm::Intrinsic::uadd_with_overflow;
+    case BuiltinValueKind::SSubOver:
+      return llvm::Intrinsic::ssub_with_overflow;
+    case BuiltinValueKind::USubOver:
+      return llvm::Intrinsic::usub_with_overflow;
+    case BuiltinValueKind::SMulOver:
+      return llvm::Intrinsic::smul_with_overflow;
+    case BuiltinValueKind::UMulOver:
+      return llvm::Intrinsic::umul_with_overflow;
+  }
+  llvm_unreachable("Cannot convert the overflow builtin to llvm intrinsic.");
 }
 
 static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &Table,
@@ -804,6 +838,12 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
 #include "swift/AST/Builtins.def"
     if (Types.size() != 1) return nullptr;
     return getBinaryOperation(Context, Id, Types[0]);
+
+#define BUILTIN(id, name, Attrs)
+#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload)  case BuiltinValueKind::id:
+#include "swift/AST/Builtins.def"
+      if (Types.size() != 1) return nullptr;
+      return getBinaryOperationWithOverflow(Context, Id, Types[0]);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload)  case BuiltinValueKind::id:
