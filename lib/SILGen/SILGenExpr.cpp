@@ -46,24 +46,13 @@ namespace {
   };
   
   class CleanupMaterializedValue : public Cleanup {
-    const TypeLowering &Lowering;
     SILValue Address;
   public:
-    CleanupMaterializedValue(const TypeLowering &lowering, SILValue address)
-      : Lowering(lowering), Address(address) {}
+    CleanupMaterializedValue(SILValue address)
+      : Address(address) {}
     
     void emit(SILGenFunction &gen, CleanupLocation l) override {
-      Lowering.emitDestroyAddress(gen.B, l, Address);
-    }
-  };
-  
-  class CleanupMaterializedAddressOnlyValue : public Cleanup {
-    SILValue address;
-  public:
-    CleanupMaterializedAddressOnlyValue(SILValue address) : address(address) {}
-    
-    void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.emitDestroyAddr(l, address);
+      gen.B.emitDestroyAddr(l, Address);
     }
   };
 } // end anonymous namespace
@@ -77,7 +66,7 @@ SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
     if (lowering.isTrivial()) {
       // Nothing to do.
     } else if (lowering.isAddressOnly()) {
-      lowering.emitDestroyAddress(Self.B, OpaqueValue, value);
+      Self.B.emitDestroyAddr(OpaqueValue, value);
     } else {
       lowering.emitDestroyRValue(Self.B, OpaqueValue, value);
     }
@@ -116,7 +105,7 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
   if (lowering.isTrivial()) {
     return ManagedValue(v, ManagedValue::Unmanaged);
   } else if (lowering.isAddressOnly()) {
-    Cleanups.pushCleanup<CleanupMaterializedAddressOnlyValue>(v);
+    Cleanups.pushCleanup<CleanupMaterializedValue>(v);
     return ManagedValue(v, getTopCleanup());
   } else {
     Cleanups.pushCleanup<CleanupRValue>(lowering, v);
@@ -481,7 +470,7 @@ ManagedValue SILGenFunction::manageBufferForExprResult(SILValue buffer,
   if (bufferTL.isTrivial()) {
     return ManagedValue::forUnmanaged(buffer);
   } else {
-    Cleanups.pushCleanup<CleanupMaterializedAddressOnlyValue>(buffer);
+    Cleanups.pushCleanup<CleanupMaterializedValue>(buffer);
     return ManagedValue(buffer, getTopCleanup());
   }
 }
@@ -503,7 +492,7 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   
   CleanupHandle valueCleanup = CleanupHandle::invalid();
   if (!lowering.isTrivial()) {
-    Cleanups.pushCleanup<CleanupMaterializedValue>(lowering, tmpMem);
+    Cleanups.pushCleanup<CleanupMaterializedValue>(tmpMem);
     valueCleanup = getTopCleanup();
   }
   
