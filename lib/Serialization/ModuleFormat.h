@@ -924,8 +924,8 @@ namespace index_block {
 
     ArrayBound = 1,
     Enumerable,
-    Enumerator,
-    LogicValue,
+    // killed
+    LogicValue = 4,
 
     ArrayLiteralConvertible,
     CharacterLiteralConvertible,

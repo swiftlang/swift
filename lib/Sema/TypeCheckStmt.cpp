@@ -236,14 +236,7 @@ public:
       return nullptr;
     }
 
-    // Retrieve the 'Enumerator' protocol.
-    ProtocolDecl *EnumeratorProto
-      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Enumerator);
-    if (!EnumeratorProto) {
-      return nullptr;
-    }
-    
-    // Retrieve the 'Enumerator' protocol.
+    // Retrieve the 'Generator' protocol.
     ProtocolDecl *GeneratorProto
       = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Generator);
     if (!GeneratorProto) {
