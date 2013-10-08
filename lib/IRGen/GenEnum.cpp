@@ -566,7 +566,7 @@ namespace {
     }
   };
   
-  /// Implementation strategy for no-payload enums, in other words, 'enum-like'
+  /// Implementation strategy for no-payload enums, in other words, 'C-like'
   /// enums where none of the cases have data.
   class NoPayloadEnumImplStrategy final
     : public SingleScalarTypeInfo<NoPayloadEnumImplStrategy,
@@ -822,7 +822,16 @@ namespace {
 
     Address projectExtraTagBits(IRGenFunction &IGF, Address addr) const {
       assert(ExtraTagBitCount > 0 && "does not have extra tag bits");
-      return IGF.Builder.CreateStructGEP(addr, 1, getExtraTagBitOffset());
+      // The place LLVM naturally places the extra tag bits isn't necessarily
+      // where we want it. E.g., if our layout is as {i72, i1}, then the
+      // i72 will likely take up 128 bits of storage and be 64-bit-aligned, when
+      // we really want the tag bit to be allocated right after the 72-bit
+      // payload.
+      addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.Int8PtrTy);
+      addr = IGF.Builder.CreateConstByteArrayGEP(addr,
+                                                 getExtraTagBitOffset());
+      return IGF.Builder.CreateBitCast(addr,
+                         getStorageType()->getElementType(1)->getPointerTo());
     }
 
     void loadForSwitch(IRGenFunction &IGF, Address addr, Explosion &e)
@@ -1811,7 +1820,7 @@ namespace {
                                       llvm::StructType *enumTy) override;
     
     Size getExtraTagBitOffset() const override {
-      return Size(CommonSpareBits.size()+7U/8U);
+      return Size((CommonSpareBits.size()+7U)/8U);
     }
     
   private:
