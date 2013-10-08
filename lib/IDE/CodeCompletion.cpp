@@ -373,33 +373,37 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   /// to the \c Consumer.
   bool DeliveredResults = false;
 
-  /// \returns true on success, false on failure.
-  bool typecheckContext() {
+  bool typecheckContextImpl(DeclContext *DC) {
     // Type check the function that contains the expression.
-    if (CurDeclContext->getContextKind() ==
-            DeclContextKind::AbstractClosureExpr ||
-        CurDeclContext->getContextKind() ==
-            DeclContextKind::AbstractFunctionDecl) {
+    if (DC->getContextKind() == DeclContextKind::AbstractClosureExpr ||
+        DC->getContextKind() == DeclContextKind::AbstractFunctionDecl) {
       SourceLoc EndTypeCheckLoc =
           ParsedExpr ? ParsedExpr->getStartLoc()
                      : TU->Ctx.SourceMgr.getCodeCompletionLoc();
       // FIXME: closures.
       // For now, just find the nearest outer function.
-      DeclContext *DCToTypeCheck = CurDeclContext;
+      DeclContext *DCToTypeCheck = DC;
       while (!DCToTypeCheck->isModuleContext() &&
              !isa<AbstractFunctionDecl>(DCToTypeCheck))
         DCToTypeCheck = DCToTypeCheck->getParent();
+      // First, type check the nominal decl that contains the function.
+      typecheckContextImpl(DCToTypeCheck->getParent());
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck))
         return typeCheckAbstractFunctionBodyUntil(TU, AFD, EndTypeCheckLoc);
       return false;
     }
-    if (CurDeclContext->getContextKind() == DeclContextKind::NominalTypeDecl) {
-      auto *NTD = cast<NominalTypeDecl>(CurDeclContext);
+    if (DC->getContextKind() == DeclContextKind::NominalTypeDecl) {
+      auto *NTD = cast<NominalTypeDecl>(DC);
       if (NTD->hasType())
         return true;
-      return typeCheckCompletionDecl(TU, cast<NominalTypeDecl>(CurDeclContext));
+      return typeCheckCompletionDecl(TU, cast<NominalTypeDecl>(DC));
     }
     return true;
+  }
+
+  /// \returns true on success, false on failure.
+  bool typecheckContext() {
+    return typecheckContextImpl(CurDeclContext);
   }
 
   /// \returns true on success, false on failure.

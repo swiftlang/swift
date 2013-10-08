@@ -2107,8 +2107,8 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
                                      SourceLoc LBLoc, SourceLoc &RBLoc,
                                      Diag<> ErrorDiag, unsigned flags) {
   bool previousHadSemi = true;
-  return parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/true,
-                   ErrorDiag, [&] () -> bool {
+  parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/true,
+            ErrorDiag, [&] () -> ParserStatus {
     // If the previous declaration didn't have a semicolon and this new
     // declaration doesn't start a line, complain.
     if (!previousHadSemi && !Tok.isAtStartOfLine()) {
@@ -2120,14 +2120,18 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
 
     previousHadSemi = false;
     if (parseDecl(memberDecls, flags).isError())
-      return true;
+      return makeParserError();
 
     // Check whether the previous declaration had a semicolon after it.
     if (!memberDecls.empty() && memberDecls.back()->TrailingSemiLoc.isValid())
       previousHadSemi = true;
 
-    return false;
+    return makeParserSuccess();
   });
+
+  // If we found the closing brace, then the caller should not care if there
+  // were errors while parsing inner decls, because we recovered.
+  return !RBLoc.isValid();
 }
 
 /// \brief Parse a 'struct' declaration, returning true (and doing no token
