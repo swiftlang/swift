@@ -394,6 +394,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
     }
     if (DC->getContextKind() == DeclContextKind::NominalTypeDecl) {
       auto *NTD = cast<NominalTypeDecl>(DC);
+      // First, type check the parent DeclContext.
+      typecheckContextImpl(DC->getParent());
       if (NTD->hasType())
         return true;
       return typeCheckCompletionDecl(TU, cast<NominalTypeDecl>(DC));
