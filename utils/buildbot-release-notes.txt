@@ -90,6 +90,21 @@
   and means that square brackets are only used for array types, collection
   literals, and subscripting operations.
 
+* The 'for' loop now uses the Generator protocol instead of the Enumerator
+  protocol to iterate a sequence. This protocol looks like this:
+
+    protocol Generator {
+      typealias Element
+      func next() -> Element?
+    }
+
+  The single method next() advances the iterator and returns an Optional,
+  which is either .Some(value) to produce the next value out of the underlying
+  sequence, or .None to signal end of sequence. This is an improvement over the
+  previous Enumerator protocol because the "isEmpty" and "next" operations are
+  fused into a single safe operation; it is safe to apply "next" to an empty
+  sequence (and receive .None) without having to query an extra predicate first.
+
 
 2013-10-02
 ----------
