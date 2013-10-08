@@ -8,7 +8,7 @@ bb0(%0 : $Builtin.RawPointer):
   %2 = integer_literal $Builtin.Int64, 9223372036854775807
   %3 = integer_literal $Builtin.Int64, 9223372036854775807
   %21 = integer_literal $Builtin.Int1, 1
-  %4 = apply %1(%2, %3, %21) : $[thin] (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) // expected-error {{arithmetic operation results in an overflow}}
+  %4 = apply %1(%2, %3, %21) : $[thin] (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) // expected-error {{results in an overflow}}
   %8 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 0
   return %8 : $Builtin.Int64
 }

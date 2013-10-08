@@ -51,27 +51,39 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
     return nullptr;
 
   // Calculate the result.
+  APInt LHSInt = Op1->getValue();
+  APInt RHSInt = Op2->getValue();
   APInt Res;
   bool Overflow;
+  bool Signed = false;
+  std::string Operator = "+";
+
   switch (ID) {
   default: llvm_unreachable("Invalid case");
   case llvm::Intrinsic::sadd_with_overflow:
-    Res = Op1->getValue().sadd_ov(Op2->getValue(), Overflow);
+    Res = LHSInt.sadd_ov(RHSInt, Overflow);
+    Signed = true;
     break;
   case llvm::Intrinsic::uadd_with_overflow:
-    Res = Op1->getValue().uadd_ov(Op2->getValue(), Overflow);
+    Res = LHSInt.uadd_ov(RHSInt, Overflow);
     break;
   case llvm::Intrinsic::ssub_with_overflow:
-    Res = Op1->getValue().ssub_ov(Op2->getValue(), Overflow);
+    Res = LHSInt.ssub_ov(RHSInt, Overflow);
+    Operator = "-";
+    Signed = true;
     break;
   case llvm::Intrinsic::usub_with_overflow:
-    Res = Op1->getValue().usub_ov(Op2->getValue(), Overflow);
+    Res = LHSInt.usub_ov(RHSInt, Overflow);
+    Operator = "-";
     break;
   case llvm::Intrinsic::smul_with_overflow:
-    Res = Op1->getValue().smul_ov(Op2->getValue(), Overflow);
+    Res = LHSInt.smul_ov(RHSInt, Overflow);
+    Operator = "*";
+    Signed = true;
     break;
   case llvm::Intrinsic::umul_with_overflow:
-    Res = Op1->getValue().umul_ov(Op2->getValue(), Overflow);
+    Res = LHSInt.umul_ov(RHSInt, Overflow);
+    Operator = "*";
     break;
   }
 
@@ -99,7 +111,10 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
   if (Overflow && ReportOverflow) {
     diagnose(M.getASTContext(),
              AI->getLoc().getSourceLoc(),
-             diag::arithmetic_operation_overflow);
+             diag::arithmetic_operation_overflow,
+             LHSInt.toString(/*Radix*/ 10, Signed),
+             Operator,
+             RHSInt.toString(/*Radix*/ 10, Signed));
   }
 
   return B.createTuple(AI->getLoc(), FuncResType, Result);

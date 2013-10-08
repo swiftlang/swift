@@ -1483,7 +1483,8 @@ ERROR(repl_must_be_initialized,sil_analysis,none,
 
 // Control flow diagnostics.
 ERROR(arithmetic_operation_overflow,sil_analysis,none,
-      "arithmetic operation results in an overflow", ())
+      "arithmetic operation '%0 %1 %2' results in an overflow",
+      (StringRef, StringRef, StringRef))
 WARNING(missing_return,sil_analysis,none,
       "missing return in the function expected to return %0", (Type))
 ERROR(return_from_noreturn,sil_analysis,none, 
