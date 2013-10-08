@@ -962,8 +962,7 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags,
                                 diag::invalid_diagnostic).isError())
       return nullptr;
     Ty = makeParserErrorResult(
-        IdentTypeRepr::createSimple(Context, NameLoc, ExtensionName,
-                                    CurDeclContext));
+        IdentTypeRepr::createSimple(Context, NameLoc, ExtensionName));
   }
   if (Ty.isNull())
     return nullptr;

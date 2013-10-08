@@ -149,37 +149,29 @@ public:
     Identifier Id;
     MutableArrayRef<TypeRepr*> GenericArgs;
 
-    /// Value is the decl or module that this refers to.
-    ///
-    /// Before name binding, each component has its value set to a DeclContext
-    /// for the root lookup, giving a context for that lookup.
+    /// Value is the decl, type, or module that this refers to.
     ///
     /// After name binding, the value is set to the decl being referenced, and
     /// the last entry in the component list is known to be a Type.
     ///
-    /// FIXME: DeclContext* should be available from the context within the type
-    /// checker. In that case, remove it and sneak the Id in its place.
-    llvm::PointerUnion4<DeclContext*, ValueDecl*, Type, Module*> Value;
+    /// FIXME: Can we sneak the Id into this union?
+    llvm::PointerUnion3<ValueDecl*, Type, Module*> Value;
 
   public:
     Component(SourceLoc Loc, Identifier Id,
-              MutableArrayRef<TypeRepr*> GenericArgs,
-              DeclContext *Ctx) :
-      Loc(Loc), Id(Id), GenericArgs(GenericArgs), Value(Ctx) {}
+              MutableArrayRef<TypeRepr*> GenericArgs) :
+      Loc(Loc), Id(Id), GenericArgs(GenericArgs) {}
 
     SourceLoc getIdLoc() const { return Loc; }
     Identifier getIdentifier() const { return Id; }
     MutableArrayRef<TypeRepr*> getGenericArgs() const { return GenericArgs; }
 
-    /// isBound - Return true if this Component has been namebound already.
-    bool isBound() const { return !Value.is<DeclContext*>(); }
-    bool isBoundDecl() const { return Value.is<ValueDecl*>(); }
-    bool isBoundType() const { return Value.is<Type>(); }
-    bool isBoundModule() const { return Value.is<Module*>(); }
+    /// Return true if this Component has been name-bound already.
+    bool isBound() const { return !Value.isNull(); }
+    bool isBoundDecl() const { return Value.is<ValueDecl*>() && isBound(); }
+    bool isBoundType() const { return Value.is<Type>() && isBound(); }
+    bool isBoundModule() const { return Value.is<Module*>() && isBound(); }
 
-    DeclContext *getUnboundContext() const {
-      return Value.dyn_cast<DeclContext*>();
-    }
     ValueDecl *getBoundDecl() const {
       return Value.dyn_cast<ValueDecl*>();
     }
@@ -194,7 +186,7 @@ public:
     void setValue(Type T) { Value = T; }
     void setValue(Module *M) { Value = M; }
 
-    void revertToContext(DeclContext *DC) { Value = DC; }
+    void revert() { Value = (ValueDecl*)nullptr; }
   };
 
 public:
@@ -208,7 +200,7 @@ public:
   static IdentTypeRepr *create(ASTContext &C, ArrayRef<Component> Components);
 
   static IdentTypeRepr *createSimple(ASTContext &C, SourceLoc Loc,
-                                     Identifier Id, DeclContext *Ctx);
+                                     Identifier Id);
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Ident;

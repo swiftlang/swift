@@ -71,7 +71,7 @@ public:
     curType = td->getDeclaredType();
     
     // Track the AST location of the component.
-    components.push_back({dre->getLoc(), dre->getDecl()->getName(), {}, nullptr});
+    components.push_back({dre->getLoc(), dre->getDecl()->getName(), {}});
     components.back().setValue(curScope.get<TypeDecl*>());
     return true;
   }
@@ -135,7 +135,7 @@ public:
     assert(curScope && "shouldn't have got past the loop without a curScope");
     
     // Track the AST location of the component.
-    components.push_back({udre->getLoc(), udre->getName(), {}, nullptr});
+    components.push_back({udre->getLoc(), udre->getName(), {}});
     if (curScope.is<TypeDecl*>())
       components.back().setValue(curScope.get<TypeDecl*>());
     else
@@ -175,7 +175,7 @@ public:
     curType = lookup[0].second;
     
     // Track the AST location of the new component.
-    components.push_back({ude->getLoc(), ude->getName(), {}, nullptr});
+    components.push_back({ude->getLoc(), ude->getName(), {}});
     components.back().setValue(curScope.get<TypeDecl*>());
     return true;
   }
@@ -205,8 +205,7 @@ public:
     auto origComponent = components.back();
     components.back() = {origComponent.getIdLoc(),
                          origComponent.getIdentifier(),
-                         TC.Context.AllocateCopy(argTypeReprs),
-                         nullptr};
+                         TC.Context.AllocateCopy(argTypeReprs)};
     components.back().setValue(origComponent.getBoundDecl());
     return true;
   }

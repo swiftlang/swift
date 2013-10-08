@@ -283,8 +283,7 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
       }
       EndLoc = Loc;
 
-      ComponentsR.push_back(IdentTypeRepr::Component(
-          Loc, Name, Context.AllocateCopy(GenericArgs), CurDeclContext));
+      ComponentsR.push_back({Loc, Name, Context.AllocateCopy(GenericArgs)});
     }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type

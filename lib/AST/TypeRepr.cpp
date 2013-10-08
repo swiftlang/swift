@@ -137,8 +137,8 @@ IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
 }
 
 IdentTypeRepr *IdentTypeRepr::createSimple(ASTContext &C, SourceLoc Loc,
-                                           Identifier Id, DeclContext *Ctx) {
-  IdentTypeRepr::Component IdTypeComponent(Loc, Id, {}, Ctx);
+                                           Identifier Id) {
+  IdentTypeRepr::Component IdTypeComponent(Loc, Id, {});
   return create(C, llvm::makeArrayRef(IdTypeComponent));
 }
 

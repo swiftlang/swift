@@ -617,7 +617,7 @@ static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC, Module *mod) {
            });
 }
 
-static void revertDependentTypeLoc(TypeLoc &tl, DeclContext *dc) {
+static void revertDependentTypeLoc(TypeLoc &tl) {
   // If there's no type representation, there's nothing to revert.
   if (!tl.getTypeRepr())
     return;
@@ -627,11 +627,7 @@ static void revertDependentTypeLoc(TypeLoc &tl, DeclContext *dc) {
 
   // Walker that reverts dependent identifier types.
   class RevertWalker : public ASTWalker {
-    DeclContext *dc;
-
   public:
-    explicit RevertWalker(DeclContext *dc) : dc(dc) { }
-
     // Skip expressions.
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       return { false, expr };
@@ -670,7 +666,7 @@ static void revertDependentTypeLoc(TypeLoc &tl, DeclContext *dc) {
           comp.setValue(genericParamType->getDecl());
         } else {
           // FIXME: Often, we could revert to a decl here.
-          comp.revertToContext(dc);
+          comp.revert();
         }
       }
 
@@ -681,10 +677,10 @@ static void revertDependentTypeLoc(TypeLoc &tl, DeclContext *dc) {
   if (tl.isNull())
     return;
 
-  tl.getTypeRepr()->walk(RevertWalker(dc));
+  tl.getTypeRepr()->walk(RevertWalker());
 }
 
-static void revertDependentPattern(Pattern *pattern, DeclContext *dc) {
+static void revertDependentPattern(Pattern *pattern) {
   // Clear out the pattern's type.
   if (pattern->hasType())
     pattern->overwriteType(Type());
@@ -710,14 +706,14 @@ static void revertDependentPattern(Pattern *pattern, DeclContext *dc) {
 
   case PatternKind::Paren:
     // Recurse into parentheses.
-    revertDependentPattern(cast<ParenPattern>(pattern)->getSubPattern(), dc);
+    revertDependentPattern(cast<ParenPattern>(pattern)->getSubPattern());
     break;
 
   case PatternKind::Tuple: {
     // Recurse into tuple elements.
     auto tuple = cast<TuplePattern>(pattern);
     for (auto &field : tuple->getFields()) {
-      revertDependentPattern(field.getPattern(), dc);
+      revertDependentPattern(field.getPattern());
     }
     break;
   }
@@ -725,10 +721,10 @@ static void revertDependentPattern(Pattern *pattern, DeclContext *dc) {
   case PatternKind::Typed: {
     // Revert the type annotation.
     auto typed = cast<TypedPattern>(pattern);
-    revertDependentTypeLoc(typed->getTypeLoc(), dc);
+    revertDependentTypeLoc(typed->getTypeLoc());
 
     // Revert the subpattern.
-    revertDependentPattern(typed->getSubPattern(), dc);
+    revertDependentPattern(typed->getSubPattern());
     break;
   }
   }
@@ -835,7 +831,7 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams,
 
     typeParam->setCheckedInheritanceClause(false);
     for (auto &inherited : typeParam->getInherited())
-      revertDependentTypeLoc(inherited, dc);
+      revertDependentTypeLoc(inherited);
   }
 #endif
 
@@ -846,14 +842,14 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams,
 
     switch (req.getKind()) {
     case RequirementKind::Conformance: {
-      revertDependentTypeLoc(req.getSubjectLoc(), dc);
-      revertDependentTypeLoc(req.getConstraintLoc(), dc);
+      revertDependentTypeLoc(req.getSubjectLoc());
+      revertDependentTypeLoc(req.getConstraintLoc());
       break;
     }
 
     case RequirementKind::SameType:
-      revertDependentTypeLoc(req.getFirstTypeLoc(), dc);
-      revertDependentTypeLoc(req.getSecondTypeLoc(), dc);
+      revertDependentTypeLoc(req.getFirstTypeLoc());
+      revertDependentTypeLoc(req.getSecondTypeLoc());
       break;
     }
   }
@@ -884,13 +880,13 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
 
     switch (Req.getKind()) {
     case RequirementKind::Conformance: {
-      revertDependentTypeLoc(Req.getSubjectLoc(), dc);
+      revertDependentTypeLoc(Req.getSubjectLoc());
       if (TC.validateType(Req.getSubjectLoc(), dc)) {
         Req.setInvalid();
         continue;
       }
 
-      revertDependentTypeLoc(Req.getConstraintLoc(), dc);
+      revertDependentTypeLoc(Req.getConstraintLoc());
       if (TC.validateType(Req.getConstraintLoc(), dc)) {
         Req.setInvalid();
         continue;
@@ -899,13 +895,13 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
     }
 
     case RequirementKind::SameType:
-      revertDependentTypeLoc(Req.getFirstTypeLoc(), dc);
+      revertDependentTypeLoc(Req.getFirstTypeLoc());
       if (TC.validateType(Req.getFirstTypeLoc(), dc)) {
         Req.setInvalid();
         continue;
       }
 
-      revertDependentTypeLoc(Req.getSecondTypeLoc(), dc);
+      revertDependentTypeLoc(Req.getSecondTypeLoc());
       if (TC.validateType(Req.getSecondTypeLoc(), dc)) {
         Req.setInvalid();
         continue;
@@ -919,7 +915,7 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
   // Revert the result type.
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     if (!fn->getBodyResultTypeLoc().isNull()) {
-      revertDependentTypeLoc(fn->getBodyResultTypeLoc(), func);
+      revertDependentTypeLoc(fn->getBodyResultTypeLoc());
     }
   }
 
@@ -928,7 +924,7 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
   if (func->getDeclContext()->isTypeContext() && isa<FuncDecl>(func))
     argPatterns = argPatterns.slice(1);
   for (auto argPattern : argPatterns) {
-    revertDependentPattern(argPattern, func);
+    revertDependentPattern(argPattern);
   }
 
   // Revert the body patterns.
@@ -936,7 +932,7 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
   if (func->getDeclContext()->isTypeContext() && isa<FuncDecl>(func))
     bodyPatterns = bodyPatterns.slice(1);
   for (auto bodyPattern : bodyPatterns) {
-    revertDependentPattern(bodyPattern, func);
+    revertDependentPattern(bodyPattern);
   }
 
   // Revert the generic parameter list.
