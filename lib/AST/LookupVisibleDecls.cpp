@@ -339,7 +339,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
                VisibleDeclConsumer &Consumer)
       : SM(SM), Loc(Loc), Consumer(Consumer) {}
 
-  bool IntersectsRange(SourceRange R) {
+  bool isReferencePointInRange(SourceRange R) {
     return SM.rangeContainsTokenLoc(R, Loc);
   }
 
@@ -411,7 +411,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   }
 
   void visitForStmt(ForStmt *S) {
-    if (!IntersectsRange(S->getSourceRange()))
+    if (!isReferencePointInRange(S->getSourceRange()))
       return;
     visit(S->getBody());
     for (Decl *D : S->getInitializerVarDecls()) {
@@ -420,13 +420,13 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     }
   }
   void visitForEachStmt(ForEachStmt *S) {
-    if (!IntersectsRange(S->getSourceRange()))
+    if (!isReferencePointInRange(S->getSourceRange()))
       return;
     visit(S->getBody());
     checkPattern(S->getPattern());
   }
   void visitBraceStmt(BraceStmt *S) {
-    if (!IntersectsRange(S->getSourceRange()))
+    if (!isReferencePointInRange(S->getSourceRange()))
       return;
     for (auto elem : S->getElements()) {
       if (Stmt *S = elem.dyn_cast<Stmt*>())
@@ -441,7 +441,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   }
   
   void visitSwitchStmt(SwitchStmt *S) {
-    if (!IntersectsRange(S->getSourceRange()))
+    if (!isReferencePointInRange(S->getSourceRange()))
       return;
     for (CaseStmt *C : S->getCases()) {
       visit(C);
@@ -449,7 +449,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   }
   
   void visitCaseStmt(CaseStmt *S) {
-    if (!IntersectsRange(S->getSourceRange()))
+    if (!isReferencePointInRange(S->getSourceRange()))
       return;
     for (auto Label : S->getCaseLabels()) {
       for (auto P : Label->getPatterns())
