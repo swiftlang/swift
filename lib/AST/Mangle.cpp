@@ -628,7 +628,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     while (it == Archetypes.end()) {
       // This should be treated like an error, but we don't want
       // clients like lldb to crash because of corrupted input.
-      assert(DeclCtx && "empty decl context");
+      //assert(DeclCtx && "empty decl context");
       if (!DeclCtx) return;
 
       // This Archetype comes from an enclosing context -- proceed to
@@ -636,7 +636,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
       GenericParamList *GenericParams = nullptr;
       do { // Skip over empty parent contexts.
         DeclCtx = DeclCtx->getParent();
-        assert(DeclCtx && "no decl context for archetype found");
+        //assert(DeclCtx && "no decl context for archetype found");
         if (!DeclCtx) return;
         GenericParams = DeclCtx->getGenericParamsOfContext();
       } while (!GenericParams);

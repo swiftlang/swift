@@ -547,6 +547,10 @@ public:
                           bool hasFalseCode = true, bool invertValue = false,
                           ArrayRef<SILType> contArgs = {});
 
+  Condition emitCondition(SILValue V, SILLocation Loc,
+                          bool hasFalseCode = true, bool invertValue = false,
+                          ArrayRef<SILType> contArgs = {});
+
   SILBasicBlock *createBasicBlock() {
     return new (F.getModule()) SILBasicBlock(&F);
   }
@@ -929,6 +933,8 @@ public:
   void visitNominalTypeDecl(NominalTypeDecl *D);
   void visitFuncDecl(FuncDecl *D);
   void visitPatternBindingDecl(PatternBindingDecl *D);
+  
+  std::unique_ptr<Initialization> emitPatternBindingInitialization(Pattern *P);
     
   void visitTypeAliasDecl(TypeAliasDecl *D) {
     // No lowering support needed.

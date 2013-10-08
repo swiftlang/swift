@@ -425,6 +425,12 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
   }
 }
 
+InitializationPtr
+SILGenFunction::emitPatternBindingInitialization(Pattern *P) {
+  return InitializationForPattern(*this, InitializationForPattern::Var)
+      .visit(P);
+}
+
 /// Enter a cleanup to deallocate the given location.
 CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILLocation loc,
                                                        SILValue temp) {

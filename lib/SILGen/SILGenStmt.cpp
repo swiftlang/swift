@@ -58,9 +58,17 @@ Condition SILGenFunction::emitCondition(Expr *E,
                                         ArrayRef<SILType> contArgs) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
-  
-  SILValue V = emitConditionValue(*this, E);
-  
+
+  return emitCondition(emitConditionValue(*this, E), E,
+                       hasFalseCode, invertValue, contArgs);
+}
+
+Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
+                                        bool hasFalseCode, bool invertValue,
+                                        ArrayRef<SILType> contArgs) {
+  assert(B.hasValidInsertionPoint() &&
+         "emitting condition at unreachable point");
+
   SILBasicBlock *ContBB = createBasicBlock();
   SILBasicBlock *TrueBB = createBasicBlock();
 
@@ -75,7 +83,6 @@ Condition SILGenFunction::emitCondition(Expr *E,
     FalseBB = nullptr;
     FalseDestBB = ContBB;
   }
-  RegularLocation Loc(E);
   if (invertValue)
     B.createCondBranch(Loc, V, FalseDestBB, TrueBB);
   else
@@ -314,20 +321,44 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   ContinueDestStack.pop_back();
 }
 
+namespace {
+  
+/// NextForEachValueInitialization - initialization for the 'next' value buffer
+/// used during for each loop codegen.
+
+class NextForEachValueInitialization : public SingleBufferInitialization {
+  SILValue address;
+public:
+  NextForEachValueInitialization(SILValue address)
+    : address(address) {}
+  
+  SILValue getAddressOrNull() override { return address; }
+};
+
+} // end anonymous namespace
+
+
 void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
-  // Emit the 'range' variable that we'll be using for iteration.
+  // Emit the 'generator' variable that we'll be using for iteration.
   Scope OuterForScope(Cleanups, CleanupLocation(S));
-  visitPatternBindingDecl(S->getRange());
+  visitPatternBindingDecl(S->getGenerator());
   
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
   if (!B.hasValidInsertionPoint()) return;
   
+  // Create a stack allocation to hold values out of the generator.
+  // This will be initialized on every entry into the loop header and consumed
+  // by the loop body. On loop exit, the terminating value will be in the
+  // buffer.
+  auto &optTL = getTypeLowering(S->getGeneratorNext()->getType());
+  SILValue nextBuf = emitTemporaryAllocation(S, optTL.getLoweredType());
+  
   // Create a new basic block and jump into it.
   SILBasicBlock *LoopBB = createBasicBlock();
   B.emitBlock(LoopBB, S);
   
-  // Set the destinations for 'break' and 'continue'
+  // Set the destinations for 'break' and 'continue'.
   SILBasicBlock *EndBB = createBasicBlock();
   BreakDestStack.emplace_back(EndBB,
                               getCleanupsDepth(),
@@ -335,8 +366,16 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth(),
                                  CleanupLocation(S->getBody()));
   
-  Condition Cond = emitCondition(S->getRangeEmpty(), /*hasFalseCode=*/false,
-                                 /*invertValue=*/true);
+  // Advance the generator.
+  InitializationPtr nextInit(new NextForEachValueInitialization(nextBuf));
+  emitExprInto(S->getGeneratorNext(), nextInit.get());
+  nextInit->finishInitialization(*this);
+  
+  // Continue if the value is present.
+  Condition Cond = emitCondition(
+         emitDoesOptionalHaveValue(S, nextBuf), S,
+         /*hasFalseCode=*/false, /*invertValue=*/false);
+
   if (Cond.hasTrue()) {
     Cond.enterTrue(B);
     
@@ -345,13 +384,20 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
     // at the end of each loop iteration.
     {
       Scope InnerForScope(Cleanups, CleanupLocation(S->getBody()));
-      visitPatternBindingDecl(S->getElementInit());
+      InitializationPtr initLoopVars
+        = emitPatternBindingInitialization(S->getPattern());
+      ManagedValue val = emitGetOptionalValueFrom(S,
+                               ManagedValue(nextBuf, ManagedValue::Unmanaged),
+                               optTL,
+                               SGFContext(initLoopVars.get()));
+      if (val)
+        RValue(*this, val, S).forwardInto(*this, initLoopVars.get(), S);
       visit(S->getBody());
     }
     
     // Loop back to the header.
     if (B.hasValidInsertionPoint()) {
-      // Accosiate the loop body's closing brace with this branch.
+      // Associate the loop body's closing brace with this branch.
       RegularLocation L(S->getBody());
       L.pointToEnd();
       B.createBranch(L, LoopBB);
@@ -365,6 +411,9 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   emitOrDeleteBlock(B, EndBB, S);
   BreakDestStack.pop_back();
   ContinueDestStack.pop_back();
+  
+  // Destroy the last value that came out of the generator.
+  B.emitDestroyAddr(S, nextBuf);
 }
 
 void SILGenFunction::visitBreakStmt(BreakStmt *S) {

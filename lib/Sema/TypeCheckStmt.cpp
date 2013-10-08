@@ -252,8 +252,8 @@ public:
     
     // Verify that the container conforms to the Enumerable protocol, and
     // invoke getElements() on it container to retrieve the range of elements.
-    Type RangeTy, GeneratorTy;
-    VarDecl *Range, *Generator;
+    Type GeneratorTy;
+    VarDecl *Generator;
     {
       Type ContainerType = Container->getType()->getRValueType();
 
@@ -262,33 +262,6 @@ public:
                                  &Conformance, Container->getLoc()))
         return nullptr;
 
-      RangeTy = TC.getWitnessType(ContainerType, EnumerableProto,
-                                  Conformance,
-                                  TC.Context.getIdentifier("EnumeratorType"),
-                                  diag::enumerable_protocol_broken);
-      if (!RangeTy)
-        return nullptr;
-
-      Expr *GetElements
-        = TC.callWitness(Container, DC, EnumerableProto, Conformance,
-                         TC.Context.getIdentifier("getEnumeratorType"),
-                         { },
-                         diag::enumerable_protocol_broken);
-      if (!GetElements) return nullptr;
-      
-      // Create a local variable to capture the range.
-      // FIXME: Mark declaration as implicit?
-      Range = new (TC.Context) VarDecl(S->getInLoc(),
-                                       TC.Context.getIdentifier("__range"),
-                                       RangeTy, DC);
-      
-      // Create a pattern binding to initialize the range and wire it into the
-      // AST.
-      Pattern *RangePat = new (TC.Context) NamedPattern(Range);
-      S->setRange(new (TC.Context) PatternBindingDecl(S->getForLoc(),
-                                                      RangePat, GetElements,
-                                                      DC));
-      
       GeneratorTy = TC.getWitnessType(ContainerType, EnumerableProto,
                                       Conformance,
                                       TC.Context.getIdentifier("GeneratorType"),
@@ -307,64 +280,36 @@ public:
       Generator->setImplicit();
       
       // Create a pattern binding to initialize the generator.
-      auto GenPat = new (TC.Context) NamedPattern(Range);
+      auto GenPat = new (TC.Context) NamedPattern(Generator);
       GenPat->setImplicit();
       auto GenBinding = new (TC.Context) PatternBindingDecl(S->getForLoc(),
-                                                            GenPat, GetElements,
-                                                            DC);
+                                                          GenPat, GetGenerator,
+                                                          DC);
       GenBinding->setImplicit();
       S->setGenerator(GenBinding);
     }
     
-    // FIXME: Would like to customize the diagnostic emitted in
-    // conformsToProtocol().
-    ProtocolConformance *RangeConformance = nullptr;
-    if (!TC.conformsToProtocol(RangeTy, EnumeratorProto, DC, &RangeConformance,
-                               Container->getLoc()))
+    // Working with generators requires Optional.
+    if (TC.requireOptionalIntrinsics(S->getForLoc()))
       return nullptr;
     
-    // Gather the witnesses from the Range protocol conformance. These are
-    // the functions we'll call.
-    Type ElementTy = TC.getWitnessType(RangeTy, EnumeratorProto, RangeConformance,
-                                       TC.Context.getIdentifier("Element"),
-                                       diag::range_protocol_broken);
-    if (!ElementTy)
-      return nullptr;
+    // Gather the witnesses from the Generator protocol conformance, which
+    // we'll use to drive the loop.
     
-    // Compute the expression that determines whether the range is empty.
-    Expr *Empty
-      = TC.callWitness(TC.buildCheckedRefExpr(Range, S->getInLoc(),
-                                              /*Implicit=*/true),
-                       DC, EnumeratorProto, RangeConformance,
-                       TC.Context.getIdentifier("isEmpty"),
-                       { },
-                       diag::range_protocol_broken);
-    if (!Empty) return nullptr;
-    if (TC.typeCheckCondition(Empty, DC)) return nullptr;
-    S->setRangeEmpty(Empty);
-    
-    // Compute the expression that extracts a value from the range.
-    Expr *GetFirstAndAdvance
-      = TC.callWitness(TC.buildCheckedRefExpr(Range, S->getInLoc(),
-                                              /*Implicit=*/true),
-                       DC, EnumeratorProto, RangeConformance,
-                       TC.Context.getIdentifier("next"),
-                       { },
-                       diag::range_protocol_broken);
-    if (!GetFirstAndAdvance) return nullptr;
-    
-    S->setElementInit(new (TC.Context) PatternBindingDecl(S->getForLoc(),
-                                                          S->getPattern(),
-                                                          GetFirstAndAdvance,
-                                                          DC));
-
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
     ProtocolConformance *GenConformance = nullptr;
     if (!TC.conformsToProtocol(GeneratorTy, GeneratorProto, DC, &GenConformance,
                                Container->getLoc()))
       return nullptr;
-
+    
+    Type ElementTy = TC.getWitnessType(GeneratorTy, GeneratorProto,
+                                       GenConformance,
+                                       TC.Context.getIdentifier("Element"),
+                                       diag::generator_protocol_broken);
+    if (!ElementTy)
+      return nullptr;
+    
     // Compute the expression that advances the generator.
     Expr *GenNext
       = TC.callWitness(TC.buildCheckedRefExpr(Generator, S->getInLoc(),
@@ -373,8 +318,14 @@ public:
                        TC.Context.getIdentifier("next"),
                        {}, diag::generator_protocol_broken);
     if (!GenNext) return nullptr;
+    // Check that next() produces an Optional<Element> value.
+    if (GenNext->getType()->getCanonicalType()->getAnyNominal()
+          != TC.Context.getOptionalDecl()) {
+      TC.diagnose(S->getForLoc(), diag::generator_protocol_broken);
+      return nullptr;
+    }
     S->setGeneratorNext(GenNext);
-
+    
     // Coerce the pattern to the element type, now that we know the element
     // type.
     if (TC.coerceToType(S->getPattern(), DC, ElementTy))

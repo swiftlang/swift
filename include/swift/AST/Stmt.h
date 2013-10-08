@@ -310,14 +310,9 @@ public:
 class ForEachStmt : public Stmt {
   SourceLoc ForLoc;
   SourceLoc InLoc;
-  llvm::PointerUnion<Pattern *, PatternBindingDecl *> Pat;
+  Pattern *Pat;
   Expr *Container;
   BraceStmt *Body;
-  
-  /// Range - The range variable along with its initializer.
-  PatternBindingDecl *Range = nullptr;
-  /// RangeEmpty - The expression that determines whether the range is empty.
-  Expr *RangeEmpty = nullptr;
   
   /// The generator variable along with its initializer.
   PatternBindingDecl *Generator = nullptr;
@@ -341,7 +336,7 @@ public:
   
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.
-  Pattern *getPattern() const;
+  Pattern *getPattern() const { return Pat; }
   
   /// getContainer - Retrieve the container whose elements will be visited
   /// by this foreach loop, as it was written in the source code and
@@ -349,24 +344,6 @@ public:
   /// expression to extract a range, use \c getRangeInit().
   Expr *getContainer() const { return Container; }
   void setContainer(Expr *C) { Container = C; }
-  
-  /// getRange - Retrieve the pattern binding that contains the (implicit)
-  /// range variable and its initialization from the container.
-  PatternBindingDecl *getRange() const { return Range; }
-  void setRange(PatternBindingDecl *R) { Range = R; }
-  
-  /// getRangeEmpty - Retrieve the expression that determines whether the
-  /// given range is empty.
-  Expr *getRangeEmpty() const { return RangeEmpty; }
-  void setRangeEmpty(Expr *E) { RangeEmpty = E; }
-  
-  /// getElementInit - Retrieve the pattern binding that binds the pattern
-  /// (with the iteration variables) to the initialization of that pattern
-  /// from the result of getFirst().
-  PatternBindingDecl *getElementInit() const {
-    return Pat.dyn_cast<PatternBindingDecl *>();
-  }
-  void setElementInit(PatternBindingDecl *EI) { Pat = EI; }
   
   /// Retrieve the pattern binding that contains the (implicit) generator
   /// variable and its initialization from the container.
