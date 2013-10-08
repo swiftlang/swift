@@ -380,7 +380,7 @@ private:
 
   /// If non-NULL, an plug-in that should be used when performing external
   /// lookups.
-  ExternalNameLookup *ExternalLookup;
+  ExternalNameLookup *ExternalLookup = nullptr;
 
 public:
   /// Kind - This is the sort of file the translation unit was parsed for, which
@@ -415,8 +415,7 @@ public:
   llvm::StringMap<PrefixOperatorDecl*> PrefixOperators;
 
   TranslationUnit(Identifier Name, Component *Comp, ASTContext &C, TUKind Kind)
-    : Module(ModuleKind::TranslationUnit, Name, Comp, C), ExternalLookup(nullptr),
-      Kind(Kind) {
+    : Module(ModuleKind::TranslationUnit, Name, Comp, C), Kind(Kind) {
   }
   
   ArrayRef<std::pair<ImportedModule, bool>> getImports() const {

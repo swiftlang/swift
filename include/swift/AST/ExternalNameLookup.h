@@ -49,9 +49,9 @@ public:
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
 private:
-  virtual void anchor ();
+  virtual void anchor();
 };
 
-}
+} // namespace swift
 
 #endif

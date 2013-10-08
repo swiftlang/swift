@@ -28,6 +28,8 @@
 
 using namespace swift;
 
+void ExternalNameLookup::anchor() {}
+
 void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                                 const Module *curModule,
                                 LazyResolver *typeResolver) {

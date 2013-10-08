@@ -12,7 +12,6 @@ add_swift_library(swiftAST
   DiagnosticList.cpp
   DiagnosticEngine.cpp
   Expr.cpp
-  ExternalNameLookup.cpp
   Identifier.cpp
   LookupVisibleDecls.cpp
   Mangle.cpp
