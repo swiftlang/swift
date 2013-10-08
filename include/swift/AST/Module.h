@@ -40,6 +40,7 @@ namespace swift {
   class Decl;
   enum class DeclKind : uint8_t;
   class ExtensionDecl;
+  class ExternalNameLookup;
   class InfixOperatorDecl;
   class LinkLibrary;
   class LookupCache;
@@ -377,6 +378,10 @@ private:
   /// if this TU is not an imported TU.
   int ImportBufferID = -1;
 
+  /// If non-NULL, an plug-in that should be used when performing external
+  /// lookups.
+  ExternalNameLookup *ExternalLookup;
+
 public:
   /// Kind - This is the sort of file the translation unit was parsed for, which
   /// can affect some type checking and other behavior.
@@ -410,7 +415,8 @@ public:
   llvm::StringMap<PrefixOperatorDecl*> PrefixOperators;
 
   TranslationUnit(Identifier Name, Component *Comp, ASTContext &C, TUKind Kind)
-    : Module(ModuleKind::TranslationUnit, Name, Comp, C), Kind(Kind) {
+    : Module(ModuleKind::TranslationUnit, Name, Comp, C), ExternalLookup(nullptr),
+      Kind(Kind) {
   }
   
   ArrayRef<std::pair<ImportedModule, bool>> getImports() const {
@@ -440,6 +446,12 @@ public:
   void setImportBufferID(unsigned BufID) {
     assert(ImportBufferID == -1 && "Already set!");
     ImportBufferID = BufID;
+  }
+
+  ExternalNameLookup *getExternalLookup() const { return ExternalLookup; }
+  void setExternalLookup(ExternalNameLookup *R) {
+    assert(!ExternalLookup && "Name resolver already set");
+    ExternalLookup = R;
   }
 
   /// \returns true if traversal was aborted, false otherwise.

@@ -17,6 +17,7 @@
 #include "ModuleNameLookup.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/ExternalNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
@@ -292,6 +293,10 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
   Module &M = *DC->getParentModule();
   const SourceManager &SM = DC->getASTContext().SourceMgr;
+  ExternalNameLookup *ExternalLookup = nullptr;
+
+  if (TranslationUnit *TU = dyn_cast<TranslationUnit>(&M))
+    ExternalLookup = TU->getExternalLookup();
 
   // Never perform local lookup for operators.
   if (Name.isOperator())
@@ -470,6 +475,10 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       }
     }
   }
+    
+  if (ExternalLookup && ExternalLookup->lookupOverrides(Name, DC, Loc,
+                                                        IsTypeLookup, Results))
+    return;
 
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
@@ -499,6 +508,9 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     }
     return true;
   });
+
+  if (ExternalLookup && !Results.size())
+    ExternalLookup->lookupFallbacks(Name, DC, Loc, IsTypeLookup, Results);
 }
 
 Optional<UnqualifiedLookup>
