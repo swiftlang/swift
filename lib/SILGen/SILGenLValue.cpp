@@ -1006,6 +1006,30 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
   emitStoreOfSemanticRValue(*this, loc, rvalue, dest, rvalueTL, isInit);
 }
 
+/// Store a semantic value loaded from an address into the given address.
+void SILGenFunction::emitSemanticStoreOutOf(SILLocation loc,
+                                            SILValue src,
+                                            const TypeLowering &srcTL,
+                                            SILValue dest,
+                                            const TypeLowering &destTL,
+                                            IsTake_t isTake,
+                                            IsInitialization_t isInit) {
+  assert(srcTL.getLoweredType().getAddressType() == src.getType());
+  assert(destTL.getLoweredType().getAddressType() == dest.getType());
+  
+  // Easy case: the types match.
+  if (srcTL.getLoweredType() == destTL.getLoweredType()) {
+    assert(!hasDifferentTypeOfRValue(srcTL));
+    B.createCopyAddr(loc, src, dest, isTake, isInit);
+    return;
+  }
+  
+  SILValue loaded = B.createLoad(loc, src);
+  if (!isTake)
+    loaded = B.createCopyValue(loc, loaded);
+  emitStoreOfSemanticRValue(*this, loc, loaded, dest, destTL, isInit);
+}
+
 /// Convert a semantic rvalue to a value of storage type.
 SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
                                                          SILValue semanticValue,
@@ -1130,3 +1154,23 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   // writeback chain.
 }
 
+void SILGenFunction::emitCopyLValueInto(SILLocation loc,
+                                        const LValue &src,
+                                        Initialization *dest) {
+  // If the destination is a single address, do a copy_addr from the lvalue
+  // into the destination.
+  if (auto destAddr = dest->getAddressOrNull()) {
+    auto srcAddr = emitAddressOfLValue(loc, src).getUnmanagedValue();
+    auto &srcTL = getTypeLowering(srcAddr.getType());
+    auto &destTL = getTypeLowering(destAddr.getType());
+    emitSemanticStoreOutOf(loc, srcAddr, srcTL, destAddr, destTL,
+                           IsNotTake, IsInitialization);
+    dest->finishInitialization(*this);
+    return;
+  }
+  
+  // Otherwise, load the lvalue normally into the initialization.
+  if (auto loaded = emitLoadOfLValue(loc, src, SGFContext(dest))) {
+    RValue(*this, loaded, loc).forwardInto(*this, dest, loc);
+  }
+}

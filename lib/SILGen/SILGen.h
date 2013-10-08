@@ -754,6 +754,13 @@ public:
   void emitSemanticStore(SILLocation loc, SILValue value,
                          SILValue dest, const TypeLowering &destTL,
                          IsInitialization_t isInit);
+  void emitSemanticStoreOutOf(SILLocation loc,
+                              SILValue src,
+                              const TypeLowering &srcTL,
+                              SILValue dest,
+                              const TypeLowering &destTL,
+                              IsTake_t isTake,
+                              IsInitialization_t isInit);
   
   SILValue emitConversionFromSemanticValue(SILLocation loc,
                                            SILValue semanticValue,
@@ -764,7 +771,9 @@ public:
                         SGFContext C, IsTake_t isTake);
   
   void emitAssignToLValue(SILLocation loc, RValue &&src,
-                          LValue const &dest);
+                          const LValue &dest);
+  void emitCopyLValueInto(SILLocation loc, const LValue &src,
+                          Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue const &src);
   ManagedValue emitLoadOfLValue(SILLocation loc, const LValue &src, SGFContext C);
   
