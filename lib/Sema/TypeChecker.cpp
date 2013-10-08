@@ -708,50 +708,49 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     ClangLoader->verifyAllModules();
 }
 
-bool swift::performTypeLocChecking(TranslationUnit *TU, TypeLoc &T,
+bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
   if (ProduceDiagnostics) {
-    return TypeChecker(TU->Ctx).validateType(T, DC);
+    return TypeChecker(Ctx).validateType(T, DC);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
-    DiagnosticEngine Diags(TU->Ctx.SourceMgr);
-    return TypeChecker(TU->Ctx, Diags).validateType(T, DC);
+    DiagnosticEngine Diags(Ctx.SourceMgr);
+    return TypeChecker(Ctx, Diags).validateType(T, DC);
   }
 }
 
-bool swift::typeCheckCompletionDecl(TranslationUnit *TU, Decl *D) {
+bool swift::typeCheckCompletionDecl(ASTContext &Ctx, Decl *D) {
   // Set up a diagnostics engine that swallows diagnostics.
-  DiagnosticEngine Diags(TU->Ctx.SourceMgr);
-  TypeChecker TC(TU->Ctx, Diags);
+  DiagnosticEngine Diags(Ctx.SourceMgr);
+  TypeChecker TC(Ctx, Diags);
   TC.typeCheckDecl(D, true);
   return true;
 }
 
-bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
+bool swift::typeCheckCompletionContextExpr(ASTContext &Ctx, DeclContext *DC,
                                            Expr *&parsedExpr) {
   // Set up a diagnostics engine that swallows diagnostics.
-  DiagnosticEngine diags(TU->Ctx.SourceMgr);
+  DiagnosticEngine diags(Ctx.SourceMgr);
   
-  TypeChecker TC(TU->Ctx, diags);
-  TC.typeCheckExpression(parsedExpr, TU, Type(), /*discardedExpr=*/true);
-  TU->ASTStage = TranslationUnit::TypeChecked;
+  TypeChecker TC(Ctx, diags);
+  TC.typeCheckExpression(parsedExpr, DC, Type(), /*discardedExpr=*/true);
   
   return parsedExpr && !isa<ErrorExpr>(parsedExpr)
                     && parsedExpr->getType()
                     && !parsedExpr->getType()->is<ErrorType>();
 }
 
-bool swift::typeCheckAbstractFunctionBodyUntil(TranslationUnit *TU,
+bool swift::typeCheckAbstractFunctionBodyUntil(ASTContext &Ctx,
                                                AbstractFunctionDecl *AFD,
                                                SourceLoc EndTypeCheckLoc) {
   if (AFD->isInvalid())
     return false;
 
   // Set up a diagnostics engine that swallows diagnostics.
-  DiagnosticEngine Diags(TU->Ctx.SourceMgr);
+  DiagnosticEngine Diags(Ctx.SourceMgr);
 
-  TypeChecker TC(TU->Ctx, Diags);
+  TypeChecker TC(Ctx, Diags);
   return !TC.typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
 }
 
@@ -761,9 +760,9 @@ static void deleteTypeCheckerAndDiags(LazyResolver *resolver) {
   delete &diags;
 }
 
-OwnedResolver swift::createLazyResolver(TranslationUnit *TU) {
-  auto diags = new DiagnosticEngine(TU->Ctx.SourceMgr);
-  return OwnedResolver(new TypeChecker(TU->Ctx, *diags),
+OwnedResolver swift::createLazyResolver(ASTContext &Ctx) {
+  auto diags = new DiagnosticEngine(Ctx.SourceMgr);
+  return OwnedResolver(new TypeChecker(Ctx, *diags),
                        &deleteTypeCheckerAndDiags);
 }
 

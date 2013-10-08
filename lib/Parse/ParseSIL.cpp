@@ -578,7 +578,7 @@ bool SILParser::performTypeLocChecking(TypeLoc &T) {
          "Unexpected stage during parsing!");
   llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.TU->ASTStage,
                                                     TranslationUnit::Parsed);
-  return swift::performTypeLocChecking(P.TU, T, P.TU);
+  return swift::performTypeLocChecking(P.Context, T, P.TU);
 }
 
 /// Find the top-level ValueDecl or Module given a name.

@@ -32,15 +32,16 @@ namespace swift {
   /// \brief Typecheck a declaration parsed during code completion.
   ///
   /// \returns true on success, false on error.
-  bool typeCheckCompletionDecl(TranslationUnit *TU, Decl *D);
+  bool typeCheckCompletionDecl(ASTContext &Ctx, Decl *D);
 
   /// \brief Typecheck an expression parsed during code completion.
   ///
   /// \returns true on success, false on error.
-  bool typeCheckCompletionContextExpr(TranslationUnit *TU, Expr *&parsedExpr);
+  bool typeCheckCompletionContextExpr(ASTContext &Ctx, DeclContext *DC,
+                                      Expr *&parsedExpr);
 
   /// Partially typecheck the specified function body.
-  bool typeCheckAbstractFunctionBodyUntil(TranslationUnit *TU,
+  bool typeCheckAbstractFunctionBodyUntil(ASTContext &Ctx,
                                           AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
 
@@ -48,7 +49,7 @@ namespace swift {
   using OwnedResolver = std::unique_ptr<LazyResolver, void(*)(LazyResolver*)>;
 
   /// Creates a lazy type resolver for use in lookups.
-  OwnedResolver createLazyResolver(TranslationUnit *TU);
+  OwnedResolver createLazyResolver(ASTContext &Ctx);
 }
 
 #endif

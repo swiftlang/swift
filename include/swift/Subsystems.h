@@ -30,6 +30,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class ASTContext;
   class TranslationUnit;
   class Component;
   class Decl;
@@ -119,7 +120,7 @@ namespace swift {
   /// parsing, code completion).
   ///
   /// \returns false on success, true on error.
-  bool performTypeLocChecking(TranslationUnit *TU, TypeLoc &T, DeclContext *DC,
+  bool performTypeLocChecking(ASTContext &Ctx, TypeLoc &T, DeclContext *DC,
                               bool ProduceDiagnostics = true);
 
   /// Turn the given translation unit into SIL IR. The returned SILModule must

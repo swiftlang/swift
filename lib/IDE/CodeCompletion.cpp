@@ -350,7 +350,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
                                     public ModuleLoadListener {
   CodeCompletionContext &CompletionContext;
   CodeCompletionConsumer &Consumer;
-  TranslationUnit *const TU;
 
   enum class CompletionKind {
     None,
@@ -379,7 +378,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
         DC->getContextKind() == DeclContextKind::AbstractFunctionDecl) {
       SourceLoc EndTypeCheckLoc =
           ParsedExpr ? ParsedExpr->getStartLoc()
-                     : TU->Ctx.SourceMgr.getCodeCompletionLoc();
+                     : P.Context.SourceMgr.getCodeCompletionLoc();
       // FIXME: closures.
       // For now, just find the nearest outer function.
       DeclContext *DCToTypeCheck = DC;
@@ -389,7 +388,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
       // First, type check the nominal decl that contains the function.
       typecheckContextImpl(DCToTypeCheck->getParent());
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck))
-        return typeCheckAbstractFunctionBodyUntil(TU, AFD, EndTypeCheckLoc);
+        return typeCheckAbstractFunctionBodyUntil(P.Context, AFD,
+                                                  EndTypeCheckLoc);
       return false;
     }
     if (DC->getContextKind() == DeclContextKind::NominalTypeDecl) {
@@ -398,7 +398,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
       typecheckContextImpl(DC->getParent());
       if (NTD->hasType())
         return true;
-      return typeCheckCompletionDecl(TU, cast<NominalTypeDecl>(DC));
+      return typeCheckCompletionDecl(P.Context, cast<NominalTypeDecl>(DC));
     }
     return true;
   }
@@ -411,7 +411,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   /// \returns true on success, false on failure.
   bool typecheckDelayedParsedDecl() {
     assert(DelayedParsedDecl && "should have a delayed parsed decl");
-    return typeCheckCompletionDecl(TU, DelayedParsedDecl);
+    return typeCheckCompletionDecl(P.Context, DelayedParsedDecl);
   }
 
   /// \returns true on success, false on failure.
@@ -423,7 +423,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
           llvm::dbgs() << "\n");
 
     Expr *TypecheckedExpr = ParsedExpr;
-    if (!typeCheckCompletionContextExpr(TU, TypecheckedExpr))
+    if (!typeCheckCompletionContextExpr(P.Context, CurDeclContext,
+                                        TypecheckedExpr))
       return false;
 
     if (TypecheckedExpr->getType()->is<ErrorType>())
@@ -440,7 +441,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   /// \returns true on success, false on failure.
   bool typecheckParsedType() {
     assert(ParsedTypeLoc.getTypeRepr() && "should have a TypeRepr");
-    return !performTypeLocChecking(TU, ParsedTypeLoc, CurDeclContext, false);
+    return !performTypeLocChecking(P.Context, ParsedTypeLoc, CurDeclContext,
+                                   false);
   }
 
 public:
@@ -448,7 +450,7 @@ public:
                               CodeCompletionContext &CompletionContext,
                               CodeCompletionConsumer &Consumer)
       : CodeCompletionCallbacks(P), CompletionContext(CompletionContext),
-        Consumer(Consumer), TU(P.TU) {
+        Consumer(Consumer) {
     P.Context.addModuleLoadListener(*this);
   }
 
@@ -492,7 +494,7 @@ namespace {
 /// Build completions by doing visible decl lookup from a context.
 class CompletionLookup : swift::VisibleDeclConsumer {
   CodeCompletionContext &CompletionContext;
-  TranslationUnit &TU;
+  ASTContext &Ctx;
   OwnedResolver TypeResolver;
   Identifier SelfIdent;
   const DeclContext *CurrDeclContext;
@@ -530,11 +532,11 @@ class CompletionLookup : swift::VisibleDeclConsumer {
 
 public:
   CompletionLookup(CodeCompletionContext &CompletionContext,
-                   TranslationUnit &TU,
+                   ASTContext &Ctx,
                    const DeclContext *CurrDeclContext)
-      : CompletionContext(CompletionContext), TU(TU),
-        TypeResolver(createLazyResolver(&TU)),
-        SelfIdent(TU.Ctx.getIdentifier("self")),
+      : CompletionContext(CompletionContext), Ctx(Ctx),
+        TypeResolver(createLazyResolver(Ctx)),
+        SelfIdent(Ctx.getIdentifier("self")),
         CurrDeclContext(CurrDeclContext) {
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext->isLocalContext()) {
@@ -556,7 +558,7 @@ public:
 
     CompletionContext.setCacheClangResults([&](bool NeedLeadingDot) {
       llvm::SaveAndRestore<bool> S(this->NeedLeadingDot, NeedLeadingDot);
-      if (auto Importer = TU.Ctx.getClangModuleLoader())
+      if (auto Importer = Ctx.getClangModuleLoader())
         static_cast<ClangImporter &>(*Importer).lookupVisibleDecls(*this);
     });
   }
@@ -608,7 +610,7 @@ public:
     if (IsDynamicLookup) {
       // Values of properties that were found on a DynamicLookup have
       // Optional<T> type.
-      T = OptionalType::get(T, TU.Ctx);
+      T = OptionalType::get(T, Ctx);
     }
     addTypeAnnotation(Builder, T);
   }
@@ -708,7 +710,7 @@ public:
         Patterns[i]->print(OS);
         OS << " -> ";
       }
-      Type ResultType = FD->getResultType(TU.Ctx);
+      Type ResultType = FD->getResultType(Ctx);
       if (ResultType->isVoid())
         OS << "Void";
       else
@@ -753,7 +755,7 @@ public:
     if (IsDynamicLookup) {
       // Values of properties that were found on a DynamicLookup have
       // Optional<T> type.
-      T = OptionalType::get(T, TU.Ctx);
+      T = OptionalType::get(T, Ctx);
     }
     addTypeAnnotation(Builder, T);
   }
@@ -767,7 +769,7 @@ public:
       Builder.addLeadingDot();
     Builder.addTextChunk(NTD->getName().str());
     addTypeAnnotation(Builder,
-                      MetaTypeType::get(NTD->getDeclaredType(), TU.Ctx));
+                      MetaTypeType::get(NTD->getDeclaredType(), Ctx));
   }
 
   void addTypeAliasRef(const TypeAliasDecl *TAD) {
@@ -780,10 +782,10 @@ public:
     Builder.addTextChunk(TAD->getName().str());
     if (TAD->hasUnderlyingType())
       addTypeAnnotation(Builder,
-                        MetaTypeType::get(TAD->getUnderlyingType(), TU.Ctx));
+                        MetaTypeType::get(TAD->getUnderlyingType(), Ctx));
     else {
       addTypeAnnotation(Builder,
-                        MetaTypeType::get(TAD->getDeclaredType(), TU.Ctx));
+                        MetaTypeType::get(TAD->getDeclaredType(), Ctx));
     }
   }
 
@@ -796,7 +798,7 @@ public:
       Builder.addLeadingDot();
     Builder.addTextChunk(GP->getName().str());
     addTypeAnnotation(Builder,
-                      MetaTypeType::get(GP->getDeclaredType(), TU.Ctx));
+                      MetaTypeType::get(GP->getDeclaredType(), Ctx));
   }
 
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT) {
@@ -808,7 +810,7 @@ public:
       Builder.addLeadingDot();
     Builder.addTextChunk(AT->getName().str());
     addTypeAnnotation(Builder,
-                      MetaTypeType::get(AT->getDeclaredType(), TU.Ctx));
+                      MetaTypeType::get(AT->getDeclaredType(), Ctx));
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation) {
@@ -1014,7 +1016,7 @@ public:
         Annotation = LVT->getObjectType();
       }
 
-      Annotation = MetaTypeType::get(Annotation, TU.Ctx);
+      Annotation = MetaTypeType::get(Annotation, Ctx);
 
       // Use the canonical type as a type annotation because looking at the
       // '.metatype' in the IDE is a way to understand what type the expression
@@ -1040,7 +1042,7 @@ public:
   void getTypeCompletions(Type BaseType) {
     Kind = LookupKind::Type;
     NeedLeadingDot = !HaveDot;
-    lookupVisibleMemberDecls(*this, MetaTypeType::get(BaseType, TU.Ctx),
+    lookupVisibleMemberDecls(*this, MetaTypeType::get(BaseType, Ctx),
                              CurrDeclContext, TypeResolver.get());
   }
 
@@ -1136,7 +1138,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (!ParsedTypeLoc.isNull() && !typecheckParsedType())
     return;
 
-  CompletionLookup Lookup(CompletionContext, *TU, CurDeclContext);
+  CompletionLookup Lookup(CompletionContext, P.Context, CurDeclContext);
 
   switch (Kind) {
   case CompletionKind::None:
@@ -1154,7 +1156,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::PostfixExprBeginning: {
     Lookup.getValueCompletionsInDeclContext(
-        TU->Ctx.SourceMgr.getCodeCompletionLoc());
+        P.Context.SourceMgr.getCodeCompletionLoc());
     break;
   }
 
@@ -1181,7 +1183,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::TypeSimpleBeginning: {
     Lookup.getTypeCompletionsInDeclContext(
-        TU->Ctx.SourceMgr.getCodeCompletionLoc());
+        P.Context.SourceMgr.getCodeCompletionLoc());
     break;
   }
 
