@@ -29,22 +29,46 @@ STATISTIC(NumShadowsRemoved, "Number of inout shadow variables removed");
 //                          inout Deshadowing
 //===----------------------------------------------------------------------===//
 
-/// processAllocation - Given an AllocStackInst that is copy_addr's to/from an
+/// promoteShadow - Given an AllocStackInst that is copy_addr's to/from an
 /// inout argument, check to see if it can be completely replaced by that inout
 /// argument.  For this to be ok, it cannot escape and must only be initialized
 /// and destroyed by copies from/to the inout argument.
-static bool processAllocation(AllocStackInst *Alloc, SILArgument *InOutArg) {
+static void promoteShadow(AllocStackInst *Alloc, SILArgument *InOutArg) {
+  // At this point, we know that we have an inout argument that is only copied
+  // into and out of for the purposes of this allocation, and that these copies
+  // define the lifetime of the alloc_stack (by init'ing and take'ing its bits).
 
-  for (auto UI : Alloc->getUses()) {
-    // We can't promote inout arguments used by basic blocks.
-    auto *ArgUser = dyn_cast<SILInstruction>(UI->getUser());
-    if (!ArgUser) return false;
+  // Since the allocation has already been promoted to an alloc_stack, we know
+  // it doesn't escape.  Eliminate the allocation.
+  DEBUG(llvm::errs() << "  Promoting shadow variable " << *Alloc);
 
-    
+  while (!Alloc->use_empty()) {
+    auto Use = *Alloc->use_begin();
+    auto *User = cast<SILInstruction>(Use->getUser());
 
+    // If this is a use of the 0th result, not the address result, just zap the
+    // instruction.  It is a dealloc_stack or something similar.
+    if (Use->get().getResultNumber() == 0) {
+      User->eraseFromParent();
+      continue;
+    }
+
+    // Otherwise, it is a use of the argument.  If this is a copy_addr that
+    // defines or destroys the value, then remove it.
+    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
+      if (CAI->getSrc() == InOutArg || CAI->getDest() == InOutArg) {
+        User->eraseFromParent();
+        continue;
+      }
+    }
+
+    // Otherwise, this is something else that is using the memory.  Remap this
+    // to use the InOutArg directly instead of using the allocation.
+    Use->set(InOutArg);
   }
 
-  return false;
+  ++NumShadowsRemoved;
+  Alloc->eraseFromParent();
 }
 
 
@@ -121,16 +145,9 @@ static void processInOutValue(SILArgument *InOutArg) {
     TheShadow = SrcAlloc;
   }
 
-  // Now that we identified the candidate alloc_stack to remove, check to see if
-  // we can legally do so.
-  if (TheShadow) {
-    DEBUG(llvm::errs() << "  Attempting to promote shadow variable "
-                       << *TheShadow);
-    if (processAllocation(TheShadow, InOutArg))
-      ++NumShadowsRemoved;
-    else
-      DEBUG(llvm::errs() << "  promotion failed for: " << *TheShadow);
-  }
+  // Now that we identified the candidate alloc_stack to remove, do it.
+  if (TheShadow)
+    promoteShadow(TheShadow, InOutArg);
 }
 
 //===----------------------------------------------------------------------===//
