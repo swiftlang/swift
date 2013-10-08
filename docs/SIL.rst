@@ -899,11 +899,11 @@ first class values and can be ``capture``-d and alias. Swift, however, is
 memory-safe and statically typed, so aliasing of classes is constrained by
 the type system as follows:
 
-* A `Builtin.ObjectPointer` may alias any native Swift heap object,
+* A ``Builtin.ObjectPointer`` may alias any native Swift heap object,
   including a Swift class instance, a box allocated by ``alloc_box``, an array
   allocated by ``alloc_array``, or a thick function's closure context.
   It may not alias natively Objective-C class instances.
-* A `Builtin.ObjCPointer` may alias any class instance, whether Swift or
+* A ``Builtin.ObjCPointer`` may alias any class instance, whether Swift or
   Objective-C, but may not alias non-class-instance heap objects.
 * Two values of the same class type ``$C`` may alias. Two values of related
   class type ``$B`` and ``$D``, where there is a subclass relationship between
