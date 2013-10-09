@@ -345,6 +345,13 @@ public:
 };
 
 
+/// A file containing Swift source code; also, the smallest unit of code
+/// organization.
+///
+/// This is a .swift or .sil file (or a virtual file, such as the contents of
+/// the REPL). Since it contains raw source, it must be parsed and name-bound
+/// before being used for anything; a full type-check is also necessary for
+/// IR generation.
 class SourceFile {
   /// This is the list of modules that are imported by this module, with the
   /// second element of the pair declaring whether the module is reexported.
@@ -360,7 +367,7 @@ public:
   /// The translation unit that this file is a part of.
   TranslationUnit &TU;
 
-  /// The list of top-level declarations for a translation unit.
+  /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
 
   /// A map of operator names to InfixOperatorDecls.
@@ -378,20 +385,17 @@ public:
   /// binding is complete.
   llvm::StringMap<PrefixOperatorDecl*> PrefixOperators;
 
-  /// This describes how this file is parsed, which can affect some type
-  /// checking and other behavior.
   enum SourceKind {
-    Library,
-    Main,
-    REPL,
+    Library,  ///< A normal .swift file.
+    Main,     ///< A .swift file that can have top-level code.
+    REPL,     ///< A virtual file that holds the user's input in the REPL.
     SIL       ///< Came from a .sil file.
   };
 
+  /// Describes what kind of file this is, which can affect some type checking
+  /// and other behavior.
   const SourceKind Kind;
 
-  /// Defines what phases of parsing and semantic analysis are complete for a
-  /// source file.  This should only be used for assertions and verification
-  /// purposes.
   enum ASTStage_t {
     /// Parsing is underway.
     Parsing,
@@ -401,7 +405,12 @@ public:
     NameBound,
     /// Type checking has completed.
     TypeChecked
-  } ASTStage = Parsing;
+  };
+
+  /// Defines what phases of parsing and semantic analysis are complete for a
+  /// source file.  This should only be used for assertions and verification
+  /// purposes.
+  ASTStage_t ASTStage = Parsing;
 
   SourceFile(TranslationUnit &tu, SourceKind K,
              int ImportID = -1) : ImportBufferID(ImportID), TU(tu), Kind(K) {}
@@ -431,8 +440,14 @@ public:
 };
 
   
-/// TranslationUnit - This contains information about all of the decls and
-/// external references in a translation unit, which is one file.
+/// Represents a module composed of one or more input files.
+///
+/// A translation unit is made up of several input files, which all represent
+/// part of the same module. The intent is if all files in a translation unit
+/// were built and linked they would form a logical module (such as a single
+/// library or executable).
+///
+/// \sa SourceFile
 class TranslationUnit : public Module {
 private:
   /// The list of libraries specified as link-time dependencies at compile time.
@@ -443,7 +458,7 @@ private:
   ExternalNameLookup *ExternalLookup = nullptr;
 
 public:
-  // FIXME: Make private.
+  // FIXME: Make private or eliminate altogether.
   SourceFile *MainSourceFile;
 
   /// If this is true, then the translation unit is allowed to access the
