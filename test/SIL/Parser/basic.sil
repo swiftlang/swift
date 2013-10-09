@@ -1019,3 +1019,16 @@ bb0(%0 : $Val):
 // CHECK-NEXT: destroy_value [[T0]] : $Val
 // CHECK-NEXT: return [[T1]] : $Val
 }
+
+struct GenericStruct<T> {
+  var x : T
+}
+
+// CHECK-LABEL: sil @extract_generic_struct
+sil @extract_generic_struct : $GenericStruct<Int64> -> Int64 {
+entry(%0 : $GenericStruct<Int64>):
+  // CHECK: %1 = struct_extract %0 : $GenericStruct<Int64>, #x
+  %1 = struct_extract %0 : $GenericStruct<Int64>, #x
+  // CHECK: return %1 : $Int64
+  return %1 : $Int64
+}

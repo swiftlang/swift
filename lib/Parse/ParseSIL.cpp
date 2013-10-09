@@ -1882,8 +1882,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     VarDecl *Field = cast<VarDecl>(FieldV);
 
-    // FIXME: substitution means this needs to be explicit.
-    auto ResultTy = Field->getType()->getCanonicalType();
+    // FIXME: substitution means this type should be explicit to improve
+    // performance.
+    auto ResultTy = Val.getType().getSwiftRValueType()
+      ->getTypeOfMember(Field->getModuleContext(),
+                        Field, nullptr)->getCanonicalType();
     if (Opcode == ValueKind::StructElementAddrInst)
       ResultVal = B.createStructElementAddr(InstLoc, Val, Field,
                                  SILType::getPrimitiveAddressType(ResultTy));
