@@ -268,51 +268,6 @@ static SILValue ExtractElement(SILValue Val,
 
 
 
-/// If the specified instruction is a store of some value, check to see if it is
-/// storing to something that intersects the access path of a load.  If the two
-/// accesses are non-intersecting, return true.  Otherwise, attempt to compute
-/// the accessed subelement value and return it in LoadResultVal.
-static bool checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
-                                               SILValue &LoadResultVal,
-                                               AccessPathTy &LoadAccessPath) {
-  // We can only store forward from store and assign's.
-  if (!isa<StoreInst>(Inst) && !isa<AssignInst>(Inst)) return false;
-
-  // Get the access path for the store/assign.
-  AccessPathTy StoreAccessPath;
-  ComputeAccessPath(Inst->getOperand(1), StoreAccessPath);
-
-  // Since loads are always completely scalarized, we know that the load access
-  // path will either be non-intersecting or that the load is deeper-or-equal in
-  // length than the store.
-  if (LoadAccessPath.size() < StoreAccessPath.size()) return true;
-
-  // In the case when the load is deeper (not equal) to the stored value, we'll
-  // have to do a number of extracts.  Compute how many.
-  unsigned LoadUnwrapLevel = LoadAccessPath.size()-StoreAccessPath.size();
-
-  // Ignoring those extracts, the remaining access path needs to be exactly
-  // identical.  If not, we have a non-intersecting access.
-  if (ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(LoadUnwrapLevel) !=
-        ArrayRef<StructOrTupleElement>(StoreAccessPath))
-    return true;
-
-  SILValue StoredVal = Inst->getOperand(0);
-
-  SILBuilder B(Inst);
-  if (LoadUnwrapLevel == 0) {
-    // Exact match (which is common).
-    LoadResultVal = StoredVal;
-  } else {
-    LoadResultVal = ExtractElement(StoredVal,
-       ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(0, LoadUnwrapLevel),
-                                   B, Inst->getLoc());
-  }
-
-  return false;
-}
-
-
 //===----------------------------------------------------------------------===//
 // Per-Element Promotion Logic
 //===----------------------------------------------------------------------===//
@@ -415,6 +370,10 @@ namespace {
     };
     DIKind checkDefinitelyInit(SILInstruction *Inst, SILValue *AV = nullptr,
                                AccessPathTy *AccessPath = nullptr);
+    bool checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
+                                            SILValue &LoadResultVal,
+                                            AccessPathTy &LoadAccessPath);
+
     bool isLiveOut(SILBasicBlock *BB);
 
     bool hasEscapedAt(SILInstruction *I);
@@ -813,6 +772,52 @@ ElementPromotion::checkDefinitelyInit(SILInstruction *Inst, SILValue *AV,
   }
 
   return DI_Yes;
+}
+
+
+/// If the specified instruction is a store of some value, check to see if it is
+/// storing to something that intersects the access path of a load.  If the two
+/// accesses are non-intersecting, return true.  Otherwise, attempt to compute
+/// the accessed subelement value and return it in LoadResultVal.
+bool ElementPromotion::
+checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
+                                   SILValue &LoadResultVal,
+                                   AccessPathTy &LoadAccessPath) {
+  // We can only store forward from store and assign's.
+  if (!isa<StoreInst>(Inst) && !isa<AssignInst>(Inst)) return false;
+
+  // Get the access path for the store/assign.
+  AccessPathTy StoreAccessPath;
+  ComputeAccessPath(Inst->getOperand(1), StoreAccessPath);
+
+  // Since loads are always completely scalarized, we know that the load access
+  // path will either be non-intersecting or that the load is deeper-or-equal in
+  // length than the store.
+  if (LoadAccessPath.size() < StoreAccessPath.size()) return true;
+
+  // In the case when the load is deeper (not equal) to the stored value, we'll
+  // have to do a number of extracts.  Compute how many.
+  unsigned LoadUnwrapLevel = LoadAccessPath.size()-StoreAccessPath.size();
+
+  // Ignoring those extracts, the remaining access path needs to be exactly
+  // identical.  If not, we have a non-intersecting access.
+  if (ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(LoadUnwrapLevel) !=
+      ArrayRef<StructOrTupleElement>(StoreAccessPath))
+    return true;
+
+  SILValue StoredVal = Inst->getOperand(0);
+
+  SILBuilder B(Inst);
+  if (LoadUnwrapLevel == 0) {
+    // Exact match (which is common).
+    LoadResultVal = StoredVal;
+  } else {
+    LoadResultVal = ExtractElement(StoredVal,
+                                   ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(0, LoadUnwrapLevel),
+                                   B, Inst->getLoc());
+  }
+  
+  return false;
 }
 
 
