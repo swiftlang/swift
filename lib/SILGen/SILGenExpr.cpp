@@ -2836,12 +2836,12 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
 RValue RValueEmitter::visitForceValueExpr(ForceValueExpr *E, SGFContext C) {
   RValue optValue = SGF.emitRValue(E->getSubExpr(), SGFContext());
   const TypeLowering &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
-  return RValue(SGF,
-                SGF.emitGetOptionalValue(
-                  E, 
-                  std::move(optValue).getAsSingleValue(SGF, E),
-                  optTL, C),
-                E);
+  
+  ManagedValue V = SGF.emitGetOptionalValue(E,
+                                   std::move(optValue).getAsSingleValue(SGF, E),
+                                   optTL, C);
+  
+  return V ? RValue(SGF, V, E) : RValue();
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
