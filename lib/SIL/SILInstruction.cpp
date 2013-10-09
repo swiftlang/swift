@@ -240,6 +240,12 @@ AllocBoxInst::AllocBoxInst(SILLocation Loc, SILType ElementType, SILFunction &F)
   : SILInstruction(ValueKind::AllocBoxInst, Loc, getAllocType(ElementType, F)) {
 }
 
+/// getDecl - Return the underlying variable declaration associated with this
+/// allocation, or null if this is a temporary allocation.
+VarDecl *AllocBoxInst::getDecl() const {
+  return getLoc().getAsASTNode<VarDecl>();
+}
+
 AllocArrayInst::AllocArrayInst(SILLocation Loc, SILType ElementType,
                                SILValue NumElements, SILFunction &F)
   : SILInstruction(ValueKind::AllocArrayInst, Loc, getAllocType(ElementType, F)),

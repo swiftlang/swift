@@ -2021,19 +2021,22 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
   //llvm_unreachable("not implemented");
 }
 
-static StringRef getNameForLoc(SILLocation loc) {
-  if (auto decl = loc.getAsASTNode<ValueDecl>())
-    return decl->getName().str();
-  return "";
-}
-
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   SILValue boxValue(i, 0);
   SILValue ptrValue(i, 1);
   const TypeInfo &type = getTypeInfo(i->getElementType());
 
-  auto Name = getNameForLoc(i->getLoc());
-  OwnedAddress addr = type.allocateBox(*this, Name);
+  // Derive name from SIL location.
+  VarDecl *Decl = i->getDecl();
+  StringRef Name = Decl ? Decl->getName().str() : "";
+  StringRef DbgName =
+# ifndef NDEBUG
+    // If this is a DEBUG build, use pretty names for the LLVM IR.
+    Name;
+# else
+    "";
+# endif
+  OwnedAddress addr = type.allocateBox(*this, DbgName);
   
   Explosion box(ExplosionKind::Maximal);
   box.add(addr.getOwner());
@@ -2044,7 +2047,8 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     IGM.DebugInfo->emitStackVariableDeclaration
       (Builder,
        emitShadowCopy(addr.getAddress(), Name),
-       DebugTypeInfo(i->getElementType().getSwiftType(), type),
+       Decl ? DebugTypeInfo(Decl, type)
+            : DebugTypeInfo(i->getElementType().getSwiftType(), type),
        Name, i, IndirectValue);
 }
 

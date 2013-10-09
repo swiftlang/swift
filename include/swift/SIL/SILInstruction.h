@@ -269,6 +269,10 @@ public:
     return getType(1).getObjectType();
   }
 
+  /// getDecl - Return the underlying variable declaration associated with this
+  /// allocation, or null if this is a temporary allocation.
+  VarDecl *getDecl() const;
+
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 
