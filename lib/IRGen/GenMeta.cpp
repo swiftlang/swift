@@ -728,7 +728,7 @@ namespace {
           = IGF.Builder.CreateBitCast(vwtAddr.getAddress(),
                                       IGF.IGM.WitnessTablePtrTy);
         
-        asImpl().emitInitializeValueWitnessTable(IGF,
+        asImpl().emitinitializeMetadata(IGF,
                                                  metadataValue, vwtableValue);
       }
       
@@ -1049,7 +1049,7 @@ namespace {
       llvm_unreachable("classes should never have dependent vwtables");
     }
 
-    void emitInitializeValueWitnessTable(IRGenFunction &IGF,
+    void emitinitializeMetadata(IRGenFunction &IGF,
                                          llvm::Value *metadata,
                                          llvm::Value *vwtable) {
       llvm_unreachable("classes should never have dependent vwtables");
@@ -2012,12 +2012,12 @@ namespace {
                 Target->getDeclaredTypeOfContext()->getCanonicalType(), Fields);
     }
                         
-    void emitInitializeValueWitnessTable(IRGenFunction &IGF,
+    void emitinitializeMetadata(IRGenFunction &IGF,
                                          llvm::Value *metadata,
                                          llvm::Value *vwtable) {
       emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
       IGM.getTypeInfo(Target->getDeclaredTypeInContext())
-        .initializeValueWitnessTable(IGF, metadata, vwtable);
+        .initializeMetadata(IGF, metadata, vwtable);
     }
   };
 }
@@ -2132,12 +2132,12 @@ public:
                 Target->getDeclaredTypeOfContext()->getCanonicalType(), Fields);
   }
   
-  void emitInitializeValueWitnessTable(IRGenFunction &IGF,
+  void emitinitializeMetadata(IRGenFunction &IGF,
                                        llvm::Value *metadata,
                                        llvm::Value *vwtable) {
     emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
     IGM.getTypeInfo(Target->getDeclaredTypeInContext())
-      .initializeValueWitnessTable(IGF, metadata, vwtable);
+      .initializeMetadata(IGF, metadata, vwtable);
   }
 };
   

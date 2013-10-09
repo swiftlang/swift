@@ -190,7 +190,7 @@ public:
   void applyFixedSpareBitsMask(llvm::BitVector &bits) const;
   
   /// Fixed-size types never need dynamic value witness table instantiation.
-  void initializeValueWitnessTable(IRGenFunction &IGF,
+  void initializeMetadata(IRGenFunction &IGF,
                                    llvm::Value *metadata,
                                    llvm::Value *vwtable) const override {}
   

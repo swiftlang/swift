@@ -1129,7 +1129,7 @@ namespace {
     llvm::Constant *getStaticAlignment(IRGenModule &IGM) const { return nullptr; }
     llvm::Constant *getStaticStride(IRGenModule &IGM) const { return nullptr; }
     
-    void initializeValueWitnessTable(IRGenFunction &IGF,
+    void initializeMetadata(IRGenFunction &IGF,
                                      llvm::Value *metadata,
                                      llvm::Value *vwtable) const override {
       // Archetypes always refer to an existing type. A witness table should

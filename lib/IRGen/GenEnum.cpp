@@ -209,7 +209,7 @@ public:
   virtual void initializeWithTake(IRGenFunction &IGF, Address dest,
                                   Address src) const = 0;
   
-  virtual void initializeValueWitnessTable(IRGenFunction &IGF,
+  virtual void initializeMetadata(IRGenFunction &IGF,
                                            llvm::Value *metadata,
                                            llvm::Value *vwtable) const = 0;
 
@@ -466,7 +466,7 @@ public:
       getLoadableSingleton()->unpackEnumPayload(IGF, payload, dest, offset);
     }
     
-    void initializeValueWitnessTable(IRGenFunction &IGF,
+    void initializeMetadata(IRGenFunction &IGF,
                                      llvm::Value *metadata,
                                      llvm::Value *vwtable) const override {
       // Fixed-size enums don't need dynamic witness table initialization.
@@ -521,7 +521,7 @@ public:
     
     bool mayHaveExtraInhabitants() const override {
       // FIXME: Hold off on registering extra inhabitants for dynamic enums
-      // until initializeValueWitnessTable handles them.
+      // until initializeMetadata handles them.
       if (!getSingleton())
         return false;
       return getSingleton()->mayHaveExtraInhabitants();
@@ -679,7 +679,7 @@ public:
       IGF.Builder.CreateStore(discriminator, discriminatorAddr);
     }
     
-    void initializeValueWitnessTable(IRGenFunction &IGF,
+    void initializeMetadata(IRGenFunction &IGF,
                                      llvm::Value *metadata,
                                      llvm::Value *vwtable) const override {
       // No-payload enums are always fixed-size so never need dynamic value
@@ -1721,7 +1721,7 @@ public:
         IGF.Builder.CreateStore(extraTag, projectExtraTagBits(IGF, enumAddr));
     }
     
-    void initializeValueWitnessTable(IRGenFunction &IGF,
+    void initializeMetadata(IRGenFunction &IGF,
                                      llvm::Value *metadata,
                                      llvm::Value *vwtable) const override
     {
@@ -2531,7 +2531,7 @@ public:
                                payloadI->ti->getStorageType()->getPointerTo());
     }
 
-    void initializeValueWitnessTable(IRGenFunction &IGF,
+    void initializeMetadata(IRGenFunction &IGF,
                                      llvm::Value *metadata,
                                      llvm::Value *vwtable) const override {
       // FIXME
@@ -2698,10 +2698,10 @@ namespace {
                         Address src) const override {
       return Strategy.assignWithTake(IGF, dest, src);
     }
-    virtual void initializeValueWitnessTable(IRGenFunction &IGF,
+    virtual void initializeMetadata(IRGenFunction &IGF,
                                          llvm::Value *metadata,
                                          llvm::Value *vwtable) const override {
-      return Strategy.initializeValueWitnessTable(IGF, metadata, vwtable);
+      return Strategy.initializeMetadata(IGF, metadata, vwtable);
     }
     bool mayHaveExtraInhabitants() const override {
       return Strategy.mayHaveExtraInhabitants();
@@ -2986,7 +2986,7 @@ namespace {
     enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/true);
 
     // Layout has to be done when the value witness table is instantiated,
-    // during initializeValueWitnessTable.
+    // during initializeMetadata.
     return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy, type,
                        getPayloadTypeInfo().getBestKnownAlignment(),
                        getPayloadTypeInfo().isPOD(ResilienceScope::Component)));

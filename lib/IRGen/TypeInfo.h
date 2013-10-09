@@ -258,7 +258,7 @@ public:
   
   /// Initialize a freshly instantiated value witness table. Should be a no-op
   /// for fixed-size types.
-  virtual void initializeValueWitnessTable(IRGenFunction &IGF,
+  virtual void initializeMetadata(IRGenFunction &IGF,
                                            llvm::Value *metadata,
                                            llvm::Value *vwtable) const = 0;
 };

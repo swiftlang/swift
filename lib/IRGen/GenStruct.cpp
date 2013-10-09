@@ -184,7 +184,7 @@ namespace {
       return IGF.emitValueWitnessTableRefForMetadata(metadata);
     }
                                     
-    void initializeValueWitnessTable(IRGenFunction &IGF,
+    void initializeMetadata(IRGenFunction &IGF,
                                      llvm::Value *metadata,
                                      llvm::Value *vwtable) const override {
       // FIXME

@@ -195,7 +195,7 @@ namespace {
       return IGF.emitValueWitnessTableRefForMetadata(metadata);
     }
 
-    void initializeValueWitnessTable(IRGenFunction &IGF,
+    void initializeMetadata(IRGenFunction &IGF,
                                      llvm::Value *metadata,
                                      llvm::Value *vwtable) const override {
       // Tuple value witness tables are instantiated by the runtime along with
