@@ -336,7 +336,7 @@ public:
 
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  void processREPLTopLevel(TranslationUnit *TU, unsigned StartElem);
+  void processREPLTopLevel(SourceFile &SF, unsigned StartElem);
   Identifier getNextResponseVariableName(DeclContext *DC);
 
   void typeCheckDecl(Decl *D, bool isFirstPass);

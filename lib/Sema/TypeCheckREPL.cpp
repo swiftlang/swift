@@ -504,7 +504,7 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
 /// generatePrintOfExpression - Emit logic to print the specified expression
 /// value with the given description of the pattern involved.
 static void generatePrintOfExpression(StringRef NameStr, Expr *E,
-                                      TypeChecker *TC, TranslationUnit *TU) {
+                                      TypeChecker *TC, SourceFile &SF) {
   ASTContext &C = TC->Context;
 
   // Always print rvalues, not lvalues.
@@ -536,7 +536,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
                        Arg->getDeclContext(),
                        /*allowUnknownTypes*/false);
   ClosureExpr *CE =
-      new (C) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(), TU);
+      new (C) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(), &SF.TU);
   Type FuncTy = FunctionType::get(ParamPat->getType(), TupleType::getEmpty(C),
                                   C);
   CE->setType(FuncTy);
@@ -576,7 +576,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   // Inject the call into the top level stream by wrapping it with a TLCD.
   auto *BS = BraceStmt::create(C, Loc, BraceStmt::ExprStmtOrDecl(TheCall),
                                EndLoc);
-  TU->MainSourceFile->Decls.push_back(new (C) TopLevelCodeDecl(TU, BS));
+  SF.Decls.push_back(new (C) TopLevelCodeDecl(&SF.TU, BS));
 }
 
 
@@ -584,8 +584,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
 /// processREPLTopLevelExpr - When we see an Expression in a TopLevelCodeDecl
 /// in the REPL, process it, adding the proper decls back to the top level of
 /// the TranslationUnit.
-static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC,
-                                    TranslationUnit *TU) {
+static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC, SourceFile &SF) {
   CanType T = E->getType()->getCanonicalType();
   
   // Don't try to print invalid expressions, module exprs, or void expressions.
@@ -598,39 +597,40 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC,
   // in the future.  However, if this is a direct reference to a decl (e.g. "x")
   // then don't create a repl metavariable.
   if (VarDecl *d = getObviousDECLFromExpr(E)) {
-    generatePrintOfExpression(d->getName().str(), E, TC, TU);
+    generatePrintOfExpression(d->getName().str(), E, TC, SF);
     return;
   }
   
   // Remove the expression from being in the list of decls to execute, we're
   // going to reparent it.
-  TU->MainSourceFile->Decls.pop_back();
+  SF.Decls.pop_back();
 
   E = TC->coerceToMaterializable(E);
 
   // Create the meta-variable, let the typechecker name it.
-  Identifier name = TC->getNextResponseVariableName(TU);
+  Identifier name = TC->getNextResponseVariableName(&SF.TU);
   VarDecl *vd = new (TC->Context) VarDecl(E->getStartLoc(), name,
-                                          E->getType(), TU);
-  TU->MainSourceFile->Decls.push_back(vd);
+                                          E->getType(), &SF.TU);
+  SF.Decls.push_back(vd);
 
   // Create a PatternBindingDecl to bind the expression into the decl.
   Pattern *metavarPat = new (TC->Context) NamedPattern(vd);
   metavarPat->setType(E->getType());
   PatternBindingDecl *metavarBinding
-    = new (TC->Context) PatternBindingDecl(E->getStartLoc(), metavarPat, E, TU);
-  TU->MainSourceFile->Decls.push_back(metavarBinding);
+    = new (TC->Context) PatternBindingDecl(E->getStartLoc(), metavarPat, E,
+                                           &SF.TU);
+  SF.Decls.push_back(metavarBinding);
 
   // Finally, print the variable's value.
   E = TC->buildCheckedRefExpr(vd, E->getStartLoc(), /*Implicit=*/true);
-  generatePrintOfExpression(vd->getName().str(), E, TC, TU);
+  generatePrintOfExpression(vd->getName().str(), E, TC, SF);
 }
 
 /// processREPLTopLevelPatternBinding - When we see a new PatternBinding parsed
 /// into the REPL, process it by generating code to print it out.
 static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
                                               TypeChecker *TC,
-                                              TranslationUnit *TU) {
+                                              SourceFile &SF) {
   // If there is no initializer for the new variable, don't auto-print it.
   // This would just cause a confusing definite initialization error.  Some
   // day we will do some high level analysis of uninitialized variables
@@ -649,7 +649,7 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
                                            getSemanticsProvidingPattern())) {
     Expr *E = TC->buildCheckedRefExpr(NP->getDecl(), PBD->getStartLoc(),
                                       /*Implicit=*/true);
-    generatePrintOfExpression(PatternString, E, TC, TU);
+    generatePrintOfExpression(PatternString, E, TC, SF);
     return;
   }
 
@@ -663,14 +663,14 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   //   replPrint(r123)
   
   // Remove PBD from the list of Decls so we can insert before it.
-  auto PBTLCD = cast<TopLevelCodeDecl>(TU->MainSourceFile->Decls.back());
-  TU->MainSourceFile->Decls.pop_back();
+  auto PBTLCD = cast<TopLevelCodeDecl>(SF.Decls.back());
+  SF.Decls.pop_back();
 
   // Create the meta-variable, let the typechecker name it.
-  VarDecl *vd = new (TC->Context) VarDecl(PBD->getStartLoc(),
-                                          TC->getNextResponseVariableName(TU),
-                                          PBD->getPattern()->getType(), TU);
-  TU->MainSourceFile->Decls.push_back(vd);
+  Identifier name = TC->getNextResponseVariableName(&SF.TU);
+  VarDecl *vd = new (TC->Context) VarDecl(PBD->getStartLoc(), name,
+                                          PBD->getPattern()->getType(), &SF.TU);
+  SF.Decls.push_back(vd);
 
   
   // Create a PatternBindingDecl to bind the expression into the decl.
@@ -678,25 +678,25 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   metavarPat->setType(vd->getType());
   PatternBindingDecl *metavarBinding
     = new (TC->Context) PatternBindingDecl(PBD->getStartLoc(), metavarPat,
-                                           PBD->getInit(), TU);
+                                           PBD->getInit(), &SF.TU);
 
   auto MVBrace = BraceStmt::create(TC->Context, metavarBinding->getStartLoc(),
                                    BraceStmt::ExprStmtOrDecl(metavarBinding),
                                    metavarBinding->getEndLoc());
 
-  auto *MVTLCD = new (TC->Context) TopLevelCodeDecl(TU, MVBrace);
-  TU->MainSourceFile->Decls.push_back(MVTLCD);
+  auto *MVTLCD = new (TC->Context) TopLevelCodeDecl(&SF.TU, MVBrace);
+  SF.Decls.push_back(MVTLCD);
 
   
   // Replace the initializer of PBD with a reference to our repl temporary.
   Expr *E = TC->buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
   E = TC->coerceToMaterializable(E);
   PBD->setInit(E);
-  TU->MainSourceFile->Decls.push_back(PBTLCD);
+  SF.Decls.push_back(PBTLCD);
 
   // Finally, print out the result, by referring to the repl temp.
   E = TC->buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
-  generatePrintOfExpression(PatternString, E, TC, TU);
+  generatePrintOfExpression(PatternString, E, TC, SF);
 }
 
 
@@ -704,17 +704,16 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
 /// processREPLTopLevel - This is called after we've parsed and typechecked some
 /// new decls at the top level.  We inject code to print out expressions and
 /// pattern bindings the are evaluated.
-void TypeChecker::processREPLTopLevel(TranslationUnit *TU, unsigned FirstDecl) {
+void TypeChecker::processREPLTopLevel(SourceFile &SF, unsigned FirstDecl) {
   // Loop over all of the new decls, moving them out of the Decls list, then
   // adding them back (with modifications) one at a time.
-  std::vector<Decl*> NewDecls(TU->MainSourceFile->Decls.begin()+FirstDecl,
-                              TU->MainSourceFile->Decls.end());
-  TU->MainSourceFile->Decls.resize(FirstDecl);
+  std::vector<Decl*> NewDecls(SF.Decls.begin()+FirstDecl, SF.Decls.end());
+  SF.Decls.resize(FirstDecl);
 
   // Loop over each of the new decls, processing them, adding them back to
   // the TU->Decls list.
   for (Decl *D : NewDecls) {
-    TU->MainSourceFile->Decls.push_back(D);
+    SF.Decls.push_back(D);
 
     TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D);
     if (TLCD == 0) continue;
@@ -723,10 +722,10 @@ void TypeChecker::processREPLTopLevel(TranslationUnit *TU, unsigned FirstDecl) {
 
     // Check to see if the TLCD has an expression that we have to transform.
     if (Expr *E = Entry.dyn_cast<Expr*>())
-      processREPLTopLevelExpr(E, this, TU);
+      processREPLTopLevelExpr(E, this, SF);
     else if (Decl *D = Entry.dyn_cast<Decl*>())
       if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
-        processREPLTopLevelPatternBinding(PBD, this, TU);
+        processREPLTopLevelPatternBinding(PBD, this, SF);
   }
 }
 

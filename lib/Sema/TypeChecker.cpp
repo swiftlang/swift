@@ -616,8 +616,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // If we're in REPL mode, inject temporary result variables and other stuff
   // that the REPL needs to synthesize.
   if (TU->MainSourceFile->Kind == SourceFile::REPL && !TC.Context.hadError())
-    TC.processREPLTopLevel(TU, StartElem);
-  
+    TC.processREPLTopLevel(*TU->MainSourceFile, StartElem);
+
   // Check overloaded vars/funcs.
   // FIXME: This is quadratic time for TUs with multiple chunks.
   // FIXME: Can we make this more efficient?
