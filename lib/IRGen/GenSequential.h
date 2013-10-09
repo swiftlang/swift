@@ -74,6 +74,10 @@ public:
     return Layout.project(IGF, seq, offsets, "." + asImpl()->getFieldName());
   }
   
+  ElementLayout::Kind getKind() const {
+    return Layout.getKind();
+  }
+  
   Size getFixedByteOffset() const {
     return Layout.getByteOffset();
   }

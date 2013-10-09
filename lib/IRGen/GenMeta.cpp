@@ -36,6 +36,7 @@
 #include "GenClass.h"
 #include "GenPoly.h"
 #include "GenProto.h"
+#include "GenStruct.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
 #include "ScalarTypeInfo.h"
@@ -728,7 +729,7 @@ namespace {
           = IGF.Builder.CreateBitCast(vwtAddr.getAddress(),
                                       IGF.IGM.WitnessTablePtrTy);
         
-        asImpl().emitinitializeMetadata(IGF,
+        asImpl().emitInitializeMetadata(IGF,
                                                  metadataValue, vwtableValue);
       }
       
@@ -1049,7 +1050,7 @@ namespace {
       llvm_unreachable("classes should never have dependent vwtables");
     }
 
-    void emitinitializeMetadata(IRGenFunction &IGF,
+    void emitInitializeMetadata(IRGenFunction &IGF,
                                          llvm::Value *metadata,
                                          llvm::Value *vwtable) {
       llvm_unreachable("classes should never have dependent vwtables");
@@ -1915,6 +1916,8 @@ namespace {
 
   protected:
     using super::IGM;
+    using super::Target;
+
     SmallVector<llvm::Constant *, 8> Fields;
 
     StructMetadataBuilderBase(IRGenModule &IGM, StructDecl *theStruct)
@@ -1935,6 +1938,19 @@ namespace {
     void addParentMetadataRef() {
       // FIXME!
       Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+    }
+    
+    void addFieldOffset(VarDecl *var) {
+      assert(!var->isComputed()
+             && "storing field offset for computed property?!");
+      llvm::Constant *offset = emitPhysicalStructMemberFixedOffset(IGM,
+                  Target->getDeclaredTypeInContext()->getCanonicalType(), var);
+      // If we have a fixed offset, add it. Otherwise, leave zero as a
+      // placeholder.
+      if (offset)
+        Fields.push_back(offset);
+      else
+        Fields.push_back(llvm::ConstantInt::get(IGM.SizeTy, 0));
     }
 
     void addGenericArgument(ArchetypeType *type) {
@@ -2012,9 +2028,9 @@ namespace {
                 Target->getDeclaredTypeOfContext()->getCanonicalType(), Fields);
     }
                         
-    void emitinitializeMetadata(IRGenFunction &IGF,
-                                         llvm::Value *metadata,
-                                         llvm::Value *vwtable) {
+    void emitInitializeMetadata(IRGenFunction &IGF,
+                                llvm::Value *metadata,
+                                llvm::Value *vwtable) {
       emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
       IGM.getTypeInfo(Target->getDeclaredTypeInContext())
         .initializeMetadata(IGF, metadata, vwtable);
@@ -2132,7 +2148,7 @@ public:
                 Target->getDeclaredTypeOfContext()->getCanonicalType(), Fields);
   }
   
-  void emitinitializeMetadata(IRGenFunction &IGF,
+  void emitInitializeMetadata(IRGenFunction &IGF,
                                        llvm::Value *metadata,
                                        llvm::Value *vwtable) {
     emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);

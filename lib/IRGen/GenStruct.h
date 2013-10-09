@@ -17,6 +17,10 @@
 #ifndef SWIFT_IRGEN_GENSTRUCT_H
 #define SWIFT_IRGEN_GENSTRUCT_H
 
+namespace llvm {
+  class Constant;
+}
+
 namespace swift {
   class MemberRefExpr;
   class CanType;
@@ -27,6 +31,7 @@ namespace irgen {
   class Address;
   class Explosion;
   class IRGenFunction;
+  class IRGenModule;
   
   Address projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                              Address base,
@@ -37,6 +42,12 @@ namespace irgen {
                                                 Explosion &base,
                                                 VarDecl *field,
                                                 Explosion &out);
+
+  /// Return the constant offset of the given stored property in a struct,
+  /// or return nullptr if the field does not have fixed layout.
+  llvm::Constant *emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
+                                                      CanType baseType,
+                                                      VarDecl *field);
 
 } // end namespace irgen
 } // end namespace swift

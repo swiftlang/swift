@@ -2,23 +2,35 @@
 
 import Builtin
 
+// -- Generic structs with dynamic layout contain the vwtable pattern as part
+//    of the metadata pattern, and no independent vwtable symbol
 // CHECK-NOT: @_TWVV15generic_structs13SingleDynamic
-
 // CHECK: @_TMPdV15generic_structs13SingleDynamic = global {{[{].*\* [}]}} {
 // -- template header
 // CHECK:   void (i8*, i8*)* [[SINGLE_DYNAMIC_FILL_METADATA:@fill_generic_metadata[0-9]*]],
-// CHECK:   i32 168, i16 1, i16 8, [8 x i8*] zeroinitializer,
+// CHECK:   i32 176, i16 1, i16 8, [8 x i8*] zeroinitializer,
 // -- placeholder for vwtable pointer
 // CHECK:   i8* null,
 // -- address point
-// CHECK:   i64 1, i8* null, %swift.type* null, %swift.type* null,
+// CHECK:   i64 1, i8* null, %swift.type* null, i64 0, %swift.type* null,
 // -- tail-allocated vwtable pattern
 // CHECK:   i8* bitcast (void ([24 x i8]*, %swift.type*)* @_TwXXV15generic_structs13SingleDynamic to i8*),
 // -- ...
 // -- placeholder for size, flags, stride
 // CHECK:   i8* null, i8* null, i8* null }
-
 // CHECK-NOT: @_TWVV15generic_structs13SingleDynamic
+
+// -- Fixed-layout struct metadata contains fixed field offsets
+// CHECK: @_TMdV15generic_structs6Intish = constant { {{.*}} i64 } {
+// CHECK:   i64 0
+// CHECK: }
+// CHECK: @_TMdV15generic_structs7Chareth = constant { {{.*}} i64 } {
+// CHECK:   i64 0
+// CHECK: }
+// CHECK: @_TMdV15generic_structs8Stringly = constant { {{.*}} i64, i64, i64 } {
+// CHECK:   i64 0, i64 8, i64 16
+// CHECK: }
+
 
 struct SingleDynamic<T> {
   var x : T
@@ -26,6 +38,11 @@ struct SingleDynamic<T> {
 
 struct Intish { var value : Builtin.Int64 }
 struct Chareth { var value : Builtin.Int21 }
+struct Stringly {
+  var owner : Builtin.ObjectPointer
+  var base : Builtin.RawPointer
+  var size : Builtin.Int64
+}
 
 // CHECK-LABEL: define { i64, i21 } @concrete_instances(i64, i21) {
 // CHECK: entry:
@@ -49,7 +66,7 @@ entry:
 
 // CHECK: define linkonce_odr hidden void @_TwXXV15generic_structs13SingleDynamic([24 x i8]* %buffer, %swift.type* %Self) {
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:   [[SELF_T_ADDR:%.*]] = getelementptr inbounds %swift.type** [[SELF_ARRAY]], i64 3
+// CHECK:   [[SELF_T_ADDR:%.*]] = getelementptr inbounds %swift.type** [[SELF_ARRAY]], i64 4
 // CHECK:   %T = load %swift.type** [[SELF_T_ADDR]], align 8
 
 // CHECK: define internal void [[SINGLE_DYNAMIC_FILL_METADATA]](i8*, i8*) {
@@ -57,12 +74,12 @@ entry:
 // CHECK:   [[METADATA_ADDR:%.*]] = bitcast i8* %0 to i64*
 // CHECK:   [[ARGS_ADDR:%.*]] = bitcast i8* %1 to i64*
 // -- fill ops
-// CHECK:   [[METADATA_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 4
+// CHECK:   [[METADATA_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 5
 // CHECK:   [[ARGS_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[ARGS_ADDR]], i32 0
 // CHECK:   [[ARG:%.*]] = load i64* [[ARGS_SLOT_ADDR]], align 8
 // CHECK:   store i64 [[ARG]], i64* [[METADATA_SLOT_ADDR]], align 8
 // -- store vwtable reference
-// CHECK:   [[VWTABLE_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 5
+// CHECK:   [[VWTABLE_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 6
 // CHECK:   [[VWTABLE_VAL:%.*]] = ptrtoint i64* [[VWTABLE_ADDR]] to i64
 // CHECK:   [[VWTABLE_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 0
 // CHECK:   store i64 [[VWTABLE_VAL]], i64* [[VWTABLE_SLOT_ADDR]], align 8

@@ -50,6 +50,10 @@ public:
 
     // If changing this layout, you must update the magic number in
     // emitParentMetadataRef.
+    
+    // Struct field offsets.
+    for (VarDecl *prop : Target->getStoredProperties())
+      asImpl().addFieldOffset(prop);
 
     // Instantiation-specific.
     if (auto generics = Target->getGenericParamsOfContext()) {
@@ -75,6 +79,7 @@ public:
   void addValueWitnessTable() { NextIndex++; }
   void addNominalTypeDescriptor() { NextIndex++; }
   void addParentMetadataRef() { NextIndex++; }
+  void addFieldOffset(VarDecl*) { NextIndex++; }
   void addGenericArgument(ArchetypeType *argument) { NextIndex++; }
   void addGenericWitnessTable(ArchetypeType *argument,
                               ProtocolDecl *protocol) {

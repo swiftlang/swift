@@ -95,12 +95,24 @@ namespace {
     Address projectFieldAddress(IRGenFunction &IGF,
                                 Address addr,
                                 VarDecl *field) const {
-      auto &fieldInfo = getFieldInfo(field);
+      const StructFieldInfo &fieldInfo = getFieldInfo(field);
       if (fieldInfo.isEmpty())
         return fieldInfo.getTypeInfo().getUndefAddress();
 
       auto offsets = asImpl().getNonFixedOffsets(IGF);
       return fieldInfo.projectAddress(IGF, addr, offsets);
+    }
+       
+    /// Return the constant offset of a field as a SizeTy, or nullptr if the
+    /// field is not at a fixed offset.
+    llvm::Constant *getConstantFieldOffset(IRGenModule &IGM,
+                                           VarDecl *field) const {
+      const StructFieldInfo &fieldInfo = getFieldInfo(field);
+      if (fieldInfo.getKind() == ElementLayout::Kind::Fixed) {
+        return llvm::ConstantInt::get(IGM.SizeTy,
+                                    fieldInfo.getFixedByteOffset().getValue());
+      }
+      return nullptr;
     }
   };
 
@@ -269,6 +281,12 @@ void irgen::projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
                                                      VarDecl *field,
                                                      Explosion &out) {
   FOR_STRUCT_IMPL(IGF, baseType, projectFieldFromExplosion, base, field, out);
+}
+
+llvm::Constant *irgen::emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
+                                                           CanType baseType,
+                                                           VarDecl *field) {
+  FOR_STRUCT_IMPL(IGM, baseType, getConstantFieldOffset, field);
 }
 
 /// emitStructDecl - Emit all the declarations associated with this struct type.
