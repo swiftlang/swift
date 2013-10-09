@@ -125,6 +125,7 @@ public:
              Kind == ChunkKind::CallParameterName ||
              Kind == ChunkKind::CallParameterColon ||
              Kind == ChunkKind::CallParameterType ||
+             Kind == ChunkKind::GenericParameterName ||
              Kind == ChunkKind::DynamicLookupMethodCallTail ||
              Kind == ChunkKind::TypeAnnotation;
     }
