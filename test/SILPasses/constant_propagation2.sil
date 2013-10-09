@@ -4,11 +4,13 @@ import Builtin
 // fold_sadd_with_overflow_Overflow
 sil @fold_sadd_with_overflow_Overflow : $[thin] (x: Builtin.RawPointer) -> Builtin.Int64 {
 bb0(%0 : $Builtin.RawPointer):
-  %1 = builtin_function_ref #Builtin.sadd_with_overflow_Int64 : $[thin] (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) 
-  %2 = integer_literal $Builtin.Int64, 9223372036854775807
-  %3 = integer_literal $Builtin.Int64, 9223372036854775807
-  %21 = integer_literal $Builtin.Int1, 1
-  %4 = apply %1(%2, %3, %21) : $[thin] (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) // expected-error {{results in an overflow}}
-  %8 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 0
+  %1 = builtin_function_ref #Builtin.int_sadd_with_overflow_Int64 : $[thin] (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // user: %4
+  %2 = integer_literal $Builtin.Int64, 9223372036854775807 // user: %4
+  %3 = integer_literal $Builtin.Int64, 9223372036854775807 // user: %4
+  %4 = apply %1(%2, %3) : $[thin] (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // users: %8, %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // users: %7, %7
+  %6 = builtin_function_ref #Builtin.staticReport : $[thin] (Builtin.Int1, Builtin.Int1, Builtin.RawPointer) -> () // user: %7
+  %7 = apply %6(%5, %5, %0) : $[thin] (Builtin.Int1, Builtin.Int1, Builtin.RawPointer) -> () // expected-error {{static report error}}
+  %8 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 0 // user: %9
   return %8 : $Builtin.Int64
 }

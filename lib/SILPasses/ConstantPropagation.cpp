@@ -34,118 +34,77 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                          diag, std::forward<U>(args)...);
 }
 
-/// \brief Fold arithmetic intrinsics with overflow.
-static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
-                                                      llvm::Intrinsic::ID ID,
-                                                      SILModule &M,
-                                                      bool ReportOverflow) {
-  OperandValueArrayRef Args = AI->getArguments();
-  assert(Args.size() >= 2);
-
-  // Check if both arguments are literals.
-  IntegerLiteralInst *Op1 = dyn_cast<IntegerLiteralInst>(Args[0]);
-  IntegerLiteralInst *Op2 = dyn_cast<IntegerLiteralInst>(Args[1]);
-
-  // We cannot fold a builtin if one of the arguments is not a constant.
-  if (!Op1 || !Op2)
-    return nullptr;
-
-  // Calculate the result.
-  APInt LHSInt = Op1->getValue();
-  APInt RHSInt = Op2->getValue();
-  APInt Res;
-  bool Overflow;
-  bool Signed = false;
-  std::string Operator = "+";
-
-  switch (ID) {
-  default: llvm_unreachable("Invalid case");
-  case llvm::Intrinsic::sadd_with_overflow:
-    Res = LHSInt.sadd_ov(RHSInt, Overflow);
-    Signed = true;
-    break;
-  case llvm::Intrinsic::uadd_with_overflow:
-    Res = LHSInt.uadd_ov(RHSInt, Overflow);
-    break;
-  case llvm::Intrinsic::ssub_with_overflow:
-    Res = LHSInt.ssub_ov(RHSInt, Overflow);
-    Operator = "-";
-    Signed = true;
-    break;
-  case llvm::Intrinsic::usub_with_overflow:
-    Res = LHSInt.usub_ov(RHSInt, Overflow);
-    Operator = "-";
-    break;
-  case llvm::Intrinsic::smul_with_overflow:
-    Res = LHSInt.smul_ov(RHSInt, Overflow);
-    Operator = "*";
-    Signed = true;
-    break;
-  case llvm::Intrinsic::umul_with_overflow:
-    Res = LHSInt.umul_ov(RHSInt, Overflow);
-    Operator = "*";
-    break;
-  }
-
-  // Get the SIL subtypes of the returned tuple type.
-  SILType FuncResType = AI->getFunctionTypeInfo(M)->getResultType();
-  TupleType *T = FuncResType.castTo<TupleType>();
-  assert(T->getNumElements() == 2);
-  SILType ResTy1 =
-  SILType::getPrimitiveType(CanType(T->getElementType(0)),
-                            SILValueCategory::Object);
-  SILType ResTy2 =
-  SILType::getPrimitiveType(CanType(T->getElementType(1)),
-                            SILValueCategory::Object);
-
-  // Construct the folded instruction - a tuple of two literals, the
-  // result and overflow.
-  SILBuilder B(AI);
-  SILValue Result[] = {
-    B.createIntegerLiteral(AI->getLoc(), ResTy1, Res),
-    B.createIntegerLiteral(AI->getLoc(), ResTy2, Overflow)
-  };
-
-  // If we can statically determine that the operation overflows,
-  // warn about it.
-  if (Overflow && ReportOverflow) {
-    diagnose(M.getASTContext(),
-             AI->getLoc().getSourceLoc(),
-             diag::arithmetic_operation_overflow,
-             LHSInt.toString(/*Radix*/ 10, Signed),
-             Operator,
-             RHSInt.toString(/*Radix*/ 10, Signed));
-  }
-
-  return B.createTuple(AI->getLoc(), FuncResType, Result);
-}
-
-static SILInstruction *constantFoldOverflowBuiltin(ApplyInst *AI,
-                                                   BuiltinValueKind ID,
-                                                   SILModule &M) {
-  OperandValueArrayRef Args = AI->getArguments();
-  IntegerLiteralInst *ShouldReportFlag = dyn_cast<IntegerLiteralInst>(Args[2]);
-  return constantFoldBinaryWithOverflow(AI,
-           getLLVMIntrinsicIDForBuiltinWithOverflow(ID), M,
-           ShouldReportFlag && (ShouldReportFlag->getValue() == 1));
-}
-
 static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
                                              llvm::Intrinsic::ID ID,
                                              SILModule &M) {
-  switch (ID) {
-    default: break;
-    case llvm::Intrinsic::sadd_with_overflow:
-    case llvm::Intrinsic::uadd_with_overflow:
-    case llvm::Intrinsic::ssub_with_overflow:
-    case llvm::Intrinsic::usub_with_overflow:
-    case llvm::Intrinsic::smul_with_overflow:
-    case llvm::Intrinsic::umul_with_overflow: {
-      return constantFoldBinaryWithOverflow(AI, ID, M, /*ReportOverflow*/false);
+  OperandValueArrayRef Args = AI->getArguments();
+
+  if (Args.size() == 2) {
+    // Check if both arguments are literals.
+    if (IntegerLiteralInst *Op1 = dyn_cast<IntegerLiteralInst>(Args[0])) {
+      if (IntegerLiteralInst *Op2 = dyn_cast<IntegerLiteralInst>(Args[1])) {
+
+        switch (ID) {
+        default: break;
+        case llvm::Intrinsic::sadd_with_overflow:
+        case llvm::Intrinsic::uadd_with_overflow:
+        case llvm::Intrinsic::ssub_with_overflow:
+        case llvm::Intrinsic::usub_with_overflow:
+        case llvm::Intrinsic::smul_with_overflow:
+        case llvm::Intrinsic::umul_with_overflow: {
+          // Handle arithmetic intrinsics with overflow.
+          // First, Calculate the result.
+          APInt Res;
+          bool Overflow;
+          switch (ID) {
+          default: llvm_unreachable("Invalid case");
+          case llvm::Intrinsic::sadd_with_overflow:
+            Res = Op1->getValue().sadd_ov(Op2->getValue(), Overflow);
+            break;
+          case llvm::Intrinsic::uadd_with_overflow:
+            Res = Op1->getValue().uadd_ov(Op2->getValue(), Overflow);
+            break;
+          case llvm::Intrinsic::ssub_with_overflow:
+            Res = Op1->getValue().ssub_ov(Op2->getValue(), Overflow);
+            break;
+          case llvm::Intrinsic::usub_with_overflow:
+            Res = Op1->getValue().usub_ov(Op2->getValue(), Overflow);
+            break;
+          case llvm::Intrinsic::smul_with_overflow:
+            Res = Op1->getValue().smul_ov(Op2->getValue(), Overflow);
+            break;
+          case llvm::Intrinsic::umul_with_overflow:
+            Res = Op1->getValue().umul_ov(Op2->getValue(), Overflow);
+            break;
+          }
+
+          // Get the SIL subtypes of the returned tuple type.
+          SILType FuncResType = AI->getFunctionTypeInfo(M)->getResultType();
+          TupleType *T = FuncResType.castTo<TupleType>();
+          assert(T->getNumElements() == 2);
+          SILType ResTy1 =
+          SILType::getPrimitiveType(CanType(T->getElementType(0)),
+                                    SILValueCategory::Object);
+          SILType ResTy2 =
+          SILType::getPrimitiveType(CanType(T->getElementType(1)),
+                                    SILValueCategory::Object);
+
+          // Construct the folded instruction - a tuple of two literals, the
+          // result and overflow.
+          SILBuilder B(AI);
+          SILValue Result[] = {
+            B.createIntegerLiteral(AI->getLoc(), ResTy1, Res),
+            B.createIntegerLiteral(AI->getLoc(), ResTy2, Overflow)
+          };
+          return B.createTuple(AI->getLoc(), FuncResType, Result);
+        }
+        } // end of switch(ID)
+      }
     }
   }
   return nullptr;
 }
+
 static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
                                            BuiltinFunctionRefInst *FR,
                                            SILModule &M) {
@@ -162,13 +121,6 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 
   switch (Builtin.ID) {
     default: break;
-
-#define BUILTIN(id, name, Attrs)
-#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
-    case BuiltinValueKind::id:
-#include "swift/AST/Builtins.def"
-      return constantFoldOverflowBuiltin(AI, Builtin.ID, M);
-
     case BuiltinValueKind::Trunc:
     case BuiltinValueKind::ZExt:
     case BuiltinValueKind::SExt: {

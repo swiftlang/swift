@@ -63,33 +63,28 @@ enum class OverloadedBuiltinKind : unsigned char {
   Special
 };
 
+
+/// getBuiltinBaseName - Decode the type list of a builtin (e.g. mul_Int32) and
+/// return the base name (e.g. "mul").
+StringRef getBuiltinBaseName(ASTContext &C, StringRef Name,
+                             SmallVectorImpl<Type> &Types);
+
+/// getLLVMIntrinsicID - Given an LLVM IR intrinsic name with argument types
+/// remove (e.g. like "bswap") return the LLVM IR IntrinsicID for the intrinsic
+/// or 0 if the intrinsic name doesn't match anything.
+unsigned getLLVMIntrinsicID(StringRef Name, bool HasArgTypes);
+  
+/// getBuiltinValue - Finds the builtin value with the given name.
+///
+/// Returns null if the name does not identifier a known builtin value.
+ValueDecl *getBuiltinValue(ASTContext &Context, Identifier Name);
+
 /// BuiltinValueKind - The set of (possibly overloaded) builtin functions.
 enum class BuiltinValueKind {
   None = 0,
 #define BUILTIN(Id, Name, Attrs) Id,
 #include "swift/AST/Builtins.def"
 };
-
-/// Decode the type list of a builtin (e.g. mul_Int32) and return the base
-/// name (e.g. "mul").
-StringRef getBuiltinBaseName(ASTContext &C, StringRef Name,
-                             SmallVectorImpl<Type> &Types);
-
-/// Given an LLVM IR intrinsic name with argument types remove (e.g. like
-/// "bswap") return the LLVM IR IntrinsicID for the intrinsic or 0 if the
-/// intrinsic name doesn't match anything.
-unsigned getLLVMIntrinsicID(StringRef Name, bool HasArgTypes);
-
-/// Get the LLVM intrinsic ID that corresponds to the given builtin with
-/// overflow.
-llvm::Intrinsic::ID
-getLLVMIntrinsicIDForBuiltinWithOverflow(BuiltinValueKind ID);
-
-
-/// \brief Finds the builtin value with the given name.
-///
-/// Returns null if the name does not identifier a known builtin value.
-ValueDecl *getBuiltinValue(ASTContext &Context, Identifier Name);
 
 /// \brief The information identifying the builtin - it's kind and types.
 struct BuiltinInfo {

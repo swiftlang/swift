@@ -934,23 +934,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return out->add(v); \
   }
 
-#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
-if (Builtin.ID == BuiltinValueKind::id) { \
-  SmallVector<llvm::Type*, 2> ArgTys; \
-  ArgTys.push_back(IGF.IGM.getTypeInfo(IInfo.Types[0]).getStorageType()); \
-  auto F = llvm::Intrinsic::getDeclaration(&IGF.IGM.Module, \
-    getLLVMIntrinsicIDForBuiltinWithOverflow(Builtin.ID), ArgTys); \
-  SmallVector<llvm::Value*, 2> IRArgs; \
-  IRArgs.push_back(args.claimNext()); \
-  IRArgs.push_back(args.claimNext()); \
-  args.claimNext();\
-  llvm::Value *TheCall = IGF.Builder.CreateCall(F, IRArgs); \
-  extractScalarResults(IGF, TheCall, *out); \
-  return; \
-}
-  // FIXME: We could generate the code to dynamically report the overflow if the
-  // thrid argument is true. Now, we just ignore it.
-
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
   if (Builtin.ID == BuiltinValueKind::id) \
     return emitCompareBuiltin(IGF, fn, *out, args, llvm::CmpInst::id);
