@@ -75,8 +75,16 @@ public:
       RightParen,
       LeftBracket,
       RightBracket,
+      LeftAngle,
+      RightAngle,
       Dot,
       Comma,
+
+      /// The first chunk of a substring that describes the parameter for a
+      /// generic type.
+      GenericParameterBegin,
+      /// Generic type parameter name.
+      GenericParameterName,
 
       /// The first chunk of a substring that describes the parameter for a
       /// function call.
@@ -110,6 +118,8 @@ public:
              Kind == ChunkKind::RightParen ||
              Kind == ChunkKind::LeftBracket ||
              Kind == ChunkKind::RightBracket ||
+             Kind == ChunkKind::LeftAngle ||
+             Kind == ChunkKind::RightAngle ||
              Kind == ChunkKind::Dot ||
              Kind == ChunkKind::Comma ||
              Kind == ChunkKind::CallParameterName ||
@@ -377,6 +387,14 @@ public:
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::RightBracket, "]");
   }
 
+  void addLeftAngle() {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::LeftAngle, "<");
+  }
+
+  void addRightAngle() {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::RightAngle, ">");
+  }
+
   void addLeadingDot() {
     HasLeadingDot = true;
     addDot();
@@ -414,6 +432,15 @@ public:
     }
     addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::CallParameterType, Type);
+    CurrentNestingLevel--;
+  }
+
+  void addGenericParameter(StringRef Name) {
+    CurrentNestingLevel++;
+    addSimpleChunk(
+       CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin);
+    addChunkWithText(
+      CodeCompletionString::Chunk::ChunkKind::GenericParameterName, Name);
     CurrentNestingLevel--;
   }
 

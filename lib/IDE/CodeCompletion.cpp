@@ -72,15 +72,19 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::RightParen:
     case Chunk::ChunkKind::LeftBracket:
     case Chunk::ChunkKind::RightBracket:
+    case Chunk::ChunkKind::LeftAngle:
+    case Chunk::ChunkKind::RightAngle:
     case Chunk::ChunkKind::Dot:
     case Chunk::ChunkKind::Comma:
     case Chunk::ChunkKind::CallParameterName:
     case Chunk::ChunkKind::CallParameterColon:
     case Chunk::ChunkKind::CallParameterType:
+    case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
       OS << C.getText();
       break;
     case Chunk::ChunkKind::OptionalBegin:
     case Chunk::ChunkKind::CallParameterBegin:
+    case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
       OS << "{#";
       break;
     case Chunk::ChunkKind::DynamicLookupMethodCallTail:
@@ -308,6 +312,8 @@ StringRef getFirstTextChunk(CodeCompletionResult *R) {
     case CodeCompletionString::Chunk::ChunkKind::RightParen:
     case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
     case CodeCompletionString::Chunk::ChunkKind::RightBracket:
+    case CodeCompletionString::Chunk::ChunkKind::LeftAngle:
+    case CodeCompletionString::Chunk::ChunkKind::RightAngle:
     case CodeCompletionString::Chunk::ChunkKind::Dot:
     case CodeCompletionString::Chunk::ChunkKind::Comma:
       return C.getText();
@@ -317,6 +323,8 @@ StringRef getFirstTextChunk(CodeCompletionResult *R) {
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
+    case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
+    case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
       continue;

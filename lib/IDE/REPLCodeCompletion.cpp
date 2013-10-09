@@ -39,6 +39,8 @@ std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::RightParen:
     case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
     case CodeCompletionString::Chunk::ChunkKind::RightBracket:
+    case CodeCompletionString::Chunk::ChunkKind::LeftAngle:
+    case CodeCompletionString::Chunk::ChunkKind::RightAngle:
     case CodeCompletionString::Chunk::ChunkKind::Dot:
     case CodeCompletionString::Chunk::ChunkKind::Comma:
       Str += C.getText();
@@ -49,6 +51,8 @@ std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
+    case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
+    case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
       return Str;
