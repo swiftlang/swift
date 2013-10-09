@@ -1092,12 +1092,17 @@ TranslationUnit::getCachedVisibleDecls() const {
 
 bool TranslationUnit::walk(ASTWalker &Walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(Walker.Parent, this);
-  for (Decl *D : MainSourceFile->Decls) {
-    if (D->walk(Walker))
+  return MainSourceFile->walk(Walker);
+}
+
+bool SourceFile::walk(ASTWalker &walker) {
+  for (Decl *D : Decls) {
+    if (D->walk(walker))
       return true;
   }
   return false;
 }
+
 
 //===----------------------------------------------------------------------===//
 // LoadedModule Implementation

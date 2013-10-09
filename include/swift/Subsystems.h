@@ -60,13 +60,18 @@ namespace swift {
     explicit SILParserState(SILModule *M);
     ~SILParserState();
   };
-  
 
-  /// verify - Check that the translation unit is well formed (i.e. following
-  /// the invariants of the AST, not that the code written by the user makes
-  /// sense), aborting and spewing errors if not.
-  void verify(TranslationUnit *TU);
+  /// @{
+
+  /// \brief Check that the translation unit is well formed, aborting and spewing
+  /// errors if not.
+  ///
+  /// "Well-formed" here means following the invariants of the AST, not that the
+  /// code written by the user makes sense.
+  void verify(SourceFile &SF);
   void verify(Decl *D);
+
+  /// @}
 
   /// \brief Parse a single buffer into the given translation unit.  If the
   /// translation unit is the main module, stop parsing after the next
@@ -108,10 +113,12 @@ namespace swift {
   /// automatic imports of the standard library.
   void performAutoImport(SourceFile &SF);
 
-  /// performNameBinding - Once parsing is complete, this walks the AST to
-  /// resolve names and do other top-level validation.  StartElem indicates
-  /// where to start for incremental name binding in the main module.
-  void performNameBinding(TranslationUnit *TU, unsigned StartElem = 0);
+  /// Once parsing is complete, this walks the AST to resolve imports, record
+  /// operators, and do other top-level validation.
+  ///
+  /// \param StartElem Where to start for incremental name binding in the main
+  ///                  source file.
+  void performNameBinding(SourceFile &SF, unsigned StartElem = 0);
   
   /// performTypeChecking - Once parsing and namebinding are complete, this
   /// walks the AST to resolve types and diagnose problems therein. StartElem

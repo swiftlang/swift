@@ -43,26 +43,11 @@ typedef llvm::PointerUnion<const ImportedModule*, EnumType*> BoundScope;
 namespace {  
   class NameBinder {    
   public:
-    TranslationUnit *TU;
+    SourceFile &SF;
     ASTContext &Context;
 
-    NameBinder(TranslationUnit *TU) : TU(TU), Context(TU->Ctx) {
-      for (auto importPair : TU->MainSourceFile->getImports()) {
-        Module *M = importPair.first.second;
-        // Don't add the builtin module to the LoadedModules list.
-        if (isa<BuiltinModule>(M))
-          continue;
-        
-        Module *&ref = Context.LoadedModules[M->Name.str()];
-        if (ref)
-          assert(ref == M || isa<ClangModule>(M));
-        else
-          ref = M;
-      }
-    }
-    ~NameBinder() {
-    }
-    
+    NameBinder(SourceFile &SF) : SF(SF), Context(SF.TU.Ctx) {}
+
     template<typename ...ArgTypes>
     InFlightDiagnostic diagnose(ArgTypes... Args) {
       return Context.Diags.diagnose(Args...);
@@ -82,21 +67,16 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
   
-  // TODO: We currently just recursively parse referenced modules.  This works
-  // fine for now since they are each a single file.  Ultimately we'll want a
-  // compiled form of AST's like clang's that support lazy deserialization.
-
   // The Builtin module cannot be explicitly imported unless we're a .sil file
   // or in the REPL.
-  if ((TU->MainSourceFile->Kind == SourceFile::SIL ||
-       TU->MainSourceFile->Kind == SourceFile::REPL) &&
+  if ((SF.Kind == SourceFile::SIL || SF.Kind == SourceFile::REPL) &&
       moduleID.first.str() == "Builtin")
-    return TU->Ctx.TheBuiltinModule;
+    return Context.TheBuiltinModule;
 
   // If the imported module name is the same as the current translation unit,
   // skip the Swift module loader and use the Clang module loader instead.
   // This allows a Swift module to extend a Clang module of the same name.
-  if (moduleID.first == TU->Name && modulePath.size() == 1) {
+  if (moduleID.first == SF.TU.Name && modulePath.size() == 1) {
     if (auto importer = Context.getClangModuleLoader())
       return importer->loadModule(moduleID.second, modulePath);
     return nullptr;
@@ -311,7 +291,7 @@ namespace {
   /// \brief AST mutation listener that captures any added declarations and
   /// types, then adds them to the translation unit.
   class CaptureExternalsListener : public ASTMutationListener {
-    TranslationUnit *TU;
+    ASTContext &Ctx;
 
     CaptureExternalsListener(const CaptureExternalsListener &) = delete;
 
@@ -319,17 +299,17 @@ namespace {
     operator=(const CaptureExternalsListener &) = delete;
 
   public:
-    explicit CaptureExternalsListener(TranslationUnit *TU) : TU(TU) {
-      TU->getASTContext().addMutationListener(*this);
+    explicit CaptureExternalsListener(ASTContext &ctx) : Ctx(ctx) {
+      Ctx.addMutationListener(*this);
     }
 
     ~CaptureExternalsListener() {
-      TU->getASTContext().removeMutationListener(*this);
+      Ctx.removeMutationListener(*this);
     }
 
     /// \brief A new declaration was added to the AST.
     virtual void addedExternalDecl(Decl *decl) {
-      TU->getASTContext().ExternalDefinitions.insert(decl);
+      Ctx.ExternalDefinitions.insert(decl);
     }
 };
 }
@@ -340,50 +320,51 @@ namespace {
 /// At this parsing has been performed, but we still have UnresolvedDeclRefExpr
 /// nodes for unresolved value names, and we may have unresolved type names as
 /// well.  This handles import directives and forward references.
-void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
+void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   // Make sure we skip adding the standard library imports if the
   // translation unit is empty.
-  if (TU->MainSourceFile->Decls.empty()) {
-    TU->MainSourceFile->ASTStage = SourceFile::NameBound;
+  if (SF.Decls.empty()) {
+    SF.ASTStage = SourceFile::NameBound;
     return;
   }
 
-  CaptureExternalsListener Capture(TU);
+  CaptureExternalsListener Capture(SF.TU.Ctx);
   
   // Reset the name lookup cache so we find new decls.
   // FIXME: This is inefficient.
-  TU->clearLookupCache();
+  SF.TU.clearLookupCache();
 
-  NameBinder Binder(TU);
+  NameBinder Binder(SF);
 
   SmallVector<std::pair<ImportedModule, bool>, 8> ImportedModules;
-  ImportedModules.append(TU->MainSourceFile->getImports().begin(),
-                         TU->MainSourceFile->getImports().end());
+  ImportedModules.append(SF.getImports().begin(), SF.getImports().end());
 
   // Do a prepass over the declarations to find and load the imported modules
   // and map operator decls.
-  for (unsigned i = StartElem, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
-    if (ImportDecl *ID = dyn_cast<ImportDecl>(TU->MainSourceFile->Decls[i])) {
+  for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
+    if (ImportDecl *ID = dyn_cast<ImportDecl>(D)) {
       if (auto import = Binder.addImport(ID))
         ImportedModules.push_back(*import);
-    } else if (auto *OD = dyn_cast<PrefixOperatorDecl>(TU->MainSourceFile->Decls[i]))
-      insertOperatorDecl(Binder, TU->MainSourceFile->PrefixOperators, OD);
-    else if (auto *OD = dyn_cast<PostfixOperatorDecl>(TU->MainSourceFile->Decls[i]))
-      insertOperatorDecl(Binder, TU->MainSourceFile->PostfixOperators, OD);
-    else if (auto *OD = dyn_cast<InfixOperatorDecl>(TU->MainSourceFile->Decls[i]))
-      insertOperatorDecl(Binder, TU->MainSourceFile->InfixOperators, OD);
+
+    } else if (auto *OD = dyn_cast<PrefixOperatorDecl>(D)) {
+      insertOperatorDecl(Binder, SF.PrefixOperators, OD);
+    } else if (auto *OD = dyn_cast<PostfixOperatorDecl>(D)) {
+      insertOperatorDecl(Binder, SF.PostfixOperators, OD);
+    } else if (auto *OD = dyn_cast<InfixOperatorDecl>(D)) {
+      insertOperatorDecl(Binder, SF.InfixOperators, OD);
+    }
   }
 
-  if (ImportedModules.size() > TU->MainSourceFile->getImports().size())
-    TU->MainSourceFile->setImports(TU->Ctx.AllocateCopy(ImportedModules));
+  if (ImportedModules.size() > SF.getImports().size())
+    SF.setImports(SF.TU.Ctx.AllocateCopy(ImportedModules));
 
   // FIXME: This algorithm has quadratic memory usage.  (In practice,
   // import statements after the first "chunk" should be rare, though.)
   // FIXME: Can we make this more efficient?
 
   llvm::DenseMap<Identifier, ValueDecl*> CheckTypes;
-  for (unsigned i = 0, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
-    Decl *D = TU->MainSourceFile->Decls[i];
+  for (unsigned i = 0, e = SF.Decls.size(); i != e; ++i) {
+    Decl *D = SF.Decls[i];
     if (D->isInvalid())
       // No need to diagnose redeclarations of invalid declarations, we have
       // already complained about them in some other way.
@@ -410,7 +391,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
-  TU->MainSourceFile->ASTStage = SourceFile::NameBound;
-  verify(TU);
+  SF.ASTStage = SourceFile::NameBound;
+  verify(SF);
 }
 

@@ -1384,9 +1384,9 @@ namespace {
   };
 }
 
-void swift::verify(TranslationUnit *TU) {
-  Verifier verifier(TU);
-  TU->walk(verifier);
+void swift::verify(SourceFile &SF) {
+  Verifier verifier(&SF.TU);
+  SF.walk(verifier);
 }
 
 void swift::verify(Decl *D) {

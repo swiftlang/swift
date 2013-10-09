@@ -467,7 +467,7 @@ static bool haveDifferentFixity(const ValueDecl *lhs, const ValueDecl *rhs) {
 void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // Make sure that name binding has been completed before doing any type
   // checking.
-  performNameBinding(TU, StartElem);
+  performNameBinding(*TU->MainSourceFile, StartElem);
   
   TypeChecker TC(TU->Ctx);
   auto &DefinedFunctions = TC.definedFunctions;

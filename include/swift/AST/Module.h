@@ -434,6 +434,12 @@ public:
     return ImportBufferID;
   }
 
+  /// Traverse the decls within this file.
+  ///
+  /// \returns true if traversal was aborted, false if it completed
+  /// successfully.
+  bool walk(ASTWalker &walker);
+
 private:
   // Make placement new and vanilla new/delete illegal for SourceFiles.
   void *operator new(size_t Bytes) throw() = delete;

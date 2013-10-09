@@ -141,7 +141,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   // FIXME: Support recursive definitions in immediate modes by making type
   // checking even lazier.
   if (SkipBodies)
-    performNameBinding(importTU);
+    performNameBinding(*importFile);
   else
     performTypeChecking(importTU);
 

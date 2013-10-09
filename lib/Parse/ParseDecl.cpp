@@ -91,7 +91,7 @@ bool Parser::parseTopLevel() {
 
   // Note that the translation unit is fully parsed and verify it.
   SF.ASTStage = SourceFile::Parsed;
-  verify(&SF.TU);
+  verify(SF);
 
   State->markParserPosition(Tok.getLoc(), PreviousLoc);
 
