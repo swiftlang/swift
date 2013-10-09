@@ -3561,6 +3561,7 @@ namespace {
     // value operations do not depend on the specifics of their
     // sub-structure (or they have none).
     void visitAnyFunctionType(CanAnyFunctionType fn) {}
+    void visitSILFunctionType(CanSILFunctionType fn) {}
     void visitBuiltinType(CanBuiltinType type) {}
     void visitMetaTypeType(CanMetaTypeType type) {}
     void visitModuleType(CanModuleType type) {}

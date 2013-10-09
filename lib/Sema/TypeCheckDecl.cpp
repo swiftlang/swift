@@ -2404,10 +2404,12 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer,
     // FIXME: We don't implement this rule yet, so just fail.
     return false;
 
-  case TypeKind::UnownedStorage:
-  case TypeKind::WeakStorage:
-    llvm_unreachable("should not be directly asking whether a [weak] or "
-                     "[unowned] type is default-initializable");
+#define ARTIFICIAL_TYPE(ID, BASE) \
+  case TypeKind::ID:
+#define TYPE(ID, BASE)
+#include "swift/AST/TypeNodes.def"
+    llvm_unreachable("should not be asking whether an artificial type "
+                     "is default-initializable");
 
   case TypeKind::BoundGenericClass:
   case TypeKind::Class:

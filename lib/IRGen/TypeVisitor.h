@@ -127,6 +127,7 @@ public:
     DISPATCH(LValue)
     DISPATCH(MetaType)
     DISPATCH(PolymorphicFunction)
+    DISPATCH(SILFunction)
     DISPATCH(UnownedStorage)
     DISPATCH(WeakStorage)
     DISPATCH(Tuple)

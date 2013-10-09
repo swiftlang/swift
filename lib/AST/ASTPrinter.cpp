@@ -1290,35 +1290,30 @@ public:
     OS << "module<" << T->getModule()->Name << '>';
   }
 
+  void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
+    AttributePrinter attrs(OS);
+
+    if (info.isAutoClosure())
+      attrs.next() << "auto_closure";
+    attrs.printCC(info.getCC());
+    if (info.isBlock())
+      attrs.next() << "objc_block";
+    if (info.isThin())
+      attrs.next() << "thin";
+    if (info.isNoReturn())
+      attrs.next() << "noreturn";
+
+    attrs.finish();
+  }
+
   void visitFunctionType(FunctionType *T) {
-    AttributePrinter Attrs(OS);
-
-    if (T->isAutoClosure())
-      Attrs.next() << "auto_closure";
-    Attrs.printCC(T->getAbstractCC());
-    if (T->isBlock())
-      Attrs.next() << "objc_block";
-    if (T->isThin())
-      Attrs.next() << "thin";
-    if (T->isNoReturn())
-      Attrs.next() << "noreturn";
-
-    Attrs.finish();
-
+    printFunctionExtInfo(T->getExtInfo());
     printWithParensIfNotSimple(T->getInput());
     OS << " -> " << T->getResult();
   }
 
   void visitPolymorphicFunctionType(PolymorphicFunctionType *T) {
-    AttributePrinter Attrs(OS);
-    Attrs.printCC(T->getAbstractCC());
-    if (T->isThin())
-      Attrs.next() << "thin";
-    if (T->isNoReturn())
-      Attrs.next() << "noreturn";
-
-    Attrs.finish();
-
+    printFunctionExtInfo(T->getExtInfo());
     printGenericParams(&T->getGenericParams());
     OS << ' ';
     printWithParensIfNotSimple(T->getInput());
@@ -1327,14 +1322,7 @@ public:
   }
 
   void visitGenericFunctionType(GenericFunctionType *T) {
-    AttributePrinter Attrs(OS);
-    Attrs.printCC(T->getAbstractCC());
-    if (T->isThin())
-      Attrs.next() << "thin";
-    if (T->isNoReturn())
-      Attrs.next() << "noreturn";
-
-    Attrs.finish();
+    printFunctionExtInfo(T->getExtInfo());
 
     // Print the generic parameters.
     OS << '<';
@@ -1376,6 +1364,26 @@ public:
     printWithParensIfNotSimple(T->getInput());
 
     OS << " -> " << T->getResult();
+  }
+
+  void visitSILFunctionType(SILFunctionType *T) {
+    OS << "func ";
+    printFunctionExtInfo(T->getExtInfo());
+    if (auto generics = T->getGenericParams())
+      printGenericParams(generics);
+    OS << '(';
+    bool first = true;
+    for (auto param : T->getParameters()) {
+      if (first) {
+        first = false;
+      } else {
+        OS << ", ";
+      }
+      param.print(OS, Options);
+    }
+    OS << ") -> ";
+
+    T->getResult().print(OS, Options);
   }
 
   void visitArrayType(ArrayType *T) {
@@ -1496,6 +1504,39 @@ void Type::print(raw_ostream &OS, const PrintOptions &PO) const {
     OS << "<null>";
   else
     TypePrinter(OS, PO).visit(*this);
+}
+
+static StringRef getStringForParameterConvention(ParameterConvention conv) {
+  switch (conv) {
+  case ParameterConvention::Indirect_In: return "@in ";
+  case ParameterConvention::Indirect_Out: return "@out ";
+  case ParameterConvention::Indirect_Inout: return "@inout ";
+  case ParameterConvention::Direct_Owned: return "@owned ";
+  case ParameterConvention::Direct_Unowned: return "";
+  case ParameterConvention::Direct_Guaranteed: return "@guaranteed ";
+  }
+  llvm_unreachable("bad parameter convention");
+}
+
+void SILFunctionType::ParameterType::print(raw_ostream &out,
+                                           const PrintOptions &opts) const {
+  out << getStringForParameterConvention(getConvention());
+  getType().print(out, opts);
+}
+
+static StringRef getStringForResultConvention(ResultConvention conv) {
+  switch (conv) {
+  case ResultConvention::Owned: return "@owned ";
+  case ResultConvention::Unowned: return "";
+  case ResultConvention::Autoreleased: return "@autoreleased ";
+  }
+  llvm_unreachable("bad result convention");
+}
+
+void SILFunctionType::ResultType::print(raw_ostream &out,
+                                        const PrintOptions &opts) const {
+  out << getStringForResultConvention(getConvention());
+  getType().print(out, opts);
 }
 
 std::string Type::getString(const PrintOptions &PO) const {

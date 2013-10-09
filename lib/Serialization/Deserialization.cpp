@@ -429,6 +429,31 @@ Optional<Substitution> ModuleFile::maybeReadSubstitution(
                       ctx.AllocateCopy(conformanceBuf)};
 }
 
+GenericParamList *
+ModuleFile::maybeGetOrReadGenericParams(serialization::DeclID genericContextID,
+                                        DeclContext *DC) {
+  if (genericContextID) {
+    Decl *genericContext = getDecl(genericContextID);
+    assert(genericContext && "loading PolymorphicFunctionType before its decl");
+
+    switch (genericContext->getKind()) {
+    case DeclKind::Constructor:
+      return cast<ConstructorDecl>(genericContext)->getGenericParams();
+    case DeclKind::Func:
+      return cast<FuncDecl>(genericContext)->getGenericParams();
+    case DeclKind::Class:
+    case DeclKind::Struct:
+    case DeclKind::Enum:
+    case DeclKind::Protocol:
+      return cast<NominalTypeDecl>(genericContext)->getGenericParams();
+    default:
+      return nullptr;
+    }
+  } else {
+    return maybeReadGenericParams(DC);
+  }
+}
+
 GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   using namespace decls_block;
 
@@ -1742,6 +1767,40 @@ Optional<swift::Ownership> getActualOwnership(serialization::Ownership raw) {
   return Nothing;
 }
 
+/// Translate from the serialization ParameterConvention enumerators,
+/// which are guaranteed to be stable, to the AST ones.
+static
+Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
+  switch (serialization::ParameterConvention(raw)) {
+#define CASE(ID) \
+  case serialization::ParameterConvention::ID: \
+    return swift::ParameterConvention::ID;
+  CASE(Indirect_In)
+  CASE(Indirect_Out)
+  CASE(Indirect_Inout)
+  CASE(Direct_Owned)
+  CASE(Direct_Unowned)
+  CASE(Direct_Guaranteed)
+#undef CASE
+  }
+  return Nothing;
+}
+
+/// Translate from the serialization ResultConvention enumerators,
+/// which are guaranteed to be stable, to the AST ones.
+static
+Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
+  switch (serialization::ResultConvention(raw)) {
+#define CASE(ID) \
+  case serialization::ResultConvention::ID: return swift::ResultConvention::ID;
+  CASE(Owned)
+  CASE(Unowned)
+  CASE(Autoreleased)
+#undef CASE
+  }
+  return Nothing;
+}
+
 Type ModuleFile::getType(TypeID TID) {
   if (TID == 0)
     return Type();
@@ -2130,30 +2189,8 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
 
-    GenericParamList *paramList = nullptr;
-    if (genericContextID) {
-      Decl *genericContext = getDecl(genericContextID);
-      assert(genericContext && "loading PolymorphicFunctionType before its decl");
-
-      switch (genericContext->getKind()) {
-      case DeclKind::Constructor:
-        paramList = cast<ConstructorDecl>(genericContext)->getGenericParams();
-        break;
-      case DeclKind::Func:
-        paramList = cast<FuncDecl>(genericContext)->getGenericParams();
-        break;
-      case DeclKind::Class:
-      case DeclKind::Struct:
-      case DeclKind::Enum:
-      case DeclKind::Protocol:
-        paramList = cast<NominalTypeDecl>(genericContext)->getGenericParams();
-        break;
-      default:
-        break;
-      }
-    } else {
-      paramList = maybeReadGenericParams(ModuleContext);
-    }
+    GenericParamList *paramList =
+      maybeGetOrReadGenericParams(genericContextID, ModuleContext);
     assert(paramList && "missing generic params for polymorphic function");
 
     auto Info = PolymorphicFunctionType::ExtInfo(callingConvention.getValue(),
@@ -2216,6 +2253,69 @@ Type ModuleFile::getType(TypeID TID) {
                                             getType(resultID),
                                             info,
                                             ctx);
+    break;
+  }
+
+  case decls_block::SIL_FUNCTION_TYPE: {
+    TypeID resultID;
+    uint8_t rawResultConvention;
+    uint8_t rawCallingConvention;
+    bool thin;
+    bool noreturn = false;
+    DeclID genericContextID;
+    ArrayRef<uint64_t> paramIDs;
+
+    decls_block::SILFunctionTypeLayout::readRecord(scratch,
+                                                   resultID,
+                                                   rawResultConvention,
+                                                   genericContextID,
+                                                   rawCallingConvention,
+                                                   thin,
+                                                   noreturn,
+                                                   paramIDs);
+
+    // Process the ExtInfo.
+    auto callingConvention = getActualCC(rawCallingConvention);
+    if (!callingConvention.hasValue()) {
+      error();
+      return nullptr;
+    }
+    SILFunctionType::ExtInfo extInfo(callingConvention.getValue(),
+                                     thin, noreturn);
+
+    // Process the result.
+    auto resultConvention = getActualResultConvention(rawResultConvention);
+    if (!resultConvention.hasValue()) {
+      error();
+      return nullptr;
+    }
+    SILFunctionType::ResultType result(getType(resultID)->getCanonicalType(),
+                                       resultConvention.getValue());
+
+    // Process the parameters.
+    if (paramIDs.size() & 1) {
+      error();
+      return nullptr;
+    }
+    SmallVector<SILFunctionType::ParameterType, 8> params;
+    params.reserve(paramIDs.size() / 2);
+    for (size_t i = 0, e = paramIDs.size(); i != e; i += 2) {
+      auto type = getType(paramIDs[i])->getCanonicalType();
+      auto convention = getActualParameterConvention(paramIDs[i+1]);
+      if (!convention.hasValue()) {
+        error();
+        return nullptr;
+      }
+      SILFunctionType::ParameterType param(type, convention.getValue());
+      params.push_back(param);
+    }
+
+    // Read the generic parameters.
+    auto genericParams =
+      maybeGetOrReadGenericParams(genericContextID, ModuleContext);
+
+    typeOrOffset = SILFunctionType::get(genericParams, extInfo,
+                                        params, result, ctx);
     break;
   }
 

@@ -457,6 +457,9 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
   case TypeKind::Module:
     llvm_unreachable("Cannot mangle module type yet");
 
+  case TypeKind::SILFunction:
+    llvm_unreachable("SILFunctionType in mangler?");
+
   case TypeKind::Error:
     Buffer << "ERR";
     return;

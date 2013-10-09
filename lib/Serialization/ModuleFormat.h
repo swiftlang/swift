@@ -88,6 +88,27 @@ enum OperatorKind : uint8_t {
 static_assert(sizeof(OperatorKind) <= sizeof(TypeID),
               "too many operator kinds");
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class ParameterConvention : uint8_t {
+  Indirect_In,
+  Indirect_Out,
+  Indirect_Inout,
+  Direct_Owned,
+  Direct_Unowned,
+  Direct_Guaranteed,
+};
+using ParameterConventionField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class ResultConvention : uint8_t {
+  Owned,
+  Unowned,
+  Autoreleased,
+};
+using ResultConventionField = BCFixed<2>;
+
 /// Translates an operator DeclKind to a Serialization fixity, whose values are
 /// guaranteed to be stable.
 static inline OperatorKind getStableFixity(DeclKind kind) {
@@ -285,6 +306,7 @@ namespace decls_block {
     REFERENCE_STORAGE_TYPE,
     UNBOUND_GENERIC_TYPE,
     OPTIONAL_TYPE,
+    SIL_FUNCTION_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     GENERIC_TYPE_PARAM_DECL,
@@ -464,6 +486,18 @@ namespace decls_block {
     BCFixed<1>,          // noreturn?
     BCArray<TypeIDField> // generic parameters
                          // followed by requirements
+  >;
+
+  using SILFunctionTypeLayout = BCRecordLayout<
+    SIL_FUNCTION_TYPE,
+    TypeIDField,           // result type
+    ResultConventionField, // result convention
+    DeclIDField,           // decl that owns the generic params
+    AbstractCCField,       // calling convention
+    BCFixed<1>,            // thin?
+    BCFixed<1>,            // noreturn?
+    BCArray<TypeIDField>   // parameter types and conventions, alternating.
+    // Trailed by its generic parameters, if the owning decl ID is 0.
   >;
 
   template <unsigned Code>

@@ -642,6 +642,8 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
     return convertFunctionType(cast<AnyFunctionType>(ty));
+  case TypeKind::SILFunction:
+    llvm_unreachable("not yet implemented!");
   case TypeKind::Array:
     llvm_unreachable("array types should be lowered by SILGen");
   case TypeKind::Protocol:

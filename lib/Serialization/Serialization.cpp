@@ -1376,34 +1376,58 @@ void Serializer::writeDecl(const Decl *D) {
   }
 }
 
+#define SIMPLE_CASE(TYPENAME, VALUE) \
+  case swift::TYPENAME::VALUE: return uint8_t(serialization::TYPENAME::VALUE);
+
 /// Translate from the AST calling convention enum to the Serialization enum
 /// values, which are guaranteed to be stable.
 static uint8_t getRawStableCC(swift::AbstractCC cc) {
   switch (cc) {
-#define CASE(THE_CC) \
-  case swift::AbstractCC::THE_CC: \
-    return serialization::AbstractCC::THE_CC;
-  CASE(C)
-  CASE(ObjCMethod)
-  CASE(Freestanding)
-  CASE(Method)
-#undef CASE
+  SIMPLE_CASE(AbstractCC, C)
+  SIMPLE_CASE(AbstractCC, ObjCMethod)
+  SIMPLE_CASE(AbstractCC, Freestanding)
+  SIMPLE_CASE(AbstractCC, Method)
   }
+  llvm_unreachable("bad calling convention");
 }
 
 /// Translate from the AST ownership enum to the Serialization enum
 /// values, which are guaranteed to be stable.
 static uint8_t getRawStableOwnership(swift::Ownership ownership) {
   switch (ownership) {
-  case swift::Ownership::Strong:
-    return serialization::Ownership::Strong;
-  case swift::Ownership::Weak:
-    return serialization::Ownership::Weak;
-  case swift::Ownership::Unowned:
-    return serialization::Ownership::Unowned;
+  SIMPLE_CASE(Ownership, Strong)
+  SIMPLE_CASE(Ownership, Weak)
+  SIMPLE_CASE(Ownership, Unowned)
   }
   llvm_unreachable("bad ownership kind");
 }
+
+/// Translate from the AST ParameterConvention enum to the
+/// Serialization enum values, which are guaranteed to be stable.
+static uint8_t getRawStableParameterConvention(swift::ParameterConvention pc) {
+  switch (pc) {
+  SIMPLE_CASE(ParameterConvention, Indirect_In)
+  SIMPLE_CASE(ParameterConvention, Indirect_Out)
+  SIMPLE_CASE(ParameterConvention, Indirect_Inout)
+  SIMPLE_CASE(ParameterConvention, Direct_Owned)
+  SIMPLE_CASE(ParameterConvention, Direct_Unowned)
+  SIMPLE_CASE(ParameterConvention, Direct_Guaranteed)
+  }
+  llvm_unreachable("bad parameter convention kind");
+}
+
+/// Translate from the AST ResultConvention enum to the
+/// Serialization enum values, which are guaranteed to be stable.
+static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
+  switch (rc) {
+  SIMPLE_CASE(ResultConvention, Owned)
+  SIMPLE_CASE(ResultConvention, Unowned)
+  SIMPLE_CASE(ResultConvention, Autoreleased)
+  }
+  llvm_unreachable("bad result convention kind");
+}
+
+#undef SIMPLE_CASE
 
 /// Find the typealias given a builtin type.
 static TypeAliasDecl *findTypeAliasForBuiltin(const TranslationUnit *TU,
@@ -1653,6 +1677,37 @@ void Serializer::writeType(Type ty) {
     // Write requirements.
     writeRequirements(fnTy->getRequirements());
     break;
+  }
+
+  case TypeKind::SILFunction: {
+    auto fnTy = cast<SILFunctionType>(ty.getPointer());
+
+    auto genericParams = fnTy->getGenericParams();
+    const Decl *genericContext =
+      (genericParams ? getGenericContext(genericParams) : nullptr);
+    DeclID dID = genericContext ? addDeclRef(genericContext) : DeclID(0);
+
+    auto callingConvention = fnTy->getAbstractCC();
+    auto result = fnTy->getResult();
+
+    SmallVector<TypeID, 8> paramTypes;
+    for (auto param : fnTy->getParameters()) {
+      paramTypes.push_back(addTypeRef(param.getType()));
+      unsigned conv = getRawStableParameterConvention(param.getConvention());
+      paramTypes.push_back(TypeID(conv));
+    }
+
+    unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
+    SILFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                      addTypeRef(result.getType()),
+                         getRawStableResultConvention(result.getConvention()),
+                                      dID,
+                                      getRawStableCC(callingConvention),
+                                      fnTy->isThin(),
+                                      fnTy->isNoReturn(),
+                                      paramTypes);
+    if (genericParams && !genericContext)
+      writeGenericParams(genericParams);
   }
 
   case TypeKind::Array: {

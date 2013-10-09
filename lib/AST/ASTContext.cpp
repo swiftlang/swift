@@ -129,6 +129,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<std::pair<unsigned, unsigned>, GenericTypeParamType *>
     GenericParamTypes;
   llvm::FoldingSet<GenericFunctionType> GenericFunctionTypes;
+  llvm::FoldingSet<SILFunctionType> SILFunctionTypes;
   llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -1284,6 +1285,45 @@ GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
                   GenericTypeParamType(depth, index, ctx);
   ctx.Impl.GenericParamTypes[{depth, index}] = result;
   return result;
+}
+
+void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
+                              GenericParamList *genericParams,
+                              ExtInfo info,
+                              ArrayRef<ParameterType> params,
+                              ResultType result) {
+  id.AddPointer(genericParams);
+  id.AddInteger(info.getFuncAttrKey());
+  id.AddInteger(params.size());
+  for (auto param : params)
+    param.profile(id);
+  result.profile(id);
+}
+
+SILFunctionType *SILFunctionType::get(GenericParamList *genericParams,
+                                      ExtInfo ext,
+                                      ArrayRef<ParameterType> params,
+                                      ResultType result, ASTContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  SILFunctionType::Profile(id, genericParams, ext, params, result);
+
+  // Do we already have this generic function type?
+  void *insertPos;
+  if (auto result
+        = ctx.Impl.SILFunctionTypes.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // All SILFunctionTypes are canonical.
+
+  // Allocate storage for the object.
+  size_t bytes = sizeof(SILFunctionType)
+               + sizeof(ParameterType) * params.size();
+  void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
+
+  auto fnType =
+    new (mem) SILFunctionType(genericParams, ext, params, result, ctx);
+  ctx.Impl.SILFunctionTypes.InsertNode(fnType, insertPos);
+  return fnType;
 }
 
 /// Return a uniqued array type with the specified base type and the

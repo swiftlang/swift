@@ -46,6 +46,7 @@ namespace swift {
   class GenericParam;
   class GenericParamList;
   class Identifier;
+  class SILType;
   class TypeAliasDecl;
   class TypeDecl;
   class NominalTypeDecl;
@@ -1473,6 +1474,220 @@ public:
 };
 
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
+
+/// Conventions for passing arguments as parameters.
+enum class ParameterConvention {
+  /// This argument is passed indirectly, i.e. by directly passing
+  /// the address of an object in memory.  The callee is responsible
+  /// for destroying the object.  The callee may assume that the
+  /// address does not alias any valid object.
+  Indirect_In,
+
+  /// This argument is passed indirectly, i.e. by directly passing
+  /// the address of an object in memory.  The object is
+  /// instantaneously valid on entry, and it must be instantaneously
+  /// valid on exit.  The callee may assume that the address does
+  /// not alias any valid object.
+  Indirect_Inout,
+
+  /// This argument is passed indirectly, i.e. by directly passing
+  /// the address of an uninitialized object in memory.  The callee
+  /// is responsible for leaving an initialized object at this
+  /// address.  The callee may assume that the address does not
+  /// alias any valid object.
+  Indirect_Out,
+
+  /// This argument is passed directly.
+  /// The callee is responsible for destroying it.
+  Direct_Owned,
+
+  /// This argument is passed directly.
+  /// The callee is not responsible for destroying it.
+  /// Its validity is guaranteed only at the instant the call
+  /// begins.
+  Direct_Unowned,
+
+  /// This argument is passed directly, and the caller
+  /// guarantees its validity for the entirety of the call.
+  Direct_Guaranteed,
+};
+inline bool isIndirectParameter(ParameterConvention conv) {
+  return conv <= ParameterConvention::Indirect_Out;
+}
+
+/// Conventions for returning values.  All return values at this
+/// level are direct.
+enum class ResultConvention {
+  /// The caller is responsible for destroying this return value.
+  Owned,
+
+  /// The caller is not responsible for destroying this return
+  /// value.  It is valid at the instant of the return, but further
+  /// operations may invalidate it.
+  Unowned,
+
+  /// This value has been (or may have been) returned autoreleased.
+  /// The caller should make an effort to reclaim the autorelease.
+  /// The type must be a class or class existential type, and this
+  /// must be the only return value.
+  Autoreleased,
+};
+
+/// SILFunctionType - The detailed type of a function value, suitable
+/// for use by SIL.
+///
+/// This type is defined by the AST library because it must be capable
+/// of appearing in secondary positions, e.g. within tuple and
+/// function parameter and result types.
+class SILFunctionType : public TypeBase, public llvm::FoldingSetNode {
+public:
+  /// A parameter type and the rules for passing it.
+  class ParameterType {
+    llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
+  public:
+    ParameterType(CanType type, ParameterConvention conv)
+      : TypeAndConvention(type, conv) {}
+
+    CanType getType() const {
+      return TypeAndConvention.getPointer();
+    }
+    ParameterConvention getConvention() const {
+      return TypeAndConvention.getInt();
+    }
+    bool isIndirect() const {
+      return isIndirectParameter(getConvention());
+    }
+    bool isIndirectResult() const {
+      return getConvention() == ParameterConvention::Indirect_Out;
+    }
+    SILType getSILType() const; // in SILType.h
+
+    void profile(llvm::FoldingSetNodeID &id) {
+      id.AddPointer(TypeAndConvention.getOpaqueValue());
+    }
+
+    void print(llvm::raw_ostream &out,
+               const PrintOptions &options = PrintOptions()) const;
+    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
+                                         ParameterType type) {
+      type.print(out);
+      return out;
+    }
+  };
+
+  /// A result type and the rules for returning it.
+  class ResultType {
+    llvm::PointerIntPair<CanType, 3, ResultConvention> TypeAndConvention;
+  public:
+    ResultType(CanType type, ResultConvention conv)
+      : TypeAndConvention(type, conv) {}
+
+    CanType getType() const {
+      return TypeAndConvention.getPointer();
+    }
+    ResultConvention getConvention() const {
+      return TypeAndConvention.getInt();
+    }
+    SILType getSILType() const; // in SILType.h
+
+    void profile(llvm::FoldingSetNodeID &id) {
+      id.AddPointer(TypeAndConvention.getOpaqueValue());
+    }
+
+    void print(llvm::raw_ostream &out,
+               const PrintOptions &options = PrintOptions()) const;
+    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
+                                         ResultType type) {
+      type.print(out);
+      return out;
+    }
+  };
+
+  typedef AnyFunctionType::ExtInfo ExtInfo;
+
+private:
+  /// TODO: Use the representation from GenericFunctionType.
+  GenericParamList *GenericParams;
+
+  /// TODO: Permit an arbitrary number of results.
+  const ResultType Result;
+  ExtInfo Ext;
+  uint16_t NumParams;
+
+  MutableArrayRef<ParameterType> getMutableParameters() {
+    auto ptr = reinterpret_cast<ParameterType*>(this + 1);
+    return MutableArrayRef<ParameterType>(ptr, NumParams);
+  }
+
+  SILFunctionType(GenericParamList *genericParams, ExtInfo ext,
+                  ArrayRef<ParameterType> params, ResultType result,
+                  const ASTContext &ctx)
+    : TypeBase(TypeKind::SILFunction, &ctx, /*HasTypeVariable*/ false),
+      GenericParams(genericParams), Result(result), Ext(ext),
+      NumParams(params.size()) {
+    memcpy(getMutableParameters().data(), params.data(),
+           params.size() * sizeof(ParameterType));
+  }
+
+public:
+  static SILFunctionType *get(GenericParamList *genericParams,
+                              ExtInfo ext, ArrayRef<ParameterType> params,
+                              ResultType result, ASTContext &ctx);
+
+  SILType getSILResult() const; // in SILType.h
+  SILType getSILParameter(unsigned i) const; // in SILType.h
+
+  ResultType getResult() const {
+    return Result;
+  }
+  ArrayRef<ParameterType> getParameters() const {
+    return const_cast<SILFunctionType*>(this)->getMutableParameters();
+  }
+
+  bool hasIndirectResult() const {
+    return !getParameters().empty() && getParameters()[0].isIndirectResult();
+  }
+
+  /// Get the parameters, ignoring any indirect-return parameter.
+  ArrayRef<ParameterType> getNonReturnParameters() const {
+    auto params = getParameters();
+    if (hasIndirectResult()) params = params.slice(1);
+    return params;
+  }
+
+  ExtInfo getExtInfo() const { return Ext; }
+  GenericParamList *getGenericParams() const { return GenericParams; }
+
+  /// \brief Returns the calling conventions of the function.
+  AbstractCC getAbstractCC() const {
+    return getExtInfo().getCC();
+  }
+  
+  /// \brief True if the function type is "thin", meaning values of the type can
+  /// be represented as simple function pointers without context.
+  bool isThin() const {
+    return getExtInfo().isThin();
+  }
+
+  bool isNoReturn() const {
+    return getExtInfo().isNoReturn();
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getGenericParams(), getExtInfo(), getParameters(), getResult());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      GenericParamList *genericParams,
+                      ExtInfo info,
+                      ArrayRef<ParameterType> params,
+                      ResultType result);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::SILFunction;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILFunctionType, Type)
 
 /// ArrayType - An array type has a base type and either an unspecified or a
 /// constant size.  For example "int[]" and "int[4]".  Array types cannot have

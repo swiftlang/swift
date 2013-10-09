@@ -487,6 +487,10 @@ namespace {
       IGF.unimplemented(SourceLoc(), "metadata ref for ref storage type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
+    llvm::Value *visitSILFunctionType(CanSILFunctionType type) {
+      IGF.unimplemented(SourceLoc(), "metadata ref for SIL function type");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
 
     llvm::Value *visitArchetypeType(CanArchetypeType type) {
       return IGF.getLocalTypeData(type, LocalTypeData::Metatype);

@@ -131,6 +131,7 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction:
+  case TypeKind::SILFunction:
     return true;
 
   case TypeKind::UnboundGeneric:
@@ -262,6 +263,7 @@ bool TypeBase::isUnspecializedGeneric() {
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition:
+  case TypeKind::SILFunction:
     return false;
     
   case TypeKind::Array:
@@ -660,6 +662,9 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
 
+  case TypeKind::SILFunction:
+    llvm_unreachable("SILFunctionTypes are always canonical!");
+
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->getInput()->getCanonicalType();
@@ -731,6 +736,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction:
+  case TypeKind::SILFunction:
   case TypeKind::Array:
   case TypeKind::LValue:
   case TypeKind::ProtocolComposition:
@@ -897,6 +903,7 @@ bool TypeBase::isSpelledLike(Type other) {
     return true;
   }
 
+  case TypeKind::SILFunction:
   case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction: {
     // Polymorphic function types should never be explicitly spelled.

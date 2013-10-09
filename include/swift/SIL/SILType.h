@@ -410,6 +410,26 @@ public:
   /// getSwiftResultType - Return the swift type of the result
   CanType getSwiftResultType() const;
 };
+
+inline SILType SILFunctionType::getSILParameter(unsigned i) const {
+  return getParameters()[i].getSILType();
+}
+
+inline SILType SILFunctionType::ParameterType::getSILType() const {
+  if (isIndirect()) {
+    return SILType::getPrimitiveAddressType(getType());
+  } else {
+    return SILType::getPrimitiveObjectType(getType());
+  }
+}
+
+inline SILType SILFunctionType::getSILResult() const {
+  return getResult().getSILType();
+}
+
+inline SILType SILFunctionType::ResultType::getSILType() const {
+  return SILType::getPrimitiveObjectType(getType());
+}
   
 } // end swift namespace
 

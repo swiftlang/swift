@@ -262,6 +262,11 @@ namespace {
                                             /*uncurry*/ 0);
     }
 
+    bool visitSILFunctionType(CanSILFunctionType origTy,
+                              CanSILFunctionType substTy) {
+      llvm_unreachable("unimplemented! will be subsumed anyway");
+    }
+
     // L-values go by the object type;  note that we ask the ordinary
     // question, not the argument question.
     bool visitLValueType(CanLValueType origTy, CanLValueType substTy) {
@@ -349,6 +354,8 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
   bool visitMetaTypeType(CanMetaTypeType type) { return false; }
   bool visitModuleType(CanModuleType type) { return false; }
   bool visitAnyFunctionType(CanAnyFunctionType type) { return false; }
+  bool visitSILFunctionType(CanSILFunctionType type) { return false; }
+
   bool visitLValueType(CanLValueType type) { return false; }
   bool visitProtocolCompositionType(CanProtocolCompositionType type) {
     return false;
@@ -535,6 +542,11 @@ namespace {
       In.transferInto(Out, 2);
     }
 
+    void visitSILFunctionType(CanSILFunctionType origTy,
+                              CanSILFunctionType substTy) {
+      llvm_unreachable("unimplemented! will be subsumed anyway");
+    }
+
     void visitLValueType(CanLValueType origTy, CanLValueType substTy) {
       CanType origObjectTy = origTy.getObjectType();
       CanType substObjectTy = substTy.getObjectType();
@@ -681,6 +693,11 @@ namespace {
                                          /*uncurry*/ 0))
         IGF.unimplemented(SourceLoc(), "remapping bound function type");
       In.transferInto(Out, 2);
+    }
+
+    void visitSILFunctionType(CanSILFunctionType origTy,
+                              CanSILFunctionType substTy) {
+      llvm_unreachable("unimplemented! will be subsumed anyway");
     }
 
     void visitLValueType(CanLValueType origTy, CanLValueType substTy) {

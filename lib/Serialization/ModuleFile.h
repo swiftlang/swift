@@ -225,6 +225,9 @@ private:
   /// without moving the cursor.
   GenericParamList *maybeReadGenericParams(DeclContext *DC);
 
+  GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
+                                                DeclContext *DC);
+
   /// Reads a set of requirements from \c DeclTypeCursor.
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements);
 
