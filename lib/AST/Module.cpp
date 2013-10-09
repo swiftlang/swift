@@ -847,8 +847,8 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
     return Nothing;
 
   // Look for an operator declaration in the current module.
-  auto found = (TU->MainSourceFile.get()->*OP_MAP).find(Name.get());
-  if (found != (TU->MainSourceFile.get()->*OP_MAP).end())
+  auto found = (TU->MainSourceFile->*OP_MAP).find(Name.get());
+  if (found != (TU->MainSourceFile->*OP_MAP).end())
     return found->getValue()? Optional<OP_DECL *>(found->getValue()) : Nothing;
   
   // Look for imported operator decls.
@@ -867,13 +867,13 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
   // If we found a single import, use it.
   if (importedOperators.empty()) {
     // Cache the mapping so we don't need to troll imports next time.
-    (TU->MainSourceFile.get()->*OP_MAP)[Name.get()] = nullptr;
+    (TU->MainSourceFile->*OP_MAP)[Name.get()] = nullptr;
     return Nothing;
   }
   if (importedOperators.size() == 1) {
     // Cache the mapping so we don't need to troll imports next time.
     OP_DECL *result = *importedOperators.begin();
-    (TU->MainSourceFile.get()->*OP_MAP)[Name.get()] = result;
+    (TU->MainSourceFile->*OP_MAP)[Name.get()] = result;
     return result;
   }
   
@@ -892,7 +892,7 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
     }
   }
   // Cache the mapping so we don't need to troll imports next time.
-  (TU->MainSourceFile.get()->*OP_MAP)[Name.get()] = first;
+  (TU->MainSourceFile->*OP_MAP)[Name.get()] = first;
   return first;
 }
 } // end anonymous namespace

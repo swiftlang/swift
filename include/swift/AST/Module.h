@@ -351,7 +351,7 @@ public:
   }
 
 private:
-  // Make placement new and vanilla new/delete illegal for DeclVarNames.
+  // Make placement new and vanilla new/delete illegal for Modules.
   void *operator new(size_t Bytes) throw() = delete;
   void operator delete(void *Data) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
@@ -372,7 +372,7 @@ class SourceFile {
 
   /// \brief The buffer ID for the file that was imported as this TU, or -1
   /// if this TU is not an imported TU.
-  int ImportBufferID = -1;
+  int ImportBufferID;
 
 public:
   /// The translation unit that this file is a part of.
@@ -407,7 +407,8 @@ public:
 
   const SourceKind Kind;
 
-  SourceFile(TranslationUnit &tu, SourceKind K) : TU(tu), Kind(K) {}
+  SourceFile(TranslationUnit &tu, SourceKind K,
+             int ImportID = -1) : ImportBufferID(ImportID), TU(tu), Kind(K) {}
 
   ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
     return Imports;
@@ -419,10 +420,17 @@ public:
   /// \brief The buffer ID for the file that was imported as this TU, or -1
   /// if this is not an imported TU.
   int getImportBufferID() const { return ImportBufferID; }
-  void setImportBufferID(unsigned BufID) {
-    assert(ImportBufferID == -1 && "Already set!");
-    ImportBufferID = BufID;
-  }
+
+private:
+  // Make placement new and vanilla new/delete illegal for SourceFiles.
+  void *operator new(size_t Bytes) throw() = delete;
+  void operator delete(void *Data) throw() = delete;
+  void *operator new(size_t Bytes, void *Mem) throw() = delete;
+public:
+  // Only allow allocation of SourceFiles using the allocator in ASTContext
+  // or by doing a placement new.
+  void *operator new(size_t Bytes, ASTContext &C,
+                     unsigned Alignment = alignof(SourceFile));
 };
 
   
@@ -439,16 +447,14 @@ private:
 
 public:
   // FIXME: Make private.
-  std::unique_ptr<SourceFile> MainSourceFile;
+  SourceFile *MainSourceFile;
 
   /// If this is true, then the translation unit is allowed to access the
   /// Builtin module with an explicit import.
   bool HasBuiltinModuleAccess = false;
 
-  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C,
-                  SourceFile::SourceKind Kind)
-    : Module(ModuleKind::TranslationUnit, Name, Comp, C),
-      MainSourceFile(new SourceFile(*this, Kind)) {
+  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C)
+    : Module(ModuleKind::TranslationUnit, Name, Comp, C) {
   }
   
   void setLinkLibraries(ArrayRef<LinkLibrary> libs) {

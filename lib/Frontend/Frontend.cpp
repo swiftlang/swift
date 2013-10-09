@@ -122,11 +122,14 @@ void swift::CompilerInstance::doIt() {
   const SourceFile::SourceKind Kind = Invocation.getInputKind();
   Component *Comp = new (Context->Allocate<Component>(1)) Component();
   Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-  TU = new (*Context) TranslationUnit(ID, Comp, *Context, Kind);
+  TU = new (*Context) TranslationUnit(ID, Comp, *Context);
   Context->LoadedModules[ID.str()] = TU;
 
   TU->HasBuiltinModuleAccess = Invocation.getParseStdlib();
   TU->setLinkLibraries(Invocation.getLinkLibraries());
+
+  auto *SingleInputFile = new (*Context) SourceFile(*TU, Kind);
+  TU->MainSourceFile = SingleInputFile;
 
   // If we're in SIL mode, don't auto import any libraries.
   // Also don't perform auto import if we are not going to do semantic
@@ -151,7 +154,7 @@ void swift::CompilerInstance::doIt() {
     // Parse all of the files into one big translation unit.
     for (auto &BufferID : BufferIDs) {
       bool Done;
-      parseIntoTranslationUnit(*TU->MainSourceFile, BufferID, &Done,
+      parseIntoTranslationUnit(*SingleInputFile, BufferID, &Done,
                                nullptr, &PersistentState, DelayedCB.get());
       assert(Done && "Parser returned early?");
       (void) Done;
@@ -185,12 +188,12 @@ void swift::CompilerInstance::doIt() {
     // after parsing any top level code in a main module, or in SIL mode when
     // there are chunks of swift decls (e.g. imports and types) interspersed
     // with 'sil' definitions.
-    parseIntoTranslationUnit(*TU->MainSourceFile, BufferID, &Done,
+    parseIntoTranslationUnit(*SingleInputFile, BufferID, &Done,
                              TheSILModule ? &SILContext : nullptr,
                              &PersistentState, DelayedCB.get());
     if (!Invocation.getParseOnly())
       performTypeChecking(TU, CurTUElem);
-    CurTUElem = TU->MainSourceFile->Decls.size();
+    CurTUElem = SingleInputFile->Decls.size();
   } while (!Done);
 
   if (DelayedCB) {

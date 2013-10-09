@@ -118,17 +118,18 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   // For now, treat all separate modules as unique components.
   Component *comp = new (Ctx.Allocate<Component>(1)) Component();
 
-  auto *importTU = new (Ctx) TranslationUnit(moduleID.first, comp, Ctx,
-                                             SourceFile::Library);
+  auto *importTU = new (Ctx) TranslationUnit(moduleID.first, comp, Ctx);
   Ctx.LoadedModules[moduleID.first.str()] = importTU;
-  importTU->MainSourceFile->setImportBufferID(bufferID);
 
+  auto *importFile = new (Ctx) SourceFile(*importTU, SourceFile::Library,
+                                          bufferID);
+  importTU->MainSourceFile = importFile;
   performAutoImport(importTU);
 
   bool done;
   PersistentParserState persistentState;
   SkipNonTransparentFunctions delayCallbacks;
-  parseIntoTranslationUnit(*importTU->MainSourceFile, bufferID, &done, nullptr,
+  parseIntoTranslationUnit(*importFile, bufferID, &done, nullptr,
                            &persistentState,
                            SkipBodies ? &delayCallbacks : nullptr);
   assert(done && "Parser returned early?");
