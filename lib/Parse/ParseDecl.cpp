@@ -40,7 +40,7 @@ using namespace swift;
 ///     decl-sil-stage [[only in SIL mode]
 /// \endverbatim
 bool Parser::parseTopLevel() {
-  SF.TU.ASTStage = TranslationUnit::Parsing;
+  SF.ASTStage = SourceFile::Parsing;
 
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
@@ -90,7 +90,7 @@ bool Parser::parseTopLevel() {
     SF.Decls.push_back(Item.get<Decl*>());
 
   // Note that the translation unit is fully parsed and verify it.
-  SF.TU.ASTStage = TranslationUnit::Parsed;
+  SF.ASTStage = SourceFile::Parsed;
   verify(&SF.TU);
 
   State->markParserPosition(Tok.getLoc(), PreviousLoc);

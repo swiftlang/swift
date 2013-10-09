@@ -573,11 +573,8 @@ bool SILParser::handleGenericParams(GenericParamList *GenericParams) {
 
 bool SILParser::performTypeLocChecking(TypeLoc &T) {
   // Do some type checking / name binding for the parsed type.
-  // We have to lie and say we're done with parsing to make this happen.
-  assert(P.SF.TU.ASTStage == TranslationUnit::Parsing &&
+  assert(P.SF.ASTStage == SourceFile::Parsing &&
          "Unexpected stage during parsing!");
-  llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.SF.TU.ASTStage,
-                                                    TranslationUnit::Parsed);
   return swift::performTypeLocChecking(P.Context, T, &P.SF.TU);
 }
 
@@ -586,10 +583,10 @@ static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
              Identifier Name) {
   // Use UnqualifiedLookup to look through all of the imports.
   // We have to lie and say we're done with parsing to make this happen.
-  assert(P.SF.TU.ASTStage == TranslationUnit::Parsing &&
+  assert(P.SF.ASTStage == SourceFile::Parsing &&
          "Unexpected stage during parsing!");
-  llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.SF.TU.ASTStage,
-                                                    TranslationUnit::Parsed);
+  llvm::SaveAndRestore<SourceFile::ASTStage_t> ASTStage(P.SF.ASTStage,
+                                                        SourceFile::Parsed);
   UnqualifiedLookup DeclLookup(Name, &P.SF.TU, nullptr);
   assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1);
   if (DeclLookup.Results.back().Kind == UnqualifiedLookupResult::ModuleName) {

@@ -700,7 +700,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;
 
   // Verify that we've checked types correctly.
-  TU->ASTStage = TranslationUnit::TypeChecked;
+  TU->MainSourceFile->ASTStage = SourceFile::TypeChecked;
   verify(TU);
 
   // Verify modules imported by Clang importer.

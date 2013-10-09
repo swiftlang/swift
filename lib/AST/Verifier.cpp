@@ -52,7 +52,9 @@ namespace {
         DISPATCH(ID);
 #define UNCHECKED_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert((M->ASTStage < TranslationUnit::TypeChecked || HadError) && \
+        assert((HadError || !isa<TranslationUnit>(M) || \
+                cast<TranslationUnit>(M)->MainSourceFile->ASTStage < \
+                  SourceFile::TypeChecked) && \
                #ID "in wrong phase");\
         DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
@@ -69,7 +71,9 @@ namespace {
         DISPATCH(ID);
 #define UNCHECKED_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert((M->ASTStage < TranslationUnit::TypeChecked || HadError) && \
+        assert((HadError || !isa<TranslationUnit>(M) || \
+                cast<TranslationUnit>(M)->MainSourceFile->ASTStage < \
+                  SourceFile::TypeChecked) && \
                #ID "in wrong phase");\
         DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
@@ -195,16 +199,19 @@ namespace {
       // Always verify the node as a parsed node.
       verifyParsed(node);
 
+      SourceFile *SF = nullptr;
+      if (auto TU = dyn_cast<TranslationUnit>(M))
+        SF = TU->MainSourceFile;
+
       // If we've bound names already, verify as a bound node.
-      if (M->ASTStage >= TranslationUnit::NameBound)
+      if (!SF || SF->ASTStage >= SourceFile::NameBound)
         verifyBound(node);
 
       // If we've checked types already, do some extra verification.
-      if (M->ASTStage >= TranslationUnit::TypeChecked) {
+      if (!SF || SF->ASTStage >= SourceFile::TypeChecked) {
         verifyCheckedAlways(node);
-        if (!HadError) {
+        if (!HadError)
           verifyChecked(node);
-        }
       }
 
       // Clean up anything that we've placed into a stack to check.

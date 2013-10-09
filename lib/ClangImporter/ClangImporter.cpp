@@ -837,8 +837,6 @@ ClangModule::ClangModule(ASTContext &ctx, std::string DebugModuleName,
                          clang::Module *clangModule)
   : LoadedModule(ModuleKind::Clang, ctx.getIdentifier(clangModule->Name),
                  DebugModuleName, comp, ctx, owner), clangModule(clangModule) {
-  // Clang modules are always well-formed.
-  ASTStage = TypeChecked;
 }
 
 bool ClangModule::isTopLevel() const {

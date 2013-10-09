@@ -136,30 +136,12 @@ protected:
 public:
   ASTContext &Ctx;
   Identifier Name;
-  
-  //===--------------------------------------------------------------------===//
-  // AST Phase of Translation
-  //===--------------------------------------------------------------------===//
-  
-  /// ASTStage - Defines what phases of parsing and semantic analysis are
-  /// complete for the given AST.  This should only be used for assertions and
-  /// verification purposes.
-  enum ASTStage_t {
-    /// Parsing is underway.
-    Parsing,
-    /// Parsing has completed.
-    Parsed,
-    /// Name binding has completed.
-    NameBound,
-    /// Type checking has completed.
-    TypeChecked
-  } ASTStage;
 
 protected:
   Module(ModuleKind Kind, Identifier Name, Component *C, ASTContext &Ctx)
   : DeclContext(DeclContextKind::Module, nullptr),
     Kind(Kind), LookupCachePimpl(0),
-    Comp(C), Ctx(Ctx), Name(Name), ASTStage(Parsing) {
+    Comp(C), Ctx(Ctx), Name(Name) {
     assert(Comp != nullptr || Kind == ModuleKind::Builtin);
   }
 
@@ -407,10 +389,25 @@ public:
 
   const SourceKind Kind;
 
+  /// Defines what phases of parsing and semantic analysis are complete for a
+  /// source file.  This should only be used for assertions and verification
+  /// purposes.
+  enum ASTStage_t {
+    /// Parsing is underway.
+    Parsing,
+    /// Parsing has completed.
+    Parsed,
+    /// Name binding has completed.
+    NameBound,
+    /// Type checking has completed.
+    TypeChecked
+  } ASTStage = Parsing;
+
   SourceFile(TranslationUnit &tu, SourceKind K,
              int ImportID = -1) : ImportBufferID(ImportID), TU(tu), Kind(K) {}
 
   ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
+    assert(ASTStage >= Parsed || Kind == SIL);
     return Imports;
   }
   void setImports(ArrayRef<std::pair<Module::ImportedModule, bool>> IM) {
@@ -509,8 +506,6 @@ class BuiltinModule : public Module {
 public:
   BuiltinModule(Identifier Name, ASTContext &Ctx)
     : Module(ModuleKind::Builtin, Name, nullptr, Ctx) {
-    // The Builtin module is always well formed.
-    ASTStage = TypeChecked;
   }
 
   static bool classof(const Module *M) {
@@ -534,8 +529,6 @@ protected:
                ASTContext &ctx, ModuleLoader &owner)
     : Module(Kind, name, comp, ctx),
       DebugModuleName(DebugModuleName) {
-    // Loaded modules are always well-formed.
-    ASTStage = TypeChecked;
     LookupCachePimpl = static_cast<void *>(&owner);
   }
 

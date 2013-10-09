@@ -344,7 +344,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   // Make sure we skip adding the standard library imports if the
   // translation unit is empty.
   if (TU->MainSourceFile->Decls.empty()) {
-    TU->ASTStage = TranslationUnit::NameBound;
+    TU->MainSourceFile->ASTStage = SourceFile::NameBound;
     return;
   }
 
@@ -410,7 +410,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
-  TU->ASTStage = TranslationUnit::NameBound;
+  TU->MainSourceFile->ASTStage = SourceFile::NameBound;
   verify(TU);
 }
 
