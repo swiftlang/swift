@@ -35,11 +35,53 @@ public:
     const Orig *Ptr;
     iterator(const Orig *ptr) : Ptr(ptr) {}
   public:
+    typedef Projected value_type;
+    typedef Projected reference;
+    typedef void pointer;
+    typedef ptrdiff_t difference_type;
+    typedef std::random_access_iterator_tag iterator_category;
+
     Projected operator*() const { return Project(*Ptr); }
     iterator &operator++() { Ptr++; return *this; }
     iterator operator++(int) { return iterator(Ptr++); }
     bool operator==(iterator rhs) { return Ptr == rhs.Ptr; }
     bool operator!=(iterator rhs) { return Ptr != rhs.Ptr; }
+
+    iterator &operator+=(difference_type i) {
+      Ptr += i;
+      return *this;
+    }
+    iterator operator+(difference_type i) const {
+      return iterator(Ptr + i);
+    }
+    friend iterator operator+(difference_type i, iterator base) {
+      return iterator(base.Ptr + i);
+    }
+    iterator &operator-=(difference_type i) {
+      Ptr -= i;
+      return *this;
+    }
+    iterator operator-(difference_type i) const {
+      return iterator(Ptr - i);
+    }
+    difference_type operator-(iterator rhs) const {
+      return Ptr - rhs.Ptr;
+    }
+    Projected operator[](difference_type i) const {
+      return Project(Ptr[i]);
+    }
+    bool operator<(iterator rhs) const {
+      return Ptr < rhs.Ptr;
+    }
+    bool operator<=(iterator rhs) const {
+      return Ptr <= rhs.Ptr;
+    }
+    bool operator>(iterator rhs) const {
+      return Ptr > rhs.Ptr;
+    }
+    bool operator>=(iterator rhs) const {
+      return Ptr >= rhs.Ptr;
+    }
   };
   iterator begin() const { return iterator(Array.begin()); }
   iterator end() const { return iterator(Array.end()); }
