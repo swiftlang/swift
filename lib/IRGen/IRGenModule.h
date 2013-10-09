@@ -68,8 +68,8 @@ namespace swift {
   class SILModule;
   class SILType;
   class SourceLoc;
+  class SourceFile;
   class StructDecl;
-  class TranslationUnit;
   class Type;
   class TypeAliasDecl;
   class TypeDecl;
@@ -244,7 +244,6 @@ private:
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
 
-  void mangleGlobalInitializer(raw_ostream &buffer, TranslationUnit *D);
   void emitGlobalLists();
 
 //--- Runtime ---------------------------------------------------------------
@@ -276,7 +275,8 @@ public:
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
 
-  void emitTranslationUnit(TranslationUnit *TU, unsigned StartElem);
+  void emitSourceFile(SourceFile &SF, unsigned StartElem);
+  void finalizeDebugInfo();
 
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);
@@ -344,7 +344,7 @@ public:
 
 //--- Global context emission --------------------------------------------------
 public:
-  void emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem);
+  void emitGlobalTopLevel(SourceFile &SF, unsigned StartElem);
 private:
   void emitGlobalDecl(Decl *D);
   void emitExternalDefinition(Decl *D);

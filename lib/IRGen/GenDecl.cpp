@@ -18,7 +18,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
@@ -269,44 +268,10 @@ static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
   return initFn;
 }
 
-static void emitModuleLinkOptions(llvm::Module &module, TranslationUnit *TU) {
-  // FIXME: This constant should be vended by LLVM somewhere.
-  static const char * const LinkerOptionsFlagName = "Linker Options";
-  
-  SmallVector<llvm::Value *, 32> metadata;
-  llvm::LLVMContext &ctx = module.getContext();
-  
-  TU->collectLinkLibraries([&](LinkLibrary linkLib) {
-    switch (linkLib.getKind()) {
-    case LibraryKind::Library: {
-      // FIXME: Use target-independent linker option.
-      // Clang uses CGM.getTargetCodeGenInfo().getDependentLibraryOption(...).
-      llvm::SmallString<32> buf;
-      buf += "-l";
-      buf += linkLib.getName();
-      auto flag = llvm::MDString::get(ctx, buf);
-      metadata.push_back(llvm::MDNode::get(ctx, flag));
-      break;
-    }
-    case LibraryKind::Framework:
-      llvm::Value *args[] = {
-        llvm::MDString::get(ctx, "-framework"),
-        llvm::MDString::get(ctx, linkLib.getName())
-      };
-      metadata.push_back(llvm::MDNode::get(ctx, args));
-      break;
-    }
-  });
-  
-  module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
-                       llvm::MDNode::get(ctx, metadata));
-}
-
-/// Emit all the top-level code in the translation unit.
-void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
-                                      unsigned StartElem) {
+/// Emit all the top-level code in the source file.
+void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   /// Emit all the code from the SIL module and declarations.
-  emitGlobalTopLevel(tunit, StartElem);
+  emitGlobalTopLevel(SF, StartElem);
   
   llvm::Function *topLevelCodeFn = Module.getFunction("top_level_code");
   assert(topLevelCodeFn && "no top_level_code in SIL module?!");
@@ -325,12 +290,14 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                       unitToUnit, ExplosionKind::Minimal, 0, ExtraData::None,
                       attrs);
   llvm::Function *initFn = nullptr;
-  if (tunit->Kind != TranslationUnit::Main &&
-      tunit->Kind != TranslationUnit::REPL) {
+  if (SF.TU.Kind != TranslationUnit::Main &&
+      SF.TU.Kind != TranslationUnit::REPL) {
     // Create a global initializer for library modules.
-    // FIXME: This is completely, utterly, wrong.
+    // FIXME: If there is more than one source file, the names will collide.
+    // FIXME: This is completely, utterly, wrong -- we don't want library
+    // initializers anyway.
     initFn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
-                                    tunit->Name.str() + ".init", &Module);
+                                    SF.TU.Name.str() + ".init", &Module);
     initFn->setAttributes(attrs);
     
     // Insert a call to the top_level_code symbol from the SIL module.
@@ -343,8 +310,8 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   }
   
   SmallVector<llvm::Constant *, 2> allInits;
-  if (tunit->Kind == TranslationUnit::Main ||
-      tunit->Kind == TranslationUnit::REPL) {
+  if (SF.TU.Kind == TranslationUnit::Main ||
+      SF.TU.Kind == TranslationUnit::REPL) {
     // We don't need global init to call main().
   } else if (isTrivialGlobalInit(topLevelCodeFn)) {
     // Not all translation units need a global initialization function.
@@ -377,8 +344,8 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   
   emitGlobalLists();
   
-  if (tunit->Kind == TranslationUnit::Main ||
-      tunit->Kind == TranslationUnit::REPL) {
+  if (SF.TU.Kind == TranslationUnit::Main ||
+      SF.TU.Kind == TranslationUnit::REPL) {
     // Emit main().
     // FIXME: We should only emit this in non-JIT modes.
 
@@ -415,7 +382,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
       fnParameter->setName(fnParameterName);
 
       auto lookup = UnqualifiedLookup::forModuleAndName(
-          tunit->Ctx, tunit->Ctx.StdlibModuleName.str(), swiftVarName);
+          Context, Context.StdlibModuleName.str(), swiftVarName);
       if (!lookup.hasValue())
         continue;
 
@@ -463,29 +430,6 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     mainIGF.Builder.CreateCall(topLevelCodeFn);
     mainIGF.Builder.CreateRet(mainIGF.Builder.getInt32(0));
   }
-
-  // Objective-C image information.
-  // Generate module-level named metadata to convey this information to the
-  // linker and code-gen.
-  unsigned version = 0; // Version is unused?
-  const char *section = "__DATA, __objc_imageinfo, regular, no_dead_strip";
-
-  // Add the ObjC ABI version to the module flags.
-  Module.addModuleFlag(llvm::Module::Error, "Objective-C Version", 2);
-  Module.addModuleFlag(llvm::Module::Error, "Objective-C Image Info Version",
-                       version);
-  Module.addModuleFlag(llvm::Module::Error, "Objective-C Image Info Section",
-                       llvm::MDString::get(LLVMContext, section));
-
-  Module.addModuleFlag(llvm::Module::Override,
-                       "Objective-C Garbage Collection", (uint32_t)0);
-  // FIXME: Simulator flag.
-  
-  emitModuleLinkOptions(Module, tunit);
-
-  // Fix up the DICompileUnit.
-  if (DebugInfo)
-    DebugInfo->finalize();
 }
 
 /// Add the given global value to @llvm.used.
@@ -560,7 +504,7 @@ void IRGenModule::emitGlobalLists() {
                  llvm::GlobalValue::AppendingLinkage);
 }
 
-void IRGenModule::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) {
+void IRGenModule::emitGlobalTopLevel(SourceFile &MainFile, unsigned StartElem) {
   // Emit global variables.
   for (VarDecl *global : SILMod->getGlobals()) {
     TypeInfo const &ti = getTypeInfo(global->getType());
@@ -573,8 +517,8 @@ void IRGenModule::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) {
   }
 
   // Emit types and other global decls.
-  for (unsigned i = StartElem, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
-    emitGlobalDecl(TU->MainSourceFile->Decls[i]);
+  for (unsigned i = StartElem, e = MainFile.Decls.size(); i != e; ++i) {
+    emitGlobalDecl(MainFile.Decls[i]);
   }
 
   // Emit the implicit import of the swift standard libary.

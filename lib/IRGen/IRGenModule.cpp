@@ -302,6 +302,11 @@ llvm::Constant *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
 }
 
+void IRGenModule::finalizeDebugInfo() {
+  if (DebugInfo)
+    DebugInfo->finalize();
+}
+
 void IRGenModule::unimplemented(SourceLoc loc, StringRef message) {
   Context.Diags.diagnose(loc, diag::irgen_unimplemented, message);
 }

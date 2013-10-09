@@ -19,6 +19,7 @@
 #include "swift/IRGen/Options.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/LinkLibrary.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/PassManager.h"
@@ -65,6 +66,40 @@ static void addSwiftExpandPass(const PassManagerBuilder &Builder,
   if (Builder.OptLevel > 0)
     PM.add(createSwiftARCExpandPass());
 }
+
+static void emitModuleLinkOptions(llvm::Module &module, TranslationUnit *TU) {
+  // FIXME: This constant should be vended by LLVM somewhere.
+  static const char * const LinkerOptionsFlagName = "Linker Options";
+  
+  SmallVector<llvm::Value *, 32> metadata;
+  llvm::LLVMContext &ctx = module.getContext();
+  
+  TU->collectLinkLibraries([&](LinkLibrary linkLib) {
+    switch (linkLib.getKind()) {
+    case LibraryKind::Library: {
+      // FIXME: Use target-independent linker option.
+      // Clang uses CGM.getTargetCodeGenInfo().getDependentLibraryOption(...).
+      llvm::SmallString<32> buf;
+      buf += "-l";
+      buf += linkLib.getName();
+      auto flag = llvm::MDString::get(ctx, buf);
+      metadata.push_back(llvm::MDNode::get(ctx, flag));
+      break;
+    }
+    case LibraryKind::Framework:
+      llvm::Value *args[] = {
+        llvm::MDString::get(ctx, "-framework"),
+        llvm::MDString::get(ctx, linkLib.getName())
+      };
+      metadata.push_back(llvm::MDNode::get(ctx, args));
+      break;
+    }
+  });
+  
+  module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
+                       llvm::MDNode::get(ctx, metadata));
+}
+
 
 void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
                                 TranslationUnit *TU,
@@ -126,8 +161,28 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
 
   // Emit the translation unit.
   IRGenModule IGM(TU->Ctx, Opts, *Module, *DataLayout, SILMod);
-  IGM.emitTranslationUnit(TU, StartElem);
+  IGM.emitSourceFile(*TU->MainSourceFile, StartElem);
   
+  // Objective-C image information.
+  // Generate module-level named metadata to convey this information to the
+  // linker and code-gen.
+  unsigned version = 0; // Version is unused?
+  const char *section = "__DATA, __objc_imageinfo, regular, no_dead_strip";
+
+  // Add the ObjC ABI version to the module flags.
+  Module->addModuleFlag(llvm::Module::Error, "Objective-C Version", 2);
+  Module->addModuleFlag(llvm::Module::Error, "Objective-C Image Info Version",
+                        version);
+  Module->addModuleFlag(llvm::Module::Error, "Objective-C Image Info Section",
+                        llvm::MDString::get(Module->getContext(), section));
+
+  Module->addModuleFlag(llvm::Module::Override,
+                        "Objective-C Garbage Collection", (uint32_t)0);
+  // FIXME: Simulator flag.
+
+  emitModuleLinkOptions(*Module, TU);
+  IGM.finalizeDebugInfo();
+
   DEBUG(llvm::dbgs() << "module before passes:\n";
         IGM.Module.dump());
 
