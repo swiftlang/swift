@@ -98,8 +98,7 @@ public:
   }
 
   bool allowTopLevelCode() const {
-    return SF.TU.Kind == TranslationUnit::Main ||
-           SF.TU.Kind == TranslationUnit::REPL;
+    return SF.Kind == SourceFile::Main || SF.Kind == SourceFile::REPL;
   }
 
   /// \brief This is the current token being considered by the parser.

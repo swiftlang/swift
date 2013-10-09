@@ -57,7 +57,7 @@ class CompilerInvocation {
   bool ParseStdlib = false;
   bool ParseOnly = false;
   bool Immediate = false;
-  TranslationUnit::TUKind TUKind = TranslationUnit::Main;
+  SourceFile::SourceKind InputKind = SourceFile::Main;
 
   std::string ModuleName;
 
@@ -167,12 +167,12 @@ public:
     return ParseOnly;
   }
 
-  void setTUKind(TranslationUnit::TUKind K) {
-    TUKind = K;
+  void setInputKind(SourceFile::SourceKind K) {
+    InputKind = K;
   }
 
-  TranslationUnit::TUKind getTUKind() const {
-    return TUKind;
+  SourceFile::SourceKind getInputKind() const {
+    return InputKind;
   }
 
   void setModuleName(StringRef Name) {

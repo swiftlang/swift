@@ -109,7 +109,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
       break;
 
     case OPT_parse_as_library:
-      setTUKind(TranslationUnit::Library);
+      setInputKind(SourceFile::Library);
       break;
 
     case OPT_parse_stdlib:

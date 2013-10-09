@@ -290,8 +290,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
                       unitToUnit, ExplosionKind::Minimal, 0, ExtraData::None,
                       attrs);
   llvm::Function *initFn = nullptr;
-  if (SF.TU.Kind != TranslationUnit::Main &&
-      SF.TU.Kind != TranslationUnit::REPL) {
+  if (SF.Kind != SourceFile::Main && SF.Kind != SourceFile::REPL) {
     // Create a global initializer for library modules.
     // FIXME: If there is more than one source file, the names will collide.
     // FIXME: This is completely, utterly, wrong -- we don't want library
@@ -310,8 +309,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   }
   
   SmallVector<llvm::Constant *, 2> allInits;
-  if (SF.TU.Kind == TranslationUnit::Main ||
-      SF.TU.Kind == TranslationUnit::REPL) {
+  if (SF.Kind == SourceFile::Main || SF.Kind == SourceFile::REPL) {
     // We don't need global init to call main().
   } else if (isTrivialGlobalInit(topLevelCodeFn)) {
     // Not all translation units need a global initialization function.
@@ -344,8 +342,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   
   emitGlobalLists();
   
-  if (SF.TU.Kind == TranslationUnit::Main ||
-      SF.TU.Kind == TranslationUnit::REPL) {
+  if (SF.Kind == SourceFile::Main || SF.Kind == SourceFile::REPL) {
     // Emit main().
     // FIXME: We should only emit this in non-JIT modes.
 

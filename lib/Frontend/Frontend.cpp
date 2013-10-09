@@ -76,7 +76,7 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
-  if (Invocation.getTUKind() == TranslationUnit::SIL)
+  if (Invocation.getInputKind() == SourceFile::SIL)
     createSILModule();
 
   auto CodeCompletePoint = Invocation.getCodeCompletionPoint();
@@ -119,7 +119,7 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
 }
 
 void swift::CompilerInstance::doIt() {
-  const TranslationUnit::TUKind Kind = Invocation.getTUKind();
+  const SourceFile::SourceKind Kind = Invocation.getInputKind();
   Component *Comp = new (Context->Allocate<Component>(1)) Component();
   Identifier ID = Context->getIdentifier(Invocation.getModuleName());
   TU = new (*Context) TranslationUnit(ID, Comp, *Context, Kind);
@@ -131,10 +131,10 @@ void swift::CompilerInstance::doIt() {
   // If we're in SIL mode, don't auto import any libraries.
   // Also don't perform auto import if we are not going to do semantic
   // analysis.
-  if (Kind != TranslationUnit::SIL && !Invocation.getParseOnly())
+  if (Kind != SourceFile::SIL && !Invocation.getParseOnly())
     performAutoImport(TU);
 
-  if (Kind == TranslationUnit::REPL)
+  if (Kind == SourceFile::REPL)
     return;
 
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB;
@@ -147,7 +147,7 @@ void swift::CompilerInstance::doIt() {
 
   PersistentParserState PersistentState;
 
-  if (Kind == TranslationUnit::Library) {
+  if (Kind == SourceFile::Library) {
     // Parse all of the files into one big translation unit.
     for (auto &BufferID : BufferIDs) {
       bool Done;
@@ -169,11 +169,11 @@ void swift::CompilerInstance::doIt() {
   }
 
   // This may only be a main module or SIL, which requires pumping the parser.
-  assert(Kind == TranslationUnit::Main || Kind == TranslationUnit::SIL);
+  assert(Kind == SourceFile::Main || Kind == SourceFile::SIL);
   assert(BufferIDs.size() == 1 && "This mode only allows one input");
   unsigned BufferID = BufferIDs[0];
 
-  if (Kind == TranslationUnit::Main)
+  if (Kind == SourceFile::Main)
     SourceMgr.setHashbangBufferID(BufferID);
 
   SILParserState SILContext(TheSILModule.get());

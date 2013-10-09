@@ -152,7 +152,7 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
   CompletionStrings.clear();
   CompletionInsertableStrings.clear();
 
-  assert(SF.TU.Kind == TranslationUnit::REPL && "Can't append to a non-REPL TU");
+  assert(SF.Kind == SourceFile::REPL && "Can't append to a non-REPL TU");
 
   unsigned BufferID;
   doCodeCompletion(SF, EnteredCode, &BufferID,

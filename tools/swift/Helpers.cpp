@@ -23,8 +23,7 @@ using namespace swift;
 bool swift::appendToREPLTranslationUnit(SourceFile &SF,
                                         REPLContext &RC,
                                         llvm::MemoryBuffer *Buffer) {
-  assert(SF.TU.Kind == TranslationUnit::REPL &&
-         "Can't append to a non-REPL TU");
+  assert(SF.Kind == SourceFile::REPL && "Can't append to a non-REPL TU");
 
   SourceManager &SrcMgr = SF.TU.getASTContext().SourceMgr;
   RC.CurBufferID = SrcMgr->AddNewSourceBuffer(Buffer, llvm::SMLoc());

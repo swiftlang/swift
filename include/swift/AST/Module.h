@@ -396,7 +396,18 @@ public:
   /// binding is complete.
   llvm::StringMap<PrefixOperatorDecl*> PrefixOperators;
 
-  SourceFile(TranslationUnit &tu) : TU(tu) {}
+  /// This describes how this file is parsed, which can affect some type
+  /// checking and other behavior.
+  enum SourceKind {
+    Library,
+    Main,
+    REPL,
+    SIL       ///< Came from a .sil file.
+  };
+
+  const SourceKind Kind;
+
+  SourceFile(TranslationUnit &tu, SourceKind K) : TU(tu), Kind(K) {}
 
   ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
     return Imports;
@@ -430,22 +441,14 @@ public:
   // FIXME: Make private.
   std::unique_ptr<SourceFile> MainSourceFile;
 
-  /// Kind - This is the sort of file the translation unit was parsed for, which
-  /// can affect some type checking and other behavior.
-  enum TUKind {
-    Library,
-    Main,
-    REPL,
-    SIL       // Came from a .sil file.
-  } Kind;
-
   /// If this is true, then the translation unit is allowed to access the
   /// Builtin module with an explicit import.
   bool HasBuiltinModuleAccess = false;
 
-  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C, TUKind Kind)
+  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C,
+                  SourceFile::SourceKind Kind)
     : Module(ModuleKind::TranslationUnit, Name, Comp, C),
-      MainSourceFile(new SourceFile(*this)), Kind(Kind) {
+      MainSourceFile(new SourceFile(*this, Kind)) {
   }
   
   void setLinkLibraries(ArrayRef<LinkLibrary> libs) {

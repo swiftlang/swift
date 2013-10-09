@@ -88,7 +88,8 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
 
   // The Builtin module cannot be explicitly imported unless we're a .sil file
   // or in the REPL.
-  if ((TU->Kind == TranslationUnit::SIL || TU->Kind == TranslationUnit::REPL) &&
+  if ((TU->MainSourceFile->Kind == SourceFile::SIL ||
+       TU->MainSourceFile->Kind == SourceFile::REPL) &&
       moduleID.first.str() == "Builtin")
     return TU->Ctx.TheBuiltinModule;
 

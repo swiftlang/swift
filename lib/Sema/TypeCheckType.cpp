@@ -688,7 +688,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
     // apply directly to types.
     if (attrs.hasOwnership() && Ty->hasReferenceSemantics()) {
       auto TU = dyn_cast<TranslationUnit>(DC->getParentModule());
-      if (TU && TU->Kind == TranslationUnit::SIL) {
+      if (TU && TU->MainSourceFile->Kind == SourceFile::SIL) {
         Ty = ReferenceStorageType::get(Ty, attrs.getOwnership(), Context);
         attrs.clearOwnership();
       }
@@ -696,8 +696,8 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
 
     // Diagnose [local_storage] in nested positions.
     if (attrs.isLocalStorage()) {
-      assert(cast<TranslationUnit>(DC->getParentModule())->Kind ==
-             TranslationUnit::SIL);
+      assert(cast<TranslationUnit>(DC->getParentModule())
+               ->MainSourceFile->Kind == SourceFile::SIL);
       diagnose(attrs.AtLoc, diag::sil_local_storage_nested);
       attrs.LocalStorage = false;
     }

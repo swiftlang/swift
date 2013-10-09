@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
   Invocation.setImportSearchPaths(ImportPaths);
 
   Invocation.setModuleName("main");
-  Invocation.setTUKind(TranslationUnit::SIL);
+  Invocation.setInputKind(SourceFile::SIL);
   
   Invocation.addInputFilename(InputFilename);
 

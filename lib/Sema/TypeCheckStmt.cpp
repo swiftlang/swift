@@ -103,7 +103,7 @@ public:
   StmtChecker(TypeChecker &TC, DeclContext *DC)
     : TC(TC), TheFunc(), DC(DC), IsREPL(false) {
     if (auto TU = dyn_cast<TranslationUnit>(DC->getParentModule()))
-      if (TU->Kind == TranslationUnit::REPL)
+      if (TU->MainSourceFile->Kind == SourceFile::REPL)
         IsREPL = true;
   }
 
