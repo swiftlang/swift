@@ -36,7 +36,7 @@ bool swift::appendToREPLTranslationUnit(SourceFile &SF,
     FoundAnySideEffects |=
         parseIntoTranslationUnit(SF, RC.CurBufferID, &Done, nullptr,
                                  &PersistentState);
-    performTypeChecking(&SF.TU, CurTUElem);
+    performTypeChecking(SF, CurTUElem);
     CurTUElem = SF.Decls.size();
   } while (!Done);
   return FoundAnySideEffects;

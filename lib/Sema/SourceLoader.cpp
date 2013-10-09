@@ -143,7 +143,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   if (SkipBodies)
     performNameBinding(*importFile);
   else
-    performTypeChecking(importTU);
+    performTypeChecking(*importFile);
 
   return importTU;
 }

@@ -120,11 +120,12 @@ namespace swift {
   ///                  source file.
   void performNameBinding(SourceFile &SF, unsigned StartElem = 0);
   
-  /// performTypeChecking - Once parsing and namebinding are complete, this
-  /// walks the AST to resolve types and diagnose problems therein. StartElem
-  /// indicates where to start for incremental type checking in the
-  /// main module.
-  void performTypeChecking(TranslationUnit *TU, unsigned StartElem = 0);
+  /// Once parsing and name-binding are complete, this walks the AST to resolve
+  /// types and diagnose problems therein.
+  ///
+  /// \param StartElem Where to start for incremental type-checking in the main
+  ///                  source file.
+  void performTypeChecking(SourceFile &SF, unsigned StartElem = 0);
 
   /// \brief Recursively validate the specified type.
   ///

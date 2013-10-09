@@ -162,7 +162,7 @@ void swift::CompilerInstance::doIt() {
 
     // Finally, if enabled, type check the whole thing in one go.
     if (!Invocation.getParseOnly())
-      performTypeChecking(TU);
+      performTypeChecking(*SingleInputFile);
 
     if (DelayedCB) {
       performDelayedParsing(TU, PersistentState,
@@ -192,7 +192,7 @@ void swift::CompilerInstance::doIt() {
                              TheSILModule ? &SILContext : nullptr,
                              &PersistentState, DelayedCB.get());
     if (!Invocation.getParseOnly())
-      performTypeChecking(TU, CurTUElem);
+      performTypeChecking(*SingleInputFile, CurTUElem);
     CurTUElem = SingleInputFile->Decls.size();
   } while (!Done);
 

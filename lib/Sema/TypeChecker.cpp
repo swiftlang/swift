@@ -460,16 +460,12 @@ static bool haveDifferentFixity(const ValueDecl *lhs, const ValueDecl *rhs) {
   return lhs->getAttrs().isPrefix() != rhs->getAttrs().isPrefix();
 }
 
-/// performTypeChecking - Once parsing and namebinding are complete, these
-/// walks the AST to resolve types and diagnose problems therein.
-///
-/// FIXME: This should be moved out to somewhere else.
-void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
+void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
   // Make sure that name binding has been completed before doing any type
   // checking.
-  performNameBinding(*TU->MainSourceFile, StartElem);
+  performNameBinding(SF, StartElem);
   
-  TypeChecker TC(TU->Ctx);
+  TypeChecker TC(SF.TU.Ctx);
   auto &DefinedFunctions = TC.definedFunctions;
 
   // Lookup the swift module.  This ensures that we record all known protocols
@@ -481,8 +477,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // to work.
   // FIXME: We can have interesting ordering dependencies among the various
   // extensions, so we'll need to be smarter here.
-  TU->forAllVisibleModules(Module::AccessPathTy(),
-                           [&](Module::ImportedModule import) {
+  // FIXME: The current source file needs to be handled specially, because of
+  // private extensions.
+  SF.TU.forAllVisibleModules(Module::AccessPathTy(),
+                             [&](Module::ImportedModule import) {
     auto importTU = dyn_cast<TranslationUnit>(import.second);
     if (!importTU)
       return;
@@ -502,8 +500,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // FIXME: Check for cycles in class inheritance here?
 
   // Type check the top-level elements of the translation unit.
-  for (unsigned i = StartElem, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
-    Decl *D = TU->MainSourceFile->Decls[i];
+  for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
     if (isa<TopLevelCodeDecl>(D))
       continue;
 
@@ -518,18 +515,17 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     enum ClassState { CheckNone, CheckExtensions, CheckAll };
     llvm::DenseMap<ClassDecl *, ClassState> CheckedClasses;
     SmallVector<ClassDecl *, 16> QueuedClasses;
-    for (unsigned i = 0, e = StartElem; i != e; ++i) {
-      ClassDecl *CD = dyn_cast<ClassDecl>(TU->MainSourceFile->Decls[i]);
-      if (CD)
+    for (auto D : llvm::makeArrayRef(SF.Decls).slice(0, StartElem)) {
+      if (auto CD = dyn_cast<ClassDecl>(D))
         CheckedClasses[CD] = CheckNone;
     }
 
     // Find all of the classes and class extensions.
     llvm::DenseMap<ClassDecl *, SmallVector<ExtensionDecl *, 2>>
       Extensions;
-    for (unsigned i = StartElem, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
+    for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
       // We found a class; record it.
-      if (auto classDecl = dyn_cast<ClassDecl>(TU->MainSourceFile->Decls[i])) {
+      if (auto classDecl = dyn_cast<ClassDecl>(D)) {
         if (CheckedClasses.find(classDecl) == CheckedClasses.end()) {
           QueuedClasses.push_back(classDecl);
           CheckedClasses[classDecl] = CheckAll;
@@ -537,7 +533,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         continue;
       }
 
-      auto ext = dyn_cast<ExtensionDecl>(TU->MainSourceFile->Decls[i]);
+      auto ext = dyn_cast<ExtensionDecl>(D);
       if (!ext || ext->isInvalid())
         continue;
 
@@ -588,8 +584,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // pass, which means we can't completely analyze everything. Perform the
   // second pass now.
 
-  for (unsigned i = StartElem, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
-    Decl *D = TU->MainSourceFile->Decls[i];
+  for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
     if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       // Immediately perform global name-binding etc.
       TC.typeCheckTopLevelCodeDecl(TLCD);
@@ -599,7 +594,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   }
 
 #define BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE, _, NATIVE_TYPE) \
-  if (Module *module = TU->Ctx.LoadedModules.lookup(#BRIDGED_MODULE)) { \
+  if (Module *module = SF.TU.Ctx.LoadedModules.lookup(#BRIDGED_MODULE)) { \
     checkBridgingFunctions(TC, module, #BRIDGED_TYPE, \
                            "convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
                            "convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
@@ -615,8 +610,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
   // If we're in REPL mode, inject temporary result variables and other stuff
   // that the REPL needs to synthesize.
-  if (TU->MainSourceFile->Kind == SourceFile::REPL && !TC.Context.hadError())
-    TC.processREPLTopLevel(*TU->MainSourceFile, StartElem);
+  if (SF.Kind == SourceFile::REPL && !TC.Context.hadError())
+    TC.processREPLTopLevel(SF, StartElem);
 
   // Check overloaded vars/funcs.
   // FIXME: This is quadratic time for TUs with multiple chunks.
@@ -624,8 +619,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // FIXME: This check should be earlier to avoid ambiguous overload
   // errors etc.
   llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> CheckOverloads;
-  for (unsigned i = 0, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(TU->MainSourceFile->Decls[i])) {
+  for (unsigned i = 0, e = SF.Decls.size(); i != e; ++i) {
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(SF.Decls[i])) {
       // FIXME: I'm not sure this check is really correct.
       if (VD->getName().empty())
         continue;
@@ -700,8 +695,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;
 
   // Verify that we've checked types correctly.
-  TU->MainSourceFile->ASTStage = SourceFile::TypeChecked;
-  verify(TU);
+  SF.ASTStage = SourceFile::TypeChecked;
+  verify(SF);
 
   // Verify modules imported by Clang importer.
   if (auto ClangLoader = TC.Context.getClangModuleLoader())

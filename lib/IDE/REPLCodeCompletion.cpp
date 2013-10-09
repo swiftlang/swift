@@ -127,7 +127,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   do {
     parseIntoTranslationUnit(SF, *BufferID, &Done,
                              nullptr, &PersistentState, DelayedCB.get());
-    performTypeChecking(&SF.TU, CurTUElem);
+    performTypeChecking(SF, CurTUElem);
     CurTUElem = SF.Decls.size();
   } while (!Done);
 
