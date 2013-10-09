@@ -20,13 +20,25 @@ import Builtin
 
 // CHECK-NOT: @_TWVV15generic_structs13SingleDynamic
 
-// CHECK: define linkonce_odr hidden void @_TwXXV15generic_structs13SingleDynamic([24 x i8]* %buffer, %swift.type* %Self) {
-// CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:   [[SELF_T_ADDR:%.*]] = getelementptr inbounds %swift.type** [[SELF_ARRAY]], i64 3
-// CHECK:   %T = load %swift.type** [[SELF_T_ADDR]], align 8
-
 struct SingleDynamic<T> {
   var x : T
+}
+
+struct Intish { var value : Builtin.Int64 }
+struct Chareth { var value : Builtin.Int21 }
+
+// CHECK-LABEL: define { i64, i21 } @concrete_instances(i64, i21) {
+// CHECK: entry:
+// CHECK:   %2 = insertvalue { i64, i21 } undef, i64 %0, 0
+// CHECK:   %3 = insertvalue { i64, i21 } %2, i21 %1, 1
+// CHECK:   ret { i64, i21 } %3
+// CHECK: }
+sil @concrete_instances : $(SingleDynamic<Intish>, SingleDynamic<Chareth>) -> (Intish, Chareth) {
+entry(%0 : $SingleDynamic<Intish>, %1 : $SingleDynamic<Chareth>):
+  %a = struct_extract %0 : $SingleDynamic<Intish>, #x
+  %b = struct_extract %1 : $SingleDynamic<Chareth>, #x
+  %c = tuple (%a : $Intish, %b : $Chareth)
+  return %c : $(Intish, Chareth)
 }
 
 sil @top_level_code : $() -> () {
@@ -34,6 +46,11 @@ entry:
   %0 = tuple ()
   return %0 : $()
 }
+
+// CHECK: define linkonce_odr hidden void @_TwXXV15generic_structs13SingleDynamic([24 x i8]* %buffer, %swift.type* %Self) {
+// CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* %Self to %swift.type**
+// CHECK:   [[SELF_T_ADDR:%.*]] = getelementptr inbounds %swift.type** [[SELF_ARRAY]], i64 3
+// CHECK:   %T = load %swift.type** [[SELF_T_ADDR]], align 8
 
 // CHECK: define internal void [[SINGLE_DYNAMIC_FILL_METADATA]](i8*, i8*) {
 // CHECK: entry:

@@ -207,7 +207,11 @@ namespace {
       return StructFieldInfo(field, fieldTI);
     }
 
-    Type getType(VarDecl *field) { return field->getType(); }
+    Type getType(VarDecl *field) {
+      assert(field->getDeclContext() == TheStruct->getAnyNominal());
+      return TheStruct->getTypeOfMember(field->getModuleContext(),
+                                        field, nullptr);
+    }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
       return StructLayout(IGM, LayoutKind::NonHeapObject,
@@ -305,16 +309,14 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
 const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
   // Collect all the fields from the type.
   SmallVector<VarDecl*, 8> fields;
-  for (Decl *D : D->getMembers())
-    if (VarDecl *VD = dyn_cast<VarDecl>(D))
-      if (!VD->isComputed()) {
-        if (!IGM.Opts.EnableDynamicValueTypeLayout &&
-            !IGM.getTypeInfo(VD->getType()).isFixedSize()) {
-          IGM.unimplemented(VD->getLoc(), "dynamic field layout in structs");
-          exit(1);
-        }
-        fields.push_back(VD);
-      }
+  for (VarDecl *VD : D->getStoredProperties()) {
+    if (!IGM.Opts.EnableDynamicValueTypeLayout &&
+        !IGM.getTypeInfo(VD->getType()).isFixedSize()) {
+      IGM.unimplemented(VD->getLoc(), "dynamic field layout in structs");
+      exit(1);
+    }
+    fields.push_back(VD);
+  }
 
   // Create the struct type.
   auto ty = IGM.createNominalType(D);
