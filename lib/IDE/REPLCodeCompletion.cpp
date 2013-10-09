@@ -99,10 +99,11 @@ REPLCompletions::REPLCompletions() : State(CompletionState::Invalid) {
 }
 
 static void
-doCodeCompletion(TranslationUnit *TU, StringRef EnteredCode, unsigned *BufferID,
+doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
                  CodeCompletionCallbacksFactory *CompletionCallbacksFactory) {
-  // Temporarily disable priting the diagnostics.
-  auto DiagnosticConsumers = TU->getASTContext().Diags.takeConsumers();
+  // Temporarily disable printing the diagnostics.
+  ASTContext &Ctx = SF.TU.Ctx;
+  auto DiagnosticConsumers = Ctx.Diags.takeConsumers();
 
   std::string AugmentedCode = EnteredCode.str();
   AugmentedCode += '\0';
@@ -111,41 +112,39 @@ doCodeCompletion(TranslationUnit *TU, StringRef EnteredCode, unsigned *BufferID,
 
   auto Buffer =
       llvm::MemoryBuffer::getMemBufferCopy(AugmentedCode, "<REPL Input>");
-  *BufferID =
-      TU->getASTContext().SourceMgr->AddNewSourceBuffer(Buffer, llvm::SMLoc());
+  *BufferID = Ctx.SourceMgr->AddNewSourceBuffer(Buffer, llvm::SMLoc());
 
-  TU->Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
+  Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
 
   // Parse, typecheck and temporarily insert the incomplete code into the AST.
-  const unsigned OriginalDeclCount = TU->MainSourceFile->Decls.size();
+  const unsigned OriginalDeclCount = SF.Decls.size();
 
-  unsigned CurTUElem = TU->MainSourceFile->Decls.size();
+  unsigned CurTUElem = OriginalDeclCount;
   PersistentParserState PersistentState;
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
-      new CodeCompleteDelayedCallbacks(
-          TU->Ctx.SourceMgr.getCodeCompletionLoc()));
+      new CodeCompleteDelayedCallbacks(Ctx.SourceMgr.getCodeCompletionLoc()));
   bool Done;
   do {
-    parseIntoTranslationUnit(*TU->MainSourceFile, *BufferID, &Done,
+    parseIntoTranslationUnit(SF, *BufferID, &Done,
                              nullptr, &PersistentState, DelayedCB.get());
-    performTypeChecking(TU, CurTUElem);
-    CurTUElem = TU->MainSourceFile->Decls.size();
+    performTypeChecking(&SF.TU, CurTUElem);
+    CurTUElem = SF.Decls.size();
   } while (!Done);
 
-  performDelayedParsing(TU, PersistentState, CompletionCallbacksFactory);
+  performDelayedParsing(&SF.TU, PersistentState, CompletionCallbacksFactory);
 
   // Now we are done with code completion.  Remove the declarations we
   // temporarily inserted.
-  TU->MainSourceFile->Decls.resize(OriginalDeclCount);
+  SF.Decls.resize(OriginalDeclCount);
 
   // Add the diagnostic consumers back.
   for (auto DC : DiagnosticConsumers)
-    TU->getASTContext().Diags.addConsumer(*DC);
+    Ctx.Diags.addConsumer(*DC);
 
-  TU->getASTContext().Diags.resetHadAnyError();
+  Ctx.Diags.resetHadAnyError();
 }
 
-void REPLCompletions::populate(TranslationUnit *TU, StringRef EnteredCode) {
+void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
   Prefix = "";
   Root.reset();
   CurrentCompletionIdx = ~size_t(0);
@@ -153,13 +152,14 @@ void REPLCompletions::populate(TranslationUnit *TU, StringRef EnteredCode) {
   CompletionStrings.clear();
   CompletionInsertableStrings.clear();
 
-  assert(TU->Kind == TranslationUnit::REPL && "Can't append to a non-REPL TU");
+  assert(SF.TU.Kind == TranslationUnit::REPL && "Can't append to a non-REPL TU");
 
   unsigned BufferID;
-  doCodeCompletion(TU, EnteredCode, &BufferID,
+  doCodeCompletion(SF, EnteredCode, &BufferID,
                    CompletionCallbacksFactory.get());
 
-  std::vector<Token> Tokens = tokenize(TU->getASTContext().SourceMgr, BufferID);
+  ASTContext &Ctx = SF.TU.Ctx;
+  std::vector<Token> Tokens = tokenize(Ctx.SourceMgr, BufferID);
 
   if (!Tokens.empty() && Tokens.back().is(tok::code_complete))
     Tokens.pop_back();
@@ -169,10 +169,10 @@ void REPLCompletions::populate(TranslationUnit *TU, StringRef EnteredCode) {
     if (LastToken.is(tok::identifier) || LastToken.isKeyword()) {
       Prefix = LastToken.getText();
 
-      unsigned Offset = TU->getASTContext().SourceMgr
-          .getLocOffsetInBuffer(LastToken.getLoc(), BufferID);
+      unsigned Offset = Ctx.SourceMgr.getLocOffsetInBuffer(LastToken.getLoc(),
+                                                           BufferID);
 
-      doCodeCompletion(TU, EnteredCode.substr(0, Offset),
+      doCodeCompletion(SF, EnteredCode.substr(0, Offset),
                        &BufferID, CompletionCallbacksFactory.get());
     }
   }

@@ -479,7 +479,7 @@ public:
     el_end(e);
   }
   
-  TranslationUnit *getTU();
+  SourceFile &getREPLInputFile();
 
   REPLInputKind getREPLInput(SmallVectorImpl<char> &Result) {
     int BraceCount = 0;
@@ -847,7 +847,7 @@ private:
     
     if (!completions) {
       // If we aren't currently working with a completion set, generate one.
-      completions.populate(getTU(), Prefix);
+      completions.populate(getREPLInputFile(), Prefix);
       // Display the common root of the found completions and beep unless we
       // found a unique one.
       insertStringRef(completions.getRoot());
@@ -896,7 +896,11 @@ static void printOrDumpDecl(Decl *d, PrintOrDump which) {
 /// The compiler and execution environment for the REPL.
 class REPLEnvironment {
   CompilerInstance &CI;
+
+public:
   SourceFile &REPLInputFile;
+
+private:
   bool ShouldRunREPLApplicationMain;
   ProcessCmdLine CmdLine;
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
@@ -913,6 +917,7 @@ class REPLEnvironment {
   REPLInput Input;
   REPLContext RC;
 
+private:
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
     // Parse the current line(s).
     auto InputBuf = llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
@@ -1242,7 +1247,7 @@ public:
   }
 };
 
-inline TranslationUnit *REPLInput::getTU() { return Env.getTranslationUnit(); }
+inline SourceFile &REPLInput::getREPLInputFile() { return Env.REPLInputFile; }
 
 void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
   out << "while processing REPL source:\n";

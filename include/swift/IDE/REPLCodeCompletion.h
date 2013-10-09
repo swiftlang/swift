@@ -70,7 +70,7 @@ public:
   REPLCompletions();
 
   /// Create completion results for the given string.
-  void populate(TranslationUnit *TU, StringRef EnteredCode);
+  void populate(SourceFile &SF, StringRef EnteredCode);
 
   /// Returns true if this is a valid completion set.
   explicit operator bool() const { return State != CompletionState::Invalid; }
