@@ -284,14 +284,7 @@ static void lookupVisibleMemberDeclsImpl(
 
   do {
     // Look in for members of a nominal type.
-    SmallVector<ValueDecl*, 8> ExtensionMethods;
     lookupTypeMembers(BaseTy, Consumer, CurrDC, LK, TypeResolver);
-
-    for (ValueDecl *VD : ExtensionMethods) {
-      assert((isa<VarDecl>(VD) || isa<SubscriptDecl>(VD)) &&
-             "Unexpected extension member");
-      Consumer.foundDecl(VD);
-    }
 
     // If we have a class type, look into its superclass.
     ClassDecl *CurClass = nullptr;
