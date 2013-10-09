@@ -47,9 +47,11 @@
 using namespace swift;
 using namespace irgen;
 
+namespace {
+
 /// An implementation strategy for an enum, which handles how the enum is
 /// laid out and how to construct and destructure values inside the enum.
-class irgen::EnumImplStrategy {
+class EnumImplStrategy {
 public:
   struct Element {
     EnumElementDecl *decl;
@@ -83,7 +85,7 @@ protected:
   {}
   
   /// Save the TypeInfo created for the enum.
-  TypeInfo * registerEnumTypeInfo(TypeInfo *mutableTI) {
+  TypeInfo *registerEnumTypeInfo(TypeInfo *mutableTI) {
     TI = mutableTI;
     return mutableTI;
   }
@@ -255,7 +257,6 @@ public:
                                   unsigned offset) const = 0;
 };
 
-namespace {
   /// Implementation strategy for singleton enums, with zero or one cases.
   class SingletonEnumImplStrategy final : public EnumImplStrategy {
     const TypeInfo *getSingleton() const {

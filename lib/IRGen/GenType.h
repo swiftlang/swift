@@ -52,7 +52,6 @@ namespace irgen {
   class ProtocolInfo;
   class Size;
   class TypeInfo;
-  class EnumImplStrategy; // defined in GenEnum.cpp
   class UnownedTypeInfo;
   class WeakTypeInfo;
 
