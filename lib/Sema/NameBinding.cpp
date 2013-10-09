@@ -276,20 +276,17 @@ Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) 
   return result;
 }
 
-/// performAutoImport - When a translation unit is first set up, this handles
-/// setting up any auto imports of the standard library.
-void swift::performAutoImport(TranslationUnit *TU) {
+void swift::performAutoImport(SourceFile &SF) {
   // If we're building the standard library, import the magic Builtin module,
   // otherwise, import the standard library.
   Module *M;
-  if (TU->HasBuiltinModuleAccess)
-    M = TU->Ctx.TheBuiltinModule;
+  if (SF.TU.HasBuiltinModuleAccess)
+    M = SF.TU.Ctx.TheBuiltinModule;
   else
-    M = TU->Ctx.getModule(
-        std::make_pair(TU->Ctx.StdlibModuleName, SourceLoc()));
+    M = SF.TU.Ctx.getModule({ {SF.TU.Ctx.StdlibModuleName, SourceLoc()} });
 
   auto Import = std::make_pair(ImportedModule({}, M), false);
-  TU->MainSourceFile->setImports(TU->Ctx.AllocateCopy(llvm::makeArrayRef(Import)));
+  SF.setImports(SF.TU.Ctx.AllocateCopy(llvm::makeArrayRef(Import)));
 }
 
 //===----------------------------------------------------------------------===//

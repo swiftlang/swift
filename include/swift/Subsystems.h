@@ -104,9 +104,9 @@ namespace swift {
                               bool KeepComments = true,
                               bool TokenizeInterpolatedString = true);
 
-  /// performAutoImport - When a translation unit is first set up, this handles
-  /// setting up any auto imports of the standard library.
-  void performAutoImport(TranslationUnit *TU);
+  /// \brief When a source file is first set up, this handles setting up any
+  /// automatic imports of the standard library.
+  void performAutoImport(SourceFile &SF);
 
   /// performNameBinding - Once parsing is complete, this walks the AST to
   /// resolve names and do other top-level validation.  StartElem indicates

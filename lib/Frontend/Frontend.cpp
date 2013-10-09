@@ -129,14 +129,14 @@ void swift::CompilerInstance::doIt() {
   TU->setLinkLibraries(Invocation.getLinkLibraries());
 
   auto *SingleInputFile = new (*Context) SourceFile(*TU, Kind);
-  TU->MainSourceFile = SingleInputFile;
 
   // If we're in SIL mode, don't auto import any libraries.
   // Also don't perform auto import if we are not going to do semantic
   // analysis.
   if (Kind != SourceFile::SIL && !Invocation.getParseOnly())
-    performAutoImport(TU);
+    performAutoImport(*SingleInputFile);
 
+  TU->MainSourceFile = SingleInputFile;
   if (Kind == SourceFile::REPL)
     return;
 
