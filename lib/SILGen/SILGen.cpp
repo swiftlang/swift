@@ -564,13 +564,23 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
 // SILModule::constructSIL method implementation
 //===--------------------------------------------------------------------===//
 
-SILModule *SILModule::constructSIL(TranslationUnit *tu,
-                                   unsigned startElem) {
-  SILModule *m = new SILModule(tu->getASTContext());
+std::unique_ptr<SILModule> SILModule::constructSIL(TranslationUnit *tu,
+                                                   SourceFile *sf,
+                                                   unsigned startElem) {
+  std::unique_ptr<SILModule> m(new SILModule(tu->getASTContext()));
   SILGenModule sgm(*m, tu);
-  for (Decl *D : llvm::makeArrayRef(tu->MainSourceFile->Decls).slice(startElem))
-    sgm.visit(D);
-  
+
+  if (sf) {
+    for (Decl *D : llvm::makeArrayRef(sf->Decls).slice(startElem))
+      sgm.visit(D);
+  } else {
+    assert(startElem == 0 && "no explicit source file");
+    // FIXME: Construct SIL for all source files, once there is more than one.
+    sf = tu->MainSourceFile;
+    for (Decl *D : llvm::makeArrayRef(sf->Decls).slice(startElem))
+      sgm.visit(D);
+  }
+    
   // Emit external definitions used by this translation unit.
   for (auto def : tu->getASTContext().ExternalDefinitions) {
     sgm.emitExternalDefinition(def);
@@ -579,7 +589,11 @@ SILModule *SILModule::constructSIL(TranslationUnit *tu,
   return m;
 }
 
-SILModule *swift::performSILGeneration(TranslationUnit *tu,
+std::unique_ptr<SILModule> swift::performSILGeneration(TranslationUnit *tu) {
+  return SILModule::constructSIL(tu);
+}
+
+std::unique_ptr<SILModule> swift::performSILGeneration(SourceFile &sf,
                                        unsigned startElem) {
-  return SILModule::constructSIL(tu, startElem);
+  return SILModule::constructSIL(&sf.TU, &sf, startElem);
 }

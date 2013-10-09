@@ -136,10 +136,12 @@ namespace swift {
   bool performTypeLocChecking(ASTContext &Ctx, TypeLoc &T, DeclContext *DC,
                               bool ProduceDiagnostics = true);
 
-  /// Turn the given translation unit into SIL IR. The returned SILModule must
-  /// be deleted by the caller.
-  SILModule *performSILGeneration(TranslationUnit *TU,
-                                  unsigned StartElem = 0);
+  /// Turn the given translation unit into SIL IR.
+  std::unique_ptr<SILModule> performSILGeneration(TranslationUnit *TU);
+
+  /// Turn a source file into SIL IR.
+  std::unique_ptr<SILModule> performSILGeneration(SourceFile &SF,
+                                                  unsigned StartElem = 0);
 
   /// performSILDefiniteInitialization - Perform definitive initialization
   /// analysis and promote alloc_box uses into SSA registers for later SSA-based
@@ -192,15 +194,14 @@ namespace swift {
   void performSILCleanup(SILModule *M);
 
   /// Turn the given translation unit into either LLVM IR or native code.
-  ///
-  /// \param SILMod  A SIL module to translate to LLVM IR. If null, IRGen works
-  ///   directly from the AST.
-  /// \param StartElem  Indicates where to start for incremental IRGen in the
-  ///   main module.
   void performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
-                           TranslationUnit *TU, SILModule *SILMod,
+                           TranslationUnit *TU, SILModule *SILMod);
+
+  /// Turn the given source file into either LLVM IR or native code.
+  void performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
+                           SourceFile &SF, SILModule *SILMod,
                            unsigned StartElem = 0);
-  
+
   // Optimization passes.
   llvm::FunctionPass *createSwiftARCOptPass();
   llvm::FunctionPass *createSwiftARCExpandPass();

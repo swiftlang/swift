@@ -31,7 +31,7 @@
 using namespace swift;
 
 void swift::CompilerInstance::createSILModule() {
-  TheSILModule.reset(SILModule::createEmptyModule(getASTContext()));
+  TheSILModule = SILModule::createEmptyModule(getASTContext());
 }
 
 bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {

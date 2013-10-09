@@ -101,10 +101,10 @@ static void emitModuleLinkOptions(llvm::Module &module, TranslationUnit *TU) {
 }
 
 
-void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
-                                TranslationUnit *TU,
-                                SILModule *SILMod,
-                                unsigned StartElem) {
+static void performIRGeneration(Options &Opts, llvm::Module *Module,
+                                TranslationUnit *TU, SILModule *SILMod,
+                                SourceFile *SF = nullptr,
+                                unsigned StartElem = 0) {
   assert(!TU->Ctx.hadError());
 
   std::unique_ptr<LLVMContext> Context;
@@ -161,7 +161,12 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
 
   // Emit the translation unit.
   IRGenModule IGM(TU->Ctx, Opts, *Module, *DataLayout, SILMod);
-  IGM.emitSourceFile(*TU->MainSourceFile, StartElem);
+  if (SF) {
+    IGM.emitSourceFile(*SF, StartElem);
+  } else {
+    assert(StartElem == 0 && "no explicit source file provided");
+    IGM.emitSourceFile(*TU->MainSourceFile, 0);
+  }
   
   // Objective-C image information.
   // Generate module-level named metadata to convey this information to the
@@ -293,4 +298,15 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   }
 
   EmitPasses.run(*Module);
+}
+
+void swift::performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
+                                TranslationUnit *TU, SILModule *SILMod) {
+  ::performIRGeneration(Opts, Module, TU, SILMod);
+}
+
+void swift::performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
+                                SourceFile &SF, SILModule *SILMod,
+                                unsigned StartElem) {
+  ::performIRGeneration(Opts, Module, &SF.TU, SILMod, &SF, StartElem);
 }

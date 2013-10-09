@@ -268,8 +268,11 @@ public:
     return *Context;
   }
 
-  void setSILModule(SILModule *M) {
-    TheSILModule.reset(M);
+  /// Set the SIL module for this compilation instance.
+  ///
+  /// The CompilerInstance takes ownership of the given SILModule object.
+  void setSILModule(std::unique_ptr<SILModule> M) {
+    TheSILModule = std::move(M);
   }
 
   SILModule *getSILModule() {

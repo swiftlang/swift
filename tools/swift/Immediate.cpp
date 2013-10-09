@@ -238,9 +238,9 @@ static bool IRGenImportedModules(CompilerInstance &CI,
 
     // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
-    llvm::OwningPtr<SILModule> SILMod(performSILGeneration(SubTU));
+    std::unique_ptr<SILModule> SILMod = performSILGeneration(SubTU);
 
-    if (runSILDiagnosticPasses(*SILMod.get())) {
+    if (runSILDiagnosticPasses(*SILMod)) {
       hadError = true;
       return false;
     }
@@ -925,11 +925,11 @@ private:
                                                         InputBuf);
     
     // SILGen the module and produce SIL diagnostics.
-    llvm::OwningPtr<SILModule> sil;
+    std::unique_ptr<SILModule> sil;
     
     if (!CI.getASTContext().hadError()) {
-      sil.reset(performSILGeneration(&REPLInputFile.TU, RC.CurIRGenElem));
-      runSILDiagnosticPasses(*sil.get());
+      sil = performSILGeneration(REPLInputFile, RC.CurIRGenElem);
+      runSILDiagnosticPasses(*sil);
     }
 
     if (CI.getASTContext().hadError()) {
@@ -955,7 +955,7 @@ private:
      // IRGen the current line(s).
     llvm::Module LineModule("REPLLine", LLVMContext);
 
-    performIRGeneration(Options, &LineModule, &REPLInputFile.TU, sil.get(),
+    performIRGeneration(Options, &LineModule, REPLInputFile, sil.get(),
                         RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurTUElem;
     

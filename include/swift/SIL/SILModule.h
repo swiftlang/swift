@@ -34,14 +34,15 @@
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
-  class TranslationUnit;
+  class AnyFunctionType;
   class ASTContext;
   class FuncDecl;
   class SILFunction;
   class SILVTable;
   class SILTypeList;
-  class AnyFunctionType;
-  
+  class SourceFile;
+  class TranslationUnit;
+
   namespace Lowering {
     class SILGenModule;
   }
@@ -132,13 +133,17 @@ public:
   /// Construct a SIL module from a translation unit. The module will be
   /// constructed in the Raw stage. It is the caller's responsibility to
   /// `delete` the module.
-  static SILModule *constructSIL(TranslationUnit *tu,
-                                 unsigned startElem);
+  ///
+  /// If a source file is provided, SIL will only be emitted for decls in that
+  /// source file, starting from the specified element number.
+  static std::unique_ptr<SILModule> constructSIL(TranslationUnit *tu,
+                                                 SourceFile *sf = nullptr,
+                                                 unsigned startElem = 0);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
-  static SILModule *createEmptyModule(ASTContext &Context) {
-    return new SILModule(Context);
+  static std::unique_ptr<SILModule> createEmptyModule(ASTContext &Context) {
+    return std::unique_ptr<SILModule>(new SILModule(Context));
   }
   
   ASTContext &getASTContext() const { return TheASTContext; }
