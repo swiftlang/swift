@@ -28,6 +28,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#include "GenAxleMeta.h"
 #include "GenType.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
@@ -65,8 +66,9 @@ IRGenModule::IRGenModule(ASTContext &Context,
   : Context(Context), Opts(Opts), Module(Module),
     LLVMContext(Module.getContext()), DataLayout(DataLayout),
     SILMod(SILMod), TargetInfo(SwiftTargetInfo::get(*this)),
-    DebugInfo(0), Types(*new TypeConverter(*this))
+    DebugInfo(0), AxleMeta(0), Types(*new TypeConverter(*this))
 {
+
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
@@ -186,6 +188,8 @@ IRGenModule::IRGenModule(ASTContext &Context,
     DebugInfo = new IRGenDebugInfo(Opts, CI->getTargetInfo(), Types,
                                    Context, Module);
   }
+  if (Context.LangOpts.Axle)
+    AxleMeta = new axle::GenAxleMeta(Module);
 }
 
 IRGenModule::~IRGenModule() {
