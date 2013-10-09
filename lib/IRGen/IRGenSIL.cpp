@@ -973,7 +973,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         IGM.DebugInfo->setCurrentLoc(Builder, DS, I.getLoc());
       else {
         if (auto FnDS = CurSILFn->getDebugScope())
-          IGM.DebugInfo->setCurrentLoc(Builder, FnDS);
+          IGM.DebugInfo->setCurrentLoc(Builder, FnDS, I.getLoc());
         else
           // We don't expect a scope from transparent functions. They
           // should be elided during IR generation anyway.

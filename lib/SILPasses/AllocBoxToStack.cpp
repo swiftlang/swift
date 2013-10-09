@@ -216,6 +216,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   // alloc_stack.  Start by inserting the alloc stack after the alloc_box.
   SILBuilder B1(ABI->getParent(), ++SILBasicBlock::iterator(ABI));
   auto *ASI = B1.createAllocStack(ABI->getLoc(), ABI->getElementType());
+  ASI->setDebugScope(ABI->getDebugScope());
    
   // Replace all uses of the pointer operand with the spiffy new AllocStack.
   SILValue(ABI, 1).replaceAllUsesWith(ASI->getAddressResult());

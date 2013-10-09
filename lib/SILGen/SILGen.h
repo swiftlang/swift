@@ -469,8 +469,7 @@ public:
   /// from when we entered the last scope up to the current one.
   void setDebugScopeForInsertedInstrs(SILDebugScope *DS) {
     while (LastInsnWithoutScope < InsertedInstrs.size()) {
-      InsertedInstrs[LastInsnWithoutScope]->setDebugScope(DS);
-      ++LastInsnWithoutScope;
+      InsertedInstrs[LastInsnWithoutScope++]->setDebugScope(DS);
     }
   }
 
