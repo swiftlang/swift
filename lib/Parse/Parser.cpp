@@ -497,7 +497,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         Status.setIsParseError();
         return Status;
       }
-      if (consumeIf(SeparatorK))
+      if (consumeIf(SeparatorK) || OptionalSep)
         continue;
       break;
     }
