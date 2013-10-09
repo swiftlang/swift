@@ -137,6 +137,20 @@ namespace {
 
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
   };
+  
+  /// Accessor for the non-fixed offsets of a struct type.
+  class StructNonFixedOffsets : public NonFixedOffsetsImpl {
+    CanType TheStruct;
+  public:
+    StructNonFixedOffsets(CanType type) : TheStruct(type) {
+      assert(TheStruct->getStructOrBoundGenericStruct());
+    }
+    
+    llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) {
+      // FIXME: implement
+      assert(false);
+    }
+  };
 
   /// A type implementation for non-fixed struct types.
   class NonFixedStructTypeInfo
@@ -156,8 +170,10 @@ namespace {
                                                    getBestKnownAlignment()));
     }
 
-    // FIXME: implement
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
+    StructNonFixedOffsets
+    getNonFixedOffsets(IRGenFunction &IGF) const {
+      return StructNonFixedOffsets(TheType);
+    }
 
     llvm::Value *getMetadataRef(IRGenFunction &IGF) const {
       return IGF.emitTypeMetadataRef(TheType);
