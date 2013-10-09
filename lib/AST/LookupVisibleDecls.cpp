@@ -166,6 +166,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       // Check if we already reported a decl with the same signature.
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
         assert(FD->getImplicitSelfDecl() && "should not find free functions");
+        (void)FD;
 
         // Get the type without the first uncurry level with 'self'.
         CanType T = D->getType()
