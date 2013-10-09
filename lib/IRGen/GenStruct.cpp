@@ -141,12 +141,19 @@ namespace {
   /// A type implementation for non-fixed struct types.
   class NonFixedStructTypeInfo
       : public StructTypeInfoBase<NonFixedStructTypeInfo,
-                                  WitnessSizedTypeInfo<NonFixedStructTypeInfo>> {
+                                  WitnessSizedTypeInfo<NonFixedStructTypeInfo>>
+  {
     CanType TheType;
   public:
     NonFixedStructTypeInfo(unsigned numFields, llvm::Type *T, CanType theType,
                            Alignment align, IsPOD_t isPOD)
       : StructTypeInfoBase(numFields, T, align, isPOD), TheType(theType) {
+    }
+
+    // We have an indirect schema.
+    void getSchema(ExplosionSchema &s) const override {
+      s.add(ExplosionSchema::Element::forAggregate(getStorageType(),
+                                                   getBestKnownAlignment()));
     }
 
     // FIXME: implement
@@ -305,6 +312,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
     llvm_unreachable("bad extension member kind");
   }
 }
+#include "llvm/Support/raw_ostream.h"
 
 const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
   // Collect all the fields from the type.
@@ -326,5 +334,15 @@ const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
 
   // Build the type.
   StructTypeBuilder builder(IGM, ty, type);
-  return builder.layout(fields);
+  auto ti = builder.layout(fields);
+//@@@@@@@@@
+  type->dump();
+  ti->getStorageType()->dump();
+  llvm::errs() << '\n';
+  ExplosionSchema s = ti->getSchema(ExplosionKind::Minimal);
+  if (s.isSingleAggregate()) {
+    ExplosionSchema s2(ExplosionKind::Minimal);
+    ti->getSchema(s2);
+  }
+  return ti;
 }
