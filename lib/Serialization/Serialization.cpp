@@ -859,10 +859,11 @@ void Serializer::writeCrossReference(const Decl *D) {
     if (kind == XRefKind::SwiftValue) {
       accessPath.push_back(addIdentifierRef(value->getName()));
 
-      // Make sure we don't create a self-referential type.
-      Type ty = value->getType();
-      if (ty->is<MetaTypeType>())
-        ty = nullptr;
+      // If the value is a type, it's uniquely identified by its name.
+      // Otherwise, use the value's type for disambiguation.
+      Type ty;
+      if (!isa<TypeDecl>(value))
+        ty = value->getType();
       typeID = addTypeRef(ty);
     }
 
