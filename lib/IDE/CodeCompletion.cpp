@@ -551,8 +551,8 @@ class CompletionLookup : swift::VisibleDeclConsumer {
   /// \brief True if we are code completing inside a static method.
   bool InsideStaticMethod = false;
 
-  /// \brief DeclContext of the inner method of the code completion point.
-  const DeclContext *CurrMethodDC = nullptr;
+  /// \brief Innermost method that the code completion point is in.
+  const AbstractFunctionDecl *CurrentMethod = nullptr;
 
   bool needDot() const {
     return NeedLeadingDot;
@@ -577,7 +577,7 @@ public:
       }
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(FunctionDC)) {
         if (AFD->getExtensionType()) {
-          CurrMethodDC = FunctionDC;
+          CurrentMethod = AFD;
           if (auto *FD = dyn_cast<FuncDecl>(AFD))
             InsideStaticMethod = FD->isStatic();
         }
@@ -612,11 +612,12 @@ public:
       return SemanticContextKind::Local;
 
     case DeclVisibilityKind::MemberOfCurrentNominal:
+      if (IsSuperRefExpr &&
+          CurrentMethod && CurrentMethod->getOverriddenDecl() == D)
+        return SemanticContextKind::ExpressionSpecific;
       return SemanticContextKind::CurrentNominal;
 
     case DeclVisibilityKind::MemberOfSuper:
-      // FIXME: check if the current declaration overrides this one and return
-      // SemanticContextKind::ExprSpecific.
       return SemanticContextKind::Super;
 
     case DeclVisibilityKind::MemberOfOutsideNominal:
@@ -651,7 +652,7 @@ public:
     assert(!Name.empty() && "name should not be empty");
 
     assert(!(InsideStaticMethod &&
-            VD->getDeclContext() == CurrMethodDC->getParent()) &&
+            VD->getDeclContext() == CurrentMethod->getDeclContext()) &&
            "name lookup bug -- can not see an instance variable "
            "in a static function");
     // FIXME: static variables.
@@ -738,8 +739,8 @@ public:
       break;
     case LookupKind::ValueInDeclContext:
       IsImlicitlyCurriedInstanceMethod =
-          CurrMethodDC &&
-          FD->getDeclContext() == CurrMethodDC->getParent() &&
+          CurrentMethod &&
+          FD->getDeclContext() == CurrentMethod->getDeclContext() &&
           InsideStaticMethod && !FD->isStatic();
       break;
     case LookupKind::Type:
