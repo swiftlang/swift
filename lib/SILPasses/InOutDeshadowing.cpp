@@ -24,6 +24,7 @@
 using namespace swift;
 
 STATISTIC(NumShadowsRemoved, "Number of inout shadow variables removed");
+STATISTIC(NumShadowsKept, "Number of inout shadow variables kept");
 
 //===----------------------------------------------------------------------===//
 //                          inout Deshadowing
@@ -76,11 +77,22 @@ static void promoteShadow(AllocStackInst *Alloc, SILArgument *InOutArg) {
 //                     Candidate Variable Identification
 //===----------------------------------------------------------------------===//
 
+
+static bool hasTrivialElementType(AllocStackInst *Alloc) {
+  auto &M = Alloc->getModule();
+  return M.Types.getTypeLowering(Alloc->getElementType()).isTrivial();
+}
+
+
+
 /// processInOutValue - Walk the use-def list of the inout argument to find uses
 /// of it.  We should only have copy_addr's into and out of it.  This
 /// specifically only matches one pattern that SILGen is producing to simplify
 /// the legality checks we'd otherwise need.
-static void processInOutValue(SILArgument *InOutArg) {
+///
+/// This returns true if it promotes away the shadow variable.
+///
+static bool processInOutValue(SILArgument *InOutArg) {
   assert(InOutArg->getType().isAddress() &&
          "inout arguments should always be addresses");
 
@@ -92,7 +104,7 @@ static void processInOutValue(SILArgument *InOutArg) {
     auto *ArgUser = dyn_cast<SILInstruction>(UI->getUser());
     if (!ArgUser) {
       DEBUG(llvm::errs() << "  inout variable used by basic block!\n");
-      return;
+      return false;
     }
 
     // TODO: We should eventually support extraneous loads, which will occur
@@ -100,7 +112,7 @@ static void processInOutValue(SILArgument *InOutArg) {
     auto CAI = dyn_cast<CopyAddrInst>(ArgUser);
     if (!CAI) {
       DEBUG(llvm::errs() << "  unknown inout variable user: " << *ArgUser);
-      return;
+      return false;
     }
 
     if (UI->getOperandNumber() == 0) {
@@ -109,14 +121,16 @@ static void processInOutValue(SILArgument *InOutArg) {
       // be the initialization of that stack location.
       auto *DestAlloc = dyn_cast<AllocStackInst>(CAI->getDest());
       // TODO: init/take flags don't matter for trivial types.
-      if (!CAI->isInitializationOfDest() || CAI->isTakeOfSrc() || !DestAlloc) {
+      if (!DestAlloc ||
+          ((!CAI->isInitializationOfDest() || CAI->isTakeOfSrc()) &&
+           !hasTrivialElementType(DestAlloc))) {
         DEBUG(llvm::errs() << "  unknown copy from inout: " << *ArgUser);
-        return;
+        return false;
       }
 
       if (FoundInit || (TheShadow && TheShadow != DestAlloc)) {
         DEBUG(llvm::errs() << "  multiple copies from inout: " << *ArgUser);
-        return;
+        return false;
       }
 
       TheShadow = DestAlloc;
@@ -131,15 +145,17 @@ static void processInOutValue(SILArgument *InOutArg) {
     // This should be a take from the source.
     // TODO: init/take flags don't matter for trivial types.
     auto *SrcAlloc = dyn_cast<AllocStackInst>(CAI->getSrc());
-    if (CAI->isInitializationOfDest() || !CAI->isTakeOfSrc() || !SrcAlloc) {
+    if (!SrcAlloc ||
+        ((CAI->isInitializationOfDest() || !CAI->isTakeOfSrc()) &&
+         !hasTrivialElementType(SrcAlloc))) {
       DEBUG(llvm::errs() << "  unknown copy back to inout: " << *ArgUser);
-      return;
+      return false;
     }
 
     // Verify that it is a copy from the one true shadow for this argument.
     if (TheShadow && TheShadow != SrcAlloc) {
       DEBUG(llvm::errs() << "  copies from multiple inout shadows: "<<*ArgUser);
-      return;
+      return false;
     }
 
     TheShadow = SrcAlloc;
@@ -148,6 +164,8 @@ static void processInOutValue(SILArgument *InOutArg) {
   // Now that we identified the candidate alloc_stack to remove, do it.
   if (TheShadow)
     promoteShadow(TheShadow, InOutArg);
+
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -166,8 +184,12 @@ void swift::performInOutDeshadowing(SILModule *M) {
     SILFunctionTypeInfo *FTI = Fn.getFunctionTypeInfo();
     
     for (unsigned arg = 0, e = FTI->getInputTypes().size(); arg != e; ++arg) {
-      if (FTI->isInOutArgument(arg))
-        processInOutValue(EntryBlock.getBBArgs()[arg]);
+      if (!FTI->isInOutArgument(arg)) continue;
+
+      if (processInOutValue(EntryBlock.getBBArgs()[arg]))
+        ++NumShadowsRemoved;
+      else
+        ++NumShadowsKept;
     }
   }
 }
