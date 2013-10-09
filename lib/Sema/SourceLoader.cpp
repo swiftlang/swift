@@ -128,7 +128,8 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   bool done;
   PersistentParserState persistentState;
   SkipNonTransparentFunctions delayCallbacks;
-  parseIntoTranslationUnit(importTU, bufferID, &done, nullptr, &persistentState,
+  parseIntoTranslationUnit(*importTU->MainSourceFile, bufferID, &done, nullptr,
+                           &persistentState,
                            SkipBodies ? &delayCallbacks : nullptr);
   assert(done && "Parser returned early?");
   (void)done;

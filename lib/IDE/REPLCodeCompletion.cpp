@@ -126,7 +126,7 @@ doCodeCompletion(TranslationUnit *TU, StringRef EnteredCode, unsigned *BufferID,
           TU->Ctx.SourceMgr.getCodeCompletionLoc()));
   bool Done;
   do {
-    parseIntoTranslationUnit(TU, *BufferID, &Done,
+    parseIntoTranslationUnit(*TU->MainSourceFile, *BufferID, &Done,
                              nullptr, &PersistentState, DelayedCB.get());
     performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->MainSourceFile->Decls.size();

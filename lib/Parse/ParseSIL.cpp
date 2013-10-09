@@ -520,7 +520,7 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 
 /// Construct ArchetypeType from Generic Params.
 bool SILParser::handleGenericParams(GenericParamList *GenericParams) {
-  ArchetypeBuilder Builder(*P.TU, P.Diags);
+  ArchetypeBuilder Builder(P.SF.TU, P.Diags);
   unsigned Index = 0;
   for (auto GP : *GenericParams) {
     auto TypeParam = GP.getAsTypeParam();
@@ -574,11 +574,11 @@ bool SILParser::handleGenericParams(GenericParamList *GenericParams) {
 bool SILParser::performTypeLocChecking(TypeLoc &T) {
   // Do some type checking / name binding for the parsed type.
   // We have to lie and say we're done with parsing to make this happen.
-  assert(P.TU->ASTStage == TranslationUnit::Parsing &&
+  assert(P.SF.TU.ASTStage == TranslationUnit::Parsing &&
          "Unexpected stage during parsing!");
-  llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.TU->ASTStage,
+  llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.SF.TU.ASTStage,
                                                     TranslationUnit::Parsed);
-  return swift::performTypeLocChecking(P.Context, T, P.TU);
+  return swift::performTypeLocChecking(P.Context, T, &P.SF.TU);
 }
 
 /// Find the top-level ValueDecl or Module given a name.
@@ -586,11 +586,11 @@ static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
              Identifier Name) {
   // Use UnqualifiedLookup to look through all of the imports.
   // We have to lie and say we're done with parsing to make this happen.
-  assert(P.TU->ASTStage == TranslationUnit::Parsing &&
+  assert(P.SF.TU.ASTStage == TranslationUnit::Parsing &&
          "Unexpected stage during parsing!");
-  llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.TU->ASTStage,
+  llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.SF.TU.ASTStage,
                                                     TranslationUnit::Parsed);
-  UnqualifiedLookup DeclLookup(Name, P.TU, nullptr);
+  UnqualifiedLookup DeclLookup(Name, &P.SF.TU, nullptr);
   assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1);
   if (DeclLookup.Results.back().Kind == UnqualifiedLookupResult::ModuleName) {
     Module *Mod = DeclLookup.Results.back().getNamedModule();
@@ -604,7 +604,7 @@ static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
 /// Find the ValueDecl given a type and a member name.
 static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
   SmallVector<ValueDecl *, 4> Lookup;
-  P.TU->lookupQualified(Ty, Name, NL_QualifiedDefault, nullptr, Lookup);
+  P.SF.TU.lookupQualified(Ty, Name, NL_QualifiedDefault, nullptr, Lookup);
   assert(Lookup.size() == 1);
   return Lookup[0];
 }
@@ -1958,10 +1958,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // Find VarDecl for GlobalName.
     ValueDecl *VD;
     SmallVector<ValueDecl*, 4> CurModuleResults;
-    // Perform a module level lookup on the first component of the fully-qualified
-    // name.
-    P.TU->lookupValue(Module::AccessPathTy(), GlobalName,
-                      NLKind::UnqualifiedLookup, CurModuleResults);
+    // Perform a module level lookup on the first component of the
+    // fully-qualified name.
+    P.SF.TU.lookupValue(Module::AccessPathTy(), GlobalName,
+                        NLKind::UnqualifiedLookup, CurModuleResults);
     assert(CurModuleResults.size() == 1);
     VD = CurModuleResults[0];
     ResultVal = B.createGlobalAddr(InstLoc, cast<VarDecl>(VD), Ty);
@@ -2202,7 +2202,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     if (!subs.empty()) {
       FnTy = SILType::getPrimitiveObjectType(
          FnTy.castTo<PolymorphicFunctionType>()
-           ->substGenericArgs(P.TU, subs)->getCanonicalType());
+           ->substGenericArgs(&P.SF.TU, subs)->getCanonicalType());
     }
     
     ResultVal = B.createApply(InstLoc, FnVal, FnTy,
@@ -2229,7 +2229,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     if (!subs.empty()) {
       FnTy = SILType::getPrimitiveObjectType(
          FnTy.castTo<PolymorphicFunctionType>()
-           ->substGenericArgs(P.TU, subs)->getCanonicalType());
+           ->substGenericArgs(&P.SF.TU, subs)->getCanonicalType());
     }
     
     SILType closureTy =
@@ -2392,7 +2392,7 @@ bool Parser::parseDeclSIL() {
 
   // If SIL prsing succeeded, verify the generated SIL.
   if (!FunctionState.P.Diags.hadAnyError())
-    FunctionState.F->verify(TU);
+    FunctionState.F->verify(&SF.TU);
 
   return false;
 }

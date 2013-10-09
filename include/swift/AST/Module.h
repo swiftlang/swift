@@ -374,10 +374,6 @@ class SourceFile {
   /// if this TU is not an imported TU.
   int ImportBufferID = -1;
 
-  /// If non-NULL, an plug-in that should be used when performing external
-  /// lookups.
-  ExternalNameLookup *ExternalLookup = nullptr;
-
 public:
   /// The translation unit that this file is a part of.
   TranslationUnit &TU;
@@ -426,6 +422,10 @@ private:
   /// The list of libraries specified as link-time dependencies at compile time.
   ArrayRef<LinkLibrary> LinkLibraries;
 
+  /// If non-NULL, an plug-in that should be used when performing external
+  /// lookups.
+  ExternalNameLookup *ExternalLookup = nullptr;
+
 public:
   // FIXME: Make private.
   std::unique_ptr<SourceFile> MainSourceFile;
@@ -461,23 +461,12 @@ public:
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
-<<<<<<< HEAD
-  /// \brief The buffer ID for the file that was imported as this TU, or -1
-  /// if this is not an imported TU.
-  int getImportBufferID() const { return ImportBufferID; }
-  void setImportBufferID(unsigned BufID) {
-    assert(ImportBufferID == -1 && "Already set!");
-    ImportBufferID = BufID;
-  }
-
   ExternalNameLookup *getExternalLookup() const { return ExternalLookup; }
   void setExternalLookup(ExternalNameLookup *R) {
     assert(!ExternalLookup && "Name resolver already set");
     ExternalLookup = R;
   }
 
-=======
->>>>>>> 57085cf... Introduce "SourceFile" within a TranslationUnit.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTWalker &Walker);
 

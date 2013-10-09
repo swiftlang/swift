@@ -576,11 +576,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   // Inject the call into the top level stream by wrapping it with a TLCD.
   auto *BS = BraceStmt::create(C, Loc, BraceStmt::ExprStmtOrDecl(TheCall),
                                EndLoc);
-<<<<<<< HEAD
-  TU->Decls.push_back(new (C) TopLevelCodeDecl(TU, BS));
-=======
-  TC->TU.MainSourceFile->Decls.push_back(new (C) TopLevelCodeDecl(&TC->TU, BS));
->>>>>>> 57085cf... Introduce "SourceFile" within a TranslationUnit.
+  TU->MainSourceFile->Decls.push_back(new (C) TopLevelCodeDecl(TU, BS));
 }
 
 
@@ -608,40 +604,22 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC,
   
   // Remove the expression from being in the list of decls to execute, we're
   // going to reparent it.
-<<<<<<< HEAD
-  TU->Decls.pop_back();
-=======
-  TC->TU.MainSourceFile->Decls.pop_back();
->>>>>>> 57085cf... Introduce "SourceFile" within a TranslationUnit.
+  TU->MainSourceFile->Decls.pop_back();
 
   E = TC->coerceToMaterializable(E);
 
   // Create the meta-variable, let the typechecker name it.
-<<<<<<< HEAD
   Identifier name = TC->getNextResponseVariableName(TU);
   VarDecl *vd = new (TC->Context) VarDecl(E->getStartLoc(), name,
                                           E->getType(), TU);
-  TU->Decls.push_back(vd);
+  TU->MainSourceFile->Decls.push_back(vd);
 
-=======
-  VarDecl *vd = new (TC->Context) VarDecl(E->getStartLoc(),
-                                          TC->getNextResponseVariableName(),
-                                          E->getType(), &TC->TU);
-  TC->TU.MainSourceFile->Decls.push_back(vd);
-  
->>>>>>> 57085cf... Introduce "SourceFile" within a TranslationUnit.
   // Create a PatternBindingDecl to bind the expression into the decl.
   Pattern *metavarPat = new (TC->Context) NamedPattern(vd);
   metavarPat->setType(E->getType());
   PatternBindingDecl *metavarBinding
-<<<<<<< HEAD
     = new (TC->Context) PatternBindingDecl(E->getStartLoc(), metavarPat, E, TU);
-  TU->Decls.push_back(metavarBinding);
-=======
-    = new (TC->Context) PatternBindingDecl(E->getStartLoc(), metavarPat, E,
-                                           &TC->TU);
-  TC->TU.MainSourceFile->Decls.push_back(metavarBinding);
->>>>>>> 57085cf... Introduce "SourceFile" within a TranslationUnit.
+  TU->MainSourceFile->Decls.push_back(metavarBinding);
 
   // Finally, print the variable's value.
   E = TC->buildCheckedRefExpr(vd, E->getStartLoc(), /*Implicit=*/true);
@@ -714,11 +692,7 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   Expr *E = TC->buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
   E = TC->coerceToMaterializable(E);
   PBD->setInit(E);
-<<<<<<< HEAD
-  TU->Decls.push_back(PBTLCD);
-=======
-  TC->TU.MainSourceFile->Decls.push_back(PBTLCD);
->>>>>>> 57085cf... Introduce "SourceFile" within a TranslationUnit.
+  TU->MainSourceFile->Decls.push_back(PBTLCD);
 
   // Finally, print out the result, by referring to the repl temp.
   E = TC->buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
@@ -733,25 +707,15 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
 void TypeChecker::processREPLTopLevel(TranslationUnit *TU, unsigned FirstDecl) {
   // Loop over all of the new decls, moving them out of the Decls list, then
   // adding them back (with modifications) one at a time.
-<<<<<<< HEAD
-  std::vector<Decl*> NewDecls(TU->Decls.begin()+FirstDecl, TU->Decls.end());
-  TU->Decls.resize(FirstDecl);
+  std::vector<Decl*> NewDecls(TU->MainSourceFile->Decls.begin()+FirstDecl,
+                              TU->MainSourceFile->Decls.end());
+  TU->MainSourceFile->Decls.resize(FirstDecl);
 
   // Loop over each of the new decls, processing them, adding them back to
   // the TU->Decls list.
   for (Decl *D : NewDecls) {
-    TU->Decls.push_back(D);
+    TU->MainSourceFile->Decls.push_back(D);
 
-=======
-  std::vector<Decl*> NewDecls(TU.MainSourceFile->Decls.begin()+FirstDecl, TU.MainSourceFile->Decls.end());
-  TU.MainSourceFile->Decls.resize(FirstDecl);
-  
-  // Loop over each of the new decls, processing them, adding them back to
-  // the TU->Decls list.
-  for (Decl *D : NewDecls) {
-    TU.MainSourceFile->Decls.push_back(D);
-    
->>>>>>> 57085cf... Introduce "SourceFile" within a TranslationUnit.
     TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D);
     if (TLCD == 0) continue;
 

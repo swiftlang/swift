@@ -39,15 +39,15 @@ using namespace swift;
 ///     decl-sil       [[only in SIL mode]
 ///     decl-sil-stage [[only in SIL mode]
 /// \endverbatim
-bool Parser::parseTranslationUnit(TranslationUnit *TU) {
-  TU->ASTStage = TranslationUnit::Parsing;
+bool Parser::parseTopLevel() {
+  SF.TU.ASTStage = TranslationUnit::Parsing;
 
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
     consumeToken();
 
-  CurDeclContext = TU;
-  
+  CurDeclContext = &SF.TU;
+
   // Parse the body of the file.
   SmallVector<ExprStmtOrDecl, 128> Items;
 
@@ -87,11 +87,11 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
 
   // Add newly parsed decls to the translation unit.
   for (auto Item : Items)
-    TU->MainSourceFile->Decls.push_back(Item.get<Decl*>());
+    SF.Decls.push_back(Item.get<Decl*>());
 
   // Note that the translation unit is fully parsed and verify it.
-  TU->ASTStage = TranslationUnit::Parsed;
-  verify(TU);
+  SF.TU.ASTStage = TranslationUnit::Parsed;
+  verify(&SF.TU);
 
   State->markParserPosition(Tok.getLoc(), PreviousLoc);
 

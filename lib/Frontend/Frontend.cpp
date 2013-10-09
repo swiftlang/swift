@@ -151,7 +151,7 @@ void swift::CompilerInstance::doIt() {
     // Parse all of the files into one big translation unit.
     for (auto &BufferID : BufferIDs) {
       bool Done;
-      parseIntoTranslationUnit(TU, BufferID, &Done,
+      parseIntoTranslationUnit(*TU->MainSourceFile, BufferID, &Done,
                                nullptr, &PersistentState, DelayedCB.get());
       assert(Done && "Parser returned early?");
       (void) Done;
@@ -185,7 +185,7 @@ void swift::CompilerInstance::doIt() {
     // after parsing any top level code in a main module, or in SIL mode when
     // there are chunks of swift decls (e.g. imports and types) interspersed
     // with 'sil' definitions.
-    parseIntoTranslationUnit(TU, BufferID, &Done,
+    parseIntoTranslationUnit(*TU->MainSourceFile, BufferID, &Done,
                              TheSILModule ? &SILContext : nullptr,
                              &PersistentState, DelayedCB.get());
     if (!Invocation.getParseOnly())

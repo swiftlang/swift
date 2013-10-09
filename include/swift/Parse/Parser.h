@@ -69,13 +69,12 @@ public:
   SourceManager &SourceMgr;
   const unsigned BufferID;
   DiagnosticEngine &Diags;
-  TranslationUnit *TU;
+  SourceFile &SF;
   Lexer *L;
   SILParserState *SIL;    // Non-null when parsing a .sil file.
   PersistentParserState *State;
   std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
-  swift::Component *Component;
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
@@ -99,8 +98,8 @@ public:
   }
 
   bool allowTopLevelCode() const {
-    return TU->Kind == TranslationUnit::Main ||
-           TU->Kind == TranslationUnit::REPL;
+    return SF.TU.Kind == TranslationUnit::Main ||
+           SF.TU.Kind == TranslationUnit::REPL;
   }
 
   /// \brief This is the current token being considered by the parser.
@@ -134,7 +133,7 @@ public:
   };
 
 public:
-  Parser(unsigned BufferID, TranslationUnit *TU, SILParserState *SIL,
+  Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
          PersistentParserState *PersistentState = nullptr);
   ~Parser();
 
@@ -436,7 +435,7 @@ public:
   static bool isStartOfDecl(const Token &Tok, const Token &Tok2);
   static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2);
 
-  bool parseTranslationUnit(TranslationUnit *TU);
+  bool parseTopLevel();
   void consumeDecl(ParserPosition BeginParserPosition, unsigned Flags);
   ParserStatus parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
   void parseDeclDelayed();

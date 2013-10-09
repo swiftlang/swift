@@ -20,13 +20,14 @@
 #include "swift/Subsystems.h"
 using namespace swift;
 
-bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
+bool swift::appendToREPLTranslationUnit(SourceFile &SF,
                                         REPLContext &RC,
                                         llvm::MemoryBuffer *Buffer) {
-  assert(TU->Kind == TranslationUnit::REPL && "Can't append to a non-REPL TU");
-  
-  RC.CurBufferID
-    = TU->getASTContext().SourceMgr->AddNewSourceBuffer(Buffer, llvm::SMLoc());
+  assert(SF.TU.Kind == TranslationUnit::REPL &&
+         "Can't append to a non-REPL TU");
+
+  SourceManager &SrcMgr = SF.TU.getASTContext().SourceMgr;
+  RC.CurBufferID = SrcMgr->AddNewSourceBuffer(Buffer, llvm::SMLoc());
   
   bool FoundAnySideEffects = false;
   unsigned CurTUElem = RC.CurTUElem;
@@ -34,10 +35,10 @@ bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
   bool Done;
   do {
     FoundAnySideEffects |=
-        parseIntoTranslationUnit(TU, RC.CurBufferID, &Done, nullptr,
+        parseIntoTranslationUnit(SF, RC.CurBufferID, &Done, nullptr,
                                  &PersistentState);
-    performTypeChecking(TU, CurTUElem);
-    CurTUElem = TU->MainSourceFile->Decls.size();
+    performTypeChecking(&SF.TU, CurTUElem);
+    CurTUElem = SF.Decls.size();
   } while (!Done);
   return FoundAnySideEffects;
 }

@@ -135,7 +135,7 @@ Module *TypeChecker::getStdlibModule() {
     // module.
     for (auto &entry : Context.LoadedModules) {
       if (auto TU = dyn_cast_or_null<TranslationUnit>(entry.getValue()))
-        if (TU->getImportBufferID() == -1)
+        if (TU->MainSourceFile->getImportBufferID() == -1)
           StdlibModule = TU;
     }
     assert(StdlibModule && "no main module found");

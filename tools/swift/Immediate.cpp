@@ -896,7 +896,7 @@ static void printOrDumpDecl(Decl *d, PrintOrDump which) {
 /// The compiler and execution environment for the REPL.
 class REPLEnvironment {
   CompilerInstance &CI;
-  TranslationUnit *TU;
+  SourceFile &REPLInputFile;
   bool ShouldRunREPLApplicationMain;
   ProcessCmdLine CmdLine;
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
@@ -915,21 +915,22 @@ class REPLEnvironment {
 
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
     // Parse the current line(s).
-    bool ShouldRun = swift::appendToREPLTranslationUnit(
-        TU, RC, llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>"));
+    auto InputBuf = llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
+    bool ShouldRun = swift::appendToREPLTranslationUnit(REPLInputFile, RC,
+                                                        InputBuf);
     
     // SILGen the module and produce SIL diagnostics.
     llvm::OwningPtr<SILModule> sil;
     
     if (!CI.getASTContext().hadError()) {
-      sil.reset(performSILGeneration(TU, RC.CurIRGenElem));
+      sil.reset(performSILGeneration(&REPLInputFile.TU, RC.CurIRGenElem));
       runSILDiagnosticPasses(*sil.get());
     }
 
     if (CI.getASTContext().hadError()) {
       CI.getASTContext().Diags.resetHadAnyError();
-      while (TU->MainSourceFile->Decls.size() > RC.CurTUElem)
-        TU->MainSourceFile->Decls.pop_back();
+      while (REPLInputFile.Decls.size() > RC.CurTUElem)
+        REPLInputFile.Decls.pop_back();
       
       // FIXME: Handling of "import" declarations?  Is there any other
       // state which needs to be reset?
@@ -937,7 +938,7 @@ class REPLEnvironment {
       return true;
     }
     
-    RC.CurTUElem = TU->MainSourceFile->Decls.size();
+    RC.CurTUElem = REPLInputFile.Decls.size();
     
     DumpSource += Line;
     
@@ -949,7 +950,7 @@ class REPLEnvironment {
      // IRGen the current line(s).
     llvm::Module LineModule("REPLLine", LLVMContext);
 
-    performIRGeneration(Options, &LineModule, TU, sil.get(),
+    performIRGeneration(Options, &LineModule, &REPLInputFile.TU, sil.get(),
                         RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurTUElem;
     
@@ -1000,7 +1001,7 @@ public:
   REPLEnvironment(CompilerInstance &CI,
                   bool ShouldRunREPLApplicationMain,
                   const ProcessCmdLine &CmdLine)
-    : CI(CI), TU(CI.getTU()),
+    : CI(CI), REPLInputFile(*CI.getTU()->MainSourceFile),
       ShouldRunREPLApplicationMain(ShouldRunREPLApplicationMain),
       CmdLine(CmdLine),
       RanGlobalInitializers(false),
@@ -1038,19 +1039,19 @@ public:
     static const char importstmt[] = "import swift\n";
 
     swift::appendToREPLTranslationUnit(
-        TU, RC,
+        REPLInputFile, RC,
         llvm::MemoryBuffer::getMemBufferCopy(importstmt,
                                              "<REPL Initialization>"));
     if (CI.getASTContext().hadError())
       return;
     
-    RC.CurTUElem = RC.CurIRGenElem = TU->MainSourceFile->Decls.size();
+    RC.CurTUElem = RC.CurIRGenElem = REPLInputFile.Decls.size();
     
     if (llvm::sys::Process::StandardInIsUserInput())
       printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");    
   }
   
-  TranslationUnit *getTranslationUnit() const { return TU; }
+  TranslationUnit *getTranslationUnit() const { return &REPLInputFile.TU; }
   StringRef getDumpSource() const { return DumpSource; }
   
   /// Get the REPLInput object owned by the REPL instance.
@@ -1068,10 +1069,9 @@ public:
         
       case REPLInputKind::REPLDirective: {
         auto Buffer =
-            llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
+          llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
         unsigned BufferID =
-            TU->getASTContext().SourceMgr->AddNewSourceBuffer(Buffer,
-                                                              llvm::SMLoc());
+          CI.getSourceMgr()->AddNewSourceBuffer(Buffer, llvm::SMLoc());
         Lexer L(CI.getSourceMgr(), BufferID, nullptr, false /*not SIL*/);
         Token Tok;
         L.lex(Tok);
@@ -1103,15 +1103,16 @@ public:
         } else if (L.peekNextToken().getText() == "dump_ir") {
           DumpModule.dump();
         } else if (L.peekNextToken().getText() == "dump_ast") {
-          TU->dump();
+          REPLInputFile.TU.dump();
         } else if (L.peekNextToken().getText() == "dump_decl" ||
                    L.peekNextToken().getText() == "print_decl") {
           PrintOrDump doPrint = (L.peekNextToken().getText() == "print_decl")
             ? PrintOrDump::Print : PrintOrDump::Dump;
           L.lex(Tok);
           L.lex(Tok);
-          UnqualifiedLookup lookup(
-              CI.getASTContext().getIdentifier(Tok.getText()), TU, nullptr);
+          ASTContext &ctx = CI.getASTContext();
+          UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()),
+                                   &REPLInputFile.TU, nullptr);
           for (auto result : lookup.Results) {
             if (result.hasValueDecl()) {
               printOrDumpDecl(result.getValueDecl(), doPrint);
@@ -1183,9 +1184,9 @@ public:
           if (Tok.getText() == "debug") {
             L.lex(Tok);
             if (Tok.getText() == "on") {
-              TU->getASTContext().LangOpts.DebugConstraintSolver = true;
+              CI.getASTContext().LangOpts.DebugConstraintSolver = true;
             } else if (Tok.getText() == "off") {
-              TU->getASTContext().LangOpts.DebugConstraintSolver = false;
+              CI.getASTContext().LangOpts.DebugConstraintSolver = false;
             } else {
               printf("%s", "Unknown :constraints debug command; try :help\n");
             }
@@ -1216,8 +1217,8 @@ public:
 
         // We haven't run replApplicationMain() yet. Look for it.
         ASTContext &ctx = CI.getASTContext();
-        UnqualifiedLookup lookup(ctx.getIdentifier("replApplicationMain"), TU,
-                                 nullptr);
+        UnqualifiedLookup lookup(ctx.getIdentifier("replApplicationMain"),
+                                 &REPLInputFile.TU, nullptr);
         if (lookup.isSuccess()) {
           // Execute replApplicationMain().
           executeSwiftSource("replApplicationMain()\n", CmdLine);
@@ -1233,8 +1234,8 @@ public:
   /// stdlib if available.
   void exitREPL() {
     /// Invoke replExit() if available.
-    UnqualifiedLookup lookup(CI.getASTContext().getIdentifier("replExit"), TU,
-                             nullptr);
+    UnqualifiedLookup lookup(CI.getASTContext().getIdentifier("replExit"),
+                             &REPLInputFile.TU, nullptr);
     if (lookup.isSuccess()) {
       executeSwiftSource("replExit()\n", CmdLine);
     }

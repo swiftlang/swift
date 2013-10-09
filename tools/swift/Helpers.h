@@ -26,10 +26,10 @@ namespace llvm {
 
 namespace swift {
   class REPLContext;
-  class TranslationUnit;
   class SILModule;
+  class SourceFile;
 
-  bool appendToREPLTranslationUnit(TranslationUnit *TU,
+  bool appendToREPLTranslationUnit(SourceFile &SF,
                                    REPLContext &RC,
                                    llvm::MemoryBuffer *Buffer);
 

@@ -39,6 +39,7 @@ namespace swift {
   struct TypeLoc;
   class SILParserTUState;
   class Parser;
+  class SourceFile;
   class Token;
   class CodeCompletionCallbacksFactory;
   class PersistentParserState;
@@ -67,9 +68,13 @@ namespace swift {
   void verify(TranslationUnit *TU);
   void verify(Decl *D);
 
-  /// \brief Parse a single buffer into the given taranslation unit.  If the
+  /// \brief Parse a single buffer into the given translation unit.  If the
   /// translation unit is the main module, stop parsing after the next
   /// stmt-brace-item with side-effects.
+  ///
+  /// \param SF the file within the translation unit being parsed.
+  ///
+  /// \param BufferID the buffer to parse from.
   ///
   /// \param Done set to \c true if end of the buffer was reached.
   ///
@@ -80,7 +85,7 @@ namespace swift {
   ///
   /// \param DelayedParseCB if non-null enables delayed parsing for function
   /// bodies.
-  bool parseIntoTranslationUnit(TranslationUnit *TU, unsigned BufferID,
+  bool parseIntoTranslationUnit(SourceFile &SF, unsigned BufferID,
                                 bool *Done,
                                 SILParserState *SIL = nullptr,
                               PersistentParserState *PersistentState = nullptr,

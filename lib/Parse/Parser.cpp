@@ -76,7 +76,7 @@ private:
 
     unsigned BufferID =
         TU->Ctx.SourceMgr.findBufferContainingLoc(AFD->getLoc());
-    Parser TheParser(BufferID, TU, nullptr, &ParserState);
+    Parser TheParser(BufferID, *TU->MainSourceFile, nullptr, &ParserState);
 
     std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
     if (CodeCompletionFactory) {
@@ -97,7 +97,7 @@ void parseDelayedDecl(TranslationUnit *TU, PersistentParserState &ParserState,
 
   unsigned BufferID = TU->Ctx.SourceMgr
       .findBufferContainingLoc(ParserState.getDelayedDeclLoc());
-  Parser TheParser(BufferID, TU, nullptr, &ParserState);
+  Parser TheParser(BufferID, *TU->MainSourceFile, nullptr, &ParserState);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
   if (CodeCompletionFactory) {
@@ -121,20 +121,19 @@ void parseDelayedDecl(TranslationUnit *TU, PersistentParserState &ParserState,
 }
 } // unnamed namespace
 
-/// parseIntoTranslationUnit - Entrypoint for the parser.
-bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
+bool swift::parseIntoTranslationUnit(SourceFile &SF,
                                      unsigned BufferID,
                                      bool *Done,
                                      SILParserState *SIL,
                                      PersistentParserState *PersistentState,
                                      DelayedParsingCallbacks *DelayedParseCB) {
-  Parser P(BufferID, TU, SIL, PersistentState);
+  Parser P(BufferID, SF, SIL, PersistentState);
   PrettyStackTraceParser StackTrace(P);
 
   if (DelayedParseCB)
     P.setDelayedParsingCallbacks(DelayedParseCB);
 
-  bool FoundSideEffects = P.parseTranslationUnit(TU);
+  bool FoundSideEffects = P.parseTopLevel();
   *Done = P.Tok.is(tok::eof);
 
   return FoundSideEffects;
@@ -220,18 +219,16 @@ std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Parser::Parser(unsigned BufferID, TranslationUnit *TU, SILParserState *SIL,
+Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
                PersistentParserState *PersistentState)
-  : SourceMgr(TU->getASTContext().SourceMgr),
+  : SourceMgr(SF.TU.Ctx.SourceMgr),
     BufferID(BufferID),
-    Diags(TU->getASTContext().Diags),
-    TU(TU),
-    L(new Lexer(TU->getASTContext().SourceMgr, BufferID,
-                &TU->getASTContext().Diags,
+    Diags(SF.TU.Ctx.Diags),
+    SF(SF),
+    L(new Lexer(SF.TU.Ctx.SourceMgr, BufferID, &SF.TU.Ctx.Diags,
                 /*InSILMode=*/SIL != nullptr, /*KeepComments=*/false)),
     SIL(SIL),
-    Component(TU->getComponent()),
-    Context(TU->getASTContext()) {
+    Context(SF.TU.Ctx) {
 
   State = PersistentState;
   if (!State) {
