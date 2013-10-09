@@ -2531,7 +2531,7 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
   const bool ConstructorsNotAllowed =
       !(Flags & PD_HasContainerType) || (Flags & PD_InProtocol);
 
-  // Reject 'constructor' functions outside of types
+  // Reject constructors outside of types.
   if (ConstructorsNotAllowed) {
     diagnose(Tok, diag::initializer_decl_wrong_scope);
   }
