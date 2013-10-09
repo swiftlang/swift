@@ -243,6 +243,9 @@ type grammar. SIL adds some additional kinds of type of its own:
   type as the first result of ``alloc_stack`` and the operand of
   ``dealloc_stack``.
 
+- The *self type for T* ``$*sil_self T``, which refers to the ``Self``
+  type within the protocol ``T``.
+
 - Values of *generic function type* such as
   ``$<T...> (A...) -> R`` can be expressed in SIL.  Accessing a generic
   function with ``function_ref`` will give a value of a generic function type.
@@ -1736,9 +1739,9 @@ protocol_method
   // #P.method!1 must be a reference to a method of one of the protocols of P
   //
   // If %0 is an address-only protocol address, then the "self" argument of
-  //   the method type $@thin U -> V must be $*P.Self, the Self archetype of P
+  //   the method type $@thin U -> V must be $*@sil_self P, the Self archetype of P
   // If %0 is a class protocol value, then the "self" argument of
-  //   the method type $@thin U -> V must be $P.Self, the Self archetype of P
+  //   the method type $@thin U -> V must be $@sil_self P, the Self archetype of P
   // If %0 is a protocol metatype, then the "self" argument of
   //   the method type $@thin U -> V must be P.metatype
 
@@ -1749,11 +1752,11 @@ be projected out of the same existential container as the ``protocol_method``
 operand:
 
 - If the operand is the address of an address-only protocol type, then the
-  "self" argument of the method is of type ``$*P.Self``, the ``Self`` archetype
+  "self" argument of the method is of type ``$*@sil_self P``, the ``Self`` archetype
   of the method's protocol, and can be projected using the
   ``project_existential`` instruction.
 - If the operand is a value of a class protocol type, then the "self"
-  argument of the method is of type ``$P.Self`` and can be
+  argument of the method is of type ``$@sil_self P`` and can be
   projected using the ``project_existential_ref`` instruction.
 - If the operand is a protocol metatype, it does not need to be projected, and
   the "self" argument of the method is the protocol metatype itself.
@@ -2372,12 +2375,12 @@ project_existential
 
   sil-instruction ::= 'project_existential' sil-operand 'to' sil-type
 
-  %1 = project_existential %0 : $*P to $*P.Self
+  %1 = project_existential %0 : $*P to $*@sil_self P
   // %0 must be of a $*P type for non-class protocol or protocol composition
   //   type P
-  // $*P.Self must be the address-of-Self type for one of the protocols %0
+  // $*@sil_self P must be the address-of-Self type for one of the protocols %0
   //   conforms to
-  // %1 will be of type $*P.Self
+  // %1 will be of type $*@sil_self P
 
 Obtains the address of the concrete value inside the
 existential container referenced by ``%0``. This pointer can be passed to
@@ -2442,9 +2445,9 @@ project_existential_ref
 
   %1 = project_existential_ref %0 : $P
   // %0 must be of a class protocol or protocol composition type $P
-  // $P.Self must be the Self type for one of the protocols %0
+  // $@sil_self P must be the Self type for one of the protocols %0
   //   conforms to
-  // %1 will be of type $P.Self
+  // %1 will be of type $@sil_self P
 
 Extracts the class instance reference from a class existential container.
 This value can be passed to protocol instance methods obtained by
