@@ -180,6 +180,8 @@ All Swift-mangled names begin with this prefix.
   global ::= 'MP' directness type        // type metadata pattern
   global ::= 'Mm' type                   // class metaclass
   global ::= 'nk_' entity                // protocol witness
+  global ::= 'PA' .*                     // partial application forwarder
+  global ::= 'PAo' .*                    // ObjC partial application forwarder
   global ::= 'w' value-witness-kind type // value witness
   global ::= 'WV' type                   // value witness table
   global ::= 'Wo' entity                 // witness table offset
@@ -204,9 +206,13 @@ All Swift-mangled names begin with this prefix.
   declaration-name ::= context identifier
   local-marker ::= 'L'
 
-Entity manglings all start with a nominal-type-kind ([COPV]), an
-identifier ([0-9oX]), or a substitution ([S]).  Global manglings start
-with any of those or [MTWw].
+Entity manglings all start with a nominal-type-kind (``[COPV]``), an
+identifier (``[0-9oX]``), or a substitution (``[S]``).  Global manglings start
+with any of those or ``[MTWw]``.
+
+If a partial application forwarder is for a static symbol, its name will
+start with the sequence ``_TPA_`` followed by the mangled symbol name of the
+forwarder's destination.
 
 ::
 

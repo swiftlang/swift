@@ -516,7 +516,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   // FIXME: Maybe cache the thunk by function and closure types?
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
-                           "partial_apply", &IGM.Module);
+                           "_TPAo", &IGM.Module);
   fwd->setAttributes(attrs);
   
   IRGenFunction subIGF(IGM, ExplosionKind::Minimal, fwd);

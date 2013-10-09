@@ -43,7 +43,7 @@ entry(%x : $Builtin.Int64, %c : $ObjCClass):
 // CHECK:   store %swift.refcounted* %1, %swift.refcounted** [[CONTEXT_ADDR]], align 8
 // CHECK:   [[FN_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 3
 // CHECK:   store i8* %0, i8** [[FN_ADDR]], align 8
-// CHECK:   [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* [[INDIRECT_PARTIAL_APPLY_STUB:@partial_apply[0-9]*]] to i8*), %swift.refcounted* undef }, %swift.refcounted* [[OBJ]], 1
+// CHECK:   [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* [[INDIRECT_PARTIAL_APPLY_STUB:@_TPA[A-Za-z0-9_]*]] to i8*), %swift.refcounted* undef }, %swift.refcounted* [[OBJ]], 1
 // CHECK:   ret { i8*, %swift.refcounted* } [[RET]]
 // CHECK: }
 // CHECK: define internal void [[INDIRECT_PARTIAL_APPLY_STUB]](%swift.refcounted*) {
@@ -72,7 +72,7 @@ entry(%f : $(Builtin.Int64) -> (), %x : $Builtin.Int64):
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* [[OBJ]] to [[DATA_TYPE:<{ %swift.refcounted, %CSo9ObjCClass\* }>]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
 // CHECK:   store %CSo9ObjCClass* %0, %CSo9ObjCClass** [[X_ADDR]], align 8
-// CHECK:   [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (i64, %swift.refcounted*)* [[OBJC_PARTIAL_APPLY_STUB:@partial_apply[0-9]*]] to i8*), %swift.refcounted* undef }, %swift.refcounted* [[OBJ]], 1
+// CHECK:   [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (i64, %swift.refcounted*)* [[OBJC_PARTIAL_APPLY_STUB:@_TPA[A-Za-z0-9_]*]] to i8*), %swift.refcounted* undef }, %swift.refcounted* [[OBJ]], 1
 // CHECK:   ret { i8*, %swift.refcounted* } [[RET]]
 // CHECK: }
 // CHECK: define internal void [[OBJC_PARTIAL_APPLY_STUB]](i64, %swift.refcounted*) {
@@ -99,7 +99,7 @@ entry(%x : $Builtin.Int64):
 }
 
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @dynamic_lookup_br_partial_apply(%objc_object*) {
-// CHECK:   phi i8* [ bitcast (void (i64)* @dummy to i8*), {{%.*}} ], [ bitcast (void (i64, %swift.refcounted*)* [[DYNAMIC_LOOKUP_BR_PARTIAL_APPLY_STUB:@partial_apply[0-9]*]] to i8*), {{%.*}} ]
+// CHECK:   phi i8* [ bitcast (void (i64)* @dummy to i8*), {{%.*}} ], [ bitcast (void (i64, %swift.refcounted*)* [[DYNAMIC_LOOKUP_BR_PARTIAL_APPLY_STUB:@_TPA[A-Za-z0-9_]*]] to i8*), {{%.*}} ]
 // CHECK: define internal void [[DYNAMIC_LOOKUP_BR_PARTIAL_APPLY_STUB]](i64, %swift.refcounted*) {
 // CHECK:   load i8** @"\01L_selector(method:)", align 8
 

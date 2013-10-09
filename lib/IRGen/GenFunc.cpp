@@ -1729,12 +1729,19 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                                   /*curryLevel=*/ 0,
                                                   extraData,
                                                   attrs);
-  // FIXME: Give the thunk a real name.
-  // FIXME: Maybe cache the thunk by function and closure types? Could there
-  // be multiple same-type closures off the same 
+  // Build a name for the thunk. If we're thunking a static function reference,
+  // include its symbol name in the thunk name.
+  llvm::SmallString<20> thunkName;
+  thunkName += "_TPA";
+  if (staticFnPtr) {
+    thunkName += '_';
+    thunkName += staticFnPtr->getName();
+  }
+  
+  // FIXME: Maybe cache the thunk by function and closure types?.
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
-                           "partial_apply", &IGM.Module);
+                           llvm::StringRef(thunkName), &IGM.Module);
   fwd->setAttributes(attrs);
 
   IRGenFunction subIGF(IGM, explosionLevel, fwd);
