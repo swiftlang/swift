@@ -61,6 +61,7 @@ typedef struct {
 } Location;
 
 enum IndirectionKind: bool { DirectValue = false, IndirectValue = true };
+enum ArtificialKind: bool { RealMcCoy = false, Artificial = true };
 
 /// IRGenDebugInfo - Helper object that keeps track of the current
 /// CompileUnit, File, LexicalScope, and translates SILLocations into
@@ -159,7 +160,8 @@ public:
                                StringRef Name,
                                unsigned Tag,
                                unsigned ArgNo = 0,
-                               bool Indirect = false);
+                               bool Indirect = false,
+                               bool Artificial = false);
 
   /// Convenience function for stack-allocated variables. Calls
   /// emitVariableDeclaration internally.

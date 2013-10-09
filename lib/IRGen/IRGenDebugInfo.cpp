@@ -683,11 +683,25 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
       // Detect the pattern of an inout argument.
       if (auto Load = dyn_cast<LoadInst>(Src))
         Src = Load->getOperand();
-      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I->getFunction(),
-                                     Src, Indirect)) return;
+      if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name,
+                                     I->getFunction(), Src, Indirect))
+        return;
     } else if (auto CopyAddr = dyn_cast<CopyAddrInst>(Use->getUser())) {
+      // Generic type metadata?
+      if (auto Call = dyn_cast<llvm::CallInst>(Storage))
+        if (Call->getNumArgOperands() == 2) {
+          auto RawPtrTy = DebugTypeInfo(Context.TheRawPointerType,
+                                        TargetInfo.getPointerWidth(0),
+                                        TargetInfo.getPointerAlign(0));
+          auto TName = BumpAllocatedString(("$swift.type."+Name).str(),
+                                           DebugInfoNames);
+          emitVariableDeclaration(B, Call->getArgOperand(1), RawPtrTy,
+                                  TName, llvm::dwarf::DW_TAG_auto_variable,
+                                  0, DirectValue, true);
+        }
       if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I->getFunction(),
-                                     CopyAddr->getSrc(), Indirect)) return;
+                                     CopyAddr->getSrc(), Indirect))
+        return;
     }
   }
   emitVariableDeclaration(B, Storage, Ty, Name,
@@ -701,7 +715,8 @@ void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 unsigned ArgNo,
                                                 bool Indirect) {
   emitVariableDeclaration(Builder, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_arg_variable, ArgNo, Indirect);
+                          llvm::dwarf::DW_TAG_arg_variable, ArgNo, Indirect,
+                          Name == "self");
 }
 
 /// Return the DIFile that is the ancestor of Scope.
@@ -731,7 +746,8 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              StringRef Name,
                                              unsigned Tag,
                                              unsigned ArgNo,
-                                             bool Indirect) {
+                                             bool Indirect,
+                                             bool Artificial) {
   llvm::DebugLoc DL = Builder.getCurrentDebugLocation();
   llvm::DIDescriptor Scope(DL.getScope(Builder.getContext()));
   // If this is an argument, attach it to the current function scope.
@@ -753,6 +769,8 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
 
   unsigned Line = DL.getLine();
   unsigned Flags = 0;
+  if (Artificial)
+    Flags |= llvm::DIDescriptor::FlagArtificial;
 
   // Create the descriptor for the variable.
   llvm::DIVariable Descriptor;
