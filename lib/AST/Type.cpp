@@ -872,6 +872,8 @@ StringRef VecType::getStructName(llvm::SmallVectorImpl<char> &buffer) const {
     os << 'd';
   else if (name.startswith("Int"))
     os << 'i' << name.drop_front(3);
+  else if (name.startswith("UInt"))
+    os << "ui" << name.drop_front(4);
   else
     return "";
 
