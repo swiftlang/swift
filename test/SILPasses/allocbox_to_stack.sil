@@ -138,7 +138,7 @@ bb0(%0 : $SomeClass):
 // CHECK: %1 = alloc_stack
 // CHECK-NOT: alloc_box
 // CHECK-NOT: strong_release
-// CHECK: strong_release {{.*}} : $SomeClass
+// CHECK: destroy_addr {{.*}} : $*SomeClass
 // CHECK: return
 }
 
