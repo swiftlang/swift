@@ -308,6 +308,7 @@ namespace decls_block {
     OPTIONAL_TYPE,
     SIL_FUNCTION_TYPE,
     VEC_TYPE,
+    MATRIX_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     GENERIC_TYPE_PARAM_DECL,
@@ -514,6 +515,14 @@ namespace decls_block {
     VEC_TYPE,
     TypeIDField, // element type
     BCVBR<6>     // length
+  >;
+
+  using MatrixTypeLayout = BCRecordLayout<
+    MATRIX_TYPE,
+    TypeIDField,  // element type
+    BCVBR<6>,     // rows
+    BCVBR<6>,     // columns
+    BCFixed<1>    // columns specified
   >;
 
   using ArrayTypeLayout = BCRecordLayout<

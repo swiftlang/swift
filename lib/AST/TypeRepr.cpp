@@ -189,6 +189,16 @@ void VecTypeRepr::printImpl(llvm::raw_ostream &OS) const {
   OS << ">";
 }
 
+void MatrixTypeRepr::printImpl(llvm::raw_ostream &OS) const {
+  OS << "Matrix<" << Base << ", ";
+  Rows->getExpr()->print(OS);
+  if (Columns) {
+    OS << ", ";
+    Columns->getExpr()->print(OS);
+  }
+  OS << ">";
+}
+
 TupleTypeRepr *TupleTypeRepr::create(ASTContext &C,
                                      ArrayRef<TypeRepr *> Elements,
                                      SourceRange Parens,

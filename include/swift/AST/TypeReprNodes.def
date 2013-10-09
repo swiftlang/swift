@@ -32,5 +32,6 @@ TYPEREPR(Named, TypeRepr)
 TYPEREPR(ProtocolComposition, TypeRepr)
 TYPEREPR(MetaType, TypeRepr)
 TYPEREPR(Vec, TypeRepr)
+TYPEREPR(Matrix, TypeRepr)
 
 #undef TYPEREPR

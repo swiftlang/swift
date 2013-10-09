@@ -895,6 +895,77 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
     
     return vecTy;
   }
+
+  case TypeReprKind::Matrix: {
+    // FIXME: diagnose non-materializability of element type!
+    auto matrixTyR = cast<MatrixTypeRepr>(TyR);
+    Type baseTy = resolveType(matrixTyR->getBase(), DC,
+                              /*FIXME:allowUnboundGenerics=*/false,
+                              resolver);
+    if (baseTy->is<ErrorType>())
+      return baseTy;
+
+    // Check the number of rows.
+    ExprHandle *rowsHandle = matrixTyR->getRows();
+    Expr *rows = rowsHandle->getExpr();
+    // FIXME: Generalize typeCheckArrayBound.
+    if (typeCheckArrayBound(rows, /*requireConstant=*/true, DC)) {
+      rowsHandle->setExpr(rowsHandle->getExpr(), true);
+      return ErrorType::get(Context);
+    } else {
+      rowsHandle->setExpr(rows, true);
+    }
+
+    // Retrieve the vector length.
+    // FIXME: We need a constant evaluator.
+    uint64_t rowsVal
+      = cast<IntegerLiteralExpr>(rows->getSemanticsProvidingExpr())
+          ->getValue().getZExtValue();
+
+    // Check the number of columns, if provided.
+    Optional<unsigned> columnsVal;
+    if (matrixTyR->getColumns()) {
+      ExprHandle *columnsHandle = matrixTyR->getColumns();
+      Expr *columns = columnsHandle->getExpr();
+      // FIXME: Generalize typeCheckArrayBound.
+      if (typeCheckArrayBound(columns, /*requireConstant=*/true, DC)) {
+        columnsHandle->setExpr(columnsHandle->getExpr(), true);
+        return ErrorType::get(Context);
+      } else {
+        columnsHandle->setExpr(columns, true);
+      }
+
+      // Retrieve the vector length.
+      // FIXME: We need a constant evaluator.
+      columnsVal
+        = cast<IntegerLiteralExpr>(columns->getSemanticsProvidingExpr())
+            ->getValue().getZExtValue();
+    }
+
+    // Create the matrix type.
+    auto matrixTy = MatrixType::get(baseTy, rowsVal, columnsVal, Context);
+
+    // Figure out which implementation struct to use.
+    llvm::SmallString<16> structNameBuf;
+    StringRef structName = matrixTy->getStructName(structNameBuf);
+    if (structName.empty()) {
+      diagnose(TyR->getStartLoc(), diag::axle_invalid_mat_type, baseTy)
+        .highlight(matrixTyR->getBase()->getSourceRange());
+      return ErrorType::get(Context);
+    }
+
+    // Make sure that the underlying struct is available.
+    llvm::SmallVector<ValueDecl *, 5> decls;
+    Context.lookupInSwiftModule(structName, decls);
+    if (decls.size() != 1 || !isa<StructDecl>(decls[0])) {
+      diagnose(TyR->getStartLoc(), diag::axle_missing_mat_type, structName,
+               matrixTy);
+      return ErrorType::get(Context);
+    }
+    
+    return matrixTy;
+  }
+
   }
 
   llvm_unreachable("all cases should be handled");

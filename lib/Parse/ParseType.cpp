@@ -61,6 +61,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 ///   type-simple:
 ///     type-identifier
 ///     type-axle-vec
+///     type-axle-matrix
 ///     type-tuple
 ///     type-composition
 ///     type-simple '.metatype'
@@ -184,7 +185,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrAxleSugarWithRecovery(
   ParserResult<TypeRepr> Ty = parseType(MessageID);
 
   if (!Ty.isParseError() && !isa<IdentTypeRepr>(Ty.get()) &&
-      !isa<VecTypeRepr>(Ty.get())) {
+      !isa<VecTypeRepr>(Ty.get()) && !isa<MatrixTypeRepr>(Ty.get())) {
     diagnose(Ty.get()->getStartLoc(), NonIdentifierTypeMessageID, Ty.get())
         .highlight(Ty.get()->getSourceRange());
     Ty.setIsParseError();
@@ -195,6 +196,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrAxleSugarWithRecovery(
   assert(Ty.isNull() ||
          isa<IdentTypeRepr>(Ty.get()) ||
          isa<VecTypeRepr>(Ty.get()) ||
+         isa<MatrixTypeRepr>(Ty.get()) ||
          isa<ErrorTypeRepr>(Ty.get()));
   return Ty;
 }
@@ -336,6 +338,8 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrAxleSugar() {
   if (Context.LangOpts.Axle) {
     if (Tok.isContextualKeyword("Vec") && startsWithLess(peekToken()))
       return parseTypeAxleVec(SourceLoc());
+    if (Tok.isContextualKeyword("Matrix") && startsWithLess(peekToken()))
+      return parseTypeAxleMatrix(SourceLoc());
   }
 
   return parseTypeIdentifier();
@@ -362,7 +366,8 @@ ParserResult<VecTypeRepr> Parser::parseTypeAxleVec(SourceLoc vecLoc) {
 
   // Parse the comma.
   if (!consumeIf(tok::comma) && !status.isSuccess()) {
-    diagnose(Tok, diag::axle_expected_comma);
+    diagnose(Tok, diag::axle_expected_vec_comma)
+      .fixItInsert(Tok.getLoc(), ", ");
   }
 
   // Parse the vector length.
@@ -398,6 +403,79 @@ ParserResult<VecTypeRepr> Parser::parseTypeAxleVec(SourceLoc vecLoc) {
            new (Context) VecTypeRepr(vecLoc, langleLoc, elementTy.get(),
                                      ExprHandle::get(Context, length.get()),
                                      rangleLoc));
+}
+
+/// Parse Axle matrix type sugar.
+///
+///   type-axle-matrix:
+///     Matrix '<' type ',' expr '>'
+///     Matrix '<' type ',' expr ',' expr '>'
+ParserResult<MatrixTypeRepr> Parser::parseTypeAxleMatrix(SourceLoc matrixLoc) {
+  // Parse leading "Vec<", which we know is here.
+  if (matrixLoc.isInvalid()) {
+    assert(Tok.isContextualKeyword("Matrix"));
+    matrixLoc = consumeToken();
+  }
+
+  SourceLoc langleLoc = consumeStartingLess();
+
+  // Parse the matrix element type.
+  ParserStatus status;
+  ParserResult<TypeRepr> elementTy
+    = parseType(diag::axle_expected_mat_element_type);
+  status |= elementTy;
+
+  // Parse the comma.
+  if (!consumeIf(tok::comma) && !status.isSuccess()) {
+    diagnose(Tok, diag::axle_expected_mat_comma)
+      .fixItInsert(Tok.getLoc(), ", ");
+  }
+
+  // Parse the matrix rows.
+  ParserResult<Expr> rows;
+  {
+    GreaterThanIsOperatorRAII notOperator(*this, false);
+    rows = parseExpr(diag::axle_expected_mat_rows);
+    status |= rows;
+  }
+
+  // If there is a comma, parse the number of columns.
+  ExprHandle *columnsHandle = nullptr;
+  if (consumeIf(tok::comma)) {
+    GreaterThanIsOperatorRAII notOperator(*this, false);
+    ParserResult<Expr> columns = parseExpr(diag::axle_expected_mat_columns);
+    status |= columns;
+
+    if (columns.isNonNull())
+      columnsHandle = ExprHandle::get(Context, columns.get());
+  }
+
+  // Check for the terminating '>'.
+  SourceLoc rangleLoc = Tok.getLoc();
+  if (!startsWithGreater(Tok)) {
+    if (status.isSuccess()) {
+      diagnose(Tok, diag::axle_expected_mat_rangle);
+      diagnose(langleLoc, diag::opening_angle);
+      status.setIsParseError();
+    }
+
+    // Skip until we hit the '>'.
+    skipUntilGreaterInTypeList();
+    if (startsWithGreater(Tok))
+      rangleLoc = consumeStartingGreater();
+  } else {
+    rangleLoc = consumeStartingGreater();
+  }
+
+  if (status.isError() || status.hasCodeCompletion())
+    return status;
+
+  return makeParserResult(
+           status,
+           new (Context) MatrixTypeRepr(matrixLoc, langleLoc, elementTy.get(),
+                                        ExprHandle::get(Context, rows.get()),
+                                        columnsHandle,
+                                        rangleLoc));
 }
 
 /// parseTypeComposition
@@ -702,10 +780,14 @@ bool Parser::canParseAxleSugarArguments() {
   if (!consumeIf(tok::comma))
     return false;
 
-  // length expression
+  // length or rows expression
   // FIXME: We don't have a true 'canParseExpr'; settle for identifying
   // integer literals, since that's all that really works here.
   if (!consumeIf(tok::integer_literal))
+    return false;
+
+  // If there's another comma here, parse it and the following integer literal.
+  if (consumeIf(tok::comma) && !consumeIf(tok::integer_literal))
     return false;
 
   // '>'
@@ -806,10 +888,11 @@ bool Parser::canParseTypeIdentifier() {
 }
 
 bool Parser::canParseTypeIdentifierOrAxleSugar() {
-  if (!Tok.isContextualKeyword("Vec") || !startsWithLess(peekToken()))
+  if (!(Tok.isContextualKeyword("Vec") || Tok.isContextualKeyword("Matrix"))
+      || !startsWithLess(peekToken()))
     return canParseTypeIdentifier();
 
-  consumeToken();        // 'Vec'
+  consumeToken();        // 'Vec' or 'Matrix'
   return canParseAxleSugarArguments();
 }
 

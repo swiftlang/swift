@@ -255,6 +255,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, UNBOUND_GENERIC_TYPE);
   RECORD(decls_block, OPTIONAL_TYPE);
   RECORD(decls_block, VEC_TYPE);
+  RECORD(decls_block, MATRIX_TYPE);
 
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, GENERIC_TYPE_PARAM_DECL);
@@ -1754,6 +1755,18 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
+  case TypeKind::Matrix: {
+    auto matrixTy = cast<MatrixType>(ty.getPointer());
+    Type base = matrixTy->getBaseType();
+    unsigned abbrCode = DeclTypeAbbrCodes[MatrixTypeLayout::Code];
+    MatrixTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                 addTypeRef(base),
+                                 matrixTy->getRows(),
+                                 matrixTy->getColumns(),
+                                 matrixTy->wereColumnsSpecified());
+    break;
+  }
+
   case TypeKind::ProtocolComposition: {
     auto composition = cast<ProtocolCompositionType>(ty.getPointer());
 
@@ -1852,6 +1865,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<UnboundGenericTypeLayout>();
     registerDeclTypeAbbr<OptionalTypeLayout>();
     registerDeclTypeAbbr<VecTypeLayout>();
+    registerDeclTypeAbbr<MatrixTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<GenericTypeParamTypeLayout>();

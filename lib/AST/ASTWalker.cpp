@@ -1082,6 +1082,22 @@ bool Traversal::visitVecTypeRepr(VecTypeRepr *T) {
   return false;
 }
 
+bool Traversal::visitMatrixTypeRepr(MatrixTypeRepr *T) {
+  if (doIt(T->getBase()))
+    return true;
+  if (auto rows = doIt(T->getRows()->getExpr()))
+    T->getRows()->setExpr(rows, T->getRows()->alreadyChecked());
+  else
+    return true;
+  if (T->getColumns()) {
+    if (auto columns = doIt(T->getColumns()->getExpr()))
+      T->getColumns()->setExpr(columns, T->getColumns()->alreadyChecked());
+    else
+      return true;
+  }
+  return false;
+}
+
 bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {
   for (auto elem : T->getElements()) {
     if (doIt(elem))

@@ -112,6 +112,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
     llvm::DenseMap<std::pair<Type, unsigned>, VecType*> VecTypes;
+    llvm::FoldingSet<MatrixType> MatrixTypes;
     llvm::DenseMap<Type, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
@@ -1388,6 +1389,35 @@ VecType *VecType::get(Type base, unsigned length, const ASTContext &C) {
   if (entry) return entry;
 
   return entry = new (C, arena) VecType(C, base, length, hasTypeVariable);
+}
+
+MatrixType *MatrixType::get(Type baseTy, unsigned rows,
+                            Optional<unsigned> columns,
+                            const ASTContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  MatrixType::Profile(id, baseTy, rows, columns);
+
+  auto arena = getArena(baseTy->hasTypeVariable());
+  void *insertPos;
+  if (MatrixType *matrixType
+        = ctx.Impl.getArena(arena).MatrixTypes.FindNodeOrInsertPos(id,
+                                                                   insertPos))
+    return matrixType;
+
+  auto matrixTy = new (ctx, arena) MatrixType(ctx, baseTy, rows, columns,
+                                              baseTy->hasTypeVariable());
+  ctx.Impl.getArena(arena).MatrixTypes.InsertNode(matrixTy, insertPos);
+  return matrixTy;
+
+}
+
+void MatrixType::Profile(llvm::FoldingSetNodeID &id, Type baseType,
+                         unsigned rows, Optional<unsigned> columns) {
+  id.AddPointer(baseType.getPointer());
+  id.AddInteger(rows);
+  id.AddBoolean(static_cast<bool>(columns));
+  if (columns)
+    id.AddInteger(*columns);
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)

@@ -1832,7 +1832,7 @@ public:
   /// Retrieve the name of the struct that implements this vector
   /// type.
   ///
-  /// \param buffer A buffer into which the struct name will be places.
+  /// \param buffer A buffer into which the struct name will be placed.
   ///
   /// \returns the name of the struct that implements this vector
   /// type, or an empty string if the base type is not compatible with
@@ -1845,6 +1845,66 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Vec;
+  }
+};
+
+/// The type Matrix<T, N> or Matrix<T, N, M>, which is always sugar for a
+/// library matrix type.
+class MatrixType : public SyntaxSugarType, public llvm::FoldingSetNode {
+  unsigned Rows;
+  unsigned Columns : 31;
+  unsigned ColumnsSpecified : 1;
+
+  MatrixType(const ASTContext &ctx, Type base, unsigned rows,
+             Optional<unsigned> columns,
+             bool hasTypeVariable)
+    : SyntaxSugarType(TypeKind::Matrix, ctx, base, hasTypeVariable),
+      Rows(rows),
+      Columns(columns? *columns : rows),
+      ColumnsSpecified(columns) { }
+
+public:
+  /// Return a uniqued optional type with the specified base type.
+  static MatrixType *get(Type baseTy, unsigned rows,
+                         Optional<unsigned> columns,
+                         const ASTContext &C);
+
+  /// Retrieve the name of the struct that implements this matrix
+  /// type.
+  ///
+  /// \param buffer A buffer into which the struct name will be placed.
+  ///
+  /// \returns the name of the struct that implements this matrix
+  /// type, or an empty string if the base type is not compatible with
+  /// matrices.
+  StringRef getStructName(llvm::SmallVectorImpl<char> &buffer) const;
+
+  /// Retrieve the number of rows in this matrix type.
+  unsigned getRows() const { return Rows; }
+
+  /// Retrieve the length (in elements) of this vector type.
+  unsigned getColumns() const { return Columns; }
+
+  /// Retrieve the length (in elements) of this vector type.
+  Optional<unsigned> getColumnsAsSpecified() const {
+    if (wereColumnsSpecified())
+      return getColumns();
+
+    return Nothing;
+  }
+
+  /// Determine whether the columns were specified explicitly.
+  bool wereColumnsSpecified() const { return ColumnsSpecified; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getBaseType(), getRows(), getColumnsAsSpecified());
+  }
+  static void Profile(llvm::FoldingSetNodeID &id, Type baseType, unsigned rows,
+                      Optional<unsigned> columns);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Matrix;
   }
 };
 
@@ -2701,6 +2761,9 @@ case TypeKind::Id:
     case TypeKind::Vec:
       return cast<VecType>(base)->getBaseType().findIf(pred);
 
+    case TypeKind::Matrix:
+      return cast<MatrixType>(base)->getBaseType().findIf(pred);
+
     case TypeKind::LValue:
       return cast<LValueType>(base)->getObjectType().findIf(pred);
 
@@ -3065,6 +3128,19 @@ case TypeKind::Id:
       return *this;
 
     return VecType::get(baseTy, vec->getLength(), ctx);
+  }
+
+  case TypeKind::Matrix: {
+    auto matrix = cast<MatrixType>(base);
+    auto baseTy = matrix->getBaseType().transform(ctx, fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == matrix->getBaseType().getPointer())
+      return *this;
+
+    return MatrixType::get(baseTy, matrix->getRows(),
+                           matrix->getColumnsAsSpecified(), ctx);
   }
 
   case TypeKind::LValue: {

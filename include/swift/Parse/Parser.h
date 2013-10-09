@@ -590,10 +590,12 @@ public:
   ParserResult<IdentTypeRepr> parseTypeIdentifier();
   ParserResult<TypeRepr> parseTypeIdentifierOrAxleSugar();
 
-  /// Determine whether we're at the start of Axle's \c Vec<T,N> type sugar.
-  bool atStartOfAxleVec();
+  /// Determine whether we're at the start of Axle's \c Vec<T,N>,
+  /// \c Matrix<T,N>, or \c Matrix<T,N,M> sugar.
+  bool atStartOfAxleSugarType();
 
   ParserResult<VecTypeRepr> parseTypeAxleVec(SourceLoc vecLoc);
+  ParserResult<MatrixTypeRepr> parseTypeAxleMatrix(SourceLoc matrixLoc);
   ParserResult<ProtocolCompositionTypeRepr> parseTypeComposition();
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<ArrayTypeRepr> parseTypeArray(TypeRepr *Base);

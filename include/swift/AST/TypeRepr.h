@@ -484,6 +484,47 @@ private:
   friend class TypeRepr;
 };
 
+/// \brief An Axle matrix type.
+///
+/// \code
+///   Matrix<Float, 4> or Matrix<Float, 4, 4>
+/// \endcode
+///
+/// If the number of columns is not specified, it's considered to be
+/// equivalent to the number of rows.
+class MatrixTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  ExprHandle *Rows;
+  ExprHandle *Columns;
+  SourceLoc MatrixLoc;
+  SourceLoc LAngleLoc;
+  SourceLoc RAngleLoc;
+
+public:
+  MatrixTypeRepr(SourceLoc MatrixLoc, SourceLoc LAngleLoc, TypeRepr *Base,
+                 ExprHandle *Rows, ExprHandle *Columns, SourceLoc RAngleLoc)
+    : TypeRepr(TypeReprKind::Matrix), Base(Base), Rows(Rows), Columns(Columns),
+      MatrixLoc(MatrixLoc), LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc) {
+  }
+
+  TypeRepr *getBase() const { return Base; }
+  ExprHandle *getRows() const { return Rows; }
+  ExprHandle *getColumns() const { return Columns; }
+  SourceLoc getMatrixLoc() const { return MatrixLoc; }
+  SourceLoc getLAngleLoc() const { return LAngleLoc; }
+  SourceLoc getRAngleLoc() const { return RAngleLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Matrix;
+  }
+
+private:
+  SourceLoc getStartLocImpl() const { return MatrixLoc; }
+  SourceLoc getEndLocImpl() const { return RAngleLoc; }
+  void printImpl(llvm::raw_ostream &OS) const;
+  friend class TypeRepr;
+};
+
 } // end namespace swift
 
 namespace llvm {

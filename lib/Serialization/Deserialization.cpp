@@ -2347,6 +2347,21 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
+  case decls_block::MATRIX_TYPE: {
+    TypeID baseID;
+    uint64_t rows;
+    uint64_t columns;
+    uint8_t columnsSpecified;
+    decls_block::MatrixTypeLayout::readRecord(scratch, baseID, rows, columns,
+                                              columnsSpecified);
+
+    if (columnsSpecified)
+      typeOrOffset = MatrixType::get(getType(baseID), rows, columns, ctx);
+    else
+      typeOrOffset = MatrixType::get(getType(baseID), rows, Nothing, ctx);
+    break;
+  }
+
   case decls_block::ARRAY_TYPE: {
     TypeID baseID;
     uint64_t size;
