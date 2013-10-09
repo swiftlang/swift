@@ -86,7 +86,7 @@
     @someattribute=42
     func foo(a : Int) {}
 
-  This flows a lot better (attributes don't push the name for declarations away,
+  This flows a lot better (attributes don't push the name for declarations away),
   and means that square brackets are only used for array types, collection
   literals, and subscripting operations.
 
