@@ -103,11 +103,10 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics23SinglePayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {
 // CHECK: entry:
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics23SinglePayloadNontrivial*
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O20enum_value_semantics23SinglePayloadNontrivial* [[ADDR]], i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics23SinglePayloadNontrivial* [[ADDR]] to i64*
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[T0:%.*]] = bitcast %O20enum_value_semantics23SinglePayloadNontrivial* %0 to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i32 8
-// CHECK:   [[TAG_ADDR:%.*]] = bitcast i8* [[T1]] to i1*
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O20enum_value_semantics23SinglePayloadNontrivial* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
 // CHECK:   [[TAG:%.*]] = load i1* [[TAG_ADDR]], align 8
 // CHECK:   [[HAS_PAYLOAD:%.*]] = icmp eq i1 [[TAG]], false
 // CHECK:   br i1 [[HAS_PAYLOAD]], label %[[RELEASE_PAYLOAD:[0-9]+]], label %[[DONE:[0-9]+]]
@@ -141,11 +140,10 @@ enum MultiPayloadNontrivial {
 // CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics22MultiPayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {
 // CHECK: entry:
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics22MultiPayloadNontrivial*
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O20enum_value_semantics22MultiPayloadNontrivial* [[ADDR]], i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics22MultiPayloadNontrivial* [[ADDR]] to i128*
 // CHECK:   [[PAYLOAD:%.*]] = load i128* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[T0:%.*]] = bitcast %O20enum_value_semantics22MultiPayloadNontrivial* %0 to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i32 16
-// CHECK:   [[TAG_ADDR:%.*]] = bitcast i8* [[T1]] to i2*
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O20enum_value_semantics22MultiPayloadNontrivial* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i2*
 // CHECK:   [[TAG:%.*]] = load i2* [[TAG_ADDR]], align 8
 // CHECK:   switch i2 [[TAG]], label %[[END:[0-9]+]] [
 // CHECK:     i2 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]

@@ -14,26 +14,26 @@ import Builtin
 //      case x(i64): X0 X1 X2 ... X63 | 0, where X0...X63 are the payload bits
 //      case y:      0  0  0  ... 0   | 1
 //      case z:      1  0  0  ... 0   | 1
-// CHECK: %O4enum17SinglePayloadNoXI = type <{ i64, i1 }>
-// CHECK: %O4enum18SinglePayloadNoXI2 = type <{ i64, i1 }>
+// CHECK: %O4enum17SinglePayloadNoXI = type <{ [8 x i8], [1 x i8] }>
+// CHECK: %O4enum18SinglePayloadNoXI2 = type <{ [8 x i8], [1 x i8] }>
 
 // -- Single-payload enum, spare bits. The representation uses a tag bit
 //    out of the payload to distinguish payload from enum tag:
 //      case x(i3): X0 X1 X2 0 0 0 0 0
 //      case y:     0  0  0  1 0 0 0 0
 //      case z:     1  0  0  1 0 0 0 0
-// CHECK: %O4enum21SinglePayloadSpareBit = type <{ i64 }>
+// CHECK: %O4enum21SinglePayloadSpareBit = type <{ [8 x i8] }>
 
 // -- Single-payload enum containing a no-payload enum as its payload.
 //    The representation takes extra inhabitants starting after the greatest
 //    discriminator value used by the nested no-payload enum.
-// CHECK: %O4enum19SinglePayloadNested = type <{ i8 }>
+// CHECK: %O4enum19SinglePayloadNested = type <{ [1 x i8] }>
 
 // -- Single-payload enum containing another single-payload enum as its
 //    payload.
 //    The representation takes extra inhabitants from the nested enum's payload
 //    that were unused by the nested enum.
-// CHECK: %O4enum25SinglePayloadNestedNested = type <{ i8 }>
+// CHECK: %O4enum25SinglePayloadNestedNested = type <{ [1 x i8] }>
 
 // -- Multi-payload enum, no spare bits. The representation adds tag bits
 //    to discriminate payloads. No-payload cases all share a tag.
@@ -43,7 +43,7 @@ import Builtin
 //      case a:     0  0  0  ... 0  0  | 1 1
 //      case b:     1  0  0  ... 0  0  | 1 1
 //      case c:     0  1  0  ... 0  0  | 1 1
-// CHECK: %O4enum23MultiPayloadNoSpareBits = type <{ i64, i2 }>
+// CHECK: %O4enum23MultiPayloadNoSpareBits = type <{ [8 x i8], [1 x i8] }>
 
 // -- Multi-payload enum, one spare bit. The representation uses spare bits
 //    common to all payloads to partially discriminate payloads, with added
@@ -54,7 +54,7 @@ import Builtin
 //      case a:     0  0  0  0  0  0  0  1 | 1
 //      case b:     1  0  0  0  0  0  0  1 | 1
 //      case c:     0  1  0  0  0  0  0  1 | 1
-// CHECK: %O4enum23MultiPayloadOneSpareBit = type <{ i64, i1 }>
+// CHECK: %O4enum23MultiPayloadOneSpareBit = type <{ [8 x i8], [1 x i8] }>
 
 // -- Multi-payload enum, two spare bits. Same as above, except we have enough
 //    spare bits not to require any added tag bits.
@@ -64,7 +64,7 @@ import Builtin
 //      case a:     0  0  0  0  0  0  1  1
 //      case b:     1  0  0  0  0  0  1  1
 //      case c:     0  1  0  0  0  0  1  1
-// CHECK: %O4enum24MultiPayloadTwoSpareBits = type <{ i64 }>
+// CHECK: %O4enum24MultiPayloadTwoSpareBits = type <{ [8 x i8] }>
 
 // -- Dynamic enums. The type layout is opaque; we dynamically bitcast to
 //    the element type.
@@ -508,9 +508,8 @@ entry(%0 : $Builtin.Int64):
 // CHECK: entry:
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum18SinglePayloadNoXI2* %1 to i64*
 // CHECK:   store i64 %0, i64* [[DATA_ADDR]], align 8
-// CHECK:   [[T0:%.*]] = bitcast %O4enum18SinglePayloadNoXI2* %1 to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i32 8
-// CHECK:   [[TAG_ADDR:%.*]] = bitcast i8* [[T1]] to i1*
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum18SinglePayloadNoXI2* %1, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
 // CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
@@ -535,11 +534,10 @@ entry:
 
 // CHECK: define void @single_payload_no_xi_inject_y_indirect(%O4enum18SinglePayloadNoXI2*) {
 // CHECK: entry:
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum18SinglePayloadNoXI2* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum18SinglePayloadNoXI2* %0 to i64*
 // CHECK:   store i64 0, i64* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[T0:%.*]] = bitcast %O4enum18SinglePayloadNoXI2* %0 to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i32 8
-// CHECK:   [[TAG_ADDR:%.*]] = bitcast i8* [[T1]] to i1*
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum18SinglePayloadNoXI2* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
 // CHECK:   store i1 true, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
@@ -754,7 +752,7 @@ end:
 
 sil @single_payload_spare_bit_switch_indirect : $[thin] ([inout] SinglePayloadSpareBit) -> () {
 entry(%u : $*SinglePayloadSpareBit):
-// CHECK:  [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum21SinglePayloadSpareBit* %0, i32 0, i32 0
+// CHECK:  [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i64*
 // CHECK:  [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]]
 // CHECK:  switch i64 [[PAYLOAD]]
   destructive_switch_enum_addr %u : $*SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!enumelt.1: x_dest, case #SinglePayloadSpareBit.y!enumelt: y_dest, case #SinglePayloadSpareBit.z!enumelt: z_dest
@@ -819,7 +817,7 @@ entry:
 
 // CHECK: define void @single_payload_spare_bit_inject_y_indirect(%O4enum21SinglePayloadSpareBit*) {
 // CHECK: entry:
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum21SinglePayloadSpareBit* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i64*
 // --                0x8000_0000_0000_0000
 // CHECK:   store i64 -9223372036854775808, i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   ret void
@@ -1042,11 +1040,10 @@ end:
 // CHECK: define void @multi_payload_no_spare_bits_switch_indirect(%O4enum23MultiPayloadNoSpareBits*) {
 sil @multi_payload_no_spare_bits_switch_indirect : $([inout] MultiPayloadNoSpareBits) -> () {
 entry(%u : $*MultiPayloadNoSpareBits):
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum23MultiPayloadNoSpareBits* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i64*
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[T0:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i32 8
-// CHECK:   [[TAG_ADDR:%.*]] = bitcast i8* [[T1]] to i2*
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadNoSpareBits* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i2*
 // CHECK:   [[TAG:%.*]] = load i2* [[TAG_ADDR]], align 8
 // CHECK:   switch i2 [[TAG]]
 // CHECK:   switch i64 [[PAYLOAD]]
@@ -1100,9 +1097,8 @@ entry(%0 : $Builtin.Int64):
 // CHECK: entry:
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %1 to i64*
 // CHECK:   store i64 %0, i64* [[DATA_ADDR]], align 8
-// CHECK:   [[T0:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %1 to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i32 8
-// CHECK:   [[TAG_ADDR:%.*]] = bitcast i8* [[T1]] to i2*
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadNoSpareBits* %1, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i2*
 // CHECK:   store i2 0, i2* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
@@ -1153,11 +1149,10 @@ entry:
 
 // CHECK: define void @multi_payload_no_spare_bit_inject_a_indirect(%O4enum23MultiPayloadNoSpareBits*) {
 // CHECK: entry:
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum23MultiPayloadNoSpareBits* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i64*
 // CHECK:   store i64 0, i64* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[T0:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i32 8
-// CHECK:   [[TAG_ADDR:%.*]] = bitcast i8* [[T1]] to i2*
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadNoSpareBits* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i2*
 // CHECK:   store i2 -1, i2* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
@@ -1285,11 +1280,10 @@ end:
 
 sil @multi_payload_one_spare_bit_switch_indirect : $([inout] MultiPayloadOneSpareBit) -> () {
 entry(%u : $*MultiPayloadOneSpareBit):
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i64*
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[T0:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i32 8
-// CHECK:   [[TAG_ADDR:%.*]] = bitcast i8* [[T1]] to i1*
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
 // CHECK:   [[TAG:%.*]] = load i1* [[TAG_ADDR]], align 8
 // CHECK:   switch i2 {{%.*}}
 // CHECK:   switch i64 [[PAYLOAD]]
@@ -1301,7 +1295,7 @@ entry(%u : $*MultiPayloadOneSpareBit):
 // CHECK:   bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i62*
 
 // CHECK: ; <label>:[[Y_PREDEST:[0-9]+]]
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i64*
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]]
 // --                                                   0x7FFF_FFFF_FFFF_FFFF
 // CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
@@ -1351,14 +1345,13 @@ entry(%0 : $Builtin.Int62):
 // CHECK: entry:
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i62*
 // CHECK:   store i62 %0, i62* [[DATA_ADDR]], align 8
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit* %1, i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i64*
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
 // --                                                   0x7FFF_FFFF_FFFF_FFFF
 // CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
 // CHECK:   store i64 [[PAYLOAD_MASKED]], i64* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[T0:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i32 8
-// CHECK:   [[TAG_ADDR:%.*]] = bitcast i8* [[T1]] to i1*
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit* %1, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
 // CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
@@ -1390,16 +1383,15 @@ entry(%0 : $Builtin.Int63):
 // CHECK: entry:
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i63*
 // CHECK:   store i63 %0, i63* [[DATA_ADDR]], align 8
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit* %1, i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i64*
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
 // --                                                   0x7FFF_FFFF_FFFF_FFFF
 // CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
 // --                                                          0x8000_0000_0000_0000
 // CHECK:   [[PAYLOAD_TAGGED:%.*]] = or i64 [[PAYLOAD_MASKED]], -9223372036854775808
 // CHECK:   store i64 [[PAYLOAD_TAGGED]], i64* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[T0:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i32 8
-// CHECK:   [[TAG_ADDR:%.*]] = bitcast i8* [[T1]] to i1*
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit* %1, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
 // CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
@@ -1439,12 +1431,11 @@ entry:
 
 // CHECK: define void @multi_payload_one_spare_bit_inject_a_indirect(%O4enum23MultiPayloadOneSpareBit*) {
 // CHECK: entry:
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i64*
 // --                0x8000_0000_0000_0000
 // CHECK:   store i64 -9223372036854775808, i64* [[PAYLOAD_ADDR]], align 8
-// CHECK:   [[T0:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i32 8
-// CHECK:   [[TAG_ADDR:%.*]] = bitcast i8* [[T1]] to i1*
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
 // CHECK:   store i1 true, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
@@ -1586,7 +1577,7 @@ entry(%0 : $Builtin.Int62):
 // CHECK: entry:
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i62*
 // CHECK:   store i62 %0, i62* [[DATA_ADDR]], align 8
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum24MultiPayloadTwoSpareBits* %1, i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i64*
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
 // --                                                   0x3FFF_FFFF_FFFF_FFFF
 // CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 4611686018427387903
@@ -1619,7 +1610,7 @@ entry(%0 : $Builtin.Int60):
 // CHECK: entry:
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i60*
 // CHECK:   store i60 %0, i60* [[DATA_ADDR]], align 8
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum24MultiPayloadTwoSpareBits* %1, i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i64*
 // CHECK:   [[PAYLOAD:%.*]] = load i64* [[PAYLOAD_ADDR]], align 8
 // --                                                   0x3FFF_FFFF_FFFF_FFFF
 // CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 4611686018427387903
@@ -1663,7 +1654,7 @@ entry:
 
 // CHECK: define void @multi_payload_two_spare_bits_inject_a_indirect(%O4enum24MultiPayloadTwoSpareBits*) {
 // CHECK: entry:
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %O4enum24MultiPayloadTwoSpareBits* %0, i32 0, i32 0
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %0 to i64*
 // --                0xC000_0000_0000_0000
 // CHECK:   store i64 -4611686018427387904, i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   ret void

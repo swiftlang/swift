@@ -776,12 +776,40 @@ namespace {
   /// Common base class for enums with one or more cases with data.
   class PayloadEnumImplStrategyBase : public EnumImplStrategy {
   protected:
+    llvm::IntegerType *payloadTy = nullptr, *extraTagTy = nullptr;
+    
     // The number of extra tag bits outside of the payload required to
     // discriminate enum cases.
     unsigned ExtraTagBitCount = ~0u;
     // The number of possible values for the extra tag bits that are used.
     // Log2(NumExtraTagValues - 1) + 1 == ExtraTagBitCount
     unsigned NumExtraTagValues = ~0u;
+
+    void setTaggedEnumBody(IRGenModule &IGM,
+                           llvm::StructType *bodyStruct,
+                           unsigned payloadBits, unsigned extraTagBits) {
+      // LLVM's ABI rules for I.O.U.S. (Integer Of Unusual Size) types is to
+      // pad them out as if aligned to the largest native integer type, even
+      // inside "packed" structs, so to accurately lay things out, we use
+      // i8 arrays for the payload and extra tag bits.
+      auto payloadArrayTy = llvm::ArrayType::get(IGM.Int8Ty,
+                                                 (payloadBits+7U)/8U);
+      payloadTy = llvm::IntegerType::get(IGM.getLLVMContext(),
+                                         payloadBits);
+      
+      if (extraTagBits > 0) {
+        auto extraTagArrayTy = llvm::ArrayType::get(IGM.Int8Ty,
+                                                    (extraTagBits+7U)/8U);
+        llvm::Type *body[] = { payloadArrayTy, extraTagArrayTy };
+        bodyStruct->setBody(body, /*isPacked*/true);
+        
+        extraTagTy = llvm::IntegerType::get(IGM.getLLVMContext(),
+                                            extraTagBits);
+      } else {
+        llvm::Type *body[] = { payloadArrayTy };
+        bodyStruct->setBody(body, /*isPacked*/true);
+      }
+    }
 
   public:
     PayloadEnumImplStrategyBase(TypeInfoKind tik, unsigned NumElements,
@@ -796,8 +824,6 @@ namespace {
       assert(ElementsWithPayload.size() >= 1);
     }
     
-    virtual Size getExtraTagBitOffset() const = 0;
-    
     void getSchema(ExplosionSchema &schema) const override {
       if (TIK < Loadable) {
         schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
@@ -805,11 +831,9 @@ namespace {
         return;
       }
       
-      schema.add(ExplosionSchema::Element::forScalar(
-                                         getStorageType()->getElementType(0)));
+      schema.add(ExplosionSchema::Element::forScalar(payloadTy));
       if (ExtraTagBitCount > 0)
-        schema.add(ExplosionSchema::Element::forScalar(
-                                         getStorageType()->getElementType(1)));
+        schema.add(ExplosionSchema::Element::forScalar(extraTagTy));
     }
     
     unsigned getExplosionSize(ExplosionKind kind) const override {
@@ -817,21 +841,17 @@ namespace {
     }
     
     Address projectPayload(IRGenFunction &IGF, Address addr) const {
-      return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
+      // FIXME: The large integer payload type touches too much
+      // memory.
+      return IGF.Builder.CreateBitCast(addr, payloadTy->getPointerTo());
     }
 
     Address projectExtraTagBits(IRGenFunction &IGF, Address addr) const {
       assert(ExtraTagBitCount > 0 && "does not have extra tag bits");
-      // The place LLVM naturally places the extra tag bits isn't necessarily
-      // where we want it. E.g., if our layout is as {i72, i1}, then the
-      // i72 will likely take up 128 bits of storage and be 64-bit-aligned, when
-      // we really want the tag bit to be allocated right after the 72-bit
-      // payload.
-      addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.Int8PtrTy);
-      addr = IGF.Builder.CreateConstByteArrayGEP(addr,
-                                                 getExtraTagBitOffset());
-      return IGF.Builder.CreateBitCast(addr,
-                         getStorageType()->getElementType(1)->getPointerTo());
+
+      addr = IGF.Builder.CreateStructGEP(addr, 1,
+                                         Size(payloadTy->getBitWidth()/8U));
+      return IGF.Builder.CreateBitCast(addr, extraTagTy->getPointerTo());
     }
 
     void loadForSwitch(IRGenFunction &IGF, Address addr, Explosion &e)
@@ -981,10 +1001,6 @@ namespace {
       return projectPayloadData(IGF, enumAddr);
     }
     
-    Size getExtraTagBitOffset() const override {
-      return getFixedPayloadTypeInfo().getFixedSize();
-    }
-    
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
                                       CanType type,
                                       EnumDecl *theEnum,
@@ -1024,16 +1040,14 @@ namespace {
       UnpackEnumPayload unpack(IGF, outerPayload);
       
       // Unpack our inner payload.
-      dest.add(unpack.claimAtOffset(getStorageType()->getElementType(0),
-                                    offset));
+      dest.add(unpack.claimAtOffset(payloadTy, offset));
       
       // Unpack our extra tag bits, if any.
       if (ExtraTagBitCount > 0) {
         unsigned extraTagOffset
           = getFixedPayloadTypeInfo().getFixedSize().getValueInBits() + offset;
         
-        dest.add(unpack.claimAtOffset(getStorageType()->getElementType(1),
-                                      extraTagOffset));
+        dest.add(unpack.claimAtOffset(extraTagTy, extraTagOffset));
       }
     }
     
@@ -1819,10 +1833,6 @@ namespace {
                                       EnumDecl *theEnum,
                                       llvm::StructType *enumTy) override;
     
-    Size getExtraTagBitOffset() const override {
-      return Size((CommonSpareBits.size()+7U)/8U);
-    }
-    
   private:
     /// The number of empty cases representable by each tag value.
     /// Equal to the size of the payload minus the spare bits used for tags.
@@ -2036,11 +2046,10 @@ namespace {
                             Explosion &dest, unsigned offset) const override {
       UnpackEnumPayload unpack(IGF, outerPayload);
       // Unpack the payload.
-      dest.add(unpack.claimAtOffset(getStorageType()->getElementType(0),
-                                    offset));
+      dest.add(unpack.claimAtOffset(payloadTy, offset));
       // Unpack the extra bits, if any.
       if (ExtraTagBitCount > 0) {
-        dest.add(unpack.claimAtOffset(getStorageType()->getElementType(1),
+        dest.add(unpack.claimAtOffset(extraTagTy,
                                       CommonSpareBits.size() + offset));
       }
     }
@@ -2911,24 +2920,6 @@ namespace {
     return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
                                      enumTy, tagSize, std::move(spareBits),
                                      Alignment(tagBytes), IsPOD));
-  }
-  
-  static void setTaggedEnumBody(IRGenModule &IGM,
-                                 llvm::StructType *bodyStruct,
-                                 unsigned payloadBits, unsigned extraTagBits) {
-
-    auto payloadEnumTy = llvm::IntegerType::get(IGM.getLLVMContext(),
-                                                 payloadBits);
-
-    if (extraTagBits > 0) {
-      auto extraTagTy = llvm::IntegerType::get(IGM.getLLVMContext(),
-                                               extraTagBits);
-      llvm::Type *body[] = { payloadEnumTy, extraTagTy };
-      bodyStruct->setBody(body, /*isPacked*/true);
-    } else {
-      llvm::Type *body[] = { payloadEnumTy };
-      bodyStruct->setBody(body, /*isPacked*/true);
-    }
   }
   
   TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
