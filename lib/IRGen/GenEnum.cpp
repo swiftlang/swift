@@ -2852,7 +2852,7 @@ namespace {
                                                    EnumDecl *theEnum,
                                                    llvm::StructType *enumTy) {
     if (ElementsWithPayload.empty()) {
-      enumTy->setBody(ArrayRef<llvm::Type*>{});
+      enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
       return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
                                                              Size(0), {},
                                                              Alignment(1),
@@ -2863,9 +2863,9 @@ namespace {
       // Use the singleton element's storage type if fixed-size.
       if (eltTI.isFixedSize()) {
         llvm::Type *body[] = { eltTI.StorageType };
-        enumTy->setBody(body);
+        enumTy->setBody(body, /*isPacked*/ true);
       } else {
-        enumTy->setBody(ArrayRef<llvm::Type*>{});
+        enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
       }
       
       if (TIK <= Opaque) {
@@ -2900,7 +2900,7 @@ namespace {
     Size tagSize(tagBytes);
     
     llvm::Type *body[] = { tagTy };
-    enumTy->setBody(body);
+    enumTy->setBody(body, /*isPacked*/true);
     
     // Unused tag bits in the physical size can be used as spare bits.
     // TODO: We can use all values greater than the largest discriminator as
@@ -2924,10 +2924,10 @@ namespace {
       auto extraTagTy = llvm::IntegerType::get(IGM.getLLVMContext(),
                                                extraTagBits);
       llvm::Type *body[] = { payloadEnumTy, extraTagTy };
-      bodyStruct->setBody(body);
+      bodyStruct->setBody(body, /*isPacked*/true);
     } else {
       llvm::Type *body[] = { payloadEnumTy };
-      bodyStruct->setBody(body);
+      bodyStruct->setBody(body, /*isPacked*/true);
     }
   }
   
@@ -2991,7 +2991,7 @@ namespace {
                                                   llvm::StructType *enumTy) {
     // The body is runtime-dependent, so we can't put anything useful here
     // statically.
-    enumTy->setBody(ArrayRef<llvm::Type*>{});
+    enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/true);
 
     // Layout has to be done when the value witness table is instantiated,
     // during initializeValueWitnessTable.

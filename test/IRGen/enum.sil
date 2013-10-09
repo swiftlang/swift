@@ -3,37 +3,37 @@
 import Builtin
 
 // -- Singleton enum. The representation is just the singleton payload.
-// CHECK: %O4enum9Singleton = type { { i64, i64 } }
+// CHECK: %O4enum9Singleton = type <{ <{ i64, i64 }> }>
 
 // -- No-payload enums. The representation is just an enum tag.
-// CHECK: %O4enum10NoPayloads = type { i2 }
-// CHECK: %O4enum11NoPayloads2 = type { i3 }
+// CHECK: %O4enum10NoPayloads = type <{ i2 }>
+// CHECK: %O4enum11NoPayloads2 = type <{ i3 }>
 
 // -- Single-payload enum, no extra inhabitants in the payload type. The
 //    representation adds a tag bit to distinguish payload from enum tag:
 //      case x(i64): X0 X1 X2 ... X63 | 0, where X0...X63 are the payload bits
 //      case y:      0  0  0  ... 0   | 1
 //      case z:      1  0  0  ... 0   | 1
-// CHECK: %O4enum17SinglePayloadNoXI = type { i64, i1 }
-// CHECK: %O4enum18SinglePayloadNoXI2 = type { i64, i1 }
+// CHECK: %O4enum17SinglePayloadNoXI = type <{ i64, i1 }>
+// CHECK: %O4enum18SinglePayloadNoXI2 = type <{ i64, i1 }>
 
 // -- Single-payload enum, spare bits. The representation uses a tag bit
 //    out of the payload to distinguish payload from enum tag:
 //      case x(i3): X0 X1 X2 0 0 0 0 0
 //      case y:     0  0  0  1 0 0 0 0
 //      case z:     1  0  0  1 0 0 0 0
-// CHECK: %O4enum21SinglePayloadSpareBit = type { i64 }
+// CHECK: %O4enum21SinglePayloadSpareBit = type <{ i64 }>
 
 // -- Single-payload enum containing a no-payload enum as its payload.
 //    The representation takes extra inhabitants starting after the greatest
 //    discriminator value used by the nested no-payload enum.
-// CHECK: %O4enum19SinglePayloadNested = type { i8 }
+// CHECK: %O4enum19SinglePayloadNested = type <{ i8 }>
 
 // -- Single-payload enum containing another single-payload enum as its
 //    payload.
 //    The representation takes extra inhabitants from the nested enum's payload
 //    that were unused by the nested enum.
-// CHECK: %O4enum25SinglePayloadNestedNested = type { i8 }
+// CHECK: %O4enum25SinglePayloadNestedNested = type <{ i8 }>
 
 // -- Multi-payload enum, no spare bits. The representation adds tag bits
 //    to discriminate payloads. No-payload cases all share a tag.
@@ -43,7 +43,7 @@ import Builtin
 //      case a:     0  0  0  ... 0  0  | 1 1
 //      case b:     1  0  0  ... 0  0  | 1 1
 //      case c:     0  1  0  ... 0  0  | 1 1
-// CHECK: %O4enum23MultiPayloadNoSpareBits = type { i64, i2 }
+// CHECK: %O4enum23MultiPayloadNoSpareBits = type <{ i64, i2 }>
 
 // -- Multi-payload enum, one spare bit. The representation uses spare bits
 //    common to all payloads to partially discriminate payloads, with added
@@ -54,7 +54,7 @@ import Builtin
 //      case a:     0  0  0  0  0  0  0  1 | 1
 //      case b:     1  0  0  0  0  0  0  1 | 1
 //      case c:     0  1  0  0  0  0  0  1 | 1
-// CHECK: %O4enum23MultiPayloadOneSpareBit = type { i64, i1 }
+// CHECK: %O4enum23MultiPayloadOneSpareBit = type <{ i64, i1 }>
 
 // -- Multi-payload enum, two spare bits. Same as above, except we have enough
 //    spare bits not to require any added tag bits.
@@ -64,12 +64,12 @@ import Builtin
 //      case a:     0  0  0  0  0  0  1  1
 //      case b:     1  0  0  0  0  0  1  1
 //      case c:     0  1  0  0  0  0  1  1
-// CHECK: %O4enum24MultiPayloadTwoSpareBits = type { i64 }
+// CHECK: %O4enum24MultiPayloadTwoSpareBits = type <{ i64 }>
 
 // -- Dynamic enums. The type layout is opaque; we dynamically bitcast to
 //    the element type.
-// CHECK: %O4enum20DynamicSinglePayload = type {}
-// CHECK: %O4enum16DynamicSingleton = type {}
+// CHECK: %O4enum20DynamicSinglePayload = type <{}>
+// CHECK: %O4enum16DynamicSingleton = type <{}>
 
 // -- Dynamic metadata template carries a value witness table pattern
 //    we fill in on instantiation.
@@ -174,10 +174,10 @@ dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
 // CHECK: entry:
 // CHECK:   br label %[[PREDEST:[0-9]+]]
 // CHECK: ; <label>:[[PREDEST]]
-// CHECK:   [[ADDR:%.*]] = bitcast %O4enum9Singleton* %0 to { i64, i64 }*
+// CHECK:   [[ADDR:%.*]] = bitcast %O4enum9Singleton* %0 to <{ i64, i64 }>*
 // CHECK:   br label %[[DEST:[0-9]+]]
 // CHECK: ; <label>:[[DEST]]
-// CHECK:   phi { i64, i64 }* [ [[ADDR]], %[[PREDEST]] ]
+// CHECK:   phi <{ i64, i64 }>* [ [[ADDR]], %[[PREDEST]] ]
 // CHECK:   ret void
 // CHECK: }
 sil @singleton_switch_indirect : $([inout] Singleton) -> () {
@@ -203,10 +203,10 @@ entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
 
 // CHECK: define void @singleton_inject_indirect(i64, i64, %O4enum9Singleton*) {
 // CHECK: entry:
-// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum9Singleton* %2 to { i64, i64 }*
-// CHECK:   [[DATA_0_ADDR:%.*]] = getelementptr inbounds { i64, i64 }* [[DATA_ADDR]], i32 0, i32 0
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum9Singleton* %2 to <{ i64, i64 }>*
+// CHECK:   [[DATA_0_ADDR:%.*]] = getelementptr inbounds <{ i64, i64 }>* [[DATA_ADDR]], i32 0, i32 0
 // CHECK:   store i64 %0, i64* [[DATA_0_ADDR]], align 8
-// CHECK:   [[DATA_1_ADDR:%.*]] = getelementptr inbounds { i64, i64 }* [[DATA_ADDR]], i32 0, i32 1
+// CHECK:   [[DATA_1_ADDR:%.*]] = getelementptr inbounds <{ i64, i64 }>* [[DATA_ADDR]], i32 0, i32 1
 // CHECK:   store i64 %1, i64* [[DATA_1_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }

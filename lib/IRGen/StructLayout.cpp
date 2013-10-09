@@ -211,14 +211,7 @@ void StructLayoutBuilder::addFixedSizeElement(ElementLayout &elt) {
       = eltAlignment.getValue() - offsetFromAlignment.getValue();
     assert(paddingRequired != 0);
 
-    // We don't actually need to uglify the IR unless the natural
-    // alignment of the IR type for the field isn't good enough.
-    // We also don't need to bother actually adding an IR field if
-    // the field can't be statically accessed.
-    Alignment fieldIRAlignment(
-          IGM.DataLayout.getABITypeAlignment(eltTI.StorageType));
-    assert(fieldIRAlignment <= eltAlignment);
-    if (fieldIRAlignment != eltAlignment && isFixedLayout()) {
+    if (isFixedLayout()) {
       auto paddingTy = llvm::ArrayType::get(IGM.Int8Ty, paddingRequired);
       StructFields.push_back(paddingTy);
     }
@@ -292,11 +285,13 @@ void StructLayoutBuilder::addNonFixedSizeElementAtOffsetZero(ElementLayout &elt)
 
 /// Produce the current fields as an anonymous structure.
 llvm::StructType *StructLayoutBuilder::getAsAnonStruct() const {
-  return llvm::StructType::get(IGM.getLLVMContext(), StructFields);
+  auto ty = llvm::StructType::get(IGM.getLLVMContext(), StructFields,
+                                  /*isPacked*/ true);
+  return ty;
 }
 
 /// Set the current fields as the body of the given struct type.
 void StructLayoutBuilder::setAsBodyOfStruct(llvm::StructType *type) const {
   assert(type->isOpaque());
-  type->setBody(StructFields);
+  type->setBody(StructFields, /*isPacked*/ true);
 }

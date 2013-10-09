@@ -3,9 +3,9 @@
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[REF:%swift.refcounted]] = type
-// CHECK: [[C:%C7unowned1C]] = type { [[REF]] }
+// CHECK: [[C:%C7unowned1C]] = type <{ [[REF]] }>
 // CHECK: [[UNKNOWN:%objc_object]] = type opaque
-// CHECK: [[A:%V7unowned1A]] = type { [[C]]* }
+// CHECK: [[A:%V7unowned1A]] = type <{ [[C]]* }>
 
 class C {}
 protocol [class_protocol] P {
