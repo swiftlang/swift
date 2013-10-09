@@ -334,15 +334,5 @@ const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
 
   // Build the type.
   StructTypeBuilder builder(IGM, ty, type);
-  auto ti = builder.layout(fields);
-//@@@@@@@@@
-  type->dump();
-  ti->getStorageType()->dump();
-  llvm::errs() << '\n';
-  ExplosionSchema s = ti->getSchema(ExplosionKind::Minimal);
-  if (s.isSingleAggregate()) {
-    ExplosionSchema s2(ExplosionKind::Minimal);
-    ti->getSchema(s2);
-  }
-  return ti;
+  return builder.layout(fields);
 }
