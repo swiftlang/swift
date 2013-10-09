@@ -295,16 +295,16 @@ void swift::performAutoImport(SourceFile &SF) {
 
 template<typename OP_DECL>
 static void insertOperatorDecl(NameBinder &Binder,
-                               llvm::StringMap<OP_DECL*> &Operators,
+                               SourceFile::IdentifierMap<OP_DECL*> &Operators,
                                OP_DECL *OpDecl) {
-  auto previousDecl = Operators.find(OpDecl->getName().get());
+  auto previousDecl = Operators.find(OpDecl->getName());
   if (previousDecl != Operators.end()) {
     Binder.diagnose(OpDecl->getLoc(), diag::operator_redeclared);
-    Binder.diagnose(previousDecl->getValue(), diag::previous_operator_decl);
+    Binder.diagnose(previousDecl->second, diag::previous_operator_decl);
     return;
   }
   
-  Operators[OpDecl->getName().get()] = OpDecl;
+  Operators[OpDecl->getName()] = OpDecl;
 }
 
 namespace {

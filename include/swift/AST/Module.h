@@ -370,20 +370,23 @@ public:
   /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
 
+  template <typename T>
+  using IdentifierMap = llvm::DenseMap<Identifier, T>;
+
   /// A map of operator names to InfixOperatorDecls.
   /// Populated during name binding; the mapping will be incomplete until name
   /// binding is complete.
-  llvm::StringMap<InfixOperatorDecl*> InfixOperators;
+  IdentifierMap<InfixOperatorDecl*> InfixOperators;
 
   /// A map of operator names to PostfixOperatorDecls.
   /// Populated during name binding; the mapping will be incomplete until name
   /// binding is complete.
-  llvm::StringMap<PostfixOperatorDecl*> PostfixOperators;
+  IdentifierMap<PostfixOperatorDecl*> PostfixOperators;
 
   /// A map of operator names to PrefixOperatorDecls.
   /// Populated during name binding; the mapping will be incomplete until name
   /// binding is complete.
-  llvm::StringMap<PrefixOperatorDecl*> PrefixOperators;
+  IdentifierMap<PrefixOperatorDecl*> PrefixOperators;
 
   enum SourceKind {
     Library,  ///< A normal .swift file.

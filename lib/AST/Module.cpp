@@ -831,13 +831,17 @@ void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) {
 }
 
 namespace {
+
+template <typename T>
+using IdentifierMap = SourceFile::IdentifierMap<T>;
+
 // Returns Nothing on error, Optional(nullptr) if no operator decl found, or
 // Optional(decl) if decl was found.
 template<typename OP_DECL>
 Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
-                          SourceLoc Loc,
-                          Identifier Name,
-                          llvm::StringMap<OP_DECL *> SourceFile::*OP_MAP)
+    SourceLoc Loc,
+    Identifier Name,
+    IdentifierMap<OP_DECL *> SourceFile::*OP_MAP)
 {
   if (auto loadedModule = dyn_cast<LoadedModule>(M))
     return loadedModule->lookupOperator<OP_DECL>(Name);
@@ -847,9 +851,9 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
     return Nothing;
 
   // Look for an operator declaration in the current module.
-  auto found = (TU->MainSourceFile->*OP_MAP).find(Name.get());
+  auto found = (TU->MainSourceFile->*OP_MAP).find(Name);
   if (found != (TU->MainSourceFile->*OP_MAP).end())
-    return found->getValue()? Optional<OP_DECL *>(found->getValue()) : Nothing;
+    return found->second ? Optional<OP_DECL *>(found->second) : Nothing;
   
   // Look for imported operator decls.
   
@@ -867,13 +871,13 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
   // If we found a single import, use it.
   if (importedOperators.empty()) {
     // Cache the mapping so we don't need to troll imports next time.
-    (TU->MainSourceFile->*OP_MAP)[Name.get()] = nullptr;
+    (TU->MainSourceFile->*OP_MAP)[Name] = nullptr;
     return Nothing;
   }
   if (importedOperators.size() == 1) {
     // Cache the mapping so we don't need to troll imports next time.
     OP_DECL *result = *importedOperators.begin();
-    (TU->MainSourceFile->*OP_MAP)[Name.get()] = result;
+    (TU->MainSourceFile->*OP_MAP)[Name] = result;
     return result;
   }
   
@@ -892,7 +896,7 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
     }
   }
   // Cache the mapping so we don't need to troll imports next time.
-  (TU->MainSourceFile->*OP_MAP)[Name.get()] = first;
+  (TU->MainSourceFile->*OP_MAP)[Name] = first;
   return first;
 }
 } // end anonymous namespace
