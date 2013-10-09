@@ -1124,6 +1124,9 @@ public:
     addKeyword("__LINE__", "Int");
     addKeyword("__COLUMN__", "Int");
 
+    if (Ctx.LangOpts.Axle)
+      addAxleSugarTypeCompletions(/*metatypeAnnotation=*/true);
+
     CompletionContext.includeUnqualifiedClangResults();
   }
 
@@ -1137,6 +1140,52 @@ public:
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::TypeInDeclContext;
     lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(), Loc);
+
+    if (Ctx.LangOpts.Axle)
+      addAxleSugarTypeCompletions(/*metatypeAnnotation=*/false);
+  }
+
+private:
+  void addAxleSugarTypeCompletions(bool metatypeAnnotation) {
+    {
+      // Vec<type, length>
+      CodeCompletionResultBuilder Builder(
+                                    CompletionContext,
+                                    CodeCompletionResult::ResultKind::Pattern,
+                                    SemanticContextKind::None);
+      Builder.addTextChunk("Vec");
+      Builder.addLeftAngle();
+      Builder.addGenericParameter("type");
+      Builder.addComma(", ");
+      Builder.addGenericParameter("length");
+      Builder.addRightAngle();
+
+      if (metatypeAnnotation) {
+        Builder.addTypeAnnotation("Vec<...>.metatype");
+      }
+    }
+
+    {
+      // Matrix<type, rows, columns>
+      CodeCompletionResultBuilder Builder(
+                                    CompletionContext,
+                                    CodeCompletionResult::ResultKind::Pattern,
+                                    SemanticContextKind::None);
+      Builder.addTextChunk("Matrix");
+      Builder.addLeftAngle();
+      Builder.addGenericParameter("type");
+      Builder.addComma(", ");
+      Builder.addGenericParameter("rows");
+      // FIXME: Make this a default argument.
+      Builder.addComma(", ");
+      Builder.addGenericParameter("columns");
+      Builder.addRightAngle();
+
+      if (metatypeAnnotation) {
+        Builder.addTypeAnnotation("Matrix<...>.metatype");
+      }
+    }
+
   }
 };
 
