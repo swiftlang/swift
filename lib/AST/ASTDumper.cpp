@@ -363,7 +363,7 @@ namespace {
 
     void visitTranslationUnit(const TranslationUnit *TU) {
       OS.indent(Indent) << "(translation_unit";
-      for (Decl *D : TU->Decls) {
+      for (Decl *D : TU->MainSourceFile->Decls) {
         if (D->isImplicit())
           continue;
 

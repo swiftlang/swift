@@ -37,7 +37,7 @@ bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
         parseIntoTranslationUnit(TU, RC.CurBufferID, &Done, nullptr,
                                  &PersistentState);
     performTypeChecking(TU, CurTUElem);
-    CurTUElem = TU->Decls.size();
+    CurTUElem = TU->MainSourceFile->Decls.size();
   } while (!Done);
   return FoundAnySideEffects;
 }

@@ -47,7 +47,7 @@ namespace {
     ASTContext &Context;
 
     NameBinder(TranslationUnit *TU) : TU(TU), Context(TU->Ctx) {
-      for (auto importPair : TU->getImports()) {
+      for (auto importPair : TU->MainSourceFile->getImports()) {
         Module *M = importPair.first.second;
         // Don't add the builtin module to the LoadedModules list.
         if (isa<BuiltinModule>(M))
@@ -288,7 +288,7 @@ void swift::performAutoImport(TranslationUnit *TU) {
         std::make_pair(TU->Ctx.StdlibModuleName, SourceLoc()));
 
   auto Import = std::make_pair(ImportedModule({}, M), false);
-  TU->setImports(TU->Ctx.AllocateCopy(llvm::makeArrayRef(Import)));
+  TU->MainSourceFile->setImports(TU->Ctx.AllocateCopy(llvm::makeArrayRef(Import)));
 }
 
 //===----------------------------------------------------------------------===//
@@ -345,7 +345,7 @@ namespace {
 void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   // Make sure we skip adding the standard library imports if the
   // translation unit is empty.
-  if (TU->Decls.empty()) {
+  if (TU->MainSourceFile->Decls.empty()) {
     TU->ASTStage = TranslationUnit::NameBound;
     return;
   }
@@ -359,33 +359,33 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   NameBinder Binder(TU);
 
   SmallVector<std::pair<ImportedModule, bool>, 8> ImportedModules;
-  ImportedModules.append(TU->getImports().begin(),
-                         TU->getImports().end());
+  ImportedModules.append(TU->MainSourceFile->getImports().begin(),
+                         TU->MainSourceFile->getImports().end());
 
   // Do a prepass over the declarations to find and load the imported modules
   // and map operator decls.
-  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
-    if (ImportDecl *ID = dyn_cast<ImportDecl>(TU->Decls[i])) {
+  for (unsigned i = StartElem, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
+    if (ImportDecl *ID = dyn_cast<ImportDecl>(TU->MainSourceFile->Decls[i])) {
       if (auto import = Binder.addImport(ID))
         ImportedModules.push_back(*import);
-    } else if (auto *OD = dyn_cast<PrefixOperatorDecl>(TU->Decls[i]))
-      insertOperatorDecl(Binder, TU->PrefixOperators, OD);
-    else if (auto *OD = dyn_cast<PostfixOperatorDecl>(TU->Decls[i]))
-      insertOperatorDecl(Binder, TU->PostfixOperators, OD);
-    else if (auto *OD = dyn_cast<InfixOperatorDecl>(TU->Decls[i]))
-      insertOperatorDecl(Binder, TU->InfixOperators, OD);
+    } else if (auto *OD = dyn_cast<PrefixOperatorDecl>(TU->MainSourceFile->Decls[i]))
+      insertOperatorDecl(Binder, TU->MainSourceFile->PrefixOperators, OD);
+    else if (auto *OD = dyn_cast<PostfixOperatorDecl>(TU->MainSourceFile->Decls[i]))
+      insertOperatorDecl(Binder, TU->MainSourceFile->PostfixOperators, OD);
+    else if (auto *OD = dyn_cast<InfixOperatorDecl>(TU->MainSourceFile->Decls[i]))
+      insertOperatorDecl(Binder, TU->MainSourceFile->InfixOperators, OD);
   }
 
-  if (ImportedModules.size() > TU->getImports().size())
-    TU->setImports(TU->Ctx.AllocateCopy(ImportedModules));
+  if (ImportedModules.size() > TU->MainSourceFile->getImports().size())
+    TU->MainSourceFile->setImports(TU->Ctx.AllocateCopy(ImportedModules));
 
   // FIXME: This algorithm has quadratic memory usage.  (In practice,
   // import statements after the first "chunk" should be rare, though.)
   // FIXME: Can we make this more efficient?
 
   llvm::DenseMap<Identifier, ValueDecl*> CheckTypes;
-  for (unsigned i = 0, e = TU->Decls.size(); i != e; ++i) {
-    Decl *D = TU->Decls[i];
+  for (unsigned i = 0, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
+    Decl *D = TU->MainSourceFile->Decls[i];
     if (D->isInvalid())
       // No need to diagnose redeclarations of invalid declarations, we have
       // already complained about them in some other way.

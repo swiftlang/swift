@@ -1119,7 +1119,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
   
   OS << "\n\nimport Builtin\nimport swift\n\n";
 
-  // Print the declarations and types from teh translation unit.
+  // Print the declarations and types from the translation unit.
   if (TU) {
     // Compute the list of emitted functions, whose AST Decls we do not need to
     // print.
@@ -1134,8 +1134,8 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     Options.VarInitializers = true;
     Options.SkipImplicit = true;
 
-    for (auto ID = TU->Decls.begin(),
-              ED = TU->Decls.end(); ID != ED; ++ID) {
+    for (auto ID = TU->MainSourceFile->Decls.begin(),
+              ED = TU->MainSourceFile->Decls.end(); ID != ED; ++ID) {
       const Decl *D = *ID;
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
           !emittedFunctions.count(D) &&

@@ -190,7 +190,7 @@ void swift::CompilerInstance::doIt() {
                              &PersistentState, DelayedCB.get());
     if (!Invocation.getParseOnly())
       performTypeChecking(TU, CurTUElem);
-    CurTUElem = TU->Decls.size();
+    CurTUElem = TU->MainSourceFile->Decls.size();
   } while (!Done);
 
   if (DelayedCB) {

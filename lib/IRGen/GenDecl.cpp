@@ -573,8 +573,8 @@ void IRGenModule::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) {
   }
 
   // Emit types and other global decls.
-  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
-    emitGlobalDecl(TU->Decls[i]);
+  for (unsigned i = StartElem, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
+    emitGlobalDecl(TU->MainSourceFile->Decls[i]);
   }
 
   // Emit the implicit import of the swift standard libary.

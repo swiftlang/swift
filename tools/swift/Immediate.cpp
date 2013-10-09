@@ -928,8 +928,8 @@ class REPLEnvironment {
 
     if (CI.getASTContext().hadError()) {
       CI.getASTContext().Diags.resetHadAnyError();
-      while (TU->Decls.size() > RC.CurTUElem)
-        TU->Decls.pop_back();
+      while (TU->MainSourceFile->Decls.size() > RC.CurTUElem)
+        TU->MainSourceFile->Decls.pop_back();
       
       // FIXME: Handling of "import" declarations?  Is there any other
       // state which needs to be reset?
@@ -937,7 +937,7 @@ class REPLEnvironment {
       return true;
     }
     
-    RC.CurTUElem = TU->Decls.size();
+    RC.CurTUElem = TU->MainSourceFile->Decls.size();
     
     DumpSource += Line;
     
@@ -1044,7 +1044,7 @@ public:
     if (CI.getASTContext().hadError())
       return;
     
-    RC.CurTUElem = RC.CurIRGenElem = TU->Decls.size();
+    RC.CurTUElem = RC.CurIRGenElem = TU->MainSourceFile->Decls.size();
     
     if (llvm::sys::Process::StandardInIsUserInput())
       printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");    

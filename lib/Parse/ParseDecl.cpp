@@ -87,7 +87,7 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
 
   // Add newly parsed decls to the translation unit.
   for (auto Item : Items)
-    TU->Decls.push_back(Item.get<Decl*>());
+    TU->MainSourceFile->Decls.push_back(Item.get<Decl*>());
 
   // Note that the translation unit is fully parsed and verify it.
   TU->ASTStage = TranslationUnit::Parsed;

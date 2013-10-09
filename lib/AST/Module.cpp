@@ -155,7 +155,7 @@ void TUModuleCache::doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators) {
 }
 
 void TUModuleCache::populateMemberCache(const TranslationUnit &TU) {
-  for (const Decl *D : TU.Decls) {
+  for (const Decl *D : TU.MainSourceFile->Decls) {
     if (const NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
       addToMemberCache(NTD->getMembers());
     } else if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
@@ -182,7 +182,7 @@ void TUModuleCache::addToMemberCache(ArrayRef<Decl*> decls) {
 
 /// Populate our cache on the first name lookup.
 TUModuleCache::TUModuleCache(const TranslationUnit &TU) {
-  doPopulateCache(TU.Decls, false);
+  doPopulateCache(TU.MainSourceFile->Decls, false);
 }
 
 
@@ -357,7 +357,8 @@ void Module::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) {
   }
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    Results.append(TU->Decls.begin(), TU->Decls.end());
+    Results.append(TU->MainSourceFile->Decls.begin(),
+                   TU->MainSourceFile->Decls.end());
     return;
   }
 
@@ -820,7 +821,8 @@ void Module::getDisplayDecls(SmallVectorImpl<Decl*> &results) {
   }
   
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    results.append(TU->Decls.begin(), TU->Decls.end());
+    results.append(TU->MainSourceFile->Decls.begin(),
+                   TU->MainSourceFile->Decls.end());
     return;
   }
   
@@ -835,7 +837,7 @@ template<typename OP_DECL>
 Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
                           SourceLoc Loc,
                           Identifier Name,
-                          llvm::StringMap<OP_DECL *> TranslationUnit::*OP_MAP)
+                          llvm::StringMap<OP_DECL *> SourceFile::*OP_MAP)
 {
   if (auto loadedModule = dyn_cast<LoadedModule>(M))
     return loadedModule->lookupOperator<OP_DECL>(Name);
@@ -845,14 +847,14 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
     return Nothing;
 
   // Look for an operator declaration in the current module.
-  auto found = (TU->*OP_MAP).find(Name.get());
-  if (found != (TU->*OP_MAP).end())
+  auto found = (TU->MainSourceFile.get()->*OP_MAP).find(Name.get());
+  if (found != (TU->MainSourceFile.get()->*OP_MAP).end())
     return found->getValue()? Optional<OP_DECL *>(found->getValue()) : Nothing;
   
   // Look for imported operator decls.
   
   llvm::DenseSet<OP_DECL*> importedOperators;
-  for (auto &imported : TU->getImports()) {
+  for (auto &imported : TU->MainSourceFile->getImports()) {
     Optional<OP_DECL *> maybeOp
       = lookupOperatorDeclForName(imported.first.second, Loc, Name, OP_MAP);
     if (!maybeOp)
@@ -865,13 +867,13 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
   // If we found a single import, use it.
   if (importedOperators.empty()) {
     // Cache the mapping so we don't need to troll imports next time.
-    (TU->*OP_MAP)[Name.get()] = nullptr;
+    (TU->MainSourceFile.get()->*OP_MAP)[Name.get()] = nullptr;
     return Nothing;
   }
   if (importedOperators.size() == 1) {
     // Cache the mapping so we don't need to troll imports next time.
     OP_DECL *result = *importedOperators.begin();
-    (TU->*OP_MAP)[Name.get()] = result;
+    (TU->MainSourceFile.get()->*OP_MAP)[Name.get()] = result;
     return result;
   }
   
@@ -890,7 +892,7 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
     }
   }
   // Cache the mapping so we don't need to troll imports next time.
-  (TU->*OP_MAP)[Name.get()] = first;
+  (TU->MainSourceFile.get()->*OP_MAP)[Name.get()] = first;
   return first;
 }
 } // end anonymous namespace
@@ -898,19 +900,19 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
 Optional<PrefixOperatorDecl *> Module::lookupPrefixOperator(Identifier name,
                                                             SourceLoc diagLoc) {
   return lookupOperatorDeclForName(this, diagLoc, name,
-                                   &TranslationUnit::PrefixOperators);
+                                   &SourceFile::PrefixOperators);
 }
 
 Optional<PostfixOperatorDecl *> Module::lookupPostfixOperator(Identifier name,
                                                             SourceLoc diagLoc) {
   return lookupOperatorDeclForName(this, diagLoc, name,
-                                   &TranslationUnit::PostfixOperators);
+                                   &SourceFile::PostfixOperators);
 }
 
 Optional<InfixOperatorDecl *> Module::lookupInfixOperator(Identifier name,
                                                           SourceLoc diagLoc) {
   return lookupOperatorDeclForName(this, diagLoc, name,
-                                   &TranslationUnit::InfixOperators);
+                                   &SourceFile::InfixOperators);
 }
 
 void
@@ -920,7 +922,7 @@ Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
     return;
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    for (auto importPair : TU->getImports())
+    for (auto importPair : TU->MainSourceFile->getImports())
       if (includePrivate || importPair.second)
         modules.push_back(importPair.first);
     return;
@@ -964,10 +966,10 @@ StringRef Module::getModuleFilename() const {
     return StringRef();
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    if (TU->getImportBufferID() == -1)
+    auto ID = TU->MainSourceFile->getImportBufferID();
+    if (ID == -1)
       return StringRef();
-    return Ctx.SourceMgr->getMemoryBuffer(
-                                TU->getImportBufferID())->getBufferIdentifier();
+    return Ctx.SourceMgr->getMemoryBuffer(ID)->getBufferIdentifier();
   }
 
   ModuleLoader &Owner = cast<LoadedModule>(this)->getOwner();
@@ -1061,7 +1063,7 @@ void TranslationUnit::print(raw_ostream &os) {
 }
 
 void TranslationUnit::print(raw_ostream &os, const PrintOptions &options) {
-  for (auto decl : Decls) {
+  for (auto decl : MainSourceFile->Decls) {
     if (!decl->shouldPrintInContext())
       continue;
 
@@ -1087,7 +1089,7 @@ TranslationUnit::getCachedVisibleDecls() const {
 
 bool TranslationUnit::walk(ASTWalker &Walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(Walker.Parent, this);
-  for (Decl *D : Decls) {
+  for (Decl *D : MainSourceFile->Decls) {
     if (D->walk(Walker))
       return true;
   }

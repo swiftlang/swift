@@ -568,7 +568,7 @@ SILModule *SILModule::constructSIL(TranslationUnit *tu,
                                    unsigned startElem) {
   SILModule *m = new SILModule(tu->getASTContext());
   SILGenModule sgm(*m, tu);
-  for (Decl *D : llvm::makeArrayRef(tu->Decls).slice(startElem))
+  for (Decl *D : llvm::makeArrayRef(tu->MainSourceFile->Decls).slice(startElem))
     sgm.visit(D);
   
   // Emit external definitions used by this translation unit.

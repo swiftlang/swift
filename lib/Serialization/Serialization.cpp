@@ -386,7 +386,7 @@ void Serializer::writeInputFiles(const TranslationUnit *TU,
     SourceFile.emit(ScratchRecord, path);
   }
 
-  for (auto import : TU->getImports()) {
+  for (auto import : TU->MainSourceFile->getImports()) {
     if (import.first.second == TU->Ctx.TheBuiltinModule)
       continue;
 
@@ -1924,7 +1924,7 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU, const SILModule
   writeSILFunctions(M);
 
   DeclTable topLevelDecls, extensionDecls, operatorDecls;
-  for (auto D : TU->Decls) {
+  for (auto D : TU->MainSourceFile->Decls) {
     if (isa<ImportDecl>(D))
       continue;
     else if (auto VD = dyn_cast<ValueDecl>(D)) {

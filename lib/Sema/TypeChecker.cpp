@@ -487,7 +487,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     if (!importTU)
       return;
     // FIXME: Respect the access path?
-    for (auto D : importTU->Decls) {
+    for (auto D : importTU->MainSourceFile->Decls) {
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         bindExtensionDecl(ED, TC);
         if (mayConformToKnownProtocol(ED))
@@ -502,8 +502,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // FIXME: Check for cycles in class inheritance here?
 
   // Type check the top-level elements of the translation unit.
-  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
-    Decl *D = TU->Decls[i];
+  for (unsigned i = StartElem, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
+    Decl *D = TU->MainSourceFile->Decls[i];
     if (isa<TopLevelCodeDecl>(D))
       continue;
 
@@ -519,7 +519,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     llvm::DenseMap<ClassDecl *, ClassState> CheckedClasses;
     SmallVector<ClassDecl *, 16> QueuedClasses;
     for (unsigned i = 0, e = StartElem; i != e; ++i) {
-      ClassDecl *CD = dyn_cast<ClassDecl>(TU->Decls[i]);
+      ClassDecl *CD = dyn_cast<ClassDecl>(TU->MainSourceFile->Decls[i]);
       if (CD)
         CheckedClasses[CD] = CheckNone;
     }
@@ -527,9 +527,9 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     // Find all of the classes and class extensions.
     llvm::DenseMap<ClassDecl *, SmallVector<ExtensionDecl *, 2>>
       Extensions;
-    for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
+    for (unsigned i = StartElem, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
       // We found a class; record it.
-      if (auto classDecl = dyn_cast<ClassDecl>(TU->Decls[i])) {
+      if (auto classDecl = dyn_cast<ClassDecl>(TU->MainSourceFile->Decls[i])) {
         if (CheckedClasses.find(classDecl) == CheckedClasses.end()) {
           QueuedClasses.push_back(classDecl);
           CheckedClasses[classDecl] = CheckAll;
@@ -537,7 +537,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         continue;
       }
 
-      auto ext = dyn_cast<ExtensionDecl>(TU->Decls[i]);
+      auto ext = dyn_cast<ExtensionDecl>(TU->MainSourceFile->Decls[i]);
       if (!ext || ext->isInvalid())
         continue;
 
@@ -588,8 +588,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // pass, which means we can't completely analyze everything. Perform the
   // second pass now.
 
-  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
-    Decl *D = TU->Decls[i];
+  for (unsigned i = StartElem, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
+    Decl *D = TU->MainSourceFile->Decls[i];
     if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       // Immediately perform global name-binding etc.
       TC.typeCheckTopLevelCodeDecl(TLCD);
@@ -624,8 +624,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // FIXME: This check should be earlier to avoid ambiguous overload
   // errors etc.
   llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> CheckOverloads;
-  for (unsigned i = 0, e = TU->Decls.size(); i != e; ++i) {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(TU->Decls[i])) {
+  for (unsigned i = 0, e = TU->MainSourceFile->Decls.size(); i != e; ++i) {
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(TU->MainSourceFile->Decls[i])) {
       // FIXME: I'm not sure this check is really correct.
       if (VD->getName().empty())
         continue;

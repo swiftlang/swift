@@ -211,7 +211,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   }
 
   void checkTranslationUnit(TranslationUnit *TU) {
-    for (Decl *D : TU->Decls) {
+    for (Decl *D : TU->MainSourceFile->Decls) {
       if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D))
         visit(TLCD->getBody());
     }

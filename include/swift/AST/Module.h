@@ -54,6 +54,7 @@ namespace swift {
   class ProtocolConformance;
   class ProtocolDecl;
   struct PrintOptions;
+  class TranslationUnit;
   class TupleType;
   class Type;
   class ValueDecl;
@@ -360,19 +361,14 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(Module));
 };
-  
-/// TranslationUnit - This contains information about all of the decls and
-/// external references in a translation unit, which is one file.
-class TranslationUnit : public Module {
-private:
+
+
+class SourceFile {
   /// This is the list of modules that are imported by this module, with the
   /// second element of the pair declaring whether the module is reexported.
   ///
   /// This is filled in by the Name Binding phase.
-  ArrayRef<std::pair<ImportedModule, bool>> Imports;
-
-  /// The list of libraries specified as link-time dependencies at compile time.
-  ArrayRef<LinkLibrary> LinkLibraries;
+  ArrayRef<std::pair<Module::ImportedModule, bool>> Imports;
 
   /// \brief The buffer ID for the file that was imported as this TU, or -1
   /// if this TU is not an imported TU.
@@ -383,22 +379,12 @@ private:
   ExternalNameLookup *ExternalLookup = nullptr;
 
 public:
-  /// Kind - This is the sort of file the translation unit was parsed for, which
-  /// can affect some type checking and other behavior.
-  enum TUKind {
-    Library,
-    Main,
-    REPL,
-    SIL       // Came from a .sil file.
-  } Kind;
+  /// The translation unit that this file is a part of.
+  TranslationUnit &TU;
 
-  /// If this is true, then the translation unit is allowed to access the
-  /// Builtin module with an explicit import.
-  bool HasBuiltinModuleAccess = false;
-  
   /// The list of top-level declarations for a translation unit.
   std::vector<Decl*> Decls;
-  
+
   /// A map of operator names to InfixOperatorDecls.
   /// Populated during name binding; the mapping will be incomplete until name
   /// binding is complete.
@@ -414,18 +400,54 @@ public:
   /// binding is complete.
   llvm::StringMap<PrefixOperatorDecl*> PrefixOperators;
 
-  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C, TUKind Kind)
-    : Module(ModuleKind::TranslationUnit, Name, Comp, C), Kind(Kind) {
-  }
-  
-  ArrayRef<std::pair<ImportedModule, bool>> getImports() const {
-    assert(ASTStage >= Parsed || Kind == SIL);
+  SourceFile(TranslationUnit &tu) : TU(tu) {}
+
+  ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
     return Imports;
   }
-  void setImports(ArrayRef<std::pair<ImportedModule, bool>> IM) {
+  void setImports(ArrayRef<std::pair<Module::ImportedModule, bool>> IM) {
     Imports = IM;
   }
 
+  /// \brief The buffer ID for the file that was imported as this TU, or -1
+  /// if this is not an imported TU.
+  int getImportBufferID() const { return ImportBufferID; }
+  void setImportBufferID(unsigned BufID) {
+    assert(ImportBufferID == -1 && "Already set!");
+    ImportBufferID = BufID;
+  }
+};
+
+  
+/// TranslationUnit - This contains information about all of the decls and
+/// external references in a translation unit, which is one file.
+class TranslationUnit : public Module {
+private:
+  /// The list of libraries specified as link-time dependencies at compile time.
+  ArrayRef<LinkLibrary> LinkLibraries;
+
+public:
+  // FIXME: Make private.
+  std::unique_ptr<SourceFile> MainSourceFile;
+
+  /// Kind - This is the sort of file the translation unit was parsed for, which
+  /// can affect some type checking and other behavior.
+  enum TUKind {
+    Library,
+    Main,
+    REPL,
+    SIL       // Came from a .sil file.
+  } Kind;
+
+  /// If this is true, then the translation unit is allowed to access the
+  /// Builtin module with an explicit import.
+  bool HasBuiltinModuleAccess = false;
+
+  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C, TUKind Kind)
+    : Module(ModuleKind::TranslationUnit, Name, Comp, C),
+      MainSourceFile(new SourceFile(*this)), Kind(Kind) {
+  }
+  
   void setLinkLibraries(ArrayRef<LinkLibrary> libs) {
     assert(LinkLibraries.empty() && "link libraries already set");
     LinkLibraries = libs;
@@ -439,6 +461,7 @@ public:
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
+<<<<<<< HEAD
   /// \brief The buffer ID for the file that was imported as this TU, or -1
   /// if this is not an imported TU.
   int getImportBufferID() const { return ImportBufferID; }
@@ -453,6 +476,8 @@ public:
     ExternalLookup = R;
   }
 
+=======
+>>>>>>> 57085cf... Introduce "SourceFile" within a TranslationUnit.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTWalker &Walker);
 
@@ -480,7 +505,6 @@ public:
   }
 };
 
-  
 /// BuiltinModule - This module represents the compiler's implicitly generated
 /// declarations in the builtin module.
 class BuiltinModule : public Module {

@@ -117,9 +117,9 @@ doCodeCompletion(TranslationUnit *TU, StringRef EnteredCode, unsigned *BufferID,
   TU->Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
 
   // Parse, typecheck and temporarily insert the incomplete code into the AST.
-  const unsigned OriginalDeclCount = TU->Decls.size();
+  const unsigned OriginalDeclCount = TU->MainSourceFile->Decls.size();
 
-  unsigned CurTUElem = TU->Decls.size();
+  unsigned CurTUElem = TU->MainSourceFile->Decls.size();
   PersistentParserState PersistentState;
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
       new CodeCompleteDelayedCallbacks(
@@ -129,14 +129,14 @@ doCodeCompletion(TranslationUnit *TU, StringRef EnteredCode, unsigned *BufferID,
     parseIntoTranslationUnit(TU, *BufferID, &Done,
                              nullptr, &PersistentState, DelayedCB.get());
     performTypeChecking(TU, CurTUElem);
-    CurTUElem = TU->Decls.size();
+    CurTUElem = TU->MainSourceFile->Decls.size();
   } while (!Done);
 
   performDelayedParsing(TU, PersistentState, CompletionCallbacksFactory);
 
   // Now we are done with code completion.  Remove the declarations we
   // temporarily inserted.
-  TU->Decls.resize(OriginalDeclCount);
+  TU->MainSourceFile->Decls.resize(OriginalDeclCount);
 
   // Add the diagnostic consumers back.
   for (auto DC : DiagnosticConsumers)
