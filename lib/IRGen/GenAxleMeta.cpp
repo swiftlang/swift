@@ -1,4 +1,4 @@
-//===--------- GenAxleMeta.h - Axle IR Metadata Generation ----------------===//
+//===--------- GenAxleMeta.cpp - Axle IR Metadata Generation --------------===//
 //
 // This source file is part of the Swift.org open source project
 //

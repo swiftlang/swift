@@ -14,6 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_IRGEN_GENAXLEMETA_H
+#define SWIFT_IRGEN_GENAXLEMETA_H
+
 namespace llvm {
   class Function;
   class Module;
@@ -37,3 +40,5 @@ namespace axle {
                                 llvm::Function *IRFn);
   };
 }
+
+#endif
