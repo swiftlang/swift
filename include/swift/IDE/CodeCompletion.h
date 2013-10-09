@@ -190,6 +190,79 @@ public:
   void dump() const;
 };
 
+/// \brief Describes the origin of the code completion result.
+///
+/// This enum is ordered from the contexts that are "nearest" to the code
+/// completion point to "outside" contexts.
+enum class SemanticContextKind {
+  /// Used in cases when the concept of semantic context is not applicable.
+  None,
+
+  /// \brief This is a highly-likely expression-context-specific completion
+  /// result.  This description is intentionally vague: this is a catch-all
+  /// category for all heuristics for highly-likely results.
+  ///
+  /// For example, the name of an overridden superclass member inside a nominal
+  /// member function has ExpressionSpecific context:
+  /// \code
+  ///   class Base {
+  ///     init() {}
+  ///     init(a: Int) {}
+  ///     func foo() {}
+  ///     func bar() {}
+  ///   }
+  ///   class Derived {
+  ///     init() {
+  ///       super. // init() -- ExpressionSpecific
+  ///              // init(a: Int) -- Super
+  ///     }
+  ///
+  ///     func foo() {
+  ///       super. // foo() -- ExpressionSpecific
+  ///              // bar() -- Super
+  ///     }
+  ///   }
+  /// \endcode
+  ///
+  /// In C-style for loop headers the iteration variable has ExpressionSpecific
+  /// context:
+  /// \code
+  ///   for var foo = 0; #^A^# // foo -- ExpressionSpecific
+  /// \endcode
+  ExpressionSpecific,
+
+  /// A declaration from the same function.
+  Local,
+
+  /// A declaration found in the immediately enclosing nominal decl.
+  CurrentNominal,
+
+  /// A declaration found in the superclass of the immediately enclosing
+  /// nominal decl.
+  Super,
+
+  /// A declaration found in the non-immediately enclosing nominal decl.
+  ///
+  /// For example, 'Foo' is visible at (1) because of this.
+  /// \code
+  ///   struct A {
+  ///     typealias Foo = Int
+  ///     struct B {
+  ///       func foo() {
+  ///         // (1)
+  ///       }
+  ///     }
+  ///   }
+  /// \endcode
+  OutsideNominal,
+
+  /// A declaration from the current module.
+  CurrentModule,
+
+  /// A declaration imported from other module.
+  OtherModule,
+};
+
 /// \brief A single code completion result.
 class CodeCompletionResult {
   friend class CodeCompletionResultBuilder;
@@ -202,24 +275,33 @@ public:
   };
 
 private:
-  const ResultKind Kind;
+  unsigned Kind : 2;
+  unsigned SemanticContext : 3;
   CodeCompletionString *const CompletionString;
   const Decl *AssociatedDecl;
 
   CodeCompletionResult(ResultKind Kind,
+                       SemanticContextKind SemanticContext,
                        CodeCompletionString *CompletionString)
-    : Kind(Kind), CompletionString(CompletionString) {
+      : Kind(Kind), SemanticContext(unsigned(SemanticContext)),
+        CompletionString(CompletionString) {
   }
 
-  CodeCompletionResult(CodeCompletionString *CompletionString,
+  CodeCompletionResult(SemanticContextKind SemanticContext,
+                       CodeCompletionString *CompletionString,
                        const Decl *AssociatedDecl)
-    : CodeCompletionResult(ResultKind::Declaration, CompletionString) {
+      : CodeCompletionResult(ResultKind::Declaration, SemanticContext,
+                             CompletionString) {
     this->AssociatedDecl = AssociatedDecl;
     assert(AssociatedDecl && "should have a decl");
   }
 
 public:
-  ResultKind getKind() const { return Kind; }
+  ResultKind getKind() const { return ResultKind(Kind); }
+
+  SemanticContextKind getSemanticContext() const {
+    return SemanticContextKind(SemanticContext);
+  }
 
   const CodeCompletionString *getCompletionString() const {
     return CompletionString;
@@ -237,6 +319,7 @@ public:
 class CodeCompletionResultBuilder {
   CodeCompletionContext &Context;
   CodeCompletionResult::ResultKind Kind;
+  SemanticContextKind SemanticContext;
   const Decl *AssociatedDecl = nullptr;
   unsigned CurrentNestingLevel = 0;
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
@@ -260,8 +343,9 @@ class CodeCompletionResultBuilder {
 
 public:
   CodeCompletionResultBuilder(CodeCompletionContext &Context,
-                              CodeCompletionResult::ResultKind Kind)
-      : Context(Context), Kind(Kind) {
+                              CodeCompletionResult::ResultKind Kind,
+                              SemanticContextKind SemanticContext)
+      : Context(Context), Kind(Kind), SemanticContext(SemanticContext) {
   }
 
   ~CodeCompletionResultBuilder() {

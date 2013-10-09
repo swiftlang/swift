@@ -215,13 +215,13 @@ void TUModuleCache::lookupVisibleDecls(AccessPathTy AccessPath,
     if (I == TopLevelValues.end()) return;
 
     for (auto vd : I->second)
-      Consumer.foundDecl(vd);
+      Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
     return;
   }
 
   for (auto &tlv : TopLevelValues) {
     for (ValueDecl *vd : tlv.second)
-      Consumer.foundDecl(vd);
+      Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
   }
 }
 
@@ -239,7 +239,7 @@ void TUModuleCache::lookupClassMembers(AccessPathTy accessPath,
         Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
         if (auto nominal = ty->getAnyNominal())
           if (nominal->getName() == accessPath.front().first)
-            consumer.foundDecl(vd);
+            consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
       }
     }
     return;
@@ -247,7 +247,7 @@ void TUModuleCache::lookupClassMembers(AccessPathTy accessPath,
 
   for (auto &member : ClassMembers) {
     for (ValueDecl *vd : member.second)
-      consumer.foundDecl(vd);
+      consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
   }
 }
 

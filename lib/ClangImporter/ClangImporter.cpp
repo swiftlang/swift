@@ -545,7 +545,7 @@ public:
                                  Results);
     for (auto *VD : Results)
       if (!ModuleFilter || VD->getModuleContext() == ModuleFilter)
-        NextConsumer.foundDecl(VD);
+        NextConsumer.foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
   }
 };
 } // unnamed namespace
@@ -624,9 +624,9 @@ namespace {
     SmallVectorImpl<ValueDecl *> &results;
     explicit VectorDeclConsumer(SmallVectorImpl<ValueDecl *> &decls)
       : results(decls) {}
-    
-    virtual void foundDecl(ValueDecl *decl) {
-      results.push_back(decl);
+
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+      results.push_back(VD);
     }
   };
 }
@@ -733,7 +733,7 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
           if (auto func = dyn_cast<FuncDecl>(VD)) {
             auto known = Impl.Subscripts.find({func, nullptr});
             if (known != Impl.Subscripts.end()) {
-              consumer.foundDecl(known->second);
+              consumer.foundDecl(known->second, DeclVisibilityKind::DynamicLookup);
             }
           }
 
@@ -742,7 +742,7 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
             continue;
         }
 
-        consumer.foundDecl(VD);
+        consumer.foundDecl(VD, DeclVisibilityKind::DynamicLookup);
       }
     }
   };

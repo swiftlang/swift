@@ -561,13 +561,15 @@ void ModuleFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
       return;
 
     for (auto item : *iter)
-      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)));
+      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
+                         DeclVisibilityKind::VisibleAtTopLevel);
   }
 
   for (auto entry : make_range(TopLevelDecls->data_begin(),
                                TopLevelDecls->data_end())) {
     for (auto item : entry)
-      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)));
+      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
+                         DeclVisibilityKind::VisibleAtTopLevel);
   }
 }
 
@@ -643,7 +645,7 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
           dc = dc->getParent();
         if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
           if (nominal->getName() == accessPath.front().first)
-            consumer.foundDecl(vd);
+            consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
       }
     }
     return;
@@ -652,7 +654,8 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
   for (const auto &list : make_range(ClassMembersByName->data_begin(),
                                      ClassMembersByName->data_end())) {
     for (auto item : list)
-      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)));
+      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
+                         DeclVisibilityKind::DynamicLookup);
   }
 }
 

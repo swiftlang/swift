@@ -68,6 +68,7 @@ static void DoGlobalExtensionLookup(Type BaseType,
                                     ArrayRef<ValueDecl*> BaseMembers,
                                     const Module *CurModule,
                                     LookupKind LK,
+                                    DeclVisibilityKind Reason,
                                     LazyResolver *TypeResolver) {
   SmallVector<ValueDecl *, 4> found;
   
@@ -94,8 +95,8 @@ static void DoGlobalExtensionLookup(Type BaseType,
   removeShadowedDecls(found, CurModule, TypeResolver);
 
   // Report the declarations we found to the consumer.
-  for (auto decl : found)
-    Consumer.foundDecl(decl);
+  for (auto VD : found)
+    Consumer.foundDecl(VD, Reason);
 }
 
 /// \brief Enumerate immediate members of the type \c BaseType and its
@@ -104,7 +105,8 @@ static void DoGlobalExtensionLookup(Type BaseType,
 /// Don't do lookup into superclasses or implemented protocols.
 static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
                               const DeclContext *CurrDC,
-                              LookupKind LK, LazyResolver *TypeResolver) {
+                              LookupKind LK, DeclVisibilityKind Reason,
+                              LazyResolver *TypeResolver) {
   NominalTypeDecl *D = BaseType->getAnyNominal();
 
   bool LookupFromChildDeclContext = false;
@@ -142,7 +144,7 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
     }
   }
   DoGlobalExtensionLookup(BaseType, Consumer, BaseMembers,
-                          CurrDC->getParentModule(), LK, TypeResolver);
+                          CurrDC->getParentModule(), LK, Reason, TypeResolver);
 }
 
 /// Enumerate DynamicLookup declarations as seen from context \c CurrDC.
@@ -160,7 +162,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
                                    LookupKind LK)
         : ChainedConsumer(ChainedConsumer), LK(LK) {}
 
-    void foundDecl(ValueDecl *D) override {
+    void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
       // If the declaration has an override, name lookup will also have found
       // the overridden method.  Skip this declaration, because we prefer the
       // overridden method.
@@ -197,7 +199,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       }
 
       if (isDeclVisibleInLookupMode(D, LK))
-        ChainedConsumer.foundDecl(D);
+        ChainedConsumer.foundDecl(D, DeclVisibilityKind::DynamicLookup);
     }
   };
 
@@ -213,13 +215,28 @@ namespace {
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
 }
 
+static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
+  switch (Reason) {
+  case DeclVisibilityKind::MemberOfCurrentNominal:
+  case DeclVisibilityKind::MemberOfSuper:
+    return DeclVisibilityKind::MemberOfSuper;
+
+  case DeclVisibilityKind::MemberOfOutsideNominal:
+    return DeclVisibilityKind::MemberOfOutsideNominal;
+
+  default:
+    llvm_unreachable("should not see this kind");
+  }
+}
+
 static void lookupVisibleMemberDeclsImpl(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
-    LookupKind LK, LazyResolver *TypeResolver, VisitedSet &Visited) {
+    LookupKind LK, DeclVisibilityKind Reason, LazyResolver *TypeResolver,
+    VisitedSet &Visited) {
   // Just look through l-valueness.  It doesn't affect name lookup.
   BaseTy = BaseTy->getRValueType();
 
-  // Type check metatype references, as in "some_type.some_member".  These are
+  // Handle metatype references, as in "some_type.some_member".  These are
   // special and can't have extensions.
   if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
     // The metatype represents an arbitrary named type: dig through to the
@@ -231,11 +248,11 @@ static void lookupVisibleMemberDeclsImpl(
     // functions, and can even look up non-static functions as well (thus
     // getting the address of the member).
     lookupVisibleMemberDeclsImpl(Ty, Consumer, CurrDC,
-                                 LookupKind::QualifiedOnMetatype,
+                                 LookupKind::QualifiedOnMetatype, Reason,
                                  TypeResolver, Visited);
     return;
   }
-  
+
   // Lookup module references, as on some_module.some_member.  These are
   // special and can't have extensions.
   if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
@@ -253,20 +270,21 @@ static void lookupVisibleMemberDeclsImpl(
     }
     if (!Visited.insert(PT->getDecl()))
       return;
-      
+
     for (auto Proto : PT->getDecl()->getProtocols())
       lookupVisibleMemberDeclsImpl(Proto->getDeclaredType(), Consumer, CurrDC,
-                                   LK, TypeResolver, Visited);
+                                   LK, getReasonForSuper(Reason), TypeResolver,
+                                   Visited);
 
-    lookupTypeMembers(PT, Consumer, CurrDC, LK, TypeResolver);
+    lookupTypeMembers(PT, Consumer, CurrDC, LK, Reason, TypeResolver);
     return;
   }
 
   // If the base is a protocol composition, enumerate members of the protocols.
   if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
     for (auto Proto : PC->getProtocols())
-      lookupVisibleMemberDeclsImpl(Proto, Consumer, CurrDC, LK, TypeResolver,
-                                   Visited);
+      lookupVisibleMemberDeclsImpl(Proto, Consumer, CurrDC, LK, Reason,
+                                   TypeResolver, Visited);
     return;
   }
 
@@ -274,17 +292,19 @@ static void lookupVisibleMemberDeclsImpl(
   if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
     for (auto Proto : Archetype->getConformsTo())
       lookupVisibleMemberDeclsImpl(Proto->getDeclaredType(), Consumer, CurrDC,
-                                   LK, TypeResolver, Visited);
+                                   LK, getReasonForSuper(Reason),
+                                   TypeResolver, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
       lookupVisibleMemberDeclsImpl(superclass, Consumer, CurrDC, LK,
-                                   TypeResolver, Visited);
+                                   getReasonForSuper(Reason), TypeResolver,
+                                   Visited);
     return;
   }
 
   do {
     // Look in for members of a nominal type.
-    lookupTypeMembers(BaseTy, Consumer, CurrDC, LK, TypeResolver);
+    lookupTypeMembers(BaseTy, Consumer, CurrDC, LK, Reason, TypeResolver);
 
     // If we have a class type, look into its superclass.
     ClassDecl *CurClass = nullptr;
@@ -297,6 +317,7 @@ static void lookupVisibleMemberDeclsImpl(
 
     if (CurClass && CurClass->hasSuperclass()) {
       BaseTy = CurClass->getSuperclass();
+      Reason = getReasonForSuper(Reason);
     } else {
       break;
     }
@@ -315,10 +336,11 @@ static void lookupVisibleMemberDecls(Type BaseTy,
                                      VisibleDeclConsumer &Consumer,
                                      const DeclContext *CurrDC,
                                      LookupKind LK,
+                                     DeclVisibilityKind Reason,
                                      LazyResolver *TypeResolver) {
   VisitedSet Visited;
-  lookupVisibleMemberDeclsImpl(BaseTy, Consumer, CurrDC, LK, TypeResolver,
-                               Visited);
+  lookupVisibleMemberDeclsImpl(BaseTy, Consumer, CurrDC, LK, Reason,
+                               TypeResolver, Visited);
 }
 
 namespace {
@@ -336,35 +358,35 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     return SM.rangeContainsTokenLoc(R, Loc);
   }
 
-  void checkValueDecl(ValueDecl *D) {
-    Consumer.foundDecl(D);
+  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason) {
+    Consumer.foundDecl(D, Reason);
   }
 
-  void checkPattern(const Pattern *Pat) {
+  void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
     switch (Pat->getKind()) {
     case PatternKind::Tuple:
       for (auto &field : cast<TuplePattern>(Pat)->getFields())
-        checkPattern(field.getPattern());
+        checkPattern(field.getPattern(), Reason);
       return;
     case PatternKind::Paren:
-      return checkPattern(cast<ParenPattern>(Pat)->getSubPattern());
+      return checkPattern(cast<ParenPattern>(Pat)->getSubPattern(), Reason);
     case PatternKind::Typed:
-      return checkPattern(cast<TypedPattern>(Pat)->getSubPattern());
+      return checkPattern(cast<TypedPattern>(Pat)->getSubPattern(), Reason);
     case PatternKind::Named:
-      return checkValueDecl(cast<NamedPattern>(Pat)->getDecl());
+      return checkValueDecl(cast<NamedPattern>(Pat)->getDecl(), Reason);
     case PatternKind::NominalType: {
       for (auto &elt : cast<NominalTypePattern>(Pat)->getElements())
-        checkPattern(elt.getSubPattern());
+        checkPattern(elt.getSubPattern(), Reason);
       return;
     }
     case PatternKind::EnumElement: {
       auto *OP = cast<EnumElementPattern>(Pat);
       if (OP->hasSubPattern())
-        checkPattern(OP->getSubPattern());
+        checkPattern(OP->getSubPattern(), Reason);
       return;
     }
     case PatternKind::Var:
-      return checkPattern(cast<VarPattern>(Pat)->getSubPattern());
+      return checkPattern(cast<VarPattern>(Pat)->getSubPattern(), Reason);
     // Handle non-vars.
     case PatternKind::Isa:
     case PatternKind::Expr:
@@ -373,12 +395,13 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     }
   }
 
-  void checkGenericParams(GenericParamList *Params) {
+  void checkGenericParams(GenericParamList *Params,
+                          DeclVisibilityKind Reason) {
     if (!Params)
       return;
 
     for (auto P : *Params)
-      checkValueDecl(P.getDecl());
+      checkValueDecl(P.getDecl(), Reason);
   }
 
   void checkTranslationUnit(const TranslationUnit *TU) {
@@ -409,14 +432,14 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     visit(S->getBody());
     for (Decl *D : S->getInitializerVarDecls()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-        checkValueDecl(VD);
+        checkValueDecl(VD, DeclVisibilityKind::LocalVariable);
     }
   }
   void visitForEachStmt(ForEachStmt *S) {
     if (!isReferencePointInRange(S->getSourceRange()))
       return;
     visit(S->getBody());
-    checkPattern(S->getPattern());
+    checkPattern(S->getPattern(), DeclVisibilityKind::LocalVariable);
   }
   void visitBraceStmt(BraceStmt *S) {
     if (!isReferencePointInRange(S->getSourceRange()))
@@ -428,7 +451,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     for (auto elem : S->getElements()) {
       if (Decl *D = elem.dyn_cast<Decl*>()) {
         if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-          checkValueDecl(VD);
+          checkValueDecl(VD, DeclVisibilityKind::LocalVariable);
       }
     }
   }
@@ -446,7 +469,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       return;
     for (auto Label : S->getCaseLabels()) {
       for (auto P : Label->getPatterns())
-        checkPattern(P);
+        checkPattern(P, DeclVisibilityKind::LocalVariable);
     }
     visit(S->getBody());
   }
@@ -460,6 +483,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                                SourceLoc Loc) {
   const Module &M = *DC->getParentModule();
   const SourceManager &SM = DC->getASTContext().SourceMgr;
+  auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
 
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.
@@ -478,11 +502,13 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       }
 
       for (auto *P : AFD->getBodyParamPatterns())
-        FindLocalVal(SM, Loc, Consumer).checkPattern(P);
+        FindLocalVal(SM, Loc, Consumer)
+            .checkPattern(P, DeclVisibilityKind::FunctionParameter);
 
       // Constructors and destructors don't have 'self' in parameter patterns.
       if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD))
-        Consumer.foundDecl(AFD->getImplicitSelfDecl());
+        Consumer.foundDecl(AFD->getImplicitSelfDecl(),
+                           DeclVisibilityKind::FunctionParameter);
 
       if (AFD->getExtensionType()) {
         ExtendedType = AFD->getExtensionType();
@@ -514,15 +540,19 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
     if (BaseDecl) {
       ::lookupVisibleMemberDecls(ExtendedType, Consumer, DC,
-                                 LookupKind::Unqualified, TypeResolver);
+                                 LookupKind::Unqualified, Reason,
+                                 TypeResolver);
     }
 
     // Check the generic parameters for something with the given name.
     if (GenericParams) {
-      FindLocalVal(SM, Loc, Consumer).checkGenericParams(GenericParams);
+      FindLocalVal(SM, Loc, Consumer)
+          .checkGenericParams(GenericParams,
+                              DeclVisibilityKind::GenericParameter);
     }
 
     DC = DC->getParent();
+    Reason = DeclVisibilityKind::MemberOfOutsideNominal;
   }
 
   if (auto TU = dyn_cast<TranslationUnit>(&M)) {
@@ -536,7 +566,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     auto &cached = TU->getCachedVisibleDecls();
     if (!cached.empty()) {
       for (auto result : cached)
-        Consumer.foundDecl(result);
+        Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
       return;
     }
   }
@@ -549,7 +579,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                              ResolutionKind::Overloadable,
                              TypeResolver);
   for (auto result : moduleResults)
-    Consumer.foundDecl(result);
+    Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
 
   if (auto TU = dyn_cast<TranslationUnit>(&M)) {
     TU->cacheVisibleDecls(std::move(moduleResults));
@@ -560,5 +590,6 @@ void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
                                      const DeclContext *CurrDC,
                                      LazyResolver *TypeResolver) {
   ::lookupVisibleMemberDecls(BaseTy, Consumer, CurrDC, LookupKind::Qualified,
+                             DeclVisibilityKind::MemberOfCurrentNominal,
                              TypeResolver);
 }

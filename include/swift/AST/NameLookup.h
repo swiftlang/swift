@@ -209,16 +209,67 @@ public:
   /// \brief Get the result as a single type, or a null type if that fails.
   TypeDecl *getSingleTypeResult();
 };
-  
+
+/// Describes the reason why a certain declaration is visible.
+enum class DeclVisibilityKind {
+  /// Declaration is a local variable or type.
+  LocalVariable,
+
+  /// Declaration is a function parameter.
+  FunctionParameter,
+
+  /// Declaration is a generic parameter.
+  GenericParameter,
+
+  /// Declaration is a member of the immediately enclosing nominal decl.
+  ///
+  /// For example, 'Foo' is visible at (1) because of this.
+  /// \code
+  ///   struct A {
+  ///     typealias Foo = Int
+  ///     func f() {
+  ///       // (1)
+  ///     }
+  ///   }
+  /// \endcode
+  MemberOfCurrentNominal,
+
+  /// Declaration is a member of the superclass of the immediately enclosing
+  /// nominal decl.
+  MemberOfSuper,
+
+  /// Declaration is a member of the non-immediately enclosing nominal decl.
+  ///
+  /// For example, 'Foo' is visible at (1) because of this.
+  /// \code
+  ///   struct A {
+  ///     typealias Foo = Int
+  ///     struct B {
+  ///       func foo() {
+  ///         // (1)
+  ///       }
+  ///     }
+  ///   }
+  /// \endcode
+  MemberOfOutsideNominal,
+
+  /// Declaration is visible at the top level because it is declared in this
+  /// module or in a imported module.
+  VisibleAtTopLevel,
+
+  /// Declaration was found via \c DynamicLookup or \c DynamicLookup.metatype.
+  DynamicLookup,
+};
+
 /// VisibleDeclConsumer - An abstract base class for a visitor that consumes
 /// visible declarations found within a given context. Subclasses of this class
 /// can be used with lookupVisibleDecls().
 class VisibleDeclConsumer {
 public:
   virtual ~VisibleDeclConsumer();
-  
+
   /// This method is called by findVisibleDecls() every time it finds a decl.
-  virtual void foundDecl(ValueDecl *decl) = 0;
+  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) = 0;
 };
 
 /// \brief Remove any declarations in the given set that are shadowed by

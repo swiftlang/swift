@@ -260,8 +260,8 @@ public:
   explicit VectorDeclConsumer(SmallVectorImpl<ValueDecl *> &decls)
     : results(decls) {}
 
-  virtual void foundDecl(ValueDecl *decl) {
-    results.push_back(decl);
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    results.push_back(VD);
   }
 };
 }

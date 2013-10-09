@@ -105,15 +105,41 @@ void CodeCompletionString::dump() const {
 }
 
 void CodeCompletionResult::print(raw_ostream &OS) const {
-  switch (Kind) {
+  switch (getKind()) {
   case ResultKind::Declaration:
-    OS << "SwiftDecl: ";
+    OS << "Decl/";
     break;
   case ResultKind::Keyword:
-    OS << "Keyword: ";
+    OS << "Keyword/";
     break;
   case ResultKind::Pattern:
-    OS << "Pattern: ";
+    OS << "Pattern/";
+    break;
+  }
+  switch (getSemanticContext()) {
+  case SemanticContextKind::None:
+    OS << "None:         ";
+    break;
+  case SemanticContextKind::ExpressionSpecific:
+    OS << "ExprSpecific: ";
+    break;
+  case SemanticContextKind::Local:
+    OS << "Local:        ";
+    break;
+  case SemanticContextKind::CurrentNominal:
+    OS << "CurrNominal:  ";
+    break;
+  case SemanticContextKind::Super:
+    OS << "Super:        ";
+    break;
+  case SemanticContextKind::OutsideNominal:
+    OS << "OutNominal:   ";
+    break;
+  case SemanticContextKind::CurrentModule:
+    OS << "CurrModule:   ";
+    break;
+  case SemanticContextKind::OtherModule:
+    OS << "OtherModule:  ";
     break;
   }
   CompletionString->print(OS);
@@ -138,11 +164,13 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
   switch (Kind) {
   case CodeCompletionResult::ResultKind::Declaration:
-    return new (Context.Allocator) CodeCompletionResult(CCS, AssociatedDecl);
+    return new (Context.Allocator) CodeCompletionResult(SemanticContext, CCS,
+                                                        AssociatedDecl);
 
   case CodeCompletionResult::ResultKind::Keyword:
   case CodeCompletionResult::ResultKind::Pattern:
-    return new (Context.Allocator) CodeCompletionResult(Kind, CCS);
+    return new (Context.Allocator) CodeCompletionResult(Kind, SemanticContext,
+                                                        CCS);
   }
 }
 
@@ -314,7 +342,7 @@ void CodeCompletionContext::addResult(CodeCompletionResult *R,
 void CodeCompletionContext::sortCompletionResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
   std::sort(Results.begin(), Results.end(),
-            [](CodeCompletionResult * LHS, CodeCompletionResult * RHS) {
+            [](CodeCompletionResult *LHS, CodeCompletionResult *RHS) {
     StringRef LHSChunk = getFirstTextChunk(LHS);
     StringRef RHSChunk = getFirstTextChunk(RHS);
     int Result = LHSChunk.compare_lower(RHSChunk);
@@ -575,6 +603,42 @@ public:
     IsDynamicLookup = true;
   }
 
+  SemanticContextKind getSemanticContext(const Decl *D,
+                                         DeclVisibilityKind Reason) {
+    switch (Reason) {
+    case DeclVisibilityKind::LocalVariable:
+    case DeclVisibilityKind::FunctionParameter:
+    case DeclVisibilityKind::GenericParameter:
+      return SemanticContextKind::Local;
+
+    case DeclVisibilityKind::MemberOfCurrentNominal:
+      return SemanticContextKind::CurrentNominal;
+
+    case DeclVisibilityKind::MemberOfSuper:
+      // FIXME: check if the current declaration overrides this one and return
+      // SemanticContextKind::ExprSpecific.
+      return SemanticContextKind::Super;
+
+    case DeclVisibilityKind::MemberOfOutsideNominal:
+      return SemanticContextKind::OutsideNominal;
+
+    case DeclVisibilityKind::VisibleAtTopLevel:
+      if (D->getModuleContext() == CurrDeclContext->getParentModule())
+        return SemanticContextKind::CurrentModule;
+      else
+        return SemanticContextKind::OtherModule;
+
+    case DeclVisibilityKind::DynamicLookup:
+      // DynamicLookup results can come from different modules, including the
+      // current module, but we always assign them the OtherModule semantic
+      // context.  These declarations are uniqued by signature, so it is
+      // totally random (determined by the hash function) which of the
+      // equivalent declarations (across multiple modules) we will get.
+      return SemanticContextKind::OtherModule;
+    }
+    llvm_unreachable("unhandled kind");
+  }
+
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
     if (T->isVoid())
       Builder.addTypeAnnotation("Void");
@@ -582,7 +646,7 @@ public:
       Builder.addTypeAnnotation(T.getString());
   }
 
-  void addVarDeclRef(const VarDecl *VD) {
+  void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
     StringRef Name = VD->getName().get();
     assert(!Name.empty() && "name should not be empty");
 
@@ -594,7 +658,8 @@ public:
 
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::Declaration);
+        CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(VD, Reason));
     Builder.setAssociatedDecl(VD);
     if (needDot())
       Builder.addLeadingDot();
@@ -640,7 +705,8 @@ public:
   void addFunctionCall(const AnyFunctionType *AFT) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::Pattern);
+        CodeCompletionResult::ResultKind::Pattern,
+        SemanticContextKind::ExpressionSpecific);
     Builder.addLeftParen();
     bool NeedComma = false;
     if (auto *TT = AFT->getInput()->getAs<TupleType>()) {
@@ -663,7 +729,7 @@ public:
     addTypeAnnotation(Builder, AFT->getResult());
   }
 
-  void addMethodCall(const FuncDecl *FD) {
+  void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
     bool IsImlicitlyCurriedInstanceMethod;
     switch (Kind) {
     case LookupKind::ValueExpr:
@@ -687,7 +753,8 @@ public:
 
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::Declaration);
+        CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(FD, Reason));
     Builder.setAssociatedDecl(FD);
     if (needDot())
       Builder.addLeadingDot();
@@ -721,10 +788,12 @@ public:
     // TODO: skip arguments with default parameters?
   }
 
-  void addConstructorCall(const ConstructorDecl *CD) {
+  void addConstructorCall(const ConstructorDecl *CD,
+                          DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::Declaration);
+        CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(CD, Reason));
     Builder.setAssociatedDecl(CD);
      if (IsSuperRefExpr) {
       assert(isa<ConstructorDecl>(
@@ -740,11 +809,12 @@ public:
     addTypeAnnotation(Builder, CD->getResultType());
   }
 
-  void addSubscriptCall(const SubscriptDecl *SD) {
+  void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
     assert(!HaveDot && "can not add a subscript after a dot");
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::Declaration);
+        CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(SD, Reason));
     Builder.setAssociatedDecl(SD);
     Builder.addLeftBracket();
     addPatternParameters(Builder, SD->getIndices());
@@ -760,10 +830,12 @@ public:
     addTypeAnnotation(Builder, T);
   }
 
-  void addNominalTypeRef(const NominalTypeDecl *NTD) {
+  void addNominalTypeRef(const NominalTypeDecl *NTD,
+                         DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::Declaration);
+        CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(NTD, Reason));
     Builder.setAssociatedDecl(NTD);
     if (needDot())
       Builder.addLeadingDot();
@@ -772,10 +844,11 @@ public:
                       MetaTypeType::get(NTD->getDeclaredType(), Ctx));
   }
 
-  void addTypeAliasRef(const TypeAliasDecl *TAD) {
+  void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::Declaration);
+        CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(TAD, Reason));
     Builder.setAssociatedDecl(TAD);
     if (needDot())
       Builder.addLeadingDot();
@@ -789,10 +862,12 @@ public:
     }
   }
 
-  void addGenericTypeParamRef(const GenericTypeParamDecl *GP) {
+  void addGenericTypeParamRef(const GenericTypeParamDecl *GP,
+                              DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
       CompletionContext,
-      CodeCompletionResult::ResultKind::Declaration);
+      CodeCompletionResult::ResultKind::Declaration,
+      getSemanticContext(GP, Reason));
     Builder.setAssociatedDecl(GP);
     if (needDot())
       Builder.addLeadingDot();
@@ -801,10 +876,12 @@ public:
                       MetaTypeType::get(GP->getDeclaredType(), Ctx));
   }
 
-  void addAssociatedTypeRef(const AssociatedTypeDecl *AT) {
+  void addAssociatedTypeRef(const AssociatedTypeDecl *AT,
+                            DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
       CompletionContext,
-      CodeCompletionResult::ResultKind::Declaration);
+      CodeCompletionResult::ResultKind::Declaration,
+      getSemanticContext(AT, Reason));
     Builder.setAssociatedDecl(AT);
     if (needDot())
       Builder.addLeadingDot();
@@ -816,7 +893,8 @@ public:
   void addKeyword(StringRef Name, Type TypeAnnotation) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::Keyword);
+        CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::None);
     if (needDot())
       Builder.addLeadingDot();
     Builder.addTextChunk(Name);
@@ -827,7 +905,8 @@ public:
   void addKeyword(StringRef Name, StringRef TypeAnnotation) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::Keyword);
+        CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::None);
     if (needDot())
       Builder.addLeadingDot();
     Builder.addTextChunk(Name);
@@ -836,17 +915,17 @@ public:
   }
 
   // Implement swift::VisibleDeclConsumer
-  void foundDecl(ValueDecl *D) override {
+  void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     if (!D->hasType())
       TypeResolver->resolveDeclSignature(D);
-    
+
     switch (Kind) {
     case LookupKind::ValueExpr:
       if (auto *VD = dyn_cast<VarDecl>(D)) {
         // Swift does not have class variables.
         // FIXME: add code completion results when class variables are added.
         assert(!ExprType->is<MetaTypeType>() && "name lookup bug");
-        addVarDeclRef(VD);
+        addVarDeclRef(VD, Reason);
         return;
       }
 
@@ -861,27 +940,27 @@ public:
         if (FD->isGetterOrSetter())
           return;
 
-        addMethodCall(FD);
+        addMethodCall(FD, Reason);
         return;
       }
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        addNominalTypeRef(NTD);
+        addNominalTypeRef(NTD, Reason);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
-        addTypeAliasRef(TAD);
+        addTypeAliasRef(TAD, Reason);
         return;
       }
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
-        addGenericTypeParamRef(GP);
+        addGenericTypeParamRef(GP, Reason);
         return;
       }
 
       if (auto *AT = dyn_cast<AssociatedTypeDecl>(D)) {
-        addAssociatedTypeRef(AT);
+        addAssociatedTypeRef(AT, Reason);
         return;
       }
 
@@ -889,13 +968,13 @@ public:
         if (ExprType->is<MetaTypeType>()) {
           if (HaveDot)
             return;
-          addConstructorCall(CD);
+          addConstructorCall(CD, Reason);
         }
         if (IsSuperRefExpr) {
           if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurrDeclContext))
             if (!isa<ConstructorDecl>(AFD))
               return;
-          addConstructorCall(CD);
+          addConstructorCall(CD, Reason);
         }
         return;
       }
@@ -906,14 +985,14 @@ public:
       if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
         if (ExprType->is<MetaTypeType>())
           return;
-        addSubscriptCall(SD);
+        addSubscriptCall(SD, Reason);
         return;
       }
       return;
 
     case LookupKind::ValueInDeclContext:
       if (auto *VD = dyn_cast<VarDecl>(D)) {
-        addVarDeclRef(VD);
+        addVarDeclRef(VD, Reason);
         return;
       }
 
@@ -928,27 +1007,27 @@ public:
         if (FD->isGetterOrSetter())
           return;
 
-        addMethodCall(FD);
+        addMethodCall(FD, Reason);
         return;
       }
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        addNominalTypeRef(NTD);
+        addNominalTypeRef(NTD, Reason);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
-        addTypeAliasRef(TAD);
+        addTypeAliasRef(TAD, Reason);
         return;
       }
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
-        addGenericTypeParamRef(GP);
+        addGenericTypeParamRef(GP, Reason);
         return;
       }
 
       if (auto *AT = dyn_cast<AssociatedTypeDecl>(D)) {
-        addAssociatedTypeRef(AT);
+        addAssociatedTypeRef(AT, Reason);
         return;
       }
 
@@ -957,22 +1036,22 @@ public:
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        addNominalTypeRef(NTD);
+        addNominalTypeRef(NTD, Reason);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
-        addTypeAliasRef(TAD);
+        addTypeAliasRef(TAD, Reason);
         return;
       }
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
-        addGenericTypeParamRef(GP);
+        addGenericTypeParamRef(GP, Reason);
         return;
       }
 
       if (auto *AT = dyn_cast<AssociatedTypeDecl>(D)) {
-        addAssociatedTypeRef(AT);
+        addAssociatedTypeRef(AT, Reason);
         return;
       }
 
