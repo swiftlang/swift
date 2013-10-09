@@ -966,10 +966,9 @@ StringRef Module::getModuleFilename() const {
     return StringRef();
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    auto ID = TU->MainSourceFile->getImportBufferID();
-    if (ID == -1)
-      return StringRef();
-    return Ctx.SourceMgr->getMemoryBuffer(ID)->getBufferIdentifier();
+    if (auto ID = TU->MainSourceFile->getImportBufferID())
+      return Ctx.SourceMgr->getMemoryBuffer(*ID)->getBufferIdentifier();
+    return StringRef();
   }
 
   ModuleLoader &Owner = cast<LoadedModule>(this)->getOwner();

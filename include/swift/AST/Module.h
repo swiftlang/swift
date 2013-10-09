@@ -412,8 +412,8 @@ public:
   /// purposes.
   ASTStage_t ASTStage = Parsing;
 
-  SourceFile(TranslationUnit &tu, SourceKind K,
-             int ImportID = -1) : ImportBufferID(ImportID), TU(tu), Kind(K) {}
+  SourceFile(TranslationUnit &tu, SourceKind K, Optional<int> ImportID = {})
+    : ImportBufferID(ImportID ? *ImportID : -1), TU(tu), Kind(K) {}
 
   ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
     assert(ASTStage >= Parsed || Kind == SIL);
@@ -423,9 +423,13 @@ public:
     Imports = IM;
   }
 
-  /// \brief The buffer ID for the file that was imported as this TU, or -1
+  /// \brief The buffer ID for the file that was imported as this TU, or Nothing
   /// if this is not an imported TU.
-  int getImportBufferID() const { return ImportBufferID; }
+  Optional<int> getImportBufferID() const {
+    if (ImportBufferID == -1)
+      return Nothing;
+    return ImportBufferID;
+  }
 
 private:
   // Make placement new and vanilla new/delete illegal for SourceFiles.
