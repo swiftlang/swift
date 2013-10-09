@@ -803,7 +803,9 @@ ParenType *ParenType::get(const ASTContext &C, Type underlying) {
   return Result;
 }
 
-Type TupleType::getEmpty(const ASTContext &C) { return C.TheEmptyTupleType; }
+CanTupleType TupleType::getEmpty(const ASTContext &C) {
+  return cast<TupleType>(CanType(C.TheEmptyTupleType));
+}
 
 void TupleType::Profile(llvm::FoldingSetNodeID &ID,
                         ArrayRef<TupleTypeElt> Fields) {

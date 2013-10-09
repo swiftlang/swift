@@ -695,7 +695,7 @@ public:
   static Type get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C);
 
   /// getEmpty - Return the empty tuple type '()'.
-  static Type getEmpty(const ASTContext &C);
+  static CanTypeWrapper<TupleType> getEmpty(const ASTContext &C);
 
   /// getFields - Return the fields of this tuple.
   ArrayRef<TupleTypeElt> getFields() const { return Fields; }
@@ -1497,18 +1497,18 @@ enum class ParameterConvention {
   /// alias any valid object.
   Indirect_Out,
 
-  /// This argument is passed directly.
-  /// The callee is responsible for destroying it.
+  /// This argument is passed directly.  Its type is non-trivial,
+  /// and the callee is responsible for destroying it.
   Direct_Owned,
 
-  /// This argument is passed directly.
-  /// The callee is not responsible for destroying it.
-  /// Its validity is guaranteed only at the instant the call
-  /// begins.
+  /// This argument is passed directly.  Its type may be trivial, or
+  /// it may simply be that the callee is not responsible for
+  /// destroying it.  Its validity is guaranteed only at the instant
+  /// the call begins.
   Direct_Unowned,
 
-  /// This argument is passed directly, and the caller
-  /// guarantees its validity for the entirety of the call.
+  /// This argument is passed directly.  Its type is non-trivial, and
+  /// the caller guarantees its validity for the entirety of the call.
   Direct_Guaranteed,
 };
 inline bool isIndirectParameter(ParameterConvention conv) {
@@ -1519,11 +1519,13 @@ inline bool isIndirectParameter(ParameterConvention conv) {
 /// level are direct.
 enum class ResultConvention {
   /// The caller is responsible for destroying this return value.
+  /// Its type is non-trivial.
   Owned,
 
-  /// The caller is not responsible for destroying this return
-  /// value.  It is valid at the instant of the return, but further
-  /// operations may invalidate it.
+  /// The caller is not responsible for destroying this return value.
+  /// Its type may be trivial, or it may simply be offered unsafely.
+  /// It is valid at the instant of the return, but further operations
+  /// may invalidate it.
   Unowned,
 
   /// This value has been (or may have been) returned autoreleased.
@@ -1545,6 +1547,7 @@ public:
   class ParameterType {
     llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
   public:
+    ParameterType() = default;
     ParameterType(CanType type, ParameterConvention conv)
       : TypeAndConvention(type, conv) {}
 
@@ -1556,6 +1559,9 @@ public:
     }
     bool isIndirect() const {
       return isIndirectParameter(getConvention());
+    }
+    bool isIndirectInOut() const {
+      return getConvention() == ParameterConvention::Indirect_Inout;
     }
     bool isIndirectResult() const {
       return getConvention() == ParameterConvention::Indirect_Out;
@@ -1579,6 +1585,7 @@ public:
   class ResultType {
     llvm::PointerIntPair<CanType, 3, ResultConvention> TypeAndConvention;
   public:
+    ResultType() = default;
     ResultType(CanType type, ResultConvention conv)
       : TypeAndConvention(type, conv) {}
 
@@ -1629,6 +1636,8 @@ private:
            params.size() * sizeof(ParameterType));
   }
 
+  static SILType getParameterSILType(const ParameterType &param);// SILType.h
+
 public:
   static SILFunctionType *get(GenericParamList *genericParams,
                               ExtInfo ext, ArrayRef<ParameterType> params,
@@ -1653,6 +1662,15 @@ public:
     auto params = getParameters();
     if (hasIndirectResult()) params = params.slice(1);
     return params;
+  }
+
+  using ParameterSILTypeArrayRef
+    = ArrayRefView<ParameterType, SILType, getParameterSILType>;  
+  ParameterSILTypeArrayRef getParameterSILTypes() const {
+    return ParameterSILTypeArrayRef(getParameters());
+  }
+  ParameterSILTypeArrayRef getNonReturnParameterSILTypes() const {
+    return ParameterSILTypeArrayRef(getNonReturnParameters());
   }
 
   ExtInfo getExtInfo() const { return Ext; }

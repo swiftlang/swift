@@ -316,65 +316,44 @@ class SILFunctionTypeInfo {
   };
 
   CanType swiftType;
-  SILType resultType;
-  unsigned inputTypeCount : 31;
-  unsigned indirectReturn : 1;
-
-  SILType *getInputTypeBuffer() {
-    return reinterpret_cast<SILType*>(this+1);
-  }
-  SILType const *getInputTypeBuffer() const {
-    return reinterpret_cast<SILType const *>(this+1);
-  }
+  CanSILFunctionType fnType;
 
   friend class SILType;
 
-  SILFunctionTypeInfo(CanType swiftType,
-                      unsigned inputTypeCount,
-                      SILType resultType,
-                      bool hasIndirectReturn)
-    : swiftType(swiftType),
-      resultType(resultType),
-      inputTypeCount(inputTypeCount),
-      indirectReturn(hasIndirectReturn)
-  {}
+  SILFunctionTypeInfo(CanType swiftType, CanSILFunctionType fnType)
+    : swiftType(swiftType), fnType(fnType) {}
 
 public:
 
   CanType getSwiftType() const { return swiftType; }
-  
+
   /// Returns the list of input types needed to fully apply a function of
   /// this function type with an ApplyInst.
-  ArrayRef<SILType> getInputTypes() const {
-    return ArrayRef<SILType>(getInputTypeBuffer(), inputTypeCount);
+  SILFunctionType::ParameterSILTypeArrayRef getInputTypes() const {
+    return fnType->getParameterSILTypes();
   }
   
   /// Returns the result of an ApplyInst applied to this function type.
   SILType getResultType() const {
-    return resultType;
+    return fnType->getResult().getSILType();
   }
   
   /// True if this function type takes an indirect return address as its
   /// first argument.
   bool hasIndirectReturn() const {
-    return bool(indirectReturn);
+    return fnType->hasIndirectResult();
   }
 
   /// True if the nth argument is an indirect return or inout parameter.
-  bool isInOutArgument(unsigned n) const {
-    if (n == 0 && hasIndirectReturn())
-      return false;
-    return getSwiftArgumentType(n)->is<LValueType>();
+  bool isInOutArgument(unsigned i) const {
+    return fnType->getParameters()[i].isIndirectInOut();
   }
 
-
   /// True if the nth argument is an indirect return or inout parameter.
-  bool isInOutOrIndirectReturn(unsigned n) const {
-    // If this is an indirect return, it isn't captured.
-    if (n == 0 && hasIndirectReturn())
-      return true;
-    // Otherwise, check for [inout].
-    return getSwiftArgumentType(n)->is<LValueType>();
+  bool isInOutOrIndirectReturn(unsigned i) const {
+    auto convention = fnType->getParameters()[i].getConvention();
+    return (convention == ParameterConvention::Indirect_Inout ||
+            convention == ParameterConvention::Indirect_Out);
   }
   
   /// Get the indirect return argument type. Always an address.
@@ -385,9 +364,9 @@ public:
   
   /// Returns the list of input types, excluding the indirect return argument,
   /// if any.
-  ArrayRef<SILType> getInputTypesWithoutIndirectReturnType() const {
-    auto inputs = getInputTypes();
-    return hasIndirectReturn() ? inputs.slice(1) : inputs;
+  SILFunctionType::ParameterSILTypeArrayRef 
+  getInputTypesWithoutIndirectReturnType() const {
+    return fnType->getNonReturnParameterSILTypes();
   }
   
   /// Returns the type of the return type or the indirect return slot if
@@ -402,9 +381,14 @@ public:
   CanType getSwiftArgumentType(unsigned ArgNo) const;
 
   template <typename F>
+  static void visitSwiftArgumentTypes(const F &fn, CanType type) {
+    DestructuredArgumentTypeVisitor<F>(fn).visit(type);
+  }
+
+  template <typename F>
   void visitSwiftArgumentTypes(const F &fn) const {
-    DestructuredArgumentTypeVisitor<F> visitor(fn);
-    visitor.visit(cast<AnyFunctionType>(getSwiftType()).getInput());
+    visitSwiftArgumentTypes(fn,
+                            cast<AnyFunctionType>(getSwiftType()).getInput());
   }
 
   /// getSwiftResultType - Return the swift type of the result
@@ -421,6 +405,11 @@ inline SILType SILFunctionType::ParameterType::getSILType() const {
   } else {
     return SILType::getPrimitiveObjectType(getType());
   }
+}
+
+inline SILType
+SILFunctionType::getParameterSILType(const ParameterType &param) {
+  return param.getSILType();
 }
 
 inline SILType SILFunctionType::getSILResult() const {

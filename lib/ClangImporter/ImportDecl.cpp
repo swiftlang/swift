@@ -1466,7 +1466,7 @@ namespace {
                        context));
 
       // Form the type of the setter.
-      auto setterType = TupleType::getEmpty(context);
+      Type setterType = TupleType::getEmpty(context);
       for (auto it = setterArgs.rbegin(), itEnd = setterArgs.rend();
            it != itEnd; ++it) {
         setterType = FunctionType::get((*it)->getType(),

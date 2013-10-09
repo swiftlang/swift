@@ -1285,8 +1285,7 @@ static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
   
   // Emit the other arguments, taking ownership of arguments if necessary.
   auto ownership = OwnershipConventions::get(gen, thunk, objcTy);
-  ArrayRef<SILType> inputs
-    = objcInfo->getInputTypesWithoutIndirectReturnType();
+  auto inputs = objcInfo->getInputTypesWithoutIndirectReturnType();
   assert(!inputs.empty());
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILValue arg = new(gen.F.getModule()) SILArgument(inputs[i], gen.F.begin());

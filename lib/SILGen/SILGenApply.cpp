@@ -895,7 +895,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     argValues.push_back(indirectReturn);
   }
   
-  ArrayRef<SILType> inputTypes
+  auto inputTypes
     = calleeTy.getFunctionTypeInfo(SGM.M)
         ->getInputTypesWithoutIndirectReturnType();
   
