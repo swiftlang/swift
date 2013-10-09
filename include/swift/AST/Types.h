@@ -1815,6 +1815,39 @@ public:
   }
 };
 
+/// The type Vec<T, N>, which is always sugar for a library vector type.
+class VecType : public SyntaxSugarType {
+  /// The length of the vector.
+  unsigned Length;
+
+  VecType(const ASTContext &ctx, Type base, unsigned length, 
+          bool hasTypeVariable)
+    : SyntaxSugarType(TypeKind::Vec, ctx, base, hasTypeVariable), 
+      Length(length) {}
+
+public:
+  /// Return a uniqued optional type with the specified base type.
+  static VecType *get(Type baseTy, unsigned length, const ASTContext &C);
+
+  /// Retrieve the name of the struct that implements this vector
+  /// type.
+  ///
+  /// \param buffer A buffer into which the struct name will be places.
+  ///
+  /// \returns the name of the struct that implements this vector
+  /// type, or an empty string if the base type is not compatible with
+  /// vectors.
+  StringRef getStructName(llvm::SmallVectorImpl<char> &buffer) const;
+
+  /// Retrieve the length (in elements) of this vector type.
+  unsigned getLength() const { return Length; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Vec;
+  }
+};
+
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
 class ProtocolType : public NominalType {
@@ -2665,6 +2698,9 @@ case TypeKind::Id:
     case TypeKind::Optional:
       return cast<OptionalType>(base)->getBaseType().findIf(pred);
 
+    case TypeKind::Vec:
+      return cast<VecType>(base)->getBaseType().findIf(pred);
+
     case TypeKind::LValue:
       return cast<LValueType>(base)->getObjectType().findIf(pred);
 
@@ -3017,6 +3053,18 @@ case TypeKind::Id:
       return *this;
 
     return OptionalType::get(baseTy, ctx);
+  }
+
+  case TypeKind::Vec: {
+    auto vec = cast<VecType>(base);
+    auto baseTy = vec->getBaseType().transform(ctx, fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == vec->getBaseType().getPointer())
+      return *this;
+
+    return VecType::get(baseTy, vec->getLength(), ctx);
   }
 
   case TypeKind::LValue: {

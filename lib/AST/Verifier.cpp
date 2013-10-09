@@ -1345,6 +1345,8 @@ namespace {
           return;
         
         Enclosing = E->getSourceRange();
+      } else if (TypeRepr *TyR = Parent.getAsTypeRepr()) {
+        Enclosing = TyR->getSourceRange();
       } else {
         llvm_unreachable("impossible parent node");
       }

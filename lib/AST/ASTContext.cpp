@@ -111,6 +111,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
+    llvm::DenseMap<std::pair<Type, unsigned>, VecType*> VecTypes;
     llvm::DenseMap<Type, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
@@ -268,16 +269,16 @@ Identifier ASTContext::getIdentifier(StringRef Str) const {
   return Identifier(Impl.IdentifierTable.GetOrCreateValue(Str).getKeyData());
 }
 
-static void lookupInSwiftModule(const ASTContext &ctx,
-                                StringRef name,
-                                SmallVectorImpl<ValueDecl *> &results) {
+void ASTContext::lookupInSwiftModule(
+                   StringRef name,
+                   SmallVectorImpl<ValueDecl *> &results) const {
   // Find the "swift" module.
-  auto module = ctx.LoadedModules.find(ctx.StdlibModuleName.str());
-  if (module == ctx.LoadedModules.end())
+  auto module = LoadedModules.find(StdlibModuleName.str());
+  if (module == LoadedModules.end())
     return;
 
   // Find all of the declarations with this name in the Swift module.
-  auto identifier = ctx.getIdentifier(name);
+  auto identifier = getIdentifier(name);
   module->second->lookupValue({ }, identifier, NLKind::UnqualifiedLookup,
                               results);
 }
@@ -288,7 +289,7 @@ static NominalTypeDecl *findSyntaxSugarImpl(const ASTContext &ctx,
                                             StringRef name) {
   // Find all of the declarations with this name in the Swift module.
   SmallVector<ValueDecl *, 1> results;
-  lookupInSwiftModule(ctx, name, results);
+  ctx.lookupInSwiftModule(name, results);
   for (auto result : results) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
       if (auto params = nominal->getGenericParams()) {
@@ -326,7 +327,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
 
   // Find all of the declarations with this name in the Swift module.
   SmallVector<ValueDecl *, 1> results;
-  lookupInSwiftModule(*this, getProtocolName(kind), results);
+  lookupInSwiftModule(getProtocolName(kind), results);
   for (auto result : results) {
     if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
       Impl.KnownProtocols[index] = protocol;
@@ -341,7 +342,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
 static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
                                       StringRef name) {
   SmallVector<ValueDecl *, 1> results;
-  lookupInSwiftModule(ctx, name, results);
+  ctx.lookupInSwiftModule(name, results);
   if (results.size() == 1)
     return dyn_cast<FuncDecl>(results.front());
   return nullptr;
@@ -1377,6 +1378,16 @@ ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {
   auto protoTy = new (C, AllocationArena::Permanent) ProtocolType(D, C);
   D->setDeclaredType(protoTy);
   return protoTy;
+}
+
+VecType *VecType::get(Type base, unsigned length, const ASTContext &C) {
+  bool hasTypeVariable = base->hasTypeVariable();
+  auto arena = getArena(hasTypeVariable);
+
+  VecType *&entry = C.Impl.getArena(arena).VecTypes[{base, length}];
+  if (entry) return entry;
+
+  return entry = new (C, arena) VecType(C, base, length, hasTypeVariable);
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)

@@ -207,6 +207,10 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message, bool isExprBasic) {
 
     switch (Tok.getKind()) {
     case tok::oper_binary: {
+      // If '>' is not an operator and this token starts with a '>', we're done.
+      if (!GreaterThanIsOperator && startsWithGreater(Tok))
+        goto done;
+
       // Parse the operator.
       Expr *Operator = parseExprOperator();
       SequencedExprs.push_back(Operator);
@@ -918,6 +922,10 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
     // Check for a postfix-operator suffix.
     if (Tok.is(tok::oper_postfix)) {
+      // If '>' is not an operator and this token starts with a '>', we're done.
+      if (!GreaterThanIsOperator && startsWithGreater(Tok))
+        return Result;
+
       Expr *oper = parseExprOperator();
       Result = makeParserResult(
           new (Context) PostfixUnaryExpr(oper, Result.get()));
@@ -1344,6 +1352,25 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
   bool hasGenericArgumentList = false;
+
+  // If the identifier is 'Vec' and it's followed by
+  if (Context.LangOpts.Axle && text.str().equals("Vec") &&
+      canParseAsAxleSugarArguments()) {
+    // Parse the vector type.
+    ParserResult<VecTypeRepr> vecTy = parseTypeAxleVec(loc);
+    LAngleLoc = Tok.getLoc();
+    if (vecTy.isParseError()) {
+      diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
+      return new (Context) ErrorExpr(loc);
+    }
+
+    // FIXME: Better handling of code completion here?
+    if (vecTy.hasCodeCompletion())
+      return new (Context) ErrorExpr(loc);
+
+    return new (Context) MetatypeExpr(vecTy.get());
+  }
+
   if (canParseAsGenericArgumentList()) {
     hasGenericArgumentList = true;
     if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {

@@ -2337,6 +2337,16 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
+  case decls_block::VEC_TYPE: {
+    TypeID baseID;
+    uint64_t length;
+    decls_block::VecTypeLayout::readRecord(scratch, baseID, length);
+
+    auto vecTy = VecType::get(getType(baseID), length, ctx);
+    typeOrOffset = vecTy;
+    break;
+  }
+
   case decls_block::ARRAY_TYPE: {
     TypeID baseID;
     uint64_t size;

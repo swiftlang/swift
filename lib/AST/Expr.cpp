@@ -340,3 +340,21 @@ unsigned ScalarToTupleExpr::getScalarField() const {
          && "Tuple elements are missing the scalar 'hole'");
   return result;
 }
+
+SourceLoc MetatypeExpr::getLoc() const {
+  if (auto tyR = getBaseTypeRepr())
+    return tyR->getStartLoc();
+
+  return MetatypeLoc;
+}
+
+SourceRange MetatypeExpr::getSourceRange() const {
+  if (auto tyR = getBaseTypeRepr())
+    return tyR->getSourceRange();
+
+  if (auto base = getBase())
+    return SourceRange(base->getStartLoc(), MetatypeLoc);
+
+  return SourceRange(MetatypeLoc);
+}
+

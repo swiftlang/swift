@@ -319,6 +319,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return nullptr;
     }
+
+    if (TypeRepr *tyR = E->getBaseTypeRepr()) {
+      if (doIt(tyR))
+        return nullptr;
+    }
+
     return E;
   }
 
@@ -1062,6 +1068,16 @@ bool Traversal::visitArrayTypeRepr(ArrayTypeRepr *T) {
 
 bool Traversal::visitOptionalTypeRepr(OptionalTypeRepr *T) {
   if (doIt(T->getBase()))
+    return true;
+  return false;
+}
+
+bool Traversal::visitVecTypeRepr(VecTypeRepr *T) {
+  if (doIt(T->getBase()))
+    return true;
+  if (auto length = doIt(T->getLength()->getExpr()))
+    T->getLength()->setExpr(length, T->getLength()->alreadyChecked());
+  else
     return true;
   return false;
 }

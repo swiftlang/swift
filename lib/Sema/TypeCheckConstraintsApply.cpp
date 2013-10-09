@@ -1647,6 +1647,7 @@ namespace {
         expr->setBase(base);
         expr->setType(MetaTypeType::get(base->getType(), tc.Context));
       }
+
       return expr;
     }
 
@@ -3035,7 +3036,13 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         tc.computeCaptures(closure);
         return { false, closure };
       }
-      
+
+      // Don't recurse into metatype expressions that have a specified type.
+      if (auto metatypeExpr = dyn_cast<MetatypeExpr>(expr)) {
+        if (metatypeExpr->getBaseTypeRepr())
+          return { false, expr };
+      }
+
       // Track whether we're in the left-hand side of an assignment...
       if (auto assign = dyn_cast<AssignExpr>(expr)) {
         ++LeftSideOfAssignment;

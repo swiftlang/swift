@@ -869,7 +869,7 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
   ParserStatus Status;
   do {
     // Parse the inherited type (which must be a protocol).
-    ParserResult<TypeRepr> Ty = parseTypeIdentifier();
+    ParserResult<TypeRepr> Ty = parseTypeIdentifierOrAxleSugar();
     Status |= Ty;
 
     // Record the type.
@@ -960,7 +960,7 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags,
 
   parseAttributeList(Attr, true);
 
-  ParserResult<TypeRepr> Ty = parseTypeIdentifierWithRecovery(
+  ParserResult<TypeRepr> Ty = parseTypeIdentifierOrAxleSugarWithRecovery(
       diag::expected_type, diag::expected_ident_type_in_extension);
   if (Ty.hasCodeCompletion())
     return makeParserCodeCompletionResult<ExtensionDecl>();

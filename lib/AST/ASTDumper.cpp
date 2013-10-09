@@ -1264,6 +1264,9 @@ public:
     if (Expr *base = E->getBase()) {
       OS << '\n';
       printRec(base);
+    } else if (TypeRepr *tyR = E->getBaseTypeRepr()) {
+      OS << '\n';
+      printRec(tyR);
     } else {
       OS << " baseless";
     }

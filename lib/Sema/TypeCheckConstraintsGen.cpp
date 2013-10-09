@@ -797,17 +797,25 @@ namespace {
     }
 
     Type visitMetatypeExpr(MetatypeExpr *expr) {
-      auto base = expr->getBase();
+      if (auto base = expr->getBase()) {
+        auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+                                        /*options=*/0);
+        CS.addConstraint(ConstraintKind::Equal, tv, base->getType(),
+          CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
 
-      // If this is an artificial MetatypeExpr, it's fully type-checked.
-      if (!base) return expr->getType();
+        return MetaTypeType::get(tv, CS.getASTContext());
+      }
 
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
-                                      /*options=*/0);
-      CS.addConstraint(ConstraintKind::Equal, tv, base->getType(),
-        CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+      if (auto baseTyR = expr->getBaseTypeRepr()) {
+        auto type = CS.TC.resolveType(baseTyR, CS.DC);
+        if (type)
+          return MetaTypeType::get(type, CS.getASTContext());
 
-      return MetaTypeType::get(tv, CS.getASTContext());
+        return Type();
+      }
+
+      // This is an artificial MetatypeExpr, so it's fully type-checked.
+      return expr->getType();
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {

@@ -322,6 +322,11 @@ public:
   /// Retrieve the declaration of swift._getBool.
   FuncDecl *getGetBoolDecl() const;
 
+  /// \brief Look for the declaration with the given name within the
+  /// swift module.
+  void lookupInSwiftModule(StringRef name,
+                           SmallVectorImpl<ValueDecl *> &results) const;
+
   /// Retrieve a specific, known protocol.
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
 

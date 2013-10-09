@@ -60,6 +60,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 /// parseTypeSimple
 ///   type-simple:
 ///     type-identifier
+///     type-axle-vec
 ///     type-tuple
 ///     type-composition
 ///     type-simple '.metatype'
@@ -69,7 +70,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::identifier:
-    ty = parseTypeIdentifier();
+    ty = parseTypeIdentifierOrAxleSugar();
     break;
   case tok::kw_protocol:
     ty = parseTypeComposition();
@@ -178,11 +179,12 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
   return ty;
 }
 
-ParserResult<TypeRepr> Parser::parseTypeIdentifierWithRecovery(
+ParserResult<TypeRepr> Parser::parseTypeIdentifierOrAxleSugarWithRecovery(
     Diag<> MessageID, Diag<TypeLoc> NonIdentifierTypeMessageID) {
   ParserResult<TypeRepr> Ty = parseType(MessageID);
 
-  if (!Ty.isParseError() && !isa<IdentTypeRepr>(Ty.get())) {
+  if (!Ty.isParseError() && !isa<IdentTypeRepr>(Ty.get()) &&
+      !isa<VecTypeRepr>(Ty.get())) {
     diagnose(Ty.get()->getStartLoc(), NonIdentifierTypeMessageID, Ty.get())
         .highlight(Ty.get()->getSourceRange());
     Ty.setIsParseError();
@@ -192,6 +194,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierWithRecovery(
 
   assert(Ty.isNull() ||
          isa<IdentTypeRepr>(Ty.get()) ||
+         isa<VecTypeRepr>(Ty.get()) ||
          isa<ErrorTypeRepr>(Ty.get()));
   return Ty;
 }
@@ -327,6 +330,74 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   }
 
   return makeParserResult(Status, ITR);
+}
+
+ParserResult<TypeRepr> Parser::parseTypeIdentifierOrAxleSugar() {
+  if (Context.LangOpts.Axle) {
+    if (Tok.isContextualKeyword("Vec") && startsWithLess(peekToken()))
+      return parseTypeAxleVec(SourceLoc());
+  }
+
+  return parseTypeIdentifier();
+}
+
+/// Parse Axle vector type sugar.
+///
+///   type-axle-vec:
+///     Vec '<' type ',' expr '>'
+ParserResult<VecTypeRepr> Parser::parseTypeAxleVec(SourceLoc vecLoc) {
+  // Parse leading "Vec<", which we know is here.
+  if (vecLoc.isInvalid()) {
+    assert(Tok.isContextualKeyword("Vec"));
+    vecLoc = consumeToken();
+  }
+
+  SourceLoc langleLoc = consumeStartingLess();
+
+  // Parse the vector element type.
+  ParserStatus status;
+  ParserResult<TypeRepr> elementTy
+    = parseType(diag::axle_expected_vec_element_type);
+  status |= elementTy;
+
+  // Parse the comma.
+  if (!consumeIf(tok::comma) && !status.isSuccess()) {
+    diagnose(Tok, diag::axle_expected_comma);
+  }
+
+  // Parse the vector length.
+  ParserResult<Expr> length;
+  {
+    GreaterThanIsOperatorRAII notOperator(*this, false);
+    length = parseExpr(diag::axle_expected_vec_length);
+    status |= length;
+  }
+
+  // Check for the terminating '>'.
+  SourceLoc rangleLoc = Tok.getLoc();
+  if (!startsWithGreater(Tok)) {
+    if (status.isSuccess()) {
+      diagnose(Tok, diag::axle_expected_vec_rangle);
+      diagnose(langleLoc, diag::opening_angle);
+      status.setIsParseError();
+    }
+
+    // Skip until we hit the '>'.
+    skipUntilGreaterInTypeList();
+    if (startsWithGreater(Tok))
+      rangleLoc = consumeStartingGreater();
+  } else {
+    rangleLoc = consumeStartingGreater();
+  }
+
+  if (status.isError() || status.hasCodeCompletion())
+    return status;
+
+  return makeParserResult(
+           status,
+           new (Context) VecTypeRepr(vecLoc, langleLoc, elementTy.get(),
+                                     ExprHandle::get(Context, length.get()),
+                                     rangleLoc));
 }
 
 /// parseTypeComposition
@@ -584,6 +655,18 @@ bool Parser::canParseAsGenericArgumentList() {
   return false;
 }
 
+bool Parser::canParseAsAxleSugarArguments() {
+  if (!startsWithLess(Tok))
+    return false;
+
+  BacktrackingScope backtrack(*this);
+
+  if (canParseAxleSugarArguments())
+    return isGenericTypeDisambiguatingToken(Tok);
+
+  return false;
+}
+
 bool Parser::canParseGenericArguments() {
   // Parse the opening '<'.
   if (!startsWithLess(Tok))
@@ -604,11 +687,39 @@ bool Parser::canParseGenericArguments() {
   }
 }
 
+bool Parser::canParseAxleSugarArguments() {
+  // '<'
+  if (!startsWithLess(Tok))
+    return false;
+
+  consumeStartingLess();
+
+  // element type
+  if (!canParseType())
+    return false;
+
+  // ','
+  if (!consumeIf(tok::comma))
+    return false;
+
+  // length expression
+  // FIXME: We don't have a true 'canParseExpr'; settle for identifying
+  // integer literals, since that's all that really works here.
+  if (!consumeIf(tok::integer_literal))
+    return false;
+
+  // '>'
+  if (!startsWithGreater(Tok))
+    return false;
+  consumeStartingGreater();
+  return true;
+}
+
 bool Parser::canParseType() {
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::identifier:
-    if (!canParseTypeIdentifier())
+    if (!canParseTypeIdentifierOrAxleSugar())
       return false;
     break;
   case tok::kw_protocol:
@@ -692,6 +803,14 @@ bool Parser::canParseTypeIdentifier() {
       return true;
     }
   }
+}
+
+bool Parser::canParseTypeIdentifierOrAxleSugar() {
+  if (!Tok.isContextualKeyword("Vec") || !startsWithLess(peekToken()))
+    return canParseTypeIdentifier();
+
+  consumeToken();        // 'Vec'
+  return canParseAxleSugarArguments();
 }
 
 bool Parser::canParseTypeComposition() {

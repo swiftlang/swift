@@ -80,6 +80,7 @@ public:
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   std::pair<const DeclContext *, ArrayRef<VarDecl *>> CurVars;
   unsigned VarPatternDepth = 0;
+  bool GreaterThanIsOperator = true;
 
   DelayedParsingCallbacks *DelayedParseCB = nullptr;
 
@@ -128,6 +129,24 @@ public:
 
     ~ContextChange() {
       if (OldContext) P.CurDeclContext = OldContext;
+    }
+  };
+
+  /// A RAII object for temporarily changing whether an operator starting with
+  /// '>' is an operator.
+  class GreaterThanIsOperatorRAII {
+    Parser &P;
+    bool OldValue;
+
+  public:
+    GreaterThanIsOperatorRAII(Parser &p, bool newValue)
+      : P(p), OldValue(p.GreaterThanIsOperator)
+    {
+      P.GreaterThanIsOperator = newValue;
+    }
+
+    ~GreaterThanIsOperatorRAII() {
+      P.GreaterThanIsOperator = OldValue;
     }
   };
 
@@ -557,8 +576,9 @@ public:
   ///
   /// \returns null, IdentTypeRepr or ErrorTypeRepr.
   ParserResult<TypeRepr>
-  parseTypeIdentifierWithRecovery(Diag<> MessageID,
-                                  Diag<TypeLoc> NonIdentifierTypeMessageID);
+  parseTypeIdentifierOrAxleSugarWithRecovery(
+    Diag<> MessageID,
+    Diag<TypeLoc> NonIdentifierTypeMessageID);
 
   ParserResult<TypeRepr> parseTypeAnnotation();
   ParserResult<TypeRepr> parseTypeAnnotation(Diag<> ID);
@@ -568,6 +588,12 @@ public:
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
   ParserResult<IdentTypeRepr> parseTypeIdentifier();
+  ParserResult<TypeRepr> parseTypeIdentifierOrAxleSugar();
+
+  /// Determine whether we're at the start of Axle's \c Vec<T,N> type sugar.
+  bool atStartOfAxleVec();
+
+  ParserResult<VecTypeRepr> parseTypeAxleVec(SourceLoc vecLoc);
   ParserResult<ProtocolCompositionTypeRepr> parseTypeComposition();
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<ArrayTypeRepr> parseTypeArray(TypeRepr *Base);
@@ -647,14 +673,18 @@ public:
   /// followed by one of the above tokens, then this function returns false,
   /// and the expression will parse with the '<' as an operator.
   bool canParseAsGenericArgumentList();
-  
+
+  bool canParseAsAxleSugarArguments();
+
   bool canParseType();
   bool canParseTypeIdentifier();
+  bool canParseTypeIdentifierOrAxleSugar();
   bool canParseTypeComposition();
   bool canParseTypeTupleBody();
   bool canParseTypeArray();
   bool canParseGenericArguments();
-  
+  bool canParseAxleSugarArguments();
+
   //===--------------------------------------------------------------------===//
   // Expression Parsing
 

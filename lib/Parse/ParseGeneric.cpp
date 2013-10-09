@@ -29,6 +29,7 @@ using namespace swift;
 ///     identifier
 ///     identifier ':' type-identifier
 ///     identifier ':' type-composition
+///     identifier ':' type-axle-vec
 ///
 /// When parsing the generic parameters, this routine establishes a new scope
 /// and adds those parameters to the scope.
@@ -58,7 +59,7 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
       (void)consumeToken();
       ParserResult<TypeRepr> Ty;
       if (Tok.getKind() == tok::identifier) {
-        Ty = parseTypeIdentifier();
+        Ty = parseTypeIdentifierOrAxleSugar();
       } else if (Tok.getKind() == tok::kw_protocol) {
         Ty = parseTypeComposition();
       } else {
@@ -145,15 +146,16 @@ GenericParamList *Parser::maybeParseGenericParams() {
 ///
 ///   same-type-requirement:
 ///     type-identifier '==' type-identifier
-bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
-                                     SmallVectorImpl<RequirementRepr> &Requirements) {
+bool Parser::parseGenericWhereClause(
+               SourceLoc &WhereLoc,
+               SmallVectorImpl<RequirementRepr> &Requirements) {
   // Parse the 'where'.
   WhereLoc = consumeToken(tok::kw_where);
   bool Invalid = false;
   do {
     // Parse the leading type-identifier.
     // FIXME: Dropping TypeLocs left and right.
-    ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
+    ParserResult<TypeRepr> FirstType = parseTypeIdentifierOrAxleSugar();
     if (FirstType.isNull() || FirstType.hasCodeCompletion()) {
       Invalid = true;
       break;
@@ -168,7 +170,7 @@ bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
       if (Tok.is(tok::kw_protocol)) {
         Protocol = parseTypeComposition();
       } else {
-        Protocol = parseTypeIdentifier();   
+        Protocol = parseTypeIdentifierOrAxleSugar();
       }
       if (Protocol.isNull() || Protocol.hasCodeCompletion()) {
         Invalid = true;
@@ -189,7 +191,7 @@ bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
       SourceLoc EqualLoc = consumeToken();
 
       // Parse the second type.
-      ParserResult<TypeRepr> SecondType = parseTypeIdentifier();
+      ParserResult<TypeRepr> SecondType = parseTypeIdentifierOrAxleSugar();
       if (SecondType.isNull() || SecondType.hasCodeCompletion()) {
         Invalid = true;
         break;

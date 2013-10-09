@@ -1401,6 +1401,12 @@ public:
     OS << '?';
   }
 
+  void visitVecType(VecType *T) {
+    OS << "Vec<";
+    T->getBaseType().print(OS, Options);
+    OS << ", " << T->getLength() << ">";
+  }
+
   void visitProtocolType(ProtocolType *T) {
     OS << T->getDecl()->getName().str();
   }

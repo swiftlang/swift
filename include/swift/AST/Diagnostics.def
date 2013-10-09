@@ -1538,6 +1538,22 @@ ERROR(error_missing_arg_value,frontend,none,
 ERROR(error_invalid_arg_value,frontend,none,
   "invalid value '%1' in '%0'", (StringRef, StringRef))
 
+//==============================================================================
+// Axle Diagnostics.
+//==============================================================================
+ERROR(axle_expected_vec_element_type,type_parsing,PointsToFirstBadToken,
+      "expected vector element type", ())
+ERROR(axle_expected_comma,type_parsing,PointsToFirstBadToken,
+      "expected comma between vector element type and length", ())
+ERROR(axle_expected_vec_length,type_parsing,PointsToFirstBadToken,
+      "expected vector length", ())
+ERROR(axle_expected_vec_rangle,type_parsing,PointsToFirstBadToken,
+      "expected '>' to complete vector type", ())
+ERROR(axle_invalid_vec_type,sema_tcd,none,
+  "invalid vector element type %0", (Type))
+ERROR(axle_missing_vec_type,sema_tcd,none,
+  "missing vector implementation type %0 for %1", (StringRef, Type))
+
 #if defined(DIAG)
 #  undef DIAG
 #endif

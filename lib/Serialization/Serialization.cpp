@@ -254,6 +254,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, REFERENCE_STORAGE_TYPE);
   RECORD(decls_block, UNBOUND_GENERIC_TYPE);
   RECORD(decls_block, OPTIONAL_TYPE);
+  RECORD(decls_block, VEC_TYPE);
 
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, GENERIC_TYPE_PARAM_DECL);
@@ -1743,6 +1744,16 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
+  case TypeKind::Vec: {
+    auto vecTy = cast<VecType>(ty.getPointer());
+    Type base = vecTy->getBaseType();
+    unsigned abbrCode = DeclTypeAbbrCodes[VecTypeLayout::Code];
+    VecTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                              addTypeRef(base),
+                              vecTy->getLength());
+    break;
+  }
+
   case TypeKind::ProtocolComposition: {
     auto composition = cast<ProtocolCompositionType>(ty.getPointer());
 
@@ -1840,6 +1851,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<ReferenceStorageTypeLayout>();
     registerDeclTypeAbbr<UnboundGenericTypeLayout>();
     registerDeclTypeAbbr<OptionalTypeLayout>();
+    registerDeclTypeAbbr<VecTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<GenericTypeParamTypeLayout>();

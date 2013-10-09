@@ -23,6 +23,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -843,6 +844,56 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
     if (ty->is<ErrorType>())
       return ty;
     return MetaTypeType::get(ty, Context);
+  }
+
+  case TypeReprKind::Vec: {
+    // FIXME: diagnose non-materializability of element type!
+    auto VecTyR = cast<VecTypeRepr>(TyR);
+    Type baseTy = resolveType(VecTyR->getBase(), DC,
+                              /*FIXME:allowUnboundGenerics=*/false,
+                              resolver);
+    if (baseTy->is<ErrorType>())
+      return baseTy;
+
+    // Check the length of the vector.
+    ExprHandle *lengthHandle = VecTyR->getLength();
+    Expr *length = lengthHandle->getExpr();
+    // FIXME: Generalize typeCheckArrayBound.
+    if (typeCheckArrayBound(length, /*requireConstant=*/true, DC)) {
+      lengthHandle->setExpr(lengthHandle->getExpr(), true);
+      return ErrorType::get(Context);
+    } else {
+      lengthHandle->setExpr(length, true);
+    }
+
+    // Retrieve the vector length.
+    // FIXME: We need a constant evaluator.
+    uint64_t lengthVal 
+      = cast<IntegerLiteralExpr>(length->getSemanticsProvidingExpr())
+          ->getValue().getZExtValue();
+
+    // Create the vector type.
+    auto vecTy = VecType::get(baseTy, lengthVal, Context);
+
+    // Figure out which implementation struct to use.
+    llvm::SmallString<16> structNameBuf;
+    StringRef structName = vecTy->getStructName(structNameBuf);
+    if (structName.empty()) {
+      diagnose(TyR->getStartLoc(), diag::axle_invalid_vec_type, baseTy)
+        .highlight(VecTyR->getBase()->getSourceRange());
+      return ErrorType::get(Context);
+    }
+
+    // Make sure that the underlying struct is available.
+    llvm::SmallVector<ValueDecl *, 5> decls;
+    Context.lookupInSwiftModule(structName, decls);
+    if (decls.size() != 1 || !isa<StructDecl>(decls[0])) {
+      diagnose(TyR->getStartLoc(), diag::axle_missing_vec_type, structName,
+               vecTy);
+      return ErrorType::get(Context);
+    }
+    
+    return vecTy;
   }
   }
 

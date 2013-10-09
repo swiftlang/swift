@@ -307,6 +307,7 @@ namespace decls_block {
     UNBOUND_GENERIC_TYPE,
     OPTIONAL_TYPE,
     SIL_FUNCTION_TYPE,
+    VEC_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     GENERIC_TYPE_PARAM_DECL,
@@ -508,6 +509,12 @@ namespace decls_block {
 
   using ArraySliceTypeLayout = SyntaxSugarTypeLayout<ARRAY_SLICE_TYPE>;
   using OptionalTypeLayout = SyntaxSugarTypeLayout<OPTIONAL_TYPE>;
+
+  using VecTypeLayout = BCRecordLayout<
+    VEC_TYPE,
+    TypeIDField, // element type
+    BCVBR<6>     // length
+  >;
 
   using ArrayTypeLayout = BCRecordLayout<
     ARRAY_TYPE,

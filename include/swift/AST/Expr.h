@@ -2112,27 +2112,38 @@ public:
   }
 };
   
-/// MetatypeExpr - Evaluates an (optional) expression and produces a
-/// metatype value.  If there's no base expression, this isn't really
-/// a parsed form.
+/// MetatypeExpr - Produces a metatype value.
+///
+/// The metatype value can come either from a evaluating an expression (then
+/// getting its metatype) or from a type that was parsed in the source. If
+/// neither is available, this isn't a parsed form.
 class MetatypeExpr : public Expr {
-  Expr *Base;
+  llvm::PointerUnion<Expr *, TypeRepr *> BaseOrType;
   SourceLoc MetatypeLoc;
 
 public:
   explicit MetatypeExpr(Expr *base, SourceLoc metatypeLoc, Type ty)
     : Expr(ExprKind::Metatype, /*Implicit=*/true, ty),
-      Base(base), MetatypeLoc(metatypeLoc) { }
+      BaseOrType(base), MetatypeLoc(metatypeLoc) { }
 
-  Expr *getBase() const { return Base; }
-  void setBase(Expr *base) { Base = base; }
+  explicit MetatypeExpr(TypeRepr *tyRepr)
+    : Expr(ExprKind::Metatype, /*Implicit=*/false, Type()),
+      BaseOrType(tyRepr) { }
 
-  SourceLoc getLoc() const { return MetatypeLoc; }
-
-  SourceRange getSourceRange() const {
-    if (Base) return SourceRange(Base->getStartLoc(), MetatypeLoc);
-    return SourceRange(MetatypeLoc);
+  Expr *getBase() const {
+    return BaseOrType.dyn_cast<Expr *>();
   }
+  void setBase(Expr *base) { BaseOrType = base; }
+
+  TypeRepr *getBaseTypeRepr() const {
+    return BaseOrType.dyn_cast<TypeRepr *>();
+  }
+
+  void setBaseTypeErpr(TypeRepr *tyR) { BaseOrType = tyR; }
+
+  SourceLoc getLoc() const;
+
+  SourceRange getSourceRange() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Metatype;

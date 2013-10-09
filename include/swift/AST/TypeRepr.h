@@ -449,6 +449,41 @@ private:
   friend class TypeRepr;
 };
 
+/// \brief An Axle vector type.
+/// \code
+///   Vec<Float, 4>
+/// \endcode
+class VecTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  ExprHandle *Length;
+  SourceLoc VecLoc;
+  SourceLoc LAngleLoc;
+  SourceLoc RAngleLoc;
+
+public:
+  VecTypeRepr(SourceLoc VecLoc, SourceLoc LAngleLoc, TypeRepr *Base, 
+              ExprHandle *Length, SourceLoc RAngleLoc)
+    : TypeRepr(TypeReprKind::Vec), Base(Base), Length(Length),
+      VecLoc(VecLoc), LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc) {
+  }
+
+  TypeRepr *getBase() const { return Base; }
+  ExprHandle *getLength() const { return Length; }
+  SourceLoc getVecLoc() const { return VecLoc; }
+  SourceLoc getLAngleLoc() const { return LAngleLoc; }
+  SourceLoc getRAngleLoc() const { return RAngleLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Vec;
+  }
+
+private:
+  SourceLoc getStartLocImpl() const { return VecLoc; }
+  SourceLoc getEndLocImpl() const { return RAngleLoc; }
+  void printImpl(llvm::raw_ostream &OS) const;
+  friend class TypeRepr;
+};
+
 } // end namespace swift
 
 namespace llvm {
