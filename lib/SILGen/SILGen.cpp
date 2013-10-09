@@ -243,12 +243,13 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant) {
   
   SILType constantType = getConstantType(constant);
   SILLinkage linkage = getConstantLinkage(constant);
+  KernelOrShaderKind KOS = constant.getKernelOrShaderKind();
 
   IsTransparent_t IsTrans = constant.isTransparent()?
                               IsTransparent : IsNotTransparent;
 
   SILFunction *F = new (M) SILFunction(M, linkage, "",
-                                       constantType, Nothing, IsTrans);
+                                       constantType, Nothing, KOS, IsTrans);
   
   ValueDecl *VD = nullptr;
   if (constant.hasDecl())

@@ -179,6 +179,14 @@ struct SILDeclRef {
   bool isDefaultArgGenerator() const {
     return kind == Kind::DefaultArgGenerator;
   }
+  
+  // The kind of Axle kernel or shader if it is one.
+  // FIXME: This only makes sense if this is a Func.
+  KernelOrShaderKind getKernelOrShaderKind() const {
+    if (!hasDecl())
+      return KernelOrShaderKind::Default;
+    return getDecl()->getAttrs().getKernelOrShaderKind();
+  }
 
   /// \brief True if the function should be treated as transparent.
   bool isTransparent() const;

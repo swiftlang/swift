@@ -12,11 +12,13 @@
 
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+
 using namespace swift;
 
 SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          StringRef Name, SILType LoweredType,
                          Optional<SILLocation> Loc,
+                         KernelOrShaderKind KOS,
                          IsTransparent_t isTrans)
   : ModuleAndLinkage(&Module, Linkage),
     Name(Name),
@@ -24,6 +26,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     Location(Loc),
     DeclCtx(nullptr),
     DebugScope(nullptr),
+    KernelOrShader(KOS),
     Transparent(isTrans) {
   Module.functions.push_back(this);
 }

@@ -19,6 +19,7 @@
 
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/AST/KernelOrShaderKind.h"
 #include "swift/AST/Ownership.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -129,18 +130,6 @@ public:
 };
   
 enum class AbstractCC : unsigned char;
-
-/// Marks if a function is a compute kernel, vertex shader, or fragment shader.
-enum class KernelOrShaderKind : unsigned char {
-  /// Not a kernel or shader.
-  Default = 0,
-  /// A compute kernel.
-  Kernel,
-  /// A vertex shader.
-  Vertex,
-  /// A fragment shader.
-  Fragment
-};
 
 /// DeclAttributes - These are attributes that may be applied to declarations.
 class DeclAttributes {
