@@ -11,6 +11,7 @@
 #include "swift/Subsystems.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -403,6 +404,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   Expr *ParsedExpr = nullptr;
   TypeLoc ParsedTypeLoc;
   DeclContext *CurDeclContext = nullptr;
+  Decl *CStyleForLoopIterationVariable = nullptr;
 
   /// \brief Set to true when we have delivered code completion results
   /// to the \c Consumer.
@@ -562,6 +564,9 @@ class CompletionLookup : swift::VisibleDeclConsumer {
   /// \brief Innermost method that the code completion point is in.
   const AbstractFunctionDecl *CurrentMethod = nullptr;
 
+  /// \brief Declarations that should get ExpressionSpecific semantic context.
+  llvm::SmallSet<const Decl *, 4> ExpressionSpecificDecls;
+
   bool needDot() const {
     return NeedLeadingDot;
   }
@@ -611,12 +616,18 @@ public:
     IsDynamicLookup = true;
   }
 
+  void addExpressionSpecificDecl(const Decl *D) {
+    ExpressionSpecificDecls.insert(D);
+  }
+
   SemanticContextKind getSemanticContext(const Decl *D,
                                          DeclVisibilityKind Reason) {
     switch (Reason) {
     case DeclVisibilityKind::LocalVariable:
     case DeclVisibilityKind::FunctionParameter:
     case DeclVisibilityKind::GenericParameter:
+      if (ExpressionSpecificDecls.count(D))
+        return SemanticContextKind::ExpressionSpecific;
       return SemanticContextKind::Local;
 
     case DeclVisibilityKind::MemberOfCurrentNominal:
@@ -1202,6 +1213,8 @@ void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
 
   Kind = CompletionKind::PostfixExprBeginning;
   CurDeclContext = P.CurDeclContext;
+  CStyleForLoopIterationVariable =
+      CodeCompletionCallbacks::CStyleForLoopIterationVariable;
 }
 
 void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
@@ -1292,6 +1305,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::PostfixExprBeginning: {
+    if (CStyleForLoopIterationVariable)
+      Lookup.addExpressionSpecificDecl(CStyleForLoopIterationVariable);
     Lookup.getValueCompletionsInDeclContext(
         P.Context.SourceMgr.getCodeCompletionLoc());
     break;

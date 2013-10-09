@@ -653,6 +653,13 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   ArrayRef<Decl *> FirstDeclsContext;
   if (!FirstDecls.empty())
     FirstDeclsContext = Context.AllocateCopy(FirstDecls);
+  VarDecl *IterationVariable = nullptr;
+  for (auto *D : FirstDeclsContext) {
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      IterationVariable = VD;
+      break;
+    }
+  }
 
   if (Tok.isNot(tok::semi)) {
     if (auto *CE = dyn_cast_or_null<ClosureExpr>(First.getPtrOrNull())) {
@@ -684,6 +691,9 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   // Consume the first semicolon.
   if (parseToken(tok::semi, Semi1Loc, diag::expected_semi_for_stmt))
     Status.setIsParseError();
+
+  CodeCompletionCallbacks::InCStyleForExpr InCStyleForExpr(CodeCompletion,
+                                                           IterationVariable);
 
   if (Tok.isNot(tok::semi)) {
     Second = parseExpr(diag::expected_cond_for_stmt);
@@ -744,6 +754,8 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     Third = parseExpr(diag::expected_expr, /*isExprBasic=*/true);
     Status |= Third;
   }
+
+  InCStyleForExpr.finished();
 
   if (LPLocConsumed && parseMatchingToken(tok::r_paren, RPLoc,
                                           diag::expected_rparen_for_stmt,LPLoc))

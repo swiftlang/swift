@@ -29,6 +29,10 @@ protected:
   /// completion.  This declaration contained the code completion token.
   Decl *DelayedParsedDecl = nullptr;
 
+  /// If code completion is done inside a controlling expression of a C-style
+  /// for loop statement, this is the declaration of the iteration variable.
+  Decl *CStyleForLoopIterationVariable = nullptr;
+
 public:
   CodeCompletionCallbacks(Parser &P)
       : P(P), Context(P.Context) {
@@ -43,6 +47,27 @@ public:
   void setDelayedParsedDecl(Decl *D) {
     DelayedParsedDecl = D;
   }
+
+  class InCStyleForExpr {
+    CodeCompletionCallbacks *Callbacks;
+
+  public:
+    InCStyleForExpr(CodeCompletionCallbacks *Callbacks,
+                    Decl *IterationVariable)
+        : Callbacks(Callbacks) {
+      if (Callbacks)
+        Callbacks->CStyleForLoopIterationVariable = IterationVariable;
+    }
+
+    void finished() {
+      if (Callbacks)
+        Callbacks->CStyleForLoopIterationVariable = nullptr;
+    }
+
+    ~InCStyleForExpr() {
+      finished();
+    }
+  };
 
   /// \brief Complete the whole expression.  This is a fallback that should
   /// produce results when more specific completion methods failed.
