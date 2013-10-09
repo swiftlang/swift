@@ -362,6 +362,8 @@ public:
 
   /// True if the nth argument is an indirect return or inout parameter.
   bool isInOutArgument(unsigned n) const {
+    if (n == 0 && hasIndirectReturn())
+      return false;
     return getSwiftArgumentType(n)->is<LValueType>();
   }
 
@@ -372,7 +374,7 @@ public:
     if (n == 0 && hasIndirectReturn())
       return true;
     // Otherwise, check for [inout].
-    return isInOutArgument(n);
+    return getSwiftArgumentType(n)->is<LValueType>();
   }
   
   /// Get the indirect return argument type. Always an address.

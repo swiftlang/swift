@@ -1,4 +1,4 @@
-//===--- SILTypeInfo.cpp - Defines the SILTypeInfo class hierarchy --------===//
+//===--- SILType.cpp - Defines the SILTypeInfo class hierarchy ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
