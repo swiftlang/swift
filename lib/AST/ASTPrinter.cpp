@@ -1165,7 +1165,7 @@ public:
     {
       // FIXME: Ugly hack: remove the .Builtin from the element type.
       llvm::raw_svector_ostream UnderlyingOS(UnderlyingStrVec);
-      T->getElementType().print(OS, Options);
+      visit(T->getElementType());
       if (UnderlyingStrVec.startswith("Builtin."))
         UnderlyingStr = UnderlyingStrVec.substr(9);
       else
@@ -1403,7 +1403,7 @@ public:
 
   void visitVecType(VecType *T) {
     OS << "Vec<";
-    T->getBaseType().print(OS, Options);
+    visit(T->getBaseType());
     OS << ", " << T->getLength() << ">";
   }
 
