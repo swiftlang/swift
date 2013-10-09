@@ -102,7 +102,7 @@ OwnershipConventions OwnershipConventions::get(SILGenFunction &gen,
   if (!c.isForeign)
     return getDefault(gen, ty);
   
-  SILFunctionTypeInfo *ft = ty.getFunctionTypeInfo(gen.SGM.M);
+  SILFunctionType *ft = ty.getFunctionTypeInfo(gen.SGM.M);
   
   // If we have a clang decl associated with the Swift decl, derive its
   // ownership conventions.
@@ -119,8 +119,8 @@ OwnershipConventions OwnershipConventions::get(SILGenFunction &gen,
 
 OwnershipConventions OwnershipConventions::getDefault(SILGenFunction &gen,
                                                       SILType ty) {
-  SILFunctionTypeInfo *ft = ty.getFunctionTypeInfo(gen.SGM.M);
-  size_t inputTypeCount = ft->getInputTypes().size();
+  SILFunctionType *ft = ty.getFunctionTypeInfo(gen.SGM.M);
+  size_t inputTypeCount = ft->getParameters().size();
   return {
     /*calleeConsumed*/ true,
     /*consumedArguments*/ llvm::SmallBitVector(inputTypeCount, true),
@@ -162,8 +162,8 @@ static void getConsumedArgs(PARAM_RANGE params,
 
 OwnershipConventions
 OwnershipConventions::getForClangDecl(const clang::Decl *clangDecl,
-                                      SILFunctionTypeInfo *ft) {
-  size_t inputTypeCount = ft->getInputTypes().size();
+                                      SILFunctionType *ft) {
+  size_t inputTypeCount = ft->getParameters().size();
   llvm::SmallBitVector consumedArgs(inputTypeCount, false);
   // FIXME: We don't support calling ObjC blocks yet. For now assume the callee
   // is always consumed.
@@ -199,13 +199,13 @@ OwnershipConventions::getForClangDecl(const clang::Decl *clangDecl,
 
 OwnershipConventions
 OwnershipConventions::getForObjCSelectorFamily(SelectorFamily family,
-                                               SILFunctionTypeInfo *ft) {
-  size_t inputTypeCount = ft->getInputTypes().size();
+                                               SILFunctionType *ft) {
+  size_t inputTypeCount = ft->getParameters().size();
   llvm::SmallBitVector consumedArgs(inputTypeCount, false);
   // FIXME: We don't support calling ObjC blocks yet. For now assume the callee
   // is always consumed.
   bool calleeConsumed = true;
-  Return returnKind = ft->getResultType().hasReferenceSemantics()
+  Return returnKind = ft->getResult().getType().hasReferenceSemantics()
     ? Return::Autoreleased
     : Return::Unretained;
   

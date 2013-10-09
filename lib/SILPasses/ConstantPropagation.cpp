@@ -79,7 +79,7 @@ static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
           }
 
           // Get the SIL subtypes of the returned tuple type.
-          SILType FuncResType = AI->getFunctionTypeInfo(M)->getResultType();
+          SILType FuncResType = AI->getFunctionTypeInfo(M)->getResult().getSILType();
           TupleType *T = FuncResType.castTo<TupleType>();
           assert(T->getNumElements() == 2);
           SILType ResTy1 =

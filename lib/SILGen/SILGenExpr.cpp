@@ -2100,14 +2100,14 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
     // Bridge arguments.
     Scope scope(Cleanups, CleanupLocation::getCleanupLocation(Loc));
-    SILFunctionTypeInfo *objcInfo = methodType.getFunctionTypeInfo(SGM.M);
+    SILFunctionType *objcInfo = methodType.getFunctionTypeInfo(SGM.M);
     unsigned idx = 0;
     for (auto &arg : args) {
       arg = emitNativeToBridgedValue(Loc,
                                      ManagedValue(arg, ManagedValue::Unmanaged),
                                      AbstractCC::ObjCMethod,
-                                     objcInfo->getInputTypes()[idx++]
-                                       .getSwiftType()).forward(*this);
+                                     objcInfo->getParameters()[idx++]
+                                       .getSILType().getSwiftType()).forward(*this);
     }
   } else {
     // Otherwise, directly call the constructor.
@@ -2262,7 +2262,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
 
   SILValue toFn = getNextUncurryLevelRef(*this, fd, to, curriedArgs);
   SILType resultTy
-    = SGM.getConstantType(from).getFunctionTypeInfo(SGM.M)->getResultType();
+    = SGM.getConstantType(from).getFunctionTypeInfo(SGM.M)->getResult().getSILType();
   SILType toFnTy = toFn.getType();
   
   // Forward archetypes and specialize if the function is generic.

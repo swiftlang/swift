@@ -49,7 +49,6 @@ class ASTContext;
 class SILArgument;
 class SILDebugScope;
 class SILModule;
-class SILFunctionTypeInfo;
 class AllocStackInst;
 
 namespace irgen {

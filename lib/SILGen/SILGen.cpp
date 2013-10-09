@@ -123,19 +123,19 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     // Check that the function takes the expected arguments and returns the
     // expected result type.
     SILDeclRef c(fd);
-    SILFunctionTypeInfo *funcInfo
+    SILFunctionType *funcInfo
       = SGM.getConstantType(c).getFunctionTypeInfo(SGM.M);
     
-    if (funcInfo->getInputTypes().size() != inputTypes.size()
-        || !std::equal(funcInfo->getInputTypes().begin(),
-                       funcInfo->getInputTypes().end(),
+    if (funcInfo->getParameters().size() != inputTypes.size()
+        || !std::equal(funcInfo->getParameterSILTypes().begin(),
+                       funcInfo->getParameterSILTypes().end(),
                        inputTypes.begin())) {
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName, functionName);
       exit(1);
     }
     
-    if (funcInfo->getResultType() != outputType) {
+    if (funcInfo->getResult().getSILType() != outputType) {
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName, functionName);
       exit(1);

@@ -985,19 +985,20 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
     if (auto *Apply = dyn_cast<ApplyInst>(User)) {
       SILType FnTy = Apply->getSubstCalleeType();
       
-      SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(Apply->getModule());
+      SILFunctionType *FTI = FnTy.getFunctionTypeInfo(Apply->getModule());
       unsigned ArgumentNumber = UI->getOperandNumber()-1;
 
+      auto Param = FTI->getParameters()[ArgumentNumber];
+
       // If this is an indirect return slot, it is a store.
-      if (ArgumentNumber == 0 && FTI->hasIndirectReturn()) {
+      if (Param.isIndirectResult()) {
         assert(!InStructSubElement && "We're initializing sub-members?");
         addElementUses(BaseElt, PointeeType, User, UseKind::Store);
         continue;
       }
 
       // Otherwise, check for @inout.
-      Type ArgTy = FTI->getSwiftArgumentType(ArgumentNumber);
-      if (ArgTy->is<LValueType>()) {
+      if (Param.isIndirectInOut()) {
         addElementUses(BaseElt, PointeeType, User, UseKind::InOutUse);
         continue;
       }

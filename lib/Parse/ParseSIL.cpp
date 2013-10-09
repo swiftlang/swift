@@ -2166,9 +2166,9 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     return true;
   }
 
-  SILFunctionTypeInfo *FTI = Ty.getFunctionTypeInfo(SILMod);
+  SILFunctionType *FTI = Ty.getFunctionTypeInfo(SILMod);
   
-  auto ArgTys = FTI->getInputTypes();
+  auto ArgTys = FTI->getParameterSILTypes();
   
   SmallVector<Substitution, 4> subs;
   if (!parsedSubs.empty()) {
@@ -2203,7 +2203,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
     
     ResultVal = B.createApply(InstLoc, FnVal, FnTy,
-                              FTI->getResultType(), subs, Args,
+                              FTI->getResult().getSILType(), subs, Args,
                               Transparent);
     break;
   }

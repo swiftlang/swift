@@ -682,10 +682,10 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
                                  IRGenSILFunction &IGF,
                                  SILBasicBlock *entry,
                                  Explosion &params,
-                                 SILFunctionTypeInfo *funcTI,
+                                 SILFunctionType *funcTy,
                                  std::function<bool()> requiresIndirectResult) {
   // Map the indirect return if present.
-  if (funcTI->hasIndirectReturn()) {
+  if (funcTy->hasIndirectResult()) {
     SILArgument *ret = entry->bbarg_begin()[0];
     SILValue retv(ret, 0);
     auto &retTI = IGF.IGM.getTypeInfo(ret->getType());
@@ -696,7 +696,7 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
     // Map an indirect return for a type SIL considers loadable but still
     // requires an indirect return at the IR level.
     if (requiresIndirectResult()) {
-      auto &retTI = IGF.IGM.getTypeInfo(funcTI->getResultType());
+      auto &retTI = IGF.IGM.getTypeInfo(funcTy->getResult().getSILType());
       IGF.IndirectReturn = retTI.getAddressForPointer(params.claimNext());
     }
     return entry->getBBArgs();
@@ -709,13 +709,13 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
                                             SILBasicBlock *entry,
                                             Explosion &allParamValues,
                                             SILType funcTy) {
-  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
+  SILFunctionType *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
   
   // Map the indirect return if present.
   ArrayRef<SILArgument*> params
     = emitEntryPointIndirectReturn(IGF, entry, allParamValues, funcTI,
       [&]() -> bool {
-        auto retType = funcTI->getResultType().getSwiftRValueType();
+        auto retType = funcTI->getResult().getType();
         return IGF.IGM.requiresIndirectResult(retType, IGF.CurExplosionLevel);
       });
 
@@ -786,12 +786,12 @@ static void emitEntryPointArgumentsObjCMethodCC(IRGenSILFunction &IGF,
                                                 SILBasicBlock *entry,
                                                 Explosion &params,
                                                 SILType funcTy) {
-  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
+  SILFunctionType *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
 
   // Map the indirect return if present.
   ArrayRef<SILArgument*> args
     = emitEntryPointIndirectReturn(IGF, entry, params, funcTI, [&] {
-      return requiresExternalIndirectResult(IGF.IGM, funcTI->getResultType());
+      return requiresExternalIndirectResult(IGF.IGM, funcTI->getResult().getSILType());
     });
   
   // Map the self argument. This should always be an ObjC pointer type so
@@ -816,12 +816,12 @@ static void emitEntryPointArgumentsCCC(IRGenSILFunction &IGF,
                                        SILBasicBlock *entry,
                                        Explosion &params,
                                        SILType funcTy) {
-  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
+  SILFunctionType *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
 
   // Map the indirect return if present.
   ArrayRef<SILArgument*> args
     = emitEntryPointIndirectReturn(IGF, entry, params, funcTI, [&] {
-      return requiresExternalIndirectResult(IGF.IGM, funcTI->getResultType());
+      return requiresExternalIndirectResult(IGF.IGM, funcTI->getResult().getSILType());
     });
   emitEntryPointArgumentsCOrObjC(IGF, entry, params, args);
 }
@@ -1332,7 +1332,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
 
   SILType calleeTy = i->getSubstCalleeType();
   SILType resultTy
-    = calleeTy.getFunctionTypeInfo(*IGM.SILMod)->getSemanticResultType();
+    = calleeTy.getFunctionTypeInfo(*IGM.SILMod)->getSemanticResultSILType();
   
   CallEmission emission = getCallEmissionForLoweredValue(*this,
                                                      i->getCallee().getType(),

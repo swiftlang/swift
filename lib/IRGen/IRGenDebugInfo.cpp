@@ -395,20 +395,21 @@ llvm::DIArray IRGenDebugInfo::createParameterTypes(SILModule &SILMod,
   if (!SILTy.getSwiftType())
     return llvm::DIArray();
 
-  SILFunctionTypeInfo *TypeInfo = SILTy.getFunctionTypeInfo(SILMod);
+  SILFunctionType *TypeInfo = SILTy.getFunctionTypeInfo(SILMod);
   if (!TypeInfo) return llvm::DIArray();
 
   SmallVector<llvm::Value *, 16> Parameters;
 
   // The function return type is the first element in the list.
-  createParameterType(Parameters, TypeInfo->getResultType().getSwiftType(),
+  createParameterType(Parameters, TypeInfo->getResult().getType(),
                       Scope, DeclCtx);
 
   // Actually, the input type is either a single type or a tuple
   // type. We currently represent a function with one n-tuple argument
   // as an n-ary function.
-  for (auto ParamTy : TypeInfo->getInputTypes())
-    createParameterType(Parameters, ParamTy.getSwiftType(), Scope, DeclCtx);
+  for (auto Param : TypeInfo->getParameters())
+    createParameterType(Parameters, Param.getSILType().getSwiftType(),
+                        Scope, DeclCtx);
 
   return DBuilder.getOrCreateArray(Parameters);
 }

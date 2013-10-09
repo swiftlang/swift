@@ -1579,6 +1579,13 @@ public:
       type.print(out);
       return out;
     }
+
+    bool operator==(ParameterType rhs) const {
+      return TypeAndConvention == rhs.TypeAndConvention;
+    }
+    bool operator!=(ParameterType rhs) const {
+      return !(*this == rhs);
+    }
   };
 
   /// A result type and the rules for returning it.
@@ -1607,6 +1614,13 @@ public:
                                          ResultType type) {
       type.print(out);
       return out;
+    }
+
+    bool operator==(ResultType rhs) const {
+      return TypeAndConvention == rhs.TypeAndConvention;
+    }
+    bool operator!=(ResultType rhs) const {
+      return !(*this == rhs);
     }
   };
 
@@ -1656,6 +1670,14 @@ public:
   bool hasIndirectResult() const {
     return !getParameters().empty() && getParameters()[0].isIndirectResult();
   }
+  ParameterType getIndirectResult() const {
+    assert(hasIndirectResult());
+    return getParameters()[0];
+  }
+
+  /// Returns the SILType of the semantic result of this function: the
+  /// indirect result type, if there is one, otherwise the direct result.
+  SILType getSemanticResultSILType() const; // in SILType.h
 
   /// Get the parameters, ignoring any indirect-return parameter.
   ArrayRef<ParameterType> getNonReturnParameters() const {

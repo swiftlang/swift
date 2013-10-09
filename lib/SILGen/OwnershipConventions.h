@@ -26,7 +26,7 @@ namespace clang {
 
 namespace swift {
   class SILType;
-  class SILFunctionTypeInfo;
+  class SILFunctionType;
   
 namespace Lowering {
   enum class SelectorFamily : unsigned;
@@ -59,9 +59,9 @@ private:
   {}
   
   static OwnershipConventions getForClangDecl(const clang::Decl *method,
-                                              SILFunctionTypeInfo *ft);
+                                              SILFunctionType *ft);
   static OwnershipConventions getForObjCSelectorFamily(SelectorFamily family,
-                                                       SILFunctionTypeInfo *ft);
+                                                       SILFunctionType *ft);
   
 public:
   OwnershipConventions() = default;

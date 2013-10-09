@@ -27,7 +27,6 @@
 namespace swift {
   class ASTContext;
   class VarDecl;
-  class SILFunctionTypeInfo;
 
 namespace Lowering {
   class TypeConverter;
@@ -153,9 +152,9 @@ public:
     return rvalueTy;
   }
   
-  /// Gives the SILFunctionTypeInfo for a function type. The type must be
+  /// Gives the SILFunctionType for a function type. The type must be
   /// derived from a Swift FunctionType or PolymorphicFunctionType.
-  SILFunctionTypeInfo *getFunctionTypeInfo(SILModule &M) const;
+  SILFunctionType *getFunctionTypeInfo(SILModule &M) const;
   
   /// Returns the Swift return type of a function type.
   /// The SILType must refer to a function type.
@@ -290,111 +289,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   return OS;
 }
 
-/// Redundant but expensive-to-recompute information about a SIL
-/// FunctionType or PolymorphicFunctionType. Contains the details of the
-/// SIL-level calling convention for the function, including its exploded
-/// input argument types and whether it uses an indirect return argument.
-class SILFunctionTypeInfo {
-  /// Recursively destructure and visit tuple-type arguments
-  template<typename F>
-  class DestructuredArgumentTypeVisitor
-    : public CanTypeVisitor<DestructuredArgumentTypeVisitor<F>>
-  {
-    const F &fn;
-  public:
-    DestructuredArgumentTypeVisitor(const F &fn) : fn(fn) { }
-
-    void visitType(CanType t) {
-      fn(t);
-    }
-
-    void visitTupleType(CanTupleType tt) {
-      for (auto eltType : tt.getElementTypes()) {
-        CanTypeVisitor<DestructuredArgumentTypeVisitor<F>>::visit(eltType);
-      }
-    }
-  };
-
-  CanType swiftType;
-  CanSILFunctionType fnType;
-
-  friend class SILType;
-
-  SILFunctionTypeInfo(CanType swiftType, CanSILFunctionType fnType)
-    : swiftType(swiftType), fnType(fnType) {}
-
-public:
-
-  CanType getSwiftType() const { return swiftType; }
-
-  /// Returns the list of input types needed to fully apply a function of
-  /// this function type with an ApplyInst.
-  SILFunctionType::ParameterSILTypeArrayRef getInputTypes() const {
-    return fnType->getParameterSILTypes();
-  }
-  
-  /// Returns the result of an ApplyInst applied to this function type.
-  SILType getResultType() const {
-    return fnType->getResult().getSILType();
-  }
-  
-  /// True if this function type takes an indirect return address as its
-  /// first argument.
-  bool hasIndirectReturn() const {
-    return fnType->hasIndirectResult();
-  }
-
-  /// True if the nth argument is an indirect return or inout parameter.
-  bool isInOutArgument(unsigned i) const {
-    return fnType->getParameters()[i].isIndirectInOut();
-  }
-
-  /// True if the nth argument is an indirect return or inout parameter.
-  bool isInOutOrIndirectReturn(unsigned i) const {
-    auto convention = fnType->getParameters()[i].getConvention();
-    return (convention == ParameterConvention::Indirect_Inout ||
-            convention == ParameterConvention::Indirect_Out);
-  }
-  
-  /// Get the indirect return argument type. Always an address.
-  SILType getIndirectReturnType() const {
-    assert(hasIndirectReturn() && "type doesn't have an indirect return?!");
-    return getInputTypes().front();
-  }
-  
-  /// Returns the list of input types, excluding the indirect return argument,
-  /// if any.
-  SILFunctionType::ParameterSILTypeArrayRef 
-  getInputTypesWithoutIndirectReturnType() const {
-    return fnType->getNonReturnParameterSILTypes();
-  }
-  
-  /// Returns the type of the return type or the indirect return slot if
-  /// present.
-  SILType getSemanticResultType() const {
-    return hasIndirectReturn() ? getIndirectReturnType() : getResultType();
-  }
-
-  /// getSwiftArgumentType - Return the swift type of the argument, numbered by
-  /// the arguments to an apply or partial_apply instruction.  If the function
-  /// has an indirect return, this cannot ask about its argument slot.
-  CanType getSwiftArgumentType(unsigned ArgNo) const;
-
-  template <typename F>
-  static void visitSwiftArgumentTypes(const F &fn, CanType type) {
-    DestructuredArgumentTypeVisitor<F>(fn).visit(type);
-  }
-
-  template <typename F>
-  void visitSwiftArgumentTypes(const F &fn) const {
-    visitSwiftArgumentTypes(fn,
-                            cast<AnyFunctionType>(getSwiftType()).getInput());
-  }
-
-  /// getSwiftResultType - Return the swift type of the result
-  CanType getSwiftResultType() const;
-};
-
 inline SILType SILFunctionType::getSILParameter(unsigned i) const {
   return getParameters()[i].getSILType();
 }
@@ -418,6 +312,11 @@ inline SILType SILFunctionType::getSILResult() const {
 
 inline SILType SILFunctionType::ResultType::getSILType() const {
   return SILType::getPrimitiveObjectType(getType());
+}
+
+inline SILType SILFunctionType::getSemanticResultSILType() const {
+  return (hasIndirectResult() ? getIndirectResult().getSILType()
+                              : getResult().getSILType());
 }
   
 } // end swift namespace

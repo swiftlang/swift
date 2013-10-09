@@ -357,7 +357,7 @@ public:
   
   // Get the type of the callee with the applied substitutions.
   SILType getSubstCalleeType() const { return SubstCalleeType; }
-  SILFunctionTypeInfo *getFunctionTypeInfo(SILModule &M) const {
+  SILFunctionType *getFunctionTypeInfo(SILModule &M) const {
     return getSubstCalleeType().getFunctionTypeInfo(M);
   }
   
@@ -385,7 +385,7 @@ public:
   bool isTransparent() const { return Transparent; }
 
   bool hasIndirectReturn(SILModule &M) const {
-    return getFunctionTypeInfo(M)->hasIndirectReturn();
+    return getFunctionTypeInfo(M)->hasIndirectResult();
   }
 
   SILValue getIndirectReturn(SILModule &M) const {
@@ -450,7 +450,7 @@ public:
 
   // Get the type of the callee with the applied substitutions.
   SILType getSubstCalleeType() const { return SubstCalleeType; }
-  SILFunctionTypeInfo *getFunctionTypeInfo(SILModule &M) const {
+  SILFunctionType *getFunctionTypeInfo(SILModule &M) const {
     return getSubstCalleeType().getFunctionTypeInfo(M);
   }
 

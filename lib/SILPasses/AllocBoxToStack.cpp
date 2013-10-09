@@ -153,12 +153,12 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     // it is passed through [inout] arguments or for indirect returns.
     if (auto apply = dyn_cast<ApplyInst>(User)) {
       if (apply->getFunctionTypeInfo(User->getModule())
-            ->isInOutOrIndirectReturn(UI->getOperandNumber()-1))
+            ->getParameters()[UI->getOperandNumber()-1].isIndirect())
         continue;
     }
     if (auto partialApply = dyn_cast<PartialApplyInst>(User)) {
       if (partialApply->getFunctionTypeInfo(User->getModule())
-            ->isInOutOrIndirectReturn(UI->getOperandNumber()-1))
+            ->getParameters()[UI->getOperandNumber()-1].isIndirect())
         continue;
       
     }

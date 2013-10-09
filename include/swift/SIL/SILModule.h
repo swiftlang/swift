@@ -97,7 +97,7 @@ private:
   llvm::SetVector<VarDecl*> globals;
 
   /// This is a cache that memoizes the result of SILType::getFunctionTypeInfo.
-  llvm::DenseMap<AnyFunctionType*, SILFunctionTypeInfo*> FunctionTypeInfoCache;
+  llvm::DenseMap<AnyFunctionType*, SILFunctionType*> FunctionTypeInfoCache;
 
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<const FuncDecl*, IntrinsicInfo> IntrinsicIDCache;

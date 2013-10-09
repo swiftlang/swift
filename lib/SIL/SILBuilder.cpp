@@ -28,25 +28,25 @@ SILType SILBuilder::getStructFieldType(VarDecl *Field) {
   return SILType::getPrimitiveObjectType(FieldTy);
 }
 
-SILType SILBuilder::getPartialApplyResultType(SILType Ty, unsigned ArgCount,
+SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                               SILModule &M) {
-  SILFunctionTypeInfo *FTI = Ty.getFunctionTypeInfo(M);
-  unsigned NewArgCount =
-    FTI->getInputTypesWithoutIndirectReturnType().size() - ArgCount;
+  SILFunctionType *FTI = origTy.getFunctionTypeInfo(M);
+  auto params = FTI->getNonReturnParameters();
+  auto newParams = params.slice(0, params.size() - argCount);
 
-  SmallVector<TupleTypeElt, 4> NewArgTypes;
-  unsigned ArgNo = 0;
-  FTI->visitSwiftArgumentTypes([&](CanType type) {
-    if (ArgNo != NewArgCount) {
-      NewArgTypes.push_back(type);
-      ++ArgNo;
-    }
-  });
+  SmallVector<TupleTypeElt, 4> newArgTypes;
+  newArgTypes.reserve(newParams.size());
+  for (auto param : newParams) {
+    Type type = param.getType();
+    if (param.isIndirectInOut())
+      type = param.getSILType().getSwiftType();
+    newArgTypes.push_back(type);
+  }
 
-  Type ArgTy = TupleType::get(NewArgTypes, M.getASTContext());
-  Type ResTy =
-    FunctionType::get(ArgTy, FTI->getSwiftResultType(), M.getASTContext());
-  return M.Types.getLoweredType(ResTy);
+  Type argTy = TupleType::get(newArgTypes, M.getASTContext());
+  Type resTy = FunctionType::get(argTy, origTy.getAs<AnyFunctionType>().getResult(),
+                                 M.getASTContext());
+  return M.Types.getLoweredType(resTy);
 }
 
 BranchInst *SILBuilder::createBranch(SILLocation Loc,

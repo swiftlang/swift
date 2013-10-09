@@ -537,7 +537,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   // Save off the forwarded indirect return address if we have one.
   llvm::Value *indirectReturn = nullptr;
   SILType appliedResultTy
-    = origMethodType.getFunctionTypeInfo(*IGM.SILMod)->getSemanticResultType();
+    = origMethodType.getFunctionTypeInfo(*IGM.SILMod)->getSemanticResultSILType();
   auto &appliedResultTI = IGM.getTypeInfo(appliedResultTy);
   if (appliedResultTI.getSchema(ExplosionKind::Minimal)
         .requiresIndirectResult(IGM)) {

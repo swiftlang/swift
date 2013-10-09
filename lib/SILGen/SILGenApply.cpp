@@ -896,14 +896,13 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
   }
   
   auto inputTypes
-    = calleeTy.getFunctionTypeInfo(SGM.M)
-        ->getInputTypesWithoutIndirectReturnType();
+    = calleeTy.getFunctionTypeInfo(SGM.M)->getNonReturnParameters();
   
   // Gather the arguments.
   for (size_t i = 0, size = Args.size(); i < size; ++i) {
     SILValue argValue
       = forwardIfConsumed(Args[i],
-                          inputTypes[i],
+                          inputTypes[i].getSILType(),
                           Ownership.isArgumentConsumed(i));
     argValues.push_back(argValue);
   }

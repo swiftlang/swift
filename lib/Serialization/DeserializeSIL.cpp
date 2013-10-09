@@ -501,8 +501,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty2 = MF->getType(TyID2);
     SILType FnTy = getSILType(Ty, (SILValueCategory)TyCategory);
     SILType SubstFnTy = getSILType(Ty2, (SILValueCategory)TyCategory);
-    SILFunctionTypeInfo *FTI = SubstFnTy.getFunctionTypeInfo(SILMod);
-    auto ArgTys = FTI->getInputTypes();
+    SILFunctionType *FTI = SubstFnTy.getFunctionTypeInfo(SILMod);
+    auto ArgTys = FTI->getParameterSILTypes();
 
     assert((ArgTys.size() << 1) == ListOfValues.size() &&
            "Argument number mismatch in ApplyInst.");
@@ -522,7 +522,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     
     ResultVal = Builder.createApply(Loc, getLocalValue(ValID, ValResNum, FnTy),
                                     SubstFnTy,
-                                    FTI->getResultType(),
+                                    FTI->getResult().getSILType(),
                                     Substitutions, Args, Transparent);
     break;
   }
@@ -531,8 +531,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty2 = MF->getType(TyID2);
     SILType FnTy = getSILType(Ty, (SILValueCategory)TyCategory);
     SILType SubstFnTy = getSILType(Ty2, (SILValueCategory)TyCategory2);
-    SILFunctionTypeInfo *FTI = SubstFnTy.getFunctionTypeInfo(SILMod);
-    auto ArgTys = FTI->getInputTypes();
+    SILFunctionType *FTI = SubstFnTy.getFunctionTypeInfo(SILMod);
+    auto ArgTys = FTI->getParameterSILTypes();
 
     assert((ArgTys.size() << 1) >= ListOfValues.size() &&
            "Argument number mismatch in PartialApplyInst.");
@@ -551,7 +551,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                    ArgTys[ArgNo++]));
 
     Type ArgTy = TupleType::get(NewArgTypes, Ctx);
-    Type ResTy = FunctionType::get(ArgTy, FTI->getResultType().getSwiftType(),
+    Type ResTy = FunctionType::get(ArgTy, FTI->getResult().getType(),
                                    Ctx);
 
     unsigned NumSub = NumSubs;

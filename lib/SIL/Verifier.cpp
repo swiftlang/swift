@@ -251,7 +251,7 @@ public:
     
     // Apply the substitutions.
     // FIXME: Eventually we want this substitution to apply 1:1 to the
-    // SILFunctionTypeInfo-level calling convention of the type, instead of
+    // SILFunctionType-level calling convention of the type, instead of
     // hiding the abstraction difference behind the specialization.
     auto substTy = polyTy->substGenericArgs(M, subs)->getCanonicalType();
     
@@ -269,16 +269,17 @@ public:
     require(calleeTy == AI->getSubstCalleeType(),
             "substituted callee type does not match substitutions");
     
-    SILFunctionTypeInfo *ti = calleeTy.getFunctionTypeInfo(F.getModule());
+    SILFunctionType *ti = calleeTy.getFunctionTypeInfo(F.getModule());
     
     // Check that the arguments and result match.
-    require(AI->getArguments().size() == ti->getInputTypes().size(),
+    require(AI->getArguments().size() == ti->getParameters().size(),
             "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = AI->getArguments().size(); i < size; ++i) {
-      requireSameType(AI->getArguments()[i].getType(), ti->getInputTypes()[i],
+      requireSameType(AI->getArguments()[i].getType(),
+                      ti->getParameters()[i].getSILType(),
                       "operand of 'apply' doesn't match function input type");
     }
-    require(AI->getType() == ti->getResultType(),
+    require(AI->getType() == ti->getResult().getSILType(),
             "type of apply instruction doesn't match function result type");
   }
   
@@ -301,36 +302,36 @@ public:
     require(calleeTy == PAI->getSubstCalleeType(),
             "substituted callee type does not match substitutions");
 
-    SILFunctionTypeInfo *info
+    SILFunctionType *info
       = calleeTy.getFunctionTypeInfo(F.getModule());
-    SILFunctionTypeInfo *resultInfo
+    SILFunctionType *resultInfo
       = appliedTy.getFunctionTypeInfo(F.getModule());
     
     // The arguments must match the suffix of the original function's input
     // types.
-    require(PAI->getArguments().size() + resultInfo->getInputTypes().size()
-              == info->getInputTypes().size(),
+    require(PAI->getArguments().size() + resultInfo->getParameters().size()
+              == info->getParameters().size(),
             "result of partial_apply should take as many inputs as were not "
             "applied by the instruction");
     
-    unsigned offset = info->getInputTypes().size() - PAI->getArguments().size();
+    unsigned offset = info->getParameters().size() - PAI->getArguments().size();
     
     for (unsigned i = 0, size = PAI->getArguments().size(); i < size; ++i) {
       require(PAI->getArguments()[i].getType()
-                == info->getInputTypes()[i + offset],
+                == info->getParameters()[i + offset].getSILType(),
               "applied argument types do not match suffix of function type's "
               "inputs");
     }
     
     // The arguments to the result function type must match the prefix of the
     // original function's input types.
-    for (unsigned i = 0, size = resultInfo->getInputTypes().size();
+    for (unsigned i = 0, size = resultInfo->getParameters().size();
          i < size; ++i) {
-      require(resultInfo->getInputTypes()[i] == info->getInputTypes()[i],
+      require(resultInfo->getParameters()[i] == info->getParameters()[i],
               "inputs to result function type do not match unapplied inputs "
               "of original function");
     }
-    require(resultInfo->getResultType() == info->getResultType(),
+    require(resultInfo->getResult() == info->getResult(),
             "result type of result function type does not match original "
             "function");
   }
@@ -1299,27 +1300,27 @@ public:
     require(opFTy->isThin() == resFTy->isThin(),
             "convert_function cannot change function thinness");
     
-    SILFunctionTypeInfo *opTI
+    SILFunctionType *opTI
       = ICI->getOperand().getType().getFunctionTypeInfo(F.getModule());
-    SILFunctionTypeInfo *resTI
+    SILFunctionType *resTI
       = ICI->getType().getFunctionTypeInfo(F.getModule());
 
-    require(opTI->getResultType() == resTI->getResultType(),
+    require(opTI->getResult() == resTI->getResult(),
             "result types of convert_function operand and result do no match");
-    require(opTI->getInputTypes().size() == resTI->getInputTypes().size(),
+    require(opTI->getParameters().size() == resTI->getParameters().size(),
             "input types of convert_function operand and result do not match");
-    require(std::equal(opTI->getInputTypes().begin(),
-                       opTI->getInputTypes().end(),
-                      resTI->getInputTypes().begin()),
+    require(std::equal(opTI->getParameters().begin(),
+                       opTI->getParameters().end(),
+                      resTI->getParameters().begin()),
             "input types of convert_function operand and result do not match");
   }
   
   void checkReturnInst(ReturnInst *RI) {
     DEBUG(RI->print(llvm::dbgs()));
     
-    SILFunctionTypeInfo *ti =
+    SILFunctionType *ti =
       F.getLoweredType().getFunctionTypeInfo(F.getModule());
-    SILType functionResultType = ti->getResultType();
+    SILType functionResultType = ti->getResult().getSILType();
     SILType instResultType = RI->getOperand().getType();
     DEBUG(llvm::dbgs() << "function return type: ";
           functionResultType.dump();
@@ -1332,9 +1333,9 @@ public:
   void checkAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
     DEBUG(RI->print(llvm::dbgs()));
     
-    SILFunctionTypeInfo *ti =
+    SILFunctionType *ti =
       F.getLoweredType().getFunctionTypeInfo(F.getModule());
-    SILType functionResultType = ti->getResultType();
+    SILType functionResultType = ti->getResult().getSILType();
     SILType instResultType = RI->getOperand().getType();
     DEBUG(llvm::dbgs() << "function return type: ";
           functionResultType.dump();
@@ -1555,7 +1556,7 @@ public:
 
   void verifyEntryPointArguments(SILBasicBlock *entry) {
     SILType ty = F.getLoweredType();
-    SILFunctionTypeInfo *ti = ty.getFunctionTypeInfo(F.getModule());
+    SILFunctionType *ti = ty.getFunctionTypeInfo(F.getModule());
     
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
           for (auto *arg : make_range(entry->bbarg_begin(), entry->bbarg_end()))
@@ -1563,15 +1564,15 @@ public:
           llvm::dbgs() << "Input types for SIL function type ";
           ty.print(llvm::dbgs());
           llvm::dbgs() << ":\n";
-          for (auto input : ti->getInputTypes())
-            input.dump(););
+          for (auto input : ti->getParameters())
+            input.getSILType().dump(););
     
-    require(entry->bbarg_size() == ti->getInputTypes().size(),
+    require(entry->bbarg_size() == ti->getParameters().size(),
             "entry point has wrong number of arguments");
     
     
     require(std::equal(entry->bbarg_begin(), entry->bbarg_end(),
-                      ti->getInputTypes().begin(),
+                      ti->getParameterSILTypes().begin(),
                       [](SILArgument *bbarg, SILType ty) {
                         return bbarg->getType() == ty;
                       }),

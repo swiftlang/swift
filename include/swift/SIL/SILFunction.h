@@ -92,7 +92,7 @@ public:
   SILModule &getModule() const { return *ModuleAndLinkage.getPointer(); }
 
   SILType getLoweredType() const { return LoweredType; }
-  SILFunctionTypeInfo *getFunctionTypeInfo() const {
+  SILFunctionType *getFunctionTypeInfo() const {
     return LoweredType.getFunctionTypeInfo(getModule());
   }
   
