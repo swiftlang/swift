@@ -249,10 +249,6 @@ namespace {
     }
     
     void visitAssociatedType(AssociatedTypeDecl *ty) {
-      // Don't need to do anything for the implicit "Self" type.
-      if (ty->isSelf())
-        return;
-      
       asDerived().addAssociatedType(ty);
     }
   };

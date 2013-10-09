@@ -133,6 +133,7 @@ DeclID Serializer::addDeclRef(const Decl *D) {
   case DeclKind::Class:
   case DeclKind::Struct:
   case DeclKind::Enum:
+  case DeclKind::Protocol:
     paramList = cast<NominalTypeDecl>(D)->getGenericParams();
     break;
   default:
@@ -862,8 +863,18 @@ void Serializer::writeCrossReference(const Decl *D) {
       // If the value is a type, it's uniquely identified by its name.
       // Otherwise, use the value's type for disambiguation.
       Type ty;
-      if (!isa<TypeDecl>(value))
-        ty = value->getType();
+      if (!isa<TypeDecl>(value)) {
+        // If this function has an interface type, use its canonicalized form.
+        if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+          ty = func->getInterfaceType();
+          if (ty)
+            ty = ty->getCanonicalType();
+        }
+
+        if (!ty)
+          ty = value->getType();
+      }
+      
       typeID = addTypeRef(ty);
     }
 
@@ -1040,7 +1051,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::GenericTypeParam: {
     auto genericParam = cast<GenericTypeParamDecl>(D);
-    assert(!genericParam->isImplicit() && "Implicit generic parameter?");
 
     // FIXME: Handle attributes.
     // FIXME: Do generic params have any interesting attributes?
@@ -1052,6 +1062,7 @@ void Serializer::writeDecl(const Decl *D) {
     GenericTypeParamDeclLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addIdentifierRef(genericParam->getName()),
                                 addDeclRef(DC),
+                                genericParam->isImplicit(),
                                 genericParam->getDepth(),
                                 genericParam->getIndex(),
                                 addTypeRef(genericParam->getSuperclass()),
@@ -1167,7 +1178,6 @@ void Serializer::writeDecl(const Decl *D) {
 
     assert(remainingAttrs.empty() && "unhandled protocol attrs");
 
-    assert(!proto->getGenericParams() && "protocols can't be generic");
     const Decl *DC = getDeclForContext(proto->getDeclContext());
 
     SmallVector<DeclID, 4> protocols;
@@ -1183,6 +1193,8 @@ void Serializer::writeDecl(const Decl *D) {
                                proto->isObjC(),
                                protocols);
 
+    writeGenericParams(proto->getGenericParams());
+    writeRequirements(proto->getGenericRequirements());
     writeMembers(proto->getMembers(), true);
     break;
   }
@@ -1509,12 +1521,18 @@ void Serializer::writeType(Type ty) {
     for (auto proto : archetypeTy->getConformsTo())
       conformances.push_back(addDeclRef(proto));
 
+    DeclID assocTypeOrProtoID;
+    if (auto assocType = archetypeTy->getAssocType())
+      assocTypeOrProtoID = addDeclRef(assocType);
+    else
+      assocTypeOrProtoID = addDeclRef(archetypeTy->getSelfProtocol());
+
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     addIdentifierRef(archetypeTy->getName()),
                                     archetypeTy->isPrimary(),
                                     indexOrParentID,
-                                    addDeclRef(archetypeTy->getAssocType()),
+                                    assocTypeOrProtoID,
                                     addTypeRef(archetypeTy->getSuperclass()),
                                     conformances);
 

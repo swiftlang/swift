@@ -134,12 +134,6 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
       if (LK == LookupKind::QualifiedOnMetatype && isa<VarDecl>(VD))
         continue;
 
-      if (!LookupFromChildDeclContext) {
-        // Current decl context is outside 'D', so 'Self' decl is not visible.
-        if (auto AssocType = dyn_cast<AssociatedTypeDecl>(VD))
-          if (AssocType->isSelf())
-            continue;
-      }
       BaseMembers.push_back(VD);
     }
   }
@@ -175,7 +169,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
 
         // Get the type without the first uncurry level with 'self'.
         CanType T = D->getType()
-                        ->castTo<FunctionType>()
+                        ->castTo<AnyFunctionType>()
                         ->getResult()
                         ->getCanonicalType();
 

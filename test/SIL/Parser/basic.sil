@@ -168,12 +168,12 @@ protocol P {
 
 sil @existentials : $@thin (n : P) -> () {
 bb0(%0 : $*P):
-  %1 = project_existential %0 : $*P to $*P.Self // CHECK: project_existential %0
+  %1 = project_existential %0 : $*P to $*@sil_self P // CHECK: project_existential %0
 
   // CHECK: protocol_method {{.*}} : $*P, #P.doIt!1
-  %2 = protocol_method %0 : $*P, #P.doIt!1 : $@cc(method) ((), [inout] P.Self) -> ()
+  %2 = protocol_method %0 : $*P, #P.doIt!1 : $@cc(method) ((), [inout] @sil_self P) -> ()
   // CHECK: apply
-  %3 = apply %2(%1) : $@cc(method) ((), [inout] P.Self) -> ()
+  %3 = apply %2(%1) : $@cc(method) ((), [inout] @sil_self P) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
   %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
   %6 = return %4 : $()                // CHECK: return 
@@ -290,11 +290,11 @@ bb0(%0 : $ClassBound):
   %2 = store %0 to %1#1 : $*ClassBound      // CHECK: store
   %3 = load %1#1 : $*ClassBound             // CHECK: load
   %4 = strong_retain %3 : $ClassBound              // CHECK: strong_retain
-  // CHECK: project_existential_ref {{%.*}} : $ClassBound to $Self
-  %5 = project_existential_ref %3 : $ClassBound to $ClassBound.Self
+  // CHECK: project_existential_ref {{%.*}} : $ClassBound to $@sil_self ClassBound
+  %5 = project_existential_ref %3 : $ClassBound to $@sil_self ClassBound
   // CHECK: protocol_method
-  %6 = protocol_method %3 : $ClassBound, #ClassBound.classBoundMethod!1 : $@cc(method) @thin ((), ClassBound.Self) -> ()
-  %7 = apply %6(%5) : $@cc(method) @thin ((), ClassBound.Self) -> ()
+  %6 = protocol_method %3 : $ClassBound, #ClassBound.classBoundMethod!1 : $@cc(method) @thin ((), @sil_self ClassBound) -> ()
+  %7 = apply %6(%5) : $@cc(method) @thin ((), @sil_self ClassBound) -> ()
   %8 = tuple ()
   %9 = strong_release %1#0 : $Builtin.ObjectPointer
   %10 = return %8 : $()
@@ -981,8 +981,8 @@ bb0(%0 : $DynamicLookup):
   %3 = alloc_box $Optional<() -> ()>
   %4 = load %1#1 : $*DynamicLookup
   strong_retain %4 : $DynamicLookup
-  %6 = project_existential_ref %4 : $DynamicLookup to $DynamicLookup.Self
-  %7 = ref_to_object_pointer %6 : $DynamicLookup.Self to $Builtin.ObjCPointer
+  %6 = project_existential_ref %4 : $DynamicLookup to $@sil_self DynamicLookup
+  %7 = ref_to_object_pointer %6 : $@sil_self DynamicLookup to $Builtin.ObjCPointer
   dynamic_method_br %7 : $Builtin.ObjCPointer, #X.f!1, bb1, bb2
 bb1:
   br bb3

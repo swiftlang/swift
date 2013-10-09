@@ -320,9 +320,9 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
       (!isa<ClassDecl>(nominalDC) && !isa<ProtocolDecl>(nominalDC)))
     return false;
 
-  // Dynamic lookup cannot find results within a generic context, because there
-  // is no sensible way to infer the generic arguments.
-  if (getDeclContext()->isGenericContext())
+  // Dynamic lookup cannot find results within a non-protocol generic context,
+  // because there is no sensible way to infer the generic arguments.
+  if (getDeclContext()->isGenericContext() && !isa<ProtocolDecl>(nominalDC))
     return false;
 
   // Dynamic lookup can find functions, variables, and subscripts.
@@ -398,16 +398,45 @@ void NominalTypeDecl::computeType() {
   // Compute the declared type.
   Type parentTy = getDeclContext()->getDeclaredTypeInContext();
   ASTContext &ctx = getASTContext();
-  if (getGenericParams()) {
+  if (auto proto = dyn_cast<ProtocolDecl>(this)) {
+    if (!DeclaredTy)
+      DeclaredTy = ProtocolType::get(proto, ctx);
+  } else if (getGenericParams()) {
     DeclaredTy = UnboundGenericType::get(this, parentTy, ctx);
-  } else if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-    DeclaredTy = new (ctx, AllocationArena::Permanent) ProtocolType(proto, ctx);
   } else {
     DeclaredTy = NominalType::get(this, parentTy, ctx);
   }
 
   // Set the type.
   setType(MetaTypeType::get(DeclaredTy, ctx));
+
+  // A protocol has an implicit generic parameter list consisting of a single
+  // generic parameter, Self, that conforms to the protocol itself. This
+  // parameter is always implicitly bound.
+  //
+  // If this protocol has been deserialized, it already has generic parameters.
+  // Don't add them again.
+  if (!getGenericParams()) {
+    if (auto proto = dyn_cast<ProtocolDecl>(this)) {
+      // The generic parameter 'Self'.
+      auto selfId = ctx.getIdentifier("Self");
+      auto selfDecl = new (ctx) GenericTypeParamDecl(proto, selfId,
+                                                     proto->getLoc(), 0, 0);
+      IdentTypeRepr::Component protoRef(proto->getLoc(), proto->getName(), { });
+      protoRef.setValue(proto);
+      TypeLoc selfInherited[1] = {
+        TypeLoc(IdentTypeRepr::create(ctx, protoRef))
+      };
+      selfInherited[0].setType(DeclaredTy);
+      selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
+      selfDecl->setImplicit();
+      
+      // The generic parameter list itself.
+      GenericParams = GenericParamList::create(ctx, SourceLoc(),
+                                               GenericParam(selfDecl),
+                                               SourceLoc());
+    }
+  }
 }
 
 Type NominalTypeDecl::getDeclaredTypeInContext() {
@@ -439,7 +468,9 @@ Type NominalTypeDecl::getInterfaceType() {
     parentType = typeOfParentContext->getAnyNominal()->getInterfaceType();
 
   Type type;
-  if (auto params = getGenericParams()) {
+  if (auto proto = dyn_cast<ProtocolDecl>(this)) {
+    type = ProtocolType::get(proto, getASTContext());
+  } else if (auto params = getGenericParams()) {
     // If we have a generic type, bind the type to the archetypes
     // in the type's definition.
     SmallVector<Type, 4> genericArgs;
@@ -607,7 +638,8 @@ EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
                            SourceLoc NameLoc, Identifier Name,
                            MutableArrayRef<TypeLoc> Inherited)
-  : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited, nullptr),
+  : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited,
+                    nullptr),
     ProtocolLoc(ProtocolLoc)
 {
   ProtocolDeclBits.RequiresClassValid = false;
@@ -680,13 +712,8 @@ bool ProtocolDecl::requiresClassSlow() {
   return false;
 }
 
-AssociatedTypeDecl *ProtocolDecl::getSelf() const {
-  for (auto member : getMembers()) {
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
-      if (assocType->isSelf())
-        return assocType;
-  }
-  llvm_unreachable("No 'Self' associated type?");
+GenericTypeParamDecl *ProtocolDecl::getSelf() const {
+  return getGenericParams()->getParams()[0].getAsTypeParam();
 }
 
 void VarDecl::setComputedAccessors(ASTContext &Context, SourceLoc LBraceLoc,
@@ -844,23 +871,12 @@ Type FuncDecl::computeSelfType(GenericParamList **OuterGenericParams) const {
   Type ContainerType = getExtensionType();
   if (ContainerType.isNull()) return ContainerType;
 
-  // For a protocol, the type of 'self' is the associated type 'Self', not
+  // For a protocol, the type of 'self' is the parameter type 'Self', not
   // the protocol itself.
   if (auto Protocol = ContainerType->getAs<ProtocolType>()) {
-    AssociatedTypeDecl *Self = 0;
-    for (auto Member : Protocol->getDecl()->getMembers()) {
-      Self = dyn_cast<AssociatedTypeDecl>(Member);
-      if (!Self)
-        continue;
-
-      if (Self->isSelf())
-        break;
-
-      Self = nullptr;
-    }
-
-    assert(Self && "Missing 'Self' associated type in protocol");
-    ContainerType = Self->getDeclaredType();
+    auto Self = Protocol->getDecl()->getSelf();
+    assert(Self && "Missing 'Self' type in protocol");
+    ContainerType = Self->getArchetype();
   }
 
   if (UnboundGenericType *UGT = ContainerType->getAs<UnboundGenericType>()) {

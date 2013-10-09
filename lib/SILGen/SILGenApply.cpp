@@ -194,7 +194,7 @@ private:
     bool isThin;
     if (methodName.getDecl()->isInstanceMember()) {
       selfTy = cast<ProtocolDecl>(methodName.getDecl()->getDeclContext())
-            ->getSelf()->getArchetype();
+                 ->getSelf()->getArchetype();
       if (proto.getType().isClassExistentialType()) {
         isThin = true;
       } else {
@@ -504,7 +504,7 @@ SILType getSelfTypeForDynamicLookup(SILGenFunction &gen,
   CanType ty = existential.getType().getSwiftRValueType();
   ProtocolDecl *proto = cast<ProtocolType>(ty)->getDecl();
   // DynamicLookup is a class protocol so its projection should be loadable.
-  return gen.getLoweredLoadableType(proto->getSelf()->getDeclaredType());
+  return gen.getLoweredLoadableType(proto->getSelf()->getArchetype());
 }
   
 /// An ASTVisitor for building SIL function calls.

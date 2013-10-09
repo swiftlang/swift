@@ -707,6 +707,16 @@ static Optional<swift::Associativity> getActualAssociativity(uint8_t assoc) {
   }
 }
 
+/// Retrieve the interface type for the given declaration.
+static Type getValueInterfaceType(ValueDecl *value) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+    if (auto interfaceTy = func->getInterfaceType())
+      return interfaceTy;
+  }
+
+  return value->getType();
+}
+
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                           std::function<void(Decl*)> DidRecord) {
   if (DID == 0)
@@ -773,6 +783,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::GENERIC_TYPE_PARAM_DECL: {
     IdentifierID nameID;
     DeclID contextID;
+    bool isImplicit;
     unsigned depth;
     unsigned index;
     TypeID superclassID;
@@ -780,6 +791,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     decls_block::GenericTypeParamDeclLayout::readRecord(scratch, nameID,
                                                         contextID,
+                                                        isImplicit,
                                                         depth,
                                                         index,
                                                         superclassID,
@@ -796,6 +808,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                                        depth,
                                                        index);
     declOrOffset = genericParam;
+
+    if (isImplicit)
+      genericParam->setImplicit();
 
     genericParam->setSuperclass(getType(superclassID));
     genericParam->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
@@ -1172,11 +1187,26 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto proto = new (ctx) ProtocolDecl(DC, SourceLoc(), SourceLoc(),
                                         getIdentifier(nameID), { });
     declOrOffset = proto;
-    proto->computeType();
 
     if (DidRecord) {
       DidRecord(proto);
       DidRecord = nullptr;
+    }
+
+    if (auto genericParams = maybeReadGenericParams(DC)) {
+      proto->setGenericParams(genericParams);
+      SmallVector<GenericTypeParamType *, 4> paramTypes;
+      for (auto &genericParam : *proto->getGenericParams()) {
+        genericParam.getAsTypeParam()->setDeclContext(proto);
+        paramTypes.push_back(genericParam.getAsTypeParam()->getDeclaredType()
+                             ->castTo<GenericTypeParamType>());
+      }
+
+      // Read the generic requirements.
+      SmallVector<Requirement, 4> requirements;
+      readGenericRequirements(requirements);
+
+      proto->setGenericSignature(paramTypes, requirements);
     }
 
 
@@ -1185,6 +1215,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isClassProtocol)
       proto->getMutableAttrs().ClassProtocol = true;
     proto->setIsObjC(isObjC);
+    proto->computeType();
 
     // Deserialize the list of protocols.
     SmallVector<ProtocolDecl *, 4> protocols;
@@ -1581,7 +1612,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       for (auto value : values) {
         if (!value->hasClangNode() && value->getModuleContext() != M)
           continue;
-        if (expectedTy && value->getType()->getCanonicalType() != expectedTy)
+        if (expectedTy &&
+            getValueInterfaceType(value)->getCanonicalType() != expectedTy)
           continue;
 
         if (!result || result == value) {
@@ -1888,12 +1920,13 @@ Type ModuleFile::getType(TypeID TID) {
     IdentifierID nameID;
     bool isPrimary;
     TypeID parentOrIndex;
-    DeclID assocTypeID;
+    DeclID assocTypeOrProtoID;
     TypeID superclassID;
     ArrayRef<uint64_t> rawConformanceIDs;
 
     decls_block::ArchetypeTypeLayout::readRecord(scratch, nameID, isPrimary,
-                                                 parentOrIndex, assocTypeID,
+                                                 parentOrIndex,
+                                                 assocTypeOrProtoID,
                                                  superclassID,
                                                  rawConformanceIDs);
 
@@ -1907,8 +1940,14 @@ Type ModuleFile::getType(TypeID TID) {
     else
       parent = getType(parentOrIndex)->castTo<ArchetypeType>();
 
-    AssociatedTypeDecl *assocType
-      = cast_or_null<AssociatedTypeDecl>(getDecl(assocTypeID));
+    ArchetypeType::AssocTypeOrProtocolType assocTypeOrProto;
+    auto assocTypeOrProtoDecl = getDecl(assocTypeOrProtoID);
+    if (auto assocType
+          = dyn_cast_or_null<AssociatedTypeDecl>(assocTypeOrProtoDecl))
+      assocTypeOrProto = assocType;
+    else
+      assocTypeOrProto = cast_or_null<ProtocolDecl>(assocTypeOrProtoDecl);
+
     superclass = getType(superclassID);
 
     for (DeclID protoID : rawConformanceIDs)
@@ -1918,7 +1957,7 @@ Type ModuleFile::getType(TypeID TID) {
     if (typeOrOffset.isComplete())
       break;
 
-    auto archetype = ArchetypeType::getNew(ctx, parent, assocType,
+    auto archetype = ArchetypeType::getNew(ctx, parent, assocTypeOrProto,
                                            getIdentifier(nameID), conformances,
                                            superclass, index);
     typeOrOffset = archetype;
@@ -2106,6 +2145,7 @@ Type ModuleFile::getType(TypeID TID) {
       case DeclKind::Class:
       case DeclKind::Struct:
       case DeclKind::Enum:
+      case DeclKind::Protocol:
         paramList = cast<NominalTypeDecl>(genericContext)->getGenericParams();
         break;
       default:

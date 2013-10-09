@@ -761,12 +761,11 @@ public:
     ArchetypeType *archetype = dyn_cast<ArchetypeType>(t);
     if (!archetype)
       return false;
-    if (!archetype->getAssocType())
+
+    auto selfProto = archetype->getSelfProtocol();
+    if (!selfProto)
       return false;
-    if (!archetype->getAssocType()->isSelf())
-      return false;
-    
-    auto *selfProto = archetype->getAssocType()->getProtocol();
+
     for (auto checkProto : protocols) {
       if (checkProto == selfProto || checkProto->inheritsFrom(selfProto))
         return true;

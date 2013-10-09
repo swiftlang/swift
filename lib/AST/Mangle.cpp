@@ -612,7 +612,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     
     // associated-type ::= 'Q' protocol-context
     // Mangle the Self archetype of a protocol.
-    if (archetype->getAssocType() && archetype->getAssocType()->isSelf()) {
+    if (archetype->getSelfProtocol()) {
       Buffer << 'P';
       mangleProtocolName(archetype->getAssocType()->getProtocol());
       addSubstitution(archetype.getPointer());

@@ -31,11 +31,11 @@ bb0(%0 : $*P):           // CHECK: bb0(%0 : $*P):
   copy_addr %0 to [initialization] %1#1 : $*P
   
   // CHECK-NEXT: project_existential %0 : $*P
-  %3 = project_existential %1#1 : $*P to $*P.Self
-  %4 = protocol_method %1#1 : $*P, #P.foo!1 : $[cc(method)] ((), [inout] P.Self) -> ()
+  %3 = project_existential %1#1 : $*P to $*@sil_self P
+  %4 = protocol_method %1#1 : $*P, #P.foo!1 : $[cc(method)] ((), [inout] @sil_self P) -> ()
   
   // CHECK: apply
-  %5 = apply %4(%3) : $[cc(method)] ((), [inout] P.Self) -> ()
+  %5 = apply %4(%3) : $[cc(method)] ((), [inout] @sil_self P) -> ()
   
   copy_addr [take] %1#1 to %0 : $*P
   dealloc_stack %1#0 : $*@local_storage P

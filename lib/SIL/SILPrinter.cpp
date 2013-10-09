@@ -258,6 +258,15 @@ void SILType::print(raw_ostream &OS) const {
   // Potentially add a leading sigil for the value category.
   ::print(OS, getCategory());
 
+  // For the Self archetype of a protocol, print @sil_self protocol.
+  if (auto archetypeTy = getSwiftRValueType()->getAs<ArchetypeType>()) {
+    if (auto proto = archetypeTy->getSelfProtocol()) {
+      OS << "@sil_self ";
+      proto->getDeclaredType()->print(OS);
+      return;
+    }
+  }
+
   // Print other types as their Swift representation.
   getSwiftRValueType().print(OS);
 }

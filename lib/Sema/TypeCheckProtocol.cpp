@@ -504,6 +504,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       DerivingTypeDecl = NT;
   }
 
+  // Bind the implicit 'Self' type to the type T.
+  TypeMapping[Proto->getSelf()->getArchetype()] = T;
+
+
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getProtocols()) {
     ProtocolConformance *InheritedConformance = nullptr;
@@ -547,12 +551,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     
     TC.validateDecl(AssociatedType, true);
 
-    // Bind the implicit 'Self' type to the type T.
     auto archetype = AssociatedType->getArchetype();
-    if (AssociatedType->isSelf()) {
-      TypeMapping[archetype] = T;
-      continue;
-    }
 
     auto candidates = TC.lookupMemberType(metaT, AssociatedType->getName(), DC);
     bool didDerive = false;
@@ -995,15 +994,10 @@ existentialConformsToItself(TypeChecker &tc,
   }
 
   // Check whether this protocol conforms to itself.
-  auto selfDecl = proto->getSelf();
   auto selfType = proto->getSelf()->getArchetype();
   for (auto member : proto->getMembers()) {
     // Check for associated types.
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      // 'Self' is obviously okay.
-      if (assocType == selfDecl)
-        continue;
-
       // A protocol cannot conform to itself if it has an associated type.
       proto->setExistentialConformsToSelf(false);
       if (complainLoc.isInvalid())
@@ -1096,10 +1090,6 @@ static void suggestExplicitConformance(TypeChecker &tc,
     // Look for the owner of this witness.
     Decl *witnessOwner = nullptr;
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(req)) {
-      // Ignore the 'Self' declaration.
-      if (assocType == proto->getSelf())
-        continue;
-
       auto witnessTy = conformance->getTypeWitness(assocType).Replacement;
       if (auto nameAlias = dyn_cast<NameAliasType>(witnessTy.getPointer())) {
         witnessOwner = getNominalOrExtensionDecl(

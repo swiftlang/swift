@@ -59,8 +59,8 @@ bb0(%0 : $DynamicLookup):
   %3 = alloc_box $Optional<() -> ()>              
   %4 = load %1#1 : $*DynamicLookup                
   strong_retain %4 : $DynamicLookup
-  %6 = project_existential_ref %4 : $DynamicLookup to $DynamicLookup.Self
-  %7 = ref_to_object_pointer %6 : $DynamicLookup.Self to $Builtin.ObjCPointer
+  %6 = project_existential_ref %4 : $DynamicLookup to $@sil_self DynamicLookup
+  %7 = ref_to_object_pointer %6 : $@sil_self DynamicLookup to $Builtin.ObjCPointer
 
   // CHECK: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(f)", align 8
   // CHECK: [[HAS_SEL:%[0-9]]] = call i1 @swift_objcRespondsToSelector(%objc_object* [[OBJECT:%[0-9]+]], i8* [[SEL]]) #0
@@ -103,8 +103,8 @@ sil @_T1t23dynamic_lookup_propertyFT1xPSo13DynamicLookup__T_ : $[thin] (x : Dyna
   store %0 to %1#1 : $*DynamicLookup
   %6 = load %1#1 : $*DynamicLookup                // users: %24, %8, %7
   strong_retain %6 : $DynamicLookup
-  %8 = project_existential_ref %6 : $DynamicLookup to $DynamicLookup.Self // users: %11, %9
-  %9 = ref_to_object_pointer %8 : $DynamicLookup.Self to $Builtin.ObjCPointer
+  %8 = project_existential_ref %6 : $DynamicLookup to $@sil_self DynamicLookup // users: %11, %9
+  %9 = ref_to_object_pointer %8 : $@sil_self DynamicLookup to $Builtin.ObjCPointer
   dynamic_method_br %9 : $Builtin.ObjCPointer, #X.value!getter.1.foreign, bb1, bb2
 
 bb1(%10 : $[cc(objc_method), thin] ((), Builtin.ObjCPointer) -> Int64):
@@ -127,8 +127,8 @@ bb0(%0 : $DynamicLookup, %1 : $Int64):
   store %1 to %3#1 : $*Int64
   %8 = load %2#1 : $*DynamicLookup
   strong_retain %8 : $DynamicLookup
-  %10 = project_existential_ref %8 : $DynamicLookup to $DynamicLookup.Self
-  %11 = ref_to_object_pointer %10 : $DynamicLookup.Self to $Builtin.ObjCPointer
+  %10 = project_existential_ref %8 : $DynamicLookup to $@sil_self DynamicLookup
+  %11 = ref_to_object_pointer %10 : $@sil_self DynamicLookup to $Builtin.ObjCPointer
   // CHECK: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(objectAtIndexedSubscript:)", align 8
   // CHECK-NEXT: [[HAS_SEL:%[0-9]+]] = call i1 @swift_objcRespondsToSelector(%objc_object* %0, i8* [[SEL]]) #0
   // CHECK-NEXT: br i1 [[HAS_SEL]], label [[HAS_METHOD:%[0-9]+]], label [[HAS_METHOD:%[0-9]+]]

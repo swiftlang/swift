@@ -1365,9 +1365,6 @@ public:
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
                      SourceLoc nameLoc);
 
-  /// Determine whether this is the implicitly-created 'Self'.
-  bool isSelf() const { return isImplicit(); }
-  
   /// Get the protocol in which this associated type is declared.
   ProtocolDecl *getProtocol() const {
     return cast<ProtocolDecl>(getDeclContext());
@@ -1557,6 +1554,11 @@ protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
 
+  void setDeclaredType(Type declaredTy) {
+    assert(DeclaredTy.isNull() && "Already set declared type");
+    DeclaredTy = declaredTy;
+  }
+
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   SourceLoc NameLoc,
                   MutableArrayRef<TypeLoc> inherited,
@@ -1564,6 +1566,8 @@ protected:
     TypeDecl(K, DC, name, NameLoc, inherited),
     DeclContext(DeclContextKind::NominalTypeDecl, DC),
     GenericParams(GenericParams), DeclaredTy(nullptr) {}
+
+  friend class ProtocolType;
 
 public:
   using TypeDecl::getASTContext;
@@ -1573,6 +1577,13 @@ public:
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
 
   GenericParamList *getGenericParams() const { return GenericParams; }
+
+  /// Provide the set of parameters to a generic type, or null if
+  /// this function is not generic.
+  void setGenericParams(GenericParamList *params) {
+    assert(!GenericParams && "Already has generic parameters");
+    GenericParams = params;
+  }
 
   /// Set the generic signature of this type.
   void setGenericSignature(ArrayRef<GenericTypeParamType *> params,
@@ -1858,8 +1869,8 @@ public:
     return SourceRange(ProtocolLoc, getBraces().End);
   }
 
-  /// \brief Retrieve the associated type 'Self'.
-  AssociatedTypeDecl *getSelf() const;
+  /// \brief Retrieve the generic parameter 'Self'.
+  GenericTypeParamDecl *getSelf() const;
 
   /// True if this protocol can only be conformed to by class types.
   bool requiresClass() {

@@ -190,6 +190,18 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;
   }
 
+  // SIL's 'sil_self' type attribute.
+  case AttrName::sil_self: {
+    if (Attributes.isSILSelf())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    else if (!isInSILMode())
+      diagnose(Tok, diag::only_allowed_in_sil, Tok.getText());
+
+    consumeToken(tok::identifier);
+    Attributes.SILSelf = true;
+    return false;
+  }
+
   // Resilience attributes.
   case AttrName::resilient:
   case AttrName::fragile:
@@ -2357,14 +2369,6 @@ parseDeclProtocol(unsigned Flags, DeclAttributes &Attributes) {
   {
     // The list of protocol elements.
     SmallVector<Decl*, 8> Members;
-
-    // Add the implicit 'Self' associated type.
-    Members.push_back(new (Context) AssociatedTypeDecl(
-                                      CurDeclContext,
-                                      Proto->getLoc(),
-                                      Context.getIdentifier("Self"),
-                                      Proto->getLoc()));
-    Members.back()->setImplicit();
 
     SourceLoc LBraceLoc;
     SourceLoc RBraceLoc;

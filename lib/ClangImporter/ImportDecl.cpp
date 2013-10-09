@@ -965,6 +965,12 @@ namespace {
       // Add the 'self' parameter to the function type.
       type = FunctionType::get(selfTy, type, Impl.SwiftContext);
 
+      Type interfaceType;
+      if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
+        std::tie(type, interfaceType)
+          = getProtocolMethodType(proto, type->castTo<AnyFunctionType>());
+      }
+
       // FIXME: Related result type?
 
       // FIXME: Poor location info.
@@ -974,7 +980,8 @@ namespace {
           /*GenericParams=*/nullptr, type, argPatterns, bodyPatterns,
           TypeLoc::withoutLoc(resultTy), dc);
       result->setBodyResultType(resultTy);
-      
+      result->setInterfaceType(interfaceType);
+
       if (hasSelectorStyleSignature)
         result->setHasSelectorStyleSignature();
 
@@ -1295,6 +1302,37 @@ namespace {
       return selfVar;
     }
 
+    /// Retrieves the type and interface type for a protocol method given
+    /// the computed type of that method.
+    std::pair<Type, Type> getProtocolMethodType(ProtocolDecl *proto,
+                                                AnyFunctionType *fnType) {
+      Type type = PolymorphicFunctionType::get(fnType->getInput(),
+                                               fnType->getResult(),
+                                               proto->getGenericParams(),
+                                               Impl.SwiftContext);
+
+      // Figure out the curried 'self' type for the interface type. It's always
+      // either the generic parameter type 'Self' or a metatype thereof.
+      auto interfaceInputTy = proto->getSelf()->getDeclaredType();
+      auto inputTy = fnType->getInput();
+      if (auto tupleTy = inputTy->getAs<TupleType>()) {
+        if (tupleTy->getNumElements() == 1)
+          inputTy = tupleTy->getElementType(0);
+      }
+      if (inputTy->is<MetaTypeType>())
+        interfaceInputTy = MetaTypeType::get(interfaceInputTy,
+                                             Impl.SwiftContext);
+
+      Type interfaceType = GenericFunctionType::get(
+                             proto->getGenericParamTypes(),
+                             proto->getGenericRequirements(),
+                             interfaceInputTy,
+                             fnType->getResult(),
+                             AnyFunctionType::ExtInfo(),
+                             Impl.SwiftContext);
+      return { type, interfaceType };
+    }
+
     /// \brief Build a thunk for an Objective-C getter.
     ///
     /// \param getter The Objective-C getter method.
@@ -1313,8 +1351,8 @@ namespace {
       // Figure out the element type, by looking through 'self' and the normal
       // parameters.
       auto elementTy
-        = getter->getType()->castTo<FunctionType>()->getResult()
-            ->castTo<FunctionType>()->getResult();
+        = getter->getType()->castTo<AnyFunctionType>()->getResult()
+            ->castTo<AnyFunctionType>()->getResult();
 
       // Form the argument patterns.
       SmallVector<Pattern *, 3> getterArgs;
@@ -1347,13 +1385,21 @@ namespace {
                                        context);
       }
 
+      // If we're in a protocol, the getter thunk will be polymorphic.
+      Type interfaceType;
+      if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
+        std::tie(getterType, interfaceType)
+          = getProtocolMethodType(proto, getterType->castTo<AnyFunctionType>());
+      }
+
       // Create the getter thunk.
       auto thunk = FuncDecl::create(context, SourceLoc(), getter->getLoc(),
                                     Identifier(), SourceLoc(), nullptr,
                                     getterType, getterArgs, getterArgs,
                                     TypeLoc::withoutLoc(elementTy),
-                                    getter->getDeclContext());
+                                    dc);
       thunk->setBodyResultType(elementTy);
+      thunk->setInterfaceType(interfaceType);
 
       setVarDeclContexts(getterArgs, thunk);
 
@@ -1380,11 +1426,11 @@ namespace {
       // Objective-C subscript setters are imported with a function type
       // such as:
       //
-      //   (this) -> (value, index) -> ()
+      //   (self) -> (value, index) -> ()
       //
       // while Swift subscript setters are curried as
       //
-      //   (this) -> (index)(value) -> ()
+      //   (self) -> (index)(value) -> ()
       //
       // Build a setter thunk with the latter signature that maps to the
       // former.
@@ -1428,12 +1474,20 @@ namespace {
                                        context);
       }
 
+      // If we're in a protocol, the setter thunk will be polymorphic.
+      Type interfaceType;
+      if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
+        std::tie(setterType, interfaceType)
+          = getProtocolMethodType(proto, setterType->castTo<AnyFunctionType>());
+      }
+
       // Create the setter thunk.
       auto thunk = FuncDecl::create(
           context, SourceLoc(), setter->getLoc(), Identifier(), SourceLoc(),
           nullptr, setterType, setterArgs, setterArgs,
           TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc);
       thunk->setBodyResultType(TupleType::getEmpty(context));
+      thunk->setInterfaceType(interfaceType);
 
       setVarDeclContexts(setterArgs, thunk);
 
@@ -1668,7 +1722,7 @@ namespace {
     Type getSelfTypeForContext(DeclContext *dc) {
       // For a protocol, the type is 'Self'.
       if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
-        return proto->getSelf()->getDeclaredType();
+        return proto->getSelf()->getArchetype();
       }
 
       return dc->getDeclaredTypeOfContext();
@@ -1927,23 +1981,15 @@ namespace {
 
       // Add the implicit 'Self' associated type.
       auto selfId = Impl.SwiftContext.getIdentifier("Self");
-      auto selfDecl = new (Impl.SwiftContext) AssociatedTypeDecl(result,
-                                                                 SourceLoc(),
-                                                                 selfId,
-                                                                 SourceLoc());
-      selfDecl->setImplicit();
+      auto selfDecl = result->getSelf();
       auto selfArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
-                                                 selfDecl, selfId,
+                                                 result, selfId,
                                                  Type(result->getDeclaredType()),
                                                  Type());
       selfDecl->setArchetype(selfArchetype);
-      result->setMembers(Impl.SwiftContext.AllocateCopy(
-                           llvm::makeArrayRef<Decl*>(selfDecl)),
-                         SourceRange());
                          
       // Import each of the members.
       SmallVector<Decl *, 4> members;
-      members.push_back(selfDecl);
       importObjCMembers(decl, result, members);
 
       // FIXME: Source range isn't accurate.

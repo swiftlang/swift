@@ -160,6 +160,7 @@ public:
   bool LocalStorage = false;
   bool Exported = false;
   Optional<AbstractCC> cc = Nothing;
+  bool SILSelf = false;
   KernelOrShaderKind KernelOrShader = KernelOrShaderKind::Default;
 
   DeclAttributes() {}
@@ -194,6 +195,8 @@ public:
   bool isExported() const { return Exported; }
   bool hasCC() const { return cc.hasValue(); }
   AbstractCC getAbstractCC() const { return *cc; }
+  bool isSILSelf() const { return SILSelf; }
+
   KernelOrShaderKind getKernelOrShaderKind() const {
     return KernelOrShader;
   }
@@ -214,6 +217,7 @@ public:
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
            !isClassProtocol() && !hasCC() && !hasOwnership() &&
            !isLocalStorage() && !isExported() && AsmName.empty() &&
+           !isSILSelf() &&
            getKernelOrShaderKind() == KernelOrShaderKind::Default;
   }
 

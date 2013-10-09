@@ -760,11 +760,10 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
     assert(func->isOperator() && "Lookup should only find operators");
 
     // Skip the 'self' metatype parameter. It's not used for deduction.
-    auto type = func->getType()->castTo<FunctionType>()->getResult();
+    auto type = func->getType()->castTo<AnyFunctionType>()->getResult();
 
     // Find the archetype for 'Self'. We'll be opening it.
-    auto selfArchetype
-      = proto->getSelf()->getDeclaredType()->castTo<ArchetypeType>();
+    auto selfArchetype = proto->getSelf()->getArchetype();
     llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
     type = adjustLValueForReference(openType(type, { &selfArchetype, 1 },
                                              replacements),
@@ -938,11 +937,17 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   // If the declaration is a protocol member, we may have more substitutions to
   // perform.
   if (auto ownerProtoTy = ownerTy->getAs<ProtocolType>()) {
+    // Turn the outer polymorphic function type into a monomorphic function
+    // type, because the caller always handles the Self parameter explicitly.
+    if (auto polyFn = type->getAs<PolymorphicFunctionType>()) {
+      type = FunctionType::get(polyFn->getInput(), polyFn->getResult(),
+                               polyFn->getExtInfo(), TC.Context);
+    }
+
     // For a member of an archetype, substitute the base type for the 'Self'
     // type.
     if (baseObjTy->is<ArchetypeType>()) {
-      auto selfArchetype = ownerProtoTy->getDecl()->getSelf()->getDeclaredType()
-                             ->castTo<ArchetypeType>();
+      auto selfArchetype = ownerProtoTy->getDecl()->getSelf()->getArchetype();
 
       llvm::DenseMap<ArchetypeType *, Type> mappedTypes;
       mappedTypes[selfArchetype] = baseObjTy;

@@ -112,12 +112,28 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
 
   // If we found an associated type in an inherited protocol, the base
   // for our reference to this associated type is our own 'Self'.
-  if (isa<AssociatedTypeDecl>(typeDecl) &&
-      typeDecl->getDeclContext() != fromDC) {
-    if (auto fromProto = dyn_cast<ProtocolDecl>(fromDC)) {
-      return substMemberTypeWithBase(fromDC->getParentModule(),
-                                     typeDecl->getDeclaredType(), typeDecl,
-                                     fromProto->getSelf()->getDeclaredType());
+  if (isa<AssociatedTypeDecl>(typeDecl)) {
+    // If we found an associated type from within its protocol, resolve it
+    // as a dependent member relative to Self if Self is still dependent.
+    if (auto proto = dyn_cast<ProtocolDecl>(fromDC)) {
+      auto selfTy
+        = proto->getSelf()->getDeclaredType()->castTo<GenericTypeParamType>();
+      auto baseTy = resolver->resolveGenericTypeParamType(selfTy);
+
+      if (baseTy->isDependentType()) {
+        return resolver->resolveDependentMemberType(baseTy, fromDC,
+                                                    SourceRange(),
+                                                    typeDecl->getName(),
+                                                    SourceLoc());
+      }
+    }
+
+    if (typeDecl->getDeclContext() != fromDC) {
+      if (auto fromProto = dyn_cast<ProtocolDecl>(fromDC)) {
+        return substMemberTypeWithBase(fromDC->getParentModule(),
+                                       typeDecl->getDeclaredType(), typeDecl,
+                                       fromProto->getSelf()->getArchetype());
+      }
     }
   }
 
@@ -590,6 +606,17 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
                      resolver);
     if (Ty->is<ErrorType>())
       return Ty;
+
+    // In SIL, handle @sil_self, which extracts the Self type of a protocol.
+    if (attrs.isSILSelf()) {
+      if (auto protoTy = Ty->getAs<ProtocolType>()) {
+        Ty = protoTy->getDecl()->getSelf()->getArchetype();
+      } else {
+        diagnose(attrs.AtLoc, diag::sil_self_non_protocol, Ty)
+          .highlight(AttrTyR->getTypeRepr()->getSourceRange());
+      }
+      attrs.SILSelf = false;
+    }
 
     if (attrs.isInOut()) {
       LValueType::Qual quals;

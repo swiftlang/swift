@@ -145,7 +145,9 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
     }
   }
 
-  auto generics = theDecl->getGenericParamsOfContext();
+  auto generics = isa<ProtocolDecl>(theDecl)
+                    ? nullptr
+                    : theDecl->getGenericParamsOfContext();
 
   bool isPattern = (generics != nullptr);
   assert(!isPattern || isa<BoundGenericType>(theType));

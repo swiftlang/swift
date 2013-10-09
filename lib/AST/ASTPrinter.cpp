@@ -394,7 +394,8 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
 void PrintAST::printNominalDeclName(NominalTypeDecl *decl) {
   OS << decl->getName();
   if (auto gp = decl->getGenericParams()) {
-    printGenericParams(gp);
+    if (!isa<ProtocolDecl>(decl))
+      printGenericParams(gp);
   }
 }
 

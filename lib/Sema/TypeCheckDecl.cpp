@@ -276,7 +276,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
       // DynamicLookup cannot be used in a generic constraint.
       if (auto protoTy = inheritedTy->getAs<ProtocolType>()) {
         if (protoTy->getDecl()->isSpecificProtocol(
-                                   KnownProtocolKind::DynamicLookup)) {
+                                   KnownProtocolKind::DynamicLookup) &&
+            !decl->isImplicit()) {
           diagnose(inheritedClause[i].getSourceRange().Start,
                    diag::dynamic_lookup_conformance);
           continue;
@@ -2116,39 +2117,29 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       return;
     proto->computeType();
 
+    // Validate the generic type parameters.
+    validateGenericTypeSignature(proto);
+
+    revertGenericParamList(proto->getGenericParams(), proto);
+
+    ArchetypeBuilder builder =
+      createArchetypeBuilder(*this, proto->getModuleContext());
+    checkGenericParamList(builder, proto->getGenericParams(), *this,
+                          proto->getDeclContext());
+    finalizeGenericParamList(builder, proto->getGenericParams(), proto, *this);
+
     checkInheritanceClause(D);
     validateAttributes(*this, D);
 
-    // Fix the 'Self' associated type.
-    AssociatedTypeDecl *selfDecl = nullptr;
-    for (auto member : proto->getMembers()) {
-      if (auto AssocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        checkInheritanceClause(AssocType);
-
-        if (AssocType->isSelf()) {
-          selfDecl = AssocType;
-          break;
-        }
-      }
-    }
-    assert(selfDecl && "no Self decl?");
-
-    // Build archetypes for this protocol.
-    ArchetypeBuilder builder = createArchetypeBuilder(*this,
-                                                      D->getModuleContext());
-    builder.addGenericParameter(selfDecl, 0);
-    builder.addImplicitConformance(selfDecl, proto);
-    builder.assignArchetypes();
-
     // Set the underlying type of each of the associated types to the
     // appropriate archetype.
+    auto selfDecl = proto->getSelf();
     ArchetypeType *selfArchetype = builder.getArchetype(selfDecl);
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         TypeLoc underlyingTy;
         ArchetypeType *archetype = selfArchetype;
-        if (assocType != selfDecl)
-          archetype = selfArchetype->getNestedType(assocType->getName());
+        archetype = selfArchetype->getNestedType(assocType->getName());
         assocType->setArchetype(archetype);
       }
     }

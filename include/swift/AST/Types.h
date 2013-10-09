@@ -1564,6 +1564,10 @@ public:
 /// by another type.
 class ProtocolType : public NominalType {
 public:
+  /// \brief Retrieve the type when we're referencing the given protocol.
+  /// declaration.
+  static ProtocolType *get(ProtocolDecl *D, const ASTContext &C);
+
   ProtocolDecl *getDecl() const {
     return reinterpret_cast<ProtocolDecl *>(NominalType::getDecl());
   }
@@ -1862,8 +1866,13 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SubstitutableType, Type)
 /// point in time, whether it be at compile time due to a direct binding or
 /// at run time due to the use of generic types.
 class ArchetypeType : public SubstitutableType {
+public:
+  typedef llvm::PointerUnion<AssociatedTypeDecl *, ProtocolDecl *>
+    AssocTypeOrProtocolType;
+
+private:
   ArchetypeType *Parent;
-  AssociatedTypeDecl *AssocType;
+  AssocTypeOrProtocolType AssocTypeOrProto;
   Identifier Name;
   unsigned IndexIfPrimary;
   ArrayRef<std::pair<Identifier, ArchetypeType *>> NestedTypes;
@@ -1873,7 +1882,7 @@ public:
   ///
   /// The ConformsTo array will be copied into the ASTContext by this routine.
   static ArchetypeType *getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                               AssociatedTypeDecl *AssocType,
+                               AssocTypeOrProtocolType AssocTypeOrProto,
                                Identifier Name, ArrayRef<Type> ConformsTo,
                                Type Superclass,
                                Optional<unsigned> Index = Optional<unsigned>());
@@ -1883,7 +1892,7 @@ public:
   /// The ConformsTo array will be minimized then copied into the ASTContext
   /// by this routine.
   static ArchetypeType *getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                               AssociatedTypeDecl *AssocType,
+                               AssocTypeOrProtocolType AssocTypeOrProto,
                                Identifier Name,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass,
@@ -1906,7 +1915,21 @@ public:
   /// This associated type will have the same name as the archetype and will
   /// be a member of one of the protocols to which the parent archetype
   /// conforms.
-  AssociatedTypeDecl *getAssocType() const { return AssocType; }
+  AssociatedTypeDecl *getAssocType() const {
+    return AssocTypeOrProto.dyn_cast<AssociatedTypeDecl *>();
+  }
+
+  /// Retrieve the protocol for which this archetype describes the 'Self'
+  /// parameter.
+  ProtocolDecl *getSelfProtocol() const {
+    return AssocTypeOrProto.dyn_cast<ProtocolDecl *>();
+  }
+
+  /// Retrieve either the associated type or the protocol to which this
+  /// associated type corresponds.
+  AssocTypeOrProtocolType getAssocTypeOrProtocol() const {
+    return AssocTypeOrProto;
+  }
 
   /// \brief Retrieve the nested type with the given name.
   ArchetypeType *getNestedType(Identifier Name) const;
@@ -1938,11 +1961,11 @@ public:
   
 private:
   ArchetypeType(const ASTContext &Ctx, ArchetypeType *Parent,
-                AssociatedTypeDecl *AssocType,
+                AssocTypeOrProtocolType AssocTypeOrProto,
                 Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass, Optional<unsigned> Index)
     : SubstitutableType(TypeKind::Archetype, &Ctx, ConformsTo, Superclass),
-      Parent(Parent), AssocType(AssocType), Name(Name),
+      Parent(Parent), AssocTypeOrProto(AssocTypeOrProto), Name(Name),
       IndexIfPrimary(Index? *Index + 1 : 0) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)

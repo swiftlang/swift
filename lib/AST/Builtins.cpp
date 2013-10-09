@@ -306,7 +306,9 @@ static std::tuple<Type, GenericParamList*>
 getGenericParam(ASTContext &Context) {
   Identifier GenericName = Context.getIdentifier("T");
   ArchetypeType *Archetype
-    = ArchetypeType::getNew(Context, nullptr, nullptr, GenericName,
+    = ArchetypeType::getNew(Context, nullptr,
+                            static_cast<AssociatedTypeDecl *>(nullptr),
+                            GenericName,
                             ArrayRef<Type>(), Type(), 0);
   auto GenericTyDecl =
     new (Context) GenericTypeParamDecl(Context.TheBuiltinModule, GenericName,

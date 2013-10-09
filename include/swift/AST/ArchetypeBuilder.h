@@ -271,8 +271,7 @@ public:
 
   /// \brief Retrieve (or build) the archetype corresponding to the potential
   /// archetype.
-  ArchetypeType *getArchetype(AssociatedTypeDecl * /*nullable*/ rootAssocTy,
-                              Module &mod);
+  ArchetypeType *getArchetype(ProtocolDecl *rootProtocol, Module &mod);
 
   /// Retrieve the associated type declaration for a given nested type.
   AssociatedTypeDecl *getAssociatedType(Module &mod, Identifier name);

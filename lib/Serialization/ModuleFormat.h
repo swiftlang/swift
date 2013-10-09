@@ -402,7 +402,7 @@ namespace decls_block {
     IdentifierIDField,   // name
     BCFixed<1>,          // primary?
     TypeIDField,         // index if primary, parent if non-primary
-    DeclIDField,         // associated type decl
+    DeclIDField,         // associated type or protocol decl
     TypeIDField,         // superclass
     BCArray<DeclIDField> // conformances
     // Trailed by the nested types record.
@@ -506,6 +506,7 @@ namespace decls_block {
     GENERIC_TYPE_PARAM_DECL,
     IdentifierIDField, // name
     DeclIDField, // context decl
+    BCFixed<1>,  // implicit flag
     BCVBR<4>,    // depth
     BCVBR<4>,    // index
     TypeIDField, // superclass type
@@ -564,6 +565,7 @@ namespace decls_block {
     BCFixed<1>,  // class protocol?
     BCFixed<1>,  // objc?
     BCArray<DeclIDField> // protocols
+  // Trailed by the generic parameters (if any) and the decl context record
   >;
 
   using ConstructorLayout = BCRecordLayout<

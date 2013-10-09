@@ -42,6 +42,9 @@ ATTR(ibaction)
 ATTR(local_storage)
 ATTR(transparent)
 
+// SIL-specific attributes
+ATTR(sil_self)
+
 // Axle-specific attributes
 ATTR(kernel)
 ATTR(vertex)

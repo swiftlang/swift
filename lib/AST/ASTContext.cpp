@@ -966,12 +966,7 @@ NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext 
   case DeclKind::Class:
     return ClassType::get(cast<ClassDecl>(D), Parent, C);
   case DeclKind::Protocol: {
-    assert(!Parent && "Protocols cannot have parents");
-    auto proto = cast<ProtocolDecl>(D);
-    if (!proto->hasType())
-      proto->computeType();
-
-    return proto->getDeclaredType()->castTo<ProtocolType>();
+    return ProtocolType::get(cast<ProtocolDecl>(D), C);
   }
 
   default:
@@ -1331,6 +1326,15 @@ OptionalType *OptionalType::get(Type base, const ASTContext &C) {
   if (entry) return entry;
 
   return entry = new (C, arena) OptionalType(C, base, hasTypeVariable);
+}
+
+ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {
+  if (auto declaredTy = D->getDeclaredType())
+    return declaredTy->castTo<ProtocolType>();
+
+  auto protoTy = new (C, AllocationArena::Permanent) ProtocolType(D, C);
+  D->setDeclaredType(protoTy);
+  return protoTy;
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)

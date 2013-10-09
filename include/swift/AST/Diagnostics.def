@@ -352,6 +352,8 @@ ERROR(sil_local_storage_non_address, decl_parsing,none,
       "can only work with the address of local storage", ())
 ERROR(sil_local_storage_nested, decl_parsing,none,
       "local storage types cannot be in nested positions", ())
+ERROR(sil_self_non_protocol, decl_parsing,none,
+      "@sil_self cannot be applied to non-protocol type %0", (Type))
 
 // SIL Values
 ERROR(sil_value_redefinition, decl_parsing,none,

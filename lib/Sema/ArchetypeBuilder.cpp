@@ -83,31 +83,27 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(Identifier Name)
 
   PotentialArchetype *&Result = NestedTypes[Name];
   if (!Result) {
-    // FIXME: The 'Self' hack is pretty ugly.
-    if (Name.str() == "Self")
-      Result = this;
-    else
-      Result = new PotentialArchetype(this, Name);
+    Result = new PotentialArchetype(this, Name);
   }
 
   return Result;
 }
 
 auto ArchetypeBuilder::PotentialArchetype::getArchetype(
-                                             AssociatedTypeDecl *rootAssocTy,
+                                             ProtocolDecl *rootProtocol,
                                              Module &mod)
                                                 -> ArchetypeType * {
   // Retrieve the archetype from the representation of this set.
   if (Representative != this)
-    return getRepresentative()->getArchetype(rootAssocTy, mod);
+    return getRepresentative()->getArchetype(rootProtocol, mod);
 
-  AssociatedTypeDecl *assocType = rootAssocTy;
+  ArchetypeType::AssocTypeOrProtocolType assocTypeOrProto = rootProtocol;
   if (!Archetype) {
     // Allocate a new archetype.
     ArchetypeType *ParentArchetype = nullptr;
     if (Parent) {
-      assert(!rootAssocTy &&
-             "root associated type given for non-root archetype");
+      assert(assocTypeOrProto.isNull() &&
+             "root protocol type given for non-root archetype");
       ParentArchetype = Parent->getArchetype(nullptr, mod);
 
       if (!ParentArchetype)
@@ -119,14 +115,15 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetype(
         if (mod.lookupQualified(proto->getDeclaredType(), Name,
                                NL_VisitSupertypes, nullptr, decls)) {
           for (auto decl : decls) {
-            assocType = dyn_cast<AssociatedTypeDecl>(decl);
-            if (assocType)
+            if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+              assocTypeOrProto = assocType;
               break;
+            }
           }
         }
       }
 
-      // FIXME: If assocType is null, we will diagnose it later.
+      // FIXME: If assocTypeOrProto is null, we will diagnose it later.
       // It would be far nicer to know now, and be able to recover, e.g.,
       // via typo correction.
     }
@@ -139,8 +136,8 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetype(
     SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
                                           ConformsTo.end());
     Archetype = ArchetypeType::getNew(mod.getASTContext(), ParentArchetype,
-                                      assocType, Name, Protos, Superclass,
-                                      Index);
+                                      assocTypeOrProto, Name, Protos,
+                                      Superclass, Index);
 
     // Collect the set of nested types of this archetype, and put them into
     // the archetype itself.
@@ -321,10 +318,6 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
   // Add requirements for each of the associated types.
   for (auto Member : Proto->getMembers()) {
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
-      // Nothing to do for 'Self'.
-      if (AssocType->isSelf())
-        continue;
-
       // Add requirements placed directly on this associated type.
       auto AssocPA = T->getNestedType(AssocType->getName());
       for (auto InheritedProto : Impl->getConformsTo(AssocType)) {
@@ -519,6 +512,18 @@ bool ArchetypeBuilder::addImplicitConformance(AbstractTypeParamDecl *Param,
   return addConformanceRequirement(Impl->PotentialArchetypes[Param], Proto);
 }
 
+/// Determine whether this archetype is a protocol's 'Self' archetype or
+/// an associated type derived from it.
+///
+/// Archetypes based on a protocol's 'Self' archetype are not listed as part
+/// of the archetypes in a polymorphic function type, because they are
+/// handled implicitly by clients.
+static bool isArchetypeSelfDerived(ArchetypeType *archetype) {
+  while (auto parent = archetype->getParent())
+    archetype = parent;
+  return archetype->getSelfProtocol();
+}
+
 /// \brief Add the nested archetypes of the given archetype to the set of
 /// all archetypes.
 static void addNestedArchetypes(ArchetypeType *Archetype,
@@ -527,7 +532,8 @@ static void addNestedArchetypes(ArchetypeType *Archetype,
   for (auto Nested : Archetype->getNestedTypes()) {
     if (Known.insert(Nested.second)) {
       assert(!Nested.second->isPrimary() && "Unexpected primary archetype");
-      All.push_back(Nested.second);
+      if (!isArchetypeSelfDerived(Nested.second))
+        All.push_back(Nested.second);
       addNestedArchetypes(Nested.second, Known, All);
     }
   }
@@ -612,8 +618,9 @@ void ArchetypeBuilder::assignArchetypes() {
   // Compute the archetypes for each of the potential archetypes (i.e., the
   // generic parameters).
   for (const auto& PA : Impl->PotentialArchetypes) {
-    auto Archetype
-      = PA.second->getArchetype(dyn_cast<AssociatedTypeDecl>(PA.first), Mod);
+    auto Archetype = PA.second->getArchetype(
+                       dyn_cast<ProtocolDecl>(PA.first->getDeclContext()),
+                       Mod);
     Impl->PrimaryArchetypeMap[PA.first] = Archetype;
   }
 }
@@ -631,7 +638,8 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
     llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
     for (auto GP : Impl->GenericParams) {
       auto Archetype = Impl->PrimaryArchetypeMap[GP];
-      if (Archetype->isPrimary() && KnownArchetypes.insert(Archetype))
+      if (Archetype->isPrimary() && KnownArchetypes.insert(Archetype) &&
+          !isArchetypeSelfDerived(Archetype))
         Impl->AllArchetypes.push_back(Archetype);
     }
 
