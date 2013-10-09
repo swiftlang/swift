@@ -287,6 +287,10 @@ void StructLayoutBuilder::addNonFixedSizeElementAtOffsetZero(ElementLayout &elt)
 llvm::StructType *StructLayoutBuilder::getAsAnonStruct() const {
   auto ty = llvm::StructType::get(IGM.getLLVMContext(), StructFields,
                                   /*isPacked*/ true);
+  assert((!isFixedLayout()
+          || IGM.DataLayout.getStructLayout(ty)->getSizeInBytes()
+            == CurSize.getValue())
+         && "LLVM size of fixed struct type does not match StructLayout size");
   return ty;
 }
 
@@ -294,4 +298,8 @@ llvm::StructType *StructLayoutBuilder::getAsAnonStruct() const {
 void StructLayoutBuilder::setAsBodyOfStruct(llvm::StructType *type) const {
   assert(type->isOpaque());
   type->setBody(StructFields, /*isPacked*/ true);
+  assert((!isFixedLayout()
+          || IGM.DataLayout.getStructLayout(type)->getSizeInBytes()
+            == CurSize.getValue())
+         && "LLVM size of fixed struct type does not match StructLayout size");
 }
