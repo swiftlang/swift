@@ -4,6 +4,8 @@
 The Swift ABI
 =============
 
+.. contents::
+
 Hard Constraints on Resilience
 ------------------------------
 
@@ -207,6 +209,66 @@ enum in declaration order.
     case Double(Double)     => <{ i64, i2 }> { (bitcast  %Double to i64), 1 }
     case Bignum(Bignum)     => <{ i64, i2 }> { (ptrtoint %Bignum to i64), 2 }
   }
+
+Type Metadata
+-------------
+
+The Swift runtime keeps a **metadata record** for every type used in a program,
+including every instantiation of generic types. These metadata records can
+be used by (TODO: reflection and) debugger tools to discover information about
+types. For non-generic nominal types, these metadata records are generated
+statically by the compiler. For instances of generic types, and for intrinsic
+types such as tuples, functions, protocol compositions, etc., metadata records
+are vended by the runtime as needed.
+
+Common Metadata Layout
+``````````````````````
+
+All metadata records share a common header, with the following fields:
+
+- The **value witness table** pointer references a vtable of functions
+  that implement the value semantics of the type, providing fundamental
+  operations such as copying and destroying the value. The value witness table
+  also records the size, alignment, stride, and other fundamental properties of
+  the type. The value witness table pointer is at **offset -1** from the
+  metadata pointer, that is, the pointer-sized word **immediately before**
+  the pointer.
+
+- The **kind** field is a pointer-sized integer that describes the kind of type
+  the metadata describes. This field is at **offset 0** from the metadata
+  pointer.
+  
+  The current kind values are as follows:
+  - `Struct metadata`_ has a kind of **1**.
+  - `Enum metadata`_ has a kind of **2**.
+  - `Tuple metadata`_ has a kind of **9**.
+  - `Function metadata`_ has a kind of **10**.
+  - `Protocol metadata`_ has a kind of **12**. This is used both for
+    protocol types and for protocol compositions.
+  - `Metatype metadata`_ has a kind of **13**.
+  - `Class metadata`_, instead of a kind, has an *isa pointer* in its kind slot,
+    pointing to the class's metaclass record.
+
+Struct Metadata
+```````````````
+
+Enum Metadata
+`````````````
+
+Class Metadata
+``````````````
+
+Tuple Metadata
+``````````````
+
+Function Metadata
+`````````````````
+
+Protocol Metadata
+`````````````````
+
+Metatype Metadata
+`````````````````
 
 Mangling
 --------
