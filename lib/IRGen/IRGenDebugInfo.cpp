@@ -126,7 +126,7 @@ void IRGenDebugInfo::finalize() {
   // The default for a function is to be in the file-level scope.
   for (auto FVH: Functions) {
     auto F = llvm::DISubprogram(cast<llvm::MDNode>(FVH.second));
-    auto Scope = F.getContext();
+    auto Scope = F.getContext().resolve(DIRefMap);
     if (Scope.isType() && llvm::DIType(Scope).isForwardDecl())
       Scope->replaceAllUsesWith(MainFile);
   }
@@ -575,7 +575,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
 
     auto SP = llvm::DISubprogram(cast<llvm::MDNode>(F->second));
     // RAUW the context of the function with the namespace.
-    auto Scope = SP.getContext();
+    auto Scope = SP.getContext().resolve(DIRefMap);
     if (Scope.isType() && llvm::DIType(Scope).isForwardDecl())
       Scope->replaceAllUsesWith(Namespace);
 
@@ -740,7 +740,7 @@ llvm::DIFile IRGenDebugInfo::getFile(llvm::DIDescriptor Scope) {
       Scope = llvm::DILexicalBlock(Scope).getContext();
       break;
     case llvm::dwarf::DW_TAG_subprogram:
-      Scope = llvm::DISubprogram(Scope).getContext();
+      Scope = llvm::DISubprogram(Scope).getContext().resolve(DIRefMap);
       break;
     default:
       return MainFile;
@@ -1377,6 +1377,8 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy,
 
   llvm::DIType DITy = createType(DbgTy, Scope, getFile(Scope));
   DITy.Verify();
+  auto CompTy = llvm::getDICompositeType(DITy);
+  DIRefMap.insert({ CompTy.getIdentifier(), CompTy });
 
   DITypeCache[DbgTy.getHash()] = llvm::WeakVH(DITy);
   return DITy;

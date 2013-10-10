@@ -80,6 +80,7 @@ class IRGenDebugInfo {
   llvm::DenseMap<const char *, llvm::WeakVH> DIFileCache;
   llvm::DenseMap<TypeBase*, llvm::WeakVH> DITypeCache;
   std::map<std::string, llvm::WeakVH> DINameSpaceCache;
+  llvm::DITypeIdentifierMap DIRefMap;
 
   // Subprograms need their scope to be RAUW'd when we work through
   // the list of imports.
