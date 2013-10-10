@@ -390,8 +390,7 @@ namespace {
 
     bool hasEscapedAt(SILInstruction *I);
 
-    void diagnoseInitError(SILInstruction *Use,
-                           Diag<StringRef> DiagMessage);
+    void diagnoseInitError(SILInstruction *Use, Diag<StringRef> DiagMessage);
   };
 } // end anonymous namespace
 
@@ -837,37 +836,45 @@ checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
       ArrayRef<StructOrTupleElement>(StoreAccessPath))
     return true;
 
+  // Set up a builder for anything we need to emit after this instruction.
+  SILBuilder B(Inst);
+  auto Loc = Inst->getLoc();
 
   // Handle StoreInst and AssignInst, since they always have a value ready to
   // use.
   if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
-    SILValue StoredVal = Inst->getOperand(0);
+    LoadResultVal = Inst->getOperand(0);
+  } else {
+    // Otherwise, this is a CopyAddr, which is a fused load+copy_value+store
+    // sequence.  Explode out the copyaddr to its relevant parts so that we can
+    // get access to the intermediate value that is stored, and return the newly
+    // available value stored to memory.
 
-    if (LoadUnwrapLevel == 0) {
-      // Exact match (which is common).
-      LoadResultVal = StoredVal;
-    } else {
-      ArrayRef<StructOrTupleElement> LoadPathRef(LoadAccessPath);
-      SILBuilder B(Inst);
-      LoadResultVal = ExtractElement(StoredVal,
-                                     LoadPathRef.slice(0, LoadUnwrapLevel),
-                                     B, Inst->getLoc());
-    }
-  
-    return false;
+    // Move the insertion point of the builder to after the copy_addr, which is
+    // going to get removed when it is exploded.
+    B.setInsertionPoint(B.getInsertionBB(), ++B.getInsertionPoint());
+
+    // Explode it, replacing it with its composite pieces and getting the
+    // LoadResultVal.
+    explodeCopyAddr(cast<CopyAddrInst>(Inst), LoadResultVal);
   }
 
-  // Otherwise, this is a CopyAddr, which is a fused load+copy_value+store
-  // sequence.  Explode out the copyaddr to its relevant parts so that we can
-  // get access to the intermediate value that is stored, and return the newly
-  // available value stored to memory.
-  explodeCopyAddr(cast<CopyAddrInst>(Inst), LoadResultVal);
+  // If the load is to a subelement of the available value, generate an extract
+  // value of the available value.
+  if (LoadUnwrapLevel != 0) {
+    ArrayRef<StructOrTupleElement> LoadPathRef(LoadAccessPath);
+    LoadResultVal = ExtractElement(LoadResultVal,
+                                   LoadPathRef.slice(0, LoadUnwrapLevel),
+                                   B, Loc);
+  }
+  
   return false;
 }
 
 
 /// Explode a copy_addr instruction of a loadable type into lower level
-/// operations like loads, stores, retains, releases, copy_value, etc.
+/// operations like loads, stores, retains, releases, copy_value, etc.  This
+/// returns the first instruction of the generated sequence.
 void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
                                        SILValue &StoredValue) {
   SILType ValTy = CAI->getDest().getType().getObjectType();
