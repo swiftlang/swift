@@ -41,7 +41,10 @@ private:
   /// Is this a qualified lookup on a metatype?
   unsigned IsOnMetatype : 1;
 
-  LookupState() : IsQualified(0), IsOnMetatype(0) {}
+  /// Did we recurse into a superclass?
+  unsigned IsOnSuperclass : 1;
+
+  LookupState() : IsQualified(0), IsOnMetatype(0), IsOnSuperclass(0) {}
 
 public:
   LookupState(const LookupState &) = default;
@@ -60,10 +63,17 @@ public:
 
   bool isQualified() const { return IsQualified; }
   bool isOnMetatype() const { return IsOnMetatype; }
+  bool isOnSuperclass() const { return IsOnSuperclass; }
 
   LookupState withOnMetatype() const {
     auto Result = *this;
     Result.IsOnMetatype = 1;
+    return Result;
+  }
+
+  LookupState withOnSuperclass() const {
+    auto Result = *this;
+    Result.IsOnSuperclass = 1;
     return Result;
   }
 };
@@ -74,6 +84,10 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
     // Can not call static functions on non-metatypes.
     if (!(LS.isQualified() && LS.isOnMetatype()) && FD->isStatic())
       return false;
+  }
+  if (LS.isQualified() && LS.isOnSuperclass() && isa<ConstructorDecl>(Member)) {
+    // Can not call constructors from a superclass.
+    return false;
   }
   if (LS.isQualified() && LS.isOnMetatype() && isa<VarDecl>(Member)) {
     // FIXME: static variables
@@ -328,7 +342,7 @@ static void lookupVisibleMemberDeclsImpl(
     if (CurClass && CurClass->hasSuperclass()) {
       BaseTy = CurClass->getSuperclass();
       Reason = getReasonForSuper(Reason);
-//      LS = LS.withOnSuperclass();
+      LS = LS.withOnSuperclass();
     } else {
       break;
     }
