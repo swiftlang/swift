@@ -18,6 +18,7 @@
 
 namespace swift {
   class DeclContext;
+  class SourceFile;
   class TranslationUnit;
   class Module;
   class Decl;
@@ -32,6 +33,9 @@ namespace ide {
 /// like implicit declarations, is ignored.
 class SourceEntityWalker {
 public:
+  /// Walks the provided source file.
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(SourceFile &SrcFile);
   /// Walks the provided translation unit.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(TranslationUnit &TU);

@@ -1056,7 +1056,6 @@ void Module::collectLinkLibraries(LinkLibraryCallback callback) {
   });
 }
 
-
 //===----------------------------------------------------------------------===//
 // TranslationUnit Implementation
 //===----------------------------------------------------------------------===//

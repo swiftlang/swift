@@ -232,6 +232,10 @@ bool SemaAnnotator::shouldIgnore(Decl *D, bool &ShouldVisitChildren) {
   return false;
 }
 
+bool SourceEntityWalker::walk(SourceFile &SrcFile) {
+  SemaAnnotator Annotator(*this);
+  return SrcFile.walk(Annotator);
+}
 
 bool SourceEntityWalker::walk(TranslationUnit &TU) {
   SemaAnnotator Annotator(*this);
