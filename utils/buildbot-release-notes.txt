@@ -29,6 +29,11 @@
   NSView?) and the '!' operation assumes that the cast succeeded,
   i.e., that the optional has a value in it.
 
+* The unconditional checked cast syntax 'x as! T' has been removed. Many cases
+  where conversion from 'id' is necessary can now be handled by postfix '!'
+  (see above). Fully general unconditional casts can still be expressed using
+  'as' and postfix '!' together, '(x as T)!'.
+
 2013-10-09
 ----------
 
