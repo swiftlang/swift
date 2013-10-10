@@ -17,6 +17,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/Basic/Fixnum.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringExtras.h"
@@ -24,6 +25,9 @@ using namespace swift;
 
 STATISTIC(NumLoadPromoted, "Number of loads promoted");
 STATISTIC(NumAssignRewritten, "Number of assigns rewritten");
+
+static llvm::cl::opt<bool>
+EnableCopyAddrForwarding("enable-copyaddr-forwarding");
 
 template<typename ...ArgTypes>
 static void diagnose(SILModule &M, SILLocation loc, ArgTypes... args) {
@@ -232,21 +236,34 @@ typedef PointerUnion<VarDecl*, TupleIndexTy> StructOrTupleElement;
 typedef SmallVector<StructOrTupleElement, 8> AccessPathTy;
 
 /// Given a pointer that is known to be derived from an alloc_box, chase up to
-/// the alloc box, computing the access path.
-static void ComputeAccessPath(SILValue Pointer, AccessPathTy &AccessPath) {
-  // If we got to the root, we're done.
-  while (!isa<AllocBoxInst>(Pointer) && !isa<MarkUninitializedInst>(Pointer) &&
-         !isa<AllocStackInst>(Pointer)) {
+/// the alloc box, computing the access path.  This returns true if the access
+/// path to the specified RootInst was successfully computed, false otherwise.
+static bool TryComputingAccessPath(SILValue Pointer, AccessPathTy &AccessPath,
+                                   SILInstruction *RootInst) {
+  while (1) {
+    // If we got to the root, we're done.
+    if (RootInst == Pointer.getDef())
+      return true;
+
     if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
       AccessPath.push_back(Fixnum<31, unsigned>(TEAI->getFieldNo()));
       Pointer = TEAI->getOperand();
-    } else {
-      auto *SEAI = cast<StructElementAddrInst>(Pointer);
+    } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Pointer)) {
       AccessPath.push_back(SEAI->getField());
       Pointer = SEAI->getOperand();
+    } else {
+      return false;
     }
   }
 }
+
+static void ComputeAccessPath(SILValue Pointer, AccessPathTy &AccessPath,
+                              SILInstruction *RootInst) {
+  bool Result = TryComputingAccessPath(Pointer, AccessPath, RootInst);
+  assert(Result && "Failed to compute an access path to our root?");
+  (void)Result;
+}
+
 
 /// Given an aggregate value and an access path, extract the value indicated by
 /// the path.
@@ -373,6 +390,7 @@ namespace {
     bool checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
                                             SILValue &LoadResultVal,
                                             AccessPathTy &LoadAccessPath);
+    void explodeCopyAddr(CopyAddrInst *CAI, SILValue &StoredValue);
 
     bool isLiveOut(SILBasicBlock *BB);
 
@@ -391,6 +409,8 @@ ElementPromotion::ElementPromotion(SILInstruction *TheMemory,
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
   for (auto Use : Uses) {
+    assert(Use.first);
+
     // Keep track of all the uses that aren't loads.
     if (Use.second == UseKind::Load)
       continue;
@@ -465,6 +485,9 @@ void ElementPromotion::doIt() {
   // for definitive initialization, promoting loads, rewriting assigns, and
   // performing other tasks.
   for (auto Use : Uses) {
+    // Ignore entries for instructions that got expanded along the way.
+    if (Use.first == nullptr) continue;
+
     switch (Use.second) {
     case UseKind::Load:         handleLoadUse(Use.first); break;
     case UseKind::Store:        handleStoreUse(Use.first, false); break;
@@ -498,7 +521,7 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
   // access path down to the field so we can determine precise def/use behavior.
   AccessPathTy AccessPath;
   if (WantValue)
-    ComputeAccessPath(Inst->getOperand(0), AccessPath);
+    ComputeAccessPath(Inst->getOperand(0), AccessPath, TheMemory);
 
   // Note that we intentionally don't support forwarding of weak pointers,
   // because the underlying value may drop be deallocated at any time.  We would
@@ -528,8 +551,6 @@ void ElementPromotion::handleLoadUse(SILInstruction *Inst) {
 
   DEBUG(llvm::errs() << "  *** Promoting load: " << *Inst << "\n");
   DEBUG(llvm::errs() << "      To value: " << Result.getDef() << "\n");
-
-
 
   SILValue(Inst, 0).replaceAllUsesWith(Result);
   SILValue Addr = Inst->getOperand(0);
@@ -582,7 +603,7 @@ void ElementPromotion::handleStoreUse(SILInstruction *Inst,
     WantsValue = !HasTrivialType && !isPartialStore;
 
     if (WantsValue)
-      ComputeAccessPath(Inst->getOperand(1), AccessPath);
+      ComputeAccessPath(Inst->getOperand(1), AccessPath, TheMemory);
   }
 
   // Check to see if the value is known-initialized here or not.  If the assign
@@ -783,12 +804,25 @@ bool ElementPromotion::
 checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
                                    SILValue &LoadResultVal,
                                    AccessPathTy &LoadAccessPath) {
-  // We can only store forward from store and assign's.
-  if (!isa<StoreInst>(Inst) && !isa<AssignInst>(Inst)) return false;
-
   // Get the access path for the store/assign.
   AccessPathTy StoreAccessPath;
-  ComputeAccessPath(Inst->getOperand(1), StoreAccessPath);
+
+  // We can always try to store forward from store and assign's.
+  if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
+    ComputeAccessPath(Inst->getOperand(1), StoreAccessPath, TheMemory);
+  } else if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
+
+    // Temporarily gate copyaddr forwarding by a command line flag.
+    if (!EnableCopyAddrForwarding)
+      return false;
+
+
+    // We've already filtered to only look at stores to the box, this can't just
+    // be a "load" copy_addr from the box (unless it loads *and* stores).
+    ComputeAccessPath(CAI->getDest(), StoreAccessPath, TheMemory);
+  } else {
+    return false;
+  }
 
   // Since loads are always completely scalarized, we know that the load access
   // path will either be non-intersecting or that the load is deeper-or-equal in
@@ -805,20 +839,118 @@ checkLoadAccessPathAndComputeValue(SILInstruction *Inst,
       ArrayRef<StructOrTupleElement>(StoreAccessPath))
     return true;
 
-  SILValue StoredVal = Inst->getOperand(0);
 
-  SILBuilder B(Inst);
-  if (LoadUnwrapLevel == 0) {
-    // Exact match (which is common).
-    LoadResultVal = StoredVal;
-  } else {
-    LoadResultVal = ExtractElement(StoredVal,
-                                   ArrayRef<StructOrTupleElement>(LoadAccessPath).slice(0, LoadUnwrapLevel),
-                                   B, Inst->getLoc());
-  }
+  // Handle StoreInst and AssignInst, since they always have a value ready to
+  // use.
+  if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
+    SILValue StoredVal = Inst->getOperand(0);
+
+    if (LoadUnwrapLevel == 0) {
+      // Exact match (which is common).
+      LoadResultVal = StoredVal;
+    } else {
+      ArrayRef<StructOrTupleElement> LoadPathRef(LoadAccessPath);
+      SILBuilder B(Inst);
+      LoadResultVal = ExtractElement(StoredVal,
+                                     LoadPathRef.slice(0, LoadUnwrapLevel),
+                                     B, Inst->getLoc());
+    }
   
+    return false;
+  }
+
+  // Otherwise, this is a CopyAddr, which is a fused load+copy_value+store
+  // sequence.  Explode out the copyaddr to its relevant parts so that we can
+  // get access to the intermediate value that is stored, and return the newly
+  // available value stored to memory.
+  explodeCopyAddr(cast<CopyAddrInst>(Inst), LoadResultVal);
   return false;
 }
+
+
+/// Explode a copy_addr instruction of a loadable type into lower level
+/// operations like loads, stores, retains, releases, copy_value, etc.
+void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
+                                       SILValue &StoredValue) {
+  SILType ValTy = CAI->getDest().getType().getObjectType();
+  auto &TL = CAI->getModule().getTypeLowering(ValTy);
+
+  // Keep track of the new instructions emitted.
+  SmallVector<SILInstruction*, 4> NewInsts;
+  SILBuilder B(CAI, &NewInsts);
+
+
+  // Use type lowering to lower the copyaddr into a load sequence + store
+  // sequence appropriate for the type.
+  StoredValue = TL.emitLoadOfCopy(B, CAI->getLoc(), CAI->getSrc(),
+                                  CAI->isTakeOfSrc());
+
+  TL.emitStoreOfCopy(B, CAI->getLoc(), StoredValue, CAI->getDest(),
+                     CAI->isInitializationOfDest());
+
+
+  // Next, remove the copy_addr itself.
+  CAI->eraseFromParent();
+
+  // Update our internal state for this being gone.
+  NonLoadUses.erase(CAI);
+
+  // Remove the copy_addr from Uses.
+  UseKind CopyAddrKind = Release;
+  for (auto &Use : Uses) {
+    if (Use.first == CAI) {
+      CopyAddrKind = Use.second;
+      Use.first = nullptr;
+      break;
+    }
+  }
+
+  assert(CopyAddrKind != Release && "Didn't find entry for copyaddr?");
+  assert((CopyAddrKind == Store || CopyAddrKind == PartialStore) &&
+         "Expected copy_addrs that store");
+
+
+  // Now that we've emitted a bunch of instructions, including a load and store
+  // but also including other stuff, update the internal state of
+  // ElementPromotion to reflect them.
+
+  // Update the instructions that touch the memory.
+  for (auto *NewInst : NewInsts) {
+    switch (NewInst->getKind()) {
+    default:
+      NewInst->dump();
+      assert(0 && "Unknown instruction generated by copy_addr lowering");
+
+    case ValueKind::LoadInst: {
+      // If this is the load of the input, ignore it.  If it is a load from the
+      // memory object, track it as an access.
+      AccessPathTy NewLoadAccessPath;
+      if (TryComputingAccessPath(NewInst->getOperand(0), NewLoadAccessPath,
+                                 TheMemory)) {
+        // TODO: Scalarize the load if applicable.
+        Uses.push_back({ NewInst, Load });
+      }
+      continue;
+    }
+
+    case ValueKind::StoreInst:
+      Uses.push_back({ NewInst, CopyAddrKind });
+      continue;
+
+    case ValueKind::CopyValueInst:
+    case ValueKind::StrongRetainInst:
+    case ValueKind::StrongReleaseInst:
+    case ValueKind::UnownedRetainInst:
+    case ValueKind::UnownedReleaseInst:
+    case ValueKind::DestroyValueInst:   // Destroy overwritten value
+      // These are ignored.
+      continue;
+    }
+  }
+}
+
+
+
 
 
 //===----------------------------------------------------------------------===//
@@ -1272,7 +1404,10 @@ void swift::performSILDefiniteInitialization(SILModule *M) {
   for (auto &Fn : *M) {
     // Walk through an promote all of the alloc_box's that we can.
     checkDefiniteInitialization(Fn);
-    
+
+    if (EnableCopyAddrForwarding)
+      Fn.dump();
+
     // Lower raw-sil only instructions used by this pass, like "assign".
     lowerRawSILOperations(Fn);
   }
