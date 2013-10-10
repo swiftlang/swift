@@ -1,3 +1,34 @@
+2013-10-16
+----------
+
+* Unlike in Objective-C, objects of type 'id' in Swift do not
+  implicitly convert to any class type. For example, the following
+  code is ill-formed:
+
+     func getContentViewBounds(window : NSWindow) -> NSRect {
+       var view : NSView = window.contentView() // error: 'id' doesn't implicitly convert to NSView
+      return view.bounds()
+     }
+
+  because contentView() returns an 'id'. One can now use the postfix
+  '!' operator to allow an object of type 'id' to convert to any class
+  type, e.g.,
+
+     func getContentViewBounds(window : NSWindow) -> NSRect {
+       var view : NSView = window.contentView()! // ok: checked conversion to NSView
+      return view.bounds()
+     }
+
+  The conversion is checked at run-time, and the program will fail if
+  the object is not an NSView. This is shorthand for
+
+      var view : NSView = (window.contentView() as NSView)!
+
+  which checks whether the content view is an NSView (via the "as
+  NSView"). That operation returns an optional NSView (written
+  NSView?) and the '!' operation assumes that the cast succeeded,
+  i.e., that the optional has a value in it.
+
 2013-10-09
 ----------
 
