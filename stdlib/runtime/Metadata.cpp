@@ -951,6 +951,23 @@ swift::swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
   return swift_getTupleTypeMetadata(3, elts, labels, proposedWitnesses);
 }
 
+/*** Structs ***************************************************************/
+
+/// Initialize the value witness table and struct field offset vector for a
+/// struct, using the "Universal" layout strategy.
+void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
+                                     const Metadata * const *fieldTypes,
+                                     size_t *fieldOffsets,
+                                     ValueWitnessTable *vwtable) {
+  auto layout = performBasicLayout(fieldTypes, numFields,
+    [&](size_t i, const Metadata *fieldType, size_t offset) {
+      fieldOffsets[i] = offset;
+    });
+  
+  vwtable->size = layout.size;
+  vwtable->flags = layout.flags;
+  vwtable->stride = layout.stride;
+}
 
 /*** Metatypes *************************************************************/
 

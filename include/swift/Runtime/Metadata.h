@@ -918,6 +918,12 @@ swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
                             const Metadata *elt2, const char *labels,
                             const ValueWitnessTable *proposedWitnesses);
 
+/// Initialize the value witness table and struct field offset vector for a
+/// struct, using the "Universal" layout strategy.
+extern "C" void swift_initStructMetadata_UniversalStrategy(size_t numFields,
+                                         const Metadata * const *fieldTypes,
+                                         size_t *fieldOffsets,
+                                         ValueWitnessTable *vwtable);
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 extern "C" const MetatypeMetadata *
