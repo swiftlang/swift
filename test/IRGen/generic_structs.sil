@@ -38,6 +38,7 @@ struct SingleDynamic<T> {
 
 struct Intish { var value : Builtin.Int64 }
 struct Chareth { var value : Builtin.Int21 }
+struct Byteful { var value : Builtin.Int8 }
 struct Stringly {
   var owner : Builtin.ObjectPointer
   var base : Builtin.RawPointer
@@ -56,6 +57,53 @@ entry(%0 : $SingleDynamic<Intish>, %1 : $SingleDynamic<Chareth>):
   %b = struct_extract %1 : $SingleDynamic<Chareth>, #x
   %c = tuple (%a : $Intish, %b : $Chareth)
   return %c : $(Intish, Chareth)
+}
+
+struct ComplexDynamic<U, V> {
+  var a, a2 : Byteful
+  var b : U
+  var c : SingleDynamic<V>
+  var d : Chareth
+}
+
+// CHECK-LABEL: define void @explode_complex_dynamic
+sil @explode_complex_dynamic : $<A, B> (ComplexDynamic<A, B>, [inout] Byteful, [inout] A, [inout] B, [inout] Chareth) -> () {
+entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Chareth):
+  %a = struct_element_addr %0 : $*ComplexDynamic<A, B>, #a2
+
+  // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i64*
+  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64* [[METADATA]], i32 3
+  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64* [[FIELD_OFFSET_VECTOR]], i32 2
+  // CHECK: [[FIELD_OFFSET:%.*]] = load i64* [[FIELD_OFFSET_ADDR]], align 8
+  // CHECK: [[BYTES:%.*]] = bitcast %V15generic_structs14ComplexDynamic* %0 to i8*
+  // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8* [[BYTES]], i64 [[FIELD_OFFSET]]
+  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %swift.opaque*
+  %b = struct_element_addr %0 : $*ComplexDynamic<A, B>, #b
+
+  // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i64*
+  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64* [[METADATA]], i32 3
+  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64* [[FIELD_OFFSET_VECTOR]], i32 3
+  // CHECK: [[FIELD_OFFSET:%.*]] = load i64* [[FIELD_OFFSET_ADDR]], align 8
+  // CHECK: [[BYTES:%.*]] = bitcast %V15generic_structs14ComplexDynamic* %0 to i8*
+  // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8* [[BYTES]], i64 [[FIELD_OFFSET]]
+  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %V15generic_structs13SingleDynamic
+  %5 = struct_element_addr %0 : $*ComplexDynamic<A, B>, #c
+  %c = struct_element_addr %5 : $*SingleDynamic<B>, #x
+
+  // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i64*
+  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64* [[METADATA]], i32 3
+  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64* [[FIELD_OFFSET_VECTOR]], i32 4
+  // CHECK: [[FIELD_OFFSET:%.*]] = load i64* [[FIELD_OFFSET_ADDR]], align 8
+  // CHECK: [[BYTES:%.*]] = bitcast %V15generic_structs14ComplexDynamic* %0 to i8*
+  // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8* [[BYTES]], i64 [[FIELD_OFFSET]]
+  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %V15generic_structs7Chareth
+  %d = struct_element_addr %0 : $*ComplexDynamic<A, B>, #d
+  copy_addr %a to %1 : $*Byteful
+  copy_addr %b to %2 : $*A
+  copy_addr %c to %3 : $*B
+  copy_addr %d to %4 : $*Chareth
+  %v = tuple ()
+  return %v : $()
 }
 
 sil @top_level_code : $() -> () {

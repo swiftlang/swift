@@ -165,6 +165,27 @@ namespace {
     void noteStartOfFieldOffsets() { StartOfFieldOffsets = NextIndex; }
   };
   
+  static Address
+  emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
+                                 StructDecl *S,
+                                 llvm::Value *metadata) {
+    // Find where the field offsets begin.
+    GetStartOfFieldOffsets scanner(IGF.IGM, S);
+    scanner.layout();
+    assert(scanner.StartOfFieldOffsets != ~0U
+           && "did not find start of field offsets?!");
+    
+    unsigned StartOfFieldOffsets = scanner.StartOfFieldOffsets;
+    
+    // Find that offset into the metadata.
+    llvm::Value *fieldVector
+      = IGF.Builder.CreateBitCast(metadata, IGF.IGM.SizeTy->getPointerTo());
+    return IGF.Builder.CreateConstArrayGEP(
+                            Address(fieldVector, IGF.IGM.getPointerAlignment()),
+                            StartOfFieldOffsets,
+                            IGF.IGM.getPointerSize());
+  }
+  
   /// Accessor for the non-fixed offsets of a struct type.
   class StructNonFixedOffsets : public NonFixedOffsetsImpl {
     CanType TheStruct;
@@ -174,8 +195,16 @@ namespace {
     }
     
     llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) {
-      // FIXME: implement
-      assert(false);
+      // Get the field offset vector from the struct metadata.
+      llvm::Value *metadata = IGF.emitTypeMetadataRef(TheStruct);
+      Address fieldVector = emitAddressOfFieldOffsetVector(IGF,
+                                    TheStruct->getStructOrBoundGenericStruct(),
+                                    metadata);
+      
+      // Grab the indexed offset.
+      fieldVector = IGF.Builder.CreateConstArrayGEP(fieldVector, index,
+                                                    IGF.IGM.getPointerSize());
+      return IGF.Builder.CreateLoad(fieldVector);
     }
   };
 
@@ -214,22 +243,10 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             llvm::Value *vwtable) const override {
-      // Find where the field offsets begin.
-      GetStartOfFieldOffsets scanner(IGF.IGM,
-                                     TheType->getStructOrBoundGenericStruct());
-      scanner.layout();
-      assert(scanner.StartOfFieldOffsets != ~0U
-             && "did not find start of field offsets?!");
-      
-      unsigned StartOfFieldOffsets = scanner.StartOfFieldOffsets;
-      
-      // Find that offset into the metadata.
-      llvm::Value *fieldVector
-        = IGF.Builder.CreateBitCast(metadata, IGF.IGM.SizeTy->getPointerTo());
-      fieldVector = IGF.Builder.CreateConstArrayGEP(
-                            Address(fieldVector, IGF.IGM.getPointerAlignment()),
-                            StartOfFieldOffsets,
-                            IGF.IGM.getPointerSize()).getAddress();
+      // Get the field offset vector.
+      llvm::Value *fieldVector = emitAddressOfFieldOffsetVector(IGF,
+                                    TheType->getStructOrBoundGenericStruct(),
+                                    metadata).getAddress();
 
       // Collect the stored properties of the type.
       llvm::SmallVector<VarDecl*, 4> storedProperties;
