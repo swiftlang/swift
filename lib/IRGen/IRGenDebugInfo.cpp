@@ -45,24 +45,20 @@ using namespace swift;
 using namespace irgen;
 
 /// Strdup a raw char array using the bump pointer.
-static
-StringRef BumpAllocatedString(const char* Data, size_t Length,
-                              llvm::BumpPtrAllocator &BP) {
-  char *Ptr = BP.Allocate<char>(Length);
+StringRef IRGenDebugInfo::BumpAllocatedString(const char* Data, size_t Length) {
+  char *Ptr = DebugInfoNames.Allocate<char>(Length);
   memcpy(Ptr, Data, Length);
   return StringRef(Ptr, Length);
 }
 
 /// Strdup S using the bump pointer.
-static
-StringRef BumpAllocatedString(std::string S, llvm::BumpPtrAllocator &BP) {
-  return BumpAllocatedString(S.c_str(), S.length(), BP);
+StringRef IRGenDebugInfo::BumpAllocatedString(std::string S) {
+  return BumpAllocatedString(S.c_str(), S.length());
 }
 
 /// Strdup StringRef S using the bump pointer.
-static
-StringRef BumpAllocatedString(StringRef S, llvm::BumpPtrAllocator &BP) {
-  return BumpAllocatedString(S.data(), S.size(), BP);
+StringRef IRGenDebugInfo::BumpAllocatedString(StringRef S) {
+  return BumpAllocatedString(S.data(), S.size());
 }
 
 IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
@@ -88,14 +84,13 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
   } else {
     // Separate path and filename.
     Filename =
-      BumpAllocatedString(llvm::sys::path::filename(Opts.MainInputFilename),
-                          DebugInfoNames);
+      BumpAllocatedString(llvm::sys::path::filename(Opts.MainInputFilename));
     llvm::SmallString<512> Path(Opts.MainInputFilename);
     llvm::sys::path::remove_filename(Path);
     llvm::sys::fs::make_absolute(Path);
     llvm::SmallString<512> NPath;
     llvm::sys::path::native(Twine(Path), NPath);
-    Dir = BumpAllocatedString(NPath, DebugInfoNames);
+    Dir = BumpAllocatedString(NPath);
   }
   // The fallback file.
   MainFilename = Dir;
@@ -107,7 +102,7 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
   std::string buf;
   llvm::raw_string_ostream OS(buf);
   OS << "Swift version ? (based on LLVM " << PACKAGE_VERSION << ")";
-  StringRef Producer = BumpAllocatedString(OS.str(), DebugInfoNames);
+  StringRef Producer = BumpAllocatedString(OS.str());
 
   bool IsOptimized = Opts.OptLevel > 0;
   StringRef Flags = Opts.DWARFDebugFlags;
@@ -290,7 +285,7 @@ StringRef IRGenDebugInfo::getCurrentDirname() {
     return CWDName;
   llvm::SmallString<256> CWD;
   llvm::sys::fs::current_path(CWD);
-  return BumpAllocatedString(CWD.str(), DebugInfoNames);
+  return BumpAllocatedString(CWD.str());
 }
 
 /// getOrCreateFile - Translate filenames into DIFiles.
@@ -308,8 +303,7 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   }
 
   // Create a new one.
-  StringRef File = BumpAllocatedString(llvm::sys::path::filename(Filename),
-                                       DebugInfoNames);
+  StringRef File = BumpAllocatedString(llvm::sys::path::filename(Filename));
   llvm::SmallString<512> Path(Filename);
   llvm::sys::path::remove_filename(Path);
   llvm::error_code ec = llvm::sys::fs::make_absolute(Path);
@@ -317,7 +311,7 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   assert(ec == llvm::errc::success);
   (void)ec; // Silence the unused variable warning
   llvm::DIFile F =
-    DBuilder.createFile(File, BumpAllocatedString(Path, DebugInfoNames));
+    DBuilder.createFile(File, BumpAllocatedString(Path));
 
   // Cache it.
   DIFileCache[Filename] = llvm::WeakVH(F);
@@ -336,7 +330,7 @@ StringRef IRGenDebugInfo::getName(const FuncDecl& FD) {
         SmallVector<char, 64> Buf;
         StringRef Name = (VD->getName().str() +
                           Twine(IsGetter ? ".get" : ".set")).toStringRef(Buf);
-        return BumpAllocatedString(Name, DebugInfoNames);
+        return BumpAllocatedString(Name);
       }
     }
 
@@ -565,7 +559,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
   }
 
   // Create the imported module.
-  StringRef Name = BumpAllocatedString(Printed, DebugInfoNames);
+  StringRef Name = BumpAllocatedString(Printed);
   Location L = getLoc(SM, D);
   auto Import = DBuilder.createImportedModule(TheCU,
                                               llvm::DINameSpace(Namespace),
@@ -711,8 +705,7 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
       // Generic type metadata?
       if (auto Call = dyn_cast<llvm::CallInst>(Storage))
         if (Call->getNumArgOperands() == 2) {
-          auto TName = BumpAllocatedString(("$swift.type."+Name).str(),
-                                           DebugInfoNames);
+          auto TName = BumpAllocatedString(("$swift.type."+Name).str());
           emitVariableDeclaration(B, Call->getArgOperand(1), getSwiftType(),
                                   TName, llvm::dwarf::DW_TAG_auto_variable,
                                   0, DirectValue, true);
@@ -838,7 +831,7 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DTI) {
     auto CanTy = DTI.getType()->getCanonicalType();
     LinkEntity::forDebuggerTypeMangling(CanTy).mangle(Buffer);
   }
-  return BumpAllocatedString(Buffer, DebugInfoNames);
+  return BumpAllocatedString(Buffer);
 }
 
 /// Create a member of a struct, class, tuple, or enum.

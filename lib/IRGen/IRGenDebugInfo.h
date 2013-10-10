@@ -192,6 +192,10 @@ public:
   StringRef getMainFilename() const { return MainFilename; }
 
 private:
+  StringRef BumpAllocatedString(const char* Data, size_t Length);
+  StringRef BumpAllocatedString(std::string S);
+  StringRef BumpAllocatedString(StringRef S);
+
   llvm::DIType createType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope,
                           llvm::DIFile File);
   llvm::DIType getOrCreateType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope);
