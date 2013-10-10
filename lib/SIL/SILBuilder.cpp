@@ -17,18 +17,20 @@ using namespace swift;
 // SILBuilder Implementation
 //===----------------------------------------------------------------------===//
 
-SILType SILBuilder::getTupleElementType(SILType Ty, unsigned EltNo) {
+SILType SILBuilder::getTupleElementType(SILType Ty, unsigned EltNo,
+                                        SILValueCategory Cat) {
   TupleType *TT = Ty.getAs<TupleType>();
   auto EltTy = TT->getFields()[EltNo].getType()->getCanonicalType();
-  return SILType::getPrimitiveObjectType(EltTy);
+  return SILType::getPrimitiveType(EltTy, Cat);
 }
 
-SILType SILBuilder::getStructFieldType(SILType Ty, VarDecl *Field) {
+SILType SILBuilder::getStructFieldType(SILType Ty, VarDecl *Field,
+                                       SILValueCategory Cat) {
   assert(Field->getDeclContext() == Ty.getStructOrBoundGenericStruct());
   auto FieldTy = Ty.getSwiftRValueType()
     ->getTypeOfMember(Field->getModuleContext(), Field, nullptr)
     ->getCanonicalType();
-  return SILType::getPrimitiveObjectType(FieldTy);
+  return SILType::getPrimitiveType(FieldTy, Cat);
 }
 
 SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,

@@ -30,8 +30,10 @@ class SILBuilder {
   /// instruction is recorded in this list.
   SmallVectorImpl<SILInstruction*> *InsertedInstrs = nullptr;
 public:
-  static SILType getTupleElementType(SILType Ty, unsigned EltNo);
-  static SILType getStructFieldType(SILType Ty, VarDecl *Field);
+  static SILType getTupleElementType(SILType Ty, unsigned EltNo,
+                                     SILValueCategory Cat);
+  static SILType getStructFieldType(SILType Ty, VarDecl *Field,
+                                    SILValueCategory Cat);
   static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
                                            SILModule &M);
 
@@ -431,7 +433,8 @@ public:
   SILValue createTupleExtract(SILLocation Loc, SILValue Operand,
                               unsigned FieldNo) {
     return createTupleExtract(Loc, Operand, FieldNo,
-                              getTupleElementType(Operand.getType(), FieldNo));
+                              getTupleElementType(Operand.getType(), FieldNo,
+                                                  SILValueCategory::Object));
   }
 
   TupleExtractInst *createTupleExtractInst(SILLocation Loc, SILValue Operand,
@@ -448,6 +451,15 @@ public:
                     TupleElementAddrInst(Loc, Operand, FieldNo, ResultTy));
   }
 
+  TupleElementAddrInst *createTupleElementAddr(SILLocation Loc,
+                                               SILValue Operand,
+                                               unsigned FieldNo) {
+    return insert(new (F.getModule())
+                  TupleElementAddrInst(Loc, Operand, FieldNo,
+                               getTupleElementType(Operand.getType(), FieldNo,
+                                                   SILValueCategory::Address)));
+  }
+  
   StructExtractInst *createStructExtract(SILLocation Loc,
                                          SILValue Operand,
                                          VarDecl *Field,
@@ -460,7 +472,8 @@ public:
                                          SILValue Operand,
                                          VarDecl *Field) {
     return createStructExtract(Loc, Operand, Field,
-                               getStructFieldType(Operand.getType(), Field));
+                               getStructFieldType(Operand.getType(), Field,
+                                                  SILValueCategory::Object));
   }
 
 
@@ -470,6 +483,15 @@ public:
                                                  SILType ResultTy) {
     return insert(new (F.getModule())
                     StructElementAddrInst(Loc, Operand, Field, ResultTy));
+  }
+  
+  StructElementAddrInst *createStructElementAddr(SILLocation Loc,
+                                                 SILValue Operand,
+                                                 VarDecl *Field) {
+    return insert(new (F.getModule())
+                  StructElementAddrInst(Loc, Operand, Field,
+                                getStructFieldType(Operand.getType(), Field,
+                                                   SILValueCategory::Address)));
   }
   
   RefElementAddrInst *createRefElementAddr(SILLocation Loc, SILValue Operand,
