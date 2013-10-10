@@ -1379,10 +1379,6 @@ struct TypeVariableConstraints {
   /// \brief The set of protocol conformance constraints directly applicable
   /// to the type variable.
   SmallVector<Constraint *, 4> ConformsToConstraints;
-  
-  /// \brief The set of archetype constraints directly
-  /// applicable to the type variable T.
-  SmallVector<Constraint *, 4> KindConstraints;
 };
 
 /// \brief The kind of type matching to perform in matchTypes().

@@ -227,10 +227,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       break;
 
     case ConstraintClassification::TypeProperty:
-      if (auto firstTV = dyn_cast<TypeVariableType>(first.getPointer())) {
-        // Record this constraint on the type variable.
-        getTVC(firstTV).KindConstraints.push_back(constraint);
-      } else {
+      if (!isa<TypeVariableType>(first.getPointer())) {
         // Simply mark any type variables in the type as referenced.
         first->getTypeVariables(referencedTypeVars);
       }
