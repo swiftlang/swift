@@ -95,6 +95,7 @@ class IRGenDebugInfo {
   llvm::BumpPtrAllocator DebugInfoNames;
   llvm::DICompileUnit TheCU;
   llvm::DIFile MainFile;
+  DebugTypeInfo *SwiftType; /// The cached debug type for swift.type.
 
   Location LastLoc; /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
@@ -253,6 +254,7 @@ private:
                                   SILFunction *Fn,
                                   SILValue Value,
                                   bool Indirect);
+  DebugTypeInfo &getSwiftType();
 };
 
 } // irgen

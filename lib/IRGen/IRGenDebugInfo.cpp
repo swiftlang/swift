@@ -77,7 +77,9 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
     M(M),
     DBuilder(M),
     Types(Types),
-    LastFn(nullptr), LastLoc({}), LastScope(nullptr) {
+    LastFn(nullptr),
+    SwiftType(nullptr),
+    LastLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfo);
   StringRef Dir, Filename;
   if (Opts.MainInputFilename.empty()) {
@@ -121,6 +123,9 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
 }
 
 void IRGenDebugInfo::finalize() {
+  if (SwiftType) delete SwiftType;
+  SwiftType = nullptr;
+
   assert(LocationStack.empty() && "Mismatch of pushLoc() and popLoc().");
 
   // The default for a function is to be in the file-level scope.
@@ -666,6 +671,22 @@ bool IRGenDebugInfo::emitVarDeclForSILArgOrNull(IRBuilder& Builder,
   return false;
 }
 
+DebugTypeInfo &IRGenDebugInfo::getSwiftType() {
+  if (!SwiftType) {
+    auto TyDecl = new (Context)
+      TypeAliasDecl(SourceLoc(),
+                    Context.getIdentifier("$swift.type"), SourceLoc(),
+                    TypeLoc::withoutLoc(Context.TheRawPointerType),
+                    Context.TheBuiltinModule,
+                    MutableArrayRef<TypeLoc>());
+    //TyDecl->overwriteType(Context.TheRawPointerType);
+    SwiftType = new DebugTypeInfo(TyDecl,
+                                  (Size)TargetInfo.getPointerWidth(0),
+                                  (Alignment)TargetInfo.getPointerAlign(0));
+  }
+  return *SwiftType;
+}
+
 void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
                                                   llvm::Value *Storage,
                                                   DebugTypeInfo Ty,
@@ -690,14 +711,13 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
       // Generic type metadata?
       if (auto Call = dyn_cast<llvm::CallInst>(Storage))
         if (Call->getNumArgOperands() == 2) {
-          auto RawPtrTy = DebugTypeInfo(Context.TheRawPointerType,
-                                        TargetInfo.getPointerWidth(0),
-                                        TargetInfo.getPointerAlign(0));
           auto TName = BumpAllocatedString(("$swift.type."+Name).str(),
                                            DebugInfoNames);
-          emitVariableDeclaration(B, Call->getArgOperand(1), RawPtrTy,
+          emitVariableDeclaration(B, Call->getArgOperand(1), getSwiftType(),
                                   TName, llvm::dwarf::DW_TAG_auto_variable,
                                   0, DirectValue, true);
+
+
         }
       if (emitVarDeclForSILArgOrNull(B, Storage, Ty, Name, I->getFunction(),
                                      CopyAddr->getSrc(), Indirect))
@@ -1206,10 +1226,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::MetaType: {
     // Metatypes are (mostly) singleton type descriptors, often without storage.
     auto Metatype = BaseTy->castTo<MetaTypeType>();
-    auto CanTy = Metatype->getInstanceType()->getCanonicalType();
+    auto Ty = Metatype->getInstanceType();
     // The type this metatype is describing.
     // FIXME: Reusing the size and alignment of the metatype for the type is wrong.
-    auto DITy = getOrCreateDesugaredType(CanTy, DbgTy, Scope);
+    auto DITy = getOrCreateDesugaredType(Ty, DbgTy, Scope);
     return DBuilder.createQualifiedType(DW_TAG_meta_type, DITy);
   }
 
