@@ -2043,13 +2043,19 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   setLoweredExplosion(boxValue, box);
   setLoweredAddress(ptrValue, addr.getAddress());
 
-  if (IGM.DebugInfo)
+  if (IGM.DebugInfo) {
+    bool IsIndirect = true;
+    // LValues [inout] are implicitly indirect because of their type.
+    if (Decl && Decl->getType()->getKind() == TypeKind::LValue)
+      IsIndirect = false;
+
     IGM.DebugInfo->emitStackVariableDeclaration
       (Builder,
        emitShadowCopy(addr.getAddress(), Name),
        Decl ? DebugTypeInfo(Decl, type)
             : DebugTypeInfo(i->getElementType().getSwiftType(), type),
-       Name, i, IndirectValue);
+       Name, i, IsIndirect);
+  }
 }
 
 void IRGenSILFunction::visitAllocArrayInst(swift::AllocArrayInst *i) {
