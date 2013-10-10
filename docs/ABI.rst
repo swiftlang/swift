@@ -280,8 +280,8 @@ contain the following fields:
   TODO: The parent pointer is currently always null.
 
 - A vector of **field offsets** begins at **offset 3**. For each field of the
-  struct, in ``var`` declaration order, the field's offset from the beginning
-  of the struct is stored as a pointer-sized integer.
+  struct, in ``var`` declaration order, the field's offset in bytes from the
+  beginning of the struct is stored as a pointer-sized integer.
 
 - If the struct is generic, then the
   `generic parameter vector`_ begins at **offset 3+n**, where **n** is the
