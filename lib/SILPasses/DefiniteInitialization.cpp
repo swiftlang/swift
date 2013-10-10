@@ -478,7 +478,11 @@ void ElementPromotion::doIt() {
   // With any escapes tallied up, we can work through all the uses, checking
   // for definitive initialization, promoting loads, rewriting assigns, and
   // performing other tasks.
-  for (auto Use : Uses) {
+
+  // Note that this should not use a for-each loop, as the Uses list can grow
+  // and reallocate as we iterate over it.
+  for (unsigned i = 0; i != Uses.size(); ++i) {
+    auto &Use = Uses[i];
     // Ignore entries for instructions that got expanded along the way.
     if (Use.first == nullptr) continue;
 
@@ -917,7 +921,8 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
 
     case ValueKind::LoadInst: {
       // If this is the load of the input, ignore it.  If it is a load from the
-      // memory object, track it as an access.
+      // memory object, track it as an access.  Note that copy_addrs can have
+      // both their input and result in the same memory object.
       AccessPathTy NewLoadAccessPath;
       if (TryComputingAccessPath(NewInst->getOperand(0), NewLoadAccessPath,
                                  TheMemory)) {
