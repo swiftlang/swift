@@ -312,14 +312,46 @@ Class Metadata
 Tuple Metadata
 ~~~~~~~~~~~~~~
 
+In addition to the `common metadata layout`_ fields, tuple metadata records
+contain the following fields:
+
+- The **number of elements** in the tuple is a pointer-sized integer at
+  **offset 1**.
+- The **labels string** is a pointer to a list of consecutive null-terminated
+  label names for the tuple at **offset 2**. Each label name is given as a
+  null-terminated, UTF-8-encoded string in sequence.
+- The **element vector** begins at **offset 3** and consists of a vector of
+  type–offset pairs. The metadata for the *n*\ th element's type is a pointer
+  at **offset 3+2*n**. The offset in bytes from the beginning of the tuple to
+  the beginning of the *n*\ th element is at **offset 3+2*n+1**.
+
 Function Metadata
 ~~~~~~~~~~~~~~~~~
+
+In addition to the `common metadata layout`_ fields, function metadata records
+contain the following fields:
+
+- A reference to the **argument type** metadata record is stored at
+  **offset 1**. If the function takes multiple arguments, this references a
+  `tuple metadata`_ record.
+- A reference to the **result type** metadata record is stored at
+  **offset 2**. If the function has multiple returns, this references a
+  `tuple metadata`_ record.
 
 Protocol Metadata
 ~~~~~~~~~~~~~~~~~
 
+Protocol metadata records currently have no special fields beyond the
+`common metadata layout`_ fields.
+
 Metatype Metadata
 ~~~~~~~~~~~~~~~~~
+
+In addition to the `common metadata layout`_ fields, metatype metadata records
+contain the following fields:
+
+- A reference to the metadata record for the **instance type** that the metatype
+  represents is stored at **offset 1**.
 
 Generic Parameter Vector
 ~~~~~~~~~~~~~~~~~~~~~~~~
