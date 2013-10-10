@@ -2397,7 +2397,7 @@ public:
   }
 };
 
-/// \brief Represents an explicit cast, 'a as! T' or 'a is T', where "T" is a
+/// \brief Represents an explicit cast, 'a as T' or 'a is T', where "T" is a
 /// type, and "a" is the expression that will be converted to the type.
 class ExplicitCastExpr : public Expr {
   Expr *SubExpr;
@@ -2474,7 +2474,7 @@ enum class CheckedCastKind {
   ExistentialToConcrete,
 };
   
-/// \brief Abstract base class for checked casts 'as!' and 'is'. These represent
+/// \brief Abstract base class for checked casts 'as' and 'is'. These represent
 /// casts that can dynamically fail.
 class CheckedCastExpr : public ExplicitCastExpr {
   CheckedCastKind CastKind;
@@ -2519,34 +2519,10 @@ public:
     return E->getKind() == ExprKind::ConditionalCheckedCast;
   }
 };
-  
-/// \brief Represents an explicit unconditional checked cast, which converts
-/// from a type to some subtype or aborts if the cast is not possible,
-/// spelled 'a as! T' and producing a value of type T.
-class UnconditionalCheckedCastExpr : public CheckedCastExpr {
-  SourceLoc BangLoc;
-  
-public:
-  UnconditionalCheckedCastExpr(Expr *sub, SourceLoc asLoc, SourceLoc bangLoc,
-                               TypeLoc type)
-    : CheckedCastExpr(ExprKind::UnconditionalCheckedCast,
-                      sub, asLoc, type, type.getType()),
-      BangLoc(bangLoc) { }
-  
-  UnconditionalCheckedCastExpr(SourceLoc asLoc, SourceLoc bangLoc, TypeLoc type)
-    : UnconditionalCheckedCastExpr(nullptr, asLoc, bangLoc, type)
-  {}
-
-  SourceLoc getBangLoc() const { return BangLoc; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnconditionalCheckedCast;
-  }
-};
 
 /// \brief Represents a runtime type check query, 'a is T', where 'T' is a type
 /// and 'a' is a value of some related type. Evaluates to a Bool true if 'a' is
-/// of the type and 'a as! T' would succeed, false otherwise.
+/// of the type and 'a as T' would succeed, false otherwise.
 ///
 /// FIXME: We should support type queries with a runtime metatype value too.
 class IsaExpr : public CheckedCastExpr {

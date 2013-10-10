@@ -169,8 +169,6 @@ namespace {
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
     RValue visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                            SGFContext C);
-    RValue visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *E,
-                                             SGFContext C);
     RValue visitIsaExpr(IsaExpr *E, SGFContext C);
     RValue visitParenExpr(ParenExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
@@ -844,14 +842,6 @@ RValue RValueEmitter::emitUnconditionalCheckedCast(Expr *source,
     SGF.Cleanups.pushCleanup<CleanupUsedExistentialContainer>(originalVal);
 
   return RValue(SGF, SGF.emitManagedRValueWithCleanup(cast), loc);
-}
-
-RValue RValueEmitter::visitUnconditionalCheckedCastExpr(
-                                               UnconditionalCheckedCastExpr *E,
-                                               SGFContext C) {
-  return emitUnconditionalCheckedCast(E->getSubExpr(), E,
-                                      E->getCastTypeLoc().getType(),
-                                      E->getCastKind(), C);
 }
 
 RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {

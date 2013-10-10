@@ -306,8 +306,6 @@ contain the following fields:
 - If the enum is generic, then the
   `generic parameter vector`_ begins at **offset 3**.
 
-Class Metadata
-~~~~~~~~~~~~~~
 
 Tuple Metadata
 ~~~~~~~~~~~~~~
@@ -357,6 +355,15 @@ contain the following fields:
 
 - A reference to the metadata record for the **instance type** that the metatype
   represents is stored at **offset 1**.
+
+Class Metadata
+~~~~~~~~~~~~~~
+
+Class metadata is designed to interoperate with Objective-C; all class metadata
+records are also valid Objective-C ``Class`` objects.
+
+- The **isa pointer** pointing to the class's Objective-C-compatible metaclass
+  record is stored at **offset 0**, in place of an integer kind discriminator.
 
 Generic Parameter Vector
 ~~~~~~~~~~~~~~~~~~~~~~~~

@@ -4888,8 +4888,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   bool fromExistential = fromType->isExistentialType();
   
   // If the from/to types are equivalent or implicitly convertible,
-  // this should have been a coercion expression (b as A) rather than a
-  // checked cast (a as! B). Complain.
+  // this should have been a coercion rather than a
+  // checked cast (a as B). Complain.
   if (fromType->isEqual(toType) || isConvertibleTo(fromType, toType, dc)) {
     return CheckedCastKind::InvalidCoercible;
   }

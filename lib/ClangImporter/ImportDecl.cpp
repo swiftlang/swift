@@ -2463,13 +2463,12 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     break;
 
   case ConstantConvertKind::Downcast: {
-    auto cast = new (context) UnconditionalCheckedCastExpr(expr,
-                                                     SourceLoc(),
+    auto cast = new (context) ConditionalCheckedCastExpr(expr,
                                                      SourceLoc(),
                                                      TypeLoc::withoutLoc(type));
     cast->setCastKind(CheckedCastKind::Downcast);
     cast->setImplicit();
-    expr = cast;
+    expr = new (context) ForceValueExpr(cast, SourceLoc());
     break;
   }
   }

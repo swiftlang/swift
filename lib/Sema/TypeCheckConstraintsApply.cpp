@@ -1800,9 +1800,13 @@ namespace {
         if (expr->getType()->isEqual(expr->getSubExpr()->getType()))
           return expr->getSubExpr();
         
-        // Just perform the coercion directly.
-        return coerceToType(expr->getSubExpr(), toType,
+        // Just perform the coercion directly, wrapping in an optional to
+        // preserve the expected type of 'as'.
+        auto coerced = coerceToType(expr->getSubExpr(), toType,
                             cs.getConstraintLocator(expr, { }));
+        return new (cs.getASTContext())
+          InjectIntoOptionalExpr(coerced,
+                                 OptionalType::get(toType, cs.getASTContext()));
       }
         
         // Valid casts.
@@ -1816,14 +1820,6 @@ namespace {
         break;
       }
       return expr;
-    }
-    
-    Expr *visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *expr){
-      expr->setType(expr->getCastTypeLoc().getType());
-      Expr *result = checkAsCastExpr(expr);
-      if (!result)
-        return nullptr;
-      return result;
     }
     
     Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {

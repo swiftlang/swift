@@ -631,18 +631,6 @@ namespace {
       // FIXME: Check base/member types through substitutions.
     }
 
-    void verifyChecked(UnconditionalCheckedCastExpr *E) {
-      Type Ty = E->getCastTypeLoc().getType();
-      if (!Ty->isEqual(E->getType())) {
-        Out << "UnconditionalCheckedCast types don't match\n";
-        abort();
-      }
-      if (!E->isResolved()) {
-        Out << "UnconditionalCheckedCast kind not resolved\n";
-        abort();
-      }
-    }
-    
     void verifyChecked(CheckedCastExpr *E) {
       if (!E->isResolved()) {
         Out << "CheckedCast kind not resolved\n";

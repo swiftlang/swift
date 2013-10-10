@@ -939,11 +939,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
     
-    Type visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *expr) {
-      // FIXME: Open this type.
-      return expr->getCastTypeLoc().getType();
-    }
-
     Type visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
       // FIXME: Open this type.
       return CS.getTypeChecker().getOptionalType(expr->getLoc(),

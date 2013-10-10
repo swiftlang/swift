@@ -746,8 +746,6 @@ ERROR(expected_expr_after_if_colon,expr_parsing,none,
 // Cast expressions
 ERROR(expected_type_after_is,expr_parsing,none,
       "expected type after 'is'", ())
-ERROR(expected_type_after_as_bang,expr_parsing,none,
-      "expected type after 'as!'", ())
 ERROR(expected_type_after_as,expr_parsing,none,
       "expected type after 'as'", ())
 ERROR(bool_type_broken,expr_parsing,none,
