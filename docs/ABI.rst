@@ -12,16 +12,49 @@ invalidating the metaclass hierarchy.  Note a Swift class without an
 explicit base class is implicitly rooted in the SwiftObject
 Objective-C class.
 
-Fragile Struct Layout
----------------------
+Fragile Struct and Tuple Layout
+-------------------------------
 
-Structs are currently laid out in declared field order, which then follows
-the size and alignment conventions of LLVM on the target platform.
+Structs and tuples currently share the same layout algorithm, noted as the
+"Universal" layout algorithm in the compiler implementation. The algorithm
+is as follows:
+
+- Start with a **size** of **0** and an **alignment** of **1**.
+- Iterate through the fields, in element order for tuples, or in ``var`` 
+  declaration order for structs. For each field:
+  - Update **size** by rounding up to **alignment**, that is, increasing it
+    to the least value greater or equal to **size** and evenly divisible by
+    **alignment**.
+  - Assign the **offset of the field** to the current value of **size**.
+  - Update **size** by adding the **size of the field**.
+  - Update **alignment** to the max of **alignment** and the
+    **alignment of the field**.
+- The final **size** and **alignment** are the size and alignment of the
+  aggregate. The **stride** of the type is the final **size** rounded up to 
+  **alignment**.
+
+Note that this differs from C or LLVM's normal layout rules in that *size*
+and *stride* are distinct; whereas C layout requires that an embedded struct's
+size be padded out to its alignment and that nothing be laid out there,
+Swift layout allows an outer struct to lay out fields in the inner struct
+s tail padding, alignment permitting. The Swift compiler emits LLVM packed
+struct types with manual padding to get the necessary control over the binary
+layout. Some examples:
 
 ::
 
-  struct S { var x:Int; var y:Double } // => LLVM { i64, double }
-  struct S2 { var x:Char; var s:S }    // => LLVM { i21, { i64, double } }
+  // LLVM <{ i64, i8 }>
+  struct S {
+    var x: Int
+    var y: UInt8
+  }
+
+  // LLVM <{ i8, [7 x i8], <{ i64, i8 }>, i8 }>
+  struct S2 {
+    var x: UInt8
+    var s: S
+    var y: UInt8
+  }
 
 Class Layout
 ------------
@@ -54,7 +87,7 @@ case's data type, or is empty if the case has no data type.
 ::
 
   enum EmptyCase { case X }             // => empty type
-  enum DataCase { case Y(Int, Double) } // => LLVM { i64, double }
+  enum DataCase { case Y(Int, Double) } // => LLVM <{ i64, double }>
 
 C-Like Enums
 ````````````
@@ -127,14 +160,14 @@ are then assigned values in the data area of the enum in declaration order.
 
 ::
 
-  enum IntOrInfinity { => LLVM { i64, i1 }
-    case NegInfinity    => { i64, i1 } {    0, 1 }
-    case Int(Int)       => { i64, i1 } { %Int, 0 }
-    case PosInfinity    => { i64, i1 } {    1, 1 }
+  enum IntOrInfinity { => LLVM <{ i64, i1 }>
+    case NegInfinity    => <{ i64, i1 }> {    0, 1 }
+    case Int(Int)       => <{ i64, i1 }> { %Int, 0 }
+    case PosInfinity    => <{ i64, i1 }> {    1, 1 }
   }
 
-  IntOrInfinity.Int(    0) => { i64, i1 } {     0, 0 }
-  IntOrInfinity.Int(20721) => { i64, i1 } { 20721, 0 }
+  IntOrInfinity.Int(    0) => <{ i64, i1 }> {     0, 0 }
+  IntOrInfinity.Int(20721) => <{ i64, i1 }> { 20721, 0 }
 
 Multi-Payload Enums
 ```````````````````
@@ -169,10 +202,10 @@ enum in declaration order.
 
   class Bignum {}
 
-  enum IntDoubleOrBignum { => LLVM { i64, i2 }
-    case Int(Int)           => { i64, i2 } {           %Int,            0 }
-    case Double(Double)     => { i64, i2 } { (bitcast  %Double to i64), 1 }
-    case Bignum(Bignum)     => { i64, i2 } { (ptrtoint %Bignum to i64), 2 }
+  enum IntDoubleOrBignum { => LLVM <{ i64, i2 }>
+    case Int(Int)           => <{ i64, i2 }> {           %Int,            0 }
+    case Double(Double)     => <{ i64, i2 }> { (bitcast  %Double to i64), 1 }
+    case Bignum(Bignum)     => <{ i64, i2 }> { (ptrtoint %Bignum to i64), 2 }
   }
 
 Mangling
