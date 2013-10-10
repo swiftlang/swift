@@ -22,9 +22,9 @@ is as follows:
 - Start with a **size** of **0** and an **alignment** of **1**.
 - Iterate through the fields, in element order for tuples, or in ``var`` 
   declaration order for structs. For each field:
-  - Update **size** by rounding up to **alignment**, that is, increasing it
-    to the least value greater or equal to **size** and evenly divisible by
-    **alignment**.
+  - Update **size** by rounding up to the **alignment of the field**, that is,
+    increasing it to the least value greater or equal to **size** and evenly
+    divisible by the **alignment of the field**.
   - Assign the **offset of the field** to the current value of **size**.
   - Update **size** by adding the **size of the field**.
   - Update **alignment** to the max of **alignment** and the
