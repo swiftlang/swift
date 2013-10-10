@@ -18,6 +18,7 @@
 #include "DebugTypeInfo.h"
 #include "IRGen.h"
 #include "FixedTypeInfo.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 using namespace irgen;
@@ -93,4 +94,9 @@ bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
 
 bool DebugTypeInfo::operator!=(DebugTypeInfo T) const {
   return !operator==(T);
+}
+
+void DebugTypeInfo::dump() const {
+  if (getDecl()) getDecl()->dump();
+  else getType()->dump();
 }

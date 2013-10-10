@@ -65,6 +65,7 @@ namespace swift {
       bool operator==(DebugTypeInfo T) const;
       bool operator!=(DebugTypeInfo T) const;
 
+      void dump() const;
     };
   }
 }
