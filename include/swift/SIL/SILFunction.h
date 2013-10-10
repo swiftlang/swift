@@ -25,7 +25,6 @@ namespace swift {
 class ASTContext;
 class SILInstruction;
 class SILModule;
-class TranslationUnit;
   
 /// Linkage attribute for a SIL function.
 enum class SILLinkage : unsigned char {

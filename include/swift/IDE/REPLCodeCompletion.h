@@ -25,11 +25,6 @@
 #include <utility>
 
 namespace swift {
-  class TranslationUnit;
-
-namespace ide {
-  class CodeCompletionResult;
-}
 
 /// State of a completion operation.
 enum class CompletionState {

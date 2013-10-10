@@ -27,7 +27,6 @@ namespace swift {
   class Decl;
   class Expr;
   class LazyResolver;
-  class TranslationUnit;
 
   /// \brief Typecheck a declaration parsed during code completion.
   ///

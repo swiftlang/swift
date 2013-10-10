@@ -581,9 +581,8 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
 
 
 
-/// processREPLTopLevelExpr - When we see an Expression in a TopLevelCodeDecl
-/// in the REPL, process it, adding the proper decls back to the top level of
-/// the TranslationUnit.
+/// When we see an expression in a TopLevelCodeDecl in the REPL, process it,
+/// adding the proper decls back to the top level of the file.
 static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC, SourceFile &SF) {
   CanType T = E->getType()->getCanonicalType();
   

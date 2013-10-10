@@ -50,7 +50,6 @@ namespace swift {
   class SourceLoc;
   class StructType;
   class Substitution;
-  class TranslationUnit;
   class ValueDecl;
   class VarDecl;
   

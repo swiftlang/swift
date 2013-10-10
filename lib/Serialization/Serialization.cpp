@@ -1432,19 +1432,21 @@ static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
 #undef SIMPLE_CASE
 
 /// Find the typealias given a builtin type.
-static TypeAliasDecl *findTypeAliasForBuiltin(const TranslationUnit *TU,
+static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx,
                                               BuiltinType *Bt) {
   /// Get the type name by chopping off "Builtin.".
   llvm::SmallString<32> FullName;
   llvm::raw_svector_ostream OS(FullName);
   Bt->print(OS);
   OS.flush();
+  assert(FullName.startswith("Builtin."));
   StringRef TypeName = FullName.substr(8);
 
   SmallVector<ValueDecl*, 4> CurModuleResults;
-  TU->Ctx.TheBuiltinModule->lookupValue(Module::AccessPathTy(),
-      TU->Ctx.getIdentifier(TypeName),
-      NLKind::QualifiedLookup, CurModuleResults);
+  Ctx.TheBuiltinModule->lookupValue(Module::AccessPathTy(),
+                                    Ctx.getIdentifier(TypeName),
+                                    NLKind::QualifiedLookup,
+                                    CurModuleResults);
   assert(CurModuleResults.size() == 1);
   return cast<TypeAliasDecl>(CurModuleResults[0]);
 }
@@ -1462,8 +1464,8 @@ void Serializer::writeType(Type ty) {
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinVector: {
-    TypeAliasDecl *typeAlias = findTypeAliasForBuiltin(TU,
-                                   ty->castTo<BuiltinType>());
+    TypeAliasDecl *typeAlias =
+      findTypeAliasForBuiltin(TU->Ctx, ty->castTo<BuiltinType>());
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1998,7 +2000,8 @@ writeKnownProtocolList(const index_block::KnownProtocolLayout &AdopterList,
   AdopterList.emit(scratch, getRawStableKnownProtocolKind(kind), adopters);
 }
 
-void Serializer::writeTranslationUnit(const TranslationUnit *TU, const SILModule *M) {
+void Serializer::writeTranslationUnit(const TranslationUnit *TU,
+                                      const SILModule *M) {
   assert(!this->TU && "already serializing a translation unit");
   this->TU = TU;
 

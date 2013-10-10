@@ -22,9 +22,7 @@
 #include <vector>
 
 namespace swift {
-  class ASTContext;
   class CompilerInstance;
-  class TranslationUnit;
   class SILModule;
 
   // Using LLVM containers to store command-line arguments turns out
