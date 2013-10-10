@@ -147,11 +147,10 @@ static void getScalarizedElementAddresses(SILValue Pointer,
 
   if (TupleType *TT = AggType->getAs<TupleType>()) {
     for (auto &Field : TT->getFields()) {
-      auto ResultTy = Field.getType()->getCanonicalType();
+      (void)Field;
       ElementAddrs.push_back(B.createTupleElementAddr(PointerInst->getLoc(),
                                                       Pointer,
-                                                      ElementAddrs.size(),
-                                   SILType::getPrimitiveAddressType(ResultTy)));
+                                                      ElementAddrs.size()));
     }
     return;
   }
@@ -160,11 +159,8 @@ static void getScalarizedElementAddresses(SILValue Pointer,
   StructDecl *SD = cast<StructDecl>(AggType->getAnyNominal());
 
   for (auto *VD : SD->getStoredProperties()) {
-    auto ResultTy = AggType->getTypeOfMember(VD->getModuleContext(),
-                                             VD, nullptr)->getCanonicalType();
     ElementAddrs.push_back(B.createStructElementAddr(PointerInst->getLoc(),
-                                                     Pointer, VD,
-                                   SILType::getPrimitiveAddressType(ResultTy)));
+                                                     Pointer, VD));
   }
 }
 
@@ -185,9 +181,8 @@ static void getScalarizedElements(SILValue V,
     }
 
     for (auto &Field : TT->getFields()) {
-      auto ResultTy = Field.getType()->getCanonicalType();
-      ElementVals.push_back(B.createTupleExtract(Loc, V, ElementVals.size(),
-                                    SILType::getPrimitiveObjectType(ResultTy)));
+      (void)Field;
+      ElementVals.push_back(B.createTupleExtract(Loc, V, ElementVals.size()));
     }
     return;
   }
@@ -205,11 +200,7 @@ static void getScalarizedElements(SILValue V,
 
   StructDecl *SD = cast<StructDecl>(AggType->getAnyNominal());
   for (auto *VD : SD->getStoredProperties()) {
-    auto ResultTy = AggType->getTypeOfMember(VD->getModuleContext(),
-                                             VD, nullptr)->getCanonicalType();
-                                             
-    ElementVals.push_back(B.createStructExtract(Loc, V, VD,
-                                    SILType::getPrimitiveObjectType(ResultTy)));
+    ElementVals.push_back(B.createStructExtract(Loc, V, VD));
   }
 }
 
