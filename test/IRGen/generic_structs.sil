@@ -83,5 +83,8 @@ entry:
 // CHECK:   [[VWTABLE_VAL:%.*]] = ptrtoint i64* [[VWTABLE_ADDR]] to i64
 // CHECK:   [[VWTABLE_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 0
 // CHECK:   store i64 [[VWTABLE_VAL]], i64* [[VWTABLE_SLOT_ADDR]], align 8
+// -- lay out fields
+// CHECK:   [[VWTABLE_ADDR_I8:%.*]] = bitcast i64* [[VWTABLE_ADDR]] to i8**
+// CHECK:   call void @swift_initStructMetadata_UniversalStrategy(i64 1, %swift.type** {{%.*}}, i64* {{%.*}}, i8** [[VWTABLE_ADDR_I8]])
 // CHECK:   ret void
 // CHECK: }

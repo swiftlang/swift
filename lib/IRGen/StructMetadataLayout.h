@@ -52,6 +52,7 @@ public:
     // emitParentMetadataRef.
     
     // Struct field offsets.
+    asImpl().noteStartOfFieldOffsets();
     for (VarDecl *prop : Target->getStoredProperties())
       asImpl().addFieldOffset(prop);
 
@@ -60,6 +61,9 @@ public:
       this->addGenericFields(*generics);
     }
   }
+  
+  // Note the start of the field offset vector.
+  void noteStartOfFieldOffsets() {}
 };
 
 /// An "implementation" of StructMetadataLayout that just scans through

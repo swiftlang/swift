@@ -304,6 +304,17 @@ FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, RuntimeCC,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// void swift_initStructMetadata_UniversalStrategy(size_t numFields,
+//                                     type_metadata_t * const *fieldTypes,
+//                                     size_t *fieldOffsets,
+//                                     value_witness_table_t *vwtable);
+FUNCTION(InitStructMetadataUniversal,
+         swift_initStructMetadata_UniversalStrategy, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(),
+              SizeTy->getPointerTo(), WitnessTablePtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_initEnumValueWitnessTableSinglePayload(value_witness_table_t *vwt,
 //                                                    type_metadata_t *payload,
 //                                                    unsigned num_empty_cases);
