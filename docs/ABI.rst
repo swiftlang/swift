@@ -319,7 +319,12 @@ contain the following fields:
   **offset 1**.
 - The **labels string** is a pointer to a list of consecutive null-terminated
   label names for the tuple at **offset 2**. Each label name is given as a
-  null-terminated, UTF-8-encoded string in sequence.
+  null-terminated, UTF-8-encoded string in sequence. If the tuple has no
+  labels, this is a null pointer.
+
+  TODO: The labels string pointer is currently always null, and labels are
+  not factored into tuple metadata uniquing.
+
 - The **element vector** begins at **offset 3** and consists of a vector of
   type–offset pairs. The metadata for the *n*\ th element's type is a pointer
   at **offset 3+2*n**. The offset in bytes from the beginning of the tuple to
