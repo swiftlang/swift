@@ -22,9 +22,7 @@
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
-  class Decl;
   class AbstractFunctionDecl;
-  class TopLevelCodeDecl;
 
 /// \brief Parser state persistent across multiple parses.
 class PersistentParserState {
