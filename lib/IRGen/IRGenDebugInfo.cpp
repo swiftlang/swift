@@ -1211,8 +1211,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // This is a [inout] type.
     // FIXME: handle LValueTy->getQualifiers();
     auto LValueTy = BaseTy->castTo<LValueType>();
-    auto CanTy = LValueTy->getObjectType()->getCanonicalType();
-    auto DT = getOrCreateDesugaredType(CanTy, DbgTy, Scope);
+    auto DT = getOrCreateDesugaredType(LValueTy->getObjectType(), DbgTy, Scope);
     return DBuilder.createReferenceType(llvm::dwarf::DW_TAG_reference_type, DT);
   }
 
@@ -1322,10 +1321,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Substituted: {
     Name = getMangledName(DbgTy);
     auto SubstitutedTy = cast<SubstitutedType>(BaseTy);
-    auto CanTy = SubstitutedTy->getDesugaredType();
+    auto OrigTy = SubstitutedTy->getOriginal();
     Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
-    return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy, Scope),
+    return DBuilder.createTypedef(getOrCreateDesugaredType(OrigTy, DbgTy, Scope),
                                   Name, File, L.Line, File);
   }
 
@@ -1333,10 +1332,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   {
     Name = getMangledName(DbgTy);
     auto ParenTy = cast<ParenType>(BaseTy);
-    auto CanTy = ParenTy->getDesugaredType();
+    auto Ty = ParenTy->getUnderlyingType();
     Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
-    return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy, Scope),
+    return DBuilder.createTypedef(getOrCreateDesugaredType(Ty, DbgTy, Scope),
                                   Name, File, L.Line, File);
   }
 
