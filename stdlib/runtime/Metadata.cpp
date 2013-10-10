@@ -812,6 +812,49 @@ static const ValueWitnessTable tuple_witnesses_nonpod_noninline = {
   0
 };
 
+namespace {
+struct BasicLayoutResult {
+  size_t size;
+  ValueWitnessFlags flags;
+  size_t stride;
+};
+  
+/// Perform basic sequential layout given a vector of metadata pointers,
+/// calling a functor with the offset of each field, and returning the
+/// final layout characteristics of the type.
+/// FUNCTOR should have signature:
+///   void (size_t index, const Metadata *type, size_t offset)
+template<typename FUNCTOR>
+BasicLayoutResult performBasicLayout(const Metadata * const *elements,
+                                     size_t numElements,
+                                     FUNCTOR &&f) {
+  size_t size = 0;
+  size_t alignment = 1;
+  bool isPOD = true;
+  for (unsigned i = 0; i != numElements; ++i) {
+    auto elt = elements[i];
+    
+    // Lay out this element.
+    auto eltVWT = elt->getValueWitnesses();
+    size = llvm::RoundUpToAlignment(size, eltVWT->getAlignment());
+
+    // Report this record to the functor.
+    f(i, elt, size);
+    
+    // Update the size and alignment of the aggregate..
+    size += eltVWT->size;
+    alignment = std::max(alignment, eltVWT->getAlignment());
+    if (!eltVWT->isPOD()) isPOD = false;
+  }
+  bool isInline = ValueWitnessTable::isValueInline(size, alignment);
+  
+  return {size, ValueWitnessFlags().withAlignment(alignment)
+                                   .withPOD(isPOD)
+                                   .withInlineStorage(isInline),
+          llvm::RoundUpToAlignment(size, alignment)};
+}
+} // end anonymous namespace
+
 const TupleTypeMetadata *
 swift::swift_getTupleTypeMetadata(size_t numElements,
                                   const Metadata * const *elements,
@@ -843,32 +886,16 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
   metadata->NumElements = numElements;
   metadata->Labels = labels;
 
-  // Perform basic layout.
-  size_t size = 0;
-  size_t alignment = 1;
-  bool isPOD = true;
-  for (unsigned i = 0; i != numElements; ++i) {
-    auto elt = elements[i];
-
-    metadata->getElements()[i].Type = elt;
-    metadata->getElements()[i].Offset = size;
-
-    // Lay out this tuple element.
-    auto eltVWT = elt->getValueWitnesses();
-    size = llvm::RoundUpToAlignment(size, eltVWT->getAlignment());
-    size += eltVWT->size;
-    alignment = std::max(alignment, eltVWT->getAlignment());
-
-    if (!eltVWT->isPOD()) isPOD = false;
-  }
-
-  bool isInline = ValueWitnessTable::isValueInline(size, alignment);
-
-  witnesses->size = size;
-  witnesses->flags = ValueWitnessFlags().withAlignment(alignment)
-                                        .withPOD(isPOD)
-                                        .withInlineStorage(isInline);
-  witnesses->stride = llvm::RoundUpToAlignment(size, alignment);
+  // Perform basic layout on the tuple.
+  auto layout = performBasicLayout(elements, numElements,
+    [&](size_t i, const Metadata *elt, size_t offset) {
+      metadata->getElements()[i].Type = elt;
+      metadata->getElements()[i].Offset = offset;
+    });
+  
+  witnesses->size = layout.size;
+  witnesses->flags = layout.flags;
+  witnesses->stride = layout.stride;
 
   // Copy the function witnesses in, either from the proposed
   // witnesses or from the standard table.
@@ -880,18 +907,22 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
     // Otherwise, use generic witnesses (when we can't pattern-match
     // into something better).
-    } else if (isInline && isPOD) {
-      if (size == 8) proposedWitnesses = &_TWVBi64_;
-      else if (size == 4) proposedWitnesses = &_TWVBi32_;
-      else if (size == 2) proposedWitnesses = &_TWVBi16_;
-      else if (size == 1) proposedWitnesses = &_TWVBi8_;
+    } else if (layout.flags.isInlineStorage()
+               && layout.flags.isPOD()) {
+      if (layout.size == 8) proposedWitnesses = &_TWVBi64_;
+      else if (layout.size == 4) proposedWitnesses = &_TWVBi32_;
+      else if (layout.size == 2) proposedWitnesses = &_TWVBi16_;
+      else if (layout.size == 1) proposedWitnesses = &_TWVBi8_;
       else proposedWitnesses = &tuple_witnesses_pod_inline;
-    } else if (isInline && !isPOD) {
+    } else if (layout.flags.isInlineStorage()
+               && !layout.flags.isPOD()) {
       proposedWitnesses = &tuple_witnesses_nonpod_inline;
-    } else if (!isInline && isPOD) {
+    } else if (!layout.flags.isInlineStorage()
+               && layout.flags.isPOD()) {
       proposedWitnesses = &tuple_witnesses_pod_noninline;
     } else {
-      assert(!isInline && !isPOD);
+      assert(!layout.flags.isInlineStorage()
+             && !layout.flags.isPOD());
       proposedWitnesses = &tuple_witnesses_nonpod_noninline;
     }
   }
