@@ -221,7 +221,29 @@ void ConstraintLocator::dump(SourceManager *sm) {
 }
 
 void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
-  First->print(Out);
+  if (Kind == ConstraintKind::Disjunction) {
+    Out << "disjunction";
+    if (Locator) {
+      Out << " [[";
+      Locator->dump(sm);
+      Out << "]]";
+    }
+    Out << ":";
+
+    bool first = true;
+    for (auto constraint : getDisjunctionConstraints()) {
+      if (first)
+        first = false;
+      else
+        Out << " or ";
+
+      constraint->print(Out, sm);
+    }
+
+    return;
+  }
+
+  Types.First->print(Out);
 
   bool skipSecond = false;
 
@@ -235,19 +257,21 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
   case ConstraintKind::ApplicableFunction: Out << " ==Fn "; break;
   case ConstraintKind::ValueMember:
-    Out << "[." << Member.str() << ": value] == ";
+    Out << "[." << Types.Member.str() << ": value] == ";
     break;
   case ConstraintKind::TypeMember:
-    Out << "[." << Member.str() << ": type] == ";
+    Out << "[." << Types.Member.str() << ": type] == ";
     break;
   case ConstraintKind::Archetype:
     Out << " is an archetype";
     skipSecond = true;
     break;
+  case ConstraintKind::Disjunction:
+    llvm_unreachable("Disjunction handled above");
   }
 
   if (!skipSecond)
-    Second->print(Out);
+    Types.Second->print(Out);
 
   if (Locator) {
     Out << " [[";
@@ -258,6 +282,48 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
 
 void Constraint::dump(SourceManager *sm) const {
   print(llvm::errs(), sm);
+}
+
+Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
+                                          ArrayRef<Constraint *> constraints,
+                                          ConstraintLocator *locator) {
+  // Unwrap any disjunctions inside the disjunction constraint; we only allow
+  // disjunctions at the top level.
+  bool unwrappedAny = false;
+  SmallVector<Constraint *, 1> unwrapped;
+  unsigned index = 0;
+  for (auto constraint : constraints) {
+    // If we have a nested disjunction, unwrap it.
+    if (constraint->getKind() == ConstraintKind::Disjunction) {
+      // If we haven't unwrapped anything before, copy all of the constraints
+      // we skipped.
+      if (!unwrappedAny) {
+        unwrapped.append(constraints.begin(), constraints.begin() + index);
+        unwrappedAny = true;
+      }
+
+      // Add all of the constraints in the disjunction.
+      unwrapped.append(constraint->getDisjunctionConstraints().begin(),
+                       constraint->getDisjunctionConstraints().end());
+    } else if (unwrappedAny) {
+      // Since we unwrapped constraints before, add this constraint.
+      unwrapped.push_back(constraint);
+    }
+    ++index;
+  }
+
+  // If we unwrapped anything, our list of constraints is the unwrapped list.
+  if (unwrappedAny)
+    constraints = unwrapped;
+
+  assert(!constraints.empty() && "Empty disjunction constraint");
+
+  // If there is a single constraint, this isn't a disjunction at all.
+  if (constraints.size() == 1)
+    return constraints.front();
+
+  // Create the disjunction constraint.
+  return new (cs) Constraint(cs.allocateCopy(constraints), locator);
 }
 
 // Only allow allocation of resolved overload set list items using the
@@ -2777,6 +2843,9 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
 
   case ConstraintKind::Archetype:
     llvm_unreachable("Archetype constraints don't involve type matches");
+
+  case ConstraintKind::Disjunction:
+    llvm_unreachable("Disjunction constraints don't involve typeh matches");
   }
 }
 
@@ -2816,6 +2885,10 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::Archetype:
     return simplifyArchetypeConstraint(constraint);
+
+  case ConstraintKind::Disjunction:
+    // Disjunction constraints are never solved here.
+    return SolutionKind::Unsolved;
   }
 }
 

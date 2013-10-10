@@ -337,7 +337,10 @@ enum class ConstraintKind : char {
   /// type of that member, when referenced as a type, is the second type.
   TypeMember,
   /// \brief The first type must be an archetype.
-  Archetype
+  Archetype,
+  /// \brief A disjunction constraint that specifies that one or more of the
+  /// stored constraints must hold.
+  Disjunction
 };
 
 /// \brief Classification of the different kinds of constraints.
@@ -351,7 +354,10 @@ enum class ConstraintClassification : char {
 
   /// \brief An archetype constraint, which simply requires that the type
   /// variable be bound to an archetype.
-  Archetype
+  Archetype,
+
+  /// \brief A disjunction constraint.
+  Disjunction
 };
 
 /// \brief Locates a given constraint within the expression being
@@ -1015,15 +1021,22 @@ class Constraint {
   /// \brief The kind of constraint.
   ConstraintKind Kind : 8;
 
-  /// \brief The first type.
-  Type First;
+  union {
+    struct {
+      /// \brief The first type.
+      Type First;
 
-  /// \brief The second type.
-  Type Second;
+      /// \brief The second type.
+      Type Second;
 
-  /// \brief If non-null, the name of a member of the first type is that
-  /// being related to the second type.
-  Identifier Member;
+      /// \brief If non-null, the name of a member of the first type is that
+      /// being related to the second type.
+      Identifier Member;
+    } Types;
+
+    /// The set of constraints for a disjunction.
+    ArrayRef<Constraint *> Disjunction;
+  };
 
   /// \brief The locator that describes where in the expression this
   /// constraint applies.
@@ -1033,11 +1046,14 @@ class Constraint {
   /// system.
   void *operator new(size_t) = delete;
 
+  Constraint(ArrayRef<Constraint *> disjunction, ConstraintLocator *locator)
+    : Kind(ConstraintKind::Disjunction), Disjunction(disjunction),
+      Locator(locator) { }
+
 public:
   Constraint(ConstraintKind Kind, Type First, Type Second, Identifier Member,
              ConstraintLocator *locator)
-    : Kind(Kind), First(First), Second(Second), Member(Member),
-      Locator(locator)
+  : Kind(Kind), Types { First, Second, Member }, Locator(locator)
   {
     switch (Kind) {
     case ConstraintKind::Bind:
@@ -1064,8 +1080,16 @@ public:
       assert(Member.empty() && "Archetype constraint cannot have a member");
       assert(Second.isNull() && "Archetype constraint with second type");
       break;
+
+    case ConstraintKind::Disjunction:
+      llvm_unreachable("Disjunction constraints should use create()");
     }
   }
+
+  /// Create a new disjunction constraint.
+  static Constraint *createDisjunction(ConstraintSystem &cs,
+                                       ArrayRef<Constraint *> constraints,
+                                       ConstraintLocator *locator);
 
   /// \brief Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -1090,34 +1114,47 @@ public:
 
     case ConstraintKind::Archetype:
       return ConstraintClassification::Archetype;
+
+    case ConstraintKind::Disjunction:
+      return ConstraintClassification::Disjunction;
     }
   }
 
   /// \brief Retrieve the first type in the constraint.
-  Type getFirstType() const { return First; }
+  Type getFirstType() const {
+    assert(getKind() != ConstraintKind::Disjunction);
+    return Types.First;
+  }
 
   /// \brief Retrieve the second type in the constraint.
   Type getSecondType() const {
-    return Second;
+    assert(getKind() != ConstraintKind::Disjunction);
+    return Types.Second;
   }
 
   /// \brief Retrieve the protocol in a conformance constraint.
   ProtocolDecl *getProtocol() const {
     assert(Kind==ConstraintKind::ConformsTo && "Not a conformance constraint");
-    return Second->castTo<ProtocolType>()->getDecl();
+    return Types.Second->castTo<ProtocolType>()->getDecl();
   }
 
   /// \brief Retrieve the name of the member for a member constraint.
   Identifier getMember() const {
     assert(Kind == ConstraintKind::ValueMember ||
            Kind == ConstraintKind::TypeMember);
-    return Member;
+    return Types.Member;
   }
 
   /// \brief Determine whether this constraint kind has a second type.
   static bool hasMember(ConstraintKind kind) {
     return kind == ConstraintKind::ValueMember
         || kind == ConstraintKind::TypeMember;
+  }
+
+  /// Retrieve the set of constraints in a disjunction.
+  ArrayRef<Constraint *> getDisjunctionConstraints() const {
+    assert(Kind == ConstraintKind::Disjunction);
+    return Disjunction;
   }
 
   /// \brief Retrieve the locator for this constraint.
@@ -2290,8 +2327,12 @@ public:
   /// \param typeVarConstraints will be populated with a list of
   /// representative type variables and the constraints that apply directly
   /// to them.
+  ///
+  /// \param disjunctions will be populated with the list of disjunction
+  /// constraints encountered.
   void collectConstraintsForTypeVariables(
-         SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints);
+         SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints,
+         SmallVectorImpl<Constraint *> &disjunctions);
 
 public:
   /// \brief Simplify the system of constraints, by breaking down complex

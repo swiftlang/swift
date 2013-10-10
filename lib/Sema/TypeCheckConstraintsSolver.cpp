@@ -186,7 +186,8 @@ typeVariablesIntersect(ConstraintSystem &cs,
 }
 
 void ConstraintSystem::collectConstraintsForTypeVariables(
-       SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints) {
+       SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints,
+       SmallVectorImpl<Constraint *> &disjunctions) {
   typeVarConstraints.clear();
 
   // Provide a mapping from type variable to its constraints. The getTVC
@@ -206,7 +207,10 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
   // type variable.
   SmallVector<TypeVariableType *, 8> referencedTypeVars;
   for (auto constraint : Constraints) {
-    auto first = simplifyType(constraint->getFirstType());
+    Type first;
+    if (constraint->getKind() != ConstraintKind::Disjunction)
+      first = simplifyType(constraint->getFirstType());
+
     switch (constraint->getClassification()) {
     case ConstraintClassification::Relational:
       // Store conformance constraints separately.
@@ -253,6 +257,19 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       }
       continue;
     }
+
+    case ConstraintClassification::Disjunction:
+      // Record this disjunction.
+      disjunctions.push_back(constraint);
+
+      // Reference type variables in all of the constraints.
+      for (auto dis : constraint->getDisjunctionConstraints()) {
+        simplifyType(dis->getFirstType())->getTypeVariables(referencedTypeVars);
+        if (auto second = dis->getSecondType()) {
+          simplifyType(second)->getTypeVariables(referencedTypeVars);
+        }
+      }
+      continue;
     }
 
     auto second = simplifyType(constraint->getSecondType());
@@ -716,7 +733,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // Collect the type variable constraints.
   SmallVector<TypeVariableConstraints, 4> typeVarConstraints;
-  collectConstraintsForTypeVariables(typeVarConstraints);
+  SmallVector<Constraint *, 4> disjunctions;
+  collectConstraintsForTypeVariables(typeVarConstraints, disjunctions);
   if (!typeVarConstraints.empty()) {
     // Look for the best type variable to bind.
     unsigned bestTypeVarIndex = 0;
@@ -753,7 +771,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // If we have a binding that does not involve type variables, or we have
     // no other option, go ahead and try the bindings for this type variable.
     if (!bestBindings.empty() &&
-        (!bestInvolvesTypeVariables || UnresolvedOverloadSets.empty())) {
+        (!bestInvolvesTypeVariables ||
+         (UnresolvedOverloadSets.empty() && disjunctions.empty()))) {
       return tryTypeVariableBindings(*this,
                                      solverState->depth,
                                      typeVarConstraints[bestTypeVarIndex],
@@ -765,8 +784,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // Fall through to resolve an overload set.
   }
 
-  // If there are no overload sets, we can't solve this system.
-  if (UnresolvedOverloadSets.empty()) {
+  // If there are no overload sets or disjunctions, we can't solve this system.
+  if (UnresolvedOverloadSets.empty() && disjunctions.empty()) {
     // If the only remaining constraints are conformance constraints
     // or member equality constraints, and we're allowed to have free
     // variables, we still have a solution.  FIXME: It seems like this
@@ -796,6 +815,48 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
       }
     }
     return true;
+  }
+
+  // If there are any disjunction constraints, solve one of them now.
+  if (!disjunctions.empty()) {
+    // FIXME: Pick the smallest or largest disjunction? Does it matter?
+    auto disjunction = disjunctions[0];
+
+    // Remove this disjunction constraint from the list.
+    unsigned disjunctionIdx = std::find(Constraints.begin(), Constraints.end(),
+                                        disjunction)
+                            - Constraints.begin();
+    assert(disjunctionIdx < Constraints.size() && "Couldn't find constraint?");
+    std::swap(Constraints[disjunctionIdx], Constraints.back());
+    Constraints.pop_back();
+
+    // Try each of the constraints within the disjunction.
+    bool anySolved = false;
+    for (auto constraint : disjunction->getDisjunctionConstraints()) {
+      // Try to solve the system with this option in the disjunction.
+      SolverScope scope(*this);
+
+      if (TC.getLangOpts().DebugConstraintSolver) {
+        llvm::errs().indent(solverState->depth * 2)
+          << "(assuming ";
+        constraint->print(llvm::errs(), &TC.Context.SourceMgr);
+        llvm::errs() << '\n';
+      }
+
+      addConstraint(constraint);
+      if (!solve(solutions, allowFreeTypeVariables))
+        anySolved = true;
+
+      if (TC.getLangOpts().DebugConstraintSolver) {
+        llvm::errs().indent(solverState->depth * 2) << ")\n";
+      }
+    }
+
+    // Put the disjunction constraint back in its place.
+    Constraints.push_back(disjunction);
+    std::swap(Constraints[disjunctionIdx], Constraints.back());
+
+    return !anySolved;
   }
 
   // Find the overload set with the minimum number of overloads.
