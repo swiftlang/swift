@@ -1305,11 +1305,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     if (auto Decl = NameAliasTy->getDecl()) {
       Name = Decl->getName().str();
       Location L = getLoc(SM, Decl);
-      auto AliasedTy = Decl->hasUnderlyingType()
-        ? Decl->getUnderlyingType()
-        : NameAliasTy->getDesugaredType();
+      auto AliasedTy = Decl->getUnderlyingType();
       auto File = getOrCreateFile(L.Filename);
-      return DBuilder.createTypedef(getOrCreateDesugaredType(AliasedTy, DbgTy, Scope),
+      // For NameAlias types, the DeclContext for the aliasED type is
+      // in the decl of the alias type.
+      VarDecl VD(SourceLoc(), Identifier::getEmptyKey(), AliasedTy,
+                 Decl->getDeclContext());
+      DebugTypeInfo DTI(&VD, DbgTy.size, DbgTy.align);
+      return DBuilder.createTypedef(getOrCreateType(DTI, Scope),
                                     Name, File, L.Line, File);
     }
     DEBUG(llvm::dbgs() << "Name alias without Decl: ";
