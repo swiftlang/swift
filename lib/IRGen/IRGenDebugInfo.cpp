@@ -1308,10 +1308,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       auto AliasedTy = Decl->hasUnderlyingType()
         ? Decl->getUnderlyingType()
         : NameAliasTy->getDesugaredType();
-      auto DTI = DebugTypeInfo(AliasedTy, DbgTy.size, DbgTy.align);
       auto File = getOrCreateFile(L.Filename);
-      return DBuilder.createTypedef(getOrCreateType(DTI, File), Name,
-                                    File, L.Line, File);
+      return DBuilder.createTypedef(getOrCreateDesugaredType(AliasedTy, DbgTy, Scope),
+                                    Name, File, L.Line, File);
     }
     DEBUG(llvm::dbgs() << "Name alias without Decl: ";
           DbgTy.getType()->dump(); llvm::dbgs() << "\n");
