@@ -362,8 +362,20 @@ Class Metadata
 Class metadata is designed to interoperate with Objective-C; all class metadata
 records are also valid Objective-C ``Class`` objects.
 
+- The **destructor pointer** is stored at **offset -2** from the metadata
+  pointer, behind the value witness table. This function is invoked by Swift's
+  deallocator when the class instance is destroyed.
 - The **isa pointer** pointing to the class's Objective-C-compatible metaclass
   record is stored at **offset 0**, in place of an integer kind discriminator.
+- The **super pointer** pointing to the metadata record for the superclass is
+  stored at **offset 1**. If the class is a root class, it is null.
+- Two words are reserved for use by the Objective-C runtime at **offset 2**
+  and **offset 3**.
+- A third word at **offset 4** is reserved for use by Objective-C, except that
+  **the low bit is always set to 1** for Swift classes and always set to 0 for
+  Objective-C classes.
+
+TODO: other class fields, vtable, generic parameter vector
 
 Generic Parameter Vector
 ~~~~~~~~~~~~~~~~~~~~~~~~
