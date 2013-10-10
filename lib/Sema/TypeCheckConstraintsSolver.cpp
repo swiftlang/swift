@@ -226,7 +226,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       // Handle this interesting case below.
       break;
 
-    case ConstraintClassification::Archetype:
+    case ConstraintClassification::TypeProperty:
       if (auto firstTV = dyn_cast<TypeVariableType>(first.getPointer())) {
         // Record this constraint on the type variable.
         getTVC(firstTV).KindConstraints.push_back(constraint);

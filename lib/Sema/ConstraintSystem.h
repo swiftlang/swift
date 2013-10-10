@@ -352,9 +352,8 @@ enum class ConstraintClassification : char {
   /// it a reference type.
   Member,
 
-  /// \brief An archetype constraint, which simply requires that the type
-  /// variable be bound to an archetype.
-  Archetype,
+  /// \brief An property of a single type, such as whether it is an archetype.
+  TypeProperty,
 
   /// \brief A disjunction constraint.
   Disjunction
@@ -1113,7 +1112,7 @@ public:
       return ConstraintClassification::Member;
 
     case ConstraintKind::Archetype:
-      return ConstraintClassification::Archetype;
+      return ConstraintClassification::TypeProperty;
 
     case ConstraintKind::Disjunction:
       return ConstraintClassification::Disjunction;
