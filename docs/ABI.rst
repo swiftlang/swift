@@ -253,7 +253,7 @@ All metadata records share a common header, with the following fields:
 
   * `Struct metadata`_ has a kind of **1**.
   * `Enum metadata`_ has a kind of **2**.
-  * `Opaque metadata`_ has a kind of **8**. This is used for compiler
+  * **Opaque metadata** has a kind of **8**. This is used for compiler
     ``Builtin`` primitives that have no additional runtime information.
   * `Tuple metadata`_ has a kind of **9**.
   * `Function metadata`_ has a kind of **10**.
