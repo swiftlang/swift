@@ -266,6 +266,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     Out << " is an archetype";
     skipSecond = true;
     break;
+  case ConstraintKind::DynamicLookupValue:
+    Out << " is a DynamicLookup value";
+    skipSecond = true;
+    break;
   case ConstraintKind::Disjunction:
     llvm_unreachable("Disjunction handled above");
   }
@@ -2750,6 +2754,37 @@ ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyDynamicLookupConstraint(const Constraint &constraint){
+  // Resolve the base type, if we can. If we can't resolve the base type,
+  // then we can't solve this constraint.
+  Type baseTy = constraint.getFirstType();
+  if (auto tv = dyn_cast<TypeVariableType>(baseTy.getPointer())) {
+    auto fixed = getFixedType(tv);
+    if (!fixed)
+      return SolutionKind::Unsolved;
+
+    // Continue with the fixed type.
+    baseTy = fixed;
+  }
+
+  // Look through implicit lvalue types.
+  if (auto lvalueTy = baseTy->getAs<LValueType>()) {
+    if (lvalueTy->getQualifiers().isImplicit())
+      baseTy = lvalueTy->getObjectType();
+  }
+
+  if (auto protoTy = baseTy->getAs<ProtocolType>()) {
+    if (protoTy->getDecl()->isSpecificProtocol(
+                              KnownProtocolKind::DynamicLookup))
+      return SolutionKind::TriviallySolved;
+  }
+
+  // Record this failure.
+  recordFailure(constraint.getLocator(), Failure::IsNotArchetype, baseTy);
+  return SolutionKind::Error;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
 
   // By construction, the left hand side is a type that looks like the
@@ -2842,7 +2877,8 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
     llvm_unreachable("Member constraints don't involve type matches");
 
   case ConstraintKind::Archetype:
-    llvm_unreachable("Archetype constraints don't involve type matches");
+  case ConstraintKind::DynamicLookupValue:
+    llvm_unreachable("Type properties don't involve type matches");
 
   case ConstraintKind::Disjunction:
     llvm_unreachable("Disjunction constraints don't involve typeh matches");
@@ -2885,6 +2921,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::Archetype:
     return simplifyArchetypeConstraint(constraint);
+
+  case ConstraintKind::DynamicLookupValue:
+    return simplifyDynamicLookupConstraint(constraint);
 
   case ConstraintKind::Disjunction:
     // Disjunction constraints are never solved here.

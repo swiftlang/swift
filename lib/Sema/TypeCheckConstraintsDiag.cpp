@@ -57,6 +57,10 @@ void Failure::dump(SourceManager *sm) {
     out << getFirstType().getString() << " is not an archetype";
     break;
 
+  case IsNotDynamicLookup:
+    out << getFirstType().getString() << " is not an dynamic lookup value";
+    break;
+
   case LValueQualifiers:
     out << "lvalue qualifier mismatch between " << getFirstType().getString()
         << " and " << getSecondType().getString();

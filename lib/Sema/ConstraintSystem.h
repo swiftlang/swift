@@ -338,6 +338,8 @@ enum class ConstraintKind : char {
   TypeMember,
   /// \brief The first type must be an archetype.
   Archetype,
+  /// \brief The first type must be DynamicLookup or an implicit lvalue thereof.
+  DynamicLookupValue,
   /// \brief A disjunction constraint that specifies that one or more of the
   /// stored constraints must hold.
   Disjunction
@@ -831,6 +833,8 @@ public:
     DoesNotHaveMember,
     /// \brief The type is not an archetype.
     IsNotArchetype,
+    /// \brief The type is not a dynamic lookup value.
+    IsNotDynamicLookup,
     /// \brief The type is not allowed to be an l-value.
     IsForbiddenLValue,
   };
@@ -915,6 +919,7 @@ public:
                      getName());
 
     case IsNotArchetype:
+    case IsNotDynamicLookup:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType());
     }
   }
@@ -1076,8 +1081,9 @@ public:
       break;
 
     case ConstraintKind::Archetype:
-      assert(Member.empty() && "Archetype constraint cannot have a member");
-      assert(Second.isNull() && "Archetype constraint with second type");
+    case ConstraintKind::DynamicLookupValue:
+        assert(Member.empty() && "Type property cannot have a member");
+      assert(Second.isNull() && "Type property with second type");
       break;
 
     case ConstraintKind::Disjunction:
@@ -1112,6 +1118,7 @@ public:
       return ConstraintClassification::Member;
 
     case ConstraintKind::Archetype:
+    case ConstraintKind::DynamicLookupValue:
       return ConstraintClassification::TypeProperty;
 
     case ConstraintKind::Disjunction:
@@ -2311,6 +2318,9 @@ private:
 
   /// \brief Attempt to simplify the given archetype constraint.
   SolutionKind simplifyArchetypeConstraint(const Constraint &constraint);
+
+  /// \brief Attempt to simplify the given dynamic lookup constraint.
+  SolutionKind simplifyDynamicLookupConstraint(const Constraint &constraint);
 
   /// \brief Simplify the given constaint.
   SolutionKind simplifyConstraint(const Constraint &constraint);

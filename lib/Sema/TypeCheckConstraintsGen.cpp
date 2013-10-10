@@ -1048,11 +1048,6 @@ namespace {
       if (!optTy)
         return Type();
 
-      auto dynLookup = CS.TC.getProtocol(expr->getExclaimLoc(),
-                                         KnownProtocolKind::DynamicLookup);
-      if (!dynLookup)
-        return Type();
-
       auto locator = CS.getConstraintLocator(expr, {});
       Constraint *constraints[2] = {
         // The subexpression is convertible to T?
@@ -1060,12 +1055,11 @@ namespace {
                             expr->getSubExpr()->getType(), optTy,
                             Identifier(),
                             locator),
-        // The subexpression is DynamicLookup.
+        // The subexpression is a DynamicLookup value.
         // FIXME: Should restrict valueTy to a class type.
-        // FIXME: We need an rvalue adjustment on the right-hand side of this.
-        new (CS) Constraint(ConstraintKind::Equal,
-                            dynLookup->getDeclaredType(),
+        new (CS) Constraint(ConstraintKind::DynamicLookupValue,
                             expr->getSubExpr()->getType(),
+                            Type(),
                             Identifier(),
                             locator)
       };
