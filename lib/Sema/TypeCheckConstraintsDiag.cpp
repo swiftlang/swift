@@ -57,6 +57,10 @@ void Failure::dump(SourceManager *sm) {
     out << getFirstType().getString() << " is not an archetype";
     break;
 
+  case IsNotClass:
+    out << getFirstType().getString() << " is not a class";
+    break;
+
   case IsNotDynamicLookup:
     out << getFirstType().getString() << " is not an dynamic lookup value";
     break;

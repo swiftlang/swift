@@ -208,7 +208,8 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
   SmallVector<TypeVariableType *, 8> referencedTypeVars;
   for (auto constraint : Constraints) {
     Type first;
-    if (constraint->getKind() != ConstraintKind::Disjunction)
+    if (constraint->getKind() != ConstraintKind::Conjunction &&
+        constraint->getKind() != ConstraintKind::Disjunction)
       first = simplifyType(constraint->getFirstType());
 
     switch (constraint->getClassification()) {
@@ -264,9 +265,18 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
 
       // Reference type variables in all of the constraints.
       for (auto dis : constraint->getNestedConstraints()) {
-        simplifyType(dis->getFirstType())->getTypeVariables(referencedTypeVars);
-        if (auto second = dis->getSecondType()) {
-          simplifyType(second)->getTypeVariables(referencedTypeVars);
+        ArrayRef<Constraint *> innerConstraints;
+        if (dis->getKind() == ConstraintKind::Conjunction)
+          innerConstraints = dis->getNestedConstraints();
+        else
+          innerConstraints = dis;
+
+        for (auto inner : innerConstraints) {
+          simplifyType(inner->getFirstType())
+            ->getTypeVariables(referencedTypeVars);
+          if (auto second = inner->getSecondType()) {
+            simplifyType(second)->getTypeVariables(referencedTypeVars);
+          }
         }
       }
       continue;

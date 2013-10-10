@@ -338,6 +338,9 @@ enum class ConstraintKind : char {
   TypeMember,
   /// \brief The first type must be an archetype.
   Archetype,
+  /// \brief The first type is a class or an archetype of a class-bound
+  /// protocol.
+  Class,
   /// \brief The first type must be DynamicLookup or an implicit lvalue thereof.
   DynamicLookupValue,
   /// \brief A conjunction constraint that specifies that all of the stored
@@ -839,6 +842,8 @@ public:
     DoesNotHaveMember,
     /// \brief The type is not an archetype.
     IsNotArchetype,
+    /// \brief The type is not a class.
+    IsNotClass,
     /// \brief The type is not a dynamic lookup value.
     IsNotDynamicLookup,
     /// \brief The type is not allowed to be an l-value.
@@ -925,6 +930,7 @@ public:
                      getName());
 
     case IsNotArchetype:
+    case IsNotClass:
     case IsNotDynamicLookup:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType());
     }
@@ -1090,6 +1096,7 @@ public:
       break;
 
     case ConstraintKind::Archetype:
+    case ConstraintKind::Class:
     case ConstraintKind::DynamicLookupValue:
         assert(Member.empty() && "Type property cannot have a member");
       assert(Second.isNull() && "Type property with second type");
@@ -1135,6 +1142,7 @@ public:
       return ConstraintClassification::Member;
 
     case ConstraintKind::Archetype:
+    case ConstraintKind::Class:
     case ConstraintKind::DynamicLookupValue:
       return ConstraintClassification::TypeProperty;
 
@@ -1148,13 +1156,15 @@ public:
 
   /// \brief Retrieve the first type in the constraint.
   Type getFirstType() const {
-    assert(getKind() != ConstraintKind::Disjunction);
+    assert(getKind() != ConstraintKind::Disjunction &&
+           getKind() != ConstraintKind::Conjunction);
     return Types.First;
   }
 
   /// \brief Retrieve the second type in the constraint.
   Type getSecondType() const {
-    assert(getKind() != ConstraintKind::Disjunction);
+    assert(getKind() != ConstraintKind::Disjunction &&
+           getKind() != ConstraintKind::Conjunction);
     return Types.Second;
   }
 
@@ -2339,6 +2349,9 @@ private:
 
   /// \brief Attempt to simplify the given archetype constraint.
   SolutionKind simplifyArchetypeConstraint(const Constraint &constraint);
+
+  /// \brief Attempt to simplify the given class constraint.
+  SolutionKind simplifyClassConstraint(const Constraint &constraint);
 
   /// \brief Attempt to simplify the given dynamic lookup constraint.
   SolutionKind simplifyDynamicLookupConstraint(const Constraint &constraint);

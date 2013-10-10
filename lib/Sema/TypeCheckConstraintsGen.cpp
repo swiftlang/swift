@@ -1049,19 +1049,27 @@ namespace {
         return Type();
 
       auto locator = CS.getConstraintLocator(expr, {});
+      Constraint *downcastConstraints[2] = {
+        new (CS) Constraint(ConstraintKind::DynamicLookupValue,
+                            expr->getSubExpr()->getType(),
+                            Type(),
+                            Identifier(),
+                            locator),
+        new (CS) Constraint(ConstraintKind::Class,
+                            valueTy,
+                            Type(),
+                            Identifier(),
+                            locator)
+      };
       Constraint *constraints[2] = {
         // The subexpression is convertible to T?
         new (CS) Constraint(ConstraintKind::Conversion,
                             expr->getSubExpr()->getType(), optTy,
                             Identifier(),
                             locator),
-        // The subexpression is a DynamicLookup value.
-        // FIXME: Should restrict valueTy to a class type.
-        new (CS) Constraint(ConstraintKind::DynamicLookupValue,
-                            expr->getSubExpr()->getType(),
-                            Type(),
-                            Identifier(),
-                            locator)
+        // The subexpression is a DynamicLookup value and the resulting value
+        // is of class type.
+        Constraint::createConjunction(CS, downcastConstraints, locator)
       };
       CS.addConstraint(Constraint::createDisjunction(CS, constraints, locator));
 

@@ -273,6 +273,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     Out << " is an archetype";
     skipSecond = true;
     break;
+  case ConstraintKind::Class:
+    Out << " is a class";
+    skipSecond = true;
+    break;
   case ConstraintKind::DynamicLookupValue:
     Out << " is a DynamicLookup value";
     skipSecond = true;
@@ -2808,19 +2812,46 @@ ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
   return SolutionKind::Error;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyDynamicLookupConstraint(const Constraint &constraint){
-  // Resolve the base type, if we can. If we can't resolve the base type,
-  // then we can't solve this constraint.
-  Type baseTy = constraint.getFirstType();
-  if (auto tv = dyn_cast<TypeVariableType>(baseTy.getPointer())) {
-    auto fixed = getFixedType(tv);
+/// Simplify the given type for use in a type property constraint.
+static Type simplifyForTypePropertyConstraint(ConstraintSystem &cs, Type type) {
+  if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+    auto fixed = cs.getFixedType(tv);
     if (!fixed)
-      return SolutionKind::Unsolved;
+      return Type();
 
     // Continue with the fixed type.
-    baseTy = fixed;
+    type = fixed;
   }
+
+  return type;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyClassConstraint(const Constraint &constraint){
+  auto baseTy = simplifyForTypePropertyConstraint(*this,
+                                                  constraint.getFirstType());
+  if (!baseTy)
+    return SolutionKind::Unsolved;
+
+  if (baseTy->getClassOrBoundGenericClass())
+    return SolutionKind::TriviallySolved;
+
+  if (auto archetype = baseTy->getAs<ArchetypeType>()) {
+    if (archetype->requiresClass())
+      return SolutionKind::TriviallySolved;
+  }
+
+  // Record this failure.
+  recordFailure(constraint.getLocator(), Failure::IsNotClass, baseTy);
+  return SolutionKind::Error;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyDynamicLookupConstraint(const Constraint &constraint){
+  auto baseTy = simplifyForTypePropertyConstraint(*this,
+                                                  constraint.getFirstType());
+  if (!baseTy)
+    return SolutionKind::Unsolved;
 
   // Look through implicit lvalue types.
   if (auto lvalueTy = baseTy->getAs<LValueType>()) {
@@ -2932,6 +2963,7 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
     llvm_unreachable("Member constraints don't involve type matches");
 
   case ConstraintKind::Archetype:
+  case ConstraintKind::Class:
   case ConstraintKind::DynamicLookupValue:
     llvm_unreachable("Type properties don't involve type matches");
 
@@ -2977,6 +3009,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::Archetype:
     return simplifyArchetypeConstraint(constraint);
+
+  case ConstraintKind::Class:
+    return simplifyClassConstraint(constraint);
 
   case ConstraintKind::DynamicLookupValue:
     return simplifyDynamicLookupConstraint(constraint);
