@@ -428,14 +428,8 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
 const TypeInfo *TypeConverter::convertStructType(CanType type, StructDecl *D) {
   // Collect all the fields from the type.
   SmallVector<VarDecl*, 8> fields;
-  for (VarDecl *VD : D->getStoredProperties()) {
-    if (!IGM.Opts.EnableDynamicValueTypeLayout &&
-        !IGM.getTypeInfo(VD->getType()).isFixedSize()) {
-      IGM.unimplemented(VD->getLoc(), "dynamic field layout in structs");
-      exit(1);
-    }
+  for (VarDecl *VD : D->getStoredProperties())
     fields.push_back(VD);
-  }
 
   // Create the struct type.
   auto ty = IGM.createNominalType(D);
