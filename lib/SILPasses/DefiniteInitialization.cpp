@@ -941,6 +941,7 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
 
     case ValueKind::StoreInst:
       Uses.push_back({ NewInst, CopyAddrKind });
+      NonLoadUses.insert(NewInst);
       continue;
 
     case ValueKind::CopyValueInst:
