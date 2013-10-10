@@ -14,8 +14,11 @@ invalidating the metaclass hierarchy.  Note a Swift class without an
 explicit base class is implicitly rooted in the SwiftObject
 Objective-C class.
 
+Type Layout
+-----------
+
 Fragile Struct and Tuple Layout
--------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Structs and tuples currently share the same layout algorithm, noted as the
 "Universal" layout algorithm in the compiler implementation. The algorithm
@@ -24,13 +27,15 @@ is as follows:
 - Start with a **size** of **0** and an **alignment** of **1**.
 - Iterate through the fields, in element order for tuples, or in ``var`` 
   declaration order for structs. For each field:
-  - Update **size** by rounding up to the **alignment of the field**, that is,
+
+  * Update **size** by rounding up to the **alignment of the field**, that is,
     increasing it to the least value greater or equal to **size** and evenly
     divisible by the **alignment of the field**.
-  - Assign the **offset of the field** to the current value of **size**.
-  - Update **size** by adding the **size of the field**.
-  - Update **alignment** to the max of **alignment** and the
+  * Assign the **offset of the field** to the current value of **size**.
+  * Update **size** by adding the **size of the field**.
+  * Update **alignment** to the max of **alignment** and the
     **alignment of the field**.
+
 - The final **size** and **alignment** are the size and alignment of the
   aggregate. The **stride** of the type is the final **size** rounded up to 
   **alignment**.
@@ -59,12 +64,12 @@ layout. Some examples:
   }
 
 Class Layout
-------------
+~~~~~~~~~~~~
 
 TODO
 
 Fragile Enum Layout
--------------------
+~~~~~~~~~~~~~~~~~~~
 
 In laying out enum types, the ABI attempts to avoid requiring additional
 storage to store the tag for the enum case. The ABI chooses one of five
@@ -222,53 +227,54 @@ types such as tuples, functions, protocol compositions, etc., metadata records
 are vended by the runtime as needed.
 
 Common Metadata Layout
-``````````````````````
+~~~~~~~~~~~~~~~~~~~~~~
 
 All metadata records share a common header, with the following fields:
 
 - The **value witness table** pointer references a vtable of functions
   that implement the value semantics of the type, providing fundamental
-  operations such as copying and destroying the value. The value witness table
-  also records the size, alignment, stride, and other fundamental properties of
-  the type. The value witness table pointer is at **offset -1** from the
-  metadata pointer, that is, the pointer-sized word **immediately before**
-  the pointer.
+  operations such as allocating, copying, and destroying values of the type.
+  The value witness table also records the size, alignment, stride, and other
+  fundamental properties of the type. The value witness table pointer is at
+  **offset -1** from the metadata pointer, that is, the pointer-sized word
+  **immediately before** the pointer.
 
 - The **kind** field is a pointer-sized integer that describes the kind of type
   the metadata describes. This field is at **offset 0** from the metadata
   pointer.
-  
+
   The current kind values are as follows:
-  - `Struct metadata`_ has a kind of **1**.
-  - `Enum metadata`_ has a kind of **2**.
-  - `Tuple metadata`_ has a kind of **9**.
-  - `Function metadata`_ has a kind of **10**.
-  - `Protocol metadata`_ has a kind of **12**. This is used both for
+
+  * `Struct metadata`_ has a kind of **1**.
+  * `Enum metadata`_ has a kind of **2**.
+  * `Tuple metadata`_ has a kind of **9**.
+  * `Function metadata`_ has a kind of **10**.
+  * `Protocol metadata`_ has a kind of **12**. This is used both for
     protocol types and for protocol compositions.
-  - `Metatype metadata`_ has a kind of **13**.
-  - `Class metadata`_, instead of a kind, has an *isa pointer* in its kind slot,
+  * `Metatype metadata`_ has a kind of **13**.
+  * `Class metadata`_, instead of a kind, has an *isa pointer* in its kind slot,
     pointing to the class's metaclass record.
 
 Struct Metadata
-```````````````
+~~~~~~~~~~~~~~~
 
 Enum Metadata
-`````````````
+~~~~~~~~~~~~~
 
 Class Metadata
-``````````````
+~~~~~~~~~~~~~~
 
 Tuple Metadata
-``````````````
+~~~~~~~~~~~~~~
 
 Function Metadata
-`````````````````
+~~~~~~~~~~~~~~~~~
 
 Protocol Metadata
-`````````````````
+~~~~~~~~~~~~~~~~~
 
 Metatype Metadata
-`````````````````
+~~~~~~~~~~~~~~~~~
 
 Mangling
 --------
@@ -277,6 +283,9 @@ Mangling
   mangled-name ::= '_T' global
 
 All Swift-mangled names begin with this prefix.
+
+Globals
+~~~~~~~
 
 ::
 
@@ -319,6 +328,9 @@ If a partial application forwarder is for a static symbol, its name will
 start with the sequence ``_TPA_`` followed by the mangled symbol name of the
 forwarder's destination.
 
+Direct and Indirect Symbols
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 ::
 
   directness ::= 'd'                         // direct
@@ -339,6 +351,9 @@ generic arguments, these offsets must be kept in metadata.  Indirect
 field offsets are therefore required when accessing fields in generic
 types where the metadata itself has unknown layout.)
 
+Declaration Contexts
+~~~~~~~~~~~~~~~~~~~~
+
 ::
 
   context ::= module
@@ -349,6 +364,12 @@ types where the metadata itself has unknown layout.)
   module ::= identifier                      // module name
   module ::= known-module                    // abbreviation
   function ::= entity
+
+These manglings identify the enclosing context in which an entity was declared,
+such as its enclosing module, function, or nominal type.
+
+Types
+~~~~~
 
   type ::= 'A' natural type                  // fixed-size array
   type ::= 'Bf' natural '_'                  // Builtin.Float<n>
@@ -387,13 +408,16 @@ types where the metadata itself has unknown layout.)
   protocol-context ::= 'P' protocol
   tuple-element ::= identifier? type
 
-<type> never begins or ends with a number.
-<type> never begins with an underscore.
+``<type>`` never begins or ends with a number.
+``<type>`` never begins with an underscore.
 
 Note that protocols mangle differently as types and as contexts. A protocol
 context always consists of a single protocol name and so mangles without a
 trailing underscore. A protocol type can have zero, one, or many protocol bounds
 which are juxtaposed and terminated with a trailing underscore.
+
+Generics
+~~~~~~~~
 
 ::
 
@@ -403,16 +427,19 @@ which are juxtaposed and terminated with a trailing underscore.
   protocol ::= substitution
   protocol ::= declaration-name
 
-<protocol-list> is unambiguous because protocols are always top-level,
+``<protocol-list>`` is unambiguous because protocols are always top-level,
 so the structure is quite simple.
 
 ::
 
   protocol-conformance ::= type protocol module
 
-<protocol-conformance> refers to a type's conformance to a protocol. The named
+``<protocol-conformance>`` refers to a type's conformance to a protocol. The named
 module is the one containing the extension or type declaration that declared
 the conformance.
+
+Value Witnesses
+~~~~~~~~~~~~~~~
 
 ::
 
@@ -434,8 +461,11 @@ the conformance.
   value-witness-kind ::= 'ug'                // getEnumTag
   value-witness-kind ::= 'up'                // inplaceProjectEnumData
 
-<value-witness-kind> differentiates the kinds of function value
-witnesses for a type.
+``<value-witness-kind>`` differentiates the kinds of value
+witness functions for a type.
+
+Identifiers
+~~~~~~~~~~~
 
 ::
 
@@ -462,7 +492,7 @@ witnesses for a type.
   operator-char ::= 'x'                      // ^ 'xor'
   operator-char ::= 'z'                      // . 'zperiod'
 
-<identifier> is run-length encoded: the natural indicates how many
+``<identifier>`` is run-length encoded: the natural indicates how many
 characters follow.  Operator characters are mapped to letter characters as
 given. In neither case can an identifier start with a digit, so
 there's no ambiguity with the run-length.
@@ -489,11 +519,14 @@ string itself. For example, the infix operator ``«+»`` is mangled to
 ``Xoi7p_qcaDc`` (``p_qcaDc`` being the encoding of the substituted
 string ``«p»``).
 
+Substitutions
+~~~~~~~~~~~~~
+
 ::
 
   substitution ::= 'S' index
 
-<substitution> is a back-reference to a previously mangled entity. The mangling
+``<substitution>`` is a back-reference to a previously mangled entity. The mangling
 algorithm maintains a mapping of entities to substitution indices as it runs.
 When an entity that can be represented by a substitution (a module, nominal
 type, or protocol) is mangled, a substitution is first looked for in the
@@ -518,6 +551,9 @@ if it mangled again.) The result type will mangle using the substitution for
 ``zim.zang``, ``CS0_zoo`` (and acquire substitution ``S3_``). The full
 function type thus mangles as ``fTCC3zim4zang4zungCS1_CS_7zippity_CS0_zoo``.
 
+Predefined Substitutions
+~~~~~~~~~~~~~~~~~~~~~~~~
+
 ::
 
   known-module ::= 'So'                      // Objective-C
@@ -532,12 +568,15 @@ function type thus mangles as ``fTCC3zim4zang4zungCS1_CS_7zippity_CS0_zoo``.
   known-nominal-type ::= 'SS'                // swift.String
   known-nominal-type ::= 'Su'                // swift.UInt64
 
-<known-module> and <known-nominal-type> are built-in substitutions for
+``<known-module>`` and ``<known-nominal-type>`` are built-in substitutions for
 certain common entities.  Like any other substitution, they all start
 with 'S'.
 
 The Objective-C module is used as the context for mangling Objective-C
-classes as <type>s.
+classes as ``<type>``\ s.
+
+Indexes
+~~~~~~~
 
 ::
 
@@ -545,5 +584,5 @@ classes as <type>s.
   index ::= natural '_'                      // N+1
   natural ::= [0-9]+
 
-<index> is a production for encoding numbers in contexts that can't
+``<index>`` is a production for encoding numbers in contexts that can't
 end in a digit; it's optimized for encoding smaller numbers.
