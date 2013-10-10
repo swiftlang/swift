@@ -150,6 +150,9 @@ public:
   LangOptions &getLangOptions() {
     return LangOpts;
   }
+  const LangOptions &getLangOptions() const {
+    return LangOpts;
+  }
 
   void setParseStdlib() {
     ParseStdlib = true;
