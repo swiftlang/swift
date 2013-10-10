@@ -255,12 +255,15 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       continue;
     }
 
+    case ConstraintClassification::Conjunction:
+      llvm_unreachable("Conjunction constraints should have been broken apart");
+
     case ConstraintClassification::Disjunction:
       // Record this disjunction.
       disjunctions.push_back(constraint);
 
       // Reference type variables in all of the constraints.
-      for (auto dis : constraint->getDisjunctionConstraints()) {
+      for (auto dis : constraint->getNestedConstraints()) {
         simplifyType(dis->getFirstType())->getTypeVariables(referencedTypeVars);
         if (auto second = dis->getSecondType()) {
           simplifyType(second)->getTypeVariables(referencedTypeVars);
@@ -829,7 +832,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
     // Try each of the constraints within the disjunction.
     bool anySolved = false;
-    for (auto constraint : disjunction->getDisjunctionConstraints()) {
+    for (auto constraint : disjunction->getNestedConstraints()) {
       // Try to solve the system with this option in the disjunction.
       SolverScope scope(*this);
 

@@ -340,6 +340,9 @@ enum class ConstraintKind : char {
   Archetype,
   /// \brief The first type must be DynamicLookup or an implicit lvalue thereof.
   DynamicLookupValue,
+  /// \brief A conjunction constraint that specifies that all of the stored
+  /// constraints must hold.
+  Conjunction,
   /// \brief A disjunction constraint that specifies that one or more of the
   /// stored constraints must hold.
   Disjunction
@@ -356,6 +359,9 @@ enum class ConstraintClassification : char {
 
   /// \brief An property of a single type, such as whether it is an archetype.
   TypeProperty,
+
+  /// \brief A conjunction constraint.
+  Conjunction,
 
   /// \brief A disjunction constraint.
   Disjunction
@@ -1039,7 +1045,7 @@ class Constraint {
     } Types;
 
     /// The set of constraints for a disjunction.
-    ArrayRef<Constraint *> Disjunction;
+    ArrayRef<Constraint *> Nested;
   };
 
   /// \brief The locator that describes where in the expression this
@@ -1050,9 +1056,12 @@ class Constraint {
   /// system.
   void *operator new(size_t) = delete;
 
-  Constraint(ArrayRef<Constraint *> disjunction, ConstraintLocator *locator)
-    : Kind(ConstraintKind::Disjunction), Disjunction(disjunction),
-      Locator(locator) { }
+  Constraint(ConstraintKind kind, ArrayRef<Constraint *> disjunction,
+             ConstraintLocator *locator)
+    : Kind(kind), Nested(disjunction), Locator(locator) {
+    assert(kind == ConstraintKind::Conjunction ||
+           kind == ConstraintKind::Disjunction);
+  }
 
 public:
   Constraint(ConstraintKind Kind, Type First, Type Second, Identifier Member,
@@ -1086,10 +1095,18 @@ public:
       assert(Second.isNull() && "Type property with second type");
       break;
 
+    case ConstraintKind::Conjunction:
+      llvm_unreachable("Conjunction constraints should use create()");
+
     case ConstraintKind::Disjunction:
       llvm_unreachable("Disjunction constraints should use create()");
     }
   }
+
+  /// Create a new conjunction constraint.
+  static Constraint *createConjunction(ConstraintSystem &cs,
+                                       ArrayRef<Constraint *> constraints,
+                                       ConstraintLocator *locator);
 
   /// Create a new disjunction constraint.
   static Constraint *createDisjunction(ConstraintSystem &cs,
@@ -1120,6 +1137,9 @@ public:
     case ConstraintKind::Archetype:
     case ConstraintKind::DynamicLookupValue:
       return ConstraintClassification::TypeProperty;
+
+    case ConstraintKind::Conjunction:
+      return ConstraintClassification::Disjunction;
 
     case ConstraintKind::Disjunction:
       return ConstraintClassification::Disjunction;
@@ -1157,10 +1177,11 @@ public:
         || kind == ConstraintKind::TypeMember;
   }
 
-  /// Retrieve the set of constraints in a disjunction.
-  ArrayRef<Constraint *> getDisjunctionConstraints() const {
-    assert(Kind == ConstraintKind::Disjunction);
-    return Disjunction;
+  /// Retrieve the set of constraints in a conjunction or disjunction.
+  ArrayRef<Constraint *> getNestedConstraints() const {
+    assert(Kind == ConstraintKind::Conjunction ||
+           Kind == ConstraintKind::Disjunction);
+    return Nested;
   }
 
   /// \brief Retrieve the locator for this constraint.
