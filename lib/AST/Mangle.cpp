@@ -639,7 +639,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
       GenericParamList *GenericParams = nullptr;
       do { // Skip over empty parent contexts.
         DeclCtx = DeclCtx->getParent();
-        assert(DeclCtx && "no decl context for archetype found");
+        //assert(DeclCtx && "no decl context for archetype found");
         if (!DeclCtx) return;
         GenericParams = DeclCtx->getGenericParamsOfContext();
       } while (!GenericParams);
