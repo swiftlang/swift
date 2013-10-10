@@ -266,8 +266,11 @@ public:
     
     calleeTy = checkApplySubstitutions(AI->getSubstitutions(), calleeTy);
     
-    require(calleeTy == AI->getSubstCalleeType(),
-            "substituted callee type does not match substitutions");
+    // FIXME: This doesn't work across TUs because of poly func type
+    // canonicalization issues.
+    // require(calleeTy == AI->getSubstCalleeType(),
+    //         "substituted callee type does not match substitutions");
+    calleeTy = AI->getSubstCalleeType();
     
     SILFunctionType *ti = calleeTy.getFunctionTypeInfo(F.getModule());
     
