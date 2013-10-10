@@ -32,7 +32,6 @@ namespace llvm {
 namespace swift {
   class ASTContext;
   class TranslationUnit;
-  class Component;
   class Decl;
   class DeclContext;
   class SILModule;

@@ -388,9 +388,8 @@ public:
 
   SerializedModule(ASTContext &ctx, SerializedModuleLoader &owner,
                    Identifier name, std::string DebugModuleName,
-                   Component *comp, ModuleFile &file)
-    : LoadedModule(ModuleKind::Serialized, name, DebugModuleName,
-                   comp, ctx, owner),
+                   ModuleFile &file)
+    : LoadedModule(ModuleKind::Serialized, name, DebugModuleName, ctx, owner),
       File(file) {}
 
   static bool classof(const Module *M) {

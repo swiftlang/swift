@@ -18,7 +18,6 @@
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
-#include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/PersistentParserState.h"
@@ -115,10 +114,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   unsigned bufferID = Ctx.SourceMgr.addNewSourceBuffer(inputFile.take(),
                                                        moduleID.second);
 
-  // For now, treat all separate modules as unique components.
-  Component *comp = new (Ctx.Allocate<Component>(1)) Component();
-
-  auto *importTU = new (Ctx) TranslationUnit(moduleID.first, comp, Ctx);
+  auto *importTU = new (Ctx) TranslationUnit(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first.str()] = importTU;
 
   auto *importFile = new (Ctx) SourceFile(*importTU, SourceFile::Library,

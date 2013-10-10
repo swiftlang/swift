@@ -14,7 +14,6 @@
 #include "ModuleFile.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
-#include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -140,16 +139,14 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   // Whether we succeed or fail, don't try to load this module again.
   Module *&module = Ctx.LoadedModules[moduleID.first.str()];
-  auto comp = new (Ctx.Allocate<Component>(1)) Component();
 
   if (err == ModuleStatus::Valid) {
     module = new (Ctx) SerializedModule(Ctx, *this, moduleID.first,
-                                        DebugModuleName,
-                                        comp, *loadedModuleFile);
+                                        DebugModuleName, *loadedModuleFile);
   } else {
     module = new (Ctx) FailedImportModule(moduleID.first, err,
                                           loadedModuleFile->getModuleFilename(),
-                                          Ctx, FailedImportLoader, comp);
+                                          Ctx, FailedImportLoader);
     loadedModuleFile.reset();
   }
 
@@ -194,7 +191,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
       module = new (Ctx) FailedImportModule(moduleID.first,
                                             loadedModuleFile->getStatus(),
                                           loadedModuleFile->getModuleFilename(),
-                                            Ctx, FailedImportLoader, comp);
+                                            Ctx, FailedImportLoader);
     }
   }
 

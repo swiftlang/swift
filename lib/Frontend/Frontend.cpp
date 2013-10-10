@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/SourceManager.h"
@@ -120,9 +119,8 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
 
 void swift::CompilerInstance::doIt() {
   const SourceFile::SourceKind Kind = Invocation.getInputKind();
-  Component *Comp = new (Context->Allocate<Component>(1)) Component();
   Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-  TU = new (*Context) TranslationUnit(ID, Comp, *Context);
+  TU = new (*Context) TranslationUnit(ID, *Context);
   Context->LoadedModules[ID.str()] = TU;
 
   TU->HasBuiltinModuleAccess = Invocation.getParseStdlib();

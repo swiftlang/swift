@@ -26,7 +26,6 @@ namespace swift {
 
 class ASTContext;
 class ClangImporter;
-class Component;
 class ModuleLoader;
 
 /// \brief Represents a Clang module that has been imported into Swift.
@@ -39,8 +38,7 @@ class ClangModule : public LoadedModule {
 
 public:
   ClangModule(ASTContext &ctx, std::string DebugModuleName,
-              ModuleLoader &owner, Component *comp,
-              clang::Module *clangModule);
+              ModuleLoader &owner, clang::Module *clangModule);
 
   /// \brief Retrieve the underlying Clang module.
   // FIXME: Remove this.

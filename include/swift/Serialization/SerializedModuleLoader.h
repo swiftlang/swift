@@ -171,9 +171,8 @@ public:
 
   FailedImportModule(Identifier Name, ModuleStatus Status,
                      StringRef ModuleFilename,
-                     ASTContext &Ctx, ModuleLoader &Owner, Component *Comp)
-    : LoadedModule(ModuleKind::FailedImport, Name, std::string(),
-                   Comp, Ctx, Owner),
+                     ASTContext &Ctx, ModuleLoader &Owner)
+    : LoadedModule(ModuleKind::FailedImport, Name, std::string(), Ctx, Owner),
       Status(Status) {
     assert(Status != ModuleStatus::Valid && "module is valid ?");
   }

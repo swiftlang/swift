@@ -22,7 +22,6 @@
 #include "swift/IRGen/Options.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Component.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/LinkLibrary.h"

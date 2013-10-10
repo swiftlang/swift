@@ -49,7 +49,6 @@ namespace swift {
   class LiteralExpr;
   class FuncDecl;
   class BraceStmt;
-  class Component;
   class DeclAttributes;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
@@ -1051,8 +1050,6 @@ public:
 
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
-
-  Resilience getResilienceFrom(Component *C) const;
 
   bool hasType() const { return !Ty.isNull(); }
   Type getType() const {

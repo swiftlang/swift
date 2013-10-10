@@ -18,7 +18,6 @@
 #include "ImporterImpl.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Component.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
@@ -278,16 +277,12 @@ Module *ClangImporter::loadModule(
     return result;
   }
 
-  // FIXME: Revisit this once components are fleshed out. Clang components
-  // are likely born-fragile.
-  auto component = new (Impl.SwiftContext.Allocate<Component>(1)) Component();
-
   // Build the representation of the Clang module in Swift.
   // FIXME: The name of this module could end up as a key in the ASTContext,
   // but that's not correct for submodules.
   auto result = new (Impl.SwiftContext)
     ClangModule(Impl.SwiftContext, (*clangModule).getFullModuleName(),
-                *this, component, clangModule);
+                *this, clangModule);
   cachedResult.setPointer(result);
 
   // FIXME: Total hack.
@@ -309,18 +304,14 @@ Module *ClangImporter::loadModule(
 
 ClangModule *
 ClangImporter::Implementation::getWrapperModule(ClangImporter &importer,
-                                                clang::Module *underlying,
-                                                Component *component) {
+                                                clang::Module *underlying) {
   auto &cacheEntry = ModuleWrappers[underlying];
   if (ClangModule *cachedModule = cacheEntry.getPointer())
     return cachedModule;
 
-  if (!component)
-    component = new (SwiftContext.Allocate<Component>(1)) Component();
-
   auto result = new (SwiftContext) ClangModule(SwiftContext,
                                                underlying->getFullModuleName(),
-                                               importer, component, underlying);
+                                               importer, underlying);
   cacheEntry.setPointer(result);
   return result;
 }
@@ -344,9 +335,9 @@ ClangModule *ClangImporter::Implementation::getClangModuleForDecl(
   // FIXME: this is just a workaround until we can import submodules.
   M = M->getTopLevelModule();
 
-  return getWrapperModule(
-      static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader()), M,
-      nullptr);
+  auto &importer =
+    static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
+  return getWrapperModule(importer, M);
 }
 
 #pragma mark Source locations
@@ -601,8 +592,7 @@ void ClangImporter::getImportedModules(
     underlying->getExportedModules(imported);
 
   for (auto importMod : imported) {
-    auto wrapper = Impl.getWrapperModule(*this, importMod,
-                                         module->getComponent());
+    auto wrapper = Impl.getWrapperModule(*this, importMod);
 
     auto actualMod = wrapper->getAdapterModule();
     if (!actualMod || actualMod == topLevelAdapter)
@@ -833,10 +823,9 @@ void ClangImporter::verifyAllModules() {
 //===----------------------------------------------------------------------===//
 
 ClangModule::ClangModule(ASTContext &ctx, std::string DebugModuleName,
-                         ModuleLoader &owner, Component *comp,
-                         clang::Module *clangModule)
+                         ModuleLoader &owner, clang::Module *clangModule)
   : LoadedModule(ModuleKind::Clang, ctx.getIdentifier(clangModule->Name),
-                 DebugModuleName, comp, ctx, owner), clangModule(clangModule) {
+                 DebugModuleName, ctx, owner), clangModule(clangModule) {
 }
 
 bool ClangModule::isTopLevel() const {
@@ -852,8 +841,7 @@ Module *ClangModule::getAdapterModule() const {
     // FIXME: Is this correct for submodules?
     auto &importer = static_cast<ClangImporter&>(getOwner());
     auto topLevel = clangModule->getTopLevelModule();
-    auto wrapper = importer.Impl.getWrapperModule(importer, topLevel,
-                                                  getComponent());
+    auto wrapper = importer.Impl.getWrapperModule(importer, topLevel);
     return wrapper->getAdapterModule();
   }
 

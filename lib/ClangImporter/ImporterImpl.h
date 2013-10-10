@@ -334,8 +334,7 @@ public:
   /// \brief Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
   ClangModule *getWrapperModule(ClangImporter &importer,
-                                clang::Module *underlying,
-                                Component *component = nullptr);
+                                clang::Module *underlying);
 
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///

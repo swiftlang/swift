@@ -36,7 +36,6 @@ namespace swift {
   class ASTContext;
   class ASTWalker;
   class BraceStmt;
-  class Component;
   class Decl;
   enum class DeclKind : uint8_t;
   class ExtensionDecl;
@@ -132,18 +131,14 @@ class Module : public DeclContext {
   ModuleKind Kind;
 protected:
   mutable void *LookupCachePimpl;
-  Component *Comp;
 public:
   ASTContext &Ctx;
   Identifier Name;
 
 protected:
-  Module(ModuleKind Kind, Identifier Name, Component *C, ASTContext &Ctx)
+  Module(ModuleKind Kind, Identifier Name, ASTContext &Ctx)
   : DeclContext(DeclContextKind::Module, nullptr),
-    Kind(Kind), LookupCachePimpl(0),
-    Comp(C), Ctx(Ctx), Name(Name) {
-    assert(Comp != nullptr || Kind == ModuleKind::Builtin);
-  }
+    Kind(Kind), LookupCachePimpl(0), Ctx(Ctx), Name(Name) {}
 
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
@@ -151,11 +146,6 @@ public:
 
   ModuleKind getKind() const { return Kind; }
 
-  Component *getComponent() const {
-    assert(Comp && "fetching component for the builtin module");
-    return Comp;
-  }
-  
   /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)
   /// within the current module.
@@ -478,8 +468,8 @@ public:
   /// Builtin module with an explicit import.
   bool HasBuiltinModuleAccess = false;
 
-  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C)
-    : Module(ModuleKind::TranslationUnit, Name, Comp, C) {
+  TranslationUnit(Identifier Name, ASTContext &C)
+    : Module(ModuleKind::TranslationUnit, Name, C) {
   }
   
   void setLinkLibraries(ArrayRef<LinkLibrary> libs) {
@@ -533,7 +523,7 @@ public:
 class BuiltinModule : public Module {
 public:
   BuiltinModule(Identifier Name, ASTContext &Ctx)
-    : Module(ModuleKind::Builtin, Name, nullptr, Ctx) {
+    : Module(ModuleKind::Builtin, Name, Ctx) {
   }
 
   static bool classof(const Module *M) {
@@ -553,9 +543,9 @@ protected:
   friend class Module;
 
   LoadedModule(ModuleKind Kind, Identifier name,
-               std::string DebugModuleName, Component *comp,
+               std::string DebugModuleName,
                ASTContext &ctx, ModuleLoader &owner)
-    : Module(Kind, name, comp, ctx),
+    : Module(Kind, name, ctx),
       DebugModuleName(DebugModuleName) {
     LookupCachePimpl = static_cast<void *>(&owner);
   }
