@@ -1090,11 +1090,11 @@ TranslationUnit::getCachedVisibleDecls() const {
 }
 
 bool TranslationUnit::walk(ASTWalker &Walker) {
-  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(Walker.Parent, this);
   return MainSourceFile->walk(Walker);
 }
 
 bool SourceFile::walk(ASTWalker &walker) {
+  llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent, &TU);
   for (Decl *D : Decls) {
     if (D->walk(walker))
       return true;
