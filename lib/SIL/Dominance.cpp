@@ -38,10 +38,11 @@ bool DominanceInfo::properlyDominates(SILInstruction *a, SILInstruction *b) {
 
   // Otherwise, they're in the same block, and we just need to check
   // whether B comes after A.  This is a non-strict computation.
-  do {
+  SILInstruction *f = aBlock->begin();
+  while (b != f) {
     b = b->getPrevNode();
     if (a == b) return true;
-  } while (b != nullptr);
+  }
 
   return false;
 }

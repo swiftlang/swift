@@ -173,7 +173,7 @@ public:
         require(valueI->getParent()->getParent() == &F,
                 "instruction uses value of instruction from another function");
         require(Dominance->properlyDominates(valueI, I),
-                "instruction doesn't dominate its operand");
+                "instruction isn't dominated by its operand");
       }
 
       require(operand.getUser() == I,
