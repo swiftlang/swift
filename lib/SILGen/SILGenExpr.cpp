@@ -219,6 +219,12 @@ namespace {
     RValue visitForceValueExpr(ForceValueExpr *E, SGFContext C);
 
     RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
+
+    RValue emitUnconditionalCheckedCast(Expr *source,
+                                        SILLocation loc,
+                                        Type destType,
+                                        CheckedCastKind castKind,
+                                        SGFContext C);
   };
 }
 
@@ -696,8 +702,6 @@ SILValue SILGenFunction::emitUnconditionalCheckedCast(SILLocation loc,
   if (origLowering.isAddressOnly() && castLowering.isLoadable())
     result = B.createLoad(loc, result);
   
-  
-  
   return result;
 }
 
@@ -818,26 +822,36 @@ RValue RValueEmitter::visitConditionalCheckedCastExpr(
   return RValue(SGF, ManagedValue(result, resultCleanup), E);
 }
 
-RValue RValueEmitter::visitUnconditionalCheckedCastExpr(
-                                               UnconditionalCheckedCastExpr *E,
-                                               SGFContext C) {
-  ManagedValue original = visit(E->getSubExpr()).getAsSingleValue(SGF,
-                                                              E->getSubExpr());
+RValue RValueEmitter::emitUnconditionalCheckedCast(Expr *source,
+                                                   SILLocation loc,
+                                                   Type destType,
+                                                   CheckedCastKind castKind,
+                                                   SGFContext C) {
+  ManagedValue original = visit(source).getAsSingleValue(SGF, source);
+
   // Disable the original cleanup because the cast-to type is more specific and
   // should have a more efficient cleanup.
   SILValue originalVal = original.forward(SGF);
-  SILValue cast = SGF.emitUnconditionalCheckedCast(E, originalVal,
-                                  E->getSubExpr()->getType(),
-                                  E->getCastTypeLoc().getType(),
-                                  E->getCastKind());
-  
+  SILValue cast = SGF.emitUnconditionalCheckedCast(loc, originalVal,
+                                                   source->getType(),
+                                                   destType,
+                                                   castKind);
+
   // If casting from an opaque existential, we'll forward the concrete value,
   // but the existential container husk still needs cleanup.
   if (originalVal.getType().isExistentialType()
       && !originalVal.getType().isClassExistentialType())
     SGF.Cleanups.pushCleanup<CleanupUsedExistentialContainer>(originalVal);
-  
-  return RValue(SGF, SGF.emitManagedRValueWithCleanup(cast), E);
+
+  return RValue(SGF, SGF.emitManagedRValueWithCleanup(cast), loc);
+}
+
+RValue RValueEmitter::visitUnconditionalCheckedCastExpr(
+                                               UnconditionalCheckedCastExpr *E,
+                                               SGFContext C) {
+  return emitUnconditionalCheckedCast(E->getSubExpr(), E,
+                                      E->getCastTypeLoc().getType(),
+                                      E->getCastKind(), C);
 }
 
 RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
@@ -2834,6 +2848,19 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
 }
 
 RValue RValueEmitter::visitForceValueExpr(ForceValueExpr *E, SGFContext C) {
+  // If the subexpression is a conditional checked cast, emit an unconditional
+  // cast, which drastically simplifies the generated SIL for something like:
+  //
+  //   (x as Foo)!
+  if (auto checkedCast = dyn_cast<ConditionalCheckedCastExpr>(
+        E->getSubExpr()->getSemanticsProvidingExpr())) {
+    return emitUnconditionalCheckedCast(checkedCast->getSubExpr(),
+                                        E, E->getType(),
+                                        checkedCast->getCastKind(),
+                                        C);
+  }
+
+
   RValue optValue = SGF.emitRValue(E->getSubExpr(), SGFContext());
   const TypeLowering &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
   
