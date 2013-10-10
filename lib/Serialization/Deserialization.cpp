@@ -2289,15 +2289,15 @@ Type ModuleFile::getType(TypeID TID) {
       error();
       return nullptr;
     }
-    SILFunctionType::ResultType result(getType(resultID)->getCanonicalType(),
-                                       resultConvention.getValue());
+    SILResultInfo result(getType(resultID)->getCanonicalType(),
+                         resultConvention.getValue());
 
     // Process the parameters.
     if (paramIDs.size() & 1) {
       error();
       return nullptr;
     }
-    SmallVector<SILFunctionType::ParameterType, 8> params;
+    SmallVector<SILParameterInfo, 8> params;
     params.reserve(paramIDs.size() / 2);
     for (size_t i = 0, e = paramIDs.size(); i != e; i += 2) {
       auto type = getType(paramIDs[i])->getCanonicalType();
@@ -2306,7 +2306,7 @@ Type ModuleFile::getType(TypeID TID) {
         error();
         return nullptr;
       }
-      SILFunctionType::ParameterType param(type, convention.getValue());
+      SILParameterInfo param(type, convention.getValue());
       params.push_back(param);
     }
 

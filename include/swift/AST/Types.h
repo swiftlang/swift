@@ -1515,6 +1515,52 @@ inline bool isIndirectParameter(ParameterConvention conv) {
   return conv <= ParameterConvention::Indirect_Out;
 }
 
+/// A parameter type and the rules for passing it.
+class SILParameterInfo {
+  llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
+public:
+  SILParameterInfo() = default;
+  SILParameterInfo(CanType type, ParameterConvention conv)
+    : TypeAndConvention(type, conv) {}
+
+  CanType getType() const {
+    return TypeAndConvention.getPointer();
+  }
+  ParameterConvention getConvention() const {
+    return TypeAndConvention.getInt();
+  }
+  bool isIndirect() const {
+    return isIndirectParameter(getConvention());
+  }
+  bool isIndirectInOut() const {
+    return getConvention() == ParameterConvention::Indirect_Inout;
+  }
+  bool isIndirectResult() const {
+    return getConvention() == ParameterConvention::Indirect_Out;
+  }
+  SILType getSILType() const; // in SILType.h
+
+  void profile(llvm::FoldingSetNodeID &id) {
+    id.AddPointer(TypeAndConvention.getOpaqueValue());
+  }
+
+  void dump() const;
+  void print(llvm::raw_ostream &out,
+             const PrintOptions &options = PrintOptions()) const;
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
+                                       SILParameterInfo type) {
+    type.print(out);
+    return out;
+  }
+
+  bool operator==(SILParameterInfo rhs) const {
+    return TypeAndConvention == rhs.TypeAndConvention;
+  }
+  bool operator!=(SILParameterInfo rhs) const {
+    return !(*this == rhs);
+  }
+};
+
 /// Conventions for returning values.  All return values at this
 /// level are direct.
 enum class ResultConvention {
@@ -1535,6 +1581,48 @@ enum class ResultConvention {
   Autoreleased,
 };
 
+/// A direct result type and the rules for returning it.
+///
+/// Indirect results require an implicit address parameter and are
+/// therefore represented with a kind of SILParameterInfo.  For now, a
+/// function with an indirect result will always have a SILResultInfo
+/// with the empty tuple type '()'.
+class SILResultInfo {
+  llvm::PointerIntPair<CanType, 3, ResultConvention> TypeAndConvention;
+public:
+  SILResultInfo() = default;
+  SILResultInfo(CanType type, ResultConvention conv)
+    : TypeAndConvention(type, conv) {}
+
+  CanType getType() const {
+    return TypeAndConvention.getPointer();
+  }
+  ResultConvention getConvention() const {
+    return TypeAndConvention.getInt();
+  }
+  SILType getSILType() const; // in SILType.h
+
+  void profile(llvm::FoldingSetNodeID &id) {
+    id.AddPointer(TypeAndConvention.getOpaqueValue());
+  }
+
+  void dump() const;
+  void print(llvm::raw_ostream &out,
+             const PrintOptions &options = PrintOptions()) const;
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
+                                       SILResultInfo type) {
+    type.print(out);
+    return out;
+  }
+
+  bool operator==(SILResultInfo rhs) const {
+    return TypeAndConvention == rhs.TypeAndConvention;
+  }
+  bool operator!=(SILResultInfo rhs) const {
+    return !(*this == rhs);
+  }
+};
+
 /// SILFunctionType - The detailed type of a function value, suitable
 /// for use by SIL.
 ///
@@ -1543,87 +1631,6 @@ enum class ResultConvention {
 /// function parameter and result types.
 class SILFunctionType : public TypeBase, public llvm::FoldingSetNode {
 public:
-  /// A parameter type and the rules for passing it.
-  class ParameterType {
-    llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
-  public:
-    ParameterType() = default;
-    ParameterType(CanType type, ParameterConvention conv)
-      : TypeAndConvention(type, conv) {}
-
-    CanType getType() const {
-      return TypeAndConvention.getPointer();
-    }
-    ParameterConvention getConvention() const {
-      return TypeAndConvention.getInt();
-    }
-    bool isIndirect() const {
-      return isIndirectParameter(getConvention());
-    }
-    bool isIndirectInOut() const {
-      return getConvention() == ParameterConvention::Indirect_Inout;
-    }
-    bool isIndirectResult() const {
-      return getConvention() == ParameterConvention::Indirect_Out;
-    }
-    SILType getSILType() const; // in SILType.h
-
-    void profile(llvm::FoldingSetNodeID &id) {
-      id.AddPointer(TypeAndConvention.getOpaqueValue());
-    }
-
-    void print(llvm::raw_ostream &out,
-               const PrintOptions &options = PrintOptions()) const;
-    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
-                                         ParameterType type) {
-      type.print(out);
-      return out;
-    }
-
-    bool operator==(ParameterType rhs) const {
-      return TypeAndConvention == rhs.TypeAndConvention;
-    }
-    bool operator!=(ParameterType rhs) const {
-      return !(*this == rhs);
-    }
-  };
-
-  /// A result type and the rules for returning it.
-  class ResultType {
-    llvm::PointerIntPair<CanType, 3, ResultConvention> TypeAndConvention;
-  public:
-    ResultType() = default;
-    ResultType(CanType type, ResultConvention conv)
-      : TypeAndConvention(type, conv) {}
-
-    CanType getType() const {
-      return TypeAndConvention.getPointer();
-    }
-    ResultConvention getConvention() const {
-      return TypeAndConvention.getInt();
-    }
-    SILType getSILType() const; // in SILType.h
-
-    void profile(llvm::FoldingSetNodeID &id) {
-      id.AddPointer(TypeAndConvention.getOpaqueValue());
-    }
-
-    void print(llvm::raw_ostream &out,
-               const PrintOptions &options = PrintOptions()) const;
-    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
-                                         ResultType type) {
-      type.print(out);
-      return out;
-    }
-
-    bool operator==(ResultType rhs) const {
-      return TypeAndConvention == rhs.TypeAndConvention;
-    }
-    bool operator!=(ResultType rhs) const {
-      return !(*this == rhs);
-    }
-  };
-
   typedef AnyFunctionType::ExtInfo ExtInfo;
 
 private:
@@ -1631,46 +1638,46 @@ private:
   GenericParamList *GenericParams;
 
   /// TODO: Permit an arbitrary number of results.
-  const ResultType Result;
+  const SILResultInfo Result;
   ExtInfo Ext;
   uint16_t NumParams;
 
-  MutableArrayRef<ParameterType> getMutableParameters() {
-    auto ptr = reinterpret_cast<ParameterType*>(this + 1);
-    return MutableArrayRef<ParameterType>(ptr, NumParams);
+  MutableArrayRef<SILParameterInfo> getMutableParameters() {
+    auto ptr = reinterpret_cast<SILParameterInfo*>(this + 1);
+    return MutableArrayRef<SILParameterInfo>(ptr, NumParams);
   }
 
   SILFunctionType(GenericParamList *genericParams, ExtInfo ext,
-                  ArrayRef<ParameterType> params, ResultType result,
+                  ArrayRef<SILParameterInfo> params, SILResultInfo result,
                   const ASTContext &ctx)
     : TypeBase(TypeKind::SILFunction, &ctx, /*HasTypeVariable*/ false),
       GenericParams(genericParams), Result(result), Ext(ext),
       NumParams(params.size()) {
     memcpy(getMutableParameters().data(), params.data(),
-           params.size() * sizeof(ParameterType));
+           params.size() * sizeof(SILParameterInfo));
   }
 
-  static SILType getParameterSILType(const ParameterType &param);// SILType.h
+  static SILType getParameterSILType(const SILParameterInfo &param);// SILType.h
 
 public:
   static SILFunctionType *get(GenericParamList *genericParams,
-                              ExtInfo ext, ArrayRef<ParameterType> params,
-                              ResultType result, ASTContext &ctx);
+                              ExtInfo ext, ArrayRef<SILParameterInfo> params,
+                              SILResultInfo result, ASTContext &ctx);
 
   SILType getSILResult() const; // in SILType.h
   SILType getSILParameter(unsigned i) const; // in SILType.h
 
-  ResultType getResult() const {
+  SILResultInfo getResult() const {
     return Result;
   }
-  ArrayRef<ParameterType> getParameters() const {
+  ArrayRef<SILParameterInfo> getParameters() const {
     return const_cast<SILFunctionType*>(this)->getMutableParameters();
   }
 
   bool hasIndirectResult() const {
     return !getParameters().empty() && getParameters()[0].isIndirectResult();
   }
-  ParameterType getIndirectResult() const {
+  SILParameterInfo getIndirectResult() const {
     assert(hasIndirectResult());
     return getParameters()[0];
   }
@@ -1680,14 +1687,14 @@ public:
   SILType getSemanticResultSILType() const; // in SILType.h
 
   /// Get the parameters, ignoring any indirect-return parameter.
-  ArrayRef<ParameterType> getNonReturnParameters() const {
+  ArrayRef<SILParameterInfo> getNonReturnParameters() const {
     auto params = getParameters();
     if (hasIndirectResult()) params = params.slice(1);
     return params;
   }
 
   using ParameterSILTypeArrayRef
-    = ArrayRefView<ParameterType, SILType, getParameterSILType>;  
+    = ArrayRefView<SILParameterInfo, SILType, getParameterSILType>;  
   ParameterSILTypeArrayRef getParameterSILTypes() const {
     return ParameterSILTypeArrayRef(getParameters());
   }
@@ -1719,8 +1726,8 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericParamList *genericParams,
                       ExtInfo info,
-                      ArrayRef<ParameterType> params,
-                      ResultType result);
+                      ArrayRef<SILParameterInfo> params,
+                      SILResultInfo result);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

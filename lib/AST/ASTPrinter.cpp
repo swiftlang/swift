@@ -1534,8 +1534,10 @@ static StringRef getStringForParameterConvention(ParameterConvention conv) {
   llvm_unreachable("bad parameter convention");
 }
 
-void SILFunctionType::ParameterType::print(raw_ostream &out,
-                                           const PrintOptions &opts) const {
+void SILParameterInfo::dump() const {
+  print(llvm::errs());
+}
+void SILParameterInfo::print(raw_ostream &out, const PrintOptions &opts) const {
   out << getStringForParameterConvention(getConvention());
   getType().print(out, opts);
 }
@@ -1549,8 +1551,10 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
   llvm_unreachable("bad result convention");
 }
 
-void SILFunctionType::ResultType::print(raw_ostream &out,
-                                        const PrintOptions &opts) const {
+void SILResultInfo::dump() const {
+  print(llvm::errs());
+}
+void SILResultInfo::print(raw_ostream &out, const PrintOptions &opts) const {
   out << getStringForResultConvention(getConvention());
   getType().print(out, opts);
 }

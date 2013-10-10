@@ -1294,8 +1294,8 @@ GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
 void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
                               GenericParamList *genericParams,
                               ExtInfo info,
-                              ArrayRef<ParameterType> params,
-                              ResultType result) {
+                              ArrayRef<SILParameterInfo> params,
+                              SILResultInfo result) {
   id.AddPointer(genericParams);
   id.AddInteger(info.getFuncAttrKey());
   id.AddInteger(params.size());
@@ -1306,8 +1306,8 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
 
 SILFunctionType *SILFunctionType::get(GenericParamList *genericParams,
                                       ExtInfo ext,
-                                      ArrayRef<ParameterType> params,
-                                      ResultType result, ASTContext &ctx) {
+                                      ArrayRef<SILParameterInfo> params,
+                                      SILResultInfo result, ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericParams, ext, params, result);
 
@@ -1321,7 +1321,7 @@ SILFunctionType *SILFunctionType::get(GenericParamList *genericParams,
 
   // Allocate storage for the object.
   size_t bytes = sizeof(SILFunctionType)
-               + sizeof(ParameterType) * params.size();
+               + sizeof(SILParameterInfo) * params.size();
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   auto fnType =

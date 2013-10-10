@@ -48,26 +48,23 @@ SILFunctionType *SILType::getFunctionTypeInfo(SILModule &M) const {
   if (found != M.FunctionTypeInfoCache.end())
     return found->second;
 
-  typedef SILFunctionType::ParameterType ParameterType;
-  typedef SILFunctionType::ResultType ResultType;
-
-  SmallVector<ParameterType, 8> inputs;
+  SmallVector<SILParameterInfo, 8> inputs;
   
   // If the result type lowers to an address-only type, add it as an indirect
   // return argument.
   auto &resultTL = M.Types.getTypeLowering(fnType.getResult());
   bool hasIndirectReturn = resultTL.isAddressOnly();
   CanType resultType = resultTL.getLoweredType().getSwiftRValueType();
-  ResultType result;
+  SILResultInfo result;
   if (hasIndirectReturn) {
-    inputs.push_back(ParameterType(resultType,
+    inputs.push_back(SILParameterInfo(resultType,
                                    ParameterConvention::Indirect_Out));
     resultType = TupleType::getEmpty(M.getASTContext());    
-    result = ResultType(resultType, ResultConvention::Unowned);
+    result = SILResultInfo(resultType, ResultConvention::Unowned);
   } else {
     auto convention = (resultTL.isTrivial() ? ResultConvention::Unowned
                                             : ResultConvention::Owned);
-    result = ResultType(resultType, convention);
+    result = SILResultInfo(resultType, convention);
   }
   
   // Destructure the input tuple type.
@@ -86,7 +83,7 @@ SILFunctionType *SILType::getFunctionTypeInfo(SILModule &M) const {
     assert(isIndirectParameter(convention)
              == paramTL.getLoweredType().isAddress());
     auto loweredType = paramTL.getLoweredType().getSwiftRValueType();
-    inputs.push_back(ParameterType(loweredType, convention));
+    inputs.push_back(SILParameterInfo(loweredType, convention));
   };
   visitDestructuredArgumentTypes(visitFn, fnType.getInput());
 

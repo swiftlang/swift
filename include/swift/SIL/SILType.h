@@ -293,7 +293,7 @@ inline SILType SILFunctionType::getSILParameter(unsigned i) const {
   return getParameters()[i].getSILType();
 }
 
-inline SILType SILFunctionType::ParameterType::getSILType() const {
+inline SILType SILParameterInfo::getSILType() const {
   if (isIndirect()) {
     return SILType::getPrimitiveAddressType(getType());
   } else {
@@ -302,7 +302,7 @@ inline SILType SILFunctionType::ParameterType::getSILType() const {
 }
 
 inline SILType
-SILFunctionType::getParameterSILType(const ParameterType &param) {
+SILFunctionType::getParameterSILType(const SILParameterInfo &param) {
   return param.getSILType();
 }
 
@@ -310,7 +310,7 @@ inline SILType SILFunctionType::getSILResult() const {
   return getResult().getSILType();
 }
 
-inline SILType SILFunctionType::ResultType::getSILType() const {
+inline SILType SILResultInfo::getSILType() const {
   return SILType::getPrimitiveObjectType(getType());
 }
 
