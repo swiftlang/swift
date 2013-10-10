@@ -31,7 +31,7 @@ class SILBuilder {
   SmallVectorImpl<SILInstruction*> *InsertedInstrs = nullptr;
 public:
   static SILType getTupleElementType(SILType Ty, unsigned EltNo);
-  static SILType getStructFieldType(VarDecl *Field);
+  static SILType getStructFieldType(SILType Ty, VarDecl *Field);
   static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
                                            SILModule &M);
 
@@ -460,7 +460,7 @@ public:
                                          SILValue Operand,
                                          VarDecl *Field) {
     return createStructExtract(Loc, Operand, Field,
-                               getStructFieldType(Field));
+                               getStructFieldType(Operand.getType(), Field));
   }
 
 

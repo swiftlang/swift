@@ -23,8 +23,11 @@ SILType SILBuilder::getTupleElementType(SILType Ty, unsigned EltNo) {
   return SILType::getPrimitiveObjectType(EltTy);
 }
 
-SILType SILBuilder::getStructFieldType(VarDecl *Field) {
-  auto FieldTy = Field->getType()->getCanonicalType();
+SILType SILBuilder::getStructFieldType(SILType Ty, VarDecl *Field) {
+  assert(Field->getDeclContext() == Ty.getStructOrBoundGenericStruct());
+  auto FieldTy = Ty.getSwiftRValueType()
+    ->getTypeOfMember(Field->getModuleContext(), Field, nullptr)
+    ->getCanonicalType();
   return SILType::getPrimitiveObjectType(FieldTy);
 }
 
