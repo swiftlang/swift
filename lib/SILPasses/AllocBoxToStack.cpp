@@ -194,6 +194,10 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   // introduce different releases for different codepaths.  If this ends up
   // mattering in the future, this can be generalized.
   SILInstruction *LastRelease = getLastRelease(ABI, Users, Releases, PDI);
+  
+  // FIXME: If there's no last release, we can't balance the alloc_stack.
+  if (!LastRelease)
+    return false;
 
   auto &lowering =
     ABI->getModule().Types.getTypeLowering(ABI->getElementType());
