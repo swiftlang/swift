@@ -92,39 +92,24 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
 }
 
 static void DoGlobalExtensionLookup(Type BaseType,
-                                    VisibleDeclConsumer &Consumer,
-                                    ArrayRef<ValueDecl*> BaseMembers,
+                                    SmallVectorImpl<ValueDecl *> &FoundDecls,
                                     const Module *CurModule,
                                     LookupState LS,
                                     DeclVisibilityKind Reason,
                                     LazyResolver *TypeResolver) {
-  SmallVector<ValueDecl *, 4> found;
-  
   auto nominal = BaseType->getAnyNominal();
-  if (!nominal)
-    return;
-
-  // Add the members from the type itself to the list of results.
-  for (auto Member : BaseMembers) {
-    if (isDeclVisibleInLookupMode(Member, LS))
-      found.push_back(Member);
-  }
 
   // Look in each extension of this type.
   for (auto extension : nominal->getExtensions()) {
     for (auto Member : extension->getMembers()) {
       if (auto VD = dyn_cast<ValueDecl>(Member))
         if (isDeclVisibleInLookupMode(VD, LS))
-          found.push_back(VD);
+          FoundDecls.push_back(VD);
     }
   }
 
   // Handle shadowing.
-  removeShadowedDecls(found, CurModule, TypeResolver);
-
-  // Report the declarations we found to the consumer.
-  for (auto VD : found)
-    Consumer.foundDecl(VD, Reason);
+  removeShadowedDecls(FoundDecls, CurModule, TypeResolver);
 }
 
 /// \brief Enumerate immediate members of the type \c BaseType and its
@@ -147,26 +132,28 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
     TempDC = TempDC->getParent();
   }
 
-  SmallVector<ValueDecl*, 2> BaseMembers;
+  SmallVector<ValueDecl*, 2> FoundDecls;
 
   if (LookupFromChildDeclContext) {
     // Current decl context is contained inside 'D', so generic parameters
     // are visible.
     if (D->getGenericParams())
       for (auto Param : *D->getGenericParams())
-        BaseMembers.push_back(Param.getDecl());
+        if (isDeclVisibleInLookupMode(Param.getDecl(), LS))
+          FoundDecls.push_back(Param.getDecl());
   }
 
   for (Decl *Member : D->getMembers()) {
-    if (auto *VD = dyn_cast<ValueDecl>(Member)) {
-      if (LS.isQualified() && LS.isOnMetatype() && isa<VarDecl>(VD))
-        continue;
-
-      BaseMembers.push_back(VD);
-    }
+    if (auto *VD = dyn_cast<ValueDecl>(Member))
+      if (isDeclVisibleInLookupMode(VD, LS))
+        FoundDecls.push_back(VD);
   }
-  DoGlobalExtensionLookup(BaseType, Consumer, BaseMembers,
+  DoGlobalExtensionLookup(BaseType, FoundDecls,
                           CurrDC->getParentModule(), LS, Reason, TypeResolver);
+
+  // Report the declarations we found to the consumer.
+  for (auto *VD : FoundDecls)
+    Consumer.foundDecl(VD, Reason);
 }
 
 /// Enumerate DynamicLookup declarations as seen from context \c CurrDC.
