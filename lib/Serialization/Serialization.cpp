@@ -1710,6 +1710,7 @@ void Serializer::writeType(Type ty) {
                                       paramTypes);
     if (genericParams && !genericContext)
       writeGenericParams(genericParams);
+    break;
   }
 
   case TypeKind::Array: {
