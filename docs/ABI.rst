@@ -224,7 +224,13 @@ be used by (TODO: reflection and) debugger tools to discover information about
 types. For non-generic nominal types, these metadata records are generated
 statically by the compiler. For instances of generic types, and for intrinsic
 types such as tuples, functions, protocol compositions, etc., metadata records
-are vended by the runtime as needed.
+are vended by the runtime as needed. Every type has a unique metadata record;
+two **metadata pointer** values are equal iff the types are equivalent.
+
+In the layout descriptions below, offsets are given relative to the
+metadata pointer as an index into an array of pointers. On a 32-bit platform,
+**offset 1** means an offset of 4 bytes, and on 64-bit platforms, it means
+an offset of 8 bytes.
 
 Common Metadata Layout
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -237,7 +243,7 @@ All metadata records share a common header, with the following fields:
   The value witness table also records the size, alignment, stride, and other
   fundamental properties of the type. The value witness table pointer is at
   **offset -1** from the metadata pointer, that is, the pointer-sized word
-  **immediately before** the pointer.
+  **immediately before** the pointer's referenced address.
 
 - The **kind** field is a pointer-sized integer that describes the kind of type
   the metadata describes. This field is at **offset 0** from the metadata
@@ -247,6 +253,8 @@ All metadata records share a common header, with the following fields:
 
   * `Struct metadata`_ has a kind of **1**.
   * `Enum metadata`_ has a kind of **2**.
+  * `Opaque metadata`_ has a kind of **8**. This is used for compiler
+    ``Builtin`` primitives that have no additional runtime information.
   * `Tuple metadata`_ has a kind of **9**.
   * `Function metadata`_ has a kind of **10**.
   * `Protocol metadata`_ has a kind of **12**. This is used both for
@@ -258,8 +266,45 @@ All metadata records share a common header, with the following fields:
 Struct Metadata
 ~~~~~~~~~~~~~~~
 
+In addition to the `common metadata layout`_ fields, struct metadata records
+contain the following fields:
+
+- The **nominal type descriptor** is a pointer at **offset 1**.
+
+  TODO: The nominal type descriptor is currently always null.
+
+- The **parent** metadata record is stored at **offset 2**. For structs that
+  are members of an enclosing nominal type, this is a reference to the enclosing
+  type's metadata. For top-level structs, this is null.
+
+  TODO: The parent pointer is currently always null.
+
+- A vector of **field offsets** begins at **offset 3**. For each field of the
+  struct, in ``var`` declaration order, the field's offset from the beginning
+  of the struct is stored as a pointer-sized integer.
+
+- If the struct is generic, then the
+  `generic parameter vector`_ begins at **offset 3+n**, where **n** is the
+  number of fields in the struct.
+
 Enum Metadata
 ~~~~~~~~~~~~~
+
+In addition to the `common metadata layout`_ fields, enum metadata records
+contain the following fields:
+
+- The **nominal type descriptor** is a pointer at **offset 1**.
+
+  TODO: The nominal type descriptor is currently always null.
+
+- The **parent** metadata record is stored at **offset 2**. For enums that
+  are members of an enclosing nominal type, this is a reference to the enclosing
+  type's metadata. For top-level enums, this is null.
+
+  TODO: The parent pointer is currently always null.
+
+- If the enum is generic, then the
+  `generic parameter vector`_ begins at **offset 3**.
 
 Class Metadata
 ~~~~~~~~~~~~~~
@@ -275,6 +320,9 @@ Protocol Metadata
 
 Metatype Metadata
 ~~~~~~~~~~~~~~~~~
+
+Generic Parameter Vector
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Mangling
 --------
