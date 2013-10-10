@@ -1905,25 +1905,68 @@ namespace {
       return expr;
     }
 
+    /// Whether this type is DynamicLookup or an implicit lvalue thereof.
+    bool isDynamicLookupType(Type type) {
+      // Look through lvalues, metatypes.
+      if (auto lvalue = type->getAs<LValueType>()) {
+        if (!lvalue->getQualifiers().isImplicit())
+          return false;
+
+        type = lvalue->getObjectType();
+      }
+
+      // Check whether we have a protocol type.
+      auto protoTy = type->getAs<ProtocolType>();
+      if (!protoTy)
+        return false;
+
+      // Check whether this is DynamicLookup.
+      return protoTy->getDecl()->isSpecificProtocol(
+                                   KnownProtocolKind::DynamicLookup);
+    }
+
     Expr *visitForceValueExpr(ForceValueExpr *expr) {
       Type valueType = simplifyType(expr->getType());
+      auto &tc = cs.getTypeChecker();
       Type optType = OptionalType::get(valueType, cs.getASTContext());
-      Expr *subExpr = coerceToType(expr->getSubExpr(), optType,
-                                   cs.getConstraintLocator(expr, { }));
-      if (!subExpr) return nullptr;
 
-      // Complain if the sub-expression was converted to T? via the
-      // inject-into-optional implicit conversion.
-      //
-      // It should be the case that that's always the last conversion applied.
-      if (isa<InjectIntoOptionalExpr>(subExpr)) {
-        cs.getTypeChecker().diagnose(subExpr->getLoc(),
-                                     diag::forcing_injected_optional,
-                               expr->getSubExpr()->getType()->getRValueType())
-          .highlight(subExpr->getSourceRange())
-          .fixItRemove(expr->getExclaimLoc());
+      // If the subexpression is of DynamicLookup type, introduce a conditional
+      // cast to the value type. This cast produces a value of optional type.
+      Expr *subExpr = expr->getSubExpr();
+      if (isDynamicLookupType(expr->getSubExpr()->getType())) {
+        // Coerce the subexpression to an rvalue.
+        subExpr = tc.coerceToRValue(subExpr);
+        if (!subExpr) return nullptr;
+
+        // Create a conditional checked cast to the value type, e.g., x as T.
+        bool isArchetype = valueType->is<ArchetypeType>();
+        auto cast = new (tc.Context) ConditionalCheckedCastExpr(
+                                       subExpr,
+                                       SourceLoc(),
+                                       TypeLoc::withoutLoc(valueType));
+        cast->setImplicit(true);
+        cast->setType(optType);
+        cast->setCastKind(isArchetype? CheckedCastKind::ExistentialToArchetype
+                                     : CheckedCastKind::ExistentialToConcrete);
+        subExpr = cast;
+      } else {
+        // Coerce the subexpression to the appropriate optional type.
+        subExpr = coerceToType(subExpr, optType,
+                               cs.getConstraintLocator(expr, { }));
+        if (!subExpr) return nullptr;
+
+        // Complain if the sub-expression was converted to T? via the
+        // inject-into-optional implicit conversion.
+        //
+        // It should be the case that that's always the last conversion applied.
+        if (isa<InjectIntoOptionalExpr>(subExpr)) {
+          tc.diagnose(subExpr->getLoc(), diag::forcing_injected_optional,
+                      expr->getSubExpr()->getType()->getRValueType())
+            .highlight(subExpr->getSourceRange())
+            .fixItRemove(expr->getExclaimLoc());
+        }
       }
-      
+
       expr->setSubExpr(subExpr);
       expr->setType(valueType);
       return expr;

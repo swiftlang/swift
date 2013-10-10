@@ -1036,7 +1036,11 @@ namespace {
     }
 
     Type visitForceValueExpr(ForceValueExpr *expr) {
-      // The operand must be coercible to T? for some type T.
+      // The value can be forced in two different ways:
+      //   - Either the value is coercible to T? and the result is T, which
+      //     retrieves the value stored in the optional
+      //   - The value is of rvalue type DynamicLookup, and the result is
+      //     some class type T.
       auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
                                            TVO_PrefersSubtypeBinding);
 
@@ -1044,9 +1048,28 @@ namespace {
       if (!optTy)
         return Type();
 
-      CS.addConstraint(ConstraintKind::Conversion,
-                       expr->getSubExpr()->getType(), optTy,
-                       CS.getConstraintLocator(expr, {}));
+      auto dynLookup = CS.TC.getProtocol(expr->getExclaimLoc(),
+                                         KnownProtocolKind::DynamicLookup);
+      if (!dynLookup)
+        return Type();
+
+      auto locator = CS.getConstraintLocator(expr, {});
+      Constraint *constraints[2] = {
+        // The subexpression is convertible to T?
+        new (CS) Constraint(ConstraintKind::Conversion,
+                            expr->getSubExpr()->getType(), optTy,
+                            Identifier(),
+                            locator),
+        // The subexpression is DynamicLookup.
+        // FIXME: Should restrict valueTy to a class type.
+        // FIXME: We need an rvalue adjustment on the right-hand side of this.
+        new (CS) Constraint(ConstraintKind::Equal,
+                            dynLookup->getDeclaredType(),
+                            expr->getSubExpr()->getType(),
+                            Identifier(),
+                            locator)
+      };
+      CS.addConstraint(Constraint::createDisjunction(CS, constraints, locator));
 
       // The result is of type T.
       return valueTy;

@@ -2423,9 +2423,17 @@ public:
 
   void setSubExpr(Expr *E) { SubExpr = E; }
 
-  SourceLoc getLoc() const { return AsLoc; }
+  SourceLoc getLoc() const {
+    if (AsLoc.isValid())
+      return AsLoc;
+
+    return SubExpr->getLoc();
+  }
 
   SourceRange getSourceRange() const {
+    if (CastTy.getSourceRange().isInvalid())
+      return SubExpr->getSourceRange();
+
     return SubExpr
       ? SourceRange{SubExpr->getStartLoc(), CastTy.getSourceRange().End}
       : SourceRange{AsLoc, CastTy.getSourceRange().End};
