@@ -199,11 +199,12 @@ static void unwrapIfDiscardedClosure(Parser &P,
 ///     stmt-fallthrough
 ///   stmt-assign:
 ///     expr '=' expr
-void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
-                             bool IsTopLevel, BraceItemListKind Kind) {
+ParserStatus Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
+                                     bool IsTopLevel, BraceItemListKind Kind) {
   // This forms a lexical scope.
   Scope S(this, IsTopLevel ? ScopeKind::TopLevel : ScopeKind::Brace);
 
+  ParserStatus BraceItemsStatus;
   SmallVector<Decl*, 8> TmpDecls;
 
   bool PreviousHadSemi = true;
@@ -237,7 +238,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         if (Status.hasCodeCompletion() && IsTopLevel &&
             isCodeCompletionFirstPass()) {
           consumeTopLevelDecl(BeginParserPosition);
-          return;
+          return Status;
         }
       }
 
@@ -256,7 +257,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       ParserStatus Status = parseExprOrStmt(Result);
       if (Status.hasCodeCompletion() && isCodeCompletionFirstPass()) {
         consumeTopLevelDecl(BeginParserPosition);
-        return;
+        return Status;
       }
       if (Status.isError())
         NeedParseErrorRecovery = true;
@@ -269,6 +270,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     } else {
       SourceLoc StartLoc = Tok.getLoc();
       ParserStatus ExprOrStmtStatus = parseExprOrStmt(Result);
+      BraceItemsStatus |= ExprOrStmtStatus;
       if (ExprOrStmtStatus.isError())
         NeedParseErrorRecovery = true;
       unwrapIfDiscardedClosure(*this, Result);
@@ -308,6 +310,8 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       PreviousHadSemi = true;
     }
   }
+
+  return BraceItemsStatus;
 }
 
 void Parser::parseTopLevelCodeDeclDelayed() {
@@ -397,7 +401,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   SmallVector<ExprStmtOrDecl, 16> Entries;
   SourceLoc RBLoc;
 
-  parseBraceItems(Entries, false /*NotTopLevel*/);
+  ParserStatus Status = parseBraceItems(Entries, false /*NotTopLevel*/);
   if (parseMatchingToken(tok::r_brace, RBLoc,
                          diag::expected_rbrace_in_brace_stmt, LBLoc)) {
     // Recover by setting the right brace location to the end location of the
@@ -414,7 +418,8 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
     }
   }
 
-  return makeParserResult(BraceStmt::create(Context, LBLoc, Entries, RBLoc));
+  return makeParserResult(Status,
+                          BraceStmt::create(Context, LBLoc, Entries, RBLoc));
 }
 
 /// parseStmtReturn
@@ -537,10 +542,14 @@ ParserResult<Stmt> Parser::parseStmtWhile() {
 ParserResult<Stmt> Parser::parseStmtDoWhile() {
   SourceLoc DoLoc = consumeToken(tok::kw_do);
 
+  ParserStatus Status;
+
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::expected_lbrace_after_do);
+  Status |= Body;
   if (Body.isNull())
-    return nullptr; // FIXME: better recovery
+    Body = makeParserResult(
+        Body, BraceStmt::create(Context, Tok.getLoc(), {}, Tok.getLoc()));
 
   SourceLoc WhileLoc;
   if (parseToken(tok::kw_while, WhileLoc, diag::expected_while_in_dowhile))
@@ -555,8 +564,9 @@ ParserResult<Stmt> Parser::parseStmtDoWhile() {
   }
 
   ParserResult<Expr> Condition = parseExpr(diag::expected_expr_do_while);
+  Status |= Condition;
   if (Condition.isNull() || Condition.hasCodeCompletion())
-    return makeParserResult<Stmt>(Condition, nullptr); // FIXME: better recovery
+    return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
 
   if (auto *CE = dyn_cast<ClosureExpr>(Condition.get())) {
     // If we parsed a closure after 'do ... while', then it was not the
@@ -572,6 +582,7 @@ ParserResult<Stmt> Parser::parseStmtDoWhile() {
   }
 
   return makeParserResult(
+      Status,
       new (Context) DoWhileStmt(DoLoc, Condition.get(), WhileLoc, Body.get()));
 }
 
@@ -764,8 +775,8 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   Body = parseBraceItemList(diag::expected_lbrace_after_for);
   Status |= Body;
   if (Body.isNull())
-    Body = makeParserErrorResult(
-        BraceStmt::create(Context, Tok.getLoc(), {}, Tok.getLoc()));
+    Body = makeParserResult(
+        Body, BraceStmt::create(Context, Tok.getLoc(), {}, Tok.getLoc()));
 
   return makeParserResult(
       Status,
@@ -826,14 +837,18 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   DeclAttributes Attributes;
   addVarsToScope(Pattern.get(), Decls, Attributes);
 
+  ParserStatus Status;
+
   // stmt-brace
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::expected_foreach_lbrace);
-
+  Status |= Body;
   if (Body.isNull())
-    return nullptr; // FIXME: better recovery
+    Body = makeParserResult(
+        Body, BraceStmt::create(Context, Tok.getLoc(), {}, Tok.getLoc()));
 
   return makeParserResult(
+      Status,
       new (Context) ForEachStmt(ForLoc, Pattern.get(), InLoc,
                                 Container.get(), Body.get()));
 }
@@ -1052,7 +1067,8 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
   SmallVector<ExprStmtOrDecl, 8> bodyItems;
 
   SourceLoc startOfBody = Tok.getLoc();
-  parseBraceItems(bodyItems, /*isTopLevel*/ false, BraceItemListKind::Case);
+  Status |=
+      parseBraceItems(bodyItems, /*isTopLevel*/ false, BraceItemListKind::Case);
   BraceStmt *body = BraceStmt::create(Context,
                                       startOfBody, bodyItems, Tok.getLoc());
 

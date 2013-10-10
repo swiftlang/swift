@@ -441,9 +441,10 @@ public:
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition);
 
-  void parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Decls,
-                       bool IsTopLevel,
-                       BraceItemListKind Kind = BraceItemListKind::Brace);
+  ParserStatus parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Decls,
+                               bool IsTopLevel,
+                               BraceItemListKind Kind =
+                                   BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
 
   void parseTopLevelCodeDeclDelayed();
