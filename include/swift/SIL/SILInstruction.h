@@ -1114,6 +1114,33 @@ public:
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
+  /// Return the Operand associated with the given VarDecl.
+  Operand *getOperandForField(VarDecl *V) {
+    return const_cast<Operand *>(getOperandForField(V));
+  }
+
+  Operand const *getOperandForField(VarDecl const *V) const {
+    // If V is null or is computed, there is no operand associated with it.
+    if (!V || V->isComputed())
+      return nullptr;
+
+    StructDecl *S = getType().getStructOrBoundGenericStruct();
+    assert(S && "A struct should always have a StructDecl associated with it.");
+
+    auto FilteredRange = S->getStoredProperties();
+    unsigned Index = 0;
+    for (auto I = FilteredRange.begin(), E = FilteredRange.end(); I != E;
+         ++I, ++Index)
+      // At this point we know that V is not null and is computed implying that
+      // it is sufficient just to check if dyn_cast<VarDecl>(Members[i]) equals
+      // V and if said equality occurs, return the operand at that index.
+      if (V == *I)
+        return &getAllOperands()[Index];
+
+    // Did not find a matching VarDecl, return nullptr.
+    return nullptr;
+  }
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::StructInst;
   }
