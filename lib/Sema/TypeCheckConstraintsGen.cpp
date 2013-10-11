@@ -106,7 +106,7 @@ namespace {
                   TVO_CanBindToLValue);
       OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false);
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
-      CS.addOverloadSet(OverloadSet::getNew(CS, tv, locator, { &choice, 1 }));
+      CS.addBindOverloadConstraint(tv, choice, locator);
       return tv;
     }
 

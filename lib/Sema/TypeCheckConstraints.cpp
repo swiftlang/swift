@@ -2259,8 +2259,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
     // Add an overload set that selects this field.
     OverloadChoice choice(baseTy, fieldIdx);
-    addOverloadSet(OverloadSet::getNew(*this, memberTy, constraint.getLocator(),
-                                       { &choice, 1 }));
+    addBindOverloadConstraint(memberTy, choice, constraint.getLocator());
     return SolutionKind::Solved;
   }
 
@@ -2384,9 +2383,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       // ".0" on a scalar just refers to the underlying scalar value.
       if (index == 0) {
         OverloadChoice identityChoice(baseTy, OverloadChoiceKind::BaseType);
-        addOverloadSet(OverloadSet::getNew(*this, memberTy,
-                                           constraint.getLocator(),
-                                           identityChoice));
+        addBindOverloadConstraint(memberTy, identityChoice,
+                                  constraint.getLocator());
         return SolutionKind::Solved;
       }
 
