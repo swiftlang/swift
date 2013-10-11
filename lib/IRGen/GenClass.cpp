@@ -434,7 +434,8 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
       Address baseAddr(base, baseClassTI.getHeapAlignment(IGF.IGM));
       auto &element = baseClassTI.getElements(IGF.IGM)[fieldIndex];
       Address memberAddr = element.project(IGF, baseAddr,
-                                           /*non fixed offsets*/ nullptr);
+                                           // FIXME: non-fixed offsets
+                                           Nothing);
       return OwnedAddress(memberAddr, base);
     }
       
