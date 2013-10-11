@@ -116,6 +116,10 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
       setParseStdlib();
       break;
 
+    case OPT_Xclang:
+      ExtraClangArgs.push_back(InputArg->getValue());
+      break;
+
     case OPT_debug_constraints:
       LangOpts.DebugConstraintSolver = true;
       break;

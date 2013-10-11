@@ -23,6 +23,9 @@ def parse_stdlib : Flag<["-"], "parse-stdlib">,
 def link_library : Joined<["-"], "l">,
   HelpText<"Link the given library into the output product">;
 
+def Xclang : Separate<["-"], "Xclang">,
+  HelpText<"Pass <arg> to the clang importer">;
+
 // LangOptions
 def debug_constraints : Flag<["-"], "debug-constraints">,
   HelpText<"Debug the constraint-based type checker">;
