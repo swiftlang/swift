@@ -25,7 +25,10 @@ USEDLIBS = swiftFrontend.a swiftParse.a swiftSema.a swiftSerialization.a \
            swiftAST.a swiftBasic.a swiftNullClangImporter.a
 
 LLVMLibsOptions :=     \
-  $(LLVMLibsOptions)  
+  -lclangAST	       \
+  -lclangLex	       \
+  -lclangBasic         \
+  $(LLVMLibsOptions)
 
 include $(SWIFT_LEVEL)/Makefile
 

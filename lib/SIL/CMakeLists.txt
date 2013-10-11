@@ -16,3 +16,6 @@ add_swift_library(swiftSIL
   Verifier.cpp
   DEPENDS swiftAST)
 
+target_link_libraries(swiftSIL
+  clangAST)
+

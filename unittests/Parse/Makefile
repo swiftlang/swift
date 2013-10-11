@@ -15,6 +15,6 @@ TESTNAME = Parse
 include $(SWIFT_LEVEL)/../../Makefile.config
 LINK_COMPONENTS := $(TARGETS_TO_BUILD)
 USEDLIBS = swiftParse.a swiftClangImporter.a swiftSema.a swiftSIL.a swiftAST.a swiftBasic.a
-LLVMLibsOptions := -lclangBasic
+LLVMLibsOptions := -lclangBasic -lclangAST -lclangLex
 
 include $(SWIFT_LEVEL)/unittests/Makefile

@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "LValue.h"
-#include "OwnershipConventions.h"
 #include "RValue.h"
 #include "Scope.h"
 #include "SILGen.h"
@@ -334,17 +333,20 @@ public:
     }
   }
   
-  std::tuple<ManagedValue, OwnershipConventions, bool>
+  std::tuple<ManagedValue, SILFunctionType*, bool>
   getAtUncurryLevel(SILGenFunction &gen, unsigned level) const {
     ManagedValue mv;
-    OwnershipConventions ownership;
+    SILFunctionType *ownershipRules;
     bool transparent = isTransparent;
+    SILType origUncurriedType;
+
+    bool applySubsToOwnership = specializeLoc.hasValue();
 
     switch (kind) {
     case Kind::IndirectValue:
       assert(level == 0 && "can't curry indirect function");
       mv = indirectValue;
-      ownership = OwnershipConventions::getDefault(gen, mv.getType());
+      ownershipRules = indirectValue.getType().getFunctionTypeInfo(gen.SGM.M);
       break;
 
     case Kind::StandaloneFunction: {
@@ -353,16 +355,16 @@ public:
       if (level < standaloneFunction.uncurryLevel)
         transparent = false;
       SILDeclRef constant = standaloneFunction.atUncurryLevel(level);
+      ownershipRules = constant.getSILFunctionType(gen.SGM.M);
       SILValue ref = gen.emitGlobalFunctionRef(Loc, constant);
       mv = ManagedValue(ref, ManagedValue::Unmanaged);
-      ownership = OwnershipConventions::get(gen, constant, ref.getType());
       break;
     }
     case Kind::ClassMethod: {
       assert(level <= method.methodName.uncurryLevel
              && "uncurrying past natural uncurry level of method");
       SILDeclRef c = method.methodName.atUncurryLevel(level);
-      ownership = OwnershipConventions::get(gen, c, gen.SGM.getConstantType(c));
+      ownershipRules = c.getSILFunctionType(gen.SGM.M);
       
       // If the call is curried, emit a direct call to the curry thunk.
       if (level < method.methodName.uncurryLevel) {
@@ -387,7 +389,7 @@ public:
              && "currying 'self' of super method dispatch not yet supported");
 
       SILDeclRef c = method.methodName.atUncurryLevel(level);
-      ownership = OwnershipConventions::get(gen, c, gen.SGM.getConstantType(c));
+      ownershipRules = c.getSILFunctionType(gen.SGM.M);
       
       SILValue methodVal = gen.B.createSuperMethod(Loc,
                                                    method.selfValue,
@@ -404,17 +406,19 @@ public:
              && "uncurrying past natural uncurry level of method");
 
       SILDeclRef constant = genericMethod.methodName.atUncurryLevel(level);
+      ownershipRules = constant.getSILFunctionType(gen.SGM.M);
+      applySubsToOwnership = true; // There's an implicit level of substitution here.
+      origUncurriedType = gen.getLoweredType(genericMethod.origType, level);
       CanType archetypeType
         = genericMethod.selfValue.getType().getSwiftRValueType();
       if (auto metatype = dyn_cast<MetaTypeType>(archetypeType))
-        archetypeType = CanType(metatype->getInstanceType());
+        archetypeType = metatype.getInstanceType();
       SILValue method = gen.B.createArchetypeMethod(Loc,
                            gen.getLoweredType(archetypeType),
                            constant,
-                           gen.getLoweredType(genericMethod.origType, level),
+                           origUncurriedType,
                            /*volatile*/ constant.isForeign);
       mv = ManagedValue(method, ManagedValue::Unmanaged);
-      ownership = OwnershipConventions::get(gen, constant, method.getType());
       break;
     }
     case Kind::ProtocolMethod: {
@@ -424,13 +428,13 @@ public:
              && "uncurrying past natural uncurry level of method");
       
       SILDeclRef constant = genericMethod.methodName.atUncurryLevel(level);
+      ownershipRules = constant.getSILFunctionType(gen.SGM.M);
       SILValue method = gen.B.createProtocolMethod(Loc,
                             genericMethod.selfValue,
                             constant,
                             gen.getLoweredType(genericMethod.origType, level),
                             /*volatile*/ constant.isForeign);
       mv = ManagedValue(method, ManagedValue::Unmanaged);
-      ownership = OwnershipConventions::get(gen, constant, method.getType());
       break;
     }
     case Kind::DynamicMethod: {
@@ -440,30 +444,35 @@ public:
              && "uncurrying past natural uncurry level of method");
 
       SILDeclRef constant = genericMethod.methodName.atUncurryLevel(level);
+      ownershipRules = constant.getSILFunctionType(gen.SGM.M);
       SILValue method = gen.B.createDynamicMethod(Loc,
                           genericMethod.selfValue,
                           constant,
                           gen.getLoweredType(genericMethod.origType, level),
                           /*volatile*/ constant.isForeign);
       mv = ManagedValue(method, ManagedValue::Unmanaged);
-      ownership = OwnershipConventions::get(gen, constant, method.getType());
       break;
     }
     }
     
     // If the callee needs to be specialized, do so.
-    if (specializeLoc) {
+    if (applySubsToOwnership) {
       SILType specializedUncurriedType
         = gen.getLoweredLoadableType(specializedType, level);
-      
+
+      if (!origUncurriedType)
+        origUncurriedType = mv.getType();
+
       // Recalculate the ownership conventions because the substitutions may
       // have changed the function signature.
       // FIXME: Currently only native methods can be specialized, so always use
       // default ownership semantics.
-      ownership = OwnershipConventions::getDefault(gen, specializedUncurriedType);
+      ownershipRules = substituteSILFunctionType(gen.SGM.M, ownershipRules,
+                                                 origUncurriedType,
+                                                 specializedUncurriedType);
     }
     
-    return {mv, ownership, transparent};
+    return {mv, ownershipRules, transparent};
   }
   
   ArrayRef<Substitution> getSubstitutions() const {
@@ -855,10 +864,10 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                        ArrayRef<Substitution> Subs,
                                        ArrayRef<ManagedValue> Args,
                                        CanType NativeResultTy,
-                                       OwnershipConventions const &Ownership,
+                                       SILFunctionType *FnType,
                                        bool Transparent,
                                        SGFContext C) {
-  AbstractCC cc = Fn.getType().getAbstractCC();
+  AbstractCC cc = FnType->getAbstractCC();
   
   // Bridge and conditionally consume the cleanup on an input value.
   auto forwardIfConsumed
@@ -875,13 +884,14 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                     ->substGenericArgs(SGM.SwiftModule, Subs));
   }
   
+  SILType instructionTy = FnType->getResult().getSILType();
+
   // Get the result type.
   Type resultTy = calleeTy.getFunctionResultType();
   const TypeLowering &resultTI = getTypeLowering(resultTy);
-  SILType instructionTy = resultTI.getLoweredType();
   
   // Get the callee value.
-  SILValue fnValue = Ownership.isCalleeConsumed()
+  SILValue fnValue = FnType->isCalleeConsumed()
     ? Fn.forward(*this)
     : Fn.getValue();
 
@@ -889,21 +899,19 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
 
   // Prepare a buffer for an indirect return if needed.
   SILValue indirectReturn;
-  if (resultTI.isAddressOnly()) {
+  if (FnType->hasIndirectResult()) {
     indirectReturn = getBufferForExprResult(Loc, resultTI.getLoweredType(), C);
-    instructionTy = SGM.Types.getEmptyTupleType();
     argValues.push_back(indirectReturn);
   }
   
-  auto inputTypes
-    = calleeTy.getFunctionTypeInfo(SGM.M)->getNonReturnParameters();
+  auto inputTypes = FnType->getNonReturnParameters();
   
   // Gather the arguments.
   for (size_t i = 0, size = Args.size(); i < size; ++i) {
     SILValue argValue
       = forwardIfConsumed(Args[i],
                           inputTypes[i].getSILType(),
-                          Ownership.isArgumentConsumed(i));
+                          inputTypes[i].isConsumed());
     argValues.push_back(argValue);
   }
   
@@ -924,24 +932,20 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
   // Take ownership of the return value, if necessary.
   ManagedValue bridgedResult;
   if (indirectReturn) {
-    /// FIXME: Can ObjC/C functions return types SIL considers address-only?
-    /// Do we need to copy here if the return value is Unretained?
-    assert(Ownership.getReturn() == OwnershipConventions::Return::Retained
-           && "address-only result with non-Retained ownership not implemented");
     bridgedResult = manageBufferForExprResult(indirectReturn, resultTI, C);
     if (!bridgedResult) return ManagedValue();
   } else {
-    switch (Ownership.getReturn()) {
-    case OwnershipConventions::Return::Retained:
+    switch (FnType->getResult().getConvention()) {
+    case ResultConvention::Owned:
       // Already retained.
       break;
 
-    case OwnershipConventions::Return::Autoreleased:
+    case ResultConvention::Autoreleased:
       // Autoreleased. Retain using retain_autoreleased.
       B.createStrongRetainAutoreleased(Loc, result);
       break;
     
-    case OwnershipConventions::Return::Unretained:
+    case ResultConvention::Unowned:
       // Unretained. Retain the value.
       result = resultTI.emitCopyValue(B, Loc, result);
       break;
@@ -1090,11 +1094,11 @@ namespace {
         = callee.getSpecializedEmitter(uncurryLevel, gen.SGM.M);
 
       ManagedValue mv;
-      OwnershipConventions ownership;
+      SILFunctionType *ownershipRules;
       bool transparent;
       auto cc = AbstractCC::Freestanding;
       if (!specializedEmitter) {
-        std::tie(mv, ownership, transparent)
+        std::tie(mv, ownershipRules, transparent)
           = callee.getAtUncurryLevel(gen, uncurryLevel);
         cc = mv.getType().getAbstractCC();
       }
@@ -1135,7 +1139,7 @@ namespace {
         result = gen.emitApply(uncurriedLoc.getValue(), mv,
                                callee.getSubstitutions(),
                                uncurriedArgs,
-                               uncurriedResultTy, ownership, transparent,
+                               uncurriedResultTy, ownershipRules, transparent,
                                uncurriedContext);
       
       // End the initial writeback scope, if any.
@@ -1152,7 +1156,8 @@ namespace {
         result = gen.emitApply(loc, result, {},
                                uncurriedArgs,
                                extraSites[i].resultType,
-                               ownership, false, context);
+                               result.getType().getFunctionTypeInfo(gen.SGM.M),
+                               false, context);
       }
       
       return result;
@@ -1515,9 +1520,15 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   Callee callee = Callee::forDirect(*this, SILDeclRef(fn), loc);
 
   ManagedValue mv;
-  OwnershipConventions ownership;
+  SILFunctionType *ownership;
   bool transparent;
   std::tie(mv, ownership, transparent) = callee.getAtUncurryLevel(*this, 0);
+
+  if (!subs.empty()) {
+    auto fnType = getLoweredType(mv.getType().castTo<PolymorphicFunctionType>()
+                                   ->substGenericArgs(SGM.SwiftModule, subs));
+    ownership = fnType.getFunctionTypeInfo(SGM.M);
+  }
 
   return emitApply(loc, mv, subs, args, resultType, ownership, transparent, ctx);
 }

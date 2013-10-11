@@ -41,7 +41,6 @@ namespace Lowering {
   class TypeConverter;
   class SILGenFunction;
   class Initialization;
-  class OwnershipConventions;
   class TemporaryInitialization;
 
 /// SILGenModule - an ASTVisitor for generating SIL from top-level declarations
@@ -811,7 +810,7 @@ public:
                          ArrayRef<Substitution> Subs,
                          ArrayRef<ManagedValue> Args,
                          CanType NativeResultTy,
-                         OwnershipConventions const &Ownership,
+                         SILFunctionType *ownershipRules,
                          bool ForceInline = false,
                          SGFContext C = SGFContext());
 

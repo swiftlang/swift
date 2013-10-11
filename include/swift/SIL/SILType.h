@@ -284,6 +284,10 @@ public:
   void print(raw_ostream &OS) const;
 };
 
+SILFunctionType *substituteSILFunctionType(SILModule &M, SILFunctionType *orig,
+                                           SILType origFnType,
+                                           SILType substFnType);
+
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);
   return OS;

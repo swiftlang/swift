@@ -477,7 +477,7 @@ namespace {
         break;
       }
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-      result->setClangNode(decl->getCanonicalDecl());
+      result->setClangNode(decl);
 
       // Import each of the enumerators.
       SmallVector<Decl *, 4> members;
@@ -549,7 +549,7 @@ namespace {
                                  { }, nullptr, dc);
       result->computeType();
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-      result->setClangNode(decl->getCanonicalDecl());
+      result->setClangNode(decl);
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
@@ -1037,7 +1037,7 @@ namespace {
         result->getMutableAttrs().IBAction = true;
 
       // Check whether there's some special method to import.
-      result->setClangNode(decl->getCanonicalDecl());
+      result->setClangNode(decl);
       if (!Impl.ImportedDecls[decl->getCanonicalDecl()])
         Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
@@ -1914,7 +1914,7 @@ namespace {
                           dc);
       objcClass->addExtension(result);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-      result->setClangNode(decl->getCanonicalDecl());
+      result->setClangNode(decl);
       result->setProtocols(importObjCProtocols(result,
                                                decl->getReferencedProtocols()));
       result->setCheckedInheritanceClause();
@@ -1966,7 +1966,7 @@ namespace {
       result->computeType();
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
-      result->setClangNode(decl->getCanonicalDecl());
+      result->setClangNode(decl);
       result->setCircularityCheck(CircularityCheck::Checked);
 
       // Import protocols this protocol conforms to.
@@ -2031,7 +2031,7 @@ namespace {
                                 { }, nullptr, dc);
       result->computeType();
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-      result->setClangNode(decl->getCanonicalDecl());
+      result->setClangNode(decl);
       result->setCircularityCheck(CircularityCheck::Checked);
 
       // If this Objective-C class has a supertype, import it.
@@ -2265,8 +2265,9 @@ Decl *ClangImporter::Implementation::importDecl(const clang::NamedDecl *decl) {
   // Note that the decl was imported from Clang.  Don't mark stdlib decls as
   // imported.
   if (result && result->getDeclContext() != getSwiftModule()) {
-    assert(!result->getClangDecl() || result->getClangDecl() == canon);
-    result->setClangNode(canon);
+    assert(!result->getClangDecl() ||
+           result->getClangDecl()->getCanonicalDecl() == canon);
+    result->setClangNode(decl);
   }
   if (result || !converter.hadForwardDeclaration())
     ImportedDecls[canon] = result;
@@ -2288,7 +2289,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::ObjCMethodDecl *d
   auto canon = decl->getCanonicalDecl();
   if (result) {
     assert(!result->getClangDecl() || result->getClangDecl() == canon);
-    result->setClangNode(canon);
+    result->setClangNode(decl);
   }
   if (result || !converter.hadForwardDeclaration())
     ImportedProtocolDecls[{canon, dc}] = result;

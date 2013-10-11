@@ -2260,6 +2260,7 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID resultID;
     uint8_t rawResultConvention;
     uint8_t rawCallingConvention;
+    uint8_t rawCalleeConvention;
     bool thin;
     bool noreturn = false;
     DeclID genericContextID;
@@ -2269,6 +2270,7 @@ Type ModuleFile::getType(TypeID TID) {
                                                    resultID,
                                                    rawResultConvention,
                                                    genericContextID,
+                                                   rawCalleeConvention,
                                                    rawCallingConvention,
                                                    thin,
                                                    noreturn,
@@ -2310,11 +2312,19 @@ Type ModuleFile::getType(TypeID TID) {
       params.push_back(param);
     }
 
+    // Process the callee convention.
+    auto calleeConvention = getActualParameterConvention(rawCalleeConvention);
+    if (!calleeConvention.hasValue()) {
+      error();
+      return nullptr;
+    }
+
     // Read the generic parameters.
     auto genericParams =
       maybeGetOrReadGenericParams(genericContextID, ModuleContext);
 
     typeOrOffset = SILFunctionType::get(genericParams, extInfo,
+                                        calleeConvention.getValue(),
                                         params, result, ctx);
     break;
   }

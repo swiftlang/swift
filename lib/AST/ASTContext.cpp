@@ -1294,10 +1294,12 @@ GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
 void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
                               GenericParamList *genericParams,
                               ExtInfo info,
+                              ParameterConvention calleeConvention,
                               ArrayRef<SILParameterInfo> params,
                               SILResultInfo result) {
   id.AddPointer(genericParams);
   id.AddInteger(info.getFuncAttrKey());
+  id.AddInteger(unsigned(calleeConvention));
   id.AddInteger(params.size());
   for (auto param : params)
     param.profile(id);
@@ -1305,11 +1307,11 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
 }
 
 SILFunctionType *SILFunctionType::get(GenericParamList *genericParams,
-                                      ExtInfo ext,
+                                      ExtInfo ext, ParameterConvention callee,
                                       ArrayRef<SILParameterInfo> params,
                                       SILResultInfo result, ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  SILFunctionType::Profile(id, genericParams, ext, params, result);
+  SILFunctionType::Profile(id, genericParams, ext, callee, params, result);
 
   // Do we already have this generic function type?
   void *insertPos;
@@ -1325,7 +1327,7 @@ SILFunctionType *SILFunctionType::get(GenericParamList *genericParams,
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   auto fnType =
-    new (mem) SILFunctionType(genericParams, ext, params, result, ctx);
+    new (mem) SILFunctionType(genericParams, ext, callee, params, result, ctx);
   ctx.Impl.SILFunctionTypes.InsertNode(fnType, insertPos);
   return fnType;
 }

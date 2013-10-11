@@ -34,6 +34,8 @@ namespace swift {
   class AutoClosureExpr;
   class ASTContext;
   class ClassDecl;
+  class SILFunctionType;
+  class SILModule;
 
 /// \brief A key for referencing a Swift declaration in SIL.
 ///
@@ -248,6 +250,10 @@ struct SILDeclRef {
       return SILDeclRef();
     return SILDeclRef(overridden, kind, uncurryLevel);
   }
+
+  /// Return the SIL function type for this declaration (presumed to
+  /// be a function).
+  SILFunctionType *getSILFunctionType(SILModule &M) const;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILDeclRef C) {

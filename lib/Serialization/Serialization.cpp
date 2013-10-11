@@ -1693,6 +1693,8 @@ void Serializer::writeType(Type ty) {
 
     auto callingConvention = fnTy->getAbstractCC();
     auto result = fnTy->getResult();
+    auto stableResultConvention =
+      getRawStableResultConvention(result.getConvention());
 
     SmallVector<TypeID, 8> paramTypes;
     for (auto param : fnTy->getParameters()) {
@@ -1701,11 +1703,15 @@ void Serializer::writeType(Type ty) {
       paramTypes.push_back(TypeID(conv));
     }
 
+    auto stableCalleeConvention =
+      getRawStableParameterConvention(fnTy->getCalleeConvention());
+
     unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                       addTypeRef(result.getType()),
-                         getRawStableResultConvention(result.getConvention()),
+                                      stableResultConvention,
                                       dID,
+                                      stableCalleeConvention,
                                       getRawStableCC(callingConvention),
                                       fnTy->isThin(),
                                       fnTy->isNoReturn(),

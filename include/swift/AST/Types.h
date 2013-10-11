@@ -112,10 +112,18 @@ protected:
   enum { NumTypeVariableTypeBits = NumTypeBaseBits + 31 };
   static_assert(NumTypeVariableTypeBits <= 32, "fits in an unsigned");
 
+  struct SILFunctionTypeBitfields {
+    unsigned : NumTypeBaseBits;
+    unsigned ExtInfo : 8;
+    unsigned CalleeConvention : 3;
+    unsigned NumParameters : 32 - 11 - NumTypeBaseBits;
+  };
+
   union {
     TypeBaseBitfields TypeBaseBits;
     AnyFunctionTypeBitfields AnyFunctionTypeBits;
     TypeVariableTypeBitfields TypeVariableTypeBits;
+    SILFunctionTypeBitfields SILFunctionTypeBits;
   };
 
 protected:
@@ -1196,6 +1204,7 @@ public:
     ExtInfo(unsigned Bits) : Bits(static_cast<uint16_t>(Bits)) {}
 
     friend class AnyFunctionType;
+    friend class SILFunctionType;
     
   public:
     // Constructor with all defaults.
@@ -1514,6 +1523,20 @@ enum class ParameterConvention {
 inline bool isIndirectParameter(ParameterConvention conv) {
   return conv <= ParameterConvention::Indirect_Out;
 }
+inline bool isConsumedParameter(ParameterConvention conv) {
+  switch (conv) {
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Direct_Owned:
+    return true;
+
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_Out:
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Guaranteed:
+    return false;
+  }
+  llvm_unreachable("bad convention kind");
+}
 
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
@@ -1538,7 +1561,15 @@ public:
   bool isIndirectResult() const {
     return getConvention() == ParameterConvention::Indirect_Out;
   }
+
+  /// True if this parameter is consumed by the callee, either
+  /// indirectly or directly.
+  bool isConsumed() const {
+    return isConsumedParameter(getConvention());
+  }
+
   SILType getSILType() const; // in SILType.h
+
 
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(TypeAndConvention.getOpaqueValue());
@@ -1639,20 +1670,23 @@ private:
 
   /// TODO: Permit an arbitrary number of results.
   const SILResultInfo Result;
-  ExtInfo Ext;
-  uint16_t NumParams;
 
   MutableArrayRef<SILParameterInfo> getMutableParameters() {
     auto ptr = reinterpret_cast<SILParameterInfo*>(this + 1);
-    return MutableArrayRef<SILParameterInfo>(ptr, NumParams);
+    unsigned n = SILFunctionTypeBits.NumParameters;
+    return MutableArrayRef<SILParameterInfo>(ptr, n);
   }
 
   SILFunctionType(GenericParamList *genericParams, ExtInfo ext,
+                  ParameterConvention calleeConvention,
                   ArrayRef<SILParameterInfo> params, SILResultInfo result,
                   const ASTContext &ctx)
     : TypeBase(TypeKind::SILFunction, &ctx, /*HasTypeVariable*/ false),
-      GenericParams(genericParams), Result(result), Ext(ext),
-      NumParams(params.size()) {
+      GenericParams(genericParams), Result(result) {
+    SILFunctionTypeBits.ExtInfo = ext.Bits;
+    SILFunctionTypeBits.NumParameters = params.size();
+    assert(!isIndirectParameter(calleeConvention));
+    SILFunctionTypeBits.CalleeConvention = unsigned(calleeConvention);
     memcpy(getMutableParameters().data(), params.data(),
            params.size() * sizeof(SILParameterInfo));
   }
@@ -1661,11 +1695,21 @@ private:
 
 public:
   static SILFunctionType *get(GenericParamList *genericParams,
-                              ExtInfo ext, ArrayRef<SILParameterInfo> params,
+                              ExtInfo ext, ParameterConvention calleeConvention,
+                              ArrayRef<SILParameterInfo> params,
                               SILResultInfo result, ASTContext &ctx);
 
   SILType getSILResult() const; // in SILType.h
   SILType getSILParameter(unsigned i) const; // in SILType.h
+
+  /// Return the convention under which the callee is passed, if this
+  /// is a thick non-block callee.
+  ParameterConvention getCalleeConvention() const {
+    return ParameterConvention(SILFunctionTypeBits.CalleeConvention);
+  }
+  bool isCalleeConsumed() const {
+    return getCalleeConvention() == ParameterConvention::Direct_Owned;
+  }
 
   SILResultInfo getResult() const {
     return Result;
@@ -1702,7 +1746,7 @@ public:
     return ParameterSILTypeArrayRef(getNonReturnParameters());
   }
 
-  ExtInfo getExtInfo() const { return Ext; }
+  ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
   GenericParamList *getGenericParams() const { return GenericParams; }
 
   /// \brief Returns the calling conventions of the function.
@@ -1721,11 +1765,13 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getGenericParams(), getExtInfo(), getParameters(), getResult());
+    Profile(ID, getGenericParams(), getExtInfo(), getCalleeConvention(),
+            getParameters(), getResult());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericParamList *genericParams,
                       ExtInfo info,
+                      ParameterConvention calleeConvention,
                       ArrayRef<SILParameterInfo> params,
                       SILResultInfo result);
 

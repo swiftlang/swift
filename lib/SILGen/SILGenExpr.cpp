@@ -21,7 +21,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
 #include "Initialization.h"
-#include "OwnershipConventions.h"
 #include "LValue.h"
 #include "RValue.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1119,12 +1118,11 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
       SILDeclRef generator 
         = SILDeclRef::getDefaultArgGenerator(E->getDefaultArgsOwner(),
                                               destIndex);
+      auto fnTy = generator.getSILFunctionType(SGF.SGM.M);
       auto fnRef = SGF.emitFunctionRef(E, generator);
       auto generatorTy = SGF.SGM.getConstantType(generator);
       auto resultTy = generatorTy.getFunctionResultType();
-      auto apply = SGF.emitApply(E, fnRef, {}, {}, resultTy,
-                             OwnershipConventions::getDefault(SGF,
-                                                              generatorTy),
+      auto apply = SGF.emitApply(E, fnRef, {}, {}, resultTy, fnTy,
                                  generator.isTransparent());
       result.addElement(SGF, apply, E);
       continue;
@@ -1226,13 +1224,12 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
            "no default initializer in non-scalar field of scalar-to-tuple?!");
     if (auto defaultArgOwner = element.dyn_cast<ValueDecl *>()) {
       SILDeclRef generator
-      = SILDeclRef::getDefaultArgGenerator(defaultArgOwner, i);
+        = SILDeclRef::getDefaultArgGenerator(defaultArgOwner, i);
+      auto fnTy = generator.getSILFunctionType(gen.SGM.M);
       auto fnRef = gen.emitFunctionRef(E, generator);
       auto generatorTy = gen.SGM.getConstantType(generator);
       auto resultTy = generatorTy.getFunctionResultType();
-      auto apply = gen.emitApply(E, fnRef, {}, {}, resultTy,
-                                 OwnershipConventions::getDefault(gen,
-                                                                  generatorTy),
+      auto apply = gen.emitApply(E, fnRef, {}, {}, resultTy, fnTy,
                                  generator.isTransparent());
       apply.forwardInto(gen, E,
                         subInitializations[i].get()->getAddressOrNull());
@@ -1296,11 +1293,11 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
     if (auto defaultArgOwner = element.dyn_cast<ValueDecl *>()) {
       SILDeclRef generator
         = SILDeclRef::getDefaultArgGenerator(defaultArgOwner, i);
+      auto fnTy = generator.getSILFunctionType(SGF.SGM.M);
       auto fnRef = SGF.emitFunctionRef(E, generator);
       auto generatorTy = SGF.SGM.getConstantType(generator);
       auto resultTy = generatorTy.getFunctionResultType();
-      auto apply = SGF.emitApply(E, fnRef, {}, {}, resultTy,
-                           OwnershipConventions::getDefault(SGF, generatorTy),
+      auto apply = SGF.emitApply(E, fnRef, {}, {}, resultTy, fnTy,
                                  generator.isTransparent());
       result.addElement(SGF, apply, E);
       continue;

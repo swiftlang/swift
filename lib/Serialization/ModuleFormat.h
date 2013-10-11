@@ -495,6 +495,7 @@ namespace decls_block {
     TypeIDField,           // result type
     ResultConventionField, // result convention
     DeclIDField,           // decl that owns the generic params
+    ParameterConventionField, // callee convention
     AbstractCCField,       // calling convention
     BCFixed<1>,            // thin?
     BCFixed<1>,            // noreturn?
