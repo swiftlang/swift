@@ -717,7 +717,7 @@ namespace {
         IGF.Builder.CreateStore(vwtAddrVal, vwtRefAddr);
 
         // The metadata should be initialized enough now that we can bind
-        // archetypes for the 'this' type from it.
+        // archetypes for the 'self' type from it.
         auto addressPointAddr = IGF.Builder.CreateConstArrayGEP(fullMetaWords,
                                                           AddressPoint,
                                                           IGM.getPointerSize());
@@ -729,8 +729,7 @@ namespace {
           = IGF.Builder.CreateBitCast(vwtAddr.getAddress(),
                                       IGF.IGM.WitnessTablePtrTy);
         
-        asImpl().emitInitializeMetadata(IGF,
-                                                 metadataValue, vwtableValue);
+        asImpl().emitInitializeMetadata(IGF, metadataValue, vwtableValue);
       }
       
       // The metadata is now complete.

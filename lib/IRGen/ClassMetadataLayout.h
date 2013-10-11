@@ -113,6 +113,13 @@ private:
         IsObjectGenericallyArranged = true;
     }
 
+    // Add entries for the methods.
+    for (auto member : theClass->getMembers()) {
+      // Add entries for methods.
+      if (auto fn = dyn_cast<FuncDecl>(member))
+        addMethodEntries(fn);
+    }
+    
     // Add offset fields if *any* of the fields are generically
     // arranged.  Essentially, we don't want the metadata layout to
     // depend on order of allocation.  In theory, if we only have one
@@ -124,16 +131,11 @@ private:
           updateForFieldSize(field);
     }
 
-    // Add entries for the methods.  TODO: methods from extensions
+    // Add fields.
     for (auto member : theClass->getMembers()) {
-      // Add entries for stored fields.
       if (auto field = dyn_cast<VarDecl>(member))
         if (!field->isComputed())
           addFieldEntries(field);
-
-      // Add entries for methods.
-      if (auto fn = dyn_cast<FuncDecl>(member))
-        addMethodEntries(fn);
     }
   }
 

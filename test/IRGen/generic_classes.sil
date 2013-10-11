@@ -9,7 +9,11 @@ import gizmo
 
 // -- offset of RootGeneric<T>.x
 // CHECK: @_TWvdC15generic_classes11RootGeneric1xVSs5UInt8 = global i64 16, align 8
-// CHECK: @_TMPdC15generic_classes11RootGeneric
+// CHECK: @_TMPdC15generic_classes11RootGeneric = global { {{.*}} i64 } {
+// --       field offset placeholders
+// CHECK:   i64 0, i64 0, i64 0
+// CHECK: }
+
 
 // -- Check that offset vars are emitted for fixed-layout generics
 //    <rdar://problem/15081049>
@@ -63,8 +67,18 @@ import gizmo
 
 class RootGeneric<T> {
   var x : UInt8
+
+  // Test that declaration order doesn't cause the field offset vector to end
+  // up interleaved with the vtable.
+  func foo()
+
   var y : T
+
+  func bar()
+
   var z : UInt8
+
+  func bas()
 }
 
 class RootGenericFixedLayout<T> {
