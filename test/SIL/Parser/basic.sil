@@ -453,6 +453,20 @@ bb0(%0 : $Int64, %1 : $M):
   %15 = return %12 : $()
 }
 
+class GenericClass<Q> {
+  var member: Q
+}
+
+// CHECK: sil @bound_generic_class_ref_element_addr : $[thin] GenericClass<Int64> -> Int64 {
+sil @bound_generic_class_ref_element_addr : $[thin] GenericClass<Int64> -> Int64 {
+entry(%0 : $GenericClass<Int64>):
+  // CHECK: %1 = ref_element_addr %0 : $GenericClass<Int64>, #member
+  %1 = ref_element_addr %0 : $GenericClass<Int64>, #member
+  // CHECK: %2 = load %1 : $*Int64
+  %2 = load %1 : $*Int64
+  return %2 : $Int64
+}
+
 class B { }
 class E : B { }
 
