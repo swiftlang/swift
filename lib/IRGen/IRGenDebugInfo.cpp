@@ -673,7 +673,6 @@ DebugTypeInfo &IRGenDebugInfo::getSwiftType() {
                     TypeLoc::withoutLoc(Context.TheRawPointerType),
                     Context.TheBuiltinModule,
                     MutableArrayRef<TypeLoc>());
-    //TyDecl->overwriteType(Context.TheRawPointerType);
     SwiftType = new DebugTypeInfo(TyDecl,
                                   (Size)TargetInfo.getPointerWidth(0),
                                   (Alignment)TargetInfo.getPointerAlign(0));
