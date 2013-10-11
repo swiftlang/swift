@@ -1093,6 +1093,20 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
+                                          TypeMatchKind kind, unsigned flags,
+                                          ConstraintLocatorBuilder locator,
+                                          bool &trivial) {
+  int scalarFieldIdx = tuple2->getFieldForScalarInit();
+  assert(scalarFieldIdx >= 0 && "Invalid tuple for scalar-to-tuple");
+  const auto &elt = tuple2->getFields()[scalarFieldIdx];
+  auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy() : elt.getType();
+  return matchTypes(type1, scalarFieldTy, kind, flags,
+                    locator.withPathElement(ConstraintLocator::ScalarToTuple),
+                    trivial);
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      TypeMatchKind kind, unsigned flags,
                                      ConstraintLocatorBuilder locator,
@@ -1359,9 +1373,9 @@ namespace {
   enum class PotentialConversion {
     /// Tuple-to-tuple conversion.
     TupleToTuple,
-#if 0
     /// Scalar-to-tuple conversion.
     ScalarToTuple,
+#if 0
     /// Class-to-superclass conversion.
     Superclass,
 #endif
@@ -1779,24 +1793,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // the type of that tuple's element.
       if (tuple2->getFields().size() == 1 &&
           !tuple2->getFields()[0].isVararg()) {
-        return matchTypes(type1, tuple2->getElementType(0), kind, subFlags,
-                          locator.withPathElement(
-                            ConstraintLocator::ScalarToTuple),
-                          trivial);
+        potentialConversions.push_back(PotentialConversion::ScalarToTuple);
+        goto commit_to_conversions;
       }
 
       // A scalar type can be converted to a tuple so long as there is at
       // most one non-defaulted element.
       if (kind >= TypeMatchKind::Conversion) {
-        int scalarFieldIdx = tuple2->getFieldForScalarInit();
-        if (scalarFieldIdx >= 0) {
-          const auto &elt = tuple2->getFields()[scalarFieldIdx];
-          auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy()
-                                             : elt.getType();
-          return matchTypes(type1, scalarFieldTy, kind, subFlags,
-                            locator.withPathElement(
-                              ConstraintLocator::ScalarToTuple),
-                            trivial);
+        if (tuple2->getFieldForScalarInit() >= 0) {
+          potentialConversions.push_back(PotentialConversion::ScalarToTuple);
+          goto commit_to_conversions;
         }
       }
     }
@@ -1945,6 +1951,10 @@ commit_to_conversions:
     return matchTupleTypes(type1->castTo<TupleType>(),
                            type2->castTo<TupleType>(),
                            kind, flags, locator, trivial);
+
+  case PotentialConversion::ScalarToTuple:
+    return matchScalarToTupleTypes(type1, type2->castTo<TupleType>(), kind,
+                                   subFlags, locator, trivial);
 
   case PotentialConversion::Existential:
     return matchExistentialTypes(type1, type2, kind, flags, locator,
