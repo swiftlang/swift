@@ -5,6 +5,8 @@ import Builtin
 import swift
 import gizmo
 
+// CHECK: [[NONGENERICINHERITSGENERIC:%C15generic_classes25NonGenericInheritsGeneric]] = type <{ %swift.refcounted, %VSs5UInt8, [7 x i8], <{ %Si, %VSs5UInt8 }>, %VSs5UInt8, [6 x i8], %Si }>
+
 // -- offset of RootGeneric<T>.x
 // CHECK: @_TWvdC15generic_classes11RootGeneric1xVSs5UInt8 = global i64 16, align 8
 // CHECK: @_TMPdC15generic_classes11RootGeneric
@@ -85,6 +87,19 @@ class GenericInheritsObjC2<E> : Gizmo {
   var x : UInt8
   var y : E
   var z : UInt8
+}
+
+// CHECK: define i64 @NonGenericInheritsGeneric_fragile_fixed_member_access([[NONGENERICINHERITSGENERIC]]*) {
+// CHECK:   %1 = getelementptr inbounds [[NONGENERICINHERITSGENERIC]]* %0, i32 0, i32 6
+// CHECK:   %.value = getelementptr inbounds %Si* %1, i32 0, i32 0
+// CHECK:   %2 = load i64* %.value, align 8
+// CHECK:   ret i64 %2
+// CHECK: }
+sil @NonGenericInheritsGeneric_fragile_fixed_member_access : $NonGenericInheritsGeneric -> Int {
+entry(%c : $NonGenericInheritsGeneric):
+  %p = ref_element_addr %c : $NonGenericInheritsGeneric, #w
+  %w = load %p : $*Int
+  return %w : $Int
 }
 
 sil @top_level_code : $[thin] () -> () {
