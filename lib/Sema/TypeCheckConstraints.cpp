@@ -817,35 +817,14 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 }
 
 void ConstraintSystem::addOverloadSet(OverloadSet *ovl) {
-  // If we have a locator, we can use it to find this overload set.
-  // FIXME: We want to get to the point where we always have a locator.
-  if (auto locator = ovl->getLocator()) {
-    if (TC.getLangOpts().DebugConstraintSolver && solverState) {
-      llvm::errs().indent(solverState->depth * 2)
-        << "(bind locator ";
-      locator->dump(&getASTContext().SourceMgr);
-      llvm::errs() << " to overload set #" << ovl->getID() << ")\n";
-    }
-
-    // FIXME: Strengthen this condition; we shouldn't have re-insertion of
-    // generated overload sets.
-    assert(!GeneratedOverloadSets[locator] ||
-           GeneratedOverloadSets[locator] == ovl);
-    GeneratedOverloadSets[locator] = ovl;
-    if (solverState) {
-      solverState->generatedOverloadSets.push_back(locator);
-    }
+  SmallVector<Constraint *, 4> overloads;
+  for (auto choice : ovl->getChoices()) {
+    overloads.push_back(new (*this) Constraint(ovl->getBoundType(),
+                                               choice,
+                                               ovl->getLocator()));
   }
-
-  // If there are fewer than two choices, then we can simply resolve this
-  // now.
-  if (ovl->getChoices().size() < 2) {
-    resolveOverload(ovl->getLocator(), ovl->getBoundType(),
-                    ovl->getChoices()[0]);
-    return;
-  }
-
-  UnresolvedOverloadSets.push_back(ovl);
+  addConstraint(Constraint::createDisjunction(*this, overloads,
+                                              ovl->getLocator()));
 }
 
 Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
