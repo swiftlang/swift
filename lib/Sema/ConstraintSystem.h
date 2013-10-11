@@ -536,57 +536,6 @@ private:
   }
 };
 
-/// \brief An overload set, which is a set of overloading choices from which
-/// only one can be selected.
-class OverloadSet {
-  /// \brief ID number that uniquely identifies this overload set.
-  unsigned ID;
-
-  /// \brief The number of choices in the overload set.
-  unsigned NumChoices;
-
-  /// \brief The locator for this overload set.
-  ConstraintLocator *Locator;
-
-  /// \brief The type bound by this overload set.
-  Type BoundType;
-  
-  /// \brief Overload sets are always allocated within a given constraint
-  /// system.
-  void *operator new(size_t) = delete;
-
-  OverloadSet(unsigned ID, ConstraintLocator *locator,
-              Type boundType, ArrayRef<OverloadChoice> choices)
-    : ID(ID), NumChoices(choices.size()), Locator(locator),
-      BoundType(boundType) {
-    memcpy(this+1, choices.data(), sizeof(OverloadChoice)*choices.size());
-  }
-
-public:
-  /// \brief Retrieve the locator that identifies where this overload set
-  /// same from.
-  ConstraintLocator *getLocator() const { return Locator; }
-
-  /// \brief Retrieve the ID associated with this overload set.
-  unsigned getID() const { return ID; }
-  
-  /// \brief Retrieve the set of choices provided by this overload set.
-  ArrayRef<OverloadChoice> getChoices() const {
-    return { reinterpret_cast<const OverloadChoice *>(this + 1),
-             NumChoices };
-  }
-
-  /// \brief Retrieve the type that is bound (via a same-type
-  /// constraint) by this overload set.
-  Type getBoundType() const { return BoundType; }
-
-  /// \brief Create a new overload set, using (and copying) the given choices.
-  static OverloadSet *getNew(ConstraintSystem &CS,
-                             Type boundType,
-                             ConstraintLocator *locator,
-                             ArrayRef<OverloadChoice> choices);
-};
-
 /// \brief A representative type variable with the list of constraints
 /// that apply to it.
 struct TypeVariableConstraints {
@@ -856,9 +805,6 @@ private:
   /// \brief Counter for type variables introduced.
   unsigned TypeCounter = 0;
 
-  /// \brief Counter for the overload sets introduced.
-  unsigned OverloadSetCounter = 0;
-
   /// \brief Cached member lookups.
   llvm::DenseMap<std::pair<Type, Identifier>, Optional<LookupResult>>
     MemberLookups;
@@ -886,8 +832,6 @@ private:
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
   SmallVector<Constraint *, 16> Constraints;
-  SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
-  llvm::DenseMap<ConstraintLocator *, OverloadSet *> GeneratedOverloadSets;
 
   typedef llvm::PointerUnion<TypeVariableType *, TypeBase *>
     RepresentativeOrFixed;
@@ -931,11 +875,6 @@ private:
     return TypeCounter++;
   }
 
-  unsigned assignOverloadSetID() {
-    return OverloadSetCounter++;
-  }
-  friend class OverloadSet;
-
 public:
   /// \brief Introduces a new solver scope, which any changes to the
   /// solver state or constraint system are temporary and will be undone when
@@ -951,12 +890,6 @@ public:
     /// \brief The length of \c TypeVariables.
     unsigned numTypeVariables;
 
-    /// \brief The length of \c UnresolvedOverloadSets.
-    unsigned numUnresolvedOverloadSets;
-
-    /// \brief The length of \c generatedOverloadSets.
-    unsigned numGeneratedOverloadSets;
-    
     /// \brief The length of \c SavedBindings.
     unsigned numSavedBindings;
 
@@ -1020,11 +953,6 @@ public:
   ///
   /// \returns A reference to the member-lookup result.
   LookupResult &lookupMember(Type base, Identifier name);
-
-  /// \brief Retrieve an unresolved overload set.
-  OverloadSet *getUnresolvedOverloadSet(unsigned Idx) const {
-    return UnresolvedOverloadSets[Idx];
-  }
 
   /// \brief Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,

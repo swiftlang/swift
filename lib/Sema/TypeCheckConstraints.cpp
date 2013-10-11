@@ -84,17 +84,6 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
   return cs.getAllocator().Allocate(bytes, alignment);
 }
 
-OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
-                                 Type boundType,
-                                 ConstraintLocator *locator,
-                                 ArrayRef<OverloadChoice> choices) {
-  unsigned size = sizeof(OverloadSet)
-                + sizeof(OverloadChoice) * choices.size();
-  void *mem = CS.getAllocator().Allocate(size, alignof(OverloadSet));
-  return ::new (mem) OverloadSet(CS.assignOverloadSetID(), locator, boundType,
-                                 choices);
-}
-
 ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc)
   : TC(tc), DC(dc), Arena(tc.Context, Allocator) {
   assert(DC && "context required");
@@ -4489,44 +4478,6 @@ void ConstraintSystem::dump() {
       }
     }
     out << "\n";
-  }
-
-  if (!UnresolvedOverloadSets.empty()) {
-    out << "\nUnresolved overload sets:\n";
-    for (auto overload : UnresolvedOverloadSets) {
-      out.indent(2) << "set #" << overload->getID() << " binds "
-        << overload->getBoundType()->getString() << ":\n";
-      for (auto choice : overload->getChoices()) {
-        out.indent(4);
-        switch (choice.getKind()) {
-        case OverloadChoiceKind::Decl:
-        case OverloadChoiceKind::DeclViaDynamic:
-        case OverloadChoiceKind::TypeDecl:
-          if (choice.getBaseType())
-            out << choice.getBaseType()->getString() << ".";
-          out << choice.getDecl()->getName().str() << ": ";
-          out << choice.getDecl()->getType() << '\n';
-          break;
-
-        case OverloadChoiceKind::BaseType:
-          out << "base type " << choice.getBaseType()->getString() << "\n";
-          break;
-
-        case OverloadChoiceKind::FunctionReturningBaseType:
-          out << "function returning base type "
-            << choice.getBaseType()->getString() << "\n";
-          break;
-        case OverloadChoiceKind::IdentityFunction:
-          out << "identity " << choice.getBaseType()->getString() << " -> "
-            << choice.getBaseType()->getString() << "\n";
-          break;
-        case OverloadChoiceKind::TupleIndex:
-          out << "tuple " << choice.getBaseType()->getString() << " index "
-            << choice.getTupleIndex() << "\n";
-          break;
-        }
-      }
-    }
   }
 
   if (failedConstraint) {

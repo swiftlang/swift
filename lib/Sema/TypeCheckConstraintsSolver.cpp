@@ -133,33 +133,6 @@ SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
   return result;
 }
 
-/// \brief Determine whether the given overload set fully binds its type
-/// variables.
-///
-/// An overload set fully binds its type when all of the the overload choices
-/// declarations, tuple indices, or identity functions. In these cases, the
-/// selection of the overload itself is enough to determine the type variables
-/// in the bound type. Otherwise, contextual information is still required even
-/// after the overload choice has been made.
-static bool overloadSetFullyBindsType(OverloadSet *ovl) {
-  for (const auto &choice : ovl->getChoices()) {
-    switch (choice.getKind()) {
-    case OverloadChoiceKind::BaseType:
-    case OverloadChoiceKind::FunctionReturningBaseType:
-      continue;
-
-    case OverloadChoiceKind::Decl:
-    case OverloadChoiceKind::DeclViaDynamic:
-    case OverloadChoiceKind::TypeDecl:
-    case OverloadChoiceKind::TupleIndex:
-    case OverloadChoiceKind::IdentityFunction:
-      return true;
-    }
-  }
-
-  return false;
-}
-
 /// Determine whether the type variables in the two given sets intersect.
 static bool
 typeVariablesIntersect(ConstraintSystem &cs,
@@ -317,19 +290,6 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     }
   }
 
-  // Mark any type variables within the result of an overload set as either
-  // fully bound or as having non-concrete constraints, as appropriate.
-  for (auto ovl : UnresolvedOverloadSets) {
-    if (overloadSetFullyBindsType(ovl)) {
-      SmallVector<TypeVariableType *, 4> boundTypeVars;
-      simplifyType(ovl->getBoundType())->getTypeVariables(boundTypeVars);
-      for (auto typeVar : boundTypeVars)
-        getTVC(typeVar).FullyBound = true;
-    } else {
-      simplifyType(ovl->getBoundType())->getTypeVariables(referencedTypeVars);
-    }
-  }
-
   // Mark any referenced type variables as having non-concrete constraints.
   llvm::SmallPtrSet<TypeVariableType *, 8> SeenVars;
   for (auto tv : referencedTypeVars) {
@@ -404,8 +364,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   resolvedOverloadSets = cs.resolvedOverloadSets;
   numTypeVariables = cs.TypeVariables.size();
-  numUnresolvedOverloadSets = cs.UnresolvedOverloadSets.size();
-  numGeneratedOverloadSets = cs.solverState->generatedOverloadSets.size();
   numSavedBindings = cs.solverState->savedBindings.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   numRetiredConstraints = cs.solverState->retiredConstraints.size();
@@ -414,19 +372,9 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 ConstraintSystem::SolverScope::~SolverScope() {
   --cs.solverState->depth;
 
-  // Remove generated overloads from the shared constraint system state.
-  // FIXME: In the long run, we shouldn't need this.
-  for (unsigned i = numGeneratedOverloadSets,
-                n = cs.solverState->generatedOverloadSets.size();
-       i != n; ++i) {
-    cs.GeneratedOverloadSets.erase(cs.solverState->generatedOverloadSets[i]);
-  }
-
   // Erase the end of various lists.
   cs.resolvedOverloadSets = resolvedOverloadSets;
   truncate(cs.TypeVariables, numTypeVariables);
-  truncate(cs.UnresolvedOverloadSets, numUnresolvedOverloadSets);
-  truncate(cs.solverState->generatedOverloadSets, numGeneratedOverloadSets);
 
   // Restore bindings.
   cs.restoreTypeVariableBindings(cs.solverState->savedBindings.size() -
@@ -725,7 +673,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   }
 
   // If there are no constraints remaining, we're done. Save this solution.
-  if (Constraints.empty() && UnresolvedOverloadSets.empty()) {
+  if (Constraints.empty()) {
     // If any free type variables remain and we're not allowed to have them,
     // fail.
     if (!allowFreeTypeVariables && hasFreeTypeVariables())
@@ -780,8 +728,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // If we have a binding that does not involve type variables, or we have
     // no other option, go ahead and try the bindings for this type variable.
     if (!bestBindings.empty() &&
-        (!bestInvolvesTypeVariables ||
-         (UnresolvedOverloadSets.empty() && disjunctions.empty()))) {
+        (!bestInvolvesTypeVariables || disjunctions.empty())) {
       return tryTypeVariableBindings(*this,
                                      solverState->depth,
                                      typeVarConstraints[bestTypeVarIndex],
@@ -793,8 +740,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // Fall through to resolve an overload set.
   }
 
-  // If there are no overload sets or disjunctions, we can't solve this system.
-  if (UnresolvedOverloadSets.empty() && disjunctions.empty()) {
+  // If there are no disjunctions, we can't solve this system.
+  if (disjunctions.empty()) {
     // If the only remaining constraints are conformance constraints
     // or member equality constraints, and we're allowed to have free
     // variables, we still have a solution.  FIXME: It seems like this
@@ -826,72 +773,17 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     return true;
   }
 
-  // If there are any disjunction constraints, solve one of them now.
-  if (!disjunctions.empty()) {
-    // Pick the smallest disjunction.
-    // FIXME: This heuristic isn't great, but it helped somewhat for
-    // overload sets.
-    auto disjunction = disjunctions[0];
-    auto bestSize = disjunction->getNestedConstraints().size();
-    if (bestSize > 2) {
-      for (auto contender : llvm::makeArrayRef(disjunctions).slice(1)) {
-        unsigned newSize = contender->getNestedConstraints().size();
-        if (newSize < bestSize) {
-          bestSize = newSize;
-          disjunction = contender;
-
-          if (bestSize == 2)
-            break;
-        }
-      }
-    }
-
-    // Remove this disjunction constraint from the list.
-    unsigned disjunctionIdx = std::find(Constraints.begin(), Constraints.end(),
-                                        disjunction)
-                            - Constraints.begin();
-    assert(disjunctionIdx < Constraints.size() && "Couldn't find constraint?");
-    std::swap(Constraints[disjunctionIdx], Constraints.back());
-    Constraints.pop_back();
-
-    // Try each of the constraints within the disjunction.
-    bool anySolved = false;
-    for (auto constraint : disjunction->getNestedConstraints()) {
-      // Try to solve the system with this option in the disjunction.
-      SolverScope scope(*this);
-
-      if (TC.getLangOpts().DebugConstraintSolver) {
-        llvm::errs().indent(solverState->depth * 2)
-          << "(assuming ";
-        constraint->print(llvm::errs(), &TC.Context.SourceMgr);
-        llvm::errs() << '\n';
-      }
-
-      addConstraint(constraint);
-      if (!solve(solutions, allowFreeTypeVariables))
-        anySolved = true;
-
-      if (TC.getLangOpts().DebugConstraintSolver) {
-        llvm::errs().indent(solverState->depth * 2) << ")\n";
-      }
-    }
-
-    // Put the disjunction constraint back in its place.
-    Constraints.push_back(disjunction);
-    std::swap(Constraints[disjunctionIdx], Constraints.back());
-
-    return !anySolved;
-  }
-
-  // Find the overload set with the minimum number of overloads.
-  unsigned bestSize = UnresolvedOverloadSets[0]->getChoices().size();
-  unsigned bestIdx = 0;
+  // Pick the smallest disjunction.
+  // FIXME: This heuristic isn't great, but it helped somewhat for
+  // overload sets.
+  auto disjunction = disjunctions[0];
+  auto bestSize = disjunction->getNestedConstraints().size();
   if (bestSize > 2) {
-    for (unsigned i = 1, n = UnresolvedOverloadSets.size(); i < n; ++i) {
-      unsigned newSize = UnresolvedOverloadSets[i]->getChoices().size();
+    for (auto contender : llvm::makeArrayRef(disjunctions).slice(1)) {
+      unsigned newSize = contender->getNestedConstraints().size();
       if (newSize < bestSize) {
         bestSize = newSize;
-        bestIdx = i;
+        disjunction = contender;
 
         if (bestSize == 2)
           break;
@@ -899,26 +791,39 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     }
   }
 
-  // Swap the best overload set to the end and pop it off the set of
-  // unresolved overload sets. We'll restore it later.
-  std::swap(UnresolvedOverloadSets[bestIdx], UnresolvedOverloadSets.back());
-  OverloadSet *bestOvl = UnresolvedOverloadSets.back();
-  UnresolvedOverloadSets.pop_back();
+  // Remove this disjunction constraint from the list.
+  unsigned disjunctionIdx = std::find(Constraints.begin(), Constraints.end(),
+                                      disjunction)
+                          - Constraints.begin();
+  assert(disjunctionIdx < Constraints.size() && "Couldn't find constraint?");
+  std::swap(Constraints[disjunctionIdx], Constraints.back());
+  Constraints.pop_back();
 
-  // Try each of the overloads.
+  // Try each of the constraints within the disjunction.
   bool anySolved = false;
-  for (auto choice : bestOvl->getChoices()) {
-    // Try to solve the system with this overload choice.
+  for (auto constraint : disjunction->getNestedConstraints()) {
+    // Try to solve the system with this option in the disjunction.
     SolverScope scope(*this);
-    addBindOverloadConstraint(bestOvl->getBoundType(), choice,
-                              bestOvl->getLocator());
+
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      llvm::errs().indent(solverState->depth * 2)
+        << "(assuming ";
+      constraint->print(llvm::errs(), &TC.Context.SourceMgr);
+      llvm::errs() << '\n';
+    }
+
+    addConstraint(constraint);
     if (!solve(solutions, allowFreeTypeVariables))
       anySolved = true;
+
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      llvm::errs().indent(solverState->depth * 2) << ")\n";
+    }
   }
 
-  // Put the best overload set back in place.
-  UnresolvedOverloadSets.push_back(bestOvl);
-  std::swap(UnresolvedOverloadSets[bestIdx], UnresolvedOverloadSets.back());
+  // Put the disjunction constraint back in its place.
+  Constraints.push_back(disjunction);
+  std::swap(Constraints[disjunctionIdx], Constraints.back());
 
   return !anySolved;
 }
