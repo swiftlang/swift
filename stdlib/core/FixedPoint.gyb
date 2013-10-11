@@ -66,9 +66,14 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
     value = v
   }
 
+  // FIXME: We will start warning on 64 bit integer overflows after the "support
+  // for negative literals" patch goes in.
+  // FIXME: We need to special case the UInt64 to just return the value.
   @@transparent 
   static func _convertFromBuiltinIntegerLiteral(val : Builtin.Int${maxBits}) -> ${Self} {
-    return ${Self}(${'val' if bits == maxBits else ('Builtin.trunc_Int%d_Int%d(val)' % (maxBits, bits) )})
+    return ${Self}(${'val' if bits == maxBits else 
+                     ('Builtin.%strunc_with_overflow_Int%d_Int%d(val)' % 
+                     ('s' if signed else 'u', maxBits, bits))})
   }
 
   @@transparent 
@@ -200,7 +205,10 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // Bitwise negate
 @@transparent @@prefix
 func ~(rhs: ${Self}) -> ${Self} {
-  return rhs ^ ${maskBits(bits)}
+  var mask = ${'Builtin.trunc_Int%d_Int%d(%s.value)' % (maxBits, bits, maskBits(bits)) 
+             if maxBits != bits else 
+               '%s.value' % (maskBits(bits))}
+  return ${Self}(Builtin.xor_Int${bits}(rhs.value, mask))
 }
 
 @ for op, name in (

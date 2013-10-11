@@ -155,6 +155,58 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
                                                       SILValueCategory::Object),
                                     CastResV);
     }
+
+    // Deal with special builtins taht are designed to check overflows on
+    // integer literals.
+    case BuiltinValueKind::STruncWithOverflow:
+    case BuiltinValueKind::UTruncWithOverflow: {
+
+      // Get the value. It should be a constant in most cases.
+      // Note, this will not always be a constant, for example, when analyzing
+      // _convertFromBuiltinIntegerLiteral function itself.
+      IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+      if (!V)
+        return nullptr;
+      APInt SrcVal = V->getValue();
+
+      // Get the signedness of the destination.
+      bool Signed = (Builtin.ID == BuiltinValueKind::STruncWithOverflow);
+
+      // Get the source and destination bit width.
+      assert(Builtin.Types.size() == 2);
+      uint32_t SrcBitWidth =
+        Builtin.Types[0]->castTo<BuiltinIntegerType>()->getBitWidth();
+      Type DestTy = Builtin.Types[1];
+      uint32_t DestBitWidth =
+        DestTy->castTo<BuiltinIntegerType>()->getBitWidth();
+
+      // Compute the destination:
+      //   truncVal = trunc_IntFrom_IntTo(val)
+      //   strunc_IntFrom_IntTo(val) =
+      //     sext_IntFrom(truncVal) == val ? truncVal : overflow_error
+      //   utrunc_IntFrom_IntTo(val) =
+      //     zext_IntFrom(truncVal) == val ? truncVal : overflow_error
+      APInt TruncVal = SrcVal.trunc(DestBitWidth);
+      APInt T = Signed ? TruncVal.sext(SrcBitWidth):TruncVal.zext(SrcBitWidth);
+
+      SILLocation Loc = AI->getLoc();
+      const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
+
+      // Check for overflow.
+      if (SrcVal != T) {
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::integer_literal_overflow,
+                 CE ? CE->getType() : DestTy);
+      }
+
+      // The call to the builtin should be replaced with the constant value.
+      SILBuilder B(AI);
+      return B.createIntegerLiteral(Loc,
+                                    SILType::getPrimitiveType(CanType(DestTy),
+                                                      SILValueCategory::Object),
+                                    TruncVal);
+    }
+
     }
   return nullptr;
 }

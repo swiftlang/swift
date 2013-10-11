@@ -201,6 +201,12 @@ BUILTIN_MISC_OPERATION(InsertElement, "insertelement", "n", Special)
 /// StaticReport has type (Builtin.Int1, Builtin.Int1, Builtin.RawPointer) -> ()
 BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 
+/// STruncWithOverflow has type (Integer) -> Integer
+BUILTIN_MISC_OPERATION(STruncWithOverflow, "strunc_with_overflow", "n", Special)
+
+/// UTruncWithOverflow has type (Integer) -> Integer
+BUILTIN_MISC_OPERATION(UTruncWithOverflow, "utrunc_with_overflow", "n", Special)
+
 // FIXME: shufflevector
 
 #undef BUILTIN_MISC_OPERATION

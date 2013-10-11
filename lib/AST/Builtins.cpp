@@ -500,6 +500,22 @@ static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
   return getBuiltinFunction(Context, Id, ArgElts, ResultTy);
 }
 
+static ValueDecl *getTruncWithOverflowOperation(ASTContext &Context,
+                                                Identifier Id,
+                                                Type InputTy,
+                                                Type OutputTy) {
+  auto InTy = InputTy->getAs<BuiltinIntegerType>();
+  auto OutTy = OutputTy->getAs<BuiltinIntegerType>();
+  if (!InTy || !OutTy)
+    return nullptr;
+  if (InTy->getBitWidth() < OutTy->getBitWidth())
+    return nullptr;
+
+  TupleTypeElt ArgElts[] = { InTy };
+
+  return getBuiltinFunction(Context, Id, ArgElts, OutTy);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -875,6 +891,12 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::StaticReport:
     if (!Types.empty()) return nullptr;
     return getStaticReportOperation(Context, Id);
+
+  case BuiltinValueKind::STruncWithOverflow:
+  case BuiltinValueKind::UTruncWithOverflow:
+    if (Types.size() != 2) return nullptr;
+    return getTruncWithOverflowOperation(Context, Id, Types[0], Types[1]);
+
   }
   llvm_unreachable("bad builtin value!");
 }
