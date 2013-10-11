@@ -207,8 +207,9 @@ namespace {
 
       // First, collect information about the superclass.
       if (theClass->hasSuperclass()) {
-        CanType superclassType = theClass->getSuperclass()->getCanonicalType();
-        auto superclass = type->getClassOrBoundGenericClass();
+        CanType superclassType
+          = type->getSuperclass(nullptr)->getCanonicalType();
+        auto superclass = superclassType->getClassOrBoundGenericClass();
         assert(superclass);
         layout(superclass, superclassType);
       } else {
@@ -223,9 +224,6 @@ namespace {
       if (isClassResilient) {
         IsMetadataResilient = true;
         IsObjectResilient = true;
-        if (theClass->getGenericParamsOfContext() != nullptr) {
-          IsObjectGenericallyArranged = true;
-        }
       }
 
       // Okay, make entries for all the physical fields we know about.
@@ -243,7 +241,7 @@ namespace {
         // Adjust based on the type of this field.
         // FIXME: this algorithm is assuming that fields are laid out
         // in declaration order.
-        adjustAccessAfterField(var);
+        adjustAccessAfterField(var, type);
       }
     }
 
@@ -263,10 +261,12 @@ namespace {
       }
     }
 
-    void adjustAccessAfterField(VarDecl *var) {
+    void adjustAccessAfterField(VarDecl *var, CanType classType) {
       if (var->isComputed()) return;
 
-      CanType type = var->getType()->getCanonicalType();
+      CanType type
+        = classType->getTypeOfMember(var->getModuleContext(),
+                                     var, nullptr)->getCanonicalType();
       switch (IGM.classifyTypeSize(type, ResilienceScope::Local)) {
       case ObjectSize::Fixed:
         return;
@@ -307,7 +307,9 @@ namespace {
       addHeapHeader();
 
       // Next, add the fields for the given class.
-      addFieldsForClass(theClass);
+      addFieldsForClass(theClass,
+                        theClass->getDeclaredTypeInContext()
+                                ->getCanonicalType());
     }
 
     /// Return the element layouts for the most-derived class.
@@ -316,31 +318,38 @@ namespace {
     }
 
   private:
-    void addFieldsForClass(ClassDecl *theClass) {
+    void addFieldsForClass(ClassDecl *theClass,
+                           CanType classType) {
       if (theClass->hasSuperclass()) {
         // TODO: apply substitutions when computing base-class layouts!
+        CanType superclassType = classType->getSuperclass(nullptr)
+          ->getCanonicalType();
         auto superclass
-          = theClass->getSuperclass()->getClassOrBoundGenericClass();
+          = superclassType->getClassOrBoundGenericClass();
         assert(superclass);
 
         // Recur.
-        addFieldsForClass(superclass);
+        addFieldsForClass(superclass, superclassType);
 
         // Forget about the fields from the superclass.
         LastElements.clear();
       }
 
       // Collect fields from this class and add them to the layout as a chunk.
-      addDirectFieldsFromClass(theClass);
+      addDirectFieldsFromClass(theClass, classType);
     }
 
-    void addDirectFieldsFromClass(ClassDecl *theClass) {
+    void addDirectFieldsFromClass(ClassDecl *theClass,
+                                  CanType classType) {
       assert(LastElements.empty());
       for (Decl *member : theClass->getMembers()) {
         VarDecl *var = dyn_cast<VarDecl>(member);
         if (!var || var->isComputed()) continue;
 
-        auto &eltType = IGM.getTypeInfo(var->getType());
+        CanType type = classType->getTypeOfMember(theClass->getModuleContext(),
+                                                  var, nullptr)
+                                ->getCanonicalType();
+        auto &eltType = IGM.getTypeInfo(type);
         // FIXME: Type-parameter-dependent field layout isn't implemented yet.
         if (!eltType.isFixedSize() && !IGM.Opts.EnableDynamicValueTypeLayout) {
           IGM.unimplemented(var->getLoc(), "non-fixed class layout");

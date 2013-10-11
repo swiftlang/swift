@@ -5,11 +5,48 @@ import Builtin
 import swift
 import gizmo
 
+// -- offset of RootGeneric<T>.x
+// CHECK: @_TWvdC15generic_classes11RootGeneric1xVSs5UInt8 = global i64 16, align 8
 // CHECK: @_TMPdC15generic_classes11RootGeneric
+
 // CHECK: @_TMdC15generic_classes14RootNonGeneric
 
-// NB: Should instantiate its bound generic root class to get fixed offsets
+// -- NonGenericInheritsGeneric instantiates its generic base class, giving
+//    fixed offsets for its own ivars
+// -- offset of NonGenericInheritsGeneric.w
+// CHECK: @_TWvdC15generic_classes25NonGenericInheritsGeneric1wSi = global i64 40, align 8
+// CHECK: [[NONGENERICINHERITSGENERIC_W_NAME:@.*]] = private unnamed_addr constant [2 x i8] c"w\00"
+// -- ivars for NonGenericInheritsGeneric
+// CHECK: @_IVARS_NonGenericInheritsGeneric = private constant { {{.*}} }] } {
+// --       entsize
+// CHECK:   i32 32,
+// --       count
+// CHECK:   i32 1,
+// CHECK:   [{
+// --       NonGenericInheritsGeneric.w
+// --         offset ptr
+// CHECK:     i64* @_TWvdC15generic_classes25NonGenericInheritsGeneric1wSi,
+// --         name
+// CHECK:     i8* getelementptr inbounds ([2 x i8]* [[NONGENERICINHERITSGENERIC_W_NAME]], i64 0, i64 0),
+// --         type encoding (FIXME)
+// CHECK:     i8* null,
+// --         align
+// CHECK:     i32 8,
+// --         size
+// CHECK:     i32 8
+// CHECK:   }]
+// CHECK: }
+// -- rodata for NonGenericInheritsGeneric
+// CHECK: @_DATA_NonGenericInheritsGeneric = private constant { {{.*}}* } {
+// --       flags (128 = compiled by ARC)
+// CHECK:   i32 128,
+// --       instanceStart
+// CHECK:   i32 40,
+// --       instanceSize
+// CHECK:   i32 48,
+// CHECK: }
 // CHECK: @_TMdC15generic_classes25NonGenericInheritsGeneric
+
 
 // CHECK: @_TMPdC15generic_classes22GenericInheritsGeneric
 // CHECK: @_TMPdC15generic_classes25GenericInheritsNonGeneric
