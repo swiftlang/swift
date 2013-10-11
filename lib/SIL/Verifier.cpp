@@ -33,7 +33,7 @@ using namespace swift;
 namespace {
 /// Metaprogramming-friendly base class.
 template <class Impl>
-class SILVerifierBase : public SILInstructionVisitor<Impl> {
+class SILVerifierBase : public SILVisitor<Impl> {
 public:
   // visitCLASS calls visitPARENT and checkCLASS.
   // checkCLASS does nothing by default.
@@ -126,12 +126,18 @@ public:
     delete Dominance;
   }
 
+  void visitSILArgument(SILArgument *arg) {
+    checkLegalTypes(arg);
+  }
+
   void visitSILInstruction(SILInstruction *I) {
     CurInstruction = I;
     checkSILInstruction(I);
 
     // Check the SILLLocation attached to the instruction.
     checkInstructionsSILLocation(I);
+
+    checkLegalTypes(I);
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -209,6 +215,18 @@ public:
     if (LocKind == SILLocation::ArtificialUnreachableKind)
       require(InstKind == ValueKind::UnreachableInst,
         "artificial locations are only allowed on Unreachable instructions");
+  }
+
+  /// Check that the types of this value producer are all legal.
+  void checkLegalTypes(ValueBase *value) {
+    for (auto type : value->getTypes()) {
+      checkLegalType(type);
+    }
+  }
+
+  /// Check that the given type is a legal SIL value.
+  void checkLegalType(SILType type) {
+    require(!type.is<LValueType>(), "l-value types are not legal in SIL");
   }
 
   /// Check that this operand appears in the use-chain of the value it uses.
