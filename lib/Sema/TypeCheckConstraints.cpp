@@ -1177,6 +1177,42 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   return result;
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
+                                        TypeMatchKind kind, unsigned flags,
+                                        ConstraintLocatorBuilder locator,
+                                        bool &trivial) {
+  // FIXME: Should allow other conversions as well.
+  SmallVector<ProtocolDecl *, 4> protocols;
+
+  bool existential = type2->isExistentialType(protocols);
+  assert(existential && "Bogus existential match");
+  (void)existential;
+
+  bool addedConstraint = false;
+  for (auto proto : protocols) {
+    switch (simplifyConformsToConstraint(type1, proto, locator)) {
+      case SolutionKind::Solved:
+      case SolutionKind::TriviallySolved:
+        break;
+
+      case SolutionKind::Unsolved:
+        // Add the constraint.
+        addConstraint(ConstraintKind::ConformsTo, type1,
+                      proto->getDeclaredType());
+        addedConstraint = true;
+        break;
+
+      case SolutionKind::Error:
+        return SolutionKind::Error;
+    }
+  }
+
+  trivial = false;
+  return addedConstraint? SolutionKind::Solved
+                        : SolutionKind::TriviallySolved;
+}
+
 /// \brief Map a type-matching kind to a constraint kind.
 static ConstraintKind getConstraintKind(TypeMatchKind kind) {
   switch (kind) {
@@ -1244,6 +1280,21 @@ static Type getFixedTypeRecursive(ConstraintSystem &cs,
   return type;
 }
 
+/// Determine whether we should attempt a user-defined conversion.
+static bool shouldTryUserConversion(ConstraintSystem &cs, Type type) {
+
+  // If this isn't a type that can have user-defined conversions, there's
+  // nothing to do.
+  if (!type->getNominalOrBoundGenericNominal() && !type->is<ArchetypeType>())
+    return false;
+
+  // If there are no user-defined conversions, there's nothing to do.
+  // FIXME: lame name!
+  auto &ctx = cs.getASTContext();
+  auto name = ctx.getIdentifier("__conversion");
+  return static_cast<bool>(cs.lookupMember(type, name));
+}
+
 /// If the given type has user-defined conversions, introduce new
 /// relational constraint between the result of performing the user-defined
 /// conversion and an arbitrary other type.
@@ -1298,6 +1349,29 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
                        ConstraintLocator::ConversionResult)));
   
   return ConstraintSystem::SolutionKind::Solved;
+}
+
+namespace {
+  /// Specifies a conversion that could be performed between the two given
+  /// types.
+  ///
+  /// The conversions themselves are not meant to be mutually exclusive.
+  enum class PotentialConversion {
+    /// Tuple-to-tuple conversion.
+    TupleToTuple,
+#if 0
+    /// Scalar-to-tuple conversion.
+    ScalarToTuple,
+    /// Class-to-superclass conversion.
+    Superclass,
+#endif
+    /// Value to existential value conversion.
+    Existential,
+    /// Value to optional conversion.
+    Optional,
+    /// User-defined conversions.
+    User
+  };
 }
 
 ConstraintSystem::SolutionKind
@@ -1425,6 +1499,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
+  llvm::SmallVector<PotentialConversion, 4> potentialConversions;
+  bool concrete = !typeVar1 && !typeVar2;
+
   // Decompose parallel structure.
   unsigned subFlags = flags | TMF_GenerateConstraints;
   if (desugar1->getKind() == desugar2->getKind()) {
@@ -1470,8 +1547,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::Tuple: {
       auto tuple1 = cast<TupleType>(desugar1);
       auto tuple2 = cast<TupleType>(desugar2);
-      if (shouldTryTupleToTupleMatch(tuple1, tuple2, kind, locator))
-        return matchTupleTypes(tuple1, tuple2, kind, flags, locator, trivial);
+
+      if (shouldTryTupleToTupleMatch(tuple1, tuple2, kind, locator)) {
+        potentialConversions.push_back(PotentialConversion::TupleToTuple);
+
+        // FIXME: We should only commit to this conversion when tuple2 cannot
+        // be initialized with a scalar.
+        goto commit_to_conversions;
+      }
 
       // Break out to attempt scalar-to-tuple conversion, below.
       break;
@@ -1672,7 +1755,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   // FIXME: Materialization
 
-  bool concrete = !typeVar1 && !typeVar2;
   if (concrete && kind >= TypeMatchKind::TrivialSubtype) {
     auto tuple1 = type1->getAs<TupleType>();
     auto tuple2 = type2->getAs<TupleType>();
@@ -1799,77 +1881,84 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // For a subtyping relation involving two existential types, or a conversion
   // from any type, check whether the first type conforms to each of the
   // protocols in the second type.
-  if (kind >= TypeMatchKind::Conversion ||
-       (kind == TypeMatchKind::Subtype && type1->isExistentialType())) {
-    SmallVector<ProtocolDecl *, 4> protocols;
+  if ((kind >= TypeMatchKind::Conversion ||
+        (kind == TypeMatchKind::Subtype && type1->isExistentialType())) &&
+      type2->isExistentialType()) {
+    potentialConversions.push_back(PotentialConversion::Existential);
 
-    if (type2->isExistentialType(protocols)) {
-      bool addedConstraint = false;
-      for (auto proto : protocols) {
-        switch (simplifyConformsToConstraint(type1, proto, locator)) {
-        case SolutionKind::Solved:
-        case SolutionKind::TriviallySolved:
-          break;
-
-        case SolutionKind::Unsolved:
-          // Add the constraint.
-          addConstraint(ConstraintKind::ConformsTo, type1,
-                        proto->getDeclaredType());
-          addedConstraint = true;
-          break;
-
-        case SolutionKind::Error:
-          return SolutionKind::Error;
-        }
-      }
-
-      trivial = false;
-      return addedConstraint? SolutionKind::Solved
-                            : SolutionKind::TriviallySolved;
-    }
+    // FIXME: Should allow other conversions.
+    goto commit_to_conversions;
   }
 
   // A value of type T can be converted to type U? if T is convertible to U.
-  BoundGenericType *boundGenericType2;
-  if (concrete && kind >= TypeMatchKind::Conversion &&
-      (boundGenericType2 = type2->getAs<BoundGenericType>())) {
-    if (boundGenericType2->getDecl() == TC.Context.getOptionalDecl()) {
-      assert(boundGenericType2->getGenericArgs().size() == 1);
-      return matchTypes(type1, boundGenericType2->getGenericArgs()[0],
-                        kind, subFlags, locator, trivial);
+  {
+    BoundGenericType *boundGenericType2;
+    if (concrete && kind >= TypeMatchKind::Conversion &&
+        (boundGenericType2 = type2->getAs<BoundGenericType>())) {
+      if (boundGenericType2->getDecl() == TC.Context.getOptionalDecl()) {
+        assert(boundGenericType2->getGenericArgs().size() == 1);
+        potentialConversions.push_back(PotentialConversion::Optional);
+
+        // FIXME: We should also consider user-defined conversions here.
+        goto commit_to_conversions;
+      }
     }
   }
-  
+
   // A nominal type can be converted to another type via a user-defined
   // conversion function.
-  if (concrete && kind >= TypeMatchKind::Conversion) {
-    switch (tryUserConversion(*this, type1, ConstraintKind::Subtype, type2,
-                              locator)) {
-    case SolutionKind::Error:
-      return SolutionKind::Error;
+  if (concrete && kind >= TypeMatchKind::Conversion &&
+      shouldTryUserConversion(*this, type1)) {
+    potentialConversions.push_back(PotentialConversion::User);
+  }
 
-    case SolutionKind::Unsolved:
-      // Keep trying.
-      break;
+commit_to_conversions:
+  // When we hit this point, we're committed to the set of potential
+  // conversions recorded thus far.
+  //
+  //
+  // FIXME: One should only jump to this label in the case where we want to
+  // cut off other potential conversions because we know none of them apply.
+  // Gradually, those gotos should go away as we can handle more kinds of
+  // conversions via disjunction constraints.
+  if (potentialConversions.empty()) {
+    // If one of the types is a type variable, we leave this unsolved.
+    if (typeVar1 || typeVar2)
+      return SolutionKind::Unsolved;
 
-    case SolutionKind::Solved:
-    case SolutionKind::TriviallySolved:
-      trivial = false;
-      return SolutionKind::Solved;
+    // If we are supposed to record failures, do so.
+    if (shouldRecordFailures()) {
+      recordFailure(getConstraintLocator(locator),
+                    getRelationalFailureKind(kind), type1, type2);
     }
+
+    return SolutionKind::Error;
   }
 
-  // If one of the types is a type variable, we leave this unsolved.
-  if (typeVar1 || typeVar2)
-    return SolutionKind::Unsolved;
+  // FIXME: When there is more than one conversion, create a disjunction
+  // constraint.
 
-  // If we are supposed to record failures, do so.
-  if (shouldRecordFailures()) {
-    recordFailure(getConstraintLocator(locator),
-                  getRelationalFailureKind(kind), type1, type2);
+  // For a single potential conversion, directly recurse, so that we
+  // don't allocate a new constraint or constraint locator.
+  switch (potentialConversions[0]) {
+  case PotentialConversion::TupleToTuple:
+    return matchTupleTypes(type1->castTo<TupleType>(),
+                           type2->castTo<TupleType>(),
+                           kind, flags, locator, trivial);
+
+  case PotentialConversion::Existential:
+    return matchExistentialTypes(type1, type2, kind, flags, locator,
+                                 trivial);
+
+  case PotentialConversion::Optional:
+    return matchTypes(type1,
+                      type2->castTo<BoundGenericType>()->getGenericArgs()[0],
+                      kind, subFlags, locator, trivial);
+
+  case PotentialConversion::User:
+    return tryUserConversion(*this, type1, ConstraintKind::Subtype, type2,
+                              locator);
   }
-
-  return SolutionKind::Error;
 }
 
 /// \brief Retrieve the fully-materialized form of the given type.

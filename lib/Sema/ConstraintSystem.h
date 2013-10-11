@@ -1350,6 +1350,13 @@ private:
                                   ConstraintLocatorBuilder locator,
                                   bool &trivial);
 
+  /// \brief Subroutine of \c matchTypes(), which matches up a value to an
+  /// existential type.
+  SolutionKind matchExistentialTypes(Type type1, Type type2,
+                                     TypeMatchKind kind, unsigned flags,
+                                     ConstraintLocatorBuilder locator,
+                                     bool &trivial);
+
   /// \brief Attempt to match up types \c type1 and \c type2, which in effect
   /// is solving the given type constraint between these two types.
   ///
