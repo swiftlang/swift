@@ -21,6 +21,8 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/Basic/STLExtras.h"
+#include "llvm/ADT/SetVector.h"
+#include <set>
 
 using namespace swift;
 
@@ -351,21 +353,68 @@ static void lookupVisibleMemberDeclsImpl(
   // FIXME: Weed out overridden methods.
 }
 
+namespace {
+struct FoundDeclTy {
+  ValueDecl *D;
+  DeclVisibilityKind Reason;
+
+  FoundDeclTy(ValueDecl *D, DeclVisibilityKind Reason)
+      : D(D), Reason(Reason) {}
+
+  friend bool operator==(const FoundDeclTy &LHS, const FoundDeclTy &RHS) {
+    return LHS.D == RHS.D;
+  }
+
+  friend bool operator<(const FoundDeclTy &LHS, const FoundDeclTy &RHS) {
+    return LHS.D < RHS.D;
+  }
+};
+
+class OverrideFilteringConsumer : public VisibleDeclConsumer {
+public:
+  std::set<ValueDecl *> FoundDecls;
+  llvm::SetVector<FoundDeclTy> DeclsToReport;
+
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    if (FoundDecls.count(VD))
+      return;
+
+    // Insert all overridden decls into FoundDecls.
+    ValueDecl *OverriddenDecl = nullptr;
+    while (ValueDecl *OverriddenDecl = VD->getOverriddenDecl()) {
+      if (FoundDecls.count(OverriddenDecl))
+        break;
+      FoundDecls.insert(OverriddenDecl);
+    }
+
+    if (OverriddenDecl) {
+      bool Erased = DeclsToReport.remove(
+          FoundDeclTy(OverriddenDecl, DeclVisibilityKind::LocalVariable));
+      assert(Erased);
+      (void)Erased;
+    }
+    DeclsToReport.insert(FoundDeclTy(VD, Reason));
+  }
+};
+} // unnamed namespace
+
 /// \brief Enumerate all members in \c BaseTy (including members of extensions,
 /// superclasses and implemented protocols), as seen from the context \c CurrDC.
 ///
 /// This operation corresponds to a standard "dot" lookup operation like "a.b"
 /// where 'self' is the type of 'a'.  This operation is only valid after name
 /// binding.
-static void lookupVisibleMemberDecls(Type BaseTy,
-                                     VisibleDeclConsumer &Consumer,
-                                     const DeclContext *CurrDC,
-                                     LookupState LS,
-                                     DeclVisibilityKind Reason,
-                                     LazyResolver *TypeResolver) {
+static void lookupVisibleMemberDecls(
+    Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
+    LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver) {
+  OverrideFilteringConsumer ConsumerWrapper;
   VisitedSet Visited;
-  lookupVisibleMemberDeclsImpl(BaseTy, Consumer, CurrDC, LS, Reason,
+  lookupVisibleMemberDeclsImpl(BaseTy, ConsumerWrapper, CurrDC, LS, Reason,
                                TypeResolver, Visited);
+
+  // Report the declarations we found to the real consumer.
+  for (const auto &DeclAndReason : ConsumerWrapper.DeclsToReport)
+    Consumer.foundDecl(DeclAndReason.D, DeclAndReason.Reason);
 }
 
 namespace {
