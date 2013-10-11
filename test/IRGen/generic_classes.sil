@@ -1,0 +1,57 @@
+// RUN: rm -rf %t/clang-module-cache
+// RUN: %swift -enable-dynamic-value-type-layout -triple x86_64-apple-darwin10 -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs -I=%S %s -emit-llvm | FileCheck %s
+
+import Builtin
+import swift
+import gizmo
+
+// CHECK: @_TMPdC15generic_classes11RootGeneric
+// CHECK: @_TMdC15generic_classes14RootNonGeneric
+
+// NB: Should instantiate its bound generic root class to get fixed offsets
+// CHECK: @_TMdC15generic_classes25NonGenericInheritsGeneric
+
+// CHECK: @_TMPdC15generic_classes22GenericInheritsGeneric
+// CHECK: @_TMPdC15generic_classes25GenericInheritsNonGeneric
+// CHECK: @_TMPdCSo19GenericInheritsObjC
+// CHECK: @_TMPdCSo20GenericInheritsObjC2
+
+class RootGeneric<T> {
+  var x : UInt8
+  var y : T
+  var z : UInt8
+}
+
+class RootNonGeneric {
+  var x : UInt8
+  var y : Int
+  var z : UInt8
+}
+
+class NonGenericInheritsGeneric : RootGeneric<(Int, UInt8)> {
+  var w : Int
+}
+
+class GenericInheritsGeneric<A, B> : RootGeneric<A> {
+  var w : B
+}
+
+class GenericInheritsNonGeneric<C> : RootNonGeneric {
+  var w : UInt8
+}
+
+class GenericInheritsObjC<D> : Gizmo {
+  var x : D
+}
+
+class GenericInheritsObjC2<E> : Gizmo {
+  var x : UInt8
+  var y : E
+  var z : UInt8
+}
+
+sil @top_level_code : $[thin] () -> () {
+entry:
+  %v = tuple ()
+  return %v : $()
+}

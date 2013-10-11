@@ -479,7 +479,13 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
   obj = IGF.Builder.CreateCall(destroyer, obj);
 
   // Emit the deallocation.
-  llvm::Value *size = info.getLayout(IGM).emitSize(IGF);
+  auto &layout = info.getLayout(IGM);
+  // FIXME: Dynamic-layout deallocation size.
+  llvm::Value *size;
+  if (layout.isFixedLayout())
+    size = info.getLayout(IGM).emitSize(IGF);
+  else
+    size = llvm::ConstantInt::get(IGM.SizeTy, 0);
   emitDeallocateHeapObject(IGF, obj, size);
   IGF.Builder.CreateRetVoid();
 }
@@ -763,9 +769,12 @@ namespace {
         instanceSize = FieldLayout->getSize();
         if (FieldLayout->getElements().empty()) {
           instanceStart = instanceSize;
-        } else {
+        } else if (FieldLayout->getElements()[0].getKind()
+                     == ElementLayout::Kind::Fixed) {
           // FIXME: assumes layout is always sequential!
           instanceStart = FieldLayout->getElements()[0].getByteOffset();
+        } else {
+          // FIXME: arrange to initialize this at runtime
         }
       }
       fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,
@@ -963,12 +972,25 @@ namespace {
       assert(Layout && FieldLayout && "can't build ivar for category");
       // FIXME: this is not always the right thing to do!
       auto &elt = FieldLayout->getElements()[NextFieldIndex++];
-      auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ false);
-      auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
-      offsetVar->setConstant(false);
-      auto offsetVal =
-        llvm::ConstantInt::get(IGM.IntPtrTy, elt.getByteOffset().getValue());
-      offsetVar->setInitializer(offsetVal);
+      auto &ivarTI = IGM.getTypeInfo(ivar->getType());
+      
+      llvm::Constant *offsetPtr;
+      if (elt.getKind() == ElementLayout::Kind::Fixed) {
+        // Emit a field offset variable for the fixed field statically.
+        auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ false);
+        auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
+        offsetVar->setConstant(false);
+        auto offsetVal =
+          llvm::ConstantInt::get(IGM.IntPtrTy, elt.getByteOffset().getValue());
+        offsetVar->setInitializer(offsetVal);
+        
+        offsetPtr = offsetVar;
+      } else {
+        // We need to set this up when the metadata is instantiated.
+        // FIXME: set something up to fill at runtime
+        offsetPtr
+          = llvm::ConstantPointerNull::get(IGM.IntPtrTy->getPointerTo());
+      }
 
       // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals
       auto name = IGM.getAddrOfGlobalString(ivar->getName().str());
@@ -976,7 +998,6 @@ namespace {
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
       auto typeEncode = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
-      auto &ivarTI = IGM.getTypeInfo(ivar->getType());
       Size size;
       Alignment alignment;
       if (auto fixedTI = dyn_cast<FixedTypeInfo>(&ivarTI)) {
@@ -998,7 +1019,7 @@ namespace {
       }
 
       llvm::Constant *fields[] = {
-        offsetVar,
+        offsetPtr,
         name,
         typeEncode,
         llvm::ConstantInt::get(IGM.Int32Ty, size.getValue()),
