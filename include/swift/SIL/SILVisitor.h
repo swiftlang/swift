@@ -28,52 +28,52 @@ namespace swift {
 template<typename ImplClass, typename ValueRetTy = void>
 class SILVisitor {
 public:
-#define VALUE(CLASS, PARENT)              \
-  case ValueKind::CLASS:                  \
-    return static_cast<ImplClass*>(this)  \
-    ->visit##CLASS(static_cast<CLASS*>(V));
-
   ValueRetTy visit(ValueBase *V) {
     switch (V->getKind()) {
+#define VALUE(CLASS, PARENT)                    \
+    case ValueKind::CLASS:                      \
+      return static_cast<ImplClass*>(this)      \
+        ->visit##CLASS(static_cast<CLASS*>(V));
 #include "swift/SIL/SILNodes.def"
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
+
   ValueRetTy visit(SILValue V) {
-    return visit(V.getDef());
+    return static_cast<ImplClass*>(this)->visit(V.getDef());
   }
 
   // Define default dispatcher implementations chain to parent nodes.
-#define VALUE(CLASS, PARENT)                   \
-ValueRetTy visit##CLASS(CLASS *I) {            \
-  return static_cast<ImplClass*>(this)->visit##PARENT(I);  \
-}
-
-#define ABSTRACT_VALUE(CLASS, PARENT)                       \
-ValueRetTy visit##CLASS(CLASS *I) {                         \
-  return static_cast<ImplClass*>(this)->visit##PARENT(I);   \
-}
+#define VALUE(CLASS, PARENT)                                    \
+  ValueRetTy visit##CLASS(CLASS *I) {                           \
+    return static_cast<ImplClass*>(this)->visit##PARENT(I);     \
+  }
+#define ABSTRACT_VALUE(CLASS, PARENT) VALUE(CLASS, PARENT)
 #include "swift/SIL/SILNodes.def"
 
   void visitSILBasicBlock(SILBasicBlock *BB) {
+    static_cast<ImplClass*>(this)->visitBasicBlockArguments(BB);
+      
+    for (auto &I : *BB)
+      static_cast<ImplClass*>(this)->visit(&I);
+  }
+  void visitSILBasicBlock(SILBasicBlock &BB) {
+    static_cast<ImplClass*>(this)->visitSILBasicBlock(&BB);
+  }
+
+  void visitBasicBlockArguments(SILBasicBlock *BB) {
     for (auto argI = BB->bbarg_begin(), argEnd = BB->bbarg_end();
          argI != argEnd;
          ++argI)
-      visit(*argI);
-      
-    for (auto &I : *BB)
-      visit(&I);
-  }
-  void visitSILBasicBlock(SILBasicBlock &BB) {
-    this->ImplClass::visitSILBasicBlock(&BB);
+      static_cast<ImplClass*>(this)->visit(*argI);
   }
 
   void visitSILFunction(SILFunction *F) {
     for (auto &BB : *F)
-      this->ImplClass::visitSILBasicBlock(&BB);
+      static_cast<ImplClass*>(this)->visitSILBasicBlock(&BB);
   }
   void visitSILFunction(SILFunction &F) {
-    this->ImplClass::visitSILFunction(&F);
+    static_cast<ImplClass*>(this)->visitSILFunction(&F);
   }
 };
 
@@ -82,6 +82,8 @@ ValueRetTy visit##CLASS(CLASS *I) {                         \
 template<typename ImplClass, typename ValueRetTy = void>
 class SILInstructionVisitor : public SILVisitor<ImplClass, ValueRetTy> {
 public:
+  void visitBasicBlockArguments(SILBasicBlock *BB) {}
+
   ValueRetTy visitSILArgument(SILArgument *A) {
     llvm_unreachable("should only be visiting instructions");
   }
