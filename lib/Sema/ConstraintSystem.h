@@ -1337,9 +1337,8 @@ private:
 
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
-  /// \returns an empty optional if the scalar-to-tuple conversion should be
-  /// used instead. Otherwise, returns the solution result.
-  Optional<SolutionKind> matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
+  /// \returns the result of performing the tuple-to-tuple conversion.
+  SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                          TypeMatchKind kind, unsigned flags,
                                          ConstraintLocatorBuilder locator,
                                          bool &trivial);

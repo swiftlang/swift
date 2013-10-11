@@ -846,7 +846,68 @@ static bool hasMandatoryTupleLabels(const ConstraintLocatorBuilder &locator) {
 //===--------------------------------------------------------------------===//
 #pragma mark Constraint simplification
 
-Optional<ConstraintSystem::SolutionKind>
+/// Determine whether we should attempt a tuple-to-tuple match.
+///
+/// FIXME: Most of this is a hack to try to get scalar-to-tuple conversions in
+/// those places where they might work.
+///
+/// \returns true if we should attempt a tuple-to-tuple match, or false if
+/// we should fall back to a scalar-to-tuple match.
+static bool shouldTryTupleToTupleMatch(TupleType *tuple1, TupleType *tuple2,
+                                       TypeMatchKind kind,
+                                       const ConstraintLocatorBuilder &locator){
+  // If the second tuple can't be initialized with a scalar, we have to try
+  // a tuple-to-tuple match.
+  if (tuple2->getFieldForScalarInit() == -1)
+    return true;
+
+  if (kind < TypeMatchKind::Conversion) {
+    // If we're not converting, the number of fields must be equivalent in
+    // the two tuple types.
+    if (tuple1->getFields().size() != tuple2->getFields().size())
+      return false;
+
+    // Compare the element names.
+    for (unsigned i = 0, n = tuple1->getFields().size(); i != n; ++i) {
+      const auto &elt1 = tuple1->getFields()[i];
+      const auto &elt2 = tuple2->getFields()[i];
+
+      // If the names don't match, we may have a conflict.
+      if (elt1.getName() != elt2.getName()) {
+        // Same-type matches require the element names to be the same.
+        if (kind == TypeMatchKind::SameType)
+          return false;
+
+        // For subtyping constraints, just make sure that this name isn't
+        // used at some other position.
+        if (!elt2.getName().empty() &&
+            tuple1->getNamedElementId(elt2.getName()) != -1)
+          return false;
+      }
+
+      // Variadic bit must match.
+      if (elt1.isVararg() != elt2.isVararg())
+        return false;
+    }
+
+    // Okay, perform the tuple-to-tuple conversion.
+    return true;
+  }
+
+  assert(kind == TypeMatchKind::Conversion);
+
+  // Compute the element shuffles for conversions.
+  SmallVector<int, 16> sources;
+  SmallVector<unsigned, 4> variadicArguments;
+  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments,
+                          ::hasMandatoryTupleLabels(locator)))
+    return false;
+
+  // Okay, perform the tuple-to-tuple conversion.
+  return true;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   TypeMatchKind kind, unsigned flags,
                                   ConstraintLocatorBuilder locator,
@@ -857,11 +918,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   // requiring element names to either match up or be disjoint.
   if (kind < TypeMatchKind::Conversion) {
     if (tuple1->getFields().size() != tuple2->getFields().size()) {
-      // If the second tuple can be initialized from a scalar, fall back to
-      // that.
-      if (tuple2->getFieldForScalarInit() >= 0)
-        return Nothing;
-
       // Record this failure.
       if (shouldRecordFailures()) {
         recordFailure(getConstraintLocator(locator),
@@ -880,11 +936,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       if (elt1.getName() != elt2.getName()) {
         // Same-type requirements require exact name matches.
         if (kind == TypeMatchKind::SameType) {
-          // If the second tuple can be initialized from a scalar, fall back to
-          // that.
-          if (tuple2->getFieldForScalarInit() >= 0)
-            return Nothing;
-
           // Record this failure.
           if (shouldRecordFailures()) {
             recordFailure(getConstraintLocator(
@@ -901,11 +952,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
         if (!elt2.getName().empty()) {
           int matched = tuple1->getNamedElementId(elt2.getName());
           if (matched != -1) {
-            // If the second tuple can be initialized from a scalar,
-            // fall back to that.
-            if (tuple2->getFieldForScalarInit() >= 0)
-              return Nothing;
-
             // Record this failure.
             if (shouldRecordFailures()) {
               recordFailure(getConstraintLocator(
@@ -921,11 +967,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
       // Variadic bit must match.
       if (elt1.isVararg() != elt2.isVararg()) {
-        // If the second tuple can be initialized from a scalar, fall back to
-        // that.
-        if (tuple2->getFieldForScalarInit() >= 0)
-          return Nothing;
-
         // Record this failure.
         if (shouldRecordFailures()) {
           recordFailure(getConstraintLocator(
@@ -967,11 +1008,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   SmallVector<unsigned, 4> variadicArguments;
   if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments,
                           ::hasMandatoryTupleLabels(locator))) {
-    // If the second tuple can be initialized from a scalar, fall back to
-    // that.
-    if (tuple2->getFieldForScalarInit() >= 0)
-      return Nothing;
-
     // FIXME: Record why the tuple shuffle couldn't be computed.
     if (shouldRecordFailures()) {
       if (tuple1->getNumElements() != tuple2->getNumElements()) {
@@ -1434,9 +1470,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::Tuple: {
       auto tuple1 = cast<TupleType>(desugar1);
       auto tuple2 = cast<TupleType>(desugar2);
-      if (auto result = matchTupleTypes(tuple1, tuple2, kind, flags, locator,
-                                        trivial))
-        return *result;
+      if (shouldTryTupleToTupleMatch(tuple1, tuple2, kind, locator))
+        return matchTupleTypes(tuple1, tuple2, kind, flags, locator, trivial);
 
       // Break out to attempt scalar-to-tuple conversion, below.
       break;
