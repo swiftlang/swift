@@ -198,6 +198,9 @@ public:
   /// Return the native, absolute path to the main file.
   StringRef getMainFilename() const { return MainFilename; }
 
+  /// Return the DIBuilder.
+  llvm::DIBuilder &getBuilder() { return DBuilder; }
+
 private:
   StringRef BumpAllocatedString(const char* Data, size_t Length);
   StringRef BumpAllocatedString(std::string S);
@@ -267,6 +270,35 @@ private:
                                   bool Indirect);
   DebugTypeInfo &getSwiftType();
 };
+
+/// ArtificialLocation - An RAII object that temporarily switches to
+/// an artificial debug location that has a valid scope, but no line
+/// information. This is useful when emitting compiler-generated
+/// instructions (e.g., ARC-inserted calls to release()) that have no
+/// source location associated with them. The DWARF specification
+/// allows the compiler to use the special line number 0 to indicate
+/// code that can not be attributed to any source location.
+class ArtificialLocation {
+  IRGenDebugInfo *DI;
+public:
+  /// Set the current location to line 0, but within the current scope
+  /// (= the top of the LexicalBlockStack).
+  ArtificialLocation(IRGenDebugInfo *DI, IRBuilder &Builder) : DI(DI) {
+    if (DI) {
+      DI->pushLoc();
+      llvm::DIDescriptor Scope(Builder.getCurrentDebugLocation().
+                               getScope(Builder.getContext()));
+      auto DL = llvm::DebugLoc::get(0, 0, Scope);
+      Builder.SetCurrentDebugLocation(DL);
+    }
+  }
+
+  /// ~ArtificialLocation - Autorestore everything back to normal.
+  ~ArtificialLocation() {
+    if (DI) DI->popLoc();
+  }
+};
+
 
 } // irgen
 } // swift
