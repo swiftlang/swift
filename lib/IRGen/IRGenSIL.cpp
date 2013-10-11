@@ -952,17 +952,26 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   Builder.SetInsertPoint(llBB);
 
   if (IGM.DebugInfo && BB->pred_empty()) {
-    // Function start. Emit debug info for any captured variables.
+    // This is the prologue of a function.
+    // Emit debug info for any captured and promoted [inout] variables.
     int ArgNo = 0;
     for (auto Arg : BB->getBBArgs()) {
       ++ArgNo;
       if (Arg->getDecl()) {
-        auto Name = Arg->getDecl()->getName().str();
-        auto AddrIR = emitShadowCopy(getLoweredAddress(Arg), Name);
-        DebugTypeInfo DTI(Arg->getType().getSwiftType(),
-                          getTypeInfo(Arg->getType()));
-        IGM.DebugInfo->emitArgVariableDeclaration
-          (Builder, AddrIR, DTI, Name, ArgNo, IndirectValue);
+        LoweredValue const &LoweredArg = getLoweredValue(Arg);
+        if (LoweredArg.isAddress()) {
+          // LValues are indirect by definition.
+          bool IsIndirect = true;
+          if (Arg->getDecl()->getType()->getKind() == TypeKind::LValue)
+            IsIndirect = false;
+
+          auto Name = Arg->getDecl()->getName().str();
+          auto AddrIR = emitShadowCopy(LoweredArg.getAddress(), Name);
+          DebugTypeInfo DTI(Arg->getType().getSwiftType(),
+                            getTypeInfo(Arg->getType()));
+          IGM.DebugInfo->emitArgVariableDeclaration
+            (Builder, AddrIR, DTI, Name, ArgNo, IsIndirect);
+        }
       }
     }
   }
