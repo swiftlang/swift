@@ -16,3 +16,9 @@ add_swift_library(swiftSIL
   Verifier.cpp
   DEPENDS swiftAST)
 
+# Clang dependencies.
+# FIXME: remove this.  SIL should not depend on Clang.
+target_link_libraries(swiftSIL
+  clangLex
+  clangAST
+  clangBasic)
