@@ -132,12 +132,19 @@ private:
     }
 
     // Add fields.
-    for (auto member : theClass->getMembers()) {
-      if (auto field = dyn_cast<VarDecl>(member))
-        if (!field->isComputed())
-          addFieldEntries(field);
+    if (IsObjectGenericallyArranged) {
+      asImpl().noteStartOfFieldOffsets();
+      for (auto member : theClass->getMembers()) {
+        if (auto field = dyn_cast<VarDecl>(member))
+          if (!field->isComputed())
+            addFieldEntries(field);
+      }
     }
   }
+  
+  /// Notes the beginning of the field offset vector for generic-layout
+  /// classes.
+  void noteStartOfFieldOffsets() {}
 
 private:
   /// Add fields related to the generics of this class declaration.

@@ -152,23 +152,22 @@ namespace {
   };
   
   /// Find the beginning of the field offset vector in a struct's metadata.
-  struct GetStartOfFieldOffsets
-    : StructMetadataScanner<GetStartOfFieldOffsets>
-  {
-  public:
-    GetStartOfFieldOffsets(IRGenModule &IGM, StructDecl *target)
-      : StructMetadataScanner(IGM, target) {}
-    
-    unsigned StartOfFieldOffsets = ~0U;
-    
-    void noteAddressPoint() { NextIndex = 0; }
-    void noteStartOfFieldOffsets() { StartOfFieldOffsets = NextIndex; }
-  };
-  
   static Address
   emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
                                  StructDecl *S,
                                  llvm::Value *metadata) {
+    struct GetStartOfFieldOffsets
+      : StructMetadataScanner<GetStartOfFieldOffsets>
+    {
+      GetStartOfFieldOffsets(IRGenModule &IGM, StructDecl *target)
+        : StructMetadataScanner(IGM, target) {}
+      
+      unsigned StartOfFieldOffsets = ~0U;
+      
+      void noteAddressPoint() { NextIndex = 0; }
+      void noteStartOfFieldOffsets() { StartOfFieldOffsets = NextIndex; }
+    };
+    
     // Find where the field offsets begin.
     GetStartOfFieldOffsets scanner(IGF.IGM, S);
     scanner.layout();
