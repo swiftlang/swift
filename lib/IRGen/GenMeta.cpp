@@ -646,10 +646,14 @@ namespace {
     using super::Fields;
     using super::asImpl;
     
+    /// Set to true if the metadata record for the generic type has fields
+    /// outside of the generic parameter vector.
+    bool HasDependentMetadata = false;
+    
     /// Set to true if the value witness table for the generic type is dependent
     /// on its generic parameters. If true, the value witness will be
     /// tail-emplaced inside the metadata pattern and initialized by the fill
-    /// function.
+    /// function. Implies HasDependentMetadata.
     bool HasDependentVWT = false;
     
     /// The index of the tail-allocated dependent VWT, if any.
@@ -698,8 +702,17 @@ namespace {
         IGF.Builder.CreateStore(IGF.Builder.CreateLoad(src), dest);
       }
       
+      // Derive the metadata value.
+      auto addressPointAddr = IGF.Builder.CreateConstArrayGEP(fullMetaWords,
+                                                          AddressPoint,
+                                                          IGM.getPointerSize());
+      llvm::Value *metadataValue
+        = IGF.Builder.CreateBitCast(addressPointAddr.getAddress(),
+                                    IGF.IGM.TypeMetadataPtrTy);
+      
       // Initialize the instantiated dependent value witness table, if we have
       // one.
+      llvm::Value *vwtableValue;
       if (HasDependentVWT) {
         assert(AddressPoint >= 1 && "did not set valid address point!");
         assert(DependentVWTPoint != 0 && "did not set dependent VWT point!");
@@ -716,19 +729,13 @@ namespace {
                                                           IGM.getPointerSize());
         IGF.Builder.CreateStore(vwtAddrVal, vwtRefAddr);
 
-        // The metadata should be initialized enough now that we can bind
-        // archetypes for the 'self' type from it.
-        auto addressPointAddr = IGF.Builder.CreateConstArrayGEP(fullMetaWords,
-                                                          AddressPoint,
-                                                          IGM.getPointerSize());
-        llvm::Value *metadataValue
-          = IGF.Builder.CreateBitCast(addressPointAddr.getAddress(),
-                                      IGF.IGM.TypeMetadataPtrTy);
+        vwtableValue = IGF.Builder.CreateBitCast(vwtAddr.getAddress(),
+                                                 IGF.IGM.WitnessTablePtrTy);
         
-        llvm::Value *vwtableValue
-          = IGF.Builder.CreateBitCast(vwtAddr.getAddress(),
-                                      IGF.IGM.WitnessTablePtrTy);
-        
+        HasDependentMetadata = true;
+      }
+
+      if (HasDependentMetadata) {
         asImpl().emitInitializeMetadata(IGF, metadataValue, vwtableValue);
       }
       
@@ -1031,28 +1038,176 @@ namespace {
       }
     }
   };
+  
+  Address emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
+                                                    ClassDecl *theClass,
+                                                    llvm::Value *metadata) {
+    struct GetOffsetToSuperclassRef
+      : ClassMetadataScanner<GetOffsetToSuperclassRef>
+    {
+    public:
+      GetOffsetToSuperclassRef(IRGenModule &IGM, ClassDecl *target)
+        : ClassMetadataScanner(IGM, target) {}
+      
+      unsigned Result = ~0U;
+      
+      void noteAddressPoint() {
+        assert(Result == ~0U && "found superclass before address point?!");
+        NextIndex = 0;
+      }
+      
+      void addSuperClass() {
+        Result = NextIndex++;
+      }
+    };
+    
+    GetOffsetToSuperclassRef scanner(IGF.IGM, theClass);
+    scanner.layout();
+    assert(scanner.Result != ~0U && "did not find superclass?!");
+    
+    Address addr(metadata, IGF.IGM.getPointerAlignment());
+    addr = IGF.Builder.CreateBitCast(addr,
+                                     IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+    return IGF.Builder.CreateConstArrayGEP(addr, scanner.Result,
+                                           IGF.IGM.getPointerSize());
+  }
+  
+  Address emitAddressOfFieldOffsetVectorInClassMetadata(IRGenFunction &IGF,
+                                                        ClassDecl *theClass,
+                                                        llvm::Value *metadata) {
+    struct GetOffsetToFieldOffsetVector
+      : ClassMetadataScanner<GetOffsetToFieldOffsetVector>
+    {
+    public:
+      GetOffsetToFieldOffsetVector(IRGenModule &IGM, ClassDecl *target)
+        : ClassMetadataScanner(IGM, target) {}
+      
+      unsigned Result = ~0U;
+      
+      void noteAddressPoint() {
+        assert(Result == ~0U && "found field offsets before address point?!");
+        NextIndex = 0;
+      }
+      
+      void noteStartOfFieldOffsets() {
+        Result = NextIndex;
+      }
+    };
+
+    GetOffsetToFieldOffsetVector scanner(IGF.IGM, theClass);
+    scanner.layout();
+    assert(scanner.Result != ~0U && "did not find field offset vector?!");
+    
+    Address addr(metadata, IGF.IGM.getPointerAlignment());
+    addr = IGF.Builder.CreateBitCast(addr,
+                                     IGF.IGM.SizeTy->getPointerTo());
+    return IGF.Builder.CreateConstArrayGEP(addr, scanner.Result,
+                                           IGF.IGM.getPointerSize());
+  }
 
   /// A builder for metadata templates.
   class GenericClassMetadataBuilder :
     public GenericMetadataBuilderBase<GenericClassMetadataBuilder,
-                      ClassMetadataBuilderBase<GenericClassMetadataBuilder>> {
-
+                      ClassMetadataBuilderBase<GenericClassMetadataBuilder>>
+  {
     typedef GenericMetadataBuilderBase super;
 
+    bool HasDependentSuperclass = false;
+    bool HasDependentFieldOffsetVector = false;
   public:
     GenericClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                                 const StructLayout &layout,
                                 const GenericParamList &classGenerics)
-      : super(IGM, classGenerics, theClass, layout) {}
+      : super(IGM, classGenerics, theClass, layout)
+    {
+      // If the superclass is generic, we'll need to initialize the superclass
+      // reference at runtime.
+      if (theClass->hasSuperclass() &&
+          theClass->getSuperclass()->is<BoundGenericClassType>()) {
+        HasDependentSuperclass = true;
+        HasDependentMetadata = true;
+      }
+    }
                         
     void addDependentValueWitnessTablePattern() {
       llvm_unreachable("classes should never have dependent vwtables");
     }
+                        
+    void noteStartOfFieldOffsets() {
+      // If the metadata contains a field offset vector, then we need to
+      // initialize it at runtime.
+      HasDependentFieldOffsetVector = true;
+      HasDependentMetadata = true;
+    }
 
     void emitInitializeMetadata(IRGenFunction &IGF,
-                                         llvm::Value *metadata,
-                                         llvm::Value *vwtable) {
-      llvm_unreachable("classes should never have dependent vwtables");
+                                llvm::Value *metadata,
+                                llvm::Value *vwtable) {
+      emitPolymorphicParametersForGenericValueWitness(IGF,
+                                                      TargetClass,
+                                                      metadata);
+
+      assert((HasDependentSuperclass || HasDependentFieldOffsetVector)
+             && "no dependent metadata parts?!");
+      
+      assert(!HasDependentVWT && "class should never have dependent VWT");
+      
+      // Get the superclass metadata.
+      llvm::Value *superMetadata;
+      if (TargetClass->hasSuperclass()) {
+        superMetadata = IGF.emitTypeMetadataRef(
+                            TargetClass->getSuperclass()->getCanonicalType());
+      } else {
+        assert(!HasDependentSuperclass
+               && "dependent superclass without superclass?!");
+        superMetadata
+          = llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
+      }
+      
+      // If the superclass is generic, populate the superclass field.
+      if (HasDependentSuperclass) {
+        Address superField
+          = emitAddressOfSuperclassRefInClassMetadata(IGF,TargetClass,metadata);
+        IGF.Builder.CreateStore(superMetadata, superField);
+      }
+      
+      // If the field layout is dependent, ask the runtime to populate the
+      // offset vector.
+      if (HasDependentFieldOffsetVector) {
+        llvm::Value *fieldVector
+          = emitAddressOfFieldOffsetVectorInClassMetadata(IGF,
+                                                          TargetClass, metadata)
+              .getAddress();
+        
+        // Collect the stored properties of the type.
+        llvm::SmallVector<VarDecl*, 4> storedProperties;
+        for (auto prop : TargetClass->getStoredProperties()) {
+          storedProperties.push_back(prop);
+        }
+        // Fill out an array with the field type metadata records.
+        Address fields = IGF.createAlloca(
+                         llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy,
+                                              storedProperties.size()),
+                         IGF.IGM.getPointerAlignment(), "classFields");
+        fields = IGF.Builder.CreateBitCast(fields,
+                                     IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+        unsigned index = 0;
+        for (auto prop : storedProperties) {
+          llvm::Value *metadata = IGF.emitTypeMetadataRef(
+                                           prop->getType()->getCanonicalType());
+          Address field = IGF.Builder.CreateConstArrayGEP(fields, index,
+                                                      IGF.IGM.getPointerSize());
+          IGF.Builder.CreateStore(metadata, field);
+          ++index;
+        }
+        
+        // Ask the runtime to lay out the class.
+        auto numFields = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                                storedProperties.size());
+        IGF.Builder.CreateCall4(IGF.IGM.getInitClassMetadataUniversalFn(),
+                                superMetadata, numFields, fields.getAddress(),
+                                fieldVector);
+      }
     }
   };
 }

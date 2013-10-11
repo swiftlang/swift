@@ -164,7 +164,11 @@ namespace {
       
       unsigned StartOfFieldOffsets = ~0U;
       
-      void noteAddressPoint() { NextIndex = 0; }
+      void noteAddressPoint() {
+        assert(StartOfFieldOffsets == ~0U
+               && "found field offsets before address point?");
+        NextIndex = 0;
+      }
       void noteStartOfFieldOffsets() { StartOfFieldOffsets = NextIndex; }
     };
     
@@ -253,7 +257,7 @@ namespace {
                               ->getStoredProperties()) {
         storedProperties.push_back(prop);
       }
-      // Fill out an array with the field metadata.
+      // Fill out an array with the field type metadata records.
       Address fields = IGF.createAlloca(
                        llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy,
                                             storedProperties.size()),

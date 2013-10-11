@@ -11,6 +11,8 @@ import gizmo
 // -- offset of RootGeneric<T>.x
 // CHECK: @_TWvdC15generic_classes11RootGeneric1xVSs5UInt8 = global i64 16, align 8
 // CHECK: @_TMPdC15generic_classes11RootGeneric = global { {{.*}} i64 } {
+// --       template fill function
+// CHECK:   void (i8*, i8*)* [[FILL_ROOTGENERIC:@fill_generic_metadata[0-9]*]],
 // --       field offset placeholders
 // CHECK:   i64 0, i64 0, i64 0
 // CHECK: }
@@ -143,7 +145,7 @@ entry(%z : $*F, %c : $RootGeneric<F>):
   return %t : $()
 }
 
-// RootGeneric.y has dependent layout; load the offset from the metadata
+// RootGeneric.z has dependent layout; load the offset from the metadata
 // CHECK: define i8 @RootGeneric_concrete_fragile_dependent_member_access_z
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
 // CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i8*** [[TYPE_METADATA_ARRAY]], i64 11
@@ -192,3 +194,8 @@ entry:
   %v = tuple ()
   return %v : $()
 }
+
+// CHECK: define internal void [[FILL_ROOTGENERIC]](i8*, i8*) {
+// -- initialize the dependent field offsets
+// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* null, i64 3, %swift.type** {{%.*}}, i64* {{%.*}})
+// }
