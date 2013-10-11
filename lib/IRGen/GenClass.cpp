@@ -236,12 +236,12 @@ namespace {
         if (var->isComputed())
           continue;
 
-        Fields.push_back(FieldEntry(var, getCurFieldAccess()));
-
         // Adjust based on the type of this field.
         // FIXME: this algorithm is assuming that fields are laid out
         // in declaration order.
         adjustAccessAfterField(var, type);
+
+        Fields.push_back(FieldEntry(var, getCurFieldAccess()));
       }
     }
 
@@ -433,9 +433,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
 
       Address baseAddr(base, baseClassTI.getHeapAlignment(IGF.IGM));
       auto &element = baseClassTI.getElements(IGF.IGM)[fieldIndex];
-      Address memberAddr = element.project(IGF, baseAddr,
-                                           // FIXME: non-fixed offsets
-                                           Nothing);
+      Address memberAddr = element.project(IGF, baseAddr, Nothing);
       return OwnedAddress(memberAddr, base);
     }
       

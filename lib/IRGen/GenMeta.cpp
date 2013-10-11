@@ -1641,7 +1641,8 @@ llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
                                          VarDecl *field,
                                          llvm::Value *metadata) {
   int index = FindClassFieldOffset(IGF.IGM, theClass, field).getTargetIndex();
-  return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
+  llvm::Value *val = emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
+  return IGF.Builder.CreatePtrToInt(val, IGF.IGM.SizeTy);
 }
 
 /// Given a pointer to a heap object (i.e. definitely not a tagged

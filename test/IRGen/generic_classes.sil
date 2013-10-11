@@ -5,6 +5,7 @@ import Builtin
 import swift
 import gizmo
 
+// CHECK: [[ROOTGENERIC:%C15generic_classes11RootGeneric]] = type <{ %swift.refcounted, %VSs5UInt8 }>
 // CHECK: [[NONGENERICINHERITSGENERIC:%C15generic_classes25NonGenericInheritsGeneric]] = type <{ %swift.refcounted, %VSs5UInt8, [7 x i8], <{ %Si, %VSs5UInt8 }>, %VSs5UInt8, [6 x i8], %Si }>
 
 // -- offset of RootGeneric<T>.x
@@ -114,6 +115,64 @@ class GenericInheritsObjC2<E> : Gizmo {
   var y : E
   var z : UInt8
 }
+
+// RootGeneric.x has fixed layout
+// CHECK: define i8 @RootGeneric_concrete_fragile_dependent_member_access_x
+// CHECK:   getelementptr inbounds [[ROOTGENERIC]]* %0, i32 0, i32 1
+sil @RootGeneric_concrete_fragile_dependent_member_access_x : $<F> RootGeneric<F> -> UInt8 {
+entry(%c : $RootGeneric<F>):
+  %p = ref_element_addr %c : $RootGeneric<F>, #x
+  %x = load %p : $*UInt8
+  return %x : $UInt8
+}
+
+// RootGeneric.y has dependent layout; load the offset from the metadata
+// CHECK: define void @RootGeneric_concrete_fragile_dependent_member_access_y
+// CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
+// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i8*** [[TYPE_METADATA_ARRAY]], i64 10
+// CHECK:   [[Y_OFFSET_PTR:%.*]] = load i8*** [[Y_OFFSET_ADDR]], align 8
+// CHECK:   [[Y_OFFSET:%.*]] = ptrtoint i8** [[Y_OFFSET_PTR]] to i64
+// CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
+// CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds i8* [[CLASS_BYTE_ARRAY]], i64 [[Y_OFFSET]]
+// CHECK:   bitcast i8* [[Y_ADDR]] to %swift.opaque*
+sil @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> RootGeneric<F> -> F {
+entry(%z : $*F, %c : $RootGeneric<F>):
+  %p = ref_element_addr %c : $RootGeneric<F>, #y
+  copy_addr %p to [initialization] %z : $*F
+  %t = tuple ()
+  return %t : $()
+}
+
+// RootGeneric.y has dependent layout; load the offset from the metadata
+// CHECK: define i8 @RootGeneric_concrete_fragile_dependent_member_access_z
+// CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
+// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i8*** [[TYPE_METADATA_ARRAY]], i64 11
+// CHECK:   [[Z_OFFSET_PTR:%.*]] = load i8*** [[Z_OFFSET_ADDR]], align 8
+// CHECK:   [[Z_OFFSET:%.*]] = ptrtoint i8** [[Z_OFFSET_PTR]] to i64
+// CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
+// CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds i8* [[CLASS_BYTE_ARRAY]], i64 [[Z_OFFSET]]
+// CHECK:   bitcast i8* [[Z_ADDR]] to %VSs5UInt8*
+sil @RootGeneric_concrete_fragile_dependent_member_access_z : $<F> RootGeneric<F> -> UInt8 {
+entry(%c : $RootGeneric<F>):
+  %p = ref_element_addr %c : $RootGeneric<F>, #z
+  %z = load %p : $*UInt8
+  return %z : $UInt8
+}
+
+/* TODO: Instantiate types for fragile generic instances so we can do
+ * fixed-layout access
+sil @RootGeneric_concrete_fragile_fixed_member_access : $RootGeneric<Int32> -> (UInt8, Int32, UInt8) {
+entry(%c : $RootGeneric<Int32>):
+  %p = ref_element_addr %c : $RootGeneric<Int32>, #x
+  %x = load %p : $*UInt8
+  %q = ref_element_addr %c : $RootGeneric<Int32>, #y
+  %y = load %q : $*Int32
+  %r = ref_element_addr %c : $RootGeneric<Int32>, #z
+  %z = load %r : $*UInt8
+  %t = tuple (%x : $UInt8, %y : $Int32, %z : $UInt8)
+  return %t : $(UInt8, Int32, UInt8)
+}
+ */
 
 // CHECK: define i64 @NonGenericInheritsGeneric_fragile_fixed_member_access([[NONGENERICINHERITSGENERIC]]*) {
 // CHECK:   %1 = getelementptr inbounds [[NONGENERICINHERITSGENERIC]]* %0, i32 0, i32 6
