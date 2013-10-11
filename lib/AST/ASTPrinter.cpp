@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
@@ -224,12 +225,14 @@ void PrintAST::printTypedPattern(const TypedPattern *TP,
                                  bool StripOuterSliceType) {
   printPattern(TP->getSubPattern());
   OS << ": ";
-  Type T = TP->getTypeLoc().getType();
   if (StripOuterSliceType) {
-    if (auto *BGT = T->getAs<BoundGenericType>())
-      T = BGT->getGenericArgs()[0];
+    Type T = TP->getType();
+    if (auto *BGT = T->getAs<BoundGenericType>()) {
+      OS << BGT->getGenericArgs()[0];
+      return;
+    }
   }
-  OS << T;
+  printTypeLoc(TP->getTypeLoc());
 }
 
 void PrintAST::printPattern(const Pattern *pattern) {
