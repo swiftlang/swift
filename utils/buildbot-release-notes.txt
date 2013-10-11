@@ -134,13 +134,13 @@
       func next() -> Element?
     }
 
-  The single method next() advances the iterator and returns an Optional,
-  which is either .Some(value) to produce the next value out of the underlying
-  sequence, or .None to signal end of sequence. This is an improvement over the
-  previous Enumerator protocol because the "isEmpty" and "next" operations are
-  fused into a single safe operation; it is safe to apply "next" to an empty
-  sequence (and receive .None) without having to query an extra predicate first.
-
+  The single method next() advances the generator and returns an
+  Optional, which is either .Some(value), wrapping the next value out
+  of the underlying sequence, or .None to signal that there are no
+  more elements. This is an improvement over the previous Enumerator
+  protocol because it eliminates the separate isEmpty() query and
+  better reflects the semantics of ephemeral sequences like
+  un-buffered input streams.
 
 2013-10-02
 ----------
