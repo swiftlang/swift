@@ -828,8 +828,23 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // If there are any disjunction constraints, solve one of them now.
   if (!disjunctions.empty()) {
-    // FIXME: Pick the smallest or largest disjunction? Does it matter?
+    // Pick the smallest disjunction.
+    // FIXME: This heuristic isn't great, but it helped somewhat for
+    // overload sets.
     auto disjunction = disjunctions[0];
+    auto bestSize = disjunction->getNestedConstraints().size();
+    if (bestSize > 2) {
+      for (auto contender : llvm::makeArrayRef(disjunctions).slice(1)) {
+        unsigned newSize = contender->getNestedConstraints().size();
+        if (newSize < bestSize) {
+          bestSize = newSize;
+          disjunction = contender;
+
+          if (bestSize == 2)
+            break;
+        }
+      }
+    }
 
     // Remove this disjunction constraint from the list.
     unsigned disjunctionIdx = std::find(Constraints.begin(), Constraints.end(),
