@@ -25,6 +25,7 @@
 
 namespace swift {
 
+class ArchetypeType;
 class ASTContext;
 class LazyResolver;
 class Module;
@@ -297,6 +298,20 @@ namespace llvm {
     }
     static inline swift::TypeBase *getFromVoidPointer(void *P) {
       return (swift::TypeBase*)P;
+    }
+    enum { NumLowBitsAvailable = 3 };
+  };
+
+  // ArchetypeType* is always at least eight-byte aligned; make the three tag
+  // bits available through PointerLikeTypeTraits.
+  template<>
+  class PointerLikeTypeTraits<swift::ArchetypeType*> {
+  public:
+    static inline void *getAsVoidPointer(swift::ArchetypeType *I) {
+      return (void*)I;
+    }
+    static inline swift::ArchetypeType *getFromVoidPointer(void *P) {
+      return (swift::ArchetypeType*)P;
     }
     enum { NumLowBitsAvailable = 3 };
   };

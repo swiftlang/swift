@@ -1,5 +1,7 @@
 add_swift_library(swiftSema
   ArchetypeBuilder.cpp
+  Constraint.cpp
+  ConstraintLocator.cpp
   NameBinding.cpp
   SourceLoader.cpp
   DerivedConformanceRawRepresentable.cpp
