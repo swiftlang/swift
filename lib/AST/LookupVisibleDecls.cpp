@@ -349,8 +349,6 @@ static void lookupVisibleMemberDeclsImpl(
       break;
     }
   } while (1);
-
-  // FIXME: Weed out overridden methods.
 }
 
 namespace {
