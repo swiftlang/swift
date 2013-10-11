@@ -199,10 +199,10 @@ static FullLocation getLocation(SourceManager &SM, Optional<SILLocation> OptLoc)
 
   if (Loc.isNull()) return {};
   if (Expr *E = Loc.getAsASTNode<Expr>()) {
-    // auto_closures should not show up in the line table. Note that the
+    // closures should not show up in the line table. Note that the
     // closure function still has a valid DW_AT_decl_line.
     auto ELoc = getLoc(SM, E);
-    if (isa<AutoClosureExpr>(E))
+    if (isa<AbstractClosureExpr>(E))
       return {{}, ELoc};
     return {ELoc, ELoc};
   }
