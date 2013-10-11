@@ -22,7 +22,7 @@ using namespace swift;
 namespace {
   class Conventions {
   protected:
-    ~Conventions() = default;
+    virtual ~Conventions() = default;
   public:
     virtual ParameterConvention getIndirectParameter(unsigned index,
                                                      CanType type) const = 0;
