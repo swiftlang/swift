@@ -75,7 +75,9 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
     Types(Types),
     LastFn(nullptr),
     SwiftType(nullptr),
-    LastLoc({}), LastScope(nullptr) {
+    LastLoc({}),
+    LastScope(nullptr)
+{
   assert(Opts.DebugInfo);
   StringRef Dir, Filename;
   if (Opts.MainInputFilename.empty()) {
@@ -167,7 +169,7 @@ Location getLoc(SourceManager &SM, WithLoc *S, bool End = false) {
 }
 
 /// getLoc - extract the start location from a SILLocation.
-static Location getLoc(SourceManager &SM, Optional<SILLocation> OptLoc) {
+static Location getASTLocation(SourceManager &SM, Optional<SILLocation> OptLoc) {
   if (!OptLoc)
     return {};
 
@@ -182,11 +184,14 @@ static Location getLoc(SourceManager &SM, Optional<SILLocation> OptLoc) {
 }
 
 /// getLocForLinetable - extract the start location from a SILLocation.
+///
+/// This returns a FullLocation, which contains the location that
+/// should be used for the linetable and the "true" AST location.
+///
 /// NOTE: Depending on how we decide to resolve
 /// rdar://problem/14627460, we may want to use the regular
 /// getLoc instead and rather use the column info.
-static Location getLocForLinetable(SourceManager &SM,
-                                   Optional<SILLocation> OptLoc) {
+static FullLocation getLocation(SourceManager &SM, Optional<SILLocation> OptLoc) {
   if (!OptLoc)
     return {};
 
@@ -196,18 +201,46 @@ static Location getLocForLinetable(SourceManager &SM,
   if (Expr *E = Loc.getAsASTNode<Expr>()) {
     // auto_closures should not show up in the line table. Note that the
     // closure function still has a valid DW_AT_decl_line.
+    auto ELoc = getLoc(SM, E);
     if (isa<AutoClosureExpr>(E))
-      return {};
-    return getLoc(SM, E);
+      return {{}, ELoc};
+    return {ELoc, ELoc};
   }
-  if (Pattern* P = Loc.getAsASTNode<Pattern>()) return getLoc(SM, P);
-  if (Stmt* S = Loc.getAsASTNode<Stmt>()) return getLoc(SM, S);
-  if (Decl* D = Loc.getAsASTNode<Decl>())
+  if (Pattern* P = Loc.getAsASTNode<Pattern>()) {
+    auto PLoc = getLoc(SM, P);
+    return {PLoc, PLoc};
+  }
+  if (Stmt* S = Loc.getAsASTNode<Stmt>()) {
+    auto SLoc = getLoc(SM, S);
+    return {SLoc, SLoc};
+  }
+
+  if (Decl* D = Loc.getAsASTNode<Decl>()) {
+    if (auto VD = dyn_cast<VarDecl>(D)) {
+      // Normally, the code that allocates storage for function
+      // arguments would end up with a location pointing to the
+      // argument declaration, but this will just confuse users that
+      // single-step through the function. So until LLDB and Xcode
+      // actually display column info, we will set any VarDecl's
+      // location that is before the opening { of the function to the
+      // beginning of the function.
+      auto VarLoc = getLoc(SM, VD);
+      if (auto Fn = dyn_cast<AbstractFunctionDecl>(VD->getDeclContext())) {
+        auto FnLoc = getLoc(SM, Fn->getBody());
+        if (FnLoc.Line > 0 && FnLoc.Line > VarLoc.Line)
+          return {FnLoc, VarLoc};
+      }
+      return {VarLoc, VarLoc};
+    }
+
     // FIXME: It may or may not be better to fix this in SILLocation.
-    return getLoc(SM, D, Loc.getKind() == SILLocation::ImplicitReturnKind);
+    // If this is an implicit return, we want the end of the
+    // AbstructFunctionDecl's body.
+    auto DLoc = getLoc(SM, D, Loc.getKind() == SILLocation::ImplicitReturnKind);
+    return {DLoc, DLoc};
+  }
 
   llvm_unreachable("unexpected location type");
-  //  return {};
 }
 
 /// Determine whether this debug scope belongs to an explicit closure.
@@ -222,29 +255,34 @@ static bool isExplicitClosure(SILDebugScope *DS) {
 void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
                                    SILDebugScope *DS,
                                    Optional<SILLocation> Loc) {
-  Location L = getLocForLinetable(SM, Loc);
+  FullLocation L = getLocation(SM, Loc);
 
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
   if (!Scope.Verify()) return;
 
-  if (L.Filename && L.Filename != getLoc(SM, DS->Loc).Filename) {
+  if (L.LocForLinetable.Filename &&
+      L.LocForLinetable.Filename !=
+      getLocation(SM, DS->Loc).LocForLinetable.Filename) {
     // We changed files in the middle of a scope. This happens, for
     // example, when constructors are inlined. Create a new scope to
     // reflect this.
-    Scope = DBuilder.createLexicalBlockFile(Scope, getOrCreateFile(L.Filename));
+    auto File = getOrCreateFile(L.LocForLinetable.Filename);
+    Scope = DBuilder.createLexicalBlockFile(Scope, File);
   }
 
-  if (L.Line == 0 && DS == LastScope) {
+  if (L.LocForLinetable.Line == 0 && DS == LastScope) {
     // Reuse the last source location if we are still in the same
     // scope to get a more contiguous line table.
-    L.Line = LastLoc.Line;
-    L.Col = LastLoc.Col;
+    L = LastLoc;
+    //L.Line = LastLoc.Line;
+    //L.Col = LastLoc.Col;
   }
   LastLoc = L;
   LastScope = DS;
 
   llvm::MDNode *InlinedAt = 0;
-  auto DL = llvm::DebugLoc::get(L.Line, L.Col, Scope, InlinedAt);
+  auto DL = llvm::DebugLoc::get(L.LocForLinetable.Line, L.LocForLinetable.Col,
+                                Scope, InlinedAt);
   // TODO: Write a strongly-worded letter to the person that came up
   // with a pair of functions spelled "get" and "Set".
   Builder.SetCurrentDebugLocation(DL);
@@ -261,7 +299,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
     return llvm::DIDescriptor(cast<llvm::MDNode>(CachedScope->second));
   }
 
-  Location L = getLoc(SM, DS->Loc);
+  Location L = getLocation(SM, DS->Loc).LocForLinetable;
   llvm::DIFile File = getOrCreateFile(L.Filename);
   llvm::DIDescriptor Parent = getOrCreateScope(DS->Parent);
   if (Parent == 0)
@@ -446,8 +484,8 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   Location L = {};
   Location PrologLoc = {};
   if (DS) {
-    L = getLoc(SM, DS->Loc);
-    PrologLoc = getLocForLinetable(SM, DS->Loc);
+    L = getLocation(SM, DS->Loc).Loc;
+    PrologLoc = getLocation(SM, DS->Loc).LocForLinetable;
     Name = getName(DS->Loc);
   }
   assert(Fn);
@@ -560,7 +598,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
 
   // Create the imported module.
   StringRef Name = BumpAllocatedString(Printed);
-  Location L = getLoc(SM, D);
+  Location L = getASTLocation(SM, D);
   auto Import = DBuilder.createImportedModule(TheCU,
                                               llvm::DINameSpace(Namespace),
                                               L.Line, Name);
@@ -779,7 +817,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
   if (!DTy)
     return;
 
-  unsigned Line = DL.getLine();
+  unsigned Line = LastLoc.Loc.Line;
   unsigned Flags = 0;
   if (Artificial)
     Flags |= llvm::DIDescriptor::FlagArtificial;
@@ -810,7 +848,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                                    StringRef LinkageName,
                                                    DebugTypeInfo DebugType,
                                                    Optional<SILLocation> Loc) {
-  Location L = getLoc(SM, Loc);
+  Location L = getASTLocation(SM, Loc);
   llvm::DIFile Unit = getOrCreateFile(L.Filename);
 
   // FIXME: Can there be nested types?

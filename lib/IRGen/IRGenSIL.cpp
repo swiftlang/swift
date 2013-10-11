@@ -2057,7 +2057,9 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     // LValues [inout] are implicitly indirect because of their type.
     if (Decl && Decl->getType()->getKind() == TypeKind::LValue)
       IsIndirect = false;
-
+    // FIXME: [inout] arguments that are not promoted are emitted as
+    // arguments and also boxed and thus may show up twice. This may
+    // or may not be bad.
     IGM.DebugInfo->emitStackVariableDeclaration
       (Builder,
        emitShadowCopy(addr.getAddress(), Name),

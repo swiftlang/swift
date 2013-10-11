@@ -60,6 +60,11 @@ typedef struct {
   const char* Filename;
 } Location;
 
+typedef struct {
+  Location LocForLinetable, Loc;
+} FullLocation;
+
+
 enum IndirectionKind: bool { DirectValue = false, IndirectValue = true };
 enum ArtificialKind: bool { RealMcCoy = false, Artificial = true };
 
@@ -98,10 +103,11 @@ class IRGenDebugInfo {
   llvm::DIFile MainFile;
   DebugTypeInfo *SwiftType; /// The cached debug type for swift.type.
 
-  Location LastLoc; /// The last location that was emitted.
+  FullLocation LastLoc; /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
 
-  SmallVector<std::pair<Location, SILDebugScope*>, 8> LocationStack;
+  SmallVector<std::pair<FullLocation, SILDebugScope*>, 8>
+  LocationStack; /// Used by pushLoc.
 
 public:
   IRGenDebugInfo(const Options &Opts,
