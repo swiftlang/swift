@@ -1818,47 +1818,35 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
     }
     
-    if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass()) {
-      // Determines whether the first type is derived from the second.
-      auto solveDerivedFrom =
-        [&](Type type1, Type type2) -> Optional<SolutionKind> {
-          // If the type we're converting to is an archetype, fail; we have
-          // no idea which class the archetype will end up being at run time.
-          if (type2->is<ArchetypeType>()) {
-            return Nothing;
-          }
+    if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass() &&
+        type2->getClassOrBoundGenericClass()) {
+      bool tryUserConversions = shouldTryUserConversion(*this, type1);
+      auto classDecl2 = type2->getClassOrBoundGenericClass();
+      bool done = false;
+      for (auto super1 = TC.getSuperClassOf(type1);
+           !done && super1;
+           super1 = TC.getSuperClassOf(super1)) {
+        if (super1->getClassOrBoundGenericClass() != classDecl2)
+          continue;
 
-          auto classDecl2 = type2->getClassOrBoundGenericClass();
+        // FIXME: If we end up generating any constraints from this
+        // match, we can't solve them immediately. We'll need to
+        // split into another system.
+        switch (auto result = matchTypes(super1, type2,
+                                         TypeMatchKind::SameType,
+                                         TMF_GenerateConstraints, locator,
+                                         trivial)) {
+        case SolutionKind::Error:
+          if (!tryUserConversions)
+            return result;
+          break;
 
-          for (auto super1 = TC.getSuperClassOf(type1); super1;
-               super1 = TC.getSuperClassOf(super1)) {
-            if (super1->getClassOrBoundGenericClass() != classDecl2)
-              continue;
-
-            // FIXME: If we end up generating any constraints from this
-            // match, we can't solve them immediately. We'll need to
-            // split into another system.
-            switch (auto result = matchTypes(super1, type2,
-                                             TypeMatchKind::SameType,
-                                             TMF_GenerateConstraints, locator,
-                                             trivial)) {
-              case SolutionKind::Error:
-                continue;
-
-              case SolutionKind::Solved:
-              case SolutionKind::TriviallySolved:
-              case SolutionKind::Unsolved:
-                return result;
-            }
-          }
-
-          return Nothing;
-        };
-
-      // A class (or bound generic class) is a subtype of another class
-      // (or bound generic class) if it is derived from that class.
-      if (auto upcastResult = solveDerivedFrom(type1, type2))
-        return *upcastResult;
+        case SolutionKind::Solved:
+        case SolutionKind::TriviallySolved:
+        case SolutionKind::Unsolved:
+          return result;
+        }
+      }
     }
   }
 
