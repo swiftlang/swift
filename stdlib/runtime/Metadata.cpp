@@ -813,10 +813,20 @@ static const ValueWitnessTable tuple_witnesses_nonpod_noninline = {
 };
 
 namespace {
-struct BasicLayoutResult {
+struct BasicLayout {
   size_t size;
   ValueWitnessFlags flags;
   size_t stride;
+  
+  static constexpr BasicLayout initialForValueType() {
+    return {0, ValueWitnessFlags().withAlignment(1).withPOD(true), 0};
+  }
+  
+  static constexpr BasicLayout initialForHeapObject() {
+    return {sizeof(HeapObject),
+            ValueWitnessFlags().withAlignment(alignof(HeapObject)),
+            sizeof(HeapObject)};
+  }
 };
   
 /// Perform basic sequential layout given a vector of metadata pointers,
@@ -825,12 +835,13 @@ struct BasicLayoutResult {
 /// FUNCTOR should have signature:
 ///   void (size_t index, const Metadata *type, size_t offset)
 template<typename FUNCTOR>
-BasicLayoutResult performBasicLayout(const Metadata * const *elements,
-                                     size_t numElements,
-                                     FUNCTOR &&f) {
-  size_t size = 0;
-  size_t alignment = 1;
-  bool isPOD = true;
+void performBasicLayout(BasicLayout &layout,
+                        const Metadata * const *elements,
+                        size_t numElements,
+                        FUNCTOR &&f) {
+  size_t size = layout.size;
+  size_t alignment = layout.flags.getAlignment();
+  bool isPOD = layout.flags.isPOD();
   for (unsigned i = 0; i != numElements; ++i) {
     auto elt = elements[i];
     
@@ -848,10 +859,11 @@ BasicLayoutResult performBasicLayout(const Metadata * const *elements,
   }
   bool isInline = ValueWitnessTable::isValueInline(size, alignment);
   
-  return {size, ValueWitnessFlags().withAlignment(alignment)
-                                   .withPOD(isPOD)
-                                   .withInlineStorage(isInline),
-          llvm::RoundUpToAlignment(size, alignment)};
+  layout.size = size;
+  layout.flags = ValueWitnessFlags().withAlignment(alignment)
+                                    .withPOD(isPOD)
+                                    .withInlineStorage(isInline);
+  layout.stride = llvm::RoundUpToAlignment(size, alignment);
 }
 } // end anonymous namespace
 
@@ -887,7 +899,8 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
   metadata->Labels = labels;
 
   // Perform basic layout on the tuple.
-  auto layout = performBasicLayout(elements, numElements,
+  auto layout = BasicLayout::initialForValueType();
+  performBasicLayout(layout, elements, numElements,
     [&](size_t i, const Metadata *elt, size_t offset) {
       metadata->getElements()[i].Type = elt;
       metadata->getElements()[i].Offset = offset;
@@ -959,7 +972,8 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
                                      const Metadata * const *fieldTypes,
                                      size_t *fieldOffsets,
                                      ValueWitnessTable *vwtable) {
-  auto layout = performBasicLayout(fieldTypes, numFields,
+  auto layout = BasicLayout::initialForValueType();
+  performBasicLayout(layout, fieldTypes, numFields,
     [&](size_t i, const Metadata *fieldType, size_t offset) {
       fieldOffsets[i] = offset;
     });
@@ -967,6 +981,25 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
   vwtable->size = layout.size;
   vwtable->flags = layout.flags;
   vwtable->stride = layout.stride;
+}
+
+/*** Classes ***************************************************************/
+
+/// Initialize the field offset vector for a dependent-layout class, using the
+/// "Universal" layout strategy.
+void swift::swift_initClassMetadata_UniversalStrategy(const Metadata *super,
+                                            size_t numFields,
+                                            const Metadata * const *fieldTypes,
+                                            size_t *fieldOffsets) {
+  // FIXME: We should start from the superclass's size and alignment.
+  auto layout = BasicLayout::initialForHeapObject();
+  performBasicLayout(layout, fieldTypes, numFields,
+    [&](size_t i, const Metadata *fieldType, size_t offset) {
+      fieldOffsets[i] = offset;
+    });
+  
+  // FIXME: We should save the instance size and alignment in the metadata
+  // for use by subclasses.
 }
 
 /*** Metatypes *************************************************************/
