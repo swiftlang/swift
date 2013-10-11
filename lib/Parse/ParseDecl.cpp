@@ -1702,6 +1702,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
   SourceLoc NameLoc = Tok.getLoc();
   if (!(Flags & PD_AllowTopLevel) && !(Flags & PD_DisallowFuncDef) &&
       Tok.isAnyOperator()) {
+    // FIXME: Recovery here is awful.
     diagnose(Tok, diag::func_decl_nonglobal_operator);
     return nullptr;
   }
@@ -1712,7 +1713,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
     if (NameStatus.isError())
       return nullptr;
   }
-  
+
   // Parse the generic-params, if present.
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);
@@ -2737,15 +2738,20 @@ ParserResult<OperatorDecl> Parser::parseDeclOperator(bool AllowTopLevel,
   assert(kind && "no fixity after 'operator'?!");
 
   SourceLoc KindLoc = consumeToken(tok::identifier);
-  
-  if (!Tok.isAnyOperator()) {
+
+  if (!Tok.isAnyOperator() && !Tok.is(tok::exclaim_postfix)) {
     diagnose(Tok, diag::expected_operator_name_after_operator);
     return nullptr;
   }
-  
+
   Identifier Name = Context.getIdentifier(Tok.getText());
   SourceLoc NameLoc = consumeToken();
-  
+
+  // Postfix operator '!' is reserved.
+  if (*kind == DeclKind::PostfixOperator &&Name.str().equals("!")) {
+    diagnose(NameLoc, diag::custom_operator_postfix_exclaim);
+  }
+
   if (!Tok.is(tok::l_brace)) {
     diagnose(Tok, diag::expected_lbrace_after_operator);
     return nullptr;

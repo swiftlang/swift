@@ -406,7 +406,16 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
     consumeToken();
     return false;
   }
-  
+
+  // When we know we're supposed to get an identifier or operator, map the
+  // postfix '!' to an operator name.
+  if (Tok.is(tok::exclaim_postfix)) {
+    Result = Context.getIdentifier(Tok.getText());
+    Loc = Tok.getLoc();
+    consumeToken();
+    return false;
+  }
+
   diagnose(Tok, D);
   return true;
 }

@@ -1018,6 +1018,8 @@ ERROR(operator_not_func,sema_tcd,none,
       "operators must be declared with 'func'", ())
 ERROR(custom_operator_addressof,sema_tcd,none,
       "cannot declare a custom unary '&' operator", ())
+ERROR(custom_operator_postfix_exclaim,sema_tcd,none,
+      "cannot declare a custom postfix '!' operator", ())
 ERROR(var_type_not_materializable,sema_tcd,none,
       "type %0 of variable is not materializable", (Type))
 ERROR(enum_element_not_materializable,sema_tcd,none,

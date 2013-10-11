@@ -1550,6 +1550,12 @@ public:
         else
           return;
       } else if (FD->getAttrs().isPostfix()) {
+        // Postfix '!' is reserved.
+        if (FD->getName().str().equals("!")) {
+          TC.diagnose(FD->getLoc(), diag::custom_operator_postfix_exclaim);
+          return;
+        }
+
         if (auto maybeOp = module.lookupPostfixOperator(FD->getName(),
                                                         FD->getLoc()))
           op = *maybeOp;
