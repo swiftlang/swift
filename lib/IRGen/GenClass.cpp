@@ -25,6 +25,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/IRGen/Options.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/SmallString.h"
@@ -341,7 +342,7 @@ namespace {
 
         auto &eltType = IGM.getTypeInfo(var->getType());
         // FIXME: Type-parameter-dependent field layout isn't implemented yet.
-        if (!eltType.isFixedSize()) {
+        if (!eltType.isFixedSize() && !IGM.Opts.EnableDynamicValueTypeLayout) {
           IGM.unimplemented(var->getLoc(), "non-fixed class layout");
           exit(1);
         }
