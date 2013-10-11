@@ -66,9 +66,8 @@ Solution ConstraintSystem::finalize() {
   // For each of the overload sets, get its overload choice.
   for (auto resolved = resolvedOverloadSets;
        resolved; resolved = resolved->Previous) {
-    solution.overloadChoices[resolved->Set->getLocator()]
-      = { resolved->Set->getChoices()[resolved->ChoiceIndex],
-          resolved->ImpliedType };
+    solution.overloadChoices[resolved->Locator]
+      = { resolved->Choice, resolved->ImpliedType };
   }
 
   return std::move(solution);
@@ -893,10 +892,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // Try each of the overloads.
   bool anySolved = false;
-  for (unsigned i = 0, n = bestOvl->getChoices().size(); i != n; ++i) {
+  for (auto choice : bestOvl->getChoices()) {
     // Try to solve the system with this overload choice.
     SolverScope scope(*this);
-    resolveOverload(bestOvl, i);
+    addBindOverloadConstraint(bestOvl->getBoundType(), choice,
+                              bestOvl->getLocator());
     if (!solve(solutions, allowFreeTypeVariables))
       anySolved = true;
   }

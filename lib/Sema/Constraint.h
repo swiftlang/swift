@@ -18,6 +18,7 @@
 #ifndef SWIFT_SEMA_CONSTRAINT_H
 #define SWIFT_SEMA_CONSTRAINT_H
 
+#include "OverloadChoice.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 
@@ -65,6 +66,8 @@ enum class ConstraintKind : char {
   /// \brief Both types are function types with the same input and output types.
   /// Note, we do not require the function type attributes to match.
   ApplicableFunction,
+  /// \brief Binds the left-hand type to a particular overload choice.
+  BindOverload,
   /// \brief The first type has a member with the given name, and the
   /// type of that member, when referenced as a value, is the second type.
   ValueMember,
@@ -125,6 +128,14 @@ class Constraint {
 
     /// The set of constraints for a disjunction.
     ArrayRef<Constraint *> Nested;
+
+    struct {
+      /// \brief The first type
+      Type First;
+
+      /// \brief The overload choice
+      OverloadChoice Choice;
+    } Overload;
   };
 
   /// \brief The locator that describes where in the expression this
@@ -145,6 +156,11 @@ class Constraint {
 public:
   Constraint(ConstraintKind Kind, Type First, Type Second, Identifier Member,
              ConstraintLocator *locator);
+
+  /// Construct a new overload-binding constraint.
+  Constraint(Type type, OverloadChoice choice, ConstraintLocator *locator)
+    : Kind(ConstraintKind::BindOverload), Overload{type, choice},
+      Locator(locator) { }
 
   /// Create a new conjunction constraint.
   static Constraint *createConjunction(ConstraintSystem &cs,
@@ -171,6 +187,7 @@ public:
     case ConstraintKind::Construction:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::ApplicableFunction:
+    case ConstraintKind::BindOverload:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:
@@ -194,6 +211,10 @@ public:
   Type getFirstType() const {
     assert(getKind() != ConstraintKind::Disjunction &&
            getKind() != ConstraintKind::Conjunction);
+
+    if (getKind() == ConstraintKind::BindOverload)
+      return Overload.First;
+
     return Types.First;
   }
 
@@ -225,6 +246,12 @@ public:
     assert(Kind == ConstraintKind::Conjunction ||
            Kind == ConstraintKind::Disjunction);
     return Nested;
+  }
+
+  /// Retrieve the overload choice for an overload-binding constraint.
+  OverloadChoice getOverloadChoice() const {
+    assert(Kind == ConstraintKind::BindOverload);
+    return Overload.Choice;
   }
 
   /// \brief Retrieve the locator for this constraint.

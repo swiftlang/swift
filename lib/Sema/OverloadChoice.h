@@ -16,10 +16,12 @@
 //
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_SEMA_OVERLOADCHOICE_H
-#define SWIFT_SEMA_CONSTRAINT_SYSTEM_H
+#define SWIFT_SEMA_OVERLOADCHOICE_H
 
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 
 namespace swift {
 

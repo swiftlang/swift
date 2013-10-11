@@ -840,20 +840,12 @@ void ConstraintSystem::addOverloadSet(OverloadSet *ovl) {
   // If there are fewer than two choices, then we can simply resolve this
   // now.
   if (ovl->getChoices().size() < 2) {
-    resolveOverload(ovl, 0);
+    resolveOverload(ovl->getLocator(), ovl->getBoundType(),
+                    ovl->getChoices()[0]);
     return;
   }
 
   UnresolvedOverloadSets.push_back(ovl);
-}
-
-OverloadSet *
-ConstraintSystem::getGeneratedOverloadSet(ConstraintLocator *locator) {
-  auto known = GeneratedOverloadSets.find(locator);
-  if (known != GeneratedOverloadSets.end())
-    return known->second;
-
-  return nullptr;
 }
 
 Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
@@ -1908,9 +1900,10 @@ static Type getMateralizedType(Type type, ASTContext &context) {
   return type;
 }
 
-void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
+void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
+                                       Type boundType,
+                                       OverloadChoice choice){
   // Determie the type to which we'll bind the overload set's type.
-  auto &choice = ovl->getChoices()[idx];
   Type refType;
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -1957,7 +1950,7 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
   case OverloadChoiceKind::FunctionReturningBaseType:
     refType = FunctionType::get(createTypeVariable(
                                   getConstraintLocator(
-                                    ovl->getLocator(),
+                                    locator,
                                     ConstraintLocator::FunctionResult),
                                   /*options=*/0),
                                 choice.getBaseType(),
@@ -1987,16 +1980,19 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
   }
 
   // Add the type binding constraint.
-  addConstraint(ConstraintKind::Bind, ovl->getBoundType(), refType);
+  addConstraint(ConstraintKind::Bind, boundType, refType);
 
   // Note that we have resolved this overload.
   resolvedOverloadSets
-    = new (*this) ResolvedOverloadSetListItem{resolvedOverloadSets, ovl, idx,
+    = new (*this) ResolvedOverloadSetListItem{resolvedOverloadSets,
+                                              boundType,
+                                              choice,
+                                              locator,
                                               refType};
   if (TC.getLangOpts().DebugConstraintSolver) {
     llvm::errs().indent(solverState? solverState->depth * 2 : 2)
-      << "(overload set #" << ovl->getID() << " choice #" << idx << ": "
-      << ovl->getBoundType()->getString() << " := "
+      << "(overload set choice binding "
+      << boundType->getString() << " := "
       << refType->getString() << ")\n";
   }
 }
@@ -2634,6 +2630,9 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
     llvm_unreachable("ApplicableFunction constraints don't involve "
                      "type matches");
 
+  case ConstraintKind::BindOverload:
+    llvm_unreachable("Overload binding constraints don't involve type matches");
+
   case ConstraintKind::Construction:
     llvm_unreachable("Construction constraints don't involve type matches");
 
@@ -2672,6 +2671,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::ApplicableFunction: {
     return simplifyApplicableFnConstraint(constraint);
+  }
+
+  case ConstraintKind::BindOverload: {
+    resolveOverload(constraint.getLocator(), constraint.getFirstType(),
+                    constraint.getOverloadChoice());
+    return SolutionKind::Solved;
   }
 
   case ConstraintKind::Construction:
@@ -4474,9 +4479,8 @@ void ConstraintSystem::dump() {
     // Otherwise, report the resolved overloads.
     for (auto resolved = resolvedOverloadSets;
          resolved; resolved = resolved->Previous) {
-      auto &choice = resolved->Set->getChoices()[resolved->ChoiceIndex];
-      out << "  selected overload set #" << resolved->Set->getID()
-          << " choice #" << resolved->ChoiceIndex << " for ";
+      auto &choice = resolved->Choice;
+      out << "  selected overload set choice ";
       switch (choice.getKind()) {
         case OverloadChoiceKind::Decl:
         case OverloadChoiceKind::DeclViaDynamic:
@@ -4484,7 +4488,7 @@ void ConstraintSystem::dump() {
           if (choice.getBaseType())
             out << choice.getBaseType()->getString() << ".";
           out << choice.getDecl()->getName().str() << ": "
-            << resolved->Set->getBoundType()->getString() << " == "
+            << resolved->BoundType->getString() << " == "
             << resolved->ImpliedType->getString() << "\n";
           break;
 

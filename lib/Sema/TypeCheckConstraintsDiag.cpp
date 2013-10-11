@@ -430,8 +430,8 @@ static void noteTargetOfDiagnostic(ConstraintSystem &cs,
         [&](ConstraintLocator *locator) -> Optional<OverloadChoice> {
           for (auto resolved = failure.getResolvedOverloadSets();
                resolved; resolved = resolved->Previous) {
-            if (resolved->Set->getLocator() == locator)
-              return resolved->Set->getChoices()[resolved->ChoiceIndex];
+            if (resolved->Locator == locator)
+              return resolved->Choice;
           }
 
           return Nothing;

@@ -55,6 +55,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
     assert(Second.isNull() && "Type property with second type");
     break;
 
+  case ConstraintKind::BindOverload:
+    llvm_unreachable("Wrong constructor for overload binding constraint");
+
   case ConstraintKind::Conjunction:
     llvm_unreachable("Conjunction constraints should use create()");
 
@@ -111,6 +114,12 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::Construction: Out << " <C "; break;
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
   case ConstraintKind::ApplicableFunction: Out << " ==Fn "; break;
+  case ConstraintKind::BindOverload: {
+    // FIXME: Better output here.
+    skipSecond = true;
+    break;
+  }
+
   case ConstraintKind::ValueMember:
     Out << "[." << Types.Member.str() << ": value] == ";
     break;
