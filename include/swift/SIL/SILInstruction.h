@@ -1127,13 +1127,9 @@ public:
     StructDecl *S = getType().getStructOrBoundGenericStruct();
     assert(S && "A struct should always have a StructDecl associated with it.");
 
-    auto FilteredRange = S->getStoredProperties();
+    NominalTypeDecl::StoredPropertyRange Range = S->getStoredProperties();
     unsigned Index = 0;
-    for (auto I = FilteredRange.begin(), E = FilteredRange.end(); I != E;
-         ++I, ++Index)
-      // At this point we know that V is not null and is computed implying that
-      // it is sufficient just to check if dyn_cast<VarDecl>(Members[i]) equals
-      // V and if said equality occurs, return the operand at that index.
+    for (auto I = Range.begin(), E = Range.end(); I != E; ++I, ++Index)
       if (V == *I)
         return &getAllOperands()[Index];
 
