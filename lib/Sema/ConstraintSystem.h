@@ -847,10 +847,6 @@ private:
     /// \brief Whether to record failures or not.
     bool recordFailures = false;
 
-    /// \brief The overload sets that were generated along the current path,
-    /// indexed by locator.
-    SmallVector<ConstraintLocator *, 4> generatedOverloadSets;
-
     /// \brief The set of constraints that were generated along the current
     /// path.
     SmallVector<Constraint *, 32> generatedConstraints;
