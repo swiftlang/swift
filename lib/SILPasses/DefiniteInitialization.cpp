@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "memory-promotion"
+#define DEBUG_TYPE "definite-init"
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Diagnostics.h"
@@ -1301,7 +1301,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
 
 
 static void processAllocBox(AllocBoxInst *ABI) {
-  DEBUG(llvm::errs() << "*** MemPromotion looking at: " << *ABI << "\n");
+  DEBUG(llvm::errs() << "*** Definite Init looking at: " << *ABI << "\n");
 
   // Set up the datastructure used to collect the uses of the alloc_box.  The
   // uses are bucketed up into the elements of the allocation that are being
@@ -1330,7 +1330,7 @@ static void processAllocBox(AllocBoxInst *ABI) {
 }
 
 static void processAllocStack(AllocStackInst *ASI) {
-  DEBUG(llvm::errs() << "*** MemPromotion looking at: " << *ASI << "\n");
+  DEBUG(llvm::errs() << "*** Definite Init looking at: " << *ASI << "\n");
 
   // Set up the datastructure used to collect the uses of the alloc_box.  The
   // uses are bucketed up into the elements of the allocation that are being
@@ -1359,7 +1359,7 @@ static void processAllocStack(AllocStackInst *ASI) {
 }
 
 static void processMarkUninitialized(MarkUninitializedInst *MUI) {
-  DEBUG(llvm::errs() << "*** MemPromotion looking at: " << *MUI << "\n");
+  DEBUG(llvm::errs() << "*** Definite Init looking at: " << *MUI << "\n");
   
   // Set up the datastructure used to collect the uses of the
   // mark_uninitialized.  The uses are bucketed up into the elements of the
@@ -1449,7 +1449,7 @@ static void lowerRawSILOperations(SILFunction &Fn) {
 /// dataflow passes.
 void swift::performSILDefiniteInitialization(SILModule *M) {
   for (auto &Fn : *M) {
-    // Walk through an promote all of the alloc_box's that we can.
+    // Walk through and promote all of the alloc_box's that we can.
     checkDefiniteInitialization(Fn);
 
     if (EnableCopyAddrForwarding)
