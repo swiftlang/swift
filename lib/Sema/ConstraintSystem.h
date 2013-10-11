@@ -1332,7 +1332,8 @@ public:
 
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.
-  void addOverloadSet(OverloadSet *ovl);
+  void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
+                      ConstraintLocator *locator);
 
   /// \brief Retrieve the allocator used by this constraint system.
   llvm::BumpPtrAllocator &getAllocator() { return Allocator; }

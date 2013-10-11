@@ -816,15 +816,17 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                   TC.Context);
 }
 
-void ConstraintSystem::addOverloadSet(OverloadSet *ovl) {
+void ConstraintSystem::addOverloadSet(Type boundType,
+                                      ArrayRef<OverloadChoice> choices,
+                                      ConstraintLocator *locator) {
+  assert(!choices.empty() && "Empty overload set");
+
   SmallVector<Constraint *, 4> overloads;
-  for (auto choice : ovl->getChoices()) {
-    overloads.push_back(new (*this) Constraint(ovl->getBoundType(),
-                                               choice,
-                                               ovl->getLocator()));
+  for (auto choice : choices) {
+    overloads.push_back(new (*this) Constraint(boundType, choice, locator));
   }
   addConstraint(Constraint::createDisjunction(*this, overloads,
-                                              ovl->getLocator()));
+                                              locator));
 }
 
 Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
@@ -2320,8 +2322,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       return SolutionKind::Error;
     }
     
-    addOverloadSet(OverloadSet::getNew(*this, memberTy, constraint.getLocator(),
-                                       choices));
+    addOverloadSet(memberTy, choices, constraint.getLocator());
     return SolutionKind::Solved;
   }
 
@@ -2349,7 +2350,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                                        /*isSpecialized=*/false));
     }
     auto locator = getConstraintLocator(constraint.getLocator());
-    addOverloadSet(OverloadSet::getNew(*this, memberTy, locator, choices));
+    addOverloadSet(memberTy, choices, locator);
     return SolutionKind::Solved;
   }
 
@@ -2440,7 +2441,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     return SolutionKind::Error;
   }
   auto locator = getConstraintLocator(constraint.getLocator());
-  addOverloadSet(OverloadSet::getNew(*this, memberTy, locator, choices));
+  addOverloadSet(memberTy, choices, locator);
   return SolutionKind::Solved;
 }
 

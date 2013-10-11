@@ -297,7 +297,7 @@ namespace {
         return nullptr;
 
       // Record this overload set.
-      CS.addOverloadSet(OverloadSet::getNew(CS, tv, locator, choices));
+      CS.addOverloadSet(tv, choices, locator);
       return tv;
     }
 
@@ -327,7 +327,7 @@ namespace {
 
       // Record this overload set.
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
-      CS.addOverloadSet(OverloadSet::getNew(CS, tv, locator, choices));
+      CS.addOverloadSet(tv, choices, locator);
       return tv;
     }
     
@@ -387,8 +387,7 @@ namespace {
         OverloadChoice(enumTy, OverloadChoiceKind::BaseType),
         OverloadChoice(enumTy, OverloadChoiceKind::FunctionReturningBaseType),
       };
-      CS.addOverloadSet(OverloadSet::getNew(CS, memberTy, enumLocator,
-                                            choices));
+      CS.addOverloadSet(memberTy, choices, enumLocator);
       return memberTy;
     }
 
