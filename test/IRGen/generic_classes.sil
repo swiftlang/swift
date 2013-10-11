@@ -11,6 +11,12 @@ import gizmo
 // CHECK: @_TWvdC15generic_classes11RootGeneric1xVSs5UInt8 = global i64 16, align 8
 // CHECK: @_TMPdC15generic_classes11RootGeneric
 
+// -- Check that offset vars are emitted for fixed-layout generics
+//    <rdar://problem/15081049>
+// CHECK: @_TWvdC15generic_classes22RootGenericFixedLayout1xVSs5UInt8 = global i64 16, align 8
+// CHECK: @_TWvdC15generic_classes22RootGenericFixedLayout1yGSaQ__ = global i64 24, align 8
+// CHECK: @_TWvdC15generic_classes22RootGenericFixedLayout1zVSs5UInt8 = global i64 48, align 8
+
 // CHECK: @_TMdC15generic_classes14RootNonGeneric
 
 // -- NonGenericInheritsGeneric instantiates its generic base class, giving
@@ -58,6 +64,12 @@ import gizmo
 class RootGeneric<T> {
   var x : UInt8
   var y : T
+  var z : UInt8
+}
+
+class RootGenericFixedLayout<T> {
+  var x : UInt8
+  var y : T[]
   var z : UInt8
 }
 
