@@ -19,13 +19,13 @@ Building a single source file
 
 A single Swift source file can be compiled to an object file using ``swift -c``.
 
-.. _executable mode:
-.. _library mode:
-
 .. sidebar:: Why is executable mode the default?
 
   By making executable mode the default, a single-file script can go from being
   interpreted to being compiled without any extra work. 
+
+.. _executable-mode:
+.. _library-mode:
 
 By default, a file is compiled in "executable" mode, which
 
@@ -54,7 +54,8 @@ single object file. Each file will be individually parsed and contains its own
 context, but non-private declarations in each file are :ref:`implicitly visible 
 <implicit-visibility>` to every other file at the global scope.
 
-Passing multiple files to the compiler implies :ref:`library mode`.
+Passing multiple files to the compiler implies :ref:`library mode
+<library-mode>`.
 
 .. admonition:: TODO
 
@@ -64,7 +65,7 @@ Passing multiple files to the compiler implies :ref:`library mode`.
   a compiled binary.
 
 
-.. _module source list:
+.. _module-source-list:
 
 Building a module in pieces
 ---------------------------
@@ -78,7 +79,7 @@ generated for the main source file.
 The other source files in the module are specified using a `compilation 
 database`__ passed to the compiler with the ``-module-source-list`` flag.
 The ``command`` field of each entry may be omitted. Other files in the module
-are parsed in :ref:`library mode`.
+are parsed in :ref:`library mode <library-mode>`.
 
 __ http://goto.apple.com/?http://clang.llvm.org/docs/JSONCompilationDatabase.html
 
@@ -92,13 +93,13 @@ __ http://goto.apple.com/?http://clang.llvm.org/docs/JSONCompilationDatabase.htm
 Interpreted Mode
 ----------------
 
-The Swift compiler also supports being used as an interpreter through use of the
-``-i`` flag. In this mode, the single input file is parsed in :ref:`executable
-mode`. As with compilation, files can be explicitly imported within the source
-using ``import``, or made implicitly visible through the use of a :ref:`module 
-source list`. However, in interpreter mode *all imported source files* are
-processed for code generation, since there's no chance to link separate object
-files later.
+The Swift compiler also supports being used as an interpreter through use of
+the ``-i`` flag. In this mode, the single input file is parsed in
+:ref:`executable mode <executable-mode>`. As with compilation, files can be
+explicitly imported within the source using ``import``, or made implicitly
+visible through the use of a :ref:`module source list <module-source-list>`.
+However, in interpreter mode *all imported source files* are processed for code
+generation, since there's no chance to link separate object files later.
 
 Swift source files support the Unix convention of a `shebang`__ line at the
 top of the file; this line will be recognized and skipped in the compiler's
