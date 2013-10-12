@@ -1,9 +1,7 @@
 .. @raise litre.TestsAreMissing
 .. default-role:: term
+.. title:: Modules User Model
 
-===================
-Modules User Model
-===================
 
 A `module` is the primary unit of code sharing in Swift. This document
 describes the experience of using modules in Swift: what they are and what they
@@ -196,6 +194,8 @@ declaration keyword::
 
   There is currently no way to selectively import extensions or operators.
 
+
+.. _implicit-visibility:
 
 Multiple source files
 ---------------------
