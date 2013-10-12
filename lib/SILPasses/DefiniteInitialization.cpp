@@ -920,13 +920,18 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
   // Update our internal state for this being gone.
   NonLoadUses.erase(CAI);
 
-  // Remove the copy_addr from Uses.
+  // Remove the copy_addr from Uses.  A single copy_addr can appear multiple
+  // times if the source and dest are to elements within a single aggregate, but
+  // we only want to pick up the CopyAddrKind from the store.
   UseKind CopyAddrKind = Release;
   for (auto &Use : Uses) {
     if (Use.first == CAI) {
-      CopyAddrKind = Use.second;
       Use.first = nullptr;
-      break;
+
+      if (Use.second != UseKind::Load)
+        CopyAddrKind = Use.second;
+
+      // Keep scanning in case the copy_addr appears multiple times.
     }
   }
 
@@ -943,7 +948,7 @@ void ElementPromotion::explodeCopyAddr(CopyAddrInst *CAI,
   // iterates, so we can't use a foreach loop.
   for (unsigned i = 0; i != NewInsts.size(); ++i) {
     auto *NewInst = NewInsts[i];
-    
+
     switch (NewInst->getKind()) {
     default:
       NewInst->dump();
@@ -1146,7 +1151,9 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseElt) {
 
     if (isa<CopyAddrInst>(User)) {
       // If this is the source of the copy_addr, then this is a load.  If it is
-      // the destination, then this is a store.
+      // the destination, then this is a store.  Note that we'll revisit this
+      // instruction and add it to Uses twice if it is both a load and store to
+      // the same aggregate.
       auto Kind = InStructSubElement ? UseKind::PartialStore : UseKind::Store;
       if (UI->getOperandNumber() == 0) Kind = UseKind::Load;
       addElementUses(BaseElt, PointeeType, User, Kind);
