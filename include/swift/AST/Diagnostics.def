@@ -775,7 +775,7 @@ ERROR(expected_attribute_name,attribute_parsing,none,
 ERROR(unknown_attribute,attribute_parsing,none,
       "unknown attribute '%0'", (StringRef))
 ERROR(duplicate_attribute,attribute_parsing,none,
-      "duplicate '%0' attribute", (StringRef))
+      "duplicate attribute", ())
 ERROR(cannot_combine_attribute,attribute_parsing,none,
       "attribute '%0' cannot be combined with this attribute", (StringRef))
 ERROR(expected_in_attribute_list,attribute_parsing,none,
@@ -783,6 +783,11 @@ ERROR(expected_in_attribute_list,attribute_parsing,none,
 ERROR(invalid_attribute_for_lang,attribute_parsing,none,
       "attribute '%0' is only valid in language mode '%select{axle}1'",
       (StringRef, unsigned))
+
+ERROR(expected_decl_attribute_not_type,attribute_parsing,none,
+      "expected declaration attribute, not a type attribute", ())
+ERROR(expected_type_attribute_not_decl,attribute_parsing,none,
+      "expected type attribute, not a declaration attribute", ())
 
 ERROR(import_attributes,attribute_parsing,none,
       "invalid attributes specified for import", ())

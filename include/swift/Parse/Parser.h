@@ -483,18 +483,30 @@ public:
   void addVarsToScope(Pattern *Pat, SmallVectorImpl<Decl*> &Decls,
                       DeclAttributes &Attributes,
                       PatternBindingDecl *PBD = nullptr);
-  bool parseAttributeList(DeclAttributes &Attributes, bool OldStyle) {
+  
+  // This enum is used buy clients to inform the attribute parsing code if they
+  // are parsing decl attributes or type attributes.
+  enum AttrListKind {
+    AK_TypeAttributes = 1,
+    AK_DeclAttributes = 2,
+    AK_SILAttributes  = 4
+  };
+  
+  bool parseAttributeList(DeclAttributes &Attributes, unsigned KindMask,
+                          bool OldStyle) {
     if (OldStyle) {
       if (Tok.is(tok::l_square))
-        return parseAttributeListPresent(Attributes, OldStyle);
+        return parseAttributeListPresent(Attributes, KindMask, OldStyle);
     } else {
       if (Tok.is(tok::at_sign))
-        return parseAttributeListPresent(Attributes, OldStyle);
+        return parseAttributeListPresent(Attributes, KindMask, OldStyle);
     }
     return false;
   }
-  bool parseAttributeListPresent(DeclAttributes &Attributes, bool OldStyle);
-  bool parseAttribute(DeclAttributes &Attributes, bool OldStyle);
+  bool parseAttributeListPresent(DeclAttributes &Attributes, unsigned KindMask,
+                                 bool OldStyle);
+  bool parseAttribute(DeclAttributes &Attributes, unsigned KindMask,
+                      bool OldStyle);
   
   ParserResult<ImportDecl> parseDeclImport(unsigned Flags,
                                            DeclAttributes &Attributes);
