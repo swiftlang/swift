@@ -41,6 +41,10 @@ namespace swift {
     /// \brief Whether to print fully qualified Types.
     bool FullyQualifiedTypes = false;
 
+    /// \brief Print swift.Slice and swift.Optional with sugared syntax
+    /// ([] and ?), even if there are no sugar type nodes.
+    bool SynthesizeSugarOnTypes = false;
+
     /// \brief Whether to print implicit parts of the AST.
     bool SkipImplicit = false;
 

@@ -77,7 +77,7 @@ namespace {
         TL.getTypeRepr()->print(OS);
         return;
       }
-      TL.getType().print(OS);
+      TL.getType().print(OS, Options);
     }
 
     void printAttributes(const DeclAttributes &attrs);
@@ -228,7 +228,7 @@ void PrintAST::printTypedPattern(const TypedPattern *TP,
   if (StripOuterSliceType) {
     Type T = TP->getType();
     if (auto *BGT = T->getAs<BoundGenericType>()) {
-      OS << BGT->getGenericArgs()[0];
+      BGT->getGenericArgs()[0].print(OS, Options);
       return;
     }
   }
@@ -1240,6 +1240,20 @@ public:
   }
 
   void visitBoundGenericType(BoundGenericType *T) {
+    if (Options.SynthesizeSugarOnTypes) {
+      auto *NT = T->getAnyNominal();
+      auto &Ctx = T->getASTContext();
+      if (NT == Ctx.getSliceDecl()) {
+        printWithParensIfNotSimple(T->getGenericArgs()[0]);
+        OS << "[]";
+        return;
+      }
+      if (NT == Ctx.getOptionalDecl()) {
+        printWithParensIfNotSimple(T->getGenericArgs()[0]);
+        OS << "?";
+        return;
+      }
+    }
     if (auto ParentType = T->getParent()) {
       visit(ParentType);
       OS << ".";
