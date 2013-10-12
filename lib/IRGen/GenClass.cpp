@@ -489,11 +489,15 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
   // Emit the deallocation.
   auto &layout = info.getLayout(IGM);
   // FIXME: Dynamic-layout deallocation size.
-  llvm::Value *size;
-  if (layout.isFixedLayout())
+  llvm::Value *size, *alignMask;
+  if (layout.isFixedLayout()) {
     size = info.getLayout(IGM).emitSize(IGF.IGM);
-  else
-    size = llvm::ConstantInt::get(IGM.SizeTy, 0);
+  } else {
+    llvm::Value *metadata = emitTypeMetadataRefForHeapObject(IGF, obj,
+                 SILType::getPrimitiveObjectType(selfType->getCanonicalType()));
+    std::tie(size, alignMask)
+      = emitClassFragileInstanceSizeAndAlignMask(IGF, theClass, metadata);
+  }
   emitDeallocateHeapObject(IGF, obj, size);
   IGF.Builder.CreateRetVoid();
 }
@@ -510,17 +514,21 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType) {
   }
 
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
-  auto &layout = classTI.getLayout(IGF.IGM);
-
-  llvm::Value *size = layout.emitSize(IGF.IGM);
-  llvm::Value *alignMask = layout.emitAlignMask(IGF.IGM);
+  llvm::Value *size, *alignMask;
+  std::tie(size, alignMask)
+    = emitClassFragileInstanceSizeAndAlignMask(IGF,
+                                   selfType.getClassOrBoundGenericClass(),
+                                   metadata);
+  
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
                                              "reference.new");
+  auto &layout = classTI.getLayout(IGF.IGM);
   llvm::Type *destType = layout.getType()->getPointerTo();
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
-llvm::Constant *irgen::tryEmitClassConstantInstanceSize(IRGenModule &IGM,
+llvm::Constant *irgen::tryEmitClassConstantFragileInstanceSize(
+                                                        IRGenModule &IGM,
                                                         ClassDecl *Class) {
   auto &classTI = IGM.getTypeInfo(Class->getDeclaredTypeInContext())
     .as<ClassTypeInfo>();
@@ -532,7 +540,8 @@ llvm::Constant *irgen::tryEmitClassConstantInstanceSize(IRGenModule &IGM,
   return nullptr;
 }
 
-llvm::Constant *irgen::tryEmitClassConstantInstanceAlignMask(IRGenModule &IGM,
+llvm::Constant *irgen::tryEmitClassConstantFragileInstanceAlignMask(
+                                                             IRGenModule &IGM,
                                                              ClassDecl *Class) {
   auto &classTI = IGM.getTypeInfo(Class->getDeclaredTypeInContext())
   .as<ClassTypeInfo>();

@@ -118,6 +118,22 @@ class GenericInheritsObjC2<E> : Gizmo {
   var z : UInt8
 }
 
+// CHECK: define [[ROOTGENERIC]]* @RootGeneric_fragile_dependent_alloc
+// CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA:%.*]] to i8***
+// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*** [[METADATA_ARRAY]], i64 5
+// CHECK:   [[SIZE_PTR:%.*]] = load i8*** [[SIZE_ADDR]], align 8
+// CHECK:   [[SIZE:%.*]] = ptrtoint i8** [[SIZE_PTR]] to i64
+// CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
+// CHECK:   [[ALIGN_ADDR:%.*]] = getelementptr inbounds i8*** [[METADATA_ARRAY]], i64 6
+// CHECK:   [[ALIGN_PTR:%.*]] = load i8*** [[ALIGN_ADDR]], align 8
+// CHECK:   [[ALIGN:%.*]] = ptrtoint i8** [[ALIGN_PTR]] to i64
+// CHECK:   call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], i64 [[SIZE]], i64 [[ALIGN]])
+sil @RootGeneric_fragile_dependent_alloc : $<G> () -> RootGeneric<G> {
+entry:
+  %x = alloc_ref $RootGeneric<G>
+  return %x : $RootGeneric<G>
+}
+
 // RootGeneric.x has fixed layout
 // CHECK: define i8 @RootGeneric_concrete_fragile_dependent_member_access_x
 // CHECK:   getelementptr inbounds [[ROOTGENERIC]]* %0, i32 0, i32 1
@@ -176,6 +192,14 @@ entry(%c : $RootGeneric<Int32>):
 }
  */
 
+// CHECK: define [[NONGENERICINHERITSGENERIC]]* @NonGenericInheritsGeneric_fragile_fixed_alloc()
+// CHECK:   call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} @_TMdC15generic_classes25NonGenericInheritsGeneric {{.*}}), i64 48, i64 7)
+sil @NonGenericInheritsGeneric_fragile_fixed_alloc : $() -> NonGenericInheritsGeneric {
+entry:
+  %x = alloc_ref $NonGenericInheritsGeneric
+  return %x : $NonGenericInheritsGeneric
+}
+
 // CHECK: define i64 @NonGenericInheritsGeneric_fragile_fixed_member_access([[NONGENERICINHERITSGENERIC]]*) {
 // CHECK:   %1 = getelementptr inbounds [[NONGENERICINHERITSGENERIC]]* %0, i32 0, i32 6
 // CHECK:   %.value = getelementptr inbounds %Si* %1, i32 0, i32 0
@@ -194,6 +218,17 @@ entry:
   %v = tuple ()
   return %v : $()
 }
+
+// -- RootGeneric deallocating destructor
+// CHECK: define void @_TC15generic_classes11RootGenericD(%swift.refcounted*)
+// CHECK:   [[DESTROYED:%.*]] = call %swift.refcounted* @_TC15generic_classes11RootGenericd
+// CHECK:   [[METADATA_ADDR:%.*]] = getelementptr inbounds %swift.refcounted* [[DESTROYED]], i32 0, i32 0
+// CHECK:   [[METADATA:%.*]] = load %swift.type** [[METADATA_ADDR]], align 8
+// CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
+// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*** [[METADATA_ARRAY]], i64 5
+// CHECK:   [[SIZE_PTR:%.*]] = load i8*** [[SIZE_ADDR]], align 8
+// CHECK:   [[SIZE:%.*]] = ptrtoint i8** [[SIZE_PTR]] to i64
+// CHECK:   call void @swift_deallocObject(%swift.refcounted* [[DESTROYED]], i64 [[SIZE]])
 
 // CHECK: define internal void [[FILL_ROOTGENERIC]](i8*, i8*) {
 // -- initialize the dependent field offsets

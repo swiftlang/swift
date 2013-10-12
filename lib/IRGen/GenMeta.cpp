@@ -962,7 +962,7 @@ namespace {
 
     void addInstanceSize() {
       if (llvm::Constant *size
-            = tryEmitClassConstantInstanceSize(IGM, TargetClass)) {
+            = tryEmitClassConstantFragileInstanceSize(IGM, TargetClass)) {
         Fields.push_back(size);
       } else {
         // Leave a zero placeholder to be filled at runtime
@@ -972,7 +972,7 @@ namespace {
     
     void addInstanceAlignMask() {
       if (llvm::Constant *align
-            = tryEmitClassConstantInstanceAlignMask(IGM, TargetClass)) {
+            = tryEmitClassConstantFragileInstanceAlignMask(IGM, TargetClass)) {
         Fields.push_back(align);
       } else {
         // Leave a zero placeholder to be filled at runtime
@@ -1787,9 +1787,14 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
   llvm_unreachable("bad decl kind!");
 }
 
-namespace {
-  /// A class for finding a protocol witness table for a type argument
-  /// in a class metadata object.
+/// Given a reference to class metadata of the given type,
+/// derive a reference to the field offset for a stored property.
+/// The type must have dependent generic layout.
+llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
+                                         ClassDecl *theClass,
+                                         VarDecl *field,
+                                         llvm::Value *metadata) {
+  /// A class for finding a field offset in a class metadata object.
   class FindClassFieldOffset :
       public MetadataSearcher<ClassMetadataScanner<FindClassFieldOffset>> {
     typedef MetadataSearcher super;
@@ -1806,18 +1811,65 @@ namespace {
       NextIndex++;
     }
   };
-}
 
-/// Given a reference to class metadata of the given type,
-/// derive a reference to a protocol witness table for the nth
-/// argument metadata.  The type must have generic arguments.
-llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
-                                         ClassDecl *theClass,
-                                         VarDecl *field,
-                                         llvm::Value *metadata) {
   int index = FindClassFieldOffset(IGF.IGM, theClass, field).getTargetIndex();
   llvm::Value *val = emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
   return IGF.Builder.CreatePtrToInt(val, IGF.IGM.SizeTy);
+}
+
+/// Given a reference to class metadata of the given type,
+/// load the fragile instance size and alignment of the class.
+std::pair<llvm::Value *, llvm::Value *>
+irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
+                                                ClassDecl *theClass,
+                                                llvm::Value *metadata) {
+  class FindClassSize :
+    public ClassMetadataScanner<FindClassSize> {
+  public:
+    FindClassSize(IRGenModule &IGM, ClassDecl *theClass)
+      : ClassMetadataScanner(IGM, theClass) {}
+
+    unsigned InstanceSize = ~0U, InstanceAlignMask = ~0U;
+        
+    void noteAddressPoint() {
+      assert(InstanceSize == ~0U && InstanceAlignMask == ~0U
+             && "found size or alignment before address point?!");
+      NextIndex = 0;
+    }
+        
+    void addInstanceSize() {
+      InstanceSize = NextIndex++;
+    }
+      
+    void addInstanceAlignMask() {
+      InstanceAlignMask = NextIndex++;
+    }
+  };
+  
+  // If the class has fragile fixed layout, return the constant size and
+  // alignment.
+  if (llvm::Constant *size
+        = tryEmitClassConstantFragileInstanceSize(IGF.IGM, theClass)) {
+    llvm::Constant *alignMask
+      = tryEmitClassConstantFragileInstanceAlignMask(IGF.IGM, theClass);
+    assert(alignMask && "static size without static align");
+    return {size, alignMask};
+  }
+  
+  // Otherwise, load from the metadata.
+  FindClassSize scanner(IGF.IGM, theClass);
+  scanner.layout();
+  assert(scanner.InstanceSize != ~0U
+         && scanner.InstanceAlignMask != ~0U
+         && "didn't find size or alignment in metadata?!");
+  llvm::Value *size = emitLoadOfWitnessTableRefAtIndex(IGF, metadata,
+                                                       scanner.InstanceSize);
+  size = IGF.Builder.CreatePtrToInt(size, IGF.IGM.SizeTy);
+  llvm::Value *alignMask = emitLoadOfWitnessTableRefAtIndex(IGF, metadata,
+                                                     scanner.InstanceAlignMask);
+  alignMask = IGF.Builder.CreatePtrToInt(alignMask, IGF.IGM.SizeTy);
+  
+  return {size, alignMask};
 }
 
 /// Given a pointer to a heap object (i.e. definitely not a tagged
