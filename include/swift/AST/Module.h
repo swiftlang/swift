@@ -129,8 +129,6 @@ typedef llvm::PointerIntPair<ProtocolConformance *, 2, ConformanceKind>
 /// module, as is an imported module.
 class Module : public DeclContext {
   ModuleKind Kind;
-protected:
-  mutable void *LookupCachePimpl;
 public:
   ASTContext &Ctx;
   Identifier Name;
@@ -138,7 +136,7 @@ public:
 protected:
   Module(ModuleKind Kind, Identifier Name, ASTContext &Ctx)
   : DeclContext(DeclContextKind::Module, nullptr),
-    Kind(Kind), LookupCachePimpl(0), Ctx(Ctx), Name(Name) {}
+    Kind(Kind), Ctx(Ctx), Name(Name) {}
 
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
@@ -457,7 +455,14 @@ public:
 ///
 /// \sa SourceFile
 class TranslationUnit : public Module {
+  friend class Module;
+
+public:
+  class LookupCache;
+
 private:
+  LookupCache *Cache = nullptr;
+
   /// If non-NULL, an plug-in that should be used when performing external
   /// lookups.
   ExternalNameLookup *ExternalLookup = nullptr;
@@ -511,6 +516,14 @@ public:
 /// BuiltinModule - This module represents the compiler's implicitly generated
 /// declarations in the builtin module.
 class BuiltinModule : public Module {
+  friend class Module;
+
+public:
+  class LookupCache;
+
+private:
+  LookupCache *Cache = nullptr;
+
 public:
   BuiltinModule(Identifier Name, ASTContext &Ctx)
     : Module(ModuleKind::Builtin, Name, Ctx) {
@@ -529,19 +542,20 @@ public:
 ///
 /// This may be a Swift module or a Clang module.
 class LoadedModule : public Module {
+  ModuleLoader &Owner;
+
 protected:
   friend class Module;
 
   LoadedModule(ModuleKind Kind, Identifier name,
-               std::string DebugModuleName,
+               StringRef DebugModuleName,
                ASTContext &ctx, ModuleLoader &owner)
-    : Module(Kind, name, ctx),
+    : Module(Kind, name, ctx), Owner(owner),
       DebugModuleName(DebugModuleName) {
-    LookupCachePimpl = static_cast<void *>(&owner);
   }
 
   ModuleLoader &getOwner() const {
-    return *static_cast<ModuleLoader *>(LookupCachePimpl);
+    return Owner;
   }
 
   std::string DebugModuleName;

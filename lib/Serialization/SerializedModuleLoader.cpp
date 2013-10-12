@@ -119,7 +119,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
     }
 
   assert(inputFile);
-  std::string DebugModuleName = inputFile->getBufferIdentifier();
+  StringRef DebugModuleName = inputFile->getBufferIdentifier();
 
   std::unique_ptr<ModuleFile> loadedModuleFile;
   ModuleStatus err = ModuleFile::load(std::move(inputFile), loadedModuleFile);

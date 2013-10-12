@@ -39,34 +39,31 @@ using namespace swift;
 // Builtin Module Name lookup
 //===----------------------------------------------------------------------===//
 
-namespace {
-  /// BuiltinModuleCache - This is the type of the cache for the BuiltinModule.
-  /// This is lazily created on its first use an hangs off
-  /// Module::LookupCachePimpl.
-  class BuiltinModuleCache {
-    /// The cache of identifiers we've already looked up.  We use a
-    /// single hashtable for both types and values as a minor
-    /// optimization; this prevents us from having both a builtin type
-    /// and a builtin value with the same name, but that's okay.
-    llvm::DenseMap<Identifier, ValueDecl*> Cache;
-  public:
+class BuiltinModule::LookupCache {
+  /// The cache of identifiers we've already looked up.  We use a
+  /// single hashtable for both types and values as a minor
+  /// optimization; this prevents us from having both a builtin type
+  /// and a builtin value with the same name, but that's okay.
+  llvm::DenseMap<Identifier, ValueDecl*> Cache;
 
-    void lookupValue(Identifier Name, NLKind LookupKind, BuiltinModule &M, 
-                     SmallVectorImpl<ValueDecl*> &Result);
-  };
-} // end anonymous namespace.
+public:
+  void lookupValue(Identifier Name, NLKind LookupKind, BuiltinModule &M, 
+                   SmallVectorImpl<ValueDecl*> &Result);
+};
 
-static BuiltinModuleCache &getBuiltinCachePimpl(void *&Ptr) {
+static BuiltinModule::LookupCache &
+getBuiltinCachePimpl(BuiltinModule::LookupCache *&Ptr) {
   // FIXME: This leaks.  Sticking this into ASTContext isn't enough because then
   // the DenseMap will leak.
   if (Ptr == 0)
-    Ptr = new BuiltinModuleCache();
-  return *(BuiltinModuleCache*)Ptr;
+    Ptr = new BuiltinModule::LookupCache();
+  return *Ptr;
 }
 
-void BuiltinModuleCache::lookupValue(Identifier Name, NLKind LookupKind,
-                                     BuiltinModule &M,
-                                     SmallVectorImpl<ValueDecl*> &Result) {
+void
+BuiltinModule::LookupCache::lookupValue(Identifier Name, NLKind LookupKind,
+                                        BuiltinModule &M,
+                                        SmallVectorImpl<ValueDecl*> &Result) {
   // Only qualified lookup ever finds anything in the builtin module.
   if (LookupKind != NLKind::QualifiedLookup) return;
   
@@ -90,59 +87,55 @@ void BuiltinModuleCache::lookupValue(Identifier Name, NLKind LookupKind,
 // Normal Module Name Lookup
 //===----------------------------------------------------------------------===//
 
-namespace {
-  /// This is the type of the cache for the TranslationUnit.
-  ///
-  /// This is lazily created on its first use and hangs off
-  /// Module::LookupCachePimpl.
-  class TUModuleCache {
-    llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> TopLevelValues;
-    llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> ClassMembers;
-    bool MemberCachePopulated = false;
-    void doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators);
-    void addToMemberCache(ArrayRef<Decl*> decls);
-    void populateMemberCache(const TranslationUnit &TU);
-  public:
-    typedef Module::AccessPathTy AccessPathTy;
-    
-    TUModuleCache(const TranslationUnit &TU);
-    
-    void lookupValue(AccessPathTy AccessPath, Identifier Name, 
-                     NLKind LookupKind, TranslationUnit &TU, 
-                     SmallVectorImpl<ValueDecl*> &Result);
-    
-    void lookupVisibleDecls(AccessPathTy AccessPath,
-                            VisibleDeclConsumer &Consumer,
-                            NLKind LookupKind,
-                            const TranslationUnit &TU);
-    
-    void lookupClassMembers(AccessPathTy AccessPath,
-                            VisibleDeclConsumer &consumer,
-                            const TranslationUnit &TU);
-                            
-    void lookupClassMember(AccessPathTy accessPath,
-                           Identifier name,
-                           SmallVectorImpl<ValueDecl*> &results,
-                           const TranslationUnit &TU);
+class TranslationUnit::LookupCache {
+  llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> TopLevelValues;
+  llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> ClassMembers;
+  bool MemberCachePopulated = false;
+  void doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators);
+  void addToMemberCache(ArrayRef<Decl*> decls);
+  void populateMemberCache(const TranslationUnit &TU);
+public:
+  typedef Module::AccessPathTy AccessPathTy;
+  
+  LookupCache(const TranslationUnit &TU);
+  
+  void lookupValue(AccessPathTy AccessPath, Identifier Name, 
+                   NLKind LookupKind, TranslationUnit &TU, 
+                   SmallVectorImpl<ValueDecl*> &Result);
+  
+  void lookupVisibleDecls(AccessPathTy AccessPath,
+                          VisibleDeclConsumer &Consumer,
+                          NLKind LookupKind,
+                          const TranslationUnit &TU);
+  
+  void lookupClassMembers(AccessPathTy AccessPath,
+                          VisibleDeclConsumer &consumer,
+                          const TranslationUnit &TU);
+                          
+  void lookupClassMember(AccessPathTy accessPath,
+                         Identifier name,
+                         SmallVectorImpl<ValueDecl*> &results,
+                         const TranslationUnit &TU);
 
-    SmallVector<ValueDecl *, 0> AllVisibleValues;
-  };
-} // end anonymous namespace.
+  SmallVector<ValueDecl *, 0> AllVisibleValues;
+};
+using TULookupCache = TranslationUnit::LookupCache;
 
-static TUModuleCache &getTUCachePimpl(void *&Ptr, const TranslationUnit &TU) {
+static TULookupCache &getTUCachePimpl(TULookupCache * const &CachePtr,
+                                      const TranslationUnit &TU) {
   // FIXME: This leaks.  Sticking this into ASTContext isn't enough because then
   // the DenseMap will leak.
-  if (Ptr == 0)
-    Ptr = new TUModuleCache(TU);
-  return *(TUModuleCache*)Ptr;
+  if (!CachePtr)
+    const_cast<TULookupCache *&>(CachePtr) = new TULookupCache(TU);
+  return *CachePtr;
 }
 
-static void freeTUCachePimpl(void *&Ptr) {
-  delete (TUModuleCache*)Ptr;
-  Ptr = 0;
+static void freeTUCachePimpl(TULookupCache *&CachePtr) {
+  delete CachePtr;
+  CachePtr = nullptr;
 }
 
-void TUModuleCache::doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators) {
+void TULookupCache::doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators) {
   for (Decl *D : decls) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
       if (onlyOperators ? VD->getName().isOperator() : !VD->getName().empty())
@@ -154,7 +147,7 @@ void TUModuleCache::doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators) {
   }
 }
 
-void TUModuleCache::populateMemberCache(const TranslationUnit &TU) {
+void TULookupCache::populateMemberCache(const TranslationUnit &TU) {
   for (const Decl *D : TU.MainSourceFile->Decls) {
     if (const NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
       addToMemberCache(NTD->getMembers());
@@ -164,7 +157,7 @@ void TUModuleCache::populateMemberCache(const TranslationUnit &TU) {
   }
 }
 
-void TUModuleCache::addToMemberCache(ArrayRef<Decl*> decls) {
+void TULookupCache::addToMemberCache(ArrayRef<Decl*> decls) {
   for (Decl *D : decls) {
     auto VD = dyn_cast<ValueDecl>(D);
     if (!VD)
@@ -181,12 +174,12 @@ void TUModuleCache::addToMemberCache(ArrayRef<Decl*> decls) {
 }
 
 /// Populate our cache on the first name lookup.
-TUModuleCache::TUModuleCache(const TranslationUnit &TU) {
+TULookupCache::LookupCache(const TranslationUnit &TU) {
   doPopulateCache(TU.MainSourceFile->Decls, false);
 }
 
 
-void TUModuleCache::lookupValue(AccessPathTy AccessPath, Identifier Name, 
+void TULookupCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
                                 NLKind LookupKind, TranslationUnit &TU, 
                                 SmallVectorImpl<ValueDecl*> &Result) {
   assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
@@ -204,7 +197,7 @@ void TUModuleCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
     Result.push_back(Elt);
 }
 
-void TUModuleCache::lookupVisibleDecls(AccessPathTy AccessPath,
+void TULookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
                                        VisibleDeclConsumer &Consumer,
                                        NLKind LookupKind,
                                        const TranslationUnit &TU) {
@@ -225,7 +218,7 @@ void TUModuleCache::lookupVisibleDecls(AccessPathTy AccessPath,
   }
 }
 
-void TUModuleCache::lookupClassMembers(AccessPathTy accessPath,
+void TULookupCache::lookupClassMembers(AccessPathTy accessPath,
                                        VisibleDeclConsumer &consumer,
                                        const TranslationUnit &TU) {
   if (!MemberCachePopulated)
@@ -251,7 +244,7 @@ void TUModuleCache::lookupClassMembers(AccessPathTy accessPath,
   }
 }
 
-void TUModuleCache::lookupClassMember(AccessPathTy accessPath,
+void TULookupCache::lookupClassMember(AccessPathTy accessPath,
                                       Identifier name,
                                       SmallVectorImpl<ValueDecl*> &results,
                                       const TranslationUnit &TU) {
@@ -286,13 +279,13 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
                          SmallVectorImpl<ValueDecl*> &Result) {
   if (BuiltinModule *BM = dyn_cast<BuiltinModule>(this)) {
     assert(AccessPath.empty() && "builtin module's access path always empty!");
-    return getBuiltinCachePimpl(LookupCachePimpl)
+    return getBuiltinCachePimpl(BM->Cache)
       .lookupValue(Name, LookupKind, *BM, Result);
   }
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
     // Look in the translation unit.
-    return getTUCachePimpl(LookupCachePimpl, *TU)
+    return getTUCachePimpl(TU->Cache, *TU)
       .lookupValue(AccessPath, Name, LookupKind, *TU, Result);
   }
 
@@ -310,7 +303,7 @@ void Module::lookupVisibleDecls(AccessPathTy AccessPath,
   }
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    return getTUCachePimpl(LookupCachePimpl, *TU)
+    return getTUCachePimpl(TU->Cache, *TU)
       .lookupVisibleDecls(AccessPath, Consumer, LookupKind, *TU);
   }
 
@@ -326,7 +319,7 @@ void Module::lookupClassMembers(AccessPathTy accessPath,
   }
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    return getTUCachePimpl(LookupCachePimpl, *TU)
+    return getTUCachePimpl(TU->Cache, *TU)
       .lookupClassMembers(accessPath, consumer, *TU);
   }
 
@@ -343,7 +336,7 @@ void Module::lookupClassMember(AccessPathTy accessPath,
   }
   
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
-    return getTUCachePimpl(LookupCachePimpl, *TU)
+    return getTUCachePimpl(TU->Cache, *TU)
       .lookupClassMember(accessPath, name, results, *TU);
   }
   
@@ -1067,18 +1060,18 @@ void TranslationUnit::print(raw_ostream &os, const PrintOptions &options) {
 }
 
 void TranslationUnit::clearLookupCache() {
-  freeTUCachePimpl(LookupCachePimpl);
+  freeTUCachePimpl(Cache);
 }
 
 void
 TranslationUnit::cacheVisibleDecls(SmallVectorImpl<ValueDecl*> &&globals) const{
-  auto &cached = getTUCachePimpl(LookupCachePimpl, *this).AllVisibleValues;
+  auto &cached = getTUCachePimpl(Cache, *this).AllVisibleValues;
   static_cast<SmallVectorImpl<ValueDecl*>&>(cached) = std::move(globals);
 }
 
 const SmallVectorImpl<ValueDecl *> &
 TranslationUnit::getCachedVisibleDecls() const {
-  return getTUCachePimpl(LookupCachePimpl, *this).AllVisibleValues;
+  return getTUCachePimpl(Cache, *this).AllVisibleValues;
 }
 
 bool TranslationUnit::walk(ASTWalker &Walker) {

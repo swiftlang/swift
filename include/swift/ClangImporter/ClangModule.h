@@ -37,7 +37,7 @@ class ClangModule : public LoadedModule {
   Module *getAdapterModule() const;
 
 public:
-  ClangModule(ASTContext &ctx, std::string DebugModuleName,
+  ClangModule(ASTContext &ctx, StringRef DebugModuleName,
               ModuleLoader &owner, clang::Module *clangModule);
 
   /// \brief Retrieve the underlying Clang module.

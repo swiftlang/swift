@@ -387,7 +387,7 @@ public:
   ModuleFile &File;
 
   SerializedModule(ASTContext &ctx, SerializedModuleLoader &owner,
-                   Identifier name, std::string DebugModuleName,
+                   Identifier name, StringRef DebugModuleName,
                    ModuleFile &file)
     : LoadedModule(ModuleKind::Serialized, name, DebugModuleName, ctx, owner),
       File(file) {}

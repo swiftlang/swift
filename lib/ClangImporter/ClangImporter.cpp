@@ -822,7 +822,7 @@ void ClangImporter::verifyAllModules() {
 // ClangModule Implementation
 //===----------------------------------------------------------------------===//
 
-ClangModule::ClangModule(ASTContext &ctx, std::string DebugModuleName,
+ClangModule::ClangModule(ASTContext &ctx, StringRef DebugModuleName,
                          ModuleLoader &owner, clang::Module *clangModule)
   : LoadedModule(ModuleKind::Clang, ctx.getIdentifier(clangModule->Name),
                  DebugModuleName, ctx, owner), clangModule(clangModule) {
