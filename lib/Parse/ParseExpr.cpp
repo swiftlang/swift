@@ -297,7 +297,7 @@ done:
 ///   expr-discard: '_'
 ///
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
-  Expr *Operator;
+  UnresolvedDeclRefExpr *Operator;
   switch (Tok.getKind()) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
@@ -357,6 +357,15 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   if (SubExpr.isNull())
     return nullptr;
 
+  // Check if we have an unary '-' with integer literal sub-expression, for
+  // example, "-42".
+  if (auto *ILE = dyn_cast<IntegerLiteralExpr>(SubExpr.get())) {
+    if (!Operator->getName().empty() && Operator->getName().str() == "-") {
+      ILE->setNegative(Operator->getLoc());
+      return makeParserResult(ILE);
+    }
+  }
+
   return makeParserResult(
       new (Context) PrefixUnaryExpr(Operator, SubExpr.get()));
 }
@@ -373,7 +382,7 @@ static DeclRefKind getDeclRefKindForOperator(tok kind) {
 /// parseExprOperator - Parse an operator reference expression.  These
 /// are not "proper" expressions; they can only appear in binary/unary
 /// operators.
-Expr *Parser::parseExprOperator() {
+UnresolvedDeclRefExpr *Parser::parseExprOperator() {
   assert(Tok.isAnyOperator());
   DeclRefKind refKind = getDeclRefKindForOperator(Tok.getKind());
   SourceLoc loc = Tok.getLoc();

@@ -73,6 +73,22 @@ class alignas(8) Expr {
   enum { NumExprBits = 9 };
   static_assert(NumExprBits <= 32, "fits in an unsigned");
 
+  class LiteralExprBitfields {
+    friend class LiteralExpr;
+    unsigned : NumExprBits;
+  };
+  enum { NumLiteralExprBits = NumExprBits + 0 };
+  static_assert(NumLiteralExprBits <= 32, "fits in an unsigned");
+
+  class IntegerLiteralExprBitfields {
+    friend class IntegerLiteralExpr;
+    unsigned : NumLiteralExprBits;
+
+    unsigned IsNegative : 1;
+  };
+  enum { NumIntegerLiteralExprBits = NumLiteralExprBits + 1 };
+  static_assert(NumIntegerLiteralExprBits <= 32, "fits in an unsigned");
+
   class AbstractClosureExprBitfields {
     friend class AbstractClosureExpr;
     unsigned : NumExprBits;
@@ -94,6 +110,8 @@ class alignas(8) Expr {
 protected:
   union {
     ExprBitfields ExprBits;
+    LiteralExprBitfields LiteralExprBits;
+    IntegerLiteralExprBitfields IntegerLiteralExprBits;
     AbstractClosureExprBitfields AbstractClosureExprBits;
     ClosureExprBitfields ClosureExprBits;
   };
@@ -208,26 +226,43 @@ public:
   }
 };
 
-/// IntegerLiteralExpr - Integer literal, like '4'.  After semantic analysis
-/// assigns types, this is guaranteed to only have a BuiltinIntegerType.
+/// \brief Integer literal with a '+' or '-' sign, like '+4' or '- 2'.
+///
+/// After semantic analysis assigns types, this is guaranteed to only have
+/// a BuiltinIntegerType.
 class IntegerLiteralExpr : public LiteralExpr {
   /// The value of the literal as an ASTContext-owned string. Underscores must
   /// be stripped.
   StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
-  SourceLoc Loc;
+  SourceLoc MinusLoc;
+  SourceLoc DigitsLoc;
 
 public:
-  IntegerLiteralExpr(StringRef Val, SourceLoc Loc, bool Implicit)
-    : LiteralExpr(ExprKind::IntegerLiteral, Implicit), Val(Val), Loc(Loc) {}
-  
+  IntegerLiteralExpr(StringRef Val, SourceLoc DigitsLoc, bool Implicit)
+      : LiteralExpr(ExprKind::IntegerLiteral, Implicit), Val(Val),
+        DigitsLoc(DigitsLoc) {
+    IntegerLiteralExprBits.IsNegative = false;
+  }
+
   APInt getValue() const;
-  
+
   static APInt getValue(StringRef Text, unsigned BitWidth);
 
-  StringRef getText() const { return Val; }
-  
-  SourceRange getSourceRange() const { return Loc; }
-  
+  bool isNegative() const { return IntegerLiteralExprBits.IsNegative; }
+  void setNegative(SourceLoc Loc) {
+    MinusLoc = Loc;
+    IntegerLiteralExprBits.IsNegative = true;
+  }
+
+  StringRef getDigitsText() const { return Val; }
+
+  SourceRange getSourceRange() const {
+    if (isNegative())
+      return { MinusLoc, DigitsLoc };
+    else
+      return DigitsLoc;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::IntegerLiteral;
   }
@@ -2244,10 +2279,10 @@ public:
     : ApplyExpr(ExprKind::PrefixUnary, Fn, Arg, /*Implicit=*/false, Ty) {}
 
   SourceLoc getLoc() const { return getFn()->getStartLoc(); }
-  
+
   SourceRange getSourceRange() const {
     return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc()); 
-  }  
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::PrefixUnary;

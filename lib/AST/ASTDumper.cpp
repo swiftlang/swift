@@ -906,10 +906,13 @@ public:
   }
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-    printCommon(E, "integer_literal_expr") << " value=";
+    printCommon(E, "integer_literal_expr");
+    if (E->isNegative())
+      OS << " negative";
+    OS << " value=";
     Type T = E->getType();
     if (T.isNull() || T->is<ErrorType>() || T->hasTypeVariable())
-      OS << E->getText();
+      OS << E->getDigitsText();
     else
       OS << E->getValue();
     OS << ')';

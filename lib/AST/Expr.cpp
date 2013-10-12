@@ -100,24 +100,30 @@ Expr *Expr::getValueProvidingExpr() {
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
 
-APInt IntegerLiteralExpr::getValue(StringRef Text,
-                                   unsigned BitWidth) {
+static APInt getIntegerLiteralValue(bool IsNegative, StringRef Text,
+                                    unsigned BitWidth) {
   llvm::APInt Value(BitWidth, 0);
   // swift encodes octal differently than C
   bool IsCOctal = Text.size() > 1 && Text[0] == '0' && isdigit(Text[1]);
   bool Error = Text.getAsInteger(IsCOctal ? 10 : 0, Value);
   assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
+  if (IsNegative)
+    Value = -Value;
   if (Value.getBitWidth() != BitWidth)
-    Value = Value.zextOrTrunc(BitWidth);
+    Value = Value.sextOrTrunc(BitWidth);
   return Value;
-  
+}
+
+APInt IntegerLiteralExpr::getValue(StringRef Text, unsigned BitWidth) {
+  return getIntegerLiteralValue(/*IsNegative=*/false, Text, BitWidth);
 }
 
 APInt IntegerLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
   assert(!getType()->is<ErrorType>() && "Should have a valid type");
-  return getValue(getText(),
-                  getType()->castTo<BuiltinIntegerType>()->getBitWidth());
+  return getIntegerLiteralValue(
+      isNegative(), getDigitsText(),
+      getType()->castTo<BuiltinIntegerType>()->getBitWidth());
 }
 
 APFloat FloatLiteralExpr::getValue(StringRef Text,

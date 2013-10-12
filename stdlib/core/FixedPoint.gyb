@@ -31,6 +31,7 @@ maxBits = max(allBits)
 
 # Number of bits in an Int
 intBits = 64
+builtinIntLiteralBits = 136
 
 assert(intBits in allBits)
 
@@ -68,12 +69,9 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
 
   // FIXME: We will start warning on 64 bit integer overflows after the "support
   // for negative literals" patch goes in.
-  // FIXME: We need to special case the UInt64 to just return the value.
-  @@transparent 
-  static func _convertFromBuiltinIntegerLiteral(val : Builtin.Int${maxBits}) -> ${Self} {
-    return ${Self}(${'val' if bits == maxBits else 
-                     ('Builtin.%strunc_with_overflow_Int%d_Int%d(val)' % 
-                     ('s' if signed else 'u', maxBits, bits))})
+  @@transparent
+  static func _convertFromBuiltinIntegerLiteral(val : Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
+    return ${Self}(Builtin.${'s' if signed else 'u'}trunc_with_overflow_Int${builtinIntLiteralBits}_Int${bits}(val))
   }
 
   @@transparent 
@@ -205,9 +203,9 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // Bitwise negate
 @@transparent @@prefix
 func ~(rhs: ${Self}) -> ${Self} {
-  var mask = ${'Builtin.trunc_Int%d_Int%d(%s.value)' % (maxBits, bits, maskBits(bits)) 
-             if maxBits != bits else 
-               '%s.value' % (maskBits(bits))}
+  var mask = ${'Builtin.trunc_Int%d_Int%d(%s.value)' % (maxBits, bits, maskBits(bits))
+             if maxBits != bits else
+               'UInt64(%s).value' % (maskBits(bits))}
   return ${Self}(Builtin.xor_Int${bits}(rhs.value, mask))
 }
 

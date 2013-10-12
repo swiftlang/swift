@@ -49,8 +49,10 @@ namespace {
 static LiteralExpr *cloneRawLiteralExpr(ASTContext &C, LiteralExpr *expr) {
   LiteralExpr *clone;
   if (auto intLit = dyn_cast<IntegerLiteralExpr>(expr)) {
-    clone = new (C) IntegerLiteralExpr(intLit->getText(), SourceLoc(),
+    clone = new (C) IntegerLiteralExpr(intLit->getDigitsText(), SourceLoc(),
                                        /*implicit*/ true);
+    if (intLit->isNegative())
+      cast<IntegerLiteralExpr>(clone)->setNegative(SourceLoc());
   } else if (auto charLit = dyn_cast<CharacterLiteralExpr>(expr)) {
     clone = new (C) CharacterLiteralExpr(charLit->getValue(), SourceLoc());
   } else if (auto stringLit = dyn_cast<StringLiteralExpr>(expr)) {

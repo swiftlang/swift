@@ -748,7 +748,7 @@ public:
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc, Expr *FirstExpr);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc, Expr *FirstKey);
 
-  Expr *parseExprOperator();
+  UnresolvedDeclRefExpr *parseExprOperator();
   Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
 
   //===--------------------------------------------------------------------===//
