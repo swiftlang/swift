@@ -878,7 +878,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
     func-arguments ::= <a href="#pattern-tuple">pattern-tuple</a>+
     func-arguments ::= selector-tuple
     <a id="selector-tuple">selector-tuple</a> ::= '(' <a href="#pattern-tuple">pattern-tuple-element</a> ')' (<a href="#identifier">identifier-or-any</a> '(' pattern-tuple-element ')')+
-    func-signature-result ::= '-&gt;' <a href="#type">type</a>
+    func-signature-result ::= '-&gt;' <a href="#type">type-annotation</a>
   </pre>
 
   <p>A function signature specifies one or more sets of parameter
@@ -1802,7 +1802,7 @@ if vec[3] {
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    type-function ::= <a href="#type">type-tuple</a> '-&gt;' <a href="#type">type</a>
+    type-function ::= <a href="#type">type-tuple</a> '-&gt;' <a href="#type">type-annotation</a>
   </pre>
 
   <p>Function types have a single input and single result type, separated by

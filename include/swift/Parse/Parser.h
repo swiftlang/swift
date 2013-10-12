@@ -494,7 +494,7 @@ public:
     return false;
   }
   bool parseAttributeListPresent(DeclAttributes &Attributes, bool OldStyle);
-  bool parseAttribute(DeclAttributes &Attributes);
+  bool parseAttribute(DeclAttributes &Attributes, bool OldStyle);
   
   ParserResult<ImportDecl> parseDeclImport(unsigned Flags,
                                            DeclAttributes &Attributes);

@@ -302,7 +302,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
 ///   func-signature:
 ///     func-arguments func-signature-result?
 ///   func-signature-result:
-///     '->' type
+///     '->' type-annotation
 ///
 /// Note that this leaves retType as null if unspecified.
 ParserStatus
@@ -338,7 +338,7 @@ Parser::parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
     }
 
     ParserResult<TypeRepr> ResultType =
-        parseType(diag::expected_type_function_result);
+        parseTypeAnnotation(diag::expected_type_function_result);
     if (ResultType.hasCodeCompletion())
       return ResultType;
     retType = ResultType.getPtrOrNull();

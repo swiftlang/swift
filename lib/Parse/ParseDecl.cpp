@@ -135,7 +135,7 @@ static Resilience getResilience(AttrName attr) {
 ///     'unowned'
 ///     'noreturn'
 /// \endverbatim
-bool Parser::parseAttribute(DeclAttributes &Attributes) {
+bool Parser::parseAttribute(DeclAttributes &Attributes, bool OldStyle) {
   if (Tok.is(tok::kw_weak)) {
     if (Attributes.hasOwnership()) {
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
@@ -158,14 +158,27 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 
   if (!Tok.is(tok::identifier)) {
     diagnose(Tok, diag::expected_attribute_name);
-    skipUntil(tok::r_square);
+    if (OldStyle) skipUntil(tok::r_square);
     return true;
   }
 
   switch (AttrName attr = getAttrName(Tok.getText())) {
   case AttrName::none:
     diagnose(Tok, diag::unknown_attribute, Tok.getText());
-    skipUntil(tok::r_square);
+    if (OldStyle)
+      skipUntil(tok::r_square);
+    else {
+      // Recover by eating @foo when foo is not known.
+      consumeToken();
+      
+      // Recovery by eating "@foo=bar" if present.
+      if (consumeIf(tok::equal)) {
+        if (Tok.is(tok::identifier) ||
+            Tok.is(tok::integer_literal) ||
+            Tok.is(tok::floating_literal))
+          consumeToken();
+      }
+    }
     return true;
 
   // Infix attributes.
@@ -271,8 +284,10 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
                              beginLoc)) {
         // If the name isn't immediately followed by a closing paren, recover
         // by trying to find some closing paren.
-        skipUntil(tok::r_paren);
-        consumeIf(tok::r_paren);
+        if (OldStyle) {
+          skipUntil(tok::r_paren);
+          consumeIf(tok::r_paren);
+        }
       }
     } else {
       diagnose(Tok, diag::cc_attribute_expected_lparen);
@@ -558,7 +573,7 @@ bool Parser::parseAttributeListPresent(DeclAttributes &Attributes,
                     tok::comma, /*OptionalSep=*/false,
                     diag::expected_in_attribute_list,
                     [&] () -> bool {
-            return parseAttribute(Attributes);
+            return parseAttribute(Attributes, OldStyle);
           }))
         return true;
 
@@ -571,7 +586,7 @@ bool Parser::parseAttributeListPresent(DeclAttributes &Attributes,
     Attributes.AtLoc = Tok.getLoc();
     do {
       if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
-          parseAttribute(Attributes))
+          parseAttribute(Attributes, OldStyle))
         return true;
    
       // Attribute lists don't require separating commas.

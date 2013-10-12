@@ -135,7 +135,7 @@ ParserResult<TypeRepr> Parser::parseType() {
 ///     type-array
 ///
 ///   type-function:
-///     type-simple '->' type
+///     type-simple '->' type-annotation
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
   ParserResult<TypeRepr> ty = parseTypeSimple(MessageID);
@@ -148,7 +148,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
   // Handle type-function if we have an arrow.
   if (consumeIf(tok::arrow)) {
     ParserResult<TypeRepr> SecondHalf =
-        parseType(diag::expected_type_function_result);
+        parseTypeAnnotation(diag::expected_type_function_result);
     if (SecondHalf.hasCodeCompletion())
       return makeParserCodeCompletionResult<TypeRepr>();
     if (SecondHalf.isNull())
