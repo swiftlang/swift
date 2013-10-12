@@ -125,10 +125,18 @@ namespace {
   class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
     ClassDecl *TheClass;
     mutable StructLayout *Layout;
+    /// Lazily-initialized array of all fragile stored properties in the class
+    /// (including superclass stored properties).
+    mutable ArrayRef<VarDecl*> AllStoredProperties;
+    /// Lazily-initialized array of all fragile stored properties inherited from
+    /// superclasses.
+    mutable ArrayRef<VarDecl*> InheritedStoredProperties;
 
     /// Can we use swift reference-counting, or do we have to use
     /// objc_retain/release?
     const bool HasSwiftRefcount;
+    
+    void generateLayout(IRGenModule &IGM) const;
 
   public:
     ClassTypeInfo(llvm::PointerType *irType, Size size, Alignment align,
@@ -147,6 +155,8 @@ namespace {
     ClassDecl *getClass() const { return TheClass; }
 
     const StructLayout &getLayout(IRGenModule &IGM) const;
+    ArrayRef<VarDecl*> getAllStoredProperties(IRGenModule &IGM) const;
+    ArrayRef<VarDecl*> getInheritedStoredProperties(IRGenModule &IGM) const;
 
     Alignment getHeapAlignment(IRGenModule &IGM) const {
       return getLayout(IGM).getAlignment();
@@ -202,9 +212,6 @@ namespace {
 
   private:
     void layout(ClassDecl *theClass, CanType type) {
-      // TODO: use the full type information to potentially make
-      // generic layouts concrete.
-
       // First, collect information about the superclass.
       if (theClass->hasSuperclass()) {
         CanType superclassType
@@ -283,26 +290,27 @@ namespace {
 }  // end anonymous namespace.
 
 /// Return the index of the given field within the class.
-static unsigned getFieldIndex(ClassDecl *base, VarDecl *target) {
+static unsigned getFieldIndex(IRGenModule &IGM,
+                              ClassDecl *base, VarDecl *target) {
   // FIXME: This is algorithmically terrible.
-
-  unsigned index = 0;
-  for (Decl *member : base->getMembers()) {
-    if (member == target) return index;
-    if (auto var = dyn_cast<VarDecl>(member))
-      if (!var->isComputed())
-        ++index;
-  }
-  llvm_unreachable("didn't find field in type!");
+  auto &ti = IGM.getTypeInfo(base->getDeclaredTypeInContext())
+    .as<ClassTypeInfo>();
+  
+  auto props = ti.getAllStoredProperties(IGM);
+  auto found = std::find(props.begin(), props.end(), target);
+  assert(found != props.end() && "didn't find field in type?!");
+  return found - props.begin();
 }
 
 namespace {
   class ClassLayoutBuilder : public StructLayoutBuilder {
-    SmallVector<ElementLayout, 8> LastElements;
+    SmallVector<ElementLayout, 8> Elements;
+    SmallVector<VarDecl*, 8> AllStoredProperties;
+    unsigned NumInherited = 0;
   public:
     ClassLayoutBuilder(IRGenModule &IGM, ClassDecl *theClass)
-      : StructLayoutBuilder(IGM) {
-
+      : StructLayoutBuilder(IGM)
+    {
       // Start by adding a heap header.
       addHeapHeader();
 
@@ -310,13 +318,25 @@ namespace {
       addFieldsForClass(theClass,
                         theClass->getDeclaredTypeInContext()
                                 ->getCanonicalType());
+      
+      // Add these fields to the builder.
+      addFields(Elements, LayoutStrategy::Universal);
     }
 
-    /// Return the element layouts for the most-derived class.
-    ArrayRef<ElementLayout> getLastElements() const {
-      return LastElements;
+    /// Return the element layouts.
+    ArrayRef<ElementLayout> getElements() const {
+      return Elements;
+    }
+    
+    /// Return the full list of stored properties.
+    ArrayRef<VarDecl *> getAllStoredProperties() const {
+      return AllStoredProperties;
     }
 
+    /// Return the inherited stored property count.
+    unsigned getNumInherited() const {
+      return NumInherited;
+    }
   private:
     void addFieldsForClass(ClassDecl *theClass,
                            CanType classType) {
@@ -330,9 +350,8 @@ namespace {
 
         // Recur.
         addFieldsForClass(superclass, superclassType);
-
-        // Forget about the fields from the superclass.
-        LastElements.clear();
+        // Count the fields we got from the superclass.
+        NumInherited = Elements.size();
       }
 
       // Collect fields from this class and add them to the layout as a chunk.
@@ -341,45 +360,70 @@ namespace {
 
     void addDirectFieldsFromClass(ClassDecl *theClass,
                                   CanType classType) {
-      assert(LastElements.empty());
-      for (Decl *member : theClass->getMembers()) {
-        VarDecl *var = dyn_cast<VarDecl>(member);
-        if (!var || var->isComputed()) continue;
-
+      for (VarDecl *var : theClass->getStoredProperties()) {
         CanType type = classType->getTypeOfMember(theClass->getModuleContext(),
                                                   var, nullptr)
                                 ->getCanonicalType();
         auto &eltType = IGM.getTypeInfo(type);
-        // FIXME: Type-parameter-dependent field layout isn't implemented yet.
+        // FIXME: Type-parameter-dependent field layout isn't fully
+        // implemented yet.
         if (!eltType.isFixedSize() && !IGM.Opts.EnableDynamicValueTypeLayout) {
           IGM.unimplemented(var->getLoc(), "non-fixed class layout");
           exit(1);
         }
         
-        LastElements.push_back(ElementLayout::getIncomplete(eltType));
+        Elements.push_back(ElementLayout::getIncomplete(eltType));
+        AllStoredProperties.push_back(var);
       }
-
-      // Add those fields to the builder.
-      addFields(LastElements, LayoutStrategy::Universal);
     }
   };
+}
+
+void ClassTypeInfo::generateLayout(IRGenModule &IGM) const {
+  assert(!Layout && AllStoredProperties.empty() && "already generated layout");
+
+  // Add the heap header.
+  ClassLayoutBuilder builder(IGM, getClass());
+  
+  // Set the body of the class type.
+  auto classPtrTy = cast<llvm::PointerType>(getStorageType());
+  auto classTy = cast<llvm::StructType>(classPtrTy->getElementType());
+  builder.setAsBodyOfStruct(classTy);
+  
+  // Record the layout.
+  Layout = new StructLayout(builder, classTy, builder.getElements());
+  AllStoredProperties
+    = IGM.Context.AllocateCopy(builder.getAllStoredProperties());
+  InheritedStoredProperties
+    = AllStoredProperties.slice(0, builder.getNumInherited());
 }
 
 const StructLayout &ClassTypeInfo::getLayout(IRGenModule &IGM) const {
   // Return the cached layout if available.
   if (Layout) return *Layout;
 
-  // Add the heap header.
-  ClassLayoutBuilder builder(IGM, getClass());
-
-  // Set the body of the class type.
-  auto classPtrTy = cast<llvm::PointerType>(getStorageType());
-  auto classTy = cast<llvm::StructType>(classPtrTy->getElementType());
-  builder.setAsBodyOfStruct(classTy);
-
-  // Record the layout.
-  Layout = new StructLayout(builder, classTy, builder.getLastElements());
+  generateLayout(IGM);
   return *Layout;
+}
+
+ArrayRef<VarDecl*>
+ClassTypeInfo::getAllStoredProperties(IRGenModule &IGM) const {
+  // Return the cached layout if available.
+  if (Layout)
+    return AllStoredProperties;
+  
+  generateLayout(IGM);
+  return AllStoredProperties;
+}
+
+ArrayRef<VarDecl*>
+ClassTypeInfo::getInheritedStoredProperties(IRGenModule &IGM) const {
+  // Return the cached layout if available.
+  if (Layout)
+    return InheritedStoredProperties;
+  
+  generateLayout(IGM);
+  return InheritedStoredProperties;
 }
 
 /// Cast the base to i8*, apply the given inbounds offset (in bytes,
@@ -415,6 +459,21 @@ static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
   return OwnedAddress(addr, base);
 }
 
+llvm::Constant *irgen::tryEmitClassConstantFragileFieldOffset(IRGenModule &IGM,
+                                                            ClassDecl *theClass,
+                                                            VarDecl *field) {
+  assert(!field->isComputed());
+  // FIXME: This field index computation is an ugly hack.
+  auto &ti = IGM.getTypeInfo(theClass->getDeclaredTypeInContext())
+    .as<ClassTypeInfo>();
+
+  unsigned fieldIndex = getFieldIndex(IGM, theClass, field);
+  auto &element = ti.getElements(IGM)[fieldIndex];
+  if (element.getKind() == ElementLayout::Kind::Fixed)
+    return IGM.getSize(element.getByteOffset());
+  return nullptr;
+}
+
 OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
                                                       SILType baseType,
@@ -429,7 +488,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   switch (entry.getAccess()) {
     case FieldAccess::ConstantDirect: {
       // FIXME: This field index computation is an ugly hack.
-      unsigned fieldIndex = getFieldIndex(baseClass, field);
+      unsigned fieldIndex = getFieldIndex(IGF.IGM, baseClass, field);
 
       Address baseAddr(base, baseClassTI.getHeapAlignment(IGF.IGM));
       auto &element = baseClassTI.getElements(IGF.IGM)[fieldIndex];
@@ -659,13 +718,19 @@ namespace {
     SmallVector<llvm::Constant*, 4> Protocols;
     SmallVector<llvm::Constant*, 8> Properties;
     llvm::Constant *Name = nullptr;
-    unsigned NextFieldIndex = 0;
+    /// Index of the first non-inherited field in the layout.
+    unsigned FirstFieldIndex;
+    unsigned NextFieldIndex;
   public:
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      const LayoutClass &layout,
-                     const StructLayout &fieldLayout)
+                     const StructLayout &fieldLayout,
+                     unsigned firstField)
         : IGM(IGM), TheClass(theClass), TheExtension(nullptr),
-          Layout(&layout), FieldLayout(&fieldLayout) {
+          Layout(&layout), FieldLayout(&fieldLayout),
+          FirstFieldIndex(firstField),
+          NextFieldIndex(firstField)
+    {
       visitMembers(TheClass);
     }
     
@@ -808,12 +873,13 @@ namespace {
       Size instanceSize = Size(0);
       if (!forMeta) {
         instanceSize = FieldLayout->getSize();
-        if (FieldLayout->getElements().empty()) {
+        if (FieldLayout->getElements().empty()
+            || FieldLayout->getElements().size() == FirstFieldIndex) {
           instanceStart = instanceSize;
-        } else if (FieldLayout->getElements()[0].getKind()
+        } else if (FieldLayout->getElements()[FirstFieldIndex].getKind()
                      == ElementLayout::Kind::Fixed) {
           // FIXME: assumes layout is always sequential!
-          instanceStart = FieldLayout->getElements()[0].getByteOffset();
+          instanceStart = FieldLayout->getElements()[FirstFieldIndex].getByteOffset();
         } else {
           // FIXME: arrange to initialize this at runtime
         }
@@ -1246,7 +1312,8 @@ llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
   auto &classTI = IGM.getTypeInfo(type).as<ClassTypeInfo>();
   auto &fieldLayout = classTI.getLayout(IGM);
   LayoutClass layout(IGM, ResilienceScope::Universal, cls, type);
-  ClassDataBuilder builder(IGM, cls, layout, fieldLayout);
+  ClassDataBuilder builder(IGM, cls, layout, fieldLayout,
+                           classTI.getInheritedStoredProperties(IGM).size());
 
   // First, build the metaclass object.
   builder.buildMetaclassStub();

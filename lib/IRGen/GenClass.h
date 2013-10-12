@@ -60,6 +60,13 @@ namespace irgen {
   llvm::Constant *tryEmitClassConstantFragileInstanceAlignMask(IRGenModule &IGM,
                                                         ClassDecl *Class);
 
+  /// Emit the constant fragile byte offset for the field in the class, or null
+  /// if the field does not have fixed layout. For resilient classes this does
+  /// not correspond to the runtime offset of the field.
+  llvm::Constant *tryEmitClassConstantFragileFieldOffset(IRGenModule &IGM,
+                                                         ClassDecl *theClass,
+                                                         VarDecl *field);
+
   /// Emit the deallocating destructor for a class in terms of its destroying
   /// destructor.
   void emitDeallocatingDestructor(IRGenModule &IGM,

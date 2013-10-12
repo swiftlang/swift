@@ -13,10 +13,13 @@ import gizmo
 // CHECK: @_TMPdC15generic_classes11RootGeneric = global { {{.*}} i64 } {
 // --       template fill function
 // CHECK:   void (i8*, i8*)* [[FILL_ROOTGENERIC:@fill_generic_metadata[0-9]*]],
+// --       vtable
+//          @_TC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
+//          @_TC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
+//          @_TC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
 // --       field offset placeholders
-// CHECK:   i64 0, i64 0, i64 0
+// CHECK:   i64 16, i64 0, i64 0
 // CHECK: }
-
 
 // -- Check that offset vars are emitted for fixed-layout generics
 //    <rdar://problem/15081049>
@@ -60,8 +63,21 @@ import gizmo
 // --       instanceSize
 // CHECK:   i32 48,
 // CHECK: }
-// CHECK: @_TMdC15generic_classes25NonGenericInheritsGeneric
 
+// CHECK: @_TMdC15generic_classes25NonGenericInheritsGeneric = global { {{.*}} i64 } {
+// --       RootGeneric vtable
+//          @_TC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
+//          @_TC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
+//          @_TC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
+// --       RootGeneric field offsets
+// CHECK:   i64 16, i64 24, i64 33,
+// --       NonGenericInheritsGeneric vtable
+// CHECK:   @_TC15generic_classes25NonGenericInheritsGeneric3zimfS0_FT_T_,
+// CHECK:   @_TC15generic_classes25NonGenericInheritsGeneric4zangfS0_FT_T_,
+// --       NonGenericInheritsGeneric field offsets
+//          FIXME: We shouldn't emit this
+// CHECK:   i64 40
+// CHECK: }
 
 // CHECK: @_TMPdC15generic_classes22GenericInheritsGeneric
 // CHECK: @_TMPdC15generic_classes25GenericInheritsNonGeneric
@@ -98,6 +114,9 @@ class RootNonGeneric {
 
 class NonGenericInheritsGeneric : RootGeneric<(Int, UInt8)> {
   var w : Int
+
+  func zim()
+  func zang()
 }
 
 class GenericInheritsGeneric<A, B> : RootGeneric<A> {

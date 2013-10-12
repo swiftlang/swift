@@ -41,6 +41,7 @@
 #include "IRGenDebugInfo.h"
 #include "ScalarTypeInfo.h"
 #include "StructMetadataLayout.h"
+#include "StructLayout.h"
 #include "EnumMetadataLayout.h"
 
 #include "GenMeta.h"
@@ -1000,9 +1001,13 @@ namespace {
     }
 
     void addFieldOffset(VarDecl *var) {
-      // FIXME: use a fixed offset if we have one, or set up so that
-      // we fill this out at runtime.
-      Fields.push_back(llvm::ConstantInt::get(IGM.IntPtrTy, 0));
+      // Use a fixed offset if we have one.
+      if (auto offset = tryEmitClassConstantFragileFieldOffset(IGM, TargetClass,
+                                                               var))
+        Fields.push_back(offset);
+      // Otherwise, leave a placeholder for the runtime to populate at runtime.
+      else
+        Fields.push_back(llvm::ConstantInt::get(IGM.IntPtrTy, 0));
     }
 
     void addMethod(FunctionRef fn) {

@@ -91,7 +91,9 @@ private:
   /// Add fields associated with the given class and its bases.
   void addClassMembers(ClassDecl *theClass) {
     // Add any fields associated with the superclass.
-    // FIXME: Keep track of bound generic members from the superclass.
+    // NB: We don't apply superclass substitutions to members because we want
+    // consistent metadata layout between generic superclasses and concrete
+    // subclasses.
     if (Type superclass = theClass->getSuperclass()) {
       addClassMembers(superclass->getClassOrBoundGenericClass());
     }
