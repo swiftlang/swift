@@ -156,7 +156,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
                                     CastResV);
     }
 
-    // Deal with special builtins that are designed to check overflows on
+    // Deal with special builtins taht are designed to check overflows on
     // integer literals.
     case BuiltinValueKind::STruncWithOverflow:
     case BuiltinValueKind::UTruncWithOverflow: {
@@ -194,10 +194,8 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 
       // Check for overflow.
       if (SrcVal != T) {
-        bool IsOverflow = SrcVal.isNonNegative();
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
-                 IsOverflow ? diag::integer_literal_overflow
-                            : diag::integer_literal_underflow,
+                 diag::integer_literal_overflow,
                  CE ? CE->getType() : DestTy);
       }
 

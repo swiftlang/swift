@@ -1500,10 +1500,9 @@ NOTE(note_while_inlining,sil_analysis,none,
      "while inlining here", ())
 
 // Integer overflow diagnostics.
-ERROR(integer_literal_underflow,sil_gen,none,
-      "integer literal underflows when stored into %0", (Type))
-ERROR(integer_literal_overflow,sil_gen,none,
-      "integer literal overflows when stored into %0", (Type))
+ERROR(integer_literal_overflow,sil_gen,none, 
+      "integer literal overflows when stored into %0",
+      (Type))
 
 // FIXME: We won't need this as it will be replaced with user-generated strings.
 // staticReport diagnostics.
