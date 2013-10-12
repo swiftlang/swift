@@ -405,7 +405,8 @@ public:
   /// purposes.
   ASTStage_t ASTStage = Parsing;
 
-  SourceFile(TranslationUnit &tu, SourceKind K, Optional<int> ImportID = {})
+  SourceFile(TranslationUnit &tu, SourceKind K,
+             Optional<unsigned> ImportID = {})
     : ImportBufferID(ImportID ? *ImportID : -1), TU(tu), Kind(K) {}
 
   ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
@@ -418,7 +419,7 @@ public:
 
   /// \brief The buffer ID for the file that was imported as this TU, or Nothing
   /// if this is not an imported TU.
-  Optional<int> getImportBufferID() const {
+  Optional<unsigned> getImportBufferID() const {
     if (ImportBufferID == -1)
       return Nothing;
     return ImportBufferID;
