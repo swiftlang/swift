@@ -156,7 +156,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
                                     CastResV);
     }
 
-    // Deal with special builtins taht are designed to check overflows on
+    // Deal with special builtins that are designed to check overflows on
     // integer literals.
     case BuiltinValueKind::STruncWithOverflow:
     case BuiltinValueKind::UTruncWithOverflow: {
