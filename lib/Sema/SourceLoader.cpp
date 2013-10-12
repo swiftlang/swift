@@ -119,7 +119,6 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
 
   auto *importFile = new (Ctx) SourceFile(*importTU, SourceFile::Library,
                                           bufferID);
-  performAutoImport(*importFile);
   importTU->MainSourceFile = importFile;
 
   bool done;

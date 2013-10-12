@@ -405,9 +405,13 @@ public:
   /// purposes.
   ASTStage_t ASTStage = Parsing;
 
+  SourceFile(TranslationUnit &tu, SourceKind K, Optional<unsigned> ImportID,
+             bool hasBuiltinModuleAccess);
+  SourceFile(TranslationUnit &tu, SourceKind K, unsigned ImportID)
+    : SourceFile(tu, K, ImportID, false) {}
   SourceFile(TranslationUnit &tu, SourceKind K,
-             Optional<unsigned> ImportID = {})
-    : ImportBufferID(ImportID ? *ImportID : -1), TU(tu), Kind(K) {}
+             bool hasBuiltinModuleAccess = false)
+    : SourceFile(tu, K, Nothing, hasBuiltinModuleAccess) {}
 
   ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
     assert(ASTStage >= Parsed || Kind == SIL);
@@ -464,10 +468,6 @@ private:
 public:
   // FIXME: Make private or eliminate altogether.
   SourceFile *MainSourceFile;
-
-  /// If this is true, then the translation unit is allowed to access the
-  /// Builtin module with an explicit import.
-  bool HasBuiltinModuleAccess = false;
 
   TranslationUnit(Identifier Name, ASTContext &C)
     : Module(ModuleKind::TranslationUnit, Name, C) {

@@ -108,10 +108,6 @@ namespace swift {
                               bool KeepComments = true,
                               bool TokenizeInterpolatedString = true);
 
-  /// \brief When a source file is first set up, this handles setting up any
-  /// automatic imports of the standard library.
-  void performAutoImport(SourceFile &SF);
-
   /// Once parsing is complete, this walks the AST to resolve imports, record
   /// operators, and do other top-level validation.
   ///

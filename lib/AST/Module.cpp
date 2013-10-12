@@ -1093,6 +1093,33 @@ bool TranslationUnit::walk(ASTWalker &Walker) {
   return MainSourceFile->walk(Walker);
 }
 
+static void performAutoImport(SourceFile &SF, bool hasBuiltinModuleAccess) {
+  if (SF.Kind == SourceFile::SIL)
+    return;
+
+  // If we're building the standard library, import the magic Builtin module,
+  // otherwise, import the standard library.
+  Module *M;
+  if (hasBuiltinModuleAccess)
+    M = SF.TU.Ctx.TheBuiltinModule;
+  else
+    M = SF.TU.Ctx.getModule({ {SF.TU.Ctx.StdlibModuleName, SourceLoc()} });
+
+  if (!M)
+    return;
+
+  // FIXME: These will be the same for most source files, but we copy them
+  // over and over again.
+  auto Import = std::make_pair(Module::ImportedModule({}, M), false);
+  SF.setImports(SF.TU.Ctx.AllocateCopy(llvm::makeArrayRef(Import)));
+}
+
+SourceFile::SourceFile(TranslationUnit &tu, SourceKind K,
+                       Optional<unsigned> ImportID, bool hasBuiltinModuleAccess)
+  : ImportBufferID(ImportID ? *ImportID : -1), TU(tu), Kind(K) {
+  performAutoImport(*this, hasBuiltinModuleAccess);
+}
+
 bool SourceFile::walk(ASTWalker &walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent, &TU);
   for (Decl *D : Decls) {

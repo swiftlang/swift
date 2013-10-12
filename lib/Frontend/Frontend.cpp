@@ -123,17 +123,10 @@ void swift::CompilerInstance::doIt() {
   TU = new (*Context) TranslationUnit(ID, *Context);
   Context->LoadedModules[ID.str()] = TU;
 
-  TU->HasBuiltinModuleAccess = Invocation.getParseStdlib();
   TU->setLinkLibraries(Invocation.getLinkLibraries());
 
-  auto *SingleInputFile = new (*Context) SourceFile(*TU, Kind);
-
-  // If we're in SIL mode, don't auto import any libraries.
-  // Also don't perform auto import if we are not going to do semantic
-  // analysis.
-  if (Kind != SourceFile::SIL && !Invocation.getParseOnly())
-    performAutoImport(*SingleInputFile);
-
+  auto *SingleInputFile =
+    new (*Context) SourceFile(*TU, Kind, Invocation.getParseStdlib());
   TU->MainSourceFile = SingleInputFile;
   if (Kind == SourceFile::REPL)
     return;
