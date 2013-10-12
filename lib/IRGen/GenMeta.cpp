@@ -1109,8 +1109,9 @@ namespace {
         NextIndex = 0;
       }
       
-      void noteStartOfFieldOffsets() {
-        Result = NextIndex;
+      void noteStartOfFieldOffsets(ClassDecl *whichClass) {
+        if (whichClass == TargetClass)
+          Result = NextIndex;
       }
     };
 
@@ -1153,9 +1154,11 @@ namespace {
       llvm_unreachable("classes should never have dependent vwtables");
     }
                         
-    void noteStartOfFieldOffsets() {
-      // If the metadata contains a field offset vector, then we need to
+    void noteStartOfFieldOffsets(ClassDecl *whichClass) {
+      // If the metadata contains any field offset vector, then we need to
       // initialize it at runtime.
+      // FIXME: Fill superclass field offset vectors from the superclass
+      // metadata.
       HasDependentFieldOffsetVector = true;
       HasDependentMetadata = true;
     }
@@ -1224,9 +1227,9 @@ namespace {
         // Ask the runtime to lay out the class.
         auto numFields = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                                 storedProperties.size());
-        IGF.Builder.CreateCall4(IGF.IGM.getInitClassMetadataUniversalFn(),
-                                superMetadata, numFields, fields.getAddress(),
-                                fieldVector);
+        IGF.Builder.CreateCall5(IGF.IGM.getInitClassMetadataUniversalFn(),
+                                metadata, superMetadata, numFields,
+                                fields.getAddress(), fieldVector);
       }
     }
   };

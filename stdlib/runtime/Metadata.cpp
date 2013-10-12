@@ -987,7 +987,8 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
-void swift::swift_initClassMetadata_UniversalStrategy(const Metadata *super,
+void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
+                                            const ClassMetadata *super,
                                             size_t numFields,
                                             const Metadata * const *fieldTypes,
                                             size_t *fieldOffsets) {
@@ -997,9 +998,10 @@ void swift::swift_initClassMetadata_UniversalStrategy(const Metadata *super,
     [&](size_t i, const Metadata *fieldType, size_t offset) {
       fieldOffsets[i] = offset;
     });
-  
-  // FIXME: We should save the instance size and alignment in the metadata
-  // for use by subclasses.
+
+  // Save the final size and alignment into the metadata record.
+  self->InstanceSize = layout.size;
+  self->InstanceAlignMask = layout.flags.getAlignmentMask();
 }
 
 /*** Metatypes *************************************************************/

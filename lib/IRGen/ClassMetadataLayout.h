@@ -91,6 +91,7 @@ private:
   /// Add fields associated with the given class and its bases.
   void addClassMembers(ClassDecl *theClass) {
     // Add any fields associated with the superclass.
+    // FIXME: Keep track of bound generic members from the superclass.
     if (Type superclass = theClass->getSuperclass()) {
       addClassMembers(superclass->getClassOrBoundGenericClass());
     }
@@ -136,7 +137,7 @@ private:
 
     // Add fields.
     if (IsObjectGenericallyArranged) {
-      asImpl().noteStartOfFieldOffsets();
+      asImpl().noteStartOfFieldOffsets(theClass);
       for (auto member : theClass->getMembers()) {
         if (auto field = dyn_cast<VarDecl>(member))
           if (!field->isComputed())
@@ -145,9 +146,9 @@ private:
     }
   }
   
-  /// Notes the beginning of the field offset vector for generic-layout
-  /// classes.
-  void noteStartOfFieldOffsets() {}
+  /// Notes the beginning of the field offset vector for a particular ancestor
+  /// of a generic-layout class.
+  void noteStartOfFieldOffsets(ClassDecl *whichClass) {}
 
 private:
   /// Add fields related to the generics of this class declaration.

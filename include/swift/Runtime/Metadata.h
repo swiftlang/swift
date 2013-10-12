@@ -668,9 +668,11 @@ struct ClassMetadata : public HeapMetadata {
   ClassMetadata() = default;
   constexpr ClassMetadata(const HeapMetadata &base,
                           const ClassMetadata *superClass,
-                          uintptr_t data)
+                          uintptr_t data,
+                          uintptr_t size, uintptr_t alignMask)
     : HeapMetadata(base), SuperClass(superClass),
-      CacheData{ nullptr, nullptr }, Data(data) {}
+      CacheData{ nullptr, nullptr }, Data(data),
+      InstanceSize(size), InstanceAlignMask(alignMask) {}
 
   /// The metadata for the super class.  This is null for the root class.
   const ClassMetadata *SuperClass;
@@ -690,6 +692,9 @@ struct ClassMetadata : public HeapMetadata {
   bool isTypeMetadata() const {
     return Data & 1;
   }
+  
+  /// The size and alignment mask of instances of this type.
+  uintptr_t InstanceSize, InstanceAlignMask;
 
   // After this come the class members, laid out as follows:
   //   - class members for the superclass (recursively)
@@ -927,7 +932,8 @@ extern "C" void swift_initStructMetadata_UniversalStrategy(size_t numFields,
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
-extern "C" void swift_initClassMetadata_UniversalStrategy(const Metadata *super,
+extern "C" void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
+                                            const ClassMetadata *super,
                                             size_t numFields,
                                             const Metadata * const *fieldTypes,
                                             size_t *fieldOffsets);

@@ -232,5 +232,5 @@ entry:
 
 // CHECK: define internal void [[FILL_ROOTGENERIC]](i8*, i8*) {
 // -- initialize the dependent field offsets
-// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* null, i64 3, %swift.type** {{%.*}}, i64* {{%.*}})
+// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type* null, i64 3, %swift.type** {{%.*}}, i64* {{%.*}})
 // }

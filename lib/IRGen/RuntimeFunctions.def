@@ -304,14 +304,16 @@ FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, RuntimeCC,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// void swift_initClassMetadata_UniversalStrategy(type_metadata_t *super,
+// void swift_initClassMetadata_UniversalStrategy(type_metadata_t *self,
+//                                          type_metadata_t *super,
 //                                          size_t numFields,
 //                                          type_metadata_t * const *fieldTypes,
 //                                          size_t *fieldOffsets);
 FUNCTION(InitClassMetadataUniversal,
          swift_initClassMetadata_UniversalStrategy, RuntimeCC,
          RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, SizeTy, TypeMetadataPtrTy->getPointerTo(),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, SizeTy,
+              TypeMetadataPtrTy->getPointerTo(),
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
