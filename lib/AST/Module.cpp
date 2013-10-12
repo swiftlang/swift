@@ -1038,20 +1038,12 @@ void Module::forAllVisibleModules(Optional<AccessPathTy> thisPath,
 void Module::collectLinkLibraries(LinkLibraryCallback callback) {
   forAllImportedModules<false>(this, AccessPathTy(),
                                [=](ImportedModule import) -> bool {
-    Module *module = import.second;
-    if (isa<BuiltinModule>(module)) {
-      // The Builtin module requires no libraries.
+    auto loadedModule = dyn_cast<LoadedModule>(import.second);
+    if (!loadedModule)
       return true;
-    }
-    
-    if (auto TU = dyn_cast<TranslationUnit>(module)) {
-      for (auto lib : TU->getLinkLibraries())
-        callback(lib);
-      return true;
-    }
-    
-    ModuleLoader &owner = cast<LoadedModule>(module)->getOwner();
-    owner.getLinkLibraries(module, callback);
+
+    ModuleLoader &owner = loadedModule->getOwner();
+    owner.getLinkLibraries(loadedModule, callback);
     return true;
   });
 }

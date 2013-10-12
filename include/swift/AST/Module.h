@@ -458,9 +458,6 @@ public:
 /// \sa SourceFile
 class TranslationUnit : public Module {
 private:
-  /// The list of libraries specified as link-time dependencies at compile time.
-  ArrayRef<LinkLibrary> LinkLibraries;
-
   /// If non-NULL, an plug-in that should be used when performing external
   /// lookups.
   ExternalNameLookup *ExternalLookup = nullptr;
@@ -473,14 +470,6 @@ public:
     : Module(ModuleKind::TranslationUnit, Name, C) {
   }
   
-  void setLinkLibraries(ArrayRef<LinkLibrary> libs) {
-    assert(LinkLibraries.empty() && "link libraries already set");
-    LinkLibraries = libs;
-  }
-  ArrayRef<LinkLibrary> getLinkLibraries() const {
-    return LinkLibraries;
-  }
-
   void clearLookupCache();
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;

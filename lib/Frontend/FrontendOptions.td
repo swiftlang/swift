@@ -20,9 +20,6 @@ def parse_as_library : Flag<["-"], "parse-as-library">,
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
   HelpText<"Parse the input as the swift standard library">;
 
-def link_library : Joined<["-"], "l">,
-  HelpText<"Link the given library into the output product">;
-
 def Xclang : Separate<["-"], "Xclang">,
   HelpText<"Pass <arg> to the clang importer">;
 

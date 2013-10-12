@@ -123,8 +123,6 @@ void swift::CompilerInstance::doIt() {
   TU = new (*Context) TranslationUnit(ID, *Context);
   Context->LoadedModules[ID.str()] = TU;
 
-  TU->setLinkLibraries(Invocation.getLinkLibraries());
-
   auto *SingleInputFile =
     new (*Context) SourceFile(*TU, Kind, Invocation.getParseStdlib());
   TU->MainSourceFile = SingleInputFile;

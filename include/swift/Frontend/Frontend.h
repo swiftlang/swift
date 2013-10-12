@@ -47,7 +47,6 @@ class CompilerInvocation {
   std::string ClangModuleCachePath;
   std::vector<std::string> ImportSearchPaths;
   std::vector<std::string> FrameworkSearchPaths;
-  SmallVector<LinkLibrary, 4> LinkLibraries;
   std::string RuntimeIncludePath;
   std::string SDKPath;
   std::vector<std::string> ExtraClangArgs;
@@ -119,14 +118,6 @@ public:
 
   ArrayRef<std::string> getExtraClangArgs() const {
     return ExtraClangArgs;
-  }
-
-  void addLinkLibrary(StringRef name, LibraryKind kind) {
-    LinkLibraries.push_back({name, kind});
-  }
-
-  ArrayRef<LinkLibrary> getLinkLibraries() const {
-    return LinkLibraries;
   }
 
   void setMainExecutablePath(StringRef Path);

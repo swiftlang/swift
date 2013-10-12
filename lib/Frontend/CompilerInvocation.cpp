@@ -124,10 +124,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
       LangOpts.DebugConstraintSolver = true;
       break;
 
-    case OPT_link_library:
-      addLinkLibrary(InputArg->getValue(), LibraryKind::Library);
-      break;
-      
     case OPT_std_EQ:
       if (strcmp(InputArg->getValue(), "axle") == 0)
         LangOpts.Axle = true;
