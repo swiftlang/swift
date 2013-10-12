@@ -25,6 +25,7 @@
 #include "IRGen.h"
 
 namespace llvm {
+  class Constant;
   class StructType;
   class Type;
   class Value;
@@ -323,8 +324,8 @@ public:
   IsPOD_t isKnownPOD() const { return IsKnownPOD; }
 
   bool isFixedLayout() const { return IsFixedLayout; }
-  llvm::Value *emitSize(IRGenFunction &IGF) const;
-  llvm::Value *emitAlignMask(IRGenFunction &IGF) const;
+  llvm::Constant *emitSize(IRGenModule &IGM) const;
+  llvm::Constant *emitAlignMask(IRGenModule &IGM) const;
 
   /// Bitcast the given pointer to this type.
   Address emitCastTo(IRGenFunction &IGF, llvm::Value *ptr,

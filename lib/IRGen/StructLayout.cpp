@@ -98,14 +98,14 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
   assert(typeToFill == nullptr || Ty == typeToFill);
 }
 
-llvm::Value *StructLayout::emitSize(IRGenFunction &IGF) const {
+llvm::Constant *StructLayout::emitSize(IRGenModule &IGM) const {
   assert(isFixedLayout());
-  return IGF.IGM.getSize(getSize());
+  return IGM.getSize(getSize());
 }
 
-llvm::Value *StructLayout::emitAlignMask(IRGenFunction &IGF) const {
+llvm::Constant *StructLayout::emitAlignMask(IRGenModule &IGM) const {
   assert(isFixedLayout());
-  return IGF.IGM.getSize(getAlignment().asSize() - Size(1));
+  return IGM.getSize(getAlignment().asSize() - Size(1));
 }
 
 /// Bitcast an arbitrary pointer to be a pointer to this type.

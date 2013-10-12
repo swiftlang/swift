@@ -491,7 +491,7 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
   // FIXME: Dynamic-layout deallocation size.
   llvm::Value *size;
   if (layout.isFixedLayout())
-    size = info.getLayout(IGM).emitSize(IGF);
+    size = info.getLayout(IGM).emitSize(IGF.IGM);
   else
     size = llvm::ConstantInt::get(IGM.SizeTy, 0);
   emitDeallocateHeapObject(IGF, obj, size);
@@ -512,12 +512,36 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType) {
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
   auto &layout = classTI.getLayout(IGF.IGM);
 
-  llvm::Value *size = layout.emitSize(IGF);
-  llvm::Value *alignMask = layout.emitAlignMask(IGF);
+  llvm::Value *size = layout.emitSize(IGF.IGM);
+  llvm::Value *alignMask = layout.emitAlignMask(IGF.IGM);
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
                                              "reference.new");
   llvm::Type *destType = layout.getType()->getPointerTo();
   return IGF.Builder.CreateBitCast(val, destType);
+}
+
+llvm::Constant *irgen::tryEmitClassConstantInstanceSize(IRGenModule &IGM,
+                                                        ClassDecl *Class) {
+  auto &classTI = IGM.getTypeInfo(Class->getDeclaredTypeInContext())
+    .as<ClassTypeInfo>();
+
+  auto &layout = classTI.getLayout(IGM);
+  if (layout.isFixedLayout())
+    return layout.emitSize(IGM);
+  
+  return nullptr;
+}
+
+llvm::Constant *irgen::tryEmitClassConstantInstanceAlignMask(IRGenModule &IGM,
+                                                             ClassDecl *Class) {
+  auto &classTI = IGM.getTypeInfo(Class->getDeclaredTypeInContext())
+  .as<ClassTypeInfo>();
+  
+  auto &layout = classTI.getLayout(IGM);
+  if (layout.isFixedLayout())
+    return layout.emitAlignMask(IGM);
+  
+  return nullptr;
 }
 
 /// emitClassDecl - Emit all the declarations associated with this class type.
@@ -1221,6 +1245,8 @@ llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
   // Then build the class RO-data.
   return builder.emitROData(ForClass);
 }
+  
+/// Emit the constant allocation size of a class
   
 /// Emit the metadata for an ObjC category.
 llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,

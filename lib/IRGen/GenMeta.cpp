@@ -949,17 +949,37 @@ namespace {
 
       addReferenceToType(TargetClass->getSuperclass()->getCanonicalType());
     }
-
+    
     void addReferenceToType(CanType type) {
       if (llvm::Constant *metadata
             = tryEmitConstantHeapMetadataRef(IGM, type)) {
         Fields.push_back(metadata);
       } else {
-        // FIXME: remember to compute this at runtime
+        // Leave a null pointer placeholder to be filled at runtime
         Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
       }
     }
 
+    void addInstanceSize() {
+      if (llvm::Constant *size
+            = tryEmitClassConstantInstanceSize(IGM, TargetClass)) {
+        Fields.push_back(size);
+      } else {
+        // Leave a zero placeholder to be filled at runtime
+        Fields.push_back(llvm::ConstantInt::get(IGM.SizeTy, 0));
+      }
+    }
+    
+    void addInstanceAlignMask() {
+      if (llvm::Constant *align
+            = tryEmitClassConstantInstanceAlignMask(IGM, TargetClass)) {
+        Fields.push_back(align);
+      } else {
+        // Leave a zero placeholder to be filled at runtime
+        Fields.push_back(llvm::ConstantInt::get(IGM.SizeTy, 0));
+      }
+    }
+    
     void addClassCacheData() {
       // We initially fill in these fields with addresses taken from
       // the ObjC runtime.

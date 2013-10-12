@@ -49,6 +49,15 @@ namespace irgen {
   /// Emit an allocation of a class.
   llvm::Value *emitClassAllocation(IRGenFunction &IGF, SILType selfType);
 
+  /// Emit the constant instance size of the class, or null if the class does
+  /// not have fixed layout.
+  llvm::Constant *tryEmitClassConstantInstanceSize(IRGenModule &IGM,
+                                                   ClassDecl *Class);
+  /// Emit the constant instance alignment mask of the class, or null if the
+  /// class does not have fixed layout.
+  llvm::Constant *tryEmitClassConstantInstanceAlignMask(IRGenModule &IGM,
+                                                        ClassDecl *Class);
+
   /// Emit the deallocating destructor for a class in terms of its destroying
   /// destructor.
   void emitDeallocatingDestructor(IRGenModule &IGM,

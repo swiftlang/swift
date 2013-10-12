@@ -97,7 +97,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     field.getType().destroy(IGF, field.project(IGF, structAddr, offsets));
   }
 
-  emitDeallocateHeapObject(IGF, fn->arg_begin(), layout.emitSize(IGF));
+  emitDeallocateHeapObject(IGF, fn->arg_begin(), layout.emitSize(IGM));
   IGF.Builder.CreateRetVoid();
 
   return fn;
@@ -118,7 +118,7 @@ llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
   // Ignore the object pointer; we aren't a dynamically-sized array,
   // so it's pointless.
 
-  llvm::Value *size = emitSize(IGF);
+  llvm::Value *size = emitSize(IGM);
   IGF.Builder.CreateRet(size);
 
   return fn;
@@ -554,8 +554,8 @@ llvm::Value *HeapArrayInfo::emitUnmanagedAlloc(IRGenFunction &IGF,
 llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
                                                const llvm::Twine &name) {
   llvm::Value *metadata = layout.getPrivateMetadata(IGM);
-  llvm::Value *size = layout.emitSize(*this);
-  llvm::Value *alignMask = layout.emitAlignMask(*this);
+  llvm::Value *size = layout.emitSize(IGM);
+  llvm::Value *alignMask = layout.emitAlignMask(IGM);
 
   return emitAllocObjectCall(metadata, size, alignMask, name);
 }

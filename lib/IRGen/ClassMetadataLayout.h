@@ -80,6 +80,9 @@ public:
       asImpl().addClassDataPointer();
     }
 
+    asImpl().addInstanceSize();
+    asImpl().addInstanceAlignMask();
+    
     // Class members.
     addClassMembers(TargetClass);
   }
@@ -112,7 +115,7 @@ private:
       if (theClass->getGenericParamsOfContext())
         IsObjectGenericallyArranged = true;
     }
-
+    
     // Add entries for the methods.
     for (auto member : theClass->getMembers()) {
       // Add entries for methods.
@@ -232,6 +235,8 @@ public:
   void addDestructorFunction() { NextIndex++; }
   void addParentMetadataRef(ClassDecl *forClass) { NextIndex++; }
   void addSuperClass() { NextIndex++; }
+  void addInstanceSize() { NextIndex++; }
+  void addInstanceAlignMask() { NextIndex++; }
   void addClassCacheData() { NextIndex += 2; }
   void addClassDataPointer() { NextIndex++; }
   void addMethod(FunctionRef fn) { NextIndex++; }
