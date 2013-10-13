@@ -41,6 +41,8 @@ ATTR(iboutlet)
 ATTR(ibaction)
 ATTR(local_storage)
 ATTR(transparent)
+ATTR(weak)
+ATTR(unowned)
 
 // SIL-specific attributes
 ATTR(sil_self)

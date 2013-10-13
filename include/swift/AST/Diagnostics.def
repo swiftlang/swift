@@ -781,8 +781,8 @@ ERROR(cannot_combine_attribute,attribute_parsing,none,
 ERROR(expected_in_attribute_list,attribute_parsing,none,
       "expected ']' or ',' in attribute list", ())
 ERROR(invalid_attribute_for_lang,attribute_parsing,none,
-      "attribute '%0' is only valid in language mode '%select{axle}1'",
-      (StringRef, unsigned))
+      "attribute is only valid in language mode '%select{axle}0'",
+      (unsigned))
 
 ERROR(expected_decl_attribute_not_type,attribute_parsing,none,
       "expected declaration attribute, not a type attribute", ())
@@ -1082,7 +1082,7 @@ ERROR(class_protocol_not_protocol,sema_tcd,none,
       "'class_protocol' attribute can only be applied to protocols", ())
       
 ERROR(invalid_decl_attribute,sema_tcd,none,
-      "attribute '%0' cannot be applied to declaration", (StringRef))
+      "attribute cannot be applied to declaration", ())
 
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,

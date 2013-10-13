@@ -90,12 +90,11 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
   const DeclAttributes &Attrs = getAttrs();
   llvm::SmallString<64> AttrStr;
   llvm::raw_svector_ostream AttrOS(AttrStr);
-  if (Attrs.Resilience.isValid()) {
-    switch (Attrs.Resilience.getResilience()) {
-    case Resilience::InherentlyFragile: AttrOS << "born_fragile,"; break;
-    case Resilience::Fragile: AttrOS << "fragile,"; break;
-    case Resilience::Resilient: AttrOS << "resilient,"; break;
-    }
+  switch (Attrs.getResilienceKind()) {
+  case Resilience::Default: break;
+  case Resilience::InherentlyFragile: AttrOS << "born_fragile,"; break;
+  case Resilience::Fragile: AttrOS << "fragile,"; break;
+  case Resilience::Resilient: AttrOS << "resilient,"; break;
   }
   if (!Attrs.AsmName.empty())
     AttrOS << "asmname=\"" << Attrs.AsmName << "\",";

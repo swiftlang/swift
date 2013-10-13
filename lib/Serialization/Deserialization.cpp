@@ -1066,7 +1066,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       var->setImplicit();
     var->setIsObjC(isObjC);
     if (isIBOutlet)
-      var->getMutableAttrs().IBOutlet = true;
+      var->getMutableAttrs().setAttr(AK_iboutlet, SourceLoc());
 
     var->setOverriddenDecl(cast_or_null<VarDecl>(getDecl(overriddenID)));
     break;
@@ -1149,24 +1149,24 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       fn->getMutableAttrs().AsmName = ctx.AllocateCopy(blobData);
     if (isAssignmentOrConversion) {
       if (fn->isOperator())
-        fn->getMutableAttrs().Assignment = true;
+        fn->getMutableAttrs().setAttr(AK_assignment, SourceLoc());
       else
-        fn->getMutableAttrs().Conversion = true;
+        fn->getMutableAttrs().setAttr(AK_conversion, SourceLoc());
     }
     fn->setIsObjC(isObjC);
     if (isIBAction)
-      fn->getMutableAttrs().IBAction = true;
+      fn->getMutableAttrs().setAttr(AK_ibaction, SourceLoc());
     if (isTransparent)
-      fn->getMutableAttrs().Transparent = true;
+      fn->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
 
     if (Decl *associated = getDecl(associatedDeclID)) {
       if (auto op = dyn_cast<OperatorDecl>(associated)) {
         fn->setOperatorDecl(op);
 
         if (isa<PrefixOperatorDecl>(op))
-          fn->getMutableAttrs().ExplicitPrefix = true;
+          fn->getMutableAttrs().setAttr(AK_prefix, SourceLoc());
         else if (isa<PostfixOperatorDecl>(op))
-          fn->getMutableAttrs().ExplicitPostfix = true;
+          fn->getMutableAttrs().setAttr(AK_postfix, SourceLoc());
         // Note that an explicit [infix] is not required.
       }
       // Otherwise, unknown associated decl kind.
@@ -1238,7 +1238,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isImplicit)
       proto->setImplicit();
     if (isClassProtocol)
-      proto->getMutableAttrs().ClassProtocol = true;
+      proto->getMutableAttrs().setAttr(AK_class_protocol, SourceLoc());
     proto->setIsObjC(isObjC);
     proto->computeType();
 

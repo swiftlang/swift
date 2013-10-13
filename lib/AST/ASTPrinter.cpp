@@ -178,20 +178,11 @@ void PrintAST::printAttributes(const DeclAttributes &Attrs) {
     AP.next() << "transparent";
   if (Attrs.isInfix())
     AP.next() << "infix";
-  if (Attrs.getResilienceData().isValid()) {
-    switch (Attrs.getResilienceData().getResilience()) {
-    case Resilience::Fragile:
-      AP.next() << "fragile";
-      break;
-
-    case Resilience::InherentlyFragile:
-      AP.next() << "born_fragile";
-      break;
-
-    case Resilience::Resilient:
-      AP.next() << "resilient";
-      break;
-    }
+  switch (Attrs.getResilienceKind()) {
+  case Resilience::Default: break;
+  case Resilience::Fragile: AP.next() << "fragile"; break;
+  case Resilience::InherentlyFragile: AP.next() << "born_fragile"; break;
+  case Resilience::Resilient: AP.next() << "resilient"; break;
   }
   if (Attrs.isInOut())
     AP.next() << "inout";

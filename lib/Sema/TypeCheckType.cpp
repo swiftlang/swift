@@ -613,16 +613,16 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
       if (auto protoTy = Ty->getAs<ProtocolType>()) {
         Ty = protoTy->getDecl()->getSelf()->getArchetype();
       } else {
-        diagnose(attrs.AtLoc, diag::sil_self_non_protocol, Ty)
+        diagnose(attrs.getLoc(AK_sil_self), diag::sil_self_non_protocol, Ty)
           .highlight(AttrTyR->getTypeRepr()->getSourceRange());
       }
-      attrs.SILSelf = false;
+      attrs.clearAttribute(AK_sil_self);
     }
 
     if (attrs.isInOut()) {
       LValueType::Qual quals;
       Ty = LValueType::get(Ty, quals, Context);
-      attrs.InOut = false; // so that the empty() check below works
+      attrs.clearAttribute(AK_inout);
     }
 
     // Handle the auto_closure, cc, and objc_block attributes for function types.
@@ -677,12 +677,15 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
                                Info,
                                Context);
       }
-      attrs.AutoClosure = false;
-      attrs.ObjCBlock = false;
-      attrs.Thin = false;
-      attrs.NoReturn = false;
+      attrs.clearAttribute(AK_auto_closure);
+      attrs.clearAttribute(AK_objc_block);
+      attrs.clearAttribute(AK_thin);
+      attrs.clearAttribute(AK_noreturn);
+      attrs.clearAttribute(AK_cc);
       attrs.cc = Nothing;
-      attrs.KernelOrShader = KernelOrShaderKind::Default;
+      attrs.clearAttribute(AK_kernel);
+      attrs.clearAttribute(AK_fragment);
+      attrs.clearAttribute(AK_vertex);
     }
 
     // In SIL translation units *only*, permit [weak] and [unowned] to
@@ -699,8 +702,8 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
     if (attrs.isLocalStorage()) {
       assert(cast<TranslationUnit>(DC->getParentModule())
                ->MainSourceFile->Kind == SourceFile::SIL);
-      diagnose(attrs.AtLoc, diag::sil_local_storage_nested);
-      attrs.LocalStorage = false;
+      diagnose(attrs.getLoc(AK_local_storage),diag::sil_local_storage_nested);
+      attrs.clearAttribute(AK_local_storage);
     }
 
     // FIXME: this is lame.

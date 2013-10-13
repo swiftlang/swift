@@ -1149,7 +1149,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto theClass = cast<ClassDecl>(D);
 
     DeclAttributes remainingAttrs = theClass->getAttrs();
-    remainingAttrs.ObjC = false;
+    remainingAttrs.clearAttribute(AK_objc);
     assert(remainingAttrs.empty() && "unhandled class attrs");
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
@@ -1175,8 +1175,8 @@ void Serializer::writeDecl(const Decl *D) {
     auto proto = cast<ProtocolDecl>(D);
     
     DeclAttributes remainingAttrs = proto->getAttrs();
-    remainingAttrs.ClassProtocol = false;
-    remainingAttrs.ObjC = false;
+    remainingAttrs.clearAttribute(AK_class_protocol);
+    remainingAttrs.clearAttribute(AK_objc);
 
     assert(remainingAttrs.empty() && "unhandled protocol attrs");
 
@@ -1206,8 +1206,8 @@ void Serializer::writeDecl(const Decl *D) {
 
     DeclAttributes remainingAttrs = var->getAttrs();
     // FIXME: We need some representation of these for source fidelity.
-    remainingAttrs.ObjC = false;
-    remainingAttrs.IBOutlet = false;
+    remainingAttrs.clearAttribute(AK_objc);
+    remainingAttrs.clearAttribute(AK_iboutlet);
 
     assert(remainingAttrs.empty() && "unhandled var attrs");
 
@@ -1233,17 +1233,18 @@ void Serializer::writeDecl(const Decl *D) {
 
     DeclAttributes remainingAttrs = fn->getAttrs();
     // FIXME: We need some representation of these for source fidelity.
-    remainingAttrs.ExplicitPrefix = false;
-    remainingAttrs.ExplicitPostfix = false;
-    remainingAttrs.ExplicitInfix = false;
-    remainingAttrs.Assignment = false;
-    remainingAttrs.Conversion = false;
+    remainingAttrs.clearAttribute(AK_prefix);
+    remainingAttrs.clearAttribute(AK_postfix);
+    remainingAttrs.clearAttribute(AK_infix);
+    remainingAttrs.clearAttribute(AK_assignment);
+    remainingAttrs.clearAttribute(AK_conversion);
     remainingAttrs.AsmName = {};
-    remainingAttrs.NoReturn = false;
-    remainingAttrs.Thin = false;
-    remainingAttrs.ObjC = false;
-    remainingAttrs.IBAction = false;
-    remainingAttrs.Transparent = false;
+    remainingAttrs.clearAttribute(AK_asmname);
+    remainingAttrs.clearAttribute(AK_noreturn);
+    remainingAttrs.clearAttribute(AK_thin);
+    remainingAttrs.clearAttribute(AK_objc);
+    remainingAttrs.clearAttribute(AK_ibaction);
+    remainingAttrs.clearAttribute(AK_transparent);
 
     assert(remainingAttrs.empty() && "unhandled func attrs");
 
@@ -1306,7 +1307,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto subscript = cast<SubscriptDecl>(D);
 
     DeclAttributes remainingAttrs = subscript->getAttrs();
-    remainingAttrs.ObjC = false;
+    remainingAttrs.clearAttribute(AK_objc);
     assert(remainingAttrs.empty() && "unhandled subscript attrs");
 
     const Decl *DC = getDeclForContext(subscript->getDeclContext());
@@ -1331,8 +1332,8 @@ void Serializer::writeDecl(const Decl *D) {
     auto ctor = cast<ConstructorDecl>(D);
 
     DeclAttributes remainingAttrs = ctor->getAttrs();
-    remainingAttrs.ObjC = false;
-    remainingAttrs.Transparent = false;
+    remainingAttrs.clearAttribute(AK_objc);
+    remainingAttrs.clearAttribute(AK_transparent);
 
     assert(remainingAttrs.empty() && "unhandled constructor attrs");
 
@@ -1359,7 +1360,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto dtor = cast<DestructorDecl>(D);
 
     DeclAttributes remainingAttrs = dtor->getAttrs();
-    remainingAttrs.ObjC = false;
+    remainingAttrs.clearAttribute(AK_objc);
     assert(remainingAttrs.empty() && "unhandled destructor attrs");
 
     const Decl *DC = getDeclForContext(dtor->getDeclContext());

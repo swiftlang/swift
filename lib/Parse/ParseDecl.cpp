@@ -98,29 +98,11 @@ bool Parser::parseTopLevel() {
   return FoundTopLevelCodeToExecute;
 }
 
-namespace {
-#define MAKE_ENUMERATOR(id) id,
-  enum class AttrName {
-    none,
-#define ATTR(X) X,
+static AttrKind getAttrName(StringRef text) {
+  return llvm::StringSwitch<AttrKind>(text)
+#define ATTR(X) .Case(#X, AK_##X)
 #include "swift/AST/Attr.def"
-  };
-}
-
-static AttrName getAttrName(StringRef text) {
-  return llvm::StringSwitch<AttrName>(text)
-#define ATTR(X) .Case(#X, AttrName::X)
-#include "swift/AST/Attr.def"
-    .Default(AttrName::none);
-}
-
-static Resilience getResilience(AttrName attr) {
-  switch (attr) {
-  case AttrName::resilient: return Resilience::Resilient;
-  case AttrName::fragile: return Resilience::Fragile;
-  case AttrName::born_fragile: return Resilience::InherentlyFragile;
-  default: llvm_unreachable("bad resilience");
-  }
+    .Default(AK_Count);
 }
 
 /// \verbatim
@@ -137,35 +119,18 @@ static Resilience getResilience(AttrName attr) {
 /// \endverbatim
 bool Parser::parseAttribute(DeclAttributes &Attributes, unsigned KindMask,
                             bool OldStyle) {
-  if (Tok.is(tok::kw_weak)) {
-    auto Loc = consumeToken(tok::kw_weak);
-    
-    if (Attributes.hasOwnership())
-      diagnose(Loc, diag::duplicate_attribute);
-    else
-      Attributes.Weak = true;
-
-    return false;
-  }
-
-  if (Tok.is(tok::kw_unowned)) {
-    auto Loc = consumeToken(tok::kw_unowned);
-    if (Attributes.hasOwnership())
-      diagnose(Loc, diag::duplicate_attribute);
-    else
-      Attributes.Unowned = true;
-    
-    return false;
-  }
-
-  if (!Tok.is(tok::identifier)) {
+  // If this not an identifier, the attribute is malformed.
+  if (Tok.isNot(tok::identifier) &&
+      Tok.isNot(tok::kw_weak) &&
+      Tok.isNot(tok::kw_unowned)) {
     diagnose(Tok, diag::expected_attribute_name);
     if (OldStyle) skipUntil(tok::r_square);
     return true;
   }
 
-  switch (AttrName attr = getAttrName(Tok.getText())) {
-  case AttrName::none:
+  // Determine which attribute it is, and diagnose it if unknown.
+  AttrKind attr = getAttrName(Tok.getText());
+  if (attr == AK_Count) {
     diagnose(Tok, diag::unknown_attribute, Tok.getText());
     if (OldStyle)
       skipUntil(tok::r_square);
@@ -182,66 +147,55 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, unsigned KindMask,
       }
     }
     return true;
-
-  // Infix attributes.
-  case AttrName::infix: {
-    auto Loc = consumeToken(tok::identifier);
-    if (Attributes.isInfix())
-      diagnose(Loc, diag::duplicate_attribute);
-    else
-      Attributes.ExplicitInfix = true;
-
-    return false;
   }
+  
+  // Ok, it is a valid attribute, eat it, and then process it.
+  SourceLoc Loc = consumeToken();
+  
+  // Diagnose duplicated attributes.
+  if (Attributes.has(attr))
+    diagnose(Loc, diag::duplicate_attribute);
+  else
+    Attributes.setAttr(attr, Loc);
 
-  // SIL's 'local_storage' type attribute.
-  case AttrName::local_storage: {
-    auto Loc = consumeToken(tok::identifier);
-    if (Attributes.isLocalStorage())
-      diagnose(Loc, diag::duplicate_attribute);
-    else if (!isInSILMode())
+  // Handle any attribute-specific processing logic.
+  switch (attr) {
+  default: break;
+  case AK_local_storage:
+  case AK_sil_self:
+    if (!isInSILMode())    // SIL's 'local_storage' type attribute.
       diagnose(Loc, diag::only_allowed_in_sil, "local_storage");
-    else
-      Attributes.LocalStorage = true;
-    return false;
-  }
+    break;
 
-  // SIL's 'sil_self' type attribute.
-  case AttrName::sil_self: {
-    auto Loc = consumeToken(tok::identifier);
-    if (Attributes.isSILSelf())
+  // Ownership attributes.
+  case AK_weak:
+  case AK_unowned:
+    // Test for duplicate entries by temporarily removing this one.
+    Attributes.clearAttribute(attr);
+    if (Attributes.hasOwnership()) {
       diagnose(Loc, diag::duplicate_attribute);
-    else if (!isInSILMode())
-      diagnose(Loc, diag::only_allowed_in_sil, "sil_self");
-    else
-      Attributes.SILSelf = true;
-    return false;
-  }
-
-  // Resilience attributes.
-  case AttrName::resilient:
-  case AttrName::fragile:
-  case AttrName::born_fragile: {
-    auto Loc = consumeToken(tok::identifier);
-    if (Attributes.Resilience.isValid())
-      diagnose(Loc, diag::duplicate_attribute);
-    else {
-      Resilience resil = getResilience(attr);
-      // TODO: 'fragile' should allow deployment versioning.
-      Attributes.Resilience = ResilienceData(resil);
+      break;
     }
-    return false;
-  }
-
+    Attributes.setAttr(attr, Loc);
+    break;
+      
+      
+  // Resilience attributes.
+  case AK_resilient:
+  case AK_fragile:
+  case AK_born_fragile:
+    // Test for duplicate entries by temporarily removing this one.
+    Attributes.clearAttribute(attr);
+    if (Attributes.getResilienceKind() != Resilience::Default) {
+      diagnose(Loc, diag::duplicate_attribute);
+      break;
+    }
+    Attributes.setAttr(attr, Loc);
+    break;
+      
   // 'inout' attribute.
   // FIXME: only permit this in specific contexts.
-  case AttrName::inout: {
-    SourceLoc TokLoc = consumeToken(tok::identifier);
-    if (Attributes.InOut)
-      diagnose(Tok, diag::duplicate_attribute);
-
-    Attributes.InOut = true;
-
+  case AK_inout: {
     // Permit "qualifiers" on the inout.
     SourceLoc beginLoc = Tok.getLoc();
     if (consumeIfNotAtStartOfLine(tok::l_paren)) {
@@ -255,20 +209,27 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, unsigned KindMask,
     // Verify that we're not combining this attribute incorrectly.  Cannot be
     // both inout and auto_closure.
     if (Attributes.isAutoClosure()) {
-      diagnose(TokLoc, diag::cannot_combine_attribute, "auto_closure");
-      Attributes.AutoClosure = false;
+      diagnose(Loc, diag::cannot_combine_attribute, "auto_closure");
+      Attributes.clearAttribute(attr);
     }
     
-    return false;
+    break;
   }
+  // FIXME: Only valid on var and tuple elements, not on func's, typealias, etc.
+  case AK_auto_closure:
+    if (Attributes.isInOut()) {
+      // Verify that we're not combining this attribute incorrectly.  Cannot be
+      // both inout and auto_closure.
+      diagnose(Loc, diag::cannot_combine_attribute, "inout");
+      Attributes.clearAttribute(attr);
+    }
+    break;
+
       
   // 'cc' attribute.
   // FIXME: only permit this in type contexts.
-  case AttrName::cc: {
-    auto Loc = consumeToken(tok::identifier);
-    if (Attributes.hasCC())
-      diagnose(Loc, diag::duplicate_attribute);
-    
+  case AK_cc: {
+ 
     // Parse the cc name in parens.
     SourceLoc beginLoc = Tok.getLoc(), nameLoc, endLoc;
     StringRef name;
@@ -308,167 +269,40 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, unsigned KindMask,
     }
     return false;
   }
-   
-  case AttrName::class_protocol: {
-    auto Loc = consumeToken(tok::identifier);
-    if (Attributes.isClassProtocol())
-      diagnose(Loc, diag::duplicate_attribute);
-    
-    
-    Attributes.ClassProtocol = true;
-    return false;
-  }
-
-  // 'objc_block' attribute.
-  // FIXME: only permit this in type contexts.
-  case AttrName::objc_block: {
-    auto Loc = consumeToken(tok::identifier);
-    if (Attributes.ObjCBlock)
-      diagnose(Loc, diag::duplicate_attribute);
-    
-    Attributes.ObjCBlock = true;
-    
-    return false;
-  }
-      
-  // FIXME: Only valid on var and tuple elements, not on func's, typealias, etc.
-  case AttrName::auto_closure: {
-    SourceLoc Loc = consumeToken(tok::identifier);
-    if (Attributes.isAutoClosure())
-      diagnose(Loc, diag::duplicate_attribute);
-    else if (Attributes.isInOut()) {
-      // Verify that we're not combining this attribute incorrectly.  Cannot be
-      // both inout and auto_closure.
-      diagnose(Loc, diag::cannot_combine_attribute, "inout");
-    } else {
-      Attributes.AutoClosure = true;
-    }
-    return false;
-  }
-  case AttrName::thin: {
-    auto Loc = consumeToken(tok::identifier);
-    if (Attributes.isThin())
-      diagnose(Loc, diag::duplicate_attribute);
-    else
-      Attributes.Thin = true;
-    return false;
-  }
-  case AttrName::noreturn: {
-    auto Loc = consumeToken(tok::identifier);
-    if (Attributes.isNoReturn())
-      diagnose(Loc, diag::duplicate_attribute);
-    else
-      Attributes.NoReturn = true;
-    return false;
-  }
-
-  case AttrName::assignment: {
-    auto Loc = consumeToken(tok::identifier);
-    if (Attributes.isAssignment())
-      diagnose(Loc, diag::duplicate_attribute);
-    
-    Attributes.Assignment = true;
-    return false;    
-  }
-
-  case AttrName::prefix: {
-     auto Loc = consumeToken(tok::identifier);
-    if (Attributes.isPrefix())
-      diagnose(Loc, diag::duplicate_attribute);
-    else if (Attributes.isPostfix())
+ 
+  case AK_prefix:
+    if (Attributes.isPostfix()) {
       diagnose(Loc, diag::cannot_combine_attribute, "postfix");
-    else
-      Attributes.ExplicitPrefix = true;
-    return false;
-  }
-
-  case AttrName::postfix: {
-    SourceLoc Loc = consumeToken(tok::identifier);
-    if (Attributes.isPostfix())
-      diagnose(Loc, diag::duplicate_attribute);
-    else if (Attributes.isPrefix())
-      diagnose(Loc, diag::cannot_combine_attribute, "prefix");
-    else
-      Attributes.ExplicitPostfix = true;
-    return false;
-  }
-
-  case AttrName::conversion: {
-    auto Loc = consumeToken(tok::identifier);
-    if (Attributes.isConversion())
-      diagnose(Loc, diag::duplicate_attribute);
-    else
-      Attributes.Conversion = true;
-    return false;
-  }
-
-  case AttrName::exported: {
-    if (Attributes.isExported())
-      diagnose(Tok, diag::duplicate_attribute);
-    consumeToken(tok::identifier);
-
-    Attributes.Exported = true;
-    return false;
-  }
-      
-  case AttrName::transparent: {
-    if (Attributes.isTransparent())
-      diagnose(Tok, diag::duplicate_attribute);
-    consumeToken(tok::identifier);
+      Attributes.clearAttribute(attr);
+    }
+    break;
     
-    Attributes.Transparent = true;
-    return false;
-  }
+  case AK_postfix:
+    if (Attributes.isPrefix()) {
+      diagnose(Loc, diag::cannot_combine_attribute, "prefix");
+      Attributes.clearAttribute(attr);
+    }
+    break;
 
-  case AttrName::iboutlet: {
-    if (Attributes.isIBOutlet())
-      diagnose(Tok, diag::duplicate_attribute);
-
-    consumeToken(tok::identifier);
-    Attributes.IBOutlet = true;
-    return false;
-  }
-
-  case AttrName::ibaction: {
-    if (Attributes.isIBAction())
-      diagnose(Tok, diag::duplicate_attribute);
-
-    consumeToken(tok::identifier);
-    Attributes.IBAction = true;
-    return false;
-  }
-
-  case AttrName::objc: {
-    if (Attributes.isObjC())
-      diagnose(Tok, diag::duplicate_attribute);
-
-    consumeToken(tok::identifier);
-    Attributes.ObjC = true;
-    return false;
-  }
-
-  /// FIXME: This is a temporary hack until we can import C modules.
-  case AttrName::asmname: {
-    SourceLoc TokLoc = Tok.getLoc();
-    if (!Attributes.AsmName.empty())
-      diagnose(Tok, diag::duplicate_attribute);
-    consumeToken(tok::identifier);
-
+  case AK_asmname: {
     if (!consumeIf(tok::equal)) {
-      diagnose(TokLoc, diag::asmname_expected_equals);
+      diagnose(Loc, diag::asmname_expected_equals);
+      Attributes.clearAttribute(attr);
       return false;
     }
 
-    if (!Tok.is(tok::string_literal)) {
-      diagnose(TokLoc, diag::asmname_expected_string_literal);
-      return false;
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Loc, diag::asmname_expected_string_literal);
+      Attributes.clearAttribute(attr);
+     return false;
     }
 
     SmallVector<Lexer::StringSegment, 1> Segments;
     L->getStringLiteralSegments(Tok, Segments);
     if (Segments.size() != 1 ||
         Segments.front().Kind == Lexer::StringSegment::Expr) {
-      diagnose(TokLoc, diag::asmname_interpolated_string);
+      diagnose(Loc, diag::asmname_interpolated_string);
+      Attributes.clearAttribute(attr);
     } else {
       Attributes.AsmName = StringRef(
           SourceMgr->getMemoryBuffer(BufferID)->getBufferStart() +
@@ -476,68 +310,31 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, unsigned KindMask,
           Segments.front().Length);
     }
     consumeToken(tok::string_literal);
-    return false;
+    break;
   }
 
-  case AttrName::kernel: {
+  case AK_kernel:
+  case AK_vertex:
+  case AK_fragment:
+    // Reject Axle specific attributes in non-axle mode.
     if (!Context.LangOpts.Axle) {
-      diagnose(Tok, diag::invalid_attribute_for_lang, Tok.getText(), 
+      diagnose(Loc, diag::invalid_attribute_for_lang,
                0 /* axle */);
-      consumeToken(tok::identifier);
+      Attributes.clearAttribute(attr);
       return false;
     }
-    if (Attributes.isKernel())
-      diagnose(Tok, diag::duplicate_attribute);
-    if (Attributes.isVertex())
-      diagnose(Tok, diag::cannot_combine_attribute, "vertex");
-    if (Attributes.isFragment())
-      diagnose(Tok, diag::cannot_combine_attribute, "fragment");
-
-    consumeToken(tok::identifier);
-    Attributes.KernelOrShader = KernelOrShaderKind::Kernel;
-    return false;
-  }
-  
-  case AttrName::vertex: {
-    if (!Context.LangOpts.Axle) {
-      diagnose(Tok, diag::invalid_attribute_for_lang, Tok.getText(),
-               0 /* axle */);
-      consumeToken(tok::identifier);
-      return false;
+      
+    // Check multiple specifications by temporarily removing this attribute.
+    Attributes.clearAttribute(attr);
+    if (Attributes.getKernelOrShaderKind() != KernelOrShaderKind::Default) {
+      diagnose(Loc, diag::duplicate_attribute);
+      break;
     }
-    if (Attributes.isVertex())
-      diagnose(Tok, diag::duplicate_attribute);
-    if (Attributes.isKernel())
-      diagnose(Tok, diag::cannot_combine_attribute, "kernel");
-    if (Attributes.isFragment())
-      diagnose(Tok, diag::cannot_combine_attribute, "fragment");
-
-    consumeToken(tok::identifier);
-    Attributes.KernelOrShader = KernelOrShaderKind::Vertex;
-    return false;
+    Attributes.setAttr(attr, Loc);
+    break;
   }
 
-  case AttrName::fragment: {
-    if (!Context.LangOpts.Axle) {
-      diagnose(Tok, diag::invalid_attribute_for_lang, Tok.getText(),
-               0 /* axle */);
-      consumeToken(tok::identifier);
-      return false;
-    }
-    if (Attributes.isFragment())
-      diagnose(Tok, diag::duplicate_attribute);
-    if (Attributes.isKernel())
-      diagnose(Tok, diag::cannot_combine_attribute, "kernel");
-    if (Attributes.isVertex())
-      diagnose(Tok, diag::cannot_combine_attribute, "vertex");
-
-    consumeToken(tok::identifier);
-    Attributes.KernelOrShader = KernelOrShaderKind::Fragment;
-    return false;
-  }
-  }
-
-  llvm_unreachable("bad attribute kind");
+  return false;
 }
 
 /// \brief This is the internal implementation of \c parseAttributeList, which
@@ -799,15 +596,11 @@ ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags,
                                                  DeclAttributes &Attributes) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
   
-  bool Exported;
-  {
-    parseAttributeList(Attributes, AK_DeclAttributes, true);
-
-    Exported = Attributes.isExported();
-    Attributes.Exported = false;
-    if (!Attributes.empty())
-      diagnose(Attributes.AtLoc, diag::import_attributes);
-  }
+  parseAttributeList(Attributes, AK_DeclAttributes, true);
+  bool Exported = Attributes.isExported();
+  Attributes.clearAttribute(AK_exported);
+  if (!Attributes.empty())
+    diagnose(Attributes.AtLoc, diag::import_attributes);
 
   if (!(Flags & PD_AllowTopLevel)) {
     diagnose(ImportLoc, diag::decl_inner_scope);

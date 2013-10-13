@@ -99,6 +99,8 @@ public:
 /// defining a resilient structure need not actually use resilience
 /// boundaries.
 enum class Resilience : unsigned char {
+  Default,
+  
   /// Inherently fragile language structures are not only resilient,
   /// but they have never been exposed as resilient.  This permits
   /// certain kinds of optimizations that are not otherwise possible
@@ -114,115 +116,119 @@ enum class Resilience : unsigned char {
   Resilient
 };
 
-class ResilienceData {
-  unsigned Valid : 1;
-  unsigned Kind : 2;
-
-public:
-  ResilienceData() : Valid(false) {}
-  ResilienceData(Resilience resil) : Valid(true), Kind(unsigned(resil)) {}
-
-  bool isValid() const { return Valid; }
-  Resilience getResilience() const {
-    assert(Valid);
-    return Resilience(Kind);
-  }
-};
   
 enum class AbstractCC : unsigned char;
 
+// Define enumerators for each attribute, e.g. AK_weak.
+#define MAKE_ENUMERATOR(id) id,
+enum AttrKind {
+#define ATTR(X) AK_##X,
+#include "swift/AST/Attr.def"
+  AK_Count
+};
+  
 /// DeclAttributes - These are attributes that may be applied to declarations.
 class DeclAttributes {
+  // Get a SourceLoc for every possible attribute that can be parsed in source.
+  // the presence of the attribute is indicated by its location being set.
+  SourceLoc AttrLocs[AK_Count];
+  bool HasAttr[AK_Count] = { false };
 public:
   /// AtLoc - This is the location of the first '@' in the attribute specifier.
   /// If this is an empty attribute specifier, then this will be an invalid loc.
   SourceLoc AtLoc;
-
-  ResilienceData Resilience;
   StringRef AsmName;
-  bool InOut = false;
-  bool AutoClosure = false;
-  bool Thin = false;
-  bool NoReturn = false;
-  bool Assignment = false;
-  bool Conversion = false;
-  bool Transparent = false;
-  bool ObjC = false;
-  bool ObjCBlock = false;
-  bool ExplicitPrefix = false;
-  bool ExplicitPostfix = false;
-  bool ExplicitInfix = false;
-  bool IBOutlet = false;
-  bool IBAction = false;
-  bool ClassProtocol = false;
-  bool Weak = false;
-  bool Unowned = false;
-  bool LocalStorage = false;
-  bool Exported = false;
+  
   Optional<AbstractCC> cc = Nothing;
-  bool SILSelf = false;
-  KernelOrShaderKind KernelOrShader = KernelOrShaderKind::Default;
 
   DeclAttributes() {}
 
   bool isValid() const { return AtLoc.isValid(); }
 
-  ResilienceData getResilienceData() const { return Resilience; }
-  bool isInOut() const { return InOut; }
-  bool isAutoClosure() const { return AutoClosure; }
-  bool isThin() const { return Thin; }
-  bool isNoReturn() const { return NoReturn; }
-  bool isAssignment() const { return Assignment; }
-  bool isConversion() const { return Conversion; }
-  bool isTransparent() const { return Transparent; }
-  bool isPrefix() const { return ExplicitPrefix; }
-  bool isPostfix() const { return ExplicitPostfix; }
-  bool isInfix() const { return ExplicitInfix; }
-  bool isObjC() const { return ObjC; }
-  bool isObjCBlock() const { return ObjCBlock; }
-  bool isIBOutlet() const { return IBOutlet; }
-  bool isIBAction() const { return IBAction; }
-  bool isClassProtocol() const { return ClassProtocol; }
-  bool isLocalStorage() const { return LocalStorage; }
-  bool isWeak() const { return Weak; }
-  bool isUnowned() const { return Unowned; }
-  bool hasOwnership() const { return Weak || Unowned; }
-  Ownership getOwnership() const {
-    if (Weak) return Ownership::Weak;
-    if (Unowned) return Ownership::Unowned;
-    return Ownership::Strong;
+  void clearAttribute(AttrKind A) {
+    AttrLocs[A] = SourceLoc();
+    HasAttr[A] = false;
   }
-  bool isExported() const { return Exported; }
+  
+  bool has(AttrKind A) const {
+    return HasAttr[A];
+  }
+  
+  SourceLoc getLoc(AttrKind A) const {
+    return AttrLocs[A];
+  }
+  
+  void setAttr(AttrKind A, SourceLoc L) {
+    AttrLocs[A] = L;
+    HasAttr[A] = true;
+  }
+
+  
+  // This attribute list is empty if no attributes are specified.  Note that
+  // the presence of the leading @ is not enough to tell, because we want
+  // clients to be able to remove attributes they process until they get to
+  // an empty list.
+  bool empty() const {
+    for (bool elt : HasAttr)
+      if (elt) return false;
+    return true;
+  }
+
+  bool isInOut() const { return has(AK_inout); }
+  bool isAutoClosure() const { return has(AK_auto_closure); }
+  bool isThin() const { return has(AK_thin); }
+  bool isNoReturn() const { return has(AK_noreturn); }
+  bool isAssignment() const { return has(AK_assignment); }
+  bool isConversion() const { return has(AK_conversion); }
+  bool isTransparent() const {return has(AK_transparent);}
+  bool isPrefix() const { return has(AK_prefix); }
+  bool isPostfix() const { return has(AK_postfix); }
+  bool isInfix() const { return has(AK_infix); }
+  bool isObjC() const { return has(AK_objc); }
+  bool isObjCBlock() const { return has(AK_objc_block); }
+  bool isIBOutlet() const { return has(AK_iboutlet); }
+  bool isIBAction() const { return has(AK_ibaction); }
+  bool isClassProtocol() const { return has(AK_class_protocol); }
+  bool isLocalStorage() const { return has(AK_local_storage); }
+  bool isWeak() const { return has(AK_weak); }
+  bool isUnowned() const { return has(AK_unowned); }
+  bool isExported() const { return has(AK_exported); }
+  bool isSILSelf() const { return has(AK_sil_self); }
+  bool isKernel() const { return has(AK_kernel); }
+  bool isVertex() const { return has(AK_vertex); }
+  bool isFragment() const { return has(AK_fragment); }
+
   bool hasCC() const { return cc.hasValue(); }
   AbstractCC getAbstractCC() const { return *cc; }
-  bool isSILSelf() const { return SILSelf; }
+
+  Resilience getResilienceKind() const {
+    if (has(AK_resilient))
+      return Resilience::Resilient;
+    if (has(AK_fragile))
+      return Resilience::Fragile;
+    if (has(AK_born_fragile))
+      return Resilience::InherentlyFragile;
+    return Resilience::Default;
+  }
+
+  
+  bool hasOwnership() const { return isWeak() || isUnowned(); }
+  Ownership getOwnership() const {
+    if (isWeak()) return Ownership::Weak;
+    if (isUnowned()) return Ownership::Unowned;
+    return Ownership::Strong;
+  }
 
   KernelOrShaderKind getKernelOrShaderKind() const {
-    return KernelOrShader;
-  }
-  bool isKernel() const {
-    return KernelOrShader == KernelOrShaderKind::Kernel;
-  }
-  bool isVertex() const {
-    return KernelOrShader == KernelOrShaderKind::Vertex;
-  }
-  bool isFragment() const {
-    return KernelOrShader == KernelOrShaderKind::Fragment;
-  }
-
-  bool empty() const {
-    return !isInfix() && !getResilienceData().isValid() && !isInOut() &&
-           !isAutoClosure() && !isThin() && !isNoReturn() && !isAssignment() &&
-           !isConversion() && !isTransparent() && !isPostfix() && !isPrefix() &&
-           !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
-           !isClassProtocol() && !hasCC() && !hasOwnership() &&
-           !isLocalStorage() && !isExported() && AsmName.empty() &&
-           !isSILSelf() &&
-           getKernelOrShaderKind() == KernelOrShaderKind::Default;
+    if (isKernel()) return KernelOrShaderKind::Kernel;
+    if (isVertex()) return KernelOrShaderKind::Fragment;
+    if (isFragment()) return KernelOrShaderKind::Vertex;
+    return KernelOrShaderKind::Default;
   }
 
   void clearOwnership() {
-    Weak = Unowned = false;
+    clearAttribute(AK_weak);
+    clearAttribute(AK_unowned);
   }
 };
   

@@ -625,13 +625,14 @@ bool SILParser::parseSILType(SILType &Result) {
   P.parseAttributeList(attrs, Parser::AK_SILAttributes, false);
   P.parseAttributeList(attrs, Parser::AK_SILAttributes, true);
 
-  // Handle [local_storage], which changes the SIL value category.
+  // Handle @local_storage, which changes the SIL value category.
   if (attrs.isLocalStorage()) {
     // Require '*' on local_storage values.
     if (category != SILValueCategory::Address)
-      P.diagnose(attrs.AtLoc, diag::sil_local_storage_non_address);
+      P.diagnose(attrs.getLoc(AK_local_storage),
+                 diag::sil_local_storage_non_address);
     category = SILValueCategory::LocalStorage;
-    attrs.LocalStorage = false;
+    attrs.clearAttribute(AK_local_storage);
   }
 
   // Parse Generic Parameters. Generic Parameters are visible in the function
@@ -665,7 +666,8 @@ bool SILParser::parseSILType(SILType &Result) {
                                              P.Context);
     Ty.setType(resultType);
     // Reset attributes that are applied.
-    attrs.Thin = false;
+    attrs.clearAttribute(AK_thin);
+    attrs.clearAttribute(AK_cc);
     attrs.cc = Nothing;
   }
 

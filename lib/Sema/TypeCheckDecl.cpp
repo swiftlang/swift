@@ -1145,7 +1145,7 @@ public:
       ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(dc);
       bool isObjC = (classContext && classContext->isObjC())
                   || (protocolContext && protocolContext->isObjC())
-                  || SD->getAttrs().ObjC;
+                  || SD->getAttrs().isObjC();
       if (isObjC && SD->getObjCSubscriptKind() != ObjCSubscriptKind::None) {
         SD->setIsObjC(true);
       }
@@ -1440,32 +1440,29 @@ public:
     auto Info = AnyFunctionType::ExtInfo();
 
     if (Attrs.hasCC()) {
-      TC.diagnose(FD->getStartLoc(), diag::invalid_decl_attribute, "cc");
+      TC.diagnose(Attrs.getLoc(AK_cc), diag::invalid_decl_attribute);
       Attrs.cc = {};
+      Attrs.clearAttribute(AK_cc);
     }
 
     if (Attrs.isThin()) {
-      TC.diagnose(FD->getStartLoc(), diag::invalid_decl_attribute,
-                  "thin");
-      Attrs.Thin = false;
+      TC.diagnose(Attrs.getLoc(AK_thin), diag::invalid_decl_attribute);
+      Attrs.clearAttribute(AK_thin);
     }
 
     // 'noreturn' is allowed on a function declaration.
     Info = Info.withIsNoReturn(Attrs.isNoReturn());
-    if (consumeAttributes) {
-      Attrs.NoReturn = false;
-    }
+    if (consumeAttributes)
+      Attrs.clearAttribute(AK_noreturn);
 
     if (Attrs.isAutoClosure()) {
-      TC.diagnose(FD->getStartLoc(), diag::invalid_decl_attribute,
-                  "auto_closure");
-      Attrs.AutoClosure = false;
+      TC.diagnose(Attrs.getLoc(AK_auto_closure), diag::invalid_decl_attribute);
+      Attrs.clearAttribute(AK_auto_closure);
     }
 
     if (Attrs.isObjCBlock()) {
-      TC.diagnose(FD->getStartLoc(), diag::invalid_decl_attribute,
-                  "objc_block");
-      Attrs.ObjCBlock = false;
+      TC.diagnose(Attrs.getLoc(AK_objc_block), diag::invalid_decl_attribute);
+      Attrs.clearAttribute(AK_objc_block);
     }
 
     return Info;
@@ -1596,13 +1593,13 @@ public:
         SourceLoc insertionLoc = FD->getLoc();
         const char *insertionText;
         if (postfixOp) {
-          insertionText = "[postfix] ";
+          insertionText = "@postfix ";
           op = *postfixOp;
-          FD->getMutableAttrs().ExplicitPostfix = true;
+          FD->getMutableAttrs().setAttr(AK_postfix, SourceLoc());
         } else {
-          insertionText = "[prefix] ";
+          insertionText = "@prefix ";
           op = *prefixOp;
-          FD->getMutableAttrs().ExplicitPrefix = true;
+          FD->getMutableAttrs().setAttr(AK_prefix, SourceLoc());
         }
 
         // Emit diagnostic with the Fix-It.
@@ -2704,7 +2701,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
     if (error) {
       TC.diagnose(D->getStartLoc(), *error);
-      D->getMutableAttrs().ObjC = false;
+      D->getMutableAttrs().clearAttribute(AK_objc);
       return;
     }
   }
@@ -2771,8 +2768,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // FIXME: This could do some type validation as well (all IBOutlets refer
     // to objects).
     if (!(isa<VarDecl>(D) && isInClassContext(D))) {
-      TC.diagnose(D->getStartLoc(), diag::invalid_iboutlet);
-      D->getMutableAttrs().IBOutlet = false;
+      TC.diagnose(Attrs.getLoc(AK_iboutlet), diag::invalid_iboutlet);
+      D->getMutableAttrs().clearAttribute(AK_iboutlet);
       return;
     }
   }
@@ -2782,8 +2779,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     const FuncDecl *FD = dyn_cast<FuncDecl>(D);
     if (!FD || !isa<ClassDecl>(D->getDeclContext()) || FD->isStatic() ||
         FD->isGetterOrSetter()) {
-      TC.diagnose(D->getStartLoc(), diag::invalid_ibaction_decl);
-      D->getMutableAttrs().IBAction = false;
+      TC.diagnose(Attrs.getLoc(AK_ibaction), diag::invalid_ibaction_decl);
+      D->getMutableAttrs().clearAttribute(AK_ibaction);
       return;
     }
 
@@ -2794,7 +2791,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     Type ResultTy = CurriedTy->castTo<AnyFunctionType>()->getResult();
     if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context))) {
       TC.diagnose(D->getStartLoc(), diag::invalid_ibaction_result, ResultTy);
-      D->getMutableAttrs().IBAction = false;
+      D->getMutableAttrs().clearAttribute(AK_ibaction);
       return;
     }
   }
@@ -2818,16 +2815,16 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   if (Attrs.isPostfix()) {
     // Only operator functions can be postfix.
     if (!isOperator) {
-      TC.diagnose(D->getStartLoc(), diag::postfix_not_an_operator);
-      D->getMutableAttrs().ExplicitPostfix = false;
+      TC.diagnose(Attrs.getLoc(AK_postfix), diag::postfix_not_an_operator);
+      D->getMutableAttrs().clearAttribute(AK_postfix);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
 
     // Only unary operators can be postfix.
     if (!FDOrNull || !FDOrNull->isUnaryOperator()) {
-      TC.diagnose(D->getStartLoc(), diag::invalid_postfix_input);
-      D->getMutableAttrs().ExplicitPostfix = false;
+      TC.diagnose(Attrs.getLoc(AK_postfix), diag::invalid_postfix_input);
+      D->getMutableAttrs().clearAttribute(AK_postfix);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
@@ -2836,16 +2833,16 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   if (Attrs.isPrefix()) {
     // Only operator functions can be postfix.
     if (!isOperator) {
-      TC.diagnose(D->getStartLoc(), diag::prefix_not_an_operator);
-      D->getMutableAttrs().ExplicitPostfix = false;
+      TC.diagnose(Attrs.getLoc(AK_prefix), diag::prefix_not_an_operator);
+      D->getMutableAttrs().clearAttribute(AK_prefix);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
 
     // Only unary operators can be postfix.
     if (!FDOrNull || !FDOrNull->isUnaryOperator()) {
-      TC.diagnose(D->getStartLoc(), diag::invalid_prefix_input);
-      D->getMutableAttrs().ExplicitPostfix = false;
+      TC.diagnose(Attrs.getLoc(AK_prefix), diag::invalid_prefix_input);
+      D->getMutableAttrs().clearAttribute(AK_prefix);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
@@ -2855,11 +2852,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // Only function declarations can be assignments.
     FuncDecl *FD = dyn_cast<FuncDecl>(D);
     if (!FD || !FD->isOperator()) {
-      TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute,"assignment");
-      D->getMutableAttrs().Assignment = false;
+      TC.diagnose(Attrs.getLoc(AK_assignment), diag::invalid_decl_attribute);
+      D->getMutableAttrs().clearAttribute(AK_assignment);
     } else if (NumArguments < 1) {
-      TC.diagnose(D->getStartLoc(), diag::assignment_without_inout);
-      D->getMutableAttrs().Assignment = false;
+      TC.diagnose(Attrs.getLoc(AK_assignment),diag::assignment_without_inout);
+      D->getMutableAttrs().clearAttribute(AK_assignment);
     } else {
       auto FT = FD->getType()->castTo<AnyFunctionType>();
       Type ParamType = FT->getInput();
@@ -2868,8 +2865,9 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         ParamType = ParamTT->getElementType(0);
 
       if (!ParamType->is<LValueType>()) {
-        TC.diagnose(D->getStartLoc(), diag::assignment_without_inout);
-        D->getMutableAttrs().Assignment = false;
+        TC.diagnose(Attrs.getLoc(AK_assignment),
+                    diag::assignment_without_inout);
+        D->getMutableAttrs().clearAttribute(AK_assignment);
       }
     }
   }
@@ -2879,12 +2877,12 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // conversions.
     FuncDecl *FD = dyn_cast<FuncDecl>(D);
     if (!FD) {
-      TC.diagnose(D->getStartLoc(), diag::conversion_not_function);
-      D->getMutableAttrs().Conversion = false;
+      TC.diagnose(Attrs.getLoc(AK_conversion), diag::conversion_not_function);
+      D->getMutableAttrs().clearAttribute(AK_conversion);
     } else if (!FD->isInstanceMember()) {
-      TC.diagnose(FD->getStartLoc(), diag::conversion_not_instance_method,
-                  FD->getName());
-      FD->getMutableAttrs().Conversion = false;
+      TC.diagnose(Attrs.getLoc(AK_conversion),
+                  diag::conversion_not_instance_method, FD->getName());
+      D->getMutableAttrs().clearAttribute(AK_conversion);
     } else if (!FD->getType()->is<ErrorType>()) {
       AnyFunctionType *BoundMethodTy
         = FD->getType()->castTo<AnyFunctionType>()->getResult()
@@ -2905,9 +2903,9 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       }
 
       if (!AcceptsEmptyParamList) {
-        TC.diagnose(FD->getStartLoc(), diag::conversion_params,
+        TC.diagnose(Attrs.getLoc(AK_conversion), diag::conversion_params,
                     FD->getName());
-        D->getMutableAttrs().Conversion = false;
+        D->getMutableAttrs().clearAttribute(AK_conversion);
       }
     }
   }
@@ -2918,96 +2916,72 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     auto *ED = dyn_cast<ExtensionDecl>(D);
 
     if (!AFD && !ED) {
-      TC.diagnose(D->getStartLoc(), diag::transparent_not_valid);
-      D->getMutableAttrs().Transparent = false;
+      TC.diagnose(Attrs.getLoc(AK_transparent), diag::transparent_not_valid);
+      D->getMutableAttrs().clearAttribute(AK_transparent);
 
     // Only Struct and Enum extensions can be transparent.
     } else if (ED) {
       CanType ExtendedTy = getExtendedType(ED);
       if (!isa<StructType>(ExtendedTy) && !isa<EnumType>(ExtendedTy)) {
-        TC.diagnose(D->getStartLoc(), diag::transparent_on_invalid_extension);
-        D->getMutableAttrs().Transparent = false;
+        TC.diagnose(Attrs.getLoc(AK_transparent),
+                    diag::transparent_on_invalid_extension);
+        D->getMutableAttrs().clearAttribute(AK_transparent);
       }
     } else if (AFD->getGenericParams()) {
       // FIXME: We don't yet support transparent on generic functions.
-      TC.diagnose(D->getStartLoc(), diag::transparent_generic_not_supported);
-      D->getMutableAttrs().Transparent = false;
+      TC.diagnose(Attrs.getLoc(AK_transparent),
+                  diag::transparent_generic_not_supported);
+      D->getMutableAttrs().clearAttribute(AK_transparent);
 
     // Protocol method declarations cannot be transparent.
     } else if (isa<ProtocolDecl>(AFD->getParent())) {
-      TC.diagnose(D->getStartLoc(),
+      TC.diagnose(Attrs.getLoc(AK_transparent),
                   diag::transparent_in_protocols_not_supported);
-      D->getMutableAttrs().Transparent = false;
+      D->getMutableAttrs().clearAttribute(AK_transparent);
 
     // Class methods cannot be transparent.
     } else if (isa<ClassDecl>(AFD->getParent())) {
-      TC.diagnose(D->getStartLoc(),
+      TC.diagnose(Attrs.getLoc(AK_transparent),
                   diag::transparent_in_classes_not_supported);
-      D->getMutableAttrs().Transparent = false;
+      D->getMutableAttrs().clearAttribute(AK_transparent);
     }
   }
 
-  if (Attrs.isInOut()) {
-    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "inout");
-    D->getMutableAttrs().InOut = false;
-  }
-
-  if (Attrs.isAutoClosure()) {
-    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "auto_closure");
-    D->getMutableAttrs().AutoClosure = false;
-  }
-
-  if (Attrs.isExported()) {
-    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "exported");
-    D->getMutableAttrs().Exported = false;
-  }
-
-  if (Attrs.isObjCBlock()) {
-    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "objc_block");
-    D->getMutableAttrs().ObjCBlock = false;
+  static const AttrKind InvalidAttrs[] = {
+    AK_inout, AK_auto_closure,
+    AK_exported, AK_objc_block, AK_cc, AK_thin, AK_noreturn, AK_local_storage
+  };
+  
+  for (AttrKind K : InvalidAttrs) {
+    if (Attrs.has(K)) {
+      TC.diagnose(Attrs.getLoc(K), diag::invalid_decl_attribute);
+      D->getMutableAttrs().clearAttribute(K);
+    }
   }
 
   // Only protocols can have the [class_protocol] attribute.
   if (Attrs.isClassProtocol() && !isa<ProtocolDecl>(D)) {
-    TC.diagnose(D->getStartLoc(), diag::class_protocol_not_protocol);
-    D->getMutableAttrs().ClassProtocol = false;
-  }
-
-  if (Attrs.hasCC()) {
-    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "cc");
-    D->getMutableAttrs().cc = {};
-  }
-
-  if (Attrs.isThin()) {
-    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "thin");
-    D->getMutableAttrs().Thin = false;
-  }
-
-  if (Attrs.isNoReturn()) {
-    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "noreturn");
-    D->getMutableAttrs().NoReturn = false;
-  }
-
-  if (Attrs.isLocalStorage()) {
-    TC.diagnose(D->getStartLoc(), diag::invalid_decl_attribute, "local_storage");
-    D->getMutableAttrs().LocalStorage = false;
+    TC.diagnose(Attrs.getLoc(AK_class_protocol),
+                diag::class_protocol_not_protocol);
+    D->getMutableAttrs().clearAttribute(AK_class_protocol);
   }
   
+
   if (!isa<FuncDecl>(D)) {
     if (Attrs.isKernel()) {
       TC.diagnose(D->getStartLoc(), diag::attribute_requires_function_decl,
                   "kernel");
-      D->getMutableAttrs().KernelOrShader = KernelOrShaderKind::Default;
+      D->getMutableAttrs().clearAttribute(AK_kernel);
     }
     if (Attrs.isVertex()) {
       TC.diagnose(D->getStartLoc(), diag::attribute_requires_function_decl,
                   "vertex");
-      D->getMutableAttrs().KernelOrShader = KernelOrShaderKind::Default;
+      D->getMutableAttrs().clearAttribute(AK_vertex);
     }
     if (Attrs.isFragment()) {
       TC.diagnose(D->getStartLoc(), diag::attribute_requires_function_decl,
                   "fragment");
-      D->getMutableAttrs().KernelOrShader = KernelOrShaderKind::Default;
+      D->getMutableAttrs().clearAttribute(AK_fragment);
     }
   }
 }

@@ -1358,7 +1358,7 @@ ClassDecl *IRGenModule::getSwiftRootClass() {
                                            /*generics*/ nullptr,
                                            Context.TheBuiltinModule);
   SwiftRootClass->computeType();
-  SwiftRootClass->getMutableAttrs().ObjC = true;
+  SwiftRootClass->getMutableAttrs().setAttr(AK_objc, SourceLoc());
   SwiftRootClass->setIsObjC(true);
   return SwiftRootClass;
 }

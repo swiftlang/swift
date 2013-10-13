@@ -290,7 +290,8 @@ namespace {
     }
 
     Decl *
-    VisitUnresolvedUsingTypenameDecl(const clang::UnresolvedUsingTypenameDecl *decl) {
+    VisitUnresolvedUsingTypenameDecl(const
+                                     clang::UnresolvedUsingTypenameDecl *decl) {
       // Note: only occurs in templates.
       return nullptr;
     }
@@ -831,7 +832,7 @@ namespace {
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
-        result->getMutableAttrs().IBOutlet = true;
+        result->getMutableAttrs().setAttr(AK_iboutlet, SourceLoc());
       // FIXME: Handle IBOutletCollection.
 
       return result;
@@ -917,7 +918,8 @@ namespace {
       return VisitObjCMethodDecl(decl, dc);
     }
 
-    Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc) {
+    Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
+                              DeclContext *dc) {
       auto loc = Impl.importSourceLoc(decl->getLocStart());
 
       // The name of the method is the first part of the selector.
@@ -989,7 +991,7 @@ namespace {
       setVarDeclContexts(bodyPatterns, result);
 
       // Mark this as an Objective-C method.
-      result->getMutableAttrs().ObjC = true;
+      result->getMutableAttrs().setAttr(AK_objc, SourceLoc());
       result->setIsObjC(true);
 
       // Mark class methods as static.
@@ -1034,7 +1036,7 @@ namespace {
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBActionAttr>())
-        result->getMutableAttrs().IBAction = true;
+        result->getMutableAttrs().setAttr(AK_ibaction, SourceLoc());
 
       // Check whether there's some special method to import.
       result->setClangNode(decl);
@@ -1975,8 +1977,8 @@ namespace {
       result->setCheckedInheritanceClause();
 
       // Note that this is an Objective-C and class protocol.
-      result->getMutableAttrs().ObjC = true;
-      result->getMutableAttrs().ClassProtocol = true;
+      result->getMutableAttrs().setAttr(AK_objc, SourceLoc());
+      result->getMutableAttrs().setAttr(AK_class_protocol, SourceLoc());
       result->setIsObjC(true);
 
       // Add the implicit 'Self' associated type.
@@ -2049,7 +2051,7 @@ namespace {
       result->setCheckedInheritanceClause();
 
       // Note that this is an Objective-C class.
-      result->getMutableAttrs().ObjC = true;
+      result->getMutableAttrs().setAttr(AK_objc, SourceLoc());
       result->setIsObjC(true);
       
       // Import each of the members.
@@ -2160,12 +2162,11 @@ namespace {
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
-        result->getMutableAttrs().IBOutlet = true;
+        result->getMutableAttrs().setAttr(AK_iboutlet, SourceLoc());
       // FIXME: Handle IBOutletCollection.
 
-      if (overridden) {
+      if (overridden)
         result->setOverriddenDecl(overridden);
-      }
 
       return result;
     }
@@ -2233,7 +2234,8 @@ namespace {
 }
 
 /// \brief Classify the given Clang enumeration to describe how it
-EnumKind ClangImporter::Implementation::classifyEnum(const clang::EnumDecl *decl) {
+EnumKind ClangImporter::Implementation::
+classifyEnum(const clang::EnumDecl *decl) {
   Identifier name;
   if (decl->getDeclName())
     name = importName(decl->getDeclName());
@@ -2275,8 +2277,8 @@ Decl *ClangImporter::Implementation::importDecl(const clang::NamedDecl *decl) {
 }
 
 Decl *
-ClangImporter::Implementation::importMirroredDecl(const clang::ObjCMethodDecl *decl,
-                                                  DeclContext *dc) {
+ClangImporter::Implementation::
+importMirroredDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc) {
   if (!decl)
     return nullptr;
 
