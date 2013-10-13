@@ -27,16 +27,19 @@
 #endif
 
 // Type attributes
-TYPE_ATTR(cc)
-TYPE_ATTR(thin)
-TYPE_ATTR(objc_block)
 TYPE_ATTR(auto_closure)
 TYPE_ATTR(inout)
+TYPE_ATTR(cc)
+TYPE_ATTR(noreturn)
+TYPE_ATTR(objc_block)
+TYPE_ATTR(thin)
+
 
 // SIL-specific attributes
 TYPE_ATTR(sil_self)
 TYPE_ATTR(local_storage)
-
+TYPE_ATTR(sil_unowned)
+TYPE_ATTR(sil_weak)
 
 ATTR(assignment)
 ATTR(class_protocol)
@@ -46,22 +49,22 @@ ATTR(infix)
 ATTR(resilient)
 ATTR(fragile)
 ATTR(born_fragile)
-BOTH_ATTR(noreturn)
 ATTR(asmname)
+ATTR(noreturn)
 ATTR(prefix)
 ATTR(postfix)
 ATTR(objc)
 ATTR(iboutlet)
 ATTR(ibaction)
 ATTR(transparent)
-BOTH_ATTR(weak)
-BOTH_ATTR(unowned)
-
+ATTR(unowned)
+ATTR(weak)
 
 // Axle-specific attributes
 ATTR(kernel)
 ATTR(vertex)
 ATTR(fragment)
+
 
 #undef BOTH_ATTR
 #undef TYPE_ATTR

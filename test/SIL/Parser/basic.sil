@@ -627,14 +627,14 @@ bb0:
 
 sil @test_unowned_retain : $@thin (p : SomeClass) -> () {
 bb0(%0 : $SomeClass):
-  %1 = ref_to_unowned %0 : $SomeClass to $@unowned SomeClass
-// CHECK: ref_to_unowned %0 : $SomeClass to $[unowned] SomeClass
-  %2 = unowned_retain %1 : $@unowned SomeClass
-// CHECK: unowned_retain %1 : $[unowned] SomeClass
-  %3 = unowned_release %1 : $@unowned SomeClass
-// CHECK: unowned_release %1 : $[unowned] SomeClass
-  %4 = unowned_to_ref %1 : $@unowned SomeClass to $SomeClass
-// CHECK: unowned_to_ref %1 : $[unowned] SomeClass to $SomeClass
+  %1 = ref_to_unowned %0 : $SomeClass to $@sil_unowned SomeClass
+// CHECK: ref_to_unowned %0 : $SomeClass to $@sil_unowned SomeClass
+  %2 = unowned_retain %1 : $@sil_unowned SomeClass
+// CHECK: unowned_retain %1 : $@sil_unowned SomeClass
+  %3 = unowned_release %1 : $@sil_unowned SomeClass
+// CHECK: unowned_release %1 : $@sil_unowned SomeClass
+  %4 = unowned_to_ref %1 : $@sil_unowned SomeClass to $SomeClass
+// CHECK: unowned_to_ref %1 : $@sil_unowned SomeClass to $SomeClass
   %5 = tuple ()
   %6 = return %5 : $()
 }

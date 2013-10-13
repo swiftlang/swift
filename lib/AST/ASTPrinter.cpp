@@ -1496,12 +1496,12 @@ public:
   }
 
   void visitUnownedStorageType(UnownedStorageType *T) {
-    OS << "[unowned] ";
+    OS << "@sil_unowned ";
     visit(T->getReferentType());
   }
 
   void visitWeakStorageType(WeakStorageType *T) {
-    OS << "[weak] ";
+    OS << "@sil_weak ";
     visit(T->getReferentType());
   }
 

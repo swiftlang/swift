@@ -183,16 +183,16 @@ public:
   bool hasCC() const { return cc.hasValue(); }
   AbstractCC getAbstractCC() const { return *cc; }
   
-  bool hasOwnership() const { return has(TAK_weak) || has(TAK_unowned); }
+  bool hasOwnership() const { return getOwnership() != Ownership::Strong; }
   Ownership getOwnership() const {
-    if (has(TAK_weak)) return Ownership::Weak;
-    if (has(TAK_unowned)) return Ownership::Unowned;
+    if (has(TAK_sil_weak)) return Ownership::Weak;
+    if (has(TAK_sil_unowned)) return Ownership::Unowned;
     return Ownership::Strong;
   }
   
   void clearOwnership() {
-    clearAttribute(TAK_weak);
-    clearAttribute(TAK_unowned);
+    clearAttribute(TAK_sil_weak);
+    clearAttribute(TAK_sil_unowned);
   }
 };
 

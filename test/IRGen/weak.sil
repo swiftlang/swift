@@ -17,14 +17,14 @@ protocol [class_protocol] P {
 }
 
 struct A {
-  var [weak] x : C?
+  @weak var x : C?
 }
 
 sil @test_weak_load_store : $[thin] (val : [inout] A, v : C) -> () {
 bb0(%0 : $*A, %1 : $C):
   %2 = struct_element_addr %0 : $*A, #x
-  %3 = load_weak %2 : $*[weak] C
-  store_weak %1 to %2 : $*[weak] C
+  %3 = load_weak %2 : $*@sil_weak C
+  store_weak %1 to %2 : $*@sil_weak C
   strong_release %3 : $C
   %4 = tuple ()
   return %4 : $()
@@ -43,8 +43,8 @@ struct B {
 sil @test_weak_load_store_proto : $[thin] (val : [inout] B, ref : P) -> () {
 bb0(%0 : $*B, %1 : $P):
   %2 = struct_element_addr %0 : $*B, #x
-  %3 = load_weak %2 : $*[weak] P
-  store_weak %1 to %2 : $*[weak] P
+  %3 = load_weak %2 : $*@sil_weak P
+  store_weak %1 to %2 : $*@sil_weak P
   strong_release %3 : $P
   %4 = tuple ()
   return %4 : $()
@@ -64,10 +64,10 @@ bb0(%0 : $*B, %1 : $P):
 
 sil @test_weak_alloc_stack : $[thin] (val : P) -> () {
 bb0(%0 : $P):
-  %1 = alloc_stack $[weak] P
-  store_weak %0 to [initialization] %1#1 : $*[weak] P
-  destroy_addr %1#1 : $*[weak] P
-  dealloc_stack %1#0 : $*[local_storage] [weak] P
+  %1 = alloc_stack $@sil_weak P
+  store_weak %0 to [initialization] %1#1 : $*@sil_weak P
+  destroy_addr %1#1 : $*@sil_weak P
+  dealloc_stack %1#0 : $*@local_storage @sil_weak P
   %4 = tuple ()
   return %4 : $()
 }

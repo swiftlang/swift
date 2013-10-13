@@ -315,7 +315,7 @@ bb0:
   // Assignments of weak pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
 
-  %c = alloc_box $[weak] SomeClass
+  %c = alloc_box $@sil_weak SomeClass
   %f = function_ref @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass
   %3 = metatype $SomeClass.metatype
 
@@ -323,7 +323,7 @@ bb0:
   // CHECK: [[C1:%[0-9]+]] = apply
 
   // THis should become an initialization.
-  store_weak %4 to %c#1 : $*[weak] SomeClass
+  store_weak %4 to %c#1 : $*@sil_weak SomeClass
   // CHECK-NEXT: store_weak [[C1]] to [initialization] %0#1
 
   strong_release %4 : $SomeClass
@@ -332,7 +332,7 @@ bb0:
   %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
-  store_weak %8 to %c#1 : $*[weak] SomeClass
+  store_weak %8 to %c#1 : $*@sil_weak SomeClass
   // CHECK-NEXT: store_weak [[C2]] to %0#1
 
   strong_release %8 : $SomeClass
@@ -350,7 +350,7 @@ bb0:
   // Assignments of unowned pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
 
-  %c = alloc_box $[unowned] SomeClass
+  %c = alloc_box $@sil_unowned SomeClass
   // CHECK: [[BOX:%[0-9]+]] = alloc_box
   %f = function_ref @getSomeClass : $[thin] ((), SomeClass.metatype) -> SomeClass
   %3 = metatype $SomeClass.metatype
@@ -359,9 +359,9 @@ bb0:
   // CHECK: [[C1:%[0-9]+]] = apply
 
   // This should become an initialization.
-  %5 = ref_to_unowned %4 : $SomeClass to $[unowned] SomeClass
-  unowned_retain %5 : $[unowned] SomeClass
-  assign %5 to %c#1 : $*[unowned] SomeClass
+  %5 = ref_to_unowned %4 : $SomeClass to $@sil_unowned SomeClass
+  unowned_retain %5 : $@sil_unowned SomeClass
+  assign %5 to %c#1 : $*@sil_unowned SomeClass
   strong_release %4 : $SomeClass
   // CHECK-NEXT: [[C1u:%[0-9]+]] = ref_to_unowned [[C1]]
   // CHECK-NEXT: unowned_retain [[C1u]]
@@ -371,9 +371,9 @@ bb0:
   %8 = apply %f(%3) : $[thin] ((), SomeClass.metatype) -> SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
-  %9 = ref_to_unowned %8 : $SomeClass to $[unowned] SomeClass
-  unowned_retain %9 : $[unowned] SomeClass
-  assign %9 to %c#1 : $*[unowned] SomeClass
+  %9 = ref_to_unowned %8 : $SomeClass to $@sil_unowned SomeClass
+  unowned_retain %9 : $@sil_unowned SomeClass
+  assign %9 to %c#1 : $*@sil_unowned SomeClass
   strong_release %8 : $SomeClass
   // CHECK-NEXT: [[C2u:%[0-9]+]] = ref_to_unowned [[C2]]
   // CHECK-NEXT: unowned_retain [[C2u]]

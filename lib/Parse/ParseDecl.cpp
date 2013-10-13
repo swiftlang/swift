@@ -322,17 +322,21 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool OldStyle) {
   default: break;
   case TAK_local_storage:
   case TAK_sil_self:
-    if (!isInSILMode())    // SIL's 'local_storage' type attribute.
+    if (!isInSILMode()) {   // SIL's 'local_storage' type attribute.
       diagnose(Loc, diag::only_allowed_in_sil, "local_storage");
+      Attributes.clearAttribute(attr);
+    }
     break;
     
   // Ownership attributes.
-  case TAK_weak:
-  case TAK_unowned:
-    // FIXME: This is only used for SIL functions, we should find a way to
-    // factor this out.
-    // Test for duplicate entries by temporarily removing this one.
+  case TAK_sil_weak:
+  case TAK_sil_unowned:
     Attributes.clearAttribute(attr);
+    if (!isInSILMode()) {
+      diagnose(Loc, diag::only_allowed_in_sil, "local_storage");
+      return false;
+    }
+      
     if (Attributes.hasOwnership()) {
       diagnose(Loc, diag::duplicate_attribute);
       break;
