@@ -681,7 +681,6 @@ ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags,
                                                  DeclAttributes &Attributes) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
   
-  parseAttributeList(Attributes, true);
   bool Exported = Attributes.isExported();
   Attributes.clearAttribute(AK_exported);
   if (!Attributes.empty())
@@ -841,8 +840,6 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
 ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags,
                                                        DeclAttributes &Attr) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
-
-  parseAttributeList(Attr, true);
 
   ParserResult<TypeRepr> Ty = parseTypeIdentifierOrAxleSugarWithRecovery(
       diag::expected_type, diag::expected_ident_type_in_extension);
@@ -1284,7 +1281,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 ///
 /// \verbatim
 ///   decl-var:
-///      'var' attribute-list identifier : type-annotation { get-set }
+///      attribute-list 'var' identifier : type-annotation { get-set }
 /// \endverbatim
 void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
   bool Invalid = false;
@@ -1365,8 +1362,6 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
   ParserStatus Status;
 
   unsigned FirstDecl = Decls.size();
-
-  parseAttributeList(Attributes, true);
   
   do {
     ParserResult<Pattern> pattern = parsePattern();
@@ -1770,8 +1765,6 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags,
                                              DeclAttributes &Attributes) {
   SourceLoc EnumLoc = consumeToken(tok::kw_enum);
 
-  parseAttributeList(Attributes, true);
-  
   Identifier EnumName;
   SourceLoc EnumNameLoc;
   ParserStatus Status;
@@ -1854,11 +1847,6 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
   ParserStatus Status;
   SourceLoc CaseLoc = consumeToken(tok::kw_case);
 
-  if (parseAttributeList(Attributes, true)) {
-    Status.setIsParseError();
-    return Status;
-  }
-  
   // Parse comma-separated enum elements.
   SmallVector<EnumElementDecl*, 4> Elements;
   
@@ -2044,8 +2032,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags,
                                                  DeclAttributes &Attributes) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
   
-  parseAttributeList(Attributes, true);
-
   Identifier StructName;
   SourceLoc StructNameLoc;
   ParserStatus Status;
@@ -2131,8 +2117,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags,
 ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags,
                                                DeclAttributes &Attributes) {
   SourceLoc ClassLoc = consumeToken(tok::kw_class);
-  
-  parseAttributeList(Attributes, true);
 
   Identifier ClassName;
   SourceLoc ClassNameLoc;
@@ -2221,8 +2205,6 @@ ParserResult<ProtocolDecl> Parser::
 parseDeclProtocol(unsigned Flags, DeclAttributes &Attributes) {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
-  parseAttributeList(Attributes, true);
-  
   SourceLoc NameLoc;
   Identifier ProtocolName;
   ParserStatus Status;
@@ -2302,9 +2284,6 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
   ParserStatus Status;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
 
-  // attribute-list
-  parseAttributeList(Attributes, true);
-  
   // pattern-tuple
   if (Tok.isNot(tok::l_paren)) {
     diagnose(Tok, diag::expected_lparen_subscript);
@@ -2425,9 +2404,6 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
     diagnose(Tok, diag::initializer_decl_wrong_scope);
   }
 
-  // attribute-list
-  parseAttributeList(Attributes, true);
-
   // Parse the generic-params, if present.
   Scope S(this, ScopeKind::Generics);
   GenericParamList *GenericParams = maybeParseGenericParams();
@@ -2513,9 +2489,6 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
 ParserResult<DestructorDecl> Parser::
 parseDeclDestructor(unsigned Flags, DeclAttributes &Attributes) {
   SourceLoc DestructorLoc = consumeToken(tok::kw_destructor);
-
-  // attribute-list
-  parseAttributeList(Attributes, true);
 
   ParserResult<Pattern> Params;
   if (Tok.is(tok::l_paren)) {
