@@ -1439,31 +1439,10 @@ public:
     DeclAttributes &Attrs = FD->getMutableAttrs();
     auto Info = AnyFunctionType::ExtInfo();
 
-    if (Attrs.hasCC()) {
-      TC.diagnose(Attrs.getLoc(AK_cc), diag::invalid_decl_attribute);
-      Attrs.cc = {};
-      Attrs.clearAttribute(AK_cc);
-    }
-
-    if (Attrs.isThin()) {
-      TC.diagnose(Attrs.getLoc(AK_thin), diag::invalid_decl_attribute);
-      Attrs.clearAttribute(AK_thin);
-    }
-
     // 'noreturn' is allowed on a function declaration.
     Info = Info.withIsNoReturn(Attrs.isNoReturn());
     if (consumeAttributes)
       Attrs.clearAttribute(AK_noreturn);
-
-    if (Attrs.isAutoClosure()) {
-      TC.diagnose(Attrs.getLoc(AK_auto_closure), diag::invalid_decl_attribute);
-      Attrs.clearAttribute(AK_auto_closure);
-    }
-
-    if (Attrs.isObjCBlock()) {
-      TC.diagnose(Attrs.getLoc(AK_objc_block), diag::invalid_decl_attribute);
-      Attrs.clearAttribute(AK_objc_block);
-    }
 
     return Info;
   }
@@ -2948,8 +2927,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   }
 
   static const AttrKind InvalidAttrs[] = {
-    AK_inout, AK_auto_closure,
-    AK_exported, AK_objc_block, AK_cc, AK_thin, AK_noreturn, AK_local_storage
+    AK_inout, AK_exported, AK_noreturn, AK_local_storage
   };
   
   for (AttrKind K : InvalidAttrs) {

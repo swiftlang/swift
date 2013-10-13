@@ -19,12 +19,21 @@
 #endif
 
 #ifndef TYPE_ATTR
-#define TYPE_ATTR(X) ATTR(X)
+#define TYPE_ATTR(X)
 #endif
 
-// ATTR(name) - Invokes a macro for each attribute.
-ATTR(assignment)
+#ifndef BOTH_ATTR
+#define BOTH_ATTR(X) ATTR(X) TYPE_ATTR(X)
+#endif
+
+// Type attributes
 TYPE_ATTR(cc)
+TYPE_ATTR(thin)
+TYPE_ATTR(objc_block)
+TYPE_ATTR(auto_closure)
+
+
+ATTR(assignment)
 ATTR(class_protocol)
 ATTR(conversion)
 ATTR(exported)
@@ -32,29 +41,27 @@ ATTR(infix)
 ATTR(resilient)
 ATTR(fragile)
 ATTR(born_fragile)
-TYPE_ATTR(inout)
-TYPE_ATTR(auto_closure)
-TYPE_ATTR(thin)
-TYPE_ATTR(noreturn)
+BOTH_ATTR(inout)
+BOTH_ATTR(noreturn)
 ATTR(asmname)
 ATTR(prefix)
 ATTR(postfix)
 ATTR(objc)
-TYPE_ATTR(objc_block)
 ATTR(iboutlet)
 ATTR(ibaction)
-TYPE_ATTR(local_storage)
+BOTH_ATTR(local_storage)
 ATTR(transparent)
-TYPE_ATTR(weak)
-TYPE_ATTR(unowned)
+BOTH_ATTR(weak)
+BOTH_ATTR(unowned)
 
 // SIL-specific attributes
-TYPE_ATTR(sil_self)
+BOTH_ATTR(sil_self)
 
 // Axle-specific attributes
 ATTR(kernel)
 ATTR(vertex)
 ATTR(fragment)
 
+#undef BOTH_ATTR
 #undef TYPE_ATTR
 #undef ATTR

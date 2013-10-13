@@ -208,8 +208,6 @@ public:
   /// If this is an empty attribute specifier, then this will be an invalid loc.
   SourceLoc AtLoc;
   StringRef AsmName;
-  
-  Optional<AbstractCC> cc = Nothing;
 
   DeclAttributes() {}
 
@@ -245,8 +243,6 @@ public:
   }
 
   bool isInOut() const { return has(AK_inout); }
-  bool isAutoClosure() const { return has(AK_auto_closure); }
-  bool isThin() const { return has(AK_thin); }
   bool isNoReturn() const { return has(AK_noreturn); }
   bool isAssignment() const { return has(AK_assignment); }
   bool isConversion() const { return has(AK_conversion); }
@@ -255,7 +251,6 @@ public:
   bool isPostfix() const { return has(AK_postfix); }
   bool isInfix() const { return has(AK_infix); }
   bool isObjC() const { return has(AK_objc); }
-  bool isObjCBlock() const { return has(AK_objc_block); }
   bool isIBOutlet() const { return has(AK_iboutlet); }
   bool isIBAction() const { return has(AK_ibaction); }
   bool isClassProtocol() const { return has(AK_class_protocol); }
@@ -268,8 +263,6 @@ public:
   bool isVertex() const { return has(AK_vertex); }
   bool isFragment() const { return has(AK_fragment); }
 
-  bool hasCC() const { return cc.hasValue(); }
-  AbstractCC getAbstractCC() const { return *cc; }
 
   Resilience getResilienceKind() const {
     if (has(AK_resilient))

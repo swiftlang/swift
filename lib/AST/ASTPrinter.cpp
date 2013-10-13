@@ -186,10 +186,6 @@ void PrintAST::printAttributes(const DeclAttributes &Attrs) {
   }
   if (Attrs.isInOut())
     AP.next() << "inout";
-  if (Attrs.isAutoClosure())
-    AP.next() << "auto_closure";
-  if (Attrs.isThin())
-    AP.next() << "thin";
   if (Attrs.isNoReturn())
     AP.next() << "noreturn";
   if (!Attrs.AsmName.empty())
@@ -198,8 +194,6 @@ void PrintAST::printAttributes(const DeclAttributes &Attrs) {
     AP.next() << "postfix";
   if (Attrs.isObjC())
     AP.next() << "objc";
-  if (Attrs.isObjCBlock())
-    AP.next() << "objc_block";
   if (Attrs.isIBOutlet())
     AP.next() << "iboutlet";
   if (Attrs.isIBAction())

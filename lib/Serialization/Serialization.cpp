@@ -1241,7 +1241,6 @@ void Serializer::writeDecl(const Decl *D) {
     remainingAttrs.AsmName = {};
     remainingAttrs.clearAttribute(AK_asmname);
     remainingAttrs.clearAttribute(AK_noreturn);
-    remainingAttrs.clearAttribute(AK_thin);
     remainingAttrs.clearAttribute(AK_objc);
     remainingAttrs.clearAttribute(AK_ibaction);
     remainingAttrs.clearAttribute(AK_transparent);

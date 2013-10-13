@@ -1077,6 +1077,10 @@ ERROR(class_protocol_not_protocol,sema_tcd,none,
       
 ERROR(invalid_decl_attribute,sema_tcd,none,
       "attribute cannot be applied to declaration", ())
+ERROR(type_attribute_applied_to_decl,sema_tcd,none,
+      "attribute can only be applied to types, not declarations", ())
+ERROR(decl_attribute_applied_to_type,sema_tcd,none,
+      "attribute can only be applied to declarations, not types", ())
 
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,

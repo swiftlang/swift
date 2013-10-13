@@ -127,7 +127,16 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, bool OldStyle) {
                .Default(AK_Count);
   
   if (attr == AK_Count) {
-    diagnose(Tok, diag::unknown_attribute, Tok.getText());
+    StringRef Text = Tok.getText();
+    bool isTypeAttribute = false
+#define TYPE_ATTR(X) || Text == #X
+#include "swift/AST/Attr.def"
+    ;
+    
+    if (isTypeAttribute)
+      diagnose(Tok, diag::type_attribute_applied_to_decl);
+    else
+      diagnose(Tok, diag::unknown_attribute, Tok.getText());
     if (OldStyle)
       skipUntil(tok::r_square);
     else {
@@ -189,73 +198,6 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, bool OldStyle) {
     Attributes.setAttr(attr, Loc);
     break;
       
-  // 'inout' attribute.
-  // FIXME: only permit this in specific contexts.
-  case AK_inout:
-    // Verify that we're not combining this attribute incorrectly.  Cannot be
-    // both inout and auto_closure.
-    if (Attributes.isAutoClosure()) {
-      diagnose(Loc, diag::cannot_combine_attribute, "auto_closure");
-      Attributes.clearAttribute(attr);
-    }
-    
-    break;
-
-  // FIXME: Only valid on var and tuple elements, not on func's, typealias, etc.
-  case AK_auto_closure:
-    if (Attributes.isInOut()) {
-      // Verify that we're not combining this attribute incorrectly.  Cannot be
-      // both inout and auto_closure.
-      diagnose(Loc, diag::cannot_combine_attribute, "inout");
-      Attributes.clearAttribute(attr);
-    }
-    break;
-
-      
-  // 'cc' attribute.
-  // FIXME: only permit this in type contexts.
-  case AK_cc: {
- 
-    // Parse the cc name in parens.
-    SourceLoc beginLoc = Tok.getLoc(), nameLoc, endLoc;
-    StringRef name;
-    if (consumeIfNotAtStartOfLine(tok::l_paren)) {
-      if (Tok.is(tok::identifier)) {
-        nameLoc = Tok.getLoc();
-        name = Tok.getText();
-        consumeToken();
-      } else {
-        diagnose(Tok, diag::cc_attribute_expected_name);
-      }
-      if (parseMatchingToken(tok::r_paren, endLoc,
-                             diag::cc_attribute_expected_rparen,
-                             beginLoc)) {
-        // If the name isn't immediately followed by a closing paren, recover
-        // by trying to find some closing paren.
-        if (OldStyle) {
-          skipUntil(tok::r_paren);
-          consumeIf(tok::r_paren);
-        }
-      }
-    } else {
-      diagnose(Tok, diag::cc_attribute_expected_lparen);
-    }
-    
-    if (!name.empty()) {
-      Attributes.cc = llvm::StringSwitch<Optional<AbstractCC>>(name)
-        .Case("freestanding", AbstractCC::Freestanding)
-        .Case("method", AbstractCC::Method)
-        .Case("cdecl", AbstractCC::C)
-        .Case("objc_method", AbstractCC::ObjCMethod)
-        .Default(Nothing);
-      if (!Attributes.cc) {
-        diagnose(nameLoc, diag::cc_attribute_unknown_cc_name, name);
-        Attributes.cc = AbstractCC::Freestanding;
-      }
-    }
-    return false;
-  }
- 
   case AK_prefix:
     if (Attributes.isPostfix()) {
       diagnose(Loc, diag::cannot_combine_attribute, "postfix");
@@ -345,7 +287,16 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool OldStyle) {
     .Default(TAK_Count);
   
   if (attr == TAK_Count) {
-    diagnose(Tok, diag::unknown_attribute, Tok.getText());
+    StringRef Text = Tok.getText();
+    bool isDeclAttribute = false
+#define ATTR(X) || Text == #X
+#include "swift/AST/Attr.def"
+    ;
+    
+    if (isDeclAttribute)
+      diagnose(Tok, diag::decl_attribute_applied_to_type);
+    else
+      diagnose(Tok, diag::unknown_attribute, Tok.getText());
     if (OldStyle)
       skipUntil(tok::r_square);
     else {

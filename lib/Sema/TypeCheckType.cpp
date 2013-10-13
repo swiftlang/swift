@@ -661,7 +661,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
                  diag::autoclosure_function_input_nonunit, FT->getInput());
       } else {
         // Otherwise, we're ok, rebuild type, adding the required bits.
-        auto Info = FunctionType::ExtInfo(attrs.has(TAK_cc)
+        auto Info = FunctionType::ExtInfo(attrs.hasCC()
                                           ? attrs.getAbstractCC()
                                           : AbstractCC::Freestanding,
                                           attrs.has(TAK_thin),
