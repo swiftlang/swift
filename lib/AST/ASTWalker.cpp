@@ -881,6 +881,13 @@ Stmt *Traversal::visitForStmt(ForStmt *FS) {
 }
 
 Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
+  if (Pattern *P = S->getPattern()) {
+    if ((P = doIt(P)))
+      assert(P == S->getPattern() && "cannot change pattern of ForEachStmt");
+    else
+      return nullptr;
+  }
+
   if (Expr *Container = S->getContainer()) {
     if ((Container = doIt(Container)))
       S->setContainer(Container);
