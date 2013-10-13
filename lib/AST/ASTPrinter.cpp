@@ -123,63 +123,42 @@ private:
              SmallVectorImpl<std::pair<Decl *, uint64_t>> *declOffsets)
       : OS(os), Options(options), DeclOffsets(declOffsets) { }
   };
-
-class AttributePrinter {
-  unsigned AttrCount = 0;
-  raw_ostream &OS;
-
-public:
-  explicit AttributePrinter(raw_ostream &OS) : OS(OS) {}
-
-  raw_ostream &next() {
-    return OS << (AttrCount++ == 0 ? "[" : ", ");
-  }
-
-  void finish() {
-    if (AttrCount > 0)
-      OS << "] ";
-  }
-};
-
 } // unnamed namespace
 
 void PrintAST::printAttributes(const DeclAttributes &Attrs) {
   if (Attrs.empty())
     return;
 
-  AttributePrinter AP(OS);
   if (Attrs.isAssignment())
-    AP.next() << "assignment";
+    OS << "@assignment ";
   if (Attrs.isConversion())
-    AP.next()<< "conversion";
+    OS << "@conversion ";
   if (Attrs.isTransparent())
-    AP.next() << "transparent";
+    OS << "@transparent ";
   if (Attrs.isInfix())
-    AP.next() << "infix";
+    OS << "@infix ";
   switch (Attrs.getResilienceKind()) {
   case Resilience::Default: break;
-  case Resilience::Fragile: AP.next() << "fragile"; break;
-  case Resilience::InherentlyFragile: AP.next() << "born_fragile"; break;
-  case Resilience::Resilient: AP.next() << "resilient"; break;
+  case Resilience::Fragile: OS << "@fragile "; break;
+  case Resilience::InherentlyFragile: OS << "@born_fragile "; break;
+  case Resilience::Resilient: OS << "@resilient "; break;
   }
   if (Attrs.isNoReturn())
-    AP.next() << "noreturn";
+    OS << "@noreturn ";
   if (!Attrs.AsmName.empty())
-    AP.next() << "asmname=\"" << Attrs.AsmName << "\"";
+    OS << "@asmname=\"" << Attrs.AsmName << "\" ";
   if (Attrs.isPostfix())
-    AP.next() << "postfix";
+    OS << "@postfix ";
   if (Attrs.isObjC())
-    AP.next() << "objc";
+    OS << "@objc ";
   if (Attrs.isIBOutlet())
-    AP.next() << "iboutlet";
+    OS << "@iboutlet ";
   if (Attrs.isIBAction())
-    AP.next() << "ibaction";
+    OS << "@ibaction ";
   if (Attrs.isClassProtocol())
-    AP.next() << "class_protocol";
+    OS << "@class_protocol ";
   if (Attrs.isExported())
-    AP.next() << "exported";
-
-  AP.finish();
+    OS << "@exported ";
 }
 
 void PrintAST::printTypedPattern(const TypedPattern *TP,
