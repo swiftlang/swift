@@ -928,6 +928,7 @@ private:
     
     if (!CI.getASTContext().hadError()) {
       sil = performSILGeneration(REPLInputFile, RC.CurIRGenElem);
+      performSILLinking(sil.get());
       runSILDiagnosticPasses(*sil);
     }
 
