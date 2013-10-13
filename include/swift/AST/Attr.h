@@ -141,7 +141,6 @@ class TypeAttributes {
   // Get a SourceLoc for every possible attribute that can be parsed in source.
   // the presence of the attribute is indicated by its location being set.
   SourceLoc AttrLocs[TAK_Count];
-  bool HasAttr[TAK_Count] = { false };
 public:
   /// AtLoc - This is the location of the first '@' in the attribute specifier.
   /// If this is an empty attribute specifier, then this will be an invalid loc.
@@ -154,11 +153,10 @@ public:
   
   void clearAttribute(TypeAttrKind A) {
     AttrLocs[A] = SourceLoc();
-    HasAttr[A] = false;
   }
   
   bool has(TypeAttrKind A) const {
-    return HasAttr[A];
+    return getLoc(A).isValid();
   }
   
   SourceLoc getLoc(TypeAttrKind A) const {
@@ -166,8 +164,8 @@ public:
   }
   
   void setAttr(TypeAttrKind A, SourceLoc L) {
+    assert(!L.isInvalid() && "Cannot clear attribute with this method");
     AttrLocs[A] = L;
-    HasAttr[A] = true;
   }
   
   // This attribute list is empty if no attributes are specified.  Note that
@@ -175,8 +173,8 @@ public:
   // clients to be able to remove attributes they process until they get to
   // an empty list.
   bool empty() const {
-    for (bool elt : HasAttr)
-      if (elt) return false;
+    for (SourceLoc elt : AttrLocs)
+      if (elt.isValid()) return false;
     return true;
   }
   
