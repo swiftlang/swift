@@ -481,8 +481,8 @@ void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
 }
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
-  OS << "typealias ";
   printAttributes(decl->getAttrs());
+  OS << "typealias ";
   recordDeclLoc(decl);
   OS << decl->getName().str();
   printInherited(decl);
@@ -499,16 +499,16 @@ void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
 }
 
 void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
-  OS << "typealias ";
   printAttributes(decl->getAttrs());
+  OS << "typealias ";
   recordDeclLoc(decl);
   OS << decl->getName().str();
   printInheritedWithSuperclass(decl);
 }
 
 void PrintAST::visitEnumDecl(EnumDecl *decl) {
-  OS << "enum ";
   printAttributes(decl->getAttrs());
+  OS << "enum ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
   printInherited(decl);
@@ -518,8 +518,8 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
 }
 
 void PrintAST::visitStructDecl(StructDecl *decl) {
-  OS << "struct ";
   printAttributes(decl->getAttrs());
+  OS << "struct ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
   printInherited(decl);
@@ -529,8 +529,8 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
 }
 
 void PrintAST::visitClassDecl(ClassDecl *decl) {
-  OS << "class ";
   printAttributes(decl->getAttrs());
+  OS << "class ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
   printInheritedWithSuperclass(decl);
@@ -540,8 +540,8 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
 }
 
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
-  OS << "protocol ";
   printAttributes(decl->getAttrs());
+  OS << "protocol ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
   printInherited(decl);
@@ -551,8 +551,8 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
-  OS << "var ";
   printAttributes(decl->getAttrs());
+  OS << "var ";
   recordDeclLoc(decl);
   OS << decl->getName().str();
   if (decl->hasType()) {
@@ -664,10 +664,10 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     
     printBraceStmtElements(decl->getBody());
   } else {
+    printAttributes(decl->getAttrs());
     if (decl->isStatic() && !decl->isOperator())
       OS << "static ";
     OS << "func ";
-    printAttributes(decl->getAttrs());
     recordDeclLoc(decl);
     if (decl->getName().empty())
       OS << "<anonymous>";
@@ -731,8 +731,8 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
 
 void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   recordDeclLoc(decl);
-  OS << "subscript ";
   printAttributes(decl->getAttrs());
+  OS << "subscript ";
   printPattern(decl->getIndices());
   OS << " -> ";
   decl->getElementType().print(OS);
@@ -762,11 +762,11 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
 
 void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   recordDeclLoc(decl);
+  printAttributes(decl->getAttrs());
   OS << "init";
   if (decl->isGeneric()) {
     printGenericParams(decl->getGenericParams());
   }
-  printAttributes(decl->getAttrs());
   printFunctionParameters(decl);
   if (!Options.FunctionDefinitions || !decl->getBody()) {
     return;
@@ -778,8 +778,8 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   recordDeclLoc(decl);
-  OS << "destructor() ";
   printAttributes(decl->getAttrs());
+  OS << "destructor() ";
 
   if (!Options.FunctionDefinitions || !decl->getBody()) {
     return;
