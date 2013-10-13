@@ -110,7 +110,7 @@ bool Parser::parseTopLevel() {
 ///     'unowned'
 ///     'noreturn'
 /// \endverbatim
-bool Parser::parseAttribute(DeclAttributes &Attributes) {
+bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       Tok.isNot(tok::kw_weak) &&
@@ -393,9 +393,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
 }
 
 
-/// \brief This is the internal implementation of \c parseAttributeList, which
-/// we expect to be inlined to handle the common case of an absent attribute
-/// list.
+/// \brief This is the internal implementation of \c parseDeclAttributeList,
+/// which we expect to be inlined to handle the common case of an absent
+/// attribute list.
 ///
 /// \verbatim
 ///   attribute-list:
@@ -405,11 +405,11 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
 ///     '@' attribute
 ///     '@' attribute ','? attribute-list-clause
 /// \endverbatim
-bool Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
+bool Parser::parseDeclAttributeListPresent(DeclAttributes &Attributes) {
   Attributes.AtLoc = Tok.getLoc();
   do {
     if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
-        parseAttribute(Attributes))
+        parseDeclAttribute(Attributes))
       return true;
  
     // Attribute lists allow, but don't require, separating commas.
@@ -418,9 +418,9 @@ bool Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
   return false;
 }
 
-/// \brief This is the internal implementation of \c parseAttributeList, which
-/// we expect to be inlined to handle the common case of an absent attribute
-/// list.
+/// \brief This is the internal implementation of \c parseTypeAttributeList,
+/// which we expect to be inlined to handle the common case of an absent
+/// attribute list.
 ///
 /// \verbatim
 ///   attribute-list:
@@ -487,7 +487,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     BeginParserPosition = getParserPosition();
   
   DeclAttributes Attributes;
-  parseAttributeList(Attributes);
+  parseDeclAttributeList(Attributes);
 
   // If we see the 'static' keyword, parse it now.
   SourceLoc StaticLoc;
@@ -1051,7 +1051,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
     // Parse any leading attributes.
     DeclAttributes Attributes;
-    parseAttributeList(Attributes);
+    parseDeclAttributeList(Attributes);
     
     if (Tok.isContextualKeyword("get") || !Tok.isContextualKeyword("set")) {
       //   get         ::= 'get' stmt-brace

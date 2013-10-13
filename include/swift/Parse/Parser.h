@@ -484,13 +484,13 @@ public:
                       DeclAttributes &Attributes,
                       PatternBindingDecl *PBD = nullptr);
   
-  bool parseAttributeList(DeclAttributes &Attributes) {
+  bool parseDeclAttributeList(DeclAttributes &Attributes) {
     if (Tok.is(tok::at_sign))
-      return parseAttributeListPresent(Attributes);
+      return parseDeclAttributeListPresent(Attributes);
     return false;
   }
-  bool parseAttributeListPresent(DeclAttributes &Attributes);
-  bool parseAttribute(DeclAttributes &Attributes);
+  bool parseDeclAttributeListPresent(DeclAttributes &Attributes);
+  bool parseDeclAttribute(DeclAttributes &Attributes);
   
   bool parseTypeAttributeList(TypeAttributes &Attributes) {
     if (Tok.is(tok::at_sign))
