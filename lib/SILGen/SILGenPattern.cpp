@@ -64,6 +64,16 @@ static bool isBindingPattern(const Pattern *p) {
   return p && isa<NamedPattern>(p->getSemanticsProvidingPattern());
 }
 
+namespace {
+  /// A pair representing a specialization of a clause matrix.
+  struct SpecializingPattern {
+    /// The pattern node representing the specialization.
+    const Pattern *pattern;
+    /// The number of rows to skip in the specialization.
+    unsigned row;
+  };
+}
+
 /// Typedef for the vector of basic blocks and destructured values produced by
 /// emitDispatchAndDestructure.
 using DispatchedPatternVector
@@ -81,14 +91,15 @@ using DispatchedPatternVector
 /// type, or else the "default" basic block for the dispatch that will be
 /// branched to if no patterns match.
 static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
-                                          ArrayRef<const Pattern *> patterns,
-                                          SILValue v,
-                                          DispatchedPatternVector &dispatches,
-                                          SwitchStmt *stmt) {
+                                        ArrayRef<SpecializingPattern> patterns,
+                                        SILValue v,
+                                        DispatchedPatternVector &dispatches,
+                                        SwitchStmt *stmt) {
   assert(!patterns.empty() && "no patterns to dispatch on?!");
   
-  PatternKind kind = patterns[0]->getSemanticsProvidingPattern()->getKind();
-  CanType type = patterns[0]->getType()->getCanonicalType();
+  const Pattern *headPattern = patterns[0].pattern;
+  PatternKind kind = headPattern->getSemanticsProvidingPattern()->getKind();
+  CanType type = headPattern->getType()->getCanonicalType();
   
   switch (kind) {
   case PatternKind::Any:
@@ -99,7 +110,7 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
   case PatternKind::Tuple: {
     // Tuples are irrefutable; destructure without branching.
     assert(patterns.size() == 1 && "pattern orthogonal to tuple?!");
-    auto *tp = cast<TuplePattern>(patterns[0]);
+    auto *tp = cast<TuplePattern>(headPattern);
     RegularLocation Loc(const_cast<TuplePattern*>(tp));
 
     std::vector<SILValue> destructured;
@@ -134,8 +145,8 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     ///
     /// FIXME: We will at some point need to deal with heterogeneous pattern
     /// node sets (e.g., a 't is U' pattern with a 'T(...)' pattern).
-    for (const Pattern *p : patterns) {
-      auto *ip = cast<IsaPattern>(p);
+    for (SpecializingPattern p : patterns) {
+      auto *ip = cast<IsaPattern>(p.pattern);
       RegularLocation Loc(const_cast<IsaPattern*>(ip));
 
       std::vector<SILValue> destructured;
@@ -191,8 +202,8 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     
     SILBasicBlock *bb = gen.B.getInsertionBB();
     
-    for (const Pattern *p : patterns) {
-      auto *up = cast<EnumElementPattern>(p);
+    for (SpecializingPattern p : patterns) {
+      auto *up = cast<EnumElementPattern>(p.pattern);
       RegularLocation Loc(const_cast<EnumElementPattern*>(up));
 
       EnumElementDecl *elt = up->getElementDecl();
@@ -466,6 +477,27 @@ bool isPatternSubsumed(const Pattern *sub, const Pattern *super) {
   case PatternKind::Var:
     llvm_unreachable("not semantic");
   }
+}
+
+/// Remove patterns in the given range that are subsumed by the given
+/// specializing pattern, returning a combined pattern that covers all of them.
+/// In most cases, the returned pattern is the same as the specializing pattern,
+/// but e.g. nominal type patterns can be combined to match all properties
+/// needed by the set of patterns.
+static const Pattern *combineAndFilterSubsumedPatterns(
+                                const Pattern *specializer,
+                                SmallVectorImpl<SpecializingPattern> &patterns,
+                                unsigned beginIndex, unsigned endIndex) {
+  for (unsigned i = beginIndex; i < endIndex; ++i) {
+    while (isPatternSubsumed(patterns[i].pattern, specializer)) {
+      patterns.erase(patterns.begin() + i);
+      --endIndex;
+      if (i >= endIndex)
+        break;
+    }
+  }
+  
+  return specializer;
 }
 
 /// True if two pattern nodes are orthogonal, that is, they never both match
@@ -916,11 +948,11 @@ public:
   /// We treat ExprPatterns as wildcards with a guard.
   ClauseMatrix
   emitSpecialization(SILGenFunction &gen,
-                     const Pattern *specializer, unsigned skipRows,
+                     SpecializingPattern specializer,
                      ArrayRef<SILValue> specOccurrences,
                      CleanupsDepth specDepth, SILBasicBlock *specCont) const {
     assert(columnCount >= 1 && "can't specialize a matrix with no columns");
-    assert(skipRows < rowCount && "can't skip more rows than we have");
+    assert(specializer.row < rowCount && "can't skip more rows than we have");
     
     unsigned specializedWidth = specOccurrences.size();
     
@@ -930,14 +962,14 @@ public:
     std::copy(getOccurrences().begin() + 1, getOccurrences().end(),
               std::back_inserter(newOccurrences));
 
-    ClauseMatrix specialized{newOccurrences, rowCount - skipRows};
+    ClauseMatrix specialized{newOccurrences, rowCount - specializer.row};
     
-    for (unsigned r = skipRows; r < rowCount; ++r) {
+    for (unsigned r = specializer.row; r < rowCount; ++r) {
       auto row = (*this)[r];
       auto columns = row.getColumns();
       // If the pattern in this row isn't a wildcard and matches an orthogonal
       // constructor, it is removed from the specialized matrix.
-      if (arePatternsOrthogonal(specializer, columns[0]))
+      if (arePatternsOrthogonal(specializer.pattern, columns[0]))
         continue;
       
       // Destructure matching constructors and wildcards.
@@ -956,7 +988,7 @@ public:
         // Non-wildcards destructure relative to the specializing pattern
         // constructor. If the specialization exposes variable bindings,
         // we rescope it to the specialized scope.
-        destructurePattern(gen, specializer, columns[0], newPatterns);
+        destructurePattern(gen, specializer.pattern, columns[0], newPatterns);
         for (auto *newPattern : newPatterns)
           if (isBindingPattern(newPattern)) {
             rowDepth = CleanupsDepth::invalid();
@@ -978,7 +1010,7 @@ public:
                          rowDepth, rowCont,
                          row.getExprGuards());
     }
-    RegularLocation loc(const_cast<Pattern *>(specializer));
+    RegularLocation loc(const_cast<Pattern *>(specializer.pattern));
 
     // Emit variable bindings from the newly specialized rows.
     for (unsigned i = 0; i < specializedWidth; ++i)
@@ -1289,34 +1321,28 @@ recur:
   // TODO: We should choose the necessary column using one or more of Maranget's
   // heuristics and specialize on that column. For now we just do naive
   // left-to-right specialization.
-  SmallVector<const Pattern *, 4> specialized;
-  SmallVector<unsigned, 4> specializedRows;
   unsigned skipRows = r;
   
-  // FIXME: O(rows * orthogonal patterns). Linear scan in this loop is lame.
-  auto isSubsumedBySpecialized = [&](const Pattern *p) -> bool {
-    for (auto s : specialized)
-      if (isPatternSubsumed(p, s))
-        return true;
-    return false;
-  };
-
-  // Derive a set of orthogonal pattern nodes to specialize on.
+  // Collect the non-wildcard nodes from the column.
+  SmallVector<SpecializingPattern, 4> specializers;
   for (; r < rows; ++r) {
     const Pattern *p = clauses[r][0];
     if (isWildcardPattern(p))
       continue;
-    // If we've seen a constructor subsuming this one, skip it.
-    // FIXME: O(n^2). Linear search here is lame.
-    if (isSubsumedBySpecialized(p))
-      continue;
-    
-    specialized.push_back(p);
-    specializedRows.push_back(r);
+    specializers.push_back({clauses[r][0], r});
+  }
+
+  // Derive a set of orthogonal pattern nodes to specialize on.
+  // We filter "specializers" on each pass, removing pattern nodes subsumed by
+  // previous ones.
+  for (unsigned i = 0; i < specializers.size(); ++i) {
+    specializers[i].pattern
+      = combineAndFilterSubsumedPatterns(specializers[i].pattern, specializers,
+                                         i+1, specializers.size());
   }
 
   // If we have no specializations, recur into the default matrix immediately.
-  if (specialized.empty()) {
+  if (specializers.empty()) {
     clauses.reduceToDefault(gen, skipRows);
     goto recur;
   }
@@ -1325,15 +1351,13 @@ recur:
   DispatchedPatternVector dispatches;
 
   SILBasicBlock *defaultBB
-    = emitDispatchAndDestructure(gen, specialized, clauses.getOccurrences()[0],
+    = emitDispatchAndDestructure(gen, specializers, clauses.getOccurrences()[0],
                                  dispatches, stmt);
-  assert(dispatches.size() == specialized.size() &&
-         "dispatch table doesn't match pattern set");
+  assert(dispatches.size() == specializers.size() &&
+         "dispatch table doesn't match specializing pattern set");
   
   // Emit each specialized branch.
-  for (size_t i = 0, e = specialized.size(); i < e; ++i) {
-    const Pattern *pat = specialized[i];
-    unsigned row = specializedRows[i];
+  for (size_t i = 0, e = specializers.size(); i < e; ++i) {
     SILBasicBlock *bodyBB = dispatches[i].first;
     ArrayRef<SILValue> bodyOccurrences = dispatches[i].second;
     
@@ -1346,9 +1370,9 @@ recur:
     
     {
       Scope patternVarScope(gen.Cleanups,
-                            CleanupLocation(const_cast<Pattern*>(pat)));
+                CleanupLocation(const_cast<Pattern*>(specializers[i].pattern)));
       
-      ClauseMatrix submatrix = clauses.emitSpecialization(gen, pat, row,
+      ClauseMatrix submatrix = clauses.emitSpecialization(gen, specializers[i],
                                               bodyOccurrences,
                                               gen.Cleanups.getCleanupsDepth(),
                                               innerContBB);
