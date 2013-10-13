@@ -3517,7 +3517,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
                                       TC.Context);
       BaseExpr = new (TC.Context) MetatypeExpr(nullptr, Loc, BaseTy);
     } else {
-      BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc, UDRE->isImplicit());
+      BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc, /*implicit=*/true);
     }
     return new (TC.Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name, Loc,
                                               UDRE->isImplicit());
