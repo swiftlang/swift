@@ -37,7 +37,7 @@ bb0(%0 : $*A, %1 : $C):
 // CHECK-NEXT: ret void
 
 struct B {
-  var [weak] x : P?
+  @weak var x : P?
 }
 
 sil @test_weak_load_store_proto : $@thin (val : @inout B, ref : P) -> () {

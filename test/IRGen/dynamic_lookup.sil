@@ -4,9 +4,9 @@ import swift
 import Builtin 
 
 class X {
-  func [objc] f() { }
-  static func [objc] g() { }
-  var [objc] value : Int { 
+  @objc func f() { }
+  @objc static func g() { }
+  @objc var value : Int { 
     return 17
   }
 

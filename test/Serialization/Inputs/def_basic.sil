@@ -920,7 +920,7 @@ bb0(%0 : $Float32):
 }
 
 class X {
-  func [objc] f() { }
+  @objc func f() { }
 }
 
 // CHECK-LABEL: sil deserialized @test_dynamic_lookup_br : $@thin (obj: DynamicLookup) -> ()

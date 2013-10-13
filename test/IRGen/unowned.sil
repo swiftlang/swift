@@ -13,7 +13,7 @@ protocol [class_protocol] P {
 }
 
 struct A {
-  var [unowned] x : C
+  @unowned var x : C
 }
 
 sil @test_weak_rr_class : $@thin (ref : @sil_unowned C) -> () {
