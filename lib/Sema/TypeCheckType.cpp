@@ -692,9 +692,10 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
       attrs.clearAttribute(AK_local_storage);
     }
 
-    // FIXME: this is lame.
-    if (!attrs.empty())
-      diagnose(attrs.AtLoc, diag::attribute_does_not_apply_to_type);
+    for (unsigned i = 0; i != AttrKind::AK_Count; ++i)
+      if (attrs.has((AttrKind)i))
+        diagnose(attrs.getLoc((AttrKind)i),
+                 diag::attribute_does_not_apply_to_type);
 
     return Ty;
   }
