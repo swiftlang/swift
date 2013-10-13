@@ -2927,7 +2927,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   }
 
   static const AttrKind InvalidAttrs[] = {
-    AK_inout, AK_exported, AK_noreturn, AK_local_storage
+    AK_exported, AK_noreturn
   };
   
   for (AttrKind K : InvalidAttrs) {

@@ -242,7 +242,6 @@ public:
     return true;
   }
 
-  bool isInOut() const { return has(AK_inout); }
   bool isNoReturn() const { return has(AK_noreturn); }
   bool isAssignment() const { return has(AK_assignment); }
   bool isConversion() const { return has(AK_conversion); }
@@ -254,11 +253,9 @@ public:
   bool isIBOutlet() const { return has(AK_iboutlet); }
   bool isIBAction() const { return has(AK_ibaction); }
   bool isClassProtocol() const { return has(AK_class_protocol); }
-  bool isLocalStorage() const { return has(AK_local_storage); }
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }
   bool isExported() const { return has(AK_exported); }
-  bool isSILSelf() const { return has(AK_sil_self); }
   bool isKernel() const { return has(AK_kernel); }
   bool isVertex() const { return has(AK_vertex); }
   bool isFragment() const { return has(AK_fragment); }

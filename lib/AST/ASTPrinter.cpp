@@ -184,8 +184,6 @@ void PrintAST::printAttributes(const DeclAttributes &Attrs) {
   case Resilience::InherentlyFragile: AP.next() << "born_fragile"; break;
   case Resilience::Resilient: AP.next() << "resilient"; break;
   }
-  if (Attrs.isInOut())
-    AP.next() << "inout";
   if (Attrs.isNoReturn())
     AP.next() << "noreturn";
   if (!Attrs.AsmName.empty())

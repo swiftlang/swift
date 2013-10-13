@@ -166,12 +166,6 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, bool OldStyle) {
   // Handle any attribute-specific processing logic.
   switch (attr) {
   default: break;
-  case AK_local_storage:
-  case AK_sil_self:
-    if (!isInSILMode())    // SIL's 'local_storage' type attribute.
-      diagnose(Loc, diag::only_allowed_in_sil, "local_storage");
-    break;
-
   // Ownership attributes.
   case AK_weak:
   case AK_unowned:
