@@ -177,8 +177,26 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
     }
 
     unsigned MatchCount = 1;
+    int LineOffset = 0;
     if (TextStartIdx > 0) {
-      if (MatchStart.substr(0, TextStartIdx).rtrim()
+      if (MatchStart[0] == '@') {
+        if (MatchStart[1] != '+' && MatchStart[1] != '-') {
+          Errors.push_back({ MatchStart.data(),
+            "expected '+'/'-' for line offset" });
+          continue;
+        }
+        StringRef Offs;
+        if (MatchStart[1] == '+')
+          Offs = MatchStart.substr(2, TextStartIdx-2);
+        else
+          Offs = MatchStart.substr(1, TextStartIdx-1);
+        if (Offs.rtrim().getAsInteger(10, LineOffset)) {
+          Errors.push_back({ MatchStart.data(),
+            "expected line offset before '{{'" });
+          continue;
+        }
+
+      } else if (MatchStart.substr(0, TextStartIdx).rtrim()
           .getAsInteger(10, MatchCount)) {
         Errors.push_back(std::make_pair(MatchStart.data(),
                                         "expected match count before '{{'"));
@@ -214,6 +232,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
           BufferStartLoc
               .getAdvancedLoc(MatchStart.data() - MemBuffer.getBufferStart()),
           BufferID).first;
+    Expected.LineNo += LineOffset;
 
     // Check if the next expected diagnostic should be in the same line.
     StringRef AfterEnd = MatchStart.substr(End + strlen("}}"));
