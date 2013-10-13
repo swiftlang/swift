@@ -181,12 +181,31 @@ static void getStringPartTokens(const Token &Tok, SourceManager &SM,
       Toks.push_back(NewTok);
 
     } else {
+      assert(Seg.Kind == Lexer::StringSegment::Expr &&
+             "new enumerator was introduced ?");
       unsigned Offset = SM.getLocOffsetInBuffer(Seg.Loc, BufID);
       unsigned EndOffset = Offset + Seg.Length;
+
+      if (isFirst) {
+        // Add a token for the quote character.
+        StringRef Text(Buffer->getBufferStart() + Offset-2, 1);
+        Token NewTok;
+        NewTok.setToken(tok::string_literal, Text);
+        Toks.push_back(NewTok);
+      }
+
       std::vector<Token> NewTokens = swift::tokenize(SM, BufID, Offset,
                                                      EndOffset,
                                                      /*KeepComments=*/true);
       Toks.insert(Toks.end(), NewTokens.begin(), NewTokens.end());
+
+      if (isLast) {
+        // Add a token for the quote character.
+        StringRef Text(Buffer->getBufferStart() + EndOffset, 1);
+        Token NewTok;
+        NewTok.setToken(tok::string_literal, Text);
+        Toks.push_back(NewTok);
+      }
     }
   }
 }
