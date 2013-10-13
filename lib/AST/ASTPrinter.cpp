@@ -440,10 +440,10 @@ void PrintAST::printInherited(const GenericTypeParamDecl *D) {
 }
 
 void PrintAST::visitImportDecl(ImportDecl *decl) {
-  OS << "import ";
-
   if (decl->isExported())
-    OS << "[exported] ";
+    OS << "@exported ";
+
+  OS << "import ";
 
   switch (decl->getImportKind()) {
   case ImportKind::Module:
