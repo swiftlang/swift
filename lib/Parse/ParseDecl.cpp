@@ -110,13 +110,12 @@ bool Parser::parseTopLevel() {
 ///     'unowned'
 ///     'noreturn'
 /// \endverbatim
-bool Parser::parseAttribute(DeclAttributes &Attributes, bool OldStyle) {
+bool Parser::parseAttribute(DeclAttributes &Attributes) {
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       Tok.isNot(tok::kw_weak) &&
       Tok.isNot(tok::kw_unowned)) {
     diagnose(Tok, diag::expected_attribute_name);
-    if (OldStyle) skipUntil(tok::r_square);
     return true;
   }
 
@@ -137,19 +136,15 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, bool OldStyle) {
       diagnose(Tok, diag::type_attribute_applied_to_decl);
     else
       diagnose(Tok, diag::unknown_attribute, Tok.getText());
-    if (OldStyle)
-      skipUntil(tok::r_square);
-    else {
-      // Recover by eating @foo when foo is not known.
-      consumeToken();
+    // Recover by eating @foo when foo is not known.
+    consumeToken();
       
-      // Recovery by eating "@foo=bar" if present.
-      if (consumeIf(tok::equal)) {
-        if (Tok.is(tok::identifier) ||
-            Tok.is(tok::integer_literal) ||
-            Tok.is(tok::floating_literal))
-          consumeToken();
-      }
+    // Recovery by eating "@foo=bar" if present.
+    if (consumeIf(tok::equal)) {
+      if (Tok.is(tok::identifier) ||
+          Tok.is(tok::integer_literal) ||
+          Tok.is(tok::floating_literal))
+        consumeToken();
     }
     return true;
   }
@@ -410,36 +405,15 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
 ///     '@' attribute
 ///     '@' attribute ','? attribute-list-clause
 /// \endverbatim
-bool Parser::parseAttributeListPresent(DeclAttributes &Attributes,
-                                       bool OldStyle) {
-  if (OldStyle) {
-    Attributes.AtLoc = consumeToken(tok::l_square);
-    
-    do {
-      SourceLoc RightLoc;
-      if (parseList(tok::r_square, Attributes.AtLoc, RightLoc,
-                    tok::comma, /*OptionalSep=*/false,
-                    diag::expected_in_attribute_list,
-                    [&] () -> bool {
-            return parseAttribute(Attributes, OldStyle);
-          }))
-        return true;
-
-      // A square bracket here begins another attribute-list-clause;
-      // consume it and continue.  Note that we'll overwrite
-      // Attributes.RSquareLoc so that it encompasses the entire range.
-    } while (consumeIf(tok::l_square));
-
-  } else {
-    Attributes.AtLoc = Tok.getLoc();
-    do {
-      if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
-          parseAttribute(Attributes, OldStyle))
-        return true;
-   
-      // Attribute lists don't require separating commas.
-    } while (Tok.is(tok::at_sign) || consumeIf(tok::comma));
-  }
+bool Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
+  Attributes.AtLoc = Tok.getLoc();
+  do {
+    if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
+        parseAttribute(Attributes))
+      return true;
+ 
+    // Attribute lists allow, but don't require, separating commas.
+  } while (Tok.is(tok::at_sign) || consumeIf(tok::comma));
   
   return false;
 }
@@ -513,7 +487,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     BeginParserPosition = getParserPosition();
   
   DeclAttributes Attributes;
-  parseAttributeList(Attributes, false);
+  parseAttributeList(Attributes);
 
   // If we see the 'static' keyword, parse it now.
   SourceLoc StaticLoc;
@@ -1074,10 +1048,13 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Invalid = true;
       break;
     }
+
+    // Parse any leading attributes.
+    DeclAttributes Attributes;
+    parseAttributeList(Attributes);
+    
     if (Tok.isContextualKeyword("get") || !Tok.isContextualKeyword("set")) {
       //   get         ::= 'get' stmt-brace
-
-      DeclAttributes GetAttributes;
 
       // Have we already parsed a get clause?
       if (Get) {
@@ -1091,10 +1068,6 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       SourceLoc GetLoc = Tok.getLoc(), ColonLoc = Tok.getLoc();
       if (Tok.isContextualKeyword("get")) {
         GetLoc = consumeToken();
-
-        // FIXME: Implicitly add immutable attribute.
-        parseAttributeList(GetAttributes, true);
-        parseAttributeList(GetAttributes, false);
 
         if (Tok.isNot(tok::colon)) {
           diagnose(Tok, diag::expected_colon_get);
@@ -1143,8 +1116,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                                           Entries, Tok.getLoc());
       Get->setBody(Body);
 
-      if (GetAttributes.isValid())
-        Get->getMutableAttrs() = GetAttributes;
+      if (Attributes.isValid())
+        Get->getMutableAttrs() = Attributes;
 
       LastValidLoc = Body->getRBraceLoc();
       continue;
@@ -1162,12 +1135,6 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     }
     
     SourceLoc SetLoc = consumeToken();
-
-    DeclAttributes SetAttributes;
-
-    // FIXME: Implicitly add immutable attribute.
-    parseAttributeList(SetAttributes, true);
-    parseAttributeList(SetAttributes, false);
 
     //   var-set-name    ::= '(' identifier ')'
     Identifier SetName;
@@ -1268,8 +1235,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                                         Entries, Tok.getLoc());
     Set->setBody(Body);
 
-    if (SetAttributes.isValid())
-      Set->getMutableAttrs() = SetAttributes;
+    if (Attributes.isValid())
+      Set->getMutableAttrs() = Attributes;
 
     LastValidLoc = Body->getRBraceLoc();
   }
@@ -1318,7 +1285,8 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
   FuncDecl *Get = nullptr;
   FuncDecl *Set = nullptr;
   SourceLoc LastValidLoc = LBLoc;
-  if (parseGetSet(HasContainerType, /*Indices=*/0, TyLoc, Get, Set, LastValidLoc))
+  if (parseGetSet(HasContainerType, /*Indices=*/0, TyLoc,
+                  Get, Set, LastValidLoc))
     Invalid = true;
   
   // Parse the final '}'.

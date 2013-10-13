@@ -108,7 +108,8 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
   case BraceItemListKind::Brace:
     return false;
   case BraceItemListKind::Variable:
-    return Tok.isContextualKeyword("get") || Tok.isContextualKeyword("set");
+    return Tok.isContextualKeyword("get") || Tok.isContextualKeyword("set") ||
+           Tok.is(tok::at_sign); // Attribute on get/set specifier.
   case BraceItemListKind::Case:
     return Tok.is(tok::kw_case) || Tok.is(tok::kw_default);
   case BraceItemListKind::TopLevelCode:
@@ -649,7 +650,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   // Parse the first part, either a var, expr, or stmt-assign.
   if (Tok.is(tok::kw_var) || Tok.is(tok::at_sign)) {
     DeclAttributes Attributes;
-    parseAttributeList(Attributes, false);
+    parseAttributeList(Attributes);
     ParserStatus VarDeclStatus = parseDeclVar(false, Attributes, FirstDecls);
     if (VarDeclStatus.isError())
       return VarDeclStatus; // FIXME: better recovery
