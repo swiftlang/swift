@@ -655,6 +655,12 @@ public:
       for (Decl *Member : NTD->getMembers())
         if (doIt(Member))
           return true;
+
+    } else if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D)) {
+      if (TypeRepr *T = TAD->getUnderlyingTypeLoc().getTypeRepr())
+        if (doIt(T))
+          return true;
+
     } else if (EnumElementDecl *ED = dyn_cast<EnumElementDecl>(D)) {
       // The getRawValueExpr should remain the untouched original LiteralExpr for
       // serialization and validation purposes. We only traverse the type-checked
