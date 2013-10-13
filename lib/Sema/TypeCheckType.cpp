@@ -600,77 +600,79 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   case TypeReprKind::Attributed: {
     Type Ty;
     auto AttrTyR = cast<AttributedTypeRepr>(TyR);
-    DeclAttributes attrs = AttrTyR->getAttrs();
-    assert(!attrs.empty());
+    
     Ty = resolveType(AttrTyR->getTypeRepr(), DC,
                      /*FIXME:allowUnboundGenerics=*/false,
                      resolver);
     if (Ty->is<ErrorType>())
       return Ty;
 
+    // Copy the attributes, since we're about to start hacking on them.
+    TypeAttributes attrs = AttrTyR->getAttrs();
+    assert(!attrs.empty());
+
     // In SIL, handle @sil_self, which extracts the Self type of a protocol.
-    if (attrs.isSILSelf()) {
+    if (attrs.has(TAK_sil_self)) {
       if (auto protoTy = Ty->getAs<ProtocolType>()) {
         Ty = protoTy->getDecl()->getSelf()->getArchetype();
       } else {
-        diagnose(attrs.getLoc(AK_sil_self), diag::sil_self_non_protocol, Ty)
+        diagnose(attrs.getLoc(TAK_sil_self), diag::sil_self_non_protocol, Ty)
           .highlight(AttrTyR->getTypeRepr()->getSourceRange());
       }
-      attrs.clearAttribute(AK_sil_self);
+      attrs.clearAttribute(TAK_sil_self);
     }
 
-    if (attrs.isInOut()) {
+    if (attrs.has(TAK_inout)) {
       LValueType::Qual quals;
       Ty = LValueType::get(Ty, quals, Context);
-      attrs.clearAttribute(AK_inout);
+      attrs.clearAttribute(TAK_inout);
     }
 
     // Handle the auto_closure, cc, and objc_block attributes for function types.
-    if (attrs.isAutoClosure() || attrs.hasCC() || attrs.isObjCBlock() ||
-        attrs.isThin() || attrs.isNoReturn()) {
+    static const TypeAttrKind FunctionAttrs[] = {
+      TAK_auto_closure, TAK_objc_block, TAK_cc, TAK_thin, TAK_noreturn
+    };
+    
+    bool HasFunctionAttr = false;
+    for (auto i : FunctionAttrs)
+      if (attrs.has(i)) {
+        HasFunctionAttr = true;
+        break;
+      }
+      
+    if (HasFunctionAttr) {
       FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer());
       TupleType *InputTy = 0;
       if (FT) InputTy = dyn_cast<TupleType>(FT->getInput().getPointer());
+      
+      // Function attributes require a syntactic function type.
       if (FT == 0) {
-        // auto_closures and objc_blocks require a syntactic function type.
-        if (attrs.isAutoClosure())
-          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
-                   "auto_closure");
-        if (attrs.isObjCBlock())
-          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
-                   "objc_block");
-        if (attrs.hasCC())
-          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
-                   "cc");
-        if (attrs.isThin())
-          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
-                   "thin");
-        if (attrs.isNoReturn())
-          diagnose(attrs.AtLoc, diag::attribute_requires_function_type,
-                   "noreturn");
-      } else if (attrs.isAutoClosure() &&
+        for (auto i : FunctionAttrs) {
+          if (attrs.has(i)) {
+            diagnose(attrs.getLoc(i), diag::attribute_requires_function_type);
+            attrs.clearAttribute(i);
+          }
+        }
+        
+      } else if (attrs.has(TAK_auto_closure) &&
                  (InputTy == 0 || !InputTy->getFields().empty())) {
         // auto_closures must take () syntactically.
-        diagnose(attrs.AtLoc, diag::autoclosure_function_input_nonunit,
-                 FT->getInput());
+        diagnose(attrs.getLoc(TAK_auto_closure),
+                 diag::autoclosure_function_input_nonunit, FT->getInput());
       } else {
-        // Otherwise, we're ok, rebuild type, adding the AutoClosure and
-        // ObjcBlock bit.
-        auto Info = FunctionType::ExtInfo(attrs.hasCC()
+        // Otherwise, we're ok, rebuild type, adding the required bits.
+        auto Info = FunctionType::ExtInfo(attrs.has(TAK_cc)
                                           ? attrs.getAbstractCC()
                                           : AbstractCC::Freestanding,
-                                          attrs.isThin(),
-                                          attrs.isNoReturn(),
-                                          attrs.isAutoClosure(),
-                                          attrs.isObjCBlock());
+                                          attrs.has(TAK_thin),
+                                          attrs.has(TAK_noreturn),
+                                          attrs.has(TAK_auto_closure),
+                                          attrs.has(TAK_objc_block));
         Ty = FunctionType::get(FT->getInput(), FT->getResult(), Info,
                                Context);
       }
-      attrs.clearAttribute(AK_auto_closure);
-      attrs.clearAttribute(AK_objc_block);
-      attrs.clearAttribute(AK_thin);
-      attrs.clearAttribute(AK_noreturn);
-      attrs.clearAttribute(AK_cc);
+      for (auto i : FunctionAttrs)
+        attrs.clearAttribute(i);
       attrs.cc = Nothing;
     }
 
@@ -685,16 +687,16 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
     }
 
     // Diagnose @local_storage in nested positions.
-    if (attrs.isLocalStorage()) {
+    if (attrs.has(TAK_local_storage)) {
       assert(cast<TranslationUnit>(DC->getParentModule())
                ->MainSourceFile->Kind == SourceFile::SIL);
-      diagnose(attrs.getLoc(AK_local_storage),diag::sil_local_storage_nested);
-      attrs.clearAttribute(AK_local_storage);
+      diagnose(attrs.getLoc(TAK_local_storage),diag::sil_local_storage_nested);
+      attrs.clearAttribute(TAK_local_storage);
     }
 
-    for (unsigned i = 0; i != AttrKind::AK_Count; ++i)
-      if (attrs.has((AttrKind)i))
-        diagnose(attrs.getLoc((AttrKind)i),
+    for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)
+      if (attrs.has((TypeAttrKind)i))
+        diagnose(attrs.getLoc((TypeAttrKind)i),
                  diag::attribute_does_not_apply_to_type);
 
     return Ty;

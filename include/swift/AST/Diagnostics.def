@@ -796,15 +796,9 @@ ERROR(typealias_attributes,attribute_parsing,none,
 ERROR(operator_attributes,attribute_parsing,none,
       "invalid attributes specified for operator", ())
 
-// inout
-ERROR(inout_attribute_unknown_qualifier,attribute_parsing,none,
-      "unknown qualifier for inout attribute", ())
-ERROR(inout_attribute_expected_rparen,attribute_parsing,none,
-      "expected ')' at end of inout qualifiers", ())
-
 // auto_closure
 ERROR(attribute_requires_function_type,attribute_parsing,none,
-      "%0 attribute only applies to syntactic function types", (StringRef))
+      "attribute only applies to syntactic function types", ())
 ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
       "auto_closure argument type %0 must be '()'", (Type))
 

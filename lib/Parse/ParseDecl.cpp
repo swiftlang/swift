@@ -98,13 +98,6 @@ bool Parser::parseTopLevel() {
   return FoundTopLevelCodeToExecute;
 }
 
-static AttrKind getAttrName(StringRef text) {
-  return llvm::StringSwitch<AttrKind>(text)
-#define ATTR(X) .Case(#X, AK_##X)
-#include "swift/AST/Attr.def"
-    .Default(AK_Count);
-}
-
 /// \verbatim
 ///   attribute:
 ///     'asmname' '=' identifier
@@ -129,7 +122,11 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, unsigned KindMask,
   }
 
   // Determine which attribute it is, and diagnose it if unknown.
-  AttrKind attr = getAttrName(Tok.getText());
+  AttrKind attr = llvm::StringSwitch<AttrKind>(Tok.getText())
+#define ATTR(X) .Case(#X, AK_##X)
+#include "swift/AST/Attr.def"
+               .Default(AK_Count);
+  
   if (attr == AK_Count) {
     diagnose(Tok, diag::unknown_attribute, Tok.getText());
     if (OldStyle)
@@ -195,17 +192,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, unsigned KindMask,
       
   // 'inout' attribute.
   // FIXME: only permit this in specific contexts.
-  case AK_inout: {
-    // Permit "qualifiers" on the inout.
-    SourceLoc beginLoc = Tok.getLoc();
-    if (consumeIfNotAtStartOfLine(tok::l_paren)) {
-      diagnose(Tok, diag::inout_attribute_unknown_qualifier);
-      SourceLoc endLoc;
-      parseMatchingToken(tok::r_paren, endLoc,
-                         diag::inout_attribute_expected_rparen,
-                         beginLoc);
-    }
-    
+  case AK_inout:
     // Verify that we're not combining this attribute incorrectly.  Cannot be
     // both inout and auto_closure.
     if (Attributes.isAutoClosure()) {
@@ -214,7 +201,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, unsigned KindMask,
     }
     
     break;
-  }
+
   // FIXME: Only valid on var and tuple elements, not on func's, typealias, etc.
   case AK_auto_closure:
     if (Attributes.isInOut()) {
@@ -337,6 +324,145 @@ bool Parser::parseAttribute(DeclAttributes &Attributes, unsigned KindMask,
   return false;
 }
 
+
+/// \verbatim
+///   attribute-type:
+///     'noreturn'
+/// \endverbatim
+bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool OldStyle) {
+  // If this not an identifier, the attribute is malformed.
+  if (Tok.isNot(tok::identifier) &&
+      Tok.isNot(tok::kw_weak) &&
+      Tok.isNot(tok::kw_unowned)) {
+    diagnose(Tok, diag::expected_attribute_name);
+    if (OldStyle) skipUntil(tok::r_square);
+    return true;
+  }
+  
+  // Determine which attribute it is, and diagnose it if unknown.
+  TypeAttrKind attr = llvm::StringSwitch<TypeAttrKind>(Tok.getText())
+#define TYPE_ATTR(X) .Case(#X, TAK_##X)
+#include "swift/AST/Attr.def"
+    .Default(TAK_Count);
+  
+  if (attr == TAK_Count) {
+    diagnose(Tok, diag::unknown_attribute, Tok.getText());
+    if (OldStyle)
+      skipUntil(tok::r_square);
+    else {
+      // Recover by eating @foo when foo is not known.
+      consumeToken();
+      
+      // Recovery by eating "@foo=bar" if present.
+      if (consumeIf(tok::equal)) {
+        if (Tok.is(tok::identifier) ||
+            Tok.is(tok::integer_literal) ||
+            Tok.is(tok::floating_literal))
+          consumeToken();
+      }
+    }
+    return true;
+  }
+  
+  // Ok, it is a valid attribute, eat it, and then process it.
+  SourceLoc Loc = consumeToken();
+  
+  // Diagnose duplicated attributes.
+  if (Attributes.has(attr))
+    diagnose(Loc, diag::duplicate_attribute);
+  else
+    Attributes.setAttr(attr, Loc);
+  
+  // Handle any attribute-specific processing logic.
+  switch (attr) {
+  default: break;
+  case TAK_local_storage:
+  case TAK_sil_self:
+    if (!isInSILMode())    // SIL's 'local_storage' type attribute.
+      diagnose(Loc, diag::only_allowed_in_sil, "local_storage");
+    break;
+    
+  // Ownership attributes.
+  case TAK_weak:
+  case TAK_unowned:
+    // FIXME: This is only used for SIL functions, we should find a way to
+    // factor this out.
+    // Test for duplicate entries by temporarily removing this one.
+    Attributes.clearAttribute(attr);
+    if (Attributes.hasOwnership()) {
+      diagnose(Loc, diag::duplicate_attribute);
+      break;
+    }
+    Attributes.setAttr(attr, Loc);
+    break;
+
+  // 'inout' attribute.
+  case TAK_inout:
+    // Verify that we're not combining this attribute incorrectly.  Cannot be
+    // both inout and auto_closure.
+    if (Attributes.has(TAK_auto_closure)) {
+      diagnose(Loc, diag::cannot_combine_attribute, "auto_closure");
+      Attributes.clearAttribute(TAK_inout);
+    }
+    break;
+
+  case TAK_auto_closure:
+    if (Attributes.has(TAK_inout)) {
+      // Verify that we're not combining this attribute incorrectly.  Cannot be
+      // both inout and auto_closure.
+      diagnose(Loc, diag::cannot_combine_attribute, "inout");
+      Attributes.clearAttribute(TAK_auto_closure);
+    }
+    break;
+      
+      
+    // 'cc' attribute.
+  case TAK_cc: {
+    // Parse the cc name in parens.
+    SourceLoc beginLoc = Tok.getLoc(), nameLoc, endLoc;
+    StringRef name;
+    if (consumeIfNotAtStartOfLine(tok::l_paren)) {
+      if (Tok.is(tok::identifier)) {
+        nameLoc = Tok.getLoc();
+        name = Tok.getText();
+        consumeToken();
+      } else {
+        diagnose(Tok, diag::cc_attribute_expected_name);
+      }
+      if (parseMatchingToken(tok::r_paren, endLoc,
+                             diag::cc_attribute_expected_rparen,
+                             beginLoc)) {
+        // If the name isn't immediately followed by a closing paren, recover
+        // by trying to find some closing paren.
+        if (OldStyle) {
+          skipUntil(tok::r_paren);
+          consumeIf(tok::r_paren);
+        }
+      }
+    } else {
+      diagnose(Tok, diag::cc_attribute_expected_lparen);
+    }
+    
+    if (!name.empty()) {
+      Attributes.cc = llvm::StringSwitch<Optional<AbstractCC>>(name)
+        .Case("freestanding", AbstractCC::Freestanding)
+        .Case("method", AbstractCC::Method)
+        .Case("cdecl", AbstractCC::C)
+        .Case("objc_method", AbstractCC::ObjCMethod)
+        .Default(Nothing);
+      if (!Attributes.cc) {
+        diagnose(nameLoc, diag::cc_attribute_unknown_cc_name, name);
+        Attributes.clearAttribute(attr);
+      }
+    }
+    return false;
+  }
+  }
+  
+  return false;
+}
+
+
 /// \brief This is the internal implementation of \c parseAttributeList, which
 /// we expect to be inlined to handle the common case of an absent attribute
 /// list.
@@ -377,6 +503,52 @@ bool Parser::parseAttributeListPresent(DeclAttributes &Attributes,
           parseAttribute(Attributes, KindMask, OldStyle))
         return true;
    
+      // Attribute lists don't require separating commas.
+    } while (Tok.is(tok::at_sign) || consumeIf(tok::comma));
+  }
+  
+  return false;
+}
+
+/// \brief This is the internal implementation of \c parseAttributeList, which
+/// we expect to be inlined to handle the common case of an absent attribute
+/// list.
+///
+/// \verbatim
+///   attribute-list:
+///     /*empty*/
+///     attribute-list-clause attribute-list
+///   attribute-list-clause:
+///     '@' attribute
+///     '@' attribute ','? attribute-list-clause
+/// \endverbatim
+bool Parser::parseTypeAttributeListPresent(TypeAttributes &Attributes,
+                                           bool OldStyle) {
+  if (OldStyle) {
+    Attributes.AtLoc = consumeToken(tok::l_square);
+    
+    do {
+      SourceLoc RightLoc;
+      if (parseList(tok::r_square, Attributes.AtLoc, RightLoc,
+                    tok::comma, /*OptionalSep=*/false,
+                    diag::expected_in_attribute_list,
+                    [&] () -> bool {
+                      return parseTypeAttribute(Attributes, OldStyle);
+                    }))
+        return true;
+      
+      // A square bracket here begins another attribute-list-clause;
+      // consume it and continue.  Note that we'll overwrite
+      // Attributes.RSquareLoc so that it encompasses the entire range.
+    } while (consumeIf(tok::l_square));
+    
+  } else {
+    Attributes.AtLoc = Tok.getLoc();
+    do {
+      if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
+          parseTypeAttribute(Attributes, OldStyle))
+        return true;
+      
       // Attribute lists don't require separating commas.
     } while (Tok.is(tok::at_sign) || consumeIf(tok::comma));
   }

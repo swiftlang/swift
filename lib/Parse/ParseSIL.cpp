@@ -621,18 +621,18 @@ bool SILParser::parseSILType(SILType &Result) {
   }
 
   // Parse attributes.
-  DeclAttributes attrs;
-  P.parseAttributeList(attrs, Parser::AK_SILAttributes, false);
-  P.parseAttributeList(attrs, Parser::AK_SILAttributes, true);
+  TypeAttributes attrs;
+  P.parseTypeAttributeList(attrs, false);
+  P.parseTypeAttributeList(attrs, true);
 
   // Handle @local_storage, which changes the SIL value category.
-  if (attrs.isLocalStorage()) {
+  if (attrs.has(TAK_local_storage)) {
     // Require '*' on local_storage values.
     if (category != SILValueCategory::Address)
-      P.diagnose(attrs.getLoc(AK_local_storage),
+      P.diagnose(attrs.getLoc(TAK_local_storage),
                  diag::sil_local_storage_non_address);
     category = SILValueCategory::LocalStorage;
-    attrs.clearAttribute(AK_local_storage);
+    attrs.clearAttribute(TAK_local_storage);
   }
 
   // Parse Generic Parameters. Generic Parameters are visible in the function
@@ -658,16 +658,16 @@ bool SILParser::parseSILType(SILType &Result) {
     auto Info = PolymorphicFunctionType::ExtInfo(attrs.hasCC()
                                                    ? attrs.getAbstractCC()
                                                    : AbstractCC::Freestanding,
-                                                 attrs.isThin(),
-                                                 attrs.isNoReturn());
+                                                 attrs.has(TAK_thin),
+                                                 attrs.has(TAK_noreturn));
     Type resultType = PolymorphicFunctionType::get(FT->getInput(),
                                              FT->getResult(), PList,
                                              Info,
                                              P.Context);
     Ty.setType(resultType);
     // Reset attributes that are applied.
-    attrs.clearAttribute(AK_thin);
-    attrs.clearAttribute(AK_cc);
+    attrs.clearAttribute(TAK_thin);
+    attrs.clearAttribute(TAK_cc);
     attrs.cc = Nothing;
   }
 

@@ -106,19 +106,19 @@ private:
 
 /// \brief A type with attributes.
 /// \code
-///   [inout] Foo
+///   @inout Foo
 /// \endcode
 class AttributedTypeRepr : public TypeRepr {
-  // FIXME: DeclAttributes wastes space.
-  DeclAttributes Attrs;
+  // FIXME: TypeAttributes isn't a great use of space.
+  TypeAttributes Attrs;
   TypeRepr *Ty;
 
 public:
-  AttributedTypeRepr(const DeclAttributes &Attrs, TypeRepr *Ty)
+  AttributedTypeRepr(const TypeAttributes &Attrs, TypeRepr *Ty)
     : TypeRepr(TypeReprKind::Attributed), Attrs(Attrs), Ty(Ty) {
   }
 
-  const DeclAttributes &getAttrs() const { return Attrs; }
+  const TypeAttributes &getAttrs() const { return Attrs; }
   TypeRepr *getTypeRepr() const { return Ty; }
 
   void printAttrs(llvm::raw_ostream &OS) const;

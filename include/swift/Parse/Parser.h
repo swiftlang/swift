@@ -508,6 +508,20 @@ public:
   bool parseAttribute(DeclAttributes &Attributes, unsigned KindMask,
                       bool OldStyle);
   
+  bool parseTypeAttributeList(TypeAttributes &Attributes, bool OldStyle) {
+    if (OldStyle) {
+      if (Tok.is(tok::l_square))
+        return parseTypeAttributeListPresent(Attributes, OldStyle);
+    } else {
+      if (Tok.is(tok::at_sign))
+        return parseTypeAttributeListPresent(Attributes, OldStyle);
+    }
+    return false;
+  }
+  bool parseTypeAttributeListPresent(TypeAttributes &Attributes, bool OldStyle);
+  bool parseTypeAttribute(TypeAttributes &Attributes, bool OldStyle);
+  
+  
   ParserResult<ImportDecl> parseDeclImport(unsigned Flags,
                                            DeclAttributes &Attributes);
   ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
@@ -614,7 +628,7 @@ public:
   ParserResult<ArrayTypeRepr> parseTypeArray(TypeRepr *Base);
   ParserResult<OptionalTypeRepr> parseTypeOptional(TypeRepr *Base);
 
-  TypeRepr *applyAttributeToType(TypeRepr *Ty, DeclAttributes &Attr);
+  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing

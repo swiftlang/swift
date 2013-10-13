@@ -120,12 +120,82 @@ enum class Resilience : unsigned char {
 enum class AbstractCC : unsigned char;
 
 // Define enumerators for each attribute, e.g. AK_weak.
-#define MAKE_ENUMERATOR(id) id,
 enum AttrKind {
 #define ATTR(X) AK_##X,
 #include "swift/AST/Attr.def"
   AK_Count
 };
+
+// Define enumerators for each attribute, e.g. AK_weak.
+enum TypeAttrKind {
+#define ATTR(X)
+#define TYPE_ATTR(X) TAK_##X,
+#include "swift/AST/Attr.def"
+  TAK_Count
+};
+
+  
+  
+/// TypeAttributes - These are attributes that may be applied to types.
+class TypeAttributes {
+  // Get a SourceLoc for every possible attribute that can be parsed in source.
+  // the presence of the attribute is indicated by its location being set.
+  SourceLoc AttrLocs[TAK_Count];
+  bool HasAttr[TAK_Count] = { false };
+public:
+  /// AtLoc - This is the location of the first '@' in the attribute specifier.
+  /// If this is an empty attribute specifier, then this will be an invalid loc.
+  SourceLoc AtLoc;
+  Optional<AbstractCC> cc = Nothing;
+  
+  TypeAttributes() {}
+  
+  bool isValid() const { return AtLoc.isValid(); }
+  
+  void clearAttribute(TypeAttrKind A) {
+    AttrLocs[A] = SourceLoc();
+    HasAttr[A] = false;
+  }
+  
+  bool has(TypeAttrKind A) const {
+    return HasAttr[A];
+  }
+  
+  SourceLoc getLoc(TypeAttrKind A) const {
+    return AttrLocs[A];
+  }
+  
+  void setAttr(TypeAttrKind A, SourceLoc L) {
+    AttrLocs[A] = L;
+    HasAttr[A] = true;
+  }
+  
+  // This attribute list is empty if no attributes are specified.  Note that
+  // the presence of the leading @ is not enough to tell, because we want
+  // clients to be able to remove attributes they process until they get to
+  // an empty list.
+  bool empty() const {
+    for (bool elt : HasAttr)
+      if (elt) return false;
+    return true;
+  }
+  
+  bool hasCC() const { return cc.hasValue(); }
+  AbstractCC getAbstractCC() const { return *cc; }
+  
+  bool hasOwnership() const { return has(TAK_weak) || has(TAK_unowned); }
+  Ownership getOwnership() const {
+    if (has(TAK_weak)) return Ownership::Weak;
+    if (has(TAK_unowned)) return Ownership::Unowned;
+    return Ownership::Strong;
+  }
+  
+  void clearOwnership() {
+    clearAttribute(TAK_weak);
+    clearAttribute(TAK_unowned);
+  }
+};
+
   
 /// DeclAttributes - These are attributes that may be applied to declarations.
 class DeclAttributes {
@@ -218,17 +288,17 @@ public:
     if (isUnowned()) return Ownership::Unowned;
     return Ownership::Strong;
   }
+  
+  void clearOwnership() {
+    clearAttribute(AK_weak);
+    clearAttribute(AK_unowned);
+  }
 
   KernelOrShaderKind getKernelOrShaderKind() const {
     if (isKernel()) return KernelOrShaderKind::Kernel;
     if (isVertex()) return KernelOrShaderKind::Fragment;
     if (isFragment()) return KernelOrShaderKind::Vertex;
     return KernelOrShaderKind::Default;
-  }
-
-  void clearOwnership() {
-    clearAttribute(AK_weak);
-    clearAttribute(AK_unowned);
   }
 };
   

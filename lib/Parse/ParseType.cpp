@@ -35,9 +35,9 @@ ParserResult<TypeRepr> Parser::parseTypeAnnotation() {
 ///     attribute-list type
 ParserResult<TypeRepr> Parser::parseTypeAnnotation(Diag<> message) {
   // Parse attributes.
-  DeclAttributes attrs;
-  parseAttributeList(attrs, AK_TypeAttributes, true);
-  parseAttributeList(attrs, AK_TypeAttributes, false);
+  TypeAttributes attrs;
+  parseTypeAttributeList(attrs, true);
+  parseTypeAttributeList(attrs, false);
 
   // Parse the type.
   ParserResult<TypeRepr> Ty = parseType(message);
@@ -46,7 +46,8 @@ ParserResult<TypeRepr> Parser::parseTypeAnnotation(Diag<> message) {
   return makeParserResult(applyAttributeToType(Ty.getPtrOrNull(), attrs));
 }
 
-TypeRepr *Parser::applyAttributeToType(TypeRepr *ty, DeclAttributes &attrs) {
+TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
+                                       const TypeAttributes &attrs) {
   // Apply those attributes that do apply.
   if (attrs.empty()) return ty;
 

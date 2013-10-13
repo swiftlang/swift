@@ -87,34 +87,14 @@ void AttributedTypeRepr::printImpl(llvm::raw_ostream &OS) const {
 
 void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
   OS << '[';
-  const DeclAttributes &Attrs = getAttrs();
+  const TypeAttributes &Attrs = getAttrs();
   llvm::SmallString<64> AttrStr;
   llvm::raw_svector_ostream AttrOS(AttrStr);
-  switch (Attrs.getResilienceKind()) {
-  case Resilience::Default: break;
-  case Resilience::InherentlyFragile: AttrOS << "born_fragile,"; break;
-  case Resilience::Fragile: AttrOS << "fragile,"; break;
-  case Resilience::Resilient: AttrOS << "resilient,"; break;
-  }
-  if (!Attrs.AsmName.empty())
-    AttrOS << "asmname=\"" << Attrs.AsmName << "\",";
-  if (Attrs.isInOut()) AttrOS << "inout,";
-  if (Attrs.isAutoClosure()) AttrOS << "auto_closure,";
-  if (Attrs.isThin()) AttrOS << "thin,";
-  if (Attrs.isNoReturn()) AttrOS << "noreturn,";
-  if (Attrs.isAssignment()) AttrOS << "assignment,";
-  if (Attrs.isConversion()) AttrOS << "conversion,";
-  if (Attrs.isTransparent()) AttrOS << "transparent,";
-  if (Attrs.isObjC()) AttrOS << "objc,";
-  if (Attrs.isObjCBlock()) AttrOS << "objc_block,";
-  if (Attrs.isPrefix()) AttrOS << "prefix,";
-  if (Attrs.isPostfix()) AttrOS << "postfix,";
-  if (Attrs.isInfix()) AttrOS << "infix,";
-  if (Attrs.isIBOutlet()) AttrOS << "iboutlet,";
-  if (Attrs.isIBAction()) AttrOS << "ibaction,";
-  if (Attrs.isClassProtocol()) AttrOS << "class_protocol,";
-  if (Attrs.isWeak()) AttrOS << "weak,";
-  if (Attrs.isUnowned()) AttrOS << "unowned,";
+  if (Attrs.has(TAK_inout)) AttrOS << "inout,";
+  if (Attrs.has(TAK_auto_closure)) AttrOS << "auto_closure,";
+  if (Attrs.has(TAK_thin)) AttrOS << "thin,";
+  if (Attrs.has(TAK_noreturn)) AttrOS << "noreturn,";
+  if (Attrs.has(TAK_objc_block)) AttrOS << "objc_block,";
   if (Attrs.cc.hasValue()) {
     AttrOS << "cc(";
     switch (Attrs.cc.getValue()) {
